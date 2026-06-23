@@ -91,6 +91,7 @@
 - ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
 - 🟡 **Alertas centralizados** — [`ALERTAS.md`](./ALERTAS.md). **Fase 1 ✅:** subs/resubs/gift subs/bits/raids (Twitch), membros/super chats (YouTube), subs/gifts/host (Kick) — **sem login**, reusando as conexões de chat → `alert://event` + **coluna "Alertas"** na tela de Chat. Pendente: follows/donates via OAuth (Fase 2) + **overlay pro OBS** (Fase 3).
 - 📄 **Enviar mensagens pelo multi-chat** (+ moderar) — exige login por plataforma; planejado em [`ENVIO.md`](./ENVIO.md).
+- 💡 **Backlog de ideias** (clipes/backtrack, "JÁ VOLTO", aviso no Discord, reframe vertical, viewers somados…) — pesquisa + reflexão em [`IDEIAS.md`](./IDEIAS.md).
 
 ---
 
