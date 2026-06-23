@@ -25,6 +25,10 @@
 - **Kick:** o conteúdo traz emotes como `[emote:ID:nome]` → `https://files.kick.com/emotes/{ID}/fullsize`.
   Badges saem de `sender.identity.badges`.
 - **YouTube:** emojis unicode renderizam nativamente; host/mod/membro viram chips.
+- **Emotes de terceiros (BetterTTV / FrankerFaceZ / 7TV):** nos canais da Twitch, a Corneta busca os
+  emotes **globais + do canal** (via `room-id` do IRC) e troca a palavra correspondente pela imagem
+  (BTTV `cdn.betterttv.net`, FFZ `cdn.frankerfacez.com`, 7TV `cdn.7tv.app`). Os hosts estão liberados na
+  CSP. *(Kick/YouTube usam só os emotes nativos por enquanto.)*
 
 ---
 

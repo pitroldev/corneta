@@ -3,6 +3,7 @@
 //! `chat://message`, `chat://status` e `chat://delete`.
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -174,14 +175,24 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
     log::info!("twitch chat: conectado em #{ch}");
     chat_status(&app, "twitch", source, "connected");
 
+    // Emotes de terceiros (BTTV/FFZ/7TV): globais já; do canal quando vier o room-id.
+    let mut emotes = fetch_global_thirdparty();
+    let mut channel_emotes_done = false;
+
     while running.load(Ordering::Relaxed) {
         match socket.read() {
             Ok(Message::Text(t)) => {
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
+                    if !channel_emotes_done {
+                        if let Some(room_id) = tag_val(twitch_tags(line), "room-id") {
+                            fetch_channel_thirdparty(&room_id, &mut emotes);
+                            channel_emotes_done = true;
+                        }
+                    }
                     if line.starts_with("PING") {
                         let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
                     } else if line.contains("PRIVMSG") {
-                        if let Some(msg) = parse_privmsg(line, source) {
+                        if let Some(msg) = parse_privmsg(line, source, &emotes) {
                             emit_chat(&app, msg);
                         }
                     } else if line.contains("CLEARMSG") {
@@ -232,7 +243,7 @@ fn clearchat_user(line: &str) -> Option<String> {
     (!u.is_empty()).then(|| u.to_string())
 }
 
-fn parse_privmsg(line: &str, source: &str) -> Option<ChatMessage> {
+fn parse_privmsg(line: &str, source: &str, emotes: &HashMap<String, String>) -> Option<ChatMessage> {
     let (tags, rest) = if let Some(stripped) = line.strip_prefix('@') {
         let sp = stripped.find(' ')?;
         (&stripped[..sp], &stripped[sp + 1..])
@@ -279,11 +290,145 @@ fn parse_privmsg(line: &str, source: &str) -> Option<ChatMessage> {
         author: display,
         native_id,
         color,
-        fragments: twitch_fragments(&text, emotes_tag),
+        fragments: apply_thirdparty(twitch_fragments(&text, emotes_tag), emotes),
         badges: twitch_badges(badges_tag),
         text,
         ts: now_ms(),
     })
+}
+
+// --------------------- Emotes de terceiros (BTTV/FFZ/7TV) ----------------------
+
+fn fetch_json(url: &str) -> Option<Value> {
+    let body = ureq::get(url)
+        .set("User-Agent", "Corneta/1.0")
+        .timeout(Duration::from_secs(5))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    serde_json::from_str(&body).ok()
+}
+
+/// Array do BTTV (`[{ id, code }]`) → mapa nome→url.
+fn add_bttv(v: &Value, map: &mut HashMap<String, String>) {
+    if let Some(arr) = v.as_array() {
+        for e in arr {
+            if let (Some(code), Some(id)) = (
+                e.get("code").and_then(|x| x.as_str()),
+                e.get("id").and_then(|x| x.as_str()),
+            ) {
+                map.insert(code.to_string(), format!("https://cdn.betterttv.net/emote/{id}/2x"));
+            }
+        }
+    }
+}
+
+/// Sets do FFZ (`{ sets: { id: { emoticons: [{ name, urls }] } } }`).
+fn add_ffz(v: &Value, map: &mut HashMap<String, String>) {
+    let Some(sets) = v.get("sets").and_then(|x| x.as_object()) else {
+        return;
+    };
+    for set in sets.values() {
+        let Some(emos) = set.get("emoticons").and_then(|x| x.as_array()) else {
+            continue;
+        };
+        for e in emos {
+            let name = e.get("name").and_then(|x| x.as_str());
+            let urls = e.get("urls");
+            let pick = urls
+                .and_then(|u| u.get("2").or_else(|| u.get("4")).or_else(|| u.get("1")))
+                .and_then(|x| x.as_str());
+            if let (Some(name), Some(u)) = (name, pick) {
+                let full = if let Some(rest) = u.strip_prefix("//") {
+                    format!("https://{rest}")
+                } else {
+                    u.to_string()
+                };
+                map.insert(name.to_string(), full);
+            }
+        }
+    }
+}
+
+/// Emotes do 7TV (`[{ name, id }]`).
+fn add_7tv(emotes: &Value, map: &mut HashMap<String, String>) {
+    if let Some(arr) = emotes.as_array() {
+        for e in arr {
+            if let (Some(name), Some(id)) = (
+                e.get("name").and_then(|x| x.as_str()),
+                e.get("id").and_then(|x| x.as_str()),
+            ) {
+                map.insert(name.to_string(), format!("https://cdn.7tv.app/emote/{id}/2x.webp"));
+            }
+        }
+    }
+}
+
+fn fetch_global_thirdparty() -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    if let Some(v) = fetch_json("https://api.betterttv.net/3/cached/emotes/global") {
+        add_bttv(&v, &mut map);
+    }
+    if let Some(v) = fetch_json("https://api.frankerfacez.com/v1/set/global") {
+        add_ffz(&v, &mut map);
+    }
+    if let Some(v) = fetch_json("https://7tv.io/v3/emote-sets/global") {
+        add_7tv(v.get("emotes").unwrap_or(&Value::Null), &mut map);
+    }
+    map
+}
+
+fn fetch_channel_thirdparty(room_id: &str, map: &mut HashMap<String, String>) {
+    if let Some(v) = fetch_json(&format!("https://api.betterttv.net/3/cached/users/twitch/{room_id}")) {
+        add_bttv(v.get("channelEmotes").unwrap_or(&Value::Null), map);
+        add_bttv(v.get("sharedEmotes").unwrap_or(&Value::Null), map);
+    }
+    if let Some(v) = fetch_json(&format!("https://api.frankerfacez.com/v1/room/id/{room_id}")) {
+        add_ffz(&v, map);
+    }
+    if let Some(v) = fetch_json(&format!("https://7tv.io/v3/users/twitch/{room_id}")) {
+        add_7tv(v.pointer("/emote_set/emotes").unwrap_or(&Value::Null), map);
+    }
+}
+
+/// Substitui palavras que batem com emotes de terceiros por fragmentos de imagem.
+fn apply_thirdparty(frags: Vec<ChatFragment>, emotes: &HashMap<String, String>) -> Vec<ChatFragment> {
+    if emotes.is_empty() {
+        return frags;
+    }
+    let mut out = vec![];
+    for f in frags {
+        if f.kind != "text" {
+            out.push(f);
+            continue;
+        }
+        let text = f.text.unwrap_or_default();
+        let mut buf = String::new();
+        for word in text.split_inclusive(' ') {
+            let bare = word.trim_end_matches(' ');
+            if let Some(url) = emotes.get(bare) {
+                if !buf.is_empty() {
+                    out.push(text_frag(&buf));
+                    buf.clear();
+                }
+                out.push(ChatFragment {
+                    kind: "emote".into(),
+                    text: Some(bare.to_string()),
+                    url: Some(url.clone()),
+                });
+                if word.ends_with(' ') {
+                    buf.push(' ');
+                }
+            } else {
+                buf.push_str(word);
+            }
+        }
+        if !buf.is_empty() {
+            out.push(text_frag(&buf));
+        }
+    }
+    out
 }
 
 fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
