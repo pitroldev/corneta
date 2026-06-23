@@ -31,5 +31,12 @@ export default defineConfig(async () => ({
     target: "es2021",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rollupOptions: {
+      // Duas páginas: o app principal e a janela flutuante do chat (entry próprio).
+      input: {
+        main: "index.html",
+        chat: "chat.html",
+      },
+    },
   },
 }));

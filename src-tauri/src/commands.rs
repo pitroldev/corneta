@@ -1114,7 +1114,7 @@ pub fn open_chat_window(app: AppHandle) -> Result<(), String> {
     tauri::WebviewWindowBuilder::new(
         &app,
         "chat",
-        tauri::WebviewUrl::App("index.html#chat-popout".into()),
+        tauri::WebviewUrl::App("chat.html".into()),
     )
     .title("Corneta — Chat")
     .inner_size(380.0, 600.0)
