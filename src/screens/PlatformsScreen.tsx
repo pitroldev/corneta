@@ -5,7 +5,9 @@ import { useStore } from "../lib/store";
 import { PLATFORM_LIST, PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import type { PlatformId, Target } from "../lib/types";
+import { isCustomUrlInvalid } from "../lib/validation";
 import { Badge, Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
+import { Select } from "../components/Select";
 import { Mascot } from "../components/decor";
 
 export function PlatformsScreen() {
@@ -27,6 +29,8 @@ export function PlatformsScreen() {
           </Button>
         }
       />
+
+      <ProfileBar />
 
       {config.targets.length === 0 ? (
         <EmptyState onAdd={() => setPicking(true)} />
@@ -65,6 +69,61 @@ export function PlatformsScreen() {
   );
 }
 
+function ProfileBar() {
+  const config = useStore((s) => s.config)!;
+  const loadProfile = useStore((s) => s.loadProfile);
+  const addProfile = useStore((s) => s.addProfile);
+  const removeProfile = useStore((s) => s.removeProfile);
+  const renameProfile = useStore((s) => s.renameProfile);
+  const [editing, setEditing] = useState(false);
+
+  const active = config.profiles.find((p) => p.id === config.activeProfileId);
+  if (!active) return null;
+  const many = config.profiles.length > 1;
+
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 p-2.5">
+      <span className="px-1 text-xs font-bold uppercase tracking-wide text-ink-faint">Perfil</span>
+
+      {editing ? (
+        <input
+          autoFocus
+          value={active.name}
+          onChange={(e) => renameProfile(active.id, e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(e) => e.key === "Enter" && setEditing(false)}
+          aria-label="Nome do perfil"
+          className="min-w-0 max-w-full rounded-md border-2 border-brass bg-surface px-2 py-1 font-display text-base font-bold text-ink outline-none [field-sizing:content]"
+        />
+      ) : many ? (
+        <Select
+          className="w-48"
+          value={config.activeProfileId}
+          options={config.profiles.map((p) => ({ value: p.id, label: p.name }))}
+          onChange={loadProfile}
+        />
+      ) : (
+        <span className="font-display text-base font-bold">{active.name}</span>
+      )}
+
+      {!editing && (
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label="Renomear perfil" title="Renomear">
+          <Pencil className="size-3.5" />
+        </Button>
+      )}
+
+      <Button variant="subtle" size="sm" onClick={addProfile} className="ml-auto">
+        <Plus className="size-3.5" strokeWidth={2.6} /> Novo
+      </Button>
+      {many && (
+        <Button variant="ghost" size="sm" onClick={() => removeProfile(active.id)}>
+          <Trash2 className="size-3.5" /> Excluir
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="rounded-xl bg-surface px-6 py-14 text-center pop">
@@ -88,6 +147,7 @@ function TargetRow({ target }: { target: Target }) {
   const toggleTarget = useStore((s) => s.toggleTarget);
   const preset = PLATFORMS[target.platformId];
   const isCustom = target.platformId === "custom";
+  const urlInvalid = isCustomUrlInvalid(target);
 
   return (
     <Card className={`flex flex-col gap-4 transition-opacity ${target.enabled ? "" : "opacity-50"}`}>
@@ -95,7 +155,12 @@ function TargetRow({ target }: { target: Target }) {
         <PlatformGlyph id={target.platformId} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate font-display text-lg font-bold">{target.name}</span>
+            <input
+              value={target.name}
+              onChange={(e) => updateTarget(target.id, { name: e.target.value })}
+              aria-label="Nome do destino"
+              className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
+            />
             <Badge color={preset.color}>{preset.protocol}</Badge>
             {preset.experimental && (
               <Badge className="bg-warn text-night">
@@ -122,20 +187,20 @@ function TargetRow({ target }: { target: Target }) {
       </div>
 
       {isCustom && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
-            Nome
-            <Input value={target.name} onChange={(e) => updateTarget(target.id, { name: e.target.value })} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
-            URL de ingestão
-            <Input
-              value={target.ingestUrl}
-              placeholder="rtmp://servidor/app"
-              onChange={(e) => updateTarget(target.id, { ingestUrl: e.target.value })}
-            />
-          </label>
-        </div>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
+          URL de ingestão
+          <Input
+            value={target.ingestUrl}
+            placeholder="rtmp://servidor/app  (rtmp://, rtmps:// ou srt://)"
+            onChange={(e) => updateTarget(target.id, { ingestUrl: e.target.value })}
+            className={urlInvalid ? "border-bad focus:border-bad" : undefined}
+          />
+          {urlInvalid && (
+            <span className="text-[11px] font-medium text-bad">
+              URL inválida — comece com rtmp://, rtmps:// ou srt://
+            </span>
+          )}
+        </label>
       )}
 
       <KeyField target={target} />

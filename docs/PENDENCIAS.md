@@ -60,18 +60,18 @@
 
 ## P2 — Robustez & qualidade
 
-- ⛔ **Validação de entrada**: URL custom, chave vazia, plataforma sem chave ao iniciar (hoje só avisa).
+- ✅ **Validação de entrada**: URL custom (rtmp/rtmps/srt), chave faltando e nome — inline em Plataformas + **bloqueia o Iniciar** com a lista de problemas.
+- ✅ **Áudio**: sempre **AAC 48 kHz estéreo** em todos os destinos (vídeo copy ou transcode; `-map 0:a?` se não houver áudio).
+- ✅ **Tratamento de erro do FFmpeg**: mensagens amigáveis por destino (chave recusada/403, sem conexão, queda) com estado `error`/`reconnecting`.
+- ✅ **Múltiplos destinos da mesma plataforma**: auto-sufixo de nome (Twitch 2…) + **nome editável** em todos os destinos.
 - 🟡 **TikTok/Instagram/X**: URLs de ingestão são placeholders (`rtmp://`) marcadas como experimentais — precisam de fluxo manual claro.
-- ⛔ **Áudio**: garantir AAC/sample rate compatível em todos os destinos (cópia vs reencode).
-- ⛔ **Tratamento de erro do FFmpeg** visível ao usuário (além do toast) — ex.: "chave recusada pela plataforma".
-- ⛔ **Múltiplos destinos da mesma plataforma** / nomes duplicados.
 - ⛔ **Testes** (Vitest no front; testes do builder de comando FFmpeg no Rust).
 
 ---
 
 ## P2/P3 — UX & escopo planejado (v1.x)
 
-- ⛔ **Perfis** ("Live de sexta", "Podcast") com conjuntos de destinos.
+- ✅ **Perfis** ("Live de sexta", "Podcast"): conjuntos de destinos + modo, troca/cria/renomeia/exclui na tela Plataformas (chaves compartilhadas por id entre perfis).
 - ⛔ **i18n** (PT-BR + EN) e **tema claro**.
 - ⛔ Refinos de onboarding, estados vazios e didática (ex.: lembrete de keyframe 2s no OBS).
 - ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.

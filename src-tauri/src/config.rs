@@ -68,6 +68,16 @@ impl Default for Settings {
     }
 }
 
+/// Um perfil salvo = um conjunto de destinos + modo de encoding.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Profile {
+    pub id: String,
+    pub name: String,
+    pub mode: String,
+    pub targets: Vec<Target>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
@@ -77,6 +87,11 @@ pub struct AppConfig {
     pub targets: Vec<Target>,
     #[serde(default)]
     pub settings: Settings,
+    /// Perfis salvos (espelham o working set ativo). Migrados no frontend se vazios.
+    #[serde(default)]
+    pub profiles: Vec<Profile>,
+    #[serde(default)]
+    pub active_profile_id: String,
 }
 
 impl Default for AppConfig {
@@ -92,6 +107,8 @@ impl Default for AppConfig {
             mode: "per-platform".into(),
             targets: vec![],
             settings: Settings::default(),
+            profiles: vec![],
+            active_profile_id: String::new(),
         }
     }
 }

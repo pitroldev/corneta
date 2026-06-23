@@ -24,11 +24,15 @@ export function makeTarget(platformId: PlatformId): Target {
 
 /** Configuração inicial (primeira execução / demo). */
 export function defaultConfig(): AppConfig {
+  const targets = [makeTarget("twitch"), makeTarget("youtube")];
+  const profId = uid("prof");
   return {
     ingest: { protocol: "rtmp", host: "127.0.0.1", port: 1935, app: "live", key: "obs" },
     mode: "per-platform",
-    targets: [makeTarget("twitch"), makeTarget("youtube")],
+    targets,
     settings: { minimizeToTray: true, autostart: false, obsPassword: "" },
+    profiles: [{ id: profId, name: "Padrão", mode: "per-platform", targets }],
+    activeProfileId: profId,
   };
 }
 

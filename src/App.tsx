@@ -41,7 +41,7 @@ export default function App() {
           <main className="relative flex-1 overflow-hidden">
             <SoundWaves className="pointer-events-none absolute -bottom-20 -right-16 size-80 text-brass/[0.05]" />
 
-            <div className="h-full overflow-y-auto px-8 py-8">
+            <div className="h-full overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={screen}

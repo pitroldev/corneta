@@ -78,9 +78,8 @@ pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<
     ];
 
     if action == "copy" {
-        // Sem reencode: copia o stream do MediaMTX direto para a plataforma.
-        args.extend(["-map", "0", "-c", "copy", "-f", "flv"].map(String::from));
-        args.push(url);
+        // Vídeo sem reencode (lossless).
+        args.extend(["-map", "0:v", "-c:v", "copy"].map(String::from));
     } else {
         let p = t
             .encoding
@@ -100,15 +99,31 @@ pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<
                 "-maxrate", &format!("{}k", p.video_bitrate_kbps),
                 "-bufsize", &format!("{}k", p.video_bitrate_kbps * 2),
                 "-g", &gop,
-                "-map", "0:a",
-                "-c:a", "aac",
-                "-b:a", &format!("{}k", p.audio_bitrate_kbps),
-                "-f", "flv",
-                &url,
             ]
             .map(String::from),
         );
     }
+
+    // Áudio: sempre AAC 48 kHz estéreo (todas as plataformas exigem AAC).
+    // `0:a?` torna o mapeamento opcional, para não falhar se a fonte não tiver áudio.
+    let audio_kbps = t
+        .encoding
+        .preset
+        .as_ref()
+        .map(|p| p.audio_bitrate_kbps)
+        .unwrap_or_else(|| recommended_preset(&t.platform_id).audio_bitrate_kbps);
+    args.extend(
+        [
+            "-map", "0:a?",
+            "-c:a", "aac",
+            "-ar", "48000",
+            "-ac", "2",
+            "-b:a", &format!("{}k", audio_kbps),
+            "-f", "flv",
+            &url,
+        ]
+        .map(String::from),
+    );
 
     args
 }

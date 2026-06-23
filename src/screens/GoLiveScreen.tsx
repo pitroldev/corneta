@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Copy, Check, Radio, Square, Gauge, Wifi, Zap, AlertTriangle, KeyRound, Loader2,
+  Copy, Check, Radio, Square, Gauge, Wifi, Zap, AlertTriangle, Loader2,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { obsIngestUrl } from "../lib/factory";
@@ -10,6 +10,7 @@ import { IS_TAURI } from "../lib/api";
 import { toast } from "../lib/toast";
 import { cn, fmtBitrate, fmtUptime } from "../lib/utils";
 import type { EngineState, TargetState } from "../lib/types";
+import { blockingIssues } from "../lib/validation";
 import { Button, Card, PlatformGlyph, SectionTitle, Stat } from "../components/ui";
 
 export function GoLiveScreen() {
@@ -24,7 +25,10 @@ export function GoLiveScreen() {
   const live = state === "live";
   const starting = state === "starting";
   const enabled = config.targets.filter((t) => t.enabled);
-  const missingKeys = enabled.filter((t) => !t.hasKey);
+  const problems = enabled
+    .map((t) => ({ target: t, issues: blockingIssues(t) }))
+    .filter((p) => p.issues.length > 0);
+  const canStart = enabled.length > 0 && problems.length === 0;
 
   // Avisa quando o OBS realmente conecta (stopped/starting → live).
   const prevState = useRef<EngineState>("stopped");
@@ -118,12 +122,18 @@ export function GoLiveScreen() {
         )}
       </Card>
 
-      {missingKeys.length > 0 && (
-        <Card className="mb-4 flex items-center gap-3 bg-warn/10">
-          <KeyRound className="size-5 text-warn" />
-          <span className="text-sm text-ink-muted">
-            {missingKeys.length} plataforma(s) ativa(s) sem chave: <strong className="text-ink">{missingKeys.map((t) => t.name).join(", ")}</strong>.
-          </span>
+      {problems.length > 0 && (
+        <Card className="mb-4 bg-warn/10">
+          <div className="flex items-center gap-2 text-sm font-bold text-warn">
+            <AlertTriangle className="size-4" /> Resolva antes de iniciar:
+          </div>
+          <ul className="mt-1.5 space-y-1 text-sm text-ink-muted">
+            {problems.map((p) => (
+              <li key={p.target.id}>
+                <strong className="text-ink">{p.target.name || "(sem nome)"}</strong>: {p.issues.join(", ")}
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 
@@ -137,7 +147,7 @@ export function GoLiveScreen() {
             <Square className="size-5" /> Cortar transmissão
           </Button>
         ) : (
-          <Button variant="pop" size="lg" className="w-full" disabled={enabled.length === 0} onClick={onStart}>
+          <Button variant="pop" size="lg" className="w-full" disabled={!canStart} onClick={onStart}>
             <Radio className="size-6" strokeWidth={2.5} /> BORA AO VIVO
           </Button>
         )}

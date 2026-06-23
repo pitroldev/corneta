@@ -357,6 +357,30 @@ fn parse_kv(line: &str, key: &str) -> Option<f64> {
     num.parse().ok()
 }
 
+/// Traduz uma linha de erro do FFmpeg para (estado, mensagem amigável).
+fn friendly_error(low: &str) -> (&'static str, String) {
+    if low.contains("403") || low.contains("forbidden") || low.contains("unauthorized")
+        || low.contains("not authorized") || low.contains("rejected") || low.contains("auth")
+    {
+        ("error", "Chave recusada pela plataforma — confira a stream key.".into())
+    } else if low.contains("connection refused")
+        || low.contains("cannot open")
+        || low.contains("failed to connect")
+        || low.contains("no route")
+        || low.contains("name or service not known")
+    {
+        ("reconnecting", "Sem conexão com a plataforma — tentando de novo.".into())
+    } else if low.contains("broken pipe")
+        || low.contains("connection reset")
+        || low.contains("end of file")
+        || low.contains("timed out")
+    {
+        ("reconnecting", "A conexão caiu — reconectando.".into())
+    } else {
+        ("reconnecting", "Instabilidade no envio — reconectando.".into())
+    }
+}
+
 /// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
 fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
     let is_stats = line.contains("frame=") || line.contains("bitrate=");
@@ -399,8 +423,9 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
         }
         snap.state = "live".into();
     } else {
-        st.state = "reconnecting".into();
-        st.message = Some(line.trim().chars().take(160).collect());
+        let (state, msg) = friendly_error(&low);
+        st.state = state.into();
+        st.message = Some(msg);
     }
 
     let out = snap.clone();

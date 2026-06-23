@@ -92,11 +92,20 @@ export interface AppSettings {
   obsPassword: string;
 }
 
+export interface Profile {
+  id: string;
+  name: string;
+  mode: EncodingMode;
+  targets: Target[];
+}
+
 export interface AppConfig {
   ingest: IngestConfig;
   mode: EncodingMode;
   targets: Target[];
   settings: AppSettings;
+  profiles: Profile[];
+  activeProfileId: string;
 }
 
 // ---- Estado de execução ----

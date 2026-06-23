@@ -232,7 +232,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto"
+            className="ml-auto self-end"
             onClick={() => updateTarget(t.id, { encoding: { ...enc, preset: { ...preset.recommended } } })}
           >
             <RotateCcw className="size-3.5" /> Recomendado
