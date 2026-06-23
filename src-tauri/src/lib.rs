@@ -1,3 +1,4 @@
+mod chat;
 mod commands;
 mod config;
 mod engine;
@@ -10,9 +11,10 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
 
-/// Estado global: runtime do motor (handle do sidecar + último snapshot).
+/// Estado global: runtime do motor (handle do sidecar + último snapshot) + chat.
 pub struct AppState {
     pub engine: Mutex<engine::EngineRuntime>,
+    pub chat: Mutex<chat::ChatRuntime>,
 }
 
 fn show_main(app: &tauri::AppHandle) {
@@ -53,6 +55,7 @@ pub fn run() {
         ))
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
+            chat: Mutex::new(chat::ChatRuntime::default()),
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
@@ -70,6 +73,8 @@ pub fn run() {
             commands::read_session,
             commands::delete_session,
             commands::open_sessions_dir,
+            commands::chat_start,
+            commands::chat_stop,
         ])
         .setup(|app| {
             // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   AppConfig,
   AppSettings,
+  ChatMessage,
   EncoderInfo,
   EncodingMode,
   EngineSnapshot,
@@ -45,9 +46,19 @@ interface State {
 
   start: () => Promise<void>;
   stop: () => Promise<void>;
+
+  // Chat unificado
+  chatMessages: ChatMessage[];
+  chatConnected: boolean;
+  chatStatuses: Record<string, string>;
+  bindChat: () => () => void;
+  connectChat: () => Promise<void>;
+  disconnectChat: () => Promise<void>;
+  clearChat: () => void;
 }
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
+const CHAT_CAP = 400;
 
 export const useStore = create<State>((set, get) => {
   // Persiste a config + mantém o perfil ativo em sincronia com o working set.
@@ -241,6 +252,38 @@ export const useStore = create<State>((set, get) => {
 
     async stop() {
       await api.stop();
+    },
+
+    chatMessages: [],
+    chatConnected: false,
+    chatStatuses: {},
+
+    bindChat() {
+      return api.subscribeChat(
+        (m) =>
+          set((s) => {
+            const next = [...s.chatMessages, m];
+            return {
+              chatMessages: next.length > CHAT_CAP ? next.slice(next.length - CHAT_CAP) : next,
+            };
+          }),
+        (st) =>
+          set((s) => ({ chatStatuses: { ...s.chatStatuses, [st.platform]: st.status } }))
+      );
+    },
+
+    async connectChat() {
+      set({ chatMessages: [], chatStatuses: {}, chatConnected: true });
+      await api.chatStart();
+    },
+
+    async disconnectChat() {
+      await api.chatStop();
+      set({ chatConnected: false });
+    },
+
+    clearChat() {
+      set({ chatMessages: [] });
     },
   };
 });

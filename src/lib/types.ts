@@ -90,6 +90,26 @@ export interface AppSettings {
   autostart: boolean;
   /** Senha do obs-websocket (vazio = sem auth). */
   obsPassword: string;
+  /** Chat: canal da Twitch (leitura anônima). */
+  twitchChannel: string;
+  /** Chat: API key do YouTube Data API v3. */
+  youtubeApiKey: string;
+  /** Chat: URL ou ID do vídeo ao vivo do YouTube. */
+  youtubeVideo: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  platform: "twitch" | "youtube";
+  author: string;
+  text: string;
+  color?: string;
+  ts: number;
+}
+
+export interface ChatStatus {
+  platform: string;
+  status: string; // connected | disconnected | error
 }
 
 export interface Profile {

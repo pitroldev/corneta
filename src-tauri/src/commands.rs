@@ -1,5 +1,6 @@
 //! Comandos expostos ao frontend (invoke) + supervisão do sidecar FFmpeg.
 use crate::config::{self, AppConfig};
+use crate::chat;
 use crate::engine::{self, EngineSnapshot};
 use crate::keys;
 use crate::session;
@@ -683,4 +684,16 @@ pub fn open_sessions_dir(app: AppHandle) -> Result<(), String> {
         let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
     }
     Ok(())
+}
+
+// ------------------------- Chat unificado -------------------------
+
+#[tauri::command]
+pub fn chat_start(app: AppHandle) {
+    chat::start_chat(&app);
+}
+
+#[tauri::command]
+pub fn chat_stop(app: AppHandle) {
+    chat::stop_chat(&app);
 }

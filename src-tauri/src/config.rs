@@ -56,6 +56,15 @@ pub struct Settings {
     /// Senha do obs-websocket (vazio = sem autenticação). Usada no auto-config do OBS.
     #[serde(default)]
     pub obs_password: String,
+    /// Chat unificado: canal da Twitch (leitura anônima).
+    #[serde(default)]
+    pub twitch_channel: String,
+    /// Chat unificado: API key do YouTube Data API v3.
+    #[serde(default)]
+    pub youtube_api_key: String,
+    /// Chat unificado: URL ou ID do vídeo ao vivo do YouTube.
+    #[serde(default)]
+    pub youtube_video: String,
 }
 
 impl Default for Settings {
@@ -64,6 +73,9 @@ impl Default for Settings {
             minimize_to_tray: true,
             autostart: false,
             obs_password: String::new(),
+            twitch_channel: String::new(),
+            youtube_api_key: String::new(),
+            youtube_video: String::new(),
         }
     }
 }

@@ -6,6 +6,8 @@
 // ============================================================
 import type {
   AppConfig,
+  ChatMessage,
+  ChatStatus,
   EncoderInfo,
   EngineSnapshot,
   SessionMeta,
@@ -33,6 +35,13 @@ export interface CornetaApi {
   readSession(id: string): Promise<string>;
   deleteSession(id: string): Promise<void>;
   openSessionsDir(): Promise<void>;
+  // Chat unificado
+  chatStart(): Promise<void>;
+  chatStop(): Promise<void>;
+  subscribeChat(
+    onMsg: (m: ChatMessage) => void,
+    onStatus: (s: ChatStatus) => void
+  ): () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +113,26 @@ function tauriApi(): CornetaApi {
     async openSessionsDir() {
       const { invoke } = await core();
       await invoke("open_sessions_dir");
+    },
+    async chatStart() {
+      const { invoke } = await core();
+      await invoke("chat_start");
+    },
+    async chatStop() {
+      const { invoke } = await core();
+      await invoke("chat_stop");
+    },
+    subscribeChat(onMsg, onStatus) {
+      const uns: Array<() => void> = [];
+      void event().then(({ listen }) => {
+        void listen<ChatMessage>("chat://message", (e) => onMsg(e.payload)).then((u) =>
+          uns.push(u)
+        );
+        void listen<ChatStatus>("chat://status", (e) => onStatus(e.payload)).then((u) =>
+          uns.push(u)
+        );
+      });
+      return () => uns.forEach((u) => u());
     },
   };
 }
@@ -221,6 +250,28 @@ function mockApi(): CornetaApi {
   let timer: ReturnType<typeof setInterval> | null = null;
   // Gravação da sessão demo em andamento.
   let rec: { id: string; lines: string[] } | null = null;
+
+  // --- chat demo ---
+  const chatMsgListeners = new Set<(m: ChatMessage) => void>();
+  const chatStatusListeners = new Set<(s: ChatStatus) => void>();
+  let chatTimer: ReturnType<typeof setInterval> | null = null;
+  let chatSeq = 0;
+  const CHAT_MSGS = [
+    "salve salve!",
+    "kkkkk",
+    "qual a build?",
+    "primeiro 🎉",
+    "tá lagando aí?",
+    "som tá baixo",
+    "boa live!",
+    "manda um salve pro RJ",
+    "que jogo é esse?",
+    "📣📣📣",
+    "cornetou demais",
+    "GG",
+    "alguém mais travando?",
+    "joga de novo!",
+  ];
 
   const emit = () => listeners.forEach((l) => l(structuredClone(snapshot)));
 
@@ -394,6 +445,46 @@ function mockApi(): CornetaApi {
     },
     async openSessionsDir() {
       // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
+    },
+    async chatStart() {
+      chatStatusListeners.forEach((l) => {
+        l({ platform: "twitch", status: "connected" });
+        l({ platform: "youtube", status: "connected" });
+      });
+      if (chatTimer) clearInterval(chatTimer);
+      chatTimer = setInterval(() => {
+        const twitch = Math.random() < 0.6;
+        const tAuthors = ["Pitrol", "brabo_do_rio", "ana_live", "zedapeça", "mestre_obs"];
+        const yAuthors = ["Maria Silva", "joao_yt", "gamer123", "fulano_de_tal"];
+        const colors = ["#ff5a36", "#7c9cff", "#34d399", "#f5a524", "#e879f9"];
+        const pool = twitch ? tAuthors : yAuthors;
+        chatMsgListeners.forEach((l) =>
+          l({
+            id: `${++chatSeq}-${Date.now()}`,
+            platform: twitch ? "twitch" : "youtube",
+            author: pool[Math.floor(Math.random() * pool.length)],
+            text: CHAT_MSGS[Math.floor(Math.random() * CHAT_MSGS.length)],
+            color: twitch ? colors[Math.floor(Math.random() * colors.length)] : undefined,
+            ts: Date.now(),
+          })
+        );
+      }, 1300);
+    },
+    async chatStop() {
+      if (chatTimer) clearInterval(chatTimer);
+      chatTimer = null;
+      chatStatusListeners.forEach((l) => {
+        l({ platform: "twitch", status: "disconnected" });
+        l({ platform: "youtube", status: "disconnected" });
+      });
+    },
+    subscribeChat(onMsg, onStatus) {
+      chatMsgListeners.add(onMsg);
+      chatStatusListeners.add(onStatus);
+      return () => {
+        chatMsgListeners.delete(onMsg);
+        chatStatusListeners.delete(onStatus);
+      };
     },
   };
 }

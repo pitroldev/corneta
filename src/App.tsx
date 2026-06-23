@@ -9,6 +9,7 @@ import { Mascot, SoundWaves } from "./components/decor";
 import { PlatformsScreen } from "./screens/PlatformsScreen";
 import { EncodingScreen } from "./screens/EncodingScreen";
 import { GoLiveScreen } from "./screens/GoLiveScreen";
+import { ChatScreen } from "./screens/ChatScreen";
 import { ReportsScreen } from "./screens/ReportsScreen";
 import { AboutScreen } from "./screens/AboutScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -17,13 +18,18 @@ export default function App() {
   const loaded = useStore((s) => s.loaded);
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
+  const bindChat = useStore((s) => s.bindChat);
   const [screen, setScreen] = useState<Screen>("platforms");
 
   useEffect(() => {
     void load();
     const unbind = bindEngine();
-    return unbind;
-  }, [load, bindEngine]);
+    const unbindChat = bindChat();
+    return () => {
+      unbind();
+      unbindChat();
+    };
+  }, [load, bindEngine, bindChat]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden border border-border-soft">
@@ -54,6 +60,7 @@ export default function App() {
                   {screen === "platforms" && <PlatformsScreen />}
                   {screen === "encoding" && <EncodingScreen />}
                   {screen === "golive" && <GoLiveScreen />}
+                  {screen === "chat" && <ChatScreen />}
                   {screen === "reports" && <ReportsScreen />}
                   {screen === "about" && <AboutScreen />}
                   {screen === "settings" && <SettingsScreen />}

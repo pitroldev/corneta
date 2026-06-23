@@ -30,7 +30,14 @@ export function defaultConfig(): AppConfig {
     ingest: { protocol: "rtmp", host: "127.0.0.1", port: 1935, app: "live", key: "obs" },
     mode: "per-platform",
     targets,
-    settings: { minimizeToTray: true, autostart: false, obsPassword: "" },
+    settings: {
+      minimizeToTray: true,
+      autostart: false,
+      obsPassword: "",
+      twitchChannel: "",
+      youtubeApiKey: "",
+      youtubeVideo: "",
+    },
     profiles: [{ id: profId, name: "Padrão", mode: "per-platform", targets }],
     activeProfileId: profId,
   };

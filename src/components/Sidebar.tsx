@@ -1,14 +1,22 @@
-import { BarChart3, Info, Radio, Settings, Sliders, Tv2 } from "lucide-react";
+import { BarChart3, Info, MessageSquare, Radio, Settings, Sliders, Tv2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
 import { Mascot } from "./decor";
 
-export type Screen = "platforms" | "encoding" | "golive" | "reports" | "about" | "settings";
+export type Screen =
+  | "platforms"
+  | "encoding"
+  | "golive"
+  | "chat"
+  | "reports"
+  | "about"
+  | "settings";
 
 const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
   { id: "platforms", label: "Plataformas", icon: Tv2, hint: "pra onde toca" },
   { id: "encoding", label: "Qualidade", icon: Sliders, hint: "como toca" },
   { id: "golive", label: "Ao vivo", icon: Radio, hint: "solta o som" },
+  { id: "chat", label: "Chat", icon: MessageSquare, hint: "a galera junta" },
 ];
 
 export function Sidebar({
