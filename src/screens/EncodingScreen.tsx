@@ -195,6 +195,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
 
   return (
     <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 bg-surface-2 py-3.5">
+      {/* Identidade (esquerda, fixa) */}
       <div className="flex min-w-40 items-center gap-3">
         <PlatformGlyph id={t.platformId} size={36} />
         <div>
@@ -203,73 +204,78 @@ function PerTargetRow({ targetId }: { targetId: string }) {
         </div>
       </div>
 
-      {config.mode === "hybrid" && (
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
-            <input
-              type="checkbox"
-              className="size-4 accent-brass"
-              checked={action === "transcode"}
-              onChange={(e) =>
-                updateTarget(t.id, {
-                  encoding: { ...enc, hybridOverride: e.target.checked ? "transcode" : "copy" },
-                })
-              }
-            />
-            Recodificar
-          </label>
-          {enc.hybridOverride === undefined ? (
-            <Badge className="bg-surface text-ink-faint">auto</Badge>
-          ) : (
-            <button
-              onClick={() => updateTarget(t.id, { encoding: { ...enc, hybridOverride: undefined } })}
-              className="text-[11px] font-semibold text-brass hover:underline"
-            >
-              voltar ao auto
-            </button>
-          )}
-        </div>
-      )}
+      {/* Controles (direita) — quebram limpo e alinham pela base dos campos */}
+      <div className="ml-auto flex flex-wrap items-end justify-end gap-x-4 gap-y-2">
+        {config.mode === "hybrid" && (
+          <div className="flex h-9 items-center gap-2">
+            <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+              <input
+                type="checkbox"
+                className="size-4 accent-brass"
+                checked={action === "transcode"}
+                onChange={(e) =>
+                  updateTarget(t.id, {
+                    encoding: { ...enc, hybridOverride: e.target.checked ? "transcode" : "copy" },
+                  })
+                }
+              />
+              Recodificar
+            </label>
+            {enc.hybridOverride === undefined ? (
+              <Badge className="bg-surface text-ink-faint">auto</Badge>
+            ) : (
+              <button
+                onClick={() => updateTarget(t.id, { encoding: { ...enc, hybridOverride: undefined } })}
+                className="text-[11px] font-semibold text-brass hover:underline"
+              >
+                voltar ao auto
+              </button>
+            )}
+          </div>
+        )}
 
-      {action === "transcode" ? (
-        <>
-          <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-            <span className="flex items-center gap-1">
-              Bitrate (kbps)
-              <Hint text="Dados por segundo: mais bitrate = imagem melhor, mas exige mais upload. ~6000 para 1080p." />
-            </span>
-            <input
-              type="number"
-              step={500}
-              value={p.videoBitrateKbps}
-              onChange={(e) => patchPreset({ videoBitrateKbps: Number(e.target.value) })}
-              className="h-9 w-28 rounded-md border-2 border-border bg-surface px-2 text-sm tabular-nums outline-none focus:border-brass"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-            <span className="flex items-center gap-1">
-              Encoder
-              <Hint text="Hardware (NVENC/QSV) poupa CPU. Software (x264) tem a melhor qualidade por bit, mas pesa mais." />
-            </span>
-            <Select
-              className="w-44"
-              value={enc.encoder}
-              options={encoderOptions}
-              onChange={(v) => updateTarget(t.id, { encoding: { ...enc, encoder: v } })}
-            />
-          </label>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto self-end"
-            onClick={() => updateTarget(t.id, { encoding: { ...enc, preset: { ...preset.recommended } } })}
-          >
-            <RotateCcw className="size-3.5" /> Recomendado
-          </Button>
-        </>
-      ) : (
-        <Badge className="ml-auto bg-surface text-ink-muted">cópia · sem recodificar</Badge>
-      )}
+        {action === "transcode" ? (
+          <>
+            <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
+              <span className="flex items-center gap-1">
+                Bitrate (kbps)
+                <Hint text="Dados por segundo: mais bitrate = imagem melhor, mas exige mais upload. ~6000 para 1080p." />
+              </span>
+              <input
+                type="number"
+                step={500}
+                value={p.videoBitrateKbps}
+                onChange={(e) => patchPreset({ videoBitrateKbps: Number(e.target.value) })}
+                className="h-9 w-28 rounded-md border-2 border-border bg-surface px-2 text-sm tabular-nums outline-none focus:border-brass"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
+              <span className="flex items-center gap-1">
+                Encoder
+                <Hint text="Hardware (NVENC/QSV) poupa CPU. Software (x264) tem a melhor qualidade por bit, mas pesa mais." />
+              </span>
+              <Select
+                className="w-44"
+                value={enc.encoder}
+                options={encoderOptions}
+                onChange={(v) => updateTarget(t.id, { encoding: { ...enc, encoder: v } })}
+              />
+            </label>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9"
+              onClick={() => updateTarget(t.id, { encoding: { ...enc, preset: { ...preset.recommended } } })}
+            >
+              <RotateCcw className="size-3.5" /> Recomendado
+            </Button>
+          </>
+        ) : (
+          <div className="flex h-9 items-center">
+            <Badge className="bg-surface text-ink-muted">cópia · sem recodificar</Badge>
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
