@@ -50,11 +50,33 @@ pub struct IngestConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct Settings {
+    pub minimize_to_tray: bool,
+    pub autostart: bool,
+    /// Senha do obs-websocket (vazio = sem autenticação). Usada no auto-config do OBS.
+    #[serde(default)]
+    pub obs_password: String,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            minimize_to_tray: true,
+            autostart: false,
+            obs_password: String::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub ingest: IngestConfig,
     /// "per-platform" | "passthrough" | "hybrid"
     pub mode: String,
     pub targets: Vec<Target>,
+    #[serde(default)]
+    pub settings: Settings,
 }
 
 impl Default for AppConfig {
@@ -69,6 +91,7 @@ impl Default for AppConfig {
             },
             mode: "per-platform".into(),
             targets: vec![],
+            settings: Settings::default(),
         }
     }
 }

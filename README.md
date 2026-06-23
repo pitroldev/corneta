@@ -6,7 +6,7 @@
 
 App desktop (Tauri 2 + React) que recebe um único stream do OBS e o replica para Twitch,
 YouTube, Facebook, Kick, TikTok e outras, com encoding por plataforma, cofre de chaves e
-painel ao vivo. Veja o racional completo em [`PLANEJAMENTO.md`](./PLANEJAMENTO.md).
+painel ao vivo. Veja o racional completo em [`PLANEJAMENTO.md`](./docs/PLANEJAMENTO.md).
 
 </div>
 
@@ -36,21 +36,24 @@ pnpm dev          # abre http://localhost:1420
 ```
 
 ### 2. App completo (Tauri)
-Requer o toolchain de desktop:
-
-- **Rust** (rustup): https://rustup.rs
-- **Visual Studio Build Tools** com "Desenvolvimento para desktop com C++" (linker MSVC)
-- **WebView2** (já vem no Windows 11)
-
-Depois:
+Pré-requisitos: **Rust** (rustup), **VS Build Tools com C++/MSVC** e **WebView2** (Win 11 já traz).
 
 ```bash
-pwsh -File scripts/make-icons.ps1       # ícones (já gerados; rode se quiser regenerar)
 pwsh -File scripts/fetch-binaries.ps1   # baixa ffmpeg + mediamtx para src-tauri/binaries
-# descomente "externalBin" em src-tauri/tauri.conf.json
-pnpm app:dev                            # roda a Corneta de verdade
+pnpm app:dev                            # compila e roda a Corneta
 pnpm app:build                          # gera o instalador (NSIS)
 ```
+
+> **Motor:** o **MediaMTX** é o servidor de ingestão (o OBS publica nele) e o **FFmpeg** lê dele e
+> distribui para as plataformas (decode-once→encode-N). Se o OBS cai e volta, o app **respawna o
+> FFmpeg** sozinho (reconexão). Ambos os binários são baixados pelo `fetch-binaries.ps1`.
+
+### 3. Testar ao vivo (OBS)
+1. No app: **Plataformas** → adicione um destino e cole a stream key.
+2. **Ao vivo** → **BORA AO VIVO** (status: "Aguardando OBS").
+3. No OBS → Transmissão → Serviço **Personalizado**:
+   - Servidor: `rtmp://127.0.0.1:1935/live` · Chave: `obs`
+4. **Iniciar transmissão** no OBS → a Corneta entra no ar e replica para os destinos.
 
 ## Arquitetura (resumo)
 
@@ -85,6 +88,14 @@ src-tauri/           Backend Rust (Tauri 2)
 scripts/             make-icons, fetch-binaries
 legacy/              setup antigo (nginx-rtmp + docker)
 ```
+
+## Documentação
+
+- [`PLANEJAMENTO.md`](./docs/PLANEJAMENTO.md) — visão de produto, arquitetura, stacks e decisões.
+- [`NOMES.md`](./NOMES.md) — como chegamos no nome "Corneta".
+- [`docs/PENDENCIAS.md`](./docs/PENDENCIAS.md) — **o que falta** para o app ficar pronto (com prioridades).
+- [`docs/ATUALIZACAO-AUTOMATICA.md`](./docs/ATUALIZACAO-AUTOMATICA.md) — auto-update via GitHub Releases.
+- [`docs/ASSINATURA.md`](./docs/ASSINATURA.md) — assinatura de código (Windows) + chave do updater.
 
 ## Licença
 

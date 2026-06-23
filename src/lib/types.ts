@@ -85,10 +85,18 @@ export interface IngestConfig {
   key: string;
 }
 
+export interface AppSettings {
+  minimizeToTray: boolean;
+  autostart: boolean;
+  /** Senha do obs-websocket (vazio = sem auth). */
+  obsPassword: string;
+}
+
 export interface AppConfig {
   ingest: IngestConfig;
   mode: EncodingMode;
   targets: Target[];
+  settings: AppSettings;
 }
 
 // ---- Estado de execução ----

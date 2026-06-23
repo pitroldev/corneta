@@ -85,16 +85,106 @@ pub async fn detect_encoders(app: AppHandle) -> Vec<EncoderInfo> {
     ]
 }
 
-#[tauri::command]
-pub fn test_upload() -> Result<f64, String> {
-    // TODO(§4.2): medir o upload real. Por ora, não implementado.
-    Err("Teste de upload ainda não implementado".into())
+/// Corpo de upload que faz streaming de bytes até um deadline, contando o que envia.
+struct UploadBody {
+    deadline: std::time::Instant,
+    sent: std::sync::Arc<std::sync::atomic::AtomicU64>,
+}
+
+impl std::io::Read for UploadBody {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if std::time::Instant::now() >= self.deadline {
+            return Ok(0); // EOF → encerra o POST
+        }
+        buf.fill(0);
+        self.sent
+            .fetch_add(buf.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        Ok(buf.len())
+    }
 }
 
 #[tauri::command]
-pub fn obs_autoconfigure() -> Result<(), String> {
-    // TODO(§4.1): integrar obs-websocket para preencher serviço/URL/chave no OBS.
-    Err("Auto-configuração do OBS ainda não implementada".into())
+pub async fn test_upload() -> Result<f64, String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    tauri::async_runtime::spawn_blocking(|| {
+        // Várias conexões em paralelo, fazendo streaming por alguns segundos.
+        // Mede só o regime estável (descarta o warm-up = fase de TCP slow-start),
+        // o que dá uma estimativa muito melhor em conexões rápidas (gigabit).
+        const CONNS: usize = 6;
+        let warmup = Duration::from_millis(1200);
+        let measure = Duration::from_secs(3);
+
+        let sent = Arc::new(AtomicU64::new(0));
+        let deadline = Instant::now() + warmup + measure + Duration::from_millis(500);
+
+        let handles: Vec<_> = (0..CONNS)
+            .map(|_| {
+                let sent = sent.clone();
+                std::thread::spawn(move || {
+                    // Reconecta se o servidor cortar antes do deadline.
+                    while Instant::now() < deadline {
+                        let agent = ureq::AgentBuilder::new()
+                            .timeout_write(Duration::from_secs(20))
+                            .timeout_read(Duration::from_secs(20))
+                            .build();
+                        let body = UploadBody { deadline, sent: sent.clone() };
+                        let _ = agent.post("https://speed.cloudflare.com/__up").send(body);
+                    }
+                })
+            })
+            .collect();
+
+        std::thread::sleep(warmup);
+        let c0 = sent.load(Ordering::Relaxed);
+        let t0 = Instant::now();
+        std::thread::sleep(measure);
+        let c1 = sent.load(Ordering::Relaxed);
+        let secs = t0.elapsed().as_secs_f64();
+
+        for h in handles {
+            let _ = h.join();
+        }
+
+        let bytes = c1.saturating_sub(c0);
+        if bytes == 0 || secs <= 0.0 {
+            return Err("não foi possível medir o upload".to_string());
+        }
+        let mbps = (bytes as f64 * 8.0) / secs / 1_000_000.0;
+        Ok((mbps * 10.0).round() / 10.0)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?
+}
+
+#[tauri::command]
+pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let m = app.autolaunch();
+    if enabled {
+        m.enable().map_err(|e| e.to_string())
+    } else {
+        m.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), String> {
+    let cfg = get_config(app);
+    // Servidor que o OBS usa = rtmp://host:port/app (a chave vai separada).
+    let server = format!(
+        "{}://{}:{}/{}",
+        cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
+    );
+    let key = cfg.ingest.key.clone();
+    let password = cfg.settings.obs_password.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::autoconfigure("127.0.0.1", 4455, &password, &server, &key)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?
 }
 
 // --------------------------- Motor (relay) ------------------------
@@ -103,64 +193,155 @@ fn emit(app: &AppHandle, snap: &EngineSnapshot) {
     let _ = app.emit("engine://status", snap);
 }
 
+fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("mediamtx.yml"))
+}
+
+/// Coloca o motor em estado de erro com uma mensagem.
+fn set_engine_error(app: &AppHandle, msg: &str) {
+    log::error!("motor: {msg}");
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let snap = eng.snapshot.get_or_insert_with(EngineSnapshot::stopped);
+    snap.state = "error".into();
+    snap.message = Some(msg.to_string());
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+}
+
+/// Entre tentativas do FFmpeg: volta o estado para "aguardando OBS".
+fn revert_to_starting(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    if let Some(snap) = eng.snapshot.as_mut() {
+        if snap.state == "stopped" || snap.state == "error" {
+            return; // já parado/erro — não reverte
+        }
+        snap.state = "starting".into();
+        for st in snap.targets.values_mut() {
+            st.state = "connecting".into();
+            st.message = None;
+        }
+        let out = snap.clone();
+        drop(eng);
+        emit(app, &out);
+    }
+}
+
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
     if enabled.is_empty() {
         return Err("Nenhuma plataforma ativa.".into());
     }
 
-    // Junta as chaves do cofre para os destinos ativos.
+    // Chaves do cofre + hosts (para erros por destino).
     let mut keymap: HashMap<String, String> = HashMap::new();
     for t in &enabled {
         if let Some(k) = keys::get_key(&t.id) {
             keymap.insert(t.id.clone(), k);
         }
     }
-
     let args = engine::build_ffmpeg_args(&config, &keymap);
+    let hosts: HashMap<String, String> = enabled
+        .iter()
+        .map(|t| (t.id.clone(), engine::host_of(&t.ingest_url)))
+        .collect();
 
-    let sidecar = app
+    // 1) Gera o mediamtx.yml e sobe o MediaMTX (servidor de ingestão do OBS).
+    let yml = mediamtx_config_path(&app)?;
+    std::fs::write(&yml, engine::mediamtx_config(&config))
+        .map_err(|e| format!("config mediamtx: {e}"))?;
+
+    let (mut mtx_rx, mtx_child) = app
         .shell()
-        .sidecar("ffmpeg")
-        .map_err(|e| format!("sidecar ffmpeg indisponível (rode scripts/fetch-binaries.ps1): {e}"))?;
-    let (mut rx, child) = sidecar
-        .args(args)
+        .sidecar("mediamtx")
+        .map_err(|e| format!("sidecar mediamtx indisponível (rode scripts/fetch-binaries.ps1): {e}"))?
+        .args([yml.to_string_lossy().to_string()])
         .spawn()
-        .map_err(|e| format!("falha ao iniciar o FFmpeg: {e}"))?;
+        .map_err(|e| format!("falha ao iniciar o MediaMTX: {e}"))?;
 
     let started = now_ms();
-    let snap = EngineSnapshot::live(&config, started);
+    let snap = EngineSnapshot::starting(&config, started);
+    let running = Arc::new(AtomicBool::new(true));
     {
         let mut eng = state.engine.lock().unwrap();
-        eng.child = Some(child);
+        eng.mediamtx = Some(mtx_child);
         eng.snapshot = Some(snap.clone());
         eng.started_ms = started;
+        eng.hosts = hosts;
+        eng.running = running.clone();
     }
     emit(&app, &snap);
+    log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
 
-    // Leitor: parseia o progresso do FFmpeg e emite status (§14.3).
-    let app2 = app.clone();
+    // 2) Leitor do MediaMTX: detecta erro fatal (porta de ingestão em uso).
+    let app_m = app.clone();
     tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes) => {
-                    let line = String::from_utf8_lossy(&bytes);
-                    update_from_stats(&app2, &line);
+        while let Some(ev) = mtx_rx.recv().await {
+            if let CommandEvent::Stdout(b) | CommandEvent::Stderr(b) = ev {
+                let line = String::from_utf8_lossy(&b).to_lowercase();
+                if line.contains("address already in use") {
+                    set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
                 }
-                CommandEvent::Terminated(_) => {
-                    let state = app2.state::<AppState>();
-                    let mut eng = state.engine.lock().unwrap();
-                    eng.child = None;
-                    let snap = EngineSnapshot::stopped();
-                    eng.snapshot = Some(snap.clone());
-                    drop(eng);
-                    emit(&app2, &snap);
+            }
+        }
+    });
+
+    // 3) Supervisor do FFmpeg: respawn ao cair = reconexão (OBS pode cair e voltar).
+    let app_f = app.clone();
+    let run_flag = running.clone();
+    tauri::async_runtime::spawn(async move {
+        while run_flag.load(Ordering::Relaxed) {
+            let spawned = app_f
+                .shell()
+                .sidecar("ffmpeg")
+                .and_then(|c| c.args(args.clone()).spawn());
+            let (mut rx, child) = match spawned {
+                Ok(v) => v,
+                Err(e) => {
+                    set_engine_error(&app_f, &format!("FFmpeg indisponível: {e}"));
                     break;
                 }
-                _ => {}
+            };
+            {
+                let st = app_f.state::<AppState>();
+                let mut eng = st.engine.lock().unwrap();
+                eng.ffmpeg = Some(child);
             }
+            while let Some(ev) = rx.recv().await {
+                match ev {
+                    CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                        let line = String::from_utf8_lossy(&b);
+                        update_from_stats(&app_f, &line);
+                        update_health(&app_f, &line);
+                    }
+                    CommandEvent::Terminated(_) => break,
+                    _ => {}
+                }
+            }
+            {
+                let st = app_f.state::<AppState>();
+                let mut eng = st.engine.lock().unwrap();
+                eng.ffmpeg = None;
+            }
+            if !run_flag.load(Ordering::Relaxed) {
+                break;
+            }
+            // OBS não está publicando (ainda ou caiu) → volta a aguardar e tenta de novo em 2s.
+            log::warn!("FFmpeg encerrou — aguardando OBS e reconectando em 2s");
+            revert_to_starting(&app_f);
+            let _ = tauri::async_runtime::spawn_blocking(|| {
+                std::thread::sleep(std::time::Duration::from_secs(2))
+            })
+            .await;
         }
     });
 
@@ -190,7 +371,7 @@ fn update_from_stats(app: &AppHandle, line: &str) {
         return;
     }
     let fps = parse_kv(line, "fps=").map(|v| v as u32);
-    let drop = parse_kv(line, "drop=").map(|v| v as u32);
+    let dropped = parse_kv(line, "drop=").map(|v| v as u32);
 
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
@@ -199,13 +380,18 @@ fn update_from_stats(app: &AppHandle, line: &str) {
         return;
     };
     let uptime = ((now_ms().saturating_sub(started)) as f64) / 1000.0;
+    // Chegaram frames → o OBS conectou: estamos no ar de verdade.
+    snap.state = "live".into();
     for st in snap.targets.values_mut() {
-        st.state = "live".into();
+        // Não sobrescreve um destino que está em erro/reconectando (ver update_health).
+        if st.state != "error" && st.state != "reconnecting" {
+            st.state = "live".into();
+        }
         st.uptime_sec = uptime;
         if let Some(f) = fps {
             st.fps = f;
         }
-        if let Some(d) = drop {
+        if let Some(d) = dropped {
             st.dropped_frames = d;
         }
     }
@@ -214,15 +400,58 @@ fn update_from_stats(app: &AppHandle, line: &str) {
     emit(app, &out);
 }
 
-/// Mata o sidecar e sua árvore de processos, e zera o estado (§14.2).
-pub fn kill_engine(app: &AppHandle) {
+/// Atribui erros do FFmpeg ao destino específico, casando o host na linha de log.
+/// Heurístico (será afinado com o teste ao vivo) — métricas por-destino reais virão do MediaMTX (v2).
+fn update_health(app: &AppHandle, line: &str) {
+    let low = line.to_lowercase();
+    const ERR_KEYS: [&str; 10] = [
+        "error", "failed", "connection refused", "broken pipe", "cannot open",
+        "unable to", "connection reset", "i/o error", "end of file", "server error",
+    ];
+    if !ERR_KEYS.iter().any(|k| low.contains(k)) {
+        return;
+    }
+
     let state = app.state::<AppState>();
-    let child = {
+    let mut eng = state.engine.lock().unwrap();
+    let hosts = eng.hosts.clone();
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
+
+    let mut changed = false;
+    for (tid, host) in hosts.iter() {
+        if host.is_empty() || !low.contains(host.as_str()) {
+            continue;
+        }
+        if let Some(st) = snap.targets.get_mut(tid) {
+            st.state = "reconnecting".into();
+            st.message = Some(line.trim().chars().take(160).collect());
+            changed = true;
+        }
+    }
+
+    if changed {
+        let out = snap.clone();
+        drop(eng);
+        emit(app, &out);
+    }
+}
+
+/// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado (§14.2).
+pub fn kill_engine(app: &AppHandle) {
+    use std::sync::atomic::Ordering;
+    log::info!("motor: encerrando");
+    let state = app.state::<AppState>();
+    let (ffmpeg, mediamtx, running) = {
         let mut eng = state.engine.lock().unwrap();
         eng.snapshot = Some(EngineSnapshot::stopped());
-        eng.child.take()
+        (eng.ffmpeg.take(), eng.mediamtx.take(), eng.running.clone())
     };
-    if let Some(child) = child {
+    // Impede o supervisor de respawnar o FFmpeg.
+    running.store(false, Ordering::Relaxed);
+
+    for child in [ffmpeg, mediamtx].into_iter().flatten() {
         let pid = child.pid();
         let _ = child.kill();
         // Mata eventuais subprocessos (netos órfãos) — Windows-first.

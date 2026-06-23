@@ -28,6 +28,7 @@ export function defaultConfig(): AppConfig {
     ingest: { protocol: "rtmp", host: "127.0.0.1", port: 1935, app: "live", key: "obs" },
     mode: "per-platform",
     targets: [makeTarget("twitch"), makeTarget("youtube")],
+    settings: { minimizeToTray: true, autostart: false, obsPassword: "" },
   };
 }
 

@@ -2,7 +2,7 @@
 //! As stream keys NUNCA são gravadas no config.json (ver §14.6).
 use keyring::Entry;
 
-const SERVICE: &str = "br.com.growthedge.corneta";
+const SERVICE: &str = "br.com.pitroldev.corneta";
 
 fn entry(target_id: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, target_id).map_err(|e| format!("keyring: {e}"))

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   AppConfig,
+  AppSettings,
   EncoderInfo,
   EncodingMode,
   EngineSnapshot,
@@ -28,6 +29,7 @@ interface State {
 
   setMode: (mode: EncodingMode) => void;
   setIngest: (patch: Partial<IngestConfig>) => void;
+  setSettings: (patch: Partial<AppSettings>) => void;
 
   setKey: (id: string, key: string) => Promise<void>;
   clearKey: (id: string) => Promise<void>;
@@ -110,6 +112,14 @@ export const useStore = create<State>((set, get) => {
       const config = get().config;
       if (!config) return;
       persist({ ...config, ingest: { ...config.ingest, ...patch } });
+    },
+
+    setSettings(patch) {
+      const config = get().config;
+      if (!config) return;
+      persist({ ...config, settings: { ...config.settings, ...patch } });
+      // Efeito colateral: ligar/desligar o autostart no nível do SO.
+      if (patch.autostart !== undefined) void api.setAutostart(patch.autostart);
     },
 
     async setKey(id, key) {

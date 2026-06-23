@@ -27,9 +27,10 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Secrets / signing keys (NUNCA versionar)
+# Secrets / signing keys / certificados gerados (NUNCA versionar)
 *.key
 *.pem
+*.crt
 .env
 .env.*
 !.env.example

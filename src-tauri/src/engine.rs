@@ -77,6 +77,8 @@ pub fn build_ffmpeg_args(config: &AppConfig, keys: &HashMap<String, String>) -> 
     );
     let lcd = lowest_common_denominator(config);
 
+    // FFmpeg LÊ do MediaMTX (servidor de ingestão) e distribui para os destinos
+    // (decode-once → encode-N). O MediaMTX é quem escuta o OBS. Ver PLANEJAMENTO.md §6.2.
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
@@ -141,6 +143,31 @@ pub fn build_ffmpeg_args(config: &AppConfig, keys: &HashMap<String, String>) -> 
     args
 }
 
+/// Gera um mediamtx.yml mínimo: só o servidor RTMP de ingestão, na porta configurada.
+/// Os demais servidores (RTSP/HLS/WebRTC/SRT/API) ficam desligados.
+pub fn mediamtx_config(config: &AppConfig) -> String {
+    format!(
+        concat!(
+            "logLevel: error\n",
+            "logDestinations: [stdout]\n",
+            "rtmp: yes\n",
+            "rtmpAddress: {host}:{port}\n",
+            "rtsp: no\n",
+            "hls: no\n",
+            "webrtc: no\n",
+            "srt: no\n",
+            "api: no\n",
+            "metrics: no\n",
+            "pprof: no\n",
+            "playback: no\n",
+            "paths:\n",
+            "  all_others:\n",
+        ),
+        host = config.ingest.host,
+        port = config.ingest.port
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Estado de execução (espelha EngineSnapshot do TS)
 // ---------------------------------------------------------------------------
@@ -153,6 +180,15 @@ pub struct TargetStatus {
     pub fps: u32,
     pub dropped_frames: u32,
     pub uptime_sec: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Extrai o host de uma URL de ingestão (para casar erros do FFmpeg por destino).
+pub fn host_of(ingest_url: &str) -> String {
+    let s = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
+    let s = s.split('/').next().unwrap_or(s);
+    s.split(':').next().unwrap_or(s).to_lowercase()
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -175,6 +211,13 @@ impl EngineSnapshot {
         }
     }
 
+    /// Estado inicial: FFmpeg ouvindo, aguardando o OBS publicar.
+    pub fn starting(config: &AppConfig, started_at: u128) -> Self {
+        let mut s = Self::live(config, started_at);
+        s.state = "starting".into();
+        s
+    }
+
     pub fn live(config: &AppConfig, started_at: u128) -> Self {
         let mut targets = HashMap::new();
         for t in config.targets.iter().filter(|t| t.enabled) {
@@ -192,6 +235,7 @@ impl EngineSnapshot {
                     fps: p.fps,
                     dropped_frames: 0,
                     uptime_sec: 0.0,
+                    message: None,
                 },
             );
         }
@@ -204,10 +248,15 @@ impl EngineSnapshot {
     }
 }
 
-/// Runtime guardado no state do Tauri (handle do sidecar + último snapshot).
+/// Runtime guardado no state do Tauri (handles dos sidecars + último snapshot).
 #[derive(Default)]
 pub struct EngineRuntime {
-    pub child: Option<tauri_plugin_shell::process::CommandChild>,
+    pub ffmpeg: Option<tauri_plugin_shell::process::CommandChild>,
+    pub mediamtx: Option<tauri_plugin_shell::process::CommandChild>,
+    /// Liga/desliga o supervisor de respawn do FFmpeg (reconexão).
+    pub running: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub snapshot: Option<EngineSnapshot>,
     pub started_ms: u128,
+    /// target_id -> host do destino (para atribuir erros do FFmpeg por plataforma).
+    pub hosts: std::collections::HashMap<String, String>,
 }

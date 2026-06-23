@@ -23,6 +23,7 @@ export interface CornetaApi {
   clearKey(targetId: string): Promise<void>;
   detectEncoders(): Promise<EncoderInfo[]>;
   testUpload(): Promise<number>; // Mbps
+  setAutostart(enabled: boolean): Promise<void>;
   start(): Promise<void>;
   stop(): Promise<void>;
   subscribe(cb: (s: EngineSnapshot) => void): () => void;
@@ -60,6 +61,10 @@ function tauriApi(): CornetaApi {
     async testUpload() {
       const { invoke } = await core();
       return invoke<number>("test_upload");
+    },
+    async setAutostart(enabled) {
+      const { invoke } = await core();
+      await invoke("set_autostart", { enabled });
     },
     async start() {
       const { invoke } = await core();
@@ -119,6 +124,8 @@ function mockApi(): CornetaApi {
 
   const tick = () => {
     const now = Date.now();
+    // Demo: depois de "ouvir" um instante, o "OBS conecta" e entra no ar.
+    if (snapshot.state === "starting") snapshot.state = "live";
     for (const st of Object.values(snapshot.targets)) {
       if (st.state === "connecting") {
         st.state = "live";
@@ -163,6 +170,9 @@ function mockApi(): CornetaApi {
       // simula um teste: ~25–60 Mbps
       return Math.round(25 + Math.random() * 35);
     },
+    async setAutostart() {
+      // no-op no navegador (sem SO pra registrar autostart)
+    },
     async start() {
       const cfg = loadConfig();
       const targets: Record<string, TargetStatus> = {};
@@ -177,7 +187,7 @@ function mockApi(): CornetaApi {
           uptimeSec: 0,
         };
       }
-      snapshot = { state: "live", startedAt: Date.now(), targets };
+      snapshot = { state: "starting", startedAt: Date.now(), targets };
       emit();
       if (timer) clearInterval(timer);
       timer = setInterval(tick, 1000);

@@ -15,12 +15,23 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-log = "2"
+log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-keyring = "3"
+# Cliente HTTP leve (bloqueante) para o teste de upload — rodado em spawn_blocking.
+ureq = "2"
+# Cliente WebSocket (ws://) para o obs-websocket v5 (auto-config do OBS).
+tungstenite = { version = "0.23", default-features = false, features = ["handshake"] }
+sha2 = "0.10"
+base64 = "0.22"
+# windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
+# Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
+keyring = { version = "3", features = ["windows-native"] }
 
 [profile.release]
 panic = "abort"

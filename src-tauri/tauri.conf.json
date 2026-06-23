@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Corneta",
   "version": "0.1.0",
-  "identifier": "br.com.growthedge.corneta",
+  "identifier": "br.com.pitroldev.corneta",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -18,7 +18,8 @@
         "height": 720,
         "minWidth": 920,
         "minHeight": 600,
-        "resizable": true
+        "resizable": true,
+        "decorations": false
       }
     ],
     "security": {
@@ -27,14 +28,24 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "publisher": "Pitrol",
+    "copyright": "© 2026 Petro Cardoso (Pitrol)",
+    "category": "Video",
+    "homepage": "https://pitrol.dev",
+    "shortDescription": "Transmita para todas as plataformas ao mesmo tempo.",
+    "longDescription": "Corneta recebe um único stream do seu OBS e distribui para Twitch, YouTube, Facebook, Kick e outras ao mesmo tempo — com qualidade por plataforma, cofre de chaves e reconexão automática.",
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "_comment_externalBin": "Descomente após rodar scripts/fetch-binaries.ps1 (baixa ffmpeg/mediamtx com o sufixo do target-triple). Ver §14.1 do PLANEJAMENTO.md.",
-    "externalBin": []
+    "externalBin": [
+      "binaries/ffmpeg",
+      "binaries/mediamtx"
+    ]
   }
 }

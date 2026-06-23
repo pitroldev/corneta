@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Copy, Check, Radio, Square, Gauge, Wifi, Zap, AlertTriangle, KeyRound,
+  Copy, Check, Radio, Square, Gauge, Wifi, Zap, AlertTriangle, KeyRound, Loader2,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { obsIngestUrl } from "../lib/factory";
@@ -9,7 +9,7 @@ import { estimate } from "../lib/estimates";
 import { IS_TAURI } from "../lib/api";
 import { toast } from "../lib/toast";
 import { cn, fmtBitrate, fmtUptime } from "../lib/utils";
-import type { TargetState } from "../lib/types";
+import type { EngineState, TargetState } from "../lib/types";
 import { Button, Card, PlatformGlyph, SectionTitle, Stat } from "../components/ui";
 
 export function GoLiveScreen() {
@@ -20,19 +20,40 @@ export function GoLiveScreen() {
   const uploadMbps = useStore((s) => s.uploadMbps);
   const runUploadTest = useStore((s) => s.runUploadTest);
 
-  const live = snapshot.state === "live";
+  const state = snapshot.state;
+  const live = state === "live";
+  const starting = state === "starting";
   const enabled = config.targets.filter((t) => t.enabled);
   const missingKeys = enabled.filter((t) => !t.hasKey);
+
+  // Avisa quando o OBS realmente conecta (stopped/starting → live).
+  const prevState = useRef<EngineState>("stopped");
+  useEffect(() => {
+    if (state === "live" && prevState.current !== "live") {
+      toast.success("No ar! A corneta tá tocando 📣");
+    }
+    prevState.current = state;
+  }, [state]);
   const est = estimate(config);
   const neededMbps = est.uploadKbps / 1000;
 
   const bandTone =
     uploadMbps == null ? "default" : uploadMbps >= neededMbps * 1.2 ? "ok" : uploadMbps >= neededMbps ? "warn" : "bad";
 
+  const [testing, setTesting] = useState(false);
+  const onTest = async () => {
+    setTesting(true);
+    try {
+      await runUploadTest();
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const onStart = async () => {
     try {
       await start();
-      toast.success("No ar! A corneta tá tocando 📣");
+      toast.success("Servidor no ar! Agora é só dar play no OBS 📣");
     } catch (e) {
       toast.error(`Não rolou: ${e}`);
     }
@@ -74,8 +95,9 @@ export function GoLiveScreen() {
           <h3 className="flex items-center gap-2 text-lg">
             <Gauge className="size-5 text-brass" /> Banda de upload
           </h3>
-          <Button variant="subtle" size="sm" onClick={runUploadTest}>
-            <Wifi className="size-4" /> Testar meu upload
+          <Button variant="subtle" size="sm" onClick={onTest} disabled={testing}>
+            {testing ? <Loader2 className="size-4 animate-spin" /> : <Wifi className="size-4" />}
+            {testing ? "Testando…" : "Testar meu upload"}
           </Button>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -106,19 +128,28 @@ export function GoLiveScreen() {
       )}
 
       <div className="mb-5">
-        {!live ? (
-          <Button variant="pop" size="lg" className="w-full" disabled={enabled.length === 0} onClick={onStart}>
-            <Radio className="size-6" strokeWidth={2.5} /> BORA AO VIVO
+        {starting ? (
+          <Button variant="outline" size="lg" className="w-full" onClick={onStop}>
+            <Loader2 className="size-5 animate-spin" /> Aguardando o OBS conectar… (cancelar)
           </Button>
-        ) : (
+        ) : live ? (
           <Button variant="danger" size="lg" className="w-full" onClick={onStop}>
             <Square className="size-5" /> Cortar transmissão
           </Button>
+        ) : (
+          <Button variant="pop" size="lg" className="w-full" disabled={enabled.length === 0} onClick={onStart}>
+            <Radio className="size-6" strokeWidth={2.5} /> BORA AO VIVO
+          </Button>
+        )}
+        {starting && (
+          <p className="mt-2 text-center text-xs text-ink-faint">
+            No OBS, clique <strong className="text-ink-muted">Iniciar transmissão</strong> — a Corneta entra no ar sozinha.
+          </p>
         )}
       </div>
 
       <AnimatePresence>
-        {live && (
+        {(live || starting) && (
           <div className="flex flex-col gap-2">
             {enabled.map((t, i) => {
               const st = snapshot.targets[t.id];
@@ -136,6 +167,11 @@ export function GoLiveScreen() {
                     <div className="min-w-32 flex-1">
                       <div className="font-display font-bold">{t.name}</div>
                       <StatePill state={st?.state ?? "idle"} />
+                      {st?.message && (
+                        <div className="mt-0.5 max-w-xs truncate text-[11px] text-bad" title={st.message}>
+                          {st.message}
+                        </div>
+                      )}
                     </div>
                     <div className="hidden gap-6 sm:flex">
                       <MiniStat label="Bitrate" value={fmtBitrate(st?.bitrateKbps ?? 0)} />
