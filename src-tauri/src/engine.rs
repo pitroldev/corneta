@@ -83,7 +83,12 @@ fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
 
 /// Monta os argumentos de UM FFmpeg para UM destino (lê do MediaMTX → 1 saída).
 /// Um processo por plataforma → métricas REAIS por destino e reconexão independente.
-pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<String> {
+pub fn ffmpeg_args_for_target(
+    config: &AppConfig,
+    t: &Target,
+    key: &str,
+    br_override: Option<u32>,
+) -> Vec<String> {
     let ingest = format!(
         "{}://{}:{}/{}/{}",
         config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
@@ -117,6 +122,8 @@ pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<
         } else {
             format!("scale={}:{}", p.width, p.height)
         };
+        // Bitrate efetivo: o auto-bitrate pode estar empurrando um valor menor.
+        let vbr = br_override.unwrap_or(p.video_bitrate_kbps);
 
         args.extend(
             [
@@ -124,9 +131,9 @@ pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<
                 "-vf", &vf,
                 "-r", &p.fps.to_string(),
                 "-c:v", codec,
-                "-b:v", &format!("{}k", p.video_bitrate_kbps),
-                "-maxrate", &format!("{}k", p.video_bitrate_kbps),
-                "-bufsize", &format!("{}k", p.video_bitrate_kbps * 2),
+                "-b:v", &format!("{vbr}k"),
+                "-maxrate", &format!("{vbr}k"),
+                "-bufsize", &format!("{}k", vbr * 2),
                 "-g", &gop,
             ]
             .map(String::from),

@@ -105,6 +105,10 @@ pub struct Settings {
     /// cair NO MEIO da live (só após já ter tido sinal) — mantém a transmissão de pé.
     #[serde(default = "default_true")]
     pub brb_enabled: bool,
+    /// Auto-bitrate: baixa o bitrate de um destino que recodifica quando a banda aperta
+    /// (e sobe de volta quando estabiliza). Só vale pra destinos em transcode.
+    #[serde(default = "default_true")]
+    pub auto_bitrate: bool,
 }
 
 fn default_true() -> bool {
@@ -150,6 +154,7 @@ impl Default for Settings {
             theme: default_theme(),
             chat_font_size: default_font(),
             brb_enabled: true,
+            auto_bitrate: true,
         }
     }
 }

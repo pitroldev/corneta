@@ -590,20 +590,32 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
 
     // 3) Um supervisor de FFmpeg POR destino — métricas reais e reconexão independentes.
     let brb_enabled = config.settings.brb_enabled;
+    let auto_bitrate = config.settings.auto_bitrate;
     let slate_png: Option<String> = brb_slate_path(&app)
         .filter(|p| p.exists())
         .map(|p| p.to_string_lossy().to_string());
     for &t in &enabled {
         let key = keymap.get(&t.id).cloned().unwrap_or_default();
-        let args = engine::ffmpeg_args_for_target(&config, t, &key);
         let slate_args = engine::ffmpeg_args_for_slate(t, &key, slate_png.as_deref());
+        let cfg = config.clone();
+        let target = t.clone();
+        let is_transcode = engine::effective_action(&config.mode, t) == "transcode";
+        let base_kbps = t
+            .encoding
+            .preset
+            .as_ref()
+            .map(|p| p.video_bitrate_kbps)
+            .unwrap_or_else(|| engine::recommended_preset(&t.platform_id).video_bitrate_kbps);
+        let floor_kbps = ((base_kbps as f64 * 0.4) as u32).max(800);
         let target_id = t.id.clone();
+        let target_name = t.name.clone();
         let app_t = app.clone();
         let run_flag = running.clone();
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
         let signal = has_signal.clone();
         let seen = signal_seen.clone();
         tauri::async_runtime::spawn(async move {
+            let mut current_kbps = base_kbps;
             while run_flag.load(Ordering::Relaxed) {
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
                 if pause_flag.load(Ordering::Relaxed) {
@@ -631,11 +643,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     continue;
                 }
 
-                // Com sinal: FFmpeg normal (lê do MediaMTX → plataforma).
+                // Com sinal: FFmpeg normal (lê do MediaMTX → plataforma) no bitrate atual.
+                let args = engine::ffmpeg_args_for_target(&cfg, &target, &key, Some(current_kbps));
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")
-                    .and_then(|c| c.args(args.clone()).spawn());
+                    .and_then(|c| c.args(args).spawn());
                 let (mut rx, child) = match spawned {
                     Ok(v) => v,
                     Err(e) => {
@@ -647,28 +660,85 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     let st = app_t.state::<AppState>();
                     st.engine.lock().unwrap().ffmpegs.insert(target_id.clone(), child);
                 }
+                let mut low = 0u32;
+                let mut stable = 0u32;
+                let mut rebitrate = false;
                 while let Some(ev) = rx.recv().await {
                     match ev {
                         CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                            let line = String::from_utf8_lossy(&b);
                             update_target_metrics(
                                 &app_t,
                                 &target_id,
-                                &String::from_utf8_lossy(&b),
+                                &line,
                                 signal.load(Ordering::Relaxed),
                             );
+                            // Auto-bitrate: vigia a velocidade do FFmpeg (só em transcode).
+                            if auto_bitrate && is_transcode {
+                                if let Some(speed) = parse_kv(&line, "speed=") {
+                                    if speed < 0.9 {
+                                        low += 1;
+                                        stable = 0;
+                                    } else {
+                                        low = 0;
+                                        stable += 1;
+                                    }
+                                    if low >= 8 && current_kbps > floor_kbps {
+                                        current_kbps =
+                                            ((current_kbps as f64 * 0.75) as u32).max(floor_kbps);
+                                        notify(
+                                            &app_t,
+                                            "Banda apertou",
+                                            &format!("{target_name}: baixei o bitrate pra {current_kbps} kbps"),
+                                        );
+                                        rebitrate = true;
+                                        break;
+                                    } else if stable >= 60 && current_kbps < base_kbps {
+                                        current_kbps =
+                                            ((current_kbps as f64 * 1.2) as u32).min(base_kbps);
+                                        log::info!(
+                                            "auto-bitrate: {target_name} subindo pra {current_kbps} kbps"
+                                        );
+                                        rebitrate = true;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         CommandEvent::Terminated(_) => break,
                         _ => {}
                     }
                 }
-                {
+                // Remove o FFmpeg do mapa (e mata, se a saída foi por troca de bitrate).
+                let leftover = {
                     let st = app_t.state::<AppState>();
-                    st.engine.lock().unwrap().ffmpegs.remove(&target_id);
+                    let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
+                    removed
+                };
+                if rebitrate {
+                    if let Some(c) = leftover {
+                        let pid = c.pid();
+                        let _ = c.kill();
+                        #[cfg(windows)]
+                        {
+                            let _ = std::process::Command::new("taskkill")
+                                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                                .output();
+                        }
+                        #[cfg(not(windows))]
+                        {
+                            let _ = pid;
+                        }
+                    }
                 }
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
                 }
                 if pause_flag.load(Ordering::Relaxed) {
+                    continue;
+                }
+                // Troca de bitrate: respawna já com o novo valor, sem espera de reconexão.
+                if rebitrate {
                     continue;
                 }
                 // Sinal sumiu enquanto rodava → volta ao topo (slate ou waiting).

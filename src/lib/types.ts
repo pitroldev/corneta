@@ -126,6 +126,8 @@ export interface AppSettings {
   chatFontSize: "sm" | "md" | "lg";
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
+  /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
+  autoBitrate: boolean;
 }
 
 export interface ObsCheck {

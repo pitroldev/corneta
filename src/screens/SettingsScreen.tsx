@@ -165,6 +165,16 @@ export function SettingsScreen() {
               label="Proteção contra quedas"
             />
           </SettingRow>
+          <SettingRow
+            title="Auto-bitrate quando a banda aperta"
+            desc="Se um destino que recodifica começar a engasgar (não dá conta do upload), a Corneta baixa o bitrate dele e sobe de volta quando estabiliza — em vez de ficar derrubando. (Só vale pra destinos em transcode.)"
+          >
+            <Toggle
+              checked={settings.autoBitrate}
+              onChange={(v) => setSettings({ autoBitrate: v })}
+              label="Auto-bitrate"
+            />
+          </SettingRow>
           <SettingRow title="Tema claro" desc="Troca a interface pro modo claro (papel).">
             <Toggle
               checked={settings.theme === "light"}

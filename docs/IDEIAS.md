@@ -48,7 +48,7 @@ Duas coisas definem nossa melhor jogada:
 | **Áudio por plataforma** (DMCA-safe) | 🟢🟢 | 🟡 | ✅ bom | não |
 | **Contador de viewers somado** (todas plataformas) | 🟢🟢 | 🟡 | ➖ ok | ✅ **FEITO** |
 | **Cloud relay BYO-VPS** (economiza banda) | 🟢🟢🟢 | 🔴 | ✅ bom | planejado |
-| **Auto-bitrate** quando a banda aperta | 🟢🟢 | 🔴 | ✅ bom | não |
+| **Auto-bitrate** quando a banda aperta | 🟢🟢 | 🔴 | ✅ bom | ✅ **FEITO** |
 | **Início agendado** | 🟢 | 🟢 | ➖ ok | não |
 | **Soundboard / som no alerta** | 🟢 | 🟡 | ➖ ok | não |
 
