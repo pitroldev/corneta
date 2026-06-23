@@ -73,7 +73,7 @@
 
 - ✅ **Perfis** ("Live de sexta", "Podcast"): conjuntos de destinos + modo, troca/cria/renomeia/exclui na tela Plataformas (chaves compartilhadas por id entre perfis).
 - ⛔ **i18n** (PT-BR + EN) e **tema claro**.
-- ⛔ Refinos de onboarding, estados vazios e didática (ex.: lembrete de keyframe 2s no OBS).
+- ✅ Refinos de **onboarding** (dica keyframe 2s/CBR), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, lembrete no OBS).
 - ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.
 
 ---

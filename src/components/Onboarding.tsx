@@ -74,6 +74,11 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
                 );
               })}
 
+              <div className="rounded-md bg-surface-2 px-3 py-2 text-xs leading-relaxed text-ink-muted">
+                💡 No OBS, deixe o <strong className="text-ink">keyframe interval em 2s</strong> e o
+                bitrate em <strong className="text-ink">CBR</strong> — quase toda plataforma exige.
+              </div>
+
               <div className="mt-2 flex items-center justify-between gap-3">
                 <button
                   onClick={() => close(false)}

@@ -5,7 +5,7 @@ import type { EncoderKind, EncodingMode } from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
 import { estimate, effectiveAction, lowestCommonDenominator } from "../lib/estimates";
 import { cn, fmtBitrate } from "../lib/utils";
-import { Badge, Button, Card, PlatformGlyph, SectionTitle } from "../components/ui";
+import { Badge, Button, Card, Hint, PlatformGlyph, SectionTitle } from "../components/ui";
 import { Select, type SelectOption } from "../components/Select";
 
 const MODES: {
@@ -135,11 +135,17 @@ export function EncodingScreen() {
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
             <Gauge className="size-4" /> Ajuste fino por plataforma
           </h3>
-          <div className="flex flex-col gap-2">
-            {config.targets.filter((t) => t.enabled).map((t) => (
-              <PerTargetRow key={t.id} targetId={t.id} />
-            ))}
-          </div>
+          {config.targets.some((t) => t.enabled) ? (
+            <div className="flex flex-col gap-2">
+              {config.targets.filter((t) => t.enabled).map((t) => (
+                <PerTargetRow key={t.id} targetId={t.id} />
+              ))}
+            </div>
+          ) : (
+            <Card className="bg-surface-2 text-sm text-ink-muted">
+              Nenhuma plataforma ativa. Ative uma em <strong className="text-ink">Plataformas</strong> pra ajustar a qualidade dela.
+            </Card>
+          )}
         </div>
       )}
     </div>
@@ -211,7 +217,10 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       {action === "transcode" ? (
         <>
           <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-            Bitrate (kbps)
+            <span className="flex items-center gap-1">
+              Bitrate (kbps)
+              <Hint text="Dados por segundo: mais bitrate = imagem melhor, mas exige mais upload. ~6000 para 1080p." />
+            </span>
             <input
               type="number"
               step={500}
@@ -221,7 +230,10 @@ function PerTargetRow({ targetId }: { targetId: string }) {
             />
           </label>
           <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-            Encoder
+            <span className="flex items-center gap-1">
+              Encoder
+              <Hint text="Hardware (NVENC/QSV) poupa CPU. Software (x264) tem a melhor qualidade por bit, mas pesa mais." />
+            </span>
             <Select
               className="w-44"
               value={enc.encoder}

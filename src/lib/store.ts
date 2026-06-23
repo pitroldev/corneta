@@ -231,11 +231,8 @@ export const useStore = create<State>((set, get) => {
     },
 
     async runUploadTest() {
-      try {
-        set({ uploadMbps: await api.testUpload() });
-      } catch {
-        // Backend ainda sem teste de upload (§4.2) — mantém o valor atual.
-      }
+      // Propaga o erro pra a tela mostrar um toast (ex.: sem internet).
+      set({ uploadMbps: await api.testUpload() });
     },
 
     async start() {

@@ -118,6 +118,11 @@ export function Sidebar({
               Aguardando OBS
             </span>
           </div>
+        ) : state === "error" ? (
+          <div className="flex items-center gap-2 rounded-md bg-bad/15 px-3 py-2.5 text-bad">
+            <span className="size-2.5 rounded-full bg-bad" />
+            <span className="font-display text-sm font-bold uppercase tracking-wide">Erro</span>
+          </div>
         ) : (
           <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2.5">
             <span className="size-2.5 rounded-full bg-ink-faint" />
