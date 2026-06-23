@@ -1,0 +1,30 @@
+[package]
+name = "corneta"
+version = "0.1.0"
+description = "Corneta — transmita para todas as plataformas ao mesmo tempo."
+authors = ["Pitrol"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+# O nome do lib é referenciado por main.rs como `corneta_lib::run()`.
+name = "corneta_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keyring = "3"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

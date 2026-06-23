@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Frontend build
+dist/
+dist-ssr/
+*.local
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
+
+# Bundled sidecar binaries (baixados pelo script, não versionar)
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets / signing keys (NUNCA versionar)
+*.key
+*.pem
+.env
+.env.*
+!.env.example

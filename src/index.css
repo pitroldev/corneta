@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* ============================================================
+   CORNETA — sistema de design v2
+   Direção: pôster/quadrinho. Blocos sólidos, sombras DURAS (offset, sem blur),
+   cantos secos, tipografia chunky com marca-texto. Nada de glow/borda genérica.
+   ============================================================ */
+@theme {
+  --color-bg: #100b07;
+  --color-surface: #1a130c;
+  --color-surface-2: #221a10;
+  --color-surface-3: #2e2314;
+  --color-border: #3d301c;
+  --color-border-soft: #281f12;
+
+  --color-ink: #fcf3e3;
+  --color-ink-muted: #c6b69b;
+  --color-ink-faint: #8c7a60;
+
+  --color-brass: #ffb323;
+  --color-brass-strong: #ffc857;
+  --color-brass-ink: #2a1c00;
+
+  --color-tomate: #ff5a36;
+  --color-tomate-strong: #ff7a55;
+
+  --color-live: #ff4733;
+  --color-ok: #56e39b;
+  --color-warn: #ffc23d;
+  --color-bad: #ff5e57;
+  --color-info: #6aa6ff;
+
+  --color-night: #0b0805;
+
+  --font-display: "Baloo 2", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif;
+
+  /* Cantos secos por padrão */
+  --radius-sm: 4px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    background-color: var(--color-bg);
+    /* Só textura de meio-tom (print), sem glow de canto */
+    background-image: radial-gradient(
+      rgba(255, 179, 35, 0.045) 1px,
+      transparent 1.5px
+    );
+    background-size: 20px 20px;
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    overflow: hidden;
+  }
+  input,
+  textarea,
+  select,
+  [data-selectable] {
+    user-select: text;
+  }
+
+  h1,
+  h2,
+  h3,
+  .display {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 0;
+  }
+  ::selection {
+    background: var(--color-brass);
+    color: var(--color-brass-ink);
+  }
+}
+
+@layer utilities {
+  /* Sombra dura estilo adesivo/quadrinho — o oposto do glow */
+  .pop {
+    box-shadow: 4px 4px 0 0 var(--color-night);
+  }
+  .pop-sm {
+    box-shadow: 3px 3px 0 0 var(--color-night);
+  }
+  .pop-brass {
+    box-shadow: 4px 4px 0 0 var(--color-brass-ink);
+  }
+
+  /* Marca-texto: bloco de latão atrás do texto (highlighter) */
+  .marker {
+    background-image: linear-gradient(
+      transparent 58%,
+      var(--color-brass) 58% 94%,
+      transparent 94%
+    );
+    padding: 0 0.12em;
+  }
+  .marker-tomate {
+    background-image: linear-gradient(
+      transparent 58%,
+      var(--color-tomate) 58% 94%,
+      transparent 94%
+    );
+  }
+
+  /* Listra de acento (barra de latão à esquerda) */
+  .accent-l {
+    border-left: 4px solid var(--color-brass);
+  }
+
+  .tilt {
+    transform: rotate(-2.4deg);
+  }
+  .tilt-r {
+    transform: rotate(2.2deg);
+  }
+
+  .live-dot {
+    animation: live-pulse 1.4s infinite;
+  }
+  @keyframes live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(255, 71, 51, 0.65);
+    }
+    70% {
+      box-shadow: 0 0 0 9px rgba(255, 71, 51, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(255, 71, 51, 0);
+    }
+  }
+
+  /* Ticker "AO VIVO" */
+  .marquee {
+    animation: marquee 14s linear infinite;
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes shout {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+  .animate-shout {
+    animation: shout 2.4s ease-in-out infinite;
+  }
+}
