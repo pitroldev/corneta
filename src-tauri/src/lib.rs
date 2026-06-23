@@ -27,6 +27,15 @@ fn show_main(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebView2 (Windows): desliga a aceleração de GPU pra TODOS os webviews ANTES de
+    // criar qualquer janela. Sem isso, o segundo webview (a janela flutuante do chat)
+    // não compõe — fica em branco/preto e parece travar. Pro painel não faz falta: o
+    // vídeo é tratado pelo FFmpeg, não pelo webview.
+    #[cfg(windows)]
+    if std::env::var_os("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_none() {
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-gpu");
+    }
+
     tauri::Builder::default()
         // single-instance DEVE ser o primeiro plugin (§14.2): evita duas Cornetas
         // disputando a porta de ingestão / subindo motores duplicados.
