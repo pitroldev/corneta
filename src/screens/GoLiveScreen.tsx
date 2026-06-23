@@ -509,6 +509,7 @@ function StatePill({ state }: { state: TargetState }) {
       reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
       error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
       paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
+      waiting: { label: "Aguardando sinal", cls: "text-info", dot: "bg-info animate-pulse" },
     };
   const m = map[state];
   return (

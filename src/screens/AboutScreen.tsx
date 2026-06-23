@@ -49,7 +49,7 @@ export function AboutScreen() {
             <Mascot className="size-9" />
           </div>
           <div>
-            <h3 className="text-3xl">Oi, sou o Pitrol</h3>
+            <h3 className="text-3xl">Oi, sou o Petro</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
               Fiz a Corneta pra resolver a minha própria dor: transmitir pra várias plataformas de
               uma vez, sem dor de cabeça.

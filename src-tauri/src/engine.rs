@@ -150,7 +150,8 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
             "hls: no\n",
             "webrtc: no\n",
             "srt: no\n",
-            "api: no\n",
+            "api: yes\n",
+            "apiAddress: 127.0.0.1:9997\n",
             "metrics: no\n",
             "pprof: no\n",
             "playback: no\n",
@@ -170,7 +171,7 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
 pub struct TargetStatus {
     pub target_id: String,
     pub name: String,
-    pub state: String, // idle | connecting | live | reconnecting | error | paused
+    pub state: String, // idle | connecting | live | reconnecting | error | paused | waiting
     pub bitrate_kbps: u32,
     pub fps: u32,
     pub dropped_frames: u32,

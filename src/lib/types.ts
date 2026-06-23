@@ -224,7 +224,8 @@ export type TargetState =
   | "live"
   | "reconnecting"
   | "error"
-  | "paused";
+  | "paused"
+  | "waiting";
 
 export interface TargetStatus {
   targetId: string;

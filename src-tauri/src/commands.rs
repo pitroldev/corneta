@@ -222,7 +222,7 @@ fn quality_of(snap: &EngineSnapshot) -> &'static str {
             for st in snap.targets.values() {
                 match st.state.as_str() {
                     "error" => bad = true,
-                    "reconnecting" | "connecting" => warn = true,
+                    "reconnecting" | "connecting" | "waiting" => warn = true,
                     _ => {}
                 }
             }
@@ -256,6 +256,7 @@ fn tray_tooltip(snap: &EngineSnapshot) -> String {
             "reconnecting" => ("⚠", "reconectando".to_string()),
             "error" => ("✕", "erro".to_string()),
             "paused" => ("⏸", "pausado".to_string()),
+            "waiting" => ("◌", "aguardando sinal".to_string()),
             _ => ("…", "conectando".to_string()),
         };
         lines.push(format!("{mark} {} · {detail}", st.name));
@@ -291,6 +292,26 @@ fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
         }
     }
     let _ = tray.set_tooltip(Some(tray_tooltip(snap)));
+}
+
+/// O MediaMTX tem algum publisher ativo? (= o OBS está mandando sinal pra ingestão.)
+fn mediamtx_has_publisher() -> bool {
+    let body = match ureq::get("http://127.0.0.1:9997/v3/paths/list")
+        .timeout(std::time::Duration::from_millis(700))
+        .call()
+    {
+        Ok(r) => r.into_string().unwrap_or_default(),
+        Err(_) => return false,
+    };
+    serde_json::from_str::<serde_json::Value>(&body)
+        .ok()
+        .and_then(|v| {
+            v.get("items").and_then(|i| i.as_array()).map(|arr| {
+                arr.iter()
+                    .any(|p| p.get("ready").and_then(|r| r.as_bool()) == Some(true))
+            })
+        })
+        .unwrap_or(false)
 }
 
 fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -389,6 +410,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let started = now_ms();
     let snap = EngineSnapshot::starting(&config, started);
     let running = Arc::new(AtomicBool::new(true));
+    // Sinal de ingestão: true quando o OBS está publicando no MediaMTX.
+    let has_signal = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
     // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
@@ -420,6 +443,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         }
     });
 
+    // 2b) Poller do sinal de ingestão (API do MediaMTX): há publisher (OBS no ar)?
+    let run_sig = running.clone();
+    let sig = has_signal.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        while run_sig.load(Ordering::Relaxed) {
+            sig.store(mediamtx_has_publisher(), Ordering::Relaxed);
+            std::thread::sleep(std::time::Duration::from_millis(700));
+        }
+    });
+
     // 3) Um supervisor de FFmpeg POR destino — métricas reais e reconexão independentes.
     for &t in &enabled {
         let key = keymap.get(&t.id).cloned().unwrap_or_default();
@@ -428,6 +461,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let app_t = app.clone();
         let run_flag = running.clone();
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
+        let signal = has_signal.clone();
         tauri::async_runtime::spawn(async move {
             while run_flag.load(Ordering::Relaxed) {
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
@@ -472,6 +506,15 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
                 // Se foi pausado, volta ao topo (que espera) sem marcar reconexão.
                 if pause_flag.load(Ordering::Relaxed) {
+                    continue;
+                }
+                // Sem sinal de ingestão = o OBS ainda não publicou. Não é erro: aguarda.
+                if !signal.load(Ordering::Relaxed) {
+                    set_target_state(&app_t, &target_id, "waiting");
+                    let _ = tauri::async_runtime::spawn_blocking(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(700))
+                    })
+                    .await;
                     continue;
                 }
                 log::warn!("FFmpeg de um destino caiu — reconectando em 2s");
