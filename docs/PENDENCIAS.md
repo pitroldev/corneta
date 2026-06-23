@@ -89,6 +89,7 @@
 - **Gravação local simultânea** e **métricas unificadas** por plataforma.
 - ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
 - 📄 **Alertas centralizados** (seguidor/inscrição/donate/raid de todas as plataformas + overlay pro OBS) — planejado em [`ALERTAS.md`](./ALERTAS.md).
+- 📄 **Enviar mensagens pelo multi-chat** (+ moderar) — exige login por plataforma; planejado em [`ENVIO.md`](./ENVIO.md).
 
 ---
 
