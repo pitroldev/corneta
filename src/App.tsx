@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
@@ -80,6 +80,13 @@ export default function App() {
     });
   }, []);
 
+  // Cada tela começa no topo: o container de scroll é compartilhado, então um
+  // scrollIntoView (ex.: "Fora do ar" → botão BORA) deixava as outras telas cortadas.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [screen]);
+
   return (
     <div className="flex h-full flex-col overflow-hidden border border-border-soft">
       <TitleBar />
@@ -97,7 +104,7 @@ export default function App() {
           <main className="relative flex-1 overflow-hidden">
             <SoundWaves className="pointer-events-none absolute -bottom-20 -right-16 size-80 text-brass/[0.05]" />
 
-            <div className="h-full overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
+            <div ref={scrollRef} className="h-full overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={screen}
