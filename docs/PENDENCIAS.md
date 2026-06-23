@@ -75,6 +75,7 @@
 - ⛔ **i18n** (PT-BR + EN) e **tema claro**.
 - ✅ **Onboarding guiado** (carrossel de 5 passos com progresso), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, dica keyframe 2s/CBR).
 - ✅ **Menos fricção:** um clique liga o OBS junto (`StartStream`), "pegar minha chave" por plataforma, testar conexão por destino, **atalho global** começar/parar, **notificações nativas** (no ar / destino caiu), colar+mostrar a chave, **arrastar pra reordenar** destinos, lembrar janela/última tela, abrir logs.
+- ✅ **Pausar/retomar por plataforma ao vivo** — botão por destino no Ao vivo mata/reativa só aquele FFmpeg, sem derrubar os outros (estado `paused`).
 - ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.
 
 ---
@@ -87,6 +88,7 @@
 - ✅ **Chat unificado** — **múltiplas fontes** (ex.: 2 Twitches), **emotes + badges**, **deleções de moderação**, **Kick**, e **janela flutuante** always-on-top. Configurável; Twitch sem login, Kick via slug, YouTube via API key — [`CHAT.md`](./CHAT.md). FB/TikTok pendentes.
 - **Gravação local simultânea** e **métricas unificadas** por plataforma.
 - ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
+- 📄 **Alertas centralizados** (seguidor/inscrição/donate/raid de todas as plataformas + overlay pro OBS) — planejado em [`ALERTAS.md`](./ALERTAS.md).
 
 ---
 

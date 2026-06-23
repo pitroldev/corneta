@@ -82,6 +82,7 @@ pub fn run() {
             commands::obs_autoconfigure,
             commands::start_engine,
             commands::stop_engine,
+            commands::set_target_paused,
             commands::list_sessions,
             commands::read_session,
             commands::delete_session,

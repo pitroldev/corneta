@@ -32,6 +32,7 @@ export interface CornetaApi {
   setAutostart(enabled: boolean): Promise<void>;
   start(): Promise<void>;
   stop(): Promise<void>;
+  setTargetPaused(targetId: string, paused: boolean): Promise<void>;
   subscribe(cb: (s: EngineSnapshot) => void): () => void;
   // Relatórios pós-live
   listSessions(): Promise<SessionMeta[]>;
@@ -99,6 +100,10 @@ function tauriApi(): CornetaApi {
     async stop() {
       const { invoke } = await core();
       await invoke("stop_engine");
+    },
+    async setTargetPaused(targetId, paused) {
+      const { invoke } = await core();
+      await invoke("set_target_paused", { targetId, paused });
     },
     subscribe(cb) {
       let unlisten: (() => void) | null = null;
@@ -285,6 +290,8 @@ function mockApi(): CornetaApi {
   let timer: ReturnType<typeof setInterval> | null = null;
   // Gravação da sessão demo em andamento.
   let rec: { id: string; lines: string[] } | null = null;
+  // Destinos pausados (controle ao vivo).
+  const pausedTargets = new Set<string>();
 
   // --- chat demo ---
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
@@ -317,6 +324,7 @@ function mockApi(): CornetaApi {
     // Demo: depois de "ouvir" um instante, o "OBS conecta" e entra no ar.
     if (snapshot.state === "starting") snapshot.state = "live";
     for (const st of Object.values(snapshot.targets)) {
+      if (pausedTargets.has(st.targetId)) continue; // pausado: mantém o estado
       if (st.state === "connecting") {
         st.state = "live";
       } else if (st.state === "live") {
@@ -431,7 +439,15 @@ function mockApi(): CornetaApi {
         saveSessions(m);
         rec = null;
       }
+      pausedTargets.clear();
       snapshot = { state: "stopped", startedAt: null, targets: {} };
+      emit();
+    },
+    async setTargetPaused(targetId, paused) {
+      if (paused) pausedTargets.add(targetId);
+      else pausedTargets.delete(targetId);
+      const st = snapshot.targets[targetId];
+      if (st) st.state = paused ? "paused" : "connecting";
       emit();
     },
     subscribe(cb) {

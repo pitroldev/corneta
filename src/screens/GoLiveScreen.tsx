@@ -10,8 +10,11 @@ import {
   Zap,
   AlertTriangle,
   Loader2,
+  Pause,
+  Play,
 } from "lucide-react";
 import { useStore } from "../lib/store";
+import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
 import { estimate } from "../lib/estimates";
 import { toast } from "../lib/toast";
@@ -320,6 +323,17 @@ export function GoLiveScreen() {
                         value={fmtUptime(st?.uptimeSec ?? 0)}
                       />
                     </div>
+                    <button
+                      onClick={() => void api.setTargetPaused(t.id, st?.state !== "paused")}
+                      className={cn(
+                        "rounded-md p-2 transition-colors hover:bg-surface-3",
+                        st?.state === "paused" ? "text-brass" : "text-ink-faint hover:text-ink"
+                      )}
+                      title={st?.state === "paused" ? "Retomar" : "Pausar este destino"}
+                      aria-label={st?.state === "paused" ? "Retomar" : "Pausar"}
+                    >
+                      {st?.state === "paused" ? <Play className="size-4" /> : <Pause className="size-4" />}
+                    </button>
                   </Card>
                 </motion.div>
               );
@@ -343,6 +357,7 @@ function StatePill({ state }: { state: TargetState }) {
       live: { label: "No ar", cls: "text-ok", dot: "bg-live live-dot" },
       reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
       error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
+      paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
     };
   const m = map[state];
   return (

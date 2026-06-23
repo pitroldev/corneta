@@ -255,6 +255,7 @@ fn tray_tooltip(snap: &EngineSnapshot) -> String {
             "live" => ("✓", fmt_mbps(st.bitrate_kbps)),
             "reconnecting" => ("⚠", "reconectando".to_string()),
             "error" => ("✕", "erro".to_string()),
+            "paused" => ("⏸", "pausado".to_string()),
             _ => ("…", "conectando".to_string()),
         };
         lines.push(format!("{mark} {} · {detail}", st.name));
@@ -333,6 +334,27 @@ fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
     }
 }
 
+/// Define o estado de UM destino e emite (idempotente). Usado pelo controle de pausa.
+fn set_target_state(app: &AppHandle, target_id: &str, new_state: &str) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    if let Some(snap) = eng.snapshot.as_mut() {
+        if snap.state == "stopped" {
+            return;
+        }
+        if let Some(st) = snap.targets.get_mut(target_id) {
+            if st.state == new_state {
+                return;
+            }
+            st.state = new_state.into();
+            st.message = None;
+            let out = snap.clone();
+            drop(eng);
+            emit(app, &out);
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -368,6 +390,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let snap = EngineSnapshot::starting(&config, started);
     let running = Arc::new(AtomicBool::new(true));
     let session_path = session::start_session(&app, &config);
+    // Uma flag de pausa por destino (controle ao vivo).
+    let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
+        .iter()
+        .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
+        .collect();
     {
         let mut eng = state.engine.lock().unwrap();
         eng.mediamtx = Some(mtx_child);
@@ -375,6 +402,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.started_ms = started;
         eng.running = running.clone();
         eng.session_path = session_path;
+        eng.paused = pause_flags.clone();
     }
     emit(&app, &snap);
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
@@ -399,8 +427,18 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let target_id = t.id.clone();
         let app_t = app.clone();
         let run_flag = running.clone();
+        let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
         tauri::async_runtime::spawn(async move {
             while run_flag.load(Ordering::Relaxed) {
+                // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
+                if pause_flag.load(Ordering::Relaxed) {
+                    set_target_state(&app_t, &target_id, "paused");
+                    let _ = tauri::async_runtime::spawn_blocking(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(300))
+                    })
+                    .await;
+                    continue;
+                }
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")
@@ -431,6 +469,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
+                }
+                // Se foi pausado, volta ao topo (que espera) sem marcar reconexão.
+                if pause_flag.load(Ordering::Relaxed) {
+                    continue;
                 }
                 log::warn!("FFmpeg de um destino caiu — reconectando em 2s");
                 set_target_reconnecting(&app_t, &target_id);
@@ -484,6 +526,49 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
 pub fn stop_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     kill_engine(&app);
     let _ = state; // o kill já usa o state via app
+    Ok(())
+}
+
+/// Pausa/retoma UM destino ao vivo (sem derrubar os outros).
+#[tauri::command]
+pub fn set_target_paused(app: AppHandle, target_id: String, paused: bool) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+
+    match eng.paused.get(&target_id) {
+        Some(flag) => flag.store(paused, Ordering::Relaxed),
+        None => return Err("destino não está ao vivo".into()),
+    }
+
+    if paused {
+        // Mata o FFmpeg desse destino; o supervisor vê a flag e não respawna.
+        if let Some(child) = eng.ffmpegs.remove(&target_id) {
+            let pid = child.pid();
+            let _ = child.kill();
+            #[cfg(windows)]
+            {
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .output();
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = pid;
+            }
+        }
+    }
+
+    // Estado otimista (o supervisor confirma na sequência).
+    if let Some(snap) = eng.snapshot.as_mut() {
+        if let Some(st) = snap.targets.get_mut(&target_id) {
+            st.state = if paused { "paused" } else { "connecting" }.into();
+            st.message = None;
+        }
+        let out = snap.clone();
+        drop(eng);
+        emit(&app, &out);
+    }
     Ok(())
 }
 
@@ -647,6 +732,7 @@ pub fn kill_engine(app: &AppHandle) {
     let (children, running, session_path) = {
         let mut eng = state.engine.lock().unwrap();
         eng.snapshot = Some(EngineSnapshot::stopped());
+        eng.paused.clear();
         let session_path = eng.session_path.take();
         let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
             eng.ffmpegs.drain().map(|(_, c)| c).collect();

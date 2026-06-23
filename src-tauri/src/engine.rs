@@ -170,7 +170,7 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
 pub struct TargetStatus {
     pub target_id: String,
     pub name: String,
-    pub state: String, // idle | connecting | live | reconnecting | error
+    pub state: String, // idle | connecting | live | reconnecting | error | paused
     pub bitrate_kbps: u32,
     pub fps: u32,
     pub dropped_frames: u32,
@@ -277,4 +277,6 @@ pub struct EngineRuntime {
     pub tray_quality: String,
     /// Arquivo NDJSON da sessão em gravação (relatório pós-live).
     pub session_path: Option<std::path::PathBuf>,
+    /// Flag de pausa por destino (controle ao vivo): true = supervisor não sobe FFmpeg.
+    pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
