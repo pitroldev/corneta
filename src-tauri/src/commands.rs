@@ -1111,17 +1111,28 @@ pub fn open_chat_window(app: AppHandle) -> Result<(), String> {
         let _ = w.set_focus();
         return Ok(());
     }
-    tauri::WebviewWindowBuilder::new(
-        &app,
-        "chat",
-        tauri::WebviewUrl::App("chat.html".into()),
-    )
-    .title("Corneta — Chat")
-    .inner_size(380.0, 600.0)
-    .min_inner_size(300.0, 360.0)
-    .resizable(true)
-    .always_on_top(true)
-    .build()
+    // Constrói o webview NA THREAD PRINCIPAL e sem bloquear o comando — criar uma
+    // segunda janela de forma síncrona a partir de um comando trava o event-loop
+    // (WebView2). `always_on_top` é aplicado depois do build (mais estável).
+    let app2 = app.clone();
+    app.run_on_main_thread(move || {
+        match tauri::WebviewWindowBuilder::new(
+            &app2,
+            "chat",
+            tauri::WebviewUrl::App("chat.html".into()),
+        )
+        .title("Corneta — Chat")
+        .inner_size(380.0, 600.0)
+        .min_inner_size(300.0, 360.0)
+        .resizable(true)
+        .build()
+        {
+            Ok(w) => {
+                let _ = w.set_always_on_top(true);
+            }
+            Err(e) => log::warn!("janela do chat: {e}"),
+        }
+    })
     .map_err(|e| e.to_string())?;
     Ok(())
 }
