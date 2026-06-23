@@ -11,6 +11,7 @@
 ## 0. O que a pesquisa mostrou
 
 **Concorrentes e o que fazem bem:**
+
 - **Aitum Multistream** (plugin OBS, grátis): saída RTMP múltipla *local*, **resolução diferente por plataforma**, **trilhas de áudio separadas** por destino, vertical + horizontal lado a lado. Custo: pesa no hardware/banda.
 - **Restream** (relay na nuvem): você sobe **um** stream e eles **rebroadcastam pra 30+** plataformas dos servidores deles → **não pesa na sua banda**. Tem multichat e analytics. Pago pra tirar marca d'água.
 - **Streamlabs**: multistream é recurso **pago** (Ultra).
@@ -56,28 +57,33 @@ Duas coisas definem nossa melhor jogada:
 ## 3. As ideias, por tema
 
 ### 🎬 Conteúdo: clipes & VOD (onde a Corneta pode surpreender)
+
 - **Gravação local da sessão** — o MediaMTX grava o sinal em disco (`record: yes`) enquanto você transmite. Vira **VOD/backup** e matéria-prima pra clipe. Quase de graça (já temos o MediaMTX no meio).
 - **Replay/clipe instantâneo (backtrack)** — buffer rolante dos últimos ~30–60 s; um **atalho** salva esse trecho como `.mp4`. É o recurso que o pessoal mais ama no Aitum. Encaixa porque o sinal passa pela Corneta.
 - **Clipes sugeridos por pico de chat** — no **relatório pós-live**, marcar automaticamente os momentos em que o **chat explodiu** (mensagens/min acima da média) ou em que **caiu um alerta forte** (raid/donate). Se houver gravação, cada pico vira um **link com timestamp** pra clipar. *Isto usa dados que já temos* — ninguém faz cruzando multi-plataforma.
 - **Auto-clipe em alerta** — raid grande ou super chat gordo → salva o backtrack sozinho. Junta os três de cima.
 
 ### 📡 Resiliência: não cair / não perder audiência
+
 - **Tela "JÁ VOLTO"** — hoje, se o OBS some, o FFmpeg morre e a plataforma marca *offline*. Em vez disso, a Corneta podia **trocar a fonte por um slate** (imagem + música) e **manter a live de pé** até o sinal voltar. Estende direto o estado **"Aguardando sinal"** que acabamos de criar.
 - **Aviso no celular/Discord** — webhook do Discord (ou push) quando um destino **cai/dá erro**. Você tá jogando, nem percebe que o YouTube caiu — a Corneta avisa. Barato e salva live.
 - **Auto-bitrate** — quando o relatório detecta congestionamento, **baixar o bitrate** daquele destino automaticamente (respawn do FFmpeg com preset menor) em vez de ficar derrubando.
 
 ### 📲 Alcance & formato
+
 - **Reframe vertical** (TikTok/Shorts/IG) — segundo "enquadramento" 9:16 a partir do sinal landscape, com **preview de corte** e envio simultâneo. Já está citado no PENDENCIAS e o modo híbrido já transcoda vertical — falta a **UI de enquadrar**. É o maior diferencial de alcance, mas é o de maior esforço.
 - **Áudio por plataforma (DMCA-safe)** — silenciar a música só pra Twitch (DMCA) mantendo no YouTube, ou trilhas diferentes por destino. O FFmpeg por destino já isola — dá pra mapear áudio por target.
 - **Resolução/bitrate por plataforma** — já dá no modo transcode (preset por destino); falta deixar **explícito e fácil** ("manda 720p pro Facebook, 1080p pra Twitch").
 
 ### 💬 Engajamento
+
 - **Overlay de alertas + metas (goals) + TTS** — já desenhado nas fases 3–4 do [`ALERTAS.md`](./ALERTAS.md).
 - **Enviar/moderar o chat** pela Corneta — já desenhado no [`ENVIO.md`](./ENVIO.md).
 - **Contador de viewers somado** — um número só com a audiência de **todas** as plataformas ao vivo (Twitch/YouTube/Kick têm endpoints de viewers). Dopamina diária e fácil de exibir (na bandeja, na sidebar, num overlay).
 - **Soundboard / som no alerta** — tocar um som quando entra sub/raid; ou botões de som por atalho. Engajamento barato.
 
 ### 🎛️ Controle & automação
+
 - **Início agendado** — programar a multitransmissão pra começar num horário (e avisar "faltam 5 min").
 - **Mais ações no atalho global / Stream Deck** — além de começar/parar, expor **pausar destino**, **marcar momento**, **clipe**, **mute** como atalhos (já temos o plugin de global-shortcut).
 
@@ -87,7 +93,7 @@ Duas coisas definem nossa melhor jogada:
 
 1. **Aviso no celular/Discord quando um destino cai** 🟢 — minúsculo, evita a pior dor (descobrir 40 min depois que o YouTube caiu).
 2. **Gravação local + clipe instantâneo (backtrack)** 🟡 — o MediaMTX entrega a gravação quase de graça; o clipe por atalho é o recurso que mais encanta. Vira pilar de "repurpose de conteúdo".
-3. **Clipes sugeridos por pico de chat no relatório** 🟡 — usa **dados que já temos**, fecha o ciclo com a gravação e é **diferencial nosso** (multi-plataforma). 
+3. **Clipes sugeridos por pico de chat no relatório** 🟡 — usa **dados que já temos**, fecha o ciclo com a gravação e é **diferencial nosso** (multi-plataforma).
 4. **Tela "JÁ VOLTO" no sumiço do sinal** 🟡 — transforma o estado "Aguardando sinal" em algo que **protege a audiência**, não só informa.
 5. **Contador de viewers somado** 🟢 — simples, satisfatório, todo dia.
 
@@ -111,6 +117,7 @@ Se topar, eu começaria por um **doc de planejamento da "família de conteúdo"*
 ---
 
 ## Fontes
+
 - [StreamYard — Best Multistreaming Software 2026](https://streamyard.com/blog/best-multistreaming-software-2026)
 - [Restream — Why Restream beats multistreaming plugins](https://restream.io/blog/why-restream-beats-multistreaming-plugins/)
 - [Aitum — automation tool for streamers](https://aitum.tv/) · [Aitum Vertical](https://aitum.tv/vertical/)
