@@ -28,7 +28,7 @@ export function defaultConfig(): AppConfig {
   const profId = uid("prof");
   return {
     ingest: { protocol: "rtmp", host: "127.0.0.1", port: 1935, app: "live", key: "obs" },
-    mode: "per-platform",
+    mode: "hybrid",
     targets,
     settings: {
       minimizeToTray: true,
@@ -42,7 +42,7 @@ export function defaultConfig(): AppConfig {
       chatShowSource: false,
       chatShowTimestamps: false,
     },
-    profiles: [{ id: profId, name: "Padrão", mode: "per-platform", targets }],
+    profiles: [{ id: profId, name: "Padrão", mode: "hybrid", targets }],
     activeProfileId: profId,
   };
 }

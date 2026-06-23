@@ -3,6 +3,7 @@ import type {
   EncoderKind,
   EncodingAction,
   EncodingMode,
+  PlatformId,
   Target,
   VideoPreset,
 } from "./types";
@@ -21,11 +22,18 @@ function transcodeCost(p: VideoPreset, encoder: EncoderKind): number {
   return pixelFactor * encoderWeight * bitrateFactor;
 }
 
+/** No híbrido sem override: copia plataformas landscape, recodifica as verticais
+ *  (ex.: TikTok/Instagram), que precisam de formato diferente do stream do OBS. */
+export function smartHybridAction(platformId: PlatformId): EncodingAction {
+  const r = PLATFORMS[platformId].recommended;
+  return r.height > r.width ? "transcode" : "copy";
+}
+
 /** Ação efetiva de um destino, considerando o modo global. */
 export function effectiveAction(mode: EncodingMode, t: Target): EncodingAction {
   if (mode === "passthrough") return "copy";
   if (mode === "per-platform") return "transcode";
-  return t.encoding.action; // hybrid
+  return t.encoding.hybridOverride ?? smartHybridAction(t.platformId); // híbrido
 }
 
 function recommended(t: Target) {

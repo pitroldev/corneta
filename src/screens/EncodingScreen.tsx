@@ -16,25 +16,25 @@ const MODES: {
   desc: string;
 }[] = [
   {
-    id: "per-platform",
-    title: "Caprichado",
-    tag: "Recomendado",
-    icon: Sparkles,
-    desc: "Um encoding sob medida pra cada uma (vertical no TikTok, 1080p no YouTube...).",
-  },
-  {
     id: "passthrough",
     title: "Na lata",
     tag: "Mais leve",
     icon: Layers,
-    desc: "Encoda uma vez e copia pra todas. CPU quase zero — todas no mesmo padrão.",
+    desc: "Encoda uma vez no OBS e copia pra todas. CPU quase zero — todas no mesmo padrão.",
   },
   {
     id: "hybrid",
     title: "Esperto",
-    tag: "Híbrido",
+    tag: "Recomendado",
     icon: Wand2,
-    desc: "Copia onde dá e recodifica só onde precisa. O melhor dos dois mundos.",
+    desc: "Copia onde dá e recodifica só onde precisa (ex.: vertical no TikTok). Decide sozinho.",
+  },
+  {
+    id: "per-platform",
+    title: "Caprichado",
+    tag: "Máx. qualidade",
+    icon: Sparkles,
+    desc: "Um encoding sob medida pra cada uma. Melhor imagem, mas o mais pesado (recodifica todas).",
   },
 ];
 
@@ -45,6 +45,9 @@ export function EncodingScreen() {
   if (!config) return null;
 
   const lcd = lowestCommonDenominator(config);
+  const hasCopy = config.targets
+    .filter((t) => t.enabled)
+    .some((t) => effectiveAction(config.mode, t) === "copy");
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -71,7 +74,7 @@ export function EncodingScreen() {
                   : "border-2 border-transparent bg-surface-2 hover:bg-surface-3"
               )}
             >
-              {m.id === "per-platform" && (
+              {m.id === "hybrid" && (
                 <span className="absolute -right-2 -top-2.5 rotate-3 rounded-sm bg-brass px-2 py-0.5 font-display text-[11px] font-extrabold uppercase text-brass-ink pop-sm">
                   {m.tag}
                 </span>
@@ -80,7 +83,7 @@ export function EncodingScreen() {
                 <span className={cn("grid size-9 place-items-center rounded-md", active ? "bg-brass text-brass-ink" : "bg-surface text-ink-muted")}>
                   <Icon className="size-5" strokeWidth={2.3} />
                 </span>
-                {m.id !== "per-platform" && (
+                {m.id !== "hybrid" && (
                   <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{m.tag}</span>
                 )}
               </div>
@@ -98,14 +101,14 @@ export function EncodingScreen() {
         })}
       </div>
 
-      {config.mode === "passthrough" && lcd.capBy && (
+      {hasCopy && lcd.capBy && (
         <Card className="mt-4 flex gap-3 bg-surface-2">
           <Info className="mt-0.5 size-5 shrink-0 text-brass" />
           <p className="text-sm text-ink-muted">
-            No modo <strong className="text-ink">Na lata</strong>, todas recebem o mesmo stream. A gente
-            usa <strong className="text-ink">{fmtBitrate(lcd.videoKbps)}</strong> pra caber no{" "}
-            <strong className="text-ink">{lcd.capBy}</strong> (o mais apertado). Quer mais qualidade em
-            alguma? Vai de <strong className="text-ink">Caprichado</strong>.
+            Destinos <strong className="text-ink">em cópia</strong> recebem o stream do OBS como está — a
+            Corneta não muda o bitrate deles. Configure o OBS em{" "}
+            <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong> pra caber no{" "}
+            <strong className="text-ink">{lcd.capBy}</strong> (o mais apertado).
           </p>
         </Card>
       )}
@@ -201,17 +204,31 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       </div>
 
       {config.mode === "hybrid" && (
-        <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
-          <input
-            type="checkbox"
-            className="size-4 accent-brass"
-            checked={enc.action === "transcode"}
-            onChange={(e) =>
-              updateTarget(t.id, { encoding: { ...enc, action: e.target.checked ? "transcode" : "copy" } })
-            }
-          />
-          Recodificar
-        </label>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+            <input
+              type="checkbox"
+              className="size-4 accent-brass"
+              checked={action === "transcode"}
+              onChange={(e) =>
+                updateTarget(t.id, {
+                  encoding: { ...enc, hybridOverride: e.target.checked ? "transcode" : "copy" },
+                })
+              }
+            />
+            Recodificar
+          </label>
+          {enc.hybridOverride === undefined ? (
+            <Badge className="bg-surface text-ink-faint">auto</Badge>
+          ) : (
+            <button
+              onClick={() => updateTarget(t.id, { encoding: { ...enc, hybridOverride: undefined } })}
+              className="text-[11px] font-semibold text-brass hover:underline"
+            >
+              voltar ao auto
+            </button>
+          )}
+        </div>
       )}
 
       {action === "transcode" ? (

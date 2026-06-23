@@ -17,12 +17,15 @@ pub struct VideoPreset {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetEncoding {
-    /// "copy" | "transcode"
+    /// "copy" | "transcode" (legado — não usado; o híbrido decide via hybrid_override/auto)
     pub action: String,
     #[serde(default)]
     pub preset: Option<VideoPreset>,
     /// "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software"
     pub encoder: String,
+    /// No modo híbrido: override manual ("copy"/"transcode"). None = decisão automática.
+    #[serde(default)]
+    pub hybrid_override: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

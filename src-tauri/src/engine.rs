@@ -28,18 +28,27 @@ pub fn recommended_preset(platform_id: &str) -> VideoPreset {
     }
 }
 
+/// No híbrido sem override: copia plataformas landscape, recodifica as verticais
+/// (ex.: TikTok/Instagram), que precisam de formato diferente do stream do OBS.
+fn smart_hybrid_action(platform_id: &str) -> &'static str {
+    let r = recommended_preset(platform_id);
+    if r.height > r.width {
+        "transcode"
+    } else {
+        "copy"
+    }
+}
+
 /// Ação efetiva considerando o modo global.
-pub fn effective_action(mode: &str, t: &Target) -> &'static str {
+pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
     match mode {
         "passthrough" => "copy",
         "per-platform" => "transcode",
-        _ => {
-            if t.encoding.action == "transcode" {
-                "transcode"
-            } else {
-                "copy"
-            }
-        }
+        // híbrido: override manual, senão decide sozinho.
+        _ => match t.encoding.hybrid_override.as_deref() {
+            Some(o) if !o.is_empty() => o,
+            _ => smart_hybrid_action(&t.platform_id),
+        },
     }
 }
 

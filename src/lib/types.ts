@@ -57,10 +57,13 @@ export interface PlatformPreset {
 
 /** Configuração de encoding de um destino específico. */
 export interface TargetEncoding {
+  /** Legado — não usado; o híbrido decide via hybridOverride/auto. */
   action: EncodingAction;
-  /** Quando action = "transcode": parâmetros de saída. */
+  /** Parâmetros de saída quando recodifica. */
   preset?: VideoPreset;
   encoder: EncoderKind;
+  /** No modo híbrido: override manual. undefined = decisão automática. */
+  hybridOverride?: EncodingAction;
 }
 
 /** Um destino de transmissão configurado pelo usuário. */
