@@ -3,6 +3,7 @@ mod config;
 mod engine;
 mod keys;
 mod obs;
+mod session;
 
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
@@ -65,6 +66,10 @@ pub fn run() {
             commands::obs_autoconfigure,
             commands::start_engine,
             commands::stop_engine,
+            commands::list_sessions,
+            commands::read_session,
+            commands::delete_session,
+            commands::open_sessions_dir,
         ])
         .setup(|app| {
             // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.

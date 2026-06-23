@@ -147,3 +147,41 @@ export interface EncoderInfo {
   /** Sessões simultâneas estimadas (heurística). */
   maxSessions?: number;
 }
+
+// ---- Relatório pós-live ----
+
+export interface SessionPlatform {
+  id: string;
+  name: string;
+  platformId: PlatformId;
+}
+
+export interface SessionMeta {
+  id: string;
+  startedAt: number;
+  endedAt?: number;
+  durationSec: number;
+  mode: EncodingMode;
+  platforms: SessionPlatform[];
+}
+
+export interface SessionSampleTarget {
+  id: string;
+  name: string;
+  state: TargetState;
+  bitrate: number;
+  fps: number;
+  dropped: number;
+}
+
+export interface SessionSample {
+  t: number;
+  cpu?: number;
+  gpu?: number;
+  targets: SessionSampleTarget[];
+}
+
+export interface SessionData {
+  meta: SessionMeta;
+  samples: SessionSample[];
+}

@@ -2,6 +2,7 @@
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::keys;
+use crate::session;
 use crate::AppState;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -354,12 +355,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let started = now_ms();
     let snap = EngineSnapshot::starting(&config, started);
     let running = Arc::new(AtomicBool::new(true));
+    let session_path = session::start_session(&app, &config);
     {
         let mut eng = state.engine.lock().unwrap();
         eng.mediamtx = Some(mtx_child);
         eng.snapshot = Some(snap.clone());
         eng.started_ms = started;
         eng.running = running.clone();
+        eng.session_path = session_path;
     }
     emit(&app, &snap);
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
@@ -579,8 +582,13 @@ fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
     snap.cpu = Some((cpu * 10.0).round() / 10.0);
     snap.gpu = gpu.map(|g| (g * 10.0).round() / 10.0);
     let out = snap.clone();
+    let session = eng.session_path.clone();
     drop(eng);
     emit(app, &out);
+    // Grava a amostra desta janela (~2s) no NDJSON da sessão.
+    if let Some(path) = session {
+        session::record_sample(&path, &out);
+    }
 }
 
 /// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado (§14.2).
@@ -588,15 +596,16 @@ pub fn kill_engine(app: &AppHandle) {
     use std::sync::atomic::Ordering;
     log::info!("motor: encerrando");
     let state = app.state::<AppState>();
-    let (children, running) = {
+    let (children, running, session_path) = {
         let mut eng = state.engine.lock().unwrap();
         eng.snapshot = Some(EngineSnapshot::stopped());
+        let session_path = eng.session_path.take();
         let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
             eng.ffmpegs.drain().map(|(_, c)| c).collect();
         if let Some(m) = eng.mediamtx.take() {
             children.push(m);
         }
-        (children, eng.running.clone())
+        (children, eng.running.clone(), session_path)
     };
     // Impede os supervisores de respawnar.
     running.store(false, Ordering::Relaxed);
@@ -616,5 +625,41 @@ pub fn kill_engine(app: &AppHandle) {
             let _ = pid; // em Unix, child.kill() já encerra; árvore tratada no futuro
         }
     }
+    // Fecha a gravação da sessão (relatório pós-live).
+    if let Some(path) = session_path {
+        session::end_session(&path);
+    }
     emit(app, &EngineSnapshot::stopped());
+}
+
+// --------------------- Relatórios (pós-live) ----------------------
+
+#[tauri::command]
+pub fn list_sessions(app: AppHandle) -> Vec<session::SessionMeta> {
+    session::list_sessions(&app)
+}
+
+#[tauri::command]
+pub fn read_session(app: AppHandle, id: String) -> Result<String, String> {
+    session::read_session(&app, &id).ok_or_else(|| "sessão não encontrada".to_string())
+}
+
+#[tauri::command]
+pub fn delete_session(app: AppHandle, id: String) -> Result<(), String> {
+    session::delete_session(&app, &id);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_sessions_dir(app: AppHandle) -> Result<(), String> {
+    let dir = session::sessions_dir(&app).ok_or("pasta de sessões indisponível")?;
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    }
+    Ok(())
 }

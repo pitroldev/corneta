@@ -9,6 +9,7 @@ import { Mascot, SoundWaves } from "./components/decor";
 import { PlatformsScreen } from "./screens/PlatformsScreen";
 import { EncodingScreen } from "./screens/EncodingScreen";
 import { GoLiveScreen } from "./screens/GoLiveScreen";
+import { ReportsScreen } from "./screens/ReportsScreen";
 import { AboutScreen } from "./screens/AboutScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
@@ -53,6 +54,7 @@ export default function App() {
                   {screen === "platforms" && <PlatformsScreen />}
                   {screen === "encoding" && <EncodingScreen />}
                   {screen === "golive" && <GoLiveScreen />}
+                  {screen === "reports" && <ReportsScreen />}
                   {screen === "about" && <AboutScreen />}
                   {screen === "settings" && <SettingsScreen />}
                 </motion.div>

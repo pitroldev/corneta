@@ -249,4 +249,6 @@ pub struct EngineRuntime {
     pub started_ms: u128,
     /// Última qualidade refletida no ícone da bandeja (evita redesenhar à toa).
     pub tray_quality: String,
+    /// Arquivo NDJSON da sessão em gravação (relatório pós-live).
+    pub session_path: Option<std::path::PathBuf>,
 }

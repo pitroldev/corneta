@@ -8,6 +8,7 @@ import type {
   AppConfig,
   EncoderInfo,
   EngineSnapshot,
+  SessionMeta,
   TargetStatus,
 } from "./types";
 import { defaultConfig } from "./factory";
@@ -27,6 +28,11 @@ export interface CornetaApi {
   start(): Promise<void>;
   stop(): Promise<void>;
   subscribe(cb: (s: EngineSnapshot) => void): () => void;
+  // Relatórios pós-live
+  listSessions(): Promise<SessionMeta[]>;
+  readSession(id: string): Promise<string>;
+  deleteSession(id: string): Promise<void>;
+  openSessionsDir(): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +89,22 @@ function tauriApi(): CornetaApi {
       );
       return () => unlisten?.();
     },
+    async listSessions() {
+      const { invoke } = await core();
+      return invoke<SessionMeta[]>("list_sessions");
+    },
+    async readSession(id) {
+      const { invoke } = await core();
+      return invoke<string>("read_session", { id });
+    },
+    async deleteSession(id) {
+      const { invoke } = await core();
+      await invoke("delete_session", { id });
+    },
+    async openSessionsDir() {
+      const { invoke } = await core();
+      await invoke("open_sessions_dir");
+    },
   };
 }
 
@@ -115,10 +137,75 @@ function mockApi(): CornetaApi {
     return cfg;
   };
 
+  // --- sessões (relatório pós-live) ---
+  const SESSIONS_KEY = "corneta.sessions";
+  const loadSessions = (): Record<string, string> => {
+    try {
+      return JSON.parse(localStorage.getItem(SESSIONS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  };
+  const saveSessions = (m: Record<string, string>) =>
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(m));
+
+  // Gera uma sessão sintética (demo), com opção de janela problemática.
+  const genSession = (
+    startedAt: number,
+    mins: number,
+    plats: { id: string; name: string; platformId: string }[],
+    opts?: { dropAtMin?: number; dropIdx?: number; highCpu?: boolean }
+  ): string => {
+    const meta = { kind: "meta", id: String(startedAt), startedAt, mode: "per-platform", platforms: plats };
+    const lines = [JSON.stringify(meta)];
+    const step = 2000;
+    const n = Math.round((mins * 60 * 1000) / step);
+    const base = [6000, 9000, 6000, 4500];
+    const drops = plats.map(() => 0);
+    for (let k = 0; k < n; k++) {
+      const t = startedAt + k * step;
+      const minNow = (k * step) / 60000;
+      let cpu = 46 + Math.sin(k / 9) * 7 + Math.random() * 5;
+      const gpu = 32 + Math.sin(k / 7) * 6 + Math.random() * 4;
+      const targets = plats.map((p, i) => {
+        let bitrate = Math.round(base[i % base.length] * (0.96 + Math.random() * 0.07));
+        let state = "live";
+        const isDrop =
+          opts?.dropAtMin != null && Math.abs(minNow - opts.dropAtMin) < 0.18 && i === (opts.dropIdx ?? 0);
+        if (isDrop) {
+          bitrate = Math.round(base[i % base.length] * 0.3);
+          state = "reconnecting";
+          drops[i] += 25;
+          if (opts?.highCpu) cpu = 97;
+        }
+        return { id: p.id, name: p.name, state, bitrate, fps: 60, dropped: drops[i] };
+      });
+      lines.push(
+        JSON.stringify({ kind: "sample", t, cpu: Math.round(cpu * 10) / 10, gpu: Math.round(gpu * 10) / 10, targets })
+      );
+    }
+    lines.push(JSON.stringify({ kind: "end", endedAt: startedAt + n * step }));
+    return lines.join("\n");
+  };
+
+  const seedSessions = () => {
+    const m = loadSessions();
+    if (Object.keys(m).length > 0) return;
+    const tw = { id: "t1", name: "Twitch", platformId: "twitch" };
+    const yt = { id: "y1", name: "YouTube", platformId: "youtube" };
+    const a = Date.now() - 26 * 3600 * 1000;
+    const b = Date.now() - 3 * 3600 * 1000;
+    m[String(a)] = genSession(a, 35, [tw, yt]); // sem incidentes
+    m[String(b)] = genSession(b, 48, [tw, yt], { dropAtMin: 23, dropIdx: 0, highCpu: true }); // com incidente
+    saveSessions(m);
+  };
+
   // --- simulador do motor ---
   let snapshot: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
   const listeners = new Set<(s: EngineSnapshot) => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
+  // Gravação da sessão demo em andamento.
+  let rec: { id: string; lines: string[] } | null = null;
 
   const emit = () => listeners.forEach((l) => l(structuredClone(snapshot)));
 
@@ -140,6 +227,24 @@ function mockApi(): CornetaApi {
     }
     snapshot.cpu = Math.round((30 + Math.random() * 40) * 10) / 10;
     snapshot.gpu = Math.round((20 + Math.random() * 30) * 10) / 10;
+    if (rec) {
+      rec.lines.push(
+        JSON.stringify({
+          kind: "sample",
+          t: now,
+          cpu: snapshot.cpu,
+          gpu: snapshot.gpu,
+          targets: Object.values(snapshot.targets).map((s) => ({
+            id: s.targetId,
+            name: s.name,
+            state: s.state,
+            bitrate: s.bitrateKbps,
+            fps: s.fps,
+            dropped: s.droppedFrames,
+          })),
+        })
+      );
+    }
     emit();
   };
 
@@ -191,6 +296,16 @@ function mockApi(): CornetaApi {
         };
       }
       snapshot = { state: "starting", startedAt: Date.now(), targets };
+      const sid = String(snapshot.startedAt);
+      const plats = cfg.targets
+        .filter((x) => x.enabled)
+        .map((t) => ({ id: t.id, name: t.name, platformId: t.platformId }));
+      rec = {
+        id: sid,
+        lines: [
+          JSON.stringify({ kind: "meta", id: sid, startedAt: snapshot.startedAt, mode: cfg.mode, platforms: plats }),
+        ],
+      };
       emit();
       if (timer) clearInterval(timer);
       timer = setInterval(tick, 1000);
@@ -198,6 +313,13 @@ function mockApi(): CornetaApi {
     async stop() {
       if (timer) clearInterval(timer);
       timer = null;
+      if (rec) {
+        rec.lines.push(JSON.stringify({ kind: "end", endedAt: Date.now() }));
+        const m = loadSessions();
+        m[rec.id] = rec.lines.join("\n");
+        saveSessions(m);
+        rec = null;
+      }
       snapshot = { state: "stopped", startedAt: null, targets: {} };
       emit();
     },
@@ -205,6 +327,50 @@ function mockApi(): CornetaApi {
       listeners.add(cb);
       cb(structuredClone(snapshot));
       return () => listeners.delete(cb);
+    },
+    async listSessions() {
+      seedSessions();
+      const m = loadSessions();
+      const out: SessionMeta[] = [];
+      for (const [id, ndjson] of Object.entries(m)) {
+        const lines = ndjson.trim().split("\n");
+        let meta: { kind?: string; startedAt?: number; mode?: string; platforms?: unknown };
+        try {
+          meta = JSON.parse(lines[0]);
+        } catch {
+          continue;
+        }
+        if (meta?.kind !== "meta") continue;
+        const startedAt = meta.startedAt ?? 0;
+        let endedAt = startedAt;
+        try {
+          const last = JSON.parse(lines[lines.length - 1]);
+          endedAt = last.kind === "end" ? last.endedAt : last.t ?? startedAt;
+        } catch {
+          /* ignore */
+        }
+        out.push({
+          id,
+          startedAt,
+          endedAt,
+          durationSec: Math.max(0, Math.round((endedAt - startedAt) / 1000)),
+          mode: (meta.mode ?? "per-platform") as SessionMeta["mode"],
+          platforms: (meta.platforms ?? []) as SessionMeta["platforms"],
+        });
+      }
+      out.sort((a, b) => b.startedAt - a.startedAt);
+      return out;
+    },
+    async readSession(id) {
+      return loadSessions()[id] ?? "";
+    },
+    async deleteSession(id) {
+      const m = loadSessions();
+      delete m[id];
+      saveSessions(m);
+    },
+    async openSessionsDir() {
+      // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
     },
   };
 }

@@ -37,7 +37,7 @@
 
 | # | Item | Status | Quem | Critério de pronto |
 |---|---|---|---|---|
-| 5 | **Gerar instalador** (`pnpm tauri build` → NSIS) | ⛔ | 🤖 | `Corneta_x.y.z_x64-setup.exe` instala e abre |
+| 5 | **Gerar instalador** (`pnpm tauri build` → NSIS) | 🟡 | 🤖+🧑 | **Gerado:** `Corneta_0.1.0_x64-setup.exe` (não assinado). Falta você validar instalar+abrir |
 | 6 | **Auto-update via GitHub** | ⛔ | 🤖+🧑 | Conforme [`ATUALIZACAO-AUTOMATICA.md`](./ATUALIZACAO-AUTOMATICA.md); update de v→v validado |
 | 7 | **Assinatura de código (Windows)** | ⛔ | 🧑 | Conforme [`ASSINATURA.md`](./ASSINATURA.md); instala sem alerta (ou OV com reputação) |
 | 8 | **Licença** (MIT/Apache-2.0) + `LICENSE` no repo | ⛔ | 🧑 | Arquivo de licença escolhido e commitado |
@@ -84,7 +84,7 @@
 - **Cloud relay "traga seu VPS"** (não estourar o upload doméstico — §7 do plano).
 - **macOS / Linux** (keyring `apple-native`/`sync-secret-service`, assinatura/notarização Apple).
 - **Gravação local simultânea**, **chat/métricas unificados** por plataforma.
-- 📄 **Relatório pós-live** (diagnóstico do que travou/lentidão por sessão) — planejado em [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md).
+- ✅ **Relatório pós-live** (v1: grava a sessão em NDJSON + tela com gráficos, janelas problemáticas e veredito) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: stats do OBS (Fase 4).
 
 ---
 

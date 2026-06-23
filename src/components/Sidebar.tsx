@@ -1,9 +1,9 @@
-import { Info, Radio, Settings, Sliders, Tv2 } from "lucide-react";
+import { BarChart3, Info, Radio, Settings, Sliders, Tv2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
 import { Mascot } from "./decor";
 
-export type Screen = "platforms" | "encoding" | "golive" | "about" | "settings";
+export type Screen = "platforms" | "encoding" | "golive" | "reports" | "about" | "settings";
 
 const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
   { id: "platforms", label: "Plataformas", icon: Tv2, hint: "pra onde toca" },
@@ -82,8 +82,17 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Configurações + Sobre + estado ao vivo */}
+      {/* Relatórios + Configurações + Sobre + estado ao vivo */}
       <div className="mt-auto flex flex-col gap-2">
+        <button
+          onClick={() => onNavigate("reports")}
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
+            screen === "reports" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
+          )}
+        >
+          <BarChart3 className="size-4" strokeWidth={2.3} /> Relatórios
+        </button>
         <button
           onClick={() => onNavigate("settings")}
           className={cn(
