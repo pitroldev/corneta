@@ -156,13 +156,13 @@ export function SettingsScreen() {
             />
           </SettingRow>
           <SettingRow
-            title="Tela “JÁ VOLTO” quando o sinal cair"
-            desc="Se o OBS parar de mandar sinal, a Corneta segura a live com um slate “JÁ VOLTO” nas plataformas até voltar — em vez de a transmissão cair."
+            title="Proteção contra quedas"
+            desc="Se o sinal do OBS cair no meio da live, a Corneta segura a transmissão com um slate “JÁ VOLTO” nas plataformas até voltar — em vez de a live cair. (Só age depois que a transmissão já começou.)"
           >
             <Toggle
               checked={settings.brbEnabled}
               onChange={(v) => setSettings({ brbEnabled: v })}
-              label="Tela JÁ VOLTO"
+              label="Proteção contra quedas"
             />
           </SettingRow>
           <SettingRow title="Tema claro" desc="Troca a interface pro modo claro (papel).">

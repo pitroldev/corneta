@@ -88,7 +88,8 @@ pub struct Settings {
     /// Tamanho da fonte do chat: "sm" | "md" | "lg".
     #[serde(default = "default_font")]
     pub chat_font_size: String,
-    /// Tela "JÁ VOLTO": empurra um slate pras plataformas quando o sinal cai.
+    /// Proteção contra quedas: empurra um slate "JÁ VOLTO" pras plataformas se o sinal
+    /// cair NO MEIO da live (só após já ter tido sinal) — mantém a transmissão de pé.
     #[serde(default = "default_true")]
     pub brb_enabled: bool,
 }

@@ -495,6 +495,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let running = Arc::new(AtomicBool::new(true));
     // Sinal de ingestão: true quando o OBS está publicando no MediaMTX.
     let has_signal = Arc::new(AtomicBool::new(false));
+    // Já teve sinal ao menos uma vez nesta sessão? (slate "JÁ VOLTO" só vale em QUEDAS.)
+    let signal_seen = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
     // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
@@ -529,9 +531,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // 2b) Poller do sinal de ingestão (API do MediaMTX): há publisher (OBS no ar)?
     let run_sig = running.clone();
     let sig = has_signal.clone();
+    let seen_sig = signal_seen.clone();
     tauri::async_runtime::spawn_blocking(move || {
         while run_sig.load(Ordering::Relaxed) {
-            sig.store(mediamtx_has_publisher(), Ordering::Relaxed);
+            let pub_now = mediamtx_has_publisher();
+            sig.store(pub_now, Ordering::Relaxed);
+            if pub_now {
+                seen_sig.store(true, Ordering::Relaxed);
+            }
             std::thread::sleep(std::time::Duration::from_millis(700));
         }
     });
@@ -550,6 +557,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let run_flag = running.clone();
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
         let signal = has_signal.clone();
+        let seen = signal_seen.clone();
         tauri::async_runtime::spawn(async move {
             while run_flag.load(Ordering::Relaxed) {
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
@@ -562,9 +570,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     continue;
                 }
 
-                // Sem sinal de ingestão: empurra o slate "JÁ VOLTO" (ou só aguarda, se desligado).
+                // Sem sinal de ingestão: empurra o slate "JÁ VOLTO" — mas só se JÁ houve sinal
+                // antes (proteção contra QUEDAS). No começo, sem ingestão ainda, só aguarda.
                 if !signal.load(Ordering::Relaxed) {
-                    if brb_enabled {
+                    if brb_enabled && seen.load(Ordering::Relaxed) {
                         run_slate(&app_t, &target_id, &slate_args, &run_flag, &pause_flag, &signal)
                             .await;
                     } else {
