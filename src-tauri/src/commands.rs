@@ -1104,35 +1104,27 @@ pub fn chat_stop(app: AppHandle) {
 
 /// Abre (ou foca) a janela flutuante só do chat (always-on-top), pro streamer
 /// deixar num canto/segundo monitor sem o app inteiro.
+// IMPORTANTE: precisa ser ASYNC. Criar um webview a partir de um comando SÍNCRONO
+// trava no Windows (o comando roda na thread principal e o build espera o event-loop
+// dela → deadlock: janela em branco/inerte). Async roda fora da thread principal.
 #[tauri::command]
-pub fn open_chat_window(app: AppHandle) -> Result<(), String> {
+pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("chat") {
         let _ = w.show();
         let _ = w.set_focus();
         return Ok(());
     }
-    // Constrói o webview NA THREAD PRINCIPAL e sem bloquear o comando — criar uma
-    // segunda janela de forma síncrona a partir de um comando trava o event-loop
-    // (WebView2). `always_on_top` é aplicado depois do build (mais estável).
-    let app2 = app.clone();
-    app.run_on_main_thread(move || {
-        match tauri::WebviewWindowBuilder::new(
-            &app2,
-            "chat",
-            tauri::WebviewUrl::App("chat.html".into()),
-        )
-        .title("Corneta — Chat")
-        .inner_size(380.0, 600.0)
-        .min_inner_size(300.0, 360.0)
-        .resizable(true)
-        .build()
-        {
-            Ok(w) => {
-                let _ = w.set_always_on_top(true);
-            }
-            Err(e) => log::warn!("janela do chat: {e}"),
-        }
-    })
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        "chat",
+        tauri::WebviewUrl::App("chat.html".into()),
+    )
+    .title("Corneta — Chat")
+    .inner_size(380.0, 600.0)
+    .min_inner_size(300.0, 360.0)
+    .resizable(true)
+    .always_on_top(true)
+    .build()
     .map_err(|e| e.to_string())?;
     Ok(())
 }
