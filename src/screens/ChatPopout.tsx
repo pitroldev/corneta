@@ -1,28 +1,38 @@
-import { useEffect } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Trash2, Wifi, WifiOff } from "lucide-react";
 import { useStore } from "../lib/store";
+import { cn } from "../lib/utils";
 import { Mascot } from "../components/decor";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
+import { AlertsFeed } from "../components/AlertsFeed";
 
 /** Versão compacta do chat para a janela flutuante (always-on-top). */
 export function ChatPopout() {
   const config = useStore((s) => s.config);
   const loaded = useStore((s) => s.loaded);
   const messages = useStore((s) => s.chatMessages);
+  const alerts = useStore((s) => s.alerts);
   const connected = useStore((s) => s.chatConnected);
   const connectChat = useStore((s) => s.connectChat);
   const disconnectChat = useStore((s) => s.disconnectChat);
   const clearChat = useStore((s) => s.clearChat);
+  const clearAlerts = useStore((s) => s.clearAlerts);
   const load = useStore((s) => s.load);
   const bindChat = useStore((s) => s.bindChat);
+  const bindAlerts = useStore((s) => s.bindAlerts);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
+  const [tab, setTab] = useState<"chat" | "alerts">("chat");
 
-  // Setup próprio do popout (sem o motor/atalhos do app): carrega config + ouve o chat.
+  // Setup próprio do popout (sem o motor/atalhos do app): config + chat + alertas.
   useEffect(() => {
     void load();
-    const unbind = bindChat();
-    return () => unbind();
-  }, [load, bindChat]);
+    const unbindChat = bindChat();
+    const unbindAlerts = bindAlerts();
+    return () => {
+      unbindChat();
+      unbindAlerts();
+    };
+  }, [load, bindChat, bindAlerts]);
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
@@ -51,11 +61,18 @@ export function ChatPopout() {
 
   return (
     <div className="flex h-screen flex-col bg-panel">
-      <div className="flex items-center gap-2 border-b-2 border-border-soft px-3 py-2">
-        <div className="grid size-6 place-items-center rounded bg-brass text-brass-ink">
+      <div className="flex items-center gap-2 border-b-2 border-border-soft px-2.5 py-2">
+        <div className="grid size-6 shrink-0 place-items-center rounded bg-brass text-brass-ink">
           <Mascot className="size-4" />
         </div>
-        <span className="font-display text-sm font-extrabold">Chat</span>
+        <div className="flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5">
+          <TabBtn active={tab === "chat"} onClick={() => setTab("chat")}>
+            Chat
+          </TabBtn>
+          <TabBtn active={tab === "alerts"} onClick={() => setTab("alerts")}>
+            Alertas{alerts.length > 0 ? ` ${alerts.length}` : ""}
+          </TabBtn>
+        </div>
         <div className="ml-auto flex items-center gap-1">
           {connected ? (
             <button onClick={() => void disconnectChat()} title="Desconectar" className={iconBtn}>
@@ -66,12 +83,42 @@ export function ChatPopout() {
               <Wifi className="size-4" />
             </button>
           )}
-          <button onClick={clearChat} title="Limpar" className={iconBtn}>
+          <button
+            onClick={() => (tab === "chat" ? clearChat() : clearAlerts())}
+            title="Limpar"
+            className={iconBtn}
+          >
             <Trash2 className="size-4" />
           </button>
         </div>
       </div>
-      <ChatFeed messages={messages} view={view} connected={connected} className="flex-1" />
+      {tab === "chat" ? (
+        <ChatFeed messages={messages} view={view} connected={connected} className="flex-1" />
+      ) : (
+        <AlertsFeed alerts={alerts} className="flex-1" />
+      )}
     </div>
+  );
+}
+
+function TabBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded px-2 py-0.5 font-display text-xs font-extrabold transition-colors",
+        active ? "bg-brass text-brass-ink" : "text-ink-faint hover:text-ink"
+      )}
+    >
+      {children}
+    </button>
   );
 }
