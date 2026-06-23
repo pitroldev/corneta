@@ -4,6 +4,7 @@ import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { renderBrbSlatePng } from "./lib/brbSlate";
 import { Sidebar, type Screen } from "./components/Sidebar";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "reports", "about", "settings"];
 import { TitleBar } from "./components/TitleBar";
@@ -105,13 +106,15 @@ export default function App() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
-                  {screen === "platforms" && <PlatformsScreen />}
-                  {screen === "encoding" && <EncodingScreen />}
-                  {screen === "golive" && <GoLiveScreen />}
-                  {screen === "chat" && <ChatScreen />}
-                  {screen === "reports" && <ReportsScreen />}
-                  {screen === "about" && <AboutScreen />}
-                  {screen === "settings" && <SettingsScreen />}
+                  <ErrorBoundary>
+                    {screen === "platforms" && <PlatformsScreen />}
+                    {screen === "encoding" && <EncodingScreen />}
+                    {screen === "golive" && <GoLiveScreen />}
+                    {screen === "chat" && <ChatScreen />}
+                    {screen === "reports" && <ReportsScreen />}
+                    {screen === "about" && <AboutScreen />}
+                    {screen === "settings" && <SettingsScreen />}
+                  </ErrorBoundary>
                 </motion.div>
               </AnimatePresence>
             </div>
