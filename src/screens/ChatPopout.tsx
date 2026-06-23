@@ -15,7 +15,7 @@ export function ChatPopout() {
 
   if (!loaded || !config) {
     return (
-      <div className="grid h-screen place-items-center bg-night">
+      <div className="grid h-screen place-items-center bg-panel">
         <div className="grid size-12 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
           <Mascot className="size-7" />
         </div>
@@ -36,7 +36,7 @@ export function ChatPopout() {
   const iconBtn = "rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink";
 
   return (
-    <div className="flex h-screen flex-col bg-night">
+    <div className="flex h-screen flex-col bg-panel">
       <div className="flex items-center gap-2 border-b-2 border-border-soft px-3 py-2">
         <div className="grid size-6 place-items-center rounded bg-brass text-brass-ink">
           <Mascot className="size-4" />

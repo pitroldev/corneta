@@ -228,7 +228,7 @@ export function Hint({ text, className }: { text: string; className?: string }) 
   return (
     <span className={cn("group relative inline-flex align-middle", className)}>
       <Info className="size-3.5 cursor-help text-ink-faint" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 hidden w-52 -translate-x-1/2 rounded-md bg-night px-2.5 py-1.5 text-[11px] font-medium normal-case leading-snug text-ink pop group-hover:block">
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 hidden w-52 -translate-x-1/2 rounded-md bg-[#1a130c] px-2.5 py-1.5 text-[11px] font-medium normal-case leading-snug text-[#fcf3e3] pop group-hover:block">
         {text}
       </span>
     </span>

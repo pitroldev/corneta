@@ -252,8 +252,14 @@ function TargetRow({ target }: { target: Target }) {
         <KeyField target={target} />
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <Button variant="subtle" size="sm" onClick={runTest} disabled={testing}>
-            <Wifi className="size-3.5" /> {testing ? "Testando…" : "Testar conexão"}
+          <Button
+            variant="subtle"
+            size="sm"
+            onClick={runTest}
+            disabled={testing}
+            title="Pinga o servidor de ingestão (não valida a chave)"
+          >
+            <Wifi className="size-3.5" /> {testing ? "Testando…" : "Testar rede"}
           </Button>
           {preset.keyUrl && (
             <button
@@ -263,11 +269,14 @@ function TargetRow({ target }: { target: Target }) {
               Pegar minha chave <ExternalLink className="size-3" />
             </button>
           )}
-          {testResult && (
-            <span className={cn("font-semibold", testResult.ok ? "text-ok" : "text-bad")}>
-              {testResult.ok ? "✓" : "✕"} {testResult.msg}
-            </span>
-          )}
+          {testResult &&
+            (testResult.ok ? (
+              <span className="font-medium text-ink-muted">
+                📡 {testResult.msg} · a chave só é confirmada ao vivo
+              </span>
+            ) : (
+              <span className="font-semibold text-bad">✕ {testResult.msg}</span>
+            ))}
         </div>
 
         {preset.note && <p className="text-xs text-ink-faint">{preset.note}</p>}

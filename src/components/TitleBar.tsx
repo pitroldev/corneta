@@ -30,7 +30,7 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-9 shrink-0 items-center justify-between bg-night pl-3 select-none"
+      className="flex h-9 shrink-0 items-center justify-between border-b border-border-soft bg-panel pl-3 select-none"
     >
       <div data-tauri-drag-region className="pointer-events-none flex items-center gap-2">
         <div className="grid size-5 place-items-center rounded-[5px] bg-brass text-brass-ink">

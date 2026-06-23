@@ -880,8 +880,8 @@ fn tcp_reach(ingest_url: &str) -> Result<String, String> {
         .next()
         .ok_or_else(|| format!("endereço não resolvido: {host}"))?;
     match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(5)) {
-        Ok(_) => Ok(format!("{host} alcançável")),
-        Err(_) => Err(format!("sem resposta de {host}:{port}")),
+        Ok(_) => Ok(format!("{host} respondeu")),
+        Err(_) => Err(format!("sem resposta de {host}:{port} — confira a URL/rede")),
     }
 }
 

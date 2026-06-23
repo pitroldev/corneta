@@ -448,15 +448,25 @@ function Checkup() {
         />
         {obs && obs !== "loading" && (
           <>
-            <CheckRow label="OBS acessível" ok={obs.reachable} detail={obs.error} />
+            <CheckRow
+              label="OBS conectado (obs-websocket)"
+              ok={obs.reachable}
+              warn={!obs.reachable}
+              detail={
+                obs.reachable
+                  ? undefined
+                  : "ative em Ferramentas → Configurações do Servidor WebSocket (e a senha em Configurações, se houver)"
+              }
+            />
             {obs.reachable && (
               <CheckRow
                 label="OBS apontando pra Corneta"
                 ok={obs.pointingAtCorneta}
+                warn={!obs.pointingAtCorneta}
                 detail={
                   obs.pointingAtCorneta
                     ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)}fps`
-                    : "use Configurar sozinho"
+                    : "clique em Configurar sozinho (tela Ao vivo)"
                 }
               />
             )}
@@ -482,7 +492,7 @@ function CheckRow({
   const Icon = ok ? Check : warn ? AlertTriangle : X;
   const cls = ok ? "text-ok" : warn ? "text-warn" : "text-bad";
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
       <Icon className={cn("size-4 shrink-0", cls)} strokeWidth={2.4} />
       <span className="font-semibold">{label}</span>
       {detail && <span className="text-xs text-ink-faint">· {detail}</span>}
