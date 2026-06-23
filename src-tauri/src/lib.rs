@@ -169,6 +169,10 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // A janela flutuante do chat fecha normalmente; só a principal vai pra bandeja.
+                if window.label() != "main" {
+                    return;
+                }
                 let app = window.app_handle();
                 let cfg = config::load(app);
                 if cfg.settings.minimize_to_tray {

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Trash2, Wifi, WifiOff } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Mascot } from "../components/decor";
@@ -12,6 +13,19 @@ export function ChatPopout() {
   const connectChat = useStore((s) => s.connectChat);
   const disconnectChat = useStore((s) => s.disconnectChat);
   const clearChat = useStore((s) => s.clearChat);
+  const load = useStore((s) => s.load);
+  const bindChat = useStore((s) => s.bindChat);
+  const theme = useStore((s) => s.config?.settings.theme ?? "dark");
+
+  // Setup próprio do popout (sem o motor/atalhos do app): carrega config + ouve o chat.
+  useEffect(() => {
+    void load();
+    const unbind = bindChat();
+    return () => unbind();
+  }, [load, bindChat]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   if (!loaded || !config) {
     return (

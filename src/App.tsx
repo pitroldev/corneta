@@ -14,7 +14,6 @@ import { PlatformsScreen } from "./screens/PlatformsScreen";
 import { EncodingScreen } from "./screens/EncodingScreen";
 import { GoLiveScreen } from "./screens/GoLiveScreen";
 import { ChatScreen } from "./screens/ChatScreen";
-import { ChatPopout } from "./screens/ChatPopout";
 import { ReportsScreen } from "./screens/ReportsScreen";
 import { AboutScreen } from "./screens/AboutScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -79,11 +78,6 @@ export default function App() {
       if (b64) void api.saveBrbSlate(b64);
     });
   }, []);
-
-  // Janela flutuante só-chat (aberta via open_chat_window com #chat-popout).
-  if (typeof window !== "undefined" && window.location.hash === "#chat-popout") {
-    return <ChatPopout />;
-  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden border border-border-soft">
