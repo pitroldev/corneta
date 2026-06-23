@@ -191,6 +191,97 @@ pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), String> {
 
 fn emit(app: &AppHandle, snap: &EngineSnapshot) {
     let _ = app.emit("engine://status", snap);
+    update_tray(app, snap);
+}
+
+fn fmt_mbps(kbps: u32) -> String {
+    if kbps >= 1000 {
+        format!("{:.1} Mbps", kbps as f64 / 1000.0)
+    } else {
+        format!("{kbps} kbps")
+    }
+}
+
+/// Qualidade geral do multistream → cor do ícone da bandeja.
+fn quality_of(snap: &EngineSnapshot) -> &'static str {
+    match snap.state.as_str() {
+        "stopped" => "idle",
+        "error" => "bad",
+        "starting" => "warn",
+        _ => {
+            let mut bad = false;
+            let mut warn = false;
+            for st in snap.targets.values() {
+                match st.state.as_str() {
+                    "error" => bad = true,
+                    "reconnecting" | "connecting" => warn = true,
+                    _ => {}
+                }
+            }
+            if bad {
+                "bad"
+            } else if warn {
+                "warn"
+            } else {
+                "good"
+            }
+        }
+    }
+}
+
+/// Tooltip da bandeja: cabeçalho + uma linha por plataforma (métrica/estado).
+fn tray_tooltip(snap: &EngineSnapshot) -> String {
+    if snap.state == "stopped" {
+        return "Corneta".into();
+    }
+    let header = match snap.state.as_str() {
+        "starting" => "Corneta · aguardando OBS".to_string(),
+        "error" => "Corneta · erro".to_string(),
+        _ => format!("Corneta · no ar ({})", snap.targets.len()),
+    };
+    let mut items: Vec<&engine::TargetStatus> = snap.targets.values().collect();
+    items.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut lines = vec![header];
+    for st in items {
+        let (mark, detail) = match st.state.as_str() {
+            "live" => ("✓", fmt_mbps(st.bitrate_kbps)),
+            "reconnecting" => ("⚠", "reconectando".to_string()),
+            "error" => ("✕", "erro".to_string()),
+            _ => ("…", "conectando".to_string()),
+        };
+        lines.push(format!("{mark} {} · {detail}", st.name));
+    }
+    lines.join("\n")
+}
+
+/// Atualiza o ícone (só quando a qualidade muda) e o tooltip da bandeja.
+fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
+    let Some(tray) = app.tray_by_id("corneta-tray") else {
+        return;
+    };
+    let quality = quality_of(snap);
+    let changed = {
+        let state = app.state::<AppState>();
+        let mut eng = state.engine.lock().unwrap();
+        if eng.tray_quality != quality {
+            eng.tray_quality = quality.to_string();
+            true
+        } else {
+            false
+        }
+    };
+    if changed {
+        let bytes: &[u8] = match quality {
+            "good" => include_bytes!("../icons/tray-good.png"),
+            "warn" => include_bytes!("../icons/tray-warn.png"),
+            "bad" => include_bytes!("../icons/tray-bad.png"),
+            _ => include_bytes!("../icons/tray-idle.png"),
+        };
+        if let Ok(img) = tauri::image::Image::from_bytes(bytes) {
+            let _ = tray.set_icon(Some(img));
+        }
+    }
+    let _ = tray.set_tooltip(Some(tray_tooltip(snap)));
 }
 
 fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {

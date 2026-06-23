@@ -121,6 +121,7 @@ export type TargetState =
 
 export interface TargetStatus {
   targetId: string;
+  name: string;
   state: TargetState;
   bitrateKbps: number;
   fps: number;

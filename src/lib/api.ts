@@ -180,6 +180,7 @@ function mockApi(): CornetaApi {
         const target = t.encoding.preset?.videoBitrateKbps ?? PLATFORMS[t.platformId].recommended.videoBitrateKbps;
         targets[t.id] = {
           targetId: t.id,
+          name: t.name,
           state: "connecting",
           bitrateKbps: target,
           fps: 60,

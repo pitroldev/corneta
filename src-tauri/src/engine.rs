@@ -160,6 +160,7 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
 #[serde(rename_all = "camelCase")]
 pub struct TargetStatus {
     pub target_id: String,
+    pub name: String,
     pub state: String, // idle | connecting | live | reconnecting | error
     pub bitrate_kbps: u32,
     pub fps: u32,
@@ -208,6 +209,7 @@ impl EngineSnapshot {
                 t.id.clone(),
                 TargetStatus {
                     target_id: t.id.clone(),
+                    name: t.name.clone(),
                     state: "connecting".into(),
                     bitrate_kbps: p.video_bitrate_kbps,
                     fps: p.fps,
@@ -236,4 +238,6 @@ pub struct EngineRuntime {
     pub running: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub snapshot: Option<EngineSnapshot>,
     pub started_ms: u128,
+    /// Última qualidade refletida no ícone da bandeja (evita redesenhar à toa).
+    pub tray_quality: String,
 }
