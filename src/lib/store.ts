@@ -11,6 +11,7 @@ import type {
   IngestConfig,
   PlatformId,
   Target,
+  Viewers,
 } from "./types";
 import { api } from "./api";
 import { makeTarget } from "./factory";
@@ -68,6 +69,10 @@ interface State {
   alerts: Alert[];
   bindAlerts: () => () => void;
   clearAlerts: () => void;
+
+  // Viewers unificados (todas as plataformas)
+  viewers: Viewers;
+  bindViewers: () => () => void;
 
   // UI: pedido de foco no botão de ir ao vivo (vindo da sidebar)
   goLiveFocus: boolean;
@@ -382,6 +387,11 @@ export const useStore = create<State>((set, get) => {
     },
     clearAlerts() {
       set({ alerts: [] });
+    },
+
+    viewers: { total: 0, anyLive: false, items: [] },
+    bindViewers() {
+      return api.subscribeViewers((v) => set({ viewers: v }));
     },
 
     goLiveFocus: false,

@@ -1,4 +1,4 @@
-import { BarChart3, Info, MessageSquare, Radio, Settings, Sliders, Tv2 } from "lucide-react";
+import { BarChart3, Eye, Info, MessageSquare, Radio, Settings, Sliders, Tv2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
 import { Mascot } from "./decor";
@@ -28,6 +28,7 @@ export function Sidebar({
 }) {
   const state = useStore((s) => s.snapshot.state);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
+  const viewers = useStore((s) => s.viewers);
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border-soft bg-panel p-4">
@@ -167,6 +168,22 @@ export function Sidebar({
               Fora do ar
             </span>
           </button>
+        )}
+
+        {viewers.total > 0 && (
+          <div
+            className="flex items-center justify-center gap-1.5 pt-0.5 text-xs text-ink-faint"
+            title={viewers.items
+              .filter((i) => i.live)
+              .map((i) => `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`)
+              .join("\n")}
+          >
+            <Eye className="size-3.5" />
+            <span className="font-display font-extrabold text-ink-muted">
+              {viewers.total.toLocaleString("pt-BR")}
+            </span>
+            assistindo
+          </div>
         )}
       </div>
     </aside>

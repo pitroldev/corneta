@@ -176,6 +176,19 @@ export interface ChatStatus {
   status: string; // connected | disconnected | error
 }
 
+export interface ViewerItem {
+  platform: ChatPlatform;
+  source: string;
+  viewers: number | null;
+  live: boolean;
+}
+
+export interface Viewers {
+  total: number;
+  anyLive: boolean;
+  items: ViewerItem[];
+}
+
 export type AlertKind =
   | "follow"
   | "sub"

@@ -17,6 +17,7 @@ import type {
   ObsCheck,
   SessionMeta,
   TargetStatus,
+  Viewers,
 } from "./types";
 import { defaultConfig } from "./factory";
 import { PLATFORMS } from "./platforms";
@@ -51,6 +52,7 @@ export interface CornetaApi {
     onDelete: (d: ChatDelete) => void
   ): () => void;
   subscribeAlerts(onAlert: (a: Alert) => void): () => void;
+  subscribeViewers(onViewers: (v: Viewers) => void): () => void;
   // UX
   obsSetStream(start: boolean): Promise<void>;
   testTarget(targetId: string): Promise<string>;
@@ -163,6 +165,13 @@ function tauriApi(): CornetaApi {
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
         listen<Alert>("alert://event", (e) => onAlert(e.payload)).then((u) => (unlisten = u))
+      );
+      return () => unlisten?.();
+    },
+    subscribeViewers(onViewers) {
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<Viewers>("viewers://update", (e) => onViewers(e.payload)).then((u) => (unlisten = u))
       );
       return () => unlisten?.();
     },
@@ -339,6 +348,8 @@ function mockApi(): CornetaApi {
   const chatDeleteListeners = new Set<(d: ChatDelete) => void>();
   const alertListeners = new Set<(a: Alert) => void>();
   let alertSeq = 0;
+  const viewerListeners = new Set<(v: Viewers) => void>();
+  let viewerTimer: ReturnType<typeof setInterval> | null = null;
   let chatTimer: ReturnType<typeof setInterval> | null = null;
   let chatSeq = 0;
   const recentIds: string[] = [];
@@ -577,6 +588,20 @@ function mockApi(): CornetaApi {
           l({ platform: src.platform, source: src.name, status: "connected" })
         )
       );
+      // Viewers simulados (oscilam ao redor de uma base por canal).
+      const VBASE: Record<string, number> = { Pitrol: 820, Gaules: 4200, XQC: 1500, Live: 300 };
+      const emitViewers = () => {
+        const items = SOURCES.map((s) => {
+          const base = VBASE[s.name] ?? 100;
+          const viewers = Math.max(0, Math.round(base * (0.9 + Math.random() * 0.2)));
+          return { platform: s.platform, source: s.name, viewers, live: true };
+        });
+        const total = items.reduce((a, b) => a + (b.viewers ?? 0), 0);
+        viewerListeners.forEach((l) => l({ total, anyLive: true, items }));
+      };
+      emitViewers();
+      if (viewerTimer) clearInterval(viewerTimer);
+      viewerTimer = setInterval(emitViewers, 4000);
       if (chatTimer) clearInterval(chatTimer);
       const AUTHORS = {
         twitch: ["Pitrol", "brabo_do_rio", "ana_live", "zedapeça"],
@@ -641,6 +666,9 @@ function mockApi(): CornetaApi {
     async chatStop() {
       if (chatTimer) clearInterval(chatTimer);
       chatTimer = null;
+      if (viewerTimer) clearInterval(viewerTimer);
+      viewerTimer = null;
+      viewerListeners.forEach((l) => l({ total: 0, anyLive: false, items: [] }));
     },
     async openChatWindow() {
       // No navegador não dá pra abrir janela nativa (no app instalado, abre a flutuante).
@@ -658,6 +686,10 @@ function mockApi(): CornetaApi {
     subscribeAlerts(onAlert) {
       alertListeners.add(onAlert);
       return () => alertListeners.delete(onAlert);
+    },
+    subscribeViewers(onViewers) {
+      viewerListeners.add(onViewers);
+      return () => viewerListeners.delete(onViewers);
     },
     async obsSetStream() {
       // no-op no navegador (sem OBS).

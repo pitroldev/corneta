@@ -169,6 +169,18 @@ pub fn start_chat(app: &AppHandle) {
             _ => {}
         }
     }
+
+    // Contagem de viewers unificada (poll das mesmas fontes).
+    let vsources: Vec<crate::config::ChatSource> = s
+        .chat_sources
+        .iter()
+        .filter(|x| x.enabled && !x.value.trim().is_empty())
+        .cloned()
+        .collect();
+    if !vsources.is_empty() {
+        let (app_v, run_v, key_v) = (app.clone(), running.clone(), api_key.clone());
+        tauri::async_runtime::spawn_blocking(move || run_viewers(vsources, key_v, run_v, app_v));
+    }
 }
 
 pub fn stop_chat(app: &AppHandle) {
@@ -1087,6 +1099,119 @@ fn kick_fragments(content: &str) -> Vec<ChatFragment> {
         frags.push(text_frag(content));
     }
     frags
+}
+
+// ----------------------- Viewers (contagem unificada) -----------------------
+
+/// Viewers da Twitch via GQL público (sem login) — `null` se offline.
+fn twitch_viewers(channel: &str) -> Option<u64> {
+    let ch = channel.trim().trim_start_matches('#').to_lowercase();
+    if ch.is_empty() {
+        return None;
+    }
+    let body = json!({
+        "query": format!("query {{ user(login: \"{ch}\") {{ stream {{ viewersCount }} }} }}")
+    })
+    .to_string();
+    let resp = ureq::post("https://gql.twitch.tv/gql")
+        .set("Client-Id", "kimne78kx3ncx6brgo4mv6wki5h1ko")
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(6))
+        .send_string(&body)
+        .ok()?
+        .into_string()
+        .ok()?;
+    let v: Value = serde_json::from_str(&resp).ok()?;
+    v.pointer("/data/user/stream/viewersCount").and_then(|x| x.as_u64())
+}
+
+/// Viewers simultâneos do YouTube via Data API v3 (`concurrentViewers`).
+fn youtube_viewers(api_key: &str, video: &str) -> Option<u64> {
+    if api_key.trim().is_empty() {
+        return None;
+    }
+    let vid = extract_video_id(video);
+    if vid.is_empty() {
+        return None;
+    }
+    let url = format!(
+        "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}&key={api_key}"
+    );
+    let body = ureq::get(&url).timeout(Duration::from_secs(6)).call().ok()?.into_string().ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.pointer("/items/0/liveStreamingDetails/concurrentViewers")
+        .and_then(|x| x.as_str())
+        .and_then(|s| s.parse::<u64>().ok())
+}
+
+/// Viewers do Kick (`livestream.viewer_count`) — `null` se offline.
+fn kick_viewers(slug: &str) -> Option<u64> {
+    let slug = slug.trim().trim_start_matches('@').to_lowercase();
+    if slug.is_empty() {
+        return None;
+    }
+    let url = format!("https://kick.com/api/v2/channels/{slug}");
+    let body = ureq::get(&url)
+        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+        .set("Accept", "application/json")
+        .timeout(Duration::from_secs(6))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.pointer("/livestream/viewer_count").and_then(|x| x.as_u64())
+}
+
+/// Poll periódico das fontes → emite `viewers://update` com o total + por fonte.
+fn run_viewers(
+    sources: Vec<crate::config::ChatSource>,
+    api_key: String,
+    running: Arc<AtomicBool>,
+    app: AppHandle,
+) {
+    while running.load(Ordering::Relaxed) {
+        let mut items = vec![];
+        let mut total: u64 = 0;
+        let mut any_live = false;
+        for src in &sources {
+            if !running.load(Ordering::Relaxed) {
+                return;
+            }
+            let label = if src.name.trim().is_empty() {
+                src.value.clone()
+            } else {
+                src.name.clone()
+            };
+            let count = match src.platform.as_str() {
+                "twitch" => twitch_viewers(&src.value),
+                "youtube" => youtube_viewers(&api_key, &src.value),
+                "kick" => kick_viewers(&src.value),
+                _ => None,
+            };
+            if let Some(v) = count {
+                total += v;
+                any_live = true;
+            }
+            items.push(json!({
+                "platform": src.platform,
+                "source": label,
+                "viewers": count,
+                "live": count.is_some(),
+            }));
+        }
+        let _ = app.emit(
+            "viewers://update",
+            json!({ "total": total, "anyLive": any_live, "items": items }),
+        );
+        // Espera ~30 s, checando o running.
+        for _ in 0..150 {
+            if !running.load(Ordering::Relaxed) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(200));
+        }
+    }
 }
 
 fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {

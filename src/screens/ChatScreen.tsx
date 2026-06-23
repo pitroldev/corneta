@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, ExternalLink, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
+import { Bell, Eye, ExternalLink, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { cn, uid } from "../lib/utils";
@@ -28,6 +28,7 @@ export function ChatScreen() {
   const clearChat = useStore((s) => s.clearChat);
   const alerts = useStore((s) => s.alerts);
   const clearAlerts = useStore((s) => s.clearAlerts);
+  const viewers = useStore((s) => s.viewers);
 
   const [showConfig, setShowConfig] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
@@ -108,9 +109,23 @@ export function ChatScreen() {
               ))
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setShowConfig((v) => !v)}>
-            <Settings2 className="size-4" /> Configurar
-          </Button>
+          <div className="flex items-center gap-3">
+            {viewers.total > 0 && (
+              <span
+                className="flex items-center gap-1.5 text-sm font-bold text-ink-muted"
+                title={viewers.items
+                  .filter((i) => i.live)
+                  .map((i) => `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`)
+                  .join("\n")}
+              >
+                <Eye className="size-4 text-brass" />
+                {viewers.total.toLocaleString("pt-BR")} assistindo
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setShowConfig((v) => !v)}>
+              <Settings2 className="size-4" /> Configurar
+            </Button>
+          </div>
         </div>
 
         {showConfig && (

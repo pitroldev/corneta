@@ -46,7 +46,7 @@ Duas coisas definem nossa melhor jogada:
 | **Clipes sugeridos por pico de chat** (no relatório) | 🟢🟢 | 🟡 | ✅ único | não |
 | **Reframe vertical** (TikTok/Shorts/IG) | 🟢🟢🟢 | 🔴 | ✅ bom | citado |
 | **Áudio por plataforma** (DMCA-safe) | 🟢🟢 | 🟡 | ✅ bom | não |
-| **Contador de viewers somado** (todas plataformas) | 🟢🟢 | 🟡 | ➖ ok | não |
+| **Contador de viewers somado** (todas plataformas) | 🟢🟢 | 🟡 | ➖ ok | ✅ **FEITO** |
 | **Cloud relay BYO-VPS** (economiza banda) | 🟢🟢🟢 | 🔴 | ✅ bom | planejado |
 | **Auto-bitrate** quando a banda aperta | 🟢🟢 | 🔴 | ✅ bom | não |
 | **Início agendado** | 🟢 | 🟢 | ➖ ok | não |
