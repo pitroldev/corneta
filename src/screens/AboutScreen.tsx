@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { ArrowUpRight, Globe, Heart } from "lucide-react";
-import { siGithub, siX, siYoutube } from "simple-icons";
+import { siGithub } from "simple-icons";
 import { IS_TAURI } from "../lib/api";
 
 // LinkedIn não está no simple-icons (removido por política de marca) — path oficial embutido.
@@ -32,9 +33,7 @@ interface LinkDef {
 
 const LINKS: LinkDef[] = [
   { label: "GitHub", sub: "@pitroldev", url: "https://github.com/pitroldev", brand: "#ffffff", path: siGithub.path },
-  { label: "X / Twitter", sub: "@petronho", url: "https://x.com/petronho", brand: "#ffffff", path: siX.path },
   { label: "LinkedIn", sub: "Petro Cardoso", url: "https://www.linkedin.com/in/petrocardoso/", brand: "#0a66c2", path: LINKEDIN_PATH },
-  { label: "YouTube", sub: "Petro Cardoso", url: "https://www.youtube.com/c/PetroCardoso", brand: "#ff0000", path: siYoutube.path },
 ];
 
 export function AboutScreen() {
@@ -50,11 +49,10 @@ export function AboutScreen() {
             <Mascot className="size-9" />
           </div>
           <div>
-            <h3 className="text-3xl">Feito por Petro</h3>
+            <h3 className="text-3xl">Oi, sou o Pitrol</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
-              A Corneta nasceu das mãos do <strong>Petro Cardoso</strong> — o <strong>Pitrol</strong>:
-              CTO, dev e músico que escreve sobre as coisas que quebram em produção (e gosta de fazer
-              deploy na sexta 😅).
+              Fiz a Corneta pra resolver a minha própria dor: transmitir pra várias plataformas de
+              uma vez, sem dor de cabeça.
             </p>
           </div>
         </div>
@@ -65,12 +63,12 @@ export function AboutScreen() {
         onClick={() => openUrl("https://pitrol.dev")}
         className="group mb-4 flex w-full items-center gap-4 rounded-xl bg-surface p-5 pop transition-transform hover:translate-x-1 hover:-translate-y-1"
       >
-        <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-tomate text-white">
-          <Globe className="size-6" strokeWidth={2.3} />
+        <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-surface-3">
+          <BlogIcon />
         </span>
         <span className="flex-1 text-left">
           <span className="block font-display text-xl font-extrabold">pitrol.dev</span>
-          <span className="block text-sm text-ink-muted">O blog e os projetos do Petro — dá um pulo lá.</span>
+          <span className="block text-sm text-ink-muted">Meu blog e meus projetos — dá um pulo lá.</span>
         </span>
         <ArrowUpRight className="size-6 text-ink-faint transition-colors group-hover:text-brass" strokeWidth={2.4} />
       </button>
@@ -103,8 +101,24 @@ export function AboutScreen() {
 
       {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
-        Corneta é gratuita e open-source. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e café.
+        Corneta é gratuita e open-source. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
       </p>
     </div>
+  );
+}
+
+/** Favicon do pitrol.dev, com fallback pro globo se não carregar. */
+function BlogIcon() {
+  const [err, setErr] = useState(false);
+  if (err) {
+    return <Globe className="size-6 text-tomate" strokeWidth={2.3} />;
+  }
+  return (
+    <img
+      src="https://pitrol.dev/favicon.ico"
+      alt=""
+      className="size-6 rounded"
+      onError={() => setErr(true)}
+    />
   );
 }
