@@ -88,6 +88,9 @@ pub struct Settings {
     /// Tamanho da fonte do chat: "sm" | "md" | "lg".
     #[serde(default = "default_font")]
     pub chat_font_size: String,
+    /// Tela "JÁ VOLTO": empurra um slate pras plataformas quando o sinal cai.
+    #[serde(default = "default_true")]
+    pub brb_enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -132,6 +135,7 @@ impl Default for Settings {
             chat_show_timestamps: false,
             theme: default_theme(),
             chat_font_size: default_font(),
+            brb_enabled: true,
         }
     }
 }

@@ -61,6 +61,7 @@ export interface CornetaApi {
   markMoment(label?: string): Promise<void>;
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
+  saveBrbSlate(b64: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +204,10 @@ function tauriApi(): CornetaApi {
     async importConfig() {
       const { invoke } = await core();
       return invoke<boolean>("import_config");
+    },
+    async saveBrbSlate(b64) {
+      const { invoke } = await core();
+      await invoke("save_brb_slate", { data: b64 });
     },
   };
 }
@@ -680,6 +685,9 @@ function mockApi(): CornetaApi {
     },
     async importConfig() {
       return false;
+    },
+    async saveBrbSlate() {
+      // no-op no navegador (sem backend pra salvar o slate)
     },
   };
 }

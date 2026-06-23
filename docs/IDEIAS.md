@@ -39,7 +39,7 @@ Duas coisas definem nossa melhor jogada:
 
 | Ideia | Valor | Esforço | Encaixe | Já planejado? |
 |---|---|---|---|---|
-| Tela **"JÁ VOLTO"** quando cai o sinal | 🟢🟢🟢 | 🟡 | ✅ ótimo | não |
+| Tela **"JÁ VOLTO"** quando cai o sinal | 🟢🟢🟢 | 🟡 | ✅ ótimo | ✅ **FEITO** |
 | **Aviso no celular/Discord** se um destino cai | 🟢🟢🟢 | 🟢 | ✅ ótimo | não |
 | **Gravação local** (MediaMTX → disco) | 🟢🟢🟢 | 🟢 | ✅ ótimo | parcial |
 | **Replay/clipe instantâneo** (backtrack) | 🟢🟢🟢 | 🟡 | ✅ ótimo | não |

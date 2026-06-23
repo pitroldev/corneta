@@ -536,6 +536,7 @@ function StatePill({ state }: { state: TargetState }) {
       error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
       paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
       waiting: { label: "Aguardando sinal", cls: "text-info", dot: "bg-info animate-pulse" },
+      brb: { label: "JÁ VOLTO (slate no ar)", cls: "text-brass", dot: "bg-brass animate-pulse" },
     };
   const m = map[state];
   return (

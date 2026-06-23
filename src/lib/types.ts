@@ -115,6 +115,8 @@ export interface AppSettings {
   theme: "dark" | "light";
   /** Tamanho da fonte do chat. */
   chatFontSize: "sm" | "md" | "lg";
+  /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
+  brbEnabled: boolean;
 }
 
 export interface ObsCheck {
@@ -225,7 +227,8 @@ export type TargetState =
   | "reconnecting"
   | "error"
   | "paused"
-  | "waiting";
+  | "waiting"
+  | "brb";
 
 export interface TargetStatus {
   targetId: string;

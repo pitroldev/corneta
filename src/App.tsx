@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useStore } from "./lib/store";
-import { api } from "./lib/api";
+import { api, IS_TAURI } from "./lib/api";
+import { renderBrbSlatePng } from "./lib/brbSlate";
 import { Sidebar, type Screen } from "./components/Sidebar";
 
 const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "reports", "about", "settings"];
@@ -67,6 +68,14 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // Gera o slate "JÁ VOLTO" e salva no disco (o FFmpeg usa quando o sinal cai).
+  useEffect(() => {
+    if (!IS_TAURI) return;
+    void renderBrbSlatePng().then((b64) => {
+      if (b64) void api.saveBrbSlate(b64);
+    });
+  }, []);
 
   // Janela flutuante só-chat (aberta via open_chat_window com #chat-popout).
   if (typeof window !== "undefined" && window.location.hash === "#chat-popout") {

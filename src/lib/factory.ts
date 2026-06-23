@@ -45,6 +45,7 @@ export function defaultConfig(): AppConfig {
       chatShowTimestamps: false,
       theme: "dark",
       chatFontSize: "md",
+      brbEnabled: true,
     },
     profiles: [{ id: profId, name: "Padrão", mode: "hybrid", targets }],
     activeProfileId: profId,

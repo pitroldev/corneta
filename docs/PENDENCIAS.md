@@ -76,6 +76,7 @@
 - ✅ **Onboarding guiado** (carrossel de 5 passos com progresso), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, dica keyframe 2s/CBR).
 - ✅ **Menos fricção:** um clique liga o OBS junto (`StartStream`), "pegar minha chave" por plataforma, testar conexão por destino, **atalho global** começar/parar, **notificações nativas** (no ar / destino caiu), colar+mostrar a chave, **arrastar pra reordenar** destinos, lembrar janela/última tela, abrir logs.
 - ✅ **Pausar/retomar por plataforma ao vivo** — botão por destino no Ao vivo mata/reativa só aquele FFmpeg, sem derrubar os outros (estado `paused`).
+- ✅ **Tela "JÁ VOLTO"** — se o sinal do OBS cai, a Corneta empurra um **slate** (PNG da marca, em loop) pras plataformas e **mantém a live de pé** até o sinal voltar, em vez de derrubar (estado `brb`). Toggle nas Configurações.
 - ✅ **QoL (lote 2):** confirmar Sair no ar · desfazer remoção / confirmar exclusão de perfil · **cronômetro** ao vivo · **marcar momento** (→ relatório) · **abrir canal** por destino · **duplicar destino** · **importar/exportar config** · **check-up pré-live** (com checagem do OBS) · **tema claro** · tamanho de fonte do chat · auto-reconnect do obs-websocket.
 - ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.
 

@@ -99,6 +99,7 @@ pub fn run() {
             commands::mark_moment,
             commands::export_config,
             commands::import_config,
+            commands::save_brb_slate,
         ])
         .setup(|app| {
             // Registra o atalho global de começar/parar a partir das settings.

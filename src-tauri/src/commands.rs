@@ -222,7 +222,7 @@ fn quality_of(snap: &EngineSnapshot) -> &'static str {
             for st in snap.targets.values() {
                 match st.state.as_str() {
                     "error" => bad = true,
-                    "reconnecting" | "connecting" | "waiting" => warn = true,
+                    "reconnecting" | "connecting" | "waiting" | "brb" => warn = true,
                     _ => {}
                 }
             }
@@ -257,6 +257,7 @@ fn tray_tooltip(snap: &EngineSnapshot) -> String {
             "error" => ("✕", "erro".to_string()),
             "paused" => ("⏸", "pausado".to_string()),
             "waiting" => ("◌", "aguardando sinal".to_string()),
+            "brb" => ("◷", "JÁ VOLTO (slate no ar)".to_string()),
             _ => ("…", "conectando".to_string()),
         };
         lines.push(format!("{mark} {} · {detail}", st.name));
@@ -320,6 +321,24 @@ fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("mediamtx.yml"))
 }
 
+/// Caminho do slate "JÁ VOLTO" (PNG gerado pela interface).
+fn brb_slate_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("brb-slate.png"))
+}
+
+/// Salva o slate "JÁ VOLTO" (PNG em base64) que a UI desenhou.
+#[tauri::command]
+pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data.trim())
+        .map_err(|e| e.to_string())?;
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("brb-slate.png"), bytes).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Coloca o motor em estado de erro com uma mensagem.
 fn set_engine_error(app: &AppHandle, msg: &str) {
     log::error!("motor: {msg}");
@@ -372,6 +391,70 @@ fn set_target_state(app: &AppHandle, target_id: &str, new_state: &str) {
             let out = snap.clone();
             drop(eng);
             emit(app, &out);
+        }
+    }
+}
+
+/// Empurra o slate "JÁ VOLTO" pra plataforma até o sinal voltar (ou parar/pausar).
+async fn run_slate(
+    app: &AppHandle,
+    target_id: &str,
+    slate_args: &[String],
+    run_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pause_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    signal: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    use std::sync::atomic::Ordering;
+    set_target_state(app, target_id, "brb");
+    let spawned = app
+        .shell()
+        .sidecar("ffmpeg")
+        .and_then(|c| c.args(slate_args.to_vec()).spawn());
+    let (mut rx, child) = match spawned {
+        Ok(v) => v,
+        Err(_) => {
+            set_target_state(app, target_id, "waiting");
+            let _ = tauri::async_runtime::spawn_blocking(|| {
+                std::thread::sleep(std::time::Duration::from_millis(700))
+            })
+            .await;
+            return;
+        }
+    };
+    {
+        let st = app.state::<AppState>();
+        st.engine.lock().unwrap().ffmpegs.insert(target_id.to_string(), child);
+    }
+    // Mantém o slate até o sinal voltar / parar / pausar (checa a cada saída do FFmpeg).
+    while let Some(ev) = rx.recv().await {
+        if matches!(ev, CommandEvent::Terminated(_)) {
+            break;
+        }
+        if !run_flag.load(Ordering::Relaxed)
+            || pause_flag.load(Ordering::Relaxed)
+            || signal.load(Ordering::Relaxed)
+        {
+            break;
+        }
+    }
+    // Derruba o slate (se ainda vivo) e libera o slot.
+    let child = {
+        let st = app.state::<AppState>();
+        let removed = st.engine.lock().unwrap().ffmpegs.remove(target_id);
+        removed
+    };
+    if let Some(c) = child {
+        let pid = c.pid();
+        let _ = c.kill();
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = pid;
         }
     }
 }
@@ -454,9 +537,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     });
 
     // 3) Um supervisor de FFmpeg POR destino — métricas reais e reconexão independentes.
+    let brb_enabled = config.settings.brb_enabled;
+    let slate_png: Option<String> = brb_slate_path(&app)
+        .filter(|p| p.exists())
+        .map(|p| p.to_string_lossy().to_string());
     for &t in &enabled {
         let key = keymap.get(&t.id).cloned().unwrap_or_default();
         let args = engine::ffmpeg_args_for_target(&config, t, &key);
+        let slate_args = engine::ffmpeg_args_for_slate(t, &key, slate_png.as_deref());
         let target_id = t.id.clone();
         let app_t = app.clone();
         let run_flag = running.clone();
@@ -473,6 +561,23 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     .await;
                     continue;
                 }
+
+                // Sem sinal de ingestão: empurra o slate "JÁ VOLTO" (ou só aguarda, se desligado).
+                if !signal.load(Ordering::Relaxed) {
+                    if brb_enabled {
+                        run_slate(&app_t, &target_id, &slate_args, &run_flag, &pause_flag, &signal)
+                            .await;
+                    } else {
+                        set_target_state(&app_t, &target_id, "waiting");
+                        let _ = tauri::async_runtime::spawn_blocking(|| {
+                            std::thread::sleep(std::time::Duration::from_millis(700))
+                        })
+                        .await;
+                    }
+                    continue;
+                }
+
+                // Com sinal: FFmpeg normal (lê do MediaMTX → plataforma).
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")
@@ -509,19 +614,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
                 }
-                // Se foi pausado, volta ao topo (que espera) sem marcar reconexão.
                 if pause_flag.load(Ordering::Relaxed) {
                     continue;
                 }
-                // Sem sinal de ingestão = o OBS ainda não publicou. Não é erro: aguarda.
+                // Sinal sumiu enquanto rodava → volta ao topo (slate ou waiting).
                 if !signal.load(Ordering::Relaxed) {
-                    set_target_state(&app_t, &target_id, "waiting");
-                    let _ = tauri::async_runtime::spawn_blocking(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(700))
-                    })
-                    .await;
                     continue;
                 }
+                // Sinal presente, mas o FFmpeg caiu → reconexão real.
                 log::warn!("FFmpeg de um destino caiu — reconectando em 2s");
                 set_target_reconnecting(&app_t, &target_id);
                 let _ = tauri::async_runtime::spawn_blocking(|| {

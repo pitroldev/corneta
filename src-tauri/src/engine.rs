@@ -137,6 +137,74 @@ pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<
     args
 }
 
+/// Monta o FFmpeg do **slate "JÁ VOLTO"**: gera vídeo a partir de uma imagem (ou cor sólida)
+/// + áudio silencioso e empurra pra plataforma — mantém a live de pé quando o sinal cai.
+pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> Vec<String> {
+    let url = output_url(t, key);
+    let p = t
+        .encoding
+        .preset
+        .clone()
+        .unwrap_or_else(|| recommended_preset(&t.platform_id));
+    let fps = p.fps.max(1);
+    let gop = (fps * 2).to_string(); // keyframe 2s
+    let vbitrate = p.video_bitrate_kbps.clamp(1000, 3000); // slate é leve
+    let scale = format!("scale={}:{},format=yuv420p", p.width, p.height);
+
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "warning".into(),
+        "-stats".into(),
+        "-re".into(),
+    ];
+    match slate_png {
+        Some(path) => args.extend(["-loop", "1", "-i", path].map(String::from)),
+        None => args.extend(
+            [
+                "-f",
+                "lavfi",
+                "-i",
+                &format!("color=c=0x14100a:s={}x{}:r={fps}", p.width, p.height),
+            ]
+            .map(String::from),
+        ),
+    }
+    // Áudio silencioso (a plataforma exige uma trilha).
+    args.extend(
+        [
+            "-f", "lavfi",
+            "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+        ]
+        .map(String::from),
+    );
+    args.extend(
+        [
+            "-map", "0:v",
+            "-vf", &scale,
+            "-r", &fps.to_string(),
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-tune", "stillimage",
+            "-b:v", &format!("{vbitrate}k"),
+            "-maxrate", &format!("{vbitrate}k"),
+            "-bufsize", &format!("{}k", vbitrate * 2),
+            "-g", &gop,
+            "-keyint_min", &gop,
+            "-sc_threshold", "0",
+            "-map", "1:a",
+            "-c:a", "aac",
+            "-ar", "48000",
+            "-ac", "2",
+            "-b:a", "128k",
+            "-f", "flv",
+            &url,
+        ]
+        .map(String::from),
+    );
+    args
+}
+
 /// Gera um mediamtx.yml mínimo: só o servidor RTMP de ingestão, na porta configurada.
 /// Os demais servidores (RTSP/HLS/WebRTC/SRT/API) ficam desligados.
 pub fn mediamtx_config(config: &AppConfig) -> String {
@@ -171,7 +239,7 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
 pub struct TargetStatus {
     pub target_id: String,
     pub name: String,
-    pub state: String, // idle | connecting | live | reconnecting | error | paused | waiting
+    pub state: String, // idle | connecting | live | reconnecting | error | paused | waiting | brb
     pub bitrate_kbps: u32,
     pub fps: u32,
     pub dropped_frames: u32,
