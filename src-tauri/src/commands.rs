@@ -212,22 +212,20 @@ fn set_engine_error(app: &AppHandle, msg: &str) {
     emit(app, &out);
 }
 
-/// Entre tentativas do FFmpeg: volta o estado para "aguardando OBS".
-fn revert_to_starting(app: &AppHandle) {
+/// Marca um destino específico como "reconectando" (entre tentativas do seu FFmpeg).
+fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     if let Some(snap) = eng.snapshot.as_mut() {
-        if snap.state == "stopped" || snap.state == "error" {
-            return; // já parado/erro — não reverte
+        if snap.state == "stopped" {
+            return;
         }
-        snap.state = "starting".into();
-        for st in snap.targets.values_mut() {
-            st.state = "connecting".into();
-            st.message = None;
+        if let Some(st) = snap.targets.get_mut(target_id) {
+            st.state = "reconnecting".into();
+            let out = snap.clone();
+            drop(eng);
+            emit(app, &out);
         }
-        let out = snap.clone();
-        drop(eng);
-        emit(app, &out);
     }
 }
 
@@ -249,12 +247,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             keymap.insert(t.id.clone(), k);
         }
     }
-    let args = engine::build_ffmpeg_args(&config, &keymap);
-    let hosts: HashMap<String, String> = enabled
-        .iter()
-        .map(|t| (t.id.clone(), engine::host_of(&t.ingest_url)))
-        .collect();
-
     // 1) Gera o mediamtx.yml e sobe o MediaMTX (servidor de ingestão do OBS).
     let yml = mediamtx_config_path(&app)?;
     std::fs::write(&yml, engine::mediamtx_config(&config))
@@ -276,7 +268,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.mediamtx = Some(mtx_child);
         eng.snapshot = Some(snap.clone());
         eng.started_ms = started;
-        eng.hosts = hosts;
         eng.running = running.clone();
     }
     emit(&app, &snap);
@@ -295,55 +286,55 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         }
     });
 
-    // 3) Supervisor do FFmpeg: respawn ao cair = reconexão (OBS pode cair e voltar).
-    let app_f = app.clone();
-    let run_flag = running.clone();
-    tauri::async_runtime::spawn(async move {
-        while run_flag.load(Ordering::Relaxed) {
-            let spawned = app_f
-                .shell()
-                .sidecar("ffmpeg")
-                .and_then(|c| c.args(args.clone()).spawn());
-            let (mut rx, child) = match spawned {
-                Ok(v) => v,
-                Err(e) => {
-                    set_engine_error(&app_f, &format!("FFmpeg indisponível: {e}"));
+    // 3) Um supervisor de FFmpeg POR destino — métricas reais e reconexão independentes.
+    for &t in &enabled {
+        let key = keymap.get(&t.id).cloned().unwrap_or_default();
+        let args = engine::ffmpeg_args_for_target(&config, t, &key);
+        let target_id = t.id.clone();
+        let app_t = app.clone();
+        let run_flag = running.clone();
+        tauri::async_runtime::spawn(async move {
+            while run_flag.load(Ordering::Relaxed) {
+                let spawned = app_t
+                    .shell()
+                    .sidecar("ffmpeg")
+                    .and_then(|c| c.args(args.clone()).spawn());
+                let (mut rx, child) = match spawned {
+                    Ok(v) => v,
+                    Err(e) => {
+                        set_engine_error(&app_t, &format!("FFmpeg indisponível: {e}"));
+                        break;
+                    }
+                };
+                {
+                    let st = app_t.state::<AppState>();
+                    st.engine.lock().unwrap().ffmpegs.insert(target_id.clone(), child);
+                }
+                while let Some(ev) = rx.recv().await {
+                    match ev {
+                        CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                            update_target_metrics(&app_t, &target_id, &String::from_utf8_lossy(&b));
+                        }
+                        CommandEvent::Terminated(_) => break,
+                        _ => {}
+                    }
+                }
+                {
+                    let st = app_t.state::<AppState>();
+                    st.engine.lock().unwrap().ffmpegs.remove(&target_id);
+                }
+                if !run_flag.load(Ordering::Relaxed) {
                     break;
                 }
-            };
-            {
-                let st = app_f.state::<AppState>();
-                let mut eng = st.engine.lock().unwrap();
-                eng.ffmpeg = Some(child);
+                log::warn!("FFmpeg de um destino caiu — reconectando em 2s");
+                set_target_reconnecting(&app_t, &target_id);
+                let _ = tauri::async_runtime::spawn_blocking(|| {
+                    std::thread::sleep(std::time::Duration::from_secs(2))
+                })
+                .await;
             }
-            while let Some(ev) = rx.recv().await {
-                match ev {
-                    CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
-                        let line = String::from_utf8_lossy(&b);
-                        update_from_stats(&app_f, &line);
-                        update_health(&app_f, &line);
-                    }
-                    CommandEvent::Terminated(_) => break,
-                    _ => {}
-                }
-            }
-            {
-                let st = app_f.state::<AppState>();
-                let mut eng = st.engine.lock().unwrap();
-                eng.ffmpeg = None;
-            }
-            if !run_flag.load(Ordering::Relaxed) {
-                break;
-            }
-            // OBS não está publicando (ainda ou caiu) → volta a aguardar e tenta de novo em 2s.
-            log::warn!("FFmpeg encerrou — aguardando OBS e reconectando em 2s");
-            revert_to_starting(&app_f);
-            let _ = tauri::async_runtime::spawn_blocking(|| {
-                std::thread::sleep(std::time::Duration::from_secs(2))
-            })
-            .await;
-        }
-    });
+        });
+    }
 
     Ok(())
 }
@@ -366,11 +357,21 @@ fn parse_kv(line: &str, key: &str) -> Option<f64> {
     num.parse().ok()
 }
 
-fn update_from_stats(app: &AppHandle, line: &str) {
-    if !line.contains("frame=") && !line.contains("bitrate=") {
+/// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
+fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
+    let is_stats = line.contains("frame=") || line.contains("bitrate=");
+    let low = line.to_lowercase();
+    const ERR_KEYS: [&str; 8] = [
+        "error", "failed", "connection refused", "broken pipe",
+        "unable to", "connection reset", "i/o error", "end of file",
+    ];
+    let is_error = !is_stats && ERR_KEYS.iter().any(|k| low.contains(k));
+    if !is_stats && !is_error {
         return;
     }
+
     let fps = parse_kv(line, "fps=").map(|v| v as u32);
+    let bitrate = parse_kv(line, "bitrate=").map(|v| v as u32); // kbits/s ≈ kbps
     let dropped = parse_kv(line, "drop=").map(|v| v as u32);
 
     let state = app.state::<AppState>();
@@ -379,63 +380,32 @@ fn update_from_stats(app: &AppHandle, line: &str) {
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
-    let uptime = ((now_ms().saturating_sub(started)) as f64) / 1000.0;
-    // Chegaram frames → o OBS conectou: estamos no ar de verdade.
-    snap.state = "live".into();
-    for st in snap.targets.values_mut() {
-        // Não sobrescreve um destino que está em erro/reconectando (ver update_health).
-        if st.state != "error" && st.state != "reconnecting" {
-            st.state = "live".into();
-        }
-        st.uptime_sec = uptime;
+    let Some(st) = snap.targets.get_mut(target_id) else {
+        return;
+    };
+
+    if is_stats {
+        st.state = "live".into();
+        st.message = None;
+        st.uptime_sec = (now_ms().saturating_sub(started) as f64) / 1000.0;
         if let Some(f) = fps {
             st.fps = f;
+        }
+        if let Some(b) = bitrate {
+            st.bitrate_kbps = b;
         }
         if let Some(d) = dropped {
             st.dropped_frames = d;
         }
+        snap.state = "live".into();
+    } else {
+        st.state = "reconnecting".into();
+        st.message = Some(line.trim().chars().take(160).collect());
     }
+
     let out = snap.clone();
     drop(eng);
     emit(app, &out);
-}
-
-/// Atribui erros do FFmpeg ao destino específico, casando o host na linha de log.
-/// Heurístico (será afinado com o teste ao vivo) — métricas por-destino reais virão do MediaMTX (v2).
-fn update_health(app: &AppHandle, line: &str) {
-    let low = line.to_lowercase();
-    const ERR_KEYS: [&str; 10] = [
-        "error", "failed", "connection refused", "broken pipe", "cannot open",
-        "unable to", "connection reset", "i/o error", "end of file", "server error",
-    ];
-    if !ERR_KEYS.iter().any(|k| low.contains(k)) {
-        return;
-    }
-
-    let state = app.state::<AppState>();
-    let mut eng = state.engine.lock().unwrap();
-    let hosts = eng.hosts.clone();
-    let Some(snap) = eng.snapshot.as_mut() else {
-        return;
-    };
-
-    let mut changed = false;
-    for (tid, host) in hosts.iter() {
-        if host.is_empty() || !low.contains(host.as_str()) {
-            continue;
-        }
-        if let Some(st) = snap.targets.get_mut(tid) {
-            st.state = "reconnecting".into();
-            st.message = Some(line.trim().chars().take(160).collect());
-            changed = true;
-        }
-    }
-
-    if changed {
-        let out = snap.clone();
-        drop(eng);
-        emit(app, &out);
-    }
 }
 
 /// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado (§14.2).
@@ -443,15 +413,20 @@ pub fn kill_engine(app: &AppHandle) {
     use std::sync::atomic::Ordering;
     log::info!("motor: encerrando");
     let state = app.state::<AppState>();
-    let (ffmpeg, mediamtx, running) = {
+    let (children, running) = {
         let mut eng = state.engine.lock().unwrap();
         eng.snapshot = Some(EngineSnapshot::stopped());
-        (eng.ffmpeg.take(), eng.mediamtx.take(), eng.running.clone())
+        let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
+            eng.ffmpegs.drain().map(|(_, c)| c).collect();
+        if let Some(m) = eng.mediamtx.take() {
+            children.push(m);
+        }
+        (children, eng.running.clone())
     };
-    // Impede o supervisor de respawnar o FFmpeg.
+    // Impede os supervisores de respawnar.
     running.store(false, Ordering::Relaxed);
 
-    for child in [ffmpeg, mediamtx].into_iter().flatten() {
+    for child in children {
         let pid = child.pid();
         let _ = child.kill();
         // Mata eventuais subprocessos (netos órfãos) — Windows-first.

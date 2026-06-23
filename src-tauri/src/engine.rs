@@ -43,17 +43,6 @@ pub fn effective_action(mode: &str, t: &Target) -> &'static str {
     }
 }
 
-/// Menor denominador comum de bitrate (modo "Encodar uma vez").
-pub fn lowest_common_denominator(config: &AppConfig) -> u32 {
-    config
-        .targets
-        .iter()
-        .filter(|t| t.enabled)
-        .map(|t| recommended_preset(&t.platform_id).video_bitrate_kbps)
-        .min()
-        .unwrap_or(6000)
-}
-
 fn ffmpeg_video_codec(encoder: &str) -> &'static str {
     match encoder {
         "nvenc" => "h264_nvenc",
@@ -69,16 +58,16 @@ fn output_url(t: &Target, key: &str) -> String {
     format!("{}/{}", t.ingest_url.trim_end_matches('/'), key)
 }
 
-/// Monta os argumentos do FFmpeg: 1 input, N outputs (copy e/ou transcode).
-pub fn build_ffmpeg_args(config: &AppConfig, keys: &HashMap<String, String>) -> Vec<String> {
+/// Monta os argumentos de UM FFmpeg para UM destino (lê do MediaMTX → 1 saída).
+/// Um processo por plataforma → métricas REAIS por destino e reconexão independente.
+pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<String> {
     let ingest = format!(
         "{}://{}:{}/{}/{}",
         config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
     );
-    let lcd = lowest_common_denominator(config);
+    let url = output_url(t, key);
+    let action = effective_action(&config.mode, t);
 
-    // FFmpeg LÊ do MediaMTX (servidor de ingestão) e distribui para os destinos
-    // (decode-once → encode-N). O MediaMTX é quem escuta o OBS. Ver PLANEJAMENTO.md §6.2.
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
@@ -88,56 +77,37 @@ pub fn build_ffmpeg_args(config: &AppConfig, keys: &HashMap<String, String>) -> 
         ingest,
     ];
 
-    for t in config.targets.iter().filter(|t| t.enabled) {
-        let key = keys.get(&t.id).cloned().unwrap_or_default();
-        let url = output_url(t, &key);
-        let action = effective_action(&config.mode, t);
+    if action == "copy" {
+        // Sem reencode: copia o stream do MediaMTX direto para a plataforma.
+        args.extend(["-map", "0", "-c", "copy", "-f", "flv"].map(String::from));
+        args.push(url);
+    } else {
+        let p = t
+            .encoding
+            .preset
+            .clone()
+            .unwrap_or_else(|| recommended_preset(&t.platform_id));
+        let codec = ffmpeg_video_codec(&t.encoding.encoder);
+        let gop = (p.fps * p.keyframe_sec).to_string();
 
-        if action == "copy" {
-            args.extend(["-map", "0", "-c", "copy", "-f", "flv"].map(String::from));
-            args.push(url);
-        } else {
-            let p = t
-                .encoding
-                .preset
-                .clone()
-                .unwrap_or_else(|| recommended_preset(&t.platform_id));
-            // No copy puro o áudio também é copiado; aqui recodificamos o vídeo.
-            let video_kbps = if action == "copy" { lcd } else { p.video_bitrate_kbps };
-            let codec = ffmpeg_video_codec(&t.encoding.encoder);
-            let gop = (p.fps * p.keyframe_sec).to_string();
-
-            args.extend(
-                [
-                    "-map",
-                    "0:v",
-                    "-vf",
-                    &format!("scale={}:{}", p.width, p.height),
-                    "-r",
-                    &p.fps.to_string(),
-                    "-c:v",
-                    codec,
-                    "-b:v",
-                    &format!("{}k", video_kbps),
-                    "-maxrate",
-                    &format!("{}k", video_kbps),
-                    "-bufsize",
-                    &format!("{}k", video_kbps * 2),
-                    "-g",
-                    &gop,
-                    "-map",
-                    "0:a",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    &format!("{}k", p.audio_bitrate_kbps),
-                    "-f",
-                    "flv",
-                    &url,
-                ]
-                .map(String::from),
-            );
-        }
+        args.extend(
+            [
+                "-map", "0:v",
+                "-vf", &format!("scale={}:{}", p.width, p.height),
+                "-r", &p.fps.to_string(),
+                "-c:v", codec,
+                "-b:v", &format!("{}k", p.video_bitrate_kbps),
+                "-maxrate", &format!("{}k", p.video_bitrate_kbps),
+                "-bufsize", &format!("{}k", p.video_bitrate_kbps * 2),
+                "-g", &gop,
+                "-map", "0:a",
+                "-c:a", "aac",
+                "-b:a", &format!("{}k", p.audio_bitrate_kbps),
+                "-f", "flv",
+                &url,
+            ]
+            .map(String::from),
+        );
     }
 
     args
@@ -182,13 +152,6 @@ pub struct TargetStatus {
     pub uptime_sec: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
-}
-
-/// Extrai o host de uma URL de ingestão (para casar erros do FFmpeg por destino).
-pub fn host_of(ingest_url: &str) -> String {
-    let s = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
-    let s = s.split('/').next().unwrap_or(s);
-    s.split(':').next().unwrap_or(s).to_lowercase()
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -251,12 +214,11 @@ impl EngineSnapshot {
 /// Runtime guardado no state do Tauri (handles dos sidecars + último snapshot).
 #[derive(Default)]
 pub struct EngineRuntime {
-    pub ffmpeg: Option<tauri_plugin_shell::process::CommandChild>,
+    /// Um FFmpeg por destino (target_id -> processo).
+    pub ffmpegs: std::collections::HashMap<String, tauri_plugin_shell::process::CommandChild>,
     pub mediamtx: Option<tauri_plugin_shell::process::CommandChild>,
-    /// Liga/desliga o supervisor de respawn do FFmpeg (reconexão).
+    /// Liga/desliga os supervisores de respawn (reconexão).
     pub running: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub snapshot: Option<EngineSnapshot>,
     pub started_ms: u128,
-    /// target_id -> host do destino (para atribuir erros do FFmpeg por plataforma).
-    pub hosts: std::collections::HashMap<String, String>,
 }

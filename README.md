@@ -44,9 +44,10 @@ pnpm app:dev                            # compila e roda a Corneta
 pnpm app:build                          # gera o instalador (NSIS)
 ```
 
-> **Motor:** o **MediaMTX** é o servidor de ingestão (o OBS publica nele) e o **FFmpeg** lê dele e
-> distribui para as plataformas (decode-once→encode-N). Se o OBS cai e volta, o app **respawna o
-> FFmpeg** sozinho (reconexão). Ambos os binários são baixados pelo `fetch-binaries.ps1`.
+> **Motor:** o **MediaMTX** é o servidor de ingestão (o OBS publica nele) e a Corneta roda **um
+> FFmpeg por plataforma** lendo dele — assim cada destino tem **métricas reais** (bitrate/fps/quedas)
+> e **reconexão independente** (uma plataforma cair não derruba as outras). Ambos os binários são
+> baixados pelo `fetch-binaries.ps1`.
 
 ### 3. Testar ao vivo (OBS)
 1. No app: **Plataformas** → adicione um destino e cole a stream key.

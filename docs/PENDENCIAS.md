@@ -13,7 +13,7 @@
 ✅ App Tauri 2 + React **compila, abre e fecha limpo** (sem processo órfão, verificado).
 ✅ UI completa com personalidade: Plataformas, Qualidade, Ao vivo, Sobre + **barra de título custom**.
 ✅ Config em disco · **chaves no cofre do Windows** (keyring).
-✅ Motor: **MediaMTX** (servidor de ingestão do OBS) + **FFmpeg fan-out** (decode-once→encode-N) com **respawn = reconexão**, parsing de status e *tree-kill*.
+✅ Motor: **MediaMTX** (ingestão do OBS) + **um FFmpeg por destino** (métricas reais + **reconexão independente** por plataforma), com *tree-kill*.
 ✅ **Configurações** (endpoint de ingestão editável), **bandeja** (minimizar ao fechar) + **autostart**, **teste de upload** (multi-conexão) e **erro por plataforma** no painel.
 ✅ **Pipeline ingest→relay validado de ponta a ponta** (sem OBS): publisher → MediaMTX → reader leu **vídeo+áudio H.264/AAC reais**.
 ✅ **Transmissão real confirmada:** OBS → Corneta → **Twitch** no ar! 🎉 (2026-06-23)
@@ -52,7 +52,7 @@
 |---|---|---|---|---|
 | 11 | **Auto-config do OBS** (obs-websocket) | ✅ | 🤖 | Cliente v5 em Rust → `SetStreamServiceSettings` (servidor+chave); senha opcional nas Configurações |
 | 12 | **Teste de upload** real | ✅ | 🤖 | Multi-conexão (6× paralelas), ~3 s de regime estável **descartando o warm-up** — preciso em gigabit |
-| 13 | **Métricas por plataforma** | 🟡 | 🤖 | ✅ erro/reconexão **por destino** (heurístico). **Bitrate real por destino** ainda agregado — dá pra evoluir lendo a **API do MediaMTX** |
+| 13 | **Métricas por plataforma** | ✅ | 🤖 | **1 FFmpeg por destino** → bitrate/fps/quedas **reais por plataforma** + reconexão independente (trade-off: N decodes no modo transcode) |
 | 14 | **Tela de Configurações** | ✅ | 🤖 | Edita endpoint de ingestão (host/porta/app/chave) + toggles de bandeja e autostart |
 | 15 | **Bandeja do sistema + autostart** | ✅ | 🤖 | Tray (clique abre, menu Abrir/Sair), fechar→bandeja (transmissão segue), autostart via `tauri-plugin-autostart` |
 
