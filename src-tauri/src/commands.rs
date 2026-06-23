@@ -427,6 +427,31 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         });
     }
 
+    // 4) Amostrador de uso real de CPU/GPU enquanto transmite.
+    let app_u = app.clone();
+    let run_u = running.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut sys = sysinfo::System::new();
+        let mut gpu_ok = true;
+        while run_u.load(Ordering::Relaxed) {
+            sys.refresh_cpu_usage();
+            std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+            sys.refresh_cpu_usage();
+            let cpu = sys.global_cpu_usage() as f64;
+            let gpu = if gpu_ok {
+                let g = read_gpu();
+                if g.is_none() {
+                    gpu_ok = false;
+                }
+                g
+            } else {
+                None
+            };
+            update_usage(&app_u, cpu, gpu);
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    });
+
     Ok(())
 }
 
@@ -519,6 +544,40 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
         st.message = Some(msg);
     }
 
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+}
+
+/// Lê a utilização da GPU NVIDIA (%) via nvidia-smi. None se não houver NVIDIA.
+fn read_gpu() -> Option<f64> {
+    let out = std::process::Command::new("nvidia-smi")
+        .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .parse::<f64>()
+        .ok()
+}
+
+/// Atualiza CPU/GPU no snapshot e emite (chamado pelo amostrador).
+fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
+    if snap.state == "stopped" {
+        return;
+    }
+    snap.cpu = Some((cpu * 10.0).round() / 10.0);
+    snap.gpu = gpu.map(|g| (g * 10.0).round() / 10.0);
     let out = snap.clone();
     drop(eng);
     emit(app, &out);

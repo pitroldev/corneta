@@ -1,5 +1,25 @@
-import type { AppConfig, EncodingAction, EncodingMode, Target } from "./types";
+import type {
+  AppConfig,
+  EncoderKind,
+  EncodingAction,
+  EncodingMode,
+  Target,
+  VideoPreset,
+} from "./types";
 import { PLATFORMS } from "./platforms";
+
+// Referência de carga: um encode 1080p60.
+const REF_PIXELS_PER_SEC = 1920 * 1080 * 60;
+
+/** Custo relativo de transcodificar um destino (0..~). Considera resolução×fps,
+ *  encoder (hardware vs software) e, em menor grau, bitrate. */
+function transcodeCost(p: VideoPreset, encoder: EncoderKind): number {
+  const pixelFactor = (p.width * p.height * p.fps) / REF_PIXELS_PER_SEC;
+  // Software (x264) pesa MUITO mais que encoders de hardware (NVENC/QSV/AMF).
+  const encoderWeight = encoder === "software" ? 0.5 : 0.12;
+  const bitrateFactor = 0.8 + 0.2 * Math.min(2, p.videoBitrateKbps / 6000);
+  return pixelFactor * encoderWeight * bitrateFactor;
+}
 
 /** Ação efetiva de um destino, considerando o modo global. */
 export function effectiveAction(mode: EncodingMode, t: Target): EncodingAction {
@@ -52,11 +72,12 @@ export function estimate(config: AppConfig): EngineEstimate {
     else copyCount++;
   }
 
-  // Carga: cada transcode pesa; software pesa muito mais que hardware.
+  // Carga: soma o custo de cada transcode (resolução×fps×encoder×bitrate). Cópia ~0.
   let load = 0;
   for (const t of enabled) {
     if (effectiveAction(config.mode, t) === "transcode") {
-      load += t.encoding.encoder === "software" ? 0.45 : 0.14;
+      const p = t.encoding.preset ?? recommended(t);
+      load += transcodeCost(p, t.encoding.encoder);
     }
   }
   load = Math.min(1, load);

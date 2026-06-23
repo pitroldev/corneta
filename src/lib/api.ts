@@ -138,6 +138,8 @@ function mockApi(): CornetaApi {
       }
       st.uptimeSec = snapshot.startedAt ? (now - snapshot.startedAt) / 1000 : 0;
     }
+    snapshot.cpu = Math.round((30 + Math.random() * 40) * 10) / 10;
+    snapshot.gpu = Math.round((20 + Math.random() * 30) * 10) / 10;
     emit();
   };
 

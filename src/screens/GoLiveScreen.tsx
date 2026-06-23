@@ -257,6 +257,16 @@ export function GoLiveScreen() {
         )}
       </div>
 
+      {(live || starting) && (
+        <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
+          <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+            Máquina
+          </span>
+          <Usage label="CPU" value={snapshot.cpu} />
+          <Usage label="GPU" value={snapshot.gpu} />
+        </Card>
+      )}
+
       <AnimatePresence>
         {(live || starting) && (
           <div className="flex flex-col gap-2">
@@ -365,6 +375,22 @@ function MiniStat({
       >
         {value}
       </div>
+    </div>
+  );
+}
+
+function Usage({ label, value }: { label: string; value?: number }) {
+  const pct = value ?? 0;
+  const tone = pct > 85 ? "bg-bad" : pct > 60 ? "bg-warn" : "bg-ok";
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{label}</span>
+      <div className="h-2 w-24 overflow-hidden rounded-sm bg-surface">
+        <div className={cn("h-full rounded-sm", tone)} style={{ width: `${Math.min(100, pct)}%` }} />
+      </div>
+      <span className="w-12 font-display text-sm font-bold tabular-nums">
+        {value == null ? "—" : `${value}%`}
+      </span>
     </div>
   );
 }

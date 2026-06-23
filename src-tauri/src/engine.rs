@@ -178,6 +178,11 @@ pub struct EngineSnapshot {
     pub targets: HashMap<String, TargetStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// Uso real de CPU/GPU (%) enquanto transmite.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu: Option<f64>,
 }
 
 impl EngineSnapshot {
@@ -187,6 +192,8 @@ impl EngineSnapshot {
             started_at: None,
             targets: HashMap::new(),
             message: None,
+            cpu: None,
+            gpu: None,
         }
     }
 
@@ -224,6 +231,8 @@ impl EngineSnapshot {
             started_at: Some(started_at),
             targets,
             message: None,
+            cpu: None,
+            gpu: None,
         }
     }
 }

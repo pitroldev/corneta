@@ -84,6 +84,7 @@
 - **Cloud relay "traga seu VPS"** (não estourar o upload doméstico — §7 do plano).
 - **macOS / Linux** (keyring `apple-native`/`sync-secret-service`, assinatura/notarização Apple).
 - **Gravação local simultânea**, **chat/métricas unificados** por plataforma.
+- 📄 **Relatório pós-live** (diagnóstico do que travou/lentidão por sessão) — planejado em [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md).
 
 ---
 

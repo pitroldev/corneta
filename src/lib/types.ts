@@ -135,6 +135,9 @@ export interface EngineSnapshot {
   startedAt: number | null;
   targets: Record<string, TargetStatus>;
   message?: string;
+  /** Uso real de CPU/GPU (%) enquanto transmite. */
+  cpu?: number;
+  gpu?: number;
 }
 
 export interface EncoderInfo {
