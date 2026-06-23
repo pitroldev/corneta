@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type {
+  Alert,
   AppConfig,
   AppSettings,
   ChatDelete,
@@ -62,10 +63,16 @@ interface State {
   connectChat: () => Promise<void>;
   disconnectChat: () => Promise<void>;
   clearChat: () => void;
+
+  // Alertas centralizados
+  alerts: Alert[];
+  bindAlerts: () => () => void;
+  clearAlerts: () => void;
 }
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
 const CHAT_CAP = 400;
+const ALERT_CAP = 100;
 
 // Decide se uma mensagem sobrevive a um evento de deleção.
 function keepMessage(m: ChatMessage, d: ChatDelete): boolean {
@@ -358,6 +365,19 @@ export const useStore = create<State>((set, get) => {
 
     clearChat() {
       set({ chatMessages: [] });
+    },
+
+    alerts: [],
+    bindAlerts() {
+      return api.subscribeAlerts((a) =>
+        set((s) => {
+          const next = [...s.alerts, a];
+          return { alerts: next.length > ALERT_CAP ? next.slice(next.length - ALERT_CAP) : next };
+        })
+      );
+    },
+    clearAlerts() {
+      set({ alerts: [] });
     },
   };
 });

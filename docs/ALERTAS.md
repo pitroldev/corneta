@@ -3,7 +3,7 @@
 > Planejamento da feature que junta os **alertas** (seguidor, inscrição, gift, bits/donate, raid,
 > membro, super chat…) de **todas as plataformas** num lugar só — painel no app e **overlay pro OBS**.
 
-- **Status:** Rascunho para discussão (v0.1) · 2026-06-23
+- **Status:** Decisões fechadas · **Fase 1 em implementação** · 2026-06-23
 - **Relacionado:** [`CHAT.md`](./CHAT.md) (reaproveita as conexões), [`PLANEJAMENTO.md`](./PLANEJAMENTO.md)
 
 ---
@@ -157,9 +157,26 @@ O OBS mostra alertas via **Browser Source** (uma URL). Três caminhos:
 
 ---
 
-## 11. Decisões em aberto
+## 11. Decisões fechadas (v1)
 
-1. **Painel separado** ("Alertas") ou **junto do Chat** (uma aba/coluna)?
-2. **Overlay** já na primeira leva (servidor local) ou depois (começar só com painel)?
-3. **Follows na v1** (vale o OAuth) ou só o que vem sem login?
-4. **Som/voz (TTS)** no overlay desde cedo?
+1. **Painel junto do Chat** — os alertas aparecem como uma **coluna "Alertas"** na tela de Chat
+   (toggleável), reusando as conexões e o ciclo de vida do chat. Sem item de navegação novo.
+2. **Overlay na Fase 3** — a Fase 1 entrega só o **painel no app**; o overlay (servidor local +
+   *browser source*) vem depois.
+3. **Follows só na Fase 2** — não compensa o OAuth na v1. A Fase 1 pega só o que vem **sem login**
+   (subs/resubs/gift subs/bits/raids/membros/super chats).
+4. **Sem som/TTS na Fase 1** — som e voz ficam pro overlay (Fase 3/4); o painel é silencioso (visual).
+
+---
+
+## 12. Fase 1 — escopo de implementação
+
+**Backend (`chat.rs`)** — ao lado do parser de mensagens, emitir `alert://event` com um `Alert`:
+- **Twitch (IRC):** tratar **`USERNOTICE`** (`msg-id` = `sub`/`resub`/`subgift`/`submysterygift`/`raid`)
+  lendo as tags `msg-param-*`; e **bits** pela tag `bits` num `PRIVMSG`.
+- **YouTube (liveChat):** `snippet.type` = `superChatEvent`/`newSponsorEvent`/`memberMilestoneChatEvent`/
+  `membershipGiftingEvent` → alerta (já vem no poll que fazemos).
+- **Kick (Pusher):** eventos `SubscriptionEvent`/`GiftedSubscriptionsEvent`/`StreamHostEvent`.
+
+**Frontend** — store acumula `alerts[]` (cap), bind em `alert://event`; a tela de **Chat** ganha a
+coluna **"Alertas"** (toggle) com um feed estilizado por tipo/plataforma. Mock simula alertas no demo.

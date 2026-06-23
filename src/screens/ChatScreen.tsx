@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
+import { Bell, ExternalLink, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { cn, uid } from "../lib/utils";
@@ -7,6 +7,7 @@ import type { ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
+import { AlertsFeed } from "../components/AlertsFeed";
 
 const PLATFORM_OPTS = [
   { value: "twitch", label: "Twitch" },
@@ -25,8 +26,11 @@ export function ChatScreen() {
   const connectChat = useStore((s) => s.connectChat);
   const disconnectChat = useStore((s) => s.disconnectChat);
   const clearChat = useStore((s) => s.clearChat);
+  const alerts = useStore((s) => s.alerts);
+  const clearAlerts = useStore((s) => s.clearAlerts);
 
   const [showConfig, setShowConfig] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
   const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
     twitch: true,
     youtube: true,
@@ -57,7 +61,7 @@ export function ChatScreen() {
     setSettings({ chatSources: sources.filter((x) => x.id !== id) });
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col">
+    <div className={cn("mx-auto flex flex-col", showAlerts ? "max-w-5xl" : "max-w-3xl")}>
       <SectionTitle
         kicker="A galera junta"
         title="Chat unificado"
@@ -208,14 +212,42 @@ export function ChatScreen() {
             onClick={() => setFilter((f) => ({ ...f, [p]: !f[p] }))}
           />
         ))}
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={clearChat}>
+        <Button
+          variant={showAlerts ? "primary" : "ghost"}
+          size="sm"
+          className="ml-auto"
+          onClick={() => setShowAlerts((v) => !v)}
+        >
+          <Bell className="size-4" /> Alertas{alerts.length > 0 ? ` (${alerts.length})` : ""}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={clearChat}>
           <Trash2 className="size-4" /> Limpar
         </Button>
       </div>
 
-      <Card className="flex h-[54vh] flex-col overflow-hidden p-0">
-        <ChatFeed messages={shown} view={view} connected={connected} className="flex-1" />
-      </Card>
+      <div className="flex gap-3">
+        <Card className="flex h-[54vh] flex-1 flex-col overflow-hidden p-0">
+          <ChatFeed messages={shown} view={view} connected={connected} className="flex-1" />
+        </Card>
+        {showAlerts && (
+          <Card className="flex h-[54vh] w-72 shrink-0 flex-col overflow-hidden p-0">
+            <div className="flex items-center justify-between border-b-2 border-border-soft px-3 py-2">
+              <span className="flex items-center gap-1.5 font-display text-sm font-extrabold">
+                <Bell className="size-4 text-brass" /> Alertas
+              </span>
+              <button
+                onClick={clearAlerts}
+                className="text-ink-faint transition-colors hover:text-bad"
+                title="Limpar alertas"
+                aria-label="Limpar alertas"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+            <AlertsFeed alerts={alerts} className="flex-1" />
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

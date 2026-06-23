@@ -23,6 +23,7 @@ export default function App() {
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
   const bindChat = useStore((s) => s.bindChat);
+  const bindAlerts = useStore((s) => s.bindAlerts);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [screen, setScreen] = useState<Screen>(() => {
     try {
@@ -46,6 +47,7 @@ export default function App() {
     void load();
     const unbind = bindEngine();
     const unbindChat = bindChat();
+    const unbindAlerts = bindAlerts();
     // C1: atalho global começar/parar (alterna conforme o estado atual).
     const unbindShortcut = api.subscribeShortcut(() => {
       const s = useStore.getState();
@@ -56,9 +58,10 @@ export default function App() {
     return () => {
       unbind();
       unbindChat();
+      unbindAlerts();
       unbindShortcut();
     };
-  }, [load, bindEngine, bindChat]);
+  }, [load, bindEngine, bindChat, bindAlerts]);
 
   // D1: aplica o tema (dark/light) no documento.
   useEffect(() => {

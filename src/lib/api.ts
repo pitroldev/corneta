@@ -5,6 +5,7 @@
 //   seja totalmente navegável e demonstrável sem o backend.
 // ============================================================
 import type {
+  Alert,
   AppConfig,
   ChatBadge,
   ChatDelete,
@@ -49,6 +50,7 @@ export interface CornetaApi {
     onStatus: (s: ChatStatus) => void,
     onDelete: (d: ChatDelete) => void
   ): () => void;
+  subscribeAlerts(onAlert: (a: Alert) => void): () => void;
   // UX
   obsSetStream(start: boolean): Promise<void>;
   testTarget(targetId: string): Promise<string>;
@@ -155,6 +157,13 @@ function tauriApi(): CornetaApi {
         void listen<ChatDelete>("chat://delete", (e) => onDelete(e.payload)).then((u) => uns.push(u));
       });
       return () => uns.forEach((u) => u());
+    },
+    subscribeAlerts(onAlert) {
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<Alert>("alert://event", (e) => onAlert(e.payload)).then((u) => (unlisten = u))
+      );
+      return () => unlisten?.();
     },
     async obsSetStream(start) {
       const { invoke } = await core();
@@ -323,9 +332,35 @@ function mockApi(): CornetaApi {
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
   const chatStatusListeners = new Set<(s: ChatStatus) => void>();
   const chatDeleteListeners = new Set<(d: ChatDelete) => void>();
+  const alertListeners = new Set<(a: Alert) => void>();
+  let alertSeq = 0;
   let chatTimer: ReturnType<typeof setInterval> | null = null;
   let chatSeq = 0;
   const recentIds: string[] = [];
+  const ALERT_SOURCES = [
+    { platform: "twitch" as const, source: "Pitrol" },
+    { platform: "kick" as const, source: "XQC" },
+    { platform: "youtube" as const, source: "Live" },
+  ];
+  const ALERT_USERS = ["brabo_do_rio", "ana_live", "kraderson", "Maria Silva", "zedapeça", "miron_tv"];
+  const randomAlert = (seq: number): Alert => {
+    const src = ALERT_SOURCES[Math.floor(Math.random() * ALERT_SOURCES.length)];
+    const user = ALERT_USERS[Math.floor(Math.random() * ALERT_USERS.length)];
+    const kinds: Alert["kind"][] = ["sub", "resub", "subgift", "bits", "raid", "member", "superchat"];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+    const base: Alert = { id: `a${seq}-${Date.now()}`, platform: src.platform, source: src.source, kind, user, ts: Date.now() };
+    switch (kind) {
+      case "bits": return { ...base, amount: pick([100, 500, 1000]) };
+      case "resub": return { ...base, amount: 1 + Math.floor(Math.random() * 24), tier: "T1", message: "valeu demais!" };
+      case "sub": return { ...base, tier: "T1" };
+      case "subgift": return { ...base, amount: pick([1, 5, 10]) };
+      case "raid": return { ...base, amount: 10 + Math.floor(Math.random() * 200) };
+      case "member": return { ...base, tier: "Membro", amount: 1 + Math.floor(Math.random() * 12) };
+      case "superchat": return { ...base, amount: pick([5, 10, 50]), currency: "BRL", message: "manda salve!" };
+      default: return base;
+    }
+  };
   const CHAT_MSGS = [
     "salve salve!",
     "kkkkk",
@@ -550,6 +585,11 @@ function mockApi(): CornetaApi {
           const nativeId = recentIds[Math.floor(Math.random() * recentIds.length)];
           chatDeleteListeners.forEach((l) => l({ scope: "message", platform: "twitch", nativeId }));
         }
+        // De vez em quando, dispara um alerta de exemplo.
+        if (Math.random() < 0.12) {
+          const a = randomAlert(++alertSeq);
+          alertListeners.forEach((l) => l(a));
+        }
         const src = SOURCES[Math.floor(Math.random() * SOURCES.length)];
         const platform = src.platform;
         const text = CHAT_MSGS[Math.floor(Math.random() * CHAT_MSGS.length)];
@@ -609,6 +649,10 @@ function mockApi(): CornetaApi {
         chatStatusListeners.delete(onStatus);
         chatDeleteListeners.delete(onDelete);
       };
+    },
+    subscribeAlerts(onAlert) {
+      alertListeners.add(onAlert);
+      return () => alertListeners.delete(onAlert);
     },
     async obsSetStream() {
       // no-op no navegador (sem OBS).

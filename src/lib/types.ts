@@ -174,6 +174,30 @@ export interface ChatStatus {
   status: string; // connected | disconnected | error
 }
 
+export type AlertKind =
+  | "follow"
+  | "sub"
+  | "resub"
+  | "subgift"
+  | "bits"
+  | "tip"
+  | "raid"
+  | "member"
+  | "superchat";
+
+export interface Alert {
+  id: string;
+  platform: ChatPlatform;
+  source: string;
+  kind: AlertKind;
+  user: string;
+  amount?: number;
+  currency?: string;
+  tier?: string;
+  message?: string;
+  ts: number;
+}
+
 export interface Profile {
   id: string;
   name: string;

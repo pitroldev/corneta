@@ -98,6 +98,32 @@ fn clear_source(app: &AppHandle, platform: &str, source: &str) {
     );
 }
 
+// ----------------------------- Alertas -----------------------------
+
+/// Alerta de engajamento normalizado (sub, gift, bits, raid, membro, super chat…).
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Alert {
+    pub id: String,
+    pub platform: String, // twitch | youtube | kick
+    pub source: String,
+    pub kind: String, // sub|resub|subgift|bits|raid|member|superchat|tip|follow
+    pub user: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f64>, // bits, meses, nº de gifts, viewers, valor do donate
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    pub ts: u64,
+}
+
+fn emit_alert(app: &AppHandle, alert: Alert) {
+    let _ = app.emit("alert://event", alert);
+}
+
 // ----------------------------- Controle ----------------------------
 
 /// (Re)inicia o chat com base nas fontes configuradas.
@@ -192,8 +218,35 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
                     if line.starts_with("PING") {
                         let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
                     } else if line.contains("PRIVMSG") {
+                        // Bits (cheer) vêm na tag `bits` de um PRIVMSG → vira alerta.
+                        if let Some(b) =
+                            tag_val(twitch_tags(line), "bits").and_then(|v| v.parse::<f64>().ok())
+                        {
+                            if b > 0.0 {
+                                emit_alert(
+                                    &app,
+                                    Alert {
+                                        id: next_id(),
+                                        platform: "twitch".into(),
+                                        source: source.to_string(),
+                                        kind: "bits".into(),
+                                        user: tag_val(twitch_tags(line), "display-name")
+                                            .unwrap_or_else(|| "alguém".into()),
+                                        amount: Some(b),
+                                        currency: None,
+                                        tier: None,
+                                        message: None,
+                                        ts: now_ms(),
+                                    },
+                                );
+                            }
+                        }
                         if let Some(msg) = parse_privmsg(line, source, &emotes) {
                             emit_chat(&app, msg);
+                        }
+                    } else if line.contains("USERNOTICE") {
+                        if let Some(alert) = parse_usernotice(line, source) {
+                            emit_alert(&app, alert);
                         }
                     } else if line.contains("CLEARMSG") {
                         if let Some(id) = tag_val(twitch_tags(line), "target-msg-id") {
@@ -241,6 +294,65 @@ fn clearchat_user(line: &str) -> Option<String> {
     let idx = after.find(':')?;
     let u = after[idx + 1..].trim();
     (!u.is_empty()).then(|| u.to_string())
+}
+
+/// Inscrição/resub/gift/raid via USERNOTICE do IRC → alerta.
+fn parse_usernotice(line: &str, source: &str) -> Option<Alert> {
+    let tags = twitch_tags(line);
+    let msg_id = tag_val(tags, "msg-id")?;
+    let user = tag_val(tags, "display-name")
+        .or_else(|| tag_val(tags, "login"))
+        .unwrap_or_else(|| "alguém".into());
+    let tier = tag_val(tags, "msg-param-sub-plan").map(|p| match p.as_str() {
+        "Prime" => "Prime".into(),
+        "1000" => "T1".into(),
+        "2000" => "T2".into(),
+        "3000" => "T3".into(),
+        other => other.to_string(),
+    });
+    let (kind, amount) = match msg_id.as_str() {
+        "sub" => ("sub", Some(1.0)),
+        "resub" => (
+            "resub",
+            tag_val(tags, "msg-param-cumulative-months").and_then(|v| v.parse().ok()),
+        ),
+        "subgift" => ("subgift", Some(1.0)),
+        "submysterygift" | "anonsubmysterygift" => (
+            "subgift",
+            tag_val(tags, "msg-param-mass-gift-count").and_then(|v| v.parse().ok()),
+        ),
+        "raid" => (
+            "raid",
+            tag_val(tags, "msg-param-viewerCount").and_then(|v| v.parse().ok()),
+        ),
+        _ => return None,
+    };
+    let message = if kind == "subgift" {
+        tag_val(tags, "msg-param-recipient-display-name").map(|r| format!("🎁 para {r}"))
+    } else {
+        usernotice_text(line)
+    };
+    Some(Alert {
+        id: next_id(),
+        platform: "twitch".into(),
+        source: source.to_string(),
+        kind: kind.into(),
+        user,
+        amount,
+        currency: None,
+        tier,
+        message,
+        ts: now_ms(),
+    })
+}
+
+/// Mensagem opcional que o usuário escreveu junto do USERNOTICE.
+fn usernotice_text(line: &str) -> Option<String> {
+    let idx = line.find("USERNOTICE")?;
+    let after = &line[idx..];
+    let mi = after.find(':')?;
+    let t = after[mi + 1..].trim_end();
+    (!t.is_empty()).then(|| t.to_string())
 }
 
 fn parse_privmsg(line: &str, source: &str, emotes: &HashMap<String, String>) -> Option<ChatMessage> {
@@ -540,6 +652,37 @@ fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
         .map(String::from)
 }
 
+fn yt_author(item: &Value) -> String {
+    item.pointer("/authorDetails/displayName")
+        .and_then(|v| v.as_str())
+        .unwrap_or("alguém")
+        .to_string()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn yt_alert(
+    source: &str,
+    kind: &str,
+    user: String,
+    amount: Option<f64>,
+    currency: Option<String>,
+    tier: Option<String>,
+    message: Option<String>,
+) -> Alert {
+    Alert {
+        id: next_id(),
+        platform: "youtube".into(),
+        source: source.to_string(),
+        kind: kind.into(),
+        user,
+        amount,
+        currency,
+        tier,
+        message,
+        ts: now_ms(),
+    }
+}
+
 fn run_youtube(api_key: &str, video: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
     let vid = extract_video_id(video);
     if vid.is_empty() {
@@ -604,6 +747,89 @@ fn run_youtube(api_key: &str, video: &str, source: &str, running: Arc<AtomicBool
                                 delete_user(&app, "youtube", source, name);
                             }
                         }
+                        "superChatEvent" => {
+                            let amount = item
+                                .pointer("/snippet/superChatDetails/amountMicros")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.parse::<f64>().ok())
+                                .map(|m| m / 1_000_000.0);
+                            emit_alert(
+                                &app,
+                                yt_alert(
+                                    source,
+                                    "superchat",
+                                    yt_author(item),
+                                    amount,
+                                    item.pointer("/snippet/superChatDetails/currency")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
+                                    None,
+                                    item.pointer("/snippet/superChatDetails/userComment")
+                                        .and_then(|v| v.as_str())
+                                        .filter(|s| !s.is_empty())
+                                        .map(String::from),
+                                ),
+                            );
+                        }
+                        "newSponsorEvent" => {
+                            emit_alert(
+                                &app,
+                                yt_alert(
+                                    source,
+                                    "member",
+                                    yt_author(item),
+                                    None,
+                                    None,
+                                    item.pointer("/snippet/newSponsorDetails/memberLevelName")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
+                                    None,
+                                ),
+                            );
+                        }
+                        "memberMilestoneChatEvent" => {
+                            let months = item
+                                .pointer("/snippet/memberMilestoneChatDetails/memberMonth")
+                                .and_then(|v| v.as_u64())
+                                .map(|m| m as f64);
+                            emit_alert(
+                                &app,
+                                yt_alert(
+                                    source,
+                                    "member",
+                                    yt_author(item),
+                                    months,
+                                    None,
+                                    item.pointer("/snippet/memberMilestoneChatDetails/memberLevelName")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
+                                    item.pointer("/snippet/memberMilestoneChatDetails/userComment")
+                                        .and_then(|v| v.as_str())
+                                        .filter(|s| !s.is_empty())
+                                        .map(String::from),
+                                ),
+                            );
+                        }
+                        "membershipGiftingEvent" => {
+                            let count = item
+                                .pointer("/snippet/membershipGiftingDetails/giftMembershipsCount")
+                                .and_then(|v| v.as_u64())
+                                .map(|c| c as f64);
+                            emit_alert(
+                                &app,
+                                yt_alert(
+                                    source,
+                                    "subgift",
+                                    yt_author(item),
+                                    count,
+                                    None,
+                                    item.pointer("/snippet/membershipGiftingDetails/giftMembershipsLevelName")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
+                                    None,
+                                ),
+                            );
+                        }
                         _ => {
                             let text = item
                                 .pointer("/snippet/displayMessage")
@@ -666,7 +892,8 @@ fn run_youtube(api_key: &str, video: &str, source: &str, running: Arc<AtomicBool
 
 // ------------------------------- Kick ------------------------------
 
-fn get_kick_chatroom_id(slug: &str) -> Option<u64> {
+/// Devolve (chatroom_id, channel_id). O chatroom carrega o chat; o channel, os alertas (subs).
+fn get_kick_ids(slug: &str) -> Option<(u64, u64)> {
     let url = format!("https://kick.com/api/v2/channels/{slug}");
     let body = ureq::get(&url)
         .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -676,7 +903,9 @@ fn get_kick_chatroom_id(slug: &str) -> Option<u64> {
         .into_string()
         .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/chatroom/id").and_then(|x| x.as_u64())
+    let chatroom = v.pointer("/chatroom/id").and_then(|x| x.as_u64())?;
+    let channel = v.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
+    Some((chatroom, channel))
 }
 
 fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
@@ -684,8 +913,8 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) 
     if slug.is_empty() {
         return;
     }
-    let chatroom_id = match get_kick_chatroom_id(&slug) {
-        Some(id) => id,
+    let (chatroom_id, channel_id) = match get_kick_ids(&slug) {
+        Some(ids) => ids,
         None => {
             log::warn!("kick chat ({source}): chatroom não resolvido (Cloudflare?)");
             chat_status(&app, "kick", source, "error");
@@ -707,6 +936,12 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) 
     let _ = socket.send(Message::Text(format!(
         "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroom_id}.v2\"}}}}"
     )));
+    // Canal de eventos (subs/gifts/host) — separado do chatroom.
+    if channel_id != 0 {
+        let _ = socket.send(Message::Text(format!(
+            "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"channel.{channel_id}\"}}}}"
+        )));
+    }
     log::info!("kick chat: conectado em {slug} (chatroom {chatroom_id})");
     chat_status(&app, "kick", source, "connected");
 
@@ -717,6 +952,8 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) 
                     let _ = socket.send(Message::Text("{\"event\":\"pusher:pong\",\"data\":{}}".into()));
                 } else if let Some(msg) = parse_kick(&t, source) {
                     emit_chat(&app, msg);
+                } else if let Some(alert) = parse_kick_alert(&t, source) {
+                    emit_alert(&app, alert);
                 } else {
                     let _ = handle_kick_moderation(&t, source, &app);
                 }
@@ -782,6 +1019,38 @@ fn handle_kick_moderation(raw: &str, source: &str, app: &AppHandle) -> Option<()
         delete_user(app, "kick", source, u);
     }
     Some(())
+}
+
+/// Subs/gifts/host do Kick (vêm no canal `channel.{id}`) → alerta.
+fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
+    let v: Value = serde_json::from_str(raw).ok()?;
+    let event = v.get("event")?.as_str()?;
+    let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
+    let mk = |kind: &str, user: String, amount: Option<f64>| Alert {
+        id: next_id(),
+        platform: "kick".into(),
+        source: source.to_string(),
+        kind: kind.into(),
+        user,
+        amount,
+        currency: None,
+        tier: None,
+        message: None,
+        ts: now_ms(),
+    };
+    if event.ends_with("SubscriptionEvent") {
+        let user = d.get("username").and_then(|x| x.as_str()).unwrap_or("alguém").to_string();
+        Some(mk("sub", user, d.get("months").and_then(|x| x.as_u64()).map(|m| m as f64)))
+    } else if event.ends_with("GiftedSubscriptionsEvent") {
+        let user = d.get("gifter_username").and_then(|x| x.as_str()).unwrap_or("alguém").to_string();
+        let count = d.get("gifted_usernames").and_then(|x| x.as_array()).map(|a| a.len() as f64);
+        Some(mk("subgift", user, count))
+    } else if event.ends_with("StreamHostEvent") {
+        let user = d.get("host_username").and_then(|x| x.as_str()).unwrap_or("alguém").to_string();
+        Some(mk("raid", user, d.get("number_viewers").and_then(|x| x.as_u64()).map(|m| m as f64)))
+    } else {
+        None
+    }
 }
 
 fn kick_fragments(content: &str) -> Vec<ChatFragment> {

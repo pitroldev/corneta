@@ -89,7 +89,7 @@
 - ✅ **Chat unificado** — **múltiplas fontes** (ex.: 2 Twitches), **emotes + badges**, **deleções de moderação**, **Kick**, e **janela flutuante** always-on-top. Configurável; Twitch sem login, Kick via slug, YouTube via API key — [`CHAT.md`](./CHAT.md). FB/TikTok pendentes.
 - **Gravação local simultânea** e **métricas unificadas** por plataforma.
 - ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
-- 📄 **Alertas centralizados** (seguidor/inscrição/donate/raid de todas as plataformas + overlay pro OBS) — planejado em [`ALERTAS.md`](./ALERTAS.md).
+- 🟡 **Alertas centralizados** — [`ALERTAS.md`](./ALERTAS.md). **Fase 1 ✅:** subs/resubs/gift subs/bits/raids (Twitch), membros/super chats (YouTube), subs/gifts/host (Kick) — **sem login**, reusando as conexões de chat → `alert://event` + **coluna "Alertas"** na tela de Chat. Pendente: follows/donates via OAuth (Fase 2) + **overlay pro OBS** (Fase 3).
 - 📄 **Enviar mensagens pelo multi-chat** (+ moderar) — exige login por plataforma; planejado em [`ENVIO.md`](./ENVIO.md).
 
 ---
