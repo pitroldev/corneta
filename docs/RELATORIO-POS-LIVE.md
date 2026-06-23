@@ -4,7 +4,7 @@
 > métricas de cada plataforma ao longo do tempo, uso de CPU/GPU, reconexões, erros e **janelas de
 > travamento/lentidão** — para diagnosticar com calma depois, **sem mexer na transmissão ao vivo**.
 
-- **Status:** ✅ Implementado (v1: Fases 1–3 + retenção + abrir pasta) · 2026-06-23
+- **Status:** ✅ Implementado (Fases 1–4 + retenção + abrir pasta) · 2026-06-23
 - **Relacionado:** [`PLANEJAMENTO.md`](./PLANEJAMENTO.md) (§8 métricas), [`PENDENCIAS.md`](./PENDENCIAS.md)
 
 ---
@@ -188,7 +188,7 @@ Ou seja, a Fase 1–3 reaproveita muita coisa; o maior ganho novo é **gravar a 
 ## 11. Decisões — fechadas no v1
 
 1. **Gráficos → SVG próprio** (zero-dependência, controle visual da marca, leve com subamostragem). uPlot ficaria pra séries gigantes, que não é o caso (~mil amostras por live).
-2. **Stats do OBS → Fase 4** (não entrou no v1). Exige conexão obs-websocket persistente com polling de `GetStats`, que não dá pra validar sem OBS no ambiente atual. O core (FFmpeg por destino + CPU/GPU) já entrega o diagnóstico; OBS é o próximo grande incremento.
+2. **Stats do OBS → ✅ implementado (Fase 4).** Coletor obs-websocket persistente (`poll_stats`) puxa `GetStats`/`GetStreamStatus` a cada ~2s (render lag, frames pulados, congestionamento), grava na sessão e entra na análise (render lag → "cena pesada"; congestionamento → "rede"). Melhor-esforço: sem OBS conectado, o relatório segue com FFmpeg+CPU/GPU. 🔬 *não validado com OBS real ainda*.
 3. **Retenção → 50 sessões** em `app_data_dir/sessions` (poda as mais antigas no início de cada live).
 4. **Export → "Abrir pasta"** (acesso aos NDJSON crus, sem plugin de diálogo). HTML/JSON formatado fica pra uma próxima.
 
@@ -197,6 +197,7 @@ Ou seja, a Fase 1–3 reaproveita muita coisa; o maior ganho novo é **gravar a 
 - **Gravação (Rust):** `session.rs` grava NDJSON por sessão (cabeçalho + amostra a cada ~2s com métricas por destino + CPU/GPU + fim), com poda de retenção. Integrado em `start_engine`/`kill_engine`.
 - **Comandos:** `list_sessions`, `read_session`, `delete_session`, `open_sessions_dir`.
 - **Frontend:** tela **Relatórios** (histórico → detalhe) com veredito, **gráficos SVG** (bitrate por plataforma + CPU/GPU), resumo por plataforma, **janelas problemáticas** (causa + recomendação) e **linha do tempo de eventos**. Análise em `lib/report.ts`.
-- **Demo (navegador):** grava a sessão simulada e semeia 2 exemplos (uma limpa, uma com incidente) pra navegar sem backend.
+- **OBS (Fase 4):** `obs.rs::poll_stats` coleta render lag + congestionamento na sessão; aparece no gráfico "OBS — render lag" e na classificação de causa (cena pesada × rede).
+- **Demo (navegador):** grava a sessão simulada (com obs) e semeia 2 exemplos (uma limpa, uma com incidente) pra navegar sem backend.
 
-**Pendente (próximas fases):** Fase 4 (OBS `GetStats`), export HTML/JSON formatado, comparação entre sessões.
+**Pendente (Fase 5, niceties):** export HTML/JSON formatado e comparação entre sessões.

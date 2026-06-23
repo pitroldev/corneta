@@ -183,6 +183,21 @@ pub struct EngineSnapshot {
     pub cpu: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gpu: Option<f64>,
+    /// Estatísticas do OBS (render/encode lag, congestionamento), se conectado.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub obs: Option<ObsStats>,
+}
+
+/// Estatísticas do OBS via obs-websocket `GetStats`/`GetStreamStatus`.
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ObsStats {
+    pub active_fps: f64,
+    pub avg_render_ms: f64,
+    pub render_skipped: u32,
+    pub output_skipped: u32,
+    /// Congestionamento de saída (0..1) — alto = rede sofrendo.
+    pub congestion: f64,
 }
 
 impl EngineSnapshot {
@@ -194,6 +209,7 @@ impl EngineSnapshot {
             message: None,
             cpu: None,
             gpu: None,
+            obs: None,
         }
     }
 
@@ -233,6 +249,7 @@ impl EngineSnapshot {
             message: None,
             cpu: None,
             gpu: None,
+            obs: None,
         }
     }
 }

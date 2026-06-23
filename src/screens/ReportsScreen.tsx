@@ -19,6 +19,8 @@ import {
   bitrateSeries,
   cpuSeries,
   gpuSeries,
+  hasObs,
+  obsRenderSeries,
   parseSession,
   type ProblemWindow,
   type ReportEvent,
@@ -255,6 +257,21 @@ function ReportDetail({
             series={machineSeries}
             n={n}
             yMax={100}
+            formatValue={(v) => `${Math.round(v)}`}
+          />
+        </Card>
+      )}
+
+      {/* OBS — render lag (encode/render) */}
+      {n > 1 && hasObs(data) && (
+        <Card className="mb-4">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+            <Activity className="size-4" /> OBS — render lag (ms)
+          </h3>
+          <LineChart
+            series={[{ label: "Render lag", color: "#a855f7", values: obsRenderSeries(data) }]}
+            n={n}
+            markers={markers}
             formatValue={(v) => `${Math.round(v)}`}
           />
         </Card>

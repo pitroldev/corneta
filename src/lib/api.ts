@@ -180,8 +180,23 @@ function mockApi(): CornetaApi {
         }
         return { id: p.id, name: p.name, state, bitrate, fps: 60, dropped: drops[i] };
       });
+      const incident = opts?.dropAtMin != null && Math.abs(minNow - opts.dropAtMin) < 0.18;
+      const obs = {
+        activeFps: 60,
+        avgRenderMs: incident ? 28 + Math.random() * 5 : 7 + Math.random() * 3,
+        renderSkipped: incident ? 40 : 0,
+        outputSkipped: incident ? 30 : 0,
+        congestion: incident ? 0.6 + Math.random() * 0.2 : Math.random() * 0.06,
+      };
       lines.push(
-        JSON.stringify({ kind: "sample", t, cpu: Math.round(cpu * 10) / 10, gpu: Math.round(gpu * 10) / 10, targets })
+        JSON.stringify({
+          kind: "sample",
+          t,
+          cpu: Math.round(cpu * 10) / 10,
+          gpu: Math.round(gpu * 10) / 10,
+          obs,
+          targets,
+        })
       );
     }
     lines.push(JSON.stringify({ kind: "end", endedAt: startedAt + n * step }));
@@ -227,6 +242,13 @@ function mockApi(): CornetaApi {
     }
     snapshot.cpu = Math.round((30 + Math.random() * 40) * 10) / 10;
     snapshot.gpu = Math.round((20 + Math.random() * 30) * 10) / 10;
+    snapshot.obs = {
+      activeFps: 60,
+      avgRenderMs: Math.round((7 + Math.random() * 4) * 10) / 10,
+      renderSkipped: 0,
+      outputSkipped: 0,
+      congestion: Math.round(Math.random() * 8) / 100,
+    };
     if (rec) {
       rec.lines.push(
         JSON.stringify({
@@ -234,6 +256,7 @@ function mockApi(): CornetaApi {
           t: now,
           cpu: snapshot.cpu,
           gpu: snapshot.gpu,
+          obs: snapshot.obs,
           targets: Object.values(snapshot.targets).map((s) => ({
             id: s.targetId,
             name: s.name,

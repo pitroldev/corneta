@@ -82,6 +82,7 @@ pub fn record_sample(path: &Path, snap: &EngineSnapshot) {
         "t": now_ms(),
         "cpu": snap.cpu,
         "gpu": snap.gpu,
+        "obs": snap.obs,
         "targets": targets,
     });
     append_line(path, &sample);

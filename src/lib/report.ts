@@ -38,6 +38,7 @@ export function parseSession(ndjson: string): SessionData | null {
         t: Number(o.t),
         cpu: o.cpu == null ? undefined : Number(o.cpu),
         gpu: o.gpu == null ? undefined : Number(o.gpu),
+        obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
         targets: (o.targets ?? []) as SessionSample["targets"],
       });
     } else if (o.kind === "end") {
@@ -67,6 +68,11 @@ export function bitrateSeries(d: SessionData, targetId: string): (number | null)
     return t ? t.bitrate : null;
   });
 }
+export const hasObs = (d: SessionData): boolean => d.samples.some((s) => s.obs != null);
+export const obsCongestionSeries = (d: SessionData): (number | null)[] =>
+  d.samples.map((s) => (s.obs ? Math.round(s.obs.congestion * 100) : null));
+export const obsRenderSeries = (d: SessionData): (number | null)[] =>
+  d.samples.map((s) => (s.obs ? s.obs.avgRenderMs : null));
 
 // ---------------------------------------------------------------------------
 // Análise
@@ -108,6 +114,8 @@ export interface ReportAnalysis {
 
 const CPU_HIGH = 92;
 const BITRATE_DROP = 0.6; // < 60% do típico = queda
+const OBS_CONGEST = 0.3; // congestionamento de saída > 30%
+const OBS_RENDER_MS = 25; // render lag do OBS acima disso = cena pesada
 
 /** Bitrate "típico" (mediana) por destino, considerando só amostras no ar. */
 function typicalBitrates(samples: SessionSample[]): Record<string, number> {
@@ -129,7 +137,9 @@ function isBad(s: SessionSample, typical: Record<string, number>): boolean {
     const typ = typical[t.id];
     if (typ && t.bitrate < typ * BITRATE_DROP) return true;
   }
-  return s.cpu != null && s.cpu > CPU_HIGH;
+  if (s.cpu != null && s.cpu > CPU_HIGH) return true;
+  if (s.obs && (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)) return true;
+  return false;
 }
 
 function buildWindow(
@@ -141,6 +151,8 @@ function buildWindow(
   const tEnd = slice[slice.length - 1].t;
   let maxCpu = 0;
   let maxGpu = 0;
+  let maxCongestion = 0;
+  let maxRenderMs = 0;
   let reconnect = false;
   let bitrateDrop = false;
   const affected = new Set<string>();
@@ -148,6 +160,10 @@ function buildWindow(
   for (const s of slice) {
     if (s.cpu != null) maxCpu = Math.max(maxCpu, s.cpu);
     if (s.gpu != null) maxGpu = Math.max(maxGpu, s.gpu);
+    if (s.obs) {
+      maxCongestion = Math.max(maxCongestion, s.obs.congestion);
+      maxRenderMs = Math.max(maxRenderMs, s.obs.avgRenderMs);
+    }
     for (const t of s.targets) {
       const typ = typical[t.id];
       if (t.state === "reconnecting" || t.state === "error") {
@@ -163,6 +179,8 @@ function buildWindow(
 
   const cpuHigh = maxCpu > CPU_HIGH;
   const gpuHigh = maxGpu > CPU_HIGH;
+  const congested = maxCongestion > OBS_CONGEST;
+  const renderLag = maxRenderMs > OBS_RENDER_MS;
   const singleTarget = affected.size === 1 && totalTargets > 1;
 
   const signals: string[] = [];
@@ -170,13 +188,18 @@ function buildWindow(
   if (bitrateDrop) signals.push("bitrate caiu");
   if (cpuHigh) signals.push(`CPU ${Math.round(maxCpu)}%`);
   if (gpuHigh) signals.push(`GPU ${Math.round(maxGpu)}%`);
+  if (renderLag) signals.push(`OBS render ${Math.round(maxRenderMs)}ms`);
+  if (congested) signals.push(`OBS congestionado ${Math.round(maxCongestion * 100)}%`);
 
   let cause = "Causa indeterminada";
   let advice = "Veja os sinais desta janela.";
-  if (cpuHigh || gpuHigh) {
+  if (renderLag && !cpuHigh && !gpuHigh) {
+    cause = "Cena pesada no OBS (render lag)";
+    advice = "Alivie a cena (fontes/efeitos/filtros) ou baixe a resolução base no OBS.";
+  } else if (cpuHigh || gpuHigh) {
     cause = "Gargalo de encoding";
     advice = "Reduza o bitrate/resolução ou use um encoder de hardware (NVENC/QSV).";
-  } else if ((bitrateDrop || reconnect) && !singleTarget) {
+  } else if (congested || ((bitrateDrop || reconnect) && !singleTarget)) {
     cause = "Gargalo de rede/upload";
     advice = "Reduza o bitrate total ou tire uma plataforma.";
   } else if (singleTarget) {
@@ -302,6 +325,7 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   if (!windows.length)
     return { tone: "ok", title: "Transmissão limpa", detail: "Nenhum incidente detectado nesta sessão." };
   const enc = windows.filter((w) => w.cause.startsWith("Gargalo de encoding")).length;
+  const render = windows.filter((w) => w.cause.startsWith("Cena pesada")).length;
   const net = windows.filter((w) => w.cause.startsWith("Gargalo de rede")).length;
   const plat = windows.filter((w) => w.cause.startsWith("Instabilidade")).length;
   if (enc)
@@ -309,6 +333,12 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
       tone: "bad",
       title: "Provável gargalo de ENCODING",
       detail: `${enc} janela(s) com CPU/GPU saturada. Reduza bitrate/resolução ou use encoder de hardware.`,
+    };
+  if (render)
+    return {
+      tone: "warn",
+      title: "Provável CENA PESADA no OBS",
+      detail: `${render} janela(s) com render lag do OBS — alivie a cena ou baixe a resolução base.`,
     };
   if (net)
     return {

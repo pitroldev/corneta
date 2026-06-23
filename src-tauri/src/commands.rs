@@ -455,6 +455,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         }
     });
 
+    // 5) Coletor de stats do OBS (melhor-esforço): render/encode lag + congestionamento.
+    let app_o = app.clone();
+    let run_o = running.clone();
+    let obs_pw = config.settings.obs_password.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::poll_stats("127.0.0.1", 4455, &obs_pw, &run_o, |stats| {
+            update_obs_stats(&app_o, stats);
+        });
+    });
+
     Ok(())
 }
 
@@ -588,6 +598,17 @@ fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
     // Grava a amostra desta janela (~2s) no NDJSON da sessão.
     if let Some(path) = session {
         session::record_sample(&path, &out);
+    }
+}
+
+/// Atualiza as stats do OBS no snapshot (o amostrador de CPU emite/grava na sequência).
+fn update_obs_stats(app: &AppHandle, stats: engine::ObsStats) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    if let Some(snap) = eng.snapshot.as_mut() {
+        if snap.state != "stopped" {
+            snap.obs = Some(stats);
+        }
     }
 }
 

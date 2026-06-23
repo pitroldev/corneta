@@ -130,6 +130,15 @@ export interface TargetStatus {
   message?: string;
 }
 
+export interface ObsStats {
+  activeFps: number;
+  avgRenderMs: number;
+  renderSkipped: number;
+  outputSkipped: number;
+  /** Congestionamento de saída (0..1). */
+  congestion: number;
+}
+
 export interface EngineSnapshot {
   state: EngineState;
   startedAt: number | null;
@@ -138,6 +147,8 @@ export interface EngineSnapshot {
   /** Uso real de CPU/GPU (%) enquanto transmite. */
   cpu?: number;
   gpu?: number;
+  /** Stats do OBS (se conectado via obs-websocket). */
+  obs?: ObsStats;
 }
 
 export interface EncoderInfo {
@@ -178,6 +189,7 @@ export interface SessionSample {
   t: number;
   cpu?: number;
   gpu?: number;
+  obs?: ObsStats;
   targets: SessionSampleTarget[];
 }
 

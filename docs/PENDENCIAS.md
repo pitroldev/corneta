@@ -84,7 +84,7 @@
 - **Cloud relay "traga seu VPS"** (não estourar o upload doméstico — §7 do plano).
 - **macOS / Linux** (keyring `apple-native`/`sync-secret-service`, assinatura/notarização Apple).
 - **Gravação local simultânea**, **chat/métricas unificados** por plataforma.
-- ✅ **Relatório pós-live** (v1: grava a sessão em NDJSON + tela com gráficos, janelas problemáticas e veredito) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: stats do OBS (Fase 4).
+- ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
 
 ---
 
