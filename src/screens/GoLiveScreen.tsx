@@ -12,14 +12,19 @@ import {
   Loader2,
   Pause,
   Play,
+  ClipboardCheck,
+  MapPin,
+  ExternalLink,
+  X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
 import { estimate } from "../lib/estimates";
+import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn, fmtBitrate, fmtUptime } from "../lib/utils";
-import type { EngineState, TargetState } from "../lib/types";
+import { cn, fmtBitrate, fmtUptime, openExternal } from "../lib/utils";
+import type { EngineState, ObsCheck, TargetState } from "../lib/types";
 import { blockingIssues } from "../lib/validation";
 import {
   Button,
@@ -95,6 +100,14 @@ export function GoLiveScreen() {
   const onStop = async () => {
     await stop();
     toast.info("Transmissão encerrada");
+  };
+  const onMark = async () => {
+    try {
+      await api.markMoment();
+      toast.success("Momento marcado 📍 — aparece no relatório");
+    } catch {
+      /* sem sessão gravando */
+    }
   };
 
   return (
@@ -224,6 +237,8 @@ export function GoLiveScreen() {
         </Card>
       )}
 
+      {!live && !starting && <Checkup />}
+
       <div className="mb-5">
         {starting ? (
           <Button
@@ -263,6 +278,15 @@ export function GoLiveScreen() {
           </p>
         )}
       </div>
+
+      {(live || starting) && (
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <LiveTimer startedAt={snapshot.startedAt} />
+          <Button variant="subtle" size="sm" onClick={onMark} title="Cravar um marcador no relatório">
+            <MapPin className="size-4" /> Marcar momento
+          </Button>
+        </div>
+      )}
 
       {(live || starting) && (
         <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
@@ -323,6 +347,16 @@ export function GoLiveScreen() {
                         value={fmtUptime(st?.uptimeSec ?? 0)}
                       />
                     </div>
+                    {PLATFORMS[t.platformId].liveUrl && (
+                      <button
+                        onClick={() => void openExternal(PLATFORMS[t.platformId].liveUrl!)}
+                        className="rounded-md p-2 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+                        title="Abrir o canal na plataforma"
+                        aria-label="Abrir o canal"
+                      >
+                        <ExternalLink className="size-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => void api.setTargetPaused(t.id, st?.state !== "paused")}
                       className={cn(
@@ -345,6 +379,113 @@ export function GoLiveScreen() {
       <AnimatePresence>
         {showObs && <ObsWizard onClose={() => setShowObs(false)} />}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function LiveTimer({ startedAt }: { startedAt: number | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const secs = startedAt ? (now - startedAt) / 1000 : 0;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="size-2.5 rounded-full bg-live live-dot" />
+      <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
+        {fmtUptime(secs)}
+      </span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">no ar</span>
+    </div>
+  );
+}
+
+function Checkup() {
+  const config = useStore((s) => s.config)!;
+  const encoders = useStore((s) => s.encoders);
+  const uploadMbps = useStore((s) => s.uploadMbps);
+  const enabled = config.targets.filter((t) => t.enabled);
+  const needed = estimate(config).uploadKbps / 1000;
+  const [obs, setObs] = useState<ObsCheck | "loading" | null>(null);
+
+  const runObs = async () => {
+    setObs("loading");
+    try {
+      setObs(await api.obsCheck());
+    } catch (e) {
+      setObs({ reachable: false, pointingAtCorneta: false, width: 0, height: 0, fps: 0, error: String(e) });
+    }
+  };
+
+  return (
+    <Card className="mb-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-lg">
+          <ClipboardCheck className="size-5 text-brass" /> Check-up pré-live
+        </h3>
+        <Button variant="subtle" size="sm" onClick={runObs} disabled={obs === "loading"}>
+          {obs === "loading" ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4 text-brass" />}
+          Verificar OBS
+        </Button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <CheckRow label="Encoder disponível" ok={encoders.some((e) => e.available)} />
+        <CheckRow
+          label="Chaves e URLs"
+          ok={enabled.length > 0 && enabled.every((t) => blockingIssues(t).length === 0)}
+          detail={enabled.length === 0 ? "nenhum destino ativo" : undefined}
+        />
+        <CheckRow
+          label="Upload"
+          ok={uploadMbps != null && uploadMbps >= needed}
+          warn={uploadMbps == null}
+          detail={
+            uploadMbps == null
+              ? "rode o teste em Banda de upload"
+              : `${uploadMbps} / ${needed.toFixed(1).replace(".", ",")} Mbps`
+          }
+        />
+        {obs && obs !== "loading" && (
+          <>
+            <CheckRow label="OBS acessível" ok={obs.reachable} detail={obs.error} />
+            {obs.reachable && (
+              <CheckRow
+                label="OBS apontando pra Corneta"
+                ok={obs.pointingAtCorneta}
+                detail={
+                  obs.pointingAtCorneta
+                    ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)}fps`
+                    : "use Configurar sozinho"
+                }
+              />
+            )}
+          </>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-ink-faint">💡 No OBS: keyframe 2s + bitrate CBR.</p>
+    </Card>
+  );
+}
+
+function CheckRow({
+  label,
+  ok,
+  warn,
+  detail,
+}: {
+  label: string;
+  ok?: boolean;
+  warn?: boolean;
+  detail?: string;
+}) {
+  const Icon = ok ? Check : warn ? AlertTriangle : X;
+  const cls = ok ? "text-ok" : warn ? "text-warn" : "text-bad";
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <Icon className={cn("size-4 shrink-0", cls)} strokeWidth={2.4} />
+      <span className="font-semibold">{label}</span>
+      {detail && <span className="text-xs text-ink-faint">· {detail}</span>}
     </div>
   );
 }

@@ -514,9 +514,18 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let run_o = running.clone();
     let obs_pw = config.settings.obs_password.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::poll_stats("127.0.0.1", 4455, &obs_pw, &run_o, |stats| {
-            update_obs_stats(&app_o, stats);
-        });
+        // Religa sozinho se a conexão cair, enquanto o motor estiver no ar.
+        while run_o.load(Ordering::Relaxed) {
+            crate::obs::poll_stats("127.0.0.1", 4455, &obs_pw, &run_o, |stats| {
+                update_obs_stats(&app_o, stats);
+            });
+            for _ in 0..25 {
+                if !run_o.load(Ordering::Relaxed) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
     });
 
     Ok(())
@@ -916,4 +925,73 @@ pub fn register_shortcut(app: AppHandle, shortcut: String) -> Result<(), String>
         gs.register(sc).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Check-up do OBS (acessível? apontando pra Corneta? resolução/fps).
+#[tauri::command]
+pub async fn obs_check(app: AppHandle) -> Result<crate::obs::ObsCheck, String> {
+    let cfg = get_config(app);
+    let server = format!(
+        "{}://{}:{}/{}",
+        cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
+    );
+    let password = cfg.settings.obs_password;
+    tauri::async_runtime::spawn_blocking(move || crate::obs::check("127.0.0.1", 4455, &password, &server))
+        .await
+        .map_err(|e| format!("join: {e}"))
+}
+
+/// Crava um marcador na sessão em gravação (relatório pós-live).
+#[tauri::command]
+pub fn mark_moment(app: AppHandle, label: Option<String>) -> Result<(), String> {
+    let st = app.state::<AppState>();
+    let path = st.engine.lock().unwrap().session_path.clone();
+    match path {
+        Some(p) => {
+            session::record_marker(&p, label.as_deref().unwrap_or("Momento"));
+            Ok(())
+        }
+        None => Err("não está gravando uma sessão".into()),
+    }
+}
+
+/// Exporta a config (perfis/ajustes — sem chaves) num arquivo escolhido pelo usuário.
+#[tauri::command]
+pub fn export_config(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let cfg = config::load(&app);
+    let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    match app
+        .dialog()
+        .file()
+        .add_filter("Config da Corneta", &["json"])
+        .set_file_name("corneta-config.json")
+        .blocking_save_file()
+    {
+        Some(p) => {
+            let pb = p.into_path().map_err(|e| e.to_string())?;
+            std::fs::write(pb, json).map_err(|e| e.to_string())?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+/// Importa a config de um arquivo (substitui perfis/ajustes).
+#[tauri::command]
+pub fn import_config(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let Some(p) = app
+        .dialog()
+        .file()
+        .add_filter("Config da Corneta", &["json"])
+        .blocking_pick_file()
+    else {
+        return Ok(false);
+    };
+    let pb = p.into_path().map_err(|e| e.to_string())?;
+    let content = std::fs::read_to_string(pb).map_err(|e| e.to_string())?;
+    let cfg: AppConfig = serde_json::from_str(&content).map_err(|e| format!("config inválida: {e}"))?;
+    config::save(&app, &cfg)?;
+    Ok(true)
 }

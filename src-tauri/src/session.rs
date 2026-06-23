@@ -93,6 +93,11 @@ pub fn end_session(path: &Path) {
     append_line(path, &json!({ "kind": "end", "endedAt": now_ms() }));
 }
 
+/// Crava um marcador ("momento") na sessão — aparece na linha do tempo do relatório.
+pub fn record_marker(path: &Path, label: &str) {
+    append_line(path, &json!({ "kind": "marker", "t": now_ms(), "label": label }));
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionMeta {

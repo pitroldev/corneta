@@ -131,6 +131,53 @@ pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<
     }
 }
 
+/// Resultado da checagem pré-live do OBS.
+#[derive(serde::Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ObsCheck {
+    pub reachable: bool,
+    pub pointing_at_corneta: bool,
+    pub width: u32,
+    pub height: u32,
+    pub fps: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Verifica se o OBS está acessível, apontando pra Corneta e em qual resolução/fps.
+pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> ObsCheck {
+    let mut socket = match connect_identify(host, port, password) {
+        Ok(s) => s,
+        Err(e) => {
+            return ObsCheck { error: Some(e), ..Default::default() };
+        }
+    };
+    let svc = request(&mut socket, "GetStreamServiceSettings", "corneta-svc").ok();
+    let server = svc
+        .as_ref()
+        .and_then(|v| v.pointer("/streamServiceSettings/server"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string();
+    let pointing = !server.is_empty() && server.trim_end_matches('/') == expected_server.trim_end_matches('/');
+
+    let vid = request(&mut socket, "GetVideoSettings", "corneta-vid").ok();
+    let g = |k: &str| vid.as_ref().and_then(|v| v.get(k)).and_then(|x| x.as_f64()).unwrap_or(0.0);
+    let num = g("fpsNumerator");
+    let den = g("fpsDenominator");
+    let fps = if den > 0.0 { (num / den * 10.0).round() / 10.0 } else { 0.0 };
+    let _ = socket.close(None);
+
+    ObsCheck {
+        reachable: true,
+        pointing_at_corneta: pointing,
+        width: g("outputWidth") as u32,
+        height: g("outputHeight") as u32,
+        fps,
+        error: None,
+    }
+}
+
 /// Envia um request e devolve o `responseData`.
 fn request(socket: &mut Socket, req_type: &str, id: &str) -> Result<Value, String> {
     send_json(

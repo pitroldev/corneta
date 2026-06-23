@@ -66,6 +66,7 @@ pub fn run() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
             chat: Mutex::new(chat::ChatRuntime::default()),
@@ -94,6 +95,10 @@ pub fn run() {
             commands::test_target,
             commands::open_logs_dir,
             commands::register_shortcut,
+            commands::obs_check,
+            commands::mark_moment,
+            commands::export_config,
+            commands::import_config,
         ])
         .setup(|app| {
             // Registra o atalho global de começar/parar a partir das settings.
@@ -118,8 +123,31 @@ pub fn run() {
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "show" => show_main(app),
                         "quit" => {
-                            commands::kill_engine(app);
-                            app.exit(0);
+                            let live = {
+                                let st = app.state::<AppState>();
+                                let eng = st.engine.lock().unwrap();
+                                eng.snapshot
+                                    .as_ref()
+                                    .map(|s| s.state != "stopped")
+                                    .unwrap_or(false)
+                            };
+                            let ok = if live {
+                                use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+                                app.dialog()
+                                    .message("Você está AO VIVO. Sair encerra a transmissão.")
+                                    .title("Sair da Corneta?")
+                                    .buttons(MessageDialogButtons::OkCancelCustom(
+                                        "Encerrar e sair".into(),
+                                        "Cancelar".into(),
+                                    ))
+                                    .blocking_show()
+                            } else {
+                                true
+                            };
+                            if ok {
+                                commands::kill_engine(app);
+                                app.exit(0);
+                            }
                         }
                         _ => {}
                     })

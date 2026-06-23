@@ -347,6 +347,7 @@ const EVENT_DOT: Record<ReportEvent["kind"], string> = {
   error: "bg-bad",
   recover: "bg-ok",
   cpu: "bg-warn",
+  marker: "bg-brass",
 };
 
 function EventRow({ e }: { e: ReportEvent }) {

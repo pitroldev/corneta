@@ -42,6 +42,7 @@ export function ChatScreen() {
     platform: s.chatShowPlatform ?? true,
     source: s.chatShowSource ?? false,
     timestamps: s.chatShowTimestamps ?? false,
+    fontSize: s.chatFontSize ?? "md",
   };
   const configured = sources.some((x) => x.enabled && x.value.trim());
   const shown = messages.filter((m) => filter[m.platform]);
@@ -174,6 +175,19 @@ export function ChatScreen() {
               <ToggleRow label="Plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
               <ToggleRow label="Origem (canal)" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
               <ToggleRow label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-ink-muted">Tamanho da fonte</span>
+                <Select
+                  className="w-28"
+                  value={view.fontSize}
+                  options={[
+                    { value: "sm", label: "Pequeno" },
+                    { value: "md", label: "Médio" },
+                    { value: "lg", label: "Grande" },
+                  ]}
+                  onChange={(v) => setSettings({ chatFontSize: v as "sm" | "md" | "lg" })}
+                />
+              </div>
             </div>
 
             <p className="text-xs leading-relaxed text-ink-faint">

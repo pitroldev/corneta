@@ -53,6 +53,8 @@ export interface PlatformPreset {
   note?: string;
   /** Página do painel onde o usuário pega a stream key. */
   keyUrl?: string;
+  /** Página ao vivo/dashboard pra conferir a transmissão. */
+  liveUrl?: string;
   /** Plataforma cuja chave não é auto-serviço / suporte experimental. */
   experimental?: boolean;
 }
@@ -109,6 +111,19 @@ export interface AppSettings {
   chatShowPlatform: boolean;
   chatShowSource: boolean;
   chatShowTimestamps: boolean;
+  /** Tema da interface. */
+  theme: "dark" | "light";
+  /** Tamanho da fonte do chat. */
+  chatFontSize: "sm" | "md" | "lg";
+}
+
+export interface ObsCheck {
+  reachable: boolean;
+  pointingAtCorneta: boolean;
+  width: number;
+  height: number;
+  fps: number;
+  error?: string;
 }
 
 export type ChatPlatform = "twitch" | "youtube" | "kick";
@@ -261,7 +276,13 @@ export interface SessionSample {
   targets: SessionSampleTarget[];
 }
 
+export interface SessionMarker {
+  t: number;
+  label: string;
+}
+
 export interface SessionData {
   meta: SessionMeta;
   samples: SessionSample[];
+  markers: SessionMarker[];
 }

@@ -5,6 +5,7 @@
 import type {
   PlatformId,
   SessionData,
+  SessionMarker,
   SessionMeta,
   SessionSample,
 } from "./types";
@@ -16,6 +17,7 @@ export function parseSession(ndjson: string): SessionData | null {
   const lines = ndjson.split("\n").map((l) => l.trim()).filter(Boolean);
   let meta: SessionMeta | null = null;
   const samples: SessionSample[] = [];
+  const markers: SessionMarker[] = [];
   let endedAt: number | undefined;
 
   for (const line of lines) {
@@ -41,6 +43,8 @@ export function parseSession(ndjson: string): SessionData | null {
         obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
         targets: (o.targets ?? []) as SessionSample["targets"],
       });
+    } else if (o.kind === "marker") {
+      markers.push({ t: Number(o.t), label: String(o.label ?? "Momento") });
     } else if (o.kind === "end") {
       endedAt = Number(o.endedAt);
     }
@@ -51,7 +55,7 @@ export function parseSession(ndjson: string): SessionData | null {
   const end = endedAt ?? last;
   meta.endedAt = end;
   meta.durationSec = Math.max(0, Math.round((end - meta.startedAt) / 1000));
-  return { meta, samples };
+  return { meta, samples, markers };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +83,7 @@ export const obsRenderSeries = (d: SessionData): (number | null)[] =>
 // ---------------------------------------------------------------------------
 export interface ReportEvent {
   t: number;
-  kind: "start" | "end" | "reconnect" | "error" | "recover" | "cpu";
+  kind: "start" | "end" | "reconnect" | "error" | "recover" | "cpu" | "marker";
   label: string;
 }
 
@@ -277,6 +281,10 @@ function deriveEvents(data: SessionData): ReportEvent[] {
   }
 
   if (meta.endedAt) events.push({ t: meta.endedAt, kind: "end", label: "Fim da transmissão" });
+  for (const m of data.markers) {
+    events.push({ t: m.t, kind: "marker", label: `📍 ${m.label}` });
+  }
+  events.sort((a, b) => a.t - b.t);
   return events;
 }
 

@@ -30,6 +30,7 @@ export function ChatPopout() {
     platform: s.chatShowPlatform ?? true,
     source: s.chatShowSource ?? false,
     timestamps: s.chatShowTimestamps ?? false,
+    fontSize: s.chatFontSize ?? "md",
   };
 
   const iconBtn = "rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink";

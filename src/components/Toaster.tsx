@@ -34,6 +34,17 @@ export function Toaster() {
             >
               <Icon className={`mt-0.5 size-5 shrink-0 ${ACCENT[t.kind]}`} />
               <p className="flex-1 text-sm text-ink">{t.message}</p>
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action?.onClick();
+                    dismiss(t.id);
+                  }}
+                  className="shrink-0 font-display text-xs font-extrabold uppercase text-brass hover:underline"
+                >
+                  {t.action.label}
+                </button>
+              )}
               <button onClick={() => dismiss(t.id)} className="text-ink-faint hover:text-ink">
                 <X className="size-4" />
               </button>

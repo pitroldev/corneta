@@ -13,6 +13,7 @@ import type {
   ChatStatus,
   EncoderInfo,
   EngineSnapshot,
+  ObsCheck,
   SessionMeta,
   TargetStatus,
 } from "./types";
@@ -54,6 +55,10 @@ export interface CornetaApi {
   openLogsDir(): Promise<void>;
   registerShortcut(shortcut: string): Promise<void>;
   subscribeShortcut(cb: () => void): () => void;
+  obsCheck(): Promise<ObsCheck>;
+  markMoment(label?: string): Promise<void>;
+  exportConfig(): Promise<boolean>;
+  importConfig(): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +179,22 @@ function tauriApi(): CornetaApi {
       );
       return () => unlisten?.();
     },
+    async obsCheck() {
+      const { invoke } = await core();
+      return invoke<ObsCheck>("obs_check");
+    },
+    async markMoment(label) {
+      const { invoke } = await core();
+      await invoke("mark_moment", { label: label ?? null });
+    },
+    async exportConfig() {
+      const { invoke } = await core();
+      return invoke<boolean>("export_config");
+    },
+    async importConfig() {
+      const { invoke } = await core();
+      return invoke<boolean>("import_config");
+    },
   };
 }
 
@@ -266,6 +287,11 @@ function mockApi(): CornetaApi {
           obs,
           targets,
         })
+      );
+    }
+    if (opts?.dropAtMin != null) {
+      lines.push(
+        JSON.stringify({ kind: "marker", t: startedAt + opts.dropAtMin * 60000, label: "Twitch caiu" })
       );
     }
     lines.push(JSON.stringify({ kind: "end", endedAt: startedAt + n * step }));
@@ -598,6 +624,18 @@ function mockApi(): CornetaApi {
     },
     subscribeShortcut() {
       return () => {};
+    },
+    async obsCheck() {
+      return { reachable: true, pointingAtCorneta: true, width: 1920, height: 1080, fps: 60 };
+    },
+    async markMoment() {
+      // no-op no navegador (sem sessão real gravando)
+    },
+    async exportConfig() {
+      return false;
+    },
+    async importConfig() {
+      return false;
     },
   };
 }

@@ -43,6 +43,8 @@ export function defaultConfig(): AppConfig {
       chatShowPlatform: true,
       chatShowSource: false,
       chatShowTimestamps: false,
+      theme: "dark",
+      chatFontSize: "md",
     },
     profiles: [{ id: profId, name: "Padrão", mode: "hybrid", targets }],
     activeProfileId: profId,

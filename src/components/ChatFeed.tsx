@@ -10,7 +10,10 @@ export interface ChatView {
   platform: boolean;
   source: boolean;
   timestamps: boolean;
+  fontSize: "sm" | "md" | "lg";
 }
+
+const FONT_CLASS = { sm: "text-xs", md: "text-sm", lg: "text-base" } as const;
 
 const fmtTime = (ms: number) =>
   new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -46,7 +49,11 @@ export function ChatFeed({
     <div
       ref={ref}
       onScroll={onScroll}
-      className={cn("overflow-y-auto py-2 [scrollbar-gutter:stable]", className)}
+      className={cn(
+        "overflow-y-auto py-2 [scrollbar-gutter:stable]",
+        FONT_CLASS[view.fontSize],
+        className
+      )}
     >
       {messages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
@@ -95,10 +102,10 @@ function MsgRow({ m, view }: { m: ChatMessage; view: ChatView }) {
             {b.label}
           </span>
         ))}
-      <span className="shrink-0 text-sm font-bold" style={m.color ? { color: m.color } : undefined}>
+      <span className="shrink-0 font-bold" style={m.color ? { color: m.color } : undefined}>
         {m.author}
       </span>
-      <span className="min-w-0 break-words text-sm text-ink-muted">
+      <span className="min-w-0 break-words text-ink-muted">
         {m.fragments.map((f, i) =>
           f.kind === "emote" && view.emotes && f.url ? (
             <img

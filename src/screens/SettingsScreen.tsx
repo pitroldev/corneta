@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from "react";
-import { FileText, Keyboard, MonitorCog, Plug, Server } from "lucide-react";
+import { Download, FileText, Keyboard, MonitorCog, Plug, Server, Upload } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
+import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { Button, Card, Input, SectionTitle, Toggle } from "../components/ui";
 
@@ -10,8 +11,27 @@ export function SettingsScreen() {
   const config = useStore((s) => s.config);
   const setIngest = useStore((s) => s.setIngest);
   const setSettings = useStore((s) => s.setSettings);
+  const load = useStore((s) => s.load);
   if (!config) return null;
   const { ingest, settings } = config;
+
+  const onExport = async () => {
+    try {
+      if (await api.exportConfig()) toast.success("Config exportada");
+    } catch (e) {
+      toast.error(`Falha ao exportar: ${e}`);
+    }
+  };
+  const onImport = async () => {
+    try {
+      if (await api.importConfig()) {
+        await load();
+        toast.success("Config importada");
+      }
+    } catch (e) {
+      toast.error(`Falha ao importar: ${e}`);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -134,6 +154,26 @@ export function SettingsScreen() {
               onChange={(v) => setSettings({ autostart: v })}
               label="Abrir com o Windows"
             />
+          </SettingRow>
+          <SettingRow title="Tema claro" desc="Troca a interface pro modo claro (papel).">
+            <Toggle
+              checked={settings.theme === "light"}
+              onChange={(v) => setSettings({ theme: v ? "light" : "dark" })}
+              label="Tema claro"
+            />
+          </SettingRow>
+          <SettingRow
+            title="Backup da config"
+            desc="Exportar/importar perfis e ajustes num arquivo (as chaves não vão — ficam no cofre)."
+          >
+            <div className="flex gap-2">
+              <Button variant="subtle" size="sm" onClick={onExport}>
+                <Download className="size-4" /> Exportar
+              </Button>
+              <Button variant="subtle" size="sm" onClick={onImport}>
+                <Upload className="size-4" /> Importar
+              </Button>
+            </div>
           </SettingRow>
           <SettingRow
             title="Logs"

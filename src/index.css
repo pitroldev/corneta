@@ -42,6 +42,38 @@
   --radius-xl: 14px;
 }
 
+/* Tema claro (papel/quadrinho) — mantém o latão e as sombras duras escuras. */
+:root[data-theme="light"] {
+  --color-bg: #f3ead7;
+  --color-surface: #fffaf0;
+  --color-surface-2: #efe4cd;
+  --color-surface-3: #e3d6b8;
+  --color-border: #cbb88f;
+  --color-border-soft: #e7dbc1;
+
+  --color-ink: #2a1c0a;
+  --color-ink-muted: #5f4e36;
+  --color-ink-faint: #92805f;
+
+  --color-brass: #ffb323;
+  --color-brass-strong: #ffc857;
+  --color-brass-ink: #2a1c00;
+
+  --color-tomate: #ef4a25;
+  --color-tomate-strong: #ff6a45;
+
+  --color-live: #e23b2b;
+  --color-ok: #1f9d57;
+  --color-warn: #b87807;
+  --color-bad: #d83a32;
+  --color-info: #1f6fe0;
+
+  --color-night: #241a0d;
+}
+:root[data-theme="light"] body {
+  background-image: radial-gradient(rgba(42, 28, 10, 0.05) 1px, transparent 1.5px);
+}
+
 @layer base {
   html,
   body,

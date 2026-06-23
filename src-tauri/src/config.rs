@@ -82,6 +82,12 @@ pub struct Settings {
     pub chat_show_source: bool,
     #[serde(default)]
     pub chat_show_timestamps: bool,
+    /// Tema da interface: "dark" | "light".
+    #[serde(default = "default_theme")]
+    pub theme: String,
+    /// Tamanho da fonte do chat: "sm" | "md" | "lg".
+    #[serde(default = "default_font")]
+    pub chat_font_size: String,
 }
 
 fn default_true() -> bool {
@@ -89,6 +95,12 @@ fn default_true() -> bool {
 }
 fn default_live_shortcut() -> String {
     "CommandOrControl+Alt+L".to_string()
+}
+fn default_theme() -> String {
+    "dark".to_string()
+}
+fn default_font() -> String {
+    "md".to_string()
 }
 
 /// Uma fonte de chat (um canal de uma plataforma).
@@ -118,6 +130,8 @@ impl Default for Settings {
             chat_show_platform: true,
             chat_show_source: false,
             chat_show_timestamps: false,
+            theme: default_theme(),
+            chat_font_size: default_font(),
         }
     }
 }

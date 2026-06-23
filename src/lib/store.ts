@@ -15,6 +15,9 @@ import { api } from "./api";
 import { makeTarget } from "./factory";
 import { uid } from "./utils";
 
+// Última remoção de destino (para o "desfazer").
+let pendingRemoval: { target: Target; index: number } | null = null;
+
 interface State {
   loaded: boolean;
   config: AppConfig | null;
@@ -30,6 +33,8 @@ interface State {
   removeTarget: (id: string) => void;
   toggleTarget: (id: string) => void;
   reorderTargets: (ordered: Target[]) => void;
+  duplicateTarget: (id: string) => void;
+  undoRemoveTarget: () => void;
 
   setMode: (mode: EncodingMode) => void;
   setIngest: (patch: Partial<IngestConfig>) => void;
@@ -143,11 +148,10 @@ export const useStore = create<State>((set, get) => {
     removeTarget(id) {
       const config = get().config;
       if (!config) return;
-      // Só apaga a chave do cofre se esse destino não estiver em outro perfil.
-      const usedElsewhere = config.profiles.some(
-        (p) => p.id !== config.activeProfileId && p.targets.some((t) => t.id === id)
-      );
-      if (!usedElsewhere) void api.clearKey(id);
+      const index = config.targets.findIndex((t) => t.id === id);
+      const target = config.targets[index];
+      if (target) pendingRemoval = { target, index };
+      // Não apaga a chave do cofre — assim o "desfazer" restaura tudo, chave inclusa.
       persist({ ...config, targets: config.targets.filter((t) => t.id !== id) });
     },
 
@@ -166,6 +170,37 @@ export const useStore = create<State>((set, get) => {
       const config = get().config;
       if (!config) return;
       persist({ ...config, targets: ordered });
+    },
+
+    duplicateTarget(id) {
+      const config = get().config;
+      if (!config) return;
+      const index = config.targets.findIndex((t) => t.id === id);
+      const t = config.targets[index];
+      if (!t) return;
+      const copy: Target = {
+        ...t,
+        id: uid("tgt"),
+        name: `${t.name} (cópia)`,
+        hasKey: false,
+        encoding: {
+          ...t.encoding,
+          preset: t.encoding.preset ? { ...t.encoding.preset } : undefined,
+        },
+      };
+      const targets = [...config.targets];
+      targets.splice(index + 1, 0, copy);
+      persist({ ...config, targets });
+    },
+
+    undoRemoveTarget() {
+      const config = get().config;
+      if (!config || !pendingRemoval) return;
+      const { target, index } = pendingRemoval;
+      pendingRemoval = null;
+      const targets = [...config.targets];
+      targets.splice(Math.min(index, targets.length), 0, target);
+      persist({ ...config, targets });
     },
 
     setMode(mode) {

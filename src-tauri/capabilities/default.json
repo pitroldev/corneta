@@ -16,6 +16,7 @@
     "shell:allow-kill",
     "shell:allow-open",
     "notification:default",
+    "dialog:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [

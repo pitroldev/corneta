@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
 import {
   KeyRound, Plus, Trash2, Check, X, AlertTriangle, Pencil,
-  GripVertical, Eye, EyeOff, ClipboardPaste, Wifi, ExternalLink,
+  GripVertical, Eye, EyeOff, ClipboardPaste, Wifi, ExternalLink, Copy,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -76,6 +76,7 @@ function ProfileBar() {
   const removeProfile = useStore((s) => s.removeProfile);
   const renameProfile = useStore((s) => s.renameProfile);
   const [editing, setEditing] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   const active = config.profiles.find((p) => p.id === config.activeProfileId);
   if (!active) return null;
@@ -116,8 +117,20 @@ function ProfileBar() {
         <Plus className="size-3.5" strokeWidth={2.6} /> Novo
       </Button>
       {many && (
-        <Button variant="ghost" size="sm" onClick={() => removeProfile(active.id)}>
-          <Trash2 className="size-3.5" /> Excluir
+        <Button
+          variant={confirmDel ? "primary" : "ghost"}
+          size="sm"
+          onClick={() => {
+            if (confirmDel) {
+              removeProfile(active.id);
+              setConfirmDel(false);
+            } else {
+              setConfirmDel(true);
+              setTimeout(() => setConfirmDel(false), 3000);
+            }
+          }}
+        >
+          <Trash2 className="size-3.5" /> {confirmDel ? "Confirmar?" : "Excluir"}
         </Button>
       )}
     </div>
@@ -145,6 +158,8 @@ function TargetRow({ target }: { target: Target }) {
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const toggleTarget = useStore((s) => s.toggleTarget);
+  const duplicateTarget = useStore((s) => s.duplicateTarget);
+  const undoRemoveTarget = useStore((s) => s.undoRemoveTarget);
   const controls = useDragControls();
   const preset = PLATFORMS[target.platformId];
   const isCustom = target.platformId === "custom";
@@ -197,9 +212,19 @@ function TargetRow({ target }: { target: Target }) {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => duplicateTarget(target.id)}
+            aria-label="Duplicar"
+            title="Duplicar"
+          >
+            <Copy className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
+              const name = target.name;
               removeTarget(target.id);
-              toast.info(`${target.name} saiu da corneta`);
+              toast.action(`${name} saiu da corneta`, "Desfazer", () => undoRemoveTarget());
             }}
             aria-label="Remover"
           >

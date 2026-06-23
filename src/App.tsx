@@ -23,6 +23,7 @@ export default function App() {
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
   const bindChat = useStore((s) => s.bindChat);
+  const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [screen, setScreen] = useState<Screen>(() => {
     try {
       const stored = localStorage.getItem("corneta.screen") as Screen | null;
@@ -58,6 +59,11 @@ export default function App() {
       unbindShortcut();
     };
   }, [load, bindEngine, bindChat]);
+
+  // D1: aplica o tema (dark/light) no documento.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   // Janela flutuante só-chat (aberta via open_chat_window com #chat-popout).
   if (typeof window !== "undefined" && window.location.hash === "#chat-popout") {
