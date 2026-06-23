@@ -70,7 +70,16 @@ export function GoLiveScreen() {
   useEffect(() => {
     if (!goLiveFocus) return;
     const id = setTimeout(() => {
-      boraRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Rola SÓ o container da tela. (Não usar scrollIntoView: ele rola também os
+      // ancestrais overflow-hidden e deixa todas as telas cortadas no topo.)
+      const scroller = document.getElementById("screen-scroll");
+      const target = boraRef.current;
+      if (scroller && target) {
+        const t = target.getBoundingClientRect();
+        const s = scroller.getBoundingClientRect();
+        const top = scroller.scrollTop + (t.top - s.top) - (scroller.clientHeight - t.height) / 2;
+        scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      }
       setGoLiveFocus(false);
     }, 140);
     return () => clearTimeout(id);
