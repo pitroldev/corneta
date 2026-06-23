@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bell, Eye, ExternalLink, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
@@ -41,16 +41,26 @@ export function ChatScreen() {
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
-  const view: ChatView = {
-    emotes: s.chatShowEmotes ?? true,
-    badges: s.chatShowBadges ?? true,
-    platform: s.chatShowPlatform ?? true,
-    source: s.chatShowSource ?? false,
-    timestamps: s.chatShowTimestamps ?? false,
-    fontSize: s.chatFontSize ?? "md",
-  };
+  const view: ChatView = useMemo(
+    () => ({
+      emotes: s.chatShowEmotes ?? true,
+      badges: s.chatShowBadges ?? true,
+      platform: s.chatShowPlatform ?? true,
+      source: s.chatShowSource ?? false,
+      timestamps: s.chatShowTimestamps ?? false,
+      fontSize: s.chatFontSize ?? "md",
+    }),
+    [
+      s.chatShowEmotes,
+      s.chatShowBadges,
+      s.chatShowPlatform,
+      s.chatShowSource,
+      s.chatShowTimestamps,
+      s.chatFontSize,
+    ]
+  );
   const configured = sources.some((x) => x.enabled && x.value.trim());
-  const shown = messages.filter((m) => filter[m.platform]);
+  const shown = useMemo(() => messages.filter((m) => filter[m.platform]), [messages, filter]);
 
   const addSource = () =>
     setSettings({

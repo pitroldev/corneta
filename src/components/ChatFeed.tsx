@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
@@ -16,7 +16,10 @@ export interface ChatView {
 const FONT_CLASS = { sm: "text-xs", md: "text-sm", lg: "text-base" } as const;
 
 const fmtTime = (ms: number) =>
-  new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  new Date(ms).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 /** Feed rolável com auto-scroll (pausa ao rolar pra cima). Compartilhado pela
  *  tela de Chat e pela janela flutuante. */
@@ -52,7 +55,7 @@ export function ChatFeed({
       className={cn(
         "overflow-y-auto py-2 [scrollbar-gutter:stable]",
         FONT_CLASS[view.fontSize],
-        className
+        className,
       )}
     >
       {messages.length === 0 ? (
@@ -74,11 +77,19 @@ export function ChatFeed({
   );
 }
 
-function MsgRow({ m, view }: { m: ChatMessage; view: ChatView }) {
+const MsgRow = memo(function MsgRow({
+  m,
+  view,
+}: {
+  m: ChatMessage;
+  view: ChatView;
+}) {
   return (
     <div className="flex flex-wrap items-start gap-1.5 px-3 py-1 leading-snug hover:bg-surface-2">
       {view.timestamps && (
-        <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-ink-faint">{fmtTime(m.ts)}</span>
+        <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-ink-faint">
+          {fmtTime(m.ts)}
+        </span>
       )}
       {view.platform && (
         <span className="mt-0.5 shrink-0">
@@ -96,13 +107,16 @@ function MsgRow({ m, view }: { m: ChatMessage; view: ChatView }) {
             key={i}
             className={cn(
               "mt-0.5 shrink-0 rounded px-1 text-[9px] font-extrabold uppercase leading-4",
-              badgeColor(b.kind)
+              badgeColor(b.kind),
             )}
           >
             {b.label}
           </span>
         ))}
-      <span className="shrink-0 font-bold" style={m.color ? { color: m.color } : undefined}>
+      <span
+        className="shrink-0 font-bold"
+        style={m.color ? { color: m.color } : undefined}
+      >
         {m.author}
       </span>
       <span className="min-w-0 break-words text-ink-muted">
@@ -118,12 +132,12 @@ function MsgRow({ m, view }: { m: ChatMessage; view: ChatView }) {
             />
           ) : (
             <span key={i}>{f.text}</span>
-          )
+          ),
         )}
       </span>
     </div>
   );
-}
+});
 
 function badgeColor(kind: string): string {
   switch (kind) {

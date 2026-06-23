@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Copy,
@@ -48,10 +48,17 @@ export function GoLiveScreen() {
   const state = snapshot.state;
   const live = state === "live";
   const starting = state === "starting";
-  const enabled = config.targets.filter((t) => t.enabled);
-  const problems = enabled
-    .map((t) => ({ target: t, issues: blockingIssues(t) }))
-    .filter((p) => p.issues.length > 0);
+  const enabled = useMemo(
+    () => config.targets.filter((t) => t.enabled),
+    [config.targets],
+  );
+  const problems = useMemo(
+    () =>
+      enabled
+        .map((t) => ({ target: t, issues: blockingIssues(t) }))
+        .filter((p) => p.issues.length > 0),
+    [enabled],
+  );
   const canStart = enabled.length > 0 && problems.length === 0;
 
   // Avisa quando o OBS realmente conecta (stopped/starting → live).
@@ -77,7 +84,10 @@ export function GoLiveScreen() {
       if (scroller && target) {
         const t = target.getBoundingClientRect();
         const s = scroller.getBoundingClientRect();
-        const top = scroller.scrollTop + (t.top - s.top) - (scroller.clientHeight - t.height) / 2;
+        const top =
+          scroller.scrollTop +
+          (t.top - s.top) -
+          (scroller.clientHeight - t.height) / 2;
         scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
       }
       setGoLiveFocus(false);
@@ -116,7 +126,7 @@ export function GoLiveScreen() {
       toast.success(
         config.settings.autoStartObs
           ? "No ar! Se o OBS não começar sozinho, dê play nele 📣"
-          : "Servidor no ar! Agora é só dar play no OBS 📣"
+          : "Servidor no ar! Agora é só dar play no OBS 📣",
       );
     } catch (e) {
       toast.error(`Não rolou: ${e}`);
@@ -307,7 +317,12 @@ export function GoLiveScreen() {
       {(live || starting) && (
         <div className="mb-2 flex items-center justify-between gap-3">
           <LiveTimer startedAt={snapshot.startedAt} live={live} />
-          <Button variant="subtle" size="sm" onClick={onMark} title="Cravar um marcador no relatório">
+          <Button
+            variant="subtle"
+            size="sm"
+            onClick={onMark}
+            title="Cravar um marcador no relatório"
+          >
             <MapPin className="size-4" /> Marcar momento
           </Button>
         </div>
@@ -374,7 +389,9 @@ export function GoLiveScreen() {
                     </div>
                     {PLATFORMS[t.platformId].liveUrl && (
                       <button
-                        onClick={() => void openExternal(PLATFORMS[t.platformId].liveUrl!)}
+                        onClick={() =>
+                          void openExternal(PLATFORMS[t.platformId].liveUrl!)
+                        }
                         className="rounded-md p-2 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
                         title="Abrir o canal na plataforma"
                         aria-label="Abrir o canal"
@@ -383,15 +400,27 @@ export function GoLiveScreen() {
                       </button>
                     )}
                     <button
-                      onClick={() => void api.setTargetPaused(t.id, st?.state !== "paused")}
+                      onClick={() =>
+                        void api.setTargetPaused(t.id, st?.state !== "paused")
+                      }
                       className={cn(
                         "rounded-md p-2 transition-colors hover:bg-surface-3",
-                        st?.state === "paused" ? "text-brass" : "text-ink-faint hover:text-ink"
+                        st?.state === "paused"
+                          ? "text-brass"
+                          : "text-ink-faint hover:text-ink",
                       )}
-                      title={st?.state === "paused" ? "Retomar" : "Pausar este destino"}
+                      title={
+                        st?.state === "paused"
+                          ? "Retomar"
+                          : "Pausar este destino"
+                      }
                       aria-label={st?.state === "paused" ? "Retomar" : "Pausar"}
                     >
-                      {st?.state === "paused" ? <Play className="size-4" /> : <Pause className="size-4" />}
+                      {st?.state === "paused" ? (
+                        <Play className="size-4" />
+                      ) : (
+                        <Pause className="size-4" />
+                      )}
                     </button>
                   </Card>
                 </motion.div>
@@ -408,7 +437,13 @@ export function GoLiveScreen() {
   );
 }
 
-function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolean }) {
+function LiveTimer({
+  startedAt,
+  live,
+}: {
+  startedAt: number | null;
+  live: boolean;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -432,7 +467,9 @@ function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolea
       <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
         {fmtUptime(secs)}
       </span>
-      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">no ar</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+        no ar
+      </span>
     </div>
   );
 }
@@ -450,7 +487,14 @@ function Checkup() {
     try {
       setObs(await api.obsCheck());
     } catch (e) {
-      setObs({ reachable: false, pointingAtCorneta: false, width: 0, height: 0, fps: 0, error: String(e) });
+      setObs({
+        reachable: false,
+        pointingAtCorneta: false,
+        width: 0,
+        height: 0,
+        fps: 0,
+        error: String(e),
+      });
     }
   };
 
@@ -460,16 +504,31 @@ function Checkup() {
         <h3 className="flex items-center gap-2 text-lg">
           <ClipboardCheck className="size-5 text-brass" /> Check-up pré-live
         </h3>
-        <Button variant="subtle" size="sm" onClick={runObs} disabled={obs === "loading"}>
-          {obs === "loading" ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4 text-brass" />}
+        <Button
+          variant="subtle"
+          size="sm"
+          onClick={runObs}
+          disabled={obs === "loading"}
+        >
+          {obs === "loading" ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Zap className="size-4 text-brass" />
+          )}
           Verificar OBS
         </Button>
       </div>
       <div className="flex flex-col gap-1.5">
-        <CheckRow label="Encoder disponível" ok={encoders.some((e) => e.available)} />
+        <CheckRow
+          label="Encoder disponível"
+          ok={encoders.some((e) => e.available)}
+        />
         <CheckRow
           label="Chaves e URLs"
-          ok={enabled.length > 0 && enabled.every((t) => blockingIssues(t).length === 0)}
+          ok={
+            enabled.length > 0 &&
+            enabled.every((t) => blockingIssues(t).length === 0)
+          }
           detail={enabled.length === 0 ? "nenhum destino ativo" : undefined}
         />
         <CheckRow
@@ -509,7 +568,9 @@ function Checkup() {
           </>
         )}
       </div>
-      <p className="mt-2 text-xs text-ink-faint">💡 No OBS: keyframe 2s + bitrate CBR.</p>
+      <p className="mt-2 text-xs text-ink-faint">
+        💡 No OBS: keyframe 2s + bitrate CBR.
+      </p>
     </Card>
   );
 }
@@ -545,8 +606,16 @@ function StatePill({ state }: { state: TargetState }) {
       reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
       error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
       paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
-      waiting: { label: "Aguardando sinal", cls: "text-info", dot: "bg-info animate-pulse" },
-      brb: { label: "JÁ VOLTO (slate no ar)", cls: "text-brass", dot: "bg-brass animate-pulse" },
+      waiting: {
+        label: "Aguardando sinal",
+        cls: "text-info",
+        dot: "bg-info animate-pulse",
+      },
+      brb: {
+        label: "JÁ VOLTO (slate no ar)",
+        cls: "text-brass",
+        dot: "bg-brass animate-pulse",
+      },
     };
   const m = map[state];
   return (
@@ -592,9 +661,14 @@ function Usage({ label, value }: { label: string; value?: number }) {
   const tone = pct > 85 ? "bg-bad" : pct > 60 ? "bg-warn" : "bg-ok";
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+        {label}
+      </span>
       <div className="h-2 w-24 overflow-hidden rounded-sm bg-surface">
-        <div className={cn("h-full rounded-sm", tone)} style={{ width: `${Math.min(100, pct)}%` }} />
+        <div
+          className={cn("h-full rounded-sm", tone)}
+          style={{ width: `${Math.min(100, pct)}%` }}
+        />
       </div>
       <span className="w-12 font-display text-sm font-bold tabular-nums">
         {value == null ? "—" : `${value}%`}

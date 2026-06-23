@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { cn } from "../lib/utils";
 import { PlatformGlyph } from "./ui";
 import type { Alert, AlertKind } from "../lib/types";
@@ -45,7 +46,7 @@ function detail(a: Alert): string {
   }
 }
 
-function AlertRow({ a }: { a: Alert }) {
+const AlertRow = memo(function AlertRow({ a }: { a: Alert }) {
   const meta = KIND_META[a.kind];
   const accent = ACCENT[meta.accent] ?? ACCENT.brass;
   const d = detail(a);
@@ -69,11 +70,11 @@ function AlertRow({ a }: { a: Alert }) {
       </div>
     </div>
   );
-}
+});
 
 /** Feed dos alertas (mais novo no topo). */
 export function AlertsFeed({ alerts, className }: { alerts: Alert[]; className?: string }) {
-  const list = [...alerts].reverse();
+  const list = useMemo(() => [...alerts].reverse(), [alerts]);
   return (
     <div className={cn("overflow-y-auto [scrollbar-gutter:stable]", className)}>
       {list.length === 0 ? (

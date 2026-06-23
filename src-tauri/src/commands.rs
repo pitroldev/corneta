@@ -953,9 +953,20 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
         st.message = Some(msg);
     }
 
+    let new_state = st.state.clone();
     let out = snap.clone();
+    // Throttle: transição de estado emite na hora; atualização de métrica pura, no
+    // máximo a cada ~250ms (evita N emits/s do snapshot inteiro com vários destinos).
+    let now = now_ms();
+    let should_emit =
+        new_state != prev_target || was_starting || now.saturating_sub(eng.last_emit_ms) >= 250;
+    if should_emit {
+        eng.last_emit_ms = now;
+    }
     drop(eng);
-    emit(app, &out);
+    if should_emit {
+        emit(app, &out);
+    }
 
     if is_stats && was_starting {
         notify(app, "Corneta no ar 📣", "Sua transmissão começou.");

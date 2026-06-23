@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Trash2, Wifi, WifiOff } from "lucide-react";
 import { useStore } from "../lib/store";
 import { cn } from "../lib/utils";
@@ -37,6 +37,26 @@ export function ChatPopout() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  const st = config?.settings;
+  const view: ChatView = useMemo(
+    () => ({
+      emotes: st?.chatShowEmotes ?? true,
+      badges: st?.chatShowBadges ?? true,
+      platform: st?.chatShowPlatform ?? true,
+      source: st?.chatShowSource ?? false,
+      timestamps: st?.chatShowTimestamps ?? false,
+      fontSize: st?.chatFontSize ?? "md",
+    }),
+    [
+      st?.chatShowEmotes,
+      st?.chatShowBadges,
+      st?.chatShowPlatform,
+      st?.chatShowSource,
+      st?.chatShowTimestamps,
+      st?.chatFontSize,
+    ],
+  );
+
   if (!loaded || !config) {
     return (
       <div className="grid h-screen place-items-center bg-panel">
@@ -47,17 +67,8 @@ export function ChatPopout() {
     );
   }
 
-  const s = config.settings;
-  const view: ChatView = {
-    emotes: s.chatShowEmotes ?? true,
-    badges: s.chatShowBadges ?? true,
-    platform: s.chatShowPlatform ?? true,
-    source: s.chatShowSource ?? false,
-    timestamps: s.chatShowTimestamps ?? false,
-    fontSize: s.chatFontSize ?? "md",
-  };
-
-  const iconBtn = "rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink";
+  const iconBtn =
+    "rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink";
 
   return (
     <div className="flex h-screen flex-col bg-panel">
@@ -75,11 +86,19 @@ export function ChatPopout() {
         </div>
         <div className="ml-auto flex items-center gap-1">
           {connected ? (
-            <button onClick={() => void disconnectChat()} title="Desconectar" className={iconBtn}>
+            <button
+              onClick={() => void disconnectChat()}
+              title="Desconectar"
+              className={iconBtn}
+            >
               <WifiOff className="size-4" />
             </button>
           ) : (
-            <button onClick={() => void connectChat()} title="Conectar" className={iconBtn}>
+            <button
+              onClick={() => void connectChat()}
+              title="Conectar"
+              className={iconBtn}
+            >
               <Wifi className="size-4" />
             </button>
           )}
@@ -93,7 +112,12 @@ export function ChatPopout() {
         </div>
       </div>
       {tab === "chat" ? (
-        <ChatFeed messages={messages} view={view} connected={connected} className="flex-1" />
+        <ChatFeed
+          messages={messages}
+          view={view}
+          connected={connected}
+          className="flex-1"
+        />
       ) : (
         <AlertsFeed alerts={alerts} className="flex-1" />
       )}
@@ -115,7 +139,7 @@ function TabBtn({
       onClick={onClick}
       className={cn(
         "rounded px-2 py-0.5 font-display text-xs font-extrabold transition-colors",
-        active ? "bg-brass text-brass-ink" : "text-ink-faint hover:text-ink"
+        active ? "bg-brass text-brass-ink" : "text-ink-faint hover:text-ink",
       )}
     >
       {children}

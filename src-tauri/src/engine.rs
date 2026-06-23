@@ -375,4 +375,6 @@ pub struct EngineRuntime {
     pub session_path: Option<std::path::PathBuf>,
     /// Flag de pausa por destino (controle ao vivo): true = supervisor não sobe FFmpeg.
     pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
+    pub last_emit_ms: u128,
 }
