@@ -28,12 +28,34 @@
 
 ---
 
+## Múltiplas fontes
+
+Dá pra ter **vários chats da mesma plataforma** (ex.: 2 Twitches + 1 Kick + 1 YouTube). Cada fonte é
+`{ platform, value, name (apelido), enabled }`. A mensagem carrega `source` (o apelido/canal), então o
+toggle **"Origem"** distingue de quem veio cada mensagem no feed unificado. A API key do YouTube é uma
+só, compartilhada entre as fontes do YouTube.
+
+## Deleções de moderação
+
+Quando um mod apaga uma mensagem ou bane alguém, a mensagem **some do feed** automaticamente:
+- **Twitch:** `CLEARMSG` (1 msg, via `target-msg-id`) e `CLEARCHAT` (usuário ou chat inteiro) — capability `twitch.tv/commands`.
+- **Kick:** `MessageDeletedEvent` e `UserBannedEvent`.
+- **YouTube:** itens `messageDeletedEvent` / `userBannedEvent`.
+
+O backend emite `chat://delete` com escopo `message` (por `nativeId`), `user` ou `all`; o store filtra o feed.
+
+## Janela flutuante
+
+Botão **"Janela"** abre uma janela **só do chat**, **always-on-top** e redimensionável (`open_chat_window`
+→ webview `#chat-popout`), pro streamer deixar num canto/segundo monitor sem o app inteiro. Compartilha o
+mesmo feed (eventos broadcast pra todas as janelas).
+
 ## Configurável
 
 Na tela **Chat → Configurar**:
-- **Canais/credenciais:** Twitch (canal), Kick (slug), YouTube (API key + vídeo).
-- **Exibição (toggles):** mostrar **emotes**, **badges**, **plataforma**, **horário**. Salvos nas settings.
-- **Filtros** por plataforma + **Limpar** no topo do feed; auto-scroll que pausa ao rolar pra cima.
+- **Fontes:** adiciona/remove/ativa cada canal (várias por plataforma) + API key do YouTube.
+- **Exibição (toggles):** **emotes**, **badges**, **plataforma**, **origem (canal)**, **horário**. Salvos nas settings.
+- **Filtros** por plataforma + **Limpar**; auto-scroll que pausa ao rolar pra cima.
 
 ---
 

@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões da janela principal da Corneta (menor privilégio — ver §14.4).",
-  "windows": ["main"],
+  "description": "Permissões da janela principal + janela flutuante do chat (§14.4).",
+  "windows": ["main", "chat"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

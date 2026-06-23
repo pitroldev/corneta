@@ -73,7 +73,7 @@
 
 - ✅ **Perfis** ("Live de sexta", "Podcast"): conjuntos de destinos + modo, troca/cria/renomeia/exclui na tela Plataformas (chaves compartilhadas por id entre perfis).
 - ⛔ **i18n** (PT-BR + EN) e **tema claro**.
-- ✅ Refinos de **onboarding** (dica keyframe 2s/CBR), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, lembrete no OBS).
+- ✅ **Onboarding guiado** (carrossel de 5 passos com progresso), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, dica keyframe 2s/CBR).
 - ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.
 
 ---
@@ -83,7 +83,7 @@
 - ✅ **MediaMTX** como ingestão (feito — reconexão via respawn). Próximos ganhos: **SRT** de entrada e **API de métricas por destino**.
 - **Cloud relay "traga seu VPS"** (não estourar o upload doméstico — §7 do plano).
 - **macOS / Linux** (keyring `apple-native`/`sync-secret-service`, assinatura/notarização Apple).
-- ✅ **Chat unificado** com **emotes + badges + Kick** (Twitch anônimo, Kick via slug, YouTube via API key; tudo configurável) — [`CHAT.md`](./CHAT.md). FB/TikTok pendentes.
+- ✅ **Chat unificado** — **múltiplas fontes** (ex.: 2 Twitches), **emotes + badges**, **deleções de moderação**, **Kick**, e **janela flutuante** always-on-top. Configurável; Twitch sem login, Kick via slug, YouTube via API key — [`CHAT.md`](./CHAT.md). FB/TikTok pendentes.
 - **Gravação local simultânea** e **métricas unificadas** por plataforma.
 - ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
 

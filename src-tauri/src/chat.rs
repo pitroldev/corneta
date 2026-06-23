@@ -1,8 +1,6 @@
-//! Chat unificado: conecta em várias plataformas e emite mensagens normalizadas
-//! (com emotes e badges) para o frontend via evento `chat://message`.
-//! - Twitch: IRC anônimo sobre WebSocket (ws://, sem login). Emotes via tag `emotes`.
-//! - YouTube: Data API v3 (liveChat/messages) com a API key do usuário.
-//! - Kick: Pusher (wss://) + emotes `[emote:id:name]` e badges do sender.
+//! Chat unificado multi-fonte: conecta em várias fontes (várias Twitch/YouTube/Kick)
+//! e emite mensagens normalizadas (com emotes, badges, origem) + deleções, via eventos
+//! `chat://message`, `chat://status` e `chat://delete`.
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -14,7 +12,6 @@ use tungstenite::Message;
 
 use crate::AppState;
 
-/// Pedaço de uma mensagem: texto ou emote (imagem).
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatFragment {
@@ -28,8 +25,8 @@ pub struct ChatFragment {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatBadge {
-    pub label: String, // "MOD"
-    pub kind: String,  // "moderator"
+    pub label: String,
+    pub kind: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -37,10 +34,14 @@ pub struct ChatBadge {
 pub struct ChatMessage {
     pub id: String,
     pub platform: String, // "twitch" | "youtube" | "kick"
+    pub source: String,   // rótulo da fonte (canal/slug) — distingue 2 da mesma plataforma
     pub author: String,
+    /// ID nativo na plataforma (para casar deleções).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub native_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
-    pub text: String, // fallback em texto puro
+    pub text: String,
     pub fragments: Vec<ChatFragment>,
     pub badges: Vec<ChatBadge>,
     pub ts: u64,
@@ -71,36 +72,75 @@ fn frags_to_text(frags: &[ChatFragment]) -> String {
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
     let _ = app.emit("chat://message", msg);
 }
-fn chat_status(app: &AppHandle, platform: &str, status: &str) {
-    let _ = app.emit("chat://status", json!({ "platform": platform, "status": status }));
+fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
+    let _ = app.emit(
+        "chat://status",
+        json!({ "platform": platform, "source": source, "status": status }),
+    );
+}
+fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
+    let _ = app.emit(
+        "chat://delete",
+        json!({ "scope": "message", "platform": platform, "nativeId": native_id }),
+    );
+}
+fn delete_user(app: &AppHandle, platform: &str, source: &str, author: &str) {
+    let _ = app.emit(
+        "chat://delete",
+        json!({ "scope": "user", "platform": platform, "source": source, "author": author }),
+    );
+}
+fn clear_source(app: &AppHandle, platform: &str, source: &str) {
+    let _ = app.emit(
+        "chat://delete",
+        json!({ "scope": "all", "platform": platform, "source": source }),
+    );
 }
 
 // ----------------------------- Controle ----------------------------
 
-/// (Re)inicia o chat com base nas settings (Twitch + YouTube + Kick).
+/// (Re)inicia o chat com base nas fontes configuradas.
 pub fn start_chat(app: &AppHandle) {
     let s = crate::config::load(app).settings;
     let running = {
         let st = app.state::<AppState>();
         let mut chat = st.chat.lock().unwrap();
-        chat.running.store(false, Ordering::Relaxed); // derruba o anterior
+        chat.running.store(false, Ordering::Relaxed);
         let running = Arc::new(AtomicBool::new(true));
         chat.running = running.clone();
         running
     };
+    let api_key = s.youtube_api_key.clone();
 
-    if !s.twitch_channel.trim().is_empty() {
-        let (app2, run2, ch) = (app.clone(), running.clone(), s.twitch_channel.clone());
-        tauri::async_runtime::spawn_blocking(move || run_twitch(&ch, run2, app2));
-    }
-    if !s.youtube_api_key.trim().is_empty() && !s.youtube_video.trim().is_empty() {
-        let (app2, run2) = (app.clone(), running.clone());
-        let (key, video) = (s.youtube_api_key.clone(), s.youtube_video.clone());
-        tauri::async_runtime::spawn_blocking(move || run_youtube(&key, &video, run2, app2));
-    }
-    if !s.kick_channel.trim().is_empty() {
-        let (app2, run2, slug) = (app.clone(), running.clone(), s.kick_channel.clone());
-        tauri::async_runtime::spawn_blocking(move || run_kick(&slug, run2, app2));
+    for src in s
+        .chat_sources
+        .iter()
+        .filter(|x| x.enabled && !x.value.trim().is_empty())
+    {
+        let label = if src.name.trim().is_empty() {
+            src.value.clone()
+        } else {
+            src.name.clone()
+        };
+        let (app2, run2, value) = (app.clone(), running.clone(), src.value.clone());
+        match src.platform.as_str() {
+            "twitch" => {
+                tauri::async_runtime::spawn_blocking(move || run_twitch(&value, &label, run2, app2));
+            }
+            "kick" => {
+                tauri::async_runtime::spawn_blocking(move || run_kick(&value, &label, run2, app2));
+            }
+            "youtube" => {
+                if api_key.trim().is_empty() {
+                    continue;
+                }
+                let key = api_key.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    run_youtube(&key, &value, &label, run2, app2)
+                });
+            }
+            _ => {}
+        }
     }
 }
 
@@ -111,7 +151,7 @@ pub fn stop_chat(app: &AppHandle) {
 
 // ----------------------------- Twitch ------------------------------
 
-fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
+fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
     let ch = channel.trim().trim_start_matches('#').to_lowercase();
     if ch.is_empty() {
         return;
@@ -119,20 +159,20 @@ fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
     let mut socket = match tungstenite::connect("ws://irc-ws.chat.twitch.tv:80") {
         Ok((s, _)) => s,
         Err(e) => {
-            log::warn!("twitch chat: conexão falhou: {e}");
-            chat_status(&app, "twitch", "error");
+            log::warn!("twitch chat ({source}): {e}");
+            chat_status(&app, "twitch", source, "error");
             return;
         }
     };
     if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
         let _ = tcp.set_read_timeout(Some(Duration::from_millis(400)));
     }
-    let _ = socket.send(Message::Text("CAP REQ :twitch.tv/tags".into()));
+    let _ = socket.send(Message::Text("CAP REQ :twitch.tv/tags twitch.tv/commands".into()));
     let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
     let _ = socket.send(Message::Text(format!("NICK justinfan{}", now_ms() % 100000)));
     let _ = socket.send(Message::Text(format!("JOIN #{ch}")));
     log::info!("twitch chat: conectado em #{ch}");
-    chat_status(&app, "twitch", "connected");
+    chat_status(&app, "twitch", source, "connected");
 
     while running.load(Ordering::Relaxed) {
         match socket.read() {
@@ -140,10 +180,19 @@ fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
                     if line.starts_with("PING") {
                         let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
-                        continue;
-                    }
-                    if let Some(msg) = parse_privmsg(line) {
-                        emit_chat(&app, msg);
+                    } else if line.contains("PRIVMSG") {
+                        if let Some(msg) = parse_privmsg(line, source) {
+                            emit_chat(&app, msg);
+                        }
+                    } else if line.contains("CLEARMSG") {
+                        if let Some(id) = tag_val(twitch_tags(line), "target-msg-id") {
+                            delete_message(&app, "twitch", &id);
+                        }
+                    } else if line.contains("CLEARCHAT") {
+                        match clearchat_user(line) {
+                            Some(u) => delete_user(&app, "twitch", source, &u),
+                            None => clear_source(&app, "twitch", source),
+                        }
                     }
                 }
             }
@@ -158,20 +207,38 @@ fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
         }
     }
     let _ = socket.close(None);
-    chat_status(&app, "twitch", "disconnected");
+    chat_status(&app, "twitch", source, "disconnected");
 }
 
-/// Parseia uma linha IRC `PRIVMSG` (com tags) numa ChatMessage com emotes e badges.
-fn parse_privmsg(line: &str) -> Option<ChatMessage> {
+fn twitch_tags(line: &str) -> &str {
+    line.strip_prefix('@')
+        .and_then(|s| s.split(' ').next())
+        .unwrap_or("")
+}
+fn tag_val(tags: &str, key: &str) -> Option<String> {
+    for kv in tags.split(';') {
+        let mut it = kv.splitn(2, '=');
+        if it.next() == Some(key) {
+            let v = it.next().unwrap_or("");
+            return (!v.is_empty()).then(|| v.to_string());
+        }
+    }
+    None
+}
+fn clearchat_user(line: &str) -> Option<String> {
+    let after = line.split("CLEARCHAT").nth(1)?;
+    let idx = after.find(':')?;
+    let u = after[idx + 1..].trim();
+    (!u.is_empty()).then(|| u.to_string())
+}
+
+fn parse_privmsg(line: &str, source: &str) -> Option<ChatMessage> {
     let (tags, rest) = if let Some(stripped) = line.strip_prefix('@') {
         let sp = stripped.find(' ')?;
         (&stripped[..sp], &stripped[sp + 1..])
     } else {
         ("", line)
     };
-    if !rest.contains("PRIVMSG") {
-        return None;
-    }
     let privmsg_idx = rest.find("PRIVMSG")?;
     let after = &rest[privmsg_idx..];
     let msg_idx = after.find(':')?;
@@ -190,6 +257,7 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
     let mut display = nick;
     let mut emotes_tag = "";
     let mut badges_tag = "";
+    let mut native_id = None;
     for kv in tags.split(';') {
         let mut it = kv.splitn(2, '=');
         let k = it.next().unwrap_or("");
@@ -199,6 +267,7 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
             "display-name" if !v.is_empty() => display = v.to_string(),
             "emotes" => emotes_tag = v,
             "badges" => badges_tag = v,
+            "id" if !v.is_empty() => native_id = Some(v.to_string()),
             _ => {}
         }
     }
@@ -206,7 +275,9 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
     Some(ChatMessage {
         id: next_id(),
         platform: "twitch".into(),
+        source: source.to_string(),
         author: display,
+        native_id,
         color,
         fragments: twitch_fragments(&text, emotes_tag),
         badges: twitch_badges(badges_tag),
@@ -215,7 +286,6 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
     })
 }
 
-/// Quebra o texto em fragmentos texto/emote a partir do tag `emotes` (id:start-end,...).
 fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
     if emotes_tag.is_empty() {
         return vec![text_frag(text)];
@@ -252,14 +322,12 @@ fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
             continue;
         }
         if a > cursor {
-            let t: String = chars[cursor..a].iter().collect();
-            frags.push(text_frag(&t));
+            frags.push(text_frag(&chars[cursor..a].iter().collect::<String>()));
         }
         let end = (b + 1).min(n);
-        let name: String = chars[a..end].iter().collect();
         frags.push(ChatFragment {
             kind: "emote".into(),
-            text: Some(name),
+            text: Some(chars[a..end].iter().collect()),
             url: Some(format!(
                 "https://static-cdn.jtvnw.net/emoticons/v2/{id}/default/dark/1.0"
             )),
@@ -267,13 +335,11 @@ fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
         cursor = end;
     }
     if cursor < n {
-        let t: String = chars[cursor..].iter().collect();
-        frags.push(text_frag(&t));
+        frags.push(text_frag(&chars[cursor..].iter().collect::<String>()));
     }
     frags
 }
 
-/// Mapeia o tag `badges` (set/versão) em chips de texto (sem API, sem auth).
 fn twitch_badges(tag: &str) -> Vec<ChatBadge> {
     if tag.is_empty() {
         return vec![];
@@ -329,7 +395,7 @@ fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
         .map(String::from)
 }
 
-fn run_youtube(api_key: &str, video: &str, running: Arc<AtomicBool>, app: AppHandle) {
+fn run_youtube(api_key: &str, video: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
     let vid = extract_video_id(video);
     if vid.is_empty() {
         return;
@@ -337,16 +403,16 @@ fn run_youtube(api_key: &str, video: &str, running: Arc<AtomicBool>, app: AppHan
     let live_chat_id = match get_live_chat_id(api_key, &vid) {
         Some(id) => id,
         None => {
-            log::warn!("youtube chat: live chat não encontrado (vídeo ao vivo? API key válida?)");
-            chat_status(&app, "youtube", "error");
+            log::warn!("youtube chat ({source}): live chat não encontrado");
+            chat_status(&app, "youtube", source, "error");
             return;
         }
     };
-    log::info!("youtube chat: conectado");
-    chat_status(&app, "youtube", "connected");
+    log::info!("youtube chat: conectado ({source})");
+    chat_status(&app, "youtube", source, "connected");
 
     let mut page_token: Option<String> = None;
-    let mut first = true; // primeira leva = backlog → ignora
+    let mut first = true;
     while running.load(Ordering::Relaxed) {
         let mut url = format!(
             "https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={live_chat_id}&part=snippet,authorDetails&key={api_key}"
@@ -372,42 +438,73 @@ fn run_youtube(api_key: &str, video: &str, running: Arc<AtomicBool>, app: AppHan
         if !first {
             if let Some(items) = json.get("items").and_then(|v| v.as_array()) {
                 for item in items {
-                    let author = item
-                        .pointer("/authorDetails/displayName")
+                    let kind = item
+                        .pointer("/snippet/type")
                         .and_then(|v| v.as_str())
-                        .unwrap_or("anon")
-                        .to_string();
-                    let text = item
-                        .pointer("/snippet/displayMessage")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    if text.is_empty() {
-                        continue;
+                        .unwrap_or("textMessageEvent");
+                    match kind {
+                        "messageDeletedEvent" => {
+                            if let Some(id) = item
+                                .pointer("/snippet/messageDeletedDetails/deletedMessageId")
+                                .and_then(|v| v.as_str())
+                            {
+                                delete_message(&app, "youtube", id);
+                            }
+                        }
+                        "userBannedEvent" => {
+                            if let Some(name) = item
+                                .pointer("/snippet/userBannedDetails/bannedUserDetails/displayName")
+                                .and_then(|v| v.as_str())
+                            {
+                                delete_user(&app, "youtube", source, name);
+                            }
+                        }
+                        _ => {
+                            let text = item
+                                .pointer("/snippet/displayMessage")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if text.is_empty() {
+                                continue;
+                            }
+                            let author = item
+                                .pointer("/authorDetails/displayName")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("anon")
+                                .to_string();
+                            let mut badges = vec![];
+                            let flag = |k: &str| {
+                                item.pointer(&format!("/authorDetails/{k}"))
+                                    .and_then(|v| v.as_bool())
+                                    == Some(true)
+                            };
+                            if flag("isChatOwner") {
+                                badges.push(ChatBadge { label: "HOST".into(), kind: "broadcaster".into() });
+                            }
+                            if flag("isChatModerator") {
+                                badges.push(ChatBadge { label: "MOD".into(), kind: "moderator".into() });
+                            }
+                            if flag("isChatSponsor") {
+                                badges.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() });
+                            }
+                            emit_chat(
+                                &app,
+                                ChatMessage {
+                                    id: next_id(),
+                                    platform: "youtube".into(),
+                                    source: source.to_string(),
+                                    author,
+                                    native_id: item.get("id").and_then(|v| v.as_str()).map(String::from),
+                                    color: None,
+                                    fragments: vec![text_frag(&text)],
+                                    badges,
+                                    text,
+                                    ts: now_ms(),
+                                },
+                            );
+                        }
                     }
-                    let mut badges = vec![];
-                    if item.pointer("/authorDetails/isChatOwner").and_then(|v| v.as_bool()) == Some(true) {
-                        badges.push(ChatBadge { label: "HOST".into(), kind: "broadcaster".into() });
-                    }
-                    if item.pointer("/authorDetails/isChatModerator").and_then(|v| v.as_bool()) == Some(true) {
-                        badges.push(ChatBadge { label: "MOD".into(), kind: "moderator".into() });
-                    }
-                    if item.pointer("/authorDetails/isChatSponsor").and_then(|v| v.as_bool()) == Some(true) {
-                        badges.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() });
-                    }
-                    emit_chat(
-                        &app,
-                        ChatMessage {
-                            id: next_id(),
-                            platform: "youtube".into(),
-                            author,
-                            color: None,
-                            fragments: vec![text_frag(&text)],
-                            badges,
-                            text,
-                            ts: now_ms(),
-                        },
-                    );
                 }
             }
         }
@@ -419,12 +516,11 @@ fn run_youtube(api_key: &str, video: &str, running: Arc<AtomicBool>, app: AppHan
             slept += 200;
         }
     }
-    chat_status(&app, "youtube", "disconnected");
+    chat_status(&app, "youtube", source, "disconnected");
 }
 
 // ------------------------------- Kick ------------------------------
 
-/// Resolve o chatroom id pelo slug do canal (API não-oficial — pode bater no Cloudflare).
 fn get_kick_chatroom_id(slug: &str) -> Option<u64> {
     let url = format!("https://kick.com/api/v2/channels/{slug}");
     let body = ureq::get(&url)
@@ -438,7 +534,7 @@ fn get_kick_chatroom_id(slug: &str) -> Option<u64> {
     v.pointer("/chatroom/id").and_then(|x| x.as_u64())
 }
 
-fn run_kick(slug: &str, running: Arc<AtomicBool>, app: AppHandle) {
+fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
     let slug = slug.trim().trim_start_matches('@').to_lowercase();
     if slug.is_empty() {
         return;
@@ -446,18 +542,17 @@ fn run_kick(slug: &str, running: Arc<AtomicBool>, app: AppHandle) {
     let chatroom_id = match get_kick_chatroom_id(&slug) {
         Some(id) => id,
         None => {
-            log::warn!("kick chat: não resolvi o chatroom de {slug} (Cloudflare?)");
-            chat_status(&app, "kick", "error");
+            log::warn!("kick chat ({source}): chatroom não resolvido (Cloudflare?)");
+            chat_status(&app, "kick", source, "error");
             return;
         }
     };
-    // App key pública do Pusher do Kick (cluster us2). Pode mudar de tempos em tempos.
     let url = "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=corneta&version=1.0&flash=false";
     let mut socket = match tungstenite::connect(url) {
         Ok((s, _)) => s,
         Err(e) => {
-            log::warn!("kick chat: pusher falhou: {e}");
-            chat_status(&app, "kick", "error");
+            log::warn!("kick chat ({source}): pusher {e}");
+            chat_status(&app, "kick", source, "error");
             return;
         }
     };
@@ -468,15 +563,17 @@ fn run_kick(slug: &str, running: Arc<AtomicBool>, app: AppHandle) {
         "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroom_id}.v2\"}}}}"
     )));
     log::info!("kick chat: conectado em {slug} (chatroom {chatroom_id})");
-    chat_status(&app, "kick", "connected");
+    chat_status(&app, "kick", source, "connected");
 
     while running.load(Ordering::Relaxed) {
         match socket.read() {
             Ok(Message::Text(t)) => {
                 if t.contains("pusher:ping") {
                     let _ = socket.send(Message::Text("{\"event\":\"pusher:pong\",\"data\":{}}".into()));
-                } else if let Some(msg) = parse_kick(&t) {
+                } else if let Some(msg) = parse_kick(&t, source) {
                     emit_chat(&app, msg);
+                } else {
+                    let _ = handle_kick_moderation(&t, source, &app);
                 }
             }
             Ok(Message::Close(_)) => break,
@@ -490,15 +587,14 @@ fn run_kick(slug: &str, running: Arc<AtomicBool>, app: AppHandle) {
         }
     }
     let _ = socket.close(None);
-    chat_status(&app, "kick", "disconnected");
+    chat_status(&app, "kick", source, "disconnected");
 }
 
-fn parse_kick(raw: &str) -> Option<ChatMessage> {
+fn parse_kick(raw: &str, source: &str) -> Option<ChatMessage> {
     let v: Value = serde_json::from_str(raw).ok()?;
     if !v.get("event")?.as_str()?.ends_with("ChatMessageEvent") {
         return None;
     }
-    // O campo "data" vem como string JSON.
     let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
     let content = d.get("content")?.as_str()?.to_string();
     if content.is_empty() {
@@ -518,7 +614,9 @@ fn parse_kick(raw: &str) -> Option<ChatMessage> {
     Some(ChatMessage {
         id: next_id(),
         platform: "kick".into(),
+        source: source.to_string(),
         author,
+        native_id: d.get("id").and_then(|x| x.as_str()).map(String::from),
         color,
         text: frags_to_text(&fragments),
         badges: kick_badges(d.pointer("/sender/identity/badges")),
@@ -527,7 +625,20 @@ fn parse_kick(raw: &str) -> Option<ChatMessage> {
     })
 }
 
-/// Quebra o conteúdo do Kick em fragmentos, expandindo `[emote:ID:nome]`.
+fn handle_kick_moderation(raw: &str, source: &str, app: &AppHandle) -> Option<()> {
+    let v: Value = serde_json::from_str(raw).ok()?;
+    let event = v.get("event")?.as_str()?;
+    let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
+    if event.ends_with("MessageDeletedEvent") {
+        let id = d.pointer("/message/id").and_then(|x| x.as_str())?;
+        delete_message(app, "kick", id);
+    } else if event.ends_with("UserBannedEvent") {
+        let u = d.pointer("/user/username").and_then(|x| x.as_str())?;
+        delete_user(app, "kick", source, u);
+    }
+    Some(())
+}
+
 fn kick_fragments(content: &str) -> Vec<ChatFragment> {
     let mut frags = vec![];
     let mut rest = content;
@@ -537,7 +648,7 @@ fn kick_fragments(content: &str) -> Vec<ChatFragment> {
         }
         let after = &rest[start..];
         if let Some(end) = after.find(']') {
-            let inner = &after[7..end]; // pula "[emote:"
+            let inner = &after[7..end];
             let mut it = inner.splitn(2, ':');
             let id = it.next().unwrap_or("");
             let name = it.next().unwrap_or("");

@@ -7,6 +7,7 @@
 import type {
   AppConfig,
   ChatBadge,
+  ChatDelete,
   ChatFragment,
   ChatMessage,
   ChatStatus,
@@ -40,9 +41,11 @@ export interface CornetaApi {
   // Chat unificado
   chatStart(): Promise<void>;
   chatStop(): Promise<void>;
+  openChatWindow(): Promise<void>;
   subscribeChat(
     onMsg: (m: ChatMessage) => void,
-    onStatus: (s: ChatStatus) => void
+    onStatus: (s: ChatStatus) => void,
+    onDelete: (d: ChatDelete) => void
   ): () => void;
 }
 
@@ -124,15 +127,16 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("chat_stop");
     },
-    subscribeChat(onMsg, onStatus) {
+    async openChatWindow() {
+      const { invoke } = await core();
+      await invoke("open_chat_window");
+    },
+    subscribeChat(onMsg, onStatus, onDelete) {
       const uns: Array<() => void> = [];
       void event().then(({ listen }) => {
-        void listen<ChatMessage>("chat://message", (e) => onMsg(e.payload)).then((u) =>
-          uns.push(u)
-        );
-        void listen<ChatStatus>("chat://status", (e) => onStatus(e.payload)).then((u) =>
-          uns.push(u)
-        );
+        void listen<ChatMessage>("chat://message", (e) => onMsg(e.payload)).then((u) => uns.push(u));
+        void listen<ChatStatus>("chat://status", (e) => onStatus(e.payload)).then((u) => uns.push(u));
+        void listen<ChatDelete>("chat://delete", (e) => onDelete(e.payload)).then((u) => uns.push(u));
       });
       return () => uns.forEach((u) => u());
     },
@@ -256,8 +260,10 @@ function mockApi(): CornetaApi {
   // --- chat demo ---
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
   const chatStatusListeners = new Set<(s: ChatStatus) => void>();
+  const chatDeleteListeners = new Set<(d: ChatDelete) => void>();
   let chatTimer: ReturnType<typeof setInterval> | null = null;
   let chatSeq = 0;
+  const recentIds: string[] = [];
   const CHAT_MSGS = [
     "salve salve!",
     "kkkkk",
@@ -449,8 +455,16 @@ function mockApi(): CornetaApi {
       // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
     },
     async chatStart() {
-      (["twitch", "kick", "youtube"] as const).forEach((p) =>
-        chatStatusListeners.forEach((l) => l({ platform: p, status: "connected" }))
+      const SOURCES = [
+        { platform: "twitch", name: "Pitrol" },
+        { platform: "twitch", name: "Gaules" },
+        { platform: "kick", name: "XQC" },
+        { platform: "youtube", name: "Live" },
+      ] as const;
+      SOURCES.forEach((src) =>
+        chatStatusListeners.forEach((l) =>
+          l({ platform: src.platform, source: src.name, status: "connected" })
+        )
       );
       if (chatTimer) clearInterval(chatTimer);
       const AUTHORS = {
@@ -460,8 +474,13 @@ function mockApi(): CornetaApi {
       };
       const COLORS = ["#ff5a36", "#7c9cff", "#34d399", "#f5a524", "#e879f9"];
       chatTimer = setInterval(() => {
-        const r = Math.random();
-        const platform = r < 0.45 ? "twitch" : r < 0.75 ? "kick" : "youtube";
+        // Demonstra o fluxo de deleção de vez em quando.
+        if (recentIds.length > 8 && Math.random() < 0.08) {
+          const nativeId = recentIds[Math.floor(Math.random() * recentIds.length)];
+          chatDeleteListeners.forEach((l) => l({ scope: "message", platform: "twitch", nativeId }));
+        }
+        const src = SOURCES[Math.floor(Math.random() * SOURCES.length)];
+        const platform = src.platform;
         const text = CHAT_MSGS[Math.floor(Math.random() * CHAT_MSGS.length)];
         const fragments: ChatFragment[] = [{ kind: "text", text: `${text} ` }];
         if (Math.random() < 0.4) {
@@ -483,12 +502,17 @@ function mockApi(): CornetaApi {
         const br = Math.random();
         if (br < 0.15) badges.push({ label: "MOD", kind: "moderator" });
         else if (br < 0.4) badges.push({ label: "SUB", kind: "subscriber" });
+        const nativeId = `n${++chatSeq}`;
+        recentIds.push(nativeId);
+        if (recentIds.length > 40) recentIds.shift();
         const pool = AUTHORS[platform];
         chatMsgListeners.forEach((l) =>
           l({
-            id: `${++chatSeq}-${Date.now()}`,
+            id: `${chatSeq}-${Date.now()}`,
             platform,
+            source: src.name,
             author: pool[Math.floor(Math.random() * pool.length)],
+            nativeId,
             color: platform === "youtube" ? undefined : COLORS[Math.floor(Math.random() * COLORS.length)],
             text,
             fragments,
@@ -496,21 +520,23 @@ function mockApi(): CornetaApi {
             ts: Date.now(),
           })
         );
-      }, 1200);
+      }, 1100);
     },
     async chatStop() {
       if (chatTimer) clearInterval(chatTimer);
       chatTimer = null;
-      (["twitch", "kick", "youtube"] as const).forEach((p) =>
-        chatStatusListeners.forEach((l) => l({ platform: p, status: "disconnected" }))
-      );
     },
-    subscribeChat(onMsg, onStatus) {
+    async openChatWindow() {
+      // No navegador não dá pra abrir janela nativa (no app instalado, abre a flutuante).
+    },
+    subscribeChat(onMsg, onStatus, onDelete) {
       chatMsgListeners.add(onMsg);
       chatStatusListeners.add(onStatus);
+      chatDeleteListeners.add(onDelete);
       return () => {
         chatMsgListeners.delete(onMsg);
         chatStatusListeners.delete(onStatus);
+        chatDeleteListeners.delete(onDelete);
       };
     },
   };

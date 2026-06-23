@@ -1,15 +1,38 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, KeyRound, Radio, Split } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageSquare, Radio, Split, Tv2, Zap } from "lucide-react";
+import { cn } from "../lib/utils";
 import { Mascot, SoundWaves } from "./decor";
 import { Button } from "./ui";
 
 const FLAG = "corneta.welcomed";
 
 const STEPS = [
-  { icon: Split, title: "Uma live, todo lugar", text: "Você manda 1 stream do OBS e a gente espalha pra geral." },
-  { icon: KeyRound, title: "Cola as chaves", text: "Guardadas no cofre do sistema — nada de arquivo de texto." },
-  { icon: Radio, title: "Solta a corneta", text: "Um clique e você entra no ar em todas de uma vez." },
+  {
+    icon: Split,
+    title: "Uma live, todo lugar",
+    text: "Você manda 1 stream do OBS e a Corneta espalha pra Twitch, YouTube, Kick e mais — tudo de uma vez.",
+  },
+  {
+    icon: Tv2,
+    title: "Escolha os destinos",
+    text: "Em Plataformas, adicione cada lugar e cole a chave. As chaves ficam no cofre do sistema, nunca num arquivo de texto.",
+  },
+  {
+    icon: Zap,
+    title: "Liga no OBS",
+    text: "Em Ao vivo, o botão “Configurar sozinho” aponta o OBS pra cá. Dica: keyframe 2s + bitrate CBR — quase toda plataforma exige.",
+  },
+  {
+    icon: Radio,
+    title: "Solta a corneta",
+    text: "Um clique e você entra no ar em todas. Métricas reais por plataforma e o ícone da bandeja mostrando a saúde geral.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Chat e relatórios",
+    text: "Chat unificado de todas as plataformas (com janela flutuante pra um canto) e, ao encerrar, um relatório do que travou.",
+  },
 ];
 
 export function Onboarding({ onStart }: { onStart: () => void }) {
@@ -20,6 +43,8 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
       return false;
     }
   });
+  const [step, setStep] = useState(0);
+  const last = step === STEPS.length - 1;
 
   const close = (start: boolean) => {
     try {
@@ -30,6 +55,11 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     setOpen(false);
     if (start) onStart();
   };
+  const next = () => (last ? close(true) : setStep((s) => s + 1));
+  const back = () => setStep((s) => Math.max(0, s - 1));
+
+  const cur = STEPS[step];
+  const Icon = cur.icon;
 
   return (
     <AnimatePresence>
@@ -53,41 +83,63 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
                 <Mascot className="size-8 animate-shout" />
               </div>
               <h2 className="text-3xl">Opa! Bora cornetar?</h2>
-              <p className="mt-1 text-sm font-semibold opacity-80">
-                Transmitir pra todo lugar é mais fácil do que parece.
-              </p>
+              <p className="mt-1 text-sm font-semibold opacity-80">Em 5 passos você manda bem.</p>
             </div>
 
-            <div className="flex flex-col gap-4 p-6">
-              {STEPS.map((s, i) => {
-                const Icon = s.icon;
-                return (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface-2 text-brass">
-                      <Icon className="size-5" strokeWidth={2.3} />
+            <div className="p-6">
+              <div className="min-h-28">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={step}
+                    initial={{ opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -24 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-start gap-4"
+                  >
+                    <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-surface-2 text-brass">
+                      <Icon className="size-6" strokeWidth={2.3} />
                     </span>
                     <div>
-                      <div className="font-display font-bold">{s.title}</div>
-                      <div className="text-sm text-ink-muted">{s.text}</div>
+                      <div className="font-display text-lg font-extrabold">{cur.title}</div>
+                      <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{cur.text}</div>
                     </div>
-                  </div>
-                );
-              })}
-
-              <div className="rounded-md bg-surface-2 px-3 py-2 text-xs leading-relaxed text-ink-muted">
-                💡 No OBS, deixe o <strong className="text-ink">keyframe interval em 2s</strong> e o
-                bitrate em <strong className="text-ink">CBR</strong> — quase toda plataforma exige.
+                  </motion.div>
+                </AnimatePresence>
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <button
-                  onClick={() => close(false)}
-                  className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
-                >
-                  Pular
-                </button>
-                <Button variant="primary" size="lg" onClick={() => close(true)}>
-                  Bora começar <ArrowRight className="size-5" />
+              <div className="my-4 flex justify-center gap-1.5">
+                {STEPS.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setStep(i)}
+                    aria-label={`Passo ${i + 1}`}
+                    className={cn(
+                      "h-2 rounded-full transition-all",
+                      i === step ? "w-5 bg-brass" : "w-2 bg-surface-3 hover:bg-border"
+                    )}
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                {step > 0 ? (
+                  <button
+                    onClick={back}
+                    className="flex items-center gap-1 text-sm font-semibold text-ink-faint hover:text-ink-muted"
+                  >
+                    <ArrowLeft className="size-4" /> Voltar
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => close(false)}
+                    className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
+                  >
+                    Pular
+                  </button>
+                )}
+                <Button variant="primary" size="lg" onClick={next}>
+                  {last ? "Bora começar" : "Próximo"} <ArrowRight className="size-5" />
                 </Button>
               </div>
             </div>

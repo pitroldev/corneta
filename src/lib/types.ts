@@ -90,22 +90,27 @@ export interface AppSettings {
   autostart: boolean;
   /** Senha do obs-websocket (vazio = sem auth). */
   obsPassword: string;
-  /** Chat: canal da Twitch (leitura anônima). */
-  twitchChannel: string;
-  /** Chat: API key do YouTube Data API v3. */
+  /** Chat: API key do YouTube Data API v3 (compartilhada entre as fontes do YouTube). */
   youtubeApiKey: string;
-  /** Chat: URL ou ID do vídeo ao vivo do YouTube. */
-  youtubeVideo: string;
-  /** Chat: canal do Kick (slug). */
-  kickChannel: string;
+  /** Chat: fontes (várias por plataforma). */
+  chatSources: ChatSource[];
   /** Exibição do chat. */
   chatShowEmotes: boolean;
   chatShowBadges: boolean;
   chatShowPlatform: boolean;
+  chatShowSource: boolean;
   chatShowTimestamps: boolean;
 }
 
 export type ChatPlatform = "twitch" | "youtube" | "kick";
+
+export interface ChatSource {
+  id: string;
+  platform: ChatPlatform;
+  value: string;
+  name: string;
+  enabled: boolean;
+}
 
 export interface ChatFragment {
   kind: "text" | "emote";
@@ -121,7 +126,9 @@ export interface ChatBadge {
 export interface ChatMessage {
   id: string;
   platform: ChatPlatform;
+  source: string;
   author: string;
+  nativeId?: string;
   color?: string;
   text: string;
   fragments: ChatFragment[];
@@ -129,8 +136,17 @@ export interface ChatMessage {
   ts: number;
 }
 
+export interface ChatDelete {
+  scope: "message" | "user" | "all";
+  platform: string;
+  source?: string;
+  nativeId?: string;
+  author?: string;
+}
+
 export interface ChatStatus {
   platform: string;
+  source: string;
   status: string; // connected | disconnected | error
 }
 

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   AppConfig,
   AppSettings,
+  ChatDelete,
   ChatMessage,
   EncoderInfo,
   EncodingMode,
@@ -50,7 +51,7 @@ interface State {
   // Chat unificado
   chatMessages: ChatMessage[];
   chatConnected: boolean;
-  chatStatuses: Record<string, string>;
+  chatStatuses: Record<string, { platform: string; status: string }>;
   bindChat: () => () => void;
   connectChat: () => Promise<void>;
   disconnectChat: () => Promise<void>;
@@ -59,6 +60,16 @@ interface State {
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
 const CHAT_CAP = 400;
+
+// Decide se uma mensagem sobrevive a um evento de deleção.
+function keepMessage(m: ChatMessage, d: ChatDelete): boolean {
+  if (m.platform !== d.platform) return true;
+  if (d.scope === "message") return m.nativeId !== d.nativeId;
+  if (d.scope === "user")
+    return !(m.source === d.source && m.author.toLowerCase() === (d.author ?? "").toLowerCase());
+  if (d.scope === "all") return m.source !== d.source;
+  return true;
+}
 
 export const useStore = create<State>((set, get) => {
   // Persiste a config + mantém o perfil ativo em sincronia com o working set.
@@ -268,7 +279,13 @@ export const useStore = create<State>((set, get) => {
             };
           }),
         (st) =>
-          set((s) => ({ chatStatuses: { ...s.chatStatuses, [st.platform]: st.status } }))
+          set((s) => ({
+            chatStatuses: {
+              ...s.chatStatuses,
+              [st.source || st.platform]: { platform: st.platform, status: st.status },
+            },
+          })),
+        (d) => set((s) => ({ chatMessages: s.chatMessages.filter((m) => keepMessage(m, d)) }))
       );
     },
 
@@ -279,7 +296,7 @@ export const useStore = create<State>((set, get) => {
 
     async disconnectChat() {
       await api.chatStop();
-      set({ chatConnected: false });
+      set({ chatConnected: false, chatStatuses: {} });
     },
 
     clearChat() {

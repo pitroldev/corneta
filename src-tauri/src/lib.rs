@@ -75,6 +75,7 @@ pub fn run() {
             commands::open_sessions_dir,
             commands::chat_start,
             commands::chat_stop,
+            commands::open_chat_window,
         ])
         .setup(|app| {
             // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.

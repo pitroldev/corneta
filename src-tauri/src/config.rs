@@ -56,18 +56,12 @@ pub struct Settings {
     /// Senha do obs-websocket (vazio = sem autenticação). Usada no auto-config do OBS.
     #[serde(default)]
     pub obs_password: String,
-    /// Chat unificado: canal da Twitch (leitura anônima).
-    #[serde(default)]
-    pub twitch_channel: String,
-    /// Chat unificado: API key do YouTube Data API v3.
+    /// Chat: API key do YouTube Data API v3 (compartilhada entre as fontes do YouTube).
     #[serde(default)]
     pub youtube_api_key: String,
-    /// Chat unificado: URL ou ID do vídeo ao vivo do YouTube.
+    /// Chat: lista de fontes (várias por plataforma).
     #[serde(default)]
-    pub youtube_video: String,
-    /// Chat: canal do Kick (slug).
-    #[serde(default)]
-    pub kick_channel: String,
+    pub chat_sources: Vec<ChatSource>,
     /// Exibição do chat.
     #[serde(default = "default_true")]
     pub chat_show_emotes: bool,
@@ -76,11 +70,25 @@ pub struct Settings {
     #[serde(default = "default_true")]
     pub chat_show_platform: bool,
     #[serde(default)]
+    pub chat_show_source: bool,
+    #[serde(default)]
     pub chat_show_timestamps: bool,
 }
 
 fn default_true() -> bool {
     true
+}
+
+/// Uma fonte de chat (um canal de uma plataforma).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSource {
+    pub id: String,
+    pub platform: String, // twitch | youtube | kick
+    pub value: String,    // canal/slug/vídeo
+    #[serde(default)]
+    pub name: String,
+    pub enabled: bool,
 }
 
 impl Default for Settings {
@@ -89,13 +97,12 @@ impl Default for Settings {
             minimize_to_tray: true,
             autostart: false,
             obs_password: String::new(),
-            twitch_channel: String::new(),
             youtube_api_key: String::new(),
-            youtube_video: String::new(),
-            kick_channel: String::new(),
+            chat_sources: Vec::new(),
             chat_show_emotes: true,
             chat_show_badges: true,
             chat_show_platform: true,
+            chat_show_source: false,
             chat_show_timestamps: false,
         }
     }

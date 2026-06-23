@@ -697,3 +697,27 @@ pub fn chat_start(app: AppHandle) {
 pub fn chat_stop(app: AppHandle) {
     chat::stop_chat(&app);
 }
+
+/// Abre (ou foca) a janela flutuante só do chat (always-on-top), pro streamer
+/// deixar num canto/segundo monitor sem o app inteiro.
+#[tauri::command]
+pub fn open_chat_window(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("chat") {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        "chat",
+        tauri::WebviewUrl::App("index.html#chat-popout".into()),
+    )
+    .title("Corneta — Chat")
+    .inner_size(380.0, 600.0)
+    .min_inner_size(300.0, 360.0)
+    .resizable(true)
+    .always_on_top(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
