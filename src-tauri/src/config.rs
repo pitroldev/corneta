@@ -14,6 +14,16 @@ pub struct VideoPreset {
     pub keyframe_sec: u32,
 }
 
+/// Enquadramento pra saída vertical: posição/zoom do recorte 9:16 sobre o sinal landscape.
+/// `x`/`y` são panorâmica (0..1) do espaço disponível; `zoom` é a altura do recorte (0.25..1).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Reframe {
+    pub x: f64,
+    pub y: f64,
+    pub zoom: f64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetEncoding {
@@ -26,6 +36,9 @@ pub struct TargetEncoding {
     /// No modo híbrido: override manual ("copy"/"transcode"). None = decisão automática.
     #[serde(default)]
     pub hybrid_override: Option<String>,
+    /// Enquadramento do recorte vertical (saída portrait). None = centralizado.
+    #[serde(default)]
+    pub reframe: Option<Reframe>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

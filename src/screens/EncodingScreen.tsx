@@ -1,5 +1,6 @@
-import { motion } from "framer-motion";
-import { Cpu, Gauge, Layers, Sparkles, Wand2, Info, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Cpu, Crosshair, Gauge, Layers, Sparkles, Wand2, Info, RotateCcw } from "lucide-react";
 import { useStore } from "../lib/store";
 import type { EncoderKind, EncodingMode } from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
@@ -7,6 +8,7 @@ import { estimate, effectiveAction, lowestCommonDenominator } from "../lib/estim
 import { cn, fmtBitrate } from "../lib/utils";
 import { Badge, Button, Card, Hint, PlatformGlyph, SectionTitle } from "../components/ui";
 import { Select, type SelectOption } from "../components/Select";
+import { ReframeEditor } from "../components/ReframeEditor";
 
 const MODES: {
   id: EncodingMode;
@@ -184,6 +186,8 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const enc = t.encoding;
   const p = enc.preset ?? preset.recommended;
   const action = effectiveAction(config.mode, t);
+  const isVertical = p.height > p.width;
+  const [reframing, setReframing] = useState(false);
 
   const patchPreset = (patch: Partial<typeof p>) =>
     updateTarget(t.id, { encoding: { ...enc, preset: { ...p, ...patch } } });
@@ -194,6 +198,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   ];
 
   return (
+    <>
     <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 bg-surface-2 py-3.5">
       {/* Identidade (esquerda, fixa) */}
       <div className="flex min-w-40 items-center gap-3">
@@ -261,6 +266,11 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 onChange={(v) => updateTarget(t.id, { encoding: { ...enc, encoder: v } })}
               />
             </label>
+            {isVertical && (
+              <Button variant="subtle" size="sm" className="h-9" onClick={() => setReframing(true)}>
+                <Crosshair className="size-3.5" /> Enquadrar
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -277,5 +287,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
         )}
       </div>
     </Card>
+    <AnimatePresence>
+      {reframing && <ReframeEditor target={t} onClose={() => setReframing(false)} />}
+    </AnimatePresence>
+    </>
   );
 }

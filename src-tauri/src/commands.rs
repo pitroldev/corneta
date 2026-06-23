@@ -339,6 +339,51 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Captura 1 frame do sinal atual (MediaMTX) como JPEG base64 — pro preview do enquadramento.
+#[tauri::command]
+pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
+    use base64::Engine;
+    if !mediamtx_has_publisher() {
+        return Err("sem sinal — entre ao vivo no OBS pra capturar o frame".into());
+    }
+    let cfg = get_config(app.clone());
+    let ingest = format!(
+        "{}://{}:{}/{}/{}",
+        cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app, cfg.ingest.key
+    );
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let out = dir.join("frame.jpg");
+    let args: Vec<String> = vec![
+        "-y".into(),
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-rw_timeout".into(),
+        "5000000".into(),
+        "-i".into(),
+        ingest,
+        "-frames:v".into(),
+        "1".into(),
+        "-q:v".into(),
+        "3".into(),
+        out.to_string_lossy().to_string(),
+    ];
+    let output = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| e.to_string())?
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err("não consegui capturar o frame (sinal instável?)".into());
+    }
+    let bytes = std::fs::read(&out).map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
 /// Coloca o motor em estado de erro com uma mensagem.
 fn set_engine_error(app: &AppHandle, msg: &str) {
     log::error!("motor: {msg}");

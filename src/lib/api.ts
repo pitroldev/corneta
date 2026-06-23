@@ -64,6 +64,7 @@ export interface CornetaApi {
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
   saveBrbSlate(b64: string): Promise<void>;
+  captureFrame(): Promise<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +218,10 @@ function tauriApi(): CornetaApi {
     async saveBrbSlate(b64) {
       const { invoke } = await core();
       await invoke("save_brb_slate", { data: b64 });
+    },
+    async captureFrame() {
+      const { invoke } = await core();
+      return invoke<string>("capture_frame");
     },
   };
 }
@@ -720,6 +725,9 @@ function mockApi(): CornetaApi {
     },
     async saveBrbSlate() {
       // no-op no navegador (sem backend pra salvar o slate)
+    },
+    async captureFrame() {
+      throw new Error("captura de frame só no app instalado (e ao vivo)");
     },
   };
 }

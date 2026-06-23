@@ -79,7 +79,7 @@
 - ✅ **Viewers unificados** — soma a audiência ao vivo de todas as plataformas (Twitch via GQL público, YouTube via Data API, Kick via API) reusando as fontes do chat, **sem login**; aparece na sidebar e no Chat. Poll a cada ~30 s.
 - ✅ **Proteção contra quedas (tela "JÁ VOLTO")** — se o sinal do OBS cai **no meio da live** (só após o 1º sinal), a Corneta empurra um **slate** (PNG da marca, em loop) pras plataformas e **mantém a transmissão de pé** até voltar, em vez de derrubar (estado `brb`). Toggle nas Configurações.
 - ✅ **QoL (lote 2):** confirmar Sair no ar · desfazer remoção / confirmar exclusão de perfil · **cronômetro** ao vivo · **marcar momento** (→ relatório) · **abrir canal** por destino · **duplicar destino** · **importar/exportar config** · **check-up pré-live** (com checagem do OBS) · **tema claro** · tamanho de fonte do chat · auto-reconnect do obs-websocket.
-- ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.
+- ✅ Editor de **enquadramento vertical** — saídas portrait (TikTok/Shorts/IG) recortam um **9:16** do sinal landscape (sem distorcer) via `crop`+`scale` no FFmpeg; UI com palco 16:9, recorte arrastável + zoom e **preview com frame real do OBS** (`capture_frame`).
 
 ---
 

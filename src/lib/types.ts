@@ -60,6 +60,13 @@ export interface PlatformPreset {
 }
 
 /** Configuração de encoding de um destino específico. */
+/** Enquadramento do recorte vertical (saída portrait). x/y = panorâmica 0..1; zoom 0.25..1. */
+export interface Reframe {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 export interface TargetEncoding {
   /** Legado — não usado; o híbrido decide via hybridOverride/auto. */
   action: EncodingAction;
@@ -68,6 +75,8 @@ export interface TargetEncoding {
   encoder: EncoderKind;
   /** No modo híbrido: override manual. undefined = decisão automática. */
   hybridOverride?: EncodingAction;
+  /** Enquadramento da saída vertical (crop 9:16). undefined = centralizado. */
+  reframe?: Reframe;
 }
 
 /** Um destino de transmissão configurado pelo usuário. */

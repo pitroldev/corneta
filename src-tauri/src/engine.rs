@@ -1,6 +1,6 @@
 //! Motor de relay: monta o comando FFmpeg a partir da config (decode-once → encode-N),
 //! supervisiona o sidecar e emite status para a UI. Ver PLANEJAMENTO.md §8 e §14.2/§14.3.
-use crate::config::{AppConfig, Target, VideoPreset};
+use crate::config::{AppConfig, Reframe, Target, VideoPreset};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -67,6 +67,20 @@ fn output_url(t: &Target, key: &str) -> String {
     format!("{}/{}", t.ingest_url.trim_end_matches('/'), key)
 }
 
+/// Filtro de vídeo pra saída vertical: recorta um 9:16 (posição/zoom do enquadramento)
+/// do sinal landscape e escala pra resolução final — sem distorcer. A panorâmica usa o
+/// espaço disponível `(iw - crop)`, então o recorte nunca sai da fonte (qualquer aspecto).
+fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
+    let ar = out_w as f64 / out_h as f64;
+    let (x, y, z) = match reframe {
+        Some(r) => (r.x.clamp(0.0, 1.0), r.y.clamp(0.0, 1.0), r.zoom.clamp(0.25, 1.0)),
+        None => (0.5, 0.5, 1.0), // centralizado, altura cheia
+    };
+    format!(
+        "crop=ih*{z:.4}*{ar:.4}:ih*{z:.4}:(iw-ih*{z:.4}*{ar:.4})*{x:.4}:(ih-ih*{z:.4})*{y:.4},scale={out_w}:{out_h}"
+    )
+}
+
 /// Monta os argumentos de UM FFmpeg para UM destino (lê do MediaMTX → 1 saída).
 /// Um processo por plataforma → métricas REAIS por destino e reconexão independente.
 pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<String> {
@@ -97,11 +111,17 @@ pub fn ffmpeg_args_for_target(config: &AppConfig, t: &Target, key: &str) -> Vec<
             .unwrap_or_else(|| recommended_preset(&t.platform_id));
         let codec = ffmpeg_video_codec(&t.encoding.encoder);
         let gop = (p.fps * p.keyframe_sec).to_string();
+        // Saída vertical → recorta/enquadra 9:16; saída landscape → só escala.
+        let vf = if p.height > p.width {
+            reframe_filter(t.encoding.reframe.as_ref(), p.width, p.height)
+        } else {
+            format!("scale={}:{}", p.width, p.height)
+        };
 
         args.extend(
             [
                 "-map", "0:v",
-                "-vf", &format!("scale={}:{}", p.width, p.height),
+                "-vf", &vf,
                 "-r", &p.fps.to_string(),
                 "-c:v", codec,
                 "-b:v", &format!("{}k", p.video_bitrate_kbps),

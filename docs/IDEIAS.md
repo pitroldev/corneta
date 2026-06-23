@@ -44,7 +44,7 @@ Duas coisas definem nossa melhor jogada:
 | **Gravação local** (MediaMTX → disco) | 🟢🟢🟢 | 🟢 | ✅ ótimo | parcial |
 | **Replay/clipe instantâneo** (backtrack) | 🟢🟢🟢 | 🟡 | ✅ ótimo | não |
 | **Clipes sugeridos por pico de chat** (no relatório) | 🟢🟢 | 🟡 | ✅ único | não |
-| **Reframe vertical** (TikTok/Shorts/IG) | 🟢🟢🟢 | 🔴 | ✅ bom | citado |
+| **Reframe vertical** (TikTok/Shorts/IG) | 🟢🟢🟢 | 🔴 | ✅ bom | ✅ **FEITO** |
 | **Áudio por plataforma** (DMCA-safe) | 🟢🟢 | 🟡 | ✅ bom | não |
 | **Contador de viewers somado** (todas plataformas) | 🟢🟢 | 🟡 | ➖ ok | ✅ **FEITO** |
 | **Cloud relay BYO-VPS** (economiza banda) | 🟢🟢🟢 | 🔴 | ✅ bom | planejado |
