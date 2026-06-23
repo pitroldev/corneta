@@ -96,14 +96,36 @@ export interface AppSettings {
   youtubeApiKey: string;
   /** Chat: URL ou ID do vídeo ao vivo do YouTube. */
   youtubeVideo: string;
+  /** Chat: canal do Kick (slug). */
+  kickChannel: string;
+  /** Exibição do chat. */
+  chatShowEmotes: boolean;
+  chatShowBadges: boolean;
+  chatShowPlatform: boolean;
+  chatShowTimestamps: boolean;
+}
+
+export type ChatPlatform = "twitch" | "youtube" | "kick";
+
+export interface ChatFragment {
+  kind: "text" | "emote";
+  text?: string;
+  url?: string;
+}
+
+export interface ChatBadge {
+  label: string;
+  kind: string;
 }
 
 export interface ChatMessage {
   id: string;
-  platform: "twitch" | "youtube";
+  platform: ChatPlatform;
   author: string;
-  text: string;
   color?: string;
+  text: string;
+  fragments: ChatFragment[];
+  badges: ChatBadge[];
   ts: number;
 }
 

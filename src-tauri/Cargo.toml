@@ -27,8 +27,8 @@ serde_json = "1"
 ureq = "2"
 # Uso de CPU ao vivo (GPU via nvidia-smi). Só o módulo "system".
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
-# Cliente WebSocket (ws://) para o obs-websocket v5 (auto-config do OBS).
-tungstenite = { version = "0.23", default-features = false, features = ["handshake"] }
+# WebSocket para obs-websocket v5 (ws://) e chat da Twitch/Kick (Kick/Pusher é wss:// → TLS).
+tungstenite = { version = "0.23", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 sha2 = "0.10"
 base64 = "0.22"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).

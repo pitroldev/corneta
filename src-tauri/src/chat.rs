@@ -1,7 +1,8 @@
 //! Chat unificado: conecta em várias plataformas e emite mensagens normalizadas
-//! para o frontend via evento `chat://message`.
-//! - Twitch: IRC anônimo sobre WebSocket (ws://, sem login).
+//! (com emotes e badges) para o frontend via evento `chat://message`.
+//! - Twitch: IRC anônimo sobre WebSocket (ws://, sem login). Emotes via tag `emotes`.
 //! - YouTube: Data API v3 (liveChat/messages) com a API key do usuário.
+//! - Kick: Pusher (wss://) + emotes `[emote:id:name]` e badges do sender.
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -13,15 +14,35 @@ use tungstenite::Message;
 
 use crate::AppState;
 
+/// Pedaço de uma mensagem: texto ou emote (imagem).
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatFragment {
+    pub kind: String, // "text" | "emote"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatBadge {
+    pub label: String, // "MOD"
+    pub kind: String,  // "moderator"
+}
+
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub id: String,
-    pub platform: String, // "twitch" | "youtube"
+    pub platform: String, // "twitch" | "youtube" | "kick"
     pub author: String,
-    pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    pub text: String, // fallback em texto puro
+    pub fragments: Vec<ChatFragment>,
+    pub badges: Vec<ChatBadge>,
     pub ts: u64,
 }
 
@@ -40,6 +61,12 @@ fn now_ms() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
+fn text_frag(t: &str) -> ChatFragment {
+    ChatFragment { kind: "text".into(), text: Some(t.to_string()), url: None }
+}
+fn frags_to_text(frags: &[ChatFragment]) -> String {
+    frags.iter().filter_map(|f| f.text.clone()).collect::<Vec<_>>().join("")
+}
 
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
     let _ = app.emit("chat://message", msg);
@@ -50,9 +77,9 @@ fn chat_status(app: &AppHandle, platform: &str, status: &str) {
 
 // ----------------------------- Controle ----------------------------
 
-/// (Re)inicia o chat com base nas settings (Twitch + YouTube, conforme configurado).
+/// (Re)inicia o chat com base nas settings (Twitch + YouTube + Kick).
 pub fn start_chat(app: &AppHandle) {
-    let settings = crate::config::load(app).settings;
+    let s = crate::config::load(app).settings;
     let running = {
         let st = app.state::<AppState>();
         let mut chat = st.chat.lock().unwrap();
@@ -62,25 +89,24 @@ pub fn start_chat(app: &AppHandle) {
         running
     };
 
-    if !settings.twitch_channel.trim().is_empty() {
-        let app2 = app.clone();
-        let run2 = running.clone();
-        let ch = settings.twitch_channel.clone();
+    if !s.twitch_channel.trim().is_empty() {
+        let (app2, run2, ch) = (app.clone(), running.clone(), s.twitch_channel.clone());
         tauri::async_runtime::spawn_blocking(move || run_twitch(&ch, run2, app2));
     }
-    if !settings.youtube_api_key.trim().is_empty() && !settings.youtube_video.trim().is_empty() {
-        let app2 = app.clone();
-        let run2 = running.clone();
-        let key = settings.youtube_api_key.clone();
-        let video = settings.youtube_video.clone();
+    if !s.youtube_api_key.trim().is_empty() && !s.youtube_video.trim().is_empty() {
+        let (app2, run2) = (app.clone(), running.clone());
+        let (key, video) = (s.youtube_api_key.clone(), s.youtube_video.clone());
         tauri::async_runtime::spawn_blocking(move || run_youtube(&key, &video, run2, app2));
+    }
+    if !s.kick_channel.trim().is_empty() {
+        let (app2, run2, slug) = (app.clone(), running.clone(), s.kick_channel.clone());
+        tauri::async_runtime::spawn_blocking(move || run_kick(&slug, run2, app2));
     }
 }
 
 pub fn stop_chat(app: &AppHandle) {
     let st = app.state::<AppState>();
-    let chat = st.chat.lock().unwrap();
-    chat.running.store(false, Ordering::Relaxed);
+    st.chat.lock().unwrap().running.store(false, Ordering::Relaxed);
 }
 
 // ----------------------------- Twitch ------------------------------
@@ -98,7 +124,6 @@ fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
             return;
         }
     };
-    // Read com timeout curto pra checar o flag de parada periodicamente.
     if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
         let _ = tcp.set_read_timeout(Some(Duration::from_millis(400)));
     }
@@ -125,12 +150,9 @@ fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
             Ok(Message::Close(_)) => break,
             Ok(_) => {}
             Err(tungstenite::Error::Io(e))
-                if matches!(
-                    e.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) =>
+                if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) =>
             {
-                continue; // timeout do read → revalida o flag
+                continue;
             }
             Err(_) => break,
         }
@@ -139,7 +161,7 @@ fn run_twitch(channel: &str, running: Arc<AtomicBool>, app: AppHandle) {
     chat_status(&app, "twitch", "disconnected");
 }
 
-/// Parseia uma linha IRC `PRIVMSG` (com tags) numa ChatMessage.
+/// Parseia uma linha IRC `PRIVMSG` (com tags) numa ChatMessage com emotes e badges.
 fn parse_privmsg(line: &str) -> Option<ChatMessage> {
     let (tags, rest) = if let Some(stripped) = line.strip_prefix('@') {
         let sp = stripped.find(' ')?;
@@ -166,6 +188,8 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
 
     let mut color = None;
     let mut display = nick;
+    let mut emotes_tag = "";
+    let mut badges_tag = "";
     for kv in tags.split(';') {
         let mut it = kv.splitn(2, '=');
         let k = it.next().unwrap_or("");
@@ -173,6 +197,8 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
         match k {
             "color" if !v.is_empty() => color = Some(v.to_string()),
             "display-name" if !v.is_empty() => display = v.to_string(),
+            "emotes" => emotes_tag = v,
+            "badges" => badges_tag = v,
             _ => {}
         }
     }
@@ -181,10 +207,96 @@ fn parse_privmsg(line: &str) -> Option<ChatMessage> {
         id: next_id(),
         platform: "twitch".into(),
         author: display,
-        text,
         color,
+        fragments: twitch_fragments(&text, emotes_tag),
+        badges: twitch_badges(badges_tag),
+        text,
         ts: now_ms(),
     })
+}
+
+/// Quebra o texto em fragmentos texto/emote a partir do tag `emotes` (id:start-end,...).
+fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
+    if emotes_tag.is_empty() {
+        return vec![text_frag(text)];
+    }
+    let mut ranges: Vec<(usize, usize, String)> = vec![];
+    for part in emotes_tag.split('/') {
+        let mut it = part.splitn(2, ':');
+        let id = it.next().unwrap_or("");
+        let positions = it.next().unwrap_or("");
+        if id.is_empty() {
+            continue;
+        }
+        for pos in positions.split(',') {
+            let mut p = pos.splitn(2, '-');
+            if let (Some(a), Some(b)) = (
+                p.next().and_then(|x| x.parse::<usize>().ok()),
+                p.next().and_then(|x| x.parse::<usize>().ok()),
+            ) {
+                ranges.push((a, b, id.to_string()));
+            }
+        }
+    }
+    if ranges.is_empty() {
+        return vec![text_frag(text)];
+    }
+    ranges.sort_by_key(|r| r.0);
+
+    let chars: Vec<char> = text.chars().collect();
+    let n = chars.len();
+    let mut frags = vec![];
+    let mut cursor = 0usize;
+    for (a, b, id) in ranges {
+        if a >= n || a < cursor {
+            continue;
+        }
+        if a > cursor {
+            let t: String = chars[cursor..a].iter().collect();
+            frags.push(text_frag(&t));
+        }
+        let end = (b + 1).min(n);
+        let name: String = chars[a..end].iter().collect();
+        frags.push(ChatFragment {
+            kind: "emote".into(),
+            text: Some(name),
+            url: Some(format!(
+                "https://static-cdn.jtvnw.net/emoticons/v2/{id}/default/dark/1.0"
+            )),
+        });
+        cursor = end;
+    }
+    if cursor < n {
+        let t: String = chars[cursor..].iter().collect();
+        frags.push(text_frag(&t));
+    }
+    frags
+}
+
+/// Mapeia o tag `badges` (set/versão) em chips de texto (sem API, sem auth).
+fn twitch_badges(tag: &str) -> Vec<ChatBadge> {
+    if tag.is_empty() {
+        return vec![];
+    }
+    tag.split(',')
+        .filter_map(|b| {
+            let set = b.split('/').next().unwrap_or("");
+            let (label, kind) = match set {
+                "broadcaster" => ("HOST", "broadcaster"),
+                "moderator" => ("MOD", "moderator"),
+                "vip" => ("VIP", "vip"),
+                "subscriber" => ("SUB", "subscriber"),
+                "founder" => ("FND", "subscriber"),
+                "premium" => ("PRIME", "premium"),
+                "turbo" => ("TURBO", "premium"),
+                "partner" => ("✓", "partner"),
+                "staff" | "admin" | "global_mod" => ("STAFF", "staff"),
+                "artist-badge" => ("ART", "artist"),
+                _ => return None,
+            };
+            Some(ChatBadge { label: label.into(), kind: kind.into() })
+        })
+        .collect()
 }
 
 // ----------------------------- YouTube -----------------------------
@@ -203,7 +315,7 @@ fn extract_video_id(input: &str) -> String {
                 .to_string();
         }
     }
-    s.to_string() // já é o ID
+    s.to_string()
 }
 
 fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
@@ -270,19 +382,32 @@ fn run_youtube(api_key: &str, video: &str, running: Arc<AtomicBool>, app: AppHan
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
-                    if !text.is_empty() {
-                        emit_chat(
-                            &app,
-                            ChatMessage {
-                                id: next_id(),
-                                platform: "youtube".into(),
-                                author,
-                                text,
-                                color: None,
-                                ts: now_ms(),
-                            },
-                        );
+                    if text.is_empty() {
+                        continue;
                     }
+                    let mut badges = vec![];
+                    if item.pointer("/authorDetails/isChatOwner").and_then(|v| v.as_bool()) == Some(true) {
+                        badges.push(ChatBadge { label: "HOST".into(), kind: "broadcaster".into() });
+                    }
+                    if item.pointer("/authorDetails/isChatModerator").and_then(|v| v.as_bool()) == Some(true) {
+                        badges.push(ChatBadge { label: "MOD".into(), kind: "moderator".into() });
+                    }
+                    if item.pointer("/authorDetails/isChatSponsor").and_then(|v| v.as_bool()) == Some(true) {
+                        badges.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() });
+                    }
+                    emit_chat(
+                        &app,
+                        ChatMessage {
+                            id: next_id(),
+                            platform: "youtube".into(),
+                            author,
+                            color: None,
+                            fragments: vec![text_frag(&text)],
+                            badges,
+                            text,
+                            ts: now_ms(),
+                        },
+                    );
                 }
             }
         }
@@ -295,4 +420,171 @@ fn run_youtube(api_key: &str, video: &str, running: Arc<AtomicBool>, app: AppHan
         }
     }
     chat_status(&app, "youtube", "disconnected");
+}
+
+// ------------------------------- Kick ------------------------------
+
+/// Resolve o chatroom id pelo slug do canal (API não-oficial — pode bater no Cloudflare).
+fn get_kick_chatroom_id(slug: &str) -> Option<u64> {
+    let url = format!("https://kick.com/api/v2/channels/{slug}");
+    let body = ureq::get(&url)
+        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+        .set("Accept", "application/json")
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.pointer("/chatroom/id").and_then(|x| x.as_u64())
+}
+
+fn run_kick(slug: &str, running: Arc<AtomicBool>, app: AppHandle) {
+    let slug = slug.trim().trim_start_matches('@').to_lowercase();
+    if slug.is_empty() {
+        return;
+    }
+    let chatroom_id = match get_kick_chatroom_id(&slug) {
+        Some(id) => id,
+        None => {
+            log::warn!("kick chat: não resolvi o chatroom de {slug} (Cloudflare?)");
+            chat_status(&app, "kick", "error");
+            return;
+        }
+    };
+    // App key pública do Pusher do Kick (cluster us2). Pode mudar de tempos em tempos.
+    let url = "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=corneta&version=1.0&flash=false";
+    let mut socket = match tungstenite::connect(url) {
+        Ok((s, _)) => s,
+        Err(e) => {
+            log::warn!("kick chat: pusher falhou: {e}");
+            chat_status(&app, "kick", "error");
+            return;
+        }
+    };
+    if let tungstenite::stream::MaybeTlsStream::Rustls(s) = socket.get_mut() {
+        let _ = s.sock.set_read_timeout(Some(Duration::from_millis(400)));
+    }
+    let _ = socket.send(Message::Text(format!(
+        "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroom_id}.v2\"}}}}"
+    )));
+    log::info!("kick chat: conectado em {slug} (chatroom {chatroom_id})");
+    chat_status(&app, "kick", "connected");
+
+    while running.load(Ordering::Relaxed) {
+        match socket.read() {
+            Ok(Message::Text(t)) => {
+                if t.contains("pusher:ping") {
+                    let _ = socket.send(Message::Text("{\"event\":\"pusher:pong\",\"data\":{}}".into()));
+                } else if let Some(msg) = parse_kick(&t) {
+                    emit_chat(&app, msg);
+                }
+            }
+            Ok(Message::Close(_)) => break,
+            Ok(_) => {}
+            Err(tungstenite::Error::Io(e))
+                if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) =>
+            {
+                continue;
+            }
+            Err(_) => break,
+        }
+    }
+    let _ = socket.close(None);
+    chat_status(&app, "kick", "disconnected");
+}
+
+fn parse_kick(raw: &str) -> Option<ChatMessage> {
+    let v: Value = serde_json::from_str(raw).ok()?;
+    if !v.get("event")?.as_str()?.ends_with("ChatMessageEvent") {
+        return None;
+    }
+    // O campo "data" vem como string JSON.
+    let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
+    let content = d.get("content")?.as_str()?.to_string();
+    if content.is_empty() {
+        return None;
+    }
+    let author = d
+        .pointer("/sender/username")
+        .and_then(|x| x.as_str())
+        .unwrap_or("anon")
+        .to_string();
+    let color = d
+        .pointer("/sender/identity/color")
+        .and_then(|x| x.as_str())
+        .filter(|c| !c.is_empty())
+        .map(String::from);
+    let fragments = kick_fragments(&content);
+    Some(ChatMessage {
+        id: next_id(),
+        platform: "kick".into(),
+        author,
+        color,
+        text: frags_to_text(&fragments),
+        badges: kick_badges(d.pointer("/sender/identity/badges")),
+        fragments,
+        ts: now_ms(),
+    })
+}
+
+/// Quebra o conteúdo do Kick em fragmentos, expandindo `[emote:ID:nome]`.
+fn kick_fragments(content: &str) -> Vec<ChatFragment> {
+    let mut frags = vec![];
+    let mut rest = content;
+    while let Some(start) = rest.find("[emote:") {
+        if start > 0 {
+            frags.push(text_frag(&rest[..start]));
+        }
+        let after = &rest[start..];
+        if let Some(end) = after.find(']') {
+            let inner = &after[7..end]; // pula "[emote:"
+            let mut it = inner.splitn(2, ':');
+            let id = it.next().unwrap_or("");
+            let name = it.next().unwrap_or("");
+            if !id.is_empty() {
+                frags.push(ChatFragment {
+                    kind: "emote".into(),
+                    text: Some(if name.is_empty() { id.to_string() } else { name.to_string() }),
+                    url: Some(format!("https://files.kick.com/emotes/{id}/fullsize")),
+                });
+            }
+            rest = &after[end + 1..];
+        } else {
+            frags.push(text_frag(after));
+            rest = "";
+            break;
+        }
+    }
+    if !rest.is_empty() {
+        frags.push(text_frag(rest));
+    }
+    if frags.is_empty() {
+        frags.push(text_frag(content));
+    }
+    frags
+}
+
+fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
+    let Some(arr) = badges.and_then(|v| v.as_array()) else {
+        return vec![];
+    };
+    arr.iter()
+        .filter_map(|b| {
+            let kind = b.get("type").and_then(|x| x.as_str()).unwrap_or("");
+            let text = b.get("text").and_then(|x| x.as_str()).unwrap_or("");
+            let label = match kind {
+                "broadcaster" => "HOST".to_string(),
+                "moderator" => "MOD".to_string(),
+                "vip" => "VIP".to_string(),
+                "subscriber" => "SUB".to_string(),
+                "founder" => "FND".to_string(),
+                "og" => "OG".to_string(),
+                "verified" => "✓".to_string(),
+                _ if !text.is_empty() => text.to_uppercase(),
+                _ => return None,
+            };
+            let kind = if kind.is_empty() { "subscriber" } else { kind };
+            Some(ChatBadge { label, kind: kind.to_string() })
+        })
+        .collect()
 }

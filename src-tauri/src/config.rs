@@ -65,6 +65,22 @@ pub struct Settings {
     /// Chat unificado: URL ou ID do vídeo ao vivo do YouTube.
     #[serde(default)]
     pub youtube_video: String,
+    /// Chat: canal do Kick (slug).
+    #[serde(default)]
+    pub kick_channel: String,
+    /// Exibição do chat.
+    #[serde(default = "default_true")]
+    pub chat_show_emotes: bool,
+    #[serde(default = "default_true")]
+    pub chat_show_badges: bool,
+    #[serde(default = "default_true")]
+    pub chat_show_platform: bool,
+    #[serde(default)]
+    pub chat_show_timestamps: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -76,6 +92,11 @@ impl Default for Settings {
             twitch_channel: String::new(),
             youtube_api_key: String::new(),
             youtube_video: String::new(),
+            kick_channel: String::new(),
+            chat_show_emotes: true,
+            chat_show_badges: true,
+            chat_show_platform: true,
+            chat_show_timestamps: false,
         }
     }
 }

@@ -3,8 +3,11 @@ import { MessageSquare, Settings2, Trash2, Wifi, WifiOff } from "lucide-react";
 import { useStore } from "../lib/store";
 import { IS_TAURI } from "../lib/api";
 import { cn } from "../lib/utils";
-import type { ChatMessage } from "../lib/types";
-import { Button, Card, PlatformGlyph, SectionTitle } from "../components/ui";
+import type { ChatMessage, ChatPlatform } from "../lib/types";
+import { Button, Card, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
+
+const fmtTime = (ms: number) =>
+  new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
 export function ChatScreen() {
   const config = useStore((s) => s.config);
@@ -17,14 +20,17 @@ export function ChatScreen() {
   const clearChat = useStore((s) => s.clearChat);
 
   const [showConfig, setShowConfig] = useState(false);
-  const [filter, setFilter] = useState({ twitch: true, youtube: true });
+  const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
+    twitch: true,
+    youtube: true,
+    kick: true,
+  });
 
   const feedRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
   const shown = messages.filter((m) => filter[m.platform]);
 
-  // Auto-scroll, a menos que o usuário tenha rolado pra cima.
   useEffect(() => {
     const el = feedRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
@@ -38,15 +44,23 @@ export function ChatScreen() {
 
   if (!config) return null;
   const s = config.settings;
+  const view = {
+    emotes: s.chatShowEmotes ?? true,
+    badges: s.chatShowBadges ?? true,
+    platform: s.chatShowPlatform ?? true,
+    timestamps: s.chatShowTimestamps ?? false,
+  };
   const configured =
-    !!s.twitchChannel?.trim() || !!(s.youtubeApiKey?.trim() && s.youtubeVideo?.trim());
+    !!s.twitchChannel?.trim() ||
+    !!s.kickChannel?.trim() ||
+    !!(s.youtubeApiKey?.trim() && s.youtubeVideo?.trim());
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col">
       <SectionTitle
         kicker="A galera junta"
         title="Chat unificado"
-        subtitle="Os chats de todas as plataformas num feed só — pra você não perder ninguém."
+        subtitle="Os chats de todas as plataformas num feed só — com emotes, badges e de onde cada um vem."
         right={
           connected ? (
             <Button variant="outline" size="sm" onClick={() => void disconnectChat()}>
@@ -65,7 +79,6 @@ export function ChatScreen() {
         }
       />
 
-      {/* Status + configuração */}
       <Card className="mb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -76,7 +89,7 @@ export function ChatScreen() {
             ) : (
               Object.entries(statuses).map(([platform, status]) => (
                 <span key={platform} className="flex items-center gap-1.5 text-sm">
-                  <PlatformGlyph id={platform as ChatMessage["platform"]} size={16} />
+                  <PlatformGlyph id={platform as ChatPlatform} size={16} />
                   <span className={cn("size-2 rounded-full", statusDot(status))} />
                   <span className="text-ink-muted">{statusLabel(status)}</span>
                 </span>
@@ -90,14 +103,21 @@ export function ChatScreen() {
 
         {showConfig && (
           <div className="mt-3 flex flex-col gap-3 border-t-2 border-border-soft pt-3">
-            <Field
-              label="Canal da Twitch"
-              hint="leitura anônima, sem login"
-              value={s.twitchChannel ?? ""}
-              placeholder="ex.: pitrol"
-              onChange={(v) => setSettings({ twitchChannel: v })}
-            />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field
+                label="Canal da Twitch"
+                hint="anônimo, sem login"
+                value={s.twitchChannel ?? ""}
+                placeholder="ex.: pitrol"
+                onChange={(v) => setSettings({ twitchChannel: v })}
+              />
+              <Field
+                label="Canal do Kick"
+                hint="slug do canal"
+                value={s.kickChannel ?? ""}
+                placeholder="ex.: xqc"
+                onChange={(v) => setSettings({ kickChannel: v })}
+              />
               <Field
                 label="YouTube — API key"
                 hint="Data API v3"
@@ -109,38 +129,42 @@ export function ChatScreen() {
                 label="YouTube — vídeo ao vivo"
                 hint="URL ou ID"
                 value={s.youtubeVideo ?? ""}
-                placeholder="ex.: youtube.com/watch?v=..."
+                placeholder="youtube.com/watch?v=..."
                 onChange={(v) => setSettings({ youtubeVideo: v })}
               />
             </div>
-            <p className="text-xs text-ink-faint">
-              💡 Twitch funciona só com o nome do canal. YouTube precisa de uma API key sua (Data API)
-              + o vídeo ao vivo. Kick/Facebook ainda não têm leitura pública simples.
+
+            <div className="flex flex-col gap-2 border-t-2 border-border-soft pt-3">
+              <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">Exibição</span>
+              <ToggleRow label="Mostrar emotes" checked={view.emotes} onChange={(v) => setSettings({ chatShowEmotes: v })} />
+              <ToggleRow label="Mostrar badges" checked={view.badges} onChange={(v) => setSettings({ chatShowBadges: v })} />
+              <ToggleRow label="Mostrar plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
+              <ToggleRow label="Mostrar horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
+            </div>
+
+            <p className="text-xs leading-relaxed text-ink-faint">
+              💡 Twitch funciona só com o nome do canal (emotes + badges nativos). Kick precisa do slug
+              (pode falhar por proteção anti-bot). YouTube precisa de API key + vídeo ao vivo.
             </p>
           </div>
         )}
       </Card>
 
-      {/* Filtros */}
       <div className="mb-2 flex items-center gap-2">
-        <FilterChip
-          label="Twitch"
-          id="twitch"
-          on={filter.twitch}
-          onClick={() => setFilter((f) => ({ ...f, twitch: !f.twitch }))}
-        />
-        <FilterChip
-          label="YouTube"
-          id="youtube"
-          on={filter.youtube}
-          onClick={() => setFilter((f) => ({ ...f, youtube: !f.youtube }))}
-        />
+        {(["twitch", "kick", "youtube"] as const).map((p) => (
+          <FilterChip
+            key={p}
+            id={p}
+            label={p === "twitch" ? "Twitch" : p === "kick" ? "Kick" : "YouTube"}
+            on={filter[p]}
+            onClick={() => setFilter((f) => ({ ...f, [p]: !f[p] }))}
+          />
+        ))}
         <Button variant="ghost" size="sm" className="ml-auto" onClick={clearChat}>
           <Trash2 className="size-4" /> Limpar
         </Button>
       </div>
 
-      {/* Feed */}
       <Card className="flex h-[54vh] flex-col overflow-hidden p-0">
         <div
           ref={feedRef}
@@ -160,7 +184,7 @@ export function ChatScreen() {
               </div>
             </div>
           ) : (
-            shown.map((m) => <MsgRow key={m.id} m={m} />)
+            shown.map((m) => <MsgRow key={m.id} m={m} view={view} />)
           )}
         </div>
       </Card>
@@ -168,16 +192,54 @@ export function ChatScreen() {
   );
 }
 
-function MsgRow({ m }: { m: ChatMessage }) {
+function MsgRow({
+  m,
+  view,
+}: {
+  m: ChatMessage;
+  view: { emotes: boolean; badges: boolean; platform: boolean; timestamps: boolean };
+}) {
   return (
-    <div className="flex items-start gap-2 px-3 py-1 leading-snug hover:bg-surface-2">
-      <span className="mt-0.5 shrink-0">
-        <PlatformGlyph id={m.platform} size={15} />
-      </span>
+    <div className="flex flex-wrap items-start gap-1.5 px-3 py-1 leading-snug hover:bg-surface-2">
+      {view.timestamps && (
+        <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-ink-faint">{fmtTime(m.ts)}</span>
+      )}
+      {view.platform && (
+        <span className="mt-0.5 shrink-0">
+          <PlatformGlyph id={m.platform} size={15} />
+        </span>
+      )}
+      {view.badges &&
+        m.badges.map((b, i) => (
+          <span
+            key={i}
+            className={cn(
+              "mt-0.5 shrink-0 rounded px-1 text-[9px] font-extrabold uppercase leading-4",
+              badgeColor(b.kind)
+            )}
+          >
+            {b.label}
+          </span>
+        ))}
       <span className="shrink-0 text-sm font-bold" style={m.color ? { color: m.color } : undefined}>
         {m.author}
       </span>
-      <span className="break-words text-sm text-ink-muted">{m.text}</span>
+      <span className="min-w-0 break-words text-sm text-ink-muted">
+        {m.fragments.map((f, i) =>
+          f.kind === "emote" && view.emotes && f.url ? (
+            <img
+              key={i}
+              src={f.url}
+              alt={f.text}
+              title={f.text}
+              className="mx-0.5 inline-block h-5 w-auto align-middle"
+              loading="lazy"
+            />
+          ) : (
+            <span key={i}>{f.text}</span>
+          )
+        )}
+      </span>
     </div>
   );
 }
@@ -189,7 +251,7 @@ function FilterChip({
   onClick,
 }: {
   label: string;
-  id: ChatMessage["platform"];
+  id: ChatPlatform;
   on: boolean;
   onClick: () => void;
 }) {
@@ -208,10 +270,45 @@ function FilterChip({
   );
 }
 
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-semibold text-ink-muted">{label}</span>
+      <Toggle checked={checked} onChange={onChange} label={label} />
+    </div>
+  );
+}
+
 const statusDot = (status: string) =>
   status === "connected" ? "bg-ok" : status === "error" ? "bg-bad" : "bg-ink-faint";
 const statusLabel = (status: string) =>
   status === "connected" ? "no ar" : status === "error" ? "erro" : "desconectado";
+
+function badgeColor(kind: string): string {
+  switch (kind) {
+    case "broadcaster":
+      return "bg-tomate text-white";
+    case "moderator":
+      return "bg-[#22c55e] text-white";
+    case "vip":
+      return "bg-[#e879f9] text-white";
+    case "subscriber":
+      return "bg-brass text-brass-ink";
+    case "staff":
+    case "partner":
+      return "bg-[#7c9cff] text-white";
+    default:
+      return "bg-surface-3 text-ink-muted";
+  }
+}
 
 function Field({
   label,

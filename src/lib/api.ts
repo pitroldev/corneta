@@ -6,6 +6,8 @@
 // ============================================================
 import type {
   AppConfig,
+  ChatBadge,
+  ChatFragment,
   ChatMessage,
   ChatStatus,
   EncoderInfo,
@@ -447,36 +449,61 @@ function mockApi(): CornetaApi {
       // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
     },
     async chatStart() {
-      chatStatusListeners.forEach((l) => {
-        l({ platform: "twitch", status: "connected" });
-        l({ platform: "youtube", status: "connected" });
-      });
+      (["twitch", "kick", "youtube"] as const).forEach((p) =>
+        chatStatusListeners.forEach((l) => l({ platform: p, status: "connected" }))
+      );
       if (chatTimer) clearInterval(chatTimer);
+      const AUTHORS = {
+        twitch: ["Pitrol", "brabo_do_rio", "ana_live", "zedapeça"],
+        kick: ["kraderson", "miron_tv", "biel_kick", "luluzinha"],
+        youtube: ["Maria Silva", "joao_yt", "gamer123", "fulano_de_tal"],
+      };
+      const COLORS = ["#ff5a36", "#7c9cff", "#34d399", "#f5a524", "#e879f9"];
       chatTimer = setInterval(() => {
-        const twitch = Math.random() < 0.6;
-        const tAuthors = ["Pitrol", "brabo_do_rio", "ana_live", "zedapeça", "mestre_obs"];
-        const yAuthors = ["Maria Silva", "joao_yt", "gamer123", "fulano_de_tal"];
-        const colors = ["#ff5a36", "#7c9cff", "#34d399", "#f5a524", "#e879f9"];
-        const pool = twitch ? tAuthors : yAuthors;
+        const r = Math.random();
+        const platform = r < 0.45 ? "twitch" : r < 0.75 ? "kick" : "youtube";
+        const text = CHAT_MSGS[Math.floor(Math.random() * CHAT_MSGS.length)];
+        const fragments: ChatFragment[] = [{ kind: "text", text: `${text} ` }];
+        if (Math.random() < 0.4) {
+          if (platform === "twitch")
+            fragments.push({
+              kind: "emote",
+              text: "Kappa",
+              url: "https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0",
+            });
+          else if (platform === "kick")
+            fragments.push({
+              kind: "emote",
+              text: "emote",
+              url: "https://files.kick.com/emotes/37236/fullsize",
+            });
+          else fragments[0] = { kind: "text", text: `${text} 🎉🔥` };
+        }
+        const badges: ChatBadge[] = [];
+        const br = Math.random();
+        if (br < 0.15) badges.push({ label: "MOD", kind: "moderator" });
+        else if (br < 0.4) badges.push({ label: "SUB", kind: "subscriber" });
+        const pool = AUTHORS[platform];
         chatMsgListeners.forEach((l) =>
           l({
             id: `${++chatSeq}-${Date.now()}`,
-            platform: twitch ? "twitch" : "youtube",
+            platform,
             author: pool[Math.floor(Math.random() * pool.length)],
-            text: CHAT_MSGS[Math.floor(Math.random() * CHAT_MSGS.length)],
-            color: twitch ? colors[Math.floor(Math.random() * colors.length)] : undefined,
+            color: platform === "youtube" ? undefined : COLORS[Math.floor(Math.random() * COLORS.length)],
+            text,
+            fragments,
+            badges,
             ts: Date.now(),
           })
         );
-      }, 1300);
+      }, 1200);
     },
     async chatStop() {
       if (chatTimer) clearInterval(chatTimer);
       chatTimer = null;
-      chatStatusListeners.forEach((l) => {
-        l({ platform: "twitch", status: "disconnected" });
-        l({ platform: "youtube", status: "disconnected" });
-      });
+      (["twitch", "kick", "youtube"] as const).forEach((p) =>
+        chatStatusListeners.forEach((l) => l({ platform: p, status: "disconnected" }))
+      );
     },
     subscribeChat(onMsg, onStatus) {
       chatMsgListeners.add(onMsg);

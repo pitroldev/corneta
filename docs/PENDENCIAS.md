@@ -83,7 +83,7 @@
 - ✅ **MediaMTX** como ingestão (feito — reconexão via respawn). Próximos ganhos: **SRT** de entrada e **API de métricas por destino**.
 - **Cloud relay "traga seu VPS"** (não estourar o upload doméstico — §7 do plano).
 - **macOS / Linux** (keyring `apple-native`/`sync-secret-service`, assinatura/notarização Apple).
-- ✅ **Chat unificado** (Twitch anônimo + YouTube via API key; Kick/FB pendentes) — [`CHAT.md`](./CHAT.md).
+- ✅ **Chat unificado** com **emotes + badges + Kick** (Twitch anônimo, Kick via slug, YouTube via API key; tudo configurável) — [`CHAT.md`](./CHAT.md). FB/TikTok pendentes.
 - **Gravação local simultânea** e **métricas unificadas** por plataforma.
 - ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
 
