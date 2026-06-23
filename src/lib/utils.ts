@@ -27,6 +27,20 @@ export function uid(prefix = "t"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Abre uma URL no navegador padrão (Tauri shell ou window.open no demo). */
+export async function openExternal(url: string): Promise<void> {
+  try {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      const { open } = await import("@tauri-apps/plugin-shell");
+      await open(url);
+      return;
+    }
+  } catch {
+    /* cai no fallback */
+  }
+  if (typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
+}
+
 /** Escolhe tinta escura ou clara para contrastar com uma cor de fundo (#rrggbb). */
 export function readableOn(hex: string): string {
   const h = hex.replace("#", "");

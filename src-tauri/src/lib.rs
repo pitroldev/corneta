@@ -9,7 +9,7 @@ mod session;
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Estado global: runtime do motor (handle do sidecar + último snapshot) + chat.
 pub struct AppState {
@@ -53,6 +53,19 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
+        // Notificações nativas + memória de tamanho/posição da janela.
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Atalho global: dispara um evento que o frontend trata (começar/parar).
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        let _ = app.emit("shortcut://toggle-live", ());
+                    }
+                })
+                .build(),
+        )
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
             chat: Mutex::new(chat::ChatRuntime::default()),
@@ -76,8 +89,20 @@ pub fn run() {
             commands::chat_start,
             commands::chat_stop,
             commands::open_chat_window,
+            commands::obs_set_stream,
+            commands::test_target,
+            commands::open_logs_dir,
+            commands::register_shortcut,
         ])
         .setup(|app| {
+            // Registra o atalho global de começar/parar a partir das settings.
+            {
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                let sc = config::load(app.handle()).settings.live_shortcut;
+                if !sc.trim().is_empty() {
+                    let _ = app.global_shortcut().register(sc.as_str());
+                }
+            }
             // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.
             if let Some(icon) = app.default_window_icon().cloned() {
                 let show = MenuItem::with_id(app, "show", "Abrir Corneta", true, None::<&str>)?;

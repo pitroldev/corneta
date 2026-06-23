@@ -74,6 +74,7 @@
 - ✅ **Perfis** ("Live de sexta", "Podcast"): conjuntos de destinos + modo, troca/cria/renomeia/exclui na tela Plataformas (chaves compartilhadas por id entre perfis).
 - ⛔ **i18n** (PT-BR + EN) e **tema claro**.
 - ✅ **Onboarding guiado** (carrossel de 5 passos com progresso), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, dica keyframe 2s/CBR).
+- ✅ **Menos fricção:** um clique liga o OBS junto (`StartStream`), "pegar minha chave" por plataforma, testar conexão por destino, **atalho global** começar/parar, **notificações nativas** (no ar / destino caiu), colar+mostrar a chave, **arrastar pra reordenar** destinos, lembrar janela/última tela, abrir logs.
 - ⛔ Editor de **enquadramento vertical** (preview pro TikTok) no modo transcode.
 
 ---

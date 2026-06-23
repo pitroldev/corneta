@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, Plus, Trash2, Check, X, AlertTriangle, Pencil } from "lucide-react";
+import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
+import {
+  KeyRound, Plus, Trash2, Check, X, AlertTriangle, Pencil,
+  GripVertical, Eye, EyeOff, ClipboardPaste, Wifi, ExternalLink,
+} from "lucide-react";
 import { useStore } from "../lib/store";
+import { api } from "../lib/api";
 import { PLATFORM_LIST, PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
+import { cn, openExternal } from "../lib/utils";
 import type { PlatformId, Target } from "../lib/types";
 import { isCustomUrlInvalid } from "../lib/validation";
 import { Badge, Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
@@ -13,6 +18,7 @@ import { Mascot } from "../components/decor";
 export function PlatformsScreen() {
   const config = useStore((s) => s.config);
   const addTarget = useStore((s) => s.addTarget);
+  const reorderTargets = useStore((s) => s.reorderTargets);
   const [picking, setPicking] = useState(false);
 
   if (!config) return null;
@@ -35,22 +41,16 @@ export function PlatformsScreen() {
       {config.targets.length === 0 ? (
         <EmptyState onAdd={() => setPicking(true)} />
       ) : (
-        <div className="flex flex-col gap-3">
-          <AnimatePresence initial={false}>
-            {config.targets.map((t) => (
-              <motion.div
-                key={t.id}
-                layout
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-                transition={{ type: "spring", stiffness: 320, damping: 28 }}
-              >
-                <TargetRow target={t} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+        <Reorder.Group
+          axis="y"
+          values={config.targets}
+          onReorder={reorderTargets}
+          className="flex list-none flex-col gap-3"
+        >
+          {config.targets.map((t) => (
+            <TargetRow key={t.id} target={t} />
+          ))}
+        </Reorder.Group>
       )}
 
       <AnimatePresence>
@@ -145,68 +145,109 @@ function TargetRow({ target }: { target: Target }) {
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const toggleTarget = useStore((s) => s.toggleTarget);
+  const controls = useDragControls();
   const preset = PLATFORMS[target.platformId];
   const isCustom = target.platformId === "custom";
   const urlInvalid = isCustomUrlInvalid(target);
 
-  return (
-    <Card className={`flex flex-col gap-4 transition-opacity ${target.enabled ? "" : "opacity-50"}`}>
-      <div className="flex items-center gap-4">
-        <PlatformGlyph id={target.platformId} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <input
-              value={target.name}
-              onChange={(e) => updateTarget(target.id, { name: e.target.value })}
-              aria-label="Nome do destino"
-              className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
-            />
-            <Badge color={preset.color}>{preset.protocol}</Badge>
-            {preset.experimental && (
-              <Badge className="bg-warn text-night">
-                <AlertTriangle className="size-3" /> beta
-              </Badge>
-            )}
-          </div>
-          <div className="mt-0.5 truncate text-xs text-ink-faint">
-            {target.ingestUrl || "URL não definida"}
-          </div>
-        </div>
-        <Toggle checked={target.enabled} onChange={() => toggleTarget(target.id)} label="Ativar" />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            removeTarget(target.id);
-            toast.info(`${target.name} saiu da corneta`);
-          }}
-          aria-label="Remover"
-        >
-          <Trash2 className="size-4" />
-        </Button>
-      </div>
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const runTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult({ ok: true, msg: await api.testTarget(target.id) });
+    } catch (e) {
+      setTestResult({ ok: false, msg: String(e) });
+    } finally {
+      setTesting(false);
+    }
+  };
 
-      {isCustom && (
-        <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
-          URL de ingestão
-          <Input
-            value={target.ingestUrl}
-            placeholder="rtmp://servidor/app  (rtmp://, rtmps:// ou srt://)"
-            onChange={(e) => updateTarget(target.id, { ingestUrl: e.target.value })}
-            className={urlInvalid ? "border-bad focus:border-bad" : undefined}
+  return (
+    <Reorder.Item value={target} dragListener={false} dragControls={controls}>
+      <Card className={cn("flex flex-col gap-4 transition-opacity", !target.enabled && "opacity-50")}>
+        <div className="flex items-center gap-3">
+          <GripVertical
+            onPointerDown={(e) => controls.start(e)}
+            className="size-5 shrink-0 cursor-grab touch-none text-ink-faint active:cursor-grabbing"
+            aria-label="Arrastar pra reordenar"
           />
-          {urlInvalid && (
-            <span className="text-[11px] font-medium text-bad">
-              URL inválida — comece com rtmp://, rtmps:// ou srt://
+          <PlatformGlyph id={target.platformId} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <input
+                value={target.name}
+                onChange={(e) => updateTarget(target.id, { name: e.target.value })}
+                aria-label="Nome do destino"
+                className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
+              />
+              <Badge color={preset.color}>{preset.protocol}</Badge>
+              {preset.experimental && (
+                <Badge className="bg-warn text-night">
+                  <AlertTriangle className="size-3" /> beta
+                </Badge>
+              )}
+            </div>
+            <div className="mt-0.5 truncate text-xs text-ink-faint">
+              {target.ingestUrl || "URL não definida"}
+            </div>
+          </div>
+          <Toggle checked={target.enabled} onChange={() => toggleTarget(target.id)} label="Ativar" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              removeTarget(target.id);
+              toast.info(`${target.name} saiu da corneta`);
+            }}
+            aria-label="Remover"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+
+        {isCustom && (
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
+            URL de ingestão
+            <Input
+              value={target.ingestUrl}
+              placeholder="rtmp://servidor/app  (rtmp://, rtmps:// ou srt://)"
+              onChange={(e) => updateTarget(target.id, { ingestUrl: e.target.value })}
+              className={urlInvalid ? "border-bad focus:border-bad" : undefined}
+            />
+            {urlInvalid && (
+              <span className="text-[11px] font-medium text-bad">
+                URL inválida — comece com rtmp://, rtmps:// ou srt://
+              </span>
+            )}
+          </label>
+        )}
+
+        <KeyField target={target} />
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <Button variant="subtle" size="sm" onClick={runTest} disabled={testing}>
+            <Wifi className="size-3.5" /> {testing ? "Testando…" : "Testar conexão"}
+          </Button>
+          {preset.keyUrl && (
+            <button
+              onClick={() => void openExternal(preset.keyUrl!)}
+              className="flex items-center gap-1 font-semibold text-brass hover:underline"
+            >
+              Pegar minha chave <ExternalLink className="size-3" />
+            </button>
+          )}
+          {testResult && (
+            <span className={cn("font-semibold", testResult.ok ? "text-ok" : "text-bad")}>
+              {testResult.ok ? "✓" : "✕"} {testResult.msg}
             </span>
           )}
-        </label>
-      )}
+        </div>
 
-      <KeyField target={target} />
-
-      {preset.note && <p className="text-xs text-ink-faint">{preset.note}</p>}
-    </Card>
+        {preset.note && <p className="text-xs text-ink-faint">{preset.note}</p>}
+      </Card>
+    </Reorder.Item>
   );
 }
 
@@ -215,6 +256,22 @@ function KeyField({ target }: { target: Target }) {
   const clearKey = useStore((s) => s.clearKey);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
+  const [reveal, setReveal] = useState(false);
+
+  const paste = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) setValue(t.trim());
+    } catch {
+      /* área de transferência bloqueada */
+    }
+  };
+  const save = async () => {
+    await setKey(target.id, value.trim());
+    setValue("");
+    setEditing(false);
+    toast.success("Chave guardada no cofre 🔒");
+  };
 
   if (target.hasKey && !editing) {
     return (
@@ -243,25 +300,28 @@ function KeyField({ target }: { target: Target }) {
       <div className="relative flex-1">
         <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
         <Input
-          type="password"
+          type={reveal ? "text" : "password"}
           autoFocus={editing}
-          className="pl-9"
+          className="pl-9 pr-9"
           placeholder="Cole aqui a stream key desta plataforma"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && value.trim() && void save()}
         />
+        <button
+          type="button"
+          onClick={() => setReveal((v) => !v)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+          aria-label={reveal ? "Ocultar" : "Mostrar"}
+          title={reveal ? "Ocultar" : "Mostrar"}
+        >
+          {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
       </div>
-      <Button
-        variant="primary"
-        size="sm"
-        disabled={!value.trim()}
-        onClick={async () => {
-          await setKey(target.id, value.trim());
-          setValue("");
-          setEditing(false);
-          toast.success("Chave guardada no cofre 🔒");
-        }}
-      >
+      <Button variant="subtle" size="sm" onClick={paste} title="Colar da área de transferência">
+        <ClipboardPaste className="size-4" /> Colar
+      </Button>
+      <Button variant="primary" size="sm" disabled={!value.trim()} onClick={save}>
         Salvar
       </Button>
       {editing && (

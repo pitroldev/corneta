@@ -103,6 +103,34 @@ pub fn autoconfigure(
     }
 }
 
+/// Liga (start=true) ou desliga a transmissão no OBS.
+pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<(), String> {
+    let mut socket = connect_identify(host, port, password)?;
+    let req_type = if start { "StartStream" } else { "StopStream" };
+    send_json(
+        &mut socket,
+        &json!({ "op": 6, "d": { "requestType": req_type, "requestId": "corneta-stream" } }),
+    )?;
+    let response = read_json(&mut socket)?;
+    let status = response.pointer("/d/requestStatus");
+    let ok = status
+        .and_then(|s| s.get("result"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let code = status
+        .and_then(|s| s.get("code"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let _ = socket.close(None);
+    // 604 = já transmitindo / 702 = não estava transmitindo → já está no estado desejado.
+    let already = if start { 604 } else { 702 };
+    if ok || code == already {
+        Ok(())
+    } else {
+        Err(format!("o OBS recusou {req_type}: {response}"))
+    }
+}
+
 /// Envia um request e devolve o `responseData`.
 fn request(socket: &mut Socket, req_type: &str, id: &str) -> Result<Value, String> {
     send_json(

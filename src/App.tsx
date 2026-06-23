@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useStore } from "./lib/store";
+import { api } from "./lib/api";
 import { Sidebar, type Screen } from "./components/Sidebar";
+
+const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "reports", "about", "settings"];
 import { TitleBar } from "./components/TitleBar";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
@@ -20,15 +23,39 @@ export default function App() {
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
   const bindChat = useStore((s) => s.bindChat);
-  const [screen, setScreen] = useState<Screen>("platforms");
+  const [screen, setScreen] = useState<Screen>(() => {
+    try {
+      const stored = localStorage.getItem("corneta.screen") as Screen | null;
+      return stored && SCREENS.includes(stored) ? stored : "platforms";
+    } catch {
+      return "platforms";
+    }
+  });
+  // D3: lembra a última tela aberta.
+  const navigate = (s: Screen) => {
+    setScreen(s);
+    try {
+      localStorage.setItem("corneta.screen", s);
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     void load();
     const unbind = bindEngine();
     const unbindChat = bindChat();
+    // C1: atalho global começar/parar (alterna conforme o estado atual).
+    const unbindShortcut = api.subscribeShortcut(() => {
+      const s = useStore.getState();
+      const st = s.snapshot.state;
+      if (st === "live" || st === "starting") void s.stop();
+      else void s.start();
+    });
     return () => {
       unbind();
       unbindChat();
+      unbindShortcut();
     };
   }, [load, bindEngine, bindChat]);
 
@@ -49,7 +76,7 @@ export default function App() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1">
-          <Sidebar screen={screen} onNavigate={setScreen} />
+          <Sidebar screen={screen} onNavigate={navigate} />
 
           <main className="relative flex-1 overflow-hidden">
             <SoundWaves className="pointer-events-none absolute -bottom-20 -right-16 size-80 text-brass/[0.05]" />
@@ -78,7 +105,7 @@ export default function App() {
       )}
 
       <Toaster />
-      <Onboarding onStart={() => setScreen("platforms")} />
+      <Onboarding onStart={() => navigate("platforms")} />
     </div>
   );
 }

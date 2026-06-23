@@ -29,6 +29,7 @@ interface State {
   updateTarget: (id: string, patch: Partial<Target>) => void;
   removeTarget: (id: string) => void;
   toggleTarget: (id: string) => void;
+  reorderTargets: (ordered: Target[]) => void;
 
   setMode: (mode: EncodingMode) => void;
   setIngest: (patch: Partial<IngestConfig>) => void;
@@ -161,6 +162,12 @@ export const useStore = create<State>((set, get) => {
       });
     },
 
+    reorderTargets(ordered) {
+      const config = get().config;
+      if (!config) return;
+      persist({ ...config, targets: ordered });
+    },
+
     setMode(mode) {
       const config = get().config;
       if (!config) return;
@@ -259,9 +266,24 @@ export const useStore = create<State>((set, get) => {
 
     async start() {
       await api.start();
+      // A1: liga o OBS junto (melhor-esforço — pode não estar acessível).
+      if (get().config?.settings.autoStartObs) {
+        try {
+          await api.obsSetStream(true);
+        } catch {
+          /* OBS sem obs-websocket → o usuário dá play manualmente */
+        }
+      }
     },
 
     async stop() {
+      if (get().config?.settings.autoStartObs) {
+        try {
+          await api.obsSetStream(false);
+        } catch {
+          /* ignore */
+        }
+      }
       await api.stop();
     },
 

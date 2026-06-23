@@ -196,6 +196,12 @@ fn emit(app: &AppHandle, snap: &EngineSnapshot) {
     update_tray(app, snap);
 }
 
+/// Notificação nativa do SO (entrou no ar / destino caiu).
+fn notify(app: &AppHandle, title: &str, body: &str) {
+    use tauri_plugin_notification::NotificationExt;
+    let _ = app.notification().builder().title(title).body(body).show();
+}
+
 fn fmt_mbps(kbps: u32) -> String {
     if kbps >= 1000 {
         format!("{:.1} Mbps", kbps as f64 / 1000.0)
@@ -314,10 +320,15 @@ fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
             return;
         }
         if let Some(st) = snap.targets.get_mut(target_id) {
+            let was = st.state.clone();
+            let name = st.name.clone();
             st.state = "reconnecting".into();
             let out = snap.clone();
             drop(eng);
             emit(app, &out);
+            if was != "reconnecting" {
+                notify(app, "Destino caiu", &format!("{name} — reconectando…"));
+            }
         }
     }
 }
@@ -534,9 +545,13 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
+    let was_starting = snap.state == "starting";
     let Some(st) = snap.targets.get_mut(target_id) else {
         return;
     };
+    let prev_target = st.state.clone();
+    let name = st.name.clone();
+    let mut err_msg = None;
 
     if is_stats {
         st.state = "live".into();
@@ -555,12 +570,23 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
     } else {
         let (state, msg) = friendly_error(&low);
         st.state = state.into();
+        if state == "error" {
+            err_msg = Some(msg.clone());
+        }
         st.message = Some(msg);
     }
 
     let out = snap.clone();
     drop(eng);
     emit(app, &out);
+
+    if is_stats && was_starting {
+        notify(app, "Corneta no ar 📣", "Sua transmissão começou.");
+    } else if let Some(msg) = err_msg {
+        if prev_target != "error" {
+            notify(app, "Destino com erro", &format!("{name}: {msg}"));
+        }
+    }
 }
 
 /// Lê a utilização da GPU NVIDIA (%) via nvidia-smi. None se não houver NVIDIA.
@@ -719,5 +745,89 @@ pub fn open_chat_window(app: AppHandle) -> Result<(), String> {
     .always_on_top(true)
     .build()
     .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ------------------- UX: OBS junto, testes, atalhos, logs -------------------
+
+/// Liga/desliga a transmissão no OBS junto com o BORA AO VIVO (melhor-esforço).
+#[tauri::command]
+pub async fn obs_set_stream(app: AppHandle, start: bool) -> Result<(), String> {
+    let password = get_config(app).settings.obs_password;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::set_stream("127.0.0.1", 4455, &password, start)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?
+}
+
+/// Testa o ALCANCE do servidor de ingestão (TCP). Não valida a chave — só uma live real valida.
+fn tcp_reach(ingest_url: &str) -> Result<String, String> {
+    if ingest_url.starts_with("srt") {
+        return Ok("SRT (UDP) — teste de alcance indisponível".into());
+    }
+    let after = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
+    let hostport = after.split('/').next().unwrap_or("");
+    let (host, port) = match hostport.rsplit_once(':') {
+        Some((h, p)) => (h.to_string(), p.parse::<u16>().unwrap_or(1935)),
+        None => {
+            let default = if ingest_url.starts_with("rtmps") { 443 } else { 1935 };
+            (hostport.to_string(), default)
+        }
+    };
+    if host.is_empty() {
+        return Err("URL de ingestão inválida".into());
+    }
+    use std::net::ToSocketAddrs;
+    let addr = format!("{host}:{port}")
+        .to_socket_addrs()
+        .map_err(|_| format!("não resolvi {host}"))?
+        .next()
+        .ok_or_else(|| format!("endereço não resolvido: {host}"))?;
+    match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(5)) {
+        Ok(_) => Ok(format!("{host} alcançável")),
+        Err(_) => Err(format!("sem resposta de {host}:{port}")),
+    }
+}
+
+#[tauri::command]
+pub async fn test_target(app: AppHandle, target_id: String) -> Result<String, String> {
+    let cfg = get_config(app);
+    let t = cfg
+        .targets
+        .into_iter()
+        .find(|t| t.id == target_id)
+        .ok_or("destino não encontrado")?;
+    let url = t.ingest_url;
+    tauri::async_runtime::spawn_blocking(move || tcp_reach(&url))
+        .await
+        .map_err(|e| format!("join: {e}"))?
+}
+
+#[tauri::command]
+pub fn open_logs_dir(app: AppHandle) -> Result<(), String> {
+    let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&dir);
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    }
+    Ok(())
+}
+
+/// (Re)registra o atalho global de começar/parar.
+#[tauri::command]
+pub fn register_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    let sc = shortcut.trim();
+    if !sc.is_empty() {
+        gs.register(sc).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }

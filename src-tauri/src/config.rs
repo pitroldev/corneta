@@ -59,6 +59,12 @@ pub struct Settings {
     /// Senha do obs-websocket (vazio = sem autenticação). Usada no auto-config do OBS.
     #[serde(default)]
     pub obs_password: String,
+    /// Ligar/parar o OBS junto com o BORA AO VIVO (via obs-websocket).
+    #[serde(default = "default_true")]
+    pub auto_start_obs: bool,
+    /// Atalho global pra começar/parar (acelerador do Tauri).
+    #[serde(default = "default_live_shortcut")]
+    pub live_shortcut: String,
     /// Chat: API key do YouTube Data API v3 (compartilhada entre as fontes do YouTube).
     #[serde(default)]
     pub youtube_api_key: String,
@@ -81,6 +87,9 @@ pub struct Settings {
 fn default_true() -> bool {
     true
 }
+fn default_live_shortcut() -> String {
+    "CommandOrControl+Alt+L".to_string()
+}
 
 /// Uma fonte de chat (um canal de uma plataforma).
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -100,6 +109,8 @@ impl Default for Settings {
             minimize_to_tray: true,
             autostart: false,
             obs_password: String::new(),
+            auto_start_obs: true,
+            live_shortcut: default_live_shortcut(),
             youtube_api_key: String::new(),
             chat_sources: Vec::new(),
             chat_show_emotes: true,

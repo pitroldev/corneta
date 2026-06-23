@@ -80,7 +80,11 @@ export function GoLiveScreen() {
   const onStart = async () => {
     try {
       await start();
-      toast.success("Servidor no ar! Agora é só dar play no OBS 📣");
+      toast.success(
+        config.settings.autoStartObs
+          ? "No ar! Se o OBS não começar sozinho, dê play nele 📣"
+          : "Servidor no ar! Agora é só dar play no OBS 📣"
+      );
     } catch (e) {
       toast.error(`Não rolou: ${e}`);
     }

@@ -1,8 +1,10 @@
-import { type ReactNode } from "react";
-import { MonitorCog, Plug, Server } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { FileText, Keyboard, MonitorCog, Plug, Server } from "lucide-react";
 import { useStore } from "../lib/store";
+import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
-import { Card, Input, SectionTitle, Toggle } from "../components/ui";
+import { cn } from "../lib/utils";
+import { Button, Card, Input, SectionTitle, Toggle } from "../components/ui";
 
 export function SettingsScreen() {
   const config = useStore((s) => s.config);
@@ -76,6 +78,35 @@ export function SettingsScreen() {
             onChange={(e) => setSettings({ obsPassword: e.target.value })}
           />
         </label>
+        <div className="mt-2 border-t border-border-soft">
+          <SettingRow
+            title="Ligar o OBS junto"
+            desc="No BORA AO VIVO, a Corneta também manda o OBS começar a transmitir (precisa do obs-websocket)."
+          >
+            <Toggle
+              checked={settings.autoStartObs}
+              onChange={(v) => setSettings({ autoStartObs: v })}
+              label="Ligar o OBS junto"
+            />
+          </SettingRow>
+        </div>
+      </Card>
+
+      {/* Atalho global */}
+      <Card className="mb-4">
+        <h3 className="mb-1 flex items-center gap-2 text-lg">
+          <Keyboard className="size-5 text-brass" /> Atalho global
+        </h3>
+        <p className="mb-3 text-xs text-ink-faint">
+          Começa/para a transmissão de qualquer lugar — mesmo com a Corneta minimizada na bandeja.
+        </p>
+        <ShortcutCapture
+          value={settings.liveShortcut}
+          onChange={(v) => {
+            setSettings({ liveShortcut: v });
+            void api.registerShortcut(v);
+          }}
+        />
       </Card>
 
       {/* Comportamento */}
@@ -104,9 +135,51 @@ export function SettingsScreen() {
               label="Abrir com o Windows"
             />
           </SettingRow>
+          <SettingRow
+            title="Logs"
+            desc="Abre a pasta de logs — útil pra diagnosticar ou mandar pro suporte."
+          >
+            <Button variant="subtle" size="sm" onClick={() => void api.openLogsDir()}>
+              <FileText className="size-4" /> Abrir logs
+            </Button>
+          </SettingRow>
         </div>
       </Card>
     </div>
+  );
+}
+
+/** Captura um atalho global: clica e pressiona a combinação (exige um modificador). */
+function ShortcutCapture({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [capturing, setCapturing] = useState(false);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (!capturing) return;
+    e.preventDefault();
+    const k = e.key;
+    if (["Control", "Alt", "Shift", "Meta", "OS"].includes(k)) return;
+    const parts: string[] = [];
+    if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    if (parts.length === 0) return; // exige ao menos um modificador
+    parts.push(k.length === 1 ? k.toUpperCase() : k);
+    onChange(parts.join("+"));
+    setCapturing(false);
+  };
+
+  return (
+    <button
+      onClick={() => setCapturing(true)}
+      onBlur={() => setCapturing(false)}
+      onKeyDown={onKey}
+      className={cn(
+        "rounded-md border-2 px-3 py-2 font-mono text-sm transition-colors",
+        capturing ? "border-brass text-brass" : "border-border text-ink hover:border-brass/60"
+      )}
+    >
+      {capturing ? "pressione as teclas…" : value || "definir atalho"}
+    </button>
   );
 }
 

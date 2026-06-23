@@ -47,6 +47,12 @@ export interface CornetaApi {
     onStatus: (s: ChatStatus) => void,
     onDelete: (d: ChatDelete) => void
   ): () => void;
+  // UX
+  obsSetStream(start: boolean): Promise<void>;
+  testTarget(targetId: string): Promise<string>;
+  openLogsDir(): Promise<void>;
+  registerShortcut(shortcut: string): Promise<void>;
+  subscribeShortcut(cb: () => void): () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +145,29 @@ function tauriApi(): CornetaApi {
         void listen<ChatDelete>("chat://delete", (e) => onDelete(e.payload)).then((u) => uns.push(u));
       });
       return () => uns.forEach((u) => u());
+    },
+    async obsSetStream(start) {
+      const { invoke } = await core();
+      await invoke("obs_set_stream", { start });
+    },
+    async testTarget(targetId) {
+      const { invoke } = await core();
+      return invoke<string>("test_target", { targetId });
+    },
+    async openLogsDir() {
+      const { invoke } = await core();
+      await invoke("open_logs_dir");
+    },
+    async registerShortcut(shortcut) {
+      const { invoke } = await core();
+      await invoke("register_shortcut", { shortcut });
+    },
+    subscribeShortcut(cb) {
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen("shortcut://toggle-live", () => cb()).then((u) => (unlisten = u))
+      );
+      return () => unlisten?.();
     },
   };
 }
@@ -538,6 +567,21 @@ function mockApi(): CornetaApi {
         chatStatusListeners.delete(onStatus);
         chatDeleteListeners.delete(onDelete);
       };
+    },
+    async obsSetStream() {
+      // no-op no navegador (sem OBS).
+    },
+    async testTarget() {
+      return "demo: alcançável";
+    },
+    async openLogsDir() {
+      // no-op no navegador.
+    },
+    async registerShortcut() {
+      // no-op no navegador (atalho global é do SO).
+    },
+    subscribeShortcut() {
+      return () => {};
     },
   };
 }

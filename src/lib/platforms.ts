@@ -23,6 +23,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     ingestUrl: "rtmp://live.twitch.tv/app",
     recommended: p(1920, 1080, 60, 6000, 160),
     note: "Limite prático ~6000 kbps (não-parceiros). Há ingests regionais.",
+    keyUrl: "https://dashboard.twitch.tv/settings/stream",
   },
   youtube: {
     id: "youtube",
@@ -32,6 +33,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     ingestUrl: "rtmp://a.rtmp.youtube.com/live2",
     recommended: p(1920, 1080, 60, 9000, 192),
     note: "Aceita bitrate alto. Keyframe a cada 2 s (máx 4 s).",
+    keyUrl: "https://studio.youtube.com/channel/live/streaming",
   },
   facebook: {
     id: "facebook",
@@ -41,6 +43,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     ingestUrl: "rtmps://live-api-s.facebook.com:443/rtmp",
     recommended: p(1280, 720, 30, 4000, 128),
     note: "Exige RTMPS (TLS). RTMP puro foi descontinuado.",
+    keyUrl: "https://www.facebook.com/live/producer",
   },
   kick: {
     id: "kick",
@@ -50,6 +53,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     ingestUrl: "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
     recommended: p(1920, 1080, 60, 6000, 160),
     note: "Pega a URL/chave exatas no painel do criador.",
+    keyUrl: "https://kick.com/dashboard/settings/stream",
   },
   tiktok: {
     id: "tiktok",

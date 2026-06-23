@@ -34,6 +34,8 @@ export function defaultConfig(): AppConfig {
       minimizeToTray: true,
       autostart: false,
       obsPassword: "",
+      autoStartObs: true,
+      liveShortcut: "CommandOrControl+Alt+L",
       youtubeApiKey: "",
       chatSources: [],
       chatShowEmotes: true,

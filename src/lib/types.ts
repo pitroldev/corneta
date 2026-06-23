@@ -51,6 +51,8 @@ export interface PlatformPreset {
   recommended: VideoPreset;
   /** Observações didáticas exibidas na UI. */
   note?: string;
+  /** Página do painel onde o usuário pega a stream key. */
+  keyUrl?: string;
   /** Plataforma cuja chave não é auto-serviço / suporte experimental. */
   experimental?: boolean;
 }
@@ -93,6 +95,10 @@ export interface AppSettings {
   autostart: boolean;
   /** Senha do obs-websocket (vazio = sem auth). */
   obsPassword: string;
+  /** Ligar/parar o OBS junto com o BORA AO VIVO. */
+  autoStartObs: boolean;
+  /** Atalho global pra começar/parar (acelerador do Tauri). */
+  liveShortcut: string;
   /** Chat: API key do YouTube Data API v3 (compartilhada entre as fontes do YouTube). */
   youtubeApiKey: string;
   /** Chat: fontes (várias por plataforma). */
