@@ -491,7 +491,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 while let Some(ev) = rx.recv().await {
                     match ev {
                         CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
-                            update_target_metrics(&app_t, &target_id, &String::from_utf8_lossy(&b));
+                            update_target_metrics(
+                                &app_t,
+                                &target_id,
+                                &String::from_utf8_lossy(&b),
+                                signal.load(Ordering::Relaxed),
+                            );
                         }
                         CommandEvent::Terminated(_) => break,
                         _ => {}
@@ -660,7 +665,7 @@ fn friendly_error(low: &str) -> (&'static str, String) {
 }
 
 /// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
-fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
+fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signal: bool) {
     let is_stats = line.contains("frame=") || line.contains("bitrate=");
     let low = line.to_lowercase();
     const ERR_KEYS: [&str; 8] = [
@@ -678,11 +683,15 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
 
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
+    let was_starting = matches!(eng.snapshot.as_ref().map(|s| s.state.as_str()), Some("starting"));
+    // O cronômetro "no ar" começa quando o sinal real chega — não no clique de BORA.
+    if is_stats && was_starting {
+        eng.started_ms = now_ms();
+    }
     let started = eng.started_ms;
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
-    let was_starting = snap.state == "starting";
     let Some(st) = snap.targets.get_mut(target_id) else {
         return;
     };
@@ -691,6 +700,9 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
     let mut err_msg = None;
 
     if is_stats {
+        if was_starting {
+            snap.started_at = Some(started);
+        }
         st.state = "live".into();
         st.message = None;
         st.uptime_sec = (now_ms().saturating_sub(started) as f64) / 1000.0;
@@ -704,10 +716,14 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str) {
             st.dropped_frames = d;
         }
         snap.state = "live".into();
+    } else if !has_signal {
+        // OBS ainda não publicou: é falta de sinal, não erro do destino.
+        st.state = "waiting".into();
+        st.message = None;
     } else {
-        let (state, msg) = friendly_error(&low);
-        st.state = state.into();
-        if state == "error" {
+        let (estate, msg) = friendly_error(&low);
+        st.state = estate.into();
+        if estate == "error" {
             err_msg = Some(msg.clone());
         }
         st.message = Some(msg);

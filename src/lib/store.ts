@@ -68,6 +68,10 @@ interface State {
   alerts: Alert[];
   bindAlerts: () => () => void;
   clearAlerts: () => void;
+
+  // UI: pedido de foco no botão de ir ao vivo (vindo da sidebar)
+  goLiveFocus: boolean;
+  setGoLiveFocus: (v: boolean) => void;
 }
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
@@ -378,6 +382,11 @@ export const useStore = create<State>((set, get) => {
     },
     clearAlerts() {
       set({ alerts: [] });
+    },
+
+    goLiveFocus: false,
+    setGoLiveFocus(v) {
+      set({ goLiveFocus: v });
     },
   };
 });

@@ -27,6 +27,7 @@ export function Sidebar({
   onNavigate: (s: Screen) => void;
 }) {
   const state = useStore((s) => s.snapshot.state);
+  const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border-soft bg-panel p-4">
@@ -122,29 +123,50 @@ export function Sidebar({
         </button>
 
         {state === "live" ? (
-          <div className="flex -rotate-1 items-center gap-2 rounded-md bg-tomate px-3 py-2.5 text-white pop">
+          <button
+            onClick={() => onNavigate("golive")}
+            title="Ver o painel ao vivo"
+            className="flex w-full -rotate-1 items-center gap-2 rounded-md bg-tomate px-3 py-2.5 text-left text-white pop transition-transform hover:scale-[1.02]"
+          >
             <span className="size-2.5 rounded-full bg-white live-dot" />
             <span className="font-display text-sm font-extrabold uppercase tracking-wide">
               No ar · cornetando
             </span>
-          </div>
+          </button>
         ) : state === "starting" ? (
-          <div className="flex items-center gap-2 rounded-md bg-brass/15 px-3 py-2.5 text-brass">
+          <button
+            onClick={() => onNavigate("golive")}
+            title="Ver o painel ao vivo"
+            className="flex w-full items-center gap-2 rounded-md bg-brass/15 px-3 py-2.5 text-left text-brass transition-transform hover:translate-x-0.5"
+          >
             <span className="size-2.5 rounded-full bg-brass animate-pulse" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">
               Aguardando OBS
             </span>
-          </div>
+          </button>
         ) : state === "error" ? (
-          <div className="flex items-center gap-2 rounded-md bg-bad/15 px-3 py-2.5 text-bad">
+          <button
+            onClick={() => onNavigate("golive")}
+            title="Ver o painel ao vivo"
+            className="flex w-full items-center gap-2 rounded-md bg-bad/15 px-3 py-2.5 text-left text-bad transition-transform hover:translate-x-0.5"
+          >
             <span className="size-2.5 rounded-full bg-bad" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">Erro</span>
-          </div>
+          </button>
         ) : (
-          <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2.5">
+          <button
+            onClick={() => {
+              setGoLiveFocus(true);
+              onNavigate("golive");
+            }}
+            title="Ir pro Ao vivo e começar"
+            className="group flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2.5 text-left transition-transform hover:translate-x-0.5"
+          >
             <span className="size-2.5 rounded-full bg-ink-faint" />
-            <span className="text-sm font-semibold text-ink-muted">Fora do ar</span>
-          </div>
+            <span className="text-sm font-semibold text-ink-muted group-hover:text-ink">
+              Fora do ar
+            </span>
+          </button>
         )}
       </div>
     </aside>

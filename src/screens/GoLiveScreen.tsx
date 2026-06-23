@@ -42,6 +42,8 @@ export function GoLiveScreen() {
   const stop = useStore((s) => s.stop);
   const uploadMbps = useStore((s) => s.uploadMbps);
   const runUploadTest = useStore((s) => s.runUploadTest);
+  const goLiveFocus = useStore((s) => s.goLiveFocus);
+  const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
 
   const state = snapshot.state;
   const live = state === "live";
@@ -60,6 +62,19 @@ export function GoLiveScreen() {
     }
     prevState.current = state;
   }, [state]);
+
+  // QoL: ao vir da sidebar ("fora do ar"), rola até o botão de ir ao vivo.
+  const boraRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!goLiveFocus) return;
+    setGoLiveFocus(false);
+    const id = setTimeout(
+      () => boraRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      80
+    );
+    return () => clearTimeout(id);
+  }, [goLiveFocus, setGoLiveFocus]);
+
   const est = estimate(config);
   const neededMbps = est.uploadKbps / 1000;
 
@@ -239,7 +254,7 @@ export function GoLiveScreen() {
 
       {!live && !starting && <Checkup />}
 
-      <div className="mb-5">
+      <div ref={boraRef} className="mb-5">
         {starting ? (
           <Button
             variant="outline"
@@ -281,7 +296,7 @@ export function GoLiveScreen() {
 
       {(live || starting) && (
         <div className="mb-2 flex items-center justify-between gap-3">
-          <LiveTimer startedAt={snapshot.startedAt} />
+          <LiveTimer startedAt={snapshot.startedAt} live={live} />
           <Button variant="subtle" size="sm" onClick={onMark} title="Cravar um marcador no relatório">
             <MapPin className="size-4" /> Marcar momento
           </Button>
@@ -383,12 +398,23 @@ export function GoLiveScreen() {
   );
 }
 
-function LiveTimer({ startedAt }: { startedAt: number | null }) {
+function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolean }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  // Enquanto não chega sinal de ingestão, o cronômetro não corre.
+  if (!live) {
+    return (
+      <div className="flex items-center gap-2 text-info">
+        <span className="size-2.5 rounded-full bg-info animate-pulse" />
+        <span className="font-display text-sm font-bold uppercase tracking-wide">
+          Aguardando sinal do OBS…
+        </span>
+      </div>
+    );
+  }
   const secs = startedAt ? (now - startedAt) / 1000 : 0;
   return (
     <div className="flex items-center gap-2">
