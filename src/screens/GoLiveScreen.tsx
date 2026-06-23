@@ -64,14 +64,15 @@ export function GoLiveScreen() {
   }, [state]);
 
   // QoL: ao vir da sidebar ("fora do ar"), rola até o botão de ir ao vivo.
+  // Importante: só consome a flag DEPOIS de rolar — se zerar antes, o re-render
+  // dispara a limpeza do effect e cancela o setTimeout do scroll.
   const boraRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!goLiveFocus) return;
-    setGoLiveFocus(false);
-    const id = setTimeout(
-      () => boraRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      80
-    );
+    const id = setTimeout(() => {
+      boraRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setGoLiveFocus(false);
+    }, 140);
     return () => clearTimeout(id);
   }, [goLiveFocus, setGoLiveFocus]);
 
