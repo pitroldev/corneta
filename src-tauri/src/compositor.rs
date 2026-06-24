@@ -161,7 +161,8 @@ pub async fn run_compositor(
                     a.auto = true;
                     a.regions = regions;
                 }
-                std::thread::sleep(Duration::from_millis(40));
+                // Cap ~3×/s: detecta vazamento novo em ~0.35s (o backfill cobre) e poupa GPU.
+                std::thread::sleep(Duration::from_millis(250));
             }
         });
     }

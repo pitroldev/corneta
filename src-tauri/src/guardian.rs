@@ -360,7 +360,8 @@ pub(crate) fn ocr_scan(jpeg: &[u8], watchlist: &[String]) -> (Vec<Leak>, Vec<Reg
     }
 }
 
-/// OCR + regras num frame CINZA cru (encoda JPEG e reusa o OCR). Pra o compositor detectar.
+/// OCR + regras num frame CINZA cru. ENCOLHE pra ~720p antes do OCR (custo de CPU/GPU bem menor;
+/// as caixas são FRAÇÕES → a resolução não muda a posição), encoda JPEG e reusa o OCR.
 pub(crate) fn ocr_scan_gray(
     gray: &[u8],
     w: usize,
@@ -370,8 +371,15 @@ pub(crate) fn ocr_scan_gray(
     let Some(img) = image::GrayImage::from_raw(w as u32, h as u32, gray.to_vec()) else {
         return (vec![], vec![]);
     };
+    // OCR não precisa de 1080p — 1280 de largura já lê o que importa, com ~metade do custo.
+    let small = if w > 1280 {
+        let nh = (h * 1280 / w) as u32;
+        image::imageops::resize(&img, 1280, nh, image::imageops::FilterType::Triangle)
+    } else {
+        img
+    };
     let mut jpeg = Vec::new();
-    if img
+    if small
         .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
         .is_err()
     {
