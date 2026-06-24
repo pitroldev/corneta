@@ -254,19 +254,42 @@ async fn zmq_send(sock: &mut zeromq::ReqSocket, cmd: &str) -> bool {
     sock.recv().await.is_ok()
 }
 
-/// Posiciona (ou esconde, com None) a tarja `i` via comandos drawbox no protetor.
-async fn set_box(sock: &mut zeromq::ReqSocket, i: usize, r: Option<Region>) -> bool {
-    match r {
-        // Mostra: tamanho e posição (x por ÚLTIMO → não pisca em lugar errado ao surgir).
-        Some((fx, fy, fw, fh)) => {
-            zmq_send(sock, &format!("drawbox@b{i} w iw*{fw:.4}")).await
-                && zmq_send(sock, &format!("drawbox@b{i} h ih*{fh:.4}")).await
-                && zmq_send(sock, &format!("drawbox@b{i} y ih*{fy:.4}")).await
-                && zmq_send(sock, &format!("drawbox@b{i} x iw*{fx:.4}")).await
-        }
-        // Esconde: joga pra FORA da tela. (NÃO usar w=0 — no drawbox isso vira TELA INTEIRA!)
-        None => zmq_send(sock, &format!("drawbox@b{i} x -99999")).await,
+/// Arredonda as frações pra uma grade ~0.5% — ignora o jitter do OCR (evita comando à toa).
+fn round_region(r: Region) -> Region {
+    let q = |v: f32| (v.clamp(-1.0, 2.0) * 200.0).round() / 200.0;
+    (q(r.0), q(r.1), q(r.2), q(r.3))
+}
+
+/// Mostra a tarja do zero: w, h, y, x (x por ÚLTIMO → não pisca em lugar errado). 4 comandos.
+async fn show_box(sock: &mut zeromq::ReqSocket, i: usize, r: Region) -> bool {
+    zmq_send(sock, &format!("drawbox@b{i} w iw*{:.4}", r.2)).await
+        && zmq_send(sock, &format!("drawbox@b{i} h ih*{:.4}", r.3)).await
+        && zmq_send(sock, &format!("drawbox@b{i} y ih*{:.4}", r.1)).await
+        && zmq_send(sock, &format!("drawbox@b{i} x iw*{:.4}", r.0)).await
+}
+
+/// Move a tarja mandando SÓ os params que mudaram (scroll = só y → 1 comando ~30ms).
+/// O filtro zmq processa ~1 comando/frame, então cada comando a menos = ~30ms a menos de atraso.
+async fn move_box(sock: &mut zeromq::ReqSocket, i: usize, old: Region, new: Region) -> bool {
+    let mut ok = true;
+    if old.2 != new.2 {
+        ok &= zmq_send(sock, &format!("drawbox@b{i} w iw*{:.4}", new.2)).await;
     }
+    if ok && old.3 != new.3 {
+        ok &= zmq_send(sock, &format!("drawbox@b{i} h ih*{:.4}", new.3)).await;
+    }
+    if ok && old.1 != new.1 {
+        ok &= zmq_send(sock, &format!("drawbox@b{i} y ih*{:.4}", new.1)).await;
+    }
+    if ok && old.0 != new.0 {
+        ok &= zmq_send(sock, &format!("drawbox@b{i} x iw*{:.4}", new.0)).await;
+    }
+    ok
+}
+
+/// Esconde: joga pra FORA da tela. (NÃO usar w=0 — no drawbox isso vira TELA INTEIRA!)
+async fn hide_box(sock: &mut zeromq::ReqSocket, i: usize) -> bool {
+    zmq_send(sock, &format!("drawbox@b{i} x -99999")).await
 }
 
 /// Guardião: OCR local nos frames + comanda as tarjas do PROTETOR via zmq (sem reiniciar nada).
@@ -281,6 +304,8 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
     let mut tick = 0u32;
     let mut auto = false;
     let mut watchlist: Vec<String> = vec![];
+    // Última região enviada PRA CADA box (arredondada) — base do envio por DELTA.
+    let mut shown: Vec<Option<Region>> = vec![None; n];
     let frame_path = crate::commands::guard_frame_path(&app);
 
     loop {
@@ -312,7 +337,9 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
                 Ok(Ok(())) => {
                     log::info!("guardião: zmq conectado no protetor");
                     sock = Some(s);
+                    // Protetor (re)começa com os boxes escondidos → zera o estado conhecido.
                     censoring = false;
+                    shown = vec![None; n];
                 }
                 _ => continue, // protetor ainda não pronto; tenta na próxima volta
             }
@@ -341,49 +368,62 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
             }
         }
 
+        // Estado DESEJADO das tarjas nesta varredura (uma por segredo; resto escondido).
+        let desired: Vec<Option<Region>> = if auto && !regions.is_empty() {
+            misses = 0;
+            (0..n)
+                .map(|i| regions.get(i).copied().map(round_region))
+                .collect()
+        } else if auto && censoring {
+            // Sumiu da tela: segura ~2 varreduras (anti-flicker) antes de liberar.
+            misses += 1;
+            if misses >= 2 {
+                misses = 0;
+                vec![None; n]
+            } else {
+                shown.clone() // mantém onde está → 0 comandos
+            }
+        } else {
+            vec![None; n] // modo "avisar", ou nada na tela e já liberado
+        };
+
+        // Aplica só o DELTA: manda só o que mudou (é isso que deixa rápido — 24 cmds → 1-2).
         let mut dead = false;
         {
             let socket = sock.as_mut().unwrap();
-            if !auto {
-                // Modo "só avisar": garante as tarjas escondidas.
-                if censoring {
-                    for i in 0..n {
-                        let _ = set_box(socket, i, None).await;
-                    }
-                    censoring = false;
-                    let _ = app.emit("leak://censor", false);
+            for i in 0..n {
+                if dead {
+                    break;
                 }
-            } else if !regions.is_empty() {
-                // Posiciona uma tarja por segredo (acompanha — só comandos, sem reiniciar nada).
-                misses = 0;
-                let mut ok = true;
-                for i in 0..n {
-                    ok &= set_box(socket, i, regions.get(i).copied()).await;
-                }
-                if !ok {
+                let ok = match (shown[i], desired[i]) {
+                    (a, b) if a == b => true,                              // igual → 0 comandos
+                    (_, None) => hide_box(socket, i).await,                // esconder
+                    (None, Some(r)) => show_box(socket, i, r).await,       // surgir (4)
+                    (Some(o), Some(r)) => move_box(socket, i, o, r).await, // mover (só delta)
+                };
+                if ok {
+                    shown[i] = desired[i];
+                } else {
                     dead = true;
-                } else if !censoring {
-                    censoring = true;
-                    let _ = app.emit("leak://censor", true);
-                    log::warn!("guardião: CENSURA (tarja) — {} região(ões)", regions.len());
-                }
-            } else if censoring {
-                // Nada na tela: depois de ~2 varreduras limpas, esconde as tarjas.
-                misses += 1;
-                if misses >= 2 {
-                    for i in 0..n {
-                        let _ = set_box(socket, i, None).await;
-                    }
-                    censoring = false;
-                    misses = 0;
-                    let _ = app.emit("leak://censor", false);
-                    log::info!("guardião: censura liberada (segredo saiu)");
                 }
             }
         }
         if dead {
             log::warn!("guardião: zmq caiu — reconectando");
             sock = None;
+            continue;
+        }
+
+        // Banner + log só na TRANSIÇÃO (censurando ↔ liberado).
+        let now = shown.iter().any(|s| s.is_some());
+        if now != censoring {
+            censoring = now;
+            let _ = app.emit("leak://censor", now);
+            if now {
+                log::warn!("guardião: CENSURA (tarja) — {} região(ões)", regions.len());
+            } else {
+                log::info!("guardião: censura liberada (segredo saiu)");
+            }
         }
     }
 }
