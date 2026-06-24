@@ -14,8 +14,9 @@ use tauri::AppHandle;
 
 /// Largura-alvo do OCR. 1280 ainda lê texto pequeno com bem menos custo que 1080p.
 const OCR_TARGET_W: u32 = 1280;
-/// Limite da detecção (lado maior). Menor = detecção mais rápida e menos caixas (~17% medido).
-const DET_LIMIT: u32 = 640;
+/// Limite da detecção (lado maior). 960 lê texto MENOR (nomes em feed tipo LinkedIn) sem detonar
+/// a velocidade — e o delay de 12s absorve o custo extra.
+const DET_LIMIT: u32 = 960;
 
 /// Encolhe o plano de cinza pra ~`OCR_TARGET_W` de largura (no-op se já for menor).
 fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {

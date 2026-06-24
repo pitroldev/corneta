@@ -74,10 +74,45 @@ fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
     prev[b.len()] <= max_d
 }
 
-/// O termo aparece no texto do OCR? Casa por TOKEN (tolera espaço/pontuação/ordem) e por
-/// proximidade (1 erro de OCR em tokens distintivos). Recall alto de propósito — é dado do usuário.
+/// O `needle` aparece no `hay` como SUBSTRING dentro de `max_k` edições, começando em QUALQUER
+/// posição? (Levenshtein com a 1ª linha zerada → o casamento pode começar em qualquer ponto do
+/// hay.) Pega o nome/endereço lido com 1-2 erros de OCR em qualquer lugar, na ordem.
+fn fuzzy_contains(needle: &str, hay: &str, max_k: usize) -> bool {
+    let n: Vec<char> = needle.chars().collect();
+    let h: Vec<char> = hay.chars().collect();
+    if n.is_empty() {
+        return true;
+    }
+    let mut prev = vec![0usize; h.len() + 1]; // i=0: casar needle vazio = 0 em qualquer coluna
+    for (i, &nc) in n.iter().enumerate() {
+        let mut cur = vec![0usize; h.len() + 1];
+        cur[0] = i + 1; // needle[..i+1] vs hay vazio = i+1 inserções
+        let mut row_min = cur[0];
+        for (j, &hc) in h.iter().enumerate() {
+            let cost = usize::from(nc != hc);
+            cur[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(cur[j] + 1);
+            row_min = row_min.min(cur[j + 1]);
+        }
+        if row_min > max_k {
+            return false; // nenhuma continuação cabe no orçamento
+        }
+        prev = cur;
+    }
+    prev.iter().any(|&c| c <= max_k)
+}
+
+/// O termo aparece no texto do OCR? (1) frase inteira por substring FUZZY (pega erro de OCR em
+/// qualquer ponto, na ordem — caso comum: nome/endereço); (2) fallback por TOKEN (reordenado/
+/// separado). Recall alto de propósito — é dado do usuário.
 fn matches_term(term: &str, hay: &str, hay_words: &[&str]) -> bool {
-    let toks: Vec<String> = normalize(term)
+    let phrase = normalize(term);
+    let plen = phrase.chars().count();
+    // Orçamento de erro ∝ tamanho (≥6 chars). Termo curto exige exato (senão casa qualquer coisa).
+    let max_k = if plen >= 6 { (plen / 6).clamp(1, 3) } else { 0 };
+    if fuzzy_contains(&phrase, hay, max_k) {
+        return true;
+    }
+    let toks: Vec<String> = phrase
         .split_whitespace()
         .filter(|w| w.chars().count() >= 3)
         .map(String::from)
@@ -216,6 +251,15 @@ mod tests {
         // OCR leu "Cardozo" (s→z) — fuzzy ≤1 ainda casa "Cardoso" (token distintivo).
         let leaks = find_watchlist("usuario: Petro Cardozo, online", &["Petro Cardoso".into()]);
         assert_eq!(leaks.len(), 1);
+    }
+
+    #[test]
+    fn casa_nome_com_dois_erros_de_ocr() {
+        // OCR leu "Cordosa" (2 erros: a→o, o→a) — a frase fuzzy ainda casa "Petro Cardoso".
+        let leaks = find_watchlist("perfil de Petro Cordosa no feed", &["Petro Cardoso".into()]);
+        assert_eq!(leaks.len(), 1);
+        // Mas um nome totalmente diferente NÃO casa (sem falso-positivo).
+        assert!(find_watchlist("perfil de Joana Ferreira", &["Petro Cardoso".into()]).is_empty());
     }
 
     #[test]
