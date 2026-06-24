@@ -337,8 +337,10 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
         concat!(
             "logLevel: info\n",
             "logDestinations: [stdout]\n",
-            // Folga de buffer: evita derrubar leitor que atrasa um pouco (ex.: o protetor re-encodando).
-            "writeQueueSize: 2048\n",
+            // Folga de buffer + timeouts generosos: evita derrubar leitor/publisher que atrase um pouco.
+            "writeQueueSize: 4096\n",
+            "readTimeout: 20s\n",
+            "writeTimeout: 20s\n",
             "rtmp: yes\n",
             "rtmpAddress: {host}:{port}\n",
             "rtsp: no\n",

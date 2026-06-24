@@ -639,12 +639,15 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 if line.contains("address already in use") {
                     set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
                 }
-                // Diagnóstico: por que um leitor/publisher caiu? (fila cheia, slow, timeout, etc.)
-                if line.contains("too slow")
+                // Diagnóstico: ciclo de vida do publisher (OBS) + quedas. Sem o ruído dos grabs.
+                if line.contains("publish")
+                    || line.contains("available")
+                    || line.contains("online")
+                    || line.contains("destroyed")
                     || line.contains("queue")
+                    || line.contains("too slow")
                     || line.contains("timed out")
-                    || line.contains("err")
-                    || (line.contains("closed") && (line.contains("read") || line.contains("publish")))
+                    || (line.contains("err") && !line.contains("address already"))
                 {
                     log::warn!("mediamtx: {}", raw.trim());
                 }
@@ -711,10 +714,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     if let CommandEvent::Stdout(b) | CommandEvent::Stderr(b) = &ev {
                         let line = String::from_utf8_lossy(b);
                         let l = line.trim();
-                        // Loga falhas (ex.: zmq "Address in use" → o protetor não sobe).
-                        if !l.is_empty()
-                            && (l.contains("rror") || l.contains("bind") || l.contains("ZMQ"))
-                        {
+                        // No nível "warning" o ffmpeg só emite avisos/erros (sem stats) → loga tudo.
+                        if !l.is_empty() {
                             log::warn!("protetor: {l}");
                         }
                     }
