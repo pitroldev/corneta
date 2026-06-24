@@ -178,10 +178,11 @@ pub fn ffmpeg_args_for_target(
 }
 
 /// Delay FIXO (s) do guardião de privacidade — não-configurável. É o mínimo que viabiliza a
-/// proteção de forma PREVENTIVA: o slate "JÁ VOLTO" entra ANTES do termo ir ao ar. 6s cobre o
-/// pior caso de OCR numa tela cheia (~3s, medido) com folga; o diff deixa as telas estáticas
-/// quase de graça. A transmissão inteira (e o chat) fica esse tanto atrás do tempo real.
-pub const GUARD_DELAY_SEC: u32 = 6;
+/// proteção de forma PREVENTIVA mesmo numa tela SATURADA de texto (ex.: Google Search), onde o
+/// OCR sobe pra ~6s (medido). A máquina do tempo só funciona se OCR < delay → 12s dá folga pro
+/// OCR de tela cheia + pra re-confirmar um termo PARADO (cadência de OCR forçado + scan). A
+/// transmissão inteira (e o chat) fica esse tanto atrás do tempo real — o preço da cobertura.
+pub const GUARD_DELAY_SEC: u32 = 12;
 
 // --- Guardião com BUFFER próprio (compositor): delay REAL + slate preventivo ---
 // O vídeo passa CRU por um buffer no nosso processo (delay garantido) e a tarja é

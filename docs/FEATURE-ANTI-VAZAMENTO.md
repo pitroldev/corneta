@@ -16,8 +16,9 @@ positivo (todo e-mail público vira alarme). A feature foi **repensada** pra ser
 
 1. **Slate, não tarja por região.** Ao detectar, troca a tela INTEIRA pelo "JÁ VOLTO" (binário) →
    não precisa de OCR preciso de POSIÇÃO, só saber SE o termo está na tela.
-2. **Delay fixo (`GUARD_DELAY_SEC` = 6s), não configurável.** É o mínimo que viabiliza o preventivo
-   (cobre o pior caso de OCR ~3s com folga).
+2. **Delay fixo (`GUARD_DELAY_SEC` = 12s), não configurável.** A máquina do tempo só funciona se
+   OCR < delay; numa tela SATURADA (Google Search) o OCR sobe pra ~6s → 12s dá folga pro pior caso
+   + pra re-confirmar termo parado. Casamento por **token + fuzzy** (tolera erro de OCR).
 3. **Só termos EXPLÍCITOS do usuário** (watchlist). Sem padrões genéricos (email/CPF/cartão) →
    zero falso positivo; só age no que o usuário listou.
 4. **Diff pra pular OCR** (tela igual → reusa) + **OCR cheio forçado a cada ~3s** (rede de segurança

@@ -196,8 +196,8 @@ export function SettingsScreen() {
                 nunca exposto, nem num clipe. Pra garantir isso:
                 <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
                   <li>
-                    A transmissão fica <strong className="text-ink">6s atrás</strong> do tempo real
-                    (fixo — é o mínimo pra dar tempo de detectar e cortar).
+                    A transmissão fica <strong className="text-ink">12s atrás</strong> do tempo
+                    real (fixo — é o mínimo pra dar conta até de tela cheia de texto).
                   </li>
                   <li>O chat e a interação ficam defasados por esse mesmo tempo.</li>
                   <li>
@@ -205,8 +205,8 @@ export function SettingsScreen() {
                     “qualquer segredo”.
                   </li>
                   <li>
-                    Tela cheia e mexendo (ex.: rolar o Google) pode escapar — é rede de segurança,
-                    não garantia.
+                    Texto pequeno demais ou o OCR errando feio ainda pode escapar — é rede de
+                    segurança, não garantia absoluta.
                   </li>
                 </ul>
               </div>
