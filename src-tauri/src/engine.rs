@@ -177,9 +177,7 @@ pub fn ffmpeg_args_for_target(
     args
 }
 
-/// Porta do `zmq` do protetor (default do filtro — evita escapar `:` no filtergraph).
-pub const GUARD_ZMQ_PORT: u16 = 5555;
-/// Quantas tarjas o protetor pré-aloca (drawbox escondidos, controlados por zmq).
+/// Máximo de regiões/tarjas simultâneas (cap das detecções).
 pub const GUARD_BOXES: usize = 6;
 /// Delay MÍNIMO (s) quando a censura automática está ligada — dá tempo de detectar e cobrir o
 /// vazamento ANTES dele ir ao ar (preventivo). Sem isso, o segredo airava ~0,3s descoberto.
@@ -275,6 +273,102 @@ pub fn ffmpeg_args_for_protector(
     }
     args.extend(
         ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "160k", "-f", "flv"].map(String::from),
+    );
+    args.push(delayed_url(config));
+    args
+}
+
+// --- Protetor com BUFFER próprio (compositor): delay REAL + censura preventiva ---
+// O vídeo passa CRU por um buffer no nosso processo (delay garantido) e a tarja é
+// desenhada por nós na saída. Ver docs/FEATURE-PROTETOR-BUFFER.md.
+
+/// Resolução/FPS do compositor (v1 fixo — previsível p/ o buffer; destinos adaptam do `_delayed`).
+pub const COMP_W: usize = 1920;
+pub const COMP_H: usize = 1080;
+pub const COMP_FPS: usize = 30;
+
+/// **Decoder**: lê o `live` e cospe vídeo CRU (yuv420p, tamanho/fps fixos) no stdout, que o
+/// compositor lê. Sem áudio aqui (o áudio vai pelo encoder, com adelay).
+pub fn ffmpeg_args_for_decoder(config: &AppConfig) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-i".into(),
+        ingest_url(config),
+        "-map".into(),
+        "0:v".into(),
+        "-vf".into(),
+        format!("scale={COMP_W}:{COMP_H},fps={COMP_FPS}"),
+        "-f".into(),
+        "rawvideo".into(),
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-".into(),
+    ]
+}
+
+/// **Encoder**: lê o vídeo CRU do compositor (stdin) + o áudio do `live` (atrasado por `adelay`
+/// pra casar com o vídeo, que já sai N atrás pelo buffer) e publica em `_delayed`.
+pub fn ffmpeg_args_for_encoder(
+    config: &AppConfig,
+    delay_sec: u32,
+    hw_codec: Option<&str>,
+) -> Vec<String> {
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "warning".into(),
+        // Entrada 0: vídeo cru do compositor (stdin).
+        "-f".into(),
+        "rawvideo".into(),
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-s".into(),
+        format!("{COMP_W}x{COMP_H}"),
+        "-r".into(),
+        COMP_FPS.to_string(),
+        "-i".into(),
+        "-".into(),
+        // Entrada 1: áudio do live.
+        "-i".into(),
+        ingest_url(config),
+        "-map".into(),
+        "0:v".into(),
+        "-map".into(),
+        "1:a?".into(),
+    ];
+    match hw_codec {
+        Some(codec) => args.extend(
+            ["-c:v", codec, "-b:v", "6000k", "-maxrate", "6000k", "-bufsize", "6000k", "-g", "60"]
+                .map(String::from),
+        ),
+        None => args.extend(
+            [
+                "-c:v", "libx264", "-preset", "veryfast", "-b:v", "6000k", "-maxrate", "6000k",
+                "-bufsize", "6000k", "-g", "60", "-pix_fmt", "yuv420p",
+            ]
+            .map(String::from),
+        ),
+    }
+    // Áudio atrasado por N pra sincronizar com o vídeo (que sai N atrás pelo buffer).
+    let ms = (delay_sec.max(1)) * 1000;
+    args.extend(
+        [
+            "-af",
+            &format!("adelay=delays={ms}:all=1"),
+            "-c:a",
+            "aac",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-b:a",
+            "160k",
+            "-f",
+            "flv",
+        ]
+        .map(String::from),
     );
     args.push(delayed_url(config));
     args

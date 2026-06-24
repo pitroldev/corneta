@@ -1,10 +1,9 @@
 //! Guardião anti-vazamento: amostra os frames de saída, faz OCR local (com bounding
 //! boxes), procura segredo na tela e avisa/censura — cobrindo SÓ a região do segredo
 //! (tarja) ou a tela toda. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use regex::Regex;
 use serde::Serialize;
@@ -339,51 +338,10 @@ fn global_motion(prev: &Proj, cur: &Proj, max_frac: f32) -> (f32, f32) {
 
 // ------------------------------- Loop -------------------------------
 
-/// Manda UM comando pro filtro (REQ exige send→recv). false se a conexão caiu.
-async fn zmq_send(sock: &mut zeromq::ReqSocket, cmd: &str) -> bool {
-    use zeromq::{SocketRecv, SocketSend};
-    if sock.send(cmd.into()).await.is_err() {
-        return false;
-    }
-    sock.recv().await.is_ok()
-}
-
-/// Arredonda as frações pra uma grade ~0.5% — ignora o jitter do OCR (evita comando à toa).
-fn round_region(r: Region) -> Region {
+/// Arredonda as frações pra uma grade ~0.5% — ignora o jitter do OCR.
+pub(crate) fn round_region(r: Region) -> Region {
     let q = |v: f32| (v.clamp(-1.0, 2.0) * 200.0).round() / 200.0;
     (q(r.0), q(r.1), q(r.2), q(r.3))
-}
-
-/// Mostra a tarja do zero: w, h, y, x (x por ÚLTIMO → não pisca em lugar errado). 4 comandos.
-async fn show_box(sock: &mut zeromq::ReqSocket, i: usize, r: Region) -> bool {
-    zmq_send(sock, &format!("drawbox@b{i} w iw*{:.4}", r.2)).await
-        && zmq_send(sock, &format!("drawbox@b{i} h ih*{:.4}", r.3)).await
-        && zmq_send(sock, &format!("drawbox@b{i} y ih*{:.4}", r.1)).await
-        && zmq_send(sock, &format!("drawbox@b{i} x iw*{:.4}", r.0)).await
-}
-
-/// Move a tarja mandando SÓ os params que mudaram (scroll = só y → 1 comando ~30ms).
-/// O filtro zmq processa ~1 comando/frame, então cada comando a menos = ~30ms a menos de atraso.
-async fn move_box(sock: &mut zeromq::ReqSocket, i: usize, old: Region, new: Region) -> bool {
-    let mut ok = true;
-    if old.2 != new.2 {
-        ok &= zmq_send(sock, &format!("drawbox@b{i} w iw*{:.4}", new.2)).await;
-    }
-    if ok && old.3 != new.3 {
-        ok &= zmq_send(sock, &format!("drawbox@b{i} h ih*{:.4}", new.3)).await;
-    }
-    if ok && old.1 != new.1 {
-        ok &= zmq_send(sock, &format!("drawbox@b{i} y ih*{:.4}", new.1)).await;
-    }
-    if ok && old.0 != new.0 {
-        ok &= zmq_send(sock, &format!("drawbox@b{i} x iw*{:.4}", new.0)).await;
-    }
-    ok
-}
-
-/// Esconde: joga pra FORA da tela. (NÃO usar w=0 — no drawbox isso vira TELA INTEIRA!)
-async fn hide_box(sock: &mut zeromq::ReqSocket, i: usize) -> bool {
-    zmq_send(sock, &format!("drawbox@b{i} x -99999")).await
 }
 
 /// Detecção (OCR): o lado LENTO, isolado em background pra não travar o rastreamento.
@@ -512,44 +470,20 @@ fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
     }
 }
 
-/// Adiantamento da POSIÇÃO (s): atraso da tarja = delay − isto. Pequeno (≈ latência do
-/// rastreamento) → a posição casa quase exata com o vídeo atrasado, sem ficar adiantada (o que
-/// EXPORIA segredo em movimento — a tarja na frente, o segredo atrás).
-const LPOS_LEAD_SEC: f32 = 0.15;
-/// Frames de BACKFILL: quando um segredo SURGE, preenche o estado dele uns frames pra trás (≈0.45s)
-/// no buffer → cobre o atraso de DETECÇÃO (OCR), garantindo a tarja no ar antes do segredo airar.
-const BACKFILL_FRAMES: usize = 8;
-
-/// Devolve o estado das tarjas registrado em `alvo` (o mais recente com timestamp ≤ alvo).
-/// É assim que a tarja sai ATRASADA pra casar com o vídeo atrasado (preventivo, sem pulo no scroll).
-fn replay(
-    history: &VecDeque<(Instant, Vec<Option<Region>>)>,
-    alvo: Instant,
-    n: usize,
-) -> Vec<Option<Region>> {
-    let mut out: Option<&Vec<Option<Region>>> = None;
-    for (ts, st) in history.iter() {
-        if *ts <= alvo {
-            out = Some(st);
-        } else {
-            break; // ordenado por tempo → passou do alvo
-        }
-    }
-    out.cloned().unwrap_or_else(|| vec![None; n])
-}
-
-/// Guardião: DETECTA (OCR em background) + RASTREIA (movimento global, por frame) e comanda as
-/// tarjas via zmq — segue o conteúdo quase em tempo real, sem reiniciar nada. SEMPRE PREVENTIVO:
-/// a posição da tarja sai atrasada pelo mesmo delay do vídeo (`d_box`), então ela cobre o segredo
-/// ANTES dele ir ao ar, casando com o frame atrasado mesmo em scroll.
-pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: Arc<AtomicBool>) {
-    use zeromq::Socket;
-    log::info!("guardião: ligado");
-    let endpoint = format!("tcp://127.0.0.1:{}", crate::engine::GUARD_ZMQ_PORT);
+/// Guardião (DETECÇÃO): OCR em background + rastreamento por frame (movimento global) na borda
+/// AO VIVO. Publica as regiões rastreadas em `shared` — o COMPOSITOR lê e desenha as tarjas no
+/// vídeo já atrasado (delay real + preventivo). Aqui não há delay nem zmq.
+pub async fn run_guardian(
+    app: AppHandle,
+    running: Arc<AtomicBool>,
+    has_signal: Arc<AtomicBool>,
+    shared: Arc<Mutex<Vec<Region>>>,
+) {
+    log::info!("guardião: ligado (detecção)");
     let n = crate::engine::GUARD_BOXES;
     let frame_path = crate::commands::guard_frame_path(&app);
 
-    // Detecção roda em background; o loop abaixo é o RASTREAMENTO (rápido).
+    // OCR roda em background; o loop abaixo é o RASTREAMENTO (rápido).
     let anchor = Arc::new(Mutex::new(Anchor::default()));
     {
         let (a, r, s, an, fp) = (
@@ -562,27 +496,15 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
         tauri::async_runtime::spawn(async move { ocr_loop(a, r, s, an, fp).await });
     }
 
-    let mut sock: Option<zeromq::ReqSocket> = None;
-    let mut censoring = false;
-    let mut shown: Vec<Option<Region>> = vec![None; n];
     let mut tracks: Vec<Track> = vec![];
     let mut last_gen = 0u64;
     let mut prev: Option<Proj> = None;
-
-    // Delay efetivo do vídeo (igual ao tpad do protetor) → a POSIÇÃO da tarja sai atrasada por
-    // `d_box` (= delay − adiantamento), casando com o frame atrasado. Fixo na sessão (= ao spawn).
-    let n_eff = crate::engine::effective_protect_delay(&crate::config::load(&app)) as f32;
-    let d_box = (n_eff - LPOS_LEAD_SEC).max(0.0);
-    let mut history: VecDeque<(Instant, Vec<Option<Region>>)> = VecDeque::new();
-    let mut prev_live: Vec<Option<Region>> = vec![None; n];
-    log::info!("guardião: preventivo — vídeo ~{n_eff:.0}s atrás, tarja casa com o atrasado (d_box {d_box:.1}s)");
 
     loop {
         if !running.load(Ordering::Relaxed) {
             log::info!("guardião: desligado");
             return;
         }
-        // ~16Hz: o rastreamento é barato, então segue o conteúdo de pertinho.
         let _ = tauri::async_runtime::spawn_blocking(|| {
             std::thread::sleep(Duration::from_millis(55))
         })
@@ -590,24 +512,11 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
 
         if !has_signal.load(Ordering::Relaxed) {
             prev = None;
+            tracks.clear();
+            *shared.lock().unwrap() = vec![];
             continue;
         }
-        if sock.is_none() {
-            let mut s = zeromq::ReqSocket::new();
-            match tokio::time::timeout(Duration::from_secs(3), s.connect(&endpoint)).await {
-                Ok(Ok(())) => {
-                    log::info!("guardião: zmq conectado no protetor");
-                    sock = Some(s);
-                    censoring = false;
-                    shown = vec![None; n];
-                    tracks.clear();
-                    prev = None;
-                }
-                _ => continue,
-            }
-        }
 
-        // Frame atual → cinza → assinatura de projeção.
         let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
             Some(b) if !b.is_empty() => b,
             _ => continue,
@@ -643,80 +552,12 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
             }
         }
 
-        // Estado AO VIVO rastreado (onde os segredos estão AGORA na borda ao vivo).
-        let mut live_desired: Vec<Option<Region>> = vec![None; n];
-        for t in &tracks {
-            if t.box_idx < n {
-                live_desired[t.box_idx] = Some(round_region((t.fx, t.fy, t.fw, t.fh)));
-            }
-        }
-        // BACKFILL: pra cada tarja que SURGIU agora, preenche o estado dela uns frames pra trás
-        // (esses frames ainda não foram pro ar, pois saem `d_box` depois) → cobre o atraso do OCR,
-        // garantindo a tarja no ar ANTES do frame do segredo, sem precisar adiantar a posição.
-        for i in 0..n {
-            if live_desired[i].is_some() && prev_live[i].is_none() {
-                let r = live_desired[i];
-                for (_, st) in history.iter_mut().rev().take(BACKFILL_FRAMES) {
-                    if st[i].is_none() {
-                        st[i] = r;
-                    }
-                }
-            }
-        }
-        prev_live = live_desired.clone();
-
-        // BUFFER PREVENTIVO: registra o estado ao vivo e usa o de `d_box` atrás → a tarja casa
-        // com o vídeo atrasado (cobre o segredo ANTES de airar, e sem pulo de posição no scroll).
-        let wall = Instant::now();
-        history.push_back((wall, live_desired));
-        let cutoff = wall
-            .checked_sub(Duration::from_secs_f32(d_box + 0.5))
-            .unwrap_or(wall);
-        while history.front().is_some_and(|(ts, _)| *ts < cutoff) {
-            history.pop_front();
-        }
-        let alvo = wall
-            .checked_sub(Duration::from_secs_f32(d_box))
-            .unwrap_or(wall);
-        let desired = replay(&history, alvo, n);
-
-        // DELTA: manda só o que mudou.
-        let mut dead = false;
-        {
-            let socket = sock.as_mut().unwrap();
-            for i in 0..n {
-                if dead {
-                    break;
-                }
-                let ok = match (shown[i], desired[i]) {
-                    (a, b) if a == b => true,
-                    (_, None) => hide_box(socket, i).await,
-                    (None, Some(r)) => show_box(socket, i, r).await,
-                    (Some(o), Some(r)) => move_box(socket, i, o, r).await,
-                };
-                if ok {
-                    shown[i] = desired[i];
-                } else {
-                    dead = true;
-                }
-            }
-        }
-        if dead {
-            log::warn!("guardião: zmq caiu — reconectando");
-            sock = None;
-            continue;
-        }
-
-        let any_shown = shown.iter().any(|s| s.is_some());
-        if any_shown != censoring {
-            censoring = any_shown;
-            let _ = app.emit("leak://censor", any_shown);
-            if any_shown {
-                log::warn!("guardião: CENSURA (tarja) no ar");
-            } else {
-                log::info!("guardião: censura liberada (segredo saiu)");
-            }
-        }
+        // Publica as regiões rastreadas AO VIVO; o compositor casa com o vídeo atrasado + backfill.
+        let regions: Vec<Region> = tracks
+            .iter()
+            .map(|t| round_region((t.fx, t.fy, t.fw, t.fh)))
+            .collect();
+        *shared.lock().unwrap() = regions;
     }
 }
 

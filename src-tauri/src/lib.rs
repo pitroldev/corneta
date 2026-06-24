@@ -1,5 +1,6 @@
 mod chat;
 mod commands;
+mod compositor;
 mod config;
 mod engine;
 mod guardian;

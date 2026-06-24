@@ -39,11 +39,6 @@ sha2 = "0.10"
 base64 = "0.22"
 # Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
 regex = "1"
-# Cliente ZeroMQ puro-Rust — controla os drawbox do FFmpeg "protetor" em tempo real
-# (mover/mostrar/esconder a tarja sem reiniciar o FFmpeg → sem derrubar a stream).
-zeromq = "0.4"
-# Só pro timeout do connect zmq do guardião (já é dep transitiva do tauri).
-tokio = { version = "1", features = ["time"] }
 # Decode de JPEG → escala de cinza pro rastreamento de movimento (optical flow) do guardião.
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
