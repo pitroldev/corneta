@@ -6,6 +6,7 @@ import { cn, uid } from "../lib/utils";
 import type { ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
+import { Slider } from "../components/Slider";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { AlertsFeed } from "../components/AlertsFeed";
 
@@ -61,7 +62,7 @@ export function ChatScreen() {
       platform: s.chatShowPlatform ?? true,
       source: s.chatShowSource ?? false,
       timestamps: s.chatShowTimestamps ?? false,
-      fontSize: s.chatFontSize ?? "md",
+      fontSize: s.chatFontSize ?? 14,
     }),
     [
       s.chatShowEmotes,
@@ -213,17 +214,15 @@ export function ChatScreen() {
                 <ToggleRow label="Nome do canal" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
                 <ToggleRow label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-border-soft pt-3">
-                <span className="text-sm font-semibold text-ink-muted">Tamanho da fonte</span>
-                <Select
-                  className="w-32"
+              <div className="mt-3 flex items-center gap-3 border-t border-border-soft pt-3">
+                <span className="shrink-0 text-sm font-semibold text-ink-muted">Tamanho da fonte</span>
+                <Slider
+                  className="ml-auto max-w-52 flex-1"
                   value={view.fontSize}
-                  options={[
-                    { value: "sm", label: "Pequeno" },
-                    { value: "md", label: "Médio" },
-                    { value: "lg", label: "Grande" },
-                  ]}
-                  onChange={(v) => setSettings({ chatFontSize: v as "sm" | "md" | "lg" })}
+                  min={11}
+                  max={26}
+                  onChange={(v) => setSettings({ chatFontSize: v })}
+                  suffix="px"
                 />
               </div>
             </div>

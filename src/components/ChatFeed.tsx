@@ -10,10 +10,9 @@ export interface ChatView {
   platform: boolean;
   source: boolean;
   timestamps: boolean;
-  fontSize: "sm" | "md" | "lg";
+  /** Tamanho da fonte do feed, em pixels. */
+  fontSize: number;
 }
-
-const FONT_CLASS = { sm: "text-xs", md: "text-sm", lg: "text-base" } as const;
 
 const fmtTime = (ms: number) =>
   new Date(ms).toLocaleTimeString("pt-BR", {
@@ -38,10 +37,12 @@ export function ChatFeed({
   const stick = useRef(true);
   const [paused, setPaused] = useState(false);
 
+  // Depende de `messages` (não de .length): quando o feed bate o teto e uma msg
+  // antiga sai, o tamanho não muda mas a referência sim — senão o follow trava.
   useEffect(() => {
     const el = ref.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+  }, [messages]);
 
   const onScroll = () => {
     const el = ref.current;
@@ -64,10 +65,8 @@ export function ChatFeed({
       <div
         ref={ref}
         onScroll={onScroll}
-        className={cn(
-          "h-full overflow-y-auto py-2 [scrollbar-gutter:stable]",
-          FONT_CLASS[view.fontSize],
-        )}
+        style={{ fontSize: view.fontSize }}
+        className="h-full overflow-y-auto py-2 [scrollbar-gutter:stable]"
       >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">

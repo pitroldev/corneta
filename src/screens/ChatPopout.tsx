@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { Bell, Eye, Minus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { cn } from "../lib/utils";
 import { Mascot } from "../components/decor";
 import { Toggle } from "../components/ui";
 import { Select } from "../components/Select";
+import { Slider } from "../components/Slider";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { AlertsFeed } from "../components/AlertsFeed";
 
@@ -15,21 +23,12 @@ const BOTH_DIR: Record<string, string> = {
   row: "flex-row",
   col: "flex-col",
 };
-const BOTH_DIVIDE: Record<string, string> = {
-  auto: "divide-y-2 min-[820px]:divide-x-2 min-[820px]:divide-y-0",
-  row: "divide-x-2",
-  col: "divide-y-2",
+// Barra do divisor: horizontal (empilhado) vs vertical (lado a lado), com cursor.
+const DIVIDER_CLS: Record<string, string> = {
+  auto: "h-1.5 w-full cursor-row-resize min-[820px]:h-auto min-[820px]:w-1.5 min-[820px]:cursor-col-resize",
+  row: "w-1.5 cursor-col-resize",
+  col: "h-1.5 w-full cursor-row-resize",
 };
-const BOTH_ALERTS_SIZE: Record<string, string> = {
-  auto: "max-h-[45%] shrink-0 min-[820px]:max-h-none min-[820px]:w-72",
-  row: "w-72 shrink-0",
-  col: "max-h-[45%] shrink-0",
-};
-const FONT_OPTS = [
-  { value: "sm", label: "Pequeno" },
-  { value: "md", label: "Médio" },
-  { value: "lg", label: "Grande" },
-];
 const LAYOUT_OPTS = [
   { value: "auto", label: "Automático" },
   { value: "row", label: "Lado a lado" },
@@ -81,7 +80,7 @@ export function ChatPopout() {
       platform: st?.chatShowPlatform ?? true,
       source: st?.chatShowSource ?? false,
       timestamps: st?.chatShowTimestamps ?? false,
-      fontSize: st?.chatFontSize ?? "md",
+      fontSize: st?.chatFontSize ?? 14,
     }),
     [
       st?.chatShowEmotes,
@@ -94,6 +93,12 @@ export function ChatPopout() {
   );
   const bothLayout = st?.chatBothLayout ?? "auto";
   const alertsFirst = st?.chatBothAlertsFirst ?? false;
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Posição do divisor (local pra arrastar suave; persiste no fim do drag).
+  const [split, setSplit] = useState(35);
+  useEffect(() => {
+    if (st?.chatBothSplit != null) setSplit(st.chatBothSplit);
+  }, [st?.chatBothSplit]);
 
   if (!loaded || !config) {
     return (
@@ -115,8 +120,46 @@ export function ChatPopout() {
   const minimize = () => void winApi().then((w) => w.minimize());
   const closeWin = () => void winApi().then((w) => w.close());
 
+  // Arraste do divisor: redimensiona o painel de alertas (% do container no eixo ativo).
+  const onDividerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const isRow = () =>
+      bothLayout === "row" ||
+      (bothLayout === "auto" && container.getBoundingClientRect().width >= 820);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = isRow() ? "col-resize" : "row-resize";
+    let latest = split;
+    const move = (ev: PointerEvent) => {
+      const r = container.getBoundingClientRect();
+      const pct = isRow()
+        ? alertsFirst
+          ? ((ev.clientX - r.left) / r.width) * 100
+          : ((r.right - ev.clientX) / r.width) * 100
+        : alertsFirst
+          ? ((ev.clientY - r.top) / r.height) * 100
+          : ((r.bottom - ev.clientY) / r.height) * 100;
+      latest = Math.max(15, Math.min(75, Math.round(pct)));
+      setSplit(latest);
+    };
+    const up = () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setSettings({ chatBothSplit: latest }); // persiste só no fim
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   const alertsPanel = (
-    <div key="alerts" className={cn("flex flex-col overflow-hidden", BOTH_ALERTS_SIZE[bothLayout])}>
+    <div
+      key="alerts"
+      style={{ flexBasis: `${split}%` }}
+      className="flex min-h-0 min-w-0 shrink-0 grow-0 flex-col overflow-hidden"
+    >
       <div className="flex shrink-0 items-center justify-between border-b-2 border-border-soft px-2.5 py-1.5">
         <span className="flex items-center gap-1.5 font-display text-xs font-extrabold">
           <Bell className="size-3.5 text-brass" /> Alertas
@@ -140,7 +183,18 @@ export function ChatPopout() {
       messages={messages}
       view={view}
       connected={connected}
-      className="min-h-0 flex-1"
+      className="min-h-0 min-w-0 flex-1"
+    />
+  );
+  const divider = (
+    <div
+      key="divider"
+      onPointerDown={onDividerDown}
+      title="Arraste pra redimensionar"
+      className={cn(
+        "shrink-0 bg-border-soft transition-colors hover:bg-brass",
+        DIVIDER_CLS[bothLayout],
+      )}
     />
   );
 
@@ -240,13 +294,15 @@ export function ChatPopout() {
               <CfgToggle label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
             </div>
           </div>
-          <label className="flex items-center justify-between">
-            <span className="font-semibold text-ink-muted">Tamanho da fonte</span>
-            <Select
-              className="w-28"
+          <label className="flex items-center gap-2.5">
+            <span className="shrink-0 font-semibold text-ink-muted">Tamanho da fonte</span>
+            <Slider
+              className="ml-auto max-w-44 flex-1"
               value={view.fontSize}
-              options={FONT_OPTS}
-              onChange={(v) => setSettings({ chatFontSize: v as "sm" | "md" | "lg" })}
+              min={11}
+              max={26}
+              onChange={(v) => setSettings({ chatFontSize: v })}
+              suffix="px"
             />
           </label>
           {tab === "both" && (
@@ -276,13 +332,12 @@ export function ChatPopout() {
       {/* Feed */}
       {tab === "both" ? (
         <div
-          className={cn(
-            "flex min-h-0 flex-1 overflow-hidden divide-border-soft",
-            BOTH_DIR[bothLayout],
-            BOTH_DIVIDE[bothLayout],
-          )}
+          ref={containerRef}
+          className={cn("flex min-h-0 flex-1 overflow-hidden", BOTH_DIR[bothLayout])}
         >
-          {alertsFirst ? [alertsPanel, chatPanel] : [chatPanel, alertsPanel]}
+          {alertsFirst
+            ? [alertsPanel, divider, chatPanel]
+            : [chatPanel, divider, alertsPanel]}
         </div>
       ) : tab === "chat" ? (
         chatPanel

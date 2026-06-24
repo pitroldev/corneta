@@ -122,12 +122,14 @@ export interface AppSettings {
   chatShowTimestamps: boolean;
   /** Tema da interface. */
   theme: "dark" | "light";
-  /** Tamanho da fonte do chat. */
-  chatFontSize: "sm" | "md" | "lg";
+  /** Tamanho da fonte do chat, em pixels. */
+  chatFontSize: number;
   /** Layout do modo "Ambos" da janela do chat. */
   chatBothLayout: "auto" | "row" | "col";
   /** No modo "Ambos", mostrar os alertas antes do chat. */
   chatBothAlertsFirst: boolean;
+  /** Posição do divisor do modo "Ambos": % que o painel de alertas ocupa. */
+  chatBothSplit: number;
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */

@@ -98,15 +98,18 @@ pub struct Settings {
     /// Tema da interface: "dark" | "light".
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// Tamanho da fonte do chat: "sm" | "md" | "lg".
-    #[serde(default = "default_font")]
-    pub chat_font_size: String,
+    /// Tamanho da fonte do chat em pixels (slider). Aceita os antigos "sm/md/lg" salvos.
+    #[serde(default = "default_font", deserialize_with = "de_font")]
+    pub chat_font_size: u32,
     /// Layout do modo "Ambos" da janela do chat: "auto" | "row" (lado a lado) | "col" (empilhado).
     #[serde(default = "default_both_layout")]
     pub chat_both_layout: String,
     /// No modo "Ambos", mostrar os alertas antes do chat.
     #[serde(default)]
     pub chat_both_alerts_first: bool,
+    /// Posição do divisor do modo "Ambos": % que o painel de alertas ocupa (15–75).
+    #[serde(default = "default_both_split")]
+    pub chat_both_split: u32,
     /// Proteção contra quedas: empurra um slate "JÁ VOLTO" pras plataformas se o sinal
     /// cair NO MEIO da live (só após já ter tido sinal) — mantém a transmissão de pé.
     #[serde(default = "default_true")]
@@ -126,8 +129,25 @@ fn default_live_shortcut() -> String {
 fn default_theme() -> String {
     "dark".to_string()
 }
-fn default_font() -> String {
-    "md".to_string()
+fn default_font() -> u32 {
+    14
+}
+/// Tamanho da fonte: aceita número (px) ou os rótulos antigos "sm/md/lg".
+fn de_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Sz {
+        N(u32),
+        S(String),
+    }
+    Ok(match Sz::deserialize(d)? {
+        Sz::N(n) => n.clamp(10, 28),
+        Sz::S(s) => match s.as_str() {
+            "sm" => 12,
+            "lg" => 16,
+            _ => 14,
+        },
+    })
 }
 
 /// Uma fonte de chat (um canal de uma plataforma).
@@ -161,12 +181,16 @@ impl Default for Settings {
             chat_font_size: default_font(),
             chat_both_layout: default_both_layout(),
             chat_both_alerts_first: false,
+            chat_both_split: default_both_split(),
             brb_enabled: true,
             auto_bitrate: true,
         }
     }
 }
 
+fn default_both_split() -> u32 {
+    35
+}
 fn default_both_layout() -> String {
     "auto".to_string()
 }
