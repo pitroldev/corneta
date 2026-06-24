@@ -12,11 +12,12 @@ use image::{DynamicImage, GrayImage};
 use std::time::Duration;
 use tauri::AppHandle;
 
-/// Largura-alvo do OCR. 1280 ainda lê texto pequeno com bem menos custo que 1080p.
-const OCR_TARGET_W: u32 = 1280;
-/// Limite da detecção (lado maior). 960 lê texto MENOR (nomes em feed tipo LinkedIn) sem detonar
-/// a velocidade — e o delay de 12s absorve o custo extra.
-const DET_LIMIT: u32 = 960;
+/// Largura-alvo do OCR = resolução cheia (sem encolher o quadro 1920) → MÁXIMA precisão. Medido:
+/// o custo por linha quase não muda com a resolução (o tempo é dominado pelo nº de linhas), então
+/// vale ler no detalhe máximo; o delay de 12s absorve.
+const OCR_TARGET_W: u32 = 1920;
+/// Limite da detecção (lado maior). 1280 lê texto bem menor (nomes em feed denso) com custo baixo.
+const DET_LIMIT: u32 = 1280;
 
 /// Encolhe o plano de cinza pra ~`OCR_TARGET_W` de largura (no-op se já for menor).
 fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {

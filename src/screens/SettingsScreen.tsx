@@ -176,8 +176,8 @@ export function SettingsScreen() {
             />
           </SettingRow>
           <SettingRow
-            title="Guardião de privacidade (beta)"
-            desc="Quando um TERMO seu (que você listar abaixo) aparece na tela, a Corneta corta pro slate “JÁ VOLTO” antes de ir ao ar. OCR local: nada sai do PC. É rede de segurança, não garantia absoluta."
+            title="Guardião de privacidade (experimental)"
+            desc="Quando um TERMO seu (que você listar abaixo) aparece na tela, a Corneta corta pro slate “JÁ VOLTO” antes de ir ao ar. OCR local: nada sai do PC. Funciona bem em tela normal; em site denso e cheio de texto (LinkedIn, etc.) o OCR é instável. Rede de segurança, não garantia."
           >
             <Toggle
               checked={settings.guardianEnabled}
