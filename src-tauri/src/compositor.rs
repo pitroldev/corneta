@@ -173,8 +173,9 @@ pub async fn run_compositor(
                     a.auto = true;
                     a.regions = regions;
                 }
-                // Cap ~3×/s: detecta vazamento novo em ~0.35s (o backfill cobre) e poupa GPU.
-                std::thread::sleep(Duration::from_millis(250));
+                // ~7×/s: re-detecta a posição (corrige deriva, segue scroll) e some rápido.
+                // O OCR na GPU é ~50ms; sem o movimento global, a re-detecção É o rastreamento.
+                std::thread::sleep(Duration::from_millis(80));
             }
         });
     }
@@ -223,13 +224,14 @@ pub async fn run_compositor(
                 if dout.read_exact(&mut frame).is_err() {
                     break; // decoder morreu / EOF
                 }
-                // Detecta+rastreia NESTE quadro (plano Y) → regiões EXATAS pra ele.
+                // Tracking-by-detection: segura as detecções do OCR (que roda na thread). Atualiza
+                // o frame do OCR a cada 2 quadros (fresco) e devolve as regiões da última âncora.
                 let regions = if censor {
-                    if idx % 5 == 0 {
+                    if idx % 2 == 0 {
                         *latest_y.lock().unwrap() = Some(frame[..YSIZE].to_vec());
                     }
                     let a = anchor.lock().unwrap().clone();
-                    tracker.update(&frame[..YSIZE], COMP_W, COMP_H, &a)
+                    tracker.update(&a)
                 } else {
                     vec![]
                 };

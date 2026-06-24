@@ -294,6 +294,10 @@ pub fn ffmpeg_args_for_decoder(config: &AppConfig) -> Vec<String> {
         "-hide_banner".into(),
         "-loglevel".into(),
         "error".into(),
+        // Decodifica no HARDWARE (NVDEC na NVIDIA) — tira o custo da CPU. `auto` cai pra software
+        // se não houver GPU, sem quebrar. O scale/fps seguem na CPU (leve).
+        "-hwaccel".into(),
+        "auto".into(),
         "-i".into(),
         ingest_url(config),
         "-map".into(),

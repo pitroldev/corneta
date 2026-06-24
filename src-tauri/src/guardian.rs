@@ -515,8 +515,9 @@ struct Track {
     miss: u32,
 }
 
-/// Casa as regiões do OCR com os tracks por PROXIMIDADE: os que continuam mantêm a posição
-/// RASTREADA (sem pulo, só atualiza o tamanho); os novos viram track; os sumidos saem após carência.
+/// Casa as regiões do OCR com os tracks por PROXIMIDADE (IoU/SORT-like): os que continuam GRUDAM
+/// na posição nova do OCR (a verdade — sem deriva); os novos viram track; os sumidos saem após
+/// carência (evita flicker se o OCR perder 1 quadro).
 fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
     let mut t_matched = vec![false; tracks.len()];
     let mut a_used = vec![false; anchors.len()];
@@ -536,7 +537,9 @@ fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
             }
         }
         if best != usize::MAX {
-            tracks[best].fw = a.2; // mantém posição, atualiza tamanho
+            tracks[best].fx = a.0; // gruda na posição do OCR (sem deriva de movimento global)
+            tracks[best].fy = a.1;
+            tracks[best].fw = a.2;
             tracks[best].fh = a.3;
             tracks[best].miss = 0;
             t_matched[best] = true;
@@ -561,12 +564,12 @@ fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
     }
 }
 
-/// Rastreador: mantém os tracks entre frames (movimento global + re-âncora do OCR). O compositor
-/// chama `update` POR FRAME (no plano Y cru do próprio vídeo) → regiões EXATAS pra aquele frame,
-/// sem lag de timeline (era a causa da tarja atrasada/torta).
+/// Rastreador (tracking-by-detection — boa prática p/ redação ao vivo): segura as detecções do
+/// OCR entre frames, associando por PROXIMIDADE (IoU/SORT-like). SEM movimento global (causava
+/// deriva → tarja no lugar errado). O OCR rápido na GPU re-detecta ~10×/s; a associação dá
+/// estabilidade de ID + carência pra sumir sem flicker.
 pub(crate) struct Tracker {
     tracks: Vec<Track>,
-    prev: Option<Proj>,
     last_gen: u64,
     n: usize,
 }
@@ -575,7 +578,6 @@ impl Tracker {
     pub(crate) fn new() -> Self {
         Self {
             tracks: vec![],
-            prev: None,
             last_gen: 0,
             n: crate::engine::GUARD_BOXES,
         }
@@ -583,22 +585,11 @@ impl Tracker {
 
     pub(crate) fn reset(&mut self) {
         self.tracks.clear();
-        self.prev = None;
     }
 
-    /// Atualiza com o frame CINZA atual + a última âncora do OCR. Devolve as regiões PRA ESTE frame.
-    pub(crate) fn update(&mut self, gray: &[u8], w: usize, h: usize, anchor: &Anchor) -> Vec<Region> {
-        let cur = project(gray, w, h);
-        if let Some(p) = &self.prev {
-            let (dx, dy) = global_motion(p, &cur, 0.2);
-            if dx != 0.0 || dy != 0.0 {
-                for t in &mut self.tracks {
-                    t.fx += dx;
-                    t.fy += dy;
-                }
-            }
-        }
-        self.prev = Some(cur);
+    /// Atualiza com a última âncora do OCR. Devolve as regiões a desenhar (só muda quando o OCR
+    /// traz uma geração nova — entre OCRs as tarjas seguram na última posição).
+    pub(crate) fn update(&mut self, anchor: &Anchor) -> Vec<Region> {
         if anchor.gen != self.last_gen {
             self.last_gen = anchor.gen;
             if anchor.auto {
