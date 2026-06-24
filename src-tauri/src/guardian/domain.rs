@@ -32,10 +32,80 @@ fn mask(s: &str) -> String {
     format!("{head}{}", "•".repeat((n - 2).min(6)))
 }
 
-/// Casa os termos EXPLÍCITOS da watchlist no texto do OCR (case-insensitive, substring). Devolve
-/// os termos achados (pra avisar/logar). Vazio = nada do usuário na tela → não dá slate.
+/// Minúsculas + troca tudo que não é alfanumérico por espaço (junta espaços). Assim "joao@email.com"
+/// e "joao @ emaiI . com" (jeito que o OCR às vezes lê) viram comparáveis por TOKEN.
+fn normalize(s: &str) -> String {
+    let lowered = s.to_lowercase();
+    let mut out = String::with_capacity(lowered.len());
+    let mut prev_space = true;
+    for c in lowered.chars() {
+        if c.is_alphanumeric() {
+            out.push(c);
+            prev_space = false;
+        } else if !prev_space {
+            out.push(' ');
+            prev_space = true;
+        }
+    }
+    out.trim_end().to_string()
+}
+
+/// Distância de edição ≤ `max_d`? (Levenshtein com saída antecipada — tolera erro do OCR.)
+fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    if a.len().abs_diff(b.len()) > max_d {
+        return false;
+    }
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for (i, &ca) in a.iter().enumerate() {
+        let mut cur = vec![i + 1; b.len() + 1];
+        let mut row_min = cur[0];
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            cur[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(cur[j] + 1);
+            row_min = row_min.min(cur[j + 1]);
+        }
+        if row_min > max_d {
+            return false; // nenhuma continuação cabe no orçamento
+        }
+        prev = cur;
+    }
+    prev[b.len()] <= max_d
+}
+
+/// O termo aparece no texto do OCR? Casa por TOKEN (tolera espaço/pontuação/ordem) e por
+/// proximidade (1 erro de OCR em tokens distintivos). Recall alto de propósito — é dado do usuário.
+fn matches_term(term: &str, hay: &str, hay_words: &[&str]) -> bool {
+    let toks: Vec<String> = normalize(term)
+        .split_whitespace()
+        .filter(|w| w.chars().count() >= 3)
+        .map(String::from)
+        .collect();
+    if toks.is_empty() {
+        return false;
+    }
+    let token_hit = |tok: &str| -> bool {
+        if hay.contains(tok) {
+            return true;
+        }
+        // Fuzzy só em tokens distintivos (≥5) — tolera 1 erro de OCR sem virar falso-positivo.
+        tok.chars().count() >= 5 && hay_words.iter().any(|w| within_edit(tok, w, 1))
+    };
+    // Um token DISTINTIVO (≥6) sozinho já casa (ex.: "growthedge", "cardoso").
+    if toks.iter().any(|tok| tok.chars().count() >= 6 && token_hit(tok)) {
+        return true;
+    }
+    // Senão, a MAIORIA (~60%) dos tokens precisa casar.
+    let matched = toks.iter().filter(|tok| token_hit(tok)).count();
+    matched * 5 >= toks.len() * 3
+}
+
+/// Casa os termos EXPLÍCITOS da watchlist no texto do OCR. Devolve os termos achados (pra
+/// avisar/logar). Vazio = nada do usuário na tela → não dá slate.
 pub fn find_watchlist(text: &str, watchlist: &[String]) -> Vec<Leak> {
-    let hay = text.to_lowercase();
+    let hay = normalize(text);
+    let hay_words: Vec<&str> = hay.split_whitespace().collect();
     let mut out = vec![];
     let mut seen = std::collections::HashSet::new();
     for term in watchlist {
@@ -44,8 +114,7 @@ pub fn find_watchlist(text: &str, watchlist: &[String]) -> Vec<Leak> {
         if t.chars().count() < 3 {
             continue;
         }
-        let tl = t.to_lowercase();
-        if hay.contains(&tl) && seen.insert(tl) {
+        if matches_term(t, &hay, &hay_words) && seen.insert(t.to_lowercase()) {
             out.push(Leak {
                 label: "Termo seu".into(),
                 snippet: mask(t),
@@ -140,6 +209,26 @@ mod tests {
         let leaks = find_watchlist("moro na rua das FLORES, 42", &wl);
         assert_eq!(leaks.len(), 1);
         assert!(leaks[0].snippet.starts_with("Ru"));
+    }
+
+    #[test]
+    fn casa_com_erro_de_ocr_fuzzy() {
+        // OCR leu "Cardozo" (s→z) — fuzzy ≤1 ainda casa "Cardoso" (token distintivo).
+        let leaks = find_watchlist("usuario: Petro Cardozo, online", &["Petro Cardoso".into()]);
+        assert_eq!(leaks.len(), 1);
+    }
+
+    #[test]
+    fn casa_com_espacos_e_pontuacao_do_ocr() {
+        // OCR às vezes separa o e-mail com espaços/pontuação — o casamento por token pega.
+        let leaks = find_watchlist("contato joao @ email . com br", &["joao@email.com".into()]);
+        assert_eq!(leaks.len(), 1);
+    }
+
+    #[test]
+    fn nao_casa_texto_qualquer() {
+        let leaks = find_watchlist("resultados da busca sobre receitas de bolo", &["Petro Cardoso".into()]);
+        assert!(leaks.is_empty());
     }
 
     #[test]
