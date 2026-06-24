@@ -420,17 +420,27 @@ pub(crate) fn ensure_paddle_models(
     Some((paths[0].clone(), paths[1].clone(), paths[2].clone()))
 }
 
-/// Constrói o pipeline PaddleOCR (uma vez por sessão). None se falhar (→ fallback Windows OCR).
+/// Constrói o pipeline PaddleOCR (uma vez por sessão) na GPU (DirectML), CPU como fallback.
+/// None se falhar (→ fallback Windows OCR).
 pub(crate) fn build_paddle(
     det: &std::path::Path,
     rec: &std::path::Path,
     dict: &std::path::Path,
 ) -> Option<oar_ocr::pipeline::OAROCR> {
+    use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
+    // DirectML (GPU) tira o OCR da CPU (que disputa com a decodificação); CPU como fallback.
+    let ort_cfg = OrtSessionConfig::new().with_execution_providers(vec![
+        OrtExecutionProvider::DirectML {
+            device_id: Some(0),
+        },
+        OrtExecutionProvider::CPU,
+    ]);
     oar_ocr::pipeline::OAROCRBuilder::new(
         det.to_string_lossy().to_string(),
         rec.to_string_lossy().to_string(),
         dict.to_string_lossy().to_string(),
     )
+    .global_ort_session(ort_cfg)
     .build()
     .ok()
 }

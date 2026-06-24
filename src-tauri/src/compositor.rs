@@ -144,11 +144,11 @@ pub async fn run_compositor(
         let (app_o, run_o, ly, an) =
             (app.clone(), running.clone(), latest_y.clone(), anchor.clone());
         tauri::async_runtime::spawn_blocking(move || {
-            // PaddleOCR (CPU — mais preciso e libera a GPU). Fallback pro Windows OCR se falhar.
+            // PaddleOCR na GPU (DirectML) — mais preciso e tira o OCR da CPU. Fallback Windows OCR.
             let paddle = ensure_paddle_models(&app_o)
                 .and_then(|(d, r, di)| build_paddle(&d, &r, &di));
             match &paddle {
-                Some(_) => log::info!("OCR: PaddleOCR (CPU — libera a GPU)"),
+                Some(_) => log::info!("OCR: PaddleOCR (DirectML/GPU — libera a CPU)"),
                 None => log::warn!("OCR: PaddleOCR indisponível — usando Windows OCR"),
             }
             let mut had_leak = false;
