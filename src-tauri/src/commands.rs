@@ -762,6 +762,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     } else {
         engine::ingest_url(&config)
     };
+    log::info!(
+        "motor: protetor={protect} delay={delay_sec}s saídas-leem={}",
+        if protect { "_delayed" } else { "live" }
+    );
     // Encoder do protetor: hardware (GPU) se houver — corta a CPU e mantém o tempo real.
     let prot_hw = if protect { detect_hw_encoder(&app).await } else { None };
     if protect {
