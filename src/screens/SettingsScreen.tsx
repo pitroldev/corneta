@@ -6,6 +6,7 @@ import { obsIngestUrl } from "../lib/factory";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { Button, Card, Input, SectionTitle, Toggle } from "../components/ui";
+import { Slider } from "../components/Slider";
 
 export function SettingsScreen() {
   const config = useStore((s) => s.config);
@@ -199,6 +200,25 @@ export function SettingsScreen() {
                   checked={settings.guardianAction === "censor"}
                   onChange={(v) => setSettings({ guardianAction: v ? "censor" : "warn" })}
                   label="Censurar automaticamente"
+                />
+              </label>
+              <label className="flex items-center gap-4">
+                <span className="text-sm font-semibold text-ink-muted">
+                  Delay de proteção
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    atrasa a transmissão alguns segundos pra a censura cortar{" "}
+                    <strong className="text-ink-muted">antes</strong> do segredo ir pro ar
+                    (preventivo). 0 = reativo (corta logo depois que aparece). Custa latência vs o
+                    chat + um pouco de CPU.
+                  </span>
+                </span>
+                <Slider
+                  className="ml-auto w-40 shrink-0"
+                  value={settings.protectDelaySec}
+                  min={0}
+                  max={10}
+                  onChange={(v) => setSettings({ protectDelaySec: v })}
+                  suffix="s"
                 />
               </label>
               <label className="flex flex-col gap-1">

@@ -136,6 +136,8 @@ export interface AppSettings {
   guardianAction: "warn" | "censor";
   /** Termos pessoais a vigiar (endereço, nome, @…). */
   guardianWatchlist: string[];
+  /** Delay de proteção (s, 0 = off): atrasa a saída pra a censura ser preventiva. */
+  protectDelaySec: number;
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */

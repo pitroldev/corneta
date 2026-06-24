@@ -83,16 +83,29 @@ fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
 
 /// Monta os argumentos de UM FFmpeg para UM destino (lê do MediaMTX → 1 saída).
 /// Um processo por plataforma → métricas REAIS por destino e reconexão independente.
+/// URL de leitura ao vivo (ingestão do OBS).
+pub fn ingest_url(config: &AppConfig) -> String {
+    format!(
+        "{}://{}:{}/{}/{}",
+        config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
+    )
+}
+/// URL do sinal ATRASADO (republicado pelo delayer) — usada quando o delay de proteção está ligado.
+pub fn delayed_url(config: &AppConfig) -> String {
+    format!(
+        "{}://{}:{}/{}/{}_delayed",
+        config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
+    )
+}
+
 pub fn ffmpeg_args_for_target(
     config: &AppConfig,
     t: &Target,
     key: &str,
     br_override: Option<u32>,
+    source_url: &str,
 ) -> Vec<String> {
-    let ingest = format!(
-        "{}://{}:{}/{}/{}",
-        config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
-    );
+    let ingest = source_url.to_string();
     let url = output_url(t, key);
     let action = effective_action(&config.mode, t);
 
@@ -162,6 +175,51 @@ pub fn ffmpeg_args_for_target(
     );
 
     args
+}
+
+/// **Delayer**: lê a ingestão ao vivo, atrasa N segundos (vídeo via `tpad`, áudio via `adelay`)
+/// e republica num path `_delayed` do MediaMTX. As saídas leem desse path → tudo sai N atrás.
+/// É isso que dá a JANELA pra censura ser PREVENTIVA (corta antes do segredo ir pro ar).
+pub fn ffmpeg_args_for_delayer(config: &AppConfig, delay_sec: u32) -> Vec<String> {
+    let d = delay_sec.max(1);
+    let ms = d * 1000;
+    vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "warning".into(),
+        "-i".into(),
+        ingest_url(config),
+        // Atraso de transmissão: prepende N s (clonando o 1º quadro) → tudo fica N atrás.
+        "-vf".into(),
+        format!("tpad=start_duration={d}:start_mode=clone"),
+        "-af".into(),
+        format!("adelay=delays={ms}:all=1"),
+        "-c:v".into(),
+        "libx264".into(),
+        "-preset".into(),
+        "veryfast".into(),
+        "-b:v".into(),
+        "6000k".into(),
+        "-maxrate".into(),
+        "6000k".into(),
+        "-bufsize".into(),
+        "12000k".into(),
+        "-g".into(),
+        "120".into(),
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-c:a".into(),
+        "aac".into(),
+        "-ar".into(),
+        "48000".into(),
+        "-ac".into(),
+        "2".into(),
+        "-b:a".into(),
+        "160k".into(),
+        "-f".into(),
+        "flv".into(),
+        delayed_url(config),
+    ]
 }
 
 /// Monta o FFmpeg do **slate "JÁ VOLTO"**: gera vídeo a partir de uma imagem (ou cor sólida)

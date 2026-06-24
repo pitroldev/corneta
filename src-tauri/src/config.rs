@@ -127,6 +127,10 @@ pub struct Settings {
     /// Termos pessoais do streamer a vigiar (endereço, nome real, @, placa…).
     #[serde(default)]
     pub guardian_watchlist: Vec<String>,
+    /// Delay de proteção em segundos (0 = off). Atrasa a saída pra a censura ser PREVENTIVA
+    /// (corta antes do segredo ir pro ar). Custa latência vs o chat + CPU (re-encode).
+    #[serde(default)]
+    pub protect_delay_sec: u32,
 }
 
 fn default_guardian_action() -> String {
@@ -200,6 +204,7 @@ impl Default for Settings {
             guardian_enabled: false,
             guardian_action: default_guardian_action(),
             guardian_watchlist: Vec::new(),
+            protect_delay_sec: 0,
         }
     }
 }

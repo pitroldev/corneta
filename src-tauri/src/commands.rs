@@ -685,6 +685,70 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let slate_png: Option<String> = brb_slate_path(&app)
         .filter(|p| p.exists())
         .map(|p| p.to_string_lossy().to_string());
+
+    // Delay de proteção: se ligado, sobe o "delayer" (republica o sinal atrasado em `_delayed`)
+    // e as saídas leem DESSE path → tudo sai N segundos atrás, e a censura vira PREVENTIVA.
+    let delay_sec = config.settings.protect_delay_sec;
+    let out_source = if delay_sec > 0 {
+        engine::delayed_url(&config)
+    } else {
+        engine::ingest_url(&config)
+    };
+    if delay_sec > 0 {
+        let (app_d, run_d, cfg_d) = (app.clone(), running.clone(), config.clone());
+        tauri::async_runtime::spawn(async move {
+            while run_d.load(Ordering::Relaxed) {
+                let args = engine::ffmpeg_args_for_delayer(&cfg_d, delay_sec);
+                let spawned = app_d.shell().sidecar("ffmpeg").and_then(|c| c.args(args).spawn());
+                let (mut rx, child) = match spawned {
+                    Ok(v) => v,
+                    Err(_) => {
+                        let _ = tauri::async_runtime::spawn_blocking(|| {
+                            std::thread::sleep(std::time::Duration::from_secs(2))
+                        })
+                        .await;
+                        continue;
+                    }
+                };
+                {
+                    let st = app_d.state::<AppState>();
+                    st.engine.lock().unwrap().ffmpegs.insert("_delayer".into(), child);
+                }
+                while let Some(ev) = rx.recv().await {
+                    if matches!(ev, CommandEvent::Terminated(_)) || !run_d.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+                let leftover = {
+                    let st = app_d.state::<AppState>();
+                    let removed = st.engine.lock().unwrap().ffmpegs.remove("_delayer");
+                    removed
+                };
+                if let Some(c) = leftover {
+                    let pid = c.pid();
+                    let _ = c.kill();
+                    #[cfg(windows)]
+                    {
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/PID", &pid.to_string(), "/T", "/F"])
+                            .output();
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        let _ = pid;
+                    }
+                }
+                if !run_d.load(Ordering::Relaxed) {
+                    break;
+                }
+                let _ = tauri::async_runtime::spawn_blocking(|| {
+                    std::thread::sleep(std::time::Duration::from_secs(1))
+                })
+                .await;
+            }
+        });
+    }
+
     for &t in &enabled {
         let key = keymap.get(&t.id).cloned().unwrap_or_default();
         let slate_args = engine::ffmpeg_args_for_slate(t, &key, slate_png.as_deref());
@@ -706,6 +770,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let signal = has_signal.clone();
         let seen = signal_seen.clone();
         let censor_t = censor.clone();
+        let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
             while run_flag.load(Ordering::Relaxed) {
@@ -741,7 +806,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
 
                 // Com sinal: FFmpeg normal (lê do MediaMTX → plataforma) no bitrate atual.
-                let args = engine::ffmpeg_args_for_target(&cfg, &target, &key, Some(current_kbps));
+                let args =
+                    engine::ffmpeg_args_for_target(&cfg, &target, &key, Some(current_kbps), &out_source);
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")

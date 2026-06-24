@@ -53,6 +53,7 @@ export function defaultConfig(): AppConfig {
       guardianEnabled: false,
       guardianAction: "warn",
       guardianWatchlist: [],
+      protectDelaySec: 0,
     },
     profiles: [{ id: profId, name: "Padrão", mode: "hybrid", targets }],
     activeProfileId: profId,

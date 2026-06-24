@@ -5,7 +5,7 @@
 > seu**. É também o **habilitador** do auto-corte do [`anti-vazamento`](./FEATURE-ANTI-VAZAMENTO.md).
 > Ver [`IDEIAS-v3.md`](./IDEIAS-v3.md) §1.
 
-- **Status:** Planejamento técnico · 2026-06-24
+- **Status:** ✅ **Delay implementado** (republish `_delayed` via tpad/adelay; saídas leem dele; torna a censura PREVENTIVA) · 🔬 não validado com stream real · 2026-06-24
 - **Relacionado:** [`FEATURE-ANTI-VAZAMENTO.md`](./FEATURE-ANTI-VAZAMENTO.md), proteção contra quedas / `run_slate`, [`MONETIZACAO.md`](./MONETIZACAO.md)
 
 ---
