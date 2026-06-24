@@ -211,14 +211,18 @@ pub fn ffmpeg_args_for_protector(config: &AppConfig, delay_sec: u32) -> Vec<Stri
         vf,
         "-c:v".into(),
         "libx264".into(),
+        // ultrafast + zerolatency: o protetor PRECISA acompanhar o tempo real, senão o MediaMTX
+        // derruba o leitor lento (I/O error → respawn em loop → live caindo). Custo de CPU mínimo.
         "-preset".into(),
-        "veryfast".into(),
+        "ultrafast".into(),
+        "-tune".into(),
+        "zerolatency".into(),
         "-b:v".into(),
         "6000k".into(),
         "-maxrate".into(),
         "6000k".into(),
         "-bufsize".into(),
-        "12000k".into(),
+        "6000k".into(),
         "-g".into(),
         "120".into(),
         "-pix_fmt".into(),
@@ -310,8 +314,10 @@ pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> 
 pub fn mediamtx_config(config: &AppConfig) -> String {
     format!(
         concat!(
-            "logLevel: error\n",
+            "logLevel: info\n",
             "logDestinations: [stdout]\n",
+            // Folga de buffer: evita derrubar leitor que atrasa um pouco (ex.: o protetor re-encodando).
+            "writeQueueSize: 2048\n",
             "rtmp: yes\n",
             "rtmpAddress: {host}:{port}\n",
             "rtsp: no\n",

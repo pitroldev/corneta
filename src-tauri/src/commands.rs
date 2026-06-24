@@ -607,9 +607,18 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     tauri::async_runtime::spawn(async move {
         while let Some(ev) = mtx_rx.recv().await {
             if let CommandEvent::Stdout(b) | CommandEvent::Stderr(b) = ev {
-                let line = String::from_utf8_lossy(&b).to_lowercase();
+                let raw = String::from_utf8_lossy(&b);
+                let line = raw.to_lowercase();
                 if line.contains("address already in use") {
                     set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
+                }
+                // Diagnóstico: por que um leitor/publisher caiu? (ex.: "is too slow", timeouts.)
+                if line.contains("too slow")
+                    || line.contains("timed out")
+                    || line.contains("err")
+                    || (line.contains("closing") && line.contains("publisher"))
+                {
+                    log::warn!("mediamtx: {}", raw.trim());
                 }
             }
         }
