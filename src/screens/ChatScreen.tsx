@@ -364,7 +364,7 @@ function SourceCard({
           </button>
         </div>
       </div>
-      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_8rem]">
+      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_11rem]">
         <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
           {VALUE_LABEL[src.platform]}
           <input
