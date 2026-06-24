@@ -37,7 +37,7 @@ Já estabelecemos (no [`IDEIAS.md`](./IDEIAS.md)) que a Corneta brilha onde **o 
 | **Tradução do chat de entrada** | 🟢🟢 | 🟡 | ✅ único | entender o chat gringo no feed unificado |
 | **Auto-moderação com IA no chat unificado** | 🟢🟢🟢 | 🟡 | ✅ único | uma regra pra todas as plataformas (estende ENVIO) |
 | **Clima/vibe do chat ao vivo** | 🟢🟢 | 🟡 | ✅ bom | "termômetro" de hype/positividade |
-| **Relatório turbinado: retenção & crescimento** | 🟢🟢🟢 | 🟡 | ✅ ótimo | usa os viewers que já pollamos + a sessão |
+| **Relatório turbinado: retenção & crescimento** | 🟢🟢🟢 | 🟡 | ✅ ótimo | ✅ **FEITO** |
 | **Controle remoto pelo celular** | 🟢🟢 | 🟡 | ✅ bom | start/stop, pausar destino, marcar momento sem alt-tab |
 | **Resumo pós-live por IA** | 🟢🟢 | 🟡 | ✅ bom | "como foi a live" em 5 linhas + clipes sugeridos |
 | **Co-host/chatbot de IA** | 🟢 | 🔴 | ➖ evitar | território do Streamer.bot |

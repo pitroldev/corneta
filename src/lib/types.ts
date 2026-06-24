@@ -325,6 +325,8 @@ export interface SessionSample {
   cpu?: number;
   gpu?: number;
   obs?: ObsStats;
+  /** Mensagens de chat nesta janela (~2s) — vira taxa de chat / picos. */
+  chat?: number;
   targets: SessionSampleTarget[];
 }
 
@@ -333,8 +335,24 @@ export interface SessionMarker {
   label: string;
 }
 
+export interface SessionViewerSample {
+  t: number;
+  total: number;
+  items: { platform: ChatPlatform; source: string; viewers: number | null }[];
+}
+
+export interface SessionAlertEvent {
+  t: number;
+  platform: ChatPlatform;
+  kind: AlertKind;
+  user: string;
+  amount?: number;
+}
+
 export interface SessionData {
   meta: SessionMeta;
   samples: SessionSample[];
   markers: SessionMarker[];
+  viewerSamples: SessionViewerSample[];
+  alertEvents: SessionAlertEvent[];
 }

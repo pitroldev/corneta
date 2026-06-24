@@ -543,6 +543,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // Já teve sinal ao menos uma vez nesta sessão? (slate "JÁ VOLTO" só vale em QUEDAS.)
     let signal_seen = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
+    chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
     // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
         .iter()
@@ -1010,9 +1011,10 @@ fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
     let session = eng.session_path.clone();
     drop(eng);
     emit(app, &out);
-    // Grava a amostra desta janela (~2s) no NDJSON da sessão.
+    // Grava a amostra desta janela (~2s) no NDJSON, com a taxa de chat (lê+zera o contador).
     if let Some(path) = session {
-        session::record_sample(&path, &out);
+        let chat = chat::MSG_COUNT.swap(0, std::sync::atomic::Ordering::Relaxed);
+        session::record_sample(&path, &out, chat);
     }
 }
 

@@ -57,6 +57,13 @@ static MSG_ID: AtomicU64 = AtomicU64::new(1);
 fn next_id() -> String {
     MSG_ID.fetch_add(1, Ordering::Relaxed).to_string()
 }
+/// Mensagens de chat desde a última amostra (o motor lê+zera a cada ~2s → taxa de chat).
+pub static MSG_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Caminho do NDJSON da sessão em gravação (None se não estiver transmitindo).
+fn session_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    app.state::<AppState>().engine.lock().ok()?.session_path.clone()
+}
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -71,6 +78,7 @@ fn frags_to_text(frags: &[ChatFragment]) -> String {
 }
 
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
+    MSG_COUNT.fetch_add(1, Ordering::Relaxed);
     let _ = app.emit("chat://message", msg);
 }
 fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
@@ -121,6 +129,9 @@ pub struct Alert {
 }
 
 fn emit_alert(app: &AppHandle, alert: Alert) {
+    if let Some(p) = session_path(app) {
+        crate::session::record_alert(&p, &alert.platform, &alert.kind, &alert.user, alert.amount);
+    }
     let _ = app.emit("alert://event", alert);
 }
 
@@ -128,6 +139,7 @@ fn emit_alert(app: &AppHandle, alert: Alert) {
 
 /// (Re)inicia o chat com base nas fontes configuradas.
 pub fn start_chat(app: &AppHandle) {
+    MSG_COUNT.store(0, Ordering::Relaxed);
     let s = crate::config::load(app).settings;
     let running = {
         let st = app.state::<AppState>();
@@ -1199,6 +1211,9 @@ fn run_viewers(
                 "viewers": count,
                 "live": count.is_some(),
             }));
+        }
+        if let Some(p) = session_path(&app) {
+            crate::session::record_viewers(&p, total, &items);
         }
         let _ = app.emit(
             "viewers://update",

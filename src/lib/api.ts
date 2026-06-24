@@ -280,6 +280,9 @@ function mockApi(): CornetaApi {
     const n = Math.round((mins * 60 * 1000) / step);
     const base = [6000, 9000, 6000, 4500];
     const drops = plats.map(() => 0);
+    const raidAtMin = Math.min(mins * 0.35, 11);
+    const raidViewers = 90 + Math.floor(Math.random() * 110);
+    const vbase = plats.map((p) => (p.platformId === "youtube" ? 70 : 280));
     for (let k = 0; k < n; k++) {
       const t = startedAt + k * step;
       const minNow = (k * step) / 60000;
@@ -306,6 +309,10 @@ function mockApi(): CornetaApi {
         outputSkipped: incident ? 30 : 0,
         congestion: incident ? 0.6 + Math.random() * 0.2 : Math.random() * 0.06,
       };
+      const nearRaid = Math.abs(minNow - raidAtMin) < 0.5;
+      let chat = Math.round(5 + Math.sin(k / 11) * 2 + Math.random() * 4);
+      if (nearRaid) chat += 18;
+      if (Math.random() < 0.015) chat += 14;
       lines.push(
         JSON.stringify({
           kind: "sample",
@@ -313,10 +320,46 @@ function mockApi(): CornetaApi {
           cpu: Math.round(cpu * 10) / 10,
           gpu: Math.round(gpu * 10) / 10,
           obs,
+          chat,
           targets,
         })
       );
+      if (k % 15 === 0) {
+        const ramp = Math.min(1, minNow / 5);
+        const items = plats.map((p, i) => {
+          let v = Math.round(vbase[i] * ramp * (0.9 + Math.random() * 0.15));
+          if (minNow >= raidAtMin) v += Math.round(raidViewers / plats.length);
+          return { platform: p.platformId, source: p.name, viewers: v };
+        });
+        const total = items.reduce((acc, x) => acc + (x.viewers ?? 0), 0);
+        lines.push(JSON.stringify({ kind: "viewers", t, total, items }));
+      }
     }
+    // Alertas de exemplo: raid (pico), subs/membros espalhados, gift bomb e bits.
+    const at = (mm: number) => startedAt + mm * 60000;
+    lines.push(
+      JSON.stringify({ kind: "alert", t: at(raidAtMin), platform: plats[0].platformId, alertKind: "raid", user: "Gaules", amount: raidViewers })
+    );
+    ["sub", "resub", "sub", "member", "resub"].forEach((kd, idx) => {
+      const mm = 3 + idx * 6;
+      if (mm < mins)
+        lines.push(
+          JSON.stringify({
+            kind: "alert",
+            t: at(mm),
+            platform: plats[idx % plats.length].platformId,
+            alertKind: kd,
+            user: ["ana_live", "brabo_do_rio", "zedapeça", "kraderson", "luluzinha"][idx],
+            amount: kd === "resub" ? 2 + idx : 1,
+          })
+        );
+    });
+    lines.push(
+      JSON.stringify({ kind: "alert", t: at(Math.min(mins * 0.55, 16)), platform: plats[0].platformId, alertKind: "subgift", user: "Patrocinador", amount: 10 })
+    );
+    lines.push(
+      JSON.stringify({ kind: "alert", t: at(Math.min(mins * 0.28, 8)), platform: plats[0].platformId, alertKind: "bits", user: "fa_numero_1", amount: 1000 })
+    );
     if (opts?.dropAtMin != null) {
       lines.push(
         JSON.stringify({ kind: "marker", t: startedAt + opts.dropAtMin * 60000, label: "Twitch caiu" })

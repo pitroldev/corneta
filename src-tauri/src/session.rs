@@ -61,8 +61,8 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
     Some(path)
 }
 
-/// Grava uma amostra (estado atual de todos os destinos + CPU/GPU).
-pub fn record_sample(path: &Path, snap: &EngineSnapshot) {
+/// Grava uma amostra (estado dos destinos + CPU/GPU + nº de mensagens de chat na janela).
+pub fn record_sample(path: &Path, snap: &EngineSnapshot, chat_count: u64) {
     let targets: Vec<Value> = snap
         .targets
         .values()
@@ -83,9 +83,29 @@ pub fn record_sample(path: &Path, snap: &EngineSnapshot) {
         "cpu": snap.cpu,
         "gpu": snap.gpu,
         "obs": snap.obs,
+        "chat": chat_count,
         "targets": targets,
     });
     append_line(path, &sample);
+}
+
+/// Grava a contagem de viewers (total + por fonte) — pra curva de retenção do relatório.
+pub fn record_viewers(path: &Path, total: u64, items: &[Value]) {
+    append_line(
+        path,
+        &json!({ "kind": "viewers", "t": now_ms(), "total": total, "items": items }),
+    );
+}
+
+/// Grava um alerta (sub/raid/bits…) na sessão — pra timeline e momentos de destaque.
+pub fn record_alert(path: &Path, platform: &str, kind: &str, user: &str, amount: Option<f64>) {
+    append_line(
+        path,
+        &json!({
+            "kind": "alert", "t": now_ms(),
+            "platform": platform, "alertKind": kind, "user": user, "amount": amount,
+        }),
+    );
 }
 
 /// Fecha a sessão (marca o fim).

@@ -8,6 +8,10 @@ import {
   Activity,
   Cpu,
   Clock,
+  Eye,
+  MessageSquare,
+  Copy,
+  Scissors,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { PLATFORMS } from "../lib/platforms";
@@ -17,11 +21,15 @@ import type { SessionData, SessionMeta } from "../lib/types";
 import {
   analyze,
   bitrateSeries,
+  chatRateSeries,
   cpuSeries,
   gpuSeries,
+  hasChat,
   hasObs,
   obsRenderSeries,
   parseSession,
+  viewerSeries,
+  type Highlight,
   type ProblemWindow,
   type ReportEvent,
 } from "../lib/report";
@@ -196,6 +204,40 @@ function ReportDetail({
     ...(hasGpu ? [{ label: "GPU", color: "#56b3ff", values: gpu }] : []),
   ];
 
+  // Retenção (viewers) — timeline própria; marca raids (costumam dar pico).
+  const vN = data.viewerSamples.length;
+  const viewerIndexAt = (t: number) => {
+    for (let i = 0; i < vN; i++) if (data.viewerSamples[i].t >= t) return i;
+    return Math.max(0, vN - 1);
+  };
+  const raidMarkers: ChartMarker[] = data.alertEvents
+    .filter((e) => e.kind === "raid")
+    .map((e) => ({ index: viewerIndexAt(e.t), color: "#7c9cff" }));
+  const chatMarkers: ChartMarker[] = a.highlights
+    .filter((h) => h.kind === "chat")
+    .map((h) => ({ index: indexAt(h.t), color: "#ffb323" }));
+
+  // Tempo relativo ao início (pra achar/clipar no VOD).
+  const rel = (t: number) => {
+    const s = Math.max(0, Math.round((t - data.meta.startedAt) / 1000));
+    const h = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, "0");
+    const ss = (s % 60).toString().padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  };
+
+  // Stats de engajamento pro topo.
+  const heroStats: { label: string; value: string; accent?: boolean }[] = [];
+  if (a.viewers.hasData) {
+    heroStats.push({ label: "Pico de viewers", value: a.viewers.peak.toLocaleString("pt-BR"), accent: true });
+    heroStats.push({ label: "Média", value: a.viewers.avg.toLocaleString("pt-BR") });
+  }
+  if (a.alerts.subs > 0) heroStats.push({ label: "Inscrições", value: String(a.alerts.subs) });
+  if (a.alerts.bits > 0) heroStats.push({ label: "Bits", value: a.alerts.bits.toLocaleString("pt-BR") });
+  if (a.alerts.raids > 0)
+    heroStats.push({ label: "Raids", value: `${a.alerts.raids} · +${a.alerts.raidViewers}` });
+  if (a.chat.hasData) heroStats.push({ label: "Mensagens", value: a.chat.total.toLocaleString("pt-BR") });
+
   const tone =
     a.verdict.tone === "ok"
       ? "border-ok/40 bg-ok/10 text-ok"
@@ -223,6 +265,28 @@ function ReportDetail({
         {data.meta.platforms.map((p) => p.name).join(", ")} · modo {data.meta.mode}
       </div>
 
+      {/* Painel de engajamento */}
+      {heroStats.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {heroStats.map((s) => (
+            <div
+              key={s.label}
+              className={cn(
+                "rounded-lg border-2 px-3 py-2.5",
+                s.accent ? "border-brass bg-brass/10" : "border-border-soft bg-surface-2"
+              )}
+            >
+              <div className="font-display text-2xl font-extrabold leading-none tabular-nums">
+                {s.value}
+              </div>
+              <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Veredito */}
       <Card className={cn("mb-4 flex items-start gap-3 border-2", tone)}>
         <AlertTriangle className="mt-0.5 size-5 shrink-0" />
@@ -231,6 +295,118 @@ function ReportDetail({
           <div className="text-sm text-ink-muted">{a.verdict.detail}</div>
         </div>
       </Card>
+
+      {/* Retenção (audiência ao vivo) */}
+      {a.viewers.hasData && vN > 1 && (
+        <Card className="mb-4">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+            <Eye className="size-4" /> Audiência ao vivo (retenção)
+          </h3>
+          <LineChart
+            series={[{ label: "Assistindo", color: "#56e39b", values: viewerSeries(data) }]}
+            n={vN}
+            markers={raidMarkers}
+            formatValue={(v) => Math.round(v).toLocaleString("pt-BR")}
+          />
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
+            <span>
+              Pico <strong className="text-ink">{a.viewers.peak.toLocaleString("pt-BR")}</strong>
+            </span>
+            <span>
+              Média <strong className="text-ink">{a.viewers.avg.toLocaleString("pt-BR")}</strong>
+            </span>
+            <span>
+              Começo {a.viewers.start} → fim {a.viewers.end}
+            </span>
+            {raidMarkers.length > 0 && <span className="text-[#7c9cff]">● raids</span>}
+          </div>
+          {a.viewers.byPlatform.length > 1 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {a.viewers.byPlatform.map((p) => (
+                <span
+                  key={`${p.platform}:${p.source}`}
+                  className="flex items-center gap-1.5 rounded bg-surface-2 px-2 py-1 text-xs text-ink-muted"
+                >
+                  <PlatformGlyph id={p.platform} size={14} /> {p.source}:{" "}
+                  <strong className="text-ink">{p.peak.toLocaleString("pt-BR")}</strong>
+                </span>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Momentos de destaque (clipes sugeridos) */}
+      {a.highlights.length > 0 && (
+        <Card className="mb-4">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+            <Scissors className="size-4 text-brass" /> Momentos de destaque (pra clipar)
+          </h3>
+          <div className="flex flex-col gap-1.5">
+            {a.highlights.map((h, i) => (
+              <HighlightRow key={i} h={h} time={rel(h.t)} />
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-ink-faint">
+            ⏱️ Tempos relativos ao início da live — use no seu VOD pra cortar o clipe.
+          </p>
+        </Card>
+      )}
+
+      {/* Atividade do chat */}
+      {hasChat(data) && n > 1 && (
+        <Card className="mb-4">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+            <MessageSquare className="size-4" /> Atividade do chat (msgs/min)
+          </h3>
+          <LineChart
+            series={[{ label: "msgs/min", color: "#ffb323", values: chatRateSeries(data) }]}
+            n={n}
+            markers={chatMarkers}
+            formatValue={(v) => Math.round(v).toString()}
+          />
+          <div className="mt-2 text-xs text-ink-muted">
+            Total <strong className="text-ink">{a.chat.total.toLocaleString("pt-BR")}</strong> · pico{" "}
+            <strong className="text-ink">{a.chat.peakPerMin}/min</strong> · média {a.chat.avgPerMin}
+            /min
+          </div>
+        </Card>
+      )}
+
+      {/* Resumo dos alertas */}
+      {a.alerts.hasData && (
+        <Card className="mb-4">
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+            Alertas da live
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {ALERT_LABELS.map(([k, label, emoji]) =>
+              a.alerts.byKind[k] ? (
+                <span
+                  key={k}
+                  className="flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 text-sm"
+                >
+                  <span>{emoji}</span> <strong>{a.alerts.byKind[k]}</strong>{" "}
+                  <span className="text-ink-muted">{label}</span>
+                </span>
+              ) : null
+            )}
+            {a.alerts.bits > 0 && (
+              <span className="flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 text-sm">
+                💎 <strong>{a.alerts.bits.toLocaleString("pt-BR")}</strong>{" "}
+                <span className="text-ink-muted">bits no total</span>
+              </span>
+            )}
+          </div>
+          {a.alerts.topRaid && a.alerts.topRaid.amount > 0 && (
+            <div className="mt-2 text-xs text-ink-muted">
+              🚀 Maior raid:{" "}
+              <strong className="text-ink">{a.alerts.topRaid.user}</strong> (+
+              {Math.round(a.alerts.topRaid.amount)})
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Gráfico de bitrate por plataforma */}
       {n > 1 && (
@@ -356,6 +532,44 @@ function EventRow({ e }: { e: ReportEvent }) {
       <span className="w-12 shrink-0 text-xs tabular-nums text-ink-faint">{fmtTime(e.t)}</span>
       <span className={cn("size-2 shrink-0 rounded-full", EVENT_DOT[e.kind])} />
       <span className="text-ink-muted">{e.label}</span>
+    </div>
+  );
+}
+
+const ALERT_LABELS: [string, string, string][] = [
+  ["sub", "inscrições", "⭐"],
+  ["resub", "resubs", "🔁"],
+  ["subgift", "gifts", "🎁"],
+  ["member", "membros", "🏅"],
+  ["superchat", "super chats", "💬"],
+  ["raid", "raids", "🚀"],
+  ["follow", "follows", "💜"],
+];
+
+const HL_ICON: Record<Highlight["kind"], string> = {
+  chat: "💬",
+  raid: "🚀",
+  viewers: "📈",
+  alert: "🎉",
+};
+
+function HighlightRow({ h, time }: { h: Highlight; time: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md bg-surface-2 px-3 py-2">
+      <span className="text-lg leading-none">{HL_ICON[h.kind]}</span>
+      <span className="w-16 shrink-0 font-display font-extrabold tabular-nums text-ink">{time}</span>
+      <span className="flex-1 text-sm text-ink-muted">{h.reason}</span>
+      <button
+        onClick={() => {
+          void navigator.clipboard?.writeText(time);
+          toast.success("Tempo copiado");
+        }}
+        className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        title="Copiar tempo"
+        aria-label="Copiar tempo"
+      >
+        <Copy className="size-3.5" />
+      </button>
     </div>
   );
 }

@@ -3,11 +3,15 @@
 // problemáticas, veredito). Ver docs/RELATORIO-POS-LIVE.md.
 // ============================================================
 import type {
+  AlertKind,
+  ChatPlatform,
   PlatformId,
+  SessionAlertEvent,
   SessionData,
   SessionMarker,
   SessionMeta,
   SessionSample,
+  SessionViewerSample,
 } from "./types";
 
 type RawLine = { kind?: string; [k: string]: unknown };
@@ -18,6 +22,8 @@ export function parseSession(ndjson: string): SessionData | null {
   let meta: SessionMeta | null = null;
   const samples: SessionSample[] = [];
   const markers: SessionMarker[] = [];
+  const viewerSamples: SessionViewerSample[] = [];
+  const alertEvents: SessionAlertEvent[] = [];
   let endedAt: number | undefined;
 
   for (const line of lines) {
@@ -41,7 +47,22 @@ export function parseSession(ndjson: string): SessionData | null {
         cpu: o.cpu == null ? undefined : Number(o.cpu),
         gpu: o.gpu == null ? undefined : Number(o.gpu),
         obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
+        chat: o.chat == null ? undefined : Number(o.chat),
         targets: (o.targets ?? []) as SessionSample["targets"],
+      });
+    } else if (o.kind === "viewers") {
+      viewerSamples.push({
+        t: Number(o.t),
+        total: Number(o.total) || 0,
+        items: (o.items ?? []) as SessionViewerSample["items"],
+      });
+    } else if (o.kind === "alert") {
+      alertEvents.push({
+        t: Number(o.t),
+        platform: o.platform as ChatPlatform,
+        kind: o.alertKind as AlertKind,
+        user: String(o.user ?? "alguém"),
+        amount: o.amount == null ? undefined : Number(o.amount),
       });
     } else if (o.kind === "marker") {
       markers.push({ t: Number(o.t), label: String(o.label ?? "Momento") });
@@ -55,7 +76,7 @@ export function parseSession(ndjson: string): SessionData | null {
   const end = endedAt ?? last;
   meta.endedAt = end;
   meta.durationSec = Math.max(0, Math.round((end - meta.startedAt) / 1000));
-  return { meta, samples, markers };
+  return { meta, samples, markers, viewerSamples, alertEvents };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +99,21 @@ export const obsCongestionSeries = (d: SessionData): (number | null)[] =>
 export const obsRenderSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => (s.obs ? s.obs.avgRenderMs : null));
 
+/** Audiência somada (todas as plataformas) ao longo do tempo. */
+export const viewerSeries = (d: SessionData): (number | null)[] =>
+  d.viewerSamples.map((s) => s.total);
+
+/** Taxa de chat em mensagens/min, por amostra (~2s). */
+export function chatRateSeries(d: SessionData): (number | null)[] {
+  const s = d.samples;
+  return s.map((x, i) => {
+    if (x.chat == null) return null;
+    const dt = i > 0 ? (x.t - s[i - 1].t) / 1000 : 2;
+    return dt > 0 ? Math.round((x.chat * 60) / dt) : 0;
+  });
+}
+export const hasChat = (d: SessionData): boolean => d.samples.some((s) => (s.chat ?? 0) > 0);
+
 // ---------------------------------------------------------------------------
 // Análise
 // ---------------------------------------------------------------------------
@@ -97,6 +133,41 @@ export interface ProblemWindow {
   targetName?: string;
 }
 
+export interface ViewerStats {
+  peak: number;
+  avg: number;
+  start: number;
+  end: number;
+  /** Audiência por plataforma no pico (último item de cada). */
+  byPlatform: { platform: ChatPlatform; source: string; peak: number }[];
+  hasData: boolean;
+}
+
+export interface ChatStats {
+  total: number;
+  peakPerMin: number;
+  avgPerMin: number;
+  hasData: boolean;
+}
+
+export interface AlertStats {
+  total: number;
+  byKind: Record<string, number>;
+  subs: number;
+  bits: number;
+  raids: number;
+  raidViewers: number;
+  topRaid?: { user: string; amount: number };
+  hasData: boolean;
+}
+
+export interface Highlight {
+  t: number;
+  kind: "chat" | "raid" | "viewers" | "alert";
+  reason: string;
+  score: number;
+}
+
 export interface ReportAnalysis {
   events: ReportEvent[];
   windows: ProblemWindow[];
@@ -114,6 +185,10 @@ export interface ReportAnalysis {
     maxDropped: number;
     reconnects: number;
   }[];
+  viewers: ViewerStats;
+  chat: ChatStats;
+  alerts: AlertStats;
+  highlights: Highlight[];
 }
 
 const CPU_HIGH = 92;
@@ -367,6 +442,99 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   };
 }
 
+function viewerStats(d: SessionData): ViewerStats {
+  const vs = d.viewerSamples;
+  if (!vs.length) return { peak: 0, avg: 0, start: 0, end: 0, byPlatform: [], hasData: false };
+  const totals = vs.map((v) => v.total);
+  const peakByKey: Record<string, { platform: ChatPlatform; source: string; peak: number }> = {};
+  for (const v of vs)
+    for (const it of v.items) {
+      const k = `${it.platform}:${it.source}`;
+      const cur = peakByKey[k] ?? { platform: it.platform, source: it.source, peak: 0 };
+      cur.peak = Math.max(cur.peak, it.viewers ?? 0);
+      peakByKey[k] = cur;
+    }
+  return {
+    peak: Math.max(...totals),
+    avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
+    start: totals[0],
+    end: totals[totals.length - 1],
+    byPlatform: Object.values(peakByKey).sort((a, b) => b.peak - a.peak),
+    hasData: true,
+  };
+}
+
+function chatStats(d: SessionData): ChatStats {
+  const total = d.samples.reduce((a, s) => a + (s.chat ?? 0), 0);
+  if (total === 0) return { total: 0, peakPerMin: 0, avgPerMin: 0, hasData: false };
+  const rate = chatRateSeries(d).filter((x): x is number => x != null);
+  const durMin = Math.max(1, d.meta.durationSec / 60);
+  return {
+    total,
+    peakPerMin: rate.length ? Math.max(...rate) : 0,
+    avgPerMin: Math.round(total / durMin),
+    hasData: true,
+  };
+}
+
+function alertStats(d: SessionData): AlertStats {
+  const a = d.alertEvents;
+  const byKind: Record<string, number> = {};
+  let bits = 0;
+  let raids = 0;
+  let raidViewers = 0;
+  let topRaid: { user: string; amount: number } | undefined;
+  for (const e of a) {
+    byKind[e.kind] = (byKind[e.kind] ?? 0) + 1;
+    if (e.kind === "bits") bits += e.amount ?? 0;
+    if (e.kind === "raid") {
+      raids++;
+      raidViewers += e.amount ?? 0;
+      if (!topRaid || (e.amount ?? 0) > topRaid.amount)
+        topRaid = { user: e.user, amount: e.amount ?? 0 };
+    }
+  }
+  const subs =
+    (byKind.sub ?? 0) + (byKind.resub ?? 0) + (byKind.subgift ?? 0) + (byKind.member ?? 0);
+  return { total: a.length, byKind, subs, bits, raids, raidViewers, topRaid, hasData: a.length > 0 };
+}
+
+/** Momentos de destaque (clipes sugeridos): picos de chat, alertas fortes e saltos de audiência. */
+function highlights(d: SessionData): Highlight[] {
+  const out: Highlight[] = [];
+  const rate = chatRateSeries(d);
+  const valid = rate.filter((x): x is number => x != null && x > 0);
+  if (valid.length > 4) {
+    const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+    const thresh = Math.max(avg * 2.5, avg + 15);
+    rate.forEach((r, i) => {
+      if (r != null && r >= thresh)
+        out.push({ t: d.samples[i].t, kind: "chat", reason: `Chat explodiu (${r}/min)`, score: r });
+    });
+  }
+  for (const e of d.alertEvents) {
+    const amt = e.amount ?? 0;
+    if (e.kind === "raid" && amt >= 8)
+      out.push({ t: e.t, kind: "raid", reason: `Raid de ${e.user} (+${Math.round(amt)})`, score: 1000 + amt });
+    else if (e.kind === "subgift" && amt >= 5)
+      out.push({ t: e.t, kind: "alert", reason: `${e.user} presenteou ${Math.round(amt)} subs`, score: 500 + amt });
+    else if (e.kind === "superchat" && amt >= 20)
+      out.push({ t: e.t, kind: "alert", reason: `Super chat gordo de ${e.user}`, score: 400 + amt });
+    else if (e.kind === "bits" && amt >= 500)
+      out.push({ t: e.t, kind: "alert", reason: `${e.user}: ${Math.round(amt)} bits`, score: 300 + amt });
+  }
+  const vs = d.viewerSamples;
+  for (let i = 1; i < vs.length; i++) {
+    const delta = vs[i].total - vs[i - 1].total;
+    if (delta >= 15 && delta >= vs[i - 1].total * 0.2)
+      out.push({ t: vs[i].t, kind: "viewers", reason: `+${delta} assistindo de uma vez`, score: 150 + delta });
+  }
+  out.sort((a, b) => b.score - a.score);
+  const kept: Highlight[] = [];
+  for (const h of out) if (!kept.some((k) => Math.abs(k.t - h.t) < 40_000)) kept.push(h);
+  return kept.sort((a, b) => a.t - b.t).slice(0, 10);
+}
+
 export function analyze(data: SessionData): ReportAnalysis {
   const typical = typicalBitrates(data.samples);
   const windows = problemWindows(data, typical);
@@ -375,5 +543,9 @@ export function analyze(data: SessionData): ReportAnalysis {
     windows,
     verdict: buildVerdict(windows),
     ...aggregates(data),
+    viewers: viewerStats(data),
+    chat: chatStats(data),
+    alerts: alertStats(data),
+    highlights: highlights(data),
   };
 }
