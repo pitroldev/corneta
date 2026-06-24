@@ -181,6 +181,20 @@ pub fn ffmpeg_args_for_target(
 pub const GUARD_ZMQ_PORT: u16 = 5555;
 /// Quantas tarjas o protetor pré-aloca (drawbox escondidos, controlados por zmq).
 pub const GUARD_BOXES: usize = 6;
+/// Delay MÍNIMO (s) quando a censura automática está ligada — dá tempo de detectar e cobrir o
+/// vazamento ANTES dele ir ao ar (preventivo). Sem isso, o segredo airava ~0,3s descoberto.
+pub const PREVENTIVE_MIN_SEC: u32 = 2;
+
+/// Delay efetivo do protetor: o que o usuário pediu, mas NUNCA menos que o mínimo preventivo
+/// quando a censura automática está ligada. Protetor (tpad) e guardião (buffer) usam ISTO.
+pub fn effective_protect_delay(config: &AppConfig) -> u32 {
+    let censoring = config.settings.guardian_enabled && config.settings.guardian_action == "censor";
+    if censoring {
+        config.settings.protect_delay_sec.max(PREVENTIVE_MIN_SEC)
+    } else {
+        config.settings.protect_delay_sec
+    }
+}
 
 /// **Protetor**: UM FFmpeg persistente que lê a ingestão e republica em `_delayed`, aplicando:
 /// - `zmq` (recebe comandos em tempo real → mover/mostrar/esconder as tarjas SEM reiniciar nada),

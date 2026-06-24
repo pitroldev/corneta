@@ -754,7 +754,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // PROTETOR: se o guardião OU o delay estiverem ligados, sobe UM FFmpeg persistente que
     // republica o sinal em `_delayed` aplicando zmq + (delay) + drawboxes. As saídas leem DESSE
     // path e NUNCA reiniciam pra censurar → zero drop; o guardião move as tarjas via zmq.
-    let delay_sec = config.settings.protect_delay_sec;
+    // Delay efetivo: a censura automática FORÇA um mínimo (preventivo — tarja antes de airar).
+    let delay_sec = engine::effective_protect_delay(&config);
     let protect = config.settings.guardian_enabled || delay_sec > 0;
     let out_source = if protect {
         engine::delayed_url(&config)

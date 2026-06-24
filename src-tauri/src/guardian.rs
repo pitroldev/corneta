@@ -1,9 +1,10 @@
 //! Guardião anti-vazamento: amostra os frames de saída, faz OCR local (com bounding
 //! boxes), procura segredo na tela e avisa/censura — cobrindo SÓ a região do segredo
 //! (tarja) ou a tela toda. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use regex::Regex;
 use serde::Serialize;
@@ -511,8 +512,36 @@ fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
     }
 }
 
+/// Adiantamento da POSIÇÃO (s): atraso da tarja = delay − isto. Pequeno (≈ latência do
+/// rastreamento) → a posição casa quase exata com o vídeo atrasado, sem ficar adiantada (o que
+/// EXPORIA segredo em movimento — a tarja na frente, o segredo atrás).
+const LPOS_LEAD_SEC: f32 = 0.15;
+/// Frames de BACKFILL: quando um segredo SURGE, preenche o estado dele uns frames pra trás (≈0.45s)
+/// no buffer → cobre o atraso de DETECÇÃO (OCR), garantindo a tarja no ar antes do segredo airar.
+const BACKFILL_FRAMES: usize = 8;
+
+/// Devolve o estado das tarjas registrado em `alvo` (o mais recente com timestamp ≤ alvo).
+/// É assim que a tarja sai ATRASADA pra casar com o vídeo atrasado (preventivo, sem pulo no scroll).
+fn replay(
+    history: &VecDeque<(Instant, Vec<Option<Region>>)>,
+    alvo: Instant,
+    n: usize,
+) -> Vec<Option<Region>> {
+    let mut out: Option<&Vec<Option<Region>>> = None;
+    for (ts, st) in history.iter() {
+        if *ts <= alvo {
+            out = Some(st);
+        } else {
+            break; // ordenado por tempo → passou do alvo
+        }
+    }
+    out.cloned().unwrap_or_else(|| vec![None; n])
+}
+
 /// Guardião: DETECTA (OCR em background) + RASTREIA (movimento global, por frame) e comanda as
-/// tarjas via zmq — segue o conteúdo quase em tempo real, sem reiniciar nada.
+/// tarjas via zmq — segue o conteúdo quase em tempo real, sem reiniciar nada. SEMPRE PREVENTIVO:
+/// a posição da tarja sai atrasada pelo mesmo delay do vídeo (`d_box`), então ela cobre o segredo
+/// ANTES dele ir ao ar, casando com o frame atrasado mesmo em scroll.
 pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: Arc<AtomicBool>) {
     use zeromq::Socket;
     log::info!("guardião: ligado");
@@ -539,6 +568,14 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
     let mut tracks: Vec<Track> = vec![];
     let mut last_gen = 0u64;
     let mut prev: Option<Proj> = None;
+
+    // Delay efetivo do vídeo (igual ao tpad do protetor) → a POSIÇÃO da tarja sai atrasada por
+    // `d_box` (= delay − adiantamento), casando com o frame atrasado. Fixo na sessão (= ao spawn).
+    let n_eff = crate::engine::effective_protect_delay(&crate::config::load(&app)) as f32;
+    let d_box = (n_eff - LPOS_LEAD_SEC).max(0.0);
+    let mut history: VecDeque<(Instant, Vec<Option<Region>>)> = VecDeque::new();
+    let mut prev_live: Vec<Option<Region>> = vec![None; n];
+    log::info!("guardião: preventivo — vídeo ~{n_eff:.0}s atrás, tarja casa com o atrasado (d_box {d_box:.1}s)");
 
     loop {
         if !running.load(Ordering::Relaxed) {
@@ -606,13 +643,42 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
             }
         }
 
-        // Estado desejado por box.
-        let mut desired: Vec<Option<Region>> = vec![None; n];
+        // Estado AO VIVO rastreado (onde os segredos estão AGORA na borda ao vivo).
+        let mut live_desired: Vec<Option<Region>> = vec![None; n];
         for t in &tracks {
             if t.box_idx < n {
-                desired[t.box_idx] = Some(round_region((t.fx, t.fy, t.fw, t.fh)));
+                live_desired[t.box_idx] = Some(round_region((t.fx, t.fy, t.fw, t.fh)));
             }
         }
+        // BACKFILL: pra cada tarja que SURGIU agora, preenche o estado dela uns frames pra trás
+        // (esses frames ainda não foram pro ar, pois saem `d_box` depois) → cobre o atraso do OCR,
+        // garantindo a tarja no ar ANTES do frame do segredo, sem precisar adiantar a posição.
+        for i in 0..n {
+            if live_desired[i].is_some() && prev_live[i].is_none() {
+                let r = live_desired[i];
+                for (_, st) in history.iter_mut().rev().take(BACKFILL_FRAMES) {
+                    if st[i].is_none() {
+                        st[i] = r;
+                    }
+                }
+            }
+        }
+        prev_live = live_desired.clone();
+
+        // BUFFER PREVENTIVO: registra o estado ao vivo e usa o de `d_box` atrás → a tarja casa
+        // com o vídeo atrasado (cobre o segredo ANTES de airar, e sem pulo de posição no scroll).
+        let wall = Instant::now();
+        history.push_back((wall, live_desired));
+        let cutoff = wall
+            .checked_sub(Duration::from_secs_f32(d_box + 0.5))
+            .unwrap_or(wall);
+        while history.front().is_some_and(|(ts, _)| *ts < cutoff) {
+            history.pop_front();
+        }
+        let alvo = wall
+            .checked_sub(Duration::from_secs_f32(d_box))
+            .unwrap_or(wall);
+        let desired = replay(&history, alvo, n);
 
         // DELTA: manda só o que mudou.
         let mut dead = false;
@@ -641,12 +707,12 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
             continue;
         }
 
-        let now = shown.iter().any(|s| s.is_some());
-        if now != censoring {
-            censoring = now;
-            let _ = app.emit("leak://censor", now);
-            if now {
-                log::warn!("guardião: CENSURA (tarja) — {} região(ões)", tracks.len());
+        let any_shown = shown.iter().any(|s| s.is_some());
+        if any_shown != censoring {
+            censoring = any_shown;
+            let _ = app.emit("leak://censor", any_shown);
+            if any_shown {
+                log::warn!("guardião: CENSURA (tarja) no ar");
             } else {
                 log::info!("guardião: censura liberada (segredo saiu)");
             }

@@ -192,35 +192,64 @@ export function SettingsScreen() {
                 <span className="text-sm font-semibold text-ink-muted">
                   Censurar automaticamente
                   <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                    ao detectar algo grave (chave/CPF/cartão/seu dado), corta a saída pra uma tela de
-                    proteção na hora. Desligado, só avisa.
+                    ao detectar um segredo, cobre só a região dele com uma tarja preta que{" "}
+                    <strong className="text-ink-muted">segue o conteúdo</strong> (até se você
+                    rolar a tela). Desligado, só te avisa por toast.
                   </span>
                 </span>
                 <Toggle
                   checked={settings.guardianAction === "censor"}
-                  onChange={(v) => setSettings({ guardianAction: v ? "censor" : "warn" })}
+                  onChange={(v) =>
+                    setSettings({
+                      guardianAction: v ? "censor" : "warn",
+                      ...(v && settings.protectDelaySec < 2 ? { protectDelaySec: 2 } : {}),
+                    })
+                  }
                   label="Censurar automaticamente"
                 />
               </label>
-              <label className="flex items-center gap-4">
-                <span className="text-sm font-semibold text-ink-muted">
-                  Delay de proteção
-                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                    atrasa a transmissão alguns segundos pra a censura cortar{" "}
-                    <strong className="text-ink-muted">antes</strong> do segredo ir pro ar
-                    (preventivo). 0 = reativo (corta logo depois que aparece). Custa latência vs o
-                    chat + um pouco de CPU.
-                  </span>
-                </span>
-                <Slider
-                  className="ml-auto w-40 shrink-0"
-                  value={settings.protectDelaySec}
-                  min={0}
-                  max={10}
-                  onChange={(v) => setSettings({ protectDelaySec: v })}
-                  suffix="s"
-                />
-              </label>
+              {settings.guardianAction === "censor" && (
+                <>
+                  <div className="rounded-md border-2 border-brass/40 bg-brass/[0.06] p-3 text-xs leading-relaxed text-ink-muted">
+                    <div className="mb-1 font-display text-sm font-extrabold text-ink">
+                      🛡️ Proteção preventiva (sempre)
+                    </div>
+                    A tarja entra <strong className="text-ink">antes</strong> do vazamento ir ao
+                    ar — nunca exposto, nem num clipe. Pra garantir isso, a transmissão sai com um
+                    atraso. Os tradeoffs:
+                    <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                      <li>
+                        A transmissão inteira fica{" "}
+                        <strong className="text-ink">{Math.max(settings.protectDelaySec, 2)}s atrás</strong>{" "}
+                        do tempo real (mínimo 2s — tempo de detectar e cobrir).
+                      </li>
+                      <li>O chat e a interação ficam defasados por esse mesmo tempo.</li>
+                      <li>
+                        A tarja cobre um instante a mais logo <strong className="text-ink">antes</strong>{" "}
+                        do segredo (o preço de nunca expor).
+                      </li>
+                      <li>Custa um pouco de CPU/GPU (o protetor re-encoda o vídeo).</li>
+                    </ul>
+                  </div>
+                  <label className="flex items-center gap-4">
+                    <span className="text-sm font-semibold text-ink-muted">
+                      Atraso da transmissão
+                      <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                        quanto a saída fica atrás do tempo real. Mínimo 2s com a censura ligada —
+                        aumente pra mais margem de segurança em vazamentos rápidos.
+                      </span>
+                    </span>
+                    <Slider
+                      className="ml-auto w-40 shrink-0"
+                      value={settings.protectDelaySec}
+                      min={2}
+                      max={15}
+                      onChange={(v) => setSettings({ protectDelaySec: v })}
+                      suffix="s"
+                    />
+                  </label>
+                </>
+              )}
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-semibold text-ink-muted">
                   Termos pessoais a vigiar{" "}
