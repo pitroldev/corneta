@@ -1137,6 +1137,7 @@ pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
     .min_inner_size(300.0, 360.0)
     .resizable(true)
     .always_on_top(true)
+    .decorations(false) // borda/titlebar custom (igual a janela principal)
     .build()
     .map_err(|e| e.to_string())?;
     Ok(())

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Trash2, Wifi, WifiOff } from "lucide-react";
+import { Minus, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { cn } from "../lib/utils";
 import { Mascot } from "../components/decor";
@@ -59,7 +59,10 @@ export function ChatPopout() {
 
   if (!loaded || !config) {
     return (
-      <div className="grid h-screen place-items-center bg-panel">
+      <div
+        data-tauri-drag-region
+        className="grid h-screen place-items-center border border-border-soft bg-panel"
+      >
         <div className="grid size-12 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
           <Mascot className="size-7" />
         </div>
@@ -69,13 +72,42 @@ export function ChatPopout() {
 
   const iconBtn =
     "rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink";
+  const winApi = async () =>
+    (await import("@tauri-apps/api/window")).getCurrentWindow();
+  const minimize = () => void winApi().then((w) => w.minimize());
+  const closeWin = () => void winApi().then((w) => w.close());
 
   return (
-    <div className="flex h-screen flex-col bg-panel">
-      <div className="flex items-center gap-2 border-b-2 border-border-soft px-2.5 py-2">
-        <div className="grid size-6 shrink-0 place-items-center rounded bg-brass text-brass-ink">
-          <Mascot className="size-4" />
+    <div className="flex h-screen flex-col border border-border-soft bg-panel">
+      {/* Titlebar custom (arrastável) + controles da janela */}
+      <div
+        data-tauri-drag-region
+        className="flex h-8 shrink-0 items-center gap-2 border-b border-border-soft pl-2 select-none"
+      >
+        <div
+          data-tauri-drag-region
+          className="pointer-events-none grid size-5 place-items-center rounded bg-brass text-brass-ink"
+        >
+          <Mascot className="size-3.5" />
         </div>
+        <span
+          data-tauri-drag-region
+          className="pointer-events-none font-display text-xs font-extrabold"
+        >
+          Chat da Corneta
+        </span>
+        <div className="ml-auto flex h-full">
+          <WinBtn onClick={minimize} label="Minimizar">
+            <Minus className="size-3.5" strokeWidth={2.4} />
+          </WinBtn>
+          <WinBtn onClick={closeWin} label="Fechar" danger>
+            <X className="size-3.5" strokeWidth={2.4} />
+          </WinBtn>
+        </div>
+      </div>
+
+      {/* Toolbar do chat: abas + conexão + limpar */}
+      <div className="flex items-center gap-2 border-b-2 border-border-soft px-2 py-1.5">
         <div className="flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5">
           <TabBtn active={tab === "chat"} onClick={() => setTab("chat")}>
             Chat
@@ -140,6 +172,32 @@ function TabBtn({
       className={cn(
         "rounded px-2 py-0.5 font-display text-xs font-extrabold transition-colors",
         active ? "bg-brass text-brass-ink" : "text-ink-faint hover:text-ink",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function WinBtn({
+  children,
+  onClick,
+  label,
+  danger,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  label: string;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "grid h-full w-9 place-items-center text-ink-muted transition-colors",
+        danger ? "hover:bg-bad hover:text-white" : "hover:bg-surface-2 hover:text-ink"
       )}
     >
       {children}

@@ -14,8 +14,21 @@ const PLATFORM_OPTS = [
   { value: "kick", label: "Kick" },
   { value: "youtube", label: "YouTube" },
 ];
-const placeholderFor = (p: string) =>
-  p === "twitch" ? "canal (ex.: pitrol)" : p === "kick" ? "slug (ex.: xqc)" : "URL ou ID do vídeo ao vivo";
+const VALUE_LABEL: Record<string, string> = {
+  twitch: "Canal",
+  kick: "Slug do canal",
+  youtube: "Vídeo ao vivo (URL ou ID)",
+};
+const PLACEHOLDER: Record<string, string> = {
+  twitch: "ex.: pitrol",
+  kick: "ex.: xqc",
+  youtube: "cole a URL ou o ID",
+};
+const HINT: Record<string, string> = {
+  twitch: "Só o nome do canal — sem login.",
+  kick: "O slug da URL (kick.com/slug). Pode falhar por Cloudflare.",
+  youtube: "A live precisa estar no ar. Usa a chave da API abaixo.",
+};
 
 export function ChatScreen() {
   const config = useStore((s) => s.config);
@@ -139,75 +152,71 @@ export function ChatScreen() {
         </div>
 
         {showConfig && (
-          <div className="mt-3 flex flex-col gap-3 border-t-2 border-border-soft pt-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                Fontes do chat
-              </span>
-              <Button variant="subtle" size="sm" onClick={addSource}>
-                <Plus className="size-3.5" /> Adicionar
-              </Button>
+          <div className="mt-3 flex flex-col gap-4 border-t-2 border-border-soft pt-3">
+            {/* Canais */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                  Canais
+                </span>
+                <Button variant="subtle" size="sm" onClick={addSource}>
+                  <Plus className="size-3.5" /> Adicionar canal
+                </Button>
+              </div>
+
+              {sources.length === 0 ? (
+                <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-5 text-center text-sm text-ink-muted">
+                  Nenhum canal ainda. Adicione um da <strong className="text-ink">Twitch</strong>,{" "}
+                  <strong className="text-ink">Kick</strong> ou{" "}
+                  <strong className="text-ink">YouTube</strong> — pode repetir (ex.: 2 Twitches).
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {sources.map((src) => (
+                    <SourceCard
+                      key={src.id}
+                      src={src}
+                      onChange={(p) => updateSource(src.id, p)}
+                      onRemove={() => removeSource(src.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {sources.some((x) => x.platform === "youtube") && (
+                <label className="mt-2 flex flex-col gap-1 rounded-md border-2 border-info/30 bg-info/5 p-2.5 text-[11px] font-semibold text-ink-faint">
+                  <span className="flex items-center gap-1.5">
+                    <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
+                    <span className="font-medium normal-case text-ink-faint/70">
+                      · necessária pro chat do YouTube
+                    </span>
+                  </span>
+                  <input
+                    value={s.youtubeApiKey ?? ""}
+                    placeholder="cole sua API key (Data API v3)"
+                    onChange={(e) => setSettings({ youtubeApiKey: e.target.value })}
+                    className="h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
+                  />
+                </label>
+              )}
             </div>
 
-            {sources.length === 0 && (
-              <p className="text-sm text-ink-muted">
-                Nenhuma fonte. Adicione um canal da Twitch/Kick ou um vídeo do YouTube — pode repetir
-                a plataforma (ex.: 2 Twitches).
-              </p>
-            )}
-
-            {sources.map((src) => (
-              <div key={src.id} className="flex flex-wrap items-center gap-2">
-                <Select
-                  className="w-28"
-                  value={src.platform}
-                  options={PLATFORM_OPTS}
-                  onChange={(v) => updateSource(src.id, { platform: v as ChatPlatform })}
-                />
-                <input
-                  value={src.value}
-                  placeholder={placeholderFor(src.platform)}
-                  onChange={(e) => updateSource(src.id, { value: e.target.value })}
-                  className="h-9 min-w-40 flex-1 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
-                />
-                <input
-                  value={src.name}
-                  placeholder="apelido"
-                  onChange={(e) => updateSource(src.id, { name: e.target.value })}
-                  className="h-9 w-28 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
-                />
-                <Toggle checked={src.enabled} onChange={(v) => updateSource(src.id, { enabled: v })} label="ativo" />
-                <button
-                  onClick={() => removeSource(src.id)}
-                  className="text-ink-faint hover:text-bad"
-                  aria-label="Remover fonte"
-                >
-                  <X className="size-4" />
-                </button>
+            {/* Exibição */}
+            <div className="border-t-2 border-border-soft pt-3">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-faint">
+                O que mostrar no feed
+              </span>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <ToggleRow label="Emotes" checked={view.emotes} onChange={(v) => setSettings({ chatShowEmotes: v })} />
+                <ToggleRow label="Badges" checked={view.badges} onChange={(v) => setSettings({ chatShowBadges: v })} />
+                <ToggleRow label="Ícone da plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
+                <ToggleRow label="Nome do canal" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
+                <ToggleRow label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
               </div>
-            ))}
-
-            {sources.some((x) => x.platform === "youtube") && (
-              <Field
-                label="YouTube — API key"
-                hint="Data API v3 (compartilhada entre as fontes do YouTube)"
-                value={s.youtubeApiKey ?? ""}
-                placeholder="sua API key"
-                onChange={(v) => setSettings({ youtubeApiKey: v })}
-              />
-            )}
-
-            <div className="flex flex-col gap-2 border-t-2 border-border-soft pt-3">
-              <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">Exibição</span>
-              <ToggleRow label="Emotes" checked={view.emotes} onChange={(v) => setSettings({ chatShowEmotes: v })} />
-              <ToggleRow label="Badges" checked={view.badges} onChange={(v) => setSettings({ chatShowBadges: v })} />
-              <ToggleRow label="Plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
-              <ToggleRow label="Origem (canal)" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
-              <ToggleRow label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
-              <div className="flex items-center justify-between">
+              <div className="mt-3 flex items-center justify-between border-t border-border-soft pt-3">
                 <span className="text-sm font-semibold text-ink-muted">Tamanho da fonte</span>
                 <Select
-                  className="w-28"
+                  className="w-32"
                   value={view.fontSize}
                   options={[
                     { value: "sm", label: "Pequeno" },
@@ -218,11 +227,6 @@ export function ChatScreen() {
                 />
               </div>
             </div>
-
-            <p className="text-xs leading-relaxed text-ink-faint">
-              💡 Twitch: só o nome do canal (sem login). Kick: o slug (pode falhar por Cloudflare).
-              YouTube: API key + vídeo ao vivo. Deleções de moderação somem do feed automaticamente.
-            </p>
           </div>
         )}
       </Card>
@@ -323,31 +327,64 @@ function ToggleRow({
 const statusDot = (status: string) =>
   status === "connected" ? "bg-ok" : status === "error" ? "bg-bad" : "bg-ink-faint";
 
-function Field({
-  label,
-  hint,
-  value,
-  placeholder,
+function SourceCard({
+  src,
   onChange,
+  onRemove,
 }: {
-  label: string;
-  hint?: string;
-  value: string;
-  placeholder?: string;
-  onChange: (v: string) => void;
+  src: ChatSource;
+  onChange: (patch: Partial<ChatSource>) => void;
+  onRemove: () => void;
 }) {
+  const inputCls =
+    "h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass";
   return (
-    <label className="flex flex-col gap-1 text-xs font-semibold text-ink-faint">
-      <span>
-        {label}
-        {hint && <span className="ml-1 font-medium normal-case text-ink-faint/70">· {hint}</span>}
-      </span>
-      <input
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
-      />
-    </label>
+    <div
+      className={cn(
+        "rounded-md border-2 border-border-soft p-2.5 transition-opacity",
+        src.enabled ? "bg-surface" : "bg-surface-2 opacity-60"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <PlatformGlyph id={src.platform} size={20} />
+        <Select
+          className="w-28"
+          value={src.platform}
+          options={PLATFORM_OPTS}
+          onChange={(v) => onChange({ platform: v as ChatPlatform })}
+        />
+        <div className="ml-auto flex items-center gap-2.5">
+          <Toggle checked={src.enabled} onChange={(v) => onChange({ enabled: v })} label="ligado" />
+          <button
+            onClick={onRemove}
+            className="text-ink-faint transition-colors hover:text-bad"
+            aria-label="Remover canal"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_8rem]">
+        <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
+          {VALUE_LABEL[src.platform]}
+          <input
+            value={src.value}
+            placeholder={PLACEHOLDER[src.platform]}
+            onChange={(e) => onChange({ value: e.target.value })}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
+          Apelido <span className="font-medium normal-case text-ink-faint/60">(opcional)</span>
+          <input
+            value={src.name}
+            placeholder="ex.: Pitrol"
+            onChange={(e) => onChange({ name: e.target.value })}
+            className={inputCls}
+          />
+        </label>
+      </div>
+      <p className="mt-1.5 text-[11px] text-ink-faint">{HINT[src.platform]}</p>
+    </div>
   );
 }
