@@ -15,9 +15,10 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use crate::engine::{self, COMP_FPS, COMP_H, COMP_W};
-use crate::guardian::Region;
+use crate::guardian::{ocr_scan_gray, Anchor, Region, Tracker};
 
 const FSIZE: usize = COMP_W * COMP_H * 3 / 2; // yuv420p
+const YSIZE: usize = COMP_W * COMP_H; // plano Y (escala de cinza)
 
 /// Caminho do sidecar ffmpeg. O Tauri copia o externalBin pro lado do exe SEM o sufixo do
 /// triple (vira `ffmpeg.exe`), tanto em dev (target/debug) quanto no bundle de produção.
@@ -108,13 +109,15 @@ fn kill(child: &mut std::process::Child) {
 }
 
 /// Roda o protetor com buffer enquanto a transmissão estiver no ar.
+/// `censor`: detecta+rastreia+desenha (no próprio vídeo). Senão, só atrasa (sem tarjas).
 pub async fn run_compositor(
     app: AppHandle,
     running: Arc<AtomicBool>,
     has_signal: Arc<AtomicBool>,
-    shared: Arc<Mutex<Vec<Region>>>,
     delay_sec: u32,
     hw_codec: Option<String>,
+    censor: bool,
+    watchlist: Vec<String>,
 ) {
     let Some(ffmpeg) = ffmpeg_path() else {
         log::error!("compositor: sidecar ffmpeg não encontrado");
@@ -124,20 +127,54 @@ pub async fn run_compositor(
     let dec_args = engine::ffmpeg_args_for_decoder(&cfg);
     let enc_args = engine::ffmpeg_args_for_encoder(&cfg, delay_sec, hw_codec.as_deref());
     let delay_frames = (delay_sec.max(1) as usize) * COMP_FPS;
-    let backfill = (COMP_FPS / 2).max(1); // ~0.5s pra trás cobre o atraso de detecção do OCR
+    let backfill = (COMP_FPS * 2 / 3).max(1); // ~0.66s pra trás cobre o atraso de detecção do OCR
     log::info!(
-        "compositor: delay {delay_sec}s ({delay_frames} frames), {COMP_W}x{COMP_H}@{COMP_FPS}, hw={hw_codec:?}"
+        "compositor: delay {delay_sec}s ({delay_frames} frames), {COMP_W}x{COMP_H}@{COMP_FPS}, censor={censor}, hw={hw_codec:?}"
     );
+
+    // Estado compartilhado entre o pipeline e a thread de OCR.
+    let latest_y: Arc<Mutex<Option<Vec<u8>>>> = Arc::new(Mutex::new(None));
+    let anchor: Arc<Mutex<Anchor>> = Arc::new(Mutex::new(Anchor::default()));
+
+    // Thread de OCR (só se for censurar): OCR no plano Y → publica âncora + toast. Roda no seu
+    // ritmo (lento), sem travar o pipeline de quadros.
+    if censor {
+        let (app_o, run_o, ly, an) =
+            (app.clone(), running.clone(), latest_y.clone(), anchor.clone());
+        tauri::async_runtime::spawn_blocking(move || {
+            let mut had_leak = false;
+            while run_o.load(Ordering::Relaxed) {
+                let y = ly.lock().unwrap().clone();
+                let Some(gray) = y else {
+                    std::thread::sleep(Duration::from_millis(60));
+                    continue;
+                };
+                let (leaks, regions) = ocr_scan_gray(&gray, COMP_W, COMP_H, &watchlist);
+                if !leaks.is_empty() && !had_leak {
+                    for l in &leaks {
+                        let _ = app_o.emit("leak://alert", l.clone());
+                    }
+                }
+                had_leak = !leaks.is_empty();
+                if let Ok(mut a) = an.lock() {
+                    a.gen = a.gen.wrapping_add(1);
+                    a.auto = true;
+                    a.regions = regions;
+                }
+                std::thread::sleep(Duration::from_millis(40));
+            }
+        });
+    }
 
     // Pipeline binário roda numa thread bloqueante (read/write crus).
     let _ = tauri::async_runtime::spawn_blocking(move || {
         let black = black_frame();
+        let mut tracker = Tracker::new();
         while running.load(Ordering::Relaxed) {
             if !has_signal.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(400));
                 continue;
             }
-            // Sobe decoder (live → cru) e encoder (cru + áudio → _delayed).
             let mut dec = match spawn_ff(&ffmpeg, &dec_args, true) {
                 Ok(c) => c,
                 Err(e) => {
@@ -162,6 +199,8 @@ pub async fn run_compositor(
             let mut prev_regions: Vec<Region> = vec![];
             let mut censoring = false;
             let mut frame = vec![0u8; FSIZE];
+            let mut idx = 0u64;
+            tracker.reset();
 
             // --- LOOP DE QUADROS ---
             loop {
@@ -171,9 +210,20 @@ pub async fn run_compositor(
                 if dout.read_exact(&mut frame).is_err() {
                     break; // decoder morreu / EOF
                 }
-                // Regiões ao vivo (do guardião) pra ESTE quadro.
-                let regions = shared.lock().unwrap().clone();
-                // Backfill: regiões NOVAS entram nos quadros recentes (ainda no buffer, não airados).
+                // Detecta+rastreia NESTE quadro (plano Y) → regiões EXATAS pra ele.
+                let regions = if censor {
+                    if idx % 5 == 0 {
+                        *latest_y.lock().unwrap() = Some(frame[..YSIZE].to_vec());
+                    }
+                    let a = anchor.lock().unwrap().clone();
+                    tracker.update(&frame[..YSIZE], COMP_W, COMP_H, &a)
+                } else {
+                    vec![]
+                };
+                idx = idx.wrapping_add(1);
+
+                // Backfill: regiões NOVAS entram nos quadros recentes (ainda no buffer, não airados)
+                // → cobre o atraso de detecção do OCR sem expor.
                 for r in &regions {
                     if is_new(r, &prev_regions) {
                         for (_, regs) in buf.iter_mut().rev().take(backfill) {

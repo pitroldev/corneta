@@ -625,16 +625,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     }
     emit(&app, &snap);
 
-    // Regiões dos segredos detectados AO VIVO (guardião escreve, compositor lê pra desenhar).
-    let shared_regions: Arc<std::sync::Mutex<Vec<crate::guardian::Region>>> =
-        Arc::new(std::sync::Mutex::new(Vec::new()));
+    // Modo do guardião: "censurar" → o COMPOSITOR detecta+rastreia+desenha nos próprios frames.
+    // "avisar" → o guardião abaixo só faz OCR no extrator + toast.
+    let g_censor = config.settings.guardian_enabled && config.settings.guardian_action == "censor";
+    let g_warn = config.settings.guardian_enabled && config.settings.guardian_action == "warn";
 
-    // Guardião anti-vazamento (DETECÇÃO): OCR local + rastreamento → publica regiões.
-    if config.settings.guardian_enabled {
-        let (app_g, run_g, sig_g, sh_g) =
-            (app.clone(), running.clone(), has_signal.clone(), shared_regions.clone());
+    // Guardião modo "AVISAR": OCR no frame do extrator + toast (sem censura).
+    if g_warn {
+        let (app_g, run_g, sig_g) = (app.clone(), running.clone(), has_signal.clone());
         tauri::async_runtime::spawn(async move {
-            crate::guardian::run_guardian(app_g, run_g, sig_g, sh_g).await;
+            crate::guardian::run_guardian(app_g, run_g, sig_g).await;
         });
 
         // EXTRATOR de frames: UM ffmpeg persistente que escreve `guardlive.jpg` a 10fps
@@ -772,14 +772,13 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     );
     if protect {
         let hw = detect_hw_encoder(&app).await;
-        let (app_c, run_c, sig_c, sh_c) = (
-            app.clone(),
-            running.clone(),
-            has_signal.clone(),
-            shared_regions.clone(),
-        );
+        let watchlist = config.settings.guardian_watchlist.clone();
+        let (app_c, run_c, sig_c) = (app.clone(), running.clone(), has_signal.clone());
         tauri::async_runtime::spawn(async move {
-            crate::compositor::run_compositor(app_c, run_c, sig_c, sh_c, delay_sec, hw).await;
+            crate::compositor::run_compositor(
+                app_c, run_c, sig_c, delay_sec, hw, g_censor, watchlist,
+            )
+            .await;
         });
     }
 

@@ -2,7 +2,7 @@
 //! boxes), procura segredo na tela e avisa/censura — cobrindo SÓ a região do segredo
 //! (tarja) ou a tela toda. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use regex::Regex;
@@ -344,74 +344,40 @@ pub(crate) fn round_region(r: Region) -> Region {
     (q(r.0), q(r.1), q(r.2), q(r.3))
 }
 
-/// Detecção (OCR): o lado LENTO, isolado em background pra não travar o rastreamento.
-/// Publica as regiões achadas + se está em modo "censurar".
+/// Âncora: detecções do OCR (regiões + modo censurar + geração). Compartilhada OCR→rastreador.
 #[derive(Default, Clone)]
-struct Anchor {
-    gen: u64,
-    auto: bool,
-    regions: Vec<Region>,
+pub(crate) struct Anchor {
+    pub(crate) gen: u64,
+    pub(crate) auto: bool,
+    pub(crate) regions: Vec<Region>,
 }
 
-async fn ocr_loop(
-    app: AppHandle,
-    running: Arc<AtomicBool>,
-    has_signal: Arc<AtomicBool>,
-    anchor: Arc<Mutex<Anchor>>,
-    frame_path: Option<std::path::PathBuf>,
-) {
-    let mut tick = 0u32;
-    let mut auto = false;
-    let mut watchlist: Vec<String> = vec![];
-    let mut had_leak = false;
-    loop {
-        if !running.load(Ordering::Relaxed) {
-            return;
-        }
-        let _ = tauri::async_runtime::spawn_blocking(|| {
-            std::thread::sleep(Duration::from_millis(30))
-        })
-        .await;
-        if tick % 20 == 0 {
-            let cfg = crate::config::load(&app).settings;
-            auto = cfg.guardian_action == "censor";
-            watchlist = cfg.guardian_watchlist;
-        }
-        tick = tick.wrapping_add(1);
-        if !has_signal.load(Ordering::Relaxed) {
-            continue;
-        }
-        let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
-            Some(b) if !b.is_empty() => b,
-            _ => continue,
-        };
-        let wl = watchlist.clone();
-        let (leaks, regions) = match tauri::async_runtime::spawn_blocking(move || {
-            ocr_words(&jpeg).map(|(text, words)| {
-                if text.trim().is_empty() {
-                    (vec![], vec![])
-                } else {
-                    scan(&text, &words, &wl)
-                }
-            })
-        })
-        .await
-        {
-            Ok(Some(v)) => v,
-            _ => continue,
-        };
-        if !leaks.is_empty() && !had_leak {
-            for l in &leaks {
-                let _ = app.emit("leak://alert", l.clone());
-            }
-        }
-        had_leak = !leaks.is_empty();
-        if let Ok(mut a) = anchor.lock() {
-            a.gen = a.gen.wrapping_add(1);
-            a.auto = auto;
-            a.regions = regions.iter().map(|r| round_region(*r)).collect();
-        }
+/// OCR + regras num frame JPEG (modo "avisar" — lê o frame do extrator).
+pub(crate) fn ocr_scan(jpeg: &[u8], watchlist: &[String]) -> (Vec<Leak>, Vec<Region>) {
+    match ocr_words(jpeg) {
+        Some((text, words)) if !text.trim().is_empty() => scan(&text, &words, watchlist),
+        _ => (vec![], vec![]),
     }
+}
+
+/// OCR + regras num frame CINZA cru (encoda JPEG e reusa o OCR). Pra o compositor detectar.
+pub(crate) fn ocr_scan_gray(
+    gray: &[u8],
+    w: usize,
+    h: usize,
+    watchlist: &[String],
+) -> (Vec<Leak>, Vec<Region>) {
+    let Some(img) = image::GrayImage::from_raw(w as u32, h as u32, gray.to_vec()) else {
+        return (vec![], vec![]);
+    };
+    let mut jpeg = Vec::new();
+    if img
+        .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+        .is_err()
+    {
+        return (vec![], vec![]);
+    }
+    ocr_scan(&jpeg, watchlist)
 }
 
 /// Uma região rastreada (frações) ligada a um box do protetor.
@@ -470,94 +436,99 @@ fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
     }
 }
 
-/// Guardião (DETECÇÃO): OCR em background + rastreamento por frame (movimento global) na borda
-/// AO VIVO. Publica as regiões rastreadas em `shared` — o COMPOSITOR lê e desenha as tarjas no
-/// vídeo já atrasado (delay real + preventivo). Aqui não há delay nem zmq.
-pub async fn run_guardian(
-    app: AppHandle,
-    running: Arc<AtomicBool>,
-    has_signal: Arc<AtomicBool>,
-    shared: Arc<Mutex<Vec<Region>>>,
-) {
-    log::info!("guardião: ligado (detecção)");
-    let n = crate::engine::GUARD_BOXES;
-    let frame_path = crate::commands::guard_frame_path(&app);
+/// Rastreador: mantém os tracks entre frames (movimento global + re-âncora do OCR). O compositor
+/// chama `update` POR FRAME (no plano Y cru do próprio vídeo) → regiões EXATAS pra aquele frame,
+/// sem lag de timeline (era a causa da tarja atrasada/torta).
+pub(crate) struct Tracker {
+    tracks: Vec<Track>,
+    prev: Option<Proj>,
+    last_gen: u64,
+    n: usize,
+}
 
-    // OCR roda em background; o loop abaixo é o RASTREAMENTO (rápido).
-    let anchor = Arc::new(Mutex::new(Anchor::default()));
-    {
-        let (a, r, s, an, fp) = (
-            app.clone(),
-            running.clone(),
-            has_signal.clone(),
-            anchor.clone(),
-            frame_path.clone(),
-        );
-        tauri::async_runtime::spawn(async move { ocr_loop(a, r, s, an, fp).await });
+impl Tracker {
+    pub(crate) fn new() -> Self {
+        Self {
+            tracks: vec![],
+            prev: None,
+            last_gen: 0,
+            n: crate::engine::GUARD_BOXES,
+        }
     }
 
-    let mut tracks: Vec<Track> = vec![];
-    let mut last_gen = 0u64;
-    let mut prev: Option<Proj> = None;
+    pub(crate) fn reset(&mut self) {
+        self.tracks.clear();
+        self.prev = None;
+    }
 
+    /// Atualiza com o frame CINZA atual + a última âncora do OCR. Devolve as regiões PRA ESTE frame.
+    pub(crate) fn update(&mut self, gray: &[u8], w: usize, h: usize, anchor: &Anchor) -> Vec<Region> {
+        let cur = project(gray, w, h);
+        if let Some(p) = &self.prev {
+            let (dx, dy) = global_motion(p, &cur, 0.2);
+            if dx != 0.0 || dy != 0.0 {
+                for t in &mut self.tracks {
+                    t.fx += dx;
+                    t.fy += dy;
+                }
+            }
+        }
+        self.prev = Some(cur);
+        if anchor.gen != self.last_gen {
+            self.last_gen = anchor.gen;
+            if anchor.auto {
+                associate(&mut self.tracks, &anchor.regions, self.n);
+            } else {
+                self.tracks.clear();
+            }
+        }
+        self.tracks
+            .iter()
+            .map(|t| round_region((t.fx, t.fy, t.fw, t.fh)))
+            .collect()
+    }
+}
+
+/// Guardião em modo "AVISAR": OCR no frame do extrator + toast no vazamento novo. (No modo
+/// "censurar" quem detecta+rastreia+desenha é o COMPOSITOR, nos próprios frames crus.)
+pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: Arc<AtomicBool>) {
+    log::info!("guardião: ligado (avisar)");
+    let frame_path = crate::commands::guard_frame_path(&app);
+    let mut tick = 0u32;
+    let mut watchlist: Vec<String> = vec![];
+    let mut had_leak = false;
     loop {
         if !running.load(Ordering::Relaxed) {
             log::info!("guardião: desligado");
             return;
         }
         let _ = tauri::async_runtime::spawn_blocking(|| {
-            std::thread::sleep(Duration::from_millis(55))
+            std::thread::sleep(Duration::from_millis(200))
         })
         .await;
-
+        if tick % 5 == 0 {
+            watchlist = crate::config::load(&app).settings.guardian_watchlist;
+        }
+        tick = tick.wrapping_add(1);
         if !has_signal.load(Ordering::Relaxed) {
-            prev = None;
-            tracks.clear();
-            *shared.lock().unwrap() = vec![];
             continue;
         }
-
         let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
             Some(b) if !b.is_empty() => b,
             _ => continue,
         };
-        let cur = match decode_gray(&jpeg) {
-            Some((g, w, h)) => project(&g, w, h),
-            None => continue,
-        };
-
-        // RASTREIA: movimento global desde o frame anterior → empurra TODOS os tracks.
-        if let Some(p) = &prev {
-            let (dxf, dyf) = global_motion(p, &cur, 0.2);
-            if dxf != 0.0 || dyf != 0.0 {
-                for t in &mut tracks {
-                    t.fx += dxf;
-                    t.fy += dyf;
-                }
+        let wl = watchlist.clone();
+        let (leaks, _) =
+            match tauri::async_runtime::spawn_blocking(move || ocr_scan(&jpeg, &wl)).await {
+                Ok(v) => v,
+                _ => continue,
+            };
+        if !leaks.is_empty() && !had_leak {
+            for l in &leaks {
+                let _ = app.emit("leak://alert", l.clone());
             }
         }
-        prev = Some(cur);
-
-        // RE-ANCORA quando o OCR trouxe uma detecção nova.
-        let (gen, auto, anchors) = {
-            let a = anchor.lock().unwrap();
-            (a.gen, a.auto, a.regions.clone())
-        };
-        if gen != last_gen {
-            last_gen = gen;
-            if auto {
-                associate(&mut tracks, &anchors, n);
-            } else {
-                tracks.clear();
-            }
-        }
-
-        // Publica as regiões rastreadas AO VIVO; o compositor casa com o vídeo atrasado + backfill.
-        let regions: Vec<Region> = tracks
-            .iter()
-            .map(|t| round_region((t.fx, t.fy, t.fw, t.fh)))
-            .collect();
-        *shared.lock().unwrap() = regions;
+        had_leak = !leaks.is_empty();
     }
 }
 
