@@ -144,36 +144,42 @@ fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Vec<Reg
             if p.kind == "card" && !valid_luhn(raw) {
                 continue;
             }
-            if !seen.insert(format!("{}:{raw}", p.kind)) {
-                continue;
-            }
+            // Uma região por OCORRÊNCIA (cobre cada aparição, mesmo o valor repetido — ex.: 2x o e-mail).
             if let Some(r) = union(&boxes_for_range(words, m.start(), m.end())) {
                 regions.push(r);
             }
-            out.push(Leak {
-                kind: p.kind.into(),
-                label: p.label.into(),
-                snippet: mask(raw),
-                severity: p.severity.into(),
-            });
+            // O alerta (toast) dedupa por valor pra não spammar.
+            if seen.insert(format!("{}:{raw}", p.kind)) {
+                out.push(Leak {
+                    kind: p.kind.into(),
+                    label: p.label.into(),
+                    snippet: mask(raw),
+                    severity: p.severity.into(),
+                });
+            }
         }
     }
-    let lower = text.to_lowercase();
     for term in watchlist {
         let t = term.trim();
-        if t.len() >= 3 {
-            if let Some(pos) = lower.find(&t.to_lowercase()) {
-                if seen.insert(format!("watch:{t}")) {
-                    if let Some(r) = union(&boxes_for_range(words, pos, pos + t.len())) {
-                        regions.push(r);
-                    }
-                    out.push(Leak {
-                        kind: "watchlist".into(),
-                        label: "Dado pessoal".into(),
-                        snippet: mask(t),
-                        severity: "high".into(),
-                    });
+        if t.len() < 3 {
+            continue;
+        }
+        // Casa no texto ORIGINAL (offsets batem com as palavras) e pega TODAS as ocorrências.
+        if let Ok(re) = Regex::new(&format!("(?i){}", regex::escape(t))) {
+            let mut found = false;
+            for m in re.find_iter(text) {
+                if let Some(r) = union(&boxes_for_range(words, m.start(), m.end())) {
+                    regions.push(r);
                 }
+                found = true;
+            }
+            if found && seen.insert(format!("watch:{t}")) {
+                out.push(Leak {
+                    kind: "watchlist".into(),
+                    label: "Dado pessoal".into(),
+                    snippet: mask(t),
+                    severity: "high".into(),
+                });
             }
         }
     }
@@ -307,16 +313,14 @@ pub async fn run_guardian(
             leaks.iter().map(|l| l.kind.clone()).collect::<Vec<_>>(),
             regions
         );
+        // Só age na TRANSIÇÃO (1ª detecção). Já censurado → mantém (NÃO respawna, pra não
+        // derrubar a stream). Cobre TODOS os segredos do frame de uma vez (várias tarjas).
         if !already {
-            // Só avisa (toast) na 1ª vez — não spamma enquanto já está censurado.
             for l in &leaks {
                 let _ = app.emit("leak://alert", l.clone());
             }
-        }
-        // No modo "censurar", censura QUALQUER detecção e ATUALIZA as regiões (a tarja acompanha).
-        if auto {
-            *censor_regions.lock().unwrap() = regions;
-            if !already {
+            if auto {
+                *censor_regions.lock().unwrap() = regions;
                 censor.store(true, Ordering::Relaxed);
                 let _ = app.emit("leak://censor", true);
                 log::warn!("guardião: CENSURA automática ativada");

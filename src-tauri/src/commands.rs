@@ -524,29 +524,14 @@ async fn run_slate(
     }
 }
 
-/// Compara regiões arredondadas (grade ~2%) — evita respawn por jitter do OCR.
-fn regions_eq_rounded(a: &[(f32, f32, f32, f32)], b: &[(f32, f32, f32, f32)]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let r = |x: f32| (x * 50.0).round();
-    a.iter().zip(b).all(|(p, q)| {
-        r(p.0) == r(q.0) && r(p.1) == r(q.1) && r(p.2) == r(q.2) && r(p.3) == r(q.3)
-    })
-}
-
-/// Empurra a CENSURA pras plataformas até ser desligada (slate de tela toda OU tarjas por região).
-/// Segura até `!censor`, e — no modo tarja — também respawna quando as regiões mudam (acompanha).
-#[allow(clippy::too_many_arguments)]
+/// Empurra a CENSURA pras plataformas até ser desligada (slate de tela toda OU tarjas por região,
+/// já embutidas em `slate_args`). Segura até `!censor`. NÃO respawna (trocar FFmpeg derruba a stream).
 async fn run_censor_slate(
     app: &AppHandle,
     target_id: &str,
     slate_args: &[String],
     run_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     censor: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-    regions_arc: &std::sync::Arc<std::sync::Mutex<Vec<(f32, f32, f32, f32)>>>,
-    my_regions: &[(f32, f32, f32, f32)],
-    track: bool,
 ) {
     use std::sync::atomic::Ordering;
     set_target_state(app, target_id, "censor");
@@ -573,10 +558,6 @@ async fn run_censor_slate(
             break;
         }
         if !run_flag.load(Ordering::Relaxed) || !censor.load(Ordering::Relaxed) {
-            break;
-        }
-        // Modo tarja: se as regiões mudaram (segredo se moveu / apareceu outro), respawna.
-        if track && !regions_eq_rounded(&regions_arc.lock().unwrap(), my_regions) {
             break;
         }
     }
@@ -820,17 +801,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     } else {
                         slate_args.clone()
                     };
-                    run_censor_slate(
-                        &app_t,
-                        &target_id,
-                        &args,
-                        &run_flag,
-                        &censor_t,
-                        &censor_regions_t,
-                        &regions,
-                        use_region,
-                    )
-                    .await;
+                    // Regiões já embutidas em `args`; sem respawn (não derruba a stream).
+                    run_censor_slate(&app_t, &target_id, &args, &run_flag, &censor_t).await;
                     continue;
                 }
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
