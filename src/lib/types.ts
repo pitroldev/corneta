@@ -274,7 +274,8 @@ export type TargetState =
   | "error"
   | "paused"
   | "waiting"
-  | "brb";
+  | "brb"
+  | "censor";
 
 export interface TargetStatus {
   targetId: string;

@@ -616,8 +616,13 @@ function StatePill({ state }: { state: TargetState }) {
         cls: "text-brass",
         dot: "bg-brass animate-pulse",
       },
+      censor: {
+        label: "Censurado",
+        cls: "text-bad",
+        dot: "bg-bad animate-pulse",
+      },
     };
-  const m = map[state];
+  const m = map[state] ?? map.idle;
   return (
     <span
       className={cn(
