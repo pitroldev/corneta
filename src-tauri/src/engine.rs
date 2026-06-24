@@ -177,11 +177,10 @@ pub fn ffmpeg_args_for_target(
     args
 }
 
-/// Máximo de regiões/tarjas simultâneas (cap das detecções).
-pub const GUARD_BOXES: usize = 6;
-/// Delay MÍNIMO (s) quando a censura automática está ligada — dá tempo de detectar e cobrir o
-/// vazamento ANTES dele ir ao ar (preventivo). Sem isso, o segredo airava ~0,3s descoberto.
-pub const PREVENTIVE_MIN_SEC: u32 = 2;
+/// Delay MÍNIMO (s) quando a censura automática está ligada — dá tempo do OCR detectar e a gente
+/// cobrir o segredo ANTES dele ir ao ar (preventivo). 3s cobre o pior caso de OCR (~1-2s numa tela
+/// MUITO cheia, medido) com folga; no caso típico (~0,4s) sobra de sobra.
+pub const PREVENTIVE_MIN_SEC: u32 = 3;
 
 /// Delay efetivo do protetor: o que o usuário pediu, mas NUNCA menos que o mínimo preventivo
 /// quando a censura automática está ligada. Protetor (tpad) e guardião (buffer) usam ISTO.
@@ -192,90 +191,6 @@ pub fn effective_protect_delay(config: &AppConfig) -> u32 {
     } else {
         config.settings.protect_delay_sec
     }
-}
-
-/// **Protetor**: UM FFmpeg persistente que lê a ingestão e republica em `_delayed`, aplicando:
-/// - `zmq` (recebe comandos em tempo real → mover/mostrar/esconder as tarjas SEM reiniciar nada),
-/// - `tpad`/`adelay` (delay de proteção, opcional → censura preventiva),
-/// - N `drawbox` escondidos (w=0) que o guardião posiciona via zmq pra cobrir cada segredo.
-///
-/// As plataformas leem do `_delayed` e NUNCA reiniciam → zero drop, e a tarja segue o texto.
-/// `hw_codec`: codec de hardware confirmado (ex.: "h264_nvenc") ou None → libx264 leve.
-/// O encoder é o gargalo: ele PRECISA acompanhar o tempo real, senão o MediaMTX derruba o
-/// leitor lento (I/O error → respawn em loop → live caindo). Hardware = custo de CPU ~zero.
-pub fn ffmpeg_args_for_protector(
-    config: &AppConfig,
-    delay_sec: u32,
-    hw_codec: Option<&str>,
-) -> Vec<String> {
-    // Vídeo: zmq → (tpad se delay) → drawboxes escondidos. drawbox DEPOIS do tpad: a tarja age
-    // sobre o stream já atrasado, então dá pra cobrir o segredo ANTES dele airar (preventivo).
-    let mut vf = String::from("zmq");
-    if delay_sec > 0 {
-        vf.push_str(&format!(",tpad=start_duration={delay_sec}:start_mode=clone"));
-    }
-    for i in 0..GUARD_BOXES {
-        // ESCONDIDO = fora da tela. ATENÇÃO: drawbox com w=0/h=0 = TELA INTEIRA (não vazio!),
-        // por isso os boxes começam pra muito longe (-99999) com tamanho mínimo.
-        vf.push_str(&format!(
-            ",drawbox@b{i}=x=-99999:y=-99999:w=2:h=2:color=black@1.0:t=fill"
-        ));
-    }
-
-    let mut args: Vec<String> = vec![
-        "-hide_banner".into(),
-        "-loglevel".into(),
-        "warning".into(),
-        "-i".into(),
-        ingest_url(config),
-        "-map".into(),
-        "0:v".into(),
-        "-vf".into(),
-        vf,
-    ];
-    match hw_codec {
-        // Hardware (GPU): só codec + caps de bitrate, como os destinos fazem (sem preset do libx264).
-        Some(codec) => args.extend(
-            [
-                "-c:v", codec, "-b:v", "6000k", "-maxrate", "6000k", "-bufsize", "6000k", "-g",
-                "120",
-            ]
-            .map(String::from),
-        ),
-        // Software: libx264 ultrafast + zerolatency (o mais leve possível na CPU).
-        None => args.extend(
-            [
-                "-c:v",
-                "libx264",
-                "-preset",
-                "ultrafast",
-                "-tune",
-                "zerolatency",
-                "-b:v",
-                "6000k",
-                "-maxrate",
-                "6000k",
-                "-bufsize",
-                "6000k",
-                "-g",
-                "120",
-                "-pix_fmt",
-                "yuv420p",
-            ]
-            .map(String::from),
-        ),
-    }
-    args.push("-map".into());
-    args.push("0:a?".into());
-    if delay_sec > 0 {
-        args.push("-af".into());
-        args.push(format!("adelay=delays={}:all=1", delay_sec * 1000));
-    }
-    args.extend(
-        ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "160k", "-f", "flv"].map(String::from),
-    );
-    args.push(delayed_url(config));
-    args
 }
 
 // --- Protetor com BUFFER próprio (compositor): delay REAL + censura preventiva ---

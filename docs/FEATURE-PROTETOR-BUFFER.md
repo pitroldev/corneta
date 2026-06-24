@@ -30,14 +30,18 @@ MediaMTX(live) ──> [Decoder FFmpeg]            ──stdout(raw yuv420p)─�
                     -map 0:v -map 1:a -c:v nvenc -c:a aac -f flv _delayed ──> destinos (N atrás, confiável)
 ```
 
-### Vídeo (compositor, in-process)
+### Vídeo (compositor, in-process) — a "máquina do tempo"
 - Lê o stdout do decoder, acumula bytes até um frame inteiro (`w*h*3/2`).
 - `ring buffer` de N segundos. Enquanto enche, emite preto (pro encoder ter vídeo contínuo).
-- **detect+track** roda no plano Y (já é escala de cinza!): reusa `ocr_words`/`scan`
-  (OCR a ~3Hz num thread separado, sem travar o pipeline) + `global_motion` (por frame).
-- Cada frame que ENTRA guarda o snapshot das regiões; ao detectar segredo novo, faz
-  **backfill** das regiões nos frames recentes do buffer (ainda não saíram). Ao SAIR,
-  desenha as regiões guardadas (`draw_box` em yuv420p). Exato e preventivo.
+- **OCR marcado por índice**: uma thread separada faz OCR do quadro mais novo oferecido
+  (no plano Y, que já é cinza), na GPU (PaddleOCR/DirectML), e guarda o resultado pelo
+  ÍNDICE do quadro numa `Coverage` (domínio puro). É só pegar o quadro mais novo livre →
+  a amostragem se auto-ajusta à velocidade do OCR (~0,4s/scan medido numa tela cheia).
+- **Ao SAIR** (N depois), o quadro pega as regiões DELE na `Coverage` (janela ±win que
+  escala com a latência medida do OCR) e desenha as tarjas (`draw_box` em yuv420p).
+- Por que é certo: o atraso do OCR (≪ N) fica TODO escondido pelo buffer. Cada quadro usa
+  a própria detecção → **sem deriva** (posição certa), **sem atraso** (aparece na hora),
+  **sem vazar** (preventivo). Nada de movimento global nem tracking entre frames.
 
 ### Áudio (no encoder, sem named pipe)
 - O encoder lê `live` pro áudio + `-af adelay=N*1000:all=1`. O vídeo sai N atrás (buffer)
@@ -47,19 +51,24 @@ MediaMTX(live) ──> [Decoder FFmpeg]            ──stdout(raw yuv420p)─�
 - Compositor emite 1 frame por frame lido (pace = entrada, real-time). Preto no fill →
   PTS 0..N; conteúdo real → PTS N+. adelay alinha o áudio igual. Tudo no MESMO `_delayed`.
 
-## O que muda no código
-- NOVO `compositor.rs`: orquestra decoder+encoder (sidecars) + o loop de frames + o
-  sub-task de OCR. Reusa de `guardian.rs`: `ocr_words`, `scan`, `Region`, `global_motion`,
-  `project`, `round_region`, `associate`, `Track` (virar `pub(crate)`).
-- `engine.rs`: args do decoder e do encoder (no lugar de `ffmpeg_args_for_protector`).
-- `commands.rs`: sobe decoder+encoder+compositor quando guardião censura OU delay>0
-  (no lugar do protetor zmq). Remove o protetor zmq + o buffer de posição do guardião.
-- Guardião: o detect+track migra pro compositor (que tem os frames crus). O `run_guardian`
-  vira fino (ou some) — o compositor emite `leak://alert` e `leak://censor`.
+## Estrutura do código (arquitetura hexagonal)
+O guardião virou um módulo `src/guardian/` com domínio puro + portas + adaptadores:
+- `domain.rs` — **núcleo PURO** (sem tauri/ffmpeg/ort/windows): regras de detecção, geometria
+  das tarjas e a `Coverage` (a máquina do tempo). Testado em isolamento.
+- `mod.rs` — a porta `Ocr` (fronteira) + a doc do hexágono + a API pública.
+- `ocr.rs` — adaptadores da porta `Ocr`: PaddleOCR (GPU/DirectML) e Windows.Media.Ocr +
+  download dos modelos + a fábrica `build_ocr`.
+- `pipeline.rs` — aplicação + adaptadores de I/O: processos FFmpeg (vídeo cru), pintura
+  yuv420p, eventos Tauri. `run_protector` (censura/delay) e `run_warn` (avisar).
+- `engine.rs` — só os args do decoder e do encoder (FFmpeg). O `ffmpeg_args_for_protector`
+  (protetor zmq/tpad antigo) foi **removido**.
+- `commands.rs` — sobe o protetor (decoder+encoder+pump) quando censura OU delay>0.
 
 ## Riscos / a validar ao vivo
 - RAM do buffer: N×~93MB (N=5s ≈ 465MB). OK até ~5-6s; avisar se N alto.
 - 2 leituras do `live` (decoder vídeo + encoder áudio) — MediaMTX aguenta.
 - Sync A/V fino (o adelay + o preto do fill) — ajustar no teste com OBS.
-- OCR no plano Y: encodar Y→JPEG (image crate) e reusar `ocr_words`, OU SoftwareBitmap
-  direto do cinza. Começar pelo JPEG (reuso) e otimizar depois.
+- OCR no plano Y: **resolvido** — PaddleOCR consome o cinza direto (encolhido a 1280w, que é
+  o ponto ótimo medido: ~400→300ms vs 1080p; 960w não ganha mais). GPU/DirectML libera a CPU.
+- Latência do OCR vs delay: medido ~0,4s típico / ~1-2s numa tela MUITO cheia. O mínimo
+  preventivo é 3s → folga garantida (o atraso fica escondido pelo buffer).

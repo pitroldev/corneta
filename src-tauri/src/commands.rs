@@ -633,9 +633,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // Guardião modo "AVISAR": OCR no frame do extrator + toast (sem censura).
     if g_warn {
         let (app_g, run_g, sig_g) = (app.clone(), running.clone(), has_signal.clone());
-        tauri::async_runtime::spawn(async move {
-            crate::guardian::run_guardian(app_g, run_g, sig_g).await;
-        });
+        crate::guardian::run_warn(app_g, run_g, sig_g);
 
         // EXTRATOR de frames: UM ffmpeg persistente que escreve `guardlive.jpg` a 10fps
         // (sobrescrevendo). Assim o guardião LÊ o arquivo direto — sem subir um ffmpeg por
@@ -775,7 +773,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let watchlist = config.settings.guardian_watchlist.clone();
         let (app_c, run_c, sig_c) = (app.clone(), running.clone(), has_signal.clone());
         tauri::async_runtime::spawn(async move {
-            crate::compositor::run_compositor(
+            crate::guardian::run_protector(
                 app_c, run_c, sig_c, delay_sec, hw, g_censor, watchlist,
             )
             .await;
