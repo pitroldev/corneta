@@ -4,8 +4,15 @@
 > brigam por durante a live. Dá pra fazer OCR na **GPU** (mais rápido e libera a CPU). Aqui estão as
 > opções e o plano. **Só planejamento — nada implementado.** Ver [`FEATURE-ANTI-VAZAMENTO.md`](./FEATURE-ANTI-VAZAMENTO.md).
 
-- **Status:** Planejamento técnico · 2026-06-24
+- **Status:** ❌ **Descartado na prática (2026-06-24)** — ver desfecho abaixo.
 - **Relacionado:** [`MONETIZACAO.md`](./MONETIZACAO.md) (OCR local = grátis, na CPU **ou** GPU)
+
+> **DESFECHO:** a GPU pro OCR foi testada (PaddleOCR/DirectML) e **degradou ao vivo**: o decode
+> (NVDEC) e o encode (NVENC) já ocupam a GPU, e o OCR na GPU (DirectML) **disputava o codec** —
+> os scans foram pra **5-15s e CRESCENDO**, então a tarja nunca aparecia (amostras longe demais da
+> janela de cobertura). A premissa "OCR na CPU briga com os encoders" caiu porque os encoders foram
+> pra GPU (NVENC) e o decode pra NVDEC → **a CPU sobrou**. Produção usa **PaddleOCR na CPU** (~300ms,
+> previsível). Ver `FEATURE-PROTETOR-BUFFER.md`.
 
 ---
 

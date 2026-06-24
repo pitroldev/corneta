@@ -34,7 +34,7 @@ MediaMTX(live) ──> [Decoder FFmpeg]            ──stdout(raw yuv420p)─�
 - Lê o stdout do decoder, acumula bytes até um frame inteiro (`w*h*3/2`).
 - `ring buffer` de N segundos. Enquanto enche, emite preto (pro encoder ter vídeo contínuo).
 - **OCR marcado por índice**: uma thread separada faz OCR do quadro mais novo oferecido
-  (no plano Y, que já é cinza), na GPU (PaddleOCR/DirectML), e guarda o resultado pelo
+  (no plano Y, que já é cinza), na CPU (PaddleOCR), e guarda o resultado pelo
   ÍNDICE do quadro numa `Coverage` (domínio puro). É só pegar o quadro mais novo livre →
   a amostragem se auto-ajusta à velocidade do OCR (~0,4s/scan medido numa tela cheia).
 - **Ao SAIR** (N depois), o quadro pega as regiões DELE na `Coverage` (janela ±win que
@@ -56,7 +56,7 @@ O guardião virou um módulo `src/guardian/` com domínio puro + portas + adapta
 - `domain.rs` — **núcleo PURO** (sem tauri/ffmpeg/ort/windows): regras de detecção, geometria
   das tarjas e a `Coverage` (a máquina do tempo). Testado em isolamento.
 - `mod.rs` — a porta `Ocr` (fronteira) + a doc do hexágono + a API pública.
-- `ocr.rs` — adaptadores da porta `Ocr`: PaddleOCR (GPU/DirectML) e Windows.Media.Ocr +
+- `ocr.rs` — adaptadores da porta `Ocr`: PaddleOCR (CPU) e Windows.Media.Ocr +
   download dos modelos + a fábrica `build_ocr`.
 - `pipeline.rs` — aplicação + adaptadores de I/O: processos FFmpeg (vídeo cru), pintura
   yuv420p, eventos Tauri. `run_protector` (censura/delay) e `run_warn` (avisar).
@@ -69,6 +69,9 @@ O guardião virou um módulo `src/guardian/` com domínio puro + portas + adapta
 - 2 leituras do `live` (decoder vídeo + encoder áudio) — MediaMTX aguenta.
 - Sync A/V fino (o adelay + o preto do fill) — ajustar no teste com OBS.
 - OCR no plano Y: **resolvido** — PaddleOCR consome o cinza direto (encolhido a 1280w, que é
-  o ponto ótimo medido: ~400→300ms vs 1080p; 960w não ganha mais). GPU/DirectML libera a CPU.
+  o ponto ótimo medido: ~400→300ms vs 1080p; 960w não ganha mais). OCR na CPU (~300ms,
+  previsível): a GPU fica só com decode+encode (NVDEC/NVENC). DirectML disputava o codec e
+  degradava pra 5-15s e CRESCENDO ao vivo — por isso a tarja "não aparecia" (amostras a 5-15s
+  de distância nunca caíam na janela de cobertura).
 - Latência do OCR vs delay: medido ~0,4s típico / ~1-2s numa tela MUITO cheia. O mínimo
   preventivo é 3s → folga garantida (o atraso fica escondido pelo buffer).

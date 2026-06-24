@@ -15,7 +15,7 @@
 //! - **`domain`** — núcleo PURO: detecção de segredo, geometria das tarjas e a política de
 //!   cobertura temporal. Sem nenhuma dependência de I/O → testável em isolamento.
 //! - **`Ocr`** (porta, aqui embaixo) — a fronteira pra reconhecer texto. Adaptadores: PaddleOCR
-//!   (GPU/DirectML) e Windows.Media.Ocr, em `ocr.rs`.
+//!   (na CPU) e Windows.Media.Ocr, em `ocr.rs`.
 //! - **`pipeline`** — aplicação + adaptadores de I/O: processos FFmpeg (vídeo cru), pintura
 //!   yuv420p, eventos Tauri. Orquestra fonte → buffer/domínio → saída.
 //!
@@ -34,7 +34,7 @@ pub use pipeline::{run_protector, run_warn};
 
 /// **Porta de OCR** (a fronteira do hexágono pra reconhecer texto). Recebe um quadro em
 /// escala de cinza e devolve os vazamentos + as regiões (frações da tela). Implementada pelos
-/// adaptadores em `ocr.rs` (PaddleOCR na GPU, Windows OCR, ou nulo se nada disponível).
+/// adaptadores em `ocr.rs` (PaddleOCR na CPU, Windows OCR, ou nulo se nada disponível).
 pub(crate) trait Ocr: Send {
     fn scan(&self, gray: &[u8], w: usize, h: usize, watchlist: &[String]) -> (Vec<Leak>, Vec<Region>);
     fn name(&self) -> &'static str;

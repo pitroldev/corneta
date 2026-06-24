@@ -1,6 +1,6 @@
 //! Adaptadores da porta [`Ocr`]: transformam pixels em texto+caixas e chamam as regras do
 //! domínio. Dois motores locais (sem nuvem — privacidade):
-//! - **PaddleOCR** (PP-OCRv5 via ONNX Runtime na GPU/DirectML) — mais preciso e tira o OCR da CPU.
+//! - **PaddleOCR** (PP-OCRv5 via ONNX Runtime na CPU) — mais preciso; a GPU fica pro codec.
 //! - **Windows.Media.Ocr** — nativo, leve, sem baixar modelo (fallback / modo "avisar").
 //!
 //! Antes do OCR a gente ENCOLHE o quadro (as caixas são frações → a posição não muda), o que
@@ -26,7 +26,7 @@ fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {
     Some(image::imageops::resize(&img, OCR_TARGET_W, nh, image::imageops::FilterType::Triangle))
 }
 
-// ----------------------------- PaddleOCR (GPU) -----------------------------
+// ----------------------------- PaddleOCR (CPU) -----------------------------
 
 pub(super) struct PaddleOcr {
     inner: oar_ocr::pipeline::OAROCR,
@@ -34,7 +34,7 @@ pub(super) struct PaddleOcr {
 
 impl Ocr for PaddleOcr {
     fn name(&self) -> &'static str {
-        "PaddleOCR (DirectML/GPU)"
+        "PaddleOCR (CPU)"
     }
 
     fn scan(&self, gray: &[u8], w: usize, h: usize, watchlist: &[String]) -> (Vec<Leak>, Vec<Region>) {
@@ -98,7 +98,7 @@ fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
     Some(app.path().app_config_dir().ok()?.join("ocr-models"))
 }
 
-/// Os 3 modelos PP-OCRv5 já estão baixados? (decide GPU agora vs Windows OCR + baixar no fundo).
+/// Os 3 modelos PP-OCRv5 já estão baixados? (Paddle agora vs Windows OCR + baixar no fundo).
 fn models_cached(app: &AppHandle) -> bool {
     match models_dir(app) {
         Some(dir) => MODEL_NAMES.iter().all(|n| dir.join(n).exists()),
@@ -137,14 +137,14 @@ fn ensure_paddle_models(
     Some((paths[0].clone(), paths[1].clone(), paths[2].clone()))
 }
 
-/// Constrói o pipeline PaddleOCR (uma vez) na GPU (DirectML), CPU como fallback. None se falhar.
+/// Constrói o pipeline PaddleOCR (uma vez) na CPU. None se falhar.
+/// CPU (não DirectML): o decode/encode já ocupam a GPU (NVDEC/NVENC) e o OCR na GPU disputava o
+/// codec, degradando pra 5-15s e crescendo ao vivo. Na CPU livre é ~300ms e previsível.
 fn build_paddle(app: &AppHandle) -> Option<PaddleOcr> {
     use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
     let (det, rec, dict) = ensure_paddle_models(app)?;
-    let ort_cfg = OrtSessionConfig::new().with_execution_providers(vec![
-        OrtExecutionProvider::DirectML { device_id: Some(0) },
-        OrtExecutionProvider::CPU,
-    ]);
+    let ort_cfg =
+        OrtSessionConfig::new().with_execution_providers(vec![OrtExecutionProvider::CPU]);
     let inner = oar_ocr::pipeline::OAROCRBuilder::new(
         det.to_string_lossy().to_string(),
         rec.to_string_lossy().to_string(),
@@ -251,14 +251,14 @@ impl Ocr for NullOcr {
 }
 
 /// Escolhe o melhor motor disponível, **sem nunca travar o arranque da live esperando download**.
-/// `prefer_gpu` (modo censurar):
-/// - Modelos em cache → PaddleOCR na GPU (preciso + libera a CPU).
-/// - 1ª vez (sem cache) → baixa o Paddle NO FUNDO (próxima sessão usa GPU) e usa o Windows OCR
+/// `prefer_paddle` (modo censurar):
+/// - Modelos em cache → PaddleOCR na CPU (preciso; a GPU fica pro codec).
+/// - 1ª vez (sem cache) → baixa o Paddle NO FUNDO (próxima sessão usa Paddle) e usa o Windows OCR
 ///   AGORA, que é instantâneo e cobre a janela do buffer (sem vazar no arranque).
 ///
 /// Chame DENTRO da thread que vai usar o OCR (evita mover sessões ONNX entre threads).
-pub(super) fn build_ocr(app: &AppHandle, prefer_gpu: bool) -> Box<dyn Ocr> {
-    if prefer_gpu {
+pub(super) fn build_ocr(app: &AppHandle, prefer_paddle: bool) -> Box<dyn Ocr> {
+    if prefer_paddle {
         if models_cached(app) {
             if let Some(p) = build_paddle(app) {
                 return Box::new(p);

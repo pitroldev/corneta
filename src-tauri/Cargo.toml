@@ -41,9 +41,11 @@ base64 = "0.22"
 regex = "1"
 # Guardião: encolhe o quadro antes do OCR (resize) e decoda o JPEG do extrator (modo avisar).
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
-# OCR PaddleOCR (PP-OCRv5 via ONNX Runtime) na GPU via DirectML — tira o OCR da CPU
-# (que disputa com a decodificação por software). `ort` FIXO no rc.10 (rc.11+ quebra o oar-ocr).
-oar-ocr = { version = "0.2", features = ["directml"] }
+# OCR PaddleOCR (PP-OCRv5 via ONNX Runtime) na CPU. Decode/encode ficam na GPU (NVDEC/NVENC);
+# OCR na CPU LIVRE (~300ms, previsível). Na GPU (DirectML) disputava o codec e degradava
+# (5-15s e crescendo) ao vivo. CPU também dispensa bundlar a DirectML.dll.
+# `ort` FIXO no rc.10 (rc.11+ quebra o oar-ocr).
+oar-ocr = "0.2"
 ort = "=2.0.0-rc.10"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].

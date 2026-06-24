@@ -25,9 +25,6 @@ use crate::engine::{self, COMP_FPS, COMP_H, COMP_W};
 const FSIZE: usize = COMP_W * COMP_H * 3 / 2; // yuv420p
 const YSIZE: usize = COMP_W * COMP_H; // plano Y (escala de cinza)
 const MAX_BOXES: usize = 12; // teto de tarjas simultâneas por quadro (depois do merge)
-/// Máximo que uma detecção "segura" um quadro sem amostra nova (≈ delay mínimo). Bracket além
-/// disso = OCR travado → para de desenhar (não trava tarja velha pra sempre).
-const MAX_HOLD_FRAMES: u64 = 3 * COMP_FPS as u64;
 /// Teto do delay (s) — o buffer é delay×3,1MB/quadro; 15s ≈ 1,3GB. Trava abuso de config manual.
 const MAX_DELAY_SEC: u32 = 15;
 
@@ -158,6 +155,9 @@ pub async fn run_protector(
     let dec_args = engine::ffmpeg_args_for_decoder(&cfg);
     let enc_args = engine::ffmpeg_args_for_encoder(&cfg, delay_sec, hw_codec.as_deref());
     let delay_frames = (delay_sec as usize) * COMP_FPS;
+    // Quanto uma detecção "segura" um quadro sem amostra nova: ~2/3 do buffer. Dá folga pra OCR
+    // mais lento (tela cheia, ~1-2s) sem buraco entre amostras; bracket além disso = OCR travado.
+    let max_hold = (delay_frames as u64 * 2 / 3).max(COMP_FPS as u64);
     log::info!(
         "protetor: delay {delay_sec}s ({delay_frames} frames), {COMP_W}x{COMP_H}@{COMP_FPS}, censor={censor}, hw={hw_codec:?}"
     );
@@ -215,7 +215,8 @@ pub async fn run_protector(
 
             *shared.scan_slot.lock().unwrap() = None; // descarta quadro pendente da conexão anterior
             let broke = pump_frames(
-                &mut dout, &mut ein, &app, &running, &shared, delay_frames, censor, &black, &mut head,
+                &mut dout, &mut ein, &app, &running, &shared, delay_frames, max_hold, censor, &black,
+                &mut head,
             );
 
             let _ = app.emit("leak://censor", false);
@@ -236,11 +237,11 @@ pub async fn run_protector(
 /// segredo com o OCR DAQUELE quadro (Coverage). Devolve quando o decoder/encoder morre.
 ///
 /// Ritmo: lê 1 / escreve 1, ditado pelo decoder (tempo real) e pelo encoder. Com NVENC (GPU, custo
-/// fixo, silício dedicado — NÃO disputa com o DirectML do OCR) o encoder acompanha o tempo real e o
-/// delay fica TRAVADO em `delay_frames`. Se o encoder atrasar (ex.: fallback libx264 em CPU fraca),
-/// o `write_all` segura o pump (contrapressão) — o delay não cresce, mas o MediaMTX pode descartar
-/// quadros. Por isso o protetor prioriza o encoder de hardware. O OCR roda em OUTRA thread e NUNCA
-/// trava o pump (só oferece/lê via `scan_slot`).
+/// fixo) o encoder acompanha o tempo real e o delay fica TRAVADO em `delay_frames`. Se o encoder
+/// atrasar (ex.: fallback libx264 em CPU fraca), o `write_all` segura o pump (contrapressão) — o
+/// delay não cresce, mas o MediaMTX pode descartar quadros. Por isso o protetor prioriza o encoder
+/// de hardware. O OCR roda em OUTRA thread (na CPU) e NUNCA trava o pump (só oferece/lê via
+/// `scan_slot`) — a GPU fica só com decode+encode, o que evita a disputa que matava o OCR.
 #[allow(clippy::too_many_arguments)]
 fn pump_frames(
     dout: &mut impl Read,
@@ -249,6 +250,7 @@ fn pump_frames(
     running: &AtomicBool,
     shared: &Shared,
     delay_frames: usize,
+    max_hold: u64,
     censor: bool,
     black: &[u8],
     head: &mut u64,
@@ -280,7 +282,7 @@ fn pump_frames(
         let ok = if buf.len() > delay_frames {
             let (out_idx, mut f) = buf.pop_front().unwrap();
             let regs = if censor {
-                draw_regions_for(shared, out_idx)
+                draw_regions_for(shared, out_idx, max_hold)
             } else {
                 vec![]
             };
@@ -304,10 +306,10 @@ fn pump_frames(
 
 /// Regiões a desenhar no quadro `out_idx`: o bracket das amostras vizinhas (cobre o intervalo
 /// inteiro entre amostras, sem buraco e sem atraso de janela). Também poda o que já saiu.
-fn draw_regions_for(shared: &Shared, out_idx: u64) -> Vec<Region> {
+fn draw_regions_for(shared: &Shared, out_idx: u64, max_hold: u64) -> Vec<Region> {
     let mut cov = shared.coverage.lock().unwrap();
-    let regs = cov.regions_at(out_idx, MAX_HOLD_FRAMES, MAX_BOXES);
-    cov.prune(out_idx.saturating_sub(MAX_HOLD_FRAMES + 2));
+    let regs = cov.regions_at(out_idx, max_hold, MAX_BOXES);
+    cov.prune(out_idx.saturating_sub(max_hold + 2));
     regs
 }
 
@@ -332,7 +334,7 @@ fn ocr_worker(
         };
         let t = Instant::now();
         let (leaks, regions) = ocr.scan(&gray, COMP_W, COMP_H, &watchlist);
-        // Diagnóstico: OCR perto do limite do buffer (tela MUITO cheia / GPU lenta) → amostragem
+        // Diagnóstico: OCR perto do limite do buffer (tela MUITO cheia / CPU lenta) → amostragem
         // fica grossa. Avisa em vez de degradar em silêncio (o usuário pode aumentar o delay).
         if t.elapsed() > Duration::from_millis(1500) {
             log::warn!(
