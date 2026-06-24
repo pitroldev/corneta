@@ -45,6 +45,8 @@ export function defaultConfig(): AppConfig {
       chatShowTimestamps: false,
       theme: "dark",
       chatFontSize: "md",
+      chatBothLayout: "auto",
+      chatBothAlertsFirst: false,
       brbEnabled: true,
       autoBitrate: true,
     },

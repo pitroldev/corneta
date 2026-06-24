@@ -1,5 +1,5 @@
-import { memo, useEffect, useRef } from "react";
-import { MessageSquare } from "lucide-react";
+import { memo, useEffect, useRef, useState } from "react";
+import { ArrowDown, MessageSquare } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
 import { PlatformGlyph } from "./ui";
@@ -36,6 +36,7 @@ export function ChatFeed({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -45,33 +46,54 @@ export function ChatFeed({
   const onScroll = () => {
     const el = ref.current;
     if (!el) return;
-    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    stick.current = atBottom;
+    setPaused(!atBottom);
+  };
+
+  const jumpToBottom = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    stick.current = true;
+    setPaused(false);
   };
 
   return (
-    <div
-      ref={ref}
-      onScroll={onScroll}
-      className={cn(
-        "overflow-y-auto py-2 [scrollbar-gutter:stable]",
-        FONT_CLASS[view.fontSize],
-        className,
-      )}
-    >
-      {messages.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-          <MessageSquare className="size-8 text-ink-faint" />
-          <div className="font-display text-lg font-bold">
-            {connected ? "Esperando mensagens…" : "Chat desconectado"}
+    <div className={cn("relative min-h-0", className)}>
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className={cn(
+          "h-full overflow-y-auto py-2 [scrollbar-gutter:stable]",
+          FONT_CLASS[view.fontSize],
+        )}
+      >
+        {messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+            <MessageSquare className="size-8 text-ink-faint" />
+            <div className="font-display text-lg font-bold">
+              {connected ? "Esperando mensagens…" : "Chat desconectado"}
+            </div>
+            <div className="max-w-sm text-sm text-ink-muted">
+              {connected
+                ? "Assim que a galera mandar mensagem, aparece aqui."
+                : "Configure ao menos uma fonte e clique em Conectar."}
+            </div>
           </div>
-          <div className="max-w-sm text-sm text-ink-muted">
-            {connected
-              ? "Assim que a galera mandar mensagem, aparece aqui."
-              : "Configure ao menos uma fonte e clique em Conectar."}
-          </div>
-        </div>
-      ) : (
-        messages.map((m) => <MsgRow key={m.id} m={m} view={view} />)
+        ) : (
+          messages.map((m) => <MsgRow key={m.id} m={m} view={view} />)
+        )}
+      </div>
+
+      {/* Aparece ao rolar pra cima — volta a acompanhar o chat (útil em chat rápido). */}
+      {paused && messages.length > 0 && (
+        <button
+          onClick={jumpToBottom}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border-2 border-brass-ink bg-brass px-3 py-1 text-xs font-extrabold text-brass-ink shadow-[2px_2px_0_0_rgba(0,0,0,0.35)] transition-transform hover:scale-105"
+        >
+          <ArrowDown className="size-3.5" strokeWidth={2.6} /> Acompanhar chat
+        </button>
       )}
     </div>
   );

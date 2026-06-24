@@ -101,6 +101,12 @@ pub struct Settings {
     /// Tamanho da fonte do chat: "sm" | "md" | "lg".
     #[serde(default = "default_font")]
     pub chat_font_size: String,
+    /// Layout do modo "Ambos" da janela do chat: "auto" | "row" (lado a lado) | "col" (empilhado).
+    #[serde(default = "default_both_layout")]
+    pub chat_both_layout: String,
+    /// No modo "Ambos", mostrar os alertas antes do chat.
+    #[serde(default)]
+    pub chat_both_alerts_first: bool,
     /// Proteção contra quedas: empurra um slate "JÁ VOLTO" pras plataformas se o sinal
     /// cair NO MEIO da live (só após já ter tido sinal) — mantém a transmissão de pé.
     #[serde(default = "default_true")]
@@ -153,10 +159,16 @@ impl Default for Settings {
             chat_show_timestamps: false,
             theme: default_theme(),
             chat_font_size: default_font(),
+            chat_both_layout: default_both_layout(),
+            chat_both_alerts_first: false,
             brb_enabled: true,
             auto_bitrate: true,
         }
     }
+}
+
+fn default_both_layout() -> String {
+    "auto".to_string()
 }
 
 /// Um perfil salvo = um conjunto de destinos + modo de encoding.
