@@ -44,6 +44,8 @@ regex = "1"
 zeromq = "0.4"
 # Só pro timeout do connect zmq do guardião (já é dep transitiva do tauri).
 tokio = { version = "1", features = ["time"] }
+# Decode de JPEG → escala de cinza pro rastreamento de movimento (optical flow) do guardião.
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
 keyring = { version = "3", features = ["windows-native"] }

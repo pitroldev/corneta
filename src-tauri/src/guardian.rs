@@ -2,7 +2,7 @@
 //! boxes), procura segredo na tela e avisa/censura — cobrindo SÓ a região do segredo
 //! (tarja) ou a tela toda. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use regex::Regex;
@@ -243,6 +243,99 @@ fn ocr_words(_bytes: &[u8]) -> Option<(String, Vec<Word>)> {
     None
 }
 
+// --------------------- Rastreamento de movimento global ---------------------
+// "Detectar + rastrear": o OCR (lento) só ACHA os segredos; entre os OCRs, este
+// rastreador segue o conteúdo a cada frame por "integral projection" — barato e
+// preciso pra translação (scroll de página/tela), que é o caso comum.
+
+/// Decodifica o JPEG do extrator em escala de cinza. Retorna (pixels, largura, altura).
+fn decode_gray(jpeg: &[u8]) -> Option<(Vec<u8>, usize, usize)> {
+    let img = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg).ok()?;
+    let g = img.to_luma8();
+    let (w, h) = (g.width() as usize, g.height() as usize);
+    Some((g.into_raw(), w, h))
+}
+
+/// Projeções integrais (soma por linha e por coluna) — assinatura 1D do frame.
+struct Proj {
+    w: usize,
+    h: usize,
+    rows: Vec<u32>,
+    cols: Vec<u32>,
+}
+
+fn project(gray: &[u8], w: usize, h: usize) -> Proj {
+    let mut rows = vec![0u32; h];
+    let mut cols = vec![0u32; w];
+    for y in 0..h {
+        let base = y * w;
+        let mut rs = 0u32;
+        for x in 0..w {
+            let v = gray[base + x] as u32;
+            rs += v;
+            cols[x] += v;
+        }
+        rows[y] = rs;
+    }
+    Proj { w, h, rows, cols }
+}
+
+/// Deslocamento d tal que `cur[i+d] ≈ prev[i]` (SAD normalizada numa janela ±maxd).
+/// d=0 é a linha de base; só devolve d≠0 se for CLARAMENTE melhor (gate de confiança) —
+/// senão devolve 0 (não inventa movimento em corte de cena / eixo sem deslocamento).
+fn best_shift(prev: &[u32], cur: &[u32], maxd: i32) -> i32 {
+    let n = prev.len() as i32;
+    if n == 0 {
+        return 0;
+    }
+    let sad = |d: i32| -> Option<f64> {
+        let lo = 0.max(-d);
+        let hi = n.min(n - d);
+        if hi - lo < n / 2 {
+            return None; // sobreposição insuficiente
+        }
+        let mut sum = 0f64;
+        let mut i = lo;
+        while i < hi {
+            sum += (prev[i as usize] as f64 - cur[(i + d) as usize] as f64).abs();
+            i += 1;
+        }
+        Some(sum / (hi - lo) as f64)
+    };
+    let base = sad(0).unwrap_or(f64::MAX); // "não mexer"
+    let mut best = base;
+    let mut best_d = 0i32;
+    for d in -maxd..=maxd {
+        if d == 0 {
+            continue;
+        }
+        if let Some(s) = sad(d) {
+            if s < best {
+                best = s;
+                best_d = d;
+            }
+        }
+    }
+    // Confiança: o melhor deslocamento precisa ser ≥15% melhor que não mexer.
+    if best_d != 0 && best > base * 0.85 {
+        return 0;
+    }
+    best_d
+}
+
+/// Movimento global do conteúdo entre dois frames, em FRAÇÕES (dxf, dyf).
+/// dyf>0 = conteúdo desceu → as tarjas descem junto. `max_frac` = alcance da busca.
+fn global_motion(prev: &Proj, cur: &Proj, max_frac: f32) -> (f32, f32) {
+    if prev.w != cur.w || prev.h != cur.h || cur.w == 0 || cur.h == 0 {
+        return (0.0, 0.0);
+    }
+    let maxdy = (((cur.h as f32) * max_frac) as i32).max(1);
+    let maxdx = (((cur.w as f32) * max_frac) as i32).max(1);
+    let dy = best_shift(&prev.rows, &cur.rows, maxdy);
+    let dx = best_shift(&prev.cols, &cur.cols, maxdx);
+    (dx as f32 / cur.w as f32, dy as f32 / cur.h as f32)
+}
+
 // ------------------------------- Loop -------------------------------
 
 /// Manda UM comando pro filtro (REQ exige send→recv). false se a conexão caiu.
@@ -292,102 +385,236 @@ async fn hide_box(sock: &mut zeromq::ReqSocket, i: usize) -> bool {
     zmq_send(sock, &format!("drawbox@b{i} x -99999")).await
 }
 
-/// Guardião: OCR local nos frames + comanda as tarjas do PROTETOR via zmq (sem reiniciar nada).
+/// Detecção (OCR): o lado LENTO, isolado em background pra não travar o rastreamento.
+/// Publica as regiões achadas + se está em modo "censurar".
+#[derive(Default, Clone)]
+struct Anchor {
+    gen: u64,
+    auto: bool,
+    regions: Vec<Region>,
+}
+
+async fn ocr_loop(
+    app: AppHandle,
+    running: Arc<AtomicBool>,
+    has_signal: Arc<AtomicBool>,
+    anchor: Arc<Mutex<Anchor>>,
+    frame_path: Option<std::path::PathBuf>,
+) {
+    let mut tick = 0u32;
+    let mut auto = false;
+    let mut watchlist: Vec<String> = vec![];
+    let mut had_leak = false;
+    loop {
+        if !running.load(Ordering::Relaxed) {
+            return;
+        }
+        let _ = tauri::async_runtime::spawn_blocking(|| {
+            std::thread::sleep(Duration::from_millis(30))
+        })
+        .await;
+        if tick % 20 == 0 {
+            let cfg = crate::config::load(&app).settings;
+            auto = cfg.guardian_action == "censor";
+            watchlist = cfg.guardian_watchlist;
+        }
+        tick = tick.wrapping_add(1);
+        if !has_signal.load(Ordering::Relaxed) {
+            continue;
+        }
+        let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
+            Some(b) if !b.is_empty() => b,
+            _ => continue,
+        };
+        let wl = watchlist.clone();
+        let (leaks, regions) = match tauri::async_runtime::spawn_blocking(move || {
+            ocr_words(&jpeg).map(|(text, words)| {
+                if text.trim().is_empty() {
+                    (vec![], vec![])
+                } else {
+                    scan(&text, &words, &wl)
+                }
+            })
+        })
+        .await
+        {
+            Ok(Some(v)) => v,
+            _ => continue,
+        };
+        if !leaks.is_empty() && !had_leak {
+            for l in &leaks {
+                let _ = app.emit("leak://alert", l.clone());
+            }
+        }
+        had_leak = !leaks.is_empty();
+        if let Ok(mut a) = anchor.lock() {
+            a.gen = a.gen.wrapping_add(1);
+            a.auto = auto;
+            a.regions = regions.iter().map(|r| round_region(*r)).collect();
+        }
+    }
+}
+
+/// Uma região rastreada (frações) ligada a um box do protetor.
+struct Track {
+    fx: f32,
+    fy: f32,
+    fw: f32,
+    fh: f32,
+    box_idx: usize,
+    miss: u32,
+}
+
+/// Casa as regiões do OCR com os tracks por PROXIMIDADE: os que continuam mantêm a posição
+/// RASTREADA (sem pulo, só atualiza o tamanho); os novos viram track; os sumidos saem após carência.
+fn associate(tracks: &mut Vec<Track>, anchors: &[Region], n: usize) {
+    let mut t_matched = vec![false; tracks.len()];
+    let mut a_used = vec![false; anchors.len()];
+    for (ai, a) in anchors.iter().enumerate() {
+        let (acx, acy) = (a.0 + a.2 / 2.0, a.1 + a.3 / 2.0);
+        let mut best = usize::MAX;
+        let mut bestd = 0.12f32; // limiar: 12% de distância entre centros
+        for (ti, t) in tracks.iter().enumerate() {
+            if t_matched[ti] {
+                continue;
+            }
+            let (tcx, tcy) = (t.fx + t.fw / 2.0, t.fy + t.fh / 2.0);
+            let d = ((acx - tcx).powi(2) + (acy - tcy).powi(2)).sqrt();
+            if d < bestd {
+                bestd = d;
+                best = ti;
+            }
+        }
+        if best != usize::MAX {
+            tracks[best].fw = a.2; // mantém posição, atualiza tamanho
+            tracks[best].fh = a.3;
+            tracks[best].miss = 0;
+            t_matched[best] = true;
+            a_used[ai] = true;
+        }
+    }
+    for (ti, t) in tracks.iter_mut().enumerate() {
+        if !t_matched[ti] {
+            t.miss += 1;
+        }
+    }
+    tracks.retain(|t| t.miss < 2);
+    let used: std::collections::HashSet<usize> = tracks.iter().map(|t| t.box_idx).collect();
+    let mut free: Vec<usize> = (0..n).filter(|i| !used.contains(i)).collect();
+    for (ai, a) in anchors.iter().enumerate() {
+        if a_used[ai] {
+            continue;
+        }
+        if let Some(bi) = free.pop() {
+            tracks.push(Track { fx: a.0, fy: a.1, fw: a.2, fh: a.3, box_idx: bi, miss: 0 });
+        }
+    }
+}
+
+/// Guardião: DETECTA (OCR em background) + RASTREIA (movimento global, por frame) e comanda as
+/// tarjas via zmq — segue o conteúdo quase em tempo real, sem reiniciar nada.
 pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: Arc<AtomicBool>) {
     use zeromq::Socket;
     log::info!("guardião: ligado");
     let endpoint = format!("tcp://127.0.0.1:{}", crate::engine::GUARD_ZMQ_PORT);
     let n = crate::engine::GUARD_BOXES;
-    let mut sock: Option<zeromq::ReqSocket> = None;
-    let mut censoring = false; // alguma tarja visível agora?
-    let mut misses = 0u32; // varreduras limpas seguidas (pra liberar)
-    let mut tick = 0u32;
-    let mut auto = false;
-    let mut watchlist: Vec<String> = vec![];
-    // Última região enviada PRA CADA box (arredondada) — base do envio por DELTA.
-    let mut shown: Vec<Option<Region>> = vec![None; n];
     let frame_path = crate::commands::guard_frame_path(&app);
+
+    // Detecção roda em background; o loop abaixo é o RASTREAMENTO (rápido).
+    let anchor = Arc::new(Mutex::new(Anchor::default()));
+    {
+        let (a, r, s, an, fp) = (
+            app.clone(),
+            running.clone(),
+            has_signal.clone(),
+            anchor.clone(),
+            frame_path.clone(),
+        );
+        tauri::async_runtime::spawn(async move { ocr_loop(a, r, s, an, fp).await });
+    }
+
+    let mut sock: Option<zeromq::ReqSocket> = None;
+    let mut censoring = false;
+    let mut shown: Vec<Option<Region>> = vec![None; n];
+    let mut tracks: Vec<Track> = vec![];
+    let mut last_gen = 0u64;
+    let mut prev: Option<Proj> = None;
 
     loop {
         if !running.load(Ordering::Relaxed) {
             log::info!("guardião: desligado");
             return;
         }
-        // Ritmo CURTO: quem dita o passo é o OCR (~5-7×/s) → tracking quase em tempo real.
+        // ~16Hz: o rastreamento é barato, então segue o conteúdo de pertinho.
         let _ = tauri::async_runtime::spawn_blocking(|| {
-            std::thread::sleep(Duration::from_millis(40))
+            std::thread::sleep(Duration::from_millis(55))
         })
         .await;
 
-        // Recarrega settings ~1×/s (não a cada volta — pega ligar/desligar "censurar", watchlist).
-        if tick % 25 == 0 {
-            let cfg = crate::config::load(&app).settings;
-            auto = cfg.guardian_action == "censor";
-            watchlist = cfg.guardian_watchlist;
-        }
-        tick = tick.wrapping_add(1);
-
         if !has_signal.load(Ordering::Relaxed) {
+            prev = None;
             continue;
         }
-        // (Re)conecta no zmq do protetor — com timeout pra não travar se ele ainda não subiu.
         if sock.is_none() {
             let mut s = zeromq::ReqSocket::new();
             match tokio::time::timeout(Duration::from_secs(3), s.connect(&endpoint)).await {
                 Ok(Ok(())) => {
                     log::info!("guardião: zmq conectado no protetor");
                     sock = Some(s);
-                    // Protetor (re)começa com os boxes escondidos → zera o estado conhecido.
                     censoring = false;
                     shown = vec![None; n];
+                    tracks.clear();
+                    prev = None;
                 }
-                _ => continue, // protetor ainda não pronto; tenta na próxima volta
+                _ => continue,
             }
         }
 
-        // Lê o frame mais recente que o extrator escreveu (SEM subir ffmpeg → rápido).
+        // Frame atual → cinza → assinatura de projeção.
         let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
             Some(b) if !b.is_empty() => b,
             _ => continue,
         };
-        let (text, words) =
-            match tauri::async_runtime::spawn_blocking(move || ocr_words(&jpeg)).await {
-                Ok(Some(v)) => v,
-                _ => continue,
-            };
-        let (leaks, regions) = if text.trim().is_empty() {
-            (vec![], vec![])
-        } else {
-            scan(&text, &words, &watchlist)
+        let cur = match decode_gray(&jpeg) {
+            Some((g, w, h)) => project(&g, w, h),
+            None => continue,
         };
 
-        // Aviso (toast) só ao começar a censurar (ou no modo avisar) — sem spam.
-        if !leaks.is_empty() && !censoring {
-            for l in &leaks {
-                let _ = app.emit("leak://alert", l.clone());
+        // RASTREIA: movimento global desde o frame anterior → empurra TODOS os tracks.
+        if let Some(p) = &prev {
+            let (dxf, dyf) = global_motion(p, &cur, 0.2);
+            if dxf != 0.0 || dyf != 0.0 {
+                for t in &mut tracks {
+                    t.fx += dxf;
+                    t.fy += dyf;
+                }
+            }
+        }
+        prev = Some(cur);
+
+        // RE-ANCORA quando o OCR trouxe uma detecção nova.
+        let (gen, auto, anchors) = {
+            let a = anchor.lock().unwrap();
+            (a.gen, a.auto, a.regions.clone())
+        };
+        if gen != last_gen {
+            last_gen = gen;
+            if auto {
+                associate(&mut tracks, &anchors, n);
+            } else {
+                tracks.clear();
             }
         }
 
-        // Estado DESEJADO das tarjas nesta varredura (uma por segredo; resto escondido).
-        let desired: Vec<Option<Region>> = if auto && !regions.is_empty() {
-            misses = 0;
-            (0..n)
-                .map(|i| regions.get(i).copied().map(round_region))
-                .collect()
-        } else if auto && censoring {
-            // Sumiu da tela: segura ~2 varreduras (anti-flicker) antes de liberar.
-            misses += 1;
-            if misses >= 2 {
-                misses = 0;
-                vec![None; n]
-            } else {
-                shown.clone() // mantém onde está → 0 comandos
+        // Estado desejado por box.
+        let mut desired: Vec<Option<Region>> = vec![None; n];
+        for t in &tracks {
+            if t.box_idx < n {
+                desired[t.box_idx] = Some(round_region((t.fx, t.fy, t.fw, t.fh)));
             }
-        } else {
-            vec![None; n] // modo "avisar", ou nada na tela e já liberado
-        };
+        }
 
-        // Aplica só o DELTA: manda só o que mudou (é isso que deixa rápido — 24 cmds → 1-2).
+        // DELTA: manda só o que mudou.
         let mut dead = false;
         {
             let socket = sock.as_mut().unwrap();
@@ -396,10 +623,10 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
                     break;
                 }
                 let ok = match (shown[i], desired[i]) {
-                    (a, b) if a == b => true,                              // igual → 0 comandos
-                    (_, None) => hide_box(socket, i).await,                // esconder
-                    (None, Some(r)) => show_box(socket, i, r).await,       // surgir (4)
-                    (Some(o), Some(r)) => move_box(socket, i, o, r).await, // mover (só delta)
+                    (a, b) if a == b => true,
+                    (_, None) => hide_box(socket, i).await,
+                    (None, Some(r)) => show_box(socket, i, r).await,
+                    (Some(o), Some(r)) => move_box(socket, i, o, r).await,
                 };
                 if ok {
                     shown[i] = desired[i];
@@ -414,13 +641,12 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
             continue;
         }
 
-        // Banner + log só na TRANSIÇÃO (censurando ↔ liberado).
         let now = shown.iter().any(|s| s.is_some());
         if now != censoring {
             censoring = now;
             let _ = app.emit("leak://censor", now);
             if now {
-                log::warn!("guardião: CENSURA (tarja) — {} região(ões)", regions.len());
+                log::warn!("guardião: CENSURA (tarja) — {} região(ões)", tracks.len());
             } else {
                 log::info!("guardião: censura liberada (segredo saiu)");
             }
@@ -438,6 +664,59 @@ mod tests {
         let (leaks, _) = scan(t, &[], &[]);
         assert!(leaks.iter().any(|l| l.kind == "apikey" && l.severity == "high"));
         assert!(leaks.iter().any(|l| l.kind == "email"));
+    }
+
+    #[test]
+    fn rastreia_scroll_vertical() {
+        let (w, h) = (64usize, 64usize);
+        let mut a = vec![0u8; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                a[y * w + x] = ((y * 7 + x * 3) % 256) as u8;
+            }
+        }
+        // b = a deslocado pra BAIXO por 5 linhas (toroidal → colunas preservadas).
+        let dy_true = 5usize;
+        let mut b = vec![0u8; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let sy = (y + h - dy_true) % h;
+                b[y * w + x] = a[sy * w + x];
+            }
+        }
+        let (pa, pb) = (project(&a, w, h), project(&b, w, h));
+        let (dxf, dyf) = global_motion(&pa, &pb, 0.5);
+        assert_eq!((dyf * h as f32).round() as i32, dy_true as i32);
+        assert!(dxf.abs() < 0.05, "dx deveria ser ~0, foi {dxf}");
+    }
+
+    #[test]
+    fn rastreia_em_jpeg_real() {
+        // Caminho completo: textura → JPEG → decode_gray → movimento (como o extrator real).
+        let (w, h) = (160usize, 120usize);
+        let tex = |y: usize, x: usize| (((y * 13) ^ (x * 7)).wrapping_add(x * x) % 256) as u8;
+        let dy_true = 8usize;
+        let mut a = image::GrayImage::new(w as u32, h as u32);
+        let mut b = image::GrayImage::new(w as u32, h as u32);
+        for y in 0..h {
+            for x in 0..w {
+                a.put_pixel(x as u32, y as u32, image::Luma([tex(y, x)]));
+                let sy = (y + h - dy_true) % h; // toroidal → colunas preservadas
+                b.put_pixel(x as u32, y as u32, image::Luma([tex(sy, x)]));
+            }
+        }
+        let enc = |img: &image::GrayImage| {
+            let mut buf = Vec::new();
+            img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg)
+                .unwrap();
+            buf
+        };
+        let (ga, wa, ha) = decode_gray(&enc(&a)).expect("decode a");
+        let (gb, _, _) = decode_gray(&enc(&b)).expect("decode b");
+        let (_dxf, dyf) = global_motion(&project(&ga, wa, ha), &project(&gb, wa, ha), 0.3);
+        let dy = (dyf * ha as f32).round() as i32;
+        // JPEG é lossy → tolera ±1 px.
+        assert!((dy - dy_true as i32).abs() <= 1, "dy recuperado={dy}, esperado≈{dy_true}");
     }
 
     #[test]

@@ -647,7 +647,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                         "-i".into(),
                         engine::ingest_url(&cfg_c),
                         "-vf".into(),
-                        "fps=10,scale=1280:-2".into(),
+                        "fps=15,scale=1280:-2".into(),
                         "-q:v".into(),
                         "5".into(),
                         "-update".into(),
