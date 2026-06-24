@@ -257,13 +257,15 @@ async fn zmq_send(sock: &mut zeromq::ReqSocket, cmd: &str) -> bool {
 /// Posiciona (ou esconde, com None) a tarja `i` via comandos drawbox no protetor.
 async fn set_box(sock: &mut zeromq::ReqSocket, i: usize, r: Option<Region>) -> bool {
     match r {
+        // Mostra: tamanho e posição (x por ÚLTIMO → não pisca em lugar errado ao surgir).
         Some((fx, fy, fw, fh)) => {
-            zmq_send(sock, &format!("drawbox@b{i} x iw*{fx:.4}")).await
-                && zmq_send(sock, &format!("drawbox@b{i} y ih*{fy:.4}")).await
-                && zmq_send(sock, &format!("drawbox@b{i} w iw*{fw:.4}")).await
+            zmq_send(sock, &format!("drawbox@b{i} w iw*{fw:.4}")).await
                 && zmq_send(sock, &format!("drawbox@b{i} h ih*{fh:.4}")).await
+                && zmq_send(sock, &format!("drawbox@b{i} y ih*{fy:.4}")).await
+                && zmq_send(sock, &format!("drawbox@b{i} x iw*{fx:.4}")).await
         }
-        None => zmq_send(sock, &format!("drawbox@b{i} w 0")).await,
+        // Esconde: joga pra FORA da tela. (NÃO usar w=0 — no drawbox isso vira TELA INTEIRA!)
+        None => zmq_send(sock, &format!("drawbox@b{i} x -99999")).await,
     }
 }
 

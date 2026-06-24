@@ -203,7 +203,11 @@ pub fn ffmpeg_args_for_protector(
         vf.push_str(&format!(",tpad=start_duration={delay_sec}:start_mode=clone"));
     }
     for i in 0..GUARD_BOXES {
-        vf.push_str(&format!(",drawbox@b{i}=x=0:y=0:w=0:h=0:color=black@1.0:t=fill"));
+        // ESCONDIDO = fora da tela. ATENÇÃO: drawbox com w=0/h=0 = TELA INTEIRA (não vazio!),
+        // por isso os boxes começam pra muito longe (-99999) com tamanho mínimo.
+        vf.push_str(&format!(
+            ",drawbox@b{i}=x=-99999:y=-99999:w=2:h=2:color=black@1.0:t=fill"
+        ));
     }
 
     let mut args: Vec<String> = vec![
