@@ -375,7 +375,9 @@ function SourceCard({
           />
         </label>
         <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-          Apelido <span className="font-medium normal-case text-ink-faint/60">(opcional)</span>
+          <span>
+            Apelido <span className="font-medium normal-case text-ink-faint/60">(opcional)</span>
+          </span>
           <input
             value={src.name}
             placeholder="ex.: Pitrol"
