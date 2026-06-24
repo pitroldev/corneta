@@ -1,13 +1,16 @@
-//! Guardião anti-vazamento: amostra os frames de saída, faz OCR local e procura
-//! segredo na tela (email, chave de API, CPF, cartão, JWT, watchlist). Avisa e,
-//! se configurado, aciona a censura. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
+//! Guardião anti-vazamento: amostra os frames de saída, faz OCR local (com bounding
+//! boxes), procura segredo na tela e avisa/censura — cobrindo SÓ a região do segredo
+//! (tarja) ou a tela toda. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+
+/// Região (frações 0–1 da tela): x, y, largura, altura.
+pub type Region = (f32, f32, f32, f32);
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -16,6 +19,16 @@ pub struct Leak {
     pub label: String,
     pub snippet: String,
     pub severity: String, // "high" (pode censurar) | "med" (só avisa)
+}
+
+/// Uma palavra do OCR: faixa de bytes no texto reconstruído + bbox em frações.
+struct Word {
+    start: usize,
+    end: usize,
+    fx: f32,
+    fy: f32,
+    fw: f32,
+    fh: f32,
 }
 
 struct Pat {
@@ -90,10 +103,38 @@ fn valid_luhn(s: &str) -> bool {
     sum % 10 == 0
 }
 
-/// Procura segredos no texto (do OCR). Dedup por padrão+valor.
-pub fn scan_text(text: &str, watchlist: &[String]) -> Vec<Leak> {
+/// Palavras cuja faixa de bytes encosta em [ms, me) → seus bboxes.
+fn boxes_for_range(words: &[Word], ms: usize, me: usize) -> Vec<Region> {
+    words
+        .iter()
+        .filter(|w| w.start < me && w.end > ms)
+        .map(|w| (w.fx, w.fy, w.fw, w.fh))
+        .collect()
+}
+
+/// Caixa que envolve todos os boxes, com uma folga (padding) — None se vazio.
+fn union(boxes: &[Region]) -> Option<Region> {
+    if boxes.is_empty() {
+        return None;
+    }
+    let x0 = boxes.iter().map(|b| b.0).fold(f32::MAX, f32::min);
+    let y0 = boxes.iter().map(|b| b.1).fold(f32::MAX, f32::min);
+    let x1 = boxes.iter().map(|b| b.0 + b.2).fold(f32::MIN, f32::max);
+    let y1 = boxes.iter().map(|b| b.1 + b.3).fold(f32::MIN, f32::max);
+    let pad = 0.012;
+    let fx = (x0 - pad).clamp(0.0, 1.0);
+    let fy = (y0 - pad).clamp(0.0, 1.0);
+    let fw = ((x1 + pad) - fx).clamp(0.0, 1.0 - fx);
+    let fh = ((y1 + pad) - fy).clamp(0.0, 1.0 - fy);
+    Some((fx, fy, fw, fh))
+}
+
+/// Procura segredos no texto do OCR. Devolve os vazamentos + a REGIÃO (união dos
+/// boxes de alta severidade) pra cobrir só onde está o segredo.
+fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Option<Region>) {
     let mut out: Vec<Leak> = vec![];
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut hi_boxes: Vec<Region> = vec![];
     for p in patterns() {
         for m in p.re.find_iter(text) {
             let raw = m.as_str();
@@ -103,36 +144,46 @@ pub fn scan_text(text: &str, watchlist: &[String]) -> Vec<Leak> {
             if p.kind == "card" && !valid_luhn(raw) {
                 continue;
             }
-            if seen.insert(format!("{}:{raw}", p.kind)) {
-                out.push(Leak {
-                    kind: p.kind.into(),
-                    label: p.label.into(),
-                    snippet: mask(raw),
-                    severity: p.severity.into(),
-                });
+            if !seen.insert(format!("{}:{raw}", p.kind)) {
+                continue;
             }
+            if p.severity == "high" {
+                hi_boxes.extend(boxes_for_range(words, m.start(), m.end()));
+            }
+            out.push(Leak {
+                kind: p.kind.into(),
+                label: p.label.into(),
+                snippet: mask(raw),
+                severity: p.severity.into(),
+            });
         }
     }
     let lower = text.to_lowercase();
     for term in watchlist {
         let t = term.trim();
-        if t.len() >= 3 && lower.contains(&t.to_lowercase()) && seen.insert(format!("watch:{t}")) {
-            out.push(Leak {
-                kind: "watchlist".into(),
-                label: "Dado pessoal".into(),
-                snippet: mask(t),
-                severity: "high".into(),
-            });
+        if t.len() >= 3 {
+            if let Some(pos) = lower.find(&t.to_lowercase()) {
+                if seen.insert(format!("watch:{t}")) {
+                    hi_boxes.extend(boxes_for_range(words, pos, pos + t.len()));
+                    out.push(Leak {
+                        kind: "watchlist".into(),
+                        label: "Dado pessoal".into(),
+                        snippet: mask(t),
+                        severity: "high".into(),
+                    });
+                }
+            }
         }
     }
-    out
+    (out, union(&hi_boxes))
 }
 
 // ------------------------------- OCR (local) -------------------------------
 
-/// OCR via Windows.Media.Ocr (nativo do Windows — sem binário extra, sem nuvem).
+/// OCR via Windows.Media.Ocr (nativo, sem binário/nuvem). Devolve o texto + as palavras
+/// com bounding box em frações da tela.
 #[cfg(windows)]
-fn ocr_jpeg(bytes: &[u8]) -> Option<String> {
+fn ocr_words(bytes: &[u8]) -> Option<(String, Vec<Word>)> {
     use windows::Graphics::Imaging::BitmapDecoder;
     use windows::Media::Ocr::OcrEngine;
     use windows::Storage::Streams::{DataWriter, InMemoryRandomAccessStream};
@@ -146,13 +197,41 @@ fn ocr_jpeg(bytes: &[u8]) -> Option<String> {
     stream.Seek(0).ok()?;
     let decoder = BitmapDecoder::CreateAsync(&stream).ok()?.get().ok()?;
     let bitmap = decoder.GetSoftwareBitmapAsync().ok()?.get().ok()?;
+    let bw = bitmap.PixelWidth().ok()?.max(1) as f32;
+    let bh = bitmap.PixelHeight().ok()?.max(1) as f32;
     let engine = OcrEngine::TryCreateFromUserProfileLanguages().ok()?;
     let result = engine.RecognizeAsync(&bitmap).ok()?.get().ok()?;
-    Some(result.Text().ok()?.to_string())
+
+    let mut full = String::new();
+    let mut words = vec![];
+    let lines = result.Lines().ok()?;
+    for i in 0..lines.Size().ok()? {
+        let line = lines.GetAt(i).ok()?;
+        let ws = line.Words().ok()?;
+        for j in 0..ws.Size().ok()? {
+            let w = ws.GetAt(j).ok()?;
+            let text = w.Text().ok()?.to_string();
+            let r = w.BoundingRect().ok()?;
+            let start = full.len();
+            full.push_str(&text);
+            let end = full.len();
+            full.push(' ');
+            words.push(Word {
+                start,
+                end,
+                fx: r.X / bw,
+                fy: r.Y / bh,
+                fw: r.Width / bw,
+                fh: r.Height / bh,
+            });
+        }
+        full.push('\n');
+    }
+    Some((full, words))
 }
 
 #[cfg(not(windows))]
-fn ocr_jpeg(_bytes: &[u8]) -> Option<String> {
+fn ocr_words(_bytes: &[u8]) -> Option<(String, Vec<Word>)> {
     None
 }
 
@@ -164,6 +243,7 @@ pub async fn run_guardian(
     running: Arc<AtomicBool>,
     has_signal: Arc<AtomicBool>,
     censor: Arc<AtomicBool>,
+    censor_region: Arc<Mutex<Option<Region>>>,
 ) {
     let s = crate::config::load(&app).settings;
     let watchlist = s.guardian_watchlist.clone();
@@ -171,7 +251,6 @@ pub async fn run_guardian(
     log::info!("guardião: ligado (ação={})", s.guardian_action);
 
     loop {
-        // Intervalo ~1.5s (7×200ms), abortando cedo se a transmissão parar.
         for _ in 0..7 {
             if !running.load(Ordering::Relaxed) {
                 log::info!("guardião: desligado");
@@ -182,7 +261,6 @@ pub async fn run_guardian(
             })
             .await;
         }
-        // Sem sinal, ou já censurado → não analisa.
         if !has_signal.load(Ordering::Relaxed) || censor.load(Ordering::Relaxed) {
             continue;
         }
@@ -190,26 +268,29 @@ pub async fn run_guardian(
             Ok(b) => b,
             Err(_) => continue,
         };
-        let text = match tauri::async_runtime::spawn_blocking(move || ocr_jpeg(&jpeg)).await {
-            Ok(Some(t)) => t,
-            _ => continue,
-        };
+        let (text, words) =
+            match tauri::async_runtime::spawn_blocking(move || ocr_words(&jpeg)).await {
+                Ok(Some(v)) => v,
+                _ => continue,
+            };
         if text.trim().is_empty() {
             continue;
         }
-        let leaks = scan_text(&text, &watchlist);
+        let (leaks, region) = scan(&text, &words, &watchlist);
         if leaks.is_empty() {
             continue;
         }
         let high = leaks.iter().any(|l| l.severity == "high");
         log::warn!(
-            "guardião: possível vazamento {:?}",
-            leaks.iter().map(|l| l.kind.clone()).collect::<Vec<_>>()
+            "guardião: possível vazamento {:?} região={:?}",
+            leaks.iter().map(|l| l.kind.clone()).collect::<Vec<_>>(),
+            region
         );
         for l in &leaks {
             let _ = app.emit("leak://alert", l.clone());
         }
         if auto && high {
+            *censor_region.lock().unwrap() = region; // região da tarja (None = tela toda)
             censor.store(true, Ordering::Relaxed);
             let _ = app.emit("leak://censor", true);
             log::warn!("guardião: CENSURA automática ativada");
@@ -224,20 +305,27 @@ mod tests {
     #[test]
     fn pega_chave_e_email() {
         let t = "meu token sk-ABCDEFGHIJKLMNOPQRSTUVWX e email joao@teste.com";
-        let leaks = scan_text(t, &[]);
+        let (leaks, _) = scan(t, &[], &[]);
         assert!(leaks.iter().any(|l| l.kind == "apikey" && l.severity == "high"));
         assert!(leaks.iter().any(|l| l.kind == "email"));
     }
 
     #[test]
     fn cpf_invalido_nao_conta() {
-        // sequência com formato de CPF mas dígito verificador errado
-        assert!(scan_text("CPF 123.456.789-00", &[]).iter().all(|l| l.kind != "cpf"));
+        let (leaks, _) = scan("CPF 123.456.789-00", &[], &[]);
+        assert!(leaks.iter().all(|l| l.kind != "cpf"));
     }
 
     #[test]
     fn watchlist_casa() {
-        let leaks = scan_text("moro na Rua das Flores 42", &["Rua das Flores".into()]);
+        let (leaks, _) = scan("moro na Rua das Flores 42", &[], &["Rua das Flores".into()]);
         assert!(leaks.iter().any(|l| l.kind == "watchlist"));
+    }
+
+    #[test]
+    fn regiao_uniao_com_padding() {
+        let r = union(&[(0.2, 0.3, 0.1, 0.05), (0.35, 0.32, 0.1, 0.05)]).unwrap();
+        assert!(r.0 < 0.2 && r.1 < 0.3); // padding empurra a borda pra fora
+        assert!(r.2 > 0.25); // cobre os dois boxes
     }
 }

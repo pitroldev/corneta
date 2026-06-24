@@ -202,6 +202,20 @@ export function SettingsScreen() {
                   label="Censurar automaticamente"
                 />
               </label>
+              <label className="flex items-center justify-between gap-4">
+                <span className="text-sm font-semibold text-ink-muted">
+                  Tarja só na seção
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    cobre só onde o segredo aparece (resto da tela continua ao vivo). Desligado, cobre
+                    a tela toda com o slate.
+                  </span>
+                </span>
+                <Toggle
+                  checked={settings.guardianCensorMode === "region"}
+                  onChange={(v) => setSettings({ guardianCensorMode: v ? "region" : "screen" })}
+                  label="Tarja só na seção"
+                />
+              </label>
               <label className="flex items-center gap-4">
                 <span className="text-sm font-semibold text-ink-muted">
                   Delay de proteção

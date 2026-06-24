@@ -121,9 +121,12 @@ pub struct Settings {
     /// Guardião anti-vazamento: vigia os frames de saída por segredo na tela (OCR local).
     #[serde(default)]
     pub guardian_enabled: bool,
-    /// Ação ao detectar: "warn" (só avisa) | "censor" (corta a saída pro slate).
+    /// Ação ao detectar: "warn" (só avisa) | "censor" (cobre a saída).
     #[serde(default = "default_guardian_action")]
     pub guardian_action: String,
+    /// Tipo de censura: "region" (tarja só na seção do segredo) | "screen" (tela toda/slate).
+    #[serde(default = "default_censor_mode")]
+    pub guardian_censor_mode: String,
     /// Termos pessoais do streamer a vigiar (endereço, nome real, @, placa…).
     #[serde(default)]
     pub guardian_watchlist: Vec<String>,
@@ -135,6 +138,9 @@ pub struct Settings {
 
 fn default_guardian_action() -> String {
     "warn".to_string()
+}
+fn default_censor_mode() -> String {
+    "region".to_string()
 }
 
 fn default_true() -> bool {
@@ -203,6 +209,7 @@ impl Default for Settings {
             auto_bitrate: true,
             guardian_enabled: false,
             guardian_action: default_guardian_action(),
+            guardian_censor_mode: default_censor_mode(),
             guardian_watchlist: Vec::new(),
             protect_delay_sec: 0,
         }

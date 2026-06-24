@@ -52,6 +52,7 @@ export function defaultConfig(): AppConfig {
       autoBitrate: true,
       guardianEnabled: false,
       guardianAction: "warn",
+      guardianCensorMode: "region",
       guardianWatchlist: [],
       protectDelaySec: 0,
     },

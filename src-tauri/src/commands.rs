@@ -395,11 +395,11 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
 pub fn set_censor(app: AppHandle, on: bool) {
     {
         let st = app.state::<AppState>();
-        st.engine
-            .lock()
-            .unwrap()
-            .censor
-            .store(on, std::sync::atomic::Ordering::Relaxed);
+        let eng = st.engine.lock().unwrap();
+        eng.censor.store(on, std::sync::atomic::Ordering::Relaxed);
+        if !on {
+            *eng.censor_region.lock().unwrap() = None; // limpa a tarja ao voltar ao vivo
+        }
     }
     let _ = app.emit("leak://censor", on);
 }
@@ -622,6 +622,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let signal_seen = Arc::new(AtomicBool::new(false));
     // Censura ao vivo (guardião anti-vazamento / botão de pânico).
     let censor = Arc::new(AtomicBool::new(false));
+    let censor_region: Arc<std::sync::Mutex<Option<(f32, f32, f32, f32)>>> =
+        Arc::new(std::sync::Mutex::new(None));
     let session_path = session::start_session(&app, &config);
     chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
     // Uma flag de pausa por destino (controle ao vivo).
@@ -638,15 +640,21 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.session_path = session_path;
         eng.paused = pause_flags.clone();
         eng.censor = censor.clone();
+        eng.censor_region = censor_region.clone();
     }
     emit(&app, &snap);
 
     // Guardião anti-vazamento: amostra frames de saída → OCR local → regras → avisa/censura.
     if config.settings.guardian_enabled {
-        let (app_g, run_g, sig_g, cen_g) =
-            (app.clone(), running.clone(), has_signal.clone(), censor.clone());
+        let (app_g, run_g, sig_g, cen_g, reg_g) = (
+            app.clone(),
+            running.clone(),
+            has_signal.clone(),
+            censor.clone(),
+            censor_region.clone(),
+        );
         tauri::async_runtime::spawn(async move {
-            crate::guardian::run_guardian(app_g, run_g, sig_g, cen_g).await;
+            crate::guardian::run_guardian(app_g, run_g, sig_g, cen_g, reg_g).await;
         });
     }
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
@@ -689,6 +697,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // Delay de proteção: se ligado, sobe o "delayer" (republica o sinal atrasado em `_delayed`)
     // e as saídas leem DESSE path → tudo sai N segundos atrás, e a censura vira PREVENTIVA.
     let delay_sec = config.settings.protect_delay_sec;
+    let region_censor = config.settings.guardian_censor_mode == "region";
     let out_source = if delay_sec > 0 {
         engine::delayed_url(&config)
     } else {
@@ -770,13 +779,27 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let signal = has_signal.clone();
         let seen = signal_seen.clone();
         let censor_t = censor.clone();
+        let censor_region_t = censor_region.clone();
         let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
             while run_flag.load(Ordering::Relaxed) {
-                // Censura ligada (anti-vazamento/pânico): corta a saída pro slate, prioridade máxima.
+                // Censura ligada (anti-vazamento/pânico): cobre a saída, prioridade máxima.
+                // Com região conhecida + modo tarja → cobre só a seção (resto ao vivo); senão, slate.
                 if censor_t.load(Ordering::Relaxed) {
-                    run_censor_slate(&app_t, &target_id, &slate_args, &run_flag, &censor_t).await;
+                    let region = *censor_region_t.lock().unwrap();
+                    let args = match (region_censor, region) {
+                        (true, Some(r)) => engine::ffmpeg_args_for_censor_region(
+                            &cfg,
+                            &target,
+                            &key,
+                            Some(current_kbps),
+                            &out_source,
+                            r,
+                        ),
+                        _ => slate_args.clone(),
+                    };
+                    run_censor_slate(&app_t, &target_id, &args, &run_flag, &censor_t).await;
                     continue;
                 }
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.

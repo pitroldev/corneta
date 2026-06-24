@@ -45,7 +45,7 @@ keyring = { version = "3", features = ["windows-native"] }
 
 # OCR local do guardião anti-vazamento via Windows.Media.Ocr (nativo, sem binário extra).
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation"] }
+windows = { version = "0.58", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections"] }
 
 [profile.release]
 panic = "abort"

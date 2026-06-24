@@ -132,8 +132,10 @@ export interface AppSettings {
   chatBothSplit: number;
   /** Guardião anti-vazamento: vigia os frames de saída por segredo na tela. */
   guardianEnabled: boolean;
-  /** Ação ao detectar: "warn" (avisa) | "censor" (corta a saída). */
+  /** Ação ao detectar: "warn" (avisa) | "censor" (cobre a saída). */
   guardianAction: "warn" | "censor";
+  /** Tipo de censura: "region" (tarja só na seção) | "screen" (tela toda). */
+  guardianCensorMode: "region" | "screen";
   /** Termos pessoais a vigiar (endereço, nome, @…). */
   guardianWatchlist: string[];
   /** Delay de proteção (s, 0 = off): atrasa a saída pra a censura ser preventiva. */
