@@ -186,6 +186,17 @@ mod tests {
     }
 
     #[test]
+    fn timeline_false_perto_nao_mascara_true_dentro_do_gap() {
+        // O bracket é OR (vizinha ≤ OU vizinha >). Uma detecção FALSE perto NÃO mascara a TRUE
+        // seguinte (dentro do max_gap) → o slate dispara. (Era o bug: pulos gravavam false perto.)
+        let mut t = Timeline::new();
+        t.record(100, false); // último OCR antes do termo aparecer
+        t.record(160, true); // detecção (diff/rede de segurança) depois
+        assert!(t.should_censor(130, 90), "false perto não pode mascarar a true dentro do gap");
+        assert!(t.should_censor(105, 90), "logo após o false, a true seguinte cobre");
+    }
+
+    #[test]
     fn timeline_prune() {
         let mut t = Timeline::new();
         t.record(10, true);

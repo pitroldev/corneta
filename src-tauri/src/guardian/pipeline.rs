@@ -26,15 +26,15 @@ use crate::engine::{self, COMP_FPS, COMP_H, COMP_W};
 const FSIZE: usize = COMP_W * COMP_H * 3 / 2; // yuv420p
 const YSIZE: usize = COMP_W * COMP_H; // plano Y (escala de cinza)
 
-// Diff (pra pular OCR): resolução pequena + limiares. Sensível de propósito (erra pra MAIS OCR).
-const DIFF_W: usize = 480;
-const DIFF_PIX: u8 = 20; // ignora ruído de compressão
-const DIFF_FRAC: f32 = 0.0012; // ~0,12% dos pixels mudou → re-OCR (pega um termo aparecendo)
-const THROTTLE_MS: u64 = 120; // teto da taxa de OCR (o buffer absorve de sobra)
-// A cada N PULOS, força um OCR cheio (rede de segurança contra mudança que o diff perdeu). Tem
-// que ser MENOR que o delay: ~24×120ms ≈ 2,9s < 6s → mesmo um termo perdido pelo diff é pego e
-// coberto ANTES de ir ao ar (o bracket da Timeline cobre o intervalo).
-const FULL_EVERY: u32 = 24;
+// Diff (pra pular OCR): resolução pequena + limiares. Sensível de propósito (erra pra MAIS OCR) —
+// pega até um termo curto aparecendo, pra não depender da rede de segurança.
+const DIFF_W: usize = 640;
+const DIFF_PIX: u8 = 18; // ignora ruído de compressão
+const DIFF_FRAC: f32 = 0.0008; // ~0,08% dos pixels mudou → re-OCR
+const THROTTLE_MS: u64 = 100; // teto da taxa de diff (o buffer absorve de sobra)
+// Rede de segurança: força um OCR cheio se passou TANTO sem OCR (pega mudança que o diff perdeu).
+// Por tempo de PAREDE (não por nº de pulos) pra ser previsível. < delay → preventivo.
+const FORCE_MS: u64 = 1200;
 const SLOW_WARN_MS: u128 = 1500;
 
 // ------------------------------ Adaptadores --------------------------------
@@ -103,6 +103,7 @@ fn load_slate_yuv(app: &AppHandle) -> Vec<u8> {
             return rgb_to_yuv420(&rgb);
         }
     }
+    log::warn!("guardião: slate brb-slate.png ausente/inválido — usando cor sólida");
     let solid = image::RgbImage::from_pixel(COMP_W as u32, COMP_H as u32, image::Rgb([20, 16, 10]));
     rgb_to_yuv420(&solid)
 }
@@ -187,8 +188,10 @@ pub async fn run_guard(
     let dec_args = engine::ffmpeg_args_for_decoder(&cfg);
     let enc_args = engine::ffmpeg_args_for_encoder(&cfg, delay_sec, hw_codec.as_deref());
     let delay_frames = (delay_sec as usize) * COMP_FPS;
-    // Quanto o slate "segura" sem amostra nova: ~2/3 do buffer (cobre OCR lento sem buraco).
-    let max_gap = (delay_frames as u64 * 2 / 3).max(COMP_FPS as u64);
+    // O slate "segura" uma detecção por quase o buffer todo (~5s) → bracketa a latência do OCR
+    // (até ~3-5s numa tela cheia) SEM buraco. Como os pulos não gravam, não há amostra falsa
+    // mascarando; o trailing real some rápido (o próximo OCR confirma "saiu").
+    let max_gap = (delay_frames as u64).saturating_sub(COMP_FPS as u64);
     log::info!(
         "guardião: delay {delay_sec}s ({delay_frames} frames), {COMP_W}x{COMP_H}@{COMP_FPS}, termos={}, hw={hw_codec:?}",
         watchlist.len()
@@ -320,6 +323,11 @@ fn pump_frames(
 
 /// Thread de OCR: pega o quadro oferecido, PULA se a tela não mudou (diff), senão lê o texto, casa
 /// a watchlist e marca por índice. Avisa (toast) quando um termo NOVO aparece.
+///
+/// CRÍTICO: só grava na Timeline quando REALMENTE faz OCR. Gravar `false` nos pulos punha uma
+/// amostra falsa BEM perto do quadro que airava e MASCARAVA a detecção verdadeira (mais longe) →
+/// o termo vazava por um instante. Sem gravar nos pulos, o bracket pega a detecção real (vizinha
+/// ≤ ou >), mesmo que distante.
 fn ocr_worker(
     app: AppHandle,
     running: Arc<AtomicBool>,
@@ -330,38 +338,39 @@ fn ocr_worker(
     log::info!("guardião/OCR: {}", ocr.name());
     let _ = ocr.read_text(&vec![16u8; YSIZE], COMP_W, COMP_H); // warmup (paga o JIT)
     let mut last_small: Vec<u8> = vec![];
-    let mut last_secret = false;
-    let mut since_full = 0u32;
     let mut had_secret = false;
+    let mut last_ocr = Instant::now();
     while running.load(Ordering::Relaxed) {
+        let iter = Instant::now();
         let job = shared.scan_slot.lock().unwrap().take();
         let Some((idx, gray)) = job else {
             std::thread::sleep(Duration::from_millis(8));
             continue;
         };
-        let t = Instant::now();
         let small = diff_small(&gray);
-        let force_full = since_full >= FULL_EVERY;
-        let changed = force_full || domain::frames_differ(&last_small, &small, DIFF_PIX, DIFF_FRAC);
-        let (secret, leaks) = if changed {
-            since_full = 0;
-            let text = ocr.read_text(&gray, COMP_W, COMP_H);
-            let leaks = domain::find_watchlist(&text, &watchlist);
-            (!leaks.is_empty(), leaks)
-        } else {
-            since_full += 1;
-            (last_secret, vec![]) // tela igual → reusa o resultado (barato)
-        };
-        if changed && t.elapsed().as_millis() > SLOW_WARN_MS {
+        // Faz OCR se a tela MUDOU OU se faz tempo demais sem OCR (rede de segurança por tempo).
+        let force = last_ocr.elapsed() >= Duration::from_millis(FORCE_MS);
+        let changed = force || domain::frames_differ(&last_small, &small, DIFF_PIX, DIFF_FRAC);
+        last_small = small;
+        if !changed {
+            // Tela igual → NÃO grava nada (não mascara a detecção real). Só descansa.
+            let spent = iter.elapsed();
+            if spent < Duration::from_millis(THROTTLE_MS) {
+                std::thread::sleep(Duration::from_millis(THROTTLE_MS) - spent);
+            }
+            continue;
+        }
+        let t = Instant::now();
+        let leaks = domain::find_watchlist(&ocr.read_text(&gray, COMP_W, COMP_H), &watchlist);
+        let secret = !leaks.is_empty();
+        last_ocr = Instant::now();
+        if t.elapsed().as_millis() > SLOW_WARN_MS {
             log::warn!(
                 "guardião/OCR: scan lento ({} ms) — tela muito cheia? o slate pode atrasar",
                 t.elapsed().as_millis()
             );
         }
-        last_small = small;
-        last_secret = secret;
         shared.timeline.lock().unwrap().record(idx, secret);
-
         if secret && !had_secret {
             for l in &leaks {
                 let _ = app.emit("leak://alert", l.clone());
@@ -369,8 +378,7 @@ fn ocr_worker(
         }
         had_secret = secret;
 
-        // Throttle: o buffer de N s absorve de sobra; não precisa diffar 1000×/s.
-        let spent = t.elapsed();
+        let spent = iter.elapsed();
         if spent < Duration::from_millis(THROTTLE_MS) {
             std::thread::sleep(Duration::from_millis(THROTTLE_MS) - spent);
         }

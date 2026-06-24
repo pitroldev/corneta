@@ -322,6 +322,9 @@ export const useStore = create<State>((set, get) => {
     },
 
     async start() {
+      // Cada sessão começa limpa: zera vazamentos/censura da sessão anterior (senão um toast
+      // antigo reaparece ao reabrir a live).
+      set({ leaks: [], censored: false });
       await api.start();
       // A1: liga o OBS junto (melhor-esforço — pode não estar acessível).
       if (get().config?.settings.autoStartObs) {
