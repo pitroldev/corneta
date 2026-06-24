@@ -164,10 +164,20 @@ pub fn start_chat(app: &AppHandle) {
         let (app2, run2, value) = (app.clone(), running.clone(), src.value.clone());
         match src.platform.as_str() {
             "twitch" => {
-                tauri::async_runtime::spawn_blocking(move || run_twitch(&value, &label, run2, app2));
+                tauri::async_runtime::spawn_blocking(move || {
+                    while run2.load(Ordering::Relaxed) {
+                        run_twitch(&value, &label, run2.clone(), app2.clone());
+                        reconnect_wait(&run2); // caiu/erro → tenta de novo em ~3s
+                    }
+                });
             }
             "kick" => {
-                tauri::async_runtime::spawn_blocking(move || run_kick(&value, &label, run2, app2));
+                tauri::async_runtime::spawn_blocking(move || {
+                    while run2.load(Ordering::Relaxed) {
+                        run_kick(&value, &label, run2.clone(), app2.clone());
+                        reconnect_wait(&run2);
+                    }
+                });
             }
             "youtube" => {
                 if api_key.trim().is_empty() {
@@ -200,6 +210,16 @@ pub fn stop_chat(app: &AppHandle) {
     st.chat.lock().unwrap().running.store(false, Ordering::Relaxed);
 }
 
+/// Espera ~3s antes de reconectar, abortando cedo se o chat foi parado.
+fn reconnect_wait(running: &AtomicBool) {
+    for _ in 0..15 {
+        if !running.load(Ordering::Relaxed) {
+            return;
+        }
+        thread::sleep(Duration::from_millis(200));
+    }
+}
+
 // ----------------------------- Twitch ------------------------------
 
 fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
@@ -207,7 +227,8 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
     if ch.is_empty() {
         return;
     }
-    let mut socket = match tungstenite::connect("ws://irc-ws.chat.twitch.tv:80") {
+    // TLS (wss://:443): a Twitch deixou de servir o IRC em texto puro na porta 80.
+    let mut socket = match tungstenite::connect("wss://irc-ws.chat.twitch.tv:443") {
         Ok((s, _)) => s,
         Err(e) => {
             log::warn!("twitch chat ({source}): {e}");
@@ -215,8 +236,14 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
             return;
         }
     };
-    if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
-        let _ = tcp.set_read_timeout(Some(Duration::from_millis(400)));
+    match socket.get_mut() {
+        tungstenite::stream::MaybeTlsStream::Rustls(s) => {
+            let _ = s.sock.set_read_timeout(Some(Duration::from_millis(400)));
+        }
+        tungstenite::stream::MaybeTlsStream::Plain(tcp) => {
+            let _ = tcp.set_read_timeout(Some(Duration::from_millis(400)));
+        }
+        _ => {}
     }
     let _ = socket.send(Message::Text("CAP REQ :twitch.tv/tags twitch.tv/commands".into()));
     let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
@@ -225,8 +252,19 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
     log::info!("twitch chat: conectado em #{ch}");
     chat_status(&app, "twitch", source, "connected");
 
-    // Emotes de terceiros (BTTV/FFZ/7TV): globais já; do canal quando vier o room-id.
-    let mut emotes = fetch_global_thirdparty();
+    // Emotes de terceiros (BTTV/FFZ/7TV) em BACKGROUND — não travam o primeiro feed.
+    // Globais já; do canal quando vier o room-id. O loop de leitura usa o mapa compartilhado.
+    let emotes: Arc<std::sync::Mutex<HashMap<String, String>>> =
+        Arc::new(std::sync::Mutex::new(HashMap::new()));
+    {
+        let em = emotes.clone();
+        thread::spawn(move || {
+            let g = fetch_global_thirdparty();
+            if let Ok(mut m) = em.lock() {
+                m.extend(g);
+            }
+        });
+    }
     let mut channel_emotes_done = false;
 
     while running.load(Ordering::Relaxed) {
@@ -235,8 +273,15 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
                     if !channel_emotes_done {
                         if let Some(room_id) = tag_val(twitch_tags(line), "room-id") {
-                            fetch_channel_thirdparty(&room_id, &mut emotes);
                             channel_emotes_done = true;
+                            let em = emotes.clone();
+                            thread::spawn(move || {
+                                let mut ch = HashMap::new();
+                                fetch_channel_thirdparty(&room_id, &mut ch);
+                                if let Ok(mut m) = em.lock() {
+                                    m.extend(ch);
+                                }
+                            });
                         }
                     }
                     if line.starts_with("PING") {
@@ -265,7 +310,9 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
                                 );
                             }
                         }
-                        if let Some(msg) = parse_privmsg(line, source, &emotes) {
+                        if let Some(msg) =
+                            emotes.lock().ok().and_then(|m| parse_privmsg(line, source, &m))
+                        {
                             emit_chat(&app, msg);
                         }
                     } else if line.contains("USERNOTICE") {
