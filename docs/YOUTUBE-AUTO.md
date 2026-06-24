@@ -75,9 +75,39 @@ o **`liveChatId` direto** (sem ID de vídeo, sem scraping).
   guardar/renovar tokens); **foge** do "sem login"; app não-verificado mostra **aviso do Google** e
   tem limite de 100 usuários até passar pela verificação. Mais peso pra implementar e pro usuário.
 
-### D) Híbrido (recomendado): scrape-first + fallback + OAuth opcional
+### D) Híbrido: scrape-first + fallback + OAuth opcional
 Tentar **(A) scrape** (grátis); se falhar/mudar o HTML, cair pra **(B) search.list** (cacheado);
 e oferecer **(C) OAuth** como caminho premium "liga e esquece" + envio de mensagens.
+
+---
+
+## 2.5 — Ler o chat SEM API key nem login (InnerTube) ⭐ A DESCOBERTA
+
+Dá pra **ler o live chat do YouTube sem API key e sem OAuth** — do mesmo jeito que já pegamos o
+videoId. O cliente web do YouTube usa uma API interna (**InnerTube**), e ferramentas consolidadas
+leem o chat por ela: **pytchat**, **chat-downloader** ("No authentication needed!"),
+**youtube-live-chat-downloader** (Go), **YTLiveChat** (.NET — *"no API keys, no OAuth dance, no quota
+headaches"*) e o **yt-dlp**.
+
+**Como funciona:**
+1. Buscar `https://www.youtube.com/live_chat?v={VIDEO_ID}` (ou a watch page) e extrair do HTML:
+   - `INNERTUBE_API_KEY` (regex — é a chave **pública do web client**, não a do usuário),
+   - a **versão do client** (`INNERTUBE_CONTEXT_CLIENT_VERSION` / `ytcfg`),
+   - o **continuation token** inicial (do `ytInitialData`).
+2. POST em `https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={INNERTUBE_API_KEY}` com
+   `{ context: { client… }, continuation }`.
+3. A resposta traz as **ações de chat** (mensagens, super chats, membros…) + um **novo continuation**
+   + o intervalo de poll. Repete com o novo token. Loop — igual ao que o navegador faz.
+
+- **Prós:** **zero config** pro usuário — só o **canal**, **igual à Twitch** (sem API key, sem login,
+  sem quota). Casa 100% com "sem login/sem servidor nosso" e com o scrape do `/live` que já fazemos.
+- **Contras:** API **interna/não-documentada** (zona cinza de ToS; pode mudar — mas é estável há anos
+  em várias libs); precisa ler key/versão/continuation **fresco** a cada conexão; o parsing dos
+  *renderers* é diferente do Data API (mais trabalho). **Não dá pra enviar** mensagem por aqui (só
+  ler) — envio continua sendo OAuth (Fase 2).
+
+> **Muda o jogo:** YouTube vira **zero-config** (igual Twitch). A API key deixa de ser **obrigatória**
+> pro chat — no máximo vira **fallback** (ou um extra pra quem já tem).
 
 ---
 
@@ -102,12 +132,17 @@ usuário troca o "ID do vídeo" pelo **canal** (uma vez) e usa a **mesma API key
 novo, sem custo de quota na descoberta. O `search.list` entra só como **rede de segurança** se o
 scrape quebrar.
 
+**Fase 1.5 — Chat por InnerTube (2.5), sem API key.** ⭐ O salto: lê o chat pela API interna, então o
+YouTube fica **zero-config (só o canal, igual Twitch)**. A API key vira **fallback** (se o InnerTube
+quebrar) ou extra. Reaproveita o videoId que o scrape do `/live` já resolve. **Recomendado** logo
+após a Fase 1 — é o que entrega a experiência "liga e transmite" no YouTube.
+
 **Fase 2 — OAuth opcional (C).** Pra quem quiser o caminho **mais robusto** (lives de membros, imune
 a mudança de HTML) **e** o **envio/moderação** de mensagens — aí já amarra com o [`ENVIO.md`](./ENVIO.md).
 Oferecido como "Conectar com o Google" opt-in, não obrigatório.
 
-> Resumo: **Fase 1 mata o problema** ("nunca mais cole o link"). **Fase 2 é o upgrade** (set-and-forget
-> blindado + enviar mensagens).
+> Resumo: **Fase 1** mata o "nunca mais cole o link". **Fase 1.5 (InnerTube)** mata o "nem precisa de
+> API key" → YouTube tão simples quanto a Twitch. **Fase 2 (OAuth)** é o upgrade pra enviar mensagens.
 
 ---
 
@@ -199,6 +234,7 @@ o link".
 ---
 
 ## Fontes
+- **InnerTube (chat sem API key):** [chat-downloader (xenova)](https://github.com/xenova/chat-downloader) · [pytchat](https://github.com/taizan-hokuto/pytchat) · [YTLiveChat (.NET)](https://github.com/Agash/YTLiveChat) · [youtube-live-chat-downloader (Go)](https://github.com/abhinavxd/youtube-live-chat-downloader) · [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - [YouTube Data API — search.list](https://developers.google.com/youtube/v3/docs/search/list) · [Quota Calculator](https://developers.google.com/youtube/v3/determine_quota_cost)
 - [YouTube Live Streaming API — liveBroadcasts.list](https://developers.google.com/youtube/v3/live/docs/liveBroadcasts/list) · [Streaming Live Chat](https://developers.google.com/youtube/v3/live/streaming-live-chat)
 - [channels.list (`forHandle` → channelId)](https://developers.google.com/youtube/v3/docs/channels/list)
