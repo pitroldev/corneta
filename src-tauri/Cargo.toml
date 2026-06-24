@@ -41,6 +41,10 @@ base64 = "0.22"
 regex = "1"
 # Decode de JPEG → escala de cinza pro rastreamento de movimento (optical flow) do guardião.
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
+# OCR PaddleOCR (PP-OCRv5 via ONNX Runtime): mais preciso e roda na CPU (libera a GPU).
+# `ort` FIXO no rc.10 — rc.11+ tornou Session.inputs privado e quebra o oar-ocr.
+oar-ocr = "0.2"
+ort = "=2.0.0-rc.10"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
 keyring = { version = "3", features = ["windows-native"] }

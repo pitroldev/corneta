@@ -15,7 +15,9 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use crate::engine::{self, COMP_FPS, COMP_H, COMP_W};
-use crate::guardian::{ocr_scan_gray, Anchor, Region, Tracker};
+use crate::guardian::{
+    build_paddle, ensure_paddle_models, ocr_scan_gray, paddle_scan_gray, Anchor, Region, Tracker,
+};
 
 const FSIZE: usize = COMP_W * COMP_H * 3 / 2; // yuv420p
 const YSIZE: usize = COMP_W * COMP_H; // plano Y (escala de cinza)
@@ -142,6 +144,13 @@ pub async fn run_compositor(
         let (app_o, run_o, ly, an) =
             (app.clone(), running.clone(), latest_y.clone(), anchor.clone());
         tauri::async_runtime::spawn_blocking(move || {
+            // PaddleOCR (CPU — mais preciso e libera a GPU). Fallback pro Windows OCR se falhar.
+            let paddle = ensure_paddle_models(&app_o)
+                .and_then(|(d, r, di)| build_paddle(&d, &r, &di));
+            match &paddle {
+                Some(_) => log::info!("OCR: PaddleOCR (CPU — libera a GPU)"),
+                None => log::warn!("OCR: PaddleOCR indisponível — usando Windows OCR"),
+            }
             let mut had_leak = false;
             while run_o.load(Ordering::Relaxed) {
                 let y = ly.lock().unwrap().clone();
@@ -149,7 +158,10 @@ pub async fn run_compositor(
                     std::thread::sleep(Duration::from_millis(60));
                     continue;
                 };
-                let (leaks, regions) = ocr_scan_gray(&gray, COMP_W, COMP_H, &watchlist);
+                let (leaks, regions) = match &paddle {
+                    Some(o) => paddle_scan_gray(o, &gray, COMP_W, COMP_H, &watchlist),
+                    None => ocr_scan_gray(&gray, COMP_W, COMP_H, &watchlist),
+                };
                 if !leaks.is_empty() && !had_leak {
                     for l in &leaks {
                         let _ = app_o.emit("leak://alert", l.clone());

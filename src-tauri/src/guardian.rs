@@ -388,6 +388,113 @@ pub(crate) fn ocr_scan_gray(
     ocr_scan(&jpeg, watchlist)
 }
 
+// --------------------------- PaddleOCR (oar-ocr) ---------------------------
+// Mais preciso que o Windows OCR e roda na CPU (libera a GPU). Ver docs/FEATURE-OCR-PADDLE.md.
+
+/// Garante os 3 modelos PP-OCRv5 (baixa do GitHub Releases na 1ª vez). (det, rec, dict).
+pub(crate) fn ensure_paddle_models(
+    app: &AppHandle,
+) -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    use tauri::Manager;
+    let dir = app.path().app_config_dir().ok()?.join("ocr-models");
+    std::fs::create_dir_all(&dir).ok()?;
+    let base = "https://github.com/GreatV/oar-ocr/releases/download/v0.3.0";
+    let names = [
+        "pp-ocrv5_mobile_det.onnx",
+        "pp-ocrv5_mobile_rec.onnx",
+        "ppocrv5_dict.txt",
+    ];
+    let mut paths = Vec::new();
+    for n in names {
+        let p = dir.join(n);
+        if !p.exists() {
+            log::info!("OCR: baixando modelo {n}…");
+            let resp = ureq::get(&format!("{base}/{n}")).call().ok()?;
+            let mut bytes = Vec::new();
+            std::io::Read::read_to_end(&mut resp.into_reader(), &mut bytes).ok()?;
+            std::fs::write(&p, &bytes).ok()?;
+            log::info!("OCR: {n} ok ({} KB)", bytes.len() / 1024);
+        }
+        paths.push(p);
+    }
+    Some((paths[0].clone(), paths[1].clone(), paths[2].clone()))
+}
+
+/// Constrói o pipeline PaddleOCR (uma vez por sessão). None se falhar (→ fallback Windows OCR).
+pub(crate) fn build_paddle(
+    det: &std::path::Path,
+    rec: &std::path::Path,
+    dict: &std::path::Path,
+) -> Option<oar_ocr::pipeline::OAROCR> {
+    oar_ocr::pipeline::OAROCRBuilder::new(
+        det.to_string_lossy().to_string(),
+        rec.to_string_lossy().to_string(),
+        dict.to_string_lossy().to_string(),
+    )
+    .build()
+    .ok()
+}
+
+/// OCR num frame CINZA via PaddleOCR → (vazamentos, regiões). Box por LINHA (cobre a linha do
+/// segredo). `ocr` é o pipeline construído com `build_paddle`.
+pub(crate) fn paddle_scan_gray(
+    ocr: &oar_ocr::pipeline::OAROCR,
+    gray: &[u8],
+    w: usize,
+    h: usize,
+    watchlist: &[String],
+) -> (Vec<Leak>, Vec<Region>) {
+    let mut rgb = Vec::with_capacity(w * h * 3);
+    for &g in gray {
+        rgb.extend_from_slice(&[g, g, g]);
+    }
+    let Some(img) = image::RgbImage::from_raw(w as u32, h as u32, rgb) else {
+        return (vec![], vec![]);
+    };
+    let results = match ocr.predict(&[img]) {
+        Ok(r) => r,
+        Err(_) => return (vec![], vec![]),
+    };
+    let Some(res) = results.first() else {
+        return (vec![], vec![]);
+    };
+    let (wf, hf) = (w as f32, h as f32);
+    let mut full = String::new();
+    let mut words: Vec<Word> = Vec::new();
+    for region in &res.text_regions {
+        let Some(text) = &region.text else { continue };
+        if text.trim().is_empty() {
+            continue;
+        }
+        let pts = &region.bounding_box.points;
+        let (mut minx, mut miny, mut maxx, mut maxy) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+        for p in pts {
+            minx = minx.min(p.x);
+            miny = miny.min(p.y);
+            maxx = maxx.max(p.x);
+            maxy = maxy.max(p.y);
+        }
+        if !full.is_empty() {
+            full.push(' ');
+        }
+        let start = full.len();
+        full.push_str(text);
+        let end = full.len();
+        words.push(Word {
+            start,
+            end,
+            fx: minx / wf,
+            fy: miny / hf,
+            fw: (maxx - minx) / wf,
+            fh: (maxy - miny) / hf,
+        });
+    }
+    if full.trim().is_empty() {
+        return (vec![], vec![]);
+    }
+    scan(&full, &words, watchlist)
+}
+
 /// Uma região rastreada (frações) ligada a um box do protetor.
 struct Track {
     fx: f32,
