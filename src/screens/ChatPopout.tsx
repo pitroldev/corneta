@@ -9,18 +9,19 @@ import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { AlertsFeed } from "../components/AlertsFeed";
 
 // Layout do modo "Ambos" — classes literais (Tailwind precisa vê-las no código).
+// "auto" só vira lado a lado a partir de ~820px de largura da janela.
 const BOTH_DIR: Record<string, string> = {
-  auto: "flex-col sm:flex-row",
+  auto: "flex-col min-[820px]:flex-row",
   row: "flex-row",
   col: "flex-col",
 };
 const BOTH_DIVIDE: Record<string, string> = {
-  auto: "divide-y-2 sm:divide-x-2 sm:divide-y-0",
+  auto: "divide-y-2 min-[820px]:divide-x-2 min-[820px]:divide-y-0",
   row: "divide-x-2",
   col: "divide-y-2",
 };
 const BOTH_ALERTS_SIZE: Record<string, string> = {
-  auto: "max-h-[45%] shrink-0 sm:max-h-none sm:w-72",
+  auto: "max-h-[45%] shrink-0 min-[820px]:max-h-none min-[820px]:w-72",
   row: "w-72 shrink-0",
   col: "max-h-[45%] shrink-0",
 };
