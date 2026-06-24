@@ -245,10 +245,7 @@ pub async fn run_guardian(
     censor: Arc<AtomicBool>,
     censor_region: Arc<Mutex<Option<Region>>>,
 ) {
-    let s = crate::config::load(&app).settings;
-    let watchlist = s.guardian_watchlist.clone();
-    let auto = s.guardian_action == "censor";
-    log::info!("guardião: ligado (ação={})", s.guardian_action);
+    log::info!("guardião: ligado");
 
     loop {
         for _ in 0..7 {
@@ -264,6 +261,11 @@ pub async fn run_guardian(
         if !has_signal.load(Ordering::Relaxed) || censor.load(Ordering::Relaxed) {
             continue;
         }
+        // Recarrega as settings a cada volta — pega mudanças (ligar "censurar", watchlist)
+        // SEM precisar reiniciar a transmissão.
+        let s = crate::config::load(&app).settings;
+        let auto = s.guardian_action == "censor";
+        let watchlist = s.guardian_watchlist;
         let jpeg = match crate::commands::grab_frame_named(&app, "guard.jpg").await {
             Ok(b) => b,
             Err(_) => continue,
@@ -280,16 +282,16 @@ pub async fn run_guardian(
         if leaks.is_empty() {
             continue;
         }
-        let high = leaks.iter().any(|l| l.severity == "high");
         log::warn!(
-            "guardião: possível vazamento {:?} região={:?}",
+            "guardião: possível vazamento {:?} região={:?} (auto={auto})",
             leaks.iter().map(|l| l.kind.clone()).collect::<Vec<_>>(),
             region
         );
         for l in &leaks {
             let _ = app.emit("leak://alert", l.clone());
         }
-        if auto && high {
+        // No modo "censurar", censura QUALQUER detecção (não só severidade alta).
+        if auto {
             *censor_region.lock().unwrap() = region; // região da tarja (None = tela toda)
             censor.store(true, Ordering::Relaxed);
             let _ = app.emit("leak://censor", true);
