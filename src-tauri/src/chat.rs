@@ -252,19 +252,10 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
     log::info!("twitch chat: conectado em #{ch}");
     chat_status(&app, "twitch", source, "connected");
 
-    // Emotes de terceiros (BTTV/FFZ/7TV) em BACKGROUND — não travam o primeiro feed.
-    // Globais já; do canal quando vier o room-id. O loop de leitura usa o mapa compartilhado.
-    let emotes: Arc<std::sync::Mutex<HashMap<String, String>>> =
-        Arc::new(std::sync::Mutex::new(HashMap::new()));
-    {
-        let em = emotes.clone();
-        thread::spawn(move || {
-            let g = fetch_global_thirdparty();
-            if let Ok(mut m) = em.lock() {
-                m.extend(g);
-            }
-        });
-    }
+    // Emotes de terceiros (BTTV/FFZ/7TV): globais já; do canal quando vier o room-id.
+    // Síncrono de propósito: o emote precisa estar no mapa quando a mensagem é parseada
+    // (senão renderiza como texto). Os emotes do canal carregam antes da 1ª mensagem.
+    let mut emotes = fetch_global_thirdparty();
     let mut channel_emotes_done = false;
 
     while running.load(Ordering::Relaxed) {
@@ -273,15 +264,8 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
                     if !channel_emotes_done {
                         if let Some(room_id) = tag_val(twitch_tags(line), "room-id") {
+                            fetch_channel_thirdparty(&room_id, &mut emotes);
                             channel_emotes_done = true;
-                            let em = emotes.clone();
-                            thread::spawn(move || {
-                                let mut ch = HashMap::new();
-                                fetch_channel_thirdparty(&room_id, &mut ch);
-                                if let Ok(mut m) = em.lock() {
-                                    m.extend(ch);
-                                }
-                            });
                         }
                     }
                     if line.starts_with("PING") {
@@ -310,9 +294,7 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
                                 );
                             }
                         }
-                        if let Some(msg) =
-                            emotes.lock().ok().and_then(|m| parse_privmsg(line, source, &m))
-                        {
+                        if let Some(msg) = parse_privmsg(line, source, &emotes) {
                             emit_chat(&app, msg);
                         }
                     } else if line.contains("USERNOTICE") {

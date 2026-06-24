@@ -117,13 +117,18 @@ function tauriApi(): CornetaApi {
       await invoke("set_target_paused", { targetId, paused });
     },
     subscribe(cb) {
+      let cancelled = false;
       let unlisten: (() => void) | null = null;
-      event().then(({ listen }) =>
-        listen<EngineSnapshot>("engine://status", (e) => cb(e.payload)).then(
-          (u) => (unlisten = u)
+      void event().then(({ listen }) =>
+        listen<EngineSnapshot>("engine://status", (e) => cb(e.payload)).then((u) =>
+          cancelled ? u() : (unlisten = u)
         )
       );
-      return () => unlisten?.();
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     async listSessions() {
       const { invoke } = await core();
@@ -154,27 +159,50 @@ function tauriApi(): CornetaApi {
       await invoke("open_chat_window");
     },
     subscribeChat(onMsg, onStatus, onDelete) {
+      // StrictMode (dev) monta→desmonta→monta. Como `listen` é async, o cleanup pode
+      // rodar antes de resolver; o flag `cancelled` garante que ele desregistre mesmo
+      // assim (senão sobram 2 listeners → mensagens duplicadas).
+      let cancelled = false;
       const uns: Array<() => void> = [];
+      const add = (u: () => void) => (cancelled ? u() : uns.push(u));
       void event().then(({ listen }) => {
-        void listen<ChatMessage>("chat://message", (e) => onMsg(e.payload)).then((u) => uns.push(u));
-        void listen<ChatStatus>("chat://status", (e) => onStatus(e.payload)).then((u) => uns.push(u));
-        void listen<ChatDelete>("chat://delete", (e) => onDelete(e.payload)).then((u) => uns.push(u));
+        void listen<ChatMessage>("chat://message", (e) => onMsg(e.payload)).then(add);
+        void listen<ChatStatus>("chat://status", (e) => onStatus(e.payload)).then(add);
+        void listen<ChatDelete>("chat://delete", (e) => onDelete(e.payload)).then(add);
       });
-      return () => uns.forEach((u) => u());
+      return () => {
+        cancelled = true;
+        uns.forEach((u) => u());
+        uns.length = 0;
+      };
     },
     subscribeAlerts(onAlert) {
+      let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen<Alert>("alert://event", (e) => onAlert(e.payload)).then((u) => (unlisten = u))
+        listen<Alert>("alert://event", (e) => onAlert(e.payload)).then((u) =>
+          cancelled ? u() : (unlisten = u)
+        )
       );
-      return () => unlisten?.();
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     subscribeViewers(onViewers) {
+      let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen<Viewers>("viewers://update", (e) => onViewers(e.payload)).then((u) => (unlisten = u))
+        listen<Viewers>("viewers://update", (e) => onViewers(e.payload)).then((u) =>
+          cancelled ? u() : (unlisten = u)
+        )
       );
-      return () => unlisten?.();
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     async obsSetStream(start) {
       const { invoke } = await core();
@@ -193,11 +221,18 @@ function tauriApi(): CornetaApi {
       await invoke("register_shortcut", { shortcut });
     },
     subscribeShortcut(cb) {
+      let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen("shortcut://toggle-live", () => cb()).then((u) => (unlisten = u))
+        listen("shortcut://toggle-live", () => cb()).then((u) =>
+          cancelled ? u() : (unlisten = u)
+        )
       );
-      return () => unlisten?.();
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     async obsCheck() {
       const { invoke } = await core();
