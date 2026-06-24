@@ -19,16 +19,13 @@ use crate::guardian::Region;
 
 const FSIZE: usize = COMP_W * COMP_H * 3 / 2; // yuv420p
 
-/// Caminho do sidecar ffmpeg (fica ao lado do exe do app, em dev e em produção).
+/// Caminho do sidecar ffmpeg. O Tauri copia o externalBin pro lado do exe SEM o sufixo do
+/// triple (vira `ffmpeg.exe`), tanto em dev (target/debug) quanto no bundle de produção.
 fn ffmpeg_path() -> Option<std::path::PathBuf> {
-    let triple = tauri::utils::platform::target_triple().ok()?;
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let name = if cfg!(windows) {
-        format!("ffmpeg-{triple}.exe")
-    } else {
-        format!("ffmpeg-{triple}")
-    };
-    Some(dir.join(name))
+    let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let p = dir.join(name);
+    p.exists().then_some(p)
 }
 
 /// Quadro preto (Y=16, U=V=128) — emitido enquanto o buffer enche (pro encoder ter vídeo contínuo).
