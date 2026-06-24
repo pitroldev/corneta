@@ -39,8 +39,9 @@ sha2 = "0.10"
 base64 = "0.22"
 # Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
 regex = "1"
-# Guardião: encolhe o quadro antes do OCR (resize) e decoda o JPEG do extrator (modo avisar).
-image = { version = "0.25", default-features = false, features = ["jpeg"] }
+# Guardião: encolhe o quadro antes do OCR (resize), diff de quadros e renderiza o slate "JÁ VOLTO"
+# (PNG) → yuv420p pro compositor.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 # OCR PaddleOCR (PP-OCRv5 via ONNX Runtime) na CPU. Decode/encode ficam na GPU (NVDEC/NVENC);
 # OCR na CPU LIVRE (~300ms, previsível). Na GPU (DirectML) disputava o codec e degradava
 # (5-15s e crescendo) ao vivo. CPU também dispensa bundlar a DirectML.dll.

@@ -130,16 +130,10 @@ export interface AppSettings {
   chatBothAlertsFirst: boolean;
   /** Posição do divisor do modo "Ambos": % que o painel de alertas ocupa. */
   chatBothSplit: number;
-  /** Guardião anti-vazamento: vigia os frames de saída por segredo na tela. */
+  /** Guardião de privacidade: mostra a tela "JÁ VOLTO" quando um TERMO seu aparece (preventivo). */
   guardianEnabled: boolean;
-  /** Ação ao detectar: "warn" (avisa) | "censor" (cobre a saída). */
-  guardianAction: "warn" | "censor";
-  /** Tipo de censura: "region" (tarja só na seção) | "screen" (tela toda). */
-  guardianCensorMode: "region" | "screen";
-  /** Termos pessoais a vigiar (endereço, nome, @…). */
+  /** Termos EXPLÍCITOS a vigiar (e-mail, nome real, endereço, @…). Único gatilho da feature. */
   guardianWatchlist: string[];
-  /** Delay de proteção (s, 0 = off): atrasa a saída pra a censura ser preventiva. */
-  protectDelaySec: number;
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
@@ -240,12 +234,10 @@ export interface Alert {
   ts: number;
 }
 
-/** Vazamento detectado pelo guardião anti-vazamento. */
+/** Termo do usuário detectado na tela pelo guardião de privacidade. */
 export interface Leak {
-  kind: string;
   label: string;
   snippet: string;
-  severity: "high" | "med";
 }
 
 export interface Profile {

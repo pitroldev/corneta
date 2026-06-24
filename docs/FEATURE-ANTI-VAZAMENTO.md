@@ -1,11 +1,30 @@
-# Anti-vazamento (Guardião) — planejamento técnico
+# Anti-vazamento (Guardião de privacidade) — planejamento técnico
 
-> Detectar **segredo na tela** (email, senha, chave de API, CPF, endereço, pop-up de mensagem) no
-> sinal que está saindo e **avisar / borrar / cortar** antes de ir pro ar. Só dá pra fazer **no
-> caminho do sinal** — onde a Corneta está. Ver [`IDEIAS-v3.md`](./IDEIAS-v3.md) §1.
+> Quando um **termo que o usuário definiu** aparece na tela, corta pro slate **"JÁ VOLTO"** ANTES
+> de ir ao ar (preventivo, via buffer). Só dá pra fazer **no caminho do sinal** — onde a Corneta está.
 
-- **Status:** ✅ **MVP + delay + tarja por região** (OCR Windows com bounding boxes → cobre SÓ a seção do segredo; delay → preventivo; fallback slate) · 🔬 não validado com stream real · 2026-06-24
-- **Relacionado:** [`MONETIZACAO.md`](./MONETIZACAO.md) (OCR local = grátis; visão na nuvem = pago), [`FEATURE-DELAY-PROTECAO.md`](./FEATURE-DELAY-PROTECAO.md) (pré-requisito do blur regional)
+- **Status:** ✅ **Guardião de privacidade (slate por watchlist, delay fixo)** — ver REDESIGN abaixo · 2026-06-24
+- **Relacionado:** [`MONETIZACAO.md`](./MONETIZACAO.md), [`FEATURE-PROTETOR-BUFFER.md`](./FEATURE-PROTETOR-BUFFER.md) (o buffer), [`FEATURE-OCR-GPU.md`](./FEATURE-OCR-GPU.md) (por que OCR na CPU)
+
+---
+
+## ⚠️ REDESIGN (2026-06-24) — a abordagem "OCR tudo + tarja na região" NÃO era viável
+
+O OCR de tela cheia ao vivo lê TODAS as linhas de texto → ~3s (até 10s) numa tela cheia tipo
+Google Search → mais que o buffer → a tarja não aparecia. Pior: ler "qualquer segredo" gera falso
+positivo (todo e-mail público vira alarme). A feature foi **repensada** pra ser viável e honesta:
+
+1. **Slate, não tarja por região.** Ao detectar, troca a tela INTEIRA pelo "JÁ VOLTO" (binário) →
+   não precisa de OCR preciso de POSIÇÃO, só saber SE o termo está na tela.
+2. **Delay fixo (`GUARD_DELAY_SEC` = 6s), não configurável.** É o mínimo que viabiliza o preventivo
+   (cobre o pior caso de OCR ~3s com folga).
+3. **Só termos EXPLÍCITOS do usuário** (watchlist). Sem padrões genéricos (email/CPF/cartão) →
+   zero falso positivo; só age no que o usuário listou.
+4. **Diff pra pular OCR** (tela igual → reusa) + **OCR cheio forçado a cada ~3s** (rede de segurança
+   < delay → pega até o que o diff perdeu) + **OCR na CPU** (a GPU é do codec; ver FEATURE-OCR-GPU).
+
+O texto abaixo é o planejamento ORIGINAL (histórico) — partes (regiões/tarja/padrões genéricos)
+foram descartadas no redesign.
 
 ---
 

@@ -1,4 +1,5 @@
-//! Guardião anti-vazamento — censura preventiva de segredos na tela ao vivo.
+//! Guardião de privacidade — mostra a tela "JÁ VOLTO" quando um termo que o usuário DEFINIU
+//! aparece na transmissão, ANTES de ir ao ar (preventivo, via buffer de delay fixo).
 //!
 //! Arquitetura **hexagonal** (portas & adaptadores):
 //!
@@ -6,36 +7,33 @@
 //!                         ┌───────────────────────────┐
 //!     adaptadores  ──────▶│          DOMÍNIO          │◀──────  adaptadores
 //!   (ocr.rs, pipeline.rs) │ (domain.rs — 100% puro)   │
-//!                         │  regras · geometria ·     │
-//!                         │  Coverage (máquina do     │
-//!                         │  tempo)                   │
+//!                         │  watchlist · diff ·       │
+//!                         │  Timeline (máquina do     │
+//!                         │  tempo, binária)          │
 //!                         └───────────────────────────┘
 //! ```
 //!
-//! - **`domain`** — núcleo PURO: detecção de segredo, geometria das tarjas e a política de
-//!   cobertura temporal. Sem nenhuma dependência de I/O → testável em isolamento.
-//! - **`Ocr`** (porta, aqui embaixo) — a fronteira pra reconhecer texto. Adaptadores: PaddleOCR
-//!   (na CPU) e Windows.Media.Ocr, em `ocr.rs`.
-//! - **`pipeline`** — aplicação + adaptadores de I/O: processos FFmpeg (vídeo cru), pintura
-//!   yuv420p, eventos Tauri. Orquestra fonte → buffer/domínio → saída.
+//! - **`domain`** — núcleo PURO: casa a watchlist, decide se a tela mudou (pra pular OCR) e a linha
+//!   do tempo binária "tinha segredo no quadro X?". Sem I/O → testável em isolamento.
+//! - **`Ocr`** (porta) — a fronteira pra LER o texto da tela. Adaptadores: PaddleOCR (CPU) e
+//!   Windows.Media.Ocr, em `ocr.rs`. Devolve só o texto (a posição não importa — slate é a tela toda).
+//! - **`pipeline`** — aplicação + adaptadores de I/O: processos FFmpeg (vídeo cru), composição do
+//!   slate yuv420p e eventos Tauri. Orquestra fonte → buffer/domínio → saída + a thread de OCR.
 //!
-//! **A ideia central (máquina do tempo):** o vídeo passa por um buffer de N s no nosso processo
-//! (delay REAL). A gente faz OCR de cada quadro amostrado e marca o resultado pelo ÍNDICE do
-//! quadro. Quando ESSE MESMO quadro vai ao ar (N depois), a gente cobre o segredo usando o OCR
-//! DELE — no lugar e na hora exatos. O atraso do OCR (~0,5–1 s) fica todo escondido pelo buffer,
-//! então a tarja nunca atrasa nem vaza, e nunca tem deriva (cada quadro usa a própria detecção).
+//! **Por que é viável (ao contrário do OCR-tarja anterior):** só vigia os termos EXPLÍCITOS do
+//! usuário (não lê "qualquer segredo"), a censura é binária (slate, sem precisão de posição), e o
+//! OCR pula quadros que não mudaram (diff). O atraso do OCR fica escondido pelo buffer fixo.
 
 mod domain;
 mod ocr;
 mod pipeline;
 
-pub use domain::{Leak, Region};
-pub use pipeline::{run_protector, run_warn};
+pub use pipeline::run_guard;
 
-/// **Porta de OCR** (a fronteira do hexágono pra reconhecer texto). Recebe um quadro em
-/// escala de cinza e devolve os vazamentos + as regiões (frações da tela). Implementada pelos
-/// adaptadores em `ocr.rs` (PaddleOCR na CPU, Windows OCR, ou nulo se nada disponível).
+/// **Porta de OCR** (a fronteira do hexágono pra ler o texto da tela). Recebe um quadro em escala
+/// de cinza e devolve TODO o texto reconhecido (a watchlist é casada no domínio). Implementada
+/// pelos adaptadores em `ocr.rs` (PaddleOCR na CPU, Windows OCR, ou nulo se nada disponível).
 pub(crate) trait Ocr: Send {
-    fn scan(&self, gray: &[u8], w: usize, h: usize, watchlist: &[String]) -> (Vec<Leak>, Vec<Region>);
+    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> String;
     fn name(&self) -> &'static str;
 }

@@ -339,11 +339,6 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Caminho do frame ao vivo escrito pelo extrator (lido pelo guardião a cada varredura).
-pub(crate) fn guard_frame_path(app: &AppHandle) -> Option<std::path::PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("guardlive.jpg"))
-}
-
 /// Captura 1 frame do sinal atual (MediaMTX) como bytes JPEG. Helper reusável
 /// (preview do enquadramento + guardião anti-vazamento). `name` = arquivo temp.
 pub(crate) async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
@@ -625,85 +620,15 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     }
     emit(&app, &snap);
 
-    // Modo do guardião: "censurar" → o COMPOSITOR detecta+rastreia+desenha nos próprios frames.
-    // "avisar" → o guardião abaixo só faz OCR no extrator + toast.
-    let g_censor = config.settings.guardian_enabled && config.settings.guardian_action == "censor";
-    let g_warn = config.settings.guardian_enabled && config.settings.guardian_action == "warn";
-
-    // Guardião modo "AVISAR": OCR no frame do extrator + toast (sem censura).
-    if g_warn {
-        let (app_g, run_g, sig_g) = (app.clone(), running.clone(), has_signal.clone());
-        crate::guardian::run_warn(app_g, run_g, sig_g);
-
-        // EXTRATOR de frames: UM ffmpeg persistente que escreve `guardlive.jpg` a 10fps
-        // (sobrescrevendo). Assim o guardião LÊ o arquivo direto — sem subir um ffmpeg por
-        // varredura (que esperava keyframe, ~1s) → tracking quase em tempo real.
-        if let Some(fp) = guard_frame_path(&app) {
-            let (app_c, run_c, cfg_c) = (app.clone(), running.clone(), config.clone());
-            let fp_s = fp.to_string_lossy().to_string();
-            tauri::async_runtime::spawn(async move {
-                while run_c.load(Ordering::Relaxed) {
-                    let args: Vec<String> = vec![
-                        "-hide_banner".into(),
-                        "-loglevel".into(),
-                        "error".into(),
-                        "-i".into(),
-                        engine::ingest_url(&cfg_c),
-                        "-vf".into(),
-                        "fps=15,scale=1280:-2".into(),
-                        "-q:v".into(),
-                        "5".into(),
-                        "-update".into(),
-                        "1".into(),
-                        "-y".into(),
-                        fp_s.clone(),
-                    ];
-                    let spawned =
-                        app_c.shell().sidecar("ffmpeg").and_then(|c| c.args(args).spawn());
-                    let (mut rx, child) = match spawned {
-                        Ok(v) => v,
-                        Err(_) => {
-                            let _ = tauri::async_runtime::spawn_blocking(|| {
-                                std::thread::sleep(std::time::Duration::from_secs(2))
-                            })
-                            .await;
-                            continue;
-                        }
-                    };
-                    app_c
-                        .state::<AppState>()
-                        .engine
-                        .lock()
-                        .unwrap()
-                        .ffmpegs
-                        .insert("_guardcap".into(), child);
-                    while let Some(ev) = rx.recv().await {
-                        if matches!(ev, CommandEvent::Terminated(_)) || !run_c.load(Ordering::Relaxed)
-                        {
-                            break;
-                        }
-                    }
-                    if let Some(c) = app_c
-                        .state::<AppState>()
-                        .engine
-                        .lock()
-                        .unwrap()
-                        .ffmpegs
-                        .remove("_guardcap")
-                    {
-                        let _ = c.kill();
-                    }
-                    if !run_c.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    let _ = tauri::async_runtime::spawn_blocking(|| {
-                        std::thread::sleep(std::time::Duration::from_secs(1))
-                    })
-                    .await;
-                }
-            });
-        }
-    }
+    // Guardião de privacidade: só roda se LIGADO e com termos válidos (sem termos = não faz nada).
+    let guard_watchlist: Vec<String> = config
+        .settings
+        .guardian_watchlist
+        .iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| t.chars().count() >= 3)
+        .collect();
+    let guard = config.settings.guardian_enabled && !guard_watchlist.is_empty();
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
 
     // 2) Leitor do MediaMTX: detecta erro fatal (porta de ingestão em uso).
@@ -754,29 +679,25 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         .filter(|p| p.exists())
         .map(|p| p.to_string_lossy().to_string());
 
-    // PROTETOR com BUFFER PRÓPRIO (compositor): segura o vídeo N segundos no nosso processo e
-    // desenha as tarjas na SAÍDA → delay REAL + censura preventiva garantida. As saídas leem o
-    // `_delayed` (genuinamente N atrás — a gente segurou os quadros, não é tpad). Censura força ≥2s.
-    let delay_sec = engine::effective_protect_delay(&config);
-    let protect = delay_sec > 0;
+    // GUARDIÃO com BUFFER PRÓPRIO (compositor): segura o vídeo N segundos no nosso processo e, na
+    // SAÍDA, troca pelo slate "JÁ VOLTO" quando um termo do usuário aparece → preventivo garantido.
+    // As saídas leem o `_delayed` (genuinamente N atrás). Delay FIXO. Sem guardião → leem o `live`.
+    let delay_sec = if guard { engine::GUARD_DELAY_SEC } else { 0 };
+    let protect = guard;
     let out_source = if protect {
         engine::delayed_url(&config)
     } else {
         engine::ingest_url(&config)
     };
     log::info!(
-        "motor: compositor={protect} delay={delay_sec}s saídas-leem={}",
+        "motor: guardião={protect} delay={delay_sec}s saídas-leem={}",
         if protect { "_delayed" } else { "live" }
     );
     if protect {
         let hw = detect_hw_encoder(&app).await;
-        let watchlist = config.settings.guardian_watchlist.clone();
         let (app_c, run_c, sig_c) = (app.clone(), running.clone(), has_signal.clone());
         tauri::async_runtime::spawn(async move {
-            crate::guardian::run_protector(
-                app_c, run_c, sig_c, delay_sec, hw, g_censor, watchlist,
-            )
-            .await;
+            crate::guardian::run_guard(app_c, run_c, sig_c, hw, guard_watchlist).await;
         });
     }
 

@@ -118,29 +118,13 @@ pub struct Settings {
     /// (e sobe de volta quando estabiliza). Só vale pra destinos em transcode.
     #[serde(default = "default_true")]
     pub auto_bitrate: bool,
-    /// Guardião anti-vazamento: vigia os frames de saída por segredo na tela (OCR local).
+    /// Guardião de privacidade: mostra a tela "JÁ VOLTO" quando um TERMO da watchlist aparece na
+    /// tela, antes de ir ao ar (preventivo, via delay fixo). Sem termos, não faz nada.
     #[serde(default)]
     pub guardian_enabled: bool,
-    /// Ação ao detectar: "warn" (só avisa) | "censor" (cobre a saída).
-    #[serde(default = "default_guardian_action")]
-    pub guardian_action: String,
-    /// Tipo de censura: "region" (tarja só na seção do segredo) | "screen" (tela toda/slate).
-    #[serde(default = "default_censor_mode")]
-    pub guardian_censor_mode: String,
-    /// Termos pessoais do streamer a vigiar (endereço, nome real, @, placa…).
+    /// Termos EXPLÍCITOS a vigiar (endereço, nome real, @, placa…). É o único gatilho da feature.
     #[serde(default)]
     pub guardian_watchlist: Vec<String>,
-    /// Delay de proteção em segundos (0 = off). Atrasa a saída pra a censura ser PREVENTIVA
-    /// (corta antes do segredo ir pro ar). Custa latência vs o chat + CPU (re-encode).
-    #[serde(default)]
-    pub protect_delay_sec: u32,
-}
-
-fn default_guardian_action() -> String {
-    "warn".to_string()
-}
-fn default_censor_mode() -> String {
-    "region".to_string()
 }
 
 fn default_true() -> bool {
@@ -208,10 +192,7 @@ impl Default for Settings {
             brb_enabled: true,
             auto_bitrate: true,
             guardian_enabled: false,
-            guardian_action: default_guardian_action(),
-            guardian_censor_mode: default_censor_mode(),
             guardian_watchlist: Vec::new(),
-            protect_delay_sec: 0,
         }
     }
 }

@@ -6,7 +6,6 @@ import { obsIngestUrl } from "../lib/factory";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { Button, Card, Input, SectionTitle, Toggle } from "../components/ui";
-import { Slider } from "../components/Slider";
 
 export function SettingsScreen() {
   const config = useStore((s) => s.config);
@@ -177,8 +176,8 @@ export function SettingsScreen() {
             />
           </SettingRow>
           <SettingRow
-            title="Guardião anti-vazamento (beta)"
-            desc="Vigia os frames que estão saindo e avisa se aparecer segredo na tela — e-mail, chave de API, CPF, cartão, ou um termo da sua lista. OCR local: nada sai do PC. Pega muito, não tudo — trate como rede de segurança."
+            title="Guardião de privacidade (beta)"
+            desc="Quando um TERMO seu (que você listar abaixo) aparece na tela, a Corneta corta pro slate “JÁ VOLTO” antes de ir ao ar. OCR local: nada sai do PC. É rede de segurança, não garantia absoluta."
           >
             <Toggle
               checked={settings.guardianEnabled}
@@ -188,82 +187,48 @@ export function SettingsScreen() {
           </SettingRow>
           {settings.guardianEnabled && (
             <div className="flex flex-col gap-3 rounded-lg border-2 border-border-soft bg-surface-2 p-4">
-              <label className="flex items-center justify-between gap-4">
-                <span className="text-sm font-semibold text-ink-muted">
-                  Censurar automaticamente
-                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                    ao detectar um segredo, cobre só a região dele com uma tarja preta que{" "}
-                    <strong className="text-ink-muted">segue o conteúdo</strong> (até se você
-                    rolar a tela). Desligado, só te avisa por toast.
-                  </span>
-                </span>
-                <Toggle
-                  checked={settings.guardianAction === "censor"}
-                  onChange={(v) =>
-                    setSettings({
-                      guardianAction: v ? "censor" : "warn",
-                      ...(v && settings.protectDelaySec < 2 ? { protectDelaySec: 2 } : {}),
-                    })
-                  }
-                  label="Censurar automaticamente"
-                />
-              </label>
-              {settings.guardianAction === "censor" && (
-                <>
-                  <div className="rounded-md border-2 border-brass/40 bg-brass/[0.06] p-3 text-xs leading-relaxed text-ink-muted">
-                    <div className="mb-1 font-display text-sm font-extrabold text-ink">
-                      🛡️ Proteção preventiva (sempre)
-                    </div>
-                    A tarja entra <strong className="text-ink">antes</strong> do vazamento ir ao
-                    ar — nunca exposto, nem num clipe. Pra garantir isso, a transmissão sai com um
-                    atraso. Os tradeoffs:
-                    <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
-                      <li>
-                        A transmissão inteira fica{" "}
-                        <strong className="text-ink">{Math.max(settings.protectDelaySec, 2)}s atrás</strong>{" "}
-                        do tempo real (mínimo 2s — tempo de detectar e cobrir).
-                      </li>
-                      <li>O chat e a interação ficam defasados por esse mesmo tempo.</li>
-                      <li>
-                        A tarja cobre um instante a mais logo <strong className="text-ink">antes</strong>{" "}
-                        do segredo (o preço de nunca expor).
-                      </li>
-                      <li>Custa um pouco de CPU/GPU (o protetor re-encoda o vídeo).</li>
-                    </ul>
-                  </div>
-                  <label className="flex items-center gap-4">
-                    <span className="text-sm font-semibold text-ink-muted">
-                      Atraso da transmissão
-                      <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                        quanto a saída fica atrás do tempo real. Mínimo 2s com a censura ligada —
-                        aumente pra mais margem de segurança em vazamentos rápidos.
-                      </span>
-                    </span>
-                    <Slider
-                      className="ml-auto w-40 shrink-0"
-                      value={settings.protectDelaySec}
-                      min={2}
-                      max={15}
-                      onChange={(v) => setSettings({ protectDelaySec: v })}
-                      suffix="s"
-                    />
-                  </label>
-                </>
-              )}
+              <div className="rounded-md border-2 border-brass/40 bg-brass/[0.06] p-3 text-xs leading-relaxed text-ink-muted">
+                <div className="mb-1 font-display text-sm font-extrabold text-ink">
+                  🛡️ Proteção preventiva
+                </div>
+                Quando um termo da sua lista aparece, a Corneta troca pra tela{" "}
+                <strong className="text-ink">“JÁ VOLTO”</strong> antes daquele instante ir ao ar —
+                nunca exposto, nem num clipe. Pra garantir isso:
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                  <li>
+                    A transmissão fica <strong className="text-ink">6s atrás</strong> do tempo real
+                    (fixo — é o mínimo pra dar tempo de detectar e cortar).
+                  </li>
+                  <li>O chat e a interação ficam defasados por esse mesmo tempo.</li>
+                  <li>
+                    Só vigia os termos que você listar — <strong className="text-ink">não</strong>{" "}
+                    “qualquer segredo”.
+                  </li>
+                  <li>
+                    Tela cheia e mexendo (ex.: rolar o Google) pode escapar — é rede de segurança,
+                    não garantia.
+                  </li>
+                </ul>
+              </div>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-semibold text-ink-muted">
-                  Termos pessoais a vigiar{" "}
+                  Termos a vigiar{" "}
                   <span className="font-normal text-ink-faint">
-                    (um por linha — endereço, nome real, @…)
+                    (um por linha — seu e-mail, nome real, endereço, @…)
                   </span>
                 </span>
                 <textarea
                   value={settings.guardianWatchlist.join("\n")}
                   onChange={(e) => setSettings({ guardianWatchlist: e.target.value.split("\n") })}
-                  rows={3}
-                  placeholder={"Rua das Flores, 42\nMeu Nome Real"}
+                  rows={4}
+                  placeholder={"meu@email.com\nRua das Flores, 42\nMeu Nome Real"}
                   className="resize-y rounded-md border-2 border-border bg-surface px-2 py-1.5 text-sm font-medium text-ink outline-none focus:border-brass"
                 />
+                {settings.guardianWatchlist.filter((t) => t.trim().length >= 3).length === 0 && (
+                  <span className="text-xs font-semibold text-brass">
+                    Sem termos (3+ letras), o guardião não faz nada — adicione ao menos um.
+                  </span>
+                )}
               </label>
             </div>
           )}

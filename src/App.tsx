@@ -78,7 +78,7 @@ export default function App() {
   useEffect(() => {
     if (leaks.length > leakSeen.current) {
       const l = leaks[leaks.length - 1];
-      toast.error(`⚠️ Possível vazamento na tela: ${l.label}`);
+      toast.error(`🛡️ "${l.snippet}" apareceu na tela — cortei pro JÁ VOLTO`);
     }
     leakSeen.current = leaks.length;
   }, [leaks]);
@@ -112,10 +112,10 @@ export default function App() {
           <span className="animate-pulse text-lg">🛑</span>
           <div className="min-w-0 flex-1">
             <div className="font-display text-sm font-extrabold leading-tight">
-              Censurando ao vivo
+              JÁ VOLTO no ar
             </div>
             <div className="truncate text-xs text-white/85">
-              Tarja cobrindo um segredo detectado na tela — some sozinho quando ele sair.
+              Um termo seu apareceu na tela — a transmissão volta sozinha quando ele sair.
             </div>
           </div>
         </div>

@@ -1,10 +1,10 @@
-//! Aplicação + adaptadores de I/O do guardião.
+//! Aplicação + adaptadores de I/O do guardião de privacidade.
 //!
-//! - **Protetor** (`run_protector`): segura o vídeo N s num buffer no nosso processo (delay REAL)
-//!   e desenha as tarjas no quadro NA SAÍDA. A thread de OCR marca cada detecção pelo ÍNDICE do
-//!   quadro (`domain::Coverage`); quando ESSE quadro sai (N depois), a gente cobre o segredo com
-//!   o OCR dele → no lugar e na hora exatos, sem deriva e sem vazar (a "máquina do tempo").
-//! - **Avisar** (`run_warn`): OCR periódico no frame do extrator (`guardlive.jpg`) + toast.
+//! Segura o vídeo N s num buffer no nosso processo (delay REAL, fixo) e, na SAÍDA, troca o quadro
+//! pela tela "JÁ VOLTO" quando um termo do usuário apareceu por perto. A thread de OCR lê o texto,
+//! casa a watchlist e marca por ÍNDICE de quadro (`domain::Timeline`); quando ESSE quadro sai (N
+//! depois), a gente já sabe se dá slate → no momento certo, preventivo. O atraso do OCR fica
+//! escondido pelo buffer, e o diff pula quadros que não mudaram (barato em tela estática).
 //!
 //! Usa `std::process` (não o tauri shell) porque o vídeo é BINÁRIO — o shell quebraria em linhas.
 
@@ -15,23 +15,32 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Emitter};
+use image::GrayImage;
+use tauri::{AppHandle, Emitter, Manager};
 
-use super::domain::{Coverage, Region};
+use super::domain::{self, Timeline};
 use super::ocr::build_ocr;
 use super::Ocr;
 use crate::engine::{self, COMP_FPS, COMP_H, COMP_W};
 
 const FSIZE: usize = COMP_W * COMP_H * 3 / 2; // yuv420p
 const YSIZE: usize = COMP_W * COMP_H; // plano Y (escala de cinza)
-const MAX_BOXES: usize = 12; // teto de tarjas simultâneas por quadro (depois do merge)
-/// Teto do delay (s) — o buffer é delay×3,1MB/quadro; 15s ≈ 1,3GB. Trava abuso de config manual.
-const MAX_DELAY_SEC: u32 = 15;
+
+// Diff (pra pular OCR): resolução pequena + limiares. Sensível de propósito (erra pra MAIS OCR).
+const DIFF_W: usize = 480;
+const DIFF_PIX: u8 = 20; // ignora ruído de compressão
+const DIFF_FRAC: f32 = 0.0012; // ~0,12% dos pixels mudou → re-OCR (pega um termo aparecendo)
+const THROTTLE_MS: u64 = 120; // teto da taxa de OCR (o buffer absorve de sobra)
+// A cada N PULOS, força um OCR cheio (rede de segurança contra mudança que o diff perdeu). Tem
+// que ser MENOR que o delay: ~24×120ms ≈ 2,9s < 6s → mesmo um termo perdido pelo diff é pego e
+// coberto ANTES de ir ao ar (o bracket da Timeline cobre o intervalo).
+const FULL_EVERY: u32 = 24;
+const SLOW_WARN_MS: u128 = 1500;
 
 // ------------------------------ Adaptadores --------------------------------
 
-/// Caminho do sidecar ffmpeg. O Tauri copia o externalBin pro lado do exe SEM o sufixo do
-/// triple (vira `ffmpeg.exe`), tanto em dev (target/debug) quanto no bundle de produção.
+/// Caminho do sidecar ffmpeg. O Tauri copia o externalBin pro lado do exe SEM o sufixo do triple
+/// (vira `ffmpeg.exe`), tanto em dev (target/debug) quanto no bundle de produção.
 fn ffmpeg_path() -> Option<std::path::PathBuf> {
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
@@ -48,29 +57,65 @@ fn black_frame() -> Vec<u8> {
     f
 }
 
-/// Pinta uma tarja preta (yuv420p) na região fracionária `r` = (fx, fy, fw, fh).
-fn draw_box(f: &mut [u8], r: Region) {
-    let (w, h) = (COMP_W, COMP_H);
-    let bx = (r.0.clamp(0.0, 1.0) * w as f32) as usize;
-    let by = (r.1.clamp(0.0, 1.0) * h as f32) as usize;
-    let bw = (r.2.clamp(0.0, 1.0) * w as f32) as usize;
-    let bh = (r.3.clamp(0.0, 1.0) * h as f32) as usize;
-    if bw == 0 || bh == 0 {
-        return;
-    }
-    let y_plane = w * h;
-    let u_plane = y_plane + (w / 2) * (h / 2);
-    for y in by..(by + bh).min(h) {
-        for x in bx..(bx + bw).min(w) {
-            f[y * w + x] = 16;
+/// Converte uma RGB → yuv420p (BT.601 limited). Usado UMA vez pra rasterizar o slate.
+fn rgb_to_yuv420(rgb: &image::RgbImage) -> Vec<u8> {
+    let (w, h) = (rgb.width() as usize, rgb.height() as usize);
+    let mut out = vec![0u8; w * h * 3 / 2];
+    let (cw, ch) = (w / 2, h / 2);
+    let y_size = w * h;
+    let c_size = cw * ch;
+    for y in 0..h {
+        for x in 0..w {
+            let p = rgb.get_pixel(x as u32, y as u32);
+            let (r, g, b) = (p[0] as f32, p[1] as f32, p[2] as f32);
+            out[y * w + x] = (0.257 * r + 0.504 * g + 0.098 * b + 16.0).clamp(16.0, 235.0) as u8;
         }
     }
-    let cw = w / 2;
-    for y in (by / 2)..((by + bh) / 2).min(h / 2) {
-        for x in (bx / 2)..((bx + bw) / 2).min(cw) {
-            f[y_plane + y * cw + x] = 128;
-            f[u_plane + y * cw + x] = 128;
+    for cy in 0..ch {
+        for cx in 0..cw {
+            let (mut rs, mut gs, mut bs) = (0f32, 0f32, 0f32);
+            for dy in 0..2 {
+                for dx in 0..2 {
+                    let p = rgb.get_pixel((cx * 2 + dx) as u32, (cy * 2 + dy) as u32);
+                    rs += p[0] as f32;
+                    gs += p[1] as f32;
+                    bs += p[2] as f32;
+                }
+            }
+            let (r, g, b) = (rs / 4.0, gs / 4.0, bs / 4.0);
+            let u = (-0.148 * r - 0.291 * g + 0.439 * b + 128.0).clamp(16.0, 240.0) as u8;
+            let v = (0.439 * r - 0.368 * g - 0.071 * b + 128.0).clamp(16.0, 240.0) as u8;
+            out[y_size + cy * cw + cx] = u;
+            out[y_size + c_size + cy * cw + cx] = v;
         }
+    }
+    out
+}
+
+/// Slate "JÁ VOLTO" como quadro yuv420p (1920x1080). Usa o PNG que a UI desenhou (brb-slate.png);
+/// se não houver, cor sólida da marca (papel escuro).
+fn load_slate_yuv(app: &AppHandle) -> Vec<u8> {
+    if let Ok(dir) = app.path().app_config_dir() {
+        if let Ok(img) = image::open(dir.join("brb-slate.png")) {
+            let rgb = img
+                .resize_to_fill(COMP_W as u32, COMP_H as u32, image::imageops::FilterType::Triangle)
+                .to_rgb8();
+            return rgb_to_yuv420(&rgb);
+        }
+    }
+    let solid = image::RgbImage::from_pixel(COMP_W as u32, COMP_H as u32, image::Rgb([20, 16, 10]));
+    rgb_to_yuv420(&solid)
+}
+
+/// Encolhe o plano Y pra o buffer de diff (DIFF_W de largura).
+fn diff_small(gray: &[u8]) -> Vec<u8> {
+    match GrayImage::from_raw(COMP_W as u32, COMP_H as u32, gray.to_vec()) {
+        Some(img) => {
+            let nh = (COMP_H * DIFF_W / COMP_W).max(1) as u32;
+            image::imageops::resize(&img, DIFF_W as u32, nh, image::imageops::FilterType::Triangle)
+                .into_raw()
+        }
+        None => vec![],
     }
 }
 
@@ -113,80 +158,62 @@ fn kill(child: &mut std::process::Child) {
     }
 }
 
-/// Decodifica um JPEG do extrator em escala de cinza → (pixels, largura, altura).
-fn decode_jpeg_gray(jpeg: &[u8]) -> Option<(Vec<u8>, usize, usize)> {
-    let img = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg).ok()?;
-    let g = img.to_luma8();
-    let (w, h) = (g.width() as usize, g.height() as usize);
-    Some((g.into_raw(), w, h))
-}
-
-// ---------------------- Estado compartilhado OCR↔pump ----------------------
-
-/// Tudo que a thread de OCR e o pump de quadros dividem. Locks são sempre curtos e NUNCA
-/// aninhados (o OCR roda sem segurar lock nenhum) → sem contenção no caminho quente.
+/// Estado compartilhado entre a thread de OCR e o pump de quadros. Locks curtos e NUNCA aninhados.
 struct Shared {
-    /// O quadro mais novo oferecido pro OCR (índice + plano Y). O worker dá `take()` quando livre
-    /// → o pump só recopia (2 MB) na taxa de amostragem do OCR (~poucas vezes/s), barato.
+    /// O quadro mais novo oferecido pro OCR (índice + plano Y). O worker dá `take()` quando livre.
     scan_slot: Mutex<Option<(u64, Vec<u8>)>>,
-    /// Resultados do OCR por índice de quadro (a máquina do tempo).
-    coverage: Mutex<Coverage>,
+    /// Linha do tempo binária "tinha segredo no quadro X?".
+    timeline: Mutex<Timeline>,
 }
 
-// ------------------------------- Protetor ----------------------------------
+// ------------------------------- Guardião ----------------------------------
 
-/// Roda o protetor com buffer enquanto a transmissão estiver no ar.
-/// `censor`: detecta+desenha (no próprio vídeo). Senão, só atrasa (sem tarjas).
-pub async fn run_protector(
+/// Roda o guardião de privacidade enquanto a transmissão estiver no ar: atrasa o vídeo (delay FIXO)
+/// e troca pelo slate "JÁ VOLTO" quando um termo da `watchlist` aparece. `watchlist` é garantida
+/// não-vazia pelo chamador (sem termos, a feature não roda).
+pub async fn run_guard(
     app: AppHandle,
     running: Arc<AtomicBool>,
     has_signal: Arc<AtomicBool>,
-    delay_sec: u32,
     hw_codec: Option<String>,
-    censor: bool,
     watchlist: Vec<String>,
 ) {
     let Some(ffmpeg) = ffmpeg_path() else {
-        log::error!("protetor: sidecar ffmpeg não encontrado");
+        log::error!("guardião: sidecar ffmpeg não encontrado");
         return;
     };
-    let delay_sec = delay_sec.clamp(1, MAX_DELAY_SEC);
     let cfg = crate::config::load(&app);
+    let delay_sec = engine::GUARD_DELAY_SEC;
     let dec_args = engine::ffmpeg_args_for_decoder(&cfg);
     let enc_args = engine::ffmpeg_args_for_encoder(&cfg, delay_sec, hw_codec.as_deref());
     let delay_frames = (delay_sec as usize) * COMP_FPS;
-    // Quanto uma detecção "segura" um quadro sem amostra nova: ~2/3 do buffer. Dá folga pra OCR
-    // mais lento (tela cheia, ~1-2s) sem buraco entre amostras; bracket além disso = OCR travado.
-    let max_hold = (delay_frames as u64 * 2 / 3).max(COMP_FPS as u64);
+    // Quanto o slate "segura" sem amostra nova: ~2/3 do buffer (cobre OCR lento sem buraco).
+    let max_gap = (delay_frames as u64 * 2 / 3).max(COMP_FPS as u64);
     log::info!(
-        "protetor: delay {delay_sec}s ({delay_frames} frames), {COMP_W}x{COMP_H}@{COMP_FPS}, censor={censor}, hw={hw_codec:?}"
+        "guardião: delay {delay_sec}s ({delay_frames} frames), {COMP_W}x{COMP_H}@{COMP_FPS}, termos={}, hw={hw_codec:?}",
+        watchlist.len()
     );
 
+    let slate = Arc::new(load_slate_yuv(&app));
     let shared = Arc::new(Shared {
         scan_slot: Mutex::new(None),
-        coverage: Mutex::new(Coverage::new()),
+        timeline: Mutex::new(Timeline::new()),
     });
 
-    // Thread de OCR (só se for censurar). Constrói o OCR ANTES do pump airar: o download/init do
-    // modelo e o JIT da 1ª inferência são pagos durante o fill do buffer (3s), então quando o 1º
-    // quadro real sai o OCR já está pronto E já varreu os quadros do começo → sem janela
-    // descoberta no arranque (era um dos bugs críticos).
-    if censor {
-        let app_b = app.clone();
-        match tauri::async_runtime::spawn_blocking(move || build_ocr(&app_b, true)).await {
-            Ok(ocr) => {
-                let (app_o, run_o, sh_o, wl) =
-                    (app.clone(), running.clone(), shared.clone(), watchlist);
-                tauri::async_runtime::spawn_blocking(move || ocr_worker(app_o, run_o, sh_o, wl, ocr));
-            }
-            Err(e) => log::error!("protetor/OCR: build falhou ({e}) — censura desligada nesta sessão"),
+    // Constrói o OCR ANTES do pump airar (cache-aware → retorna rápido; download fica no fundo).
+    let app_b = app.clone();
+    match tauri::async_runtime::spawn_blocking(move || build_ocr(&app_b)).await {
+        Ok(ocr) => {
+            let (app_o, run_o, sh_o, wl) =
+                (app.clone(), running.clone(), shared.clone(), watchlist);
+            tauri::async_runtime::spawn_blocking(move || ocr_worker(app_o, run_o, sh_o, wl, ocr));
         }
+        Err(e) => log::error!("guardião/OCR: build falhou ({e}) — sem detecção nesta sessão"),
     }
 
-    // Pump binário (read/write crus) numa thread bloqueante.
     let _ = tauri::async_runtime::spawn_blocking(move || {
         let black = black_frame();
-        let mut head: u64 = 0; // índice monotônico — NÃO zera nos reconnects (Coverage fica coerente)
+        let mut head: u64 = 0; // índice monotônico — NÃO zera nos reconnects (Timeline coerente)
         while running.load(Ordering::Relaxed) {
             if !has_signal.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(400));
@@ -195,7 +222,7 @@ pub async fn run_protector(
             let mut dec = match spawn_ff(&ffmpeg, &dec_args, true) {
                 Ok(c) => c,
                 Err(e) => {
-                    log::warn!("protetor: decoder não subiu: {e}");
+                    log::warn!("guardião: decoder não subiu: {e}");
                     std::thread::sleep(Duration::from_secs(2));
                     continue;
                 }
@@ -203,7 +230,7 @@ pub async fn run_protector(
             let mut enc = match spawn_ff(&ffmpeg, &enc_args, false) {
                 Ok(c) => c,
                 Err(e) => {
-                    log::warn!("protetor: encoder não subiu: {e}");
+                    log::warn!("guardião: encoder não subiu: {e}");
                     kill(&mut dec);
                     std::thread::sleep(Duration::from_secs(2));
                     continue;
@@ -213,35 +240,28 @@ pub async fn run_protector(
                 std::io::BufReader::with_capacity(FSIZE * 2, dec.stdout.take().unwrap());
             let mut ein = enc.stdin.take().unwrap();
 
-            *shared.scan_slot.lock().unwrap() = None; // descarta quadro pendente da conexão anterior
-            let broke = pump_frames(
-                &mut dout, &mut ein, &app, &running, &shared, delay_frames, max_hold, censor, &black,
+            *shared.scan_slot.lock().unwrap() = None;
+            let _ = pump_frames(
+                &mut dout, &mut ein, &app, &running, &shared, delay_frames, max_gap, &slate, &black,
                 &mut head,
             );
 
             let _ = app.emit("leak://censor", false);
             kill(&mut enc);
             kill(&mut dec);
-            let _ = broke;
             if !running.load(Ordering::Relaxed) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(800));
         }
-        log::info!("protetor: encerrado");
+        log::info!("guardião: encerrado");
     })
     .await;
 }
 
-/// O laço quente: lê um quadro, oferece o mais novo pro OCR, bufferiza N s e, ao sair, cobre o
-/// segredo com o OCR DAQUELE quadro (Coverage). Devolve quando o decoder/encoder morre.
-///
-/// Ritmo: lê 1 / escreve 1, ditado pelo decoder (tempo real) e pelo encoder. Com NVENC (GPU, custo
-/// fixo) o encoder acompanha o tempo real e o delay fica TRAVADO em `delay_frames`. Se o encoder
-/// atrasar (ex.: fallback libx264 em CPU fraca), o `write_all` segura o pump (contrapressão) — o
-/// delay não cresce, mas o MediaMTX pode descartar quadros. Por isso o protetor prioriza o encoder
-/// de hardware. O OCR roda em OUTRA thread (na CPU) e NUNCA trava o pump (só oferece/lê via
-/// `scan_slot`) — a GPU fica só com decode+encode, o que evita a disputa que matava o OCR.
+/// Laço quente: lê um quadro, oferece o mais novo pro OCR, bufferiza N s e, ao sair, troca pelo
+/// slate se a `Timeline` mandar. Ritmo ditado pelo decoder (tempo real) + encoder (NVENC acompanha;
+/// o OCR roda em OUTRA thread e nunca trava o pump). Devolve quando o decoder/encoder morre.
 #[allow(clippy::too_many_arguments)]
 fn pump_frames(
     dout: &mut impl Read,
@@ -250,8 +270,8 @@ fn pump_frames(
     running: &AtomicBool,
     shared: &Shared,
     delay_frames: usize,
-    max_hold: u64,
-    censor: bool,
+    max_gap: u64,
+    slate: &[u8],
     black: &[u8],
     head: &mut u64,
 ) -> bool {
@@ -268,33 +288,27 @@ fn pump_frames(
         *head += 1;
         let idx = *head;
 
-        // Oferece o quadro mais novo pro OCR se ele estiver livre (≈ taxa de amostragem do OCR).
-        if censor {
-            let mut slot = shared.scan_slot.lock().unwrap();
+        if let Ok(mut slot) = shared.scan_slot.lock() {
             if slot.is_none() {
                 *slot = Some((idx, frame[..YSIZE].to_vec()));
             }
         }
-
         buf.push_back((idx, frame.clone()));
 
-        // Saída: quadro de `delay_frames` atrás (com as tarjas DELE), ou preto enquanto enche.
         let ok = if buf.len() > delay_frames {
-            let (out_idx, mut f) = buf.pop_front().unwrap();
-            let regs = if censor {
-                draw_regions_for(shared, out_idx, max_hold)
-            } else {
-                vec![]
+            let (out_idx, f) = buf.pop_front().unwrap();
+            let slate_on = {
+                let mut tl = shared.timeline.lock().unwrap();
+                let s = tl.should_censor(out_idx, max_gap);
+                tl.prune(out_idx.saturating_sub(max_gap + 2));
+                s
             };
-            let any = !regs.is_empty();
-            for r in &regs {
-                draw_box(&mut f, *r);
+            if slate_on != censoring {
+                censoring = slate_on;
+                let _ = app.emit("leak://censor", slate_on);
             }
-            if any != censoring {
-                censoring = any;
-                let _ = app.emit("leak://censor", any);
-            }
-            ein.write_all(&f).is_ok()
+            let out: &[u8] = if slate_on { slate } else { &f };
+            ein.write_all(out).is_ok()
         } else {
             ein.write_all(black).is_ok()
         };
@@ -304,17 +318,8 @@ fn pump_frames(
     }
 }
 
-/// Regiões a desenhar no quadro `out_idx`: o bracket das amostras vizinhas (cobre o intervalo
-/// inteiro entre amostras, sem buraco e sem atraso de janela). Também poda o que já saiu.
-fn draw_regions_for(shared: &Shared, out_idx: u64, max_hold: u64) -> Vec<Region> {
-    let mut cov = shared.coverage.lock().unwrap();
-    let regs = cov.regions_at(out_idx, max_hold, MAX_BOXES);
-    cov.prune(out_idx.saturating_sub(max_hold + 2));
-    regs
-}
-
-/// A thread de OCR: pega o quadro oferecido, reconhece o texto, marca o resultado pelo índice e
-/// avisa (toast) no vazamento novo. O `ocr` já vem CONSTRUÍDO (build pago antes do pump airar).
+/// Thread de OCR: pega o quadro oferecido, PULA se a tela não mudou (diff), senão lê o texto, casa
+/// a watchlist e marca por índice. Avisa (toast) quando um termo NOVO aparece.
 fn ocr_worker(
     app: AppHandle,
     running: Arc<AtomicBool>,
@@ -322,10 +327,12 @@ fn ocr_worker(
     watchlist: Vec<String>,
     ocr: Box<dyn Ocr>,
 ) {
-    log::info!("protetor/OCR: {}", ocr.name());
-    // Warmup: paga o JIT do detector já (antes de qualquer quadro real sair).
-    let _ = ocr.scan(&vec![16u8; YSIZE], COMP_W, COMP_H, &watchlist);
-    let mut had_leak = false;
+    log::info!("guardião/OCR: {}", ocr.name());
+    let _ = ocr.read_text(&vec![16u8; YSIZE], COMP_W, COMP_H); // warmup (paga o JIT)
+    let mut last_small: Vec<u8> = vec![];
+    let mut last_secret = false;
+    let mut since_full = 0u32;
+    let mut had_secret = false;
     while running.load(Ordering::Relaxed) {
         let job = shared.scan_slot.lock().unwrap().take();
         let Some((idx, gray)) = job else {
@@ -333,61 +340,39 @@ fn ocr_worker(
             continue;
         };
         let t = Instant::now();
-        let (leaks, regions) = ocr.scan(&gray, COMP_W, COMP_H, &watchlist);
-        // Diagnóstico: OCR perto do limite do buffer (tela MUITO cheia / CPU lenta) → amostragem
-        // fica grossa. Avisa em vez de degradar em silêncio (o usuário pode aumentar o delay).
-        if t.elapsed() > Duration::from_millis(1500) {
+        let small = diff_small(&gray);
+        let force_full = since_full >= FULL_EVERY;
+        let changed = force_full || domain::frames_differ(&last_small, &small, DIFF_PIX, DIFF_FRAC);
+        let (secret, leaks) = if changed {
+            since_full = 0;
+            let text = ocr.read_text(&gray, COMP_W, COMP_H);
+            let leaks = domain::find_watchlist(&text, &watchlist);
+            (!leaks.is_empty(), leaks)
+        } else {
+            since_full += 1;
+            (last_secret, vec![]) // tela igual → reusa o resultado (barato)
+        };
+        if changed && t.elapsed().as_millis() > SLOW_WARN_MS {
             log::warn!(
-                "protetor/OCR: scan lento ({} ms) — tela muito cheia? considere aumentar o delay",
+                "guardião/OCR: scan lento ({} ms) — tela muito cheia? o slate pode atrasar",
                 t.elapsed().as_millis()
             );
         }
-        shared.coverage.lock().unwrap().record(idx, regions);
-        if !leaks.is_empty() && !had_leak {
+        last_small = small;
+        last_secret = secret;
+        shared.timeline.lock().unwrap().record(idx, secret);
+
+        if secret && !had_secret {
             for l in &leaks {
                 let _ = app.emit("leak://alert", l.clone());
             }
         }
-        had_leak = !leaks.is_empty();
-    }
-}
+        had_secret = secret;
 
-// -------------------------------- Avisar -----------------------------------
-
-/// Guardião em modo "AVISAR": OCR leve e periódico no frame do extrator (`guardlive.jpg`) +
-/// toast no vazamento novo. (No modo "censurar" quem detecta+desenha é o protetor, nos frames crus.)
-pub fn run_warn(app: AppHandle, running: Arc<AtomicBool>, has_signal: Arc<AtomicBool>) {
-    let frame_path = crate::commands::guard_frame_path(&app);
-    tauri::async_runtime::spawn_blocking(move || {
-        let ocr = build_ocr(&app, false); // Windows OCR: leve, sem baixar modelo
-        log::info!("guardião(avisar): OCR {}", ocr.name());
-        let mut tick = 0u32;
-        let mut watchlist: Vec<String> = vec![];
-        let mut had_leak = false;
-        while running.load(Ordering::Relaxed) {
-            std::thread::sleep(Duration::from_millis(200));
-            if tick % 5 == 0 {
-                watchlist = crate::config::load(&app).settings.guardian_watchlist;
-            }
-            tick = tick.wrapping_add(1);
-            if !has_signal.load(Ordering::Relaxed) {
-                continue;
-            }
-            let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
-                Some(b) if !b.is_empty() => b,
-                _ => continue,
-            };
-            let Some((gray, w, h)) = decode_jpeg_gray(&jpeg) else {
-                continue;
-            };
-            let (leaks, _) = ocr.scan(&gray, w, h, &watchlist);
-            if !leaks.is_empty() && !had_leak {
-                for l in &leaks {
-                    let _ = app.emit("leak://alert", l.clone());
-                }
-            }
-            had_leak = !leaks.is_empty();
+        // Throttle: o buffer de N s absorve de sobra; não precisa diffar 1000×/s.
+        let spent = t.elapsed();
+        if spent < Duration::from_millis(THROTTLE_MS) {
+            std::thread::sleep(Duration::from_millis(THROTTLE_MS) - spent);
         }
-        log::info!("guardião: desligado");
-    });
+    }
 }

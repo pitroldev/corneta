@@ -177,23 +177,13 @@ pub fn ffmpeg_args_for_target(
     args
 }
 
-/// Delay MÍNIMO (s) quando a censura automática está ligada — dá tempo do OCR detectar e a gente
-/// cobrir o segredo ANTES dele ir ao ar (preventivo). 3s cobre o pior caso de OCR (~1-2s numa tela
-/// MUITO cheia, medido) com folga; no caso típico (~0,4s) sobra de sobra.
-pub const PREVENTIVE_MIN_SEC: u32 = 3;
+/// Delay FIXO (s) do guardião de privacidade — não-configurável. É o mínimo que viabiliza a
+/// proteção de forma PREVENTIVA: o slate "JÁ VOLTO" entra ANTES do termo ir ao ar. 6s cobre o
+/// pior caso de OCR numa tela cheia (~3s, medido) com folga; o diff deixa as telas estáticas
+/// quase de graça. A transmissão inteira (e o chat) fica esse tanto atrás do tempo real.
+pub const GUARD_DELAY_SEC: u32 = 6;
 
-/// Delay efetivo do protetor: o que o usuário pediu, mas NUNCA menos que o mínimo preventivo
-/// quando a censura automática está ligada. Protetor (tpad) e guardião (buffer) usam ISTO.
-pub fn effective_protect_delay(config: &AppConfig) -> u32 {
-    let censoring = config.settings.guardian_enabled && config.settings.guardian_action == "censor";
-    if censoring {
-        config.settings.protect_delay_sec.max(PREVENTIVE_MIN_SEC)
-    } else {
-        config.settings.protect_delay_sec
-    }
-}
-
-// --- Protetor com BUFFER próprio (compositor): delay REAL + censura preventiva ---
+// --- Guardião com BUFFER próprio (compositor): delay REAL + slate preventivo ---
 // O vídeo passa CRU por um buffer no nosso processo (delay garantido) e a tarja é
 // desenhada por nós na saída. Ver docs/FEATURE-PROTETOR-BUFFER.md.
 
