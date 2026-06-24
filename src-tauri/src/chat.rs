@@ -180,9 +180,7 @@ pub fn start_chat(app: &AppHandle) {
                 });
             }
             "youtube" => {
-                if api_key.trim().is_empty() {
-                    continue;
-                }
+                // Sem guard de API key: o InnerTube lê o chat sem chave (igual Twitch).
                 let key = api_key.clone();
                 tauri::async_runtime::spawn_blocking(move || {
                     while run2.load(Ordering::Relaxed) {
@@ -919,6 +917,295 @@ fn yt_alert(
     }
 }
 
+// --------------------- YouTube via InnerTube (SEM API key) ---------------------
+// Lê o live chat pela API interna do YouTube (a mesma do navegador) — sem chave,
+// sem OAuth, sem quota. Ver docs/YOUTUBE-AUTO.md (§2.5).
+
+/// Parseia o 1º objeto JSON logo após `marker` no HTML (ignora o resto do script).
+fn json_after(html: &str, marker: &str) -> Option<Value> {
+    let i = html.find(marker)? + marker.len();
+    serde_json::Deserializer::from_str(&html[i..])
+        .into_iter::<Value>()
+        .next()?
+        .ok()
+}
+fn find_between(s: &str, start: &str, end: &str) -> Option<String> {
+    let i = s.find(start)? + start.len();
+    let j = s[i..].find(end)?;
+    Some(s[i..i + j].to_string())
+}
+
+/// Pega o continuation token de um objeto `continuations[i]` (vários formatos).
+fn continuation_token(c: &Value) -> Option<String> {
+    for path in [
+        "/invalidationContinuationData/continuation",
+        "/timedContinuationData/continuation",
+        "/reloadContinuationData/continuation",
+    ] {
+        if let Some(s) = c.pointer(path).and_then(|v| v.as_str()) {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+/// Busca a página `live_chat` e extrai (api_key pública, versão do client, 1º continuation).
+fn innertube_bootstrap(video_id: &str) -> Option<(String, String, String)> {
+    let url = format!("https://www.youtube.com/live_chat?is_popout=1&v={video_id}");
+    let html = ureq::get(&url)
+        .set("User-Agent", BROWSER_UA)
+        .set("Accept-Language", "en-US,en;q=0.9")
+        .timeout(Duration::from_secs(8))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    let key = find_between(&html, "\"INNERTUBE_API_KEY\":\"", "\"")?;
+    let version = find_between(&html, "\"INNERTUBE_CONTEXT_CLIENT_VERSION\":\"", "\"")
+        .or_else(|| find_between(&html, "\"clientVersion\":\"", "\""))?;
+    let yt = json_after(&html, "ytInitialData = ")
+        .or_else(|| json_after(&html, "window[\"ytInitialData\"] = "))?;
+    let cont = yt
+        .pointer("/contents/liveChatRenderer/continuations")?
+        .as_array()?
+        .iter()
+        .find_map(continuation_token)?;
+    Some((key, version, cont))
+}
+
+/// POST no get_live_chat → devolve o `liveChatContinuation` (actions + próximo continuation).
+fn innertube_poll(key: &str, version: &str, cont: &str) -> Option<Value> {
+    let url = format!(
+        "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={key}&prettyPrint=false"
+    );
+    let body = json!({
+        "context": { "client": { "clientName": "WEB", "clientVersion": version } },
+        "continuation": cont,
+    });
+    let txt = ureq::post(&url)
+        .set("User-Agent", BROWSER_UA)
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(10))
+        .send_string(&body.to_string())
+        .ok()?
+        .into_string()
+        .ok()?;
+    let v: Value = serde_json::from_str(&txt).ok()?;
+    v.pointer("/continuationContents/liveChatContinuation").cloned()
+}
+
+/// `message.runs[]` (texto + emojis) → (texto puro, fragmentos).
+fn yt_message_fragments(message: &Value) -> (String, Vec<ChatFragment>) {
+    let mut text = String::new();
+    let mut frags = vec![];
+    if let Some(runs) = message.get("runs").and_then(|r| r.as_array()) {
+        for run in runs {
+            if let Some(t) = run.get("text").and_then(|x| x.as_str()) {
+                text.push_str(t);
+                frags.push(text_frag(t));
+            } else if let Some(emoji) = run.get("emoji") {
+                let label = emoji
+                    .pointer("/shortcuts/0")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("");
+                text.push_str(label);
+                match emoji.pointer("/image/thumbnails/0/url").and_then(|x| x.as_str()) {
+                    Some(u) => frags.push(ChatFragment {
+                        kind: "emote".into(),
+                        text: Some(label.to_string()),
+                        url: Some(u.to_string()),
+                    }),
+                    None => frags.push(text_frag(label)),
+                }
+            }
+        }
+    } else if let Some(s) = message.get("simpleText").and_then(|x| x.as_str()) {
+        text.push_str(s);
+        frags.push(text_frag(s));
+    }
+    (text, frags)
+}
+
+fn yt_innertube_badges(renderer: &Value) -> Vec<ChatBadge> {
+    let mut out = vec![];
+    if let Some(badges) = renderer.get("authorBadges").and_then(|b| b.as_array()) {
+        for b in badges {
+            let r = b.get("liveChatAuthorBadgeRenderer");
+            match r.and_then(|x| x.pointer("/icon/iconType")).and_then(|x| x.as_str()) {
+                Some("OWNER") => out.push(ChatBadge { label: "HOST".into(), kind: "broadcaster".into() }),
+                Some("MODERATOR") => out.push(ChatBadge { label: "MOD".into(), kind: "moderator".into() }),
+                Some("VERIFIED") => out.push(ChatBadge { label: "✓".into(), kind: "verified".into() }),
+                _ if r.and_then(|x| x.get("customThumbnail")).is_some() => {
+                    out.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() })
+                }
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// Número a partir de um texto monetário localizado ("R$ 1.234,56" → 1234.56). Best-effort.
+fn parse_amount(s: &str) -> Option<f64> {
+    let kept: String = s
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
+        .collect();
+    if kept.is_empty() {
+        return None;
+    }
+    let norm = match kept.rfind([',', '.']) {
+        Some(p) => {
+            let int: String = kept[..p].chars().filter(|c| c.is_ascii_digit()).collect();
+            let frac: String = kept[p + 1..].chars().filter(|c| c.is_ascii_digit()).collect();
+            format!("{int}.{frac}")
+        }
+        None => kept,
+    };
+    norm.parse::<f64>().ok()
+}
+
+/// Processa uma `action` do InnerTube → mensagem / super chat / membro / deleção.
+fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value) {
+    if let Some(id) = action
+        .pointer("/markChatItemAsDeletedAction/targetItemId")
+        .and_then(|v| v.as_str())
+    {
+        delete_message(app, "youtube", id);
+        return;
+    }
+    let Some(item) = action.pointer("/addChatItemAction/item") else {
+        return;
+    };
+    // Mensagem normal
+    if let Some(r) = item.get("liveChatTextMessageRenderer") {
+        let (text, fragments) = yt_message_fragments(r.get("message").unwrap_or(&Value::Null));
+        if text.is_empty() {
+            return;
+        }
+        let author = r
+            .pointer("/authorName/simpleText")
+            .and_then(|v| v.as_str())
+            .unwrap_or("anon")
+            .to_string();
+        emit_chat(
+            app,
+            ChatMessage {
+                id: next_id(),
+                platform: "youtube".into(),
+                source: source.to_string(),
+                author,
+                native_id: r.get("id").and_then(|v| v.as_str()).map(String::from),
+                color: None,
+                fragments,
+                badges: yt_innertube_badges(r),
+                text,
+                ts: now_ms(),
+            },
+        );
+        return;
+    }
+    // Super chat
+    if let Some(r) = item.get("liveChatPaidMessageRenderer") {
+        let author = r
+            .pointer("/authorName/simpleText")
+            .and_then(|v| v.as_str())
+            .unwrap_or("alguém")
+            .to_string();
+        let amount_text = r
+            .pointer("/purchaseAmountText/simpleText")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let (msg, _) = yt_message_fragments(r.get("message").unwrap_or(&Value::Null));
+        let display = if msg.is_empty() {
+            amount_text.to_string()
+        } else {
+            format!("{amount_text} — {msg}")
+        };
+        emit_alert(
+            app,
+            yt_alert(source, "superchat", author, parse_amount(amount_text), None, None, Some(display)),
+        );
+        return;
+    }
+    // Novo membro
+    if item.get("liveChatMembershipItemRenderer").is_some() {
+        let author = item
+            .pointer("/liveChatMembershipItemRenderer/authorName/simpleText")
+            .and_then(|v| v.as_str())
+            .unwrap_or("alguém")
+            .to_string();
+        emit_alert(app, yt_alert(source, "member", author, None, None, None, None));
+        return;
+    }
+    // Presente de memberships
+    if let Some(r) = item.get("liveChatSponsorshipsGiftPurchaseAnnouncementRenderer") {
+        let author = r
+            .pointer("/header/liveChatSponsorshipsHeaderRenderer/authorName/simpleText")
+            .and_then(|v| v.as_str())
+            .unwrap_or("alguém")
+            .to_string();
+        emit_alert(app, yt_alert(source, "subgift", author, None, None, None, None));
+    }
+}
+
+/// Lê o chat via InnerTube (sem chave). Devolve `false` se não conseguiu inicializar.
+fn youtube_innertube(
+    video_id: &str,
+    source: &str,
+    running: &Arc<AtomicBool>,
+    app: &AppHandle,
+) -> bool {
+    let Some((key, version, mut cont)) = innertube_bootstrap(video_id) else {
+        return false;
+    };
+    log::info!("youtube chat: InnerTube conectado ({source}) — vídeo {video_id}");
+    chat_status(app, "youtube", source, "connected");
+    let mut first = true;
+    let mut errors = 0u32;
+    while running.load(Ordering::Relaxed) {
+        let lcc = match innertube_poll(&key, &version, &cont) {
+            Some(v) => {
+                errors = 0;
+                v
+            }
+            None => {
+                errors += 1;
+                if errors >= 3 {
+                    break; // chat caiu/acabou → o supervisor re-resolve (live nova?)
+                }
+                thread::sleep(Duration::from_secs(4));
+                continue;
+            }
+        };
+        if !first {
+            if let Some(actions) = lcc.get("actions").and_then(|a| a.as_array()) {
+                for action in actions {
+                    handle_innertube_action(app, source, action);
+                }
+            }
+        }
+        first = false;
+        let Some(next) = lcc.pointer("/continuations/0").and_then(continuation_token) else {
+            break; // sem continuation = a live acabou
+        };
+        cont = next;
+        let timeout = lcc
+            .pointer("/continuations/0/invalidationContinuationData/timeoutMs")
+            .or_else(|| lcc.pointer("/continuations/0/timedContinuationData/timeoutMs"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(2000)
+            .clamp(1000, 5000);
+        let mut slept = 0u64;
+        while running.load(Ordering::Relaxed) && slept < timeout {
+            thread::sleep(Duration::from_millis(200));
+            slept += 200;
+        }
+    }
+    chat_status(app, "youtube", source, "disconnected");
+    true
+}
+
 fn run_youtube(api_key: &str, channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
     // Resolve o CANAL → vídeo ao vivo atual (sem precisar colar o link toda vez).
     let vid = match resolve_youtube_video(channel, api_key) {
@@ -929,14 +1216,28 @@ fn run_youtube(api_key: &str, channel: &str, source: &str, running: Arc<AtomicBo
             return;
         }
     };
-    let live_chat_id = match get_live_chat_id(api_key, &vid) {
+    // 1) InnerTube — SEM API key (igual Twitch). Primário.
+    if youtube_innertube(&vid, source, &running, &app) {
+        return;
+    }
+    // 2) Fallback Data API — só se o InnerTube não inicializar E houver chave.
+    if api_key.trim().is_empty() {
+        chat_status(&app, "youtube", source, "waiting");
+        return;
+    }
+    youtube_dataapi(api_key, &vid, source, running, app);
+}
+
+/// Leitor via YouTube Data API v3 (precisa de API key). Fallback do InnerTube.
+fn youtube_dataapi(api_key: &str, vid: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+    let live_chat_id = match get_live_chat_id(api_key, vid) {
         Some(id) => id,
         None => {
             chat_status(&app, "youtube", source, "waiting");
             return;
         }
     };
-    log::info!("youtube chat: conectado ({source}) — vídeo {vid}");
+    log::info!("youtube chat: Data API conectado ({source})");
     chat_status(&app, "youtube", source, "connected");
 
     let mut page_token: Option<String> = None;

@@ -28,7 +28,7 @@ const PLACEHOLDER: Record<string, string> = {
 const HINT: Record<string, string> = {
   twitch: "Só o nome do canal — sem login.",
   kick: "O slug da URL (kick.com/slug). Pode falhar por Cloudflare.",
-  youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live sozinha — sem colar o link toda vez. Usa a chave da API.",
+  youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live e lê o chat sozinha — sem colar link e sem precisar de chave.",
 };
 
 export function ChatScreen() {
@@ -185,16 +185,22 @@ export function ChatScreen() {
               )}
 
               {sources.some((x) => x.platform === "youtube") && (
-                <label className="mt-2 flex flex-col gap-1 rounded-md border-2 border-info/30 bg-info/5 p-2.5 text-[11px] font-semibold text-ink-faint">
-                  <span className="flex items-center gap-1.5">
+                <label className="mt-2 flex flex-col gap-1 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
+                  <span className="flex flex-wrap items-center gap-1.5">
                     <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
-                    <span className="font-medium normal-case text-ink-faint/70">
-                      · necessária pro chat do YouTube
+                    <span
+                      className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2"
+                      title={
+                        "Opcional. O chat do YouTube já funciona sem ela — a Corneta lê direto, igual à Twitch. " +
+                        "Com a chave você ganha a contagem de “assistindo” do YouTube, e ela serve de reserva caso a leitura direta falhe."
+                      }
+                    >
+                      · opcional (bom ter)
                     </span>
                   </span>
                   <input
                     value={s.youtubeApiKey ?? ""}
-                    placeholder="cole sua API key (Data API v3)"
+                    placeholder="opcional — cole sua API key (Data API v3)"
                     onChange={(e) => setSettings({ youtubeApiKey: e.target.value })}
                     className="h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
                   />

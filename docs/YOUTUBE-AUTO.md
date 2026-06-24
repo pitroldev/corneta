@@ -5,7 +5,7 @@
 > (fixo); no YouTube, não. A meta: ele configura o **canal uma vez** e a Corneta **acha a live atual
 > sozinha** — "fazemos isso por ele".
 
-- **Status:** ✅ **Fase 1 implementada** (scrape-first + fallback search.list) · 🔬 não validada com canal real · 2026-06-23
+- **Status:** ✅ **Fase 1 + 1.5 implementadas** (scrape do `/live` + **chat via InnerTube, sem API key**; API key vira fallback/opcional) · 🔬 não validadas com canal real · 2026-06-23
 - **Relacionado:** [`ENVIO.md`](./ENVIO.md) (enviar/moderar — casa com OAuth), [`IDEIAS-v2.md`](./IDEIAS-v2.md)
 
 ---
