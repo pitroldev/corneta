@@ -339,6 +339,11 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Caminho do frame ao vivo escrito pelo extrator (lido pelo guardião a cada varredura).
+pub(crate) fn guard_frame_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("guardlive.jpg"))
+}
+
 /// Captura 1 frame do sinal atual (MediaMTX) como bytes JPEG. Helper reusável
 /// (preview do enquadramento + guardião anti-vazamento). `name` = arquivo temp.
 pub(crate) async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
@@ -626,6 +631,75 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         tauri::async_runtime::spawn(async move {
             crate::guardian::run_guardian(app_g, run_g, sig_g).await;
         });
+
+        // EXTRATOR de frames: UM ffmpeg persistente que escreve `guardlive.jpg` a 10fps
+        // (sobrescrevendo). Assim o guardião LÊ o arquivo direto — sem subir um ffmpeg por
+        // varredura (que esperava keyframe, ~1s) → tracking quase em tempo real.
+        if let Some(fp) = guard_frame_path(&app) {
+            let (app_c, run_c, cfg_c) = (app.clone(), running.clone(), config.clone());
+            let fp_s = fp.to_string_lossy().to_string();
+            tauri::async_runtime::spawn(async move {
+                while run_c.load(Ordering::Relaxed) {
+                    let args: Vec<String> = vec![
+                        "-hide_banner".into(),
+                        "-loglevel".into(),
+                        "error".into(),
+                        "-i".into(),
+                        engine::ingest_url(&cfg_c),
+                        "-vf".into(),
+                        "fps=10,scale=1280:-2".into(),
+                        "-q:v".into(),
+                        "5".into(),
+                        "-update".into(),
+                        "1".into(),
+                        "-y".into(),
+                        fp_s.clone(),
+                    ];
+                    let spawned =
+                        app_c.shell().sidecar("ffmpeg").and_then(|c| c.args(args).spawn());
+                    let (mut rx, child) = match spawned {
+                        Ok(v) => v,
+                        Err(_) => {
+                            let _ = tauri::async_runtime::spawn_blocking(|| {
+                                std::thread::sleep(std::time::Duration::from_secs(2))
+                            })
+                            .await;
+                            continue;
+                        }
+                    };
+                    app_c
+                        .state::<AppState>()
+                        .engine
+                        .lock()
+                        .unwrap()
+                        .ffmpegs
+                        .insert("_guardcap".into(), child);
+                    while let Some(ev) = rx.recv().await {
+                        if matches!(ev, CommandEvent::Terminated(_)) || !run_c.load(Ordering::Relaxed)
+                        {
+                            break;
+                        }
+                    }
+                    if let Some(c) = app_c
+                        .state::<AppState>()
+                        .engine
+                        .lock()
+                        .unwrap()
+                        .ffmpegs
+                        .remove("_guardcap")
+                    {
+                        let _ = c.kill();
+                    }
+                    if !run_c.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let _ = tauri::async_runtime::spawn_blocking(|| {
+                        std::thread::sleep(std::time::Duration::from_secs(1))
+                    })
+                    .await;
+                }
+            });
+        }
     }
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
 

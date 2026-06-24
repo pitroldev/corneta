@@ -278,18 +278,30 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
     let mut sock: Option<zeromq::ReqSocket> = None;
     let mut censoring = false; // alguma tarja visível agora?
     let mut misses = 0u32; // varreduras limpas seguidas (pra liberar)
+    let mut tick = 0u32;
+    let mut auto = false;
+    let mut watchlist: Vec<String> = vec![];
+    let frame_path = crate::commands::guard_frame_path(&app);
 
     loop {
-        for _ in 0..7 {
-            if !running.load(Ordering::Relaxed) {
-                log::info!("guardião: desligado");
-                return;
-            }
-            let _ = tauri::async_runtime::spawn_blocking(|| {
-                std::thread::sleep(Duration::from_millis(200))
-            })
-            .await;
+        if !running.load(Ordering::Relaxed) {
+            log::info!("guardião: desligado");
+            return;
         }
+        // Ritmo CURTO: quem dita o passo é o OCR (~5-7×/s) → tracking quase em tempo real.
+        let _ = tauri::async_runtime::spawn_blocking(|| {
+            std::thread::sleep(Duration::from_millis(40))
+        })
+        .await;
+
+        // Recarrega settings ~1×/s (não a cada volta — pega ligar/desligar "censurar", watchlist).
+        if tick % 25 == 0 {
+            let cfg = crate::config::load(&app).settings;
+            auto = cfg.guardian_action == "censor";
+            watchlist = cfg.guardian_watchlist;
+        }
+        tick = tick.wrapping_add(1);
+
         if !has_signal.load(Ordering::Relaxed) {
             continue;
         }
@@ -306,13 +318,10 @@ pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: 
             }
         }
 
-        let cfg = crate::config::load(&app).settings;
-        let auto = cfg.guardian_action == "censor";
-        let watchlist = cfg.guardian_watchlist;
-
-        let jpeg = match crate::commands::grab_frame_named(&app, "guard.jpg").await {
-            Ok(b) => b,
-            Err(_) => continue,
+        // Lê o frame mais recente que o extrator escreveu (SEM subir ffmpeg → rápido).
+        let jpeg = match frame_path.as_ref().and_then(|p| std::fs::read(p).ok()) {
+            Some(b) if !b.is_empty() => b,
+            _ => continue,
         };
         let (text, words) =
             match tauri::async_runtime::spawn_blocking(move || ocr_words(&jpeg)).await {
