@@ -100,7 +100,7 @@
 - 💡 **YouTube: achar a live sozinho** (configura o canal uma vez, sem colar o link do vídeo toda transmissão) — planejamento em [`YOUTUBE-AUTO.md`](./YOUTUBE-AUTO.md).
 - 💡 **Backlog v3 — fora da caixinha** (guardião anti-vazamento, uma comunidade só / placar entre plataformas, o Produtor copiloto, máquina do tempo com chat embutido) — [`IDEIAS-v3.md`](./IDEIAS-v3.md).
 - 💰 **Monetização** (regra: local = grátis pra sempre; pago = sempre server-sided) — estratégia + tiers em [`MONETIZACAO.md`](./MONETIZACAO.md).
-- 🔧 **Planejamentos técnicos** (cada um com TODO de implementação): [`anti-vazamento`](./FEATURE-ANTI-VAZAMENTO.md), [`máquina do tempo`](./FEATURE-MAQUINA-DO-TEMPO.md), [`recap automático`](./FEATURE-RECAP-AUTOMATICO.md), [`vertical ao vivo`](./FEATURE-VERTICAL-AO-VIVO.md), [`dead air`](./FEATURE-DEAD-AIR.md), [`delay de proteção`](./FEATURE-DELAY-PROTECAO.md).
+- 🔧 **Planejamentos técnicos** (cada um com TODO de implementação): [`anti-vazamento`](./FEATURE-ANTI-VAZAMENTO.md), [`máquina do tempo`](./FEATURE-MAQUINA-DO-TEMPO.md), [`recap automático`](./FEATURE-RECAP-AUTOMATICO.md), [`vertical ao vivo`](./FEATURE-VERTICAL-AO-VIVO.md), [`dead air`](./FEATURE-DEAD-AIR.md), [`delay de proteção`](./FEATURE-DELAY-PROTECAO.md), [`OCR por GPU`](./FEATURE-OCR-GPU.md).
 
 ---
 
