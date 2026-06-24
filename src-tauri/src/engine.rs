@@ -177,23 +177,38 @@ pub fn ffmpeg_args_for_target(
     args
 }
 
-/// **Delayer**: lê a ingestão ao vivo, atrasa N segundos (vídeo via `tpad`, áudio via `adelay`)
-/// e republica num path `_delayed` do MediaMTX. As saídas leem desse path → tudo sai N atrás.
-/// É isso que dá a JANELA pra censura ser PREVENTIVA (corta antes do segredo ir pro ar).
-pub fn ffmpeg_args_for_delayer(config: &AppConfig, delay_sec: u32) -> Vec<String> {
-    let d = delay_sec.max(1);
-    let ms = d * 1000;
-    vec![
+/// Porta do `zmq` do protetor (default do filtro — evita escapar `:` no filtergraph).
+pub const GUARD_ZMQ_PORT: u16 = 5555;
+/// Quantas tarjas o protetor pré-aloca (drawbox escondidos, controlados por zmq).
+pub const GUARD_BOXES: usize = 6;
+
+/// **Protetor**: UM FFmpeg persistente que lê a ingestão e republica em `_delayed`, aplicando:
+/// - `zmq` (recebe comandos em tempo real → mover/mostrar/esconder as tarjas SEM reiniciar nada),
+/// - `tpad`/`adelay` (delay de proteção, opcional → censura preventiva),
+/// - N `drawbox` escondidos (w=0) que o guardião posiciona via zmq pra cobrir cada segredo.
+///
+/// As plataformas leem do `_delayed` e NUNCA reiniciam → zero drop, e a tarja segue o texto.
+pub fn ffmpeg_args_for_protector(config: &AppConfig, delay_sec: u32) -> Vec<String> {
+    // Vídeo: zmq → (tpad se delay) → drawboxes escondidos. drawbox DEPOIS do tpad: a tarja age
+    // sobre o stream já atrasado, então dá pra cobrir o segredo ANTES dele airar (preventivo).
+    let mut vf = String::from("zmq");
+    if delay_sec > 0 {
+        vf.push_str(&format!(",tpad=start_duration={delay_sec}:start_mode=clone"));
+    }
+    for i in 0..GUARD_BOXES {
+        vf.push_str(&format!(",drawbox@b{i}=x=0:y=0:w=0:h=0:color=black@1.0:t=fill"));
+    }
+
+    let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
         "warning".into(),
         "-i".into(),
         ingest_url(config),
-        // Atraso de transmissão: prepende N s (clonando o 1º quadro) → tudo fica N atrás.
+        "-map".into(),
+        "0:v".into(),
         "-vf".into(),
-        format!("tpad=start_duration={d}:start_mode=clone"),
-        "-af".into(),
-        format!("adelay=delays={ms}:all=1"),
+        vf,
         "-c:v".into(),
         "libx264".into(),
         "-preset".into(),
@@ -208,98 +223,17 @@ pub fn ffmpeg_args_for_delayer(config: &AppConfig, delay_sec: u32) -> Vec<String
         "120".into(),
         "-pix_fmt".into(),
         "yuv420p".into(),
-        "-c:a".into(),
-        "aac".into(),
-        "-ar".into(),
-        "48000".into(),
-        "-ac".into(),
-        "2".into(),
-        "-b:a".into(),
-        "160k".into(),
-        "-f".into(),
-        "flv".into(),
-        delayed_url(config),
-    ]
-}
-
-/// Saída com **TARJA**: cobre só a região (frações x,y,w,h) com um bloco sólido e mantém o
-/// resto AO VIVO. Sempre recodifica (drawbox é filtro). Lê do `source_url` (atrasado quando há delay).
-pub fn ffmpeg_args_for_censor_region(
-    config: &AppConfig,
-    t: &Target,
-    key: &str,
-    br_override: Option<u32>,
-    source_url: &str,
-    regions: &[(f32, f32, f32, f32)],
-) -> Vec<String> {
-    let _ = config;
-    let url = output_url(t, key);
-    let p = t
-        .encoding
-        .preset
-        .clone()
-        .unwrap_or_else(|| recommended_preset(&t.platform_id));
-    let codec = ffmpeg_video_codec(&t.encoding.encoder);
-    let gop = (p.fps * p.keyframe_sec).to_string();
-    let vbr = br_override.unwrap_or(p.video_bitrate_kbps);
-    // Uma tarja sólida por região (frações do frame de entrada), depois escala pra saída.
-    let boxes: String = regions
-        .iter()
-        .map(|r| {
-            let (fx, fy, fw, fh) = (
-                r.0.clamp(0.0, 1.0),
-                r.1.clamp(0.0, 1.0),
-                r.2.clamp(0.0, 1.0),
-                r.3.clamp(0.0, 1.0),
-            );
-            format!("drawbox=x=iw*{fx:.4}:y=ih*{fy:.4}:w=iw*{fw:.4}:h=ih*{fh:.4}:color=black@1.0:t=fill")
-        })
-        .collect::<Vec<_>>()
-        .join(",");
-    let vf = if boxes.is_empty() {
-        format!("scale={}:{}", p.width, p.height)
-    } else {
-        format!("{boxes},scale={}:{}", p.width, p.height)
-    };
-    let audio_kbps = t
-        .encoding
-        .preset
-        .as_ref()
-        .map(|x| x.audio_bitrate_kbps)
-        .unwrap_or_else(|| recommended_preset(&t.platform_id).audio_bitrate_kbps);
-    let mut args: Vec<String> = vec![
-        "-hide_banner".into(),
-        "-loglevel".into(),
-        "warning".into(),
-        "-stats".into(),
-        "-i".into(),
-        source_url.to_string(),
+        "-map".into(),
+        "0:a?".into(),
     ];
+    if delay_sec > 0 {
+        args.push("-af".into());
+        args.push(format!("adelay=delays={}:all=1", delay_sec * 1000));
+    }
     args.extend(
-        [
-            "-map", "0:v",
-            "-vf", &vf,
-            "-r", &p.fps.to_string(),
-            "-c:v", codec,
-            "-b:v", &format!("{vbr}k"),
-            "-maxrate", &format!("{vbr}k"),
-            "-bufsize", &format!("{}k", vbr * 2),
-            "-g", &gop,
-        ]
-        .map(String::from),
+        ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "160k", "-f", "flv"].map(String::from),
     );
-    args.extend(
-        [
-            "-map", "0:a?",
-            "-c:a", "aac",
-            "-ar", "48000",
-            "-ac", "2",
-            "-b:a", &format!("{}k", audio_kbps),
-            "-f", "flv",
-            &url,
-        ]
-        .map(String::from),
-    );
+    args.push(delayed_url(config));
     args
 }
 
@@ -514,10 +448,6 @@ pub struct EngineRuntime {
     pub session_path: Option<std::path::PathBuf>,
     /// Flag de pausa por destino (controle ao vivo): true = supervisor não sobe FFmpeg.
     pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
-    /// Censura ao vivo (guardião anti-vazamento): true = cobre a saída em TODOS os destinos.
-    pub censor: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    /// Regiões das tarjas (frações x,y,w,h) — uma por segredo. Vazio = censura de tela toda (slate).
-    pub censor_regions: std::sync::Arc<std::sync::Mutex<Vec<(f32, f32, f32, f32)>>>,
     /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
     pub last_emit_ms: u128,
 }

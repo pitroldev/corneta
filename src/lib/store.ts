@@ -79,7 +79,6 @@ interface State {
   leaks: Leak[];
   censored: boolean;
   bindGuardian: () => () => void;
-  setCensor: (on: boolean) => Promise<void>;
 
   // UI: pedido de foco no botão de ir ao vivo (vindo da sidebar)
   goLiveFocus: boolean;
@@ -408,10 +407,6 @@ export const useStore = create<State>((set, get) => {
         (l) => set((s) => ({ leaks: [...s.leaks, l].slice(-20) })),
         (on) => set({ censored: on })
       );
-    },
-    async setCensor(on) {
-      set({ censored: on });
-      await api.setCensor(on);
     },
 
     goLiveFocus: false,

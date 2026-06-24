@@ -2,7 +2,7 @@
 //! boxes), procura segredo na tela e avisa/censura — cobrindo SÓ a região do segredo
 //! (tarja) ou a tela toda. Ver docs/FEATURE-ANTI-VAZAMENTO.md.
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use regex::Regex;
@@ -245,16 +245,37 @@ fn ocr_words(_bytes: &[u8]) -> Option<(String, Vec<Word>)> {
 
 // ------------------------------- Loop -------------------------------
 
-/// Roda enquanto a transmissão está no ar (e o guardião está ligado).
-pub async fn run_guardian(
-    app: AppHandle,
-    running: Arc<AtomicBool>,
-    has_signal: Arc<AtomicBool>,
-    censor: Arc<AtomicBool>,
-    censor_regions: Arc<Mutex<Vec<Region>>>,
-) {
+/// Manda UM comando pro filtro (REQ exige send→recv). false se a conexão caiu.
+async fn zmq_send(sock: &mut zeromq::ReqSocket, cmd: &str) -> bool {
+    use zeromq::{SocketRecv, SocketSend};
+    if sock.send(cmd.into()).await.is_err() {
+        return false;
+    }
+    sock.recv().await.is_ok()
+}
+
+/// Posiciona (ou esconde, com None) a tarja `i` via comandos drawbox no protetor.
+async fn set_box(sock: &mut zeromq::ReqSocket, i: usize, r: Option<Region>) -> bool {
+    match r {
+        Some((fx, fy, fw, fh)) => {
+            zmq_send(sock, &format!("drawbox@b{i} x iw*{fx:.4}")).await
+                && zmq_send(sock, &format!("drawbox@b{i} y ih*{fy:.4}")).await
+                && zmq_send(sock, &format!("drawbox@b{i} w iw*{fw:.4}")).await
+                && zmq_send(sock, &format!("drawbox@b{i} h ih*{fh:.4}")).await
+        }
+        None => zmq_send(sock, &format!("drawbox@b{i} w 0")).await,
+    }
+}
+
+/// Guardião: OCR local nos frames + comanda as tarjas do PROTETOR via zmq (sem reiniciar nada).
+pub async fn run_guardian(app: AppHandle, running: Arc<AtomicBool>, has_signal: Arc<AtomicBool>) {
+    use zeromq::Socket;
     log::info!("guardião: ligado");
-    let mut misses = 0u32; // varreduras seguidas SEM segredo (pra auto-liberar a censura)
+    let endpoint = format!("tcp://127.0.0.1:{}", crate::engine::GUARD_ZMQ_PORT);
+    let n = crate::engine::GUARD_BOXES;
+    let mut sock: Option<zeromq::ReqSocket> = None;
+    let mut censoring = false; // alguma tarja visível agora?
+    let mut misses = 0u32; // varreduras limpas seguidas (pra liberar)
 
     loop {
         for _ in 0..7 {
@@ -267,15 +288,26 @@ pub async fn run_guardian(
             })
             .await;
         }
-        // CONTINUA escaneando mesmo censurado (pra acompanhar o segredo e liberar quando some).
         if !has_signal.load(Ordering::Relaxed) {
             continue;
         }
-        // Recarrega as settings a cada volta — pega mudanças (ligar "censurar", watchlist)
-        // SEM precisar reiniciar a transmissão.
-        let s = crate::config::load(&app).settings;
-        let auto = s.guardian_action == "censor";
-        let watchlist = s.guardian_watchlist;
+        // (Re)conecta no zmq do protetor — com timeout pra não travar se ele ainda não subiu.
+        if sock.is_none() {
+            let mut s = zeromq::ReqSocket::new();
+            match tokio::time::timeout(Duration::from_secs(3), s.connect(&endpoint)).await {
+                Ok(Ok(())) => {
+                    log::info!("guardião: zmq conectado no protetor");
+                    sock = Some(s);
+                    censoring = false;
+                }
+                _ => continue, // protetor ainda não pronto; tenta na próxima volta
+            }
+        }
+
+        let cfg = crate::config::load(&app).settings;
+        let auto = cfg.guardian_action == "censor";
+        let watchlist = cfg.guardian_watchlist;
+
         let jpeg = match crate::commands::grab_frame_named(&app, "guard.jpg").await {
             Ok(b) => b,
             Err(_) => continue,
@@ -290,41 +322,57 @@ pub async fn run_guardian(
         } else {
             scan(&text, &words, &watchlist)
         };
-        let already = censor.load(Ordering::Relaxed);
 
-        if leaks.is_empty() {
-            // Nada na tela. Se estava censurado (auto), conta as varreduras limpas e libera.
-            if already && auto {
-                misses += 1;
-                if misses >= 2 {
-                    censor.store(false, Ordering::Relaxed);
-                    censor_regions.lock().unwrap().clear();
-                    let _ = app.emit("leak://censor", false);
-                    misses = 0;
-                    log::info!("guardião: censura liberada (segredo saiu da tela)");
-                }
-            }
-            continue;
-        }
-
-        misses = 0;
-        log::warn!(
-            "guardião: possível vazamento {:?} regiões={:?} (auto={auto})",
-            leaks.iter().map(|l| l.kind.clone()).collect::<Vec<_>>(),
-            regions
-        );
-        // Só age na TRANSIÇÃO (1ª detecção). Já censurado → mantém (NÃO respawna, pra não
-        // derrubar a stream). Cobre TODOS os segredos do frame de uma vez (várias tarjas).
-        if !already {
+        // Aviso (toast) só ao começar a censurar (ou no modo avisar) — sem spam.
+        if !leaks.is_empty() && !censoring {
             for l in &leaks {
                 let _ = app.emit("leak://alert", l.clone());
             }
-            if auto {
-                *censor_regions.lock().unwrap() = regions;
-                censor.store(true, Ordering::Relaxed);
-                let _ = app.emit("leak://censor", true);
-                log::warn!("guardião: CENSURA automática ativada");
+        }
+
+        let mut dead = false;
+        {
+            let socket = sock.as_mut().unwrap();
+            if !auto {
+                // Modo "só avisar": garante as tarjas escondidas.
+                if censoring {
+                    for i in 0..n {
+                        let _ = set_box(socket, i, None).await;
+                    }
+                    censoring = false;
+                    let _ = app.emit("leak://censor", false);
+                }
+            } else if !regions.is_empty() {
+                // Posiciona uma tarja por segredo (acompanha — só comandos, sem reiniciar nada).
+                misses = 0;
+                let mut ok = true;
+                for i in 0..n {
+                    ok &= set_box(socket, i, regions.get(i).copied()).await;
+                }
+                if !ok {
+                    dead = true;
+                } else if !censoring {
+                    censoring = true;
+                    let _ = app.emit("leak://censor", true);
+                    log::warn!("guardião: CENSURA (tarja) — {} região(ões)", regions.len());
+                }
+            } else if censoring {
+                // Nada na tela: depois de ~2 varreduras limpas, esconde as tarjas.
+                misses += 1;
+                if misses >= 2 {
+                    for i in 0..n {
+                        let _ = set_box(socket, i, None).await;
+                    }
+                    censoring = false;
+                    misses = 0;
+                    let _ = app.emit("leak://censor", false);
+                    log::info!("guardião: censura liberada (segredo saiu)");
+                }
             }
+        }
+        if dead {
+            log::warn!("guardião: zmq caiu — reconectando");
+            sock = None;
         }
     }
 }

@@ -390,19 +390,6 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
-/// Liga/desliga a censura ao vivo (guardião / botão de pânico). Corta a saída pro slate.
-#[tauri::command]
-pub fn set_censor(app: AppHandle, on: bool) {
-    {
-        let st = app.state::<AppState>();
-        let eng = st.engine.lock().unwrap();
-        eng.censor.store(on, std::sync::atomic::Ordering::Relaxed);
-        if !on {
-            eng.censor_regions.lock().unwrap().clear(); // limpa as tarjas ao voltar ao vivo
-        }
-    }
-    let _ = app.emit("leak://censor", on);
-}
 
 /// Coloca o motor em estado de erro com uma mensagem.
 fn set_engine_error(app: &AppHandle, msg: &str) {
@@ -524,64 +511,6 @@ async fn run_slate(
     }
 }
 
-/// Empurra a CENSURA pras plataformas até ser desligada (slate de tela toda OU tarjas por região,
-/// já embutidas em `slate_args`). Segura até `!censor`. NÃO respawna (trocar FFmpeg derruba a stream).
-async fn run_censor_slate(
-    app: &AppHandle,
-    target_id: &str,
-    slate_args: &[String],
-    run_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-    censor: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-) {
-    use std::sync::atomic::Ordering;
-    set_target_state(app, target_id, "censor");
-    let spawned = app
-        .shell()
-        .sidecar("ffmpeg")
-        .and_then(|c| c.args(slate_args.to_vec()).spawn());
-    let (mut rx, child) = match spawned {
-        Ok(v) => v,
-        Err(_) => {
-            let _ = tauri::async_runtime::spawn_blocking(|| {
-                std::thread::sleep(std::time::Duration::from_millis(500))
-            })
-            .await;
-            return;
-        }
-    };
-    {
-        let st = app.state::<AppState>();
-        st.engine.lock().unwrap().ffmpegs.insert(target_id.to_string(), child);
-    }
-    while let Some(ev) = rx.recv().await {
-        if matches!(ev, CommandEvent::Terminated(_)) {
-            break;
-        }
-        if !run_flag.load(Ordering::Relaxed) || !censor.load(Ordering::Relaxed) {
-            break;
-        }
-    }
-    let child = {
-        let st = app.state::<AppState>();
-        let removed = st.engine.lock().unwrap().ffmpegs.remove(target_id);
-        removed
-    };
-    if let Some(c) = child {
-        let pid = c.pid();
-        let _ = c.kill();
-        #[cfg(windows)]
-        {
-            let _ = std::process::Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .output();
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = pid;
-        }
-    }
-}
-
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -620,10 +549,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let has_signal = Arc::new(AtomicBool::new(false));
     // Já teve sinal ao menos uma vez nesta sessão? (slate "JÁ VOLTO" só vale em QUEDAS.)
     let signal_seen = Arc::new(AtomicBool::new(false));
-    // Censura ao vivo (guardião anti-vazamento / botão de pânico).
-    let censor = Arc::new(AtomicBool::new(false));
-    let censor_regions: Arc<std::sync::Mutex<Vec<(f32, f32, f32, f32)>>> =
-        Arc::new(std::sync::Mutex::new(Vec::new()));
     let session_path = session::start_session(&app, &config);
     chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
     // Uma flag de pausa por destino (controle ao vivo).
@@ -639,22 +564,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.running = running.clone();
         eng.session_path = session_path;
         eng.paused = pause_flags.clone();
-        eng.censor = censor.clone();
-        eng.censor_regions = censor_regions.clone();
     }
     emit(&app, &snap);
 
-    // Guardião anti-vazamento: amostra frames de saída → OCR local → regras → avisa/censura.
+    // Guardião anti-vazamento: OCR local nos frames + comanda as tarjas do PROTETOR via zmq.
     if config.settings.guardian_enabled {
-        let (app_g, run_g, sig_g, cen_g, reg_g) = (
-            app.clone(),
-            running.clone(),
-            has_signal.clone(),
-            censor.clone(),
-            censor_regions.clone(),
-        );
+        let (app_g, run_g, sig_g) = (app.clone(), running.clone(), has_signal.clone());
         tauri::async_runtime::spawn(async move {
-            crate::guardian::run_guardian(app_g, run_g, sig_g, cen_g, reg_g).await;
+            crate::guardian::run_guardian(app_g, run_g, sig_g).await;
         });
     }
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
@@ -694,20 +611,21 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         .filter(|p| p.exists())
         .map(|p| p.to_string_lossy().to_string());
 
-    // Delay de proteção: se ligado, sobe o "delayer" (republica o sinal atrasado em `_delayed`)
-    // e as saídas leem DESSE path → tudo sai N segundos atrás, e a censura vira PREVENTIVA.
+    // PROTETOR: se o guardião OU o delay estiverem ligados, sobe UM FFmpeg persistente que
+    // republica o sinal em `_delayed` aplicando zmq + (delay) + drawboxes. As saídas leem DESSE
+    // path e NUNCA reiniciam pra censurar → zero drop; o guardião move as tarjas via zmq.
     let delay_sec = config.settings.protect_delay_sec;
-    let region_censor = config.settings.guardian_censor_mode == "region";
-    let out_source = if delay_sec > 0 {
+    let protect = config.settings.guardian_enabled || delay_sec > 0;
+    let out_source = if protect {
         engine::delayed_url(&config)
     } else {
         engine::ingest_url(&config)
     };
-    if delay_sec > 0 {
+    if protect {
         let (app_d, run_d, cfg_d) = (app.clone(), running.clone(), config.clone());
         tauri::async_runtime::spawn(async move {
             while run_d.load(Ordering::Relaxed) {
-                let args = engine::ffmpeg_args_for_delayer(&cfg_d, delay_sec);
+                let args = engine::ffmpeg_args_for_protector(&cfg_d, delay_sec);
                 let spawned = app_d.shell().sidecar("ffmpeg").and_then(|c| c.args(args).spawn());
                 let (mut rx, child) = match spawned {
                     Ok(v) => v,
@@ -721,7 +639,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 };
                 {
                     let st = app_d.state::<AppState>();
-                    st.engine.lock().unwrap().ffmpegs.insert("_delayer".into(), child);
+                    st.engine.lock().unwrap().ffmpegs.insert("_protector".into(), child);
                 }
                 while let Some(ev) = rx.recv().await {
                     if matches!(ev, CommandEvent::Terminated(_)) || !run_d.load(Ordering::Relaxed) {
@@ -730,7 +648,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
                 let leftover = {
                     let st = app_d.state::<AppState>();
-                    let removed = st.engine.lock().unwrap().ffmpegs.remove("_delayer");
+                    let removed = st.engine.lock().unwrap().ffmpegs.remove("_protector");
                     removed
                 };
                 if let Some(c) = leftover {
@@ -778,33 +696,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
         let signal = has_signal.clone();
         let seen = signal_seen.clone();
-        let censor_t = censor.clone();
-        let censor_regions_t = censor_regions.clone();
         let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
             while run_flag.load(Ordering::Relaxed) {
-                // Censura ligada (anti-vazamento/pânico): cobre a saída, prioridade máxima.
-                // Com região conhecida + modo tarja → cobre só a seção (resto ao vivo); senão, slate.
-                if censor_t.load(Ordering::Relaxed) {
-                    let regions = censor_regions_t.lock().unwrap().clone();
-                    let use_region = region_censor && !regions.is_empty();
-                    let args = if use_region {
-                        engine::ffmpeg_args_for_censor_region(
-                            &cfg,
-                            &target,
-                            &key,
-                            Some(current_kbps),
-                            &out_source,
-                            &regions,
-                        )
-                    } else {
-                        slate_args.clone()
-                    };
-                    // Regiões já embutidas em `args`; sem respawn (não derruba a stream).
-                    run_censor_slate(&app_t, &target_id, &args, &run_flag, &censor_t).await;
-                    continue;
-                }
+                // (A censura agora é feita pelo "protetor" via zmq — sem trocar este FFmpeg.)
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
                 if pause_flag.load(Ordering::Relaxed) {
                     set_target_state(&app_t, &target_id, "paused");
@@ -852,7 +748,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 let mut low = 0u32;
                 let mut stable = 0u32;
                 let mut rebitrate = false;
-                let mut censored = false;
                 while let Some(ev) = rx.recv().await {
                     match ev {
                         CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
@@ -898,18 +793,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                         CommandEvent::Terminated(_) => break,
                         _ => {}
                     }
-                    if censor_t.load(Ordering::Relaxed) {
-                        censored = true;
-                        break;
-                    }
                 }
-                // Remove o FFmpeg do mapa (e mata, se saiu por troca de bitrate ou censura).
+                // Remove o FFmpeg do mapa (e mata, se saiu por troca de bitrate).
                 let leftover = {
                     let st = app_t.state::<AppState>();
                     let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
                     removed
                 };
-                if rebitrate || censored {
+                if rebitrate {
                     if let Some(c) = leftover {
                         let pid = c.pid();
                         let _ = c.kill();
@@ -927,10 +818,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
-                }
-                // Censura ligada no meio: volta ao topo (entra no branch de censura).
-                if censored {
-                    continue;
                 }
                 if pause_flag.load(Ordering::Relaxed) {
                     continue;

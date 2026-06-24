@@ -67,7 +67,6 @@ export interface CornetaApi {
   saveBrbSlate(b64: string): Promise<void>;
   captureFrame(): Promise<string>;
   // Guardião anti-vazamento
-  setCensor(on: boolean): Promise<void>;
   subscribeGuardian(onLeak: (l: Leak) => void, onCensor: (on: boolean) => void): () => void;
 }
 
@@ -261,10 +260,6 @@ function tauriApi(): CornetaApi {
     async captureFrame() {
       const { invoke } = await core();
       return invoke<string>("capture_frame");
-    },
-    async setCensor(on) {
-      const { invoke } = await core();
-      await invoke("set_censor", { on });
     },
     subscribeGuardian(onLeak, onCensor) {
       let cancelled = false;
@@ -828,9 +823,6 @@ function mockApi(): CornetaApi {
     },
     async captureFrame() {
       throw new Error("captura de frame só no app instalado (e ao vivo)");
-    },
-    async setCensor() {
-      // no-op no navegador (sem motor real pra censurar)
     },
     subscribeGuardian() {
       return () => {};

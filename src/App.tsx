@@ -30,7 +30,6 @@ export default function App() {
   const bindGuardian = useStore((s) => s.bindGuardian);
   const leaks = useStore((s) => s.leaks);
   const censored = useStore((s) => s.censored);
-  const setCensor = useStore((s) => s.setCensor);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [screen, setScreen] = useState<Screen>(() => {
     try {
@@ -113,18 +112,12 @@ export default function App() {
           <span className="animate-pulse text-lg">🛑</span>
           <div className="min-w-0 flex-1">
             <div className="font-display text-sm font-extrabold leading-tight">
-              AO VIVO CENSURADO
+              Censurando ao vivo
             </div>
             <div className="truncate text-xs text-white/85">
-              A saída está cortada pra uma tela de proteção. Esconda o que vazou e volte ao vivo.
+              Tarja cobrindo um segredo detectado na tela — some sozinho quando ele sair.
             </div>
           </div>
-          <button
-            onClick={() => void setCensor(false)}
-            className="shrink-0 rounded-md border-2 border-white/80 bg-white/10 px-3 py-1 text-sm font-extrabold transition-colors hover:bg-white/20"
-          >
-            Voltar ao vivo
-          </button>
         </div>
       )}
 

@@ -102,7 +102,6 @@ pub fn run() {
             commands::import_config,
             commands::save_brb_slate,
             commands::capture_frame,
-            commands::set_censor,
         ])
         .setup(|app| {
             // Registra o atalho global de começar/parar a partir das settings.
