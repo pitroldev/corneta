@@ -511,10 +511,36 @@ async fn run_slate(
     }
 }
 
+/// Mata sidecars (ffmpeg/mediamtx do Corneta) ÓRFÃOS de sessões que não morreram direito
+/// (app fechado à força, crash). Eles SEGURAM PORTAS — sobretudo a zmq 5555 do protetor e a
+/// 1935 do MediaMTX — e fazem o boot falhar em loop ("a live nunca fica online"). O nome do
+/// binário tem o sufixo do target-triple (único do Corneta), então matar por nome é seguro.
+fn kill_orphan_sidecars() {
+    let triple = tauri::utils::platform::target_triple()
+        .unwrap_or_else(|_| "x86_64-pc-windows-msvc".into());
+    #[cfg(windows)]
+    for base in ["ffmpeg", "mediamtx"] {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/IM", &format!("{base}-{triple}.exe")])
+            .output();
+    }
+    #[cfg(not(windows))]
+    for base in ["ffmpeg", "mediamtx"] {
+        let _ = std::process::Command::new("pkill")
+            .args(["-f", &format!("{base}-{triple}")])
+            .output();
+    }
+}
+
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+
+    // Se NÃO estamos no ar, limpa sidecars órfãos (portas presas → protetor/MediaMTX falham no boot).
+    if !state.engine.lock().unwrap().running.load(Ordering::Relaxed) {
+        kill_orphan_sidecars();
+    }
 
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
@@ -642,6 +668,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     st.engine.lock().unwrap().ffmpegs.insert("_protector".into(), child);
                 }
                 while let Some(ev) = rx.recv().await {
+                    if let CommandEvent::Stdout(b) | CommandEvent::Stderr(b) = &ev {
+                        let line = String::from_utf8_lossy(b);
+                        let l = line.trim();
+                        // Loga falhas (ex.: zmq "Address in use" → o protetor não sobe).
+                        if !l.is_empty()
+                            && (l.contains("rror") || l.contains("bind") || l.contains("ZMQ"))
+                        {
+                            log::warn!("protetor: {l}");
+                        }
+                    }
                     if matches!(ev, CommandEvent::Terminated(_)) || !run_d.load(Ordering::Relaxed) {
                         break;
                     }
