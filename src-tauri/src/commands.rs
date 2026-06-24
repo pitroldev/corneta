@@ -541,10 +541,12 @@ async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
         let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
             continue;
         };
+        // 1280x720 (NÃO 128x128!): NVENC/QSV têm resolução MÍNIMA — um teste pequeno demais
+        // falha mesmo com a GPU presente (falso negativo → cai no libx264 → CPU estoura → live cai).
         let res = cmd
             .args([
                 "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
-                "color=c=black:s=128x128:r=5", "-frames:v", "2", "-c:v", codec, "-f", "null", "-",
+                "color=c=black:s=1280x720:r=30", "-frames:v", "3", "-c:v", codec, "-f", "null", "-",
             ])
             .output()
             .await;
@@ -637,11 +639,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 if line.contains("address already in use") {
                     set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
                 }
-                // Diagnóstico: por que um leitor/publisher caiu? (ex.: "is too slow", timeouts.)
+                // Diagnóstico: por que um leitor/publisher caiu? (fila cheia, slow, timeout, etc.)
                 if line.contains("too slow")
+                    || line.contains("queue")
                     || line.contains("timed out")
                     || line.contains("err")
-                    || (line.contains("closing") && line.contains("publisher"))
+                    || (line.contains("closed") && (line.contains("read") || line.contains("publish")))
                 {
                     log::warn!("mediamtx: {}", raw.trim());
                 }
