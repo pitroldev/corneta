@@ -97,6 +97,7 @@
 - 📄 **Enviar mensagens pelo multi-chat** (+ moderar) — exige login por plataforma; planejado em [`ENVIO.md`](./ENVIO.md).
 - 💡 **Backlog de ideias** (clipes/backtrack, "JÁ VOLTO", aviso no Discord, reframe vertical, viewers somados…) — pesquisa + reflexão em [`IDEIAS.md`](./IDEIAS.md).
 - 💡 **Backlog v2 — era da IA** (legendas ao vivo + tradução, auto-moderação cross-platform, relatório com retenção, controle pelo celular) — [`IDEIAS-v2.md`](./IDEIAS-v2.md).
+- 💡 **YouTube: achar a live sozinho** (configura o canal uma vez, sem colar o link do vídeo toda transmissão) — planejamento em [`YOUTUBE-AUTO.md`](./YOUTUBE-AUTO.md).
 
 ---
 
