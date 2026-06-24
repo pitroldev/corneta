@@ -7,6 +7,7 @@ import type { ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
+import { Tooltip } from "../components/Tooltip";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { AlertsFeed } from "../components/AlertsFeed";
 
@@ -188,15 +189,13 @@ export function ChatScreen() {
                 <label className="mt-2 flex flex-col gap-1 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
                   <span className="flex flex-wrap items-center gap-1.5">
                     <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
-                    <span
-                      className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2"
-                      title={
-                        "Opcional. O chat do YouTube já funciona sem ela — a Corneta lê direto, igual à Twitch. " +
-                        "Com a chave você ganha a contagem de “assistindo” do YouTube, e ela serve de reserva caso a leitura direta falhe."
-                      }
+                    <Tooltip
+                      content="O chat do YouTube já funciona sem ela — a Corneta lê direto, igual à Twitch. Com a chave você ganha a contagem de “assistindo” do YouTube, e ela serve de reserva caso a leitura direta falhe."
                     >
-                      · opcional (bom ter)
-                    </span>
+                      <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
+                        · opcional (bom ter)
+                      </span>
+                    </Tooltip>
                   </span>
                   <input
                     value={s.youtubeApiKey ?? ""}
