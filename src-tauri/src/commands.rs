@@ -532,6 +532,31 @@ fn kill_orphan_sidecars() {
     }
 }
 
+/// Testa qual encoder de hardware REALMENTE funciona (codifica 2 frames de uma cor sólida).
+/// O `-encoders` lista nvenc/qsv/amf no build do BtbN mesmo SEM a GPU, então só o teste real
+/// confirma. O protetor usa isso pra rodar na GPU (CPU ~zero) e acompanhar o tempo real —
+/// senão o MediaMTX derruba o leitor lento e a live cai.
+async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
+    for codec in ["h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox"] {
+        let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
+            continue;
+        };
+        let res = cmd
+            .args([
+                "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                "color=c=black:s=128x128:r=5", "-frames:v", "2", "-c:v", codec, "-f", "null", "-",
+            ])
+            .output()
+            .await;
+        if matches!(res, Ok(ref o) if o.status.success()) {
+            log::info!("protetor: encoder de hardware {codec} OK");
+            return Some(codec.to_string());
+        }
+    }
+    log::info!("protetor: sem encoder de hardware — libx264 ultrafast");
+    None
+}
+
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -656,11 +681,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     } else {
         engine::ingest_url(&config)
     };
+    // Encoder do protetor: hardware (GPU) se houver — corta a CPU e mantém o tempo real.
+    let prot_hw = if protect { detect_hw_encoder(&app).await } else { None };
     if protect {
         let (app_d, run_d, cfg_d) = (app.clone(), running.clone(), config.clone());
+        let prot_hw_c = prot_hw.clone();
         tauri::async_runtime::spawn(async move {
             while run_d.load(Ordering::Relaxed) {
-                let args = engine::ffmpeg_args_for_protector(&cfg_d, delay_sec);
+                let args = engine::ffmpeg_args_for_protector(&cfg_d, delay_sec, prot_hw_c.as_deref());
                 let spawned = app_d.shell().sidecar("ffmpeg").and_then(|c| c.args(args).spawn());
                 let (mut rx, child) = match spawned {
                     Ok(v) => v,

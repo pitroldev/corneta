@@ -188,7 +188,14 @@ pub const GUARD_BOXES: usize = 6;
 /// - N `drawbox` escondidos (w=0) que o guardião posiciona via zmq pra cobrir cada segredo.
 ///
 /// As plataformas leem do `_delayed` e NUNCA reiniciam → zero drop, e a tarja segue o texto.
-pub fn ffmpeg_args_for_protector(config: &AppConfig, delay_sec: u32) -> Vec<String> {
+/// `hw_codec`: codec de hardware confirmado (ex.: "h264_nvenc") ou None → libx264 leve.
+/// O encoder é o gargalo: ele PRECISA acompanhar o tempo real, senão o MediaMTX derruba o
+/// leitor lento (I/O error → respawn em loop → live caindo). Hardware = custo de CPU ~zero.
+pub fn ffmpeg_args_for_protector(
+    config: &AppConfig,
+    delay_sec: u32,
+    hw_codec: Option<&str>,
+) -> Vec<String> {
     // Vídeo: zmq → (tpad se delay) → drawboxes escondidos. drawbox DEPOIS do tpad: a tarja age
     // sobre o stream já atrasado, então dá pra cobrir o segredo ANTES dele airar (preventivo).
     let mut vf = String::from("zmq");
@@ -209,27 +216,41 @@ pub fn ffmpeg_args_for_protector(config: &AppConfig, delay_sec: u32) -> Vec<Stri
         "0:v".into(),
         "-vf".into(),
         vf,
-        "-c:v".into(),
-        "libx264".into(),
-        // ultrafast + zerolatency: o protetor PRECISA acompanhar o tempo real, senão o MediaMTX
-        // derruba o leitor lento (I/O error → respawn em loop → live caindo). Custo de CPU mínimo.
-        "-preset".into(),
-        "ultrafast".into(),
-        "-tune".into(),
-        "zerolatency".into(),
-        "-b:v".into(),
-        "6000k".into(),
-        "-maxrate".into(),
-        "6000k".into(),
-        "-bufsize".into(),
-        "6000k".into(),
-        "-g".into(),
-        "120".into(),
-        "-pix_fmt".into(),
-        "yuv420p".into(),
-        "-map".into(),
-        "0:a?".into(),
     ];
+    match hw_codec {
+        // Hardware (GPU): só codec + caps de bitrate, como os destinos fazem (sem preset do libx264).
+        Some(codec) => args.extend(
+            [
+                "-c:v", codec, "-b:v", "6000k", "-maxrate", "6000k", "-bufsize", "6000k", "-g",
+                "120",
+            ]
+            .map(String::from),
+        ),
+        // Software: libx264 ultrafast + zerolatency (o mais leve possível na CPU).
+        None => args.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-tune",
+                "zerolatency",
+                "-b:v",
+                "6000k",
+                "-maxrate",
+                "6000k",
+                "-bufsize",
+                "6000k",
+                "-g",
+                "120",
+                "-pix_fmt",
+                "yuv420p",
+            ]
+            .map(String::from),
+        ),
+    }
+    args.push("-map".into());
+    args.push("0:a?".into());
     if delay_sec > 0 {
         args.push("-af".into());
         args.push(format!("adelay=delays={}:all=1", delay_sec * 1000));
