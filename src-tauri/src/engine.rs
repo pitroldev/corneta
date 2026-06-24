@@ -230,7 +230,7 @@ pub fn ffmpeg_args_for_censor_region(
     key: &str,
     br_override: Option<u32>,
     source_url: &str,
-    region: (f32, f32, f32, f32),
+    regions: &[(f32, f32, f32, f32)],
 ) -> Vec<String> {
     let _ = config;
     let url = output_url(t, key);
@@ -242,16 +242,25 @@ pub fn ffmpeg_args_for_censor_region(
     let codec = ffmpeg_video_codec(&t.encoding.encoder);
     let gop = (p.fps * p.keyframe_sec).to_string();
     let vbr = br_override.unwrap_or(p.video_bitrate_kbps);
-    let (fx, fy, fw, fh) = (
-        region.0.clamp(0.0, 1.0),
-        region.1.clamp(0.0, 1.0),
-        region.2.clamp(0.0, 1.0),
-        region.3.clamp(0.0, 1.0),
-    );
-    let vf = format!(
-        "drawbox=x=iw*{fx:.4}:y=ih*{fy:.4}:w=iw*{fw:.4}:h=ih*{fh:.4}:color=black@1.0:t=fill,scale={}:{}",
-        p.width, p.height
-    );
+    // Uma tarja sólida por região (frações do frame de entrada), depois escala pra saída.
+    let boxes: String = regions
+        .iter()
+        .map(|r| {
+            let (fx, fy, fw, fh) = (
+                r.0.clamp(0.0, 1.0),
+                r.1.clamp(0.0, 1.0),
+                r.2.clamp(0.0, 1.0),
+                r.3.clamp(0.0, 1.0),
+            );
+            format!("drawbox=x=iw*{fx:.4}:y=ih*{fy:.4}:w=iw*{fw:.4}:h=ih*{fh:.4}:color=black@1.0:t=fill")
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let vf = if boxes.is_empty() {
+        format!("scale={}:{}", p.width, p.height)
+    } else {
+        format!("{boxes},scale={}:{}", p.width, p.height)
+    };
     let audio_kbps = t
         .encoding
         .preset
@@ -507,8 +516,8 @@ pub struct EngineRuntime {
     pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// Censura ao vivo (guardião anti-vazamento): true = cobre a saída em TODOS os destinos.
     pub censor: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    /// Região da tarja (frações x,y,w,h). None = censura de tela toda (slate).
-    pub censor_region: std::sync::Arc<std::sync::Mutex<Option<(f32, f32, f32, f32)>>>,
+    /// Regiões das tarjas (frações x,y,w,h) — uma por segredo. Vazio = censura de tela toda (slate).
+    pub censor_regions: std::sync::Arc<std::sync::Mutex<Vec<(f32, f32, f32, f32)>>>,
     /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
     pub last_emit_ms: u128,
 }

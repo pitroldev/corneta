@@ -398,7 +398,7 @@ pub fn set_censor(app: AppHandle, on: bool) {
         let eng = st.engine.lock().unwrap();
         eng.censor.store(on, std::sync::atomic::Ordering::Relaxed);
         if !on {
-            *eng.censor_region.lock().unwrap() = None; // limpa a tarja ao voltar ao vivo
+            eng.censor_regions.lock().unwrap().clear(); // limpa as tarjas ao voltar ao vivo
         }
     }
     let _ = app.emit("leak://censor", on);
@@ -524,14 +524,29 @@ async fn run_slate(
     }
 }
 
-/// Empurra um slate de CENSURA pras plataformas até a censura ser desligada
-/// (anti-vazamento / botão de pânico). Diferente do BRB: segura até `!censor`, ignora o sinal.
+/// Compara regiões arredondadas (grade ~2%) — evita respawn por jitter do OCR.
+fn regions_eq_rounded(a: &[(f32, f32, f32, f32)], b: &[(f32, f32, f32, f32)]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let r = |x: f32| (x * 50.0).round();
+    a.iter().zip(b).all(|(p, q)| {
+        r(p.0) == r(q.0) && r(p.1) == r(q.1) && r(p.2) == r(q.2) && r(p.3) == r(q.3)
+    })
+}
+
+/// Empurra a CENSURA pras plataformas até ser desligada (slate de tela toda OU tarjas por região).
+/// Segura até `!censor`, e — no modo tarja — também respawna quando as regiões mudam (acompanha).
+#[allow(clippy::too_many_arguments)]
 async fn run_censor_slate(
     app: &AppHandle,
     target_id: &str,
     slate_args: &[String],
     run_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     censor: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    regions_arc: &std::sync::Arc<std::sync::Mutex<Vec<(f32, f32, f32, f32)>>>,
+    my_regions: &[(f32, f32, f32, f32)],
+    track: bool,
 ) {
     use std::sync::atomic::Ordering;
     set_target_state(app, target_id, "censor");
@@ -558,6 +573,10 @@ async fn run_censor_slate(
             break;
         }
         if !run_flag.load(Ordering::Relaxed) || !censor.load(Ordering::Relaxed) {
+            break;
+        }
+        // Modo tarja: se as regiões mudaram (segredo se moveu / apareceu outro), respawna.
+        if track && !regions_eq_rounded(&regions_arc.lock().unwrap(), my_regions) {
             break;
         }
     }
@@ -622,8 +641,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let signal_seen = Arc::new(AtomicBool::new(false));
     // Censura ao vivo (guardião anti-vazamento / botão de pânico).
     let censor = Arc::new(AtomicBool::new(false));
-    let censor_region: Arc<std::sync::Mutex<Option<(f32, f32, f32, f32)>>> =
-        Arc::new(std::sync::Mutex::new(None));
+    let censor_regions: Arc<std::sync::Mutex<Vec<(f32, f32, f32, f32)>>> =
+        Arc::new(std::sync::Mutex::new(Vec::new()));
     let session_path = session::start_session(&app, &config);
     chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
     // Uma flag de pausa por destino (controle ao vivo).
@@ -640,7 +659,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.session_path = session_path;
         eng.paused = pause_flags.clone();
         eng.censor = censor.clone();
-        eng.censor_region = censor_region.clone();
+        eng.censor_regions = censor_regions.clone();
     }
     emit(&app, &snap);
 
@@ -651,7 +670,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             running.clone(),
             has_signal.clone(),
             censor.clone(),
-            censor_region.clone(),
+            censor_regions.clone(),
         );
         tauri::async_runtime::spawn(async move {
             crate::guardian::run_guardian(app_g, run_g, sig_g, cen_g, reg_g).await;
@@ -779,7 +798,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let signal = has_signal.clone();
         let seen = signal_seen.clone();
         let censor_t = censor.clone();
-        let censor_region_t = censor_region.clone();
+        let censor_regions_t = censor_regions.clone();
         let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
@@ -787,19 +806,31 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 // Censura ligada (anti-vazamento/pânico): cobre a saída, prioridade máxima.
                 // Com região conhecida + modo tarja → cobre só a seção (resto ao vivo); senão, slate.
                 if censor_t.load(Ordering::Relaxed) {
-                    let region = *censor_region_t.lock().unwrap();
-                    let args = match (region_censor, region) {
-                        (true, Some(r)) => engine::ffmpeg_args_for_censor_region(
+                    let regions = censor_regions_t.lock().unwrap().clone();
+                    let use_region = region_censor && !regions.is_empty();
+                    let args = if use_region {
+                        engine::ffmpeg_args_for_censor_region(
                             &cfg,
                             &target,
                             &key,
                             Some(current_kbps),
                             &out_source,
-                            r,
-                        ),
-                        _ => slate_args.clone(),
+                            &regions,
+                        )
+                    } else {
+                        slate_args.clone()
                     };
-                    run_censor_slate(&app_t, &target_id, &args, &run_flag, &censor_t).await;
+                    run_censor_slate(
+                        &app_t,
+                        &target_id,
+                        &args,
+                        &run_flag,
+                        &censor_t,
+                        &censor_regions_t,
+                        &regions,
+                        use_region,
+                    )
+                    .await;
                     continue;
                 }
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.

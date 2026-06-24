@@ -121,7 +121,7 @@ fn union(boxes: &[Region]) -> Option<Region> {
     let y0 = boxes.iter().map(|b| b.1).fold(f32::MAX, f32::min);
     let x1 = boxes.iter().map(|b| b.0 + b.2).fold(f32::MIN, f32::max);
     let y1 = boxes.iter().map(|b| b.1 + b.3).fold(f32::MIN, f32::max);
-    let pad = 0.012;
+    let pad = 0.02; // folga generosa pra cobrir o segredo todo
     let fx = (x0 - pad).clamp(0.0, 1.0);
     let fy = (y0 - pad).clamp(0.0, 1.0);
     let fw = ((x1 + pad) - fx).clamp(0.0, 1.0 - fx);
@@ -129,12 +129,12 @@ fn union(boxes: &[Region]) -> Option<Region> {
     Some((fx, fy, fw, fh))
 }
 
-/// Procura segredos no texto do OCR. Devolve os vazamentos + a REGIÃO (união dos
-/// boxes de alta severidade) pra cobrir só onde está o segredo.
-fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Option<Region>) {
+/// Procura segredos no texto do OCR. Devolve os vazamentos + UMA REGIÃO por segredo
+/// (pra cobrir cada um com a sua tarja, lidando com várias aparições).
+fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Vec<Region>) {
     let mut out: Vec<Leak> = vec![];
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut hi_boxes: Vec<Region> = vec![];
+    let mut regions: Vec<Region> = vec![];
     for p in patterns() {
         for m in p.re.find_iter(text) {
             let raw = m.as_str();
@@ -147,8 +147,8 @@ fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Option<
             if !seen.insert(format!("{}:{raw}", p.kind)) {
                 continue;
             }
-            if p.severity == "high" {
-                hi_boxes.extend(boxes_for_range(words, m.start(), m.end()));
+            if let Some(r) = union(&boxes_for_range(words, m.start(), m.end())) {
+                regions.push(r);
             }
             out.push(Leak {
                 kind: p.kind.into(),
@@ -164,7 +164,9 @@ fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Option<
         if t.len() >= 3 {
             if let Some(pos) = lower.find(&t.to_lowercase()) {
                 if seen.insert(format!("watch:{t}")) {
-                    hi_boxes.extend(boxes_for_range(words, pos, pos + t.len()));
+                    if let Some(r) = union(&boxes_for_range(words, pos, pos + t.len())) {
+                        regions.push(r);
+                    }
                     out.push(Leak {
                         kind: "watchlist".into(),
                         label: "Dado pessoal".into(),
@@ -175,7 +177,7 @@ fn scan(text: &str, words: &[Word], watchlist: &[String]) -> (Vec<Leak>, Option<
             }
         }
     }
-    (out, union(&hi_boxes))
+    (out, regions)
 }
 
 // ------------------------------- OCR (local) -------------------------------
@@ -243,9 +245,10 @@ pub async fn run_guardian(
     running: Arc<AtomicBool>,
     has_signal: Arc<AtomicBool>,
     censor: Arc<AtomicBool>,
-    censor_region: Arc<Mutex<Option<Region>>>,
+    censor_regions: Arc<Mutex<Vec<Region>>>,
 ) {
     log::info!("guardião: ligado");
+    let mut misses = 0u32; // varreduras seguidas SEM segredo (pra auto-liberar a censura)
 
     loop {
         for _ in 0..7 {
@@ -258,7 +261,8 @@ pub async fn run_guardian(
             })
             .await;
         }
-        if !has_signal.load(Ordering::Relaxed) || censor.load(Ordering::Relaxed) {
+        // CONTINUA escaneando mesmo censurado (pra acompanhar o segredo e liberar quando some).
+        if !has_signal.load(Ordering::Relaxed) {
             continue;
         }
         // Recarrega as settings a cada volta — pega mudanças (ligar "censurar", watchlist)
@@ -275,27 +279,48 @@ pub async fn run_guardian(
                 Ok(Some(v)) => v,
                 _ => continue,
             };
-        if text.trim().is_empty() {
-            continue;
-        }
-        let (leaks, region) = scan(&text, &words, &watchlist);
+        let (leaks, regions) = if text.trim().is_empty() {
+            (vec![], vec![])
+        } else {
+            scan(&text, &words, &watchlist)
+        };
+        let already = censor.load(Ordering::Relaxed);
+
         if leaks.is_empty() {
+            // Nada na tela. Se estava censurado (auto), conta as varreduras limpas e libera.
+            if already && auto {
+                misses += 1;
+                if misses >= 2 {
+                    censor.store(false, Ordering::Relaxed);
+                    censor_regions.lock().unwrap().clear();
+                    let _ = app.emit("leak://censor", false);
+                    misses = 0;
+                    log::info!("guardião: censura liberada (segredo saiu da tela)");
+                }
+            }
             continue;
         }
+
+        misses = 0;
         log::warn!(
-            "guardião: possível vazamento {:?} região={:?} (auto={auto})",
+            "guardião: possível vazamento {:?} regiões={:?} (auto={auto})",
             leaks.iter().map(|l| l.kind.clone()).collect::<Vec<_>>(),
-            region
+            regions
         );
-        for l in &leaks {
-            let _ = app.emit("leak://alert", l.clone());
+        if !already {
+            // Só avisa (toast) na 1ª vez — não spamma enquanto já está censurado.
+            for l in &leaks {
+                let _ = app.emit("leak://alert", l.clone());
+            }
         }
-        // No modo "censurar", censura QUALQUER detecção (não só severidade alta).
+        // No modo "censurar", censura QUALQUER detecção e ATUALIZA as regiões (a tarja acompanha).
         if auto {
-            *censor_region.lock().unwrap() = region; // região da tarja (None = tela toda)
-            censor.store(true, Ordering::Relaxed);
-            let _ = app.emit("leak://censor", true);
-            log::warn!("guardião: CENSURA automática ativada");
+            *censor_regions.lock().unwrap() = regions;
+            if !already {
+                censor.store(true, Ordering::Relaxed);
+                let _ = app.emit("leak://censor", true);
+                log::warn!("guardião: CENSURA automática ativada");
+            }
         }
     }
 }
