@@ -340,6 +340,7 @@ fn ocr_worker(
     let mut last_small: Vec<u8> = vec![];
     let mut had_secret = false;
     let mut last_ocr = Instant::now();
+    let mut last_diag = Instant::now();
     while running.load(Ordering::Relaxed) {
         let iter = Instant::now();
         let job = shared.scan_slot.lock().unwrap().take();
@@ -361,7 +362,8 @@ fn ocr_worker(
             continue;
         }
         let t = Instant::now();
-        let leaks = domain::find_watchlist(&ocr.read_text(&gray, COMP_W, COMP_H), &watchlist);
+        let text = ocr.read_text(&gray, COMP_W, COMP_H);
+        let leaks = domain::find_watchlist(&text, &watchlist);
         let secret = !leaks.is_empty();
         last_ocr = Instant::now();
         if t.elapsed().as_millis() > SLOW_WARN_MS {
@@ -369,6 +371,13 @@ fn ocr_worker(
                 "guardião/OCR: scan lento ({} ms) — tela muito cheia? o slate pode atrasar",
                 t.elapsed().as_millis()
             );
+        }
+        // Diagnóstico (a cada ~4s): mostra match + um trecho do que o OCR LEU. Ajuda a saber se a
+        // falha é de LEITURA (o termo nem aparece no texto) ou de CASAMENTO. Log local (sua tela).
+        if last_diag.elapsed() >= Duration::from_secs(4) {
+            last_diag = Instant::now();
+            let sample: String = text.chars().take(300).collect::<String>().replace('\n', " ");
+            log::info!("guardião/OCR diag: match={secret} chars={} | leu: {sample}", text.len());
         }
         shared.timeline.lock().unwrap().record(idx, secret);
         if secret && !had_secret {
