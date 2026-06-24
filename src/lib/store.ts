@@ -9,6 +9,7 @@ import type {
   EncodingMode,
   EngineSnapshot,
   IngestConfig,
+  Leak,
   PlatformId,
   Target,
   Viewers,
@@ -73,6 +74,12 @@ interface State {
   // Viewers unificados (todas as plataformas)
   viewers: Viewers;
   bindViewers: () => () => void;
+
+  // Guardião anti-vazamento
+  leaks: Leak[];
+  censored: boolean;
+  bindGuardian: () => () => void;
+  setCensor: (on: boolean) => Promise<void>;
 
   // UI: pedido de foco no botão de ir ao vivo (vindo da sidebar)
   goLiveFocus: boolean;
@@ -392,6 +399,19 @@ export const useStore = create<State>((set, get) => {
     viewers: { total: 0, anyLive: false, items: [] },
     bindViewers() {
       return api.subscribeViewers((v) => set({ viewers: v }));
+    },
+
+    leaks: [],
+    censored: false,
+    bindGuardian() {
+      return api.subscribeGuardian(
+        (l) => set((s) => ({ leaks: [...s.leaks, l].slice(-20) })),
+        (on) => set({ censored: on })
+      );
+    },
+    async setCensor(on) {
+      set({ censored: on });
+      await api.setCensor(on);
     },
 
     goLiveFocus: false,

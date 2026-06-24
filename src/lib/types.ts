@@ -130,6 +130,12 @@ export interface AppSettings {
   chatBothAlertsFirst: boolean;
   /** Posição do divisor do modo "Ambos": % que o painel de alertas ocupa. */
   chatBothSplit: number;
+  /** Guardião anti-vazamento: vigia os frames de saída por segredo na tela. */
+  guardianEnabled: boolean;
+  /** Ação ao detectar: "warn" (avisa) | "censor" (corta a saída). */
+  guardianAction: "warn" | "censor";
+  /** Termos pessoais a vigiar (endereço, nome, @…). */
+  guardianWatchlist: string[];
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
@@ -228,6 +234,14 @@ export interface Alert {
   tier?: string;
   message?: string;
   ts: number;
+}
+
+/** Vazamento detectado pelo guardião anti-vazamento. */
+export interface Leak {
+  kind: string;
+  label: string;
+  snippet: string;
+  severity: "high" | "med";
 }
 
 export interface Profile {

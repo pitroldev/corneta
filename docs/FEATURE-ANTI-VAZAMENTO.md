@@ -4,8 +4,8 @@
 > sinal que está saindo e **avisar / borrar / cortar** antes de ir pro ar. Só dá pra fazer **no
 > caminho do sinal** — onde a Corneta está. Ver [`IDEIAS-v3.md`](./IDEIAS-v3.md) §1.
 
-- **Status:** Planejamento técnico · 2026-06-24
-- **Relacionado:** [`MONETIZACAO.md`](./MONETIZACAO.md) (OCR local = grátis; visão na nuvem = pago)
+- **Status:** ✅ **MVP implementado** (amostrador + OCR Windows + regras + **censura de tela cheia**) · 🔬 não validado com stream real · 2026-06-24
+- **Relacionado:** [`MONETIZACAO.md`](./MONETIZACAO.md) (OCR local = grátis; visão na nuvem = pago), [`FEATURE-DELAY-PROTECAO.md`](./FEATURE-DELAY-PROTECAO.md) (pré-requisito do blur regional)
 
 ---
 

@@ -339,10 +339,9 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Captura 1 frame do sinal atual (MediaMTX) como JPEG base64 — pro preview do enquadramento.
-#[tauri::command]
-pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
-    use base64::Engine;
+/// Captura 1 frame do sinal atual (MediaMTX) como bytes JPEG. Helper reusável
+/// (preview do enquadramento + guardião anti-vazamento). `name` = arquivo temp.
+pub(crate) async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
     if !mediamtx_has_publisher() {
         return Err("sem sinal — entre ao vivo no OBS pra capturar o frame".into());
     }
@@ -353,7 +352,7 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
     );
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let out = dir.join("frame.jpg");
+    let out = dir.join(name);
     let args: Vec<String> = vec![
         "-y".into(),
         "-hide_banner".into(),
@@ -380,8 +379,29 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
     if !output.status.success() {
         return Err("não consegui capturar o frame (sinal instável?)".into());
     }
-    let bytes = std::fs::read(&out).map_err(|e| e.to_string())?;
+    std::fs::read(&out).map_err(|e| e.to_string())
+}
+
+/// Captura 1 frame como JPEG base64 — pro preview do enquadramento.
+#[tauri::command]
+pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = grab_frame_named(&app, "frame.jpg").await?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// Liga/desliga a censura ao vivo (guardião / botão de pânico). Corta a saída pro slate.
+#[tauri::command]
+pub fn set_censor(app: AppHandle, on: bool) {
+    {
+        let st = app.state::<AppState>();
+        st.engine
+            .lock()
+            .unwrap()
+            .censor
+            .store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+    let _ = app.emit("leak://censor", on);
 }
 
 /// Coloca o motor em estado de erro com uma mensagem.
@@ -504,6 +524,64 @@ async fn run_slate(
     }
 }
 
+/// Empurra um slate de CENSURA pras plataformas até a censura ser desligada
+/// (anti-vazamento / botão de pânico). Diferente do BRB: segura até `!censor`, ignora o sinal.
+async fn run_censor_slate(
+    app: &AppHandle,
+    target_id: &str,
+    slate_args: &[String],
+    run_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    censor: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    use std::sync::atomic::Ordering;
+    set_target_state(app, target_id, "censor");
+    let spawned = app
+        .shell()
+        .sidecar("ffmpeg")
+        .and_then(|c| c.args(slate_args.to_vec()).spawn());
+    let (mut rx, child) = match spawned {
+        Ok(v) => v,
+        Err(_) => {
+            let _ = tauri::async_runtime::spawn_blocking(|| {
+                std::thread::sleep(std::time::Duration::from_millis(500))
+            })
+            .await;
+            return;
+        }
+    };
+    {
+        let st = app.state::<AppState>();
+        st.engine.lock().unwrap().ffmpegs.insert(target_id.to_string(), child);
+    }
+    while let Some(ev) = rx.recv().await {
+        if matches!(ev, CommandEvent::Terminated(_)) {
+            break;
+        }
+        if !run_flag.load(Ordering::Relaxed) || !censor.load(Ordering::Relaxed) {
+            break;
+        }
+    }
+    let child = {
+        let st = app.state::<AppState>();
+        let removed = st.engine.lock().unwrap().ffmpegs.remove(target_id);
+        removed
+    };
+    if let Some(c) = child {
+        let pid = c.pid();
+        let _ = c.kill();
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = pid;
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -542,6 +620,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let has_signal = Arc::new(AtomicBool::new(false));
     // Já teve sinal ao menos uma vez nesta sessão? (slate "JÁ VOLTO" só vale em QUEDAS.)
     let signal_seen = Arc::new(AtomicBool::new(false));
+    // Censura ao vivo (guardião anti-vazamento / botão de pânico).
+    let censor = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
     chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
     // Uma flag de pausa por destino (controle ao vivo).
@@ -557,8 +637,18 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.running = running.clone();
         eng.session_path = session_path;
         eng.paused = pause_flags.clone();
+        eng.censor = censor.clone();
     }
     emit(&app, &snap);
+
+    // Guardião anti-vazamento: amostra frames de saída → OCR local → regras → avisa/censura.
+    if config.settings.guardian_enabled {
+        let (app_g, run_g, sig_g, cen_g) =
+            (app.clone(), running.clone(), has_signal.clone(), censor.clone());
+        tauri::async_runtime::spawn(async move {
+            crate::guardian::run_guardian(app_g, run_g, sig_g, cen_g).await;
+        });
+    }
     log::info!("motor: iniciando — MediaMTX (ingestão) + FFmpeg fan-out");
 
     // 2) Leitor do MediaMTX: detecta erro fatal (porta de ingestão em uso).
@@ -615,9 +705,15 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
         let signal = has_signal.clone();
         let seen = signal_seen.clone();
+        let censor_t = censor.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
             while run_flag.load(Ordering::Relaxed) {
+                // Censura ligada (anti-vazamento/pânico): corta a saída pro slate, prioridade máxima.
+                if censor_t.load(Ordering::Relaxed) {
+                    run_censor_slate(&app_t, &target_id, &slate_args, &run_flag, &censor_t).await;
+                    continue;
+                }
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
                 if pause_flag.load(Ordering::Relaxed) {
                     set_target_state(&app_t, &target_id, "paused");
@@ -664,6 +760,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 let mut low = 0u32;
                 let mut stable = 0u32;
                 let mut rebitrate = false;
+                let mut censored = false;
                 while let Some(ev) = rx.recv().await {
                     match ev {
                         CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
@@ -709,14 +806,18 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                         CommandEvent::Terminated(_) => break,
                         _ => {}
                     }
+                    if censor_t.load(Ordering::Relaxed) {
+                        censored = true;
+                        break;
+                    }
                 }
-                // Remove o FFmpeg do mapa (e mata, se a saída foi por troca de bitrate).
+                // Remove o FFmpeg do mapa (e mata, se saiu por troca de bitrate ou censura).
                 let leftover = {
                     let st = app_t.state::<AppState>();
                     let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
                     removed
                 };
-                if rebitrate {
+                if rebitrate || censored {
                     if let Some(c) = leftover {
                         let pid = c.pid();
                         let _ = c.kill();
@@ -734,6 +835,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
+                }
+                // Censura ligada no meio: volta ao topo (entra no branch de censura).
+                if censored {
+                    continue;
                 }
                 if pause_flag.load(Ordering::Relaxed) {
                     continue;

@@ -2,6 +2,7 @@ mod chat;
 mod commands;
 mod config;
 mod engine;
+mod guardian;
 mod keys;
 mod obs;
 mod session;
@@ -101,6 +102,7 @@ pub fn run() {
             commands::import_config,
             commands::save_brb_slate,
             commands::capture_frame,
+            commands::set_censor,
         ])
         .setup(|app| {
             // Registra o atalho global de começar/parar a partir das settings.

@@ -175,6 +175,49 @@ export function SettingsScreen() {
               label="Auto-bitrate"
             />
           </SettingRow>
+          <SettingRow
+            title="Guardião anti-vazamento (beta)"
+            desc="Vigia os frames que estão saindo e avisa se aparecer segredo na tela — e-mail, chave de API, CPF, cartão, ou um termo da sua lista. OCR local: nada sai do PC. Pega muito, não tudo — trate como rede de segurança."
+          >
+            <Toggle
+              checked={settings.guardianEnabled}
+              onChange={(v) => setSettings({ guardianEnabled: v })}
+              label="Guardião"
+            />
+          </SettingRow>
+          {settings.guardianEnabled && (
+            <div className="flex flex-col gap-3 rounded-lg border-2 border-border-soft bg-surface-2 p-4">
+              <label className="flex items-center justify-between gap-4">
+                <span className="text-sm font-semibold text-ink-muted">
+                  Censurar automaticamente
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    ao detectar algo grave (chave/CPF/cartão/seu dado), corta a saída pra uma tela de
+                    proteção na hora. Desligado, só avisa.
+                  </span>
+                </span>
+                <Toggle
+                  checked={settings.guardianAction === "censor"}
+                  onChange={(v) => setSettings({ guardianAction: v ? "censor" : "warn" })}
+                  label="Censurar automaticamente"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-semibold text-ink-muted">
+                  Termos pessoais a vigiar{" "}
+                  <span className="font-normal text-ink-faint">
+                    (um por linha — endereço, nome real, @…)
+                  </span>
+                </span>
+                <textarea
+                  value={settings.guardianWatchlist.join("\n")}
+                  onChange={(e) => setSettings({ guardianWatchlist: e.target.value.split("\n") })}
+                  rows={3}
+                  placeholder={"Rua das Flores, 42\nMeu Nome Real"}
+                  className="resize-y rounded-md border-2 border-border bg-surface px-2 py-1.5 text-sm font-medium text-ink outline-none focus:border-brass"
+                />
+              </label>
+            </div>
+          )}
           <SettingRow title="Tema claro" desc="Troca a interface pro modo claro (papel).">
             <Toggle
               checked={settings.theme === "light"}

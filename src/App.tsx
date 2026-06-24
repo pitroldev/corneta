@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
+import { toast } from "./lib/toast";
 import { renderBrbSlatePng } from "./lib/brbSlate";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -26,6 +27,10 @@ export default function App() {
   const bindChat = useStore((s) => s.bindChat);
   const bindAlerts = useStore((s) => s.bindAlerts);
   const bindViewers = useStore((s) => s.bindViewers);
+  const bindGuardian = useStore((s) => s.bindGuardian);
+  const leaks = useStore((s) => s.leaks);
+  const censored = useStore((s) => s.censored);
+  const setCensor = useStore((s) => s.setCensor);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [screen, setScreen] = useState<Screen>(() => {
     try {
@@ -51,6 +56,7 @@ export default function App() {
     const unbindChat = bindChat();
     const unbindAlerts = bindAlerts();
     const unbindViewers = bindViewers();
+    const unbindGuardian = bindGuardian();
     // C1: atalho global começar/parar (alterna conforme o estado atual).
     const unbindShortcut = api.subscribeShortcut(() => {
       const s = useStore.getState();
@@ -63,9 +69,20 @@ export default function App() {
       unbindChat();
       unbindAlerts();
       unbindViewers();
+      unbindGuardian();
       unbindShortcut();
     };
-  }, [load, bindEngine, bindChat, bindAlerts, bindViewers]);
+  }, [load, bindEngine, bindChat, bindAlerts, bindViewers, bindGuardian]);
+
+  // Guardião: avisa por toast a cada novo vazamento detectado.
+  const leakSeen = useRef(0);
+  useEffect(() => {
+    if (leaks.length > leakSeen.current) {
+      const l = leaks[leaks.length - 1];
+      toast.error(`⚠️ Possível vazamento na tela: ${l.label}`);
+    }
+    leakSeen.current = leaks.length;
+  }, [leaks]);
 
   // D1: aplica o tema (dark/light) no documento.
   useEffect(() => {
@@ -90,6 +107,26 @@ export default function App() {
   return (
     <div className="flex h-full flex-col overflow-hidden border border-border-soft">
       <TitleBar />
+
+      {censored && (
+        <div className="flex items-center gap-3 border-b-2 border-bad bg-bad px-4 py-2 text-white">
+          <span className="animate-pulse text-lg">🛑</span>
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-sm font-extrabold leading-tight">
+              AO VIVO CENSURADO
+            </div>
+            <div className="truncate text-xs text-white/85">
+              A saída está cortada pra uma tela de proteção. Esconda o que vazou e volte ao vivo.
+            </div>
+          </div>
+          <button
+            onClick={() => void setCensor(false)}
+            className="shrink-0 rounded-md border-2 border-white/80 bg-white/10 px-3 py-1 text-sm font-extrabold transition-colors hover:bg-white/20"
+          >
+            Voltar ao vivo
+          </button>
+        </div>
+      )}
 
       {!loaded ? (
         <div className="grid flex-1 place-items-center">

@@ -14,6 +14,7 @@ import type {
   ChatStatus,
   EncoderInfo,
   EngineSnapshot,
+  Leak,
   ObsCheck,
   SessionMeta,
   TargetStatus,
@@ -65,6 +66,9 @@ export interface CornetaApi {
   importConfig(): Promise<boolean>;
   saveBrbSlate(b64: string): Promise<void>;
   captureFrame(): Promise<string>;
+  // Guardião anti-vazamento
+  setCensor(on: boolean): Promise<void>;
+  subscribeGuardian(onLeak: (l: Leak) => void, onCensor: (on: boolean) => void): () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +261,24 @@ function tauriApi(): CornetaApi {
     async captureFrame() {
       const { invoke } = await core();
       return invoke<string>("capture_frame");
+    },
+    async setCensor(on) {
+      const { invoke } = await core();
+      await invoke("set_censor", { on });
+    },
+    subscribeGuardian(onLeak, onCensor) {
+      let cancelled = false;
+      const uns: Array<() => void> = [];
+      const add = (u: () => void) => (cancelled ? u() : uns.push(u));
+      void event().then(({ listen }) => {
+        void listen<Leak>("leak://alert", (e) => onLeak(e.payload)).then(add);
+        void listen<boolean>("leak://censor", (e) => onCensor(e.payload)).then(add);
+      });
+      return () => {
+        cancelled = true;
+        uns.forEach((u) => u());
+        uns.length = 0;
+      };
     },
   };
 }
@@ -806,6 +828,12 @@ function mockApi(): CornetaApi {
     },
     async captureFrame() {
       throw new Error("captura de frame só no app instalado (e ao vivo)");
+    },
+    async setCensor() {
+      // no-op no navegador (sem motor real pra censurar)
+    },
+    subscribeGuardian() {
+      return () => {};
     },
   };
 }

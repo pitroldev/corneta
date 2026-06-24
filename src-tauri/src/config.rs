@@ -118,6 +118,19 @@ pub struct Settings {
     /// (e sobe de volta quando estabiliza). Só vale pra destinos em transcode.
     #[serde(default = "default_true")]
     pub auto_bitrate: bool,
+    /// Guardião anti-vazamento: vigia os frames de saída por segredo na tela (OCR local).
+    #[serde(default)]
+    pub guardian_enabled: bool,
+    /// Ação ao detectar: "warn" (só avisa) | "censor" (corta a saída pro slate).
+    #[serde(default = "default_guardian_action")]
+    pub guardian_action: String,
+    /// Termos pessoais do streamer a vigiar (endereço, nome real, @, placa…).
+    #[serde(default)]
+    pub guardian_watchlist: Vec<String>,
+}
+
+fn default_guardian_action() -> String {
+    "warn".to_string()
 }
 
 fn default_true() -> bool {
@@ -184,6 +197,9 @@ impl Default for Settings {
             chat_both_split: default_both_split(),
             brb_enabled: true,
             auto_bitrate: true,
+            guardian_enabled: false,
+            guardian_action: default_guardian_action(),
+            guardian_watchlist: Vec::new(),
         }
     }
 }
