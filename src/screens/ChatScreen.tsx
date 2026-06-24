@@ -18,17 +18,17 @@ const PLATFORM_OPTS = [
 const VALUE_LABEL: Record<string, string> = {
   twitch: "Canal",
   kick: "Slug do canal",
-  youtube: "Vídeo ao vivo (URL ou ID)",
+  youtube: "Canal",
 };
 const PLACEHOLDER: Record<string, string> = {
   twitch: "ex.: pitrol",
   kick: "ex.: xqc",
-  youtube: "cole a URL ou o ID",
+  youtube: "ex.: @seucanal",
 };
 const HINT: Record<string, string> = {
   twitch: "Só o nome do canal — sem login.",
   kick: "O slug da URL (kick.com/slug). Pode falhar por Cloudflare.",
-  youtube: "A live precisa estar no ar. Usa a chave da API abaixo.",
+  youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live sozinha — sem colar o link toda vez. Usa a chave da API.",
 };
 
 export function ChatScreen() {
@@ -324,7 +324,13 @@ function ToggleRow({
 }
 
 const statusDot = (status: string) =>
-  status === "connected" ? "bg-ok" : status === "error" ? "bg-bad" : "bg-ink-faint";
+  status === "connected"
+    ? "bg-ok"
+    : status === "error"
+      ? "bg-bad"
+      : status === "waiting"
+        ? "bg-warn animate-pulse"
+        : "bg-ink-faint";
 
 function SourceCard({
   src,

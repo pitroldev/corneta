@@ -185,7 +185,11 @@ pub fn start_chat(app: &AppHandle) {
                 }
                 let key = api_key.clone();
                 tauri::async_runtime::spawn_blocking(move || {
-                    run_youtube(&key, &value, &label, run2, app2)
+                    while run2.load(Ordering::Relaxed) {
+                        run_youtube(&key, &value, &label, run2.clone(), app2.clone());
+                        // ~20s entre tentativas: aguardando a live começar / re-resolver a nova
+                        reconnect_for(&run2, 100);
+                    }
                 });
             }
             _ => {}
@@ -212,7 +216,11 @@ pub fn stop_chat(app: &AppHandle) {
 
 /// Espera ~3s antes de reconectar, abortando cedo se o chat foi parado.
 fn reconnect_wait(running: &AtomicBool) {
-    for _ in 0..15 {
+    reconnect_for(running, 15);
+}
+/// Espera `ticks`×200ms antes de tentar de novo, abortando cedo se o chat foi parado.
+fn reconnect_for(running: &AtomicBool, ticks: u32) {
+    for _ in 0..ticks {
         if !running.load(Ordering::Relaxed) {
             return;
         }
@@ -694,6 +702,181 @@ fn extract_video_id(input: &str) -> String {
     s.to_string()
 }
 
+const BROWSER_UA: &str =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+/// Resultado de resolver um canal → o vídeo ao vivo atual.
+enum LiveResolve {
+    Video(String),  // achou a live
+    NotLive,        // canal existe mas não está ao vivo (ou entrada inválida)
+    ScrapeFailed,   // não deu pra raspar a página (rede/HTML) → vale tentar o fallback
+}
+
+/// É uma referência direta de VÍDEO (URL/ID)? Devolve o ID. (Compatibilidade.)
+fn direct_video_id(s: &str) -> Option<String> {
+    let s = s.trim();
+    if s.contains("watch?v=")
+        || s.contains("youtu.be/")
+        || s.contains("/shorts/")
+        || s.contains("/embed/")
+        || (s.contains("/live/") && !s.trim_end_matches('/').ends_with("/live"))
+    {
+        let v = extract_video_id(s);
+        return (!v.is_empty()).then_some(v);
+    }
+    // ID cru de 11 chars (não-handle, não-channelId)
+    if !s.contains('/')
+        && !s.starts_with('@')
+        && !(s.starts_with("UC") && s.len() == 24)
+        && s.len() == 11
+        && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return Some(s.to_string());
+    }
+    None
+}
+
+/// Monta a URL `.../live` do canal (handle / channel id / URL). None se não parecer canal.
+fn youtube_live_url(input: &str) -> Option<String> {
+    let s = input.trim().trim_end_matches('/');
+    const BASE: &str = "https://www.youtube.com";
+    for marker in ["/channel/", "/@", "/c/", "/user/"] {
+        if let Some(i) = s.find(marker) {
+            let seg = s[i + marker.len()..].split('/').next().unwrap_or("");
+            if seg.is_empty() {
+                return None;
+            }
+            return Some(format!("{BASE}/{}{seg}/live", &marker[1..]));
+        }
+    }
+    if let Some(h) = s.strip_prefix('@') {
+        return (!h.is_empty()).then(|| format!("{BASE}/@{h}/live"));
+    }
+    if s.starts_with("UC") && s.len() == 24 {
+        return Some(format!("{BASE}/channel/{s}/live"));
+    }
+    if !s.is_empty() && !s.contains('/') && !s.contains('.') {
+        return Some(format!("{BASE}/@{s}/live"));
+    }
+    None
+}
+
+/// Extrai o ID do vídeo AO VIVO do HTML da página `/live`. None se não estiver ao vivo agora.
+fn live_video_from_html(html: &str) -> Option<String> {
+    if !(html.contains("\"isLive\":true") || html.contains("\"isLiveNow\":true")) {
+        return None; // não conecta em VOD/premiere/canal offline
+    }
+    let grab = |start: usize| -> Option<String> {
+        let id: String = html[start..]
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+            .collect();
+        (id.len() == 11).then_some(id)
+    };
+    // 1) <link rel="canonical" href=".../watch?v=VIDEOID"> (perto do marcador)
+    if let Some(i) = html.find("rel=\"canonical\"") {
+        if let Some(j) = html[i..].find("watch?v=") {
+            if j < 220 {
+                if let Some(id) = grab(i + j + 8) {
+                    return Some(id);
+                }
+            }
+        }
+    }
+    // 2) "videoId":"VIDEOID"
+    html.find("\"videoId\":\"").and_then(|i| grab(i + 11))
+}
+
+/// Raspa a página `/live` do canal (grátis, sem quota).
+fn scrape_live(url: &str) -> LiveResolve {
+    let body = match ureq::get(url)
+        .set("User-Agent", BROWSER_UA)
+        .set("Accept-Language", "en-US,en;q=0.9")
+        .timeout(Duration::from_secs(8))
+        .call()
+    {
+        Ok(r) => r.into_string().unwrap_or_default(),
+        Err(_) => return LiveResolve::ScrapeFailed,
+    };
+    if let Some(vid) = live_video_from_html(&body) {
+        return LiveResolve::Video(vid);
+    }
+    // página carregou: ou o canal não está ao vivo, ou o HTML mudou
+    if body.contains("ytInitialData") || body.contains("\"videoId\"") {
+        LiveResolve::NotLive
+    } else {
+        LiveResolve::ScrapeFailed
+    }
+}
+
+/// channelId (UC...) — direto da entrada ou via channels.list?forHandle (1 unidade).
+fn channel_id_of(input: &str, api_key: &str) -> Option<String> {
+    let s = input.trim();
+    if let Some(i) = s.find("/channel/") {
+        let id = s[i + 9..].split('/').next().unwrap_or("");
+        if id.starts_with("UC") {
+            return Some(id.to_string());
+        }
+    }
+    if s.starts_with("UC") && s.len() == 24 {
+        return Some(s.to_string());
+    }
+    let handle = if let Some(h) = s.strip_prefix('@') {
+        h.to_string()
+    } else if let Some(i) = s.find("/@") {
+        s[i + 2..].split('/').next().unwrap_or("").to_string()
+    } else if !s.contains('/') && !s.contains('.') {
+        s.to_string()
+    } else {
+        return None;
+    };
+    if handle.is_empty() || api_key.trim().is_empty() {
+        return None;
+    }
+    let url = format!(
+        "https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=@{handle}&key={api_key}"
+    );
+    let body = ureq::get(&url).timeout(Duration::from_secs(6)).call().ok()?.into_string().ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.pointer("/items/0/id").and_then(|x| x.as_str()).map(String::from)
+}
+
+/// Fallback oficial: search.list (eventType=live). Custa 100 unidades — só quando o scrape falha.
+fn search_live_video_id(channel_id: &str, api_key: &str) -> Option<String> {
+    if api_key.trim().is_empty() {
+        return None;
+    }
+    let url = format!(
+        "https://www.googleapis.com/youtube/v3/search?part=id&channelId={channel_id}&eventType=live&type=video&key={api_key}"
+    );
+    let body = ureq::get(&url).timeout(Duration::from_secs(8)).call().ok()?.into_string().ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.pointer("/items/0/id/videoId").and_then(|x| x.as_str()).map(String::from)
+}
+
+/// Resolve a entrada (CANAL ou vídeo) no ID do vídeo ao vivo atual.
+/// Canal → scrape do `/live` (grátis); fallback `search.list` só se o scrape falhar.
+fn resolve_youtube_video(input: &str, api_key: &str) -> LiveResolve {
+    if let Some(vid) = direct_video_id(input) {
+        return LiveResolve::Video(vid);
+    }
+    let Some(url) = youtube_live_url(input) else {
+        return LiveResolve::NotLive;
+    };
+    match scrape_live(&url) {
+        LiveResolve::Video(v) => LiveResolve::Video(v),
+        LiveResolve::NotLive => LiveResolve::NotLive,
+        LiveResolve::ScrapeFailed => {
+            if let Some(cid) = channel_id_of(input, api_key) {
+                if let Some(v) = search_live_video_id(&cid, api_key) {
+                    return LiveResolve::Video(v);
+                }
+            }
+            LiveResolve::NotLive
+        }
+    }
+}
+
 fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={api_key}"
@@ -736,24 +919,29 @@ fn yt_alert(
     }
 }
 
-fn run_youtube(api_key: &str, video: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
-    let vid = extract_video_id(video);
-    if vid.is_empty() {
-        return;
-    }
-    let live_chat_id = match get_live_chat_id(api_key, &vid) {
-        Some(id) => id,
-        None => {
-            log::warn!("youtube chat ({source}): live chat não encontrado");
-            chat_status(&app, "youtube", source, "error");
+fn run_youtube(api_key: &str, channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+    // Resolve o CANAL → vídeo ao vivo atual (sem precisar colar o link toda vez).
+    let vid = match resolve_youtube_video(channel, api_key) {
+        LiveResolve::Video(v) => v,
+        _ => {
+            // canal ainda não está ao vivo (ou entrada inválida) → aguardando; o supervisor re-tenta
+            chat_status(&app, "youtube", source, "waiting");
             return;
         }
     };
-    log::info!("youtube chat: conectado ({source})");
+    let live_chat_id = match get_live_chat_id(api_key, &vid) {
+        Some(id) => id,
+        None => {
+            chat_status(&app, "youtube", source, "waiting");
+            return;
+        }
+    };
+    log::info!("youtube chat: conectado ({source}) — vídeo {vid}");
     chat_status(&app, "youtube", source, "connected");
 
     let mut page_token: Option<String> = None;
     let mut first = true;
+    let mut errors = 0u32;
     while running.load(Ordering::Relaxed) {
         let mut url = format!(
             "https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={live_chat_id}&part=snippet,authorDetails&key={api_key}"
@@ -762,9 +950,17 @@ fn run_youtube(api_key: &str, video: &str, source: &str, running: Arc<AtomicBool
             url.push_str(&format!("&pageToken={tok}"));
         }
         let json = match ureq::get(&url).call() {
-            Ok(r) => serde_json::from_str::<Value>(&r.into_string().unwrap_or_default())
-                .unwrap_or(Value::Null),
+            Ok(r) => {
+                errors = 0;
+                serde_json::from_str::<Value>(&r.into_string().unwrap_or_default())
+                    .unwrap_or(Value::Null)
+            }
             Err(_) => {
+                errors += 1;
+                // Erros seguidos = a live provavelmente acabou → sai pra re-resolver (live nova?).
+                if errors >= 3 {
+                    break;
+                }
                 thread::sleep(Duration::from_secs(5));
                 continue;
             }
@@ -1167,14 +1363,14 @@ fn twitch_viewers(channel: &str) -> Option<u64> {
 }
 
 /// Viewers simultâneos do YouTube via Data API v3 (`concurrentViewers`).
-fn youtube_viewers(api_key: &str, video: &str) -> Option<u64> {
+fn youtube_viewers(api_key: &str, channel: &str) -> Option<u64> {
     if api_key.trim().is_empty() {
         return None;
     }
-    let vid = extract_video_id(video);
-    if vid.is_empty() {
-        return None;
-    }
+    let vid = match resolve_youtube_video(channel, api_key) {
+        LiveResolve::Video(v) => v,
+        _ => return None, // não está ao vivo
+    };
     let url = format!(
         "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}&key={api_key}"
     );
