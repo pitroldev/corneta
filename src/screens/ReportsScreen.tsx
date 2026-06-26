@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  Check,
   ChevronRight,
   FolderOpen,
   Trash2,
@@ -14,6 +15,7 @@ import {
   Scissors,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { useStore } from "../lib/store";
 import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -34,7 +36,7 @@ import {
   type ReportEvent,
 } from "../lib/report";
 import { LineChart, type ChartMarker } from "../components/LineChart";
-import { Button, Card, PlatformGlyph, SectionTitle } from "../components/ui";
+import { Button, Card, EmptyState, PlatformGlyph, SectionTitle } from "../components/ui";
 
 function fmtDur(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -50,10 +52,12 @@ export function ReportsScreen() {
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
+  const markReportSeen = useStore((s) => s.markReportSeen);
   const refresh = () => api.listSessions().then(setSessions);
   useEffect(() => {
     void refresh();
-  }, []);
+    markReportSeen(); // abriu Relatórios → some o selo "NOVO"
+  }, [markReportSeen]);
 
   if (selected) {
     return (
@@ -73,7 +77,7 @@ export function ReportsScreen() {
       <SectionTitle
         kicker="Depois da live"
         title="Relatórios"
-        subtitle="O que rolou em cada transmissão — pra diagnosticar travamentos com calma, sem mexer no ar."
+        subtitle="O retrato de cada transmissão depois que ela acaba — pra entender travamentos e o que prendeu a galera, com calma e fora do ao vivo."
         right={
           <Button variant="subtle" size="sm" onClick={() => void api.openSessionsDir()}>
             <FolderOpen className="size-4" /> Abrir pasta
@@ -84,13 +88,9 @@ export function ReportsScreen() {
       {sessions === null ? (
         <Card className="text-sm text-ink-muted">Carregando…</Card>
       ) : sessions.length === 0 ? (
-        <Card className="flex flex-col items-center gap-2 bg-surface-2 py-10 text-center">
-          <Activity className="size-8 text-ink-faint" />
-          <div className="font-display text-lg font-bold">Nenhuma transmissão ainda</div>
-          <div className="max-w-sm text-sm text-ink-muted">
-            Quando você entrar ao vivo, a Corneta grava tudo e o relatório aparece aqui ao encerrar.
-          </div>
-        </Card>
+        <EmptyState title="Nenhuma transmissão ainda">
+          Toda vez que você for ao ar, eu anoto tudo o que rolou e, quando a live encerra, monto o relatório aqui.
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
           {sessions.map((s) => (
@@ -138,6 +138,7 @@ function ReportDetail({
   onDeleted: () => void;
 }) {
   const [data, setData] = useState<SessionData | null | "loading">("loading");
+  const [confirmDel, setConfirmDel] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -151,6 +152,11 @@ function ReportDetail({
   }, [id]);
 
   const remove = async () => {
+    if (!confirmDel) {
+      setConfirmDel(true);
+      setTimeout(() => setConfirmDel(false), 3000);
+      return;
+    }
     await api.deleteSession(id);
     toast.info("Relatório excluído");
     onDeleted();
@@ -244,6 +250,7 @@ function ReportDetail({
       : a.verdict.tone === "warn"
         ? "border-warn/40 bg-warn/10 text-warn"
         : "border-bad/40 bg-bad/10 text-bad";
+  const VIcon = a.verdict.tone === "ok" ? Check : AlertTriangle;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -251,8 +258,8 @@ function ReportDetail({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="size-4" /> Voltar
         </Button>
-        <Button variant="ghost" size="sm" onClick={remove}>
-          <Trash2 className="size-4" /> Excluir
+        <Button variant={confirmDel ? "danger" : "ghost"} size="sm" onClick={remove}>
+          <Trash2 className="size-4" /> {confirmDel ? "Confirmar?" : "Excluir"}
         </Button>
       </div>
 
@@ -289,7 +296,7 @@ function ReportDetail({
 
       {/* Veredito */}
       <Card className={cn("mb-4 flex items-start gap-3 border-2", tone)}>
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+        <VIcon className="mt-0.5 size-5 shrink-0" />
         <div>
           <div className="font-display font-bold">{a.verdict.title}</div>
           <div className="text-sm text-ink-muted">{a.verdict.detail}</div>
@@ -300,7 +307,7 @@ function ReportDetail({
       {a.viewers.hasData && vN > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Eye className="size-4" /> Audiência ao vivo (retenção)
+            <Eye className="size-4" /> Audiência ao vivo (retenção: quanto da galera ficou)
           </h3>
           <LineChart
             series={[{ label: "Assistindo", color: "#56e39b", values: viewerSeries(data) }]}
@@ -348,7 +355,7 @@ function ReportDetail({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            ⏱️ Tempos relativos ao início da live — use no seu VOD pra cortar o clipe.
+            ⏱️ Os tempos contam a partir do início da live — ache esse minuto na gravação (o VOD) pra cortar o clipe.
           </p>
         </Card>
       )}
@@ -412,7 +419,7 @@ function ReportDetail({
       {n > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> Bitrate por plataforma (Mbps)
+            <Activity className="size-4" /> Bitrate por plataforma — dados enviados por segundo (Mbps)
           </h3>
           <LineChart
             series={bitrateSeriesData}
@@ -420,6 +427,12 @@ function ReportDetail({
             markers={markers}
             formatValue={(v) => v.toFixed(1)}
           />
+          {markers.length > 0 && (
+            <div className="mt-2 flex gap-3 text-[11px] font-semibold text-ink-faint">
+              <span className="text-[#f97316]">● reconexão</span>
+              <span className="text-[#ef4444]">● erro</span>
+            </div>
+          )}
         </Card>
       )}
 
@@ -427,7 +440,7 @@ function ReportDetail({
       {n > 1 && (cpu.some((v) => v != null) || hasGpu) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Cpu className="size-4" /> Máquina (%)
+            <Cpu className="size-4" /> Carga da máquina (%)
           </h3>
           <LineChart
             series={machineSeries}
@@ -442,7 +455,7 @@ function ReportDetail({
       {n > 1 && hasObs(data) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> OBS — render lag (ms)
+            <Activity className="size-4" /> OBS — atraso pra montar o quadro (render lag, ms)
           </h3>
           <LineChart
             series={[{ label: "Render lag", color: "#a855f7", values: obsRenderSeries(data) }]}
@@ -475,7 +488,7 @@ function ReportDetail({
       {a.windows.length > 0 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <AlertTriangle className="size-4 text-warn" /> Janelas problemáticas
+            <AlertTriangle className="size-4 text-warn" /> Trechos que deram problema
           </h3>
           <div className="flex flex-col gap-2">
             {a.windows.map((w, i) => (

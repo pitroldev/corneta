@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, MessageSquare, Radio, Split, Tv2, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageSquare, Radio, Split, Tv2, X, Zap } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useStore } from "../lib/store";
+import { useDialog } from "../lib/useDialog";
 import { Mascot, SoundWaves } from "./decor";
 import { Button } from "./ui";
 
@@ -16,17 +18,17 @@ const STEPS = [
   {
     icon: Tv2,
     title: "Escolha os destinos",
-    text: "Em Plataformas, adicione cada lugar e cole a chave. As chaves ficam no cofre do sistema, nunca num arquivo de texto.",
+    text: "Em Plataformas, adicione cada lugar e cole a chave de transmissão (aquele código secreto que liga a live à sua conta). As chaves ficam guardadas no cofre do sistema, nunca soltas num arquivo de texto.",
   },
   {
     icon: Zap,
     title: "Liga no OBS",
-    text: "Em Ao vivo, o botão “Configurar sozinho” aponta o OBS pra cá. Dica: keyframe 2s + bitrate CBR — quase toda plataforma exige.",
+    text: "Em Ao vivo, o botão “Configura pra mim” ajusta o OBS pra mandar a live pra Corneta sozinho — sem você abrir menu técnico nenhum.",
   },
   {
     icon: Radio,
     title: "Solta a corneta",
-    text: "Um clique e você entra no ar em todas. Métricas reais por plataforma e o ícone da bandeja mostrando a saúde geral.",
+    text: "Um clique e você entra no ar em todas. Acompanhe os números de cada plataforma e, pelo ícone lá perto do relógio, veja a saúde geral num olhar.",
   },
   {
     icon: MessageSquare,
@@ -46,6 +48,15 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
 
+  // "Rever o tour" (a partir de Sobre): reabre no passo 1.
+  const replayNonce = useStore((s) => s.tourNonce);
+  useEffect(() => {
+    if (replayNonce > 0) {
+      setStep(0);
+      setOpen(true);
+    }
+  }, [replayNonce]);
+
   const close = (start: boolean) => {
     try {
       localStorage.setItem(FLAG, "1");
@@ -57,6 +68,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   };
   const next = () => (last ? close(true) : setStep((s) => s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
+  const dialogRef = useDialog<HTMLDivElement>(open, () => close(false));
 
   const cur = STEPS[step];
   const Icon = cur.icon;
@@ -71,19 +83,33 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
           exit={{ opacity: 0 }}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="onb-title"
+            tabIndex={-1}
             initial={{ scale: 0.9, y: 20, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.9, y: 20, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className="relative w-full max-w-md overflow-hidden rounded-xl bg-surface pop"
+            className="relative w-full max-w-md overflow-hidden rounded-xl bg-surface pop outline-none"
           >
             <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
+            <button
+              onClick={() => close(false)}
+              aria-label="Pular o tour"
+              className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-md text-brass-ink/70 transition-colors hover:bg-brass-ink/10 hover:text-brass-ink"
+            >
+              <X className="size-5" />
+            </button>
             <div className="bg-brass px-6 py-7 text-brass-ink">
               <div className="mb-3 grid size-14 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
                 <Mascot className="size-8 animate-shout" />
               </div>
-              <h2 className="text-3xl">Opa! Bora cornetar?</h2>
-              <p className="mt-1 text-sm font-semibold opacity-80">Em 5 passos você manda bem.</p>
+              <h2 id="onb-title" className="text-3xl">Opa! Bora cornetar?</h2>
+              <p className="mt-1 text-sm font-semibold opacity-80">
+                Em {STEPS.length} passos você manda bem.
+              </p>
             </div>
 
             <div className="p-6">

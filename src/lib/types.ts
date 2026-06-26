@@ -181,6 +181,8 @@ export interface ChatMessage {
   fragments: ChatFragment[];
   badges: ChatBadge[];
   ts: number;
+  /** Removida pela moderação — vira lápide (tombstone) no feed em vez de sumir. */
+  deleted?: boolean;
 }
 
 export interface ChatDelete {

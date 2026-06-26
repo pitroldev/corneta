@@ -37,6 +37,7 @@ interface State {
   toggleTarget: (id: string) => void;
   reorderTargets: (ordered: Target[]) => void;
   duplicateTarget: (id: string) => void;
+  moveTarget: (id: string, dir: -1 | 1) => void;
   undoRemoveTarget: () => void;
 
   setMode: (mode: EncodingMode) => void;
@@ -83,6 +84,18 @@ interface State {
   // UI: pedido de foco no botão de ir ao vivo (vindo da sidebar)
   goLiveFocus: boolean;
   setGoLiveFocus: (v: boolean) => void;
+
+  // UI: relatório novo (não visto) — selo "NOVO" na sidebar após encerrar uma live.
+  unseenReport: boolean;
+  markReportSeen: () => void;
+
+  // UI: rever o tour (onboarding) sob demanda (a partir de Sobre).
+  tourNonce: number;
+  replayTour: () => void;
+
+  // UI: aba pedida ao abrir Configurações (deep-link do "Ajustar").
+  settingsTab: string | null;
+  setSettingsTab: (v: string | null) => void;
 }
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
@@ -200,10 +213,18 @@ export const useStore = create<State>((set, get) => {
       const index = config.targets.findIndex((t) => t.id === id);
       const t = config.targets[index];
       if (!t) return;
+      // Mesma convenção do "Adicionar": sufixo numérico (Twitch → Twitch 2…).
+      const names = new Set(config.targets.map((x) => x.name));
+      let n = 2;
+      let copyName = `${t.name} ${n}`;
+      while (names.has(copyName)) {
+        n++;
+        copyName = `${t.name} ${n}`;
+      }
       const copy: Target = {
         ...t,
         id: uid("tgt"),
-        name: `${t.name} (cópia)`,
+        name: copyName,
         hasKey: false,
         encoding: {
           ...t.encoding,
@@ -212,6 +233,17 @@ export const useStore = create<State>((set, get) => {
       };
       const targets = [...config.targets];
       targets.splice(index + 1, 0, copy);
+      persist({ ...config, targets });
+    },
+
+    moveTarget(id, dir) {
+      const config = get().config;
+      if (!config) return;
+      const i = config.targets.findIndex((t) => t.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= config.targets.length) return;
+      const targets = [...config.targets];
+      [targets[i], targets[j]] = [targets[j], targets[i]];
       persist({ ...config, targets });
     },
 
@@ -337,6 +369,8 @@ export const useStore = create<State>((set, get) => {
     },
 
     async stop() {
+      // Só marca relatório novo se chegou a ficar AO VIVO (cancelar no "starting" não gera live).
+      const wasLive = get().snapshot.state === "live";
       if (get().config?.settings.autoStartObs) {
         try {
           await api.obsSetStream(false);
@@ -345,6 +379,7 @@ export const useStore = create<State>((set, get) => {
         }
       }
       await api.stop();
+      if (wasLive) set({ unseenReport: true });
     },
 
     chatMessages: [],
@@ -367,7 +402,11 @@ export const useStore = create<State>((set, get) => {
               [st.source || st.platform]: { platform: st.platform, status: st.status },
             },
           })),
-        (d) => set((s) => ({ chatMessages: s.chatMessages.filter((m) => keepMessage(m, d)) }))
+        // Moderação: em vez de sumir, marca como removida (vira lápide no feed).
+        (d) =>
+          set((s) => ({
+            chatMessages: s.chatMessages.map((m) => (keepMessage(m, d) ? m : { ...m, deleted: true })),
+          }))
       );
     },
 
@@ -415,6 +454,21 @@ export const useStore = create<State>((set, get) => {
     goLiveFocus: false,
     setGoLiveFocus(v) {
       set({ goLiveFocus: v });
+    },
+
+    unseenReport: false,
+    markReportSeen() {
+      set({ unseenReport: false });
+    },
+
+    tourNonce: 0,
+    replayTour() {
+      set((s) => ({ tourNonce: s.tourNonce + 1 }));
+    },
+
+    settingsTab: null,
+    setSettingsTab(v) {
+      set({ settingsTab: v });
     },
   };
 });

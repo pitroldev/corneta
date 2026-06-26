@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Copy,
   Check,
   Radio,
   Square,
@@ -15,7 +14,10 @@ import {
   ClipboardCheck,
   MapPin,
   ExternalLink,
-  X,
+  Eye,
+  Shield,
+  RefreshCw,
+  FileText,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -25,25 +27,34 @@ import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { cn, fmtBitrate, fmtUptime, openExternal } from "../lib/utils";
 import type { EngineState, ObsCheck, TargetState } from "../lib/types";
+import type { Screen } from "../components/Sidebar";
 import { blockingIssues } from "../lib/validation";
 import {
+  Badge,
   Button,
   Card,
+  CopyField,
   PlatformGlyph,
   SectionTitle,
   Stat,
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
 
-export function GoLiveScreen() {
+export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void }) {
   const config = useStore((s) => s.config)!;
   const snapshot = useStore((s) => s.snapshot);
+  const viewers = useStore((s) => s.viewers);
   const start = useStore((s) => s.start);
   const stop = useStore((s) => s.stop);
   const uploadMbps = useStore((s) => s.uploadMbps);
   const runUploadTest = useStore((s) => s.runUploadTest);
   const goLiveFocus = useStore((s) => s.goLiveFocus);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
+  const setSettingsTab = useStore((s) => s.setSettingsTab);
+  const openSecurity = () => {
+    setSettingsTab("seguranca");
+    onNavigate?.("settings");
+  };
 
   const state = snapshot.state;
   const live = state === "live";
@@ -60,6 +71,14 @@ export function GoLiveScreen() {
     [enabled],
   );
   const canStart = enabled.length > 0 && problems.length === 0;
+  // Motivo do BORA estar travado (pra leitor de tela e legenda — o tooltip nativo
+  // não dispara em botão desabilitado).
+  const blockReason =
+    enabled.length === 0
+      ? "Ative ao menos uma plataforma em Plataformas."
+      : problems.length > 0
+        ? `Resolva ${problems[0].target.name || "(sem nome)"}: ${problems[0].issues.join(", ")}.`
+        : "";
 
   // Avisa quando o OBS realmente conecta (stopped/starting → live).
   const prevState = useRef<EngineState>("stopped");
@@ -71,14 +90,10 @@ export function GoLiveScreen() {
   }, [state]);
 
   // QoL: ao vir da sidebar ("fora do ar"), rola até o botão de ir ao vivo.
-  // Importante: só consome a flag DEPOIS de rolar — se zerar antes, o re-render
-  // dispara a limpeza do effect e cancela o setTimeout do scroll.
   const boraRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!goLiveFocus) return;
     const id = setTimeout(() => {
-      // Rola SÓ o container da tela. (Não usar scrollIntoView: ele rola também os
-      // ancestrais overflow-hidden e deixa todas as telas cortadas no topo.)
       const scroller = document.getElementById("screen-scroll");
       const target = boraRef.current;
       if (scroller && target) {
@@ -132,9 +147,15 @@ export function GoLiveScreen() {
       toast.error(`Não rolou: ${e}`);
     }
   };
+  // Cortar uma live de verdade → puxa pro relatório fresquinho.
   const onStop = async () => {
     await stop();
-    toast.info("Transmissão encerrada");
+    toast.action("Cortou! Tá fora do ar 👋", "Ver relatório", () => onNavigate?.("reports"));
+  };
+  // Cancelar antes de ficar no ar (não gerou live).
+  const onCancel = async () => {
+    await stop();
+    toast.info("Cancelado");
   };
   const onMark = async () => {
     try {
@@ -150,103 +171,106 @@ export function GoLiveScreen() {
       <SectionTitle
         kicker="Solta o som"
         title="Ao vivo"
-        subtitle="Configure o OBS uma vez, confira a banda e entre no ar em todo lugar de uma tacada."
+        subtitle="Configure o OBS uma vez, veja se sua internet dá conta e entre no ar em todo lugar de uma tacada."
       />
 
-      {state === "error" && snapshot.message && (
-        <Card className="mb-4 flex items-start gap-3 border-2 border-bad/40 bg-bad/10">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
-          <div>
-            <div className="font-display font-bold text-bad">
-              Algo deu errado
+      {state === "error" && (
+        <Card className="mb-4 border-2 border-bad/40 bg-bad/10">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
+            <div>
+              <div className="font-display font-bold text-bad">Algo deu errado</div>
+              <div className="text-sm text-ink-muted" data-selectable>
+                {snapshot.message || "A transmissão parou. Veja os logs ou tente de novo."}
+              </div>
             </div>
-            <div className="text-sm text-ink-muted">{snapshot.message}</div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="primary" size="sm" onClick={onStart}>
+              <RefreshCw className="size-4" /> Tentar de novo
+            </Button>
+            <Button variant="subtle" size="sm" onClick={() => setShowObs(true)}>
+              <Zap className="size-4 text-brass" /> Configurar OBS
+            </Button>
+            <Button variant="subtle" size="sm" onClick={() => void api.openLogsDir()}>
+              <FileText className="size-4" /> Ver logs
+            </Button>
           </div>
         </Card>
       )}
 
-      <Card className="mb-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg">Liga no OBS</h3>
-          <Button variant="outline" size="sm" onClick={() => setShowObs(true)}>
-            <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configurar
-            sozinho
-          </Button>
-        </div>
-        <p className="mb-3 text-xs text-ink-faint">
-          No OBS:{" "}
-          <strong className="text-ink-muted">
-            Configurações → Transmissão → Serviço “Personalizado”
-          </strong>{" "}
-          e cole abaixo.
-        </p>
-        <div className="grid grid-cols-1 gap-2">
-          <CopyField label="Servidor" value={obsIngestUrl(config.ingest)} />
-          <CopyField
-            label="Chave de transmissão"
-            value={config.ingest.key}
-            mono
-          />
-        </div>
-        <p className="mt-3 text-xs text-ink-faint">
-          Essa chave é local (OBS ↔ Corneta). As chaves das plataformas ficam no
-          cofre do sistema.
-        </p>
-        <p className="mt-1.5 text-xs text-ink-faint">
-          💡 No OBS, use{" "}
-          <strong className="text-ink-muted">keyframe interval 2s</strong> e
-          bitrate <strong className="text-ink-muted">CBR</strong> — o padrão que
-          as plataformas pedem.
-        </p>
-      </Card>
-
-      <Card className="mb-4 bg-surface-2">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg">
-            <Gauge className="size-5 text-brass" /> Banda de upload
-          </h3>
-          <Button
-            variant="subtle"
-            size="sm"
-            onClick={onTest}
-            disabled={testing}
-          >
-            {testing ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Wifi className="size-4" />
-            )}
-            {testing ? "Testando…" : "Testar meu upload"}
-          </Button>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Stat
-            label="Precisa de"
-            value={`${neededMbps.toFixed(1).replace(".", ",")} Mbps`}
-            hint={`${est.enabledCount} plataformas`}
-          />
-          <Stat
-            label="Seu upload"
-            value={uploadMbps == null ? "—" : `${uploadMbps} Mbps`}
-            tone={bandTone === "default" ? "default" : bandTone}
-            hint={uploadMbps == null ? "rode o teste" : undefined}
-          />
-          <Stat
-            label="Transcodes"
-            value={est.transcodeCount}
-            hint={`${est.copyCount} em cópia`}
-          />
-        </div>
-        {uploadMbps != null && bandTone === "bad" && (
-          <div className="mt-3 flex items-center gap-2 rounded-md bg-bad/15 px-3 py-2 text-sm font-semibold text-bad">
-            <AlertTriangle className="size-4" />
-            Teu upload pode não dar conta. Baixa o bitrate ou tira uma
-            plataforma.
+      {/* ---- BANCADA DE SETUP (some quando já está no ar) ---- */}
+      {!live && (
+        <Card className="mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-lg">Liga no OBS</h3>
+            <Button variant="outline" size="sm" onClick={() => setShowObs(true)}>
+              <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configura pra mim
+            </Button>
           </div>
-        )}
-      </Card>
+          <p className="mb-3 text-xs text-ink-faint">
+            No OBS:{" "}
+            <strong className="text-ink-muted">
+              Configurações → Transmissão → Serviço “Personalizado”
+            </strong>{" "}
+            e cole os dois campos abaixo — assim o OBS manda o vídeo pra Corneta, e ela espalha pras plataformas.
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            <CopyField label="Servidor" value={obsIngestUrl(config.ingest)} />
+            <CopyField label="Chave de transmissão" value={config.ingest.key} mono />
+          </div>
+          <p className="mt-3 text-xs text-ink-faint">
+            Essa chave fica só no seu PC, entre o OBS e a Corneta — não é a chave de nenhuma plataforma. As chaves de cada plataforma ficam guardadas no cofre do sistema.
+          </p>
+        </Card>
+      )}
 
-      {problems.length > 0 && (
+      {!live && (
+        <Card className="mb-4 bg-surface-2">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-lg">
+              <Gauge className="size-5 text-brass" /> Banda de upload
+            </h3>
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={onTest}
+              loading={testing}
+              disabled={testing || starting}
+              title={starting ? "Espera entrar no ar pra não competir pela banda" : undefined}
+            >
+              {!testing && <Wifi className="size-4" />}
+              {testing ? "Testando…" : "Testar seu upload"}
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Stat
+              label="Precisa de"
+              value={`${neededMbps.toFixed(1).replace(".", ",")} Mbps`}
+              hint={`${est.enabledCount} plataformas`}
+            />
+            <Stat
+              label="Seu upload"
+              value={uploadMbps == null ? "—" : `${uploadMbps} Mbps`}
+              tone={bandTone === "default" ? "default" : bandTone}
+              hint={uploadMbps == null ? "rode o teste" : undefined}
+            />
+            <Stat
+              label="Recodificadas"
+              value={est.transcodeCount}
+              hint={`${est.copyCount} em cópia`}
+            />
+          </div>
+          {uploadMbps != null && bandTone === "bad" && (
+            <div className="mt-3 flex items-center gap-2 rounded-md bg-bad/15 px-3 py-2 text-sm font-semibold text-bad">
+              <AlertTriangle className="size-4" />
+              Seu upload pode não dar conta. Baixe o bitrate (a qualidade do vídeo) ou tire uma plataforma da lista.
+            </div>
+          )}
+        </Card>
+      )}
+
+      {!live && !starting && problems.length > 0 && (
         <Card className="mb-4 bg-warn/10">
           <div className="flex items-center gap-2 text-sm font-bold text-warn">
             <AlertTriangle className="size-4" /> Resolva antes de iniciar:
@@ -254,181 +278,174 @@ export function GoLiveScreen() {
           <ul className="mt-1.5 space-y-1 text-sm text-ink-muted">
             {problems.map((p) => (
               <li key={p.target.id}>
-                <strong className="text-ink">
-                  {p.target.name || "(sem nome)"}
-                </strong>
-                : {p.issues.join(", ")}
+                <strong className="text-ink">{p.target.name || "(sem nome)"}</strong>:{" "}
+                {p.issues.join(", ")}
               </li>
             ))}
           </ul>
         </Card>
       )}
 
-      {enabled.length === 0 && !live && !starting && (
+      {!live && !starting && enabled.length === 0 && (
         <Card className="mb-4 bg-surface-2 text-sm text-ink-muted">
-          Nenhuma plataforma ativa. Vá em{" "}
-          <strong className="text-ink">Plataformas</strong>, ative pelo menos
-          uma e cole a chave.
+          Nenhuma plataforma ativa. Vá em <strong className="text-ink">Plataformas</strong>, ative pelo
+          menos uma e cole a chave.
         </Card>
       )}
 
       {!live && !starting && <Checkup />}
 
+      {/* Confirma a rede de proteção ANTES do BORA (e durante, lá embaixo). */}
+      {!live && !starting && <SecurityPanel onAdjust={openSecurity} />}
+
+      {/* ---- SALA DE GUERRA (sobe pro topo quando está no ar) ---- */}
+      {(live || starting) && (
+        <>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-4">
+              <LiveTimer startedAt={snapshot.startedAt} live={live} />
+              {viewers.total > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <Eye className="size-4 text-ink-faint" />
+                  <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
+                    {viewers.total.toLocaleString("pt-BR")}
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                    assistindo
+                  </span>
+                </span>
+              )}
+            </div>
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={onMark}
+              disabled={!live}
+              title={live ? "Cravar um marcador no relatório" : "Disponível quando estiver no ar"}
+            >
+              <MapPin className="size-4" /> Marcar momento
+            </Button>
+          </div>
+
+          <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
+            <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">Máquina</span>
+            <Usage label="CPU" value={snapshot.cpu} />
+            <Usage label="GPU" value={snapshot.gpu} />
+          </Card>
+
+          <SecurityPanel onAdjust={openSecurity} />
+
+          <div className="mb-4 flex flex-col gap-2">
+            <AnimatePresence>
+              {enabled.map((t, i) => {
+                const st = snapshot.targets[t.id];
+                const paused = st?.state === "paused";
+                return (
+                  <motion.div
+                    key={t.id}
+                    layout
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: i * 0.05, type: "spring", stiffness: 320, damping: 28 }}
+                  >
+                    <Card className="flex items-center gap-4 bg-surface-2 py-3">
+                      <PlatformGlyph id={t.platformId} size={36} />
+                      <div className="min-w-32 flex-1">
+                        <div className="font-display font-bold">{t.name}</div>
+                        <StatePill state={st?.state ?? "idle"} />
+                        {st?.message && (
+                          <div
+                            className="mt-0.5 max-w-xs truncate text-[11px] text-bad"
+                            title={st.message}
+                          >
+                            {st.message}
+                          </div>
+                        )}
+                      </div>
+                      <div className="hidden gap-6 sm:flex">
+                        <MiniStat label="Bitrate" value={fmtBitrate(st?.bitrateKbps ?? 0)} />
+                        <MiniStat label="FPS" value={String(st?.fps ?? 0)} />
+                        <MiniStat
+                          label="Quedas"
+                          value={String(st?.droppedFrames ?? 0)}
+                          tone={st && st.droppedFrames > 0 ? "warn" : "default"}
+                        />
+                        <MiniStat label="No ar" value={fmtUptime(st?.uptimeSec ?? 0)} />
+                      </div>
+                      {/* Em telas estreitas mantém ao menos Bitrate + Quedas. */}
+                      <div className="flex gap-4 sm:hidden">
+                        <MiniStat label="Bitrate" value={fmtBitrate(st?.bitrateKbps ?? 0)} />
+                        <MiniStat
+                          label="Quedas"
+                          value={String(st?.droppedFrames ?? 0)}
+                          tone={st && st.droppedFrames > 0 ? "warn" : "default"}
+                        />
+                      </div>
+                      {PLATFORMS[t.platformId].liveUrl && (
+                        <button
+                          onClick={() => void openExternal(PLATFORMS[t.platformId].liveUrl!)}
+                          className="grid size-9 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+                          title="Abrir o canal na plataforma"
+                          aria-label={`Abrir o canal de ${t.name}`}
+                        >
+                          <ExternalLink className="size-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void api.setTargetPaused(t.id, !paused)}
+                        className={cn(
+                          "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold uppercase tracking-wide transition-colors",
+                          paused
+                            ? "bg-brass/15 text-brass hover:bg-brass/25"
+                            : "bg-surface-3 text-ink-muted hover:text-ink",
+                        )}
+                        title={paused ? "Retomar este destino" : "Pausar este destino"}
+                      >
+                        {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+                        {paused ? "Retomar" : "Pausar"}
+                      </button>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </>
+      )}
+
+      {/* ---- BOTÃO PRINCIPAL ---- */}
       <div ref={boraRef} className="mb-5">
         {starting ? (
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
-            onClick={onStop}
-          >
-            <Loader2 className="size-5 animate-spin" /> Aguardando o OBS
-            conectar… (cancelar)
+          <Button variant="outline" size="lg" className="w-full" onClick={onCancel}>
+            <Loader2 className="size-5 animate-spin" /> Aguardando o OBS conectar… (cancelar)
           </Button>
         ) : live ? (
-          <Button
-            variant="danger"
-            size="lg"
-            className="w-full"
-            onClick={onStop}
-          >
+          <Button variant="danger" size="lg" className="w-full" onClick={onStop}>
             <Square className="size-5" /> Cortar transmissão
           </Button>
         ) : (
           <Button
-            variant="pop"
+            variant="tomate"
             size="lg"
             className="w-full"
             disabled={!canStart}
             onClick={onStart}
+            aria-label={canStart ? "Bora ao vivo" : `Bora ao vivo (travado: ${blockReason})`}
           >
             <Radio className="size-6" strokeWidth={2.5} /> BORA AO VIVO
           </Button>
         )}
         {starting && (
           <p className="mt-2 text-center text-xs text-ink-faint">
-            No OBS, clique{" "}
-            <strong className="text-ink-muted">Iniciar transmissão</strong> — a
-            Corneta entra no ar sozinha.
+            No OBS, clique <strong className="text-ink-muted">Iniciar transmissão</strong> — a Corneta
+            entra no ar sozinha.
           </p>
         )}
-      </div>
-
-      {(live || starting) && (
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <LiveTimer startedAt={snapshot.startedAt} live={live} />
-          <Button
-            variant="subtle"
-            size="sm"
-            onClick={onMark}
-            title="Cravar um marcador no relatório"
-          >
-            <MapPin className="size-4" /> Marcar momento
-          </Button>
-        </div>
-      )}
-
-      {(live || starting) && (
-        <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
-          <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-            Máquina
-          </span>
-          <Usage label="CPU" value={snapshot.cpu} />
-          <Usage label="GPU" value={snapshot.gpu} />
-        </Card>
-      )}
-
-      <AnimatePresence>
-        {(live || starting) && (
-          <div className="flex flex-col gap-2">
-            {enabled.map((t, i) => {
-              const st = snapshot.targets[t.id];
-              return (
-                <motion.div
-                  key={t.id}
-                  layout
-                  initial={{ opacity: 0, x: -16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{
-                    delay: i * 0.05,
-                    type: "spring",
-                    stiffness: 320,
-                    damping: 28,
-                  }}
-                >
-                  <Card className="flex items-center gap-4 bg-surface-2 py-3">
-                    <PlatformGlyph id={t.platformId} size={36} />
-                    <div className="min-w-32 flex-1">
-                      <div className="font-display font-bold">{t.name}</div>
-                      <StatePill state={st?.state ?? "idle"} />
-                      {st?.message && (
-                        <div
-                          className="mt-0.5 max-w-xs truncate text-[11px] text-bad"
-                          title={st.message}
-                        >
-                          {st.message}
-                        </div>
-                      )}
-                    </div>
-                    <div className="hidden gap-6 sm:flex">
-                      <MiniStat
-                        label="Bitrate"
-                        value={fmtBitrate(st?.bitrateKbps ?? 0)}
-                      />
-                      <MiniStat label="FPS" value={String(st?.fps ?? 0)} />
-                      <MiniStat
-                        label="Quedas"
-                        value={String(st?.droppedFrames ?? 0)}
-                        tone={st && st.droppedFrames > 0 ? "warn" : "default"}
-                      />
-                      <MiniStat
-                        label="No ar"
-                        value={fmtUptime(st?.uptimeSec ?? 0)}
-                      />
-                    </div>
-                    {PLATFORMS[t.platformId].liveUrl && (
-                      <button
-                        onClick={() =>
-                          void openExternal(PLATFORMS[t.platformId].liveUrl!)
-                        }
-                        className="rounded-md p-2 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-                        title="Abrir o canal na plataforma"
-                        aria-label="Abrir o canal"
-                      >
-                        <ExternalLink className="size-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() =>
-                        void api.setTargetPaused(t.id, st?.state !== "paused")
-                      }
-                      className={cn(
-                        "rounded-md p-2 transition-colors hover:bg-surface-3",
-                        st?.state === "paused"
-                          ? "text-brass"
-                          : "text-ink-faint hover:text-ink",
-                      )}
-                      title={
-                        st?.state === "paused"
-                          ? "Retomar"
-                          : "Pausar este destino"
-                      }
-                      aria-label={st?.state === "paused" ? "Retomar" : "Pausar"}
-                    >
-                      {st?.state === "paused" ? (
-                        <Play className="size-4" />
-                      ) : (
-                        <Pause className="size-4" />
-                      )}
-                    </button>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
+        {!live && !starting && !canStart && blockReason && (
+          <p className="mt-2 text-center text-xs text-ink-faint">{blockReason}</p>
         )}
-      </AnimatePresence>
+      </div>
 
       <AnimatePresence>
         {showObs && <ObsWizard onClose={() => setShowObs(false)} />}
@@ -437,19 +454,60 @@ export function GoLiveScreen() {
   );
 }
 
-function LiveTimer({
-  startedAt,
-  live,
-}: {
-  startedAt: number | null;
-  live: boolean;
-}) {
+/** Painel "Seu segurança": Guardião / JÁ VOLTO / Auto-bitrate visíveis e confirmáveis. */
+function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
+  const settings = useStore((s) => s.config!.settings);
+  const watchCount = settings.guardianWatchlist.filter((t) => t.trim().length >= 3).length;
+  const items = [
+    {
+      on: settings.guardianEnabled && watchCount > 0,
+      label: "Guardião",
+      desc: settings.guardianEnabled
+        ? watchCount > 0
+          ? `vigiando ${watchCount} termo${watchCount > 1 ? "s" : ""}`
+          : "ligado, mas sem termos — adicione um"
+        : "desligado",
+    },
+    {
+      on: settings.brbEnabled,
+      label: "JÁ VOLTO",
+      desc: settings.brbEnabled ? "se o sinal do OBS cair, põe um aviso no ar e segura a live" : "desligado",
+    },
+    {
+      on: settings.autoBitrate,
+      label: "Auto-bitrate",
+      desc: settings.autoBitrate ? "baixa o bitrate (a qualidade) se a internet apertar" : "desligado",
+    },
+  ];
+  return (
+    <Card accent className="mb-2 bg-surface-2">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-lg">
+          <Shield className="size-5 text-brass" /> Seu segurança
+        </h3>
+        <Button variant="ghost" size="sm" onClick={onAdjust}>
+          Ajustar
+        </Button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {items.map((it) => (
+          <div key={it.label} className="flex items-center gap-2 text-sm">
+            <Badge tone={it.on ? "brass" : "neutral"}>{it.on ? "Armado" : "Off"}</Badge>
+            <span className="font-semibold">{it.label}</span>
+            <span className="text-xs text-ink-faint">· {it.desc}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolean }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  // Enquanto não chega sinal de ingestão, o cronômetro não corre.
   if (!live) {
     return (
       <div className="flex items-center gap-2 text-info">
@@ -467,9 +525,7 @@ function LiveTimer({
       <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
         {fmtUptime(secs)}
       </span>
-      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-        no ar
-      </span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">no ar</span>
     </div>
   );
 }
@@ -504,31 +560,16 @@ function Checkup() {
         <h3 className="flex items-center gap-2 text-lg">
           <ClipboardCheck className="size-5 text-brass" /> Check-up pré-live
         </h3>
-        <Button
-          variant="subtle"
-          size="sm"
-          onClick={runObs}
-          disabled={obs === "loading"}
-        >
-          {obs === "loading" ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Zap className="size-4 text-brass" />
-          )}
+        <Button variant="subtle" size="sm" onClick={runObs} loading={obs === "loading"} disabled={obs === "loading"}>
+          {obs !== "loading" && <Zap className="size-4 text-brass" />}
           Verificar OBS
         </Button>
       </div>
       <div className="flex flex-col gap-1.5">
-        <CheckRow
-          label="Encoder disponível"
-          ok={encoders.some((e) => e.available)}
-        />
+        <CheckRow label="Encoder disponível" ok={encoders.some((e) => e.available)} />
         <CheckRow
           label="Chaves e URLs"
-          ok={
-            enabled.length > 0 &&
-            enabled.every((t) => blockingIssues(t).length === 0)
-          }
+          ok={enabled.length > 0 && enabled.every((t) => blockingIssues(t).length === 0)}
           detail={enabled.length === 0 ? "nenhum destino ativo" : undefined}
         />
         <CheckRow
@@ -561,7 +602,7 @@ function Checkup() {
                 detail={
                   obs.pointingAtCorneta
                     ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)}fps`
-                    : "clique em Configurar sozinho (tela Ao vivo)"
+                    : "clique em Configura pra mim (tela Ao vivo)"
                 }
               />
             )}
@@ -569,7 +610,8 @@ function Checkup() {
         )}
       </div>
       <p className="mt-2 text-xs text-ink-faint">
-        💡 No OBS: keyframe 2s + bitrate CBR.
+        💡 No OBS: keyframe (quadro-base) a cada <strong className="text-ink-muted">2s</strong> e bitrate{" "}
+        <strong className="text-ink-muted">CBR</strong> (taxa constante de dados) — é o que as plataformas pedem pra não travar.
       </p>
     </Card>
   );
@@ -586,7 +628,7 @@ function CheckRow({
   warn?: boolean;
   detail?: string;
 }) {
-  const Icon = ok ? Check : warn ? AlertTriangle : X;
+  const Icon = ok ? Check : warn ? AlertTriangle : Square;
   const cls = ok ? "text-ok" : warn ? "text-warn" : "text-bad";
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
@@ -598,30 +640,17 @@ function CheckRow({
 }
 
 function StatePill({ state }: { state: TargetState }) {
-  const map: Record<TargetState, { label: string; cls: string; dot: string }> =
-    {
-      idle: { label: "Aguardando", cls: "text-ink-faint", dot: "bg-ink-faint" },
-      connecting: { label: "Conectando", cls: "text-warn", dot: "bg-warn" },
-      live: { label: "No ar", cls: "text-ok", dot: "bg-live live-dot" },
-      reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
-      error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
-      paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
-      waiting: {
-        label: "Aguardando sinal",
-        cls: "text-info",
-        dot: "bg-info animate-pulse",
-      },
-      brb: {
-        label: "JÁ VOLTO (slate no ar)",
-        cls: "text-brass",
-        dot: "bg-brass animate-pulse",
-      },
-      censor: {
-        label: "Censurado",
-        cls: "text-bad",
-        dot: "bg-bad animate-pulse",
-      },
-    };
+  const map: Record<TargetState, { label: string; cls: string; dot: string }> = {
+    idle: { label: "Aguardando", cls: "text-ink-faint", dot: "bg-ink-faint" },
+    connecting: { label: "Conectando", cls: "text-warn", dot: "bg-warn" },
+    live: { label: "No ar", cls: "text-ok", dot: "bg-live live-dot" },
+    reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
+    error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
+    paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
+    waiting: { label: "Aguardando sinal", cls: "text-info", dot: "bg-info animate-pulse" },
+    brb: { label: "JÁ VOLTO (slate no ar)", cls: "text-brass", dot: "bg-brass animate-pulse" },
+    censor: { label: "Censurado", cls: "text-bad", dot: "bg-bad animate-pulse" },
+  };
   const m = map[state] ?? map.idle;
   return (
     <span
@@ -646,9 +675,7 @@ function MiniStat({
 }) {
   return (
     <div className="text-right">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">
-        {label}
-      </div>
+      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">{label}</div>
       <div
         className={cn(
           "font-display text-base font-extrabold tabular-nums",
@@ -666,64 +693,13 @@ function Usage({ label, value }: { label: string; value?: number }) {
   const tone = pct > 85 ? "bg-bad" : pct > 60 ? "bg-warn" : "bg-ok";
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-        {label}
-      </span>
+      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{label}</span>
       <div className="h-2 w-24 overflow-hidden rounded-sm bg-surface">
-        <div
-          className={cn("h-full rounded-sm", tone)}
-          style={{ width: `${Math.min(100, pct)}%` }}
-        />
+        <div className={cn("h-full rounded-sm", tone)} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
       <span className="w-12 font-display text-sm font-bold tabular-nums">
         {value == null ? "—" : `${value}%`}
       </span>
-    </div>
-  );
-}
-
-function CopyField({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      toast.success("Copiado!");
-      setTimeout(() => setCopied(false), 1400);
-    } catch {
-      /* ignore */
-    }
-  };
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-44 text-xs font-bold uppercase tracking-wide text-ink-faint">
-        {label}
-      </div>
-      <div
-        data-selectable
-        className={cn(
-          "flex-1 truncate rounded-md bg-surface px-3 py-2 text-sm",
-          mono && "font-mono",
-        )}
-      >
-        {value}
-      </div>
-      <Button variant="subtle" size="sm" onClick={copy}>
-        {copied ? (
-          <Check className="size-4 text-ok" />
-        ) : (
-          <Copy className="size-4" />
-        )}
-        {copied ? "Copiado" : "Copiar"}
-      </Button>
     </div>
   );
 }

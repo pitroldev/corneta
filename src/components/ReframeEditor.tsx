@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, Check, Crosshair, Loader2, X } from "lucide-react";
+import { Camera, Check, Crosshair, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { useDialog } from "../lib/useDialog";
 import { toast } from "../lib/toast";
 import { PLATFORMS } from "../lib/platforms";
 import type { Target } from "../lib/types";
@@ -68,6 +69,15 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
     onClose();
   };
 
+  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
+  const anyLive = useStore((s) => s.viewers.anyLive);
+  // Mudou algo? (pra não descartar sem querer no clique fora)
+  const dirty = x !== init.x || y !== init.y || zoom !== init.zoom || frame != null;
+  const nudge = (dx: number, dy: number) => {
+    setX((v) => clamp(v + dx, 0, 1));
+    setY((v) => clamp(v + dy, 0, 1));
+  };
+
   const bg = frame ? { backgroundImage: `url(${frame})`, backgroundSize: "cover" } : undefined;
   // Mini-preview do 9:16 final: mostra só a região recortada do frame.
   const previewStyle = frame
@@ -81,18 +91,25 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
   return (
     <div
       className="fixed inset-0 z-[80] grid place-items-center bg-night/80 p-6"
-      onClick={onClose}
+      onClick={() => {
+        if (!dirty) onClose();
+      }}
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reframe-title"
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
         transition={{ type: "spring", stiffness: 320, damping: 28 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl rounded-xl bg-surface p-6 pop"
+        className="w-full max-w-3xl rounded-xl bg-surface p-6 pop outline-none"
       >
         <div className="mb-1 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-xl">
+          <h3 id="reframe-title" className="flex items-center gap-2 text-xl">
             <Crosshair className="size-5 text-brass" /> Enquadrar vertical · {target.name}
           </h3>
           <button onClick={onClose} className="text-ink-faint hover:text-ink" aria-label="Fechar">
@@ -113,11 +130,21 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
               className="relative aspect-video w-full select-none overflow-hidden rounded-md border-2 border-border bg-surface-2"
               style={bg}
             >
-              {!frame && <ThirdsGrid />}
+              <ThirdsGrid />
               <div
+                tabIndex={0}
+                role="group"
+                aria-label="Recorte vertical — arraste ou use as setas (Shift = 10%)"
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
+                onKeyDown={(e) => {
+                  const step = e.shiftKey ? 0.1 : 0.01;
+                  if (e.key === "ArrowLeft") (e.preventDefault(), nudge(-step, 0));
+                  else if (e.key === "ArrowRight") (e.preventDefault(), nudge(step, 0));
+                  else if (e.key === "ArrowUp") (e.preventDefault(), nudge(0, -step));
+                  else if (e.key === "ArrowDown") (e.preventDefault(), nudge(0, step));
+                }}
                 className="absolute cursor-grab touch-none rounded-[3px] border-2 border-brass active:cursor-grabbing"
                 style={{
                   left: `${left * 100}%`,
@@ -140,10 +167,14 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
                 min={0.4}
                 max={1}
                 step={0.01}
-                value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
+                value={1.4 - zoom}
+                aria-label="Zoom"
+                onChange={(e) => setZoom(Number((1.4 - Number(e.target.value)).toFixed(2)))}
                 className="flex-1 accent-brass"
               />
+              <span className="w-9 text-right text-xs font-bold tabular-nums text-ink-muted">
+                {(1 / zoom).toFixed(1).replace(".", ",")}×
+              </span>
               <Button
                 variant="subtle"
                 size="sm"
@@ -153,7 +184,7 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
                   setZoom(1);
                 }}
               >
-                Centralizar
+                Do zero
               </Button>
             </div>
           </div>
@@ -173,8 +204,15 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
         </div>
 
         <div className="mt-5 flex items-center justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={capture} disabled={capturing}>
-            {capturing ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={capture}
+            loading={capturing}
+            disabled={capturing || !anyLive}
+            title={!anyLive ? "Disponível com o OBS ao vivo" : undefined}
+          >
+            {!capturing && <Camera className="size-4" />}
             Capturar frame do OBS
           </Button>
           <div className="flex gap-2">
@@ -186,8 +224,10 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
             </Button>
           </div>
         </div>
-        <p className="mt-2 text-center text-[11px] text-ink-faint">
-          💡 A captura só funciona com o OBS ao vivo. Sem frame, use a grade pra posicionar.
+        <p className="mt-2 text-center text-xs text-ink-faint">
+          {anyLive
+            ? "Capture um frame do OBS pra enquadrar exatamente."
+            : "💡 A captura de frame fica disponível com o OBS ao vivo. Sem frame, use a grade pra posicionar."}
         </p>
       </motion.div>
     </div>

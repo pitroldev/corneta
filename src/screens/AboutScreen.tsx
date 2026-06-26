@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { ArrowUpRight, Globe, Heart } from "lucide-react";
+import { ArrowUpRight, Globe, Heart, RefreshCw } from "lucide-react";
 import { siGithub } from "simple-icons";
 import { IS_TAURI } from "../lib/api";
+import { useStore } from "../lib/store";
+
+// Mantém em sincronia com package.json.
+const APP_VERSION = "0.1.0";
 
 // LinkedIn não está no simple-icons (removido por política de marca) — path oficial embutido.
 const LINKEDIN_PATH =
@@ -37,6 +41,7 @@ const LINKS: LinkDef[] = [
 ];
 
 export function AboutScreen() {
+  const replayTour = useStore((s) => s.replayTour);
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle kicker="Quem soprou essa corneta" title="Sobre" />
@@ -51,8 +56,8 @@ export function AboutScreen() {
           <div>
             <h3 className="text-3xl">Oi, sou o Petro</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
-              Fiz a Corneta pra resolver a minha própria dor: transmitir pra várias plataformas de
-              uma vez, sem dor de cabeça.
+              Fiz a Corneta pra resolver a minha própria dor: você manda um stream do OBS e ela
+              joga ao vivo em várias plataformas de uma vez, sem dor de cabeça.
             </p>
           </div>
         </div>
@@ -68,7 +73,7 @@ export function AboutScreen() {
         </span>
         <span className="flex-1 text-left">
           <span className="block font-display text-xl font-extrabold">pitrol.dev</span>
-          <span className="block text-sm text-ink-muted">Meu blog e meus projetos — dá um pulo lá.</span>
+          <span className="block text-sm text-ink-muted">Meu blog e meus projetos — dá um pulo lá pra ver no que ando trabalhando.</span>
         </span>
         <ArrowUpRight className="size-6 text-ink-faint transition-colors group-hover:text-brass" strokeWidth={2.4} />
       </button>
@@ -99,9 +104,20 @@ export function AboutScreen() {
         ))}
       </div>
 
+      {/* Rever o tour */}
+      <button
+        onClick={replayTour}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-border bg-surface-2 px-4 py-3 text-sm font-semibold text-ink-muted transition-colors hover:border-brass hover:text-ink"
+      >
+        <RefreshCw className="size-4" /> Rever o tour de boas-vindas
+      </button>
+
       {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
-        Corneta é gratuita e open-source. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
+        Corneta é gratuita e de código aberto: você pode usar à vontade e ver como ela funciona por dentro. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
+      </p>
+      <p className="mt-1 text-center text-[11px] font-semibold text-ink-faint">
+        Corneta v{APP_VERSION} · multi-stream
       </p>
     </div>
   );

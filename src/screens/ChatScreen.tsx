@@ -18,7 +18,7 @@ const PLATFORM_OPTS = [
 ];
 const VALUE_LABEL: Record<string, string> = {
   twitch: "Canal",
-  kick: "Slug do canal",
+  kick: "Nome no link",
   youtube: "Canal",
 };
 const PLACEHOLDER: Record<string, string> = {
@@ -27,8 +27,8 @@ const PLACEHOLDER: Record<string, string> = {
   youtube: "ex.: @seucanal",
 };
 const HINT: Record<string, string> = {
-  twitch: "Só o nome do canal — sem login.",
-  kick: "O slug da URL (kick.com/slug). Pode falhar por Cloudflare.",
+  twitch: "Só o nome do canal (o que vem depois de twitch.tv/) — sem o link inteiro e sem login.",
+  kick: "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
   youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live e lê o chat sozinha — sem colar link e sem precisar de chave.",
 };
 
@@ -47,6 +47,8 @@ export function ChatScreen() {
 
   const [showConfig, setShowConfig] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [confirmClearChat, setConfirmClearChat] = useState(false);
+  const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
     twitch: true,
     youtube: true,
@@ -56,12 +58,22 @@ export function ChatScreen() {
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
+  // 2+ fontes da mesma plataforma (ex.: 2 Twitches) → mostra o nome do canal por padrão.
+  const hasDup = (() => {
+    const seen = new Set<string>();
+    for (const x of sources)
+      if (x.enabled) {
+        if (seen.has(x.platform)) return true;
+        seen.add(x.platform);
+      }
+    return false;
+  })();
   const view: ChatView = useMemo(
     () => ({
       emotes: s.chatShowEmotes ?? true,
       badges: s.chatShowBadges ?? true,
       platform: s.chatShowPlatform ?? true,
-      source: s.chatShowSource ?? false,
+      source: (s.chatShowSource ?? false) || hasDup,
       timestamps: s.chatShowTimestamps ?? false,
       fontSize: s.chatFontSize ?? 14,
     }),
@@ -72,10 +84,12 @@ export function ChatScreen() {
       s.chatShowSource,
       s.chatShowTimestamps,
       s.chatFontSize,
+      hasDup,
     ]
   );
   const configured = sources.some((x) => x.enabled && x.value.trim());
   const shown = useMemo(() => messages.filter((m) => filter[m.platform]), [messages, filter]);
+  const allFilteredOut = messages.length > 0 && shown.length === 0;
 
   const addSource = () =>
     setSettings({
@@ -87,11 +101,11 @@ export function ChatScreen() {
     setSettings({ chatSources: sources.filter((x) => x.id !== id) });
 
   return (
-    <div className={cn("mx-auto flex flex-col", showAlerts ? "max-w-5xl" : "max-w-3xl")}>
+    <div className="mx-auto flex max-w-5xl flex-col">
       <SectionTitle
         kicker="A galera junta"
         title="Chat unificado"
-        subtitle="Vários canais (até 2 Twitches!) num feed só — com emotes, badges, origem e deleções."
+        subtitle="Junte vários canais (até 2 Twitches!) num feed só — com emotes, selos, de onde veio cada mensagem e o que foi apagado."
         right={
           <div className="flex items-center gap-2">
             {IS_TAURI && (
@@ -107,8 +121,14 @@ export function ChatScreen() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => void connectChat()}
-                disabled={IS_TAURI && !configured}
+                onClick={() => {
+                  if (IS_TAURI && !configured) {
+                    setShowConfig(true);
+                    return;
+                  }
+                  void connectChat();
+                }}
+                title={IS_TAURI && !configured ? "Adicione um canal primeiro" : undefined}
               >
                 <Wifi className="size-4" /> Conectar
               </Button>
@@ -126,10 +146,19 @@ export function ChatScreen() {
               </span>
             ) : (
               Object.entries(statuses).map(([source, st]) => (
-                <span key={source} className="flex items-center gap-1.5 text-sm">
+                <span
+                  key={source}
+                  className="flex items-center gap-1.5 text-sm"
+                  title={`${source}: ${statusLabel(st.status)}`}
+                >
                   <PlatformGlyph id={st.platform as ChatPlatform} size={16} />
-                  <span className={cn("size-2 rounded-full", statusDot(st.status))} />
+                  <span className={cn("size-2 rounded-full", statusDot(st.status))} aria-hidden />
                   <span className="text-ink-muted">{source}</span>
+                  {st.status !== "connected" && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                      {statusLabel(st.status)}
+                    </span>
+                  )}
                 </span>
               ))
             )}
@@ -170,7 +199,7 @@ export function ChatScreen() {
                 <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-5 text-center text-sm text-ink-muted">
                   Nenhum canal ainda. Adicione um da <strong className="text-ink">Twitch</strong>,{" "}
                   <strong className="text-ink">Kick</strong> ou{" "}
-                  <strong className="text-ink">YouTube</strong> — pode repetir (ex.: 2 Twitches).
+                  <strong className="text-ink">YouTube</strong> pra ver o chat aqui — pode repetir a mesma (ex.: 2 Twitches).
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -215,8 +244,8 @@ export function ChatScreen() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 <ToggleRow label="Emotes" checked={view.emotes} onChange={(v) => setSettings({ chatShowEmotes: v })} />
                 <ToggleRow label="Badges" checked={view.badges} onChange={(v) => setSettings({ chatShowBadges: v })} />
-                <ToggleRow label="Ícone da plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
-                <ToggleRow label="Nome do canal" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
+                <ToggleRow label="Plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
+                <ToggleRow label="Canal" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
                 <ToggleRow label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
               </div>
               <div className="mt-3 flex items-center gap-3 border-t border-border-soft pt-3">
@@ -253,14 +282,32 @@ export function ChatScreen() {
         >
           <Bell className="size-4" /> Alertas{alerts.length > 0 ? ` (${alerts.length})` : ""}
         </Button>
-        <Button variant="ghost" size="sm" onClick={clearChat}>
-          <Trash2 className="size-4" /> Limpar
+        <Button
+          variant={confirmClearChat ? "danger" : "ghost"}
+          size="sm"
+          onClick={() => {
+            if (!confirmClearChat) {
+              setConfirmClearChat(true);
+              setTimeout(() => setConfirmClearChat(false), 3000);
+              return;
+            }
+            setConfirmClearChat(false);
+            clearChat();
+          }}
+        >
+          <Trash2 className="size-4" /> {confirmClearChat ? "Limpar mesmo?" : "Limpar"}
         </Button>
       </div>
 
       <div className="flex gap-3">
         <Card className="flex h-[54vh] flex-1 flex-col overflow-hidden p-0">
-          <ChatFeed messages={shown} view={view} connected={connected} className="flex-1" />
+          <ChatFeed
+            messages={shown}
+            view={view}
+            connected={connected}
+            allFilteredOut={allFilteredOut}
+            className="flex-1"
+          />
         </Card>
         {showAlerts && (
           <Card className="flex h-[54vh] w-72 shrink-0 flex-col overflow-hidden p-0">
@@ -269,12 +316,23 @@ export function ChatScreen() {
                 <Bell className="size-4 text-brass" /> Alertas
               </span>
               <button
-                onClick={clearAlerts}
-                className="text-ink-faint transition-colors hover:text-bad"
-                title="Limpar alertas"
+                onClick={() => {
+                  if (!confirmClearAlerts) {
+                    setConfirmClearAlerts(true);
+                    setTimeout(() => setConfirmClearAlerts(false), 3000);
+                    return;
+                  }
+                  setConfirmClearAlerts(false);
+                  clearAlerts();
+                }}
+                className={cn(
+                  "text-xs font-bold transition-colors",
+                  confirmClearAlerts ? "text-bad" : "text-ink-faint hover:text-bad"
+                )}
+                title={confirmClearAlerts ? "Clique pra confirmar" : "Limpar alertas"}
                 aria-label="Limpar alertas"
               >
-                <Trash2 className="size-3.5" />
+                {confirmClearAlerts ? "Limpar?" : <Trash2 className="size-3.5" />}
               </button>
             </div>
             <AlertsFeed alerts={alerts} className="flex-1" />
@@ -336,6 +394,15 @@ const statusDot = (status: string) =>
       : status === "waiting"
         ? "bg-warn animate-pulse"
         : "bg-ink-faint";
+
+const statusLabel = (status: string) =>
+  status === "connected"
+    ? "no ar"
+    : status === "error"
+      ? "caiu"
+      : status === "waiting"
+        ? "aguardando"
+        : "conectando";
 
 function SourceCard({
   src,

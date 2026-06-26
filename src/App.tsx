@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { toast } from "./lib/toast";
@@ -9,6 +9,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "reports", "about", "settings"];
 import { TitleBar } from "./components/TitleBar";
+import { LiveBar } from "./components/LiveBar";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
 import { Mascot, SoundWaves } from "./components/decor";
@@ -30,7 +31,19 @@ export default function App() {
   const bindGuardian = useStore((s) => s.bindGuardian);
   const leaks = useStore((s) => s.leaks);
   const censored = useStore((s) => s.censored);
+  const liveState = useStore((s) => s.snapshot.state);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
+
+  // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
+  const liveLabel = censored
+    ? "Atenção: tela JÁ VOLTO no ar — um termo apareceu na tela"
+    : liveState === "live"
+      ? "No ar em todas as plataformas"
+      : liveState === "starting"
+        ? "Aguardando o OBS conectar"
+        : liveState === "error"
+          ? "Erro na transmissão"
+          : "Fora do ar";
   const [screen, setScreen] = useState<Screen>(() => {
     try {
       const stored = localStorage.getItem("corneta.screen") as Screen | null;
@@ -104,8 +117,13 @@ export default function App() {
   }, [screen]);
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex h-full flex-col overflow-hidden border border-border-soft">
       <TitleBar />
+
+      <div className="sr-only" role="status" aria-live="polite">
+        {liveLabel}
+      </div>
 
       {censored && (
         <div className="flex items-center gap-3 border-b-2 border-bad bg-bad px-4 py-2 text-white">
@@ -120,6 +138,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {!censored && <LiveBar onOpen={() => navigate("golive")} />}
 
       {!loaded ? (
         <div className="grid flex-1 place-items-center">
@@ -150,7 +170,7 @@ export default function App() {
                   <ErrorBoundary>
                     {screen === "platforms" && <PlatformsScreen />}
                     {screen === "encoding" && <EncodingScreen />}
-                    {screen === "golive" && <GoLiveScreen />}
+                    {screen === "golive" && <GoLiveScreen onNavigate={navigate} />}
                     {screen === "chat" && <ChatScreen />}
                     {screen === "reports" && <ReportsScreen />}
                     {screen === "about" && <AboutScreen />}
@@ -166,5 +186,6 @@ export default function App() {
       <Toaster />
       <Onboarding onStart={() => navigate("platforms")} />
     </div>
+    </MotionConfig>
   );
 }

@@ -12,13 +12,23 @@ const ACCENT: Record<ToastKind, string> = {
   error: "text-bad",
   info: "text-info",
 };
+const STRIPE: Record<ToastKind, string> = {
+  success: "border-l-ok",
+  error: "border-l-bad",
+  info: "border-l-info",
+};
 
 export function Toaster() {
   const toasts = useToasts((s) => s.toasts);
   const dismiss = useToasts((s) => s.dismiss);
 
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-[100] flex w-80 flex-col gap-2">
+    <div
+      role="region"
+      aria-label="Avisos"
+      aria-live="polite"
+      className="pointer-events-none fixed bottom-5 right-5 z-[100] flex w-80 flex-col gap-2"
+    >
       <AnimatePresence>
         {toasts.map((t) => {
           const Icon = ICON[t.kind];
@@ -30,7 +40,7 @@ export function Toaster() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className="pointer-events-auto flex items-start gap-3 rounded-md bg-surface-2 pop p-3.5"
+              className={`pointer-events-auto flex items-start gap-3 rounded-md border-l-4 bg-surface-2 pop p-3.5 ${STRIPE[t.kind]}`}
             >
               <Icon className={`mt-0.5 size-5 shrink-0 ${ACCENT[t.kind]}`} />
               <p className="flex-1 text-sm text-ink">{t.message}</p>

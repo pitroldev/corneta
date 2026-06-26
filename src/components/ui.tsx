@@ -1,11 +1,13 @@
-import { type ButtonHTMLAttributes, type ReactNode } from "react";
-import { Globe, Info } from "lucide-react";
+import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
+import { Check, Copy, Globe, Info, Loader2 } from "lucide-react";
 import {
   siTwitch, siYoutube, siFacebook, siKick, siTiktok, siX, siInstagram,
 } from "simple-icons";
 import { cn, readableOn } from "../lib/utils";
 import { PLATFORMS } from "../lib/platforms";
 import type { PlatformId } from "../lib/types";
+import { Mascot } from "./decor";
+import { Tooltip } from "./Tooltip";
 
 const PLATFORM_ICON: Partial<Record<PlatformId, string>> = {
   twitch: siTwitch.path,
@@ -18,13 +20,18 @@ const PLATFORM_ICON: Partial<Record<PlatformId, string>> = {
 };
 
 // ---------------- Button ----------------
-type Variant = "primary" | "pop" | "ghost" | "outline" | "danger" | "subtle";
+// "tomate" é o nome canônico do botão de ação (bloco tomate, sombra dura).
+// "pop" segue como alias retrocompatível — a utility `.pop` é a sombra, não a variante.
+type Variant = "primary" | "tomate" | "pop" | "ghost" | "outline" | "danger" | "subtle";
 type Size = "sm" | "md" | "lg";
 
+const TOMATE =
+  "bg-tomate text-white hover:bg-tomate-strong pop active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold";
 const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-brass text-brass-ink hover:bg-brass-strong pop-brass active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold",
-  pop: "bg-tomate text-white hover:bg-tomate-strong pop active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold",
+  tomate: TOMATE,
+  pop: TOMATE,
   ghost: "text-ink-muted hover:text-ink hover:bg-surface-2",
   outline: "border-2 border-border text-ink hover:border-brass",
   danger: "bg-bad/15 text-bad hover:bg-bad/25 border-2 border-bad/40 font-display font-bold",
@@ -39,12 +46,20 @@ const SIZES: Record<Size, string> = {
 export function Button({
   variant = "subtle",
   size = "md",
+  loading = false,
   className,
   children,
+  disabled,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+}) {
   return (
     <button
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap transition-all duration-75 disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none",
         VARIANTS[variant],
@@ -53,6 +68,7 @@ export function Button({
       )}
       {...rest}
     >
+      {loading && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />}
       {children}
     </button>
   );
@@ -89,19 +105,32 @@ export function Card({
 }
 
 // ---------------- Badge (adesivo) ----------------
+type BadgeTone = "ok" | "warn" | "bad" | "live" | "brass" | "neutral";
+const BADGE_TONES: Record<BadgeTone, string> = {
+  ok: "bg-ok text-night",
+  warn: "bg-warn text-night",
+  bad: "bg-bad text-white",
+  live: "bg-live text-white",
+  brass: "bg-brass text-brass-ink",
+  neutral: "bg-surface-3 text-ink-muted",
+};
+
 export function Badge({
   children,
   className,
   color,
+  tone,
 }: {
   children: ReactNode;
   className?: string;
   color?: string;
+  tone?: BadgeTone;
 }) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
+        tone && BADGE_TONES[tone],
         className
       )}
       style={color ? { backgroundColor: color, color: readableOn(color) } : undefined}
@@ -116,19 +145,22 @@ export function Toggle({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative h-6 w-11 shrink-0 rounded-md transition-colors",
+        "relative h-6 w-11 shrink-0 rounded-md transition-colors disabled:pointer-events-none disabled:opacity-40",
         checked ? "bg-brass" : "bg-surface-3"
       )}
     >
@@ -224,29 +256,112 @@ export function Stat({
 }
 
 // ---------------- Hint (tooltip didático) ----------------
+// Gatilho focável: abre no hover E no foco/tap (teclado também vê). Usa o Tooltip
+// (tokens, sem hex fixo) pra não quebrar no tema claro.
 export function Hint({ text, className }: { text: string; className?: string }) {
   return (
-    <span className={cn("group relative inline-flex align-middle", className)}>
-      <Info className="size-3.5 cursor-help text-ink-faint" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 hidden w-52 -translate-x-1/2 rounded-md bg-[#1a130c] px-2.5 py-1.5 text-[11px] font-medium normal-case leading-snug text-[#fcf3e3] pop group-hover:block">
-        {text}
-      </span>
-    </span>
+    <Tooltip content={text} className={cn("align-middle", className)}>
+      <button
+        type="button"
+        aria-label="Ajuda"
+        className="inline-flex cursor-help text-ink-faint transition-colors hover:text-ink"
+      >
+        <Info className="size-3.5" />
+      </button>
+    </Tooltip>
   );
 }
 
 // ---------------- Text input ----------------
 export function Input({
   className,
+  invalid,
   ...rest
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+}: React.InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   return (
     <input
+      aria-invalid={invalid || undefined}
       className={cn(
-        "h-10 w-full rounded-md border-2 border-border bg-surface-2 px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-brass",
+        "h-10 w-full rounded-md border-2 border-border bg-surface-2 px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-brass disabled:cursor-not-allowed disabled:opacity-50",
+        invalid && "border-bad focus:border-bad",
         className
       )}
       {...rest}
     />
+  );
+}
+
+// ---------------- CopyField (valor copiável com 1 clique) ----------------
+// Feedback é inline no próprio botão — sem toast duplicado.
+export function CopyField({
+  label,
+  value,
+  mono,
+  className,
+}: {
+  label?: string;
+  value: string;
+  mono?: boolean;
+  className?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* área de transferência bloqueada */
+    }
+  };
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      {label && (
+        <div className="w-40 shrink-0 text-xs font-bold uppercase tracking-wide text-ink-faint">
+          {label}
+        </div>
+      )}
+      <div
+        data-selectable
+        className={cn("min-w-0 flex-1 truncate rounded-md bg-surface px-3 py-2 text-sm", mono && "font-mono")}
+      >
+        {value}
+      </div>
+      <Button
+        variant="subtle"
+        size="sm"
+        onClick={copy}
+        aria-label={`Copiar${label ? ` ${label}` : ""}`}
+      >
+        {copied ? <Check className="size-4 text-ok" /> : <Copy className="size-4" />}
+        {copied ? "Copiado" : "Copiar"}
+      </Button>
+    </div>
+  );
+}
+
+// ---------------- EmptyState (palco vazio com mascote) ----------------
+// Estado vazio on-brand: bloco sólido com sombra dura, mascote e CTA. Centraliza
+// o padrão que telas vazias improvisavam (Plataformas/Relatórios).
+export function EmptyState({
+  title,
+  children,
+  action,
+  className,
+}: {
+  title: ReactNode;
+  children?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-xl bg-surface px-6 py-12 text-center pop", className)}>
+      <div className="mx-auto mb-4 grid size-16 -rotate-3 place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
+        <Mascot className="size-9 animate-shout" />
+      </div>
+      <h3 className="text-2xl">{title}</h3>
+      {children && <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">{children}</p>}
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
+    </div>
   );
 }

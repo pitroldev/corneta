@@ -13,10 +13,10 @@ export type Screen =
   | "settings";
 
 const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
-  { id: "platforms", label: "Plataformas", icon: Tv2, hint: "pra onde toca" },
-  { id: "encoding", label: "Qualidade", icon: Sliders, hint: "como toca" },
-  { id: "golive", label: "Ao vivo", icon: Radio, hint: "solta o som" },
-  { id: "chat", label: "Chat", icon: MessageSquare, hint: "a galera junta" },
+  { id: "platforms", label: "Plataformas", icon: Tv2, hint: "onde sua live aparece" },
+  { id: "encoding", label: "Qualidade", icon: Sliders, hint: "capricho da imagem" },
+  { id: "golive", label: "Ao vivo", icon: Radio, hint: "bota tudo no ar" },
+  { id: "chat", label: "Chat", icon: MessageSquare, hint: "todo chat num lugar" },
 ];
 
 export function Sidebar({
@@ -29,6 +29,7 @@ export function Sidebar({
   const state = useStore((s) => s.snapshot.state);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const viewers = useStore((s) => s.viewers);
+  const unseenReport = useStore((s) => s.unseenReport);
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border-soft bg-panel p-4">
@@ -53,6 +54,8 @@ export function Sidebar({
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
+              aria-current={active ? "page" : undefined}
+              data-on-brass={active ? "" : undefined}
               className={cn(
                 "group relative flex items-center gap-3 rounded-md px-3 py-3 text-left transition-all",
                 active
@@ -96,15 +99,22 @@ export function Sidebar({
       <div className="mt-auto flex flex-col gap-2">
         <button
           onClick={() => onNavigate("reports")}
+          aria-current={screen === "reports" ? "page" : undefined}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
             screen === "reports" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
           )}
         >
           <BarChart3 className="size-4" strokeWidth={2.3} /> Relatórios
+          {unseenReport && screen !== "reports" && (
+            <span className="ml-auto -rotate-3 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
+              novo
+            </span>
+          )}
         </button>
         <button
           onClick={() => onNavigate("settings")}
+          aria-current={screen === "settings" ? "page" : undefined}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
             screen === "settings" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
@@ -114,6 +124,7 @@ export function Sidebar({
         </button>
         <button
           onClick={() => onNavigate("about")}
+          aria-current={screen === "about" ? "page" : undefined}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
             screen === "about" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"

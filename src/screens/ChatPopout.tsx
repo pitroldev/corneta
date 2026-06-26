@@ -55,6 +55,7 @@ export function ChatPopout() {
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [tab, setTab] = useState<"chat" | "alerts" | "both">("chat");
   const [showConfig, setShowConfig] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   // Setup próprio do popout (sem o motor/atalhos do app): config + chat + alertas + viewers.
   useEffect(() => {
@@ -93,6 +94,8 @@ export function ChatPopout() {
   );
   const bothLayout = st?.chatBothLayout ?? "auto";
   const alertsFirst = st?.chatBothAlertsFirst ?? false;
+  // Canais se configuram na janela principal — aqui só dá pra ligar se já houver.
+  const configured = (st?.chatSources ?? []).some((x) => x.enabled && x.value.trim());
   const containerRef = useRef<HTMLDivElement>(null);
   // Posição do divisor (local pra arrastar suave; persiste no fim do drag).
   const [split, setSplit] = useState(35);
@@ -258,14 +261,30 @@ export function ChatPopout() {
               <WifiOff className="size-4" />
             </button>
           ) : (
-            <button onClick={() => void connectChat()} title="Conectar" className={iconBtn}>
+            <button
+              onClick={() => {
+                if (configured) void connectChat();
+              }}
+              disabled={!configured}
+              title={configured ? "Conectar" : "Configure os canais na janela principal da Corneta"}
+              className={cn(iconBtn, !configured && "opacity-40")}
+            >
               <Wifi className="size-4" />
             </button>
           )}
           <button
-            onClick={() => (tab === "alerts" ? clearAlerts() : clearChat())}
-            title="Limpar"
-            className={iconBtn}
+            onClick={() => {
+              if (!confirmClear) {
+                setConfirmClear(true);
+                setTimeout(() => setConfirmClear(false), 3000);
+                return;
+              }
+              setConfirmClear(false);
+              if (tab === "alerts") clearAlerts();
+              else clearChat();
+            }}
+            title={confirmClear ? "Clique pra confirmar" : "Limpar"}
+            className={cn(iconBtn, confirmClear && "text-bad")}
           >
             <Trash2 className="size-4" />
           </button>

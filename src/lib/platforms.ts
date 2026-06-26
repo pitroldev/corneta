@@ -22,7 +22,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://live.twitch.tv/app",
     recommended: p(1920, 1080, 60, 6000, 160),
-    note: "Limite prático ~6000 kbps (não-parceiros). Há ingests regionais.",
+    note: "Sem ser parceiro, a Twitch aguenta uns 6000 kbps (quanto de dado por segundo — mais sobe a qualidade da imagem, mas pesa no seu upload). Ela tem servidores em várias regiões; o mais perto de você costuma travar menos.",
     keyUrl: "https://dashboard.twitch.tv/settings/stream",
     liveUrl: "https://dashboard.twitch.tv/stream-manager",
   },
@@ -33,7 +33,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://a.rtmp.youtube.com/live2",
     recommended: p(1920, 1080, 60, 9000, 192),
-    note: "Aceita bitrate alto. Keyframe a cada 2 s (máx 4 s).",
+    note: "Aceita imagem pesada numa boa (bitrate alto = mais dado por segundo, mais qualidade). Peça pro seu OBS mandar um keyframe (quadro que reinicia a imagem) a cada 2 s — no máximo 4 s.",
     keyUrl: "https://studio.youtube.com/channel/live/streaming",
     liveUrl: "https://studio.youtube.com/channel/live",
   },
@@ -44,7 +44,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmps",
     ingestUrl: "rtmps://live-api-s.facebook.com:443/rtmp",
     recommended: p(1280, 720, 30, 4000, 128),
-    note: "Exige RTMPS (TLS). RTMP puro foi descontinuado.",
+    note: "Só entra com conexão criptografada (RTMPS). O modo antigo sem proteção saiu de cena — aqui já vai do jeito certo.",
     keyUrl: "https://www.facebook.com/live/producer",
     liveUrl: "https://www.facebook.com/live/producer",
   },
@@ -55,7 +55,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmps",
     ingestUrl: "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
     recommended: p(1920, 1080, 60, 6000, 160),
-    note: "Pega a URL/chave exatas no painel do criador.",
+    note: "Copie a URL e a chave certinhas no painel de criador da Kick — é lá que ela gera as suas.",
     keyUrl: "https://kick.com/dashboard/settings/stream",
     liveUrl: "https://kick.com/dashboard/stream",
   },
@@ -66,7 +66,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://", // fornecido pelo painel (varia)
     recommended: p(720, 1280, 30, 3000, 128),
-    note: "Vertical 720×1280. Acesso ao Live exige elegibilidade; chave nem sempre é auto-serviço.",
+    note: "Vídeo em pé (720×1280, formato de celular). Pra transmitir, a TikTok precisa liberar sua conta — e nem todo mundo consegue a chave sozinho.",
     experimental: true,
   },
   x: {
@@ -76,7 +76,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(1280, 720, 30, 3000, 128),
-    note: "Chave gerada no Media Studio.",
+    note: "A chave de transmissão sai do Media Studio do X — é lá que você a gera.",
     experimental: true,
   },
   instagram: {
@@ -86,7 +86,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(720, 1280, 30, 2500, 128),
-    note: "Sem ingestão RTMP oficial estável — suporte experimental.",
+    note: "O Instagram não tem uma entrada oficial firme pra receber transmissão de fora — por isso aqui é experimental e pode falhar.",
     experimental: true,
   },
   custom: {
@@ -96,7 +96,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(1920, 1080, 30, 4500, 160),
-    note: "Defina URL e protocolo manualmente (RTMP/RTMPS/SRT).",
+    note: "Você mesmo informa o endereço e o tipo de conexão (RTMP, RTMPS ou SRT) — serve pra qualquer destino fora da lista.",
   },
 };
 
