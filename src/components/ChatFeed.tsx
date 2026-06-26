@@ -40,19 +40,24 @@ export function ChatFeed({
   const stick = useRef(true);
   const [paused, setPaused] = useState(false);
   const [missed, setMissed] = useState(0);
-  const prevLen = useRef(messages.length);
+  const lastId = useRef<string | undefined>(messages[messages.length - 1]?.id);
 
-  // Depende de `messages` (não de .length): quando o feed bate o teto e uma msg
-  // antiga sai, o tamanho não muda mas a referência sim — senão o follow trava.
   useEffect(() => {
     const el = ref.current;
+    const newLast = messages[messages.length - 1];
     if (el && stick.current) {
       el.scrollTop = el.scrollHeight;
-    } else {
-      const delta = messages.length - prevLen.current;
-      if (delta > 0) setMissed((n) => n + delta);
+      lastId.current = newLast?.id;
+      return;
     }
-    prevLen.current = messages.length;
+    if (newLast && newLast.id !== lastId.current) {
+      const idx = messages.findIndex((m) => m.id === lastId.current);
+      if (idx >= 0) {
+        const added = messages.length - 1 - idx;
+        if (added > 0) setMissed((n) => n + added);
+      }
+      lastId.current = newLast.id;
+    }
   }, [messages]);
 
   const onScroll = () => {
@@ -61,6 +66,10 @@ export function ChatFeed({
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
     stick.current = atBottom;
     setPaused(!atBottom);
+    if (atBottom) {
+      setMissed(0);
+      lastId.current = messages[messages.length - 1]?.id;
+    }
   };
 
   const jumpToBottom = () => {
@@ -70,6 +79,7 @@ export function ChatFeed({
     stick.current = true;
     setPaused(false);
     setMissed(0);
+    lastId.current = messages[messages.length - 1]?.id;
   };
 
   return (
@@ -130,10 +140,15 @@ const MsgRow = memo(function MsgRow({
         <span className="shrink-0 rounded-sm bg-bad/15 px-1 text-[9px] font-extrabold uppercase leading-4 text-bad">
           removida
         </span>
-        <span className="font-bold line-through opacity-60" style={m.color ? { color: m.color } : undefined}>
+        <span
+          className="font-bold line-through opacity-60"
+          style={m.color ? { color: m.color } : undefined}
+        >
           {m.author}
         </span>
-        <span className="text-ink-faint line-through opacity-60">um moderador apagou esta mensagem</span>
+        <span className="text-ink-faint line-through opacity-60">
+          um moderador apagou esta mensagem
+        </span>
       </div>
     );
   }

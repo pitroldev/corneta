@@ -148,7 +148,13 @@ export const useStore = create<State>((set, get) => {
         };
         void api.saveConfig(config);
       } else if (!config.profiles.some((p) => p.id === config.activeProfileId)) {
-        config = { ...config, activeProfileId: config.profiles[0].id };
+        const p = config.profiles[0];
+        config = {
+          ...config,
+          activeProfileId: p.id,
+          mode: p.mode,
+          targets: p.targets.map((t) => ({ ...t })),
+        };
       }
       set({ config, encoders, loaded: true });
     },
@@ -278,6 +284,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     loadProfile(id) {
+      pendingRemoval = null;
       const config = get().config;
       if (!config) return;
       const prof = config.profiles.find((p) => p.id === id);
@@ -291,6 +298,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     addProfile() {
+      pendingRemoval = null;
       const config = get().config;
       if (!config) return;
       // Novo perfil = cópia do atual (compartilha as chaves por id), com nome único.
@@ -308,6 +316,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     removeProfile(id) {
+      pendingRemoval = null;
       const config = get().config;
       if (!config || config.profiles.length <= 1) return;
       const profiles = config.profiles.filter((p) => p.id !== id);
@@ -354,9 +363,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async start() {
-      // Cada sessão começa limpa: zera vazamentos/censura da sessão anterior (senão um toast
-      // antigo reaparece ao reabrir a live).
-      set({ leaks: [], censored: false });
+      set({ leaks: [], censored: false, viewers: { total: 0, anyLive: false, items: [] } });
       await api.start();
       // A1: liga o OBS junto (melhor-esforço — pode não estar acessível).
       if (get().config?.settings.autoStartObs) {
@@ -411,8 +418,9 @@ export const useStore = create<State>((set, get) => {
     },
 
     async connectChat() {
-      set({ chatMessages: [], chatStatuses: {}, chatConnected: true });
+      set({ chatMessages: [], chatStatuses: {} });
       await api.chatStart();
+      set({ chatConnected: true });
     },
 
     async disconnectChat() {

@@ -61,7 +61,9 @@ export function EncodingScreen() {
   // Quantas recodificações simultâneas a placa aguenta (heurística dos encoders).
   const maxHw = Math.max(
     0,
-    ...encoders.filter((e) => e.available && e.maxSessions != null).map((e) => e.maxSessions!),
+    ...encoders
+      .filter((e) => e.available && e.kind !== "software" && e.maxSessions != null)
+      .map((e) => e.maxSessions!),
   );
   const activeEst = estimate(config);
   const overSessions = maxHw > 0 && activeEst.transcodeCount > maxHw;
@@ -315,6 +317,13 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   step={500}
                   value={p.videoBitrateKbps}
                   onChange={(e) => patchPreset({ videoBitrateKbps: Number(e.target.value) })}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value);
+                    const clamped = Number.isFinite(v)
+                      ? Math.min(MAX_BR, Math.max(MIN_BR, Math.round(v)))
+                      : recBr;
+                    if (clamped !== p.videoBitrateKbps) patchPreset({ videoBitrateKbps: clamped });
+                  }}
                   aria-invalid={brInvalid || undefined}
                   className={cn(
                     "h-9 w-28 rounded-md border-2 bg-surface px-2 text-sm tabular-nums outline-none focus:border-brass",

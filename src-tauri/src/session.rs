@@ -31,7 +31,9 @@ pub fn sessions_dir(app: &AppHandle) -> Option<PathBuf> {
 
 fn append_line(path: &Path, value: &Value) {
     if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
-        let _ = writeln!(f, "{value}");
+        let mut line = value.to_string();
+        line.push('\n');
+        let _ = f.write_all(line.as_bytes());
     }
 }
 

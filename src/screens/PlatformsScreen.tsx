@@ -1,9 +1,26 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  Reorder,
+  useDragControls,
+} from "framer-motion";
 import { useDialog } from "../lib/useDialog";
 import {
-  KeyRound, Plus, Trash2, Check, X, AlertTriangle, Pencil,
-  GripVertical, Eye, EyeOff, ClipboardPaste, Wifi, ExternalLink, Copy,
+  KeyRound,
+  Plus,
+  Trash2,
+  Check,
+  X,
+  AlertTriangle,
+  Pencil,
+  GripVertical,
+  Eye,
+  EyeOff,
+  ClipboardPaste,
+  Wifi,
+  ExternalLink,
+  Copy,
   Crop,
 } from "lucide-react";
 import { useStore } from "../lib/store";
@@ -13,7 +30,15 @@ import { toast } from "../lib/toast";
 import { cn, openExternal } from "../lib/utils";
 import type { PlatformId, Target } from "../lib/types";
 import { INGEST_URL_RE, hasValidUrl, isUrlInvalid } from "../lib/validation";
-import { Badge, Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  PlatformGlyph,
+  SectionTitle,
+  Toggle,
+} from "../components/ui";
 import { Select } from "../components/Select";
 import { ReframeEditor } from "../components/ReframeEditor";
 import { Mascot } from "../components/decor";
@@ -23,6 +48,7 @@ export function PlatformsScreen() {
   const addTarget = useStore((s) => s.addTarget);
   const reorderTargets = useStore((s) => s.reorderTargets);
   const [picking, setPicking] = useState(false);
+  const [reframeTarget, setReframeTarget] = useState<Target | null>(null);
 
   if (!config) return null;
 
@@ -51,10 +77,23 @@ export function PlatformsScreen() {
           className="flex list-none flex-col gap-3"
         >
           {config.targets.map((t) => (
-            <TargetRow key={t.id} target={t} />
+            <TargetRow
+              key={t.id}
+              target={t}
+              onReframe={() => setReframeTarget(t)}
+            />
           ))}
         </Reorder.Group>
       )}
+
+      <AnimatePresence>
+        {reframeTarget && (
+          <ReframeEditor
+            target={reframeTarget}
+            onClose={() => setReframeTarget(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {picking && (
@@ -87,7 +126,9 @@ function ProfileBar() {
 
   return (
     <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 p-2.5">
-      <span className="px-1 text-xs font-bold uppercase tracking-wide text-ink-faint">Perfil</span>
+      <span className="px-1 text-xs font-bold uppercase tracking-wide text-ink-faint">
+        Perfil
+      </span>
 
       {editing ? (
         <input
@@ -111,12 +152,23 @@ function ProfileBar() {
       )}
 
       {!editing && (
-        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label="Renomear perfil" title="Renomear">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditing(true)}
+          aria-label="Renomear perfil"
+          title="Renomear"
+        >
           <Pencil className="size-3.5" />
         </Button>
       )}
 
-      <Button variant="subtle" size="sm" onClick={addProfile} className="ml-auto">
+      <Button
+        variant="subtle"
+        size="sm"
+        onClick={addProfile}
+        className="ml-auto"
+      >
         <Plus className="size-3.5" strokeWidth={2.6} /> Novo
       </Button>
       {many && (
@@ -133,7 +185,8 @@ function ProfileBar() {
             }
           }}
         >
-          <Trash2 className="size-3.5" /> {confirmDel ? "Confirmar?" : "Excluir"}
+          <Trash2 className="size-3.5" />{" "}
+          {confirmDel ? "Confirmar?" : "Excluir"}
         </Button>
       )}
     </div>
@@ -148,7 +201,8 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <h3 className="text-2xl">Cadê os destinos?</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">
-        Sua corneta ainda não aponta pra lugar nenhum. Bora colocar a primeira plataforma?
+        Sua corneta ainda não aponta pra lugar nenhum. Bora colocar a primeira
+        plataforma?
       </p>
       <Button variant="primary" size="lg" className="mt-5" onClick={onAdd}>
         <Plus className="size-5" strokeWidth={2.6} /> Adicionar plataforma
@@ -157,7 +211,13 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function TargetRow({ target }: { target: Target }) {
+function TargetRow({
+  target,
+  onReframe,
+}: {
+  target: Target;
+  onReframe: () => void;
+}) {
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const toggleTarget = useStore((s) => s.toggleTarget);
@@ -186,8 +246,10 @@ function TargetRow({ target }: { target: Target }) {
   const isPortrait = rec.height > rec.width;
 
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [reframing, setReframing] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    msg: string;
+  } | null>(null);
   // Resultado do "Testar rede" envelhece: zera ao trocar chave/URL/enabled.
   useEffect(() => {
     setTestResult(null);
@@ -206,13 +268,20 @@ function TargetRow({ target }: { target: Target }) {
 
   return (
     <Reorder.Item value={target} dragListener={false} dragControls={controls}>
-      <Card className={cn("flex flex-col gap-4 transition-opacity", !target.enabled && "opacity-50")}>
+      <Card
+        className={cn(
+          "flex flex-col gap-4 transition-opacity",
+          !target.enabled && "opacity-50",
+        )}
+      >
         <div className="flex items-center gap-3">
           <button
             onPointerDown={(e) => controls.start(e)}
             onKeyDown={(e) => {
-              if (e.key === "ArrowUp") (e.preventDefault(), moveTarget(target.id, -1));
-              else if (e.key === "ArrowDown") (e.preventDefault(), moveTarget(target.id, 1));
+              if (e.key === "ArrowUp")
+                (e.preventDefault(), moveTarget(target.id, -1));
+              else if (e.key === "ArrowDown")
+                (e.preventDefault(), moveTarget(target.id, 1));
             }}
             aria-label="Reordenar destino (setas ↑/↓)"
             title="Arraste ou use ↑/↓"
@@ -225,14 +294,17 @@ function TargetRow({ target }: { target: Target }) {
             <div className="flex items-center gap-2">
               <input
                 value={target.name}
-                onChange={(e) => updateTarget(target.id, { name: e.target.value })}
+                onChange={(e) =>
+                  updateTarget(target.id, { name: e.target.value })
+                }
                 aria-label="Nome do destino"
                 className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
               />
               <Badge color={preset.color}>{preset.protocol}</Badge>
               {preset.experimental && (
                 <Badge className="-rotate-2 bg-tomate text-white pop-sm">
-                  <AlertTriangle className="size-3" strokeWidth={2.8} /> Experimental
+                  <AlertTriangle className="size-3" strokeWidth={2.8} />{" "}
+                  Experimental
                 </Badge>
               )}
             </div>
@@ -241,7 +313,11 @@ function TargetRow({ target }: { target: Target }) {
             </div>
           </div>
           <Badge tone={readiness.tone}>{readiness.label}</Badge>
-          <Toggle checked={target.enabled} onChange={() => toggleTarget(target.id)} label="Ativar" />
+          <Toggle
+            checked={target.enabled}
+            onChange={() => toggleTarget(target.id)}
+            label="Ativar"
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -257,7 +333,9 @@ function TargetRow({ target }: { target: Target }) {
             onClick={() => {
               const name = target.name;
               removeTarget(target.id);
-              toast.action(`${name} saiu da corneta`, "Desfazer", () => undoRemoveTarget());
+              toast.action(`${name} saiu da corneta`, "Desfazer", () =>
+                undoRemoveTarget(),
+              );
             }}
             aria-label="Remover"
           >
@@ -270,13 +348,23 @@ function TargetRow({ target }: { target: Target }) {
             <span>
               URL de ingestão
               {!isCustom && (
-                <span className="font-normal text-ink-faint"> — é o endereço pra onde o seu vídeo é enviado; cole a que o painel da {preset.name} te deu</span>
+                <span className="font-normal text-ink-faint">
+                  {" "}
+                  — é o endereço pra onde o seu vídeo é enviado; cole a que o
+                  painel da {preset.name} te deu
+                </span>
               )}
             </span>
             <Input
-              value={INGEST_URL_RE.test(target.ingestUrl) ? target.ingestUrl : target.ingestUrl.replace(/^(rtmps?|srt):\/\/$/i, "")}
+              value={
+                INGEST_URL_RE.test(target.ingestUrl)
+                  ? target.ingestUrl
+                  : target.ingestUrl.replace(/^(rtmps?|srt):\/\/$/i, "")
+              }
               placeholder="rtmp://servidor/app  (rtmp://, rtmps:// ou srt://)"
-              onChange={(e) => updateTarget(target.id, { ingestUrl: e.target.value })}
+              onChange={(e) =>
+                updateTarget(target.id, { ingestUrl: e.target.value })
+              }
               invalid={urlInvalid}
             />
             {urlInvalid && (
@@ -297,7 +385,8 @@ function TargetRow({ target }: { target: Target }) {
             disabled={testing}
             title="Vê se o servidor da plataforma está respondendo — não confere a chave"
           >
-            <Wifi className="size-3.5" /> {testing ? "Testando…" : "Testar rede"}
+            <Wifi className="size-3.5" />{" "}
+            {testing ? "Testando…" : "Testar rede"}
           </Button>
           {preset.keyUrl && (
             <button
@@ -309,7 +398,7 @@ function TargetRow({ target }: { target: Target }) {
           )}
           {isPortrait && (
             <button
-              onClick={() => setReframing(true)}
+              onClick={onReframe}
               className="flex items-center gap-1 font-semibold text-brass hover:underline"
               title="Recorta o 9:16 do seu vídeo pra esta saída vertical"
             >
@@ -328,9 +417,6 @@ function TargetRow({ target }: { target: Target }) {
 
         {preset.note && <p className="text-xs text-ink-faint">{preset.note}</p>}
       </Card>
-      <AnimatePresence>
-        {reframing && <ReframeEditor target={target} onClose={() => setReframing(false)} />}
-      </AnimatePresence>
     </Reorder.Item>
   );
 }
@@ -365,7 +451,14 @@ function KeyField({ target }: { target: Target }) {
         <span className="text-sm font-semibold">Chave no cofre</span>
         <span className="font-mono text-sm text-ink-faint">•••••••••••</span>
         <div className="ml-auto flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => { setValue(""); setEditing(true); }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setValue("");
+              setEditing(true);
+            }}
+          >
             <Pencil className="size-3.5" /> Trocar
           </Button>
           <Button
@@ -412,10 +505,20 @@ function KeyField({ target }: { target: Target }) {
           {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>
       </div>
-      <Button variant="subtle" size="sm" onClick={paste} title="Colar da área de transferência">
+      <Button
+        variant="subtle"
+        size="sm"
+        onClick={paste}
+        title="Colar da área de transferência"
+      >
         <ClipboardPaste className="size-4" /> Colar
       </Button>
-      <Button variant="primary" size="sm" disabled={!value.trim()} onClick={save}>
+      <Button
+        variant="primary"
+        size="sm"
+        disabled={!value.trim()}
+        onClick={save}
+      >
         Salvar
       </Button>
       {editing && (
@@ -436,7 +539,8 @@ function PlatformPicker({
 }) {
   const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   const targets = useStore((s) => s.config?.targets ?? []);
-  const countOf = (id: PlatformId) => targets.filter((t) => t.platformId === id).length;
+  const countOf = (id: PlatformId) =>
+    targets.filter((t) => t.platformId === id).length;
 
   return (
     <motion.div
@@ -460,7 +564,9 @@ function PlatformPicker({
         transition={{ type: "spring", stiffness: 320, damping: 26 }}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 id="picker-title" className="text-xl">Quem entra na corneta?</h3>
+          <h3 id="picker-title" className="text-xl">
+            Quem entra na corneta?
+          </h3>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="size-4" />
           </Button>
@@ -477,7 +583,9 @@ function PlatformPicker({
                 <div className="truncate font-display font-bold">{p.name}</div>
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                   {p.protocol}
-                  {p.experimental && <span className="ml-1.5 text-tomate">· experimental</span>}
+                  {p.experimental && (
+                    <span className="ml-1.5 text-tomate">· experimental</span>
+                  )}
                 </div>
               </div>
               {countOf(p.id) > 0 && (

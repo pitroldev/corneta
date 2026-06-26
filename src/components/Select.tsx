@@ -34,11 +34,9 @@ export function Select<T extends string>({
   const listId = `${baseId}-list`;
   const optId = (i: number) => `${baseId}-opt-${i}`;
 
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((o) => o.value === value),
-  );
-  const current = options[selectedIndex];
+  const foundIndex = options.findIndex((o) => o.value === value);
+  const selectedIndex = Math.max(0, foundIndex);
+  const current = foundIndex >= 0 ? options[foundIndex] : undefined;
 
   const openMenu = () => {
     setActive(selectedIndex);

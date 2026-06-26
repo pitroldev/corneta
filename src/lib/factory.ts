@@ -1,5 +1,6 @@
 import type { AppConfig, PlatformId, Target } from "./types";
 import { PLATFORMS } from "./platforms";
+import { INGEST_URL_RE } from "./validation";
 import { uid } from "./utils";
 
 /** Cria um destino a partir do preset de uma plataforma. */
@@ -11,7 +12,7 @@ export function makeTarget(platformId: PlatformId): Target {
     name: preset.name,
     enabled: true,
     protocol: preset.protocol,
-    ingestUrl: preset.ingestUrl,
+    ingestUrl: INGEST_URL_RE.test(preset.ingestUrl) ? preset.ingestUrl : "",
     hasKey: false,
     encoding: {
       // MVP lidera com encoding por plataforma (PLANEJAMENTO.md §12.1).
@@ -27,7 +28,13 @@ export function defaultConfig(): AppConfig {
   const targets = [makeTarget("twitch"), makeTarget("youtube")];
   const profId = uid("prof");
   return {
-    ingest: { protocol: "rtmp", host: "127.0.0.1", port: 1935, app: "live", key: "obs" },
+    ingest: {
+      protocol: "rtmp",
+      host: "127.0.0.1",
+      port: 1935,
+      app: "live",
+      key: "obs",
+    },
     mode: "hybrid",
     targets,
     settings: {

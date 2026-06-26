@@ -76,9 +76,9 @@ fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
         Some(r) => (r.x.clamp(0.0, 1.0), r.y.clamp(0.0, 1.0), r.zoom.clamp(0.25, 1.0)),
         None => (0.5, 0.5, 1.0), // centralizado, altura cheia
     };
-    format!(
-        "crop=ih*{z:.4}*{ar:.4}:ih*{z:.4}:(iw-ih*{z:.4}*{ar:.4})*{x:.4}:(ih-ih*{z:.4})*{y:.4},scale={out_w}:{out_h}"
-    )
+    let cw = format!("min(iw\\,ih*{z:.4}*{ar:.4})");
+    let ch = format!("ih*{z:.4}");
+    format!("crop={cw}:{ch}:(iw-{cw})*{x:.4}:(ih-{ch})*{y:.4},scale={out_w}:{out_h}")
 }
 
 /// Monta os argumentos de UM FFmpeg para UM destino (lê do MediaMTX → 1 saída).
@@ -128,21 +128,22 @@ pub fn ffmpeg_args_for_target(
             .clone()
             .unwrap_or_else(|| recommended_preset(&t.platform_id));
         let codec = ffmpeg_video_codec(&t.encoding.encoder);
-        let gop = (p.fps * p.keyframe_sec).to_string();
+        let fps = p.fps.max(1);
+        let gop = (fps * p.keyframe_sec.max(1)).to_string();
         // Saída vertical → recorta/enquadra 9:16; saída landscape → só escala.
         let vf = if p.height > p.width {
-            reframe_filter(t.encoding.reframe.as_ref(), p.width, p.height)
+            reframe_filter(t.encoding.reframe.as_ref(), p.width.max(2), p.height.max(2))
         } else {
-            format!("scale={}:{}", p.width, p.height)
+            format!("scale={}:{}", p.width.max(2), p.height.max(2))
         };
         // Bitrate efetivo: o auto-bitrate pode estar empurrando um valor menor.
-        let vbr = br_override.unwrap_or(p.video_bitrate_kbps);
+        let vbr = br_override.unwrap_or(p.video_bitrate_kbps).max(1);
 
         args.extend(
             [
                 "-map", "0:v",
                 "-vf", &vf,
-                "-r", &p.fps.to_string(),
+                "-r", &fps.to_string(),
                 "-c:v", codec,
                 "-b:v", &format!("{vbr}k"),
                 "-maxrate", &format!("{vbr}k"),

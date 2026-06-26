@@ -452,7 +452,7 @@ function mockApi(): CornetaApi {
   let viewerTimer: ReturnType<typeof setInterval> | null = null;
   let chatTimer: ReturnType<typeof setInterval> | null = null;
   let chatSeq = 0;
-  const recentIds: string[] = [];
+  const recentIds: { nativeId: string; platform: string }[] = [];
   const ALERT_SOURCES = [
     { platform: "twitch" as const, source: "Pitrol" },
     { platform: "kick" as const, source: "XQC" },
@@ -578,6 +578,7 @@ function mockApi(): CornetaApi {
     },
     async start() {
       const cfg = loadConfig();
+      pausedTargets.clear();
       const targets: Record<string, TargetStatus> = {};
       for (const t of cfg.targets.filter((x) => x.enabled)) {
         const target = t.encoding.preset?.videoBitrateKbps ?? PLATFORMS[t.platformId].recommended.videoBitrateKbps;
@@ -712,8 +713,10 @@ function mockApi(): CornetaApi {
       chatTimer = setInterval(() => {
         // Demonstra o fluxo de deleção de vez em quando.
         if (recentIds.length > 8 && Math.random() < 0.08) {
-          const nativeId = recentIds[Math.floor(Math.random() * recentIds.length)];
-          chatDeleteListeners.forEach((l) => l({ scope: "message", platform: "twitch", nativeId }));
+          const r = recentIds[Math.floor(Math.random() * recentIds.length)];
+          chatDeleteListeners.forEach((l) =>
+            l({ scope: "message", platform: r.platform, nativeId: r.nativeId })
+          );
         }
         // De vez em quando, dispara um alerta de exemplo.
         if (Math.random() < 0.12) {
@@ -744,7 +747,7 @@ function mockApi(): CornetaApi {
         if (br < 0.15) badges.push({ label: "MOD", kind: "moderator" });
         else if (br < 0.4) badges.push({ label: "SUB", kind: "subscriber" });
         const nativeId = `n${++chatSeq}`;
-        recentIds.push(nativeId);
+        recentIds.push({ nativeId, platform });
         if (recentIds.length > 40) recentIds.shift();
         const pool = AUTHORS[platform];
         chatMsgListeners.forEach((l) =>

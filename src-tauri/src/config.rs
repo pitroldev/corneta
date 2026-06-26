@@ -264,7 +264,18 @@ pub fn load(app: &AppHandle) -> AppConfig {
         Err(_) => return AppConfig::default(),
     };
     match std::fs::read_to_string(&path) {
-        Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
+        Ok(raw) => match serde_json::from_str(&raw) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                log::error!("config.json inválido ({e}); preservando como .corrupt e usando o padrão");
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let _ = std::fs::rename(&path, path.with_extension(format!("corrupt-{ts}.json")));
+                AppConfig::default()
+            }
+        },
         Err(_) => AppConfig::default(),
     }
 }
@@ -272,5 +283,7 @@ pub fn load(app: &AppHandle) -> AppConfig {
 pub fn save(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let path = config_path(app)?;
     let raw = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-    std::fs::write(&path, raw).map_err(|e| e.to_string())
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, raw).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }

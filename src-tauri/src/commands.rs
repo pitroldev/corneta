@@ -564,10 +564,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
-    // Se NÃO estamos no ar, limpa sidecars órfãos (portas presas → protetor/MediaMTX falham no boot).
-    if !state.engine.lock().unwrap().running.load(Ordering::Relaxed) {
-        kill_orphan_sidecars();
+    if state.engine.lock().unwrap().running.load(Ordering::Relaxed) {
+        return Err("já está no ar.".into());
     }
+    kill_orphan_sidecars();
 
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
@@ -1368,7 +1368,9 @@ pub fn mark_moment(app: AppHandle, label: Option<String>) -> Result<(), String> 
 #[tauri::command]
 pub fn export_config(app: AppHandle) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
-    let cfg = config::load(&app);
+    let mut cfg = config::load(&app);
+    cfg.settings.obs_password = String::new();
+    cfg.settings.youtube_api_key = String::new();
     let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     match app
         .dialog()

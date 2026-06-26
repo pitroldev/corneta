@@ -1,6 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Check, ChevronDown, Plug, Wrench, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Plug,
+  Wrench,
+  X,
+} from "lucide-react";
 import { useStore } from "../lib/store";
 import { IS_TAURI } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
@@ -18,7 +25,11 @@ function obsErrorHelp(raw: string): { title: string; tips: string[] } {
     e.includes("password") ||
     e.includes("senha") ||
     e.includes("401") ||
-    e.includes("403")
+    e.includes("403") ||
+    e.includes("fechou") ||
+    e.includes("4009") ||
+    e.includes("closed") ||
+    e.includes("close")
   ) {
     return {
       title: "A senha do WebSocket não bateu.",
@@ -115,24 +126,40 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
               <Plug className="size-5" strokeWidth={2.3} />
             </div>
             <div>
-              <h2 id="obs-wizard-title" className="text-xl">Conectar ao OBS</h2>
-              <p className="text-xs font-semibold opacity-80">A Corneta configura o OBS sozinha.</p>
+              <h2 id="obs-wizard-title" className="text-xl">
+                Conectar ao OBS
+              </h2>
+              <p className="text-xs font-semibold opacity-80">
+                A Corneta configura o OBS sozinha.
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-brass-ink/70 hover:text-brass-ink" aria-label="Fechar">
+          <button
+            onClick={onClose}
+            className="text-brass-ink/70 hover:text-brass-ink"
+            aria-label="Fechar"
+          >
             <X className="size-5" />
           </button>
         </div>
 
         <div className="flex flex-col gap-4 p-5">
           <Step n={1} title="Ative o WebSocket no OBS">
-            O WebSocket é o canal por onde eu converso com o OBS — é ele que me deixa configurar tudo pra você. No OBS: <strong className="text-ink">Ferramentas → Configurações do Servidor WebSocket</strong> e
-            marque <strong className="text-ink">Ativar Servidor WebSocket</strong> (a porta já vem 4455, pode deixar).
+            O WebSocket é o canal por onde eu converso com o OBS — é ele que me
+            deixa configurar tudo pra você. No OBS:{" "}
+            <strong className="text-ink">
+              Ferramentas → Configurações do Servidor WebSocket
+            </strong>{" "}
+            e marque{" "}
+            <strong className="text-ink">Ativar Servidor WebSocket</strong> (a
+            porta já vem 4455, pode deixar).
           </Step>
 
           <Step n={2} title="Senha (se tiver)">
-            Se <strong className="text-ink">Ativar Autenticação</strong> estiver marcado, clique em{" "}
-            <strong className="text-ink">Mostrar Chave de Conexão</strong>, copie e cole aqui. Sem senha? Deixe vazio.
+            Se <strong className="text-ink">Ativar Autenticação</strong> estiver
+            marcado, clique em{" "}
+            <strong className="text-ink">Mostrar Chave de Conexão</strong>,
+            copie e cole aqui. Sem senha? Deixe vazio.
             <Input
               type="password"
               placeholder="senha do obs-websocket"
@@ -143,13 +170,15 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           </Step>
 
           <Step n={3} title="Conecte">
-            Eu conecto no OBS e já deixo ele mandando o seu vídeo pra mim. Depois é só dar{" "}
+            Eu conecto no OBS e já deixo ele mandando o seu vídeo pra mim.
+            Depois é só dar{" "}
             <strong className="text-ink">Iniciar transmissão</strong> no OBS.
           </Step>
 
           {status === "ok" && (
             <div className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok">
-              <Check className="size-4 shrink-0" strokeWidth={2.6} /> Conectado! O OBS já está mandando o vídeo pra mim.
+              <Check className="size-4 shrink-0" strokeWidth={2.6} /> Conectado!
+              O OBS já está mandando o vídeo pra mim.
             </div>
           )}
           {status === "error" && help && (
@@ -163,8 +192,15 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
                 ))}
               </ul>
               <details className="mt-2 text-xs text-ink-faint">
-                <summary className="cursor-pointer select-none font-semibold">Ver detalhe técnico</summary>
-                <p data-selectable className="mt-1 font-mono break-all text-ink-muted">{error}</p>
+                <summary className="cursor-pointer select-none font-semibold">
+                  Ver detalhe técnico
+                </summary>
+                <p
+                  data-selectable
+                  className="mt-1 font-mono break-all text-ink-muted"
+                >
+                  {error}
+                </p>
               </details>
             </div>
           )}
@@ -178,24 +214,44 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             >
               <Wrench className="size-4 text-brass" />
               Prefiro configurar na mão
-              <ChevronDown className={cn("ml-auto size-4 transition-transform", manualOpen && "rotate-180")} />
+              <ChevronDown
+                className={cn(
+                  "ml-auto size-4 transition-transform",
+                  manualOpen && "rotate-180",
+                )}
+              />
             </button>
             {manualOpen && (
               <div className="flex flex-col gap-2 border-t border-border-soft p-3">
                 <p className="text-xs text-ink-faint">
-                  Na mão também é rápido. No OBS: <strong className="text-ink-muted">Configurações → Transmissão → Serviço “Personalizado”</strong> e cole estes dois campos (eles apontam o OBS pra mim):
+                  Na mão também é rápido. No OBS:{" "}
+                  <strong className="text-ink-muted">
+                    Configurações → Transmissão → Serviço “Personalizado”
+                  </strong>{" "}
+                  e cole estes dois campos (eles apontam o OBS pra mim):
                 </p>
                 <CopyField label="Servidor" value={obsIngestUrl(ingest)} />
-                <CopyField label="Chave de transmissão" value={ingest.key} mono />
+                <CopyField
+                  label="Chave de transmissão"
+                  value={ingest.key}
+                  mono
+                />
                 <p className="text-xs text-ink-faint">
-                  Depois é só dar <strong className="text-ink-muted">Iniciar transmissão</strong> no OBS.
+                  Depois é só dar{" "}
+                  <strong className="text-ink-muted">
+                    Iniciar transmissão
+                  </strong>{" "}
+                  no OBS.
                 </p>
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between gap-3 pt-1">
-            <button onClick={onClose} className="text-sm font-semibold text-ink-faint hover:text-ink-muted">
+            <button
+              onClick={onClose}
+              className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
+            >
               Fechar
             </button>
             {status === "ok" ? (
@@ -203,8 +259,17 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
                 Pronto <Check className="size-4" strokeWidth={2.6} />
               </Button>
             ) : (
-              <Button variant="primary" onClick={connect} loading={status === "connecting"} disabled={status === "connecting"}>
-                {status === "connecting" ? "Conectando…" : status === "error" ? "Tentar de novo" : "Conectar e configurar"}
+              <Button
+                variant="primary"
+                onClick={connect}
+                loading={status === "connecting"}
+                disabled={status === "connecting"}
+              >
+                {status === "connecting"
+                  ? "Conectando…"
+                  : status === "error"
+                    ? "Tentar de novo"
+                    : "Conectar e configurar"}
               </Button>
             )}
           </div>
@@ -214,7 +279,15 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+function Step({
+  n,
+  title,
+  children,
+}: {
+  n: number;
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex gap-3">
       <span className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 font-display text-sm font-extrabold text-brass">
@@ -222,7 +295,9 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       </span>
       <div>
         <div className="font-display font-bold">{title}</div>
-        <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{children}</div>
+        <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
+          {children}
+        </div>
       </div>
     </div>
   );

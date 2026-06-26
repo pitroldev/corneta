@@ -45,6 +45,11 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Str
         )
     })?;
 
+    if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
+        let _ = tcp.set_read_timeout(Some(Duration::from_secs(8)));
+        let _ = tcp.set_write_timeout(Some(Duration::from_secs(8)));
+    }
+
     let hello = read_json(&mut socket)?;
     let mut identify = json!({ "op": 1, "d": { "rpcVersion": 1, "eventSubscriptions": 0 } });
     if let Some(auth) = hello.get("d").and_then(|d| d.get("authentication")) {

@@ -634,7 +634,7 @@ fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
     let mut frags = vec![];
     let mut cursor = 0usize;
     for (a, b, id) in ranges {
-        if a >= n || a < cursor {
+        if a >= n || a < cursor || b < a {
             continue;
         }
         if a > cursor {
@@ -879,7 +879,12 @@ fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={api_key}"
     );
-    let body = ureq::get(&url).call().ok()?.into_string().ok()?;
+    let body = ureq::get(&url)
+        .timeout(Duration::from_secs(8))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
     let json: Value = serde_json::from_str(&body).ok()?;
     json.pointer("/items/0/liveStreamingDetails/activeLiveChatId")
         .and_then(|v| v.as_str())
@@ -1250,7 +1255,7 @@ fn youtube_dataapi(api_key: &str, vid: &str, source: &str, running: Arc<AtomicBo
         if let Some(tok) = &page_token {
             url.push_str(&format!("&pageToken={tok}"));
         }
-        let json = match ureq::get(&url).call() {
+        let json = match ureq::get(&url).timeout(Duration::from_secs(8)).call() {
             Ok(r) => {
                 errors = 0;
                 serde_json::from_str::<Value>(&r.into_string().unwrap_or_default())
@@ -1446,6 +1451,7 @@ fn youtube_dataapi(api_key: &str, vid: &str, source: &str, running: Arc<AtomicBo
 fn get_kick_ids(slug: &str) -> Option<(u64, u64)> {
     let url = format!("https://kick.com/api/v2/channels/{slug}");
     let body = ureq::get(&url)
+        .timeout(Duration::from_secs(6))
         .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
         .set("Accept", "application/json")
         .call()

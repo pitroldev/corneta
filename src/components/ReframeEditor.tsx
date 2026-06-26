@@ -138,6 +138,7 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
                 onKeyDown={(e) => {
                   const step = e.shiftKey ? 0.1 : 0.01;
                   if (e.key === "ArrowLeft") (e.preventDefault(), nudge(-step, 0));

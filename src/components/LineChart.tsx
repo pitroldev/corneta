@@ -40,7 +40,8 @@ export function LineChart({
   const innerH = H - padT - padB;
 
   const allVals = series.flatMap((s) => s.values.filter((v): v is number => v != null));
-  const yMax = yMaxProp ?? Math.max(1, ...allVals) * 1.1;
+  const peak = allVals.reduce((m, v) => (v > m ? v : m), 1);
+  const yMax = yMaxProp ?? peak * 1.1;
   const xAt = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - Math.min(v, yMax) / yMax) * innerH;
   const fmt = formatValue ?? ((v: number) => `${Math.round(v)}`);
@@ -56,14 +57,24 @@ export function LineChart({
   const pathFor = (vals: (number | null)[]) => {
     let d = "";
     let pen = false;
+    let prev = -1;
     for (const i of indices(vals.length)) {
+      if (pen && prev >= 0) {
+        for (let k = prev + 1; k < i; k++) {
+          if (vals[k] == null) {
+            pen = false;
+            break;
+          }
+        }
+      }
       const v = vals[i];
       if (v == null) {
-        pen = false; // gap → quebra a linha
-        continue;
+        pen = false;
+      } else {
+        d += `${pen ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)} `;
+        pen = true;
       }
-      d += `${pen ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)} `;
-      pen = true;
+      prev = i;
     }
     return d.trim();
   };

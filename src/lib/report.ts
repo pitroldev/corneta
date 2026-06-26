@@ -42,8 +42,10 @@ export function parseSession(ndjson: string): SessionData | null {
         platforms: (o.platforms ?? []) as SessionMeta["platforms"],
       };
     } else if (o.kind === "sample") {
+      const t = Number(o.t);
+      if (!Number.isFinite(t)) continue;
       samples.push({
-        t: Number(o.t),
+        t,
         cpu: o.cpu == null ? undefined : Number(o.cpu),
         gpu: o.gpu == null ? undefined : Number(o.gpu),
         obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
@@ -51,27 +53,33 @@ export function parseSession(ndjson: string): SessionData | null {
         targets: (o.targets ?? []) as SessionSample["targets"],
       });
     } else if (o.kind === "viewers") {
+      const t = Number(o.t);
+      if (!Number.isFinite(t)) continue;
       viewerSamples.push({
-        t: Number(o.t),
+        t,
         total: Number(o.total) || 0,
         items: (o.items ?? []) as SessionViewerSample["items"],
       });
     } else if (o.kind === "alert") {
+      const t = Number(o.t);
+      if (!Number.isFinite(t)) continue;
       alertEvents.push({
-        t: Number(o.t),
+        t,
         platform: o.platform as ChatPlatform,
         kind: o.alertKind as AlertKind,
         user: String(o.user ?? "alguém"),
         amount: o.amount == null ? undefined : Number(o.amount),
       });
     } else if (o.kind === "marker") {
-      markers.push({ t: Number(o.t), label: String(o.label ?? "Momento") });
+      const t = Number(o.t);
+      if (Number.isFinite(t)) markers.push({ t, label: String(o.label ?? "Momento") });
     } else if (o.kind === "end") {
-      endedAt = Number(o.endedAt);
+      const e = Number(o.endedAt);
+      if (Number.isFinite(e)) endedAt = e;
     }
   }
 
-  if (!meta) return null;
+  if (!meta || !Number.isFinite(meta.startedAt)) return null;
   const last = samples.length ? samples[samples.length - 1].t : meta.startedAt;
   const end = endedAt ?? last;
   meta.endedAt = end;
@@ -196,6 +204,9 @@ const BITRATE_DROP = 0.6; // < 60% do típico = queda
 const OBS_CONGEST = 0.3; // congestionamento de saída > 30%
 const OBS_RENDER_MS = 25; // render lag do OBS acima disso = cena pesada
 
+const maxOf = (a: number[]) => a.reduce((m, v) => (v > m ? v : m), -Infinity);
+const minOf = (a: number[]) => a.reduce((m, v) => (v < m ? v : m), Infinity);
+
 /** Bitrate "típico" (mediana) por destino, considerando só amostras no ar. */
 function typicalBitrates(samples: SessionSample[]): Record<string, number> {
   const byId: Record<string, number[]> = {};
@@ -214,9 +225,10 @@ function isBad(s: SessionSample, typical: Record<string, number>): boolean {
   for (const t of s.targets) {
     if (t.state === "reconnecting" || t.state === "error") return true;
     const typ = typical[t.id];
-    if (typ && t.bitrate < typ * BITRATE_DROP) return true;
+    if (t.state === "live" && typ && t.bitrate < typ * BITRATE_DROP) return true;
   }
   if (s.cpu != null && s.cpu > CPU_HIGH) return true;
+  if (s.gpu != null && s.gpu > CPU_HIGH) return true;
   if (s.obs && (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)) return true;
   return false;
 }
@@ -249,7 +261,7 @@ function buildWindow(
         reconnect = true;
         affected.add(t.name);
       }
-      if (typ && t.bitrate < typ * BITRATE_DROP) {
+      if (t.state === "live" && typ && t.bitrate < typ * BITRATE_DROP) {
         bitrateDrop = true;
         affected.add(t.name);
       }
@@ -388,7 +400,7 @@ function aggregates(data: SessionData) {
     name: e.name,
     platformId: platOf(id),
     avgBitrate: e.brs.length ? Math.round(e.brs.reduce((a, b) => a + b, 0) / e.brs.length) : 0,
-    minBitrate: e.brs.length ? Math.min(...e.brs) : 0,
+    minBitrate: e.brs.length ? minOf(e.brs) : 0,
     maxDropped: e.maxDropped,
     reconnects: e.reconnects,
   }));
@@ -397,9 +409,9 @@ function aggregates(data: SessionData) {
     a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : null;
   return {
     avgCpu: avg(cpus),
-    maxCpu: cpus.length ? Math.max(...cpus) : null,
+    maxCpu: cpus.length ? maxOf(cpus) : null,
     avgGpu: avg(gpus),
-    maxGpu: gpus.length ? Math.max(...gpus) : null,
+    maxGpu: gpus.length ? maxOf(gpus) : null,
     perTarget,
   };
 }
@@ -455,7 +467,7 @@ function viewerStats(d: SessionData): ViewerStats {
       peakByKey[k] = cur;
     }
   return {
-    peak: Math.max(...totals),
+    peak: maxOf(totals),
     avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
     start: totals[0],
     end: totals[totals.length - 1],
@@ -471,7 +483,7 @@ function chatStats(d: SessionData): ChatStats {
   const durMin = Math.max(1, d.meta.durationSec / 60);
   return {
     total,
-    peakPerMin: rate.length ? Math.max(...rate) : 0,
+    peakPerMin: rate.length ? maxOf(rate) : 0,
     avgPerMin: Math.round(total / durMin),
     hasData: true,
   };

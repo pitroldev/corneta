@@ -106,6 +106,9 @@ fn fuzzy_contains(needle: &str, hay: &str, max_k: usize) -> bool {
 /// separado). Recall alto de propósito — é dado do usuário.
 fn matches_term(term: &str, hay: &str, hay_words: &[&str]) -> bool {
     let phrase = normalize(term);
+    if phrase.is_empty() {
+        return false;
+    }
     let plen = phrase.chars().count();
     // Orçamento de erro ∝ tamanho (≥6 chars). Termo curto exige exato (senão casa qualquer coisa).
     let max_k = if plen >= 6 { (plen / 6).clamp(1, 3) } else { 0 };
@@ -146,7 +149,7 @@ pub fn find_watchlist(text: &str, watchlist: &[String]) -> Vec<Leak> {
     for term in watchlist {
         let t = term.trim();
         // Termos curtos demais casariam em qualquer coisa (falso-positivo) → ignora.
-        if t.chars().count() < 3 {
+        if normalize(t).chars().count() < 3 {
             continue;
         }
         if matches_term(t, &hay, &hay_words) && seen.insert(t.to_lowercase()) {

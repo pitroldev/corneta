@@ -85,10 +85,13 @@ fn models_cached(app: &AppHandle) -> bool {
 }
 
 /// Garante os 3 modelos PP-OCRv5 (baixa do GitHub Releases na 1ª vez). (det, rec, dict).
+static DL_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Com timeout por arquivo — uma rede ruim falha rápido (cai pro Windows OCR) em vez de pendurar.
 fn ensure_paddle_models(
     app: &AppHandle,
 ) -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    let _guard = DL_GUARD.lock().ok()?;
     let dir = models_dir(app)?;
     std::fs::create_dir_all(&dir).ok()?;
     let base = "https://github.com/GreatV/oar-ocr/releases/download/v0.3.0";
