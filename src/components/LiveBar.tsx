@@ -13,8 +13,10 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const state = useStore((s) => s.snapshot.state);
   const startedAt = useStore((s) => s.snapshot.startedAt);
   const targets = useStore((s) => s.snapshot.targets);
-  const viewers = useStore((s) => s.viewers);
-  const settings = useStore((s) => s.config?.settings);
+  const viewersTotal = useStore((s) => s.viewers.total);
+  const guardianOn = useStore((s) => s.config?.settings.guardianEnabled ?? false);
+  const brbOn = useStore((s) => s.config?.settings.brbEnabled ?? false);
+  const autoBitrateOn = useStore((s) => s.config?.settings.autoBitrate ?? false);
 
   const live = state === "live";
   const starting = state === "starting";
@@ -33,9 +35,9 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
     (t) => t.state === "error" || t.state === "reconnecting",
   ).length;
   const protections = [
-    settings?.guardianEnabled && "Guardião",
-    settings?.brbEnabled && "JÁ VOLTO",
-    settings?.autoBitrate && "Auto-bitrate",
+    guardianOn && "Guardião",
+    brbOn && "JÁ VOLTO",
+    autoBitrateOn && "Auto-bitrate",
   ].filter(Boolean) as string[];
 
   return (
@@ -62,11 +64,11 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
         </span>
       )}
 
-      {viewers.total > 0 && (
+      {viewersTotal > 0 && (
         <span className="flex items-center gap-1.5">
           <Eye className="size-4" />
           <span className="font-display text-lg font-extrabold leading-none tabular-nums">
-            {viewers.total.toLocaleString("pt-BR")}
+            {viewersTotal.toLocaleString("pt-BR")}
           </span>
           <span className="text-[11px] font-bold uppercase tracking-wide">assistindo</span>
         </span>

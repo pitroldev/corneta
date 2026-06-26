@@ -138,7 +138,6 @@ function ReportDetail({
   onDeleted: () => void;
 }) {
   const [data, setData] = useState<SessionData | null | "loading">("loading");
-  const [confirmDel, setConfirmDel] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -152,11 +151,6 @@ function ReportDetail({
   }, [id]);
 
   const remove = async () => {
-    if (!confirmDel) {
-      setConfirmDel(true);
-      setTimeout(() => setConfirmDel(false), 3000);
-      return;
-    }
     await api.deleteSession(id);
     toast.info("Relatório excluído");
     onDeleted();
@@ -258,9 +252,7 @@ function ReportDetail({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="size-4" /> Voltar
         </Button>
-        <Button variant={confirmDel ? "danger" : "ghost"} size="sm" onClick={remove}>
-          <Trash2 className="size-4" /> {confirmDel ? "Confirmar?" : "Excluir"}
-        </Button>
+        <DeleteButton onDelete={remove} />
       </div>
 
       <div className="mb-1 font-display text-2xl font-extrabold">
@@ -510,6 +502,26 @@ function ReportDetail({
         </div>
       </Card>
     </div>
+  );
+}
+
+function DeleteButton({ onDelete }: { onDelete: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <Button
+      variant={confirm ? "danger" : "ghost"}
+      size="sm"
+      onClick={() => {
+        if (!confirm) {
+          setConfirm(true);
+          setTimeout(() => setConfirm(false), 3000);
+          return;
+        }
+        onDelete();
+      }}
+    >
+      <Trash2 className="size-4" /> {confirm ? "Confirmar?" : "Excluir"}
+    </Button>
   );
 }
 

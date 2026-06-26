@@ -88,7 +88,13 @@ export function ChatScreen() {
     ]
   );
   const configured = sources.some((x) => x.enabled && x.value.trim());
-  const shown = useMemo(() => messages.filter((m) => filter[m.platform]), [messages, filter]);
+  const shown = useMemo(
+    () =>
+      filter.twitch && filter.youtube && filter.kick
+        ? messages
+        : messages.filter((m) => filter[m.platform]),
+    [messages, filter],
+  );
   const allFilteredOut = messages.length > 0 && shown.length === 0;
 
   const addSource = () =>

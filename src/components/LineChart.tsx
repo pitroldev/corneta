@@ -39,8 +39,8 @@ export function LineChart({
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
-  const allVals = series.flatMap((s) => s.values.filter((v): v is number => v != null));
-  const peak = allVals.reduce((m, v) => (v > m ? v : m), 1);
+  let peak = 1;
+  for (const s of series) for (const v of s.values) if (v != null && v > peak) peak = v;
   const yMax = yMaxProp ?? peak * 1.1;
   const xAt = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - Math.min(v, yMax) / yMax) * innerH;

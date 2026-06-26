@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Camera, Check, Crosshair, X } from "lucide-react";
 import { api } from "../lib/api";
@@ -26,6 +26,8 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
 
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ px: number; py: number; left: number; top: number } | null>(null);
+  const rafId = useRef<number | null>(null);
+  const pendingXY = useRef<{ x: number; y: number } | null>(null);
 
   // Dimensões do recorte como fração do palco (16:9).
   const cropW = Math.min(1, zoom * ar * (9 / 16));
@@ -42,12 +44,38 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
     const r = stageRef.current.getBoundingClientRect();
     const nl = clamp(drag.current.left + (e.clientX - drag.current.px) / r.width, 0, 1 - cropW);
     const nt = clamp(drag.current.top + (e.clientY - drag.current.py) / r.height, 0, 1 - cropH);
-    setX(1 - cropW > 0 ? nl / (1 - cropW) : 0.5);
-    setY(1 - cropH > 0 ? nt / (1 - cropH) : 0.5);
+    pendingXY.current = {
+      x: 1 - cropW > 0 ? nl / (1 - cropW) : 0.5,
+      y: 1 - cropH > 0 ? nt / (1 - cropH) : 0.5,
+    };
+    if (rafId.current == null) {
+      rafId.current = requestAnimationFrame(() => {
+        rafId.current = null;
+        if (pendingXY.current) {
+          setX(pendingXY.current.x);
+          setY(pendingXY.current.y);
+        }
+      });
+    }
   };
   const onPointerUp = () => {
     drag.current = null;
+    if (rafId.current != null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+    }
+    if (pendingXY.current) {
+      setX(pendingXY.current.x);
+      setY(pendingXY.current.y);
+      pendingXY.current = null;
+    }
   };
+  useEffect(
+    () => () => {
+      if (rafId.current != null) cancelAnimationFrame(rafId.current);
+    },
+    [],
+  );
 
   const capture = async () => {
     setCapturing(true);

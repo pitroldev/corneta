@@ -94,7 +94,6 @@
       transparent 1.5px
     );
     background-size: 20px 20px;
-    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     user-select: none;
     overflow: hidden;

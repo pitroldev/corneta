@@ -1669,15 +1669,8 @@ fn twitch_viewers(channel: &str) -> Option<u64> {
     v.pointer("/data/user/stream/viewersCount").and_then(|x| x.as_u64())
 }
 
-/// Viewers simultâneos do YouTube via Data API v3 (`concurrentViewers`).
-fn youtube_viewers(api_key: &str, channel: &str) -> Option<u64> {
-    if api_key.trim().is_empty() {
-        return None;
-    }
-    let vid = match resolve_youtube_video(channel, api_key) {
-        LiveResolve::Video(v) => v,
-        _ => return None, // não está ao vivo
-    };
+/// `concurrentViewers` de um vídeo já conhecido (chamada barata da Data API).
+fn yt_concurrent(api_key: &str, vid: &str) -> Option<u64> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}&key={api_key}"
     );
@@ -1686,6 +1679,32 @@ fn youtube_viewers(api_key: &str, channel: &str) -> Option<u64> {
     v.pointer("/items/0/liveStreamingDetails/concurrentViewers")
         .and_then(|x| x.as_str())
         .and_then(|s| s.parse::<u64>().ok())
+}
+
+/// Viewers do YouTube reusando o video_id resolvido entre polls (evita re-raspar a /live).
+fn youtube_viewers(
+    api_key: &str,
+    channel: &str,
+    cache: &mut std::collections::HashMap<String, String>,
+) -> Option<u64> {
+    if api_key.trim().is_empty() {
+        return None;
+    }
+    if let Some(vid) = cache.get(channel) {
+        if let Some(n) = yt_concurrent(api_key, vid) {
+            return Some(n);
+        }
+        cache.remove(channel);
+    }
+    let vid = match resolve_youtube_video(channel, api_key) {
+        LiveResolve::Video(v) => v,
+        _ => return None,
+    };
+    let n = yt_concurrent(api_key, &vid);
+    if n.is_some() {
+        cache.insert(channel.to_string(), vid);
+    }
+    n
 }
 
 /// Viewers do Kick (`livestream.viewer_count`) — `null` se offline.
@@ -1714,6 +1733,7 @@ fn run_viewers(
     running: Arc<AtomicBool>,
     app: AppHandle,
 ) {
+    let mut yt_cache: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     while running.load(Ordering::Relaxed) {
         let mut items = vec![];
         let mut total: u64 = 0;
@@ -1729,7 +1749,7 @@ fn run_viewers(
             };
             let count = match src.platform.as_str() {
                 "twitch" => twitch_viewers(&src.value),
-                "youtube" => youtube_viewers(&api_key, &src.value),
+                "youtube" => youtube_viewers(&api_key, &src.value, &mut yt_cache),
                 "kick" => kick_viewers(&src.value),
                 _ => None,
             };

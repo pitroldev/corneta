@@ -110,7 +110,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
     return () => clearTimeout(id);
   }, [goLiveFocus, setGoLiveFocus]);
 
-  const est = estimate(config);
+  const est = useMemo(() => estimate(config), [config]);
   const neededMbps = est.uploadKbps / 1000;
 
   const bandTone =

@@ -114,6 +114,22 @@ function keepMessage(m: ChatMessage, d: ChatDelete): boolean {
 
 export const useStore = create<State>((set, get) => {
   // Persiste a config + mantém o perfil ativo em sincronia com o working set.
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingSave: AppConfig | null = null;
+  const flushSave = async () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    if (pendingSave) {
+      const c = pendingSave;
+      pendingSave = null;
+      await api.saveConfig(c);
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", () => void flushSave());
+  }
   const persist = (config: AppConfig) => {
     const profiles = config.profiles.map((p) =>
       p.id === config.activeProfileId
@@ -122,7 +138,9 @@ export const useStore = create<State>((set, get) => {
     );
     const next = { ...config, profiles };
     set({ config: next });
-    void api.saveConfig(next);
+    pendingSave = next;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => void flushSave(), 400);
   };
 
   return {
@@ -363,6 +381,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async start() {
+      await flushSave();
       set({ leaks: [], censored: false, viewers: { total: 0, anyLive: false, items: [] } });
       await api.start();
       // A1: liga o OBS junto (melhor-esforço — pode não estar acessível).
@@ -376,6 +395,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async stop() {
+      await flushSave();
       // Só marca relatório novo se chegou a ficar AO VIVO (cancelar no "starting" não gera live).
       const wasLive = get().snapshot.state === "live";
       if (get().config?.settings.autoStartObs) {

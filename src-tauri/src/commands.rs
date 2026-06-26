@@ -925,39 +925,48 @@ pub fn stop_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), Str
 pub fn set_target_paused(app: AppHandle, target_id: String, paused: bool) -> Result<(), String> {
     use std::sync::atomic::Ordering;
     let state = app.state::<AppState>();
-    let mut eng = state.engine.lock().unwrap();
 
-    match eng.paused.get(&target_id) {
-        Some(flag) => flag.store(paused, Ordering::Relaxed),
-        None => return Err("destino não está ao vivo".into()),
-    }
+    // Mata o FFmpeg desse destino FORA do lock (taskkill bloqueia); o supervisor vê a flag e não respawna.
+    let child = {
+        let mut eng = state.engine.lock().unwrap();
+        match eng.paused.get(&target_id) {
+            Some(flag) => flag.store(paused, Ordering::Relaxed),
+            None => return Err("destino não está ao vivo".into()),
+        }
+        if paused {
+            eng.ffmpegs.remove(&target_id)
+        } else {
+            None
+        }
+    };
 
-    if paused {
-        // Mata o FFmpeg desse destino; o supervisor vê a flag e não respawna.
-        if let Some(child) = eng.ffmpegs.remove(&target_id) {
-            let pid = child.pid();
-            let _ = child.kill();
-            #[cfg(windows)]
-            {
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                    .output();
-            }
-            #[cfg(not(windows))]
-            {
-                let _ = pid;
-            }
+    if let Some(child) = child {
+        let pid = child.pid();
+        let _ = child.kill();
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = pid;
         }
     }
 
     // Estado otimista (o supervisor confirma na sequência).
-    if let Some(snap) = eng.snapshot.as_mut() {
-        if let Some(st) = snap.targets.get_mut(&target_id) {
-            st.state = if paused { "paused" } else { "connecting" }.into();
-            st.message = None;
-        }
-        let out = snap.clone();
-        drop(eng);
+    let out = {
+        let mut eng = state.engine.lock().unwrap();
+        eng.snapshot.as_mut().map(|snap| {
+            if let Some(st) = snap.targets.get_mut(&target_id) {
+                st.state = if paused { "paused" } else { "connecting" }.into();
+                st.message = None;
+            }
+            snap.clone()
+        })
+    };
+    if let Some(out) = out {
         emit(&app, &out);
     }
     Ok(())
@@ -1001,11 +1010,11 @@ fn friendly_error(low: &str) -> (&'static str, String) {
 /// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
 fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signal: bool) {
     let is_stats = line.contains("frame=") || line.contains("bitrate=");
-    let low = line.to_lowercase();
     const ERR_KEYS: [&str; 8] = [
         "error", "failed", "connection refused", "broken pipe",
         "unable to", "connection reset", "i/o error", "end of file",
     ];
+    let low = if is_stats { String::new() } else { line.to_lowercase() };
     let is_error = !is_stats && ERR_KEYS.iter().any(|k| low.contains(k));
     if !is_stats && !is_error {
         return;
@@ -1023,6 +1032,7 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
         eng.started_ms = now_ms();
     }
     let started = eng.started_ms;
+    let last_emit = eng.last_emit_ms;
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
@@ -1064,17 +1074,17 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
     }
 
     let new_state = st.state.clone();
-    let out = snap.clone();
     // Throttle: transição de estado emite na hora; atualização de métrica pura, no
     // máximo a cada ~250ms (evita N emits/s do snapshot inteiro com vários destinos).
     let now = now_ms();
     let should_emit =
-        new_state != prev_target || was_starting || now.saturating_sub(eng.last_emit_ms) >= 250;
+        new_state != prev_target || was_starting || now.saturating_sub(last_emit) >= 250;
+    let out = if should_emit { Some(snap.clone()) } else { None };
     if should_emit {
         eng.last_emit_ms = now;
     }
     drop(eng);
-    if should_emit {
+    if let Some(out) = out {
         emit(app, &out);
     }
 

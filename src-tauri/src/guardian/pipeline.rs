@@ -280,11 +280,11 @@ fn pump_frames(
 ) -> bool {
     let mut buf: VecDeque<(u64, Vec<u8>)> = VecDeque::with_capacity(delay_frames + 4);
     let mut censoring = false;
-    let mut frame = vec![0u8; FSIZE];
     loop {
         if !running.load(Ordering::Relaxed) {
             return false;
         }
+        let mut frame = vec![0u8; FSIZE];
         if dout.read_exact(&mut frame).is_err() {
             return true; // decoder morreu / EOF
         }
@@ -296,7 +296,7 @@ fn pump_frames(
                 *slot = Some((idx, frame[..YSIZE].to_vec()));
             }
         }
-        buf.push_back((idx, frame.clone()));
+        buf.push_back((idx, frame));
 
         let ok = if buf.len() > delay_frames {
             let (out_idx, f) = buf.pop_front().unwrap();
