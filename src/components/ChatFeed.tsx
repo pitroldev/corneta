@@ -1,4 +1,5 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, MessageSquare } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
@@ -42,11 +43,24 @@ export function ChatFeed({
   const [missed, setMissed] = useState(0);
   const lastId = useRef<string | undefined>(messages[messages.length - 1]?.id);
 
+  const virt = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => ref.current,
+    estimateSize: () => 28,
+    overscan: 12,
+    getItemKey: (i) => messages[i].id,
+  });
+  const totalSize = virt.getTotalSize();
+
+  useLayoutEffect(() => {
+    if (stick.current && ref.current) {
+      ref.current.scrollTop = ref.current.scrollHeight;
+    }
+  }, [totalSize]);
+
   useEffect(() => {
-    const el = ref.current;
     const newLast = messages[messages.length - 1];
-    if (el && stick.current) {
-      el.scrollTop = el.scrollHeight;
+    if (stick.current) {
       lastId.current = newLast?.id;
       return;
     }
@@ -58,6 +72,7 @@ export function ChatFeed({
       }
       lastId.current = newLast.id;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   const onScroll = () => {
@@ -73,13 +88,11 @@ export function ChatFeed({
   };
 
   const jumpToBottom = () => {
-    const el = ref.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
     stick.current = true;
     setPaused(false);
     setMissed(0);
     lastId.current = messages[messages.length - 1]?.id;
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   };
 
   return (
@@ -109,11 +122,27 @@ export function ChatFeed({
             </div>
           </div>
         ) : (
-          messages.map((m) => <MsgRow key={m.id} m={m} view={view} />)
+          <div style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}>
+            {virt.getVirtualItems().map((vi) => (
+              <div
+                key={vi.key}
+                data-index={vi.index}
+                ref={virt.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${vi.start}px)`,
+                }}
+              >
+                <MsgRow m={messages[vi.index]} view={view} />
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Aparece ao rolar pra cima — volta a acompanhar o chat (útil em chat rápido). */}
       {paused && messages.length > 0 && (
         <button
           onClick={jumpToBottom}
