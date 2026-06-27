@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  AnimatePresence,
-  motion,
-  Reorder,
-  useDragControls,
-} from "framer-motion";
-import { useDialog } from "../lib/useDialog";
+import { Reorder, useDragControls } from "framer-motion";
+import { Modal } from "../components/Modal";
 import {
   KeyRound,
   Plus,
@@ -86,27 +81,20 @@ export function PlatformsScreen() {
         </Reorder.Group>
       )}
 
-      <AnimatePresence>
-        {reframeTarget && (
-          <ReframeEditor
-            target={reframeTarget}
-            onClose={() => setReframeTarget(null)}
-          />
-        )}
-      </AnimatePresence>
+      {reframeTarget && (
+        <ReframeEditor target={reframeTarget} onClose={() => setReframeTarget(null)} />
+      )}
 
-      <AnimatePresence>
-        {picking && (
-          <PlatformPicker
-            onPick={(id) => {
-              addTarget(id);
-              setPicking(false);
-              toast.success(`${PLATFORMS[id].name} entrou na corneta 📣`);
-            }}
-            onClose={() => setPicking(false)}
-          />
-        )}
-      </AnimatePresence>
+      {picking && (
+        <PlatformPicker
+          onPick={(id) => {
+            addTarget(id);
+            setPicking(false);
+            toast.success(`${PLATFORMS[id].name} entrou na corneta 📣`);
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </div>
   );
 }
@@ -537,32 +525,12 @@ function PlatformPicker({
   onPick: (id: PlatformId) => void;
   onClose: () => void;
 }) {
-  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   const targets = useStore((s) => s.config?.targets ?? []);
   const countOf = (id: PlatformId) =>
     targets.filter((t) => t.platformId === id).length;
 
   return (
-    <motion.div
-      className="fixed inset-0 z-50 grid place-items-center bg-night/80 p-6"
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="picker-title"
-        tabIndex={-1}
-        className="w-full max-w-lg rounded-xl bg-surface p-5 pop outline-none"
-        onClick={(e) => e.stopPropagation()}
-        initial={{ scale: 0.92, y: 16, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.92, y: 16, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 320, damping: 26 }}
-      >
+    <Modal title="Quem entra na corneta?" onClose={onClose} className="max-w-lg rounded-xl bg-surface p-5 pop">
         <div className="mb-4 flex items-center justify-between">
           <h3 id="picker-title" className="text-xl">
             Quem entra na corneta?
@@ -596,7 +564,6 @@ function PlatformPicker({
             </button>
           ))}
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }

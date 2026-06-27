@@ -1,4 +1,4 @@
-import { BarChart3, Eye, Info, MessageSquare, Radio, Settings, Sliders, Tv2 } from "lucide-react";
+import { BarChart3, Eye, Info, MessageSquare, Radio, Settings, Sliders, Tv2, Users } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
 import { Mascot } from "./decor";
@@ -8,6 +8,7 @@ export type Screen =
   | "encoding"
   | "golive"
   | "chat"
+  | "mesa"
   | "reports"
   | "about"
   | "settings";
@@ -17,6 +18,7 @@ const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
   { id: "encoding", label: "Qualidade", icon: Sliders, hint: "capricho da imagem" },
   { id: "golive", label: "Ao vivo", icon: Radio, hint: "bota tudo no ar" },
   { id: "chat", label: "Chat", icon: MessageSquare, hint: "todo chat num lugar" },
+  { id: "mesa", label: "Mesa", icon: Users, hint: "co-stream com a galera" },
 ];
 
 export function Sidebar({

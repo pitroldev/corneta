@@ -1,6 +1,7 @@
+import * as RSlider from "@radix-ui/react-slider";
 import { cn } from "../lib/utils";
 
-/** Slider on-brand (thumb chunky brass com borda dura). Mostra o valor + sufixo opcional. */
+/** Slider on-brand via Radix (thumb chunky brass com borda dura). Mostra o valor + sufixo opcional. */
 export function Slider({
   value,
   min,
@@ -24,25 +25,27 @@ export function Slider({
 }) {
   return (
     <div className={cn("flex items-center gap-2.5", disabled && "opacity-40", className)}>
-      <input
-        type="range"
+      <RSlider.Root
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={[value]}
         disabled={disabled}
-        aria-label={ariaLabel}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className={cn(
-          "h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-3 outline-none disabled:cursor-not-allowed",
-          "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-[3px]",
-          "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-brass-ink [&::-webkit-slider-thumb]:bg-brass",
-          "[&::-webkit-slider-thumb]:shadow-[1px_1px_0_0_rgba(0,0,0,0.35)] [&::-webkit-slider-thumb]:transition-transform",
-          "[&::-webkit-slider-thumb]:hover:scale-110",
-          "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-[3px] [&::-moz-range-thumb]:border-2",
-          "[&::-moz-range-thumb]:border-brass-ink [&::-moz-range-thumb]:bg-brass",
-        )}
-      />
+        onValueChange={(v) => onChange(v[0])}
+        className="relative flex h-4 flex-1 cursor-pointer touch-none select-none items-center disabled:cursor-not-allowed"
+      >
+        <RSlider.Track className="relative h-1.5 flex-1 rounded-full bg-surface-3">
+          <RSlider.Range className="absolute h-full rounded-full bg-brass/40" />
+        </RSlider.Track>
+        <RSlider.Thumb
+          aria-label={ariaLabel}
+          className={cn(
+            "block size-4 rounded-[3px] border-2 border-brass-ink bg-brass outline-none",
+            "shadow-[1px_1px_0_0_rgba(0,0,0,0.35)] transition-transform hover:scale-110",
+            "focus-visible:ring-2 focus-visible:ring-brass",
+          )}
+        />
+      </RSlider.Root>
       {suffix != null && (
         <span className="min-w-10 shrink-0 text-right text-xs font-bold tabular-nums text-ink-muted">
           {value}

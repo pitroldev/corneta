@@ -18,6 +18,7 @@ import {
   Shield,
   RefreshCw,
   FileText,
+  ChevronDown,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -36,7 +37,6 @@ import {
   CopyField,
   PlatformGlyph,
   SectionTitle,
-  Stat,
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
 
@@ -91,25 +91,8 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
     prevState.current = state;
   }, [state]);
 
-  // QoL: ao vir da sidebar ("fora do ar"), rola até o botão de ir ao vivo.
-  const boraRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!goLiveFocus) return;
-    const id = setTimeout(() => {
-      const scroller = document.getElementById("screen-scroll");
-      const target = boraRef.current;
-      if (scroller && target) {
-        const t = target.getBoundingClientRect();
-        const s = scroller.getBoundingClientRect();
-        const top =
-          scroller.scrollTop +
-          (t.top - s.top) -
-          (scroller.clientHeight - t.height) / 2;
-        scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-      }
-      setGoLiveFocus(false);
-    }, 140);
-    return () => clearTimeout(id);
+    if (goLiveFocus) setGoLiveFocus(false);
   }, [goLiveFocus, setGoLiveFocus]);
 
   const est = useMemo(() => estimate(config), [config]);
@@ -126,6 +109,16 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
 
   const [testing, setTesting] = useState(false);
   const [showObs, setShowObs] = useState(false);
+  const [obsOpen, setObsOpen] = useState(false);
+  const [obs, setObs] = useState<ObsCheck | "loading" | null>(null);
+  const runObs = async () => {
+    setObs("loading");
+    try {
+      setObs(await api.obsCheck());
+    } catch (e) {
+      setObs({ reachable: false, pointingAtCorneta: false, width: 0, height: 0, fps: 0, error: String(e) });
+    }
+  };
   const onTest = async () => {
     setTesting(true);
     try {
@@ -145,6 +138,11 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
     runUploadTest()
       .catch(() => {})
       .finally(() => setTesting(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!live && !starting) void runObs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -178,6 +176,25 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       /* sem sessão gravando */
     }
   };
+
+  const obsConfigured =
+    obs !== null && obs !== "loading" && obs.reachable && obs.pointingAtCorneta;
+  const obsStatus =
+    obs === null || obs === "loading"
+      ? { tone: "neutral" as const, label: "verificando…" }
+      : obsConfigured
+        ? { tone: "ok" as const, label: "configurado" }
+        : obs.reachable
+          ? { tone: "warn" as const, label: "falta apontar pra cá" }
+          : { tone: "bad" as const, label: "não configurado" };
+  const bandColor =
+    bandTone === "ok"
+      ? "text-ok"
+      : bandTone === "warn"
+        ? "text-warn"
+        : bandTone === "bad"
+          ? "text-bad"
+          : "text-ink";
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -215,77 +232,80 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       {/* ---- BANCADA DE SETUP (some quando já está no ar) ---- */}
       {!live && (
         <Card className="mb-4">
-          <div className="mb-3 flex items-center justify-between">
+          <button
+            onClick={() => setObsOpen((o) => !o)}
+            aria-expanded={obsOpen}
+            className="flex w-full items-center gap-2.5 text-left"
+          >
             <h3 className="text-lg">Liga no OBS</h3>
-            <Button variant="outline" size="sm" onClick={() => setShowObs(true)}>
-              <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configura pra mim
-            </Button>
-          </div>
-          <p className="mb-3 text-xs text-ink-faint">
-            No OBS:{" "}
-            <strong className="text-ink-muted">
-              Configurações → Transmissão → Serviço “Personalizado”
-            </strong>{" "}
-            e cole os dois campos abaixo — assim o OBS manda o vídeo pra Corneta, e ela espalha pras plataformas.
-          </p>
-          <div className="grid grid-cols-1 gap-2">
-            <CopyField label="Servidor" value={obsIngestUrl(config.ingest)} />
-            <CopyField label="Chave de transmissão" value={config.ingest.key} mono />
-          </div>
-          <p className="mt-3 text-xs text-ink-faint">
-            Essa chave fica só no seu PC, entre o OBS e a Corneta — não é a chave de nenhuma plataforma. As chaves de cada plataforma ficam guardadas no cofre do sistema.
-          </p>
+            <Badge tone={obsStatus.tone}>{obsStatus.label}</Badge>
+            <ChevronDown
+              className={cn(
+                "ml-auto size-4 shrink-0 text-ink-faint transition-transform",
+                obsOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {obsOpen && (
+            <div className="mt-3">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <p className="text-xs text-ink-faint">
+                  No OBS:{" "}
+                  <strong className="text-ink-muted">
+                    Configurações → Transmissão → Serviço “Personalizado”
+                  </strong>{" "}
+                  e cole os dois campos abaixo — assim o OBS manda o vídeo pra Corneta, e ela espalha pras plataformas.
+                </p>
+                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setShowObs(true)}>
+                  <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configura pra mim
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <CopyField label="Servidor" value={obsIngestUrl(config.ingest)} />
+                <CopyField label="Chave de transmissão" value={config.ingest.key} mono />
+              </div>
+              <p className="mt-3 text-xs text-ink-faint">
+                Essa chave fica só no seu PC, entre o OBS e a Corneta — não é a chave de nenhuma plataforma. As chaves de cada plataforma ficam guardadas no cofre do sistema.
+              </p>
+            </div>
+          )}
         </Card>
       )}
 
       {!live && (
-        <Card className="mb-4 bg-surface-2">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-lg">
-              <Gauge className="size-5 text-brass" /> Banda de upload
-            </h3>
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={onTest}
-              loading={testing}
-              disabled={testing || starting}
-              title={starting ? "Espera entrar no ar pra não competir pela banda" : undefined}
+        <Card className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 bg-surface-2 py-3">
+          <span className="flex items-center gap-2">
+            <Gauge className="size-4 text-brass" />
+            <span className="text-sm font-semibold text-ink-muted">Banda de upload</span>
+          </span>
+          <span className="text-sm">
+            <span className={cn("font-display text-lg font-extrabold tabular-nums", bandColor)}>
+              {uploadMbps == null ? "—" : uploadMbps}
+            </span>
+            <span className="text-ink-faint"> / {neededMbps.toFixed(1).replace(".", ",")} Mbps</span>
+          </span>
+          {uploadMbps != null && bandTone === "bad" ? (
+            <button
+              onClick={() => onNavigate?.("encoding")}
+              className="text-xs font-bold text-bad hover:underline"
             >
-              {!testing && <Wifi className="size-4" />}
-              {testing ? "Testando…" : "Testar seu upload"}
-            </Button>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Stat
-              label="Precisa de"
-              value={`${neededMbps.toFixed(1).replace(".", ",")} Mbps`}
-              hint={`${est.enabledCount} plataformas`}
-            />
-            <Stat
-              label="Seu upload"
-              value={uploadMbps == null ? "—" : `${uploadMbps} Mbps`}
-              tone={bandTone === "default" ? "default" : bandTone}
-              hint={uploadMbps == null ? "rode o teste" : undefined}
-            />
-            <Stat
-              label="Recodificadas"
-              value={est.transcodeCount}
-              hint={`${est.copyCount} em cópia`}
-            />
-          </div>
-          {uploadMbps != null && bandTone === "bad" && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-bad/15 px-3 py-2 text-sm font-semibold text-bad">
-              <AlertTriangle className="size-4 shrink-0" />
-              <span>
-                Seu upload pode não dar conta. Baixe o bitrate (a qualidade do vídeo) ou tire uma
-                plataforma da lista.
-              </span>
-              <Button variant="subtle" size="sm" className="ml-auto" onClick={() => onNavigate?.("encoding")}>
-                Ajustar qualidade
-              </Button>
-            </div>
-          )}
+              não dá conta — ajustar qualidade
+            </button>
+          ) : uploadMbps != null && bandTone === "warn" ? (
+            <span className="text-xs font-bold text-warn">no limite</span>
+          ) : null}
+          <Button
+            variant="subtle"
+            size="sm"
+            className="ml-auto"
+            onClick={onTest}
+            loading={testing}
+            disabled={testing || starting}
+            title={starting ? "Espera entrar no ar pra não competir pela banda" : undefined}
+          >
+            {!testing && <Wifi className="size-4" />}
+            {testing ? "Testando…" : "Testar"}
+          </Button>
         </Card>
       )}
 
@@ -312,7 +332,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         </Card>
       )}
 
-      {!live && !starting && <Checkup />}
+      {!live && !starting && <Checkup obs={obs} onRecheck={runObs} />}
 
       {/* Confirma a rede de proteção ANTES do BORA (e durante, lá embaixo). */}
       {!live && !starting && <SecurityPanel onAdjust={openSecurity} />}
@@ -441,8 +461,8 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         </>
       )}
 
-      {/* ---- BOTÃO PRINCIPAL ---- */}
-      <div ref={boraRef} className="mb-5">
+      {/* ---- BOTÃO PRINCIPAL (rodapé fixo) ---- */}
+      <div className="sticky -bottom-8 z-10 mt-4 border-t-2 border-border bg-bg pb-3 pt-3">
         {starting ? (
           <Button variant="outline" size="lg" className="w-full" onClick={onCancel}>
             <Loader2 className="size-5 animate-spin" /> Aguardando o OBS conectar… (cancelar)
@@ -475,7 +495,14 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       </div>
 
       <AnimatePresence>
-        {showObs && <ObsWizard onClose={() => setShowObs(false)} />}
+        {showObs && (
+          <ObsWizard
+            onClose={() => {
+              setShowObs(false);
+              void runObs();
+            }}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -557,34 +584,18 @@ function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolea
   );
 }
 
-function Checkup() {
+function Checkup({
+  obs,
+  onRecheck,
+}: {
+  obs: ObsCheck | "loading" | null;
+  onRecheck: () => void;
+}) {
   const config = useStore((s) => s.config)!;
   const encoders = useStore((s) => s.encoders);
   const uploadMbps = useStore((s) => s.uploadMbps);
   const enabled = config.targets.filter((t) => t.enabled);
   const needed = estimate(config).uploadKbps / 1000;
-  const [obs, setObs] = useState<ObsCheck | "loading" | null>(null);
-
-  const runObs = async () => {
-    setObs("loading");
-    try {
-      setObs(await api.obsCheck());
-    } catch (e) {
-      setObs({
-        reachable: false,
-        pointingAtCorneta: false,
-        width: 0,
-        height: 0,
-        fps: 0,
-        error: String(e),
-      });
-    }
-  };
-
-  useEffect(() => {
-    void runObs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <Card className="mb-4">
@@ -592,7 +603,7 @@ function Checkup() {
         <h3 className="flex items-center gap-2 text-lg">
           <ClipboardCheck className="size-5 text-brass" /> Check-up pré-live
         </h3>
-        <Button variant="subtle" size="sm" onClick={runObs} loading={obs === "loading"} disabled={obs === "loading"}>
+        <Button variant="subtle" size="sm" onClick={onRecheck} loading={obs === "loading"} disabled={obs === "loading"}>
           {obs !== "loading" && <Zap className="size-4 text-brass" />}
           Verificar OBS
         </Button>

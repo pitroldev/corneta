@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import {
   AlertTriangle,
   Check,
@@ -12,7 +11,7 @@ import { useStore } from "../lib/store";
 import { IS_TAURI } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
 import { cn } from "../lib/utils";
-import { useDialog } from "../lib/useDialog";
+import { Modal } from "./Modal";
 import { Button, CopyField, Input } from "./ui";
 
 type Status = "idle" | "connecting" | "ok" | "error";
@@ -76,7 +75,6 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
-  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
 
   const help = error ? obsErrorHelp(error) : null;
 
@@ -100,26 +98,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[80] grid place-items-center bg-night/80 p-6"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="obs-wizard-title"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        initial={{ scale: 0.92, y: 16, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.92, y: 16, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 26 }}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-surface pop outline-none"
-      >
+    <Modal title="Conectar ao OBS" onClose={onClose} className="max-w-lg rounded-xl bg-surface pop">
         <div className="sticky top-0 flex items-center justify-between bg-brass px-5 py-4 text-brass-ink">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-lg bg-brass-ink text-brass">
@@ -274,8 +253,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             )}
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 

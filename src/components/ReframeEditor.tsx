@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { Camera, Check, Crosshair, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
-import { useDialog } from "../lib/useDialog";
 import { toast } from "../lib/toast";
+import { Modal } from "./Modal";
 import { PLATFORMS } from "../lib/platforms";
 import type { Target } from "../lib/types";
 import { Button } from "./ui";
@@ -97,7 +96,6 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
     onClose();
   };
 
-  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   const anyLive = useStore((s) => s.viewers.anyLive);
   // Mudou algo? (pra não descartar sem querer no clique fora)
   const dirty = x !== init.x || y !== init.y || zoom !== init.zoom || frame != null;
@@ -117,25 +115,12 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
     : undefined;
 
   return (
-    <div
-      className="fixed inset-0 z-[80] grid place-items-center bg-night/80 p-6"
-      onClick={() => {
-        if (!dirty) onClose();
-      }}
+    <Modal
+      title="Enquadrar vertical"
+      onClose={onClose}
+      lockOutside={dirty}
+      className="max-w-3xl rounded-xl bg-surface p-6 pop"
     >
-      <motion.div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reframe-title"
-        tabIndex={-1}
-        initial={{ opacity: 0, scale: 0.96, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl rounded-xl bg-surface p-6 pop outline-none"
-      >
         <div className="mb-1 flex items-center justify-between">
           <h3 id="reframe-title" className="flex items-center gap-2 text-xl">
             <Crosshair className="size-5 text-brass" /> Enquadrar vertical · {target.name}
@@ -258,8 +243,7 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
             ? "Capture um frame do OBS pra enquadrar exatamente."
             : "💡 A captura de frame fica disponível com o OBS ao vivo. Sem frame, use a grade pra posicionar."}
         </p>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 

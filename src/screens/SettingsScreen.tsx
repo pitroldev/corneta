@@ -14,6 +14,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import * as RTabs from "@radix-ui/react-tabs";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
@@ -91,33 +92,29 @@ export function SettingsScreen() {
         subtitle="O endereço que o OBS usa pra te entregar o vídeo, e como a Corneta se comporta."
       />
 
-      {/* Abas */}
-      <div className="mb-5 flex flex-wrap gap-2">
-        {TABS.map((t) => {
-          const active = tab === t.id;
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              aria-current={active ? "page" : undefined}
-              data-on-brass={active ? "" : undefined}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-md px-4 py-2 font-display text-sm font-bold transition-all",
-                active
-                  ? "bg-brass text-brass-ink pop-brass"
-                  : "bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink",
-              )}
-            >
-              <Icon className="size-4" strokeWidth={2.4} /> {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <RTabs.Root value={tab} onValueChange={(v) => setTab(v as SettingsTab)}>
+        <RTabs.List className="mb-5 flex flex-wrap gap-2">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <RTabs.Trigger
+                key={t.id}
+                value={t.id}
+                data-on-brass={tab === t.id ? "" : undefined}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-md px-4 py-2 font-display text-sm font-bold transition-all",
+                  "bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink",
+                  "data-[state=active]:bg-brass data-[state=active]:text-brass-ink data-[state=active]:pop-brass",
+                )}
+              >
+                <Icon className="size-4" strokeWidth={2.4} /> {t.label}
+              </RTabs.Trigger>
+            );
+          })}
+        </RTabs.List>
 
-      {/* ===================== OBS ===================== */}
-      {tab === "obs" && (
-        <>
+        {/* ===================== OBS ===================== */}
+        <RTabs.Content value="obs">
           <Card className="mb-4">
             <h3 className="flex items-center gap-2 text-lg">
               <Server className="size-5 text-brass" /> Endpoint de ingestão (OBS)
@@ -202,12 +199,11 @@ export function SettingsScreen() {
               </SettingRow>
             </div>
           </Card>
-        </>
-      )}
+        </RTabs.Content>
 
-      {/* ===================== Segurança ao vivo ===================== */}
-      {tab === "seguranca" && (
-        <Card accent>
+        {/* ===================== Segurança ao vivo ===================== */}
+        <RTabs.Content value="seguranca">
+          <Card accent>
           <h3 className="mb-1 flex items-center gap-2 text-lg">
             <Shield className="size-5 text-brass" /> Segurança ao vivo
           </h3>
@@ -247,12 +243,11 @@ export function SettingsScreen() {
             </SettingRow>
             {settings.guardianEnabled && <GuardianEditor />}
           </div>
-        </Card>
-      )}
+          </Card>
+        </RTabs.Content>
 
-      {/* ===================== Geral ===================== */}
-      {tab === "geral" && (
-        <>
+        {/* ===================== Geral ===================== */}
+        <RTabs.Content value="geral">
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">
               <Keyboard className="size-5 text-brass" /> Atalho global
@@ -354,8 +349,8 @@ export function SettingsScreen() {
               </SettingRow>
             </div>
           </Card>
-        </>
-      )}
+        </RTabs.Content>
+      </RTabs.Root>
     </div>
   );
 }

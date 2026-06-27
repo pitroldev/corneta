@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, MessageSquare, Radio, Split, Tv2, X, Zap } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
-import { useDialog } from "../lib/useDialog";
+import { Modal } from "./Modal";
 import { Mascot, SoundWaves } from "./decor";
 import { Button } from "./ui";
 
@@ -68,32 +68,17 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   };
   const next = () => (last ? close(true) : setStep((s) => s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
-  const dialogRef = useDialog<HTMLDivElement>(open, () => close(false));
 
   const cur = STEPS[step];
   const Icon = cur.icon;
 
+  if (!open) return null;
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-[90] grid place-items-center bg-night/80 p-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="onb-title"
-            tabIndex={-1}
-            initial={{ scale: 0.9, y: 20, opacity: 0 }}
-            animate={{ scale: 1, y: 0, opacity: 1 }}
-            exit={{ scale: 0.9, y: 20, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className="relative w-full max-w-md overflow-hidden rounded-xl bg-surface pop outline-none"
-          >
+    <Modal
+      title="Bora cornetar?"
+      onClose={() => close(false)}
+      className="max-w-md overflow-hidden rounded-xl bg-surface pop"
+    >
             <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
             <button
               onClick={() => close(false)}
@@ -169,9 +154,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
                 </Button>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }

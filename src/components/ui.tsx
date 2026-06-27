@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
+import * as Switch from "@radix-ui/react-switch";
 import { Check, Copy, Globe, Info, Loader2 } from "lucide-react";
 import {
   siTwitch, siYoutube, siFacebook, siKick, siTiktok, siX, siInstagram,
@@ -153,24 +154,24 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
+    <Switch.Root
+      checked={checked}
+      onCheckedChange={onChange}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      aria-label={label}
       className={cn(
-        "relative h-6 w-11 shrink-0 rounded-md transition-colors disabled:pointer-events-none disabled:opacity-40",
-        checked ? "bg-brass" : "bg-surface-3"
+        "inline-flex h-6 w-11 shrink-0 items-center rounded-md px-1 transition-colors",
+        "bg-surface-3 data-[state=checked]:bg-brass",
+        "disabled:pointer-events-none disabled:opacity-40",
       )}
     >
-      <span
+      <Switch.Thumb
         className={cn(
-          "absolute left-1 top-1 size-4 rounded-[4px] transition-transform",
-          checked ? "translate-x-5 bg-brass-ink" : "translate-x-0 bg-ink-faint"
+          "block size-4 rounded-[4px] bg-ink-faint transition-transform",
+          "data-[state=checked]:translate-x-5 data-[state=checked]:bg-brass-ink",
         )}
       />
-    </button>
+    </Switch.Root>
   );
 }
 
