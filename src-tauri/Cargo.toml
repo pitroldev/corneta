@@ -51,10 +51,18 @@ ort = "=2.0.0-rc.10"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
 keyring = { version = "3", features = ["windows-native"] }
+# Mesa (co-stream P2P): servidor local HTTP (página de estúdio pro OBS) + relay de
+# sinalização WebRTC. axum =0.8.4 (MSRV ok p/ rust 1.77) reusa o stack hyper1/http1/tower
+# que o Tauri já traz; só compila axum/axum-core/matchit/tokio-tungstenite a mais.
+axum = { version = "=0.8.4", default-features = false, features = ["http1", "tokio", "ws"] }
+tokio = { version = "1", features = ["net", "sync", "macros"] }
 
 # OCR local do guardião anti-vazamento via Windows.Media.Ocr (nativo, sem binário extra).
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections"] }
+# Mesa: auto-concede câmera/mic no WebView2 (PermissionRequested). Resolve pra 0.38.2,
+# o mesmo já fixado pelo wry — sem binding nativo duplicado.
+webview2-com = "0.38"
 
 [profile.release]
 panic = "abort"

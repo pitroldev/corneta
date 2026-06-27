@@ -7,7 +7,7 @@ import { renderBrbSlatePng } from "./lib/brbSlate";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "reports", "about", "settings"];
+const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "mesa", "reports", "about", "settings"];
 import { TitleBar } from "./components/TitleBar";
 import { LiveBar } from "./components/LiveBar";
 import { Toaster } from "./components/Toaster";
@@ -17,6 +17,7 @@ import { PlatformsScreen } from "./screens/PlatformsScreen";
 import { EncodingScreen } from "./screens/EncodingScreen";
 import { GoLiveScreen } from "./screens/GoLiveScreen";
 import { ChatScreen } from "./screens/ChatScreen";
+import { MesaScreen } from "./screens/MesaScreen";
 import { ReportsScreen } from "./screens/ReportsScreen";
 import { AboutScreen } from "./screens/AboutScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -189,6 +190,7 @@ export default function App() {
                     {screen === "encoding" && <EncodingScreen />}
                     {screen === "golive" && <GoLiveScreen onNavigate={navigate} />}
                     {screen === "chat" && <ChatScreen />}
+                    {screen === "mesa" && <MesaScreen />}
                     {screen === "reports" && <ReportsScreen />}
                     {screen === "about" && <AboutScreen />}
                     {screen === "settings" && <SettingsScreen />}

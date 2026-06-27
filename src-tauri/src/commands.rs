@@ -1360,6 +1360,62 @@ pub async fn obs_check(app: AppHandle) -> Result<crate::obs::ObsCheck, String> {
         .map_err(|e| format!("join: {e}"))
 }
 
+// ------------------------------- Mesa (co-stream P2P) -------------------------------
+
+/// Nome do Browser Source que a Mesa cria/atualiza no OBS.
+const MESA_OBS_SOURCE: &str = "Corneta · Mesa";
+
+/// Sobe (ou reaproveita) o servidor local da Mesa: HTTP da página de estúdio + relay de
+/// sinalização WebRTC. Devolve porta + IP da LAN pra montar o convite.
+#[tauri::command]
+pub async fn mesa_start_server(
+    state: State<'_, AppState>,
+) -> Result<crate::studio::MesaServerInfo, String> {
+    crate::studio::start(&state.studio).await
+}
+
+/// Encerra o servidor local da Mesa (fecha conexões vivas e libera a porta).
+#[tauri::command]
+pub fn mesa_stop_server(state: State<'_, AppState>) {
+    crate::studio::stop(&state.studio);
+}
+
+/// Adiciona (ou atualiza) o Browser Source da Mesa na cena atual do OBS.
+#[tauri::command]
+pub async fn mesa_obs_add_source(app: AppHandle, url: String, width: u32, height: u32) -> Result<(), String> {
+    let password = get_config(app).settings.obs_password;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::add_or_update_browser_source("127.0.0.1", 4455, &password, MESA_OBS_SOURCE, &url, width, height)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?
+}
+
+/// Remove o Browser Source da Mesa do OBS (limpeza ao encerrar).
+#[tauri::command]
+pub async fn mesa_obs_remove_source(app: AppHandle) -> Result<(), String> {
+    let password = get_config(app).settings.obs_password;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::remove_input("127.0.0.1", 4455, &password, MESA_OBS_SOURCE)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?
+}
+
+/// Abre as Configurações de Privacidade do Windows (câmera/mic) quando o getUserMedia
+/// falha por causa do bloqueio do SO (que o handler do WebView2 não consegue cobrir).
+/// Vai pelo Rust porque o open() do plugin-shell no JS é barrado pelo escopo padrão.
+#[tauri::command]
+pub fn open_privacy_settings(app: AppHandle, which: String) -> Result<(), String> {
+    let uri = match which.as_str() {
+        "camera" => "ms-settings:privacy-webcam",
+        "microphone" => "ms-settings:privacy-microphone",
+        _ => return Err("configuração desconhecida".into()),
+    };
+    #[allow(deprecated)]
+    app.shell().open(uri, None).map_err(|e| e.to_string())
+}
+
 /// Crava um marcador na sessão em gravação (relatório pós-live).
 #[tauri::command]
 pub fn mark_moment(app: AppHandle, label: Option<String>) -> Result<(), String> {

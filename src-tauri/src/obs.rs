@@ -127,8 +127,8 @@ pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
     let _ = socket.close(None);
-    // 604 = já transmitindo / 702 = não estava transmitindo → já está no estado desejado.
-    let already = if start { 604 } else { 702 };
+    // 500 = OutputRunning (já transmitindo) / 501 = OutputNotRunning (não estava) → já no estado desejado.
+    let already = if start { 500 } else { 501 };
     if ok || code == already {
         Ok(())
     } else {
@@ -191,6 +191,150 @@ fn request(socket: &mut Socket, req_type: &str, id: &str) -> Result<Value, Strin
     )?;
     let resp = read_json(socket)?;
     Ok(resp.pointer("/d/responseData").cloned().unwrap_or(Value::Null))
+}
+
+/// Envia um request COM `requestData` e devolve a resposta inteira (pra inspecionar o status).
+fn request_with(socket: &mut Socket, req_type: &str, id: &str, data: Value) -> Result<Value, String> {
+    send_json(
+        socket,
+        &json!({ "op": 6, "d": { "requestType": req_type, "requestId": id, "requestData": data } }),
+    )?;
+    read_json(socket)
+}
+
+fn req_ok(resp: &Value) -> bool {
+    resp.pointer("/d/requestStatus/result")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
+// --------------------- Mesa: Browser Source no OBS ---------------------
+
+/// Cria (ou atualiza) um Browser Source apontando pra `url`, na cena atual do OBS.
+/// Idempotente: checa o GetInputList primeiro (sem depender de código de erro) — se o
+/// input já existe, só atualiza a URL/tamanho (preserva a posição que o usuário ajustou).
+pub fn add_or_update_browser_source(
+    host: &str,
+    port: u16,
+    password: &str,
+    input_name: &str,
+    url: &str,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let mut socket = connect_identify(host, port, password)?;
+
+    let settings = json!({
+        "url": url,
+        "width": width,
+        "height": height,
+        // Roteia o áudio dos convidados pela mesa de som do OBS (vai pra live).
+        "reroute_audio": true,
+    });
+
+    // Já existe um input com esse nome? Nomes são GLOBAIS no OBS (entre cenas E tipos),
+    // então também conferimos o tipo: se existir com OUTRO tipo, é colisão de nome.
+    let list = request(&mut socket, "GetInputList", "corneta-inputs")?;
+    let existing_kind = list.get("inputs").and_then(|v| v.as_array()).and_then(|arr| {
+        arr.iter()
+            .find(|i| i.get("inputName").and_then(|n| n.as_str()) == Some(input_name))
+            .map(|i| {
+                i.get("inputKind")
+                    .and_then(|k| k.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            })
+    });
+    if let Some(kind) = &existing_kind {
+        if kind != "browser_source" {
+            let _ = socket.close(None);
+            return Err(format!(
+                "já existe uma fonte \"{input_name}\" no OBS (do tipo {kind}). Renomeie ou apague pra a Mesa usar esse nome."
+            ));
+        }
+    }
+
+    // Cena atual (program) — os dois ramos precisam dela.
+    let scene_resp = request(&mut socket, "GetCurrentProgramScene", "corneta-scene")?;
+    let scene = scene_resp
+        .get("currentProgramSceneName")
+        .or_else(|| scene_resp.get("sceneName"))
+        .and_then(|v| v.as_str())
+        .ok_or("não consegui descobrir a cena atual do OBS")?
+        .to_string();
+
+    let resp = if existing_kind.is_some() {
+        // O input existe globalmente, mas o scene item é POR-CENA: pode ter sobrado de uma
+        // sessão anterior em OUTRA cena. Garante que ele está na cena atual (senão a Mesa
+        // "soma" — atualiza a fonte numa cena que o streamer não está usando).
+        let item = request_with(
+            &mut socket,
+            "GetSceneItemId",
+            "corneta-itemid",
+            json!({ "sceneName": scene, "sourceName": input_name }),
+        )?;
+        let missing = item.pointer("/d/requestStatus/code").and_then(|v| v.as_u64()) == Some(600);
+        if missing {
+            let added = request_with(
+                &mut socket,
+                "CreateSceneItem",
+                "corneta-additem",
+                json!({ "sceneName": scene, "sourceName": input_name, "sceneItemEnabled": true }),
+            )?;
+            if !req_ok(&added) {
+                let _ = socket.close(None);
+                return Err(format!("o OBS recusou pôr a Mesa na cena atual: {added}"));
+            }
+        }
+        request_with(
+            &mut socket,
+            "SetInputSettings",
+            "corneta-update",
+            json!({ "inputName": input_name, "inputSettings": settings, "overlay": true }),
+        )?
+    } else {
+        request_with(
+            &mut socket,
+            "CreateInput",
+            "corneta-create",
+            json!({
+                "sceneName": scene,
+                "inputName": input_name,
+                "inputKind": "browser_source",
+                "inputSettings": settings,
+                "sceneItemEnabled": true,
+            }),
+        )?
+    };
+
+    let _ = socket.close(None);
+    if req_ok(&resp) {
+        Ok(())
+    } else {
+        Err(format!("o OBS recusou a fonte da Mesa: {resp}"))
+    }
+}
+
+/// Remove um input da Mesa (limpeza ao encerrar). Tolera "não encontrado".
+pub fn remove_input(host: &str, port: u16, password: &str, input_name: &str) -> Result<(), String> {
+    let mut socket = connect_identify(host, port, password)?;
+    let resp = request_with(
+        &mut socket,
+        "RemoveInput",
+        "corneta-remove",
+        json!({ "inputName": input_name }),
+    )?;
+    let _ = socket.close(None);
+    // Se já não existe, o objetivo (não estar lá) já foi alcançado.
+    let not_found = resp
+        .pointer("/d/requestStatus/code")
+        .and_then(|v| v.as_u64())
+        == Some(600);
+    if req_ok(&resp) || not_found {
+        Ok(())
+    } else {
+        Err(format!("o OBS recusou remover a fonte da Mesa: {resp}"))
+    }
 }
 
 /// Coleta stats do OBS a cada ~2s enquanto `running`, chamando `on_stats`.

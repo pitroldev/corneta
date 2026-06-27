@@ -68,6 +68,19 @@ export interface CornetaApi {
   captureFrame(): Promise<string>;
   // Guardião anti-vazamento
   subscribeGuardian(onLeak: (l: Leak) => void, onCensor: (on: boolean) => void): () => void;
+  // Mesa (co-stream P2P): servidor local (HTTP + sinalização) + auto-fonte no OBS
+  mesaStartServer(): Promise<MesaServerInfo>;
+  mesaStopServer(): Promise<void>;
+  mesaObsAddSource(url: string, width: number, height: number): Promise<void>;
+  mesaObsRemoveSource(): Promise<void>;
+  openPrivacySettings(which: "camera" | "microphone"): Promise<void>;
+}
+
+export interface MesaServerInfo {
+  /** Porta do servidor local (HTTP do estúdio + websocket de sinalização). */
+  port: number;
+  /** IPv4 da LAN (pra montar o convite que o convidado alcança). */
+  lanIp: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +287,26 @@ function tauriApi(): CornetaApi {
         uns.forEach((u) => u());
         uns.length = 0;
       };
+    },
+    async mesaStartServer() {
+      const { invoke } = await core();
+      return invoke<MesaServerInfo>("mesa_start_server");
+    },
+    async mesaStopServer() {
+      const { invoke } = await core();
+      await invoke("mesa_stop_server");
+    },
+    async mesaObsAddSource(url, width, height) {
+      const { invoke } = await core();
+      await invoke("mesa_obs_add_source", { url, width, height });
+    },
+    async mesaObsRemoveSource() {
+      const { invoke } = await core();
+      await invoke("mesa_obs_remove_source");
+    },
+    async openPrivacySettings(which) {
+      const { invoke } = await core();
+      await invoke("open_privacy_settings", { which });
     },
   };
 }
@@ -829,6 +862,22 @@ function mockApi(): CornetaApi {
     },
     subscribeGuardian() {
       return () => {};
+    },
+    // Mesa: sem backend no navegador — a conexão real só roda no app instalado.
+    async mesaStartServer() {
+      return { port: 0, lanIp: "127.0.0.1" };
+    },
+    async mesaStopServer() {
+      /* no-op no navegador */
+    },
+    async mesaObsAddSource() {
+      /* no-op no navegador (sem OBS) */
+    },
+    async mesaObsRemoveSource() {
+      /* no-op no navegador */
+    },
+    async openPrivacySettings() {
+      /* no-op no navegador */
     },
   };
 }

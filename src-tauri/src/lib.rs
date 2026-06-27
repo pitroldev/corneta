@@ -5,17 +5,20 @@ mod engine;
 mod guardian;
 mod keys;
 mod obs;
+mod permissions;
 mod session;
+mod studio;
 
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
-/// Estado global: runtime do motor (handle do sidecar + último snapshot) + chat.
+/// Estado global: runtime do motor (handle do sidecar + último snapshot) + chat + Mesa.
 pub struct AppState {
     pub engine: Mutex<engine::EngineRuntime>,
     pub chat: Mutex<chat::ChatRuntime>,
+    pub studio: Mutex<studio::StudioServer>,
 }
 
 fn show_main(app: &tauri::AppHandle) {
@@ -71,6 +74,7 @@ pub fn run() {
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
             chat: Mutex::new(chat::ChatRuntime::default()),
+            studio: Mutex::new(studio::StudioServer::default()),
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
@@ -102,8 +106,17 @@ pub fn run() {
             commands::import_config,
             commands::save_brb_slate,
             commands::capture_frame,
+            commands::mesa_start_server,
+            commands::mesa_stop_server,
+            commands::mesa_obs_add_source,
+            commands::mesa_obs_remove_source,
+            commands::open_privacy_settings,
         ])
         .setup(|app| {
+            // Mesa: auto-concede câmera/mic no WebView2 (getUserMedia sem prompt/lock).
+            if let Some(w) = app.get_webview_window("main") {
+                permissions::grant_av_permissions(&w);
+            }
             // Registra o atalho global de começar/parar a partir das settings.
             {
                 use tauri_plugin_global_shortcut::GlobalShortcutExt;
@@ -148,6 +161,7 @@ pub fn run() {
                                 true
                             };
                             if ok {
+                                studio::stop(&app.state::<AppState>().studio);
                                 commands::kill_engine(app);
                                 app.exit(0);
                             }
@@ -182,6 +196,7 @@ pub fn run() {
                     let _ = window.hide();
                 } else {
                     // Fechar de verdade: mata FFmpeg para não deixar processo órfão (§14.2).
+                    studio::stop(&app.state::<AppState>().studio);
                     commands::kill_engine(app);
                 }
             }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   Check,
   Radio,
@@ -232,22 +233,13 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       {/* ---- BANCADA DE SETUP (some quando já está no ar) ---- */}
       {!live && (
         <Card className="mb-4">
-          <button
-            onClick={() => setObsOpen((o) => !o)}
-            aria-expanded={obsOpen}
-            className="flex w-full items-center gap-2.5 text-left"
-          >
-            <h3 className="text-lg">Liga no OBS</h3>
-            <Badge tone={obsStatus.tone}>{obsStatus.label}</Badge>
-            <ChevronDown
-              className={cn(
-                "ml-auto size-4 shrink-0 text-ink-faint transition-transform",
-                obsOpen && "rotate-180",
-              )}
-            />
-          </button>
-          {obsOpen && (
-            <div className="mt-3">
+          <Collapsible.Root open={obsOpen} onOpenChange={setObsOpen}>
+            <Collapsible.Trigger className="group flex w-full items-center gap-2.5 text-left">
+              <h3 className="text-lg">Liga no OBS</h3>
+              <Badge tone={obsStatus.tone}>{obsStatus.label}</Badge>
+              <ChevronDown className="ml-auto size-4 shrink-0 text-ink-faint transition-transform group-data-[state=open]:rotate-180" />
+            </Collapsible.Trigger>
+            <Collapsible.Content className="mt-3">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <p className="text-xs text-ink-faint">
                   No OBS:{" "}
@@ -267,8 +259,8 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
               <p className="mt-3 text-xs text-ink-faint">
                 Essa chave fica só no seu PC, entre o OBS e a Corneta — não é a chave de nenhuma plataforma. As chaves de cada plataforma ficam guardadas no cofre do sistema.
               </p>
-            </div>
-          )}
+            </Collapsible.Content>
+          </Collapsible.Root>
         </Card>
       )}
 
@@ -494,16 +486,14 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         )}
       </div>
 
-      <AnimatePresence>
-        {showObs && (
-          <ObsWizard
-            onClose={() => {
-              setShowObs(false);
-              void runObs();
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {showObs && (
+        <ObsWizard
+          onClose={() => {
+            setShowObs(false);
+            void runObs();
+          }}
+        />
+      )}
     </div>
   );
 }

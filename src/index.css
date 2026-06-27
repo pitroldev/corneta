@@ -212,6 +212,25 @@
   }
 }
 
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -44%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 /* ============================================================
    Foco visível on-brand (teclado). FORA de @layer de propósito: estilos
    sem camada vencem as utilities do Tailwind (ex.: `outline-none` dos inputs),
