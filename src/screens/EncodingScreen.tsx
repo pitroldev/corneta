@@ -97,18 +97,28 @@ export function EncodingScreen() {
                   : "border-2 border-transparent bg-surface-2 hover:bg-surface-3",
               )}
             >
-              <div className="mb-2 flex items-center justify-between">
+              <div
+                className={cn(
+                  "relative mb-3 h-16 w-full overflow-hidden rounded-md bg-surface-2 ring-1 transition-all",
+                  active ? "ring-2 ring-brass" : "ring-border",
+                )}
+              >
+                <ModeFlow mode={m.id} />
+                <Badge tone={m.tone} className="absolute right-1.5 top-1.5">
+                  {m.tag}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    "grid size-9 place-items-center rounded-md",
+                    "grid size-7 shrink-0 place-items-center rounded-md",
                     active ? "bg-brass text-brass-ink" : "bg-surface text-ink-muted",
                   )}
                 >
-                  <Icon className="size-5" strokeWidth={2.3} />
+                  <Icon className="size-4" strokeWidth={2.4} />
                 </span>
-                <Badge tone={m.tone}>{m.tag}</Badge>
+                <span className="font-display text-lg font-bold">{m.title}</span>
               </div>
-              <div className="font-display text-lg font-bold">{m.title}</div>
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">{m.desc}</p>
               <div className="mt-3 space-y-2">
                 <LoadBar load={est.load} />
@@ -218,6 +228,40 @@ export function EncodingScreen() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Mini-fluxo do modo: a fonte do OBS (latão) → 3 plataformas, com um chip TOMATE
+ *  onde a Corneta recodifica. 0 chips = cópia · 1 = esperto · 1 por plataforma = caprichado. */
+function ModeFlow({ mode }: { mode: EncodingMode }) {
+  const chips = mode === "per-platform" ? [14, 32, 50] : mode === "hybrid" ? [32] : [];
+  return (
+    <svg viewBox="0 0 200 64" className="h-full w-full" aria-hidden>
+      <g
+        className="text-brass"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      >
+        <path d="M36 32 H56" />
+        <path d="M56 14 V50" />
+        <path d="M56 14 H174" />
+        <path d="M56 32 H174" />
+        <path d="M56 50 H174" />
+      </g>
+      <g className="text-brass" fill="currentColor">
+        <rect x="12" y="22" width="24" height="20" rx="4" />
+        <circle cx="176" cy="14" r="5" />
+        <circle cx="176" cy="32" r="5" />
+        <circle cx="176" cy="50" r="5" />
+      </g>
+      <g className="text-tomate" fill="currentColor" stroke="var(--color-brass-ink)" strokeWidth="1.5">
+        {chips.map((y) => (
+          <rect key={y} x="101" y={y - 7} width="14" height="14" rx="3" />
+        ))}
+      </g>
+    </svg>
   );
 }
 

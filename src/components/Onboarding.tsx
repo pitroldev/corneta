@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, MessageSquare, Radio, Split, Tv2, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
 import { Modal } from "./Modal";
@@ -11,27 +11,22 @@ const FLAG = "corneta.welcomed";
 
 const STEPS = [
   {
-    icon: Split,
     title: "Uma live, todo lugar",
     text: "Você manda 1 stream do OBS e a Corneta espalha pra Twitch, YouTube, Kick e mais — tudo de uma vez.",
   },
   {
-    icon: Tv2,
     title: "Escolha os destinos",
     text: "Em Plataformas, adicione cada lugar e cole a chave de transmissão (o código secreto que liga a live à sua conta). Elas ficam no cofre do sistema, nunca soltas num arquivo de texto.",
   },
   {
-    icon: Zap,
     title: "Liga no OBS",
     text: "Em Ao vivo, o botão “Configura pra mim” ajusta o OBS pra mandar a live pra Corneta sozinho — sem você abrir menu técnico nenhum.",
   },
   {
-    icon: Radio,
     title: "Solta a corneta",
     text: "Um clique e você entra no ar em todas. Veja os números de cada plataforma — e a saúde geral no ícone perto do relógio.",
   },
   {
-    icon: MessageSquare,
     title: "Chat e relatórios",
     text: "Todo o chat num lugar (dá pra soltar numa janela flutuante) e, ao encerrar, um relatório do que travou.",
   },
@@ -70,7 +65,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const cur = STEPS[step];
-  const Icon = cur.icon;
 
   if (!open) return null;
   return (
@@ -98,7 +92,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
             </div>
 
             <div className="p-6">
-              <div className="min-h-28">
+              <div className="min-h-[14rem]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -106,15 +100,10 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -24 }}
                     transition={{ duration: 0.2 }}
-                    className="flex items-start gap-4"
                   >
-                    <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-surface-2 text-brass">
-                      <Icon className="size-6" strokeWidth={2.3} />
-                    </span>
-                    <div>
-                      <div className="font-display text-lg font-extrabold">{cur.title}</div>
-                      <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{cur.text}</div>
-                    </div>
+                    <StepArt step={step} />
+                    <div className="font-display text-lg font-extrabold">{cur.title}</div>
+                    <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{cur.text}</div>
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -155,5 +144,159 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
               </div>
             </div>
     </Modal>
+  );
+}
+
+// ---------------- Ilustrações dos passos (mini-painéis de quadrinho) ----------------
+// Vocabulário: latão = seu sinal/destinos, tomate = ação/destaque, brass-ink = contorno
+// duro. Passo 1 (leque 1→muitos) e passo 5 (funil muitos→1) são imagem espelhada.
+
+const BRASS = "var(--color-brass)";
+const TOMATE = "var(--color-tomate)";
+const INK = "var(--color-brass-ink)";
+
+/** Chip de plataforma (círculo de latão com a letra). */
+function PChip({ cx, cy, label }: { cx: number; cy: number; label: string }) {
+  return (
+    <>
+      <circle cx={cx} cy={cy} r="12" fill={BRASS} stroke={INK} strokeWidth="1.5" />
+      <text x={cx} y={cy + 4} textAnchor="middle" fontSize="12" fontWeight="800" fill={INK}>
+        {label}
+      </text>
+    </>
+  );
+}
+
+function ArtFanout() {
+  return (
+    <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
+      <g stroke={BRASS} strokeWidth="3" fill="none" strokeLinecap="round">
+        <path d="M84 52 H120" />
+        <path d="M120 52 C152 52 152 28 196 28" />
+        <path d="M120 52 H196" />
+        <path d="M120 52 C152 52 152 76 196 76" />
+      </g>
+      <rect x="20" y="38" width="60" height="28" rx="6" fill={BRASS} stroke={INK} strokeWidth="2" />
+      <text x="50" y="56" textAnchor="middle" fontSize="14" fontWeight="800" fill={INK}>OBS</text>
+      <circle cx="78" cy="36" r="10" fill={TOMATE} stroke={INK} strokeWidth="1.5" />
+      <text x="78" y="40" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">1</text>
+      <PChip cx={208} cy={28} label="T" />
+      <PChip cx={208} cy={52} label="Y" />
+      <PChip cx={208} cy={76} label="K" />
+    </svg>
+  );
+}
+
+function ArtKeyVault() {
+  return (
+    <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
+      <rect x="18" y="32" width="92" height="26" rx="13" fill={BRASS} stroke={INK} strokeWidth="2" />
+      <text x="64" y="50" textAnchor="middle" fontSize="17" fontWeight="800" fill={INK} letterSpacing="3">••••</text>
+      <text x="64" y="72" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--color-ink-faint)">sua chave</text>
+      <g stroke={TOMATE} strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M118 45 H150" />
+        <path d="M143 38 L152 45 L143 52" />
+      </g>
+      <rect x="166" y="22" width="76" height="62" rx="8" fill={INK} />
+      <circle cx="204" cy="53" r="15" fill="none" stroke={BRASS} strokeWidth="3" />
+      <circle cx="204" cy="53" r="4" fill={BRASS} />
+      <rect x="200" y="53" width="8" height="16" fill={BRASS} />
+    </svg>
+  );
+}
+
+function ArtObsSetup() {
+  return (
+    <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
+      <rect x="22" y="18" width="150" height="68" rx="8" fill="none" stroke={INK} strokeWidth="2.5" />
+      <g stroke={INK} strokeWidth="3" strokeLinecap="round" opacity="0.3">
+        <path d="M38 36 H156" />
+        <path d="M38 52 H156" />
+        <path d="M38 68 H156" />
+      </g>
+      <g fill={BRASS} stroke={INK} strokeWidth="2">
+        <circle cx="120" cy="36" r="7" />
+        <circle cx="120" cy="52" r="7" />
+        <circle cx="120" cy="68" r="7" />
+      </g>
+      <g stroke={TOMATE} strokeWidth="3" strokeLinecap="round">
+        <path d="M210 26 v16" />
+        <path d="M202 34 h16" />
+        <path d="M205 29 l10 10" />
+        <path d="M215 29 l-10 10" />
+      </g>
+      <rect x="188" y="56" width="52" height="22" rx="5" fill={BRASS} stroke={INK} strokeWidth="2" />
+      <text x="214" y="71" textAnchor="middle" fontSize="9" fontWeight="800" fill={INK}>AUTO</text>
+    </svg>
+  );
+}
+
+function ArtOnAir() {
+  const cols: [string, number][] = [
+    ["T", 150],
+    ["Y", 192],
+    ["K", 234],
+  ];
+  return (
+    <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
+      <rect x="20" y="22" width="96" height="28" rx="6" fill={TOMATE} stroke={INK} strokeWidth="2" />
+      <circle cx="38" cy="36" r="5" fill="#fff" />
+      <text x="76" y="41" textAnchor="middle" fontSize="13" fontWeight="800" fill="#fff">NO AR</text>
+      <path
+        d="M20 80 H44 L52 66 L62 92 L72 72 L80 80 H120"
+        fill="none"
+        stroke={BRASS}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {cols.map(([l, x]) => (
+        <g key={l}>
+          <PChip cx={x} cy={34} label={l} />
+          <g fill={BRASS}>
+            <rect x={x - 12} y={66} width={6} height={10} rx={1} />
+            <rect x={x - 4} y={60} width={6} height={16} rx={1} />
+            <rect x={x + 4} y={54} width={6} height={22} rx={1} />
+          </g>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function ArtFunnel() {
+  const bubbles: [number, number, string][] = [
+    [26, 84, BRASS],
+    [46, 72, TOMATE],
+    [66, 80, BRASS],
+  ];
+  return (
+    <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
+      <PChip cx={28} cy={28} label="T" />
+      <PChip cx={28} cy={52} label="Y" />
+      <PChip cx={28} cy={76} label="K" />
+      <g stroke={BRASS} strokeWidth="3" fill="none" strokeLinecap="round">
+        <path d="M42 28 C90 28 90 52 130 52" />
+        <path d="M42 52 H130" />
+        <path d="M42 76 C90 76 90 52 130 52" />
+      </g>
+      {bubbles.map(([y, w, dot]) => (
+        <g key={y}>
+          <rect x="150" y={y} width={w} height="16" rx="6" fill="var(--color-surface-3)" stroke={INK} strokeWidth="1.5" />
+          <circle cx="158" cy={y + 8} r="3" fill={dot} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+const STEP_ART = [ArtFanout, ArtKeyVault, ArtObsSetup, ArtOnAir, ArtFunnel];
+
+function StepArt({ step }: { step: number }) {
+  const Art = STEP_ART[step] ?? ArtFanout;
+  return (
+    <div className="mb-3 h-28 w-full overflow-hidden rounded-md bg-surface-2 ring-1 ring-border">
+      <Art />
+    </div>
   );
 }

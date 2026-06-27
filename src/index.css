@@ -268,3 +268,77 @@
     animation: none !important;
   }
 }
+
+/* ============================================================
+   Troca de tema: a corneta SOPRA o tema novo — um sopro de latão (.wash) + ondas
+   sonoras concêntricas (.ring) blastando do ponto do clique. Latão sólido, sem glow,
+   no espírito megafone/pôster. Disparado em src/lib/theme.ts.
+   ============================================================ */
+.theme-blast {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+.theme-blast-wash,
+.theme-blast-ring {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 200vmax;
+  height: 200vmax;
+  margin-left: -100vmax;
+  margin-top: -100vmax;
+  border-radius: 9999px;
+  transform: scale(0);
+  will-change: transform, opacity;
+}
+.theme-blast-wash {
+  background: radial-gradient(
+    circle,
+    rgba(255, 179, 35, 0.28) 0%,
+    rgba(255, 179, 35, 0.1) 40%,
+    transparent 64%
+  );
+  animation: theme-blast-pop 620ms cubic-bezier(0.22, 0.7, 0.25, 1) forwards;
+}
+.theme-blast-ring {
+  border: 0.55vmax solid var(--color-brass);
+  opacity: 0.7;
+  animation: theme-blast-pop 720ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+@keyframes theme-blast-pop {
+  from {
+    transform: scale(0);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-blast {
+    display: none;
+  }
+}
+
+/* Enquanto `.theme-anim` está no <html> (só durante a troca), as cores DERRETEM pro
+   tema novo em vez de pular seco — é o que tira o "brusco". Fora dessa janela, os
+   hovers/estados normais seguem rápidos. Desligado pra quem pede menos movimento. */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-anim,
+  html.theme-anim *,
+  html.theme-anim *::before,
+  html.theme-anim *::after {
+    transition:
+      background-color 450ms ease,
+      color 450ms ease,
+      border-color 450ms ease,
+      fill 450ms ease,
+      stroke 450ms ease,
+      box-shadow 450ms ease,
+      outline-color 450ms ease !important;
+  }
+}

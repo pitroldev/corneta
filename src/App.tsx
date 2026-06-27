@@ -4,6 +4,7 @@ import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { toast } from "./lib/toast";
 import { renderBrbSlatePng } from "./lib/brbSlate";
+import { applyTheme } from "./lib/theme";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -97,9 +98,12 @@ export default function App() {
     leakSeen.current = leaks.length;
   }, [leaks]);
 
-  // D1: aplica o tema (dark/light) no documento.
+  // D1: aplica o tema (dark/light). Na troca pela mão, a corneta "sopra" o tema novo
+  // (ondas de latão saindo do clique — ver lib/theme); no 1º load aplica direto.
+  const firstTheme = useRef(true);
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    applyTheme(theme, !firstTheme.current);
+    firstTheme.current = false;
   }, [theme]);
 
   // Gera o slate "JÁ VOLTO" e salva no disco (o FFmpeg usa quando o sinal cai).

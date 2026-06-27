@@ -9,6 +9,7 @@ import {
   MonitorCog,
   Palette,
   Plug,
+  ScanEye,
   Server,
   Shield,
   Upload,
@@ -21,7 +22,7 @@ import { obsIngestUrl } from "../lib/factory";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import type { ObsCheck } from "../lib/types";
-import { Button, Card, CopyField, EmptyState, ExperimentalBadge, Input, SectionTitle, Toggle } from "../components/ui";
+import { Badge, Button, Card, CopyField, EmptyState, ExperimentalBadge, Input, SectionTitle, Toggle } from "../components/ui";
 
 type SettingsTab = "obs" | "seguranca" | "geral";
 const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
@@ -204,46 +205,54 @@ export function SettingsScreen() {
         {/* ===================== Segurança ao vivo ===================== */}
         <RTabs.Content value="seguranca">
           <Card accent>
-          <h3 className="mb-1 flex items-center gap-2 text-lg">
-            <Shield className="size-5 text-brass" /> Segurança ao vivo
-          </h3>
-          <p className="mb-1 text-xs text-ink-faint">
-            As redes que seguram a sua live quando algo dá errado. Aparecem como “armadas” na tela Ao vivo.
-          </p>
-          <div className="divide-y divide-border-soft">
-            <SettingRow
-              title="Proteção contra quedas (JÁ VOLTO)"
-              desc="Se o OBS cair no meio da live, a Corneta segura no ar com a tela “JÁ VOLTO” até o sinal voltar — em vez de derrubar tudo. (Só depois que a transmissão já começou.)"
-            >
-              <Toggle
-                checked={settings.brbEnabled}
-                onChange={(v) => setSettings({ brbEnabled: v })}
-                label="Proteção contra quedas"
-              />
-            </SettingRow>
-            <SettingRow
-              title="Auto-bitrate quando a banda aperta"
-              desc="Se um destino que a Corneta recodifica não dá conta do upload, ela baixa o bitrate dele e sobe de volta quando estabiliza — em vez de derrubar."
-            >
-              <Toggle
-                checked={settings.autoBitrate}
-                onChange={(v) => setSettings({ autoBitrate: v })}
-                label="Auto-bitrate"
-              />
-            </SettingRow>
-            <SettingRow
-              title="Guardião de privacidade"
-              badge={<ExperimentalBadge />}
-              desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. A leitura é local — OCR no seu PC, nada sai daqui. Rede de segurança, não garantia."
-            >
-              <Toggle
-                checked={settings.guardianEnabled}
-                onChange={(v) => setSettings({ guardianEnabled: v })}
-                label="Guardião"
-              />
-            </SettingRow>
-            {settings.guardianEnabled && <GuardianEditor />}
-          </div>
+            <h3 className="mb-1 flex items-center gap-2 text-lg">
+              <Shield className="size-5 text-brass" /> Segurança ao vivo
+            </h3>
+            <p className="mb-2 text-xs text-ink-faint">
+              As redes que seguram a sua live quando algo dá errado. O escudo{" "}
+              <strong className="text-brass">acende</strong> quando a proteção está armada — igual na
+              tela Ao vivo.
+            </p>
+            <div className="divide-y divide-border-soft">
+              <SecurityFeature
+                preview={<BrbPreview />}
+                on={settings.brbEnabled}
+                title="Proteção contra quedas (JÁ VOLTO)"
+                desc="Se o OBS cair no meio da live, a Corneta segura no ar com a tela “JÁ VOLTO” até o sinal voltar — em vez de derrubar tudo. (Só depois que a transmissão já começou.)"
+              >
+                <Toggle
+                  checked={settings.brbEnabled}
+                  onChange={(v) => setSettings({ brbEnabled: v })}
+                  label="Proteção contra quedas"
+                />
+              </SecurityFeature>
+              <SecurityFeature
+                preview={<BitratePreview />}
+                on={settings.autoBitrate}
+                title="Auto-bitrate quando a banda aperta"
+                desc="Se um destino que a Corneta recodifica não dá conta do upload, ela baixa o bitrate dele e sobe de volta quando estabiliza — em vez de derrubar."
+              >
+                <Toggle
+                  checked={settings.autoBitrate}
+                  onChange={(v) => setSettings({ autoBitrate: v })}
+                  label="Auto-bitrate"
+                />
+              </SecurityFeature>
+              <SecurityFeature
+                preview={<GuardianPreview />}
+                on={settings.guardianEnabled}
+                title="Guardião de privacidade"
+                badge={<ExperimentalBadge />}
+                desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. A leitura é local — OCR no seu PC, nada sai daqui. Rede de segurança, não garantia."
+              >
+                <Toggle
+                  checked={settings.guardianEnabled}
+                  onChange={(v) => setSettings({ guardianEnabled: v })}
+                  label="Guardião"
+                />
+              </SecurityFeature>
+              {settings.guardianEnabled && <GuardianEditor />}
+            </div>
           </Card>
         </RTabs.Content>
 
@@ -491,6 +500,118 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {label}
       {children}
     </label>
+  );
+}
+
+/** A tela "JÁ VOLTO" que vai pro ar quando o sinal do OBS cai. */
+function BrbPreview() {
+  return (
+    <div className="absolute inset-0 grid place-items-center bg-[#14100a]">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(255,179,35,0.16) 1px, transparent 0)",
+          backgroundSize: "7px 7px",
+        }}
+      />
+      <div className="relative -rotate-3 bg-brass px-2 py-0.5 font-display text-[9px] font-extrabold leading-none text-brass-ink shadow-[2px_2px_0_#0b0805]">
+        JÁ VOLTO
+      </div>
+    </div>
+  );
+}
+
+/** O bitrate de saída (latão) descendo pra caber embaixo da banda disponível (linha tracejada). */
+function BitratePreview() {
+  return (
+    <div className="absolute inset-0 bg-surface-2">
+      <svg viewBox="0 0 128 72" preserveAspectRatio="none" className="h-full w-full">
+        <path
+          d="M2 16 H44 L64 40 H84 L126 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeDasharray="4 3"
+          className="text-bad/70"
+        />
+        <path d="M2 26 H44 L64 50 H84 L126 26 V72 H2 Z" fill="currentColor" className="text-brass/20" />
+        <path
+          d="M2 26 H44 L64 50 H84 L126 26"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          className="text-brass"
+        />
+      </svg>
+    </div>
+  );
+}
+
+/** Uma linha da tela com um termo seu tampado — o Guardião viu e cortou. */
+function GuardianPreview() {
+  return (
+    <div className="absolute inset-0 flex flex-col justify-center gap-1.5 bg-surface-2 px-2.5">
+      <div className="h-1.5 w-4/5 rounded-full bg-ink-faint/40" />
+      <div className="flex items-center gap-1.5">
+        <div className="h-1.5 w-1/5 rounded-full bg-ink-faint/40" />
+        <div className="h-3 flex-1 rounded-sm bg-night" />
+      </div>
+      <div className="h-1.5 w-3/5 rounded-full bg-ink-faint/40" />
+      <ScanEye className="absolute right-1.5 top-1.5 size-3.5 text-brass" strokeWidth={2.4} />
+    </div>
+  );
+}
+
+/** Linha ILUSTRADA da "Segurança ao vivo": uma mini-tela mostra a proteção em ação e
+ *  ganha moldura de latão (com sombra) quando está armada — como na tela Ao vivo. */
+function SecurityFeature({
+  preview,
+  on,
+  title,
+  desc,
+  badge,
+  children,
+}: {
+  preview: ReactNode;
+  on: boolean;
+  title: string;
+  desc: string;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-4 py-4">
+      <div
+        className={cn(
+          "relative aspect-video w-32 shrink-0 overflow-hidden rounded-md transition-all",
+          on ? "pop-brass ring-2 ring-brass" : "opacity-60 grayscale ring-1 ring-border",
+        )}
+      >
+        {preview}
+        {!on && (
+          <div className="absolute inset-0 grid place-items-center bg-night/45">
+            <span className="rounded-sm bg-surface-3/90 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-faint">
+              desligado
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2 font-display font-bold">
+          {title}
+          {badge}
+          {on && (
+            <Badge tone="brass" className="text-[10px]">
+              Armado
+            </Badge>
+          )}
+        </div>
+        <div className="mt-0.5 text-sm text-ink-muted">{desc}</div>
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
   );
 }
 

@@ -77,6 +77,63 @@ const CONN_LABEL: Record<string, { text: string; down: boolean }> = {
   closed: { text: "saiu", down: true },
 };
 
+// Ilustrações do lobby: você = hub central (host) e o convite = ingresso que entra
+// na Mesa de outro (convidado). Latão = seu / a Mesa, tomate = a galera / o destaque.
+function HostHubArt() {
+  return (
+    <svg viewBox="0 0 260 96" className="h-full w-full" aria-hidden>
+      <g
+        stroke="var(--color-brass)"
+        strokeWidth="3"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M66 30 L108 44" />
+        <path d="M101 35 L110 45 L100 47" />
+        <path d="M194 30 L152 44" />
+        <path d="M160 35 L150 45 L160 47" />
+        <path d="M130 84 L130 70" />
+        <path d="M124 76 L130 70 L136 76" />
+      </g>
+      <g fill="var(--color-tomate)" stroke="var(--color-brass-ink)" strokeWidth="1.5">
+        <circle cx="60" cy="24" r="11" />
+        <circle cx="200" cy="24" r="11" />
+        <circle cx="130" cy="88" r="11" />
+      </g>
+      <circle cx="130" cy="46" r="22" fill="var(--color-brass)" stroke="var(--color-brass-ink)" strokeWidth="2.5" />
+      <rect x="118" y="40" width="24" height="14" rx="3" fill="var(--color-brass-ink)" />
+      <circle cx="130" cy="47" r="4" fill="var(--color-brass)" />
+    </svg>
+  );
+}
+
+function GuestTicketArt() {
+  return (
+    <svg viewBox="0 0 260 96" className="h-full w-full" aria-hidden>
+      <g stroke="var(--color-brass)" strokeWidth="2.5" fill="none" strokeLinecap="round">
+        <path d="M216 30 L198 48" />
+        <path d="M216 66 L198 48" />
+      </g>
+      <circle cx="198" cy="48" r="16" fill="var(--color-brass)" stroke="var(--color-brass-ink)" strokeWidth="2" />
+      <g fill="var(--color-brass)" stroke="var(--color-brass-ink)" strokeWidth="1.5">
+        <circle cx="224" cy="26" r="9" />
+        <circle cx="224" cy="70" r="9" />
+      </g>
+      <g stroke="var(--color-tomate)" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M122 48 H166" />
+        <path d="M159 41 L168 48 L159 55" />
+      </g>
+      <g transform="rotate(-6 64 48)">
+        <rect x="18" y="30" width="94" height="36" rx="6" fill="var(--color-surface-3)" stroke="var(--color-brass-ink)" strokeWidth="2" />
+        <line x1="86" y1="30" x2="86" y2="66" stroke="var(--color-brass-ink)" strokeWidth="1.5" strokeDasharray="3 3" />
+        <text x="52" y="53" textAnchor="middle" fontSize="13" fontWeight="800" fill="var(--color-brass)">MESA1</text>
+        <rect x="86" y="30" width="26" height="36" rx="6" fill="var(--color-tomate)" />
+      </g>
+    </svg>
+  );
+}
+
 export function MesaScreen() {
   const mesa = useMesa();
   const [name, setName] = useState(() => {
@@ -220,6 +277,9 @@ export function MesaScreen() {
         // -------------------- Lobby --------------------
         <div className="grid gap-5 md:grid-cols-2">
           <Card pop className="flex flex-col">
+            <div className="mb-3 h-24 w-full overflow-hidden rounded-md bg-surface-2 ring-1 ring-border">
+              <HostHubArt />
+            </div>
             <div className="mb-2 flex items-center gap-2">
               <div className="grid size-9 place-items-center rounded-md bg-brass text-brass-ink pop-brass">
                 <Plus className="size-5" strokeWidth={2.6} />
@@ -242,6 +302,9 @@ export function MesaScreen() {
           </Card>
 
           <Card pop className="flex flex-col">
+            <div className="mb-3 h-24 w-full overflow-hidden rounded-md bg-surface-2 ring-1 ring-border">
+              <GuestTicketArt />
+            </div>
             <div className="mb-2 flex items-center gap-2">
               <div className="grid size-9 place-items-center rounded-md bg-surface-3 text-ink">
                 <LogIn className="size-5" strokeWidth={2.6} />
