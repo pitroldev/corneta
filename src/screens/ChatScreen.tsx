@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Bell, Eye, ExternalLink, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
+import { toast } from "../lib/toast";
 import { cn, uid } from "../lib/utils";
 import type { ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
@@ -47,6 +48,7 @@ export function ChatScreen() {
 
   const [showConfig, setShowConfig] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
@@ -127,16 +129,24 @@ export function ChatScreen() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => {
+                loading={connecting}
+                onClick={async () => {
                   if (IS_TAURI && !configured) {
                     setShowConfig(true);
                     return;
                   }
-                  void connectChat();
+                  setConnecting(true);
+                  try {
+                    await connectChat();
+                  } catch {
+                    toast.error("Não consegui conectar o chat — confira os canais.");
+                  } finally {
+                    setConnecting(false);
+                  }
                 }}
                 title={IS_TAURI && !configured ? "Adicione um canal primeiro" : undefined}
               >
-                <Wifi className="size-4" /> Conectar
+                {!connecting && <Wifi className="size-4" />} Conectar
               </Button>
             )}
           </div>

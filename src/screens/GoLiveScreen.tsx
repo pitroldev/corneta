@@ -40,6 +40,8 @@ import {
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
 
+let prewarmedUpload = false;
+
 export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void }) {
   const config = useStore((s) => s.config)!;
   const snapshot = useStore((s) => s.snapshot);
@@ -134,6 +136,17 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       setTesting(false);
     }
   };
+
+  // Pré-aquece a medição de banda na 1ª visita (fora do ar) pra a tela já chegar pronta.
+  useEffect(() => {
+    if (prewarmedUpload || live || starting || uploadMbps != null) return;
+    prewarmedUpload = true;
+    setTesting(true);
+    runUploadTest()
+      .catch(() => {})
+      .finally(() => setTesting(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onStart = async () => {
     try {
@@ -262,9 +275,15 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
             />
           </div>
           {uploadMbps != null && bandTone === "bad" && (
-            <div className="mt-3 flex items-center gap-2 rounded-md bg-bad/15 px-3 py-2 text-sm font-semibold text-bad">
-              <AlertTriangle className="size-4" />
-              Seu upload pode não dar conta. Baixe o bitrate (a qualidade do vídeo) ou tire uma plataforma da lista.
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-bad/15 px-3 py-2 text-sm font-semibold text-bad">
+              <AlertTriangle className="size-4 shrink-0" />
+              <span>
+                Seu upload pode não dar conta. Baixe o bitrate (a qualidade do vídeo) ou tire uma
+                plataforma da lista.
+              </span>
+              <Button variant="subtle" size="sm" className="ml-auto" onClick={() => onNavigate?.("encoding")}>
+                Ajustar qualidade
+              </Button>
             </div>
           )}
         </Card>
@@ -361,6 +380,14 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                           >
                             {st.message}
                           </div>
+                        )}
+                        {st?.state === "error" && (
+                          <button
+                            onClick={() => onNavigate?.("platforms")}
+                            className="mt-0.5 text-[11px] font-bold text-brass hover:underline"
+                          >
+                            Resolver →
+                          </button>
                         )}
                       </div>
                       <div className="hidden gap-6 sm:flex">
@@ -553,6 +580,11 @@ function Checkup() {
       });
     }
   };
+
+  useEffect(() => {
+    void runObs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Card className="mb-4">

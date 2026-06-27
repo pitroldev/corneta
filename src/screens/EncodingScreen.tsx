@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, Cpu, Crosshair, Gauge, Info, Layers, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, Cpu, Crosshair, Gauge, Info, Layers, RotateCcw, Sparkles, Wand2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import type { EncoderKind, EncodingMode } from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
@@ -51,6 +51,8 @@ export function EncodingScreen() {
   const config = useStore((s) => s.config);
   const encoders = useStore((s) => s.encoders);
   const setMode = useStore((s) => s.setMode);
+  const uploadMbps = useStore((s) => s.uploadMbps);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   if (!config) return null;
 
   const lcd = lowestCommonDenominator(config);
@@ -116,6 +118,16 @@ export function EncodingScreen() {
                     {fmtBitrate(est.uploadKbps)}
                   </span>
                 </div>
+                {uploadMbps != null && (
+                  <div
+                    className={cn(
+                      "text-[11px] font-bold",
+                      est.uploadKbps / 1000 <= uploadMbps ? "text-ok" : "text-bad",
+                    )}
+                  >
+                    {est.uploadKbps / 1000 <= uploadMbps ? "cabe na sua banda" : "acima da sua banda"}
+                  </div>
+                )}
               </div>
             </motion.button>
           );
@@ -179,10 +191,17 @@ export function EncodingScreen() {
 
       {config.mode !== "passthrough" && (
         <div className="mt-7">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+          <button
+            onClick={() => setShowAdvanced((v) => !v)}
+            aria-expanded={showAdvanced}
+            className="mb-2 flex w-full items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint transition-colors hover:text-ink-muted"
+          >
             <Gauge className="size-4" /> Ajuste fino por plataforma
-          </h3>
-          {config.targets.some((t) => t.enabled) ? (
+            <span className="font-medium normal-case tracking-normal text-ink-faint/70">(avançado)</span>
+            <ChevronDown className={cn("ml-auto size-4 transition-transform", showAdvanced && "rotate-180")} />
+          </button>
+          {showAdvanced &&
+            (config.targets.some((t) => t.enabled) ? (
             <div className="flex flex-col gap-2">
               {config.targets
                 .filter((t) => t.enabled)
@@ -195,7 +214,7 @@ export function EncodingScreen() {
               Nenhuma plataforma ativa. Ative uma em <strong className="text-ink">Plataformas</strong> pra
               ajustar a qualidade dela.
             </Card>
-          )}
+          ))}
         </div>
       )}
     </div>

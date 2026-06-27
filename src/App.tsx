@@ -116,6 +116,23 @@ export default function App() {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [screen]);
 
+  // Alt+1..7 troca de tela (ignora quando o foco está num campo de texto).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      const i = "1234567".indexOf(e.key);
+      if (i >= 0 && i < SCREENS.length) {
+        e.preventDefault();
+        navigate(SCREENS[i]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <MotionConfig reducedMotion="user">
     <div className="flex h-full flex-col overflow-hidden border border-border-soft">

@@ -86,7 +86,11 @@ export function ReportsScreen() {
       />
 
       {sessions === null ? (
-        <Card className="text-sm text-ink-muted">Carregando…</Card>
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-lg bg-surface-2" />
+          ))}
+        </div>
       ) : sessions.length === 0 ? (
         <EmptyState title="Nenhuma transmissão ainda">
           Toda vez que você for ao ar, eu anoto tudo o que rolou e, quando a live encerra, monto o relatório aqui.
@@ -162,7 +166,11 @@ function ReportDetail({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="size-4" /> Voltar
         </Button>
-        <Card className="mt-4 text-sm text-ink-muted">Carregando o relatório…</Card>
+        <div className="mt-4 flex flex-col gap-3">
+          <div className="h-20 animate-pulse rounded-lg bg-surface-2" />
+          <div className="h-16 animate-pulse rounded-lg bg-surface-2" />
+          <div className="h-44 animate-pulse rounded-lg bg-surface-2" />
+        </div>
       </div>
     );
   }
