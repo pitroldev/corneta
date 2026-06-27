@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
 import * as Switch from "@radix-ui/react-switch";
-import { Check, Copy, Globe, Info, Loader2 } from "lucide-react";
+import { Check, Copy, FlaskConical, Globe, Info, Loader2 } from "lucide-react";
 import {
   siTwitch, siYoutube, siFacebook, siKick, siTiktok, siX, siInstagram,
 } from "simple-icons";
@@ -137,6 +137,22 @@ export function Badge({
       style={color ? { backgroundColor: color, color: readableOn(color) } : undefined}
     >
       {children}
+    </span>
+  );
+}
+
+// ---------------- Experimental (adesivo de feature beta) ----------------
+// Selo de gibi torto com frasco — sinaliza "ainda em teste, pode falhar/mudar".
+export function ExperimentalBadge({ className }: { className?: string }) {
+  return (
+    <span
+      title="Feature experimental — ainda em teste, pode falhar ou mudar"
+      className={cn(
+        "inline-flex shrink-0 -rotate-2 items-center gap-1 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white pop-sm",
+        className
+      )}
+    >
+      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden /> experimental
     </span>
   );
 }

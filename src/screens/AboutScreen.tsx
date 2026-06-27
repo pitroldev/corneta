@@ -56,7 +56,7 @@ export function AboutScreen() {
           <div>
             <h3 className="text-3xl">Oi, sou o Petro</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
-              Fiz a Corneta pra resolver a minha própria dor: você manda um stream do OBS e ela
+              Fiz a Corneta pra resolver o meu próprio perrengue: você manda um stream do OBS e ela
               joga ao vivo em várias plataformas de uma vez, sem dor de cabeça.
             </p>
           </div>
@@ -114,7 +114,7 @@ export function AboutScreen() {
 
       {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
-        Corneta é gratuita e de código aberto: você pode usar à vontade e ver como ela funciona por dentro. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
+        Corneta é grátis e de código aberto — espia como ela funciona por dentro. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
       </p>
       <p className="mt-1 text-center text-[11px] font-semibold text-ink-faint">
         Corneta v{APP_VERSION} · multi-stream

@@ -228,7 +228,7 @@ export const useMesa = create<MesaState>((set, get) => {
         return;
       }
       if (isLoopback(inv.addr.split(":")[0])) {
-        toast.error("Esse convite aponta pra um endereço local. Peça um convite novo (com rede) pro host.");
+        toast.error("Esse convite aponta pra um endereço local. Pede um convite novo pro host.");
         return;
       }
       try {
@@ -240,7 +240,7 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         info = await api.mesaStartServer();
       } catch (e) {
-        toast.error("Não consegui subir o servidor local pro seu OBS.");
+        toast.error("Não consegui subir o servidor da Mesa.");
         set({ camError: String(e) });
         return;
       }

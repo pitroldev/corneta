@@ -78,7 +78,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
         <span className="flex items-center gap-1.5 rounded-sm bg-bad px-2 py-0.5 text-white">
           <AlertTriangle className="size-3.5" />
           <span className="text-[11px] font-bold uppercase tracking-wide">
-            {down} destino{down > 1 ? "s" : ""} caiu
+            {down} destino{down > 1 ? "s" : ""} fora
           </span>
         </span>
       )}

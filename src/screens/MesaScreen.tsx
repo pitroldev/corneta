@@ -111,7 +111,7 @@ export function MesaScreen() {
       <SectionTitle
         kicker="Mesa · co-stream"
         title="Chama a galera pra Mesa"
-        subtitle="Webcam de cada um direto P2P, em alta — sem call do Discord, sem mosaico borrado. A Corneta põe cada um num slot fixo no seu OBS, e quem cai vira um 'JÁ VOLTO' no lugar (a cena não quebra)."
+        subtitle="Webcam de cada um direto P2P, em alta — sem call do Discord, sem mosaico borrado. E quem cai vira 'JÁ VOLTO' no lugar, sem quebrar a sua cena."
         right={
           mesa.active ? (
             <Badge tone={online ? "live" : "warn"}>
@@ -125,8 +125,7 @@ export function MesaScreen() {
       {!IS_TAURI && (
         <Card className="mb-6 border-l-4 border-warn bg-warn/10">
           <div className="text-sm font-semibold text-ink">
-            Modo demonstração — a conexão real da Mesa roda no app instalado (precisa do servidor local).
-            Aqui dá pra ver a interface e testar a câmera.
+            Modo demonstração — a Mesa de verdade só roda no app instalado. Aqui dá pra testar a câmera e ver a interface.
           </div>
         </Card>
       )}
@@ -179,7 +178,7 @@ export function MesaScreen() {
                     Abrir privacidade (câmera)
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void mesa.openPrivacy("microphone")}>
-                    Microfone
+                    Abrir privacidade (microfone)
                   </Button>
                 </div>
               </div>
@@ -278,8 +277,7 @@ export function MesaScreen() {
             <Card accent>
               <h3 className="mb-1 text-lg">Convite da Mesa</h3>
               <p className="mb-3 text-sm text-ink-muted">
-                Manda esse código pra galera entrar. Na mesma rede já conecta direto; pela internet, o host
-                precisa estar alcançável (ou usar o relay — em breve).
+                Manda esse código pra galera entrar. Na mesma rede conecta na hora; pela internet, o host precisa estar alcançável — relay tá vindo.
               </p>
               <CopyField label="Convite" value={mesa.invite} mono />
             </Card>
@@ -320,8 +318,7 @@ export function MesaScreen() {
                   <MonitorPlay className="size-5 text-brass" /> Levar a Mesa pro OBS
                 </h3>
                 <p className="max-w-md text-sm text-ink-muted">
-                  A Corneta adiciona a grade como Browser Source na sua cena atual — slot fixo, e quem cai
-                  vira "JÁ VOLTO" sem bagunçar o resto.
+                  Entra como Browser Source na sua cena atual, cada um num slot fixo. É só posicionar.
                 </p>
               </div>
               <div className="flex flex-col items-end gap-2">
@@ -353,9 +350,8 @@ export function MesaScreen() {
           </div>
 
           {participants.length >= 5 && (
-            <EmptyState title="Mesa cheia puxa muito do seu upload">
-              Acima de ~5 pessoas, o modo P2P direto pesa no upload de todo mundo. Em breve: modo servidor
-              (SFU) pra mesas grandes.
+            <EmptyState title="Mesa cheia pesa no upload">
+              Acima de ~5 no P2P direto, a banda de todo mundo sofre. Modo servidor (SFU) pra mesas grandes tá vindo.
             </EmptyState>
           )}
         </div>

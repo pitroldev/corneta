@@ -11,7 +11,7 @@ export function targetIssues(t: Target): string[] {
   if (!t.name.trim()) issues.push("nome vazio");
   const url = t.ingestUrl.trim();
   if (!url || BARE_SCHEME_RE.test(url)) issues.push("URL não definida");
-  else if (!INGEST_URL_RE.test(url)) issues.push("URL inválida (use rtmp://, rtmps:// ou srt://)");
+  else if (!INGEST_URL_RE.test(url)) issues.push("URL inválida — use rtmp://, rtmps:// ou srt://");
   if (t.enabled && !t.hasKey) issues.push("sem chave");
   return issues;
 }

@@ -37,7 +37,7 @@ export default function App() {
 
   // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
   const liveLabel = censored
-    ? "Atenção: tela JÁ VOLTO no ar — um termo apareceu na tela"
+    ? "JÁ VOLTO no ar — um termo seu apareceu na tela"
     : liveState === "live"
       ? "No ar em todas as plataformas"
       : liveState === "starting"
@@ -151,7 +151,7 @@ export default function App() {
               JÁ VOLTO no ar
             </div>
             <div className="truncate text-xs text-white/85">
-              Um termo seu apareceu na tela — a transmissão volta sozinha quando ele sair.
+              Um termo seu apareceu na tela — a live volta sozinha quando ele sumir.
             </div>
           </div>
         </div>

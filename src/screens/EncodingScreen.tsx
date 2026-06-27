@@ -43,7 +43,7 @@ const MODES: {
     tag: "Máx. qualidade",
     tone: "neutral",
     icon: Sparkles,
-    desc: "Uma recodificação sob medida pra cada plataforma. Melhor imagem possível, mas é o mais pesado (recodifica todas).",
+    desc: "Uma recodificação sob medida pra cada plataforma. Melhor imagem possível, mas é o mais pesado.",
   },
 ];
 
@@ -76,7 +76,7 @@ export function EncodingScreen() {
       <SectionTitle
         kicker="Como a corneta toca"
         title="Qualidade"
-        subtitle="Quantas vezes o vídeo é recodificado — e quanto a sua máquina vai suar. Cada modo mostra o custo de CPU e de upload."
+        subtitle="Quantas vezes o vídeo é recodificado — e quanto a sua máquina vai suar."
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -150,7 +150,7 @@ export function EncodingScreen() {
         <Card className="mt-4 flex gap-3 bg-surface-2">
           <Info className="mt-0.5 size-5 shrink-0 text-brass" />
           <p className="text-sm text-ink-muted">
-            Destinos <strong className="text-ink">em cópia</strong> recebem o vídeo do OBS exatamente como saiu — a
+            Destinos <strong className="text-ink">em cópia</strong> recebem o vídeo do OBS como saiu — a
             Corneta não mexe na qualidade deles. Ajuste o OBS em{" "}
             <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong> pra caber no{" "}
             <strong className="text-ink">{lcd.capBy}</strong> (a plataforma mais apertada).

@@ -36,6 +36,7 @@ import {
   Button,
   Card,
   CopyField,
+  ExperimentalBadge,
   PlatformGlyph,
   SectionTitle,
 } from "../components/ui";
@@ -202,7 +203,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       <SectionTitle
         kicker="Solta o som"
         title="Ao vivo"
-        subtitle="Configure o OBS uma vez, veja se sua internet dá conta e entre no ar em todo lugar de uma tacada."
+        subtitle="Liga o OBS uma vez, vê se a internet aguenta e entra no ar em todo lugar — de uma tacada."
       />
 
       {state === "error" && (
@@ -246,7 +247,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                   <strong className="text-ink-muted">
                     Configurações → Transmissão → Serviço “Personalizado”
                   </strong>{" "}
-                  e cole os dois campos abaixo — assim o OBS manda o vídeo pra Corneta, e ela espalha pras plataformas.
+                  e cole os dois campos abaixo — é por aqui que o OBS manda o vídeo pra mim.
                 </p>
                 <Button variant="outline" size="sm" className="shrink-0" onClick={() => setShowObs(true)}>
                   <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configura pra mim
@@ -257,7 +258,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                 <CopyField label="Chave de transmissão" value={config.ingest.key} mono />
               </div>
               <p className="mt-3 text-xs text-ink-faint">
-                Essa chave fica só no seu PC, entre o OBS e a Corneta — não é a chave de nenhuma plataforma. As chaves de cada plataforma ficam guardadas no cofre do sistema.
+                Essa chave é só entre o OBS e a Corneta, aqui no seu PC — não é de nenhuma plataforma. As das plataformas ficam no cofre do sistema.
               </p>
             </Collapsible.Content>
           </Collapsible.Root>
@@ -511,18 +512,25 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
           ? `vigiando ${watchCount} termo${watchCount > 1 ? "s" : ""}`
           : "ligado, mas sem termos — adicione um"
         : "desligado",
+      experimental: true,
+      // Experimental fica oculto aqui no Ao vivo até ser ligado nas Configurações.
+      show: settings.guardianEnabled,
     },
     {
       on: settings.brbEnabled,
       label: "JÁ VOLTO",
       desc: settings.brbEnabled ? "se o sinal do OBS cair, põe um aviso no ar e segura a live" : "desligado",
+      experimental: false,
+      show: true,
     },
     {
       on: settings.autoBitrate,
       label: "Auto-bitrate",
       desc: settings.autoBitrate ? "baixa o bitrate (a qualidade) se a internet apertar" : "desligado",
+      experimental: false,
+      show: true,
     },
-  ];
+  ].filter((it) => it.show);
   return (
     <Card accent className="mb-2 bg-surface-2">
       <div className="mb-2 flex items-center justify-between">
@@ -538,6 +546,7 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
           <div key={it.label} className="flex items-center gap-2 text-sm">
             <Badge tone={it.on ? "brass" : "neutral"}>{it.on ? "Armado" : "Off"}</Badge>
             <span className="font-semibold">{it.label}</span>
+            {it.experimental && <ExperimentalBadge />}
             <span className="text-xs text-ink-faint">· {it.desc}</span>
           </div>
         ))}
@@ -603,7 +612,7 @@ function Checkup({
         <CheckRow
           label="Chaves e URLs"
           ok={enabled.length > 0 && enabled.every((t) => blockingIssues(t).length === 0)}
-          detail={enabled.length === 0 ? "nenhum destino ativo" : undefined}
+          detail={enabled.length === 0 ? "nenhuma plataforma ativa" : undefined}
         />
         <CheckRow
           label="Upload"
@@ -681,7 +690,7 @@ function StatePill({ state }: { state: TargetState }) {
     error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
     paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
     waiting: { label: "Aguardando sinal", cls: "text-info", dot: "bg-info animate-pulse" },
-    brb: { label: "JÁ VOLTO (slate no ar)", cls: "text-brass", dot: "bg-brass animate-pulse" },
+    brb: { label: "JÁ VOLTO no ar", cls: "text-brass", dot: "bg-brass animate-pulse" },
     censor: { label: "Censurado", cls: "text-bad", dot: "bg-bad animate-pulse" },
   };
   const m = map[state] ?? map.idle;

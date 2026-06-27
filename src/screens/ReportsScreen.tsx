@@ -77,7 +77,7 @@ export function ReportsScreen() {
       <SectionTitle
         kicker="Depois da live"
         title="Relatórios"
-        subtitle="O retrato de cada transmissão depois que ela acaba — pra entender travamentos e o que prendeu a galera, com calma e fora do ao vivo."
+        subtitle="O retrato de cada live: o que travou e o que prendeu a galera."
         right={
           <Button variant="subtle" size="sm" onClick={() => void api.openSessionsDir()}>
             <FolderOpen className="size-4" /> Abrir pasta
@@ -92,8 +92,8 @@ export function ReportsScreen() {
           ))}
         </div>
       ) : sessions.length === 0 ? (
-        <EmptyState title="Nenhuma transmissão ainda">
-          Toda vez que você for ao ar, eu anoto tudo o que rolou e, quando a live encerra, monto o relatório aqui.
+        <EmptyState title="Nenhuma live ainda">
+          Toda vez que você for ao ar eu anoto tudo, e monto o relatório aqui quando a live encerra.
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
@@ -307,7 +307,7 @@ function ReportDetail({
       {a.viewers.hasData && vN > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Eye className="size-4" /> Audiência ao vivo (retenção: quanto da galera ficou)
+            <Eye className="size-4" /> Audiência ao vivo (quanto da galera ficou)
           </h3>
           <LineChart
             series={[{ label: "Assistindo", color: "#56e39b", values: viewerSeries(data) }]}

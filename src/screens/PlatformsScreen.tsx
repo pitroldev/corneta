@@ -52,7 +52,7 @@ export function PlatformsScreen() {
       <SectionTitle
         kicker="Pra onde a corneta toca"
         title="Plataformas"
-        subtitle="Escolha os destinos e cole a chave de cada um — é o código que conecta você àquela plataforma. Eu pego o seu vídeo do OBS e toco em todos ao mesmo tempo."
+        subtitle="Escolha os destinos, cole a chave de cada um e eu pego seu vídeo do OBS e toco em todos de uma vez."
         right={
           <Button variant="primary" onClick={() => setPicking(true)}>
             <Plus className="size-4" strokeWidth={2.6} /> Adicionar
@@ -338,7 +338,7 @@ function TargetRow({
               {!isCustom && (
                 <span className="font-normal text-ink-faint">
                   {" "}
-                  — é o endereço pra onde o seu vídeo é enviado; cole a que o
+                  — o endereço pra onde seu vídeo vai; cole a que o
                   painel da {preset.name} te deu
                 </span>
               )}
@@ -357,7 +357,7 @@ function TargetRow({
             />
             {urlInvalid && (
               <span className="text-[11px] font-medium text-bad">
-                URL inválida — comece com rtmp://, rtmps:// ou srt://
+                URL inválida — use rtmp://, rtmps:// ou srt://
               </span>
             )}
           </label>

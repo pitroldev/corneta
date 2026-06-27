@@ -18,7 +18,7 @@ const STEPS = [
   {
     icon: Tv2,
     title: "Escolha os destinos",
-    text: "Em Plataformas, adicione cada lugar e cole a chave de transmissão (aquele código secreto que liga a live à sua conta). As chaves ficam guardadas no cofre do sistema, nunca soltas num arquivo de texto.",
+    text: "Em Plataformas, adicione cada lugar e cole a chave de transmissão (o código secreto que liga a live à sua conta). Elas ficam no cofre do sistema, nunca soltas num arquivo de texto.",
   },
   {
     icon: Zap,
@@ -28,12 +28,12 @@ const STEPS = [
   {
     icon: Radio,
     title: "Solta a corneta",
-    text: "Um clique e você entra no ar em todas. Acompanhe os números de cada plataforma e, pelo ícone lá perto do relógio, veja a saúde geral num olhar.",
+    text: "Um clique e você entra no ar em todas. Veja os números de cada plataforma — e a saúde geral no ícone perto do relógio.",
   },
   {
     icon: MessageSquare,
     title: "Chat e relatórios",
-    text: "Chat unificado de todas as plataformas (com janela flutuante pra um canto) e, ao encerrar, um relatório do que travou.",
+    text: "Todo o chat num lugar (dá pra soltar numa janela flutuante) e, ao encerrar, um relatório do que travou.",
   },
 ];
 
@@ -75,7 +75,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   if (!open) return null;
   return (
     <Modal
-      title="Bora cornetar?"
+      title="Opa! Bora cornetar?"
       onClose={() => close(false)}
       className="max-w-md overflow-hidden rounded-xl bg-surface pop"
     >

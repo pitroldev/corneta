@@ -28,9 +28,9 @@ const PLACEHOLDER: Record<string, string> = {
   youtube: "ex.: @seucanal",
 };
 const HINT: Record<string, string> = {
-  twitch: "Só o nome do canal (o que vem depois de twitch.tv/) — sem o link inteiro e sem login.",
+  twitch: "Só o nome do canal (o que vem depois de twitch.tv/) — sem link inteiro nem login.",
   kick: "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
-  youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live e lê o chat sozinha — sem colar link e sem precisar de chave.",
+  youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live e lê o chat sozinha — sem colar link.",
 };
 
 export function ChatScreen() {
@@ -113,7 +113,7 @@ export function ChatScreen() {
       <SectionTitle
         kicker="A galera junta"
         title="Chat unificado"
-        subtitle="Junte vários canais (até 2 Twitches!) num feed só — com emotes, selos, de onde veio cada mensagem e o que foi apagado."
+        subtitle="Twitch, Kick e YouTube no mesmo feed (até 2 Twitches!) — com emotes, selos, de onde veio cada mensagem e o que foi apagado."
         right={
           <div className="flex items-center gap-2">
             {IS_TAURI && (
@@ -235,7 +235,7 @@ export function ChatScreen() {
                   <span className="flex flex-wrap items-center gap-1.5">
                     <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
                     <Tooltip
-                      content="O chat do YouTube já funciona sem ela — a Corneta lê direto, igual à Twitch. Com a chave você ganha a contagem de “assistindo” do YouTube, e ela serve de reserva caso a leitura direta falhe."
+                      content="Sem ela a Corneta já lê o chat direto. Com ela você ganha a contagem de “assistindo” do YouTube e uma reserva, caso a leitura direta falhe."
                     >
                       <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
                         · opcional (bom ter)
@@ -244,7 +244,7 @@ export function ChatScreen() {
                   </span>
                   <input
                     value={s.youtubeApiKey ?? ""}
-                    placeholder="opcional — cole sua API key (Data API v3)"
+                    placeholder="cole sua API key (Data API v3)"
                     onChange={(e) => setSettings({ youtubeApiKey: e.target.value })}
                     className="h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
                   />

@@ -21,13 +21,13 @@ import { obsIngestUrl } from "../lib/factory";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import type { ObsCheck } from "../lib/types";
-import { Button, Card, CopyField, EmptyState, Input, SectionTitle, Toggle } from "../components/ui";
+import { Button, Card, CopyField, EmptyState, ExperimentalBadge, Input, SectionTitle, Toggle } from "../components/ui";
 
 type SettingsTab = "obs" | "seguranca" | "geral";
 const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
-  { id: "obs", label: "OBS", icon: Plug },
-  { id: "seguranca", label: "Segurança ao vivo", icon: Shield },
   { id: "geral", label: "Geral", icon: MonitorCog },
+  { id: "seguranca", label: "Segurança ao vivo", icon: Shield },
+  { id: "obs", label: "OBS", icon: Plug },
 ];
 
 export function SettingsScreen() {
@@ -40,7 +40,7 @@ export function SettingsScreen() {
   const setSettingsTab = useStore((s) => s.setSettingsTab);
 
   const [confirmImport, setConfirmImport] = useState(false);
-  const [tab, setTab] = useState<SettingsTab>(() => (requestedTab as SettingsTab) || "obs");
+  const [tab, setTab] = useState<SettingsTab>(() => (requestedTab as SettingsTab) || "geral");
 
   // Deep-link do "Ajustar" (Ao vivo) → abre direto na aba certa, e consome o pedido.
   useEffect(() => {
@@ -87,9 +87,9 @@ export function SettingsScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker="Ajustes da corneta"
+        kicker="Por baixo do capô"
         title="Configurações"
-        subtitle="O endereço que o OBS usa pra te entregar o vídeo, e como a Corneta se comporta."
+        subtitle="Como a Corneta conversa com o OBS e se comporta no ar."
       />
 
       <RTabs.Root value={tab} onValueChange={(v) => setTab(v as SettingsTab)}>
@@ -120,7 +120,7 @@ export function SettingsScreen() {
               <Server className="size-5 text-brass" /> Endpoint de ingestão (OBS)
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
-              É o endereço local onde o OBS entrega a sua transmissão pra Corneta. Se mudar aqui, atualize também no OBS. A
+              Endereço local onde o OBS te entrega o vídeo. Mudou aqui, muda no OBS também. A
               <strong className="text-ink-muted"> chave</strong> abaixo é local (OBS ↔ Corneta) — não
               confunda com as chaves das plataformas, que ficam no cofre.
             </p>
@@ -213,7 +213,7 @@ export function SettingsScreen() {
           <div className="divide-y divide-border-soft">
             <SettingRow
               title="Proteção contra quedas (JÁ VOLTO)"
-              desc="Se o sinal do OBS cair no meio da live, a Corneta segura a transmissão com uma tela de aviso “JÁ VOLTO” nas plataformas até voltar — em vez de a live cair. (Só age depois que a transmissão já começou.)"
+              desc="Se o OBS cair no meio da live, a Corneta segura no ar com a tela “JÁ VOLTO” até o sinal voltar — em vez de derrubar tudo. (Só depois que a transmissão já começou.)"
             >
               <Toggle
                 checked={settings.brbEnabled}
@@ -223,7 +223,7 @@ export function SettingsScreen() {
             </SettingRow>
             <SettingRow
               title="Auto-bitrate quando a banda aperta"
-              desc="Se um destino que recodifica começar a engasgar (não dá conta do upload), a Corneta baixa a qualidade dele (o bitrate — quanto de dado por segundo o vídeo manda) e sobe de volta quando estabiliza — em vez de ficar derrubando. (Só vale pra destinos que a Corneta recodifica.)"
+              desc="Se um destino que a Corneta recodifica não dá conta do upload, ela baixa o bitrate dele e sobe de volta quando estabiliza — em vez de derrubar."
             >
               <Toggle
                 checked={settings.autoBitrate}
@@ -232,8 +232,9 @@ export function SettingsScreen() {
               />
             </SettingRow>
             <SettingRow
-              title="Guardião de privacidade (experimental)"
-              desc="Quando um TERMO seu (que você listar abaixo) aparece na tela, a Corneta corta pra tela “JÁ VOLTO” antes de ir ao ar. Ela lê o texto da tela aqui no seu PC (OCR local — nada sai daqui). Funciona bem em tela normal; em site denso e cheio de texto (LinkedIn, etc.) essa leitura falha mais. Rede de segurança, não garantia."
+              title="Guardião de privacidade"
+              badge={<ExperimentalBadge />}
+              desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. A leitura é local — OCR no seu PC, nada sai daqui. Rede de segurança, não garantia."
             >
               <Toggle
                 checked={settings.guardianEnabled}
@@ -396,7 +397,7 @@ function GuardianEditor() {
   return (
     <div className="flex flex-col gap-3 py-3.5">
       <div className="rounded-md border-2 border-brass/40 bg-brass/[0.06] p-3 text-xs leading-relaxed text-ink-muted">
-        <div className="mb-1 font-display text-sm font-extrabold text-ink">🛡️ Proteção preventiva</div>
+        <div className="mb-1 font-display text-sm font-extrabold text-ink">🛡️ O preço da proteção</div>
         Quando um termo da sua lista aparece, a Corneta troca pra tela{" "}
         <strong className="text-ink">“JÁ VOLTO”</strong> antes daquele instante ir ao ar — nunca exposto,
         nem num clipe. Pra garantir isso:
@@ -411,8 +412,7 @@ function GuardianEditor() {
             segredo”.
           </li>
           <li>
-            Texto pequeno demais ou o OCR errando feio ainda pode escapar — é rede de segurança, não
-            garantia absoluta.
+            Texto miúdo ou OCR errando feio ainda pode escapar.
           </li>
         </ul>
       </div>
@@ -494,11 +494,24 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function SettingRow({ title, desc, children }: { title: string; desc: string; children: ReactNode }) {
+function SettingRow({
+  title,
+  desc,
+  badge,
+  children,
+}: {
+  title: string;
+  desc: string;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 py-3.5">
       <div>
-        <div className="font-display font-bold">{title}</div>
+        <div className="flex items-center gap-2 font-display font-bold">
+          {title}
+          {badge}
+        </div>
         <div className="mt-0.5 max-w-md text-sm text-ink-muted">{desc}</div>
       </div>
       {children}

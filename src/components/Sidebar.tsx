@@ -155,7 +155,7 @@ export function Sidebar({
           >
             <span className="size-2.5 rounded-full bg-brass animate-pulse" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">
-              Aguardando OBS
+              Aguardando o OBS
             </span>
           </button>
         ) : state === "error" ? (

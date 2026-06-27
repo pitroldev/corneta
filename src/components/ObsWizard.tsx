@@ -53,7 +53,7 @@ function obsErrorHelp(raw: string): { title: string; tips: string[] } {
       title: "Não achei o OBS pra conectar.",
       tips: [
         "O OBS está aberto aí no seu PC?",
-        "O WebSocket (o canal por onde eu falo com o OBS) está ligado? Ferramentas → Configurações do Servidor WebSocket → Ativar Servidor WebSocket.",
+        "O WebSocket está ligado? Ferramentas → Configurações do Servidor WebSocket → Ativar Servidor WebSocket.",
         "A porta continua a padrão, 4455?",
         "Algum firewall pode estar barrando a conexão — libere o OBS pra mim.",
       ],
@@ -62,7 +62,7 @@ function obsErrorHelp(raw: string): { title: string; tips: string[] } {
   return {
     title: "Não consegui configurar o OBS sozinha.",
     tips: [
-      "Confira se o OBS está aberto e com o WebSocket ligado (Ferramentas → Configurações do Servidor WebSocket) — é por ali que eu falo com ele.",
+      "Confira se o OBS está aberto e com o WebSocket ligado (Ferramentas → Configurações do Servidor WebSocket).",
       "Sem estresse: dá pra configurar na mão logo abaixo, em 30 segundos.",
     ],
   };
@@ -124,8 +124,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-col gap-4 p-5">
           <Step n={1} title="Ative o WebSocket no OBS">
-            O WebSocket é o canal por onde eu converso com o OBS — é ele que me
-            deixa configurar tudo pra você. No OBS:{" "}
+            O WebSocket é o canal por onde eu falo com o OBS e configuro tudo pra você. No OBS:{" "}
             <strong className="text-ink">
               Ferramentas → Configurações do Servidor WebSocket
             </strong>{" "}
@@ -149,7 +148,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           </Step>
 
           <Step n={3} title="Conecte">
-            Eu conecto no OBS e já deixo ele mandando o seu vídeo pra mim.
+            Eu conecto, configuro e já deixo o OBS mandando seu vídeo pra cá.
             Depois é só dar{" "}
             <strong className="text-ink">Iniciar transmissão</strong> no OBS.
           </Step>
@@ -157,7 +156,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           {status === "ok" && (
             <div className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok">
               <Check className="size-4 shrink-0" strokeWidth={2.6} /> Conectado!
-              O OBS já está mandando o vídeo pra mim.
+              Já tá mandando o vídeo pra cá.
             </div>
           )}
           {status === "error" && help && (
