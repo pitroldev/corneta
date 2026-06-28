@@ -189,6 +189,7 @@ export function ChatPopout() {
       view={view}
       connected={connected}
       className="min-h-0 min-w-0 flex-1"
+      onFontSize={(n) => setSettings({ chatFontSize: n })}
     />
   );
   const divider = (
@@ -246,17 +247,21 @@ export function ChatPopout() {
           </TabBtn>
         </div>
         <div className="ml-auto flex items-center gap-1">
-          {viewers.total > 0 && (
-            <span
-              className="flex items-center gap-1 px-0.5 text-xs font-bold text-ink-muted"
-              title={viewers.items
-                .filter((i) => i.live)
-                .map((i) => `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`)
-                .join("\n")}
+          {viewers.total > 0 && (st?.chatShowViewers ?? true) && (
+            <button
+              type="button"
+              onClick={() => setSettings({ chatShowViewers: false })}
+              className="flex items-center gap-1 px-0.5 text-xs font-bold text-ink-muted transition-colors hover:text-ink"
+              title={
+                viewers.items
+                  .filter((i) => i.live)
+                  .map((i) => `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`)
+                  .join("\n") + "\nClique pra esconder (volta na config)"
+              }
             >
               <Eye className="size-3.5 text-brass" />
               {viewers.total.toLocaleString("pt-BR")}
-            </span>
+            </button>
           )}
           {connected ? (
             <button onClick={() => void disconnectChat()} title="Desconectar" className={iconBtn}>
@@ -313,6 +318,7 @@ export function ChatPopout() {
               <CfgToggle label="Plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
               <CfgToggle label="Canal" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
               <CfgToggle label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
+              <CfgToggle label="Quem assiste" checked={st?.chatShowViewers ?? true} onChange={(v) => setSettings({ chatShowViewers: v })} />
             </div>
           </div>
           <label className="flex items-center gap-2.5">

@@ -120,6 +120,8 @@ export interface AppSettings {
   chatShowPlatform: boolean;
   chatShowSource: boolean;
   chatShowTimestamps: boolean;
+  /** Mostrar o contador de quem está assistindo (clicável pra esconder). */
+  chatShowViewers: boolean;
   /** Tema da interface. */
   theme: "dark" | "light";
   /** Tamanho da fonte do chat, em pixels. */

@@ -29,6 +29,7 @@ export function ChatFeed({
   connected,
   allFilteredOut,
   className,
+  onFontSize,
 }: {
   messages: ChatMessage[];
   view: ChatView;
@@ -36,6 +37,8 @@ export function ChatFeed({
   /** Há mensagens, mas o filtro escondeu todas (vazio diferente de "sem chat"). */
   allFilteredOut?: boolean;
   className?: string;
+  /** Ctrl+scroll redimensiona a fonte (11–26px). */
+  onFontSize?: (next: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -74,6 +77,21 @@ export function ChatFeed({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
+
+  // Ctrl+scroll no feed dimensiona a fonte. Listener nativo (não-passivo) pra poder
+  // cancelar o zoom padrão do navegador.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !onFontSize) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const next = Math.min(26, Math.max(11, view.fontSize + (e.deltaY < 0 ? 1 : -1)));
+      if (next !== view.fontSize) onFontSize(next);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [view.fontSize, onFontSize]);
 
   const onScroll = () => {
     const el = ref.current;

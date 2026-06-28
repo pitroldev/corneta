@@ -44,7 +44,7 @@ export function Select<T extends string>({
         <RSelect.Content
           position="popper"
           sideOffset={4}
-          className="z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md bg-surface-2 pop"
+          className="z-[100] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md bg-surface-2 pop"
         >
           <RSelect.Viewport className="max-h-64 overflow-auto">
             {options.map((o) => (

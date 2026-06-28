@@ -10,7 +10,6 @@ import {
   X,
   AlertTriangle,
   ChevronDown,
-  Gauge,
   Layers,
   Pencil,
   GripVertical,
@@ -19,14 +18,13 @@ import {
   ClipboardPaste,
   Wifi,
   ExternalLink,
-  Copy,
   Crop,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { PLATFORM_LIST, PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn, fmtBitrate, openExternal } from "../lib/utils";
+import { cn, openExternal } from "../lib/utils";
 import type { PlatformId, Target } from "../lib/types";
 import { INGEST_URL_RE, blockingIssues, hasValidUrl, isUrlInvalid } from "../lib/validation";
 import {
@@ -42,22 +40,15 @@ import {
 } from "../components/ui";
 import { ReframeEditor } from "../components/ReframeEditor";
 import { Mascot } from "../components/decor";
-import type { Screen } from "../components/Sidebar";
 
-export function PlatformsScreen({ onNavigate }: { onNavigate?: (s: Screen) => void }) {
+export function PlatformsScreen() {
   const config = useStore((s) => s.config);
   const addTarget = useStore((s) => s.addTarget);
   const reorderTargets = useStore((s) => s.reorderTargets);
-  const setEncodingFocus = useStore((s) => s.setEncodingFocus);
   const [picking, setPicking] = useState(false);
   const [reframeTarget, setReframeTarget] = useState<Target | null>(null);
 
   if (!config) return null;
-
-  const tune = (id: string) => {
-    setEncodingFocus(id);
-    onNavigate?.("encoding");
-  };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -90,7 +81,6 @@ export function PlatformsScreen({ onNavigate }: { onNavigate?: (s: Screen) => vo
                 key={t.id}
                 target={t}
                 onReframe={() => setReframeTarget(t)}
-                onTune={() => tune(t.id)}
               />
             ))}
           </Reorder.Group>
@@ -246,25 +236,6 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-// Chip de qualidade do destino (resolução · bitrate). Clica → tela Qualidade focada nele.
-function QualityChip({ target, onClick }: { target: Target; onClick: () => void }) {
-  const rec = target.encoding.preset ?? PLATFORMS[target.platformId].recommended;
-  const res = `${Math.min(rec.width, rec.height)}p${rec.fps}`;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title="Ajustar a qualidade deste destino"
-      className="hidden shrink-0 items-center gap-1.5 rounded-md bg-surface-2 px-2 py-1 text-[11px] font-bold text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink sm:flex"
-    >
-      <Gauge className="size-3.5 text-brass" />
-      <span className="tabular-nums">{res}</span>
-      <span className="text-ink-faint">·</span>
-      <span className="tabular-nums">{fmtBitrate(rec.videoBitrateKbps)}</span>
-    </button>
-  );
-}
-
 // Resumo "pronto pra live": o que está pronto e o que falta (chave/URL) num relance.
 function ReadinessSummary({ targets }: { targets: Target[] }) {
   const enabled = targets.filter((t) => t.enabled);
@@ -307,16 +278,13 @@ function ReadinessSummary({ targets }: { targets: Target[] }) {
 function TargetRow({
   target,
   onReframe,
-  onTune,
 }: {
   target: Target;
   onReframe: () => void;
-  onTune: () => void;
 }) {
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const toggleTarget = useStore((s) => s.toggleTarget);
-  const duplicateTarget = useStore((s) => s.duplicateTarget);
   const moveTarget = useStore((s) => s.moveTarget);
   const undoRemoveTarget = useStore((s) => s.undoRemoveTarget);
   const controls = useDragControls();
@@ -412,7 +380,6 @@ function TargetRow({
               {urlOk ? target.ingestUrl : "URL não definida"}
             </div>
           </div>
-          <QualityChip target={target} onClick={onTune} />
           <Badge tone={readiness.tone}>{readiness.label}</Badge>
           <Toggle
             checked={target.enabled}
@@ -500,23 +467,19 @@ function TargetRow({
             ) : (
               <span className="font-semibold text-bad">✕ {testResult.msg}</span>
             ))}
-          <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => duplicateTarget(target.id)} title="Duplicar">
-              <Copy className="size-4" /> Duplicar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const name = target.name;
-                removeTarget(target.id);
-                toast.action(`${name} saiu da corneta`, "Desfazer", () => undoRemoveTarget());
-              }}
-              aria-label="Remover"
-            >
-              <Trash2 className="size-4" /> Remover
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => {
+              const name = target.name;
+              removeTarget(target.id);
+              toast.action(`${name} saiu da corneta`, "Desfazer", () => undoRemoveTarget());
+            }}
+            aria-label="Remover"
+          >
+            <Trash2 className="size-4" /> Remover
+          </Button>
         </div>
 
         {preset.note && <p className="text-xs text-ink-faint">{preset.note}</p>}
@@ -648,7 +611,7 @@ function PlatformPicker({
     targets.filter((t) => t.platformId === id).length;
 
   return (
-    <Modal title="Quem entra na corneta?" onClose={onClose} className="max-w-lg rounded-xl bg-surface p-5 pop">
+    <Modal title="Quem entra na corneta?" onClose={onClose} className="max-w-2xl rounded-xl bg-surface p-5 pop">
         <div className="mb-4 flex items-center justify-between">
           <h3 id="picker-title" className="text-xl">
             Quem entra na corneta?
@@ -671,13 +634,8 @@ function PlatformPicker({
                   <span className="truncate font-display font-bold">{p.name}</span>
                   {p.experimental && <ExperimentalBadge className="shrink-0 scale-90" />}
                 </div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-ink-faint">
-                  <span className="uppercase tracking-wide">{p.protocol}</span>
-                  <span aria-hidden>·</span>
-                  <span className="tabular-nums">
-                    {Math.min(p.recommended.width, p.recommended.height)}p{p.recommended.fps} ·{" "}
-                    {fmtBitrate(p.recommended.videoBitrateKbps)}
-                  </span>
+                <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                  {p.protocol}
                 </div>
               </div>
               {countOf(p.id) > 0 && (

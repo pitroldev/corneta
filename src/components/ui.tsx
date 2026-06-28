@@ -2,7 +2,13 @@ import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
 import * as Switch from "@radix-ui/react-switch";
 import { Check, Copy, FlaskConical, Globe, Info, Loader2 } from "lucide-react";
 import {
-  siTwitch, siYoutube, siFacebook, siKick, siTiktok, siX, siInstagram,
+  siTwitch,
+  siYoutube,
+  siFacebook,
+  siKick,
+  siTiktok,
+  siX,
+  siInstagram,
 } from "simple-icons";
 import { cn, readableOn } from "../lib/utils";
 import { PLATFORMS } from "../lib/platforms";
@@ -23,7 +29,14 @@ const PLATFORM_ICON: Partial<Record<PlatformId, string>> = {
 // ---------------- Button ----------------
 // "tomate" é o nome canônico do botão de ação (bloco tomate, sombra dura).
 // "pop" segue como alias retrocompatível — a utility `.pop` é a sombra, não a variante.
-type Variant = "primary" | "tomate" | "pop" | "ghost" | "outline" | "danger" | "subtle";
+type Variant =
+  | "primary"
+  | "tomate"
+  | "pop"
+  | "ghost"
+  | "outline"
+  | "danger"
+  | "subtle";
 type Size = "sm" | "md" | "lg";
 
 const TOMATE =
@@ -35,7 +48,8 @@ const VARIANTS: Record<Variant, string> = {
   pop: TOMATE,
   ghost: "text-ink-muted hover:text-ink hover:bg-surface-2",
   outline: "border-2 border-border text-ink hover:border-brass",
-  danger: "bg-bad/15 text-bad hover:bg-bad/25 border-2 border-bad/40 font-display font-bold",
+  danger:
+    "bg-bad/15 text-bad hover:bg-bad/25 border-2 border-bad/40 font-display font-bold",
   subtle: "bg-surface-2 text-ink hover:bg-surface-3",
 };
 const SIZES: Record<Size, string> = {
@@ -65,11 +79,13 @@ export function Button({
         "inline-flex items-center justify-center whitespace-nowrap transition-all duration-75 disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none",
         VARIANTS[variant],
         SIZES[size],
-        className
+        className,
       )}
       {...rest}
     >
-      {loading && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />}
+      {loading && (
+        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+      )}
       {children}
     </button>
   );
@@ -96,7 +112,7 @@ export function Card({
         "rounded-lg bg-surface p-5",
         accent && "accent-l",
         pop && "pop",
-        className
+        className,
       )}
       {...rest}
     >
@@ -132,9 +148,11 @@ export function Badge({
       className={cn(
         "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
         tone && BADGE_TONES[tone],
-        className
+        className,
       )}
-      style={color ? { backgroundColor: color, color: readableOn(color) } : undefined}
+      style={
+        color ? { backgroundColor: color, color: readableOn(color) } : undefined
+      }
     >
       {children}
     </span>
@@ -149,10 +167,11 @@ export function ExperimentalBadge({ className }: { className?: string }) {
       title="Feature experimental — ainda em teste, pode falhar ou mudar"
       className={cn(
         "inline-flex shrink-0 -rotate-2 items-center gap-1 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white pop-sm",
-        className
+        className,
       )}
     >
-      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden /> experimental
+      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden />{" "}
+      experimental
     </span>
   );
 }
@@ -209,11 +228,22 @@ export function PlatformGlyph({
       style={{ width: size, height: size, backgroundColor: preset.color }}
     >
       {path ? (
-        <svg viewBox="0 0 24 24" width={glyph} height={glyph} fill={fg} aria-hidden>
+        <svg
+          viewBox="0 0 24 24"
+          width={glyph}
+          height={glyph}
+          fill={fg}
+          aria-hidden
+        >
           <path d={path} />
         </svg>
       ) : (
-        <Globe width={glyph} height={glyph} style={{ color: fg }} strokeWidth={2.4} />
+        <Globe
+          width={glyph}
+          height={glyph}
+          style={{ color: fg }}
+          strokeWidth={2.4}
+        />
       )}
     </div>
   );
@@ -240,7 +270,9 @@ export function SectionTitle({
           </div>
         )}
         <h2 className="text-3xl">{title}</h2>
-        {subtitle && <p className="mt-2 max-w-lg text-sm text-ink-muted">{subtitle}</p>}
+        {subtitle && (
+          <p className="mt-2 max-w-xl text-sm text-ink-muted">{subtitle}</p>
+        )}
       </div>
       {right}
     </div>
@@ -260,11 +292,24 @@ export function Stat({
   tone?: "default" | "ok" | "warn" | "bad";
 }) {
   const toneColor =
-    tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : tone === "bad" ? "text-bad" : "text-ink";
+    tone === "ok"
+      ? "text-ok"
+      : tone === "warn"
+        ? "text-warn"
+        : tone === "bad"
+          ? "text-bad"
+          : "text-ink";
   return (
     <div className="rounded-md border-t-2 border-brass/50 bg-surface-2 px-4 py-3">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{label}</div>
-      <div className={cn("mt-1 font-display text-2xl font-extrabold tabular-nums", toneColor)}>
+      <div className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 font-display text-2xl font-extrabold tabular-nums",
+          toneColor,
+        )}
+      >
         {value}
       </div>
       {hint && <div className="text-xs text-ink-faint">{hint}</div>}
@@ -275,7 +320,13 @@ export function Stat({
 // ---------------- Hint (tooltip didático) ----------------
 // Gatilho focável: abre no hover E no foco/tap (teclado também vê). Usa o Tooltip
 // (tokens, sem hex fixo) pra não quebrar no tema claro.
-export function Hint({ text, className }: { text: string; className?: string }) {
+export function Hint({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
   return (
     <Tooltip content={text} className={cn("align-middle", className)}>
       <button
@@ -301,7 +352,7 @@ export function Input({
       className={cn(
         "h-10 w-full rounded-md border-2 border-border bg-surface-2 px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-brass disabled:cursor-not-allowed disabled:opacity-50",
         invalid && "border-bad focus:border-bad",
-        className
+        className,
       )}
       {...rest}
     />
@@ -340,7 +391,10 @@ export function CopyField({
       )}
       <div
         data-selectable
-        className={cn("min-w-0 flex-1 truncate rounded-md bg-surface px-3 py-2 text-sm", mono && "font-mono")}
+        className={cn(
+          "min-w-0 flex-1 truncate rounded-md bg-surface px-3 py-2 text-sm",
+          mono && "font-mono",
+        )}
       >
         {value}
       </div>
@@ -350,7 +404,11 @@ export function CopyField({
         onClick={copy}
         aria-label={`Copiar${label ? ` ${label}` : ""}`}
       >
-        {copied ? <Check className="size-4 text-ok" /> : <Copy className="size-4" />}
+        {copied ? (
+          <Check className="size-4 text-ok" />
+        ) : (
+          <Copy className="size-4" />
+        )}
         {copied ? "Copiado" : "Copiar"}
       </Button>
     </div>
@@ -372,12 +430,21 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-xl bg-surface px-6 py-12 text-center pop", className)}>
+    <div
+      className={cn(
+        "rounded-xl bg-surface px-6 py-12 text-center pop",
+        className,
+      )}
+    >
       <div className="mx-auto mb-4 grid size-16 -rotate-3 place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
         <Mascot className="size-9 animate-shout" />
       </div>
       <h3 className="text-2xl">{title}</h3>
-      {children && <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">{children}</p>}
+      {children && (
+        <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">
+          {children}
+        </p>
+      )}
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );

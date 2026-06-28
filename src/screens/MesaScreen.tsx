@@ -77,69 +77,114 @@ const CONN_LABEL: Record<string, { text: string; down: boolean }> = {
   closed: { text: "saiu", down: true },
 };
 
-// Ilustrações do lobby: você = hub central (host) e o convite = ingresso que entra
-// na Mesa de outro (convidado). Latão = seu / a Mesa, tomate = a galera / o destaque.
+// ---- Ilustrações da Mesa: tudo em "tiles" de webcam (moldura + busto) ----
+// Latão = você / a Mesa; tomate = a galera / o destaque; brass-ink = contorno duro.
+const BRASS = "var(--color-brass)";
+const TOMATE = "var(--color-tomate)";
+const INK = "var(--color-brass-ink)";
+
+/** Tile de webcam: moldura + silhueta (cabeça + ombros), recortada na própria moldura. */
+function Cam({
+  x,
+  y,
+  w,
+  h,
+  frame = BRASS,
+  live = false,
+}: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  frame?: string;
+  live?: boolean;
+}) {
+  const id = `cam${Math.round(x)}_${Math.round(y)}`;
+  const cx = x + w / 2;
+  const rx = Math.min(6, w * 0.14);
+  return (
+    <g>
+      <defs>
+        <clipPath id={id}>
+          <rect x={x} y={y} width={w} height={h} rx={rx} />
+        </clipPath>
+      </defs>
+      <rect x={x} y={y} width={w} height={h} rx={rx} fill="var(--color-surface)" stroke={frame} strokeWidth="3" />
+      <g clipPath={`url(#${id})`} fill={frame}>
+        <circle cx={cx} cy={y + h * 0.44} r={h * 0.17} />
+        <ellipse cx={cx} cy={y + h * 1.02} rx={w * 0.32} ry={h * 0.3} />
+      </g>
+      {live && (
+        <circle cx={x + w - 8} cy={y + 8} r="3.5" fill={TOMATE} stroke="var(--color-surface)" strokeWidth="1.2" />
+      )}
+    </g>
+  );
+}
+
+// Criar: as câmeras da galera (tomate) convergem na SUA (latão, ao vivo) — você é o host.
 function HostHubArt() {
+  const guests: [number, number][] = [
+    [16, 8],
+    [16, 37],
+    [16, 66],
+  ];
   return (
     <svg viewBox="0 0 260 96" className="h-full w-full" aria-hidden>
-      <g
-        stroke="var(--color-brass)"
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M66 30 L108 44" />
-        <path d="M101 35 L110 45 L100 47" />
-        <path d="M194 30 L152 44" />
-        <path d="M160 35 L150 45 L160 47" />
-        <path d="M130 84 L130 70" />
-        <path d="M124 76 L130 70 L136 76" />
+      <g stroke={BRASS} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {guests.map(([gx, gy]) => (
+          <path key={gy} d={`M${gx + 40} ${gy + 11} C 112 ${gy + 11} 120 48 166 48`} />
+        ))}
+        <path d="M156 41 L170 48 L156 55" />
       </g>
-      <g fill="var(--color-tomate)" stroke="var(--color-brass-ink)" strokeWidth="1.5">
-        <circle cx="60" cy="24" r="11" />
-        <circle cx="200" cy="24" r="11" />
-        <circle cx="130" cy="88" r="11" />
-      </g>
-      <circle cx="130" cy="46" r="22" fill="var(--color-brass)" stroke="var(--color-brass-ink)" strokeWidth="2.5" />
-      <rect x="118" y="40" width="24" height="14" rx="3" fill="var(--color-brass-ink)" />
-      <circle cx="130" cy="47" r="4" fill="var(--color-brass)" />
+      {guests.map(([gx, gy]) => (
+        <Cam key={gy} x={gx} y={gy} w={40} h={22} frame={TOMATE} />
+      ))}
+      <Cam x={172} y={24} w={70} h={48} frame={BRASS} live />
+      <rect x={180} y={56} width={54} height={13} rx={3} fill={INK} />
+      <text x={207} y={66} textAnchor="middle" fontSize="9" fontWeight="800" fill={BRASS} letterSpacing="1">
+        VOCÊ
+      </text>
     </svg>
   );
 }
 
+// Entrar: seu convite (ingresso MESA) entra numa Mesa já formada (cluster de câmeras).
 function GuestTicketArt() {
   return (
     <svg viewBox="0 0 260 96" className="h-full w-full" aria-hidden>
-      <g stroke="var(--color-brass)" strokeWidth="2.5" fill="none" strokeLinecap="round">
-        <path d="M216 30 L198 48" />
-        <path d="M216 66 L198 48" />
+      <g transform="rotate(-7 70 48)">
+        <rect x="20" y="28" width="100" height="40" rx="7" fill={BRASS} stroke={INK} strokeWidth="2.5" />
+        <line x1="94" y1="28" x2="94" y2="68" stroke={INK} strokeWidth="2" strokeDasharray="4 4" />
+        <text x="57" y="45" textAnchor="middle" fontSize="8" fontWeight="800" fill={INK} letterSpacing="1.5">
+          CONVITE
+        </text>
+        <text x="57" y="60" textAnchor="middle" fontSize="14" fontWeight="900" fill={INK}>
+          MESA1
+        </text>
+        <g fill={INK}>
+          <circle cx="107" cy="40" r="2.3" />
+          <circle cx="107" cy="48" r="2.3" />
+          <circle cx="107" cy="56" r="2.3" />
+        </g>
       </g>
-      <circle cx="198" cy="48" r="16" fill="var(--color-brass)" stroke="var(--color-brass-ink)" strokeWidth="2" />
-      <g fill="var(--color-brass)" stroke="var(--color-brass-ink)" strokeWidth="1.5">
-        <circle cx="224" cy="26" r="9" />
-        <circle cx="224" cy="70" r="9" />
+      <g stroke={TOMATE} strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M134 48 H168" />
+        <path d="M160 40 L170 48 L160 56" />
       </g>
-      <g stroke="var(--color-tomate)" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M122 48 H166" />
-        <path d="M159 41 L168 48 L159 55" />
-      </g>
-      <g transform="rotate(-6 64 48)">
-        <rect x="18" y="30" width="94" height="36" rx="6" fill="var(--color-surface-3)" stroke="var(--color-brass-ink)" strokeWidth="2" />
-        <line x1="86" y1="30" x2="86" y2="66" stroke="var(--color-brass-ink)" strokeWidth="1.5" strokeDasharray="3 3" />
-        <text x="52" y="53" textAnchor="middle" fontSize="13" fontWeight="800" fill="var(--color-brass)">MESA1</text>
-        <rect x="86" y="30" width="26" height="36" rx="6" fill="var(--color-tomate)" />
-      </g>
+      <Cam x={182} y={9} w={40} h={28} frame={BRASS} live />
+      <Cam x={182} y={50} w={40} h={28} frame={BRASS} />
+      <Cam x={226} y={30} w={30} h={34} frame={TOMATE} />
     </svg>
   );
 }
 
-// Mesa cheia: a teia do mesh P2P (cada par ligado a todos) fica densa demais e a banda sofre.
+// Mesa cheia: webcams de todo mundo ligadas a todo mundo (mesh P2P). A teia tomate fica
+// densa demais — é o que pesa no upload acima de ~5.
 function MeshArt() {
-  const n = 6;
+  const n = 5;
   const cx = 70;
-  const cy = 70;
-  const r = 50;
+  const cy = 68;
+  const r = 46;
   const pts = Array.from({ length: n }, (_, i) => {
     const a = (Math.PI * 2 * i) / n - Math.PI / 2;
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)] as [number, number];
@@ -148,21 +193,13 @@ function MeshArt() {
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) edges.push([i, j]);
   return (
     <svg viewBox="0 0 140 140" className="size-full" aria-hidden>
-      <g stroke="var(--color-tomate)" strokeWidth="1.3" opacity="0.55">
+      <g stroke={TOMATE} strokeWidth="1.6" opacity="0.6">
         {edges.map(([i, j]) => (
           <line key={`${i}-${j}`} x1={pts[i][0]} y1={pts[i][1]} x2={pts[j][0]} y2={pts[j][1]} />
         ))}
       </g>
       {pts.map(([x, y], i) => (
-        <circle
-          key={i}
-          cx={x}
-          cy={y}
-          r="10"
-          fill="var(--color-brass)"
-          stroke="var(--color-brass-ink)"
-          strokeWidth="2"
-        />
+        <Cam key={i} x={x - 16} y={y - 12} w={32} h={24} frame={i === 0 ? BRASS : TOMATE} live={i === 0} />
       ))}
     </svg>
   );
@@ -284,7 +321,7 @@ export function MesaScreen() {
                 options={[
                   { value: "default", label: "Padrão" },
                   ...mesa.devices.cameras
-                    .filter((d) => d.deviceId)
+                    .filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications")
                     .map((d) => ({ value: d.deviceId, label: d.label || "Câmera" })),
                 ]}
               />
@@ -298,7 +335,7 @@ export function MesaScreen() {
                 options={[
                   { value: "default", label: "Padrão" },
                   ...mesa.devices.mics
-                    .filter((d) => d.deviceId)
+                    .filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications")
                     .map((d) => ({ value: d.deviceId, label: d.label || "Microfone" })),
                 ]}
               />

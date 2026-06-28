@@ -50,6 +50,7 @@ export function defaultConfig(): AppConfig {
       chatShowPlatform: true,
       chatShowSource: false,
       chatShowTimestamps: false,
+      chatShowViewers: true,
       theme: "dark",
       chatFontSize: 14,
       chatBothLayout: "auto",
