@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, ChevronDown, Cpu, Crosshair, Gauge, Info, Layers, RotateCcw, Sparkles, Wand2 } from "lucide-react";
 import { useStore } from "../lib/store";
@@ -52,7 +52,30 @@ export function EncodingScreen() {
   const encoders = useStore((s) => s.encoders);
   const setMode = useStore((s) => s.setMode);
   const uploadMbps = useStore((s) => s.uploadMbps);
+  const encodingFocus = useStore((s) => s.encodingFocus);
+  const setEncodingFocus = useStore((s) => s.setEncodingFocus);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  // Deep-link do chip de qualidade (Plataformas → Qualidade): abre o ajuste fino, rola
+  // até o destino e dá um realce de ~2s. O scroll é adiado pra rodar DEPOIS do App
+  // resetar o scrollTop ao trocar de tela. Consome o pedido.
+  useEffect(() => {
+    if (!encodingFocus) return;
+    const id = encodingFocus;
+    setShowAdvanced(true);
+    setFlash(id);
+    setEncodingFocus(null);
+    const scroll = setTimeout(() => {
+      document.getElementById(`enc-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 90);
+    const clear = setTimeout(() => setFlash(null), 2200);
+    return () => {
+      clearTimeout(scroll);
+      clearTimeout(clear);
+    };
+  }, [encodingFocus, setEncodingFocus]);
+
   if (!config) return null;
 
   const lcd = lowestCommonDenominator(config);
@@ -216,7 +239,7 @@ export function EncodingScreen() {
               {config.targets
                 .filter((t) => t.enabled)
                 .map((t) => (
-                  <PerTargetRow key={t.id} targetId={t.id} />
+                  <PerTargetRow key={t.id} targetId={t.id} highlight={flash === t.id} />
                 ))}
             </div>
           ) : (
@@ -288,7 +311,7 @@ function LoadBar({ load }: { load: number }) {
   );
 }
 
-function PerTargetRow({ targetId }: { targetId: string }) {
+function PerTargetRow({ targetId, highlight }: { targetId: string; highlight?: boolean }) {
   const config = useStore((s) => s.config)!;
   const updateTarget = useStore((s) => s.updateTarget);
   const encoders = useStore((s) => s.encoders);
@@ -318,7 +341,13 @@ function PerTargetRow({ targetId }: { targetId: string }) {
 
   return (
     <>
-      <Card className="flex flex-wrap items-center gap-x-5 gap-y-3 bg-surface-2 py-3.5">
+      <Card
+        id={`enc-${t.id}`}
+        className={cn(
+          "flex flex-wrap items-center gap-x-5 gap-y-3 bg-surface-2 py-3.5 transition-shadow",
+          highlight && "pop-brass ring-2 ring-brass",
+        )}
+      >
         {/* Identidade (esquerda, fixa) */}
         <div className="flex min-w-40 items-center gap-3">
           <PlatformGlyph id={t.platformId} size={36} />

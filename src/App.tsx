@@ -190,7 +190,7 @@ export default function App() {
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
                   <ErrorBoundary>
-                    {screen === "platforms" && <PlatformsScreen />}
+                    {screen === "platforms" && <PlatformsScreen onNavigate={navigate} />}
                     {screen === "encoding" && <EncodingScreen />}
                     {screen === "golive" && <GoLiveScreen onNavigate={navigate} />}
                     {screen === "chat" && <ChatScreen />}

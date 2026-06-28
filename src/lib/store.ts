@@ -96,6 +96,10 @@ interface State {
   // UI: aba pedida ao abrir Configurações (deep-link do "Ajustar").
   settingsTab: string | null;
   setSettingsTab: (v: string | null) => void;
+
+  // UI: destino pedido ao abrir Qualidade (deep-link do chip de qualidade em Plataformas).
+  encodingFocus: string | null;
+  setEncodingFocus: (v: string | null) => void;
 }
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
@@ -497,6 +501,11 @@ export const useStore = create<State>((set, get) => {
     settingsTab: null,
     setSettingsTab(v) {
       set({ settingsTab: v });
+    },
+
+    encodingFocus: null,
+    setEncodingFocus(v) {
+      set({ encodingFocus: v });
     },
   };
 });
