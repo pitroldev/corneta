@@ -491,7 +491,7 @@ pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -
         _ => {
             let mut t: Vec<String> = senders.lock().unwrap().keys().cloned().collect();
             for s in &cfg.settings.chat_sources {
-                if s.enabled && s.platform == "youtube" {
+                if s.enabled && (s.platform == "youtube" || s.platform == "kick") {
                     t.push(s.id.clone());
                 }
             }
@@ -510,13 +510,8 @@ pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -
     let mut last_err: Option<String> = None;
     let mut youtube_done = false; // o insert do YT vai pra SUA live; manda uma vez só
     for id in targets {
-        let platform = cfg
-            .settings
-            .chat_sources
-            .iter()
-            .find(|s| s.id == id)
-            .map(|s| s.platform.as_str());
-        match platform {
+        let src = cfg.settings.chat_sources.iter().find(|s| s.id == id);
+        match src.map(|s| s.platform.as_str()) {
             Some("twitch") => {
                 if let Some(tx) = senders.lock().unwrap().get(&id) {
                     if tx.send(text.clone()).is_ok() {
@@ -547,6 +542,15 @@ pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -
                             },
                         );
                     }
+                    Err(e) => last_err = Some(e),
+                }
+            }
+            // Kick: API oficial (HTTP), manda pro canal da fonte. Cada canal Kick é um alvo.
+            // SEM eco local: o leitor Pusher já reflete a sua mensagem (com seu nick) → duplicaria.
+            Some("kick") => {
+                let slug = src.map(|s| s.value.clone()).unwrap_or_default();
+                match crate::auth::kick_send(app, &text, &slug) {
+                    Ok(()) => sent += 1,
                     Err(e) => last_err = Some(e),
                 }
             }

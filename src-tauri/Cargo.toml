@@ -37,6 +37,8 @@ sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 tungstenite = { version = "0.23", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 sha2 = "0.10"
 base64 = "0.22"
+# Aleatoriedade do SO (PKCE verifier/state do login do Kick). Já está no lock (transitivo).
+getrandom = "0.2"
 # Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
 regex = "1"
 # Guardião: encolhe o quadro antes do OCR (resize), diff de quadros e renderiza o slate "JÁ VOLTO"

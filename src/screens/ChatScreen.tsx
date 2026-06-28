@@ -27,7 +27,7 @@ import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cn, openExternal, uid } from "../lib/utils";
 import * as RTabs from "@radix-ui/react-tabs";
-import { HAS_TWITCH_OAUTH } from "../lib/oauth";
+import { HAS_KICK_OAUTH, HAS_TWITCH_OAUTH } from "../lib/oauth";
 import type { AlertSource, AlertSourceKind, ChatMessage, ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
@@ -87,6 +87,8 @@ export function ChatScreen() {
   const twitchLogout = useStore((s) => s.twitchLogout);
   const youtubeLogin = useStore((s) => s.youtubeLogin);
   const youtubeLogout = useStore((s) => s.youtubeLogout);
+  const kickLogin = useStore((s) => s.kickLogin);
+  const kickLogout = useStore((s) => s.kickLogout);
   const youtubeOauthReady = useStore((s) => s.youtubeOauthReady);
   const setYoutubeOauth = useStore((s) => s.setYoutubeOauth);
   const clearYoutubeOauth = useStore((s) => s.clearYoutubeOauth);
@@ -180,19 +182,23 @@ export function ChatScreen() {
     setSettings({ alertSources: alertSources.filter((x) => x.id !== id) });
   };
 
-  // Envio: fontes capazes (token colado, conta Twitch logada, ou YouTube logado).
+  // Envio: fontes capazes (token colado, conta Twitch logada, YouTube ou Kick logado).
   const twitchReady = chatLogin.twitch.state === "connected";
   const youtubeReady = chatLogin.youtube.state === "connected";
+  const kickReady = chatLogin.kick.state === "connected";
   const sendableSources = sources.filter(
     (x) =>
       (x.platform === "twitch" && (x.hasSendToken || twitchReady)) ||
-      (x.platform === "youtube" && youtubeReady),
+      (x.platform === "youtube" && youtubeReady) ||
+      (x.platform === "kick" && kickReady),
   );
   const hasTwitchChannel = sources.some((x) => x.platform === "twitch");
   const hasYoutubeChannel = sources.some((x) => x.platform === "youtube");
-  // Pode habilitar envio/moderação? Twitch precisa do client_id shippado; YouTube é sempre
+  const hasKickChannel = sources.some((x) => x.platform === "kick");
+  // Pode habilitar envio/moderação? Twitch/Kick precisam do client_id shippado; YouTube é sempre
   // configurável (cada um cola as credenciais do Google — BYOK).
-  const canLoginSomewhere = (hasTwitchChannel && HAS_TWITCH_OAUTH) || hasYoutubeChannel;
+  const canLoginSomewhere =
+    (hasTwitchChannel && HAS_TWITCH_OAUTH) || hasYoutubeChannel || (hasKickChannel && HAS_KICK_OAUTH);
   // Rótulo da fonte igual ao backend (value quando o nome é só espaço) — pra casar moderação.
   const srcLabel = (x: ChatSource) => (x.name.trim() === "" ? x.value : x.name);
   // Alvo efetivo do envio (guarda contra id morto no seletor).
@@ -200,9 +206,9 @@ export function ChatScreen() {
   const effectiveSendTo = sendValid ? sendTo : "all";
   const sendTargets =
     effectiveSendTo === "all" ? sendableSources : sendableSources.filter((x) => x.id === effectiveSendTo);
-  // Twitch só envia DEPOIS que o IRC autentica (chatAuth.ok); YouTube manda via HTTP na hora.
+  // Twitch só envia DEPOIS que o IRC autentica (chatAuth.ok); YouTube/Kick mandam via HTTP na hora.
   const canSend = sendTargets.some((x) =>
-    x.platform === "youtube" ? youtubeReady : !!chatAuth[x.id]?.ok,
+    x.platform === "youtube" ? youtubeReady : x.platform === "kick" ? kickReady : !!chatAuth[x.id]?.ok,
   );
   const doSend = async () => {
     const t = draft.trim();
@@ -225,6 +231,7 @@ export function ChatScreen() {
       .map((x) => {
         const label = srcLabel(x);
         if (x.platform === "youtube") return youtubeReady ? "YouTube logado" : `${label}: entre no YouTube`;
+        if (x.platform === "kick") return kickReady ? "Kick logado" : `${label}: entre no Kick`;
         const a = chatAuth[x.id];
         if (a?.ok) return `logado como @${a.login}`;
         if (twitchReady) return `${label}: reconecte o chat pra logar`;
@@ -244,6 +251,7 @@ export function ChatScreen() {
     if (m.author === "você" || (myLogin && m.author.toLowerCase() === myLogin)) return "none";
     if (src.platform === "twitch" && twitchReady) return "full";
     if (src.platform === "youtube" && youtubeReady) return "delete";
+    if (src.platform === "kick" && kickReady) return "delete";
     return "none";
   };
   const onModerate = (m: ChatMessage, action: string) => {
@@ -543,10 +551,11 @@ export function ChatScreen() {
             <RTabs.Content value="conta">
               {!IS_TAURI ? (
                 <p className="text-xs text-ink-muted">Disponível no app instalado.</p>
-              ) : !hasTwitchChannel && !hasYoutubeChannel ? (
+              ) : !hasTwitchChannel && !hasYoutubeChannel && !hasKickChannel ? (
                 <p className="text-xs text-ink-muted">
-                  Adicione um canal da <strong className="text-ink">Twitch</strong> ou{" "}
-                  <strong className="text-ink">YouTube</strong> na aba Canais pra logar.
+                  Adicione um canal da <strong className="text-ink">Twitch</strong>,{" "}
+                  <strong className="text-ink">YouTube</strong> ou <strong className="text-ink">Kick</strong>{" "}
+                  na aba Canais pra logar.
                 </p>
               ) : (
                 <>
@@ -582,6 +591,16 @@ export function ChatScreen() {
                       ) : (
                         <YoutubeCredsForm onSave={(id, sec) => void setYoutubeOauth(id, sec)} />
                       ))}
+                    {hasKickChannel && (
+                      <LoginRow
+                        platform="kick"
+                        label="Kick"
+                        state={chatLogin.kick}
+                        enabled={HAS_KICK_OAUTH}
+                        onLogin={() => void kickLogin()}
+                        onLogout={() => void kickLogout()}
+                      />
+                    )}
                   </div>
                   <p className="mt-3 text-[11px] text-ink-faint">
                     Entre pra <strong className="text-ink">enviar</strong> e{" "}
@@ -1213,12 +1232,14 @@ function LoginRow({
           )}
         </div>
       </div>
-      {state.state === "code" && state.userCode && (
+      {state.state === "code" && (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
-          <span>Abrimos o navegador — confirme com o código:</span>
-          <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
-            {state.userCode}
-          </span>
+          <span>Abrimos o navegador — {state.userCode ? "confirme com o código:" : "é só autorizar."}</span>
+          {state.userCode && (
+            <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
+              {state.userCode}
+            </span>
+          )}
           <span className="text-ink-faint">aguardando…</span>
           <button
             onClick={() => state.verifyUri && void openExternal(state.verifyUri)}

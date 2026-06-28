@@ -110,6 +110,8 @@ pub fn run() {
             auth::twitch_logout,
             auth::youtube_login_start,
             auth::youtube_logout,
+            auth::kick_login_start,
+            auth::kick_logout,
             auth::chat_moderate,
             commands::alerts_start,
             commands::alerts_stop,

@@ -89,7 +89,7 @@ interface State {
   clearChatSendToken: (id: string) => Promise<void>;
 
   // OAuth (login no navegador) — envio/moderação por conta
-  chatLogin: { twitch: LoginState; youtube: LoginState };
+  chatLogin: { twitch: LoginState; youtube: LoginState; kick: LoginState };
   /** YouTube tem credenciais do Google configuradas (.env do dev OU coladas pelo usuário). */
   youtubeOauthReady: boolean;
   setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
@@ -100,6 +100,8 @@ interface State {
   twitchLogout: () => Promise<void>;
   youtubeLogin: () => Promise<void>;
   youtubeLogout: () => Promise<void>;
+  kickLogin: () => Promise<void>;
+  kickLogout: () => Promise<void>;
   moderate: (
     sourceId: string,
     action: string,
@@ -454,7 +456,7 @@ export const useStore = create<State>((set, get) => {
     chatStatuses: {},
     alertStatuses: {},
     chatAuth: {},
-    chatLogin: { twitch: { state: "out" }, youtube: { state: "out" } },
+    chatLogin: { twitch: { state: "out" }, youtube: { state: "out" }, kick: { state: "out" } },
     youtubeOauthReady: false,
 
     bindChat() {
@@ -578,6 +580,8 @@ export const useStore = create<State>((set, get) => {
         twitchClientSecret: OAUTH.twitchClientSecret,
         googleClientId: OAUTH.googleClientId,
         googleClientSecret: OAUTH.googleClientSecret,
+        kickClientId: OAUTH.kickClientId,
+        kickClientSecret: OAUTH.kickClientSecret,
       });
       try {
         const a = await api.authStatus();
@@ -585,6 +589,7 @@ export const useStore = create<State>((set, get) => {
           chatLogin: {
             twitch: a.twitchLogin ? { state: "connected", login: a.twitchLogin } : { state: "out" },
             youtube: a.youtube ? { state: "connected" } : { state: "out" },
+            kick: a.kick ? { state: "connected" } : { state: "out" },
           },
           youtubeOauthReady: a.youtubeConfigured,
         });
@@ -605,7 +610,7 @@ export const useStore = create<State>((set, get) => {
     bindAuthFlow() {
       return api.subscribeAuthFlow((who, a) => {
         set((s) => {
-          const k = who as "twitch" | "youtube";
+          const k = who as "twitch" | "youtube" | "kick";
           let next: LoginState = s.chatLogin[k];
           if (a.state === "code") next = { state: "code", userCode: a.userCode, verifyUri: a.verifyUri };
           else if (a.state === "connected") next = { state: "connected", login: a.login || undefined };
@@ -641,6 +646,14 @@ export const useStore = create<State>((set, get) => {
     async youtubeLogout() {
       await api.youtubeLogout();
       set((s) => ({ chatLogin: { ...s.chatLogin, youtube: { state: "out" } } }));
+    },
+    async kickLogin() {
+      set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
+      await api.kickLoginStart();
+    },
+    async kickLogout() {
+      await api.kickLogout();
+      set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "out" } } }));
     },
 
     async moderate(sourceId, action, opts) {

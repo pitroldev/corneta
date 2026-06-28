@@ -54,12 +54,21 @@ export interface CornetaApi {
     twitchClientSecret: string;
     googleClientId: string;
     googleClientSecret: string;
+    kickClientId: string;
+    kickClientSecret: string;
   }): Promise<void>;
-  authStatus(): Promise<{ twitchLogin: string | null; youtube: boolean; youtubeConfigured: boolean }>;
+  authStatus(): Promise<{
+    twitchLogin: string | null;
+    youtube: boolean;
+    youtubeConfigured: boolean;
+    kick: boolean;
+  }>;
   twitchLoginStart(): Promise<void>;
   twitchLogout(): Promise<void>;
   youtubeLoginStart(): Promise<void>;
   youtubeLogout(): Promise<void>;
+  kickLoginStart(): Promise<void>;
+  kickLogout(): Promise<void>;
   /** BYOK: salva/limpa as credenciais do Google do próprio usuário (cofre). */
   setYoutubeOauth(clientId: string, clientSecret: string): Promise<void>;
   clearYoutubeOauth(): Promise<void>;
@@ -243,6 +252,14 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("youtube_logout");
     },
+    async kickLoginStart() {
+      const { invoke } = await core();
+      await invoke("kick_login_start");
+    },
+    async kickLogout() {
+      const { invoke } = await core();
+      await invoke("kick_logout");
+    },
     async setYoutubeOauth(clientId, clientSecret) {
       const { invoke } = await core();
       await invoke("set_youtube_oauth", { clientId, clientSecret });
@@ -276,6 +293,7 @@ function tauriApi(): CornetaApi {
       void event().then(({ listen }) => {
         void listen<AuthPayload>("auth://twitch", (e) => onAuth("twitch", e.payload)).then(add);
         void listen<AuthPayload>("auth://youtube", (e) => onAuth("youtube", e.payload)).then(add);
+        void listen<AuthPayload>("auth://kick", (e) => onAuth("kick", e.payload)).then(add);
       });
       return () => {
         cancelled = true;
@@ -965,12 +983,14 @@ function mockApi(): CornetaApi {
     },
     async setOauthConfig() {},
     async authStatus() {
-      return { twitchLogin: null, youtube: false, youtubeConfigured: false };
+      return { twitchLogin: null, youtube: false, youtubeConfigured: false, kick: false };
     },
     async twitchLoginStart() {},
     async twitchLogout() {},
     async youtubeLoginStart() {},
     async youtubeLogout() {},
+    async kickLoginStart() {},
+    async kickLogout() {},
     async setYoutubeOauth() {},
     async clearYoutubeOauth() {},
     async chatModerate() {},

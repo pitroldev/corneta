@@ -24,7 +24,17 @@
 > - **Fase 3** — **moderação**: hover numa mensagem → apagar/timeout/ban. Twitch via Helix
 >   (`moderation/chat`, `moderation/bans`); YouTube via `liveChat/messages.delete` (ban/timeout do YT
 >   ficou de fora — precisa do channelId do autor, que o feed não carrega ainda).
-> - **Fase 4 (Kick)** — não feita de propósito (API não-oficial, frágil, risco de ToS).
+> - **Fase 4 (Kick)** — ✅ **envio + moderação (apagar) pela API OFICIAL** do Kick (OAuth 2.1 + PKCE,
+>   redirect loopback `localhost:7395`, sem device flow). `auth.rs`: `kick_login_start`/`kick_wait`
+>   (servidor loopback IPv4+IPv6), `kick_send` (`POST /public/v1/chat`), `kick_moderate` (DELETE).
+>   Client no `.env` (`VITE_KICK_CLIENT_ID/SECRET`), app self-serve sem revisão. Leitura segue no
+>   Pusher anônimo. Ban/timeout pendente (falta o `user_id` do autor no feed).
+>
+> **Facebook e TikTok — avaliados e NÃO implementados** (limite das plataformas, não do código):
+> - **Facebook:** sem leitura pública (só o seu próprio live de Página) + exige Meta App Review +
+>   Business Verification pra qualquer usuário → quebra o modelo "adiciono qualquer canal".
+> - **TikTok:** leitura exige sign server externo (EulerStream) + protobuf (crate Rust arquivado em
+>   jul/2025); **envio é impossível** (sem API; hack viola ToS e arrisca ban da conta).
 
 ---
 

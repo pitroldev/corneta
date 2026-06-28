@@ -6,7 +6,12 @@
 //! (`twitch_oauth`/`twitch_refresh`/`youtube_oauth`/`youtube_refresh`) com refresh automático.
 //! A UI acompanha por `auth://twitch` e `auth://youtube`.
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::io::{Read, Write};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
@@ -18,6 +23,9 @@ const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users";
 const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube.force-ssl";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
+// Kick: API oficial (OAuth 2.1 + PKCE, sem device flow). Redirect loopback numa porta fixa.
+const KICK_SCOPES: &str = "user:read channel:read chat:write moderation:chat_message:manage";
+const KICK_PORT: u16 = 7395;
 
 /// Client ids/secrets vindos do `.env` (definidos pelo frontend no boot).
 #[derive(Default, Clone)]
@@ -26,6 +34,8 @@ pub struct OauthConfig {
     pub twitch_client_secret: String,
     pub google_client_id: String,
     pub google_client_secret: String,
+    pub kick_client_id: String,
+    pub kick_client_secret: String,
 }
 
 fn oauth(app: &AppHandle) -> OauthConfig {
@@ -79,6 +89,8 @@ pub fn set_oauth_config(
     twitch_client_secret: Option<String>,
     google_client_id: String,
     google_client_secret: Option<String>,
+    kick_client_id: Option<String>,
+    kick_client_secret: Option<String>,
 ) {
     // BYOK: credenciais do YouTube que o usuário colou NO APP (cofre) vencem as do .env (build),
     // pra cada um usar a própria conta do Google — própria cota, sem verificação compartilhada.
@@ -91,6 +103,8 @@ pub fn set_oauth_config(
         twitch_client_secret: twitch_client_secret.unwrap_or_default().trim().to_string(),
         google_client_id: g_id.trim().to_string(),
         google_client_secret: g_secret.trim().to_string(),
+        kick_client_id: kick_client_id.unwrap_or_default().trim().to_string(),
+        kick_client_secret: kick_client_secret.unwrap_or_default().trim().to_string(),
     };
 }
 
@@ -134,10 +148,11 @@ pub async fn auth_status(app: AppHandle) -> Value {
         let twitch = twitch_token(&app).and_then(|t| twitch_validate(&t)).map(|i| i.login);
         let youtube = keys::has_key("youtube_refresh");
         let youtube_configured = !app.state::<AppState>().oauth.lock().unwrap().google_client_id.is_empty();
-        json!({ "twitchLogin": twitch, "youtube": youtube, "youtubeConfigured": youtube_configured })
+        let kick = keys::has_key("kick_refresh");
+        json!({ "twitchLogin": twitch, "youtube": youtube, "youtubeConfigured": youtube_configured, "kick": kick })
     })
     .await
-    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false }))
+    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false, "kick": false }))
 }
 
 // ----------------------------- Twitch ------------------------------
@@ -518,6 +533,7 @@ pub async fn chat_moderate(
         match src.platform.as_str() {
             "twitch" => twitch_moderate(&app, &src.value, &action, native_id, author, author_id, seconds),
             "youtube" => youtube_moderate(&app, &action, native_id),
+            "kick" => kick_moderate(&app, &action, native_id),
             _ => Err("essa plataforma não tem moderação".into()),
         }
     })
@@ -615,5 +631,345 @@ fn youtube_moderate(app: &AppHandle, action: &str, native_id: Option<String>) ->
         // banir/timeout no YouTube precisa do channelId do autor (liveChatBans), que o feed
         // não carrega hoje → fica como evolução. Apagar já cobre o essencial.
         _ => Err("no YouTube, por enquanto só dá pra apagar a mensagem".into()),
+    }
+}
+
+// ----------------------------- Kick --------------------------------
+// Kick tem API OFICIAL (OAuth 2.1 + PKCE, SEM device flow). Login = Authorization Code com
+// redirect loopback (http://localhost:KICK_PORT/callback). Envio: POST /public/v1/chat.
+// Leitura continua no Pusher anônimo (run_kick) — não muda.
+
+static KICK_IDS: Mutex<BTreeMap<String, i64>> = Mutex::new(BTreeMap::new());
+
+/// Token aleatório (32 bytes do CSPRNG do SO → base64url, ~43 chars) pro PKCE verifier e o
+/// state anti-CSRF (RFC 7636 exige aleatoriedade real, não time/pid).
+fn rand_token() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).expect("OS RNG indisponível");
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+
+fn pkce_challenge(verifier: &str) -> String {
+    URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
+}
+
+/// Percent-encode pra valores de query da URL de autorização.
+fn pct(s: &str) -> String {
+    s.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+fn pct_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'%' if i + 3 <= b.len() => {
+                // decodifica por bytes (não fatia o &str → evita panic em fronteira UTF-8).
+                match ((b[i + 1] as char).to_digit(16), (b[i + 2] as char).to_digit(16)) {
+                    (Some(h), Some(l)) => out.push((h * 16 + l) as u8),
+                    _ => out.push(b'%'),
+                }
+                i += 3;
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            c => {
+                out.push(c);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+#[tauri::command]
+pub fn kick_login_start(app: AppHandle) {
+    let cfg = oauth(&app);
+    if cfg.kick_client_id.is_empty() || cfg.kick_client_secret.is_empty() {
+        auth_event(&app, "kick", "error", "", "", "Falta VITE_KICK_CLIENT_ID/SECRET no .env");
+        return;
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let verifier = rand_token();
+        let challenge = pkce_challenge(&verifier);
+        let state = rand_token();
+        let redirect = format!("http://localhost:{KICK_PORT}/callback");
+        // Abre a porta ANTES do navegador. Escuta em IPv4 E IPv6 — no Windows "localhost" pode
+        // resolver pra ::1 ou 127.0.0.1, então pegamos os dois.
+        let mut listeners = Vec::new();
+        for ip in [IpAddr::V4(Ipv4Addr::LOCALHOST), IpAddr::V6(Ipv6Addr::LOCALHOST)] {
+            if let Ok(l) = TcpListener::bind(SocketAddr::new(ip, KICK_PORT)) {
+                let _ = l.set_nonblocking(true);
+                listeners.push(l);
+            }
+        }
+        if listeners.is_empty() {
+            return auth_event(&app, "kick", "error", "", "", &format!("Porta {KICK_PORT} ocupada"));
+        }
+        let url = format!(
+            "https://id.kick.com/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&state={}",
+            pct(&cfg.kick_client_id),
+            pct(&redirect),
+            pct(KICK_SCOPES),
+            pct(&challenge),
+            pct(&state),
+        );
+        // o front abre o navegador (auth://kick "code" → openExternal). Sem user_code (não é device).
+        auth_code_event(&app, "kick", "", &url, &url);
+        match kick_wait(&listeners, &state) {
+            Ok(code) => match kick_exchange(&cfg, &code, &verifier, &redirect) {
+                Ok(()) => {
+                    let login = kick_whoami(&app).unwrap_or_default();
+                    auth_event(&app, "kick", "connected", "", "", &login);
+                }
+                Err(e) => auth_event(&app, "kick", "error", "", "", &e),
+            },
+            Err(e) => auth_event(&app, "kick", "error", "", "", &e),
+        }
+    });
+}
+
+/// Servidor loopback (IPv4+IPv6) de uso único: espera o GET /callback?code=...&state=..., confere
+/// o state (CSRF), trata negação (`error`) e IGNORA conexões espúrias (preconnect/favicon) em vez
+/// de matar o login. Timeout de 5 min.
+fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, String> {
+    let deadline = Instant::now() + Duration::from_secs(300);
+    loop {
+        if Instant::now() > deadline {
+            return Err("Login do Kick expirou (5 min)".into());
+        }
+        let mut idle = true;
+        for listener in listeners {
+            let mut stream = match listener.accept() {
+                Ok((s, _)) => s,
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
+                Err(_) => continue,
+            };
+            idle = false;
+            // O socket aceito herda o não-bloqueante do listener (Windows) → força bloqueio com
+            // timeout e lê até a request inteira (read único poderia voltar 0 byte e quebrar).
+            let _ = stream.set_nonblocking(false);
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+            let mut buf = [0u8; 8192];
+            let mut n = 0usize;
+            loop {
+                match stream.read(&mut buf[n..]) {
+                    Ok(0) => break,
+                    Ok(k) => {
+                        n += k;
+                        if n >= buf.len() || buf[..n].windows(4).any(|w| w == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break,
+                }
+            }
+            let req = String::from_utf8_lossy(&buf[..n]);
+            let line = req.lines().next().unwrap_or("");
+            let path = line.split_whitespace().nth(1).unwrap_or("");
+            let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
+            let (mut code, mut got_state, mut err) = (String::new(), String::new(), String::new());
+            for kv in query.split('&') {
+                if let Some((k, v)) = kv.split_once('=') {
+                    match k {
+                        "code" => code = pct_decode(v),
+                        "state" => got_state = pct_decode(v),
+                        "error_description" => err = pct_decode(v),
+                        "error" if err.is_empty() => err = pct_decode(v),
+                        _ => {}
+                    }
+                }
+            }
+            let ok = err.is_empty() && !code.is_empty() && got_state == expected_state;
+            let is_callback = !code.is_empty() || !err.is_empty();
+            let msg = if ok {
+                "Pronto! Pode fechar esta aba e voltar pra Corneta."
+            } else if is_callback {
+                "Algo deu errado. Volte pra Corneta e tente de novo."
+            } else {
+                "Corneta — aguardando o login do Kick…"
+            };
+            let html = format!(
+                "<!doctype html><meta charset=utf-8><body style=\"font-family:sans-serif;text-align:center;padding-top:3rem\"><h2>{msg}</h2>"
+            );
+            let _ = write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
+                html.len(),
+                html
+            );
+            let _ = stream.flush();
+            if ok {
+                return Ok(code);
+            }
+            if !err.is_empty() {
+                return Err(format!("Autorização negada no Kick ({err})"));
+            }
+            if !code.is_empty() {
+                return Err("Login do Kick inválido (state não confere)".into());
+            }
+            // conexão espúria (sem code/erro) → ignora e segue esperando o callback real.
+        }
+        if idle {
+            std::thread::sleep(Duration::from_millis(150));
+        }
+    }
+}
+
+fn kick_exchange(cfg: &OauthConfig, code: &str, verifier: &str, redirect: &str) -> Result<(), String> {
+    let v = post_form(
+        "https://id.kick.com/oauth/token",
+        &[
+            ("grant_type", "authorization_code"),
+            ("client_id", cfg.kick_client_id.as_str()),
+            ("client_secret", cfg.kick_client_secret.as_str()),
+            ("redirect_uri", redirect),
+            ("code_verifier", verifier),
+            ("code", code),
+        ],
+    )
+    .map_err(|(c, e)| format!("Kick token {c}: {e}"))?;
+    let access = v.get("access_token").and_then(|x| x.as_str()).ok_or("Kick: token vazio")?;
+    keys::set_key("kick_oauth", access)?;
+    if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
+        let _ = keys::set_key("kick_refresh", r);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn kick_logout(app: AppHandle) {
+    let _ = keys::clear_key("kick_oauth");
+    let _ = keys::clear_key("kick_refresh");
+    KICK_IDS.lock().unwrap().clear();
+    auth_event(&app, "kick", "loggedout", "", "", "");
+}
+
+fn kick_refresh(app: &AppHandle) -> Option<String> {
+    let cfg = oauth(app);
+    let refresh = keys::get_key("kick_refresh")?;
+    let v = match post_form(
+        "https://id.kick.com/oauth/token",
+        &[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh.as_str()),
+            ("client_id", cfg.kick_client_id.as_str()),
+            ("client_secret", cfg.kick_client_secret.as_str()),
+        ],
+    ) {
+        Ok(v) => v,
+        Err((code, e)) => {
+            // refresh morto (revogado/expirado) → desloga de vez pra UI refletir. Erro de rede
+            // (status 0) ou 5xx → mantém a sessão pra tentar de novo.
+            let dead = code == 400 || e.get("error").and_then(|x| x.as_str()) == Some("invalid_grant");
+            if dead {
+                let _ = keys::clear_key("kick_oauth");
+                let _ = keys::clear_key("kick_refresh");
+                KICK_IDS.lock().unwrap().clear();
+                auth_event(app, "kick", "loggedout", "", "", "");
+            }
+            return None;
+        }
+    };
+    let access = v.get("access_token").and_then(|x| x.as_str())?.to_string();
+    let _ = keys::set_key("kick_oauth", &access);
+    if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
+        let _ = keys::set_key("kick_refresh", r);
+    }
+    Some(access)
+}
+
+/// Chamada à API oficial do Kick (Bearer), com refresh automático no 401.
+fn kick_api(app: &AppHandle, method: &str, url: &str, body: Option<&Value>) -> Result<String, String> {
+    let mut token = keys::get_key("kick_oauth").ok_or("entre no Kick primeiro")?;
+    for attempt in 0..2 {
+        let req = match method {
+            "POST" => ureq::post(url),
+            "DELETE" => ureq::delete(url),
+            _ => ureq::get(url),
+        }
+        .set("Authorization", &format!("Bearer {token}"))
+        .timeout(Duration::from_secs(12));
+        let res = match body {
+            Some(b) => req.set("Content-Type", "application/json").send_string(&b.to_string()),
+            None => req.call(),
+        };
+        match res {
+            Ok(r) => return Ok(r.into_string().unwrap_or_default()),
+            Err(ureq::Error::Status(401, _)) if attempt == 0 => {
+                token = kick_refresh(app).ok_or("Kick: sessão expirou, entre de novo")?;
+            }
+            Err(ureq::Error::Status(c, r)) => {
+                return Err(format!("Kick {c}: {}", r.into_string().unwrap_or_default()));
+            }
+            Err(e) => return Err(format!("Kick: {e}")),
+        }
+    }
+    Err("Kick: falha após renovar a sessão".into())
+}
+
+fn kick_broadcaster_id(app: &AppHandle, slug: &str) -> Result<i64, String> {
+    let slug = slug.trim().trim_start_matches('@').to_lowercase();
+    if slug.is_empty() {
+        return Err("Kick: canal sem nome".into());
+    }
+    if let Some(id) = KICK_IDS.lock().unwrap().get(&slug) {
+        return Ok(*id);
+    }
+    let body = kick_api(
+        app,
+        "GET",
+        &format!("https://api.kick.com/public/v1/channels?slug={}", pct(&slug)),
+        None,
+    )?;
+    let v: Value = serde_json::from_str(&body).map_err(|_| "Kick: resposta inválida".to_string())?;
+    let id = v
+        .get("data")
+        .and_then(|d| d.as_array())
+        .and_then(|a| a.first())
+        .and_then(|c| c.get("broadcaster_user_id"))
+        .and_then(|x| x.as_i64())
+        .ok_or("Kick: canal não encontrado")?;
+    KICK_IDS.lock().unwrap().insert(slug, id);
+    Ok(id)
+}
+
+/// Manda mensagem no chat do canal Kick (API oficial: POST /public/v1/chat, type=user).
+pub fn kick_send(app: &AppHandle, text: &str, slug: &str) -> Result<(), String> {
+    let bid = kick_broadcaster_id(app, slug)?;
+    let content: String = text.chars().take(500).collect();
+    let body = json!({ "type": "user", "content": content, "broadcaster_user_id": bid });
+    kick_api(app, "POST", "https://api.kick.com/public/v1/chat", Some(&body)).map(|_| ())
+}
+
+/// Nome da conta logada (pra mostrar "logado como X"). Best-effort.
+fn kick_whoami(app: &AppHandle) -> Option<String> {
+    let body = kick_api(app, "GET", "https://api.kick.com/public/v1/users", None).ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    let u = v.get("data")?.as_array()?.first()?;
+    u.get("name")
+        .or_else(|| u.get("username"))
+        .or_else(|| u.get("slug"))
+        .and_then(|x| x.as_str())
+        .map(|s| s.to_string())
+}
+
+fn kick_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Result<(), String> {
+    match action {
+        "delete" => {
+            let id = native_id.ok_or("sem id da mensagem")?;
+            kick_api(app, "DELETE", &format!("https://api.kick.com/public/v1/chat/{id}"), None).map(|_| ())
+        }
+        // banir/timeout precisa do user_id do autor (o feed Pusher só dá username) → evolução.
+        _ => Err("no Kick, por enquanto só dá pra apagar a mensagem".into()),
     }
 }
