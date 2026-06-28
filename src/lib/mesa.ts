@@ -56,6 +56,14 @@ function randomId(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
 }
 
+/** Segredo por par (CSPRNG): prova ao relay que sou o dono deste peerId ao reconectar.
+ *  Só viaja no `join`, nunca é difundido — um terceiro não consegue roubar meu slot. */
+function randomSecret(): string {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
 // ------------------------------------------------------------------
 // Convite (token) — carrega o endereço do host + a chave da sala, sem servidor de
 // rendezvous. base64url de um JSON pequeno. Curto o bastante pra copiar/QR.
@@ -152,6 +160,7 @@ export async function openCamera(opts: CameraOpts = {}): Promise<MediaStream> {
 // ------------------------------------------------------------------
 export class MesaClient {
   readonly myId = randomId("control");
+  private readonly secret = randomSecret();
   private ws: WebSocket | null = null;
   private readonly opts: MesaClientOpts;
   private readonly ice: RTCIceServer[];
@@ -235,7 +244,14 @@ export class MesaClient {
       this.retry = 0;
       this.opts.onStatus("online");
       this.opts.onReady?.(this.myId);
-      this.send({ t: "join", room: this.opts.room, peerId: this.myId, role: "control", name: this.opts.name });
+      this.send({
+        t: "join",
+        room: this.opts.room,
+        peerId: this.myId,
+        role: "control",
+        name: this.opts.name,
+        secret: this.secret,
+      });
     };
     ws.onmessage = (ev) => {
       let m: Record<string, unknown>;
@@ -283,6 +299,11 @@ export class MesaClient {
       case "signal":
         await this.onPeerSignal(m.from as string, m.data as SignalData);
         break;
+      case "error": {
+        const code = typeof m.code === "string" ? m.code : "desconhecida";
+        this.opts.onError?.(`a Mesa recusou a entrada (${code})`);
+        break;
+      }
     }
   }
 

@@ -43,6 +43,9 @@ struct Peer {
     name: String,
     tx: mpsc::Sender<String>,
     token: u64,
+    /// Segredo por par (gerado no cliente, só viaja no `join`, nunca é difundido).
+    /// Só quem o conhece reassume o peerId — fecha o sequestro de slot por insider.
+    secret: String,
 }
 
 /// room → (peerId → Peer). Em memória; sala vazia some.
@@ -127,6 +130,7 @@ fn handle_msg(
             let peer_id = v.get("peerId").and_then(|x| x.as_str()).unwrap_or("").to_string();
             let role = v.get("role").and_then(|x| x.as_str()).unwrap_or("control").to_string();
             let name = v.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let secret = v.get("secret").and_then(|x| x.as_str()).unwrap_or("").to_string();
             if room.is_empty() || peer_id.is_empty() {
                 return;
             }
@@ -141,6 +145,16 @@ fn handle_msg(
             }
             let mut rooms = ctx.rooms.lock().unwrap();
             let r = rooms.map.entry(room.clone()).or_default();
+            // Anti-sequestro: o peerId é difundido a todos na sala. Sem isto, um membro
+            // poderia dar `join` com o peerId de outro e roubar o canal de sinalização
+            // dele. Só quem trouxe o mesmo `secret` (o próprio dono, reconectando)
+            // reassume o slot; um terceiro não conhece o segredo → entra recusado.
+            if let Some(existing) = r.get(&peer_id) {
+                if existing.secret != secret {
+                    let _ = my_tx.try_send(json!({ "t": "error", "code": "peer-taken" }).to_string());
+                    return;
+                }
+            }
             // welcome: quem já está na sala (com papel e nome).
             let existing: Vec<Value> = r
                 .iter()
@@ -158,7 +172,7 @@ fn handle_msg(
                     let _ = p.tx.try_send(join_evt.clone());
                 }
             }
-            r.insert(peer_id.clone(), Peer { role, name, tx: my_tx.clone(), token });
+            r.insert(peer_id.clone(), Peer { role, name, tx: my_tx.clone(), token, secret });
             *joined = Some((room, peer_id));
         }
         "signal" => {

@@ -119,6 +119,13 @@
 
     const stage = document.getElementById("stage");
     const myId = "studio-" + Math.random().toString(36).slice(2, 10);
+    // Segredo por par: prova ao relay que sou o dono deste peerId ao reconectar
+    // (anti-sequestro de slot). Só viaja no join, nunca é difundido.
+    const SECRET = (() => {
+      const b = new Uint8Array(16);
+      crypto.getRandomValues(b);
+      return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+    })();
 
     // peerId -> { pc, slot, name, role, video, tile, brb, dot, label }
     const peers = new Map();
@@ -235,7 +242,7 @@
       ws = new WebSocket(SIGNAL);
       ws.onopen = () => {
         retry = 0;
-        send({ t: "join", room: ROOM, peerId: myId, role: "studio", name: "OBS" });
+        send({ t: "join", room: ROOM, peerId: myId, role: "studio", name: "OBS", secret: SECRET });
       };
       ws.onmessage = (ev) => {
         let m; try { m = JSON.parse(ev.data); } catch (_) { return; }

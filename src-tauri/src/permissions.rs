@@ -4,6 +4,20 @@
 //! ficaria preso num DENY em cache (tauri#5042) que só limpa apagando a pasta EBWebView.
 //! Setar o estado ALLOW antes do prompt aparecer evita os dois problemas.
 
+/// Só a origem local do app (prod: tauri.localhost; dev: localhost:1420) ganha o ALLOW
+/// automático. Conteúdo remoto que porventura fosse carregado no WebView fica de fora —
+/// volta a cair no prompt padrão. Hoje a CSP já só carrega a própria origem; isto é
+/// defesa em profundidade caso isso mude.
+#[cfg(windows)]
+fn is_app_origin(uri: &str) -> bool {
+    uri.is_empty()
+        || uri.starts_with("http://tauri.localhost")
+        || uri.starts_with("https://tauri.localhost")
+        || uri.starts_with("http://localhost")
+        || uri.starts_with("http://127.0.0.1")
+        || uri.starts_with("tauri://")
+}
+
 #[cfg(windows)]
 pub fn grant_av_permissions(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
@@ -11,7 +25,7 @@ pub fn grant_av_permissions(window: &tauri::WebviewWindow) {
         COREWEBVIEW2_PERMISSION_KIND_CAMERA, COREWEBVIEW2_PERMISSION_KIND_MICROPHONE,
         COREWEBVIEW2_PERMISSION_STATE_ALLOW,
     };
-    use webview2_com::PermissionRequestedEventHandler;
+    use webview2_com::{take_pwstr, PermissionRequestedEventHandler};
 
     // with_webview roda F: FnOnce(PlatformWebview) + Send + 'static na thread do webview.
     let _ = window.with_webview(move |webview| unsafe {
@@ -29,7 +43,14 @@ pub fn grant_av_permissions(window: &tauri::WebviewWindow) {
                     if kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA
                         || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE
                     {
-                        args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
+                        // Tipo da PWSTR resolvido por inferência (a versão do windows que
+                        // o webview2-com usa difere da do crate `windows` do projeto).
+                        let mut uri_ptr = Default::default();
+                        args.Uri(&mut uri_ptr)?;
+                        let uri = take_pwstr(uri_ptr);
+                        if is_app_origin(&uri) {
+                            args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
+                        }
                     }
                 }
                 Ok(())
