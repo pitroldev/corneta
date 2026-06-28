@@ -18,6 +18,21 @@ fn now_ms() -> u128 {
         .unwrap_or(0)
 }
 
+/// `std::process::Command` que NÃO pisca uma janela de console no Windows. Os sidecars
+/// (ffmpeg/mediamtx) já sobem sem janela pelo plugin shell; isto cobre os utilitários
+/// crus daqui — sobretudo o `nvidia-smi` do amostrador (a cada ~2s ao vivo) e os
+/// `taskkill` da limpeza — que senão piscavam um CMD cada vez que rodavam.
+fn quiet_command(program: &str) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    cmd
+}
+
 // ----------------------------- Config -----------------------------
 
 #[tauri::command]
@@ -500,7 +515,7 @@ async fn run_slate(
         let _ = c.kill();
         #[cfg(windows)]
         {
-            let _ = std::process::Command::new("taskkill")
+            let _ = quiet_command("taskkill")
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output();
         }
@@ -520,13 +535,13 @@ fn kill_orphan_sidecars() {
         .unwrap_or_else(|_| "x86_64-pc-windows-msvc".into());
     #[cfg(windows)]
     for base in ["ffmpeg", "mediamtx"] {
-        let _ = std::process::Command::new("taskkill")
+        let _ = quiet_command("taskkill")
             .args(["/F", "/IM", &format!("{base}-{triple}.exe")])
             .output();
     }
     #[cfg(not(windows))]
     for base in ["ffmpeg", "mediamtx"] {
-        let _ = std::process::Command::new("pkill")
+        let _ = quiet_command("pkill")
             .args(["-f", &format!("{base}-{triple}")])
             .output();
     }
@@ -831,7 +846,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                         let _ = c.kill();
                         #[cfg(windows)]
                         {
-                            let _ = std::process::Command::new("taskkill")
+                            let _ = quiet_command("taskkill")
                                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                                 .output();
                         }
@@ -945,7 +960,7 @@ pub fn set_target_paused(app: AppHandle, target_id: String, paused: bool) -> Res
         let _ = child.kill();
         #[cfg(windows)]
         {
-            let _ = std::process::Command::new("taskkill")
+            let _ = quiet_command("taskkill")
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output();
         }
@@ -1099,7 +1114,7 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
 
 /// Lê a utilização da GPU NVIDIA (%) via nvidia-smi. None se não houver NVIDIA.
 fn read_gpu() -> Option<f64> {
-    let out = std::process::Command::new("nvidia-smi")
+    let out = quiet_command("nvidia-smi")
         .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
         .output()
         .ok()?;
@@ -1174,7 +1189,7 @@ pub fn kill_engine(app: &AppHandle) {
         // Mata eventuais subprocessos (netos órfãos) — Windows-first.
         #[cfg(windows)]
         {
-            let _ = std::process::Command::new("taskkill")
+            let _ = quiet_command("taskkill")
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output();
         }
