@@ -1,3 +1,4 @@
+mod alerts;
 mod chat;
 mod commands;
 mod config;
@@ -18,6 +19,7 @@ use tauri::{Emitter, Manager};
 pub struct AppState {
     pub engine: Mutex<engine::EngineRuntime>,
     pub chat: Mutex<chat::ChatRuntime>,
+    pub alerts: Mutex<alerts::AlertRuntime>,
     pub studio: Mutex<studio::StudioServer>,
 }
 
@@ -74,6 +76,7 @@ pub fn run() {
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
             chat: Mutex::new(chat::ChatRuntime::default()),
+            alerts: Mutex::new(alerts::AlertRuntime::default()),
             studio: Mutex::new(studio::StudioServer::default()),
         })
         .invoke_handler(tauri::generate_handler![
@@ -95,6 +98,8 @@ pub fn run() {
             commands::open_sessions_dir,
             commands::chat_start,
             commands::chat_stop,
+            commands::alerts_start,
+            commands::alerts_stop,
             commands::open_chat_window,
             commands::obs_set_stream,
             commands::test_target,

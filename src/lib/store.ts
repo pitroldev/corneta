@@ -65,6 +65,12 @@ interface State {
   bindChat: () => () => void;
   connectChat: () => Promise<void>;
   disconnectChat: () => Promise<void>;
+
+  // Alertas externos (Streamlabs/StreamElements)
+  alertStatuses: Record<string, { status: string }>;
+  bindAlertStatus: () => () => void;
+  setAlertToken: (id: string, token: string) => Promise<void>;
+  clearAlertToken: (id: string) => Promise<void>;
   clearChat: () => void;
 
   // Alertas centralizados
@@ -412,6 +418,7 @@ export const useStore = create<State>((set, get) => {
     chatMessages: [],
     chatConnected: false,
     chatStatuses: {},
+    alertStatuses: {},
 
     bindChat() {
       return api.subscribeChat(
@@ -438,14 +445,54 @@ export const useStore = create<State>((set, get) => {
     },
 
     async connectChat() {
-      set({ chatMessages: [], chatStatuses: {} });
+      set({ chatMessages: [], chatStatuses: {}, alertStatuses: {} });
       await api.chatStart();
+      await api.alertsStart();
       set({ chatConnected: true });
     },
 
     async disconnectChat() {
       await api.chatStop();
-      set({ chatConnected: false, chatStatuses: {} });
+      await api.alertsStop();
+      set({ chatConnected: false, chatStatuses: {}, alertStatuses: {} });
+    },
+
+    bindAlertStatus() {
+      return api.subscribeAlertStatus((st) =>
+        set((s) => ({
+          alertStatuses: { ...s.alertStatuses, [st.source]: { status: st.status } },
+        }))
+      );
+    },
+
+    async setAlertToken(id, token) {
+      await api.setKey(`alert_${id}`, token);
+      const config = get().config;
+      if (!config) return;
+      persist({
+        ...config,
+        settings: {
+          ...config.settings,
+          alertSources: (config.settings.alertSources ?? []).map((a) =>
+            a.id === id ? { ...a, hasToken: true } : a,
+          ),
+        },
+      });
+    },
+
+    async clearAlertToken(id) {
+      await api.clearKey(`alert_${id}`);
+      const config = get().config;
+      if (!config) return;
+      persist({
+        ...config,
+        settings: {
+          ...config.settings,
+          alertSources: (config.settings.alertSources ?? []).map((a) =>
+            a.id === id ? { ...a, hasToken: false } : a,
+          ),
+        },
+      });
     },
 
     clearChat() {

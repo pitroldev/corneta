@@ -4,10 +4,13 @@ import {
   AtSign,
   BadgeCheck,
   Bell,
+  Check,
   ChevronDown,
+  ClipboardPaste,
   Clock,
   Eye,
   ExternalLink,
+  Pencil,
   Plus,
   Settings2,
   Smile,
@@ -21,8 +24,8 @@ import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cn, uid } from "../lib/utils";
-import type { ChatPlatform, ChatSource } from "../lib/types";
-import { Button, Card, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
+import type { AlertSource, AlertSourceKind, ChatPlatform, ChatSource } from "../lib/types";
+import { Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
 import { Tooltip } from "../components/Tooltip";
@@ -63,9 +66,12 @@ export function ChatScreen() {
   const alerts = useStore((s) => s.alerts);
   const clearAlerts = useStore((s) => s.clearAlerts);
   const viewers = useStore((s) => s.viewers);
+  const setAlertToken = useStore((s) => s.setAlertToken);
+  const alertStatuses = useStore((s) => s.alertStatuses);
 
   const [showConfig, setShowConfig] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [addingAlert, setAddingAlert] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
@@ -108,7 +114,10 @@ export function ChatScreen() {
       hasDup,
     ]
   );
-  const configured = sources.some((x) => x.enabled && x.value.trim());
+  const alertSources = s.alertSources ?? [];
+  const configured =
+    sources.some((x) => x.enabled && x.value.trim()) ||
+    alertSources.some((x) => x.enabled && x.hasToken);
   // Plataformas que de fato entram no feed (fonte ligada e nomeada). Os chips de filtro
   // só fazem sentido com 2+ — com 1 só viram ruído (e o risco de filtrar sem religar).
   const feedPlatforms = [
@@ -132,6 +141,17 @@ export function ChatScreen() {
     setSettings({ chatSources: sources.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
   const removeSource = (id: string) =>
     setSettings({ chatSources: sources.filter((x) => x.id !== id) });
+
+  const addAlertSource = (kind: AlertSourceKind) =>
+    setSettings({
+      alertSources: [...alertSources, { id: uid("alert"), kind, name: "", enabled: true }],
+    });
+  const updateAlertSource = (id: string, patch: Partial<AlertSource>) =>
+    setSettings({ alertSources: alertSources.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
+  const removeAlertSource = (id: string) => {
+    void api.clearKey(`alert_${id}`);
+    setSettings({ alertSources: alertSources.filter((x) => x.id !== id) });
+  };
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col">
@@ -327,6 +347,70 @@ export function ChatScreen() {
                     className="h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
                   />
                 </label>
+              )}
+            </div>
+
+            {/* Fontes de alerta (Streamlabs / StreamElements) */}
+            <div className="border-t-2 border-border-soft pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                  Fontes de alerta
+                </span>
+                <Button
+                  variant={addingAlert ? "ghost" : "subtle"}
+                  size="sm"
+                  onClick={() => setAddingAlert((v) => !v)}
+                >
+                  {addingAlert ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
+                  {addingAlert ? "Cancelar" : "Adicionar fonte"}
+                </Button>
+              </div>
+              <p className="mb-2 text-[11px] text-ink-faint">
+                Doações, follows e subs que você centraliza no{" "}
+                <strong className="text-ink">Streamlabs</strong> ou{" "}
+                <strong className="text-ink">StreamElements</strong> caem aqui na aba Alertas. Cole o
+                token — ele fica no cofre do sistema.
+              </p>
+
+              {addingAlert && (
+                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-surface-2 p-2">
+                  <span className="px-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+                    De qual?
+                  </span>
+                  {(["streamlabs", "streamelements"] as const).map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => {
+                        addAlertSource(k);
+                        setAddingAlert(false);
+                      }}
+                      className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-xs font-bold ring-1 ring-border transition-all hover:-translate-y-px hover:text-ink"
+                    >
+                      <Bell className="size-3.5 text-brass" />
+                      {ALERT_META[k].label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {alertSources.length === 0 ? (
+                <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-4 text-center text-xs text-ink-muted">
+                  Nenhuma fonte de alerta. Adicione <strong className="text-ink">Streamlabs</strong> ou{" "}
+                  <strong className="text-ink">StreamElements</strong> pra ver doações no feed de Alertas.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {alertSources.map((src) => (
+                    <AlertSourceCard
+                      key={src.id}
+                      src={src}
+                      status={alertStatuses[src.name.trim() || src.kind]?.status}
+                      onChange={(p) => updateAlertSource(src.id, p)}
+                      onRemove={() => removeAlertSource(src.id)}
+                      onToken={(t) => setAlertToken(src.id, t)}
+                    />
+                  ))}
+                </div>
               )}
             </div>
 
@@ -606,6 +690,161 @@ function SourceCard({
             >
               <Trash2 className="size-4" />
               {confirmRemove ? "Remover mesmo?" : "Remover canal"}
+            </Button>
+          </div>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </div>
+  );
+}
+
+const ALERT_META: Record<AlertSourceKind, { label: string; placeholder: string; hint: string }> = {
+  streamlabs: {
+    label: "Streamlabs",
+    placeholder: "Socket API Token",
+    hint: 'Streamlabs → Account Settings → API Settings → "Your Socket API Token". Pega doações, follows, subs e bits que você centraliza no Streamlabs.',
+  },
+  streamelements: {
+    label: "StreamElements",
+    placeholder: "JWT Token",
+    hint: 'StreamElements → seu perfil → Channels → "Show secrets" → JWT Token. ⚠️ Expira a cada ~2 semanas — é só colar de novo.',
+  },
+};
+
+const ALERT_STATUS: Record<string, string> = {
+  connected: "no ar",
+  error: "erro",
+  disconnected: "caiu",
+};
+
+function AlertSourceCard({
+  src,
+  status,
+  onChange,
+  onRemove,
+  onToken,
+}: {
+  src: AlertSource;
+  status?: string;
+  onChange: (patch: Partial<AlertSource>) => void;
+  onRemove: () => void;
+  onToken: (token: string) => Promise<void>;
+}) {
+  const meta = ALERT_META[src.kind];
+  const [open, setOpen] = useState(() => !src.hasToken);
+  const [editing, setEditing] = useState(false);
+  const [token, setToken] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const showInput = !src.hasToken || editing;
+
+  const save = async () => {
+    const t = token.trim();
+    if (!t) return;
+    await onToken(t);
+    setToken("");
+    setEditing(false);
+    toast.success("Token guardado no cofre 🔒");
+  };
+  const paste = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) setToken(t.trim());
+    } catch {
+      /* área de transferência bloqueada */
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-md border-2 transition-opacity",
+        src.enabled ? "bg-surface" : "bg-surface-2 opacity-60",
+        src.hasToken ? "border-border-soft" : "border-bad/50",
+      )}
+    >
+      <Collapsible.Root open={open} onOpenChange={setOpen}>
+        <div className="flex items-center gap-2 p-2.5">
+          <div className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 text-brass">
+            <Bell className="size-4" />
+          </div>
+          <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+            <span className="shrink-0 font-display text-sm font-bold">{meta.label}</span>
+            {src.hasToken ? (
+              <span className="truncate text-xs text-ink-muted">
+                · {status ? ALERT_STATUS[status] ?? status : "token salvo"}
+              </span>
+            ) : (
+              <span className="shrink-0 text-xs font-semibold text-bad">· sem token</span>
+            )}
+          </div>
+          <Toggle checked={src.enabled} onChange={(v) => onChange({ enabled: v })} label="ligado" />
+          <Collapsible.Trigger asChild>
+            <button
+              aria-label={open ? "Recolher fonte" : "Expandir fonte"}
+              className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
+            >
+              <ChevronDown className={cn("size-5 transition-transform", open && "rotate-180")} />
+            </button>
+          </Collapsible.Trigger>
+        </div>
+
+        <Collapsible.Content className="flex flex-col gap-2 px-2.5 pb-2.5">
+          {showInput ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="password"
+                autoFocus
+                placeholder={meta.placeholder}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && token.trim() && void save()}
+                className="flex-1"
+              />
+              <Button variant="subtle" size="sm" onClick={paste}>
+                <ClipboardPaste className="size-4" /> Colar
+              </Button>
+              <Button variant="primary" size="sm" disabled={!token.trim()} onClick={save}>
+                Salvar
+              </Button>
+              {editing && (
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                  <X className="size-4" />
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2">
+              <Check className="size-4 text-ok" strokeWidth={2.6} />
+              <span className="text-sm font-semibold">Token no cofre</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={() => {
+                  setToken("");
+                  setEditing(true);
+                }}
+              >
+                <Pencil className="size-3.5" /> Trocar
+              </Button>
+            </div>
+          )}
+          <p className="text-[11px] text-ink-faint">{meta.hint}</p>
+          <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
+            <Button
+              variant={confirmRemove ? "danger" : "ghost"}
+              size="sm"
+              onClick={() => {
+                if (confirmRemove) {
+                  onRemove();
+                  return;
+                }
+                setConfirmRemove(true);
+                setTimeout(() => setConfirmRemove(false), 3000);
+              }}
+            >
+              <Trash2 className="size-4" />
+              {confirmRemove ? "Remover mesmo?" : "Remover fonte"}
             </Button>
           </div>
         </Collapsible.Content>

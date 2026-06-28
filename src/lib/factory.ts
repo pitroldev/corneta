@@ -45,6 +45,7 @@ export function defaultConfig(): AppConfig {
       liveShortcut: "CommandOrControl+Alt+L",
       youtubeApiKey: "",
       chatSources: [],
+      alertSources: [],
       chatShowEmotes: true,
       chatShowBadges: true,
       chatShowPlatform: true,

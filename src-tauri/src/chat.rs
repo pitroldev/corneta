@@ -128,7 +128,7 @@ pub struct Alert {
     pub ts: u64,
 }
 
-fn emit_alert(app: &AppHandle, alert: Alert) {
+pub fn emit_alert(app: &AppHandle, alert: Alert) {
     if let Some(p) = session_path(app) {
         crate::session::record_alert(&p, &alert.platform, &alert.kind, &alert.user, alert.amount);
     }

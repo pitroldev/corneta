@@ -114,6 +114,8 @@ export interface AppSettings {
   youtubeApiKey: string;
   /** Chat: fontes (várias por plataforma). */
   chatSources: ChatSource[];
+  /** Alertas: fontes externas (Streamlabs/StreamElements). Token no cofre. */
+  alertSources: AlertSource[];
   /** Exibição do chat. */
   chatShowEmotes: boolean;
   chatShowBadges: boolean;
@@ -159,6 +161,18 @@ export interface ChatSource {
   value: string;
   name: string;
   enabled: boolean;
+}
+
+export type AlertSourceKind = "streamlabs" | "streamelements";
+
+/** Fonte de alerta externa (agregador). O token fica no cofre, não aqui. */
+export interface AlertSource {
+  id: string;
+  kind: AlertSourceKind;
+  name: string;
+  enabled: boolean;
+  /** Recomputado pelo backend a partir do cofre (não confiar pra persistir). */
+  hasToken?: boolean;
 }
 
 export interface ChatFragment {
@@ -227,7 +241,8 @@ export type AlertKind =
 
 export interface Alert {
   id: string;
-  platform: ChatPlatform;
+  /** Origem: plataforma de chat (twitch/youtube/kick) OU agregador (streamlabs/streamelements). */
+  platform: string;
   source: string;
   kind: AlertKind;
   user: string;

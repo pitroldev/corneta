@@ -1,7 +1,13 @@
 import { memo, useMemo } from "react";
 import { cn } from "../lib/utils";
 import { PlatformGlyph } from "./ui";
-import type { Alert, AlertKind } from "../lib/types";
+import type { Alert, AlertKind, PlatformId } from "../lib/types";
+
+// Origem agregadora (não é plataforma de chat) → mostra o nome no lugar do glifo.
+const ORIGIN: Record<string, string> = {
+  streamlabs: "Streamlabs",
+  streamelements: "StreamElements",
+};
 
 const KIND_META: Record<AlertKind, { emoji: string; verb: string; accent: string }> = {
   follow: { emoji: "💜", verb: "seguiu", accent: "info" },
@@ -55,7 +61,13 @@ const AlertRow = memo(function AlertRow({ a }: { a: Alert }) {
       <span className="text-lg leading-none">{meta.emoji}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <PlatformGlyph id={a.platform} size={13} />
+          {ORIGIN[a.platform] ? (
+            <span className="shrink-0 rounded-sm bg-surface-3 px-1 text-[9px] font-bold uppercase tracking-wide text-ink-faint">
+              {ORIGIN[a.platform]}
+            </span>
+          ) : (
+            <PlatformGlyph id={a.platform as PlatformId} size={13} />
+          )}
           <span className="truncate text-sm font-bold">{a.user}</span>
         </div>
         <div className="text-xs text-ink-muted">

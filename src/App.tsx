@@ -31,6 +31,7 @@ export default function App() {
   const bindAlerts = useStore((s) => s.bindAlerts);
   const bindViewers = useStore((s) => s.bindViewers);
   const bindGuardian = useStore((s) => s.bindGuardian);
+  const bindAlertStatus = useStore((s) => s.bindAlertStatus);
   const leaks = useStore((s) => s.leaks);
   const censored = useStore((s) => s.censored);
   const liveState = useStore((s) => s.snapshot.state);
@@ -71,6 +72,7 @@ export default function App() {
     const unbindAlerts = bindAlerts();
     const unbindViewers = bindViewers();
     const unbindGuardian = bindGuardian();
+    const unbindAlertStatus = bindAlertStatus();
     // C1: atalho global começar/parar (alterna conforme o estado atual).
     const unbindShortcut = api.subscribeShortcut(() => {
       const s = useStore.getState();
@@ -84,9 +86,10 @@ export default function App() {
       unbindAlerts();
       unbindViewers();
       unbindGuardian();
+      unbindAlertStatus();
       unbindShortcut();
     };
-  }, [load, bindEngine, bindChat, bindAlerts, bindViewers, bindGuardian]);
+  }, [load, bindEngine, bindChat, bindAlerts, bindViewers, bindGuardian, bindAlertStatus]);
 
   // Guardião: avisa por toast a cada novo vazamento detectado.
   const leakSeen = useRef(0);

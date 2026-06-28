@@ -84,6 +84,9 @@ pub struct Settings {
     /// Chat: lista de fontes (várias por plataforma).
     #[serde(default)]
     pub chat_sources: Vec<ChatSource>,
+    /// Alertas: fontes externas (Streamlabs/StreamElements). Token vai no keyring, não aqui.
+    #[serde(default)]
+    pub alert_sources: Vec<AlertSource>,
     /// Exibição do chat.
     #[serde(default = "default_true")]
     pub chat_show_emotes: bool,
@@ -169,6 +172,20 @@ pub struct ChatSource {
     pub enabled: bool,
 }
 
+/// Uma fonte de alerta externa (agregador). O token NUNCA fica aqui — só no keyring,
+/// sob a chave `alert_<id>`. `has_token` é recomputado no get_config (igual Target.has_key).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertSource {
+    pub id: String,
+    pub kind: String, // streamlabs | streamelements
+    #[serde(default)]
+    pub name: String,
+    pub enabled: bool,
+    #[serde(default)]
+    pub has_token: bool,
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Settings {
@@ -179,6 +196,7 @@ impl Default for Settings {
             live_shortcut: default_live_shortcut(),
             youtube_api_key: String::new(),
             chat_sources: Vec::new(),
+            alert_sources: Vec::new(),
             chat_show_emotes: true,
             chat_show_badges: true,
             chat_show_platform: true,

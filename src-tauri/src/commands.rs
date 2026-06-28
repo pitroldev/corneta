@@ -42,6 +42,9 @@ pub fn get_config(app: AppHandle) -> AppConfig {
     for t in cfg.targets.iter_mut() {
         t.has_key = keys::has_key(&t.id);
     }
+    for a in cfg.settings.alert_sources.iter_mut() {
+        a.has_token = keys::has_key(&format!("alert_{}", a.id));
+    }
     cfg
 }
 
@@ -1247,6 +1250,16 @@ pub fn chat_start(app: AppHandle) {
 #[tauri::command]
 pub fn chat_stop(app: AppHandle) {
     chat::stop_chat(&app);
+}
+
+#[tauri::command]
+pub fn alerts_start(app: AppHandle) {
+    crate::alerts::start_alerts(&app);
+}
+
+#[tauri::command]
+pub fn alerts_stop(app: AppHandle) {
+    crate::alerts::stop_alerts(&app);
 }
 
 /// Abre (ou foca) a janela flutuante só do chat (always-on-top), pro streamer

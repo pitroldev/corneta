@@ -53,6 +53,9 @@ export interface CornetaApi {
     onDelete: (d: ChatDelete) => void
   ): () => void;
   subscribeAlerts(onAlert: (a: Alert) => void): () => void;
+  alertsStart(): Promise<void>;
+  alertsStop(): Promise<void>;
+  subscribeAlertStatus(onStatus: (s: { source: string; status: string }) => void): () => void;
   subscribeViewers(onViewers: (v: Viewers) => void): () => void;
   // UX
   obsSetStream(start: boolean): Promise<void>;
@@ -198,6 +201,28 @@ function tauriApi(): CornetaApi {
       void event().then(({ listen }) =>
         listen<Alert>("alert://event", (e) => onAlert(e.payload)).then((u) =>
           cancelled ? u() : (unlisten = u)
+        )
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
+    },
+    async alertsStart() {
+      const { invoke } = await core();
+      await invoke("alerts_start");
+    },
+    async alertsStop() {
+      const { invoke } = await core();
+      await invoke("alerts_stop");
+    },
+    subscribeAlertStatus(onStatus) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<{ source: string; status: string }>("alert://status", (e) => onStatus(e.payload)).then(
+          (u) => (cancelled ? u() : (unlisten = u))
         )
       );
       return () => {
@@ -822,6 +847,11 @@ function mockApi(): CornetaApi {
     subscribeAlerts(onAlert) {
       alertListeners.add(onAlert);
       return () => alertListeners.delete(onAlert);
+    },
+    async alertsStart() {},
+    async alertsStop() {},
+    subscribeAlertStatus() {
+      return () => {};
     },
     subscribeViewers(onViewers) {
       viewerListeners.add(onViewers);
