@@ -46,6 +46,34 @@ export interface CornetaApi {
   // Chat unificado
   chatStart(): Promise<void>;
   chatStop(): Promise<void>;
+  chatSend(text: string, sources?: string[]): Promise<void>;
+  subscribeChatAuth(onAuth: (a: { source: string; login: string; ok: boolean }) => void): () => void;
+  // OAuth (envio/moderação)
+  setOauthConfig(c: {
+    twitchClientId: string;
+    twitchClientSecret: string;
+    googleClientId: string;
+    googleClientSecret: string;
+  }): Promise<void>;
+  authStatus(): Promise<{ twitchLogin: string | null; youtube: boolean; youtubeConfigured: boolean }>;
+  twitchLoginStart(): Promise<void>;
+  twitchLogout(): Promise<void>;
+  youtubeLoginStart(): Promise<void>;
+  youtubeLogout(): Promise<void>;
+  /** BYOK: salva/limpa as credenciais do Google do próprio usuário (cofre). */
+  setYoutubeOauth(clientId: string, clientSecret: string): Promise<void>;
+  clearYoutubeOauth(): Promise<void>;
+  chatModerate(
+    sourceId: string,
+    action: string,
+    opts?: { nativeId?: string; author?: string; authorId?: string; seconds?: number }
+  ): Promise<void>;
+  subscribeAuthFlow(
+    onAuth: (
+      who: string,
+      a: { state: string; userCode: string; verifyUri: string; verifyUriComplete?: string; login: string }
+    ) => void
+  ): () => void;
   openChatWindow(): Promise<void>;
   subscribeChat(
     onMsg: (m: ChatMessage) => void,
@@ -172,6 +200,88 @@ function tauriApi(): CornetaApi {
     async chatStop() {
       const { invoke } = await core();
       await invoke("chat_stop");
+    },
+    async chatSend(text, sources) {
+      const { invoke } = await core();
+      await invoke("chat_send", { text, sources: sources ?? null });
+    },
+    subscribeChatAuth(onAuth) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<{ source: string; login: string; ok: boolean }>("chat://auth", (e) => onAuth(e.payload)).then(
+          (u) => (cancelled ? u() : (unlisten = u))
+        )
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
+    },
+    async setOauthConfig(c) {
+      const { invoke } = await core();
+      await invoke("set_oauth_config", c);
+    },
+    async authStatus() {
+      const { invoke } = await core();
+      return await invoke("auth_status");
+    },
+    async twitchLoginStart() {
+      const { invoke } = await core();
+      await invoke("twitch_login_start");
+    },
+    async twitchLogout() {
+      const { invoke } = await core();
+      await invoke("twitch_logout");
+    },
+    async youtubeLoginStart() {
+      const { invoke } = await core();
+      await invoke("youtube_login_start");
+    },
+    async youtubeLogout() {
+      const { invoke } = await core();
+      await invoke("youtube_logout");
+    },
+    async setYoutubeOauth(clientId, clientSecret) {
+      const { invoke } = await core();
+      await invoke("set_youtube_oauth", { clientId, clientSecret });
+    },
+    async clearYoutubeOauth() {
+      const { invoke } = await core();
+      await invoke("clear_youtube_oauth");
+    },
+    async chatModerate(sourceId, action, opts) {
+      const { invoke } = await core();
+      await invoke("chat_moderate", {
+        sourceId,
+        action,
+        nativeId: opts?.nativeId ?? null,
+        author: opts?.author ?? null,
+        authorId: opts?.authorId ?? null,
+        seconds: opts?.seconds ?? null,
+      });
+    },
+    subscribeAuthFlow(onAuth) {
+      let cancelled = false;
+      const uns: Array<() => void> = [];
+      const add = (u: () => void) => (cancelled ? u() : uns.push(u));
+      type AuthPayload = {
+        state: string;
+        userCode: string;
+        verifyUri: string;
+        verifyUriComplete?: string;
+        login: string;
+      };
+      void event().then(({ listen }) => {
+        void listen<AuthPayload>("auth://twitch", (e) => onAuth("twitch", e.payload)).then(add);
+        void listen<AuthPayload>("auth://youtube", (e) => onAuth("youtube", e.payload)).then(add);
+      });
+      return () => {
+        cancelled = true;
+        uns.forEach((u) => u());
+        uns.length = 0;
+      };
     },
     async openChatWindow() {
       const { invoke } = await core();
@@ -833,6 +943,39 @@ function mockApi(): CornetaApi {
     },
     async openChatWindow() {
       // No navegador não dá pra abrir janela nativa (no app instalado, abre a flutuante).
+    },
+    async chatSend(text) {
+      // Demo: ecoa local pra UI funcionar no navegador.
+      chatMsgListeners.forEach((l) =>
+        l({
+          id: `me-${Date.now()}`,
+          platform: "twitch",
+          source: "você",
+          author: "você",
+          color: "#ffb323",
+          text,
+          fragments: [{ kind: "text", text }],
+          badges: [],
+          ts: Date.now(),
+        })
+      );
+    },
+    subscribeChatAuth() {
+      return () => {};
+    },
+    async setOauthConfig() {},
+    async authStatus() {
+      return { twitchLogin: null, youtube: false, youtubeConfigured: false };
+    },
+    async twitchLoginStart() {},
+    async twitchLogout() {},
+    async youtubeLoginStart() {},
+    async youtubeLogout() {},
+    async setYoutubeOauth() {},
+    async clearYoutubeOauth() {},
+    async chatModerate() {},
+    subscribeAuthFlow() {
+      return () => {};
     },
     subscribeChat(onMsg, onStatus, onDelete) {
       chatMsgListeners.add(onMsg);

@@ -6,6 +6,26 @@
 - **Status:** Rascunho para discussão (v0.1) · 2026-06-23
 - **Relacionado:** [`CHAT.md`](./CHAT.md) (leitura já existe), [`ALERTAS.md`](./ALERTAS.md)
 
+> ✅ **Fases 1–3 implementadas** (falta só o Kick, Fase 4):
+> - **Fase 1** — Twitch via token colado: IRC autenticado, fila de saída por fonte, `PRIVMSG`,
+>   eco local, rate-limit (~18/30s), `chat://auth`, token no cofre (`chat_send_<id>`).
+> - **Fase 2** — **login no navegador (device flow)** na Twitch e **envio no YouTube** (OAuth):
+>   `src-tauri/src/auth.rs` faz os dois device flows, guarda tokens no cofre com refresh, eventos
+>   `auth://twitch`/`auth://youtube`. YouTube resolve a live ativa e usa `liveChatMessages.insert`.
+>   Logado, todas as fontes Twitch enviam pela conta; a caixa de envio inclui YouTube.
+> - **Escala (local) das credenciais** — pensado pra distribuir o app:
+>   - **Twitch:** o `client_id` (público) é shippado pelo dev via `.env` (`VITE_TWITCH_CLIENT_ID`).
+>     Um app serve todos os usuários (cada um loga na própria conta; rate limit é por token). Escala.
+>   - **YouTube (BYOK):** a cota do YouTube é **por projeto do Google**, então shippar um `client_id`
+>     do dev NÃO escala (cota e verificação compartilhadas). Por isso **cada usuário cola as próprias
+>     credenciais do Google no app** (`set_youtube_oauth` → cofre `youtube_client_id`/`_secret`), com
+>     guia embutido. Assim cada um tem a própria cota (10k/dia) e não precisa de verificação do dev.
+>     O `.env` Google vira só um padrão de dev; o que o usuário cola sempre vence.
+> - **Fase 3** — **moderação**: hover numa mensagem → apagar/timeout/ban. Twitch via Helix
+>   (`moderation/chat`, `moderation/bans`); YouTube via `liveChat/messages.delete` (ban/timeout do YT
+>   ficou de fora — precisa do channelId do autor, que o feed não carrega ainda).
+> - **Fase 4 (Kick)** — não feita de propósito (API não-oficial, frágil, risco de ToS).
+
 ---
 
 ## 1. Problema

@@ -170,6 +170,9 @@ pub struct ChatSource {
     #[serde(default)]
     pub name: String,
     pub enabled: bool,
+    /// Tem token de envio no cofre (`chat_send_<id>`)? Recomputado no get_config.
+    #[serde(default)]
+    pub has_send_token: bool,
 }
 
 /// Uma fonte de alerta externa (agregador). O token NUNCA fica aqui — só no keyring,

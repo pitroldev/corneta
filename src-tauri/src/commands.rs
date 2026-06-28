@@ -45,6 +45,9 @@ pub fn get_config(app: AppHandle) -> AppConfig {
     for a in cfg.settings.alert_sources.iter_mut() {
         a.has_token = keys::has_key(&format!("alert_{}", a.id));
     }
+    for c in cfg.settings.chat_sources.iter_mut() {
+        c.has_send_token = keys::has_key(&format!("chat_send_{}", c.id));
+    }
     cfg
 }
 
@@ -1308,6 +1311,19 @@ pub fn chat_start(app: AppHandle) {
 #[tauri::command]
 pub fn chat_stop(app: AppHandle) {
     chat::stop_chat(&app);
+}
+
+// ASYNC: o envio (sobretudo o insert HTTP do YouTube) bloqueia; comando síncrono trava
+// a thread principal (ver open_chat_window). spawn_blocking tira da thread do event-loop.
+#[tauri::command]
+pub async fn chat_send(
+    app: AppHandle,
+    text: String,
+    sources: Option<Vec<String>>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || chat::send_message(&app, &text, sources))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

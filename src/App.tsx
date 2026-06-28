@@ -32,6 +32,9 @@ export default function App() {
   const bindViewers = useStore((s) => s.bindViewers);
   const bindGuardian = useStore((s) => s.bindGuardian);
   const bindAlertStatus = useStore((s) => s.bindAlertStatus);
+  const bindChatAuth = useStore((s) => s.bindChatAuth);
+  const bindAuthFlow = useStore((s) => s.bindAuthFlow);
+  const setupOauth = useStore((s) => s.setupOauth);
   const leaks = useStore((s) => s.leaks);
   const censored = useStore((s) => s.censored);
   const liveState = useStore((s) => s.snapshot.state);
@@ -67,12 +70,15 @@ export default function App() {
 
   useEffect(() => {
     void load();
+    void setupOauth();
     const unbind = bindEngine();
     const unbindChat = bindChat();
     const unbindAlerts = bindAlerts();
     const unbindViewers = bindViewers();
     const unbindGuardian = bindGuardian();
     const unbindAlertStatus = bindAlertStatus();
+    const unbindChatAuth = bindChatAuth();
+    const unbindAuthFlow = bindAuthFlow();
     // C1: atalho global começar/parar (alterna conforme o estado atual).
     const unbindShortcut = api.subscribeShortcut(() => {
       const s = useStore.getState();
@@ -87,9 +93,11 @@ export default function App() {
       unbindViewers();
       unbindGuardian();
       unbindAlertStatus();
+      unbindChatAuth();
+      unbindAuthFlow();
       unbindShortcut();
     };
-  }, [load, bindEngine, bindChat, bindAlerts, bindViewers, bindGuardian, bindAlertStatus]);
+  }, [load, setupOauth, bindEngine, bindChat, bindAlerts, bindViewers, bindGuardian, bindAlertStatus, bindChatAuth, bindAuthFlow]);
 
   // Guardião: avisa por toast a cada novo vazamento detectado.
   const leakSeen = useRef(0);

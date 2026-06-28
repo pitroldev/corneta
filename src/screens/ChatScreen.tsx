@@ -10,8 +10,10 @@ import {
   Clock,
   Eye,
   ExternalLink,
+  LogIn,
   Pencil,
   Plus,
+  Send,
   Settings2,
   Smile,
   Trash2,
@@ -23,8 +25,10 @@ import {
 import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
-import { cn, uid } from "../lib/utils";
-import type { AlertSource, AlertSourceKind, ChatPlatform, ChatSource } from "../lib/types";
+import { cn, openExternal, uid } from "../lib/utils";
+import * as RTabs from "@radix-ui/react-tabs";
+import { HAS_TWITCH_OAUTH } from "../lib/oauth";
+import type { AlertSource, AlertSourceKind, ChatMessage, ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
@@ -54,6 +58,14 @@ const HINT: Record<string, string> = {
   youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live e lê o chat sozinha — sem colar link.",
 };
 
+type ConfigTab = "canais" | "conta" | "alertas" | "exibicao";
+const CONFIG_TABS: { id: ConfigTab; label: string; icon: typeof Tv2 }[] = [
+  { id: "canais", label: "Canais", icon: Tv2 },
+  { id: "conta", label: "Conta", icon: LogIn },
+  { id: "alertas", label: "Alertas", icon: Bell },
+  { id: "exibicao", label: "Exibição", icon: Eye },
+];
+
 export function ChatScreen() {
   const config = useStore((s) => s.config);
   const setSettings = useStore((s) => s.setSettings);
@@ -68,10 +80,25 @@ export function ChatScreen() {
   const viewers = useStore((s) => s.viewers);
   const setAlertToken = useStore((s) => s.setAlertToken);
   const alertStatuses = useStore((s) => s.alertStatuses);
+  const chatAuth = useStore((s) => s.chatAuth);
+  const sendChat = useStore((s) => s.sendChat);
+  const chatLogin = useStore((s) => s.chatLogin);
+  const twitchLogin = useStore((s) => s.twitchLogin);
+  const twitchLogout = useStore((s) => s.twitchLogout);
+  const youtubeLogin = useStore((s) => s.youtubeLogin);
+  const youtubeLogout = useStore((s) => s.youtubeLogout);
+  const youtubeOauthReady = useStore((s) => s.youtubeOauthReady);
+  const setYoutubeOauth = useStore((s) => s.setYoutubeOauth);
+  const clearYoutubeOauth = useStore((s) => s.clearYoutubeOauth);
+  const moderate = useStore((s) => s.moderate);
 
   const [showConfig, setShowConfig] = useState(false);
+  const [configTab, setConfigTab] = useState<ConfigTab>("canais");
   const [adding, setAdding] = useState(false);
   const [addingAlert, setAddingAlert] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendTo, setSendTo] = useState("all");
   const [showAlerts, setShowAlerts] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
@@ -151,6 +178,84 @@ export function ChatScreen() {
   const removeAlertSource = (id: string) => {
     void api.clearKey(`alert_${id}`);
     setSettings({ alertSources: alertSources.filter((x) => x.id !== id) });
+  };
+
+  // Envio: fontes capazes (token colado, conta Twitch logada, ou YouTube logado).
+  const twitchReady = chatLogin.twitch.state === "connected";
+  const youtubeReady = chatLogin.youtube.state === "connected";
+  const sendableSources = sources.filter(
+    (x) =>
+      (x.platform === "twitch" && (x.hasSendToken || twitchReady)) ||
+      (x.platform === "youtube" && youtubeReady),
+  );
+  const hasTwitchChannel = sources.some((x) => x.platform === "twitch");
+  const hasYoutubeChannel = sources.some((x) => x.platform === "youtube");
+  // Pode habilitar envio/moderação? Twitch precisa do client_id shippado; YouTube é sempre
+  // configurável (cada um cola as credenciais do Google — BYOK).
+  const canLoginSomewhere = (hasTwitchChannel && HAS_TWITCH_OAUTH) || hasYoutubeChannel;
+  // Rótulo da fonte igual ao backend (value quando o nome é só espaço) — pra casar moderação.
+  const srcLabel = (x: ChatSource) => (x.name.trim() === "" ? x.value : x.name);
+  // Alvo efetivo do envio (guarda contra id morto no seletor).
+  const sendValid = sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
+  const effectiveSendTo = sendValid ? sendTo : "all";
+  const sendTargets =
+    effectiveSendTo === "all" ? sendableSources : sendableSources.filter((x) => x.id === effectiveSendTo);
+  // Twitch só envia DEPOIS que o IRC autentica (chatAuth.ok); YouTube manda via HTTP na hora.
+  const canSend = sendTargets.some((x) =>
+    x.platform === "youtube" ? youtubeReady : !!chatAuth[x.id]?.ok,
+  );
+  const doSend = async () => {
+    const t = draft.trim();
+    if (!t) return;
+    setSending(true);
+    try {
+      await sendChat(
+        t,
+        sendTargets.map((x) => x.id),
+      );
+      setDraft("");
+    } catch (e) {
+      toast.error(String(e).replace("Error: ", ""));
+    } finally {
+      setSending(false);
+    }
+  };
+  const sendStatusLine = () =>
+    sendTargets
+      .map((x) => {
+        const label = srcLabel(x);
+        if (x.platform === "youtube") return youtubeReady ? "YouTube logado" : `${label}: entre no YouTube`;
+        const a = chatAuth[x.id];
+        if (a?.ok) return `logado como @${a.login}`;
+        if (twitchReady) return `${label}: reconecte o chat pra logar`;
+        if (a && !a.ok) return `${label}: token de envio inválido`;
+        return `${label}: conecte o chat pra logar`;
+      })
+      .join(" · ");
+
+  // Moderação: acha a fonte de uma mensagem (rótulo+plataforma) e o nível permitido.
+  const sourceForMessage = (m: ChatMessage) =>
+    sources.find((x) => x.platform === m.platform && srcLabel(x) === m.source);
+  const modLevel = (m: ChatMessage): "full" | "delete" | "none" => {
+    const src = sourceForMessage(m);
+    if (!src) return "none";
+    const myLogin = chatLogin.twitch.login?.toLowerCase();
+    // Não modera as próprias mensagens (eco / sua conta).
+    if (m.author === "você" || (myLogin && m.author.toLowerCase() === myLogin)) return "none";
+    if (src.platform === "twitch" && twitchReady) return "full";
+    if (src.platform === "youtube" && youtubeReady) return "delete";
+    return "none";
+  };
+  const onModerate = (m: ChatMessage, action: string) => {
+    const src = sourceForMessage(m);
+    if (!src) return;
+    void moderate(src.id, action, { nativeId: m.nativeId, author: m.author, authorId: m.authorId }).then(
+      () =>
+        toast.success(
+          action === "delete" ? "Mensagem apagada" : action === "ban" ? "Usuário banido" : "Timeout aplicado",
+        ),
+      (e) => toast.error(String(e).replace("Error: ", "")),
+    );
   };
 
   return (
@@ -271,7 +376,27 @@ export function ChatScreen() {
               <X className="size-4" />
             </Button>
           </div>
-          <div className="flex flex-col gap-4">
+          <RTabs.Root value={configTab} onValueChange={(v) => setConfigTab(v as ConfigTab)}>
+            <RTabs.List className="mb-4 flex flex-wrap gap-2">
+              {CONFIG_TABS.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <RTabs.Trigger
+                    key={t.id}
+                    value={t.id}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 font-display text-sm font-bold transition-all",
+                      "bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink",
+                      "data-[state=active]:bg-brass data-[state=active]:text-brass-ink data-[state=active]:pop-brass",
+                    )}
+                  >
+                    <Icon className="size-4" strokeWidth={2.4} /> {t.label}
+                  </RTabs.Trigger>
+                );
+              })}
+            </RTabs.List>
+
+            <RTabs.Content value="canais">
             {/* Canais */}
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -349,9 +474,11 @@ export function ChatScreen() {
                 </label>
               )}
             </div>
+            </RTabs.Content>
 
+            <RTabs.Content value="alertas">
             {/* Fontes de alerta (Streamlabs / StreamElements) */}
-            <div className="border-t-2 border-border-soft pt-3">
+            <div>
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
                   Fontes de alerta
@@ -366,10 +493,8 @@ export function ChatScreen() {
                 </Button>
               </div>
               <p className="mb-2 text-[11px] text-ink-faint">
-                Doações, follows e subs que você centraliza no{" "}
-                <strong className="text-ink">Streamlabs</strong> ou{" "}
-                <strong className="text-ink">StreamElements</strong> caem aqui na aba Alertas. Cole o
-                token — ele fica no cofre do sistema.
+                Cole o token do <strong className="text-ink">Streamlabs</strong> ou{" "}
+                <strong className="text-ink">StreamElements</strong> — as doações caem no feed de Alertas.
               </p>
 
               {addingAlert && (
@@ -413,9 +538,62 @@ export function ChatScreen() {
                 </div>
               )}
             </div>
+            </RTabs.Content>
 
+            <RTabs.Content value="conta">
+              {!IS_TAURI ? (
+                <p className="text-xs text-ink-muted">Disponível no app instalado.</p>
+              ) : !hasTwitchChannel && !hasYoutubeChannel ? (
+                <p className="text-xs text-ink-muted">
+                  Adicione um canal da <strong className="text-ink">Twitch</strong> ou{" "}
+                  <strong className="text-ink">YouTube</strong> na aba Canais pra logar.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    {hasTwitchChannel && (
+                      <LoginRow
+                        platform="twitch"
+                        label="Twitch"
+                        state={chatLogin.twitch}
+                        enabled={HAS_TWITCH_OAUTH}
+                        onLogin={() => void twitchLogin()}
+                        onLogout={() => void twitchLogout()}
+                      />
+                    )}
+                    {hasYoutubeChannel &&
+                      (youtubeOauthReady ? (
+                        <div className="flex flex-col gap-1">
+                          <LoginRow
+                            platform="youtube"
+                            label="YouTube"
+                            state={chatLogin.youtube}
+                            enabled
+                            onLogin={() => void youtubeLogin()}
+                            onLogout={() => void youtubeLogout()}
+                          />
+                          <button
+                            onClick={() => void clearYoutubeOauth()}
+                            className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
+                          >
+                            trocar credenciais do Google
+                          </button>
+                        </div>
+                      ) : (
+                        <YoutubeCredsForm onSave={(id, sec) => void setYoutubeOauth(id, sec)} />
+                      ))}
+                  </div>
+                  <p className="mt-3 text-[11px] text-ink-faint">
+                    Entre pra <strong className="text-ink">enviar</strong> e{" "}
+                    <strong className="text-ink">moderar</strong>. O chat reconecta sozinho ao logar.
+                  </p>
+                </>
+              )}
+            </RTabs.Content>
+
+            <RTabs.Content value="exibicao">
             {/* Exibição */}
-            <div className="border-t-2 border-border-soft pt-3">
+            <div>
               <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-faint">
                 O que mostrar no feed
               </span>
@@ -439,7 +617,8 @@ export function ChatScreen() {
                 />
               </div>
             </div>
-          </div>
+            </RTabs.Content>
+          </RTabs.Root>
         </Modal>
       )}
 
@@ -488,6 +667,8 @@ export function ChatScreen() {
             allFilteredOut={allFilteredOut}
             className="flex-1"
             onFontSize={(n) => setSettings({ chatFontSize: n })}
+            modLevel={modLevel}
+            onModerate={onModerate}
           />
         </Card>
         {showAlerts && (
@@ -520,6 +701,62 @@ export function ChatScreen() {
           </Card>
         )}
       </div>
+
+      {IS_TAURI && sendableSources.length > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2">
+            {sendableSources.length > 1 && (
+              <Select
+                className="w-40 shrink-0"
+                value={effectiveSendTo}
+                options={[
+                  { value: "all", label: "Todas" },
+                  ...sendableSources.map((x) => ({ value: x.id, label: srcLabel(x) })),
+                ]}
+                onChange={setSendTo}
+              />
+            )}
+            <Input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void doSend();
+                }
+              }}
+              placeholder="Manda no chat…"
+              className="flex-1"
+            />
+            <Button
+              variant="primary"
+              loading={sending}
+              disabled={!draft.trim() || sending || !canSend}
+              onClick={doSend}
+            >
+              {!sending && <Send className="size-4" />} Enviar
+            </Button>
+          </div>
+          <div className="mt-1 px-0.5 text-[11px] text-ink-faint">{sendStatusLine()}</div>
+        </div>
+      )}
+
+      {IS_TAURI && sendableSources.length === 0 && canLoginSomewhere && (
+        <button
+          onClick={() => {
+            setConfigTab("conta");
+            setShowConfig(true);
+          }}
+          className="mt-3 flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-sm text-ink-muted ring-1 ring-border transition-colors hover:text-ink"
+        >
+          <LogIn className="size-4 shrink-0 text-brass" />
+          <span>
+            Entre na sua conta pra <strong className="text-ink">enviar</strong> e{" "}
+            <strong className="text-ink">moderar</strong>
+          </span>
+          <span className="ml-auto shrink-0 text-xs font-bold text-brass">Configurar →</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -852,3 +1089,146 @@ function AlertSourceCard({
     </div>
   );
 }
+
+// BYOK do YouTube: cada usuário cria as credenciais do Google dele e cola aqui (cofre).
+// Assim cada um tem a própria cota — sem limite/verificação compartilhados.
+function YoutubeCredsForm({ onSave }: { onSave: (clientId: string, clientSecret: string) => void }) {
+  const [id, setId] = useState("");
+  const [secret, setSecret] = useState("");
+  const [guide, setGuide] = useState(false);
+  const can = id.trim() !== "" && secret.trim() !== "";
+  const save = () => {
+    if (!can) return;
+    onSave(id.trim(), secret.trim());
+    setId("");
+    setSecret("");
+    toast.success("Credenciais do YouTube no cofre 🔒");
+  };
+  return (
+    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
+      <div className="mb-2 flex items-center gap-2">
+        <PlatformGlyph id="youtube" size={20} />
+        <span className="font-display text-sm font-bold">YouTube</span>
+        <button
+          onClick={() => setGuide((v) => !v)}
+          className="ml-auto text-xs font-bold text-brass hover:underline"
+        >
+          {guide ? "ocultar guia" : "como conseguir?"}
+        </button>
+      </div>
+
+      {guide && (
+        <ol className="mb-2.5 list-decimal space-y-2 rounded-md bg-surface px-5 py-3 text-[11px] leading-relaxed text-ink-muted marker:font-bold marker:text-brass">
+          <li>
+            Abra o{" "}
+            <button
+              onClick={() => void openExternal("https://console.cloud.google.com/projectcreate")}
+              className="font-bold text-brass hover:underline"
+            >
+              Google Cloud Console
+            </button>{" "}
+            e crie um projeto.
+          </li>
+          <li>
+            Em <strong className="text-ink">APIs e Serviços → Biblioteca</strong>, procure e ative a{" "}
+            <strong className="text-ink">YouTube Data API v3</strong>.
+          </li>
+          <li>
+            Em <strong className="text-ink">Tela de permissão OAuth</strong>: escolha{" "}
+            <strong className="text-ink">External</strong> e adicione seu e-mail em{" "}
+            <strong className="text-ink">Usuários de teste</strong>.
+          </li>
+          <li>
+            Em <strong className="text-ink">Credenciais → Criar credenciais → ID do cliente OAuth</strong>,
+            escolha o tipo <strong className="text-ink">TVs e dispositivos de entrada limitada</strong>.
+          </li>
+          <li>Copie o Client ID e o Client Secret e cole abaixo. ↓</li>
+        </ol>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <Input placeholder="Client ID" value={id} onChange={(e) => setId(e.target.value)} />
+        <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            placeholder="Client Secret"
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && can && save()}
+            className="flex-1"
+          />
+          <Button variant="primary" size="sm" disabled={!can} onClick={save}>
+            Salvar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Linha de login OAuth (Twitch/YouTube): entrar no navegador (device flow) pra enviar/moderar.
+function LoginRow({
+  platform,
+  label,
+  state,
+  enabled,
+  onLogin,
+  onLogout,
+}: {
+  platform: ChatPlatform;
+  label: string;
+  state: { state: string; login?: string; userCode?: string; verifyUri?: string; message?: string };
+  enabled: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
+      <div className="flex items-center gap-2">
+        <PlatformGlyph id={platform} size={20} />
+        <span className="font-display text-sm font-bold">{label}</span>
+        {state.state === "connected" && (
+          <span className="truncate text-xs font-semibold text-ok">
+            · logado{state.login ? ` como @${state.login}` : ""}
+          </span>
+        )}
+        {state.state === "error" && <span className="truncate text-xs text-bad">· {state.message}</span>}
+        <div className="ml-auto shrink-0">
+          {!enabled ? (
+            <span className="text-[11px] text-ink-faint">configure no .env</span>
+          ) : state.state === "connected" ? (
+            <Button variant="ghost" size="sm" onClick={onLogout}>
+              Sair
+            </Button>
+          ) : (
+            <Button
+              variant="subtle"
+              size="sm"
+              loading={state.state === "code"}
+              disabled={state.state === "code"}
+              onClick={onLogin}
+            >
+              <LogIn className="size-3.5" /> Entrar
+            </Button>
+          )}
+        </div>
+      </div>
+      {state.state === "code" && state.userCode && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
+          <span>Abrimos o navegador — confirme com o código:</span>
+          <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
+            {state.userCode}
+          </span>
+          <span className="text-ink-faint">aguardando…</span>
+          <button
+            onClick={() => state.verifyUri && void openExternal(state.verifyUri)}
+            className="ml-auto text-[11px] font-semibold text-brass hover:underline"
+          >
+            não abriu? abrir
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+

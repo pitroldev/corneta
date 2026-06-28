@@ -161,6 +161,8 @@ export interface ChatSource {
   value: string;
   name: string;
   enabled: boolean;
+  /** Tem token de envio no cofre (recomputado pelo backend). Só Twitch por enquanto. */
+  hasSendToken?: boolean;
 }
 
 export type AlertSourceKind = "streamlabs" | "streamelements";
@@ -191,6 +193,8 @@ export interface ChatMessage {
   platform: ChatPlatform;
   source: string;
   author: string;
+  /** ID do autor na plataforma (Twitch user-id) — pra moderar sem lookup por nome. */
+  authorId?: string;
   nativeId?: string;
   color?: string;
   text: string;

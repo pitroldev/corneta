@@ -15,8 +15,17 @@ import type {
   Viewers,
 } from "./types";
 import { api } from "./api";
+import { OAUTH } from "./oauth";
 import { makeTarget } from "./factory";
-import { uid } from "./utils";
+import { openExternal, uid } from "./utils";
+
+interface LoginState {
+  state: string; // out | code | connected | error
+  login?: string;
+  userCode?: string;
+  verifyUri?: string;
+  message?: string;
+}
 
 // Última remoção de destino (para o "desfazer").
 let pendingRemoval: { target: Target; index: number } | null = null;
@@ -71,6 +80,31 @@ interface State {
   bindAlertStatus: () => () => void;
   setAlertToken: (id: string, token: string) => Promise<void>;
   clearAlertToken: (id: string) => Promise<void>;
+
+  // Envio de mensagens (Twitch via token de envio)
+  chatAuth: Record<string, { login: string; ok: boolean }>;
+  bindChatAuth: () => () => void;
+  sendChat: (text: string, sources?: string[]) => Promise<void>;
+  setChatSendToken: (id: string, token: string) => Promise<void>;
+  clearChatSendToken: (id: string) => Promise<void>;
+
+  // OAuth (login no navegador) — envio/moderação por conta
+  chatLogin: { twitch: LoginState; youtube: LoginState };
+  /** YouTube tem credenciais do Google configuradas (.env do dev OU coladas pelo usuário). */
+  youtubeOauthReady: boolean;
+  setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
+  clearYoutubeOauth: () => Promise<void>;
+  setupOauth: () => Promise<void>;
+  bindAuthFlow: () => () => void;
+  twitchLogin: () => Promise<void>;
+  twitchLogout: () => Promise<void>;
+  youtubeLogin: () => Promise<void>;
+  youtubeLogout: () => Promise<void>;
+  moderate: (
+    sourceId: string,
+    action: string,
+    opts?: { nativeId?: string; author?: string; authorId?: string; seconds?: number },
+  ) => Promise<void>;
   clearChat: () => void;
 
   // Alertas centralizados
@@ -419,6 +453,9 @@ export const useStore = create<State>((set, get) => {
     chatConnected: false,
     chatStatuses: {},
     alertStatuses: {},
+    chatAuth: {},
+    chatLogin: { twitch: { state: "out" }, youtube: { state: "out" } },
+    youtubeOauthReady: false,
 
     bindChat() {
       return api.subscribeChat(
@@ -445,7 +482,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async connectChat() {
-      set({ chatMessages: [], chatStatuses: {}, alertStatuses: {} });
+      set({ chatMessages: [], chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
       await api.chatStart();
       await api.alertsStart();
       set({ chatConnected: true });
@@ -454,7 +491,7 @@ export const useStore = create<State>((set, get) => {
     async disconnectChat() {
       await api.chatStop();
       await api.alertsStop();
-      set({ chatConnected: false, chatStatuses: {}, alertStatuses: {} });
+      set({ chatConnected: false, chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
     },
 
     bindAlertStatus() {
@@ -493,6 +530,121 @@ export const useStore = create<State>((set, get) => {
           ),
         },
       });
+    },
+
+    bindChatAuth() {
+      return api.subscribeChatAuth((a) =>
+        set((s) => ({ chatAuth: { ...s.chatAuth, [a.source]: { login: a.login, ok: a.ok } } })),
+      );
+    },
+
+    async sendChat(text, sources) {
+      await api.chatSend(text, sources);
+    },
+
+    async setChatSendToken(id, token) {
+      await api.setKey(`chat_send_${id}`, token);
+      const config = get().config;
+      if (!config) return;
+      persist({
+        ...config,
+        settings: {
+          ...config.settings,
+          chatSources: (config.settings.chatSources ?? []).map((c) =>
+            c.id === id ? { ...c, hasSendToken: true } : c,
+          ),
+        },
+      });
+    },
+
+    async clearChatSendToken(id) {
+      await api.clearKey(`chat_send_${id}`);
+      const config = get().config;
+      if (!config) return;
+      persist({
+        ...config,
+        settings: {
+          ...config.settings,
+          chatSources: (config.settings.chatSources ?? []).map((c) =>
+            c.id === id ? { ...c, hasSendToken: false } : c,
+          ),
+        },
+      });
+    },
+
+    async setupOauth() {
+      await api.setOauthConfig({
+        twitchClientId: OAUTH.twitchClientId,
+        twitchClientSecret: OAUTH.twitchClientSecret,
+        googleClientId: OAUTH.googleClientId,
+        googleClientSecret: OAUTH.googleClientSecret,
+      });
+      try {
+        const a = await api.authStatus();
+        set({
+          chatLogin: {
+            twitch: a.twitchLogin ? { state: "connected", login: a.twitchLogin } : { state: "out" },
+            youtube: a.youtube ? { state: "connected" } : { state: "out" },
+          },
+          youtubeOauthReady: a.youtubeConfigured,
+        });
+      } catch {
+        /* sem login ainda */
+      }
+    },
+
+    async setYoutubeOauth(clientId, clientSecret) {
+      await api.setYoutubeOauth(clientId, clientSecret);
+      set({ youtubeOauthReady: true });
+    },
+    async clearYoutubeOauth() {
+      await api.clearYoutubeOauth();
+      set((s) => ({ youtubeOauthReady: false, chatLogin: { ...s.chatLogin, youtube: { state: "out" } } }));
+    },
+
+    bindAuthFlow() {
+      return api.subscribeAuthFlow((who, a) => {
+        set((s) => {
+          const k = who as "twitch" | "youtube";
+          let next: LoginState = s.chatLogin[k];
+          if (a.state === "code") next = { state: "code", userCode: a.userCode, verifyUri: a.verifyUri };
+          else if (a.state === "connected") next = { state: "connected", login: a.login || undefined };
+          else if (a.state === "error") next = { state: "error", message: a.login || "erro no login" };
+          else if (a.state === "loggedout") next = { state: "out" };
+          return { chatLogin: { ...s.chatLogin, [k]: next } };
+        });
+        // Código chegou → abre o navegador direto na autorização (a URL completa, quando existe,
+        // já pré-preenche o código). O link no app continua como plano B.
+        if (a.state === "code") {
+          const url = a.verifyUriComplete || a.verifyUri;
+          if (url) void openExternal(url);
+        }
+        // Twitch logou e o chat está no ar → reconecta pra o IRC autenticar (mantém o histórico).
+        if (who === "twitch" && a.state === "connected" && get().chatConnected) {
+          void api.chatStart();
+        }
+      });
+    },
+
+    async twitchLogin() {
+      set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "code" } } }));
+      await api.twitchLoginStart();
+    },
+    async twitchLogout() {
+      await api.twitchLogout();
+      set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "out" } } }));
+    },
+    async youtubeLogin() {
+      set((s) => ({ chatLogin: { ...s.chatLogin, youtube: { state: "code" } } }));
+      await api.youtubeLoginStart();
+    },
+    async youtubeLogout() {
+      await api.youtubeLogout();
+      set((s) => ({ chatLogin: { ...s.chatLogin, youtube: { state: "out" } } }));
+    },
+
+    async moderate(sourceId, action, opts) {
+      await api.chatModerate(sourceId, action, opts);
     },
 
     clearChat() {

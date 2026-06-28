@@ -5,9 +5,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tungstenite::Message;
 
@@ -37,7 +37,10 @@ pub struct ChatMessage {
     pub platform: String, // "twitch" | "youtube" | "kick"
     pub source: String,   // rótulo da fonte (canal/slug) — distingue 2 da mesma plataforma
     pub author: String,
-    /// ID nativo na plataforma (para casar deleções).
+    /// ID do AUTOR na plataforma (Twitch user-id) — pra moderar sem lookup por nome.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_id: Option<String>,
+    /// ID nativo da MENSAGEM na plataforma (para casar deleções).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub native_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -51,6 +54,9 @@ pub struct ChatMessage {
 #[derive(Default)]
 pub struct ChatRuntime {
     pub running: Arc<AtomicBool>,
+    /// Filas de envio por fonte (source id → sender). O loop de leitura de cada Twitch
+    /// autenticada drena a fila e manda `PRIVMSG`. Reseta no start_chat.
+    pub senders: Arc<Mutex<HashMap<String, mpsc::Sender<String>>>>,
 }
 
 static MSG_ID: AtomicU64 = AtomicU64::new(1);
@@ -85,6 +91,14 @@ fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
     let _ = app.emit(
         "chat://status",
         json!({ "platform": platform, "source": source, "status": status }),
+    );
+}
+/// Estado de login pra ENVIO de uma fonte (source id): logado como `login` (ok=true) ou
+/// sem permissão / token inválido (ok=false).
+fn chat_auth(app: &AppHandle, source_id: &str, login: &str, ok: bool) {
+    let _ = app.emit(
+        "chat://auth",
+        json!({ "source": source_id, "login": login, "ok": ok }),
     );
 }
 fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
@@ -145,6 +159,7 @@ pub fn start_chat(app: &AppHandle) {
         let st = app.state::<AppState>();
         let mut chat = st.chat.lock().unwrap();
         chat.running.store(false, Ordering::Relaxed);
+        chat.senders.lock().unwrap().clear(); // filas de envio antigas saem
         let running = Arc::new(AtomicBool::new(true));
         chat.running = running.clone();
         running
@@ -162,11 +177,17 @@ pub fn start_chat(app: &AppHandle) {
             src.name.clone()
         };
         let (app2, run2, value) = (app.clone(), running.clone(), src.value.clone());
+        let sid = src.id.clone();
         match src.platform.as_str() {
             "twitch" => {
+                // Token de envio resolvido A CADA conexão: token colado da fonte OU a conta
+                // logada (device flow, com refresh) — token expirado não fica preso.
+                let send_key = format!("chat_send_{}", src.id);
                 tauri::async_runtime::spawn_blocking(move || {
                     while run2.load(Ordering::Relaxed) {
-                        run_twitch(&value, &label, run2.clone(), app2.clone());
+                        let tok = crate::keys::get_key(&send_key)
+                            .or_else(|| crate::auth::twitch_token(&app2));
+                        run_twitch(&value, &label, &sid, tok, run2.clone(), app2.clone());
                         reconnect_wait(&run2); // caiu/erro → tenta de novo em ~3s
                     }
                 });
@@ -209,7 +230,9 @@ pub fn start_chat(app: &AppHandle) {
 
 pub fn stop_chat(app: &AppHandle) {
     let st = app.state::<AppState>();
-    st.chat.lock().unwrap().running.store(false, Ordering::Relaxed);
+    let chat = st.chat.lock().unwrap();
+    chat.running.store(false, Ordering::Relaxed);
+    chat.senders.lock().unwrap().clear(); // sem fontes vivas → ninguém pra enviar
 }
 
 /// Espera ~3s antes de reconectar, abortando cedo se o chat foi parado.
@@ -228,11 +251,39 @@ fn reconnect_for(running: &AtomicBool, ticks: u32) {
 
 // ----------------------------- Twitch ------------------------------
 
-fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+fn run_twitch(
+    channel: &str,
+    source: &str,
+    source_id: &str,
+    send_token: Option<String>,
+    running: Arc<AtomicBool>,
+    app: AppHandle,
+) {
     let ch = channel.trim().trim_start_matches('#').to_lowercase();
     if ch.is_empty() {
         return;
     }
+
+    // Credencial de envio (opcional): valida o token → (login, raw). Sem escopo chat:edit ou
+    // token inválido → segue em leitura anônima e avisa a UI (chat://auth ok=false).
+    let creds: Option<(String, String)> = match send_token.as_ref() {
+        Some(t) => {
+            let raw = t.trim().trim_start_matches("oauth:").trim().to_string();
+            match twitch_validate(&raw) {
+                Some((login, true)) => Some((login, raw)),
+                Some((login, false)) => {
+                    chat_auth(&app, source_id, &login, false);
+                    None
+                }
+                None => {
+                    chat_auth(&app, source_id, "", false);
+                    None
+                }
+            }
+        }
+        None => None,
+    };
+
     // TLS (wss://:443): a Twitch deixou de servir o IRC em texto puro na porta 80.
     let mut socket = match tungstenite::connect("wss://irc-ws.chat.twitch.tv:443") {
         Ok((s, _)) => s,
@@ -252,11 +303,30 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
         _ => {}
     }
     let _ = socket.send(Message::Text("CAP REQ :twitch.tv/tags twitch.tv/commands".into()));
-    let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
-    let _ = socket.send(Message::Text(format!("NICK justinfan{}", now_ms() % 100000)));
+    // Autenticada (PASS/NICK com o login do token) pra poder ENVIAR; senão, anônima.
+    if let Some((login, raw)) = &creds {
+        let _ = socket.send(Message::Text(format!("PASS oauth:{raw}")));
+        let _ = socket.send(Message::Text(format!("NICK {login}")));
+    } else {
+        let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
+        let _ = socket.send(Message::Text(format!("NICK justinfan{}", now_ms() % 100000)));
+    }
     let _ = socket.send(Message::Text(format!("JOIN #{ch}")));
     log::info!("twitch chat: conectado em #{ch}");
     chat_status(&app, "twitch", source, "connected");
+
+    // Fila de envio: registra um sender pra esta fonte e avisa "logado como X".
+    let mut out_rx: Option<mpsc::Receiver<String>> = None;
+    let mut send_login: Option<String> = None;
+    if let Some((login, _)) = &creds {
+        let (tx, rx) = mpsc::channel::<String>();
+        let senders = app.state::<AppState>().chat.lock().unwrap().senders.clone();
+        senders.lock().unwrap().insert(source_id.to_string(), tx);
+        chat_auth(&app, source_id, login, true);
+        out_rx = Some(rx);
+        send_login = Some(login.clone());
+    }
+    let mut sends: Vec<Instant> = Vec::new();
 
     // Emotes de terceiros (BTTV/FFZ/7TV): globais já; do canal quando vier o room-id.
     // Síncrono de propósito: o emote precisa estar no mapa quando a mensagem é parseada
@@ -265,6 +335,48 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
     let mut channel_emotes_done = false;
 
     while running.load(Ordering::Relaxed) {
+        // Drena a fila de envio (token-bucket ~18/30s). Roda a cada iteração — inclusive
+        // quando o read dá timeout (400ms) — então a latência de envio fica < 400ms.
+        if let (Some(rx), Some(login)) = (&out_rx, &send_login) {
+            loop {
+                sends.retain(|t| t.elapsed() < Duration::from_secs(30));
+                if sends.len() >= 18 {
+                    break; // estourou o limite → segura e tenta na próxima iteração
+                }
+                let text = match rx.try_recv() {
+                    Ok(t) => t,
+                    Err(_) => break, // vazia ou desconectada
+                };
+                let clean = sanitize_outgoing(&text);
+                if clean.is_empty() {
+                    continue;
+                }
+                if socket
+                    .send(Message::Text(format!("PRIVMSG #{ch} :{clean}")))
+                    .is_ok()
+                {
+                    sends.push(Instant::now());
+                    // Eco local: a Twitch não devolve o próprio PRIVMSG.
+                    emit_chat(
+                        &app,
+                        ChatMessage {
+                            id: next_id(),
+                            platform: "twitch".into(),
+                            source: source.to_string(),
+                            author: login.clone(),
+                            author_id: None,
+                            native_id: None,
+                            color: Some("#ffb323".into()),
+                            text: clean.clone(),
+                            fragments: vec![text_frag(&clean)],
+                            badges: vec![],
+                            ts: now_ms(),
+                        },
+                    );
+                }
+            }
+        }
+
         match socket.read() {
             Ok(Message::Text(t)) => {
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
@@ -331,6 +443,120 @@ fn run_twitch(channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHan
     }
     let _ = socket.close(None);
     chat_status(&app, "twitch", source, "disconnected");
+}
+
+/// Valida um token de envio na Twitch → (login minúsculo, tem escopo chat:edit?).
+fn twitch_validate(token: &str) -> Option<(String, bool)> {
+    let body = ureq::get("https://id.twitch.tv/oauth2/validate")
+        .set("Authorization", &format!("OAuth {token}"))
+        .timeout(Duration::from_secs(5))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    let login = v.get("login")?.as_str()?.to_lowercase();
+    let can_send = v
+        .get("scopes")
+        .and_then(|s| s.as_array())
+        .map(|arr| arr.iter().any(|x| x.as_str() == Some("chat:edit")))
+        .unwrap_or(false);
+    Some((login, can_send))
+}
+
+/// Sanitiza a mensagem de saída: sem quebras de linha, aparada e até 480 chars (limite IRC).
+fn sanitize_outgoing(s: &str) -> String {
+    let one_line: String = s
+        .chars()
+        .map(|c| if c == '\r' || c == '\n' { ' ' } else { c })
+        .collect();
+    one_line.trim().chars().take(480).collect()
+}
+
+/// Enfileira `text` pra envio nas fontes dadas (ou todas as logadas). Erro se nenhuma logada.
+pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -> Result<(), String> {
+    let text = sanitize_outgoing(text);
+    if text.is_empty() {
+        return Err("mensagem vazia".into());
+    }
+    let cfg = crate::config::load(app);
+    let senders = {
+        let st = app.state::<AppState>();
+        let guard = st.chat.lock().map_err(|_| "estado do chat".to_string())?;
+        guard.senders.clone()
+    };
+    let targets: Vec<String> = match sources {
+        Some(ids) if !ids.is_empty() => ids,
+        // Sem alvo explícito: Twitch logadas (na fila) + YouTube ativas.
+        _ => {
+            let mut t: Vec<String> = senders.lock().unwrap().keys().cloned().collect();
+            for s in &cfg.settings.chat_sources {
+                if s.enabled && s.platform == "youtube" {
+                    t.push(s.id.clone());
+                }
+            }
+            t
+        }
+    };
+    let label_of = |id: &str| -> String {
+        cfg.settings
+            .chat_sources
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| if s.name.trim().is_empty() { s.value.clone() } else { s.name.clone() })
+            .unwrap_or_default()
+    };
+    let mut sent = 0u32;
+    let mut last_err: Option<String> = None;
+    let mut youtube_done = false; // o insert do YT vai pra SUA live; manda uma vez só
+    for id in targets {
+        let platform = cfg
+            .settings
+            .chat_sources
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.platform.as_str());
+        match platform {
+            Some("twitch") => {
+                if let Some(tx) = senders.lock().unwrap().get(&id) {
+                    if tx.send(text.clone()).is_ok() {
+                        sent += 1;
+                    }
+                }
+            }
+            // YouTube: insert HTTP (vai pra sua live; uma vez só mesmo com vários canais YT).
+            Some("youtube") if !youtube_done => {
+                youtube_done = true;
+                match crate::auth::youtube_send(app, &text) {
+                    Ok(()) => {
+                        sent += 1;
+                        emit_chat(
+                            app,
+                            ChatMessage {
+                                id: next_id(),
+                                platform: "youtube".into(),
+                                source: label_of(&id),
+                                author: "você".into(),
+                                author_id: None,
+                                native_id: None,
+                                color: Some("#ffb323".into()),
+                                text: text.clone(),
+                                fragments: vec![text_frag(&text)],
+                                badges: vec![],
+                                ts: now_ms(),
+                            },
+                        );
+                    }
+                    Err(e) => last_err = Some(e),
+                }
+            }
+            _ => {}
+        }
+    }
+    if sent == 0 {
+        return Err(last_err.unwrap_or_else(|| "nenhum canal logado pra enviar".into()));
+    }
+    Ok(())
 }
 
 fn twitch_tags(line: &str) -> &str {
@@ -459,6 +685,7 @@ fn parse_privmsg(line: &str, source: &str, emotes: &HashMap<String, String>) -> 
         platform: "twitch".into(),
         source: source.to_string(),
         author: display,
+        author_id: tag_val(twitch_tags(line), "user-id"),
         native_id,
         color,
         fragments: apply_thirdparty(twitch_fragments(&text, emotes_tag), emotes),
@@ -1100,6 +1327,7 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value) {
                 platform: "youtube".into(),
                 source: source.to_string(),
                 author,
+                author_id: None,
                 native_id: r.get("id").and_then(|v| v.as_str()).map(String::from),
                 color: None,
                 fragments,
@@ -1421,6 +1649,7 @@ fn youtube_dataapi(api_key: &str, vid: &str, source: &str, running: Arc<AtomicBo
                                     platform: "youtube".into(),
                                     source: source.to_string(),
                                     author,
+                                    author_id: None,
                                     native_id: item.get("id").and_then(|v| v.as_str()).map(String::from),
                                     color: None,
                                     fragments: vec![text_frag(&text)],
@@ -1554,6 +1783,7 @@ fn parse_kick(raw: &str, source: &str) -> Option<ChatMessage> {
         platform: "kick".into(),
         source: source.to_string(),
         author,
+        author_id: None,
         native_id: d.get("id").and_then(|x| x.as_str()).map(String::from),
         color,
         text: frags_to_text(&fragments),

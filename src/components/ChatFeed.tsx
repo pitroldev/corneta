@@ -1,6 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, MessageSquare } from "lucide-react";
+import { ArrowDown, Ban, Clock, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
 import { PlatformGlyph } from "./ui";
@@ -30,6 +30,8 @@ export function ChatFeed({
   allFilteredOut,
   className,
   onFontSize,
+  modLevel,
+  onModerate,
 }: {
   messages: ChatMessage[];
   view: ChatView;
@@ -39,6 +41,10 @@ export function ChatFeed({
   className?: string;
   /** Ctrl+scroll redimensiona a fonte (11–26px). */
   onFontSize?: (next: number) => void;
+  /** Moderação: nível de ação permitido por mensagem ("full" Twitch, "delete" YouTube). */
+  modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
+  /** Moderação: ação numa mensagem (apagar/timeout/ban). */
+  onModerate?: (m: ChatMessage, action: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -154,7 +160,12 @@ export function ChatFeed({
                   transform: `translateY(${vi.start}px)`,
                 }}
               >
-                <MsgRow m={messages[vi.index]} view={view} />
+                <MsgRow
+                  m={messages[vi.index]}
+                  view={view}
+                  modLevel={modLevel}
+                  onModerate={onModerate}
+                />
               </div>
             ))}
           </div>
@@ -177,9 +188,13 @@ export function ChatFeed({
 const MsgRow = memo(function MsgRow({
   m,
   view,
+  modLevel,
+  onModerate,
 }: {
   m: ChatMessage;
   view: ChatView;
+  modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
+  onModerate?: (m: ChatMessage, action: string) => void;
 }) {
   if (m.deleted) {
     return (
@@ -200,7 +215,7 @@ const MsgRow = memo(function MsgRow({
     );
   }
   return (
-    <div className="flex flex-wrap items-start gap-1.5 px-3 py-1 leading-snug hover:bg-surface-2">
+    <div className="group relative flex flex-wrap items-start gap-1.5 px-3 py-1 pr-16 leading-snug hover:bg-surface-2">
       {view.timestamps && (
         <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-ink-faint">
           {fmtTime(m.ts)}
@@ -250,9 +265,47 @@ const MsgRow = memo(function MsgRow({
           ),
         )}
       </span>
+      <ModButtons m={m} modLevel={modLevel} onModerate={onModerate} />
     </div>
   );
 });
+
+/** Botões de moderação que aparecem ao passar o mouse na mensagem. */
+function ModButtons({
+  m,
+  modLevel,
+  onModerate,
+}: {
+  m: ChatMessage;
+  modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
+  onModerate?: (m: ChatMessage, action: string) => void;
+}) {
+  if (!onModerate || !modLevel) return null;
+  const lvl = modLevel(m);
+  if (lvl === "none") return null;
+  const btn = "grid size-6 place-items-center rounded text-ink-faint transition-colors";
+  return (
+    <div className="absolute right-1.5 top-0.5 hidden items-center gap-0.5 rounded-md bg-surface ring-1 ring-border group-hover:flex">
+      <button onClick={() => onModerate(m, "delete")} title="Apagar" className={cn(btn, "hover:text-bad")}>
+        <Trash2 className="size-3.5" />
+      </button>
+      {lvl === "full" && (
+        <>
+          <button
+            onClick={() => onModerate(m, "timeout")}
+            title="Timeout 10 min"
+            className={cn(btn, "hover:text-warn")}
+          >
+            <Clock className="size-3.5" />
+          </button>
+          <button onClick={() => onModerate(m, "ban")} title="Banir" className={cn(btn, "hover:text-bad")}>
+            <Ban className="size-3.5" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 // Estado vazio: os 3 chats (Twitch/Kick/YouTube) afunilam num feed só — a cara da tela.
 function ChatFunnel() {
