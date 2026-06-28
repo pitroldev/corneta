@@ -104,8 +104,8 @@ export function ChatFeed({
         className="h-full overflow-y-auto py-2 [scrollbar-gutter:stable]"
       >
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-            <MessageSquare className="size-8 text-ink-faint" />
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+            <ChatFunnel />
             <div className="font-display text-lg font-bold">
               {allFilteredOut
                 ? "Filtro escondeu tudo"
@@ -235,6 +235,30 @@ const MsgRow = memo(function MsgRow({
     </div>
   );
 });
+
+// Estado vazio: os 3 chats (Twitch/Kick/YouTube) afunilam num feed só — a cara da tela.
+function ChatFunnel() {
+  return (
+    <div className="flex items-center gap-1" aria-hidden>
+      <div className="flex flex-col gap-1.5">
+        <PlatformGlyph id="twitch" size={20} />
+        <PlatformGlyph id="kick" size={20} />
+        <PlatformGlyph id="youtube" size={20} />
+      </div>
+      <svg viewBox="0 0 44 72" className="h-[4.5rem] w-11 text-brass" fill="none" aria-hidden>
+        <g stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 12 C26 12 20 36 36 36" />
+          <path d="M4 36 H36" />
+          <path d="M4 60 C26 60 20 36 36 36" />
+          <path d="M29 30 L37 36 L29 42" />
+        </g>
+      </svg>
+      <div className="grid size-11 place-items-center rounded-md bg-brass-ink text-brass pop">
+        <MessageSquare className="size-5" />
+      </div>
+    </div>
+  );
+}
 
 function badgeColor(kind: string): string {
   switch (kind) {

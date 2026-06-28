@@ -65,20 +65,23 @@ export function PlatformsScreen() {
       {config.targets.length === 0 ? (
         <EmptyState onAdd={() => setPicking(true)} />
       ) : (
-        <Reorder.Group
-          axis="y"
-          values={config.targets}
-          onReorder={reorderTargets}
-          className="flex list-none flex-col gap-3"
-        >
-          {config.targets.map((t) => (
-            <TargetRow
-              key={t.id}
-              target={t}
-              onReframe={() => setReframeTarget(t)}
-            />
-          ))}
-        </Reorder.Group>
+        <>
+          <RoutingBanner targets={config.targets} />
+          <Reorder.Group
+            axis="y"
+            values={config.targets}
+            onReorder={reorderTargets}
+            className="flex list-none flex-col gap-3"
+          >
+            {config.targets.map((t) => (
+              <TargetRow
+                key={t.id}
+                target={t}
+                onReframe={() => setReframeTarget(t)}
+              />
+            ))}
+          </Reorder.Group>
+        </>
       )}
 
       {reframeTarget && (
@@ -196,6 +199,58 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         <Plus className="size-5" strokeWidth={2.6} /> Adicionar plataforma
       </Button>
     </div>
+  );
+}
+
+// Mapa de roteamento: seu OBS → a Corneta (megafone) → as plataformas reais que você
+// configurou, tocando todas de uma vez. Glyphs apagados = destino desligado.
+function RoutingBanner({ targets }: { targets: Target[] }) {
+  const liveCount = targets.filter((t) => t.enabled).length;
+  return (
+    <div className="mb-6 flex items-center gap-2.5 overflow-hidden rounded-lg bg-surface-2 p-3 ring-1 ring-border sm:gap-3">
+      <div className="flex shrink-0 items-center rounded-md bg-surface px-2.5 py-2 ring-1 ring-border">
+        <span className="font-display text-sm font-extrabold text-ink">OBS</span>
+      </div>
+      <FlowArrow />
+      <div
+        className="grid size-10 shrink-0 -rotate-3 place-items-center rounded-lg bg-brass-ink text-brass pop"
+        title="A Corneta espalha pra todos"
+      >
+        <Mascot className="size-6" />
+      </div>
+      <FlowArrow />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {targets.map((t) => (
+          <span
+            key={t.id}
+            className={cn("transition-opacity", !t.enabled && "opacity-30 grayscale")}
+            title={t.enabled ? t.name : `${t.name} (desligado)`}
+          >
+            <PlatformGlyph id={t.platformId} size={30} />
+          </span>
+        ))}
+      </div>
+      <div className="shrink-0 text-right text-[11px] font-bold uppercase leading-tight tracking-wide text-ink-faint">
+        {liveCount} no ar
+        <br />
+        de uma vez
+      </div>
+    </div>
+  );
+}
+
+function FlowArrow() {
+  return (
+    <svg viewBox="0 0 28 16" className="h-4 w-7 shrink-0 text-brass" fill="none" aria-hidden>
+      <path d="M2 8 H22" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d="M17 3 L23 8 L17 13"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

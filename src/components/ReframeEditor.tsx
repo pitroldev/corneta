@@ -143,6 +143,7 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
               className="relative aspect-video w-full select-none overflow-hidden rounded-md border-2 border-border bg-surface-2"
               style={bg}
             >
+              {!frame && <GhostScene />}
               <ThirdsGrid />
               <div
                 tabIndex={0}
@@ -172,6 +173,11 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
                   9:16
                 </span>
               </div>
+              {!frame && (
+                <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-brass-ink/75 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brass">
+                  prévia
+                </span>
+              )}
             </div>
 
             <div className="mt-3 flex items-center gap-3">
@@ -209,10 +215,15 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
               Vai sair assim
             </span>
             <div
-              className="grid h-56 place-items-center overflow-hidden rounded-md border-2 border-border bg-surface-2 [aspect-ratio:9/16]"
+              className="relative grid h-56 place-items-center overflow-hidden rounded-md border-2 border-border bg-surface-2 [aspect-ratio:9/16]"
               style={previewStyle}
             >
-              {!frame && <span className="px-2 text-center text-[11px] text-ink-faint">9:16</span>}
+              {!frame && <GhostScene />}
+              {!frame && (
+                <span className="relative z-10 px-2 text-center text-[11px] font-bold text-ink-faint">
+                  9:16
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -244,6 +255,35 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
             : "💡 A captura de frame fica disponível com o OBS ao vivo. Sem frame, use a grade pra posicionar."}
         </p>
     </Modal>
+  );
+}
+
+// Cena-fantasma: sem frame do OBS, mostra uma silhueta (busto) centralizada pra você
+// já enxergar onde o recorte 9:16 vai cair. Latão suave de fundo, contorno duro do tema.
+function GhostScene() {
+  return (
+    <svg
+      viewBox="0 0 320 180"
+      preserveAspectRatio="xMidYMid slice"
+      className="pointer-events-none absolute inset-0 size-full"
+      aria-hidden
+    >
+      <circle cx="160" cy="78" r="60" fill="var(--color-brass)" opacity="0.07" />
+      <g fill="var(--color-ink-faint)" opacity="0.22">
+        <circle cx="160" cy="74" r="30" />
+        <path d="M104 182 C104 142 130 120 160 120 C190 120 216 142 216 182 Z" />
+      </g>
+      <line
+        x1="20"
+        y1="150"
+        x2="300"
+        y2="150"
+        stroke="var(--color-ink-faint)"
+        strokeWidth="1.5"
+        opacity="0.2"
+        strokeDasharray="5 6"
+      />
+    </svg>
   );
 }
 

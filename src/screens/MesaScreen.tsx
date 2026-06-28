@@ -19,7 +19,7 @@ import { useMesa } from "../lib/mesaStore";
 import { IS_TAURI } from "../lib/api";
 import type { MesaPeer } from "../lib/mesa";
 import { cn } from "../lib/utils";
-import { Badge, Button, Card, CopyField, EmptyState, Input, SectionTitle, Toggle } from "../components/ui";
+import { Badge, Button, Card, CopyField, Input, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 
 // Tile de vídeo: anexa a MediaStream via ref. Sem stream, mostra o slate "JÁ VOLTO".
@@ -130,6 +130,40 @@ function GuestTicketArt() {
         <text x="52" y="53" textAnchor="middle" fontSize="13" fontWeight="800" fill="var(--color-brass)">MESA1</text>
         <rect x="86" y="30" width="26" height="36" rx="6" fill="var(--color-tomate)" />
       </g>
+    </svg>
+  );
+}
+
+// Mesa cheia: a teia do mesh P2P (cada par ligado a todos) fica densa demais e a banda sofre.
+function MeshArt() {
+  const n = 6;
+  const cx = 70;
+  const cy = 70;
+  const r = 50;
+  const pts = Array.from({ length: n }, (_, i) => {
+    const a = (Math.PI * 2 * i) / n - Math.PI / 2;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)] as [number, number];
+  });
+  const edges: [number, number][] = [];
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) edges.push([i, j]);
+  return (
+    <svg viewBox="0 0 140 140" className="size-full" aria-hidden>
+      <g stroke="var(--color-tomate)" strokeWidth="1.3" opacity="0.55">
+        {edges.map(([i, j]) => (
+          <line key={`${i}-${j}`} x1={pts[i][0]} y1={pts[i][1]} x2={pts[j][0]} y2={pts[j][1]} />
+        ))}
+      </g>
+      {pts.map(([x, y], i) => (
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
+          r="10"
+          fill="var(--color-brass)"
+          stroke="var(--color-brass-ink)"
+          strokeWidth="2"
+        />
+      ))}
     </svg>
   );
 }
@@ -413,9 +447,32 @@ export function MesaScreen() {
           </div>
 
           {participants.length >= 5 && (
-            <EmptyState title="Mesa cheia pesa no upload">
-              Acima de ~5 no P2P direto, a banda de todo mundo sofre. Modo servidor (SFU) pra mesas grandes tá vindo.
-            </EmptyState>
+            <Card className="flex flex-col items-center gap-4 border-l-4 border-warn sm:flex-row sm:items-start">
+              <div className="size-28 shrink-0">
+                <MeshArt />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-display text-lg font-extrabold">Mesa cheia pesa no upload</h3>
+                <p className="mt-1 text-sm text-ink-muted">
+                  No P2P direto cada câmera sai pra todo mundo — a conta de conexões explode e seu
+                  upload vai no talo passando de ~5. Modo servidor (SFU) pra mesas grandes tá vindo.
+                </p>
+                <div className="mt-3 max-w-xs">
+                  <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide">
+                    <span className="text-ink-faint">seu upload</span>
+                    <span className="text-bad">no talo</span>
+                  </div>
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={cn("h-3 flex-1 rounded-[1px]", i < 8 ? "bg-brass" : "bg-tomate")}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
           )}
         </div>
       )}
