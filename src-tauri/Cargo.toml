@@ -55,7 +55,7 @@ keyring = { version = "3", features = ["windows-native"] }
 # sinalização WebRTC. axum =0.8.4 (MSRV ok p/ rust 1.77) reusa o stack hyper1/http1/tower
 # que o Tauri já traz; só compila axum/axum-core/matchit/tokio-tungstenite a mais.
 axum = { version = "=0.8.4", default-features = false, features = ["http1", "tokio", "ws"] }
-tokio = { version = "1", features = ["net", "sync", "macros"] }
+tokio = { version = "1", features = ["net", "sync", "macros", "time"] }
 
 # OCR local do guardião anti-vazamento via Windows.Media.Ocr (nativo, sem binário extra).
 [target.'cfg(windows)'.dependencies]

@@ -333,6 +333,34 @@ fn mediamtx_has_publisher() -> bool {
         .unwrap_or(false)
 }
 
+/// Estado da ingestão: (tem publisher pronto, total de bytes recebidos). O byte count
+/// distingue OBS no ar de OBS travado/caído — num crash (sem desconexão limpa) o MediaMTX
+/// segura o `ready` true por até o readTimeout, mas os bytes param de subir na hora.
+fn mediamtx_ingest() -> (bool, u64) {
+    let body = match ureq::get("http://127.0.0.1:9997/v3/paths/list")
+        .timeout(std::time::Duration::from_millis(700))
+        .call()
+    {
+        Ok(r) => r.into_string().unwrap_or_default(),
+        Err(_) => return (false, 0),
+    };
+    let v: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(_) => return (false, 0),
+    };
+    let mut ready = false;
+    let mut bytes = 0u64;
+    if let Some(arr) = v.get("items").and_then(|i| i.as_array()) {
+        for p in arr {
+            if p.get("ready").and_then(|r| r.as_bool()) == Some(true) {
+                ready = true;
+                bytes = bytes.max(p.get("bytesReceived").and_then(|b| b.as_u64()).unwrap_or(0));
+            }
+        }
+    }
+    (ready, bytes)
+}
+
 fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -482,7 +510,8 @@ async fn run_slate(
         .and_then(|c| c.args(slate_args.to_vec()).spawn());
     let (mut rx, child) = match spawned {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
+            log::error!("slate (JÁ VOLTO) não subiu pra {target_id}: {e}");
             set_target_state(app, target_id, "waiting");
             let _ = tauri::async_runtime::spawn_blocking(|| {
                 std::thread::sleep(std::time::Duration::from_millis(700))
@@ -680,10 +709,22 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let sig = has_signal.clone();
     let seen_sig = signal_seen.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        // Sinal vivo = publisher pronto E bytes subindo. Dois polls sem fluxo (~1.4s) = caiu,
+        // mesmo que o MediaMTX ainda mostre `ready` (crash do OBS segura o ready por ~20s).
+        let mut last_bytes = 0u64;
+        let mut stalls = 0u32;
         while run_sig.load(Ordering::Relaxed) {
-            let pub_now = mediamtx_has_publisher();
-            sig.store(pub_now, Ordering::Relaxed);
-            if pub_now {
+            let (ready, bytes) = mediamtx_ingest();
+            let flowing = bytes != last_bytes; // qualquer mudança (sobe ou reseta) = atividade
+            last_bytes = bytes;
+            if ready && flowing {
+                stalls = 0;
+            } else {
+                stalls = stalls.saturating_add(1);
+            }
+            let live = ready && stalls < 2;
+            sig.store(live, Ordering::Relaxed);
+            if live {
                 seen_sig.store(true, Ordering::Relaxed);
             }
             std::thread::sleep(std::time::Duration::from_millis(700));
@@ -791,50 +832,67 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 let mut low = 0u32;
                 let mut stable = 0u32;
                 let mut rebitrate = false;
-                while let Some(ev) = rx.recv().await {
-                    match ev {
-                        CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
-                            let line = String::from_utf8_lossy(&b);
-                            update_target_metrics(
-                                &app_t,
-                                &target_id,
-                                &line,
-                                signal.load(Ordering::Relaxed),
-                            );
-                            // Auto-bitrate: vigia a velocidade do FFmpeg (só em transcode).
-                            if auto_bitrate && is_transcode {
-                                if let Some(speed) = parse_kv(&line, "speed=") {
-                                    if speed < 0.9 {
-                                        low += 1;
-                                        stable = 0;
-                                    } else {
-                                        low = 0;
-                                        stable += 1;
-                                    }
-                                    if low >= 8 && current_kbps > floor_kbps {
-                                        current_kbps =
-                                            ((current_kbps as f64 * 0.75) as u32).max(floor_kbps);
-                                        notify(
-                                            &app_t,
-                                            "Banda apertou",
-                                            &format!("{target_name}: baixei o bitrate pra {current_kbps} kbps"),
-                                        );
-                                        rebitrate = true;
-                                        break;
-                                    } else if stable >= 60 && current_kbps < base_kbps {
-                                        current_kbps =
-                                            ((current_kbps as f64 * 1.2) as u32).min(base_kbps);
-                                        log::info!(
-                                            "auto-bitrate: {target_name} subindo pra {current_kbps} kbps"
-                                        );
-                                        rebitrate = true;
-                                        break;
+                let mut signal_lost = false;
+                // Cão de guarda: tica a cada 250ms. Se o sinal caiu, mata este FFmpeg NA HORA —
+                // senão ele segura a conexão da plataforma faminta (input morto) e a live cai.
+                // O slate "JÁ VOLTO" entra logo em seguida (topo do laço, com !signal).
+                let mut watchdog = tokio::time::interval(std::time::Duration::from_millis(250));
+                watchdog.tick().await; // descarta o tick imediato inicial
+                loop {
+                    tokio::select! {
+                        ev = rx.recv() => {
+                            let Some(ev) = ev else { break };
+                            match ev {
+                                CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                                    let line = String::from_utf8_lossy(&b);
+                                    update_target_metrics(
+                                        &app_t,
+                                        &target_id,
+                                        &line,
+                                        signal.load(Ordering::Relaxed),
+                                    );
+                                    // Auto-bitrate: vigia a velocidade do FFmpeg (só em transcode).
+                                    if auto_bitrate && is_transcode {
+                                        if let Some(speed) = parse_kv(&line, "speed=") {
+                                            if speed < 0.9 {
+                                                low += 1;
+                                                stable = 0;
+                                            } else {
+                                                low = 0;
+                                                stable += 1;
+                                            }
+                                            if low >= 8 && current_kbps > floor_kbps {
+                                                current_kbps =
+                                                    ((current_kbps as f64 * 0.75) as u32).max(floor_kbps);
+                                                notify(
+                                                    &app_t,
+                                                    "Banda apertou",
+                                                    &format!("{target_name}: baixei o bitrate pra {current_kbps} kbps"),
+                                                );
+                                                rebitrate = true;
+                                                break;
+                                            } else if stable >= 60 && current_kbps < base_kbps {
+                                                current_kbps =
+                                                    ((current_kbps as f64 * 1.2) as u32).min(base_kbps);
+                                                log::info!(
+                                                    "auto-bitrate: {target_name} subindo pra {current_kbps} kbps"
+                                                );
+                                                rebitrate = true;
+                                                break;
+                                            }
+                                        }
                                     }
                                 }
+                                CommandEvent::Terminated(_) => break,
+                                _ => {}
                             }
                         }
-                        CommandEvent::Terminated(_) => break,
-                        _ => {}
+                        _ = watchdog.tick() => {
+                            if !signal.load(Ordering::Relaxed) && !pause_flag.load(Ordering::Relaxed) {
+                                signal_lost = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 // Remove o FFmpeg do mapa (e mata, se saiu por troca de bitrate).
@@ -843,7 +901,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
                     removed
                 };
-                if rebitrate {
+                if rebitrate || signal_lost {
                     if let Some(c) = leftover {
                         let pid = c.pid();
                         let _ = c.kill();
