@@ -183,6 +183,7 @@ pub fn run() {
                             };
                             if ok {
                                 studio::stop(&app.state::<AppState>().studio);
+                                auth::youtube_complete_active(app); // encerra o broadcast do YouTube
                                 commands::kill_engine(app);
                                 app.exit(0);
                             }
@@ -218,6 +219,7 @@ pub fn run() {
                 } else {
                     // Fechar de verdade: mata FFmpeg para não deixar processo órfão (§14.2).
                     studio::stop(&app.state::<AppState>().studio);
+                    auth::youtube_complete_active(app); // encerra o broadcast do YouTube
                     commands::kill_engine(app);
                 }
             }

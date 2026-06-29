@@ -528,7 +528,8 @@ function StreamInfoCard() {
 
   // O título é lembrado entre sessões — alimenta o broadcast automático do YouTube.
   const persistTitle = () => {
-    if (title !== settings.streamTitle) setSettings({ streamTitle: title });
+    const t = title.trim();
+    if (t !== settings.streamTitle) setSettings({ streamTitle: t });
   };
   const onTitle = (v: string) => {
     setTitleLocal(v);

@@ -619,40 +619,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     }
     kill_orphan_sidecars();
 
-    let mut config = get_config(app.clone());
-
-    // YouTube automático: cria a transmissão (broadcast público + autostart) e injeta a URL+chave
-    // do YouTube ANTES de montar os destinos — o streamer não abre o Studio. Falha não derruba o
-    // resto (segue com o que o usuário tiver configurado manualmente no destino YouTube).
-    let mut yt_override: Option<(String, String)> = None;
-    if config.settings.youtube_auto_live && keys::has_key("youtube_refresh") {
-        if let Some(idx) = config
-            .targets
-            .iter()
-            .position(|t| t.enabled && t.platform_id == "youtube")
-        {
-            let title = {
-                let t = config.settings.stream_title.trim();
-                if t.is_empty() { "Ao vivo".to_string() } else { t.to_string() }
-            };
-            let app2 = app.clone();
-            match tauri::async_runtime::spawn_blocking(move || {
-                crate::auth::youtube_provision_broadcast(&app2, &title)
-            })
-            .await
-            {
-                Ok(Ok((addr, key))) => {
-                    config.targets[idx].ingest_url = addr;
-                    config.targets[idx].has_key = true;
-                    yt_override = Some((config.targets[idx].id.clone(), key));
-                    log::info!("YouTube: transmissão criada automaticamente");
-                }
-                Ok(Err(e)) => log::warn!("YouTube auto-broadcast: {e}"),
-                Err(e) => log::warn!("YouTube auto-broadcast: {e}"),
-            }
-        }
-    }
-
+    let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
     if enabled.is_empty() {
         return Err("Nenhuma plataforma ativa.".into());
@@ -664,9 +631,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         if let Some(k) = keys::get_key(&t.id) {
             keymap.insert(t.id.clone(), k);
         }
-    }
-    if let Some((id, k)) = yt_override {
-        keymap.insert(id, k); // a chave do YouTube vem da API, não do cofre
     }
     // 1) Gera o mediamtx.yml e sobe o MediaMTX (servidor de ingestão do OBS).
     let yml = mediamtx_config_path(&app)?;
@@ -705,6 +669,34 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         eng.paused = pause_flags.clone();
     }
     emit(&app, &snap);
+
+    // YouTube automático: cria a transmissão (broadcast público + autostart) AGORA — com o motor
+    // local já no ar e a UI em "starting", uma falha de MediaMTX não pode deixar broadcast órfão.
+    // A URL+chave entram como override por-destino (aplicado no loop). Falha aqui não derruba a
+    // live: o destino YouTube cai pra config manual do usuário.
+    let mut yt_override: Option<(String, String, String)> = None;
+    if config.settings.youtube_auto_live && keys::has_key("youtube_refresh") {
+        if let Some(yt) = enabled.iter().find(|t| t.platform_id == "youtube") {
+            let yid = yt.id.clone();
+            let title = {
+                let t = config.settings.stream_title.trim();
+                if t.is_empty() { "Ao vivo".to_string() } else { t.to_string() }
+            };
+            let app2 = app.clone();
+            match tauri::async_runtime::spawn_blocking(move || {
+                crate::auth::youtube_provision_broadcast(&app2, &title)
+            })
+            .await
+            {
+                Ok(Ok((addr, key))) => {
+                    log::info!("YouTube: transmissão criada automaticamente");
+                    yt_override = Some((yid, addr, key));
+                }
+                Ok(Err(e)) => log::warn!("YouTube auto-broadcast: {e}"),
+                Err(e) => log::warn!("YouTube auto-broadcast: {e}"),
+            }
+        }
+    }
 
     // Guardião de privacidade: só roda se LIGADO e com termos válidos (sem termos = não faz nada).
     let guard_watchlist: Vec<String> = config
@@ -800,10 +792,17 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     }
 
     for &t in &enabled {
-        let key = keymap.get(&t.id).cloned().unwrap_or_default();
-        let slate_args = engine::ffmpeg_args_for_slate(t, &key, slate_png.as_deref());
+        let mut target = t.clone();
+        let mut key = keymap.get(&t.id).cloned().unwrap_or_default();
+        // YouTube automático: usa a URL+chave provisionadas pela API (vencem a config manual).
+        if let Some((yid, yurl, ykey)) = &yt_override {
+            if target.id == *yid {
+                target.ingest_url = yurl.clone();
+                key = ykey.clone();
+            }
+        }
+        let slate_args = engine::ffmpeg_args_for_slate(&target, &key, slate_png.as_deref());
         let cfg = config.clone();
-        let target = t.clone();
         let is_transcode = engine::effective_action(&config.mode, t) == "transcode";
         let base_kbps = t
             .encoding

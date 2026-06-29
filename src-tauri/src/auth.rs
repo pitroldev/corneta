@@ -1199,15 +1199,19 @@ fn youtube_bind(token: &str, broadcast_id: &str, stream_id: &str) -> Result<(), 
 /// Cria a transmissão pública do YouTube (autostart) e amarra ao ingest reutilizável.
 /// Retorna (ingestionAddress, streamKey); guarda o broadcastId no cofre pra encerrar no corte.
 pub fn youtube_provision_broadcast(app: &AppHandle, title: &str) -> Result<(String, String), String> {
+    // Encerra qualquer transmissão pendente de uma sessão anterior (app fechou/crashou no ar).
+    youtube_complete_active(app);
     let token = youtube_token(app).ok_or("entre no YouTube")?;
     let start = rfc3339_utc(now_ms() / 1000 + 60); // ISO 8601 no futuro (obrigatório)
     let title: String = title.chars().take(100).collect();
+    // autoStop=false: numa queda longa (sem o slate BRB), o autostop ENCERRARIA a live de vez e a
+    // reconexão não a reviveria. Encerramos explicitamente no corte (e limpamos pendência no start).
     let body = json!({
         "snippet": { "title": title, "scheduledStartTime": start },
         "status": { "privacyStatus": "public", "selfDeclaredMadeForKids": false },
         "contentDetails": {
             "enableAutoStart": true,
-            "enableAutoStop": true,
+            "enableAutoStop": false,
             "monitorStream": { "enableMonitorStream": false }
         }
     });
@@ -1219,9 +1223,15 @@ pub fn youtube_provision_broadcast(app: &AppHandle, title: &str) -> Result<(Stri
     )?;
     let v: Value = serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
     let broadcast_id = v.get("id").and_then(|x| x.as_str()).ok_or("YouTube: broadcast sem id")?.to_string();
-    // stream reutilizável + bind (recria o stream se o cacheado sumiu na conta).
+    // Grava o id JÁ — se o stream/bind falhar depois, ainda dá pra encerrar (sem broadcast órfão).
+    let _ = keys::set_key("youtube_live_broadcast", &broadcast_id);
+    // stream reutilizável + bind (recria o stream SÓ se ele sumiu na conta — não em erro transitório).
     let (mut sid, mut addr, mut key) = youtube_reusable_stream(&token)?;
-    if youtube_bind(&token, &broadcast_id, &sid).is_err() {
+    if let Err(e) = youtube_bind(&token, &broadcast_id, &sid) {
+        let missing = e.contains("YouTube 404") || e.contains("streamNotFound") || e.contains("notFound");
+        if !missing {
+            return Err(e); // rede/5xx/401/cota: mantém o stream cacheado e propaga
+        }
         for k in ["youtube_stream_id", "youtube_ingest_addr", "youtube_stream_key"] {
             let _ = keys::clear_key(k);
         }
@@ -1231,11 +1241,11 @@ pub fn youtube_provision_broadcast(app: &AppHandle, title: &str) -> Result<(Stri
         key = s.2;
         youtube_bind(&token, &broadcast_id, &sid)?;
     }
-    let _ = keys::set_key("youtube_live_broadcast", &broadcast_id);
     Ok((addr, key))
 }
 
-/// Encerra na hora o broadcast ativo (se houver). Best-effort — o autostop também encerra sozinho.
+/// Encerra na hora o broadcast ativo (se houver). Best-effort. Se ele nunca foi ao ar
+/// (estado created/ready), o transition falha → deleta pra não deixar transmissão fantasma.
 pub fn youtube_complete_active(app: &AppHandle) {
     let bid = match keys::get_key("youtube_live_broadcast") {
         Some(b) if !b.is_empty() => b,
@@ -1243,9 +1253,12 @@ pub fn youtube_complete_active(app: &AppHandle) {
     };
     let _ = keys::clear_key("youtube_live_broadcast");
     if let Some(token) = youtube_token(app) {
-        let url = format!(
+        let transition = format!(
             "https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id={bid}&part=status"
         );
-        let _ = google_json("POST", &url, &token, None);
+        if google_json("POST", &transition, &token, None).is_err() {
+            let del = format!("https://www.googleapis.com/youtube/v3/liveBroadcasts?id={bid}");
+            let _ = google_json("DELETE", &del, &token, None);
+        }
     }
 }
