@@ -112,6 +112,7 @@ pub fn run() {
             auth::youtube_logout,
             auth::kick_login_start,
             auth::kick_logout,
+            auth::set_stream_info,
             auth::chat_moderate,
             commands::alerts_start,
             commands::alerts_stop,

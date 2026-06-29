@@ -619,7 +619,40 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     }
     kill_orphan_sidecars();
 
-    let config = get_config(app.clone());
+    let mut config = get_config(app.clone());
+
+    // YouTube automático: cria a transmissão (broadcast público + autostart) e injeta a URL+chave
+    // do YouTube ANTES de montar os destinos — o streamer não abre o Studio. Falha não derruba o
+    // resto (segue com o que o usuário tiver configurado manualmente no destino YouTube).
+    let mut yt_override: Option<(String, String)> = None;
+    if config.settings.youtube_auto_live && keys::has_key("youtube_refresh") {
+        if let Some(idx) = config
+            .targets
+            .iter()
+            .position(|t| t.enabled && t.platform_id == "youtube")
+        {
+            let title = {
+                let t = config.settings.stream_title.trim();
+                if t.is_empty() { "Ao vivo".to_string() } else { t.to_string() }
+            };
+            let app2 = app.clone();
+            match tauri::async_runtime::spawn_blocking(move || {
+                crate::auth::youtube_provision_broadcast(&app2, &title)
+            })
+            .await
+            {
+                Ok(Ok((addr, key))) => {
+                    config.targets[idx].ingest_url = addr;
+                    config.targets[idx].has_key = true;
+                    yt_override = Some((config.targets[idx].id.clone(), key));
+                    log::info!("YouTube: transmissão criada automaticamente");
+                }
+                Ok(Err(e)) => log::warn!("YouTube auto-broadcast: {e}"),
+                Err(e) => log::warn!("YouTube auto-broadcast: {e}"),
+            }
+        }
+    }
+
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
     if enabled.is_empty() {
         return Err("Nenhuma plataforma ativa.".into());
@@ -631,6 +664,9 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         if let Some(k) = keys::get_key(&t.id) {
             keymap.insert(t.id.clone(), k);
         }
+    }
+    if let Some((id, k)) = yt_override {
+        keymap.insert(id, k); // a chave do YouTube vem da API, não do cofre
     }
     // 1) Gera o mediamtx.yml e sobe o MediaMTX (servidor de ingestão do OBS).
     let yml = mediamtx_config_path(&app)?;
@@ -996,6 +1032,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
 pub fn stop_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     kill_engine(&app);
     let _ = state; // o kill já usa o state via app
+    // Encerra na hora o broadcast automático do YouTube (fora da thread principal; best-effort —
+    // o enableAutoStop também encerraria sozinho ~1min depois).
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::auth::youtube_complete_active(&app2));
     Ok(())
 }
 

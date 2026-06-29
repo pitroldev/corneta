@@ -20,6 +20,7 @@ import {
   RefreshCw,
   FileText,
   ChevronDown,
+  Megaphone,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -230,6 +231,9 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
           </div>
         </Card>
       )}
+
+      {/* Título + categoria pra todas as plataformas logadas, de uma tacada. */}
+      <StreamInfoCard />
 
       {/* ---- BANCADA DE SETUP (some quando já está no ar) ---- */}
       {!live && (
@@ -496,6 +500,156 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         />
       )}
     </div>
+  );
+}
+
+const PLAT_LABEL: Record<string, string> = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" };
+
+/** Define título (+jogo) da live em todas as plataformas logadas de uma vez. */
+function StreamInfoCard() {
+  const chatLogin = useStore((s) => s.chatLogin);
+  const settings = useStore((s) => s.config!.settings);
+  const setSettings = useStore((s) => s.setSettings);
+  const ready = {
+    twitch: chatLogin.twitch.state === "connected",
+    youtube: chatLogin.youtube.state === "connected",
+    kick: chatLogin.kick.state === "connected",
+  };
+  const targets = (["twitch", "youtube", "kick"] as const).filter((p) => ready[p]);
+  const [title, setTitleLocal] = useState(settings.streamTitle ?? "");
+  const [game, setGame] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState<Record<
+    string,
+    { ok: boolean; error?: string; warn?: string }
+  > | null>(null);
+
+  if (targets.length === 0) return null;
+
+  // O título é lembrado entre sessões — alimenta o broadcast automático do YouTube.
+  const persistTitle = () => {
+    if (title !== settings.streamTitle) setSettings({ streamTitle: title });
+  };
+  const onTitle = (v: string) => {
+    setTitleLocal(v);
+    setResults(null);
+  };
+  const onGame = (v: string) => {
+    setGame(v);
+    setResults(null);
+  };
+
+  const apply = async () => {
+    if (busy) return;
+    if (!title.trim()) {
+      toast.error("Digite um título");
+      return;
+    }
+    persistTitle();
+    setBusy(true);
+    setResults(null);
+    try {
+      const r = await api.setStreamInfo(title.trim(), game.trim() || undefined);
+      setResults(r);
+      const okN = Object.values(r).filter((x) => x.ok).length;
+      const total = Object.keys(r).length;
+      if (okN === total) toast.success(`Título atualizado em ${okN} plataforma${okN > 1 ? "s" : ""} 📣`);
+      else toast.error(`${okN}/${total} ok — veja os detalhes`);
+    } catch (e) {
+      toast.error(String(e).replace("Error: ", ""));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="mb-4">
+      <div className="mb-2.5 flex flex-wrap items-center gap-2">
+        <h3 className="flex items-center gap-2 text-lg">
+          <Megaphone className="size-5 text-brass" /> Título da live
+        </h3>
+        <div className="ml-auto flex items-center gap-1.5">
+          {targets.map((p) => (
+            <span
+              key={p}
+              className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-muted"
+            >
+              <PlatformGlyph id={p} size={13} /> {PLAT_LABEL[p]}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <input
+          value={title}
+          onChange={(e) => onTitle(e.target.value)}
+          onBlur={persistTitle}
+          onKeyDown={(e) => e.key === "Enter" && !busy && title.trim() && void apply()}
+          placeholder="Título da transmissão (vale pra todas)"
+          maxLength={140}
+          className="h-10 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
+        />
+        <div className="flex gap-2">
+          <input
+            value={game}
+            onChange={(e) => onGame(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !busy && title.trim() && void apply()}
+            placeholder="Jogo / categoria (opcional)"
+            className="h-10 flex-1 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
+          />
+          <Button variant="primary" onClick={apply} loading={busy} disabled={busy || !title.trim()}>
+            {!busy && <Megaphone className="size-4" />} Aplicar
+          </Button>
+        </div>
+      </div>
+      {results && (
+        <div className="mt-2.5 flex flex-col gap-1">
+          {Object.entries(results).map(([p, r]) => (
+            <div key={p} className="flex min-w-0 items-center gap-1.5 text-xs">
+              {!r.ok ? (
+                <AlertTriangle className="size-3.5 shrink-0 text-bad" />
+              ) : r.warn ? (
+                <AlertTriangle className="size-3.5 shrink-0 text-warn" />
+              ) : (
+                <Check className="size-3.5 shrink-0 text-ok" strokeWidth={2.6} />
+              )}
+              <span className="shrink-0 font-semibold">{PLAT_LABEL[p] ?? p}</span>
+              {!r.ok && <span className="truncate text-bad">· {r.error}</span>}
+              {r.ok && r.warn && <span className="truncate text-warn">· {r.warn}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {ready.youtube && (
+        <>
+          <button
+            onClick={() => setSettings({ youtubeAutoLive: !settings.youtubeAutoLive })}
+            className="mt-2.5 flex w-full items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-left"
+          >
+            <span
+              className={cn(
+                "grid size-5 shrink-0 place-items-center rounded border-2 transition-colors",
+                settings.youtubeAutoLive
+                  ? "border-brass bg-brass text-brass-ink"
+                  : "border-border text-transparent",
+              )}
+            >
+              <Check className="size-3.5" strokeWidth={3} />
+            </span>
+            <span className="text-xs leading-snug">
+              <strong className="text-ink">YouTube automático</strong>
+              <span className="text-ink-faint">
+                {" "}
+                — a Corneta cria a transmissão no BORA AO VIVO, sem abrir o Studio.
+              </span>
+            </span>
+          </button>
+          <p className="mt-1.5 text-[11px] text-ink-faint">
+            No YouTube a API muda só o <strong className="text-ink-muted">título</strong> (não o jogo).
+          </p>
+        </>
+      )}
+    </Card>
   );
 }
 

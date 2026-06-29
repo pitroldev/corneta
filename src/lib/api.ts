@@ -69,6 +69,11 @@ export interface CornetaApi {
   youtubeLogout(): Promise<void>;
   kickLoginStart(): Promise<void>;
   kickLogout(): Promise<void>;
+  /** Atualiza título (+categoria onde dá) da live em todas as plataformas logadas. */
+  setStreamInfo(
+    title: string,
+    category?: string,
+  ): Promise<Record<string, { ok: boolean; error?: string; warn?: string }>>;
   /** BYOK: salva/limpa as credenciais do Google do próprio usuário (cofre). */
   setYoutubeOauth(clientId: string, clientSecret: string): Promise<void>;
   clearYoutubeOauth(): Promise<void>;
@@ -259,6 +264,10 @@ function tauriApi(): CornetaApi {
     async kickLogout() {
       const { invoke } = await core();
       await invoke("kick_logout");
+    },
+    async setStreamInfo(title, category) {
+      const { invoke } = await core();
+      return await invoke("set_stream_info", { title, category: category ?? null });
     },
     async setYoutubeOauth(clientId, clientSecret) {
       const { invoke } = await core();
@@ -991,6 +1000,9 @@ function mockApi(): CornetaApi {
     async youtubeLogout() {},
     async kickLoginStart() {},
     async kickLogout() {},
+    async setStreamInfo() {
+      return {};
+    },
     async setYoutubeOauth() {},
     async clearYoutubeOauth() {},
     async chatModerate() {},

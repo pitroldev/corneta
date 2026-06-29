@@ -61,6 +61,8 @@ export function defaultConfig(): AppConfig {
       autoBitrate: true,
       guardianEnabled: false,
       guardianWatchlist: [],
+      youtubeAutoLive: true,
+      streamTitle: "",
     },
     profiles: [{ id: profId, name: "Padrão", mode: "hybrid", targets }],
     activeProfileId: profId,

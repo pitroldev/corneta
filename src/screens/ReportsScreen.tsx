@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -13,6 +13,9 @@ import {
   MessageSquare,
   Copy,
   Scissors,
+  Share2,
+  Download,
+  X,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
@@ -33,10 +36,13 @@ import {
   viewerSeries,
   type Highlight,
   type ProblemWindow,
+  type ReportAnalysis,
   type ReportEvent,
 } from "../lib/report";
 import { LineChart, type ChartMarker } from "../components/LineChart";
 import { Button, Card, EmptyState, PlatformGlyph, SectionTitle } from "../components/ui";
+import { Modal } from "../components/Modal";
+import { drawRecap, recapToBlob, RECAP_SIZE, type RecapData, type RecapStat } from "../lib/recap";
 
 function fmtDur(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -132,6 +138,122 @@ function SessionRow({ meta, onOpen }: { meta: SessionMeta; onOpen: () => void })
   );
 }
 
+// Monta o pôster de recap a partir do relatório analisado.
+function buildRecap(data: SessionData, a: ReportAnalysis): RecapData {
+  const platforms = data.meta.platforms.map((p) => ({
+    name: p.name,
+    color: PLATFORMS[p.platformId as keyof typeof PLATFORMS]?.color ?? "#ffb323",
+  }));
+  const follows = a.alerts.byKind.follow ?? 0;
+  const big: RecapStat[] = [];
+  if (a.viewers.hasData) big.push({ label: "pico de audiência", value: a.viewers.peak.toLocaleString("pt-BR") });
+  if (a.chat.hasData) big.push({ label: "mensagens", value: a.chat.total.toLocaleString("pt-BR") });
+  const small: RecapStat[] = [];
+  if (big.length > 0) small.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
+  if (a.viewers.hasData) small.push({ label: "média", value: a.viewers.avg.toLocaleString("pt-BR") });
+  if (follows > 0) small.push({ label: "novos seguidores", value: follows.toLocaleString("pt-BR") });
+  if (a.alerts.subs > 0) small.push({ label: "inscrições", value: String(a.alerts.subs) });
+  if (a.alerts.bits > 0) small.push({ label: "bits", value: a.alerts.bits.toLocaleString("pt-BR") });
+  if (a.alerts.raids > 0) small.push({ label: "raids", value: String(a.alerts.raids) });
+  // Sem audiência nem chat → promove tempo no ar (e inscrições) pros heróis.
+  if (big.length === 0) {
+    big.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
+    if (a.alerts.subs > 0) big.push({ label: "inscrições", value: String(a.alerts.subs) });
+  }
+  const top = a.highlights[0]?.reason;
+  const moment = top ? (top.length > 44 ? `${top.slice(0, 43)}…` : top) : undefined;
+  // não repete nos secundários um rótulo que já virou herói (ex.: "inscrições")
+  const bigLabels = new Set(big.map((s) => s.label));
+  return {
+    brand: "CORNETA",
+    date: fmtDate(data.meta.startedAt),
+    title: `LIVE DE ${fmtDate(data.meta.startedAt)}`,
+    subtitle: `${fmtDur(data.meta.durationSec)} · ${data.meta.platforms.map((p) => p.name).join(" · ")}`,
+    big,
+    small: small.filter((s) => !bigLabels.has(s.label)).slice(0, 4),
+    moment,
+    platforms,
+    footer: "transmitido com Corneta — multistream num app só",
+  };
+}
+
+function RecapModal({
+  data,
+  analysis,
+  onClose,
+}: {
+  data: SessionData;
+  analysis: ReportAnalysis;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let alive = true;
+    const el = ref.current;
+    if (!el) return;
+    const ctx = el.getContext("2d");
+    if (!ctx) return;
+    const r = buildRecap(data, analysis);
+    // Espera as fontes carregarem pra o pôster não sair com fallback.
+    void (document.fonts?.ready ?? Promise.resolve()).then(() => {
+      if (alive) drawRecap(ctx, r);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [data, analysis]);
+
+  const copy = async () => {
+    const el = ref.current;
+    if (!el) return;
+    try {
+      const blob = await recapToBlob(el);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast.success("Imagem copiada — cola no WhatsApp/Discord/Twitter 📋");
+    } catch {
+      toast.error("Não consegui copiar; use o Baixar PNG");
+    }
+  };
+  const download = async () => {
+    const el = ref.current;
+    if (!el) return;
+    const blob = await recapToBlob(el);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `corneta-live-${fmtDate(data.meta.startedAt).replace("/", "-")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  return (
+    <Modal title="Recap da live" onClose={onClose} className="max-w-lg rounded-xl bg-surface p-5 pop">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-xl">Recap pra postar</h3>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          <X className="size-4" />
+        </Button>
+      </div>
+      <canvas
+        ref={ref}
+        width={RECAP_SIZE}
+        height={RECAP_SIZE}
+        className="mb-3 w-full border-2 border-border-soft"
+      />
+      <div className="flex gap-2">
+        <Button variant="primary" className="flex-1" onClick={copy}>
+          <Copy className="size-4" /> Copiar imagem
+        </Button>
+        <Button variant="subtle" className="flex-1" onClick={download}>
+          <Download className="size-4" /> Baixar PNG
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 function ReportDetail({
   id,
   onBack,
@@ -142,6 +264,7 @@ function ReportDetail({
   onDeleted: () => void;
 }) {
   const [data, setData] = useState<SessionData | null | "loading">("loading");
+  const [showRecap, setShowRecap] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -260,8 +383,14 @@ function ReportDetail({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="size-4" /> Voltar
         </Button>
-        <DeleteButton onDelete={remove} />
+        <div className="flex items-center gap-2">
+          <Button variant="subtle" size="sm" onClick={() => setShowRecap(true)}>
+            <Share2 className="size-4" /> Recap
+          </Button>
+          <DeleteButton onDelete={remove} />
+        </div>
       </div>
+      {showRecap && <RecapModal data={data} analysis={a} onClose={() => setShowRecap(false)} />}
 
       <div className="mb-1 font-display text-2xl font-extrabold">
         Live de {fmtDate(data.meta.startedAt)}

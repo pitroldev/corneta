@@ -128,6 +128,13 @@ pub struct Settings {
     /// Termos EXPLÍCITOS a vigiar (endereço, nome real, @, placa…). É o único gatilho da feature.
     #[serde(default)]
     pub guardian_watchlist: Vec<String>,
+    /// YouTube automático: ao dar BORA, a Corneta cria a transmissão (broadcast) e injeta a
+    /// chave RTMP do YouTube sozinha — o streamer não abre o YouTube Studio.
+    #[serde(default = "default_true")]
+    pub youtube_auto_live: bool,
+    /// Título da live, lembrado entre sessões. Alimenta o broadcast automático do YouTube.
+    #[serde(default)]
+    pub stream_title: String,
 }
 
 fn default_true() -> bool {
@@ -214,6 +221,8 @@ impl Default for Settings {
             auto_bitrate: true,
             guardian_enabled: false,
             guardian_watchlist: Vec::new(),
+            youtube_auto_live: true,
+            stream_title: String::new(),
         }
     }
 }

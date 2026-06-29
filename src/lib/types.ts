@@ -142,6 +142,10 @@ export interface AppSettings {
   brbEnabled: boolean;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
   autoBitrate: boolean;
+  /** YouTube automático: cria a transmissão (broadcast) e injeta a chave no BORA — sem Studio. */
+  youtubeAutoLive: boolean;
+  /** Título da live, lembrado entre sessões (alimenta o broadcast automático do YouTube). */
+  streamTitle: string;
 }
 
 export interface ObsCheck {

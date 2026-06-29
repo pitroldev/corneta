@@ -20,11 +20,11 @@ use crate::keys;
 use crate::AppState;
 
 const TWITCH_SCOPES: &str =
-    "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users";
+    "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast";
 const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube.force-ssl";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 // Kick: API oficial (OAuth 2.1 + PKCE, sem device flow). Redirect loopback numa porta fixa.
-const KICK_SCOPES: &str = "user:read channel:read chat:write moderation:chat_message:manage";
+const KICK_SCOPES: &str = "user:read channel:read channel:write chat:write moderation:chat_message:manage";
 const KICK_PORT: u16 = 7395;
 
 /// Client ids/secrets vindos do `.env` (definidos pelo frontend no boot).
@@ -473,6 +473,7 @@ pub fn youtube_send(app: &AppHandle, text: &str) -> Result<(), String> {
 fn google_json(method: &str, url: &str, token: &str, body: Option<&Value>) -> Result<String, String> {
     let req = match method {
         "POST" => ureq::post(url),
+        "PUT" => ureq::request("PUT", url),
         "DELETE" => ureq::delete(url),
         _ => ureq::get(url),
     }
@@ -894,6 +895,7 @@ fn kick_api(app: &AppHandle, method: &str, url: &str, body: Option<&Value>) -> R
     for attempt in 0..2 {
         let req = match method {
             "POST" => ureq::post(url),
+            "PATCH" => ureq::request("PATCH", url),
             "DELETE" => ureq::delete(url),
             _ => ureq::get(url),
         }
@@ -971,5 +973,279 @@ fn kick_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Re
         }
         // banir/timeout precisa do user_id do autor (o feed Pusher só dá username) → evolução.
         _ => Err("no Kick, por enquanto só dá pra apagar a mensagem".into()),
+    }
+}
+
+// ------------------- Info da live (título + categoria) -------------
+// Seta TÍTULO (+categoria onde a API permite) em todas as plataformas logadas de uma vez.
+// Twitch: PATCH /helix/channels (escopo channel:manage:broadcast). Kick: PATCH /public/v1/channels
+// (channel:write). YouTube: videos.update — só título (a API pública não seta o jogo).
+
+// Ok(None) = sucesso limpo; Ok(Some(w)) = sucesso COM aviso (ex.: categoria não achada,
+// título cortado); Err = falhou. Evita "check verde mentiroso".
+fn result_json(r: Result<Option<String>, String>) -> Value {
+    match r {
+        Ok(None) => json!({ "ok": true }),
+        Ok(Some(w)) => json!({ "ok": true, "warn": w }),
+        Err(e) => json!({ "ok": false, "error": e }),
+    }
+}
+
+#[tauri::command]
+pub async fn set_stream_info(app: AppHandle, title: String, category: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let title = title.trim().to_string();
+        if title.is_empty() {
+            return Err("digite um título".to_string());
+        }
+        let category = category.unwrap_or_default().trim().to_string();
+        let mut out = serde_json::Map::new();
+        if keys::has_key("twitch_oauth") {
+            out.insert("twitch".into(), result_json(twitch_set_info(&app, &title, &category)));
+        }
+        if keys::has_key("youtube_refresh") {
+            out.insert("youtube".into(), result_json(youtube_set_title(&app, &title)));
+        }
+        if keys::has_key("kick_refresh") {
+            out.insert("kick".into(), result_json(kick_set_info(&app, &title, &category)));
+        }
+        if out.is_empty() {
+            return Err("entre em alguma plataforma primeiro (aba Conta)".to_string());
+        }
+        Ok(Value::Object(out))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn twitch_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<String>, String> {
+    let token = twitch_token(app).ok_or("entre na Twitch")?;
+    let client_id = oauth(app).twitch_client_id;
+    let info = twitch_validate(&token).ok_or("token da Twitch inválido")?;
+    let mut body = json!({ "title": title.chars().take(140).collect::<String>() });
+    let mut warn = None;
+    if !category.is_empty() {
+        match twitch_game_id(&token, &client_id, category) {
+            Some(gid) => body["game_id"] = json!(gid),
+            None => warn = Some(format!("categoria \"{category}\" não encontrada")),
+        }
+    }
+    let url = format!("https://api.twitch.tv/helix/channels?broadcaster_id={}", info.user_id);
+    match ureq::request("PATCH", &url)
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Client-Id", &client_id)
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(12))
+        .send_string(&body.to_string())
+    {
+        Ok(_) => Ok(warn),
+        Err(ureq::Error::Status(401, _)) | Err(ureq::Error::Status(403, _)) => {
+            Err("re-entre na Twitch (faltou a permissão de editar a live)".into())
+        }
+        Err(ureq::Error::Status(c, r)) => Err(format!("Twitch {c}: {}", r.into_string().unwrap_or_default())),
+        Err(e) => Err(format!("Twitch: {e}")),
+    }
+}
+
+fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
+    let v = helix(
+        token,
+        client_id,
+        &format!("https://api.twitch.tv/helix/search/categories?query={}&first=1", pct(name)),
+    )?;
+    Some(v.get("data")?.as_array()?.first()?.get("id")?.as_str()?.to_string())
+}
+
+fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, String> {
+    let token = youtube_token(app).ok_or("entre no YouTube")?;
+    let vid = youtube_active_video_id(&token).ok_or("nenhuma transmissão ativa no YouTube agora")?;
+    // GET do snippet atual (o update re-envia o snippet inteiro — omitir apaga description/tags).
+    let body = google_json(
+        "GET",
+        &format!("https://www.googleapis.com/youtube/v3/videos?part=snippet&id={vid}"),
+        &token,
+        None,
+    )?;
+    let v: Value = serde_json::from_str(&body).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let mut snippet = v
+        .get("items")
+        .and_then(|i| i.as_array())
+        .and_then(|a| a.first())
+        .and_then(|x| x.get("snippet"))
+        .cloned()
+        .ok_or("YouTube: vídeo da live não encontrado")?;
+    let cut = title.chars().count() > 100;
+    snippet["title"] = json!(title.chars().take(100).collect::<String>());
+    // categoryId é obrigatório no update; preserva o atual ou cai pra "24" (Entretenimento, neutro).
+    if snippet.get("categoryId").and_then(|x| x.as_str()).unwrap_or("").is_empty() {
+        snippet["categoryId"] = json!("24");
+    }
+    let put = json!({ "id": vid, "snippet": snippet });
+    google_json(
+        "PUT",
+        "https://www.googleapis.com/youtube/v3/videos?part=snippet",
+        &token,
+        Some(&put),
+    )
+    .map(|_| if cut { Some("título cortado em 100 (limite do YouTube)".into()) } else { None })
+}
+
+fn youtube_active_video_id(token: &str) -> Option<String> {
+    let body = ureq::get(
+        "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id&broadcastStatus=active&broadcastType=all",
+    )
+    .set("Authorization", &format!("Bearer {token}"))
+    .timeout(Duration::from_secs(10))
+    .call()
+    .ok()?
+    .into_string()
+    .ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.get("items")?.as_array()?.first()?.get("id")?.as_str().map(|s| s.to_string())
+}
+
+fn kick_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<String>, String> {
+    let mut body = json!({ "stream_title": title.chars().take(255).collect::<String>() });
+    let mut warn = None;
+    if !category.is_empty() {
+        match kick_category_id(app, category) {
+            Some(cid) => body["category_id"] = json!(cid),
+            None => warn = Some(format!("categoria \"{category}\" não encontrada")),
+        }
+    }
+    match kick_api(app, "PATCH", "https://api.kick.com/public/v1/channels", Some(&body)) {
+        Ok(_) => Ok(warn),
+        Err(e) if e.contains("Kick 401") || e.contains("Kick 403") => {
+            Err("re-entre no Kick (faltou a permissão channel:write)".into())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+fn kick_category_id(app: &AppHandle, name: &str) -> Option<i64> {
+    let body = kick_api(
+        app,
+        "GET",
+        &format!("https://api.kick.com/public/v2/categories?name={}", pct(name)),
+        None,
+    )
+    .ok()?;
+    let v: Value = serde_json::from_str(&body).ok()?;
+    v.get("data")?.as_array()?.first()?.get("id")?.as_i64()
+}
+
+// ------------- YouTube: transmissão automática (sem Studio) ---------
+// Cria/reusa um liveStream reutilizável (chave RTMP fixa) e, por live, cria um broadcast PÚBLICO
+// com autostart + amarra. O motor empurra → entra no ar sozinho. Reusa o login do chat.
+
+/// RFC3339 (UTC) a partir de epoch-segundos — civil_from_days (Howard Hinnant), sem dep de data.
+fn rfc3339_utc(secs: u64) -> String {
+    let days = (secs / 86400) as i64;
+    let rem = secs % 86400;
+    let (hh, mm, ss) = (rem / 3600, (rem % 3600) / 60, rem % 60);
+    let z = days + 719468;
+    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y0 = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y0 + 1 } else { y0 };
+    format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}Z")
+}
+
+/// liveStream reutilizável (chave RTMP fixa). Reusa o do cofre; cria se faltar.
+fn youtube_reusable_stream(token: &str) -> Result<(String, String, String), String> {
+    if let (Some(id), Some(addr), Some(key)) = (
+        keys::get_key("youtube_stream_id"),
+        keys::get_key("youtube_ingest_addr"),
+        keys::get_key("youtube_stream_key"),
+    ) {
+        if !id.is_empty() && !addr.is_empty() && !key.is_empty() {
+            return Ok((id, addr, key));
+        }
+    }
+    let body = json!({
+        "snippet": { "title": "Corneta — ingest" },
+        "cdn": { "ingestionType": "rtmp", "resolution": "variable", "frameRate": "variable" },
+        "contentDetails": { "isReusable": true }
+    });
+    let resp = google_json(
+        "POST",
+        "https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn,contentDetails",
+        token,
+        Some(&body),
+    )?;
+    let v: Value = serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let id = v.get("id").and_then(|x| x.as_str()).ok_or("YouTube: stream sem id")?.to_string();
+    let info = v.get("cdn").and_then(|c| c.get("ingestionInfo")).ok_or("YouTube: sem ingestionInfo")?;
+    let addr = info.get("ingestionAddress").and_then(|x| x.as_str()).ok_or("YouTube: sem ingestionAddress")?.to_string();
+    let key = info.get("streamName").and_then(|x| x.as_str()).ok_or("YouTube: sem streamName")?.to_string();
+    let _ = keys::set_key("youtube_stream_id", &id);
+    let _ = keys::set_key("youtube_ingest_addr", &addr);
+    let _ = keys::set_key("youtube_stream_key", &key);
+    Ok((id, addr, key))
+}
+
+fn youtube_bind(token: &str, broadcast_id: &str, stream_id: &str) -> Result<(), String> {
+    let url = format!(
+        "https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id={broadcast_id}&streamId={stream_id}&part=id,contentDetails"
+    );
+    google_json("POST", &url, token, None).map(|_| ())
+}
+
+/// Cria a transmissão pública do YouTube (autostart) e amarra ao ingest reutilizável.
+/// Retorna (ingestionAddress, streamKey); guarda o broadcastId no cofre pra encerrar no corte.
+pub fn youtube_provision_broadcast(app: &AppHandle, title: &str) -> Result<(String, String), String> {
+    let token = youtube_token(app).ok_or("entre no YouTube")?;
+    let start = rfc3339_utc(now_ms() / 1000 + 60); // ISO 8601 no futuro (obrigatório)
+    let title: String = title.chars().take(100).collect();
+    let body = json!({
+        "snippet": { "title": title, "scheduledStartTime": start },
+        "status": { "privacyStatus": "public", "selfDeclaredMadeForKids": false },
+        "contentDetails": {
+            "enableAutoStart": true,
+            "enableAutoStop": true,
+            "monitorStream": { "enableMonitorStream": false }
+        }
+    });
+    let resp = google_json(
+        "POST",
+        "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails",
+        &token,
+        Some(&body),
+    )?;
+    let v: Value = serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let broadcast_id = v.get("id").and_then(|x| x.as_str()).ok_or("YouTube: broadcast sem id")?.to_string();
+    // stream reutilizável + bind (recria o stream se o cacheado sumiu na conta).
+    let (mut sid, mut addr, mut key) = youtube_reusable_stream(&token)?;
+    if youtube_bind(&token, &broadcast_id, &sid).is_err() {
+        for k in ["youtube_stream_id", "youtube_ingest_addr", "youtube_stream_key"] {
+            let _ = keys::clear_key(k);
+        }
+        let s = youtube_reusable_stream(&token)?;
+        sid = s.0;
+        addr = s.1;
+        key = s.2;
+        youtube_bind(&token, &broadcast_id, &sid)?;
+    }
+    let _ = keys::set_key("youtube_live_broadcast", &broadcast_id);
+    Ok((addr, key))
+}
+
+/// Encerra na hora o broadcast ativo (se houver). Best-effort — o autostop também encerra sozinho.
+pub fn youtube_complete_active(app: &AppHandle) {
+    let bid = match keys::get_key("youtube_live_broadcast") {
+        Some(b) if !b.is_empty() => b,
+        _ => return,
+    };
+    let _ = keys::clear_key("youtube_live_broadcast");
+    if let Some(token) = youtube_token(app) {
+        let url = format!(
+            "https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id={bid}&part=status"
+        );
+        let _ = google_json("POST", &url, &token, None);
     }
 }
