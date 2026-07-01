@@ -15,7 +15,7 @@
         "label": "main",
         "title": "Corneta",
         "width": 1080,
-        "height": 720,
+        "height": 800,
         "minWidth": 920,
         "minHeight": 600,
         "resizable": true,

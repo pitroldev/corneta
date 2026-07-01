@@ -56,8 +56,8 @@ export function AboutScreen() {
           <div>
             <h3 className="text-3xl">Oi, sou o Petro</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
-              Fiz a Corneta pra resolver o meu próprio perrengue: você manda um stream do OBS e ela
-              joga ao vivo em várias plataformas de uma vez, sem dor de cabeça.
+              Fiz a Corneta pra matar um perrengue meu: um stream do OBS vira live na Twitch, YouTube,
+              Kick e cia. de uma vez só — grátis e sem dor de cabeça.
             </p>
           </div>
         </div>

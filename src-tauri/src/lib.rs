@@ -33,6 +33,31 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+/// Garante que a janela caiba na tela. Se a altura (vinda do config ou de um tamanho
+/// salvo pelo window-state) passar da área útil do monitor atual — descontando a barra
+/// de tarefas —, reduz e recentraliza. Em telas grandes não mexe; em 720p/768p evita
+/// que a janela sem bordas (`decorations: false`) fique cortada embaixo.
+fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
+    let Ok(Some(monitor)) = w.current_monitor() else {
+        return;
+    };
+    let scale = monitor.scale_factor();
+    if scale <= 0.0 {
+        return;
+    }
+    let mon_h = monitor.size().height as f64 / scale; // altura lógica do monitor
+    let max_h = (mon_h - 72.0).max(480.0); // folga pra barra de tarefas
+    let Ok(size) = w.inner_size() else {
+        return;
+    };
+    let cur_h = size.height as f64 / scale;
+    if cur_h > max_h {
+        let cur_w = size.width as f64 / scale;
+        let _ = w.set_size(tauri::LogicalSize::new(cur_w, max_h));
+        let _ = w.center();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -137,6 +162,8 @@ pub fn run() {
             // Mesa: auto-concede câmera/mic no WebView2 (getUserMedia sem prompt/lock).
             if let Some(w) = app.get_webview_window("main") {
                 permissions::grant_av_permissions(&w);
+                // Nunca deixa a janela mais alta que a tela (720p/768p incluídos).
+                clamp_window_to_screen(&w);
             }
             // Registra o atalho global de começar/parar a partir das settings.
             {
