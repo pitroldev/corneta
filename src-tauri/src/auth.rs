@@ -231,9 +231,14 @@ pub fn twitch_login_start(app: AppHandle) {
                     if access.is_empty() {
                         continue;
                     }
-                    let _ = keys::set_key("twitch_oauth", access);
+                    // keyring falhou = token não salvo → erro visível em vez de "connected" mentiroso.
+                    if let Err(e) = keys::set_key("twitch_oauth", access) {
+                        return auth_event(&app, "twitch", "error", "", "", &e);
+                    }
                     if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
-                        let _ = keys::set_key("twitch_refresh", r);
+                        if let Err(e) = keys::set_key("twitch_refresh", r) {
+                            return auth_event(&app, "twitch", "error", "", "", &e);
+                        }
                     }
                     let login = twitch_validate(access).map(|i| i.login).unwrap_or_default();
                     return auth_event(&app, "twitch", "connected", "", "", &login);
@@ -274,12 +279,22 @@ pub fn twitch_token(app: &AppHandle) -> Option<String> {
     twitch_refresh(app)
 }
 
+// Serializa o refresh: a Twitch rotaciona o refresh token, então duas threads renovando
+// juntas gastariam o MESMO token e a segunda levaria invalid_grant.
+static TWITCH_REFRESH_LOCK: Mutex<()> = Mutex::new(());
+
 fn twitch_refresh(app: &AppHandle) -> Option<String> {
     let cfg = oauth(app);
     let refresh = keys::get_key("twitch_refresh")?;
+    let _guard = TWITCH_REFRESH_LOCK.lock().unwrap();
+    // Relê dentro do lock: se mudou, outra thread já renovou → usa o access novo do keyring.
+    let atual = keys::get_key("twitch_refresh")?;
+    if atual != refresh {
+        return keys::get_key("twitch_oauth");
+    }
     let mut form = vec![
         ("grant_type", "refresh_token"),
-        ("refresh_token", refresh.as_str()),
+        ("refresh_token", atual.as_str()),
         ("client_id", cfg.twitch_client_id.as_str()),
     ];
     if !cfg.twitch_client_secret.is_empty() {
@@ -287,9 +302,10 @@ fn twitch_refresh(app: &AppHandle) -> Option<String> {
     }
     let v = post_form("https://id.twitch.tv/oauth2/token", &form).ok()?;
     let access = v.get("access_token").and_then(|x| x.as_str())?.to_string();
-    let _ = keys::set_key("twitch_oauth", &access);
+    // keyring falhou = token não persistido → falha visível (None) em vez de sessão fantasma.
+    keys::set_key("twitch_oauth", &access).ok()?;
     if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
-        let _ = keys::set_key("twitch_refresh", r);
+        keys::set_key("twitch_refresh", r).ok()?;
     }
     Some(access)
 }
@@ -352,9 +368,14 @@ pub fn youtube_login_start(app: AppHandle) {
                     if access.is_empty() {
                         continue;
                     }
-                    let _ = keys::set_key("youtube_oauth", access);
+                    // keyring falhou = token não salvo → erro visível em vez de "connected" mentiroso.
+                    if let Err(e) = keys::set_key("youtube_oauth", access) {
+                        return auth_event(&app, "youtube", "error", "", "", &e);
+                    }
                     if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
-                        let _ = keys::set_key("youtube_refresh", r);
+                        if let Err(e) = keys::set_key("youtube_refresh", r) {
+                            return auth_event(&app, "youtube", "error", "", "", &e);
+                        }
                     }
                     return auth_event(&app, "youtube", "connected", "", "", "");
                 }
@@ -739,8 +760,8 @@ pub fn kick_login_start(app: AppHandle) {
 }
 
 /// Servidor loopback (IPv4+IPv6) de uso único: espera o GET /callback?code=...&state=..., confere
-/// o state (CSRF), trata negação (`error`) e IGNORA conexões espúrias (preconnect/favicon) em vez
-/// de matar o login. Timeout de 5 min.
+/// o state (CSRF), trata negação (`error`, só com state correto) e IGNORA conexões espúrias ou
+/// forjadas (preconnect/favicon/state errado) em vez de matar o login. Timeout de 5 min.
 fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, String> {
     let deadline = Instant::now() + Duration::from_secs(300);
     loop {
@@ -790,7 +811,11 @@ fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, 
                     }
                 }
             }
-            let ok = err.is_empty() && !code.is_empty() && got_state == expected_state;
+            // Só é DEFINITIVO com o state correto — qualquer página local pode forjar
+            // ?error=x ou ?code=x&state=lixo pra abortar o login; essas respondem erro
+            // e o loop segue esperando o callback legítimo até o deadline.
+            let state_ok = got_state == expected_state;
+            let ok = err.is_empty() && !code.is_empty() && state_ok;
             let is_callback = !code.is_empty() || !err.is_empty();
             let msg = if ok {
                 "Pronto! Pode fechar esta aba e voltar pra Corneta."
@@ -812,13 +837,11 @@ fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, 
             if ok {
                 return Ok(code);
             }
-            if !err.is_empty() {
+            // `error` só é definitivo se veio com o state correto (senão pode ser forjado).
+            if state_ok && !err.is_empty() {
                 return Err(format!("Autorização negada no Kick ({err})"));
             }
-            if !code.is_empty() {
-                return Err("Login do Kick inválido (state não confere)".into());
-            }
-            // conexão espúria (sem code/erro) → ignora e segue esperando o callback real.
+            // conexão espúria ou state errado/ausente → ignora e segue esperando o callback real.
         }
         if idle {
             std::thread::sleep(Duration::from_millis(150));
@@ -855,14 +878,24 @@ pub fn kick_logout(app: AppHandle) {
     auth_event(&app, "kick", "loggedout", "", "", "");
 }
 
+// Serializa o refresh: o Kick rotaciona o refresh token, então duas threads renovando juntas
+// gastariam o MESMO token — a segunda levaria invalid_grant e apagaria os tokens válidos da primeira.
+static KICK_REFRESH_LOCK: Mutex<()> = Mutex::new(());
+
 fn kick_refresh(app: &AppHandle) -> Option<String> {
     let cfg = oauth(app);
     let refresh = keys::get_key("kick_refresh")?;
+    let _guard = KICK_REFRESH_LOCK.lock().unwrap();
+    // Relê dentro do lock: se mudou, outra thread já renovou → usa o access novo do keyring.
+    let atual = keys::get_key("kick_refresh")?;
+    if atual != refresh {
+        return keys::get_key("kick_oauth");
+    }
     let v = match post_form(
         "https://id.kick.com/oauth/token",
         &[
             ("grant_type", "refresh_token"),
-            ("refresh_token", refresh.as_str()),
+            ("refresh_token", atual.as_str()),
             ("client_id", cfg.kick_client_id.as_str()),
             ("client_secret", cfg.kick_client_secret.as_str()),
         ],
@@ -872,7 +905,9 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
             // refresh morto (revogado/expirado) → desloga de vez pra UI refletir. Erro de rede
             // (status 0) ou 5xx → mantém a sessão pra tentar de novo.
             let dead = code == 400 || e.get("error").and_then(|x| x.as_str()) == Some("invalid_grant");
-            if dead {
+            // Só apaga se o refresh que falhou ainda for o gravado — senão apagaria tokens
+            // recém-renovados por outro fluxo (ex.: re-login concluído nesse meio-tempo).
+            if dead && keys::get_key("kick_refresh").as_deref() == Some(atual.as_str()) {
                 let _ = keys::clear_key("kick_oauth");
                 let _ = keys::clear_key("kick_refresh");
                 KICK_IDS.lock().unwrap().clear();

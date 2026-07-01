@@ -28,6 +28,19 @@ pub fn recommended_preset(platform_id: &str) -> VideoPreset {
     }
 }
 
+/// Sanitiza um preset vindo da config: import_config aceita qualquer JSON, então os campos
+/// não são confiáveis — clampa cada um numa faixa sã pra evitar overflow nos cálculos
+/// derivados (`vbr * 2`, `fps * keyframe_sec`) e args absurdos no FFmpeg.
+fn sanitize_preset(mut p: VideoPreset) -> VideoPreset {
+    p.width = p.width.clamp(16, 7680);
+    p.height = p.height.clamp(16, 7680);
+    p.fps = p.fps.clamp(1, 240);
+    p.video_bitrate_kbps = p.video_bitrate_kbps.clamp(100, 100_000);
+    p.audio_bitrate_kbps = p.audio_bitrate_kbps.clamp(32, 512);
+    p.keyframe_sec = p.keyframe_sec.clamp(1, 10);
+    p
+}
+
 /// No híbrido sem override: copia plataformas landscape, recodifica as verticais
 /// (ex.: TikTok/Instagram), que precisam de formato diferente do stream do OBS.
 fn smart_hybrid_action(platform_id: &str) -> &'static str {
@@ -122,11 +135,12 @@ pub fn ffmpeg_args_for_target(
         // Vídeo sem reencode (lossless).
         args.extend(["-map", "0:v", "-c:v", "copy"].map(String::from));
     } else {
-        let p = t
-            .encoding
-            .preset
-            .clone()
-            .unwrap_or_else(|| recommended_preset(&t.platform_id));
+        let p = sanitize_preset(
+            t.encoding
+                .preset
+                .clone()
+                .unwrap_or_else(|| recommended_preset(&t.platform_id)),
+        );
         let codec = ffmpeg_video_codec(&t.encoding.encoder);
         let fps = p.fps.max(1);
         let gop = (fps * p.keyframe_sec.max(1)).to_string();
@@ -136,8 +150,9 @@ pub fn ffmpeg_args_for_target(
         } else {
             format!("scale={}:{}", p.width.max(2), p.height.max(2))
         };
-        // Bitrate efetivo: o auto-bitrate pode estar empurrando um valor menor.
-        let vbr = br_override.unwrap_or(p.video_bitrate_kbps).max(1);
+        // Bitrate efetivo: o auto-bitrate pode estar empurrando um valor menor. O clamp
+        // protege o `vbr * 2` do bufsize (o override parte do preset cru da config).
+        let vbr = br_override.unwrap_or(p.video_bitrate_kbps).clamp(100, 100_000);
 
         args.extend(
             [
@@ -159,8 +174,8 @@ pub fn ffmpeg_args_for_target(
     let audio_kbps = t
         .encoding
         .preset
-        .as_ref()
-        .map(|p| p.audio_bitrate_kbps)
+        .clone()
+        .map(|p| sanitize_preset(p).audio_bitrate_kbps)
         .unwrap_or_else(|| recommended_preset(&t.platform_id).audio_bitrate_kbps);
     args.extend(
         [
@@ -289,11 +304,12 @@ pub fn ffmpeg_args_for_encoder(
 /// + áudio silencioso e empurra pra plataforma — mantém a live de pé quando o sinal cai.
 pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> Vec<String> {
     let url = output_url(t, key);
-    let p = t
-        .encoding
-        .preset
-        .clone()
-        .unwrap_or_else(|| recommended_preset(&t.platform_id));
+    let p = sanitize_preset(
+        t.encoding
+            .preset
+            .clone()
+            .unwrap_or_else(|| recommended_preset(&t.platform_id)),
+    );
     let fps = p.fps.max(1);
     let gop = (fps * 2).to_string(); // keyframe 2s
     let vbitrate = p.video_bitrate_kbps.clamp(1000, 3000); // slate é leve
@@ -490,6 +506,10 @@ pub struct EngineRuntime {
     /// Um FFmpeg por destino (target_id -> processo).
     pub ffmpegs: std::collections::HashMap<String, tauri_plugin_shell::process::CommandChild>,
     pub mediamtx: Option<tauri_plugin_shell::process::CommandChild>,
+    /// Trava de sessão: `true` enquanto UM start_engine está no ar (ou subindo). É reivindicada
+    /// ATOMICAMENTE sob o lock no topo do start (antes de qualquer trabalho lento) e solta por
+    /// kill_engine/erro fatal — impede TOCTOU (dois cliques em BORA subindo dois motores).
+    pub live: bool,
     /// Liga/desliga os supervisores de respawn (reconexão).
     pub running: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub snapshot: Option<EngineSnapshot>,

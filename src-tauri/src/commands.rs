@@ -213,6 +213,19 @@ pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), String> {
 // --------------------------- Motor (relay) ------------------------
 
 fn emit(app: &AppHandle, snap: &EngineSnapshot) {
+    // Barra um snapshot ATRASADO (ex.: amostra de CPU/métrica clonada antes do stop) de
+    // ressuscitar a UI depois que o motor já parou: se o estado autoritativo é "stopped" e
+    // este snapshot não é, ignora. Fecha a corrida "emit fora do lock" (o kill_engine grava
+    // "stopped" sob o lock; qualquer emit posterior relê e desiste).
+    {
+        let state = app.state::<AppState>();
+        let eng = state.engine.lock().unwrap();
+        let authoritative_stopped =
+            eng.snapshot.as_ref().map(|s| s.state == "stopped").unwrap_or(false);
+        if authoritative_stopped && snap.state != "stopped" {
+            return;
+        }
+    }
     let _ = app.emit("engine://status", snap);
     update_tray(app, snap);
 }
@@ -440,17 +453,13 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
 }
 
 
-/// Coloca o motor em estado de erro com uma mensagem.
+/// Erro FATAL do motor: derruba sidecars + supervisores e SOLTA a trava de sessão (pra o
+/// "Tentar de novo" ser aceito), preservando a mensagem no snapshot ("error"). Antes, o motor
+/// só trocava o snapshot pra "error" e deixava `live=true`/supervisores rodando — todo retry
+/// batia em "já está no ar." e o usuário ficava preso até fechar pela bandeja.
 fn set_engine_error(app: &AppHandle, msg: &str) {
     log::error!("motor: {msg}");
-    let state = app.state::<AppState>();
-    let mut eng = state.engine.lock().unwrap();
-    let snap = eng.snapshot.get_or_insert_with(EngineSnapshot::stopped);
-    snap.state = "error".into();
-    snap.message = Some(msg.to_string());
-    let out = snap.clone();
-    drop(eng);
-    emit(app, &out);
+    stop_engine_internal(app, Some(msg.to_string()));
 }
 
 /// Marca um destino específico como "reconectando" (entre tentativas do seu FFmpeg).
@@ -562,23 +571,42 @@ async fn run_slate(
 }
 
 /// Mata sidecars (ffmpeg/mediamtx do Corneta) ÓRFÃOS de sessões que não morreram direito
-/// (app fechado à força, crash). Eles SEGURAM PORTAS — sobretudo a zmq 5555 do protetor e a
-/// 1935 do MediaMTX — e fazem o boot falhar em loop ("a live nunca fica online"). O nome do
-/// binário tem o sufixo do target-triple (único do Corneta), então matar por nome é seguro.
+/// (app fechado à força, crash). Eles SEGURAM PORTAS — sobretudo a 1935 do MediaMTX — e fazem
+/// o boot falhar em loop ("a live nunca fica online").
+///
+/// Filtra pelo CAMINHO do executável (o diretório do corneta.exe), não pelo nome da imagem:
+/// (1) o processo pode se chamar `ffmpeg.exe` OU `ffmpeg-<triple>.exe` dependendo de como o
+/// Tauri empacota o sidecar — matar por `/IM <nome>` errado era um no-op; (2) filtrar pelo
+/// diretório da instalação evita matar um ffmpeg/mediamtx alheio do usuário.
 fn kill_orphan_sidecars() {
-    let triple = tauri::utils::platform::target_triple()
-        .unwrap_or_else(|_| "x86_64-pc-windows-msvc".into());
+    let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+    else {
+        return;
+    };
     #[cfg(windows)]
-    for base in ["ffmpeg", "mediamtx"] {
-        let _ = quiet_command("taskkill")
-            .args(["/F", "/IM", &format!("{base}-{triple}.exe")])
+    {
+        // Casa qualquer processo cujo ExecutablePath comece no nosso diretório e cujo nome
+        // comece com ffmpeg/mediamtx. Aspas simples escapadas ('' ) pro literal do PowerShell.
+        let dir_s = dir.to_string_lossy().replace('\'', "''");
+        let script = format!(
+            "Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -like '{dir_s}\\*' -and ($_.Name -like 'ffmpeg*' -or $_.Name -like 'mediamtx*') }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
+        );
+        let _ = quiet_command("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
             .output();
     }
     #[cfg(not(windows))]
-    for base in ["ffmpeg", "mediamtx"] {
-        let _ = quiet_command("pkill")
-            .args(["-f", &format!("{base}-{triple}")])
-            .output();
+    {
+        // pkill -f pelo caminho <dir>/<base>: casa o sidecar sem casar o próprio corneta.
+        let base_dir = dir.to_string_lossy();
+        let base_dir = base_dir.trim_end_matches('/');
+        for base in ["ffmpeg", "mediamtx"] {
+            let _ = quiet_command("pkill")
+                .args(["-f", &format!("{base_dir}/{base}")])
+                .output();
+        }
     }
 }
 
@@ -609,14 +637,42 @@ async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
     None
 }
 
+/// Guarda RAII da trava de sessão: se o setup do start_engine abortar (erro/`?`/panic) antes de
+/// confirmar, solta a trava e limpa qualquer sidecar parcial. Sem isto, um start meio-feito
+/// (ex.: disco cheio, MediaMTX ausente) deixaria `live=true` e travaria todo BORA futuro com
+/// "já está no ar.".
+struct StartGuard<'a> {
+    app: &'a AppHandle,
+    armed: bool,
+}
+impl Drop for StartGuard<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            kill_engine(self.app);
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
-    if state.engine.lock().unwrap().running.load(Ordering::Relaxed) {
-        return Err("já está no ar.".into());
+    // Trava de sessão ATÔMICA: reivindica a sessão sob UM lock, ANTES de qualquer trabalho lento
+    // (kill_orphan/keyring/spawn). Sem isto, dois cliques em BORA (ou dois disparos do atalho)
+    // passavam ambos pela checagem e subiam dois MediaMTX + dois conjuntos de supervisores no
+    // mesmo mapa (TOCTOU → FFmpeg vazado, publish duplicado, supervisor imortal).
+    {
+        let mut eng = state.engine.lock().unwrap();
+        if eng.live {
+            return Err("já está no ar.".into());
+        }
+        eng.live = true;
     }
+    // Daqui pra frente qualquer saída por erro solta a trava e limpa parciais (Drop). Só o
+    // sucesso desarma a guarda (no fim da função).
+    let mut start_guard = StartGuard { app: &app, armed: true };
+
     kill_orphan_sidecars();
 
     let config = get_config(app.clone());
@@ -713,24 +769,35 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let app_m = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(ev) = mtx_rx.recv().await {
-            if let CommandEvent::Stdout(b) | CommandEvent::Stderr(b) = ev {
-                let raw = String::from_utf8_lossy(&b);
-                let line = raw.to_lowercase();
-                if line.contains("address already in use") {
-                    set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
+            match ev {
+                CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                    let raw = String::from_utf8_lossy(&b);
+                    let line = raw.to_lowercase();
+                    if line.contains("address already in use") {
+                        set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
+                    }
+                    // Diagnóstico: ciclo de vida do publisher (OBS) + quedas. Sem o ruído dos grabs.
+                    if line.contains("publish")
+                        || line.contains("available")
+                        || line.contains("online")
+                        || line.contains("destroyed")
+                        || line.contains("queue")
+                        || line.contains("too slow")
+                        || line.contains("timed out")
+                        || (line.contains("err") && !line.contains("address already"))
+                    {
+                        log::warn!("mediamtx: {}", raw.trim());
+                    }
                 }
-                // Diagnóstico: ciclo de vida do publisher (OBS) + quedas. Sem o ruído dos grabs.
-                if line.contains("publish")
-                    || line.contains("available")
-                    || line.contains("online")
-                    || line.contains("destroyed")
-                    || line.contains("queue")
-                    || line.contains("too slow")
-                    || line.contains("timed out")
-                    || (line.contains("err") && !line.contains("address already"))
-                {
-                    log::warn!("mediamtx: {}", raw.trim());
+                // MediaMTX morreu (yml inválido, permissão, crash) sem a mensagem específica de
+                // porta acima: se o motor ainda se considera no ar, é fatal — senão o snapshot
+                // ficaria preso em "starting"/"aguardando OBS" pra sempre. No-op se já parou
+                // (ex.: fomos nós que matamos o MediaMTX no stop_engine).
+                CommandEvent::Terminated(_) => {
+                    set_engine_error(&app_m, "O servidor de ingestão (MediaMTX) caiu. Tente de novo.");
+                    break;
                 }
+                _ => {}
             }
         }
     });
@@ -867,10 +934,37 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     let st = app_t.state::<AppState>();
                     st.engine.lock().unwrap().ffmpegs.insert(target_id.clone(), child);
                 }
+                // Corrida com o stop: o kill_engine pode ter drenado o mapa ENTRE o topo do laço
+                // e este insert (o FFmpeg recém-spawnado escaparia do kill e transmitiria segundos
+                // após o "Cortar"). Como o kill grava running=false sob o mesmo lock antes de
+                // drenar, aqui já vemos a flag: mata o filho recém-inserido e sai.
+                if !run_flag.load(Ordering::Relaxed) {
+                    let leftover = {
+                        let st = app_t.state::<AppState>();
+                        let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
+                        removed
+                    };
+                    if let Some(c) = leftover {
+                        let pid = c.pid();
+                        let _ = c.kill();
+                        #[cfg(windows)]
+                        {
+                            let _ = quiet_command("taskkill")
+                                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                                .output();
+                        }
+                        #[cfg(not(windows))]
+                        {
+                            let _ = pid;
+                        }
+                    }
+                    break;
+                }
                 let mut low = 0u32;
                 let mut stable = 0u32;
                 let mut rebitrate = false;
                 let mut signal_lost = false;
+                let mut paused_kill = false;
                 // Cão de guarda: tica a cada 250ms. Se o sinal caiu, mata este FFmpeg NA HORA —
                 // senão ele segura a conexão da plataforma faminta (input morto) e a live cai.
                 // O slate "JÁ VOLTO" entra logo em seguida (topo do laço, com !signal).
@@ -926,7 +1020,14 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                             }
                         }
                         _ = watchdog.tick() => {
-                            if !signal.load(Ordering::Relaxed) && !pause_flag.load(Ordering::Relaxed) {
+                            // Pausou no meio: derruba este FFmpeg. Sem isto, se a pausa chegar na
+                            // janela entre o spawn e o insert, o set_target_paused não acha o handle
+                            // (remove→None) e o processo segue transmitindo com o usuário em "pausa".
+                            if pause_flag.load(Ordering::Relaxed) {
+                                paused_kill = true;
+                                break;
+                            }
+                            if !signal.load(Ordering::Relaxed) {
                                 signal_lost = true;
                                 break;
                             }
@@ -939,7 +1040,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
                     removed
                 };
-                if rebitrate || signal_lost {
+                if rebitrate || signal_lost || paused_kill {
                     if let Some(c) = leftover {
                         let pid = c.pid();
                         let _ = c.kill();
@@ -1024,28 +1125,43 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         }
     });
 
+    // Setup completo: confirma a sessão (desarma a limpeza automática do StartGuard).
+    start_guard.armed = false;
     Ok(())
 }
 
+// ASYNC: kill_engine roda `taskkill /T /F` (bloqueante ~50-300ms) por processo. Como comando
+// síncrono, isso congelava a thread do event-loop por até ~1-2s no encerramento (o momento mais
+// sensível). spawn_blocking tira do event-loop; o snapshot "stopped" é emitido no começo do
+// kill_engine, então a UI responde na hora mesmo com o taskkill ainda rolando.
 #[tauri::command]
-pub fn stop_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    kill_engine(&app);
-    let _ = state; // o kill já usa o state via app
-    // Encerra na hora o broadcast automático do YouTube (fora da thread principal; best-effort —
-    // o enableAutoStop também encerraria sozinho ~1min depois).
+pub async fn stop_engine(app: AppHandle) -> Result<(), String> {
     let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || crate::auth::youtube_complete_active(&app2));
+    tauri::async_runtime::spawn_blocking(move || kill_engine(&app2))
+        .await
+        .map_err(|e| e.to_string())?;
+    // Encerra na hora o broadcast automático do YouTube (best-effort — o enableAutoStop também
+    // encerraria sozinho ~1min depois).
+    let app3 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::auth::youtube_complete_active(&app3));
     Ok(())
 }
 
 /// Pausa/retoma UM destino ao vivo (sem derrubar os outros).
+// ASYNC: o taskkill do FFmpeg pausado bloqueia (~50-300ms); síncrono, congelava o event-loop.
+// O estado otimista é emitido ANTES de matar, então a UI responde na hora.
 #[tauri::command]
-pub fn set_target_paused(app: AppHandle, target_id: String, paused: bool) -> Result<(), String> {
+pub async fn set_target_paused(
+    app: AppHandle,
+    target_id: String,
+    paused: bool,
+) -> Result<(), String> {
     use std::sync::atomic::Ordering;
-    let state = app.state::<AppState>();
 
-    // Mata o FFmpeg desse destino FORA do lock (taskkill bloqueia); o supervisor vê a flag e não respawna.
+    // Grava a flag e retira o handle do mapa (o supervisor vê a flag e não respawna). Escopo
+    // fechado: não segura o `State`/lock através do await do spawn_blocking.
     let child = {
+        let state = app.state::<AppState>();
         let mut eng = state.engine.lock().unwrap();
         match eng.paused.get(&target_id) {
             Some(flag) => flag.store(paused, Ordering::Relaxed),
@@ -1058,23 +1174,9 @@ pub fn set_target_paused(app: AppHandle, target_id: String, paused: bool) -> Res
         }
     };
 
-    if let Some(child) = child {
-        let pid = child.pid();
-        let _ = child.kill();
-        #[cfg(windows)]
-        {
-            let _ = quiet_command("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .output();
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = pid;
-        }
-    }
-
-    // Estado otimista (o supervisor confirma na sequência).
+    // Estado otimista imediato (o supervisor confirma na sequência).
     let out = {
+        let state = app.state::<AppState>();
         let mut eng = state.engine.lock().unwrap();
         eng.snapshot.as_mut().map(|snap| {
             if let Some(st) = snap.targets.get_mut(&target_id) {
@@ -1086,6 +1188,26 @@ pub fn set_target_paused(app: AppHandle, target_id: String, paused: bool) -> Res
     };
     if let Some(out) = out {
         emit(&app, &out);
+    }
+
+    // Mata o FFmpeg pausado FORA da thread do event-loop.
+    if let Some(child) = child {
+        tauri::async_runtime::spawn_blocking(move || {
+            let pid = child.pid();
+            let _ = child.kill();
+            #[cfg(windows)]
+            {
+                let _ = quiet_command("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .output();
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = pid;
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -1268,12 +1390,39 @@ fn update_obs_stats(app: &AppHandle, stats: engine::ObsStats) {
 
 /// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado (§14.2).
 pub fn kill_engine(app: &AppHandle) {
+    stop_engine_internal(app, None);
+}
+
+/// Núcleo de encerramento do motor. `error=None` → parada normal (snapshot "stopped");
+/// `error=Some(msg)` → erro fatal (snapshot "error" com a mensagem, mas mesma limpeza).
+/// IDEMPOTENTE: se a sessão já não está no ar, é no-op (o primeiro a encerrar vence — evita que
+/// um erro duplicado clobbere o estado, ou que o taskkill rode duas vezes).
+fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
     use std::sync::atomic::Ordering;
-    log::info!("motor: encerrando");
     let state = app.state::<AppState>();
-    let (children, running, session_path) = {
+    let (children, session_path, out) = {
         let mut eng = state.engine.lock().unwrap();
-        eng.snapshot = Some(EngineSnapshot::stopped());
+        if !eng.live {
+            return;
+        }
+        eng.live = false;
+        log::info!(
+            "motor: encerrando{}",
+            if error.is_some() { " (erro)" } else { "" }
+        );
+        // Sinaliza os supervisores a pararem ANTES de drenar (sob o MESMO lock que eles usam pra
+        // inserir): fecha a janela em que um FFmpeg recém-spawnado escaparia da drenagem.
+        eng.running.store(false, Ordering::Relaxed);
+        let out = match &error {
+            Some(msg) => {
+                let mut s = EngineSnapshot::stopped();
+                s.state = "error".into();
+                s.message = Some(msg.clone());
+                s
+            }
+            None => EngineSnapshot::stopped(),
+        };
+        eng.snapshot = Some(out.clone());
         eng.paused.clear();
         let session_path = eng.session_path.take();
         let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
@@ -1281,10 +1430,10 @@ pub fn kill_engine(app: &AppHandle) {
         if let Some(m) = eng.mediamtx.take() {
             children.push(m);
         }
-        (children, eng.running.clone(), session_path)
+        (children, session_path, out)
     };
-    // Impede os supervisores de respawnar.
-    running.store(false, Ordering::Relaxed);
+    // Emite o estado final JÁ (a UI responde na hora), ANTES do taskkill pesado.
+    emit(app, &out);
 
     for child in children {
         let pid = child.pid();
@@ -1305,7 +1454,6 @@ pub fn kill_engine(app: &AppHandle) {
     if let Some(path) = session_path {
         session::end_session(&path);
     }
-    emit(app, &EngineSnapshot::stopped());
 }
 
 // --------------------- Relatórios (pós-live) ----------------------

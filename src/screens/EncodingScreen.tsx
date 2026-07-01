@@ -1,12 +1,34 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ChevronDown, Cpu, Crosshair, Gauge, Info, Layers, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  Cpu,
+  Crosshair,
+  Gauge,
+  Info,
+  Layers,
+  RotateCcw,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
 import { useStore } from "../lib/store";
 import type { EncoderKind, EncodingMode } from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
-import { estimate, effectiveAction, lowestCommonDenominator } from "../lib/estimates";
+import {
+  estimate,
+  effectiveAction,
+  lowestCommonDenominator,
+} from "../lib/estimates";
 import { cn, fmtBitrate } from "../lib/utils";
-import { Badge, Button, Card, Hint, PlatformGlyph, SectionTitle } from "../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Hint,
+  PlatformGlyph,
+  SectionTitle,
+} from "../components/ui";
 import { Select, type SelectOption } from "../components/Select";
 import { ReframeEditor } from "../components/ReframeEditor";
 
@@ -57,15 +79,14 @@ export function EncodingScreen() {
   if (!config) return null;
 
   const lcd = lowestCommonDenominator(config);
-  const hasCopy = config.targets
-    .filter((t) => t.enabled)
-    .some((t) => effectiveAction(config.mode, t) === "copy");
 
   // Quantas recodificações simultâneas a placa aguenta (heurística dos encoders).
   const maxHw = Math.max(
     0,
     ...encoders
-      .filter((e) => e.available && e.kind !== "software" && e.maxSessions != null)
+      .filter(
+        (e) => e.available && e.kind !== "software" && e.maxSessions != null,
+      )
       .map((e) => e.maxSessions!),
   );
   const activeEst = estimate(config);
@@ -113,14 +134,20 @@ export function EncodingScreen() {
                 <span
                   className={cn(
                     "grid size-7 shrink-0 place-items-center rounded-md",
-                    active ? "bg-brass text-brass-ink" : "bg-surface text-ink-muted",
+                    active
+                      ? "bg-brass text-brass-ink"
+                      : "bg-surface text-ink-muted",
                   )}
                 >
                   <Icon className="size-4" strokeWidth={2.4} />
                 </span>
-                <span className="font-display text-lg font-bold">{m.title}</span>
+                <span className="font-display text-lg font-bold">
+                  {m.title}
+                </span>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-ink-muted">{m.desc}</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                {m.desc}
+              </p>
               <div className="mt-3 space-y-2">
                 <LoadBar load={est.load} />
                 <div className="flex items-center justify-between text-xs">
@@ -133,10 +160,14 @@ export function EncodingScreen() {
                   <div
                     className={cn(
                       "text-[11px] font-bold",
-                      est.uploadKbps / 1000 <= uploadMbps ? "text-ok" : "text-bad",
+                      est.uploadKbps / 1000 <= uploadMbps
+                        ? "text-ok"
+                        : "text-bad",
                     )}
                   >
-                    {est.uploadKbps / 1000 <= uploadMbps ? "cabe na sua banda" : "acima da sua banda"}
+                    {est.uploadKbps / 1000 <= uploadMbps
+                      ? "cabe na sua banda"
+                      : "acima da sua banda"}
                   </div>
                 )}
               </div>
@@ -149,22 +180,28 @@ export function EncodingScreen() {
         <Card className="mt-4 flex gap-3 border-2 border-bad/40 bg-bad/10">
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
           <p className="text-sm text-ink-muted">
-            Este modo pede <strong className="text-ink">{activeEst.transcodeCount} recodificações</strong>{" "}
-            ao mesmo tempo, mas a sua placa deve aguentar umas <strong className="text-ink">{maxHw}</strong>.
-            Pode falhar no meio da live — use o <strong className="text-ink">Esperto</strong> ou tire uma
-            plataforma.
+            Este modo pede{" "}
+            <strong className="text-ink">
+              {activeEst.transcodeCount} recodificações
+            </strong>{" "}
+            ao mesmo tempo, mas a sua placa deve aguentar umas{" "}
+            <strong className="text-ink">{maxHw}</strong>. Pode falhar no meio
+            da live — use o <strong className="text-ink">Esperto</strong> ou
+            tire uma plataforma.
           </p>
         </Card>
       )}
 
-      {hasCopy && lcd.capBy && (
+      {lcd.videoKbps != null && lcd.capBy && (
         <Card className="mt-4 flex gap-3 bg-surface-2">
           <Info className="mt-0.5 size-5 shrink-0 text-brass" />
           <p className="text-sm text-ink-muted">
-            Destinos <strong className="text-ink">em cópia</strong> recebem o vídeo do OBS como saiu — a
-            Corneta não mexe na qualidade deles. Ajuste o OBS em{" "}
-            <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong> pra caber no{" "}
-            <strong className="text-ink">{lcd.capBy}</strong> (a plataforma mais apertada).
+            Destinos <strong className="text-ink">em cópia</strong> recebem o
+            vídeo do OBS como saiu — a Corneta não mexe na qualidade deles.
+            Ajuste o OBS em{" "}
+            <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong>{" "}
+            pra caber no <strong className="text-ink">{lcd.capBy}</strong> (a
+            plataforma mais apertada).
           </p>
         </Card>
       )}
@@ -174,7 +211,9 @@ export function EncodingScreen() {
           <Cpu className="size-4" /> O que recodifica nesta máquina
         </h3>
         {encoders.length === 0 ? (
-          <Card className="bg-surface-2 text-sm text-ink-muted">Vendo o que esta máquina tem…</Card>
+          <Card className="bg-surface-2 text-sm text-ink-muted">
+            Vendo o que esta máquina tem…
+          </Card>
         ) : (
           <>
             <div className="flex flex-wrap gap-2">
@@ -183,17 +222,22 @@ export function EncodingScreen() {
                   key={e.kind}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-bold",
-                    e.available ? "bg-ok/15 text-ok" : "bg-surface-2 text-ink-faint line-through",
+                    e.available
+                      ? "bg-ok/15 text-ok"
+                      : "bg-surface-2 text-ink-faint line-through",
                   )}
                 >
                   {e.label}
-                  {e.available && e.maxSessions ? ` · até ${e.maxSessions} ao mesmo tempo` : ""}
+                  {e.available && e.maxSessions
+                    ? ` · até ${e.maxSessions} ao mesmo tempo`
+                    : ""}
                 </span>
               ))}
             </div>
             {!anyHw && (
               <p className="mt-2 text-xs text-ink-faint">
-                Sem placa de vídeo compatível por aqui — vai de CPU (x264). Funciona, só pesa mais.
+                Sem placa de vídeo compatível por aqui — vai de CPU (x264).
+                Funciona, só pesa mais.
               </p>
             )}
           </>
@@ -208,24 +252,32 @@ export function EncodingScreen() {
             className="mb-2 flex w-full items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint transition-colors hover:text-ink-muted"
           >
             <Gauge className="size-4" /> Ajuste fino por plataforma
-            <span className="font-medium normal-case tracking-normal text-ink-faint/70">(avançado)</span>
-            <ChevronDown className={cn("ml-auto size-4 transition-transform", showAdvanced && "rotate-180")} />
+            <span className="font-medium normal-case tracking-normal text-ink-faint/70">
+              (avançado)
+            </span>
+            <ChevronDown
+              className={cn(
+                "ml-auto size-4 transition-transform",
+                showAdvanced && "rotate-180",
+              )}
+            />
           </button>
           {showAdvanced &&
             (config.targets.some((t) => t.enabled) ? (
-            <div className="flex flex-col gap-2">
-              {config.targets
-                .filter((t) => t.enabled)
-                .map((t) => (
-                  <PerTargetRow key={t.id} targetId={t.id} />
-                ))}
-            </div>
-          ) : (
-            <Card className="bg-surface-2 text-sm text-ink-muted">
-              Nenhuma plataforma ativa. Ative uma em <strong className="text-ink">Plataformas</strong> pra
-              ajustar a qualidade dela.
-            </Card>
-          ))}
+              <div className="flex flex-col gap-2">
+                {config.targets
+                  .filter((t) => t.enabled)
+                  .map((t) => (
+                    <PerTargetRow key={t.id} targetId={t.id} />
+                  ))}
+              </div>
+            ) : (
+              <Card className="bg-surface-2 text-sm text-ink-muted">
+                Nenhuma plataforma ativa. Ative uma em{" "}
+                <strong className="text-ink">Plataformas</strong> pra ajustar a
+                qualidade dela.
+              </Card>
+            ))}
         </div>
       )}
     </div>
@@ -235,7 +287,8 @@ export function EncodingScreen() {
 /** Mini-fluxo do modo: a fonte do OBS (latão) → 3 plataformas, com um chip TOMATE
  *  onde a Corneta recodifica. 0 chips = cópia · 1 = esperto · 1 por plataforma = caprichado. */
 function ModeFlow({ mode }: { mode: EncodingMode }) {
-  const chips = mode === "per-platform" ? [14, 32, 50] : mode === "hybrid" ? [32] : [];
+  const chips =
+    mode === "per-platform" ? [14, 32, 50] : mode === "hybrid" ? [32] : [];
   return (
     <svg viewBox="0 0 200 64" className="h-full w-full" aria-hidden>
       <g
@@ -257,7 +310,12 @@ function ModeFlow({ mode }: { mode: EncodingMode }) {
         <circle cx="176" cy="32" r="5" />
         <circle cx="176" cy="50" r="5" />
       </g>
-      <g className="text-tomate" fill="currentColor" stroke="var(--color-brass-ink)" strokeWidth="1.5">
+      <g
+        className="text-tomate"
+        fill="currentColor"
+        stroke="var(--color-brass-ink)"
+        strokeWidth="1.5"
+      >
         {chips.map((y) => (
           <rect key={y} x="101" y={y - 7} width="14" height="14" rx="3" />
         ))}
@@ -269,7 +327,14 @@ function ModeFlow({ mode }: { mode: EncodingMode }) {
 function LoadBar({ load }: { load: number }) {
   const pct = Math.round(load * 100);
   const tone = load > 0.66 ? "bg-bad" : load > 0.33 ? "bg-warn" : "bg-ok";
-  const word = load >= 0.95 ? "no limite" : load > 0.66 ? "pega pesado" : load > 0.33 ? "esquenta" : "tranquilo";
+  const word =
+    load >= 0.95
+      ? "no limite"
+      : load > 0.66
+        ? "pega pesado"
+        : load > 0.33
+          ? "esquenta"
+          : "tranquilo";
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
@@ -302,7 +367,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const [reframing, setReframing] = useState(false);
 
   const recBr = preset.recommended.videoBitrateKbps;
-  const brInvalid = !(p.videoBitrateKbps >= MIN_BR && p.videoBitrateKbps <= MAX_BR);
+  const brInvalid = !(
+    p.videoBitrateKbps >= MIN_BR && p.videoBitrateKbps <= MAX_BR
+  );
 
   const patchPreset = (patch: Partial<typeof p>) =>
     updateTarget(t.id, { encoding: { ...enc, preset: { ...p, ...patch } } });
@@ -314,7 +381,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
 
   const encoderOptions: SelectOption<EncoderKind>[] = [
     { value: "auto", label: "Automático" },
-    ...encoders.filter((x) => x.available).map((x) => ({ value: x.kind, label: x.label })),
+    ...encoders
+      .filter((x) => x.available)
+      .map((x) => ({ value: x.kind, label: x.label })),
   ];
 
   return (
@@ -342,7 +411,10 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   checked={action === "transcode"}
                   onChange={(e) =>
                     updateTarget(t.id, {
-                      encoding: { ...enc, hybridOverride: e.target.checked ? "transcode" : "copy" },
+                      encoding: {
+                        ...enc,
+                        hybridOverride: e.target.checked ? "transcode" : "copy",
+                      },
                     })
                   }
                 />
@@ -352,7 +424,11 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 <Badge tone="neutral">auto</Badge>
               ) : (
                 <button
-                  onClick={() => updateTarget(t.id, { encoding: { ...enc, hybridOverride: undefined } })}
+                  onClick={() =>
+                    updateTarget(t.id, {
+                      encoding: { ...enc, hybridOverride: undefined },
+                    })
+                  }
                   className="text-[11px] font-semibold text-brass hover:underline"
                 >
                   voltar ao auto
@@ -380,13 +456,16 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   type="number"
                   step={500}
                   value={p.videoBitrateKbps}
-                  onChange={(e) => patchPreset({ videoBitrateKbps: Number(e.target.value) })}
+                  onChange={(e) =>
+                    patchPreset({ videoBitrateKbps: Number(e.target.value) })
+                  }
                   onBlur={(e) => {
                     const v = Number(e.target.value);
                     const clamped = Number.isFinite(v)
                       ? Math.min(MAX_BR, Math.max(MIN_BR, Math.round(v)))
                       : recBr;
-                    if (clamped !== p.videoBitrateKbps) patchPreset({ videoBitrateKbps: clamped });
+                    if (clamped !== p.videoBitrateKbps)
+                      patchPreset({ videoBitrateKbps: clamped });
                   }}
                   aria-invalid={brInvalid || undefined}
                   className={cn(
@@ -395,7 +474,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   )}
                 />
                 {brInvalid && (
-                  <span className="font-medium text-bad">entre {MIN_BR} e {MAX_BR}</span>
+                  <span className="font-medium text-bad">
+                    entre {MIN_BR} e {MAX_BR}
+                  </span>
                 )}
               </label>
               <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
@@ -408,14 +489,23 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   aria-label={`Encoder de ${t.name}`}
                   value={enc.encoder}
                   options={encoderOptions}
-                  onChange={(v) => updateTarget(t.id, { encoding: { ...enc, encoder: v } })}
+                  onChange={(v) =>
+                    updateTarget(t.id, { encoding: { ...enc, encoder: v } })
+                  }
                 />
                 {enc.encoder === "auto" && autoResolved && (
-                  <span className="font-normal text-ink-faint">usa {autoResolved}</span>
+                  <span className="font-normal text-ink-faint">
+                    usa {autoResolved}
+                  </span>
                 )}
               </label>
               {isVertical && (
-                <Button variant="outline" size="sm" className="h-9" onClick={() => setReframing(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => setReframing(true)}
+                >
                   <Crosshair className="size-3.5 text-brass" /> Enquadrar 9:16
                 </Button>
               )}
@@ -424,7 +514,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 size="sm"
                 className="h-9"
                 onClick={() =>
-                  updateTarget(t.id, { encoding: { ...enc, preset: { ...preset.recommended } } })
+                  updateTarget(t.id, {
+                    encoding: { ...enc, preset: { ...preset.recommended } },
+                  })
                 }
               >
                 <RotateCcw className="size-3.5" /> Recomendado
@@ -438,7 +530,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
         </div>
       </Card>
       <AnimatePresence>
-        {reframing && <ReframeEditor target={t} onClose={() => setReframing(false)} />}
+        {reframing && (
+          <ReframeEditor target={t} onClose={() => setReframing(false)} />
+        )}
       </AnimatePresence>
     </>
   );

@@ -22,7 +22,17 @@ import { obsIngestUrl } from "../lib/factory";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import type { ObsCheck } from "../lib/types";
-import { Badge, Button, Card, CopyField, EmptyState, ExperimentalBadge, Input, SectionTitle, Toggle } from "../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CopyField,
+  EmptyState,
+  ExperimentalBadge,
+  Input,
+  SectionTitle,
+  Toggle,
+} from "../components/ui";
 
 type SettingsTab = "obs" | "seguranca" | "geral";
 const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
@@ -36,12 +46,17 @@ export function SettingsScreen() {
   const setIngest = useStore((s) => s.setIngest);
   const setSettings = useStore((s) => s.setSettings);
   const load = useStore((s) => s.load);
-  const live = useStore((s) => s.snapshot.state === "live" || s.snapshot.state === "starting");
+  const live = useStore(
+    (s) => s.snapshot.state === "live" || s.snapshot.state === "starting",
+  );
   const requestedTab = useStore((s) => s.settingsTab);
   const setSettingsTab = useStore((s) => s.setSettingsTab);
 
   const [confirmImport, setConfirmImport] = useState(false);
-  const [tab, setTab] = useState<SettingsTab>(() => (requestedTab as SettingsTab) || "geral");
+  const [tab, setTab] = useState<SettingsTab>(
+    () => (requestedTab as SettingsTab) || "geral",
+  );
+  const [portDraft, setPortDraft] = useState<string | null>(null);
 
   // Deep-link do "Ajustar" (Ao vivo) → abre direto na aba certa, e consome o pedido.
   useEffect(() => {
@@ -59,7 +74,13 @@ export function SettingsScreen() {
     );
   }
   const { ingest, settings } = config;
-  const portInvalid = !Number.isInteger(ingest.port) || ingest.port < 1 || ingest.port > 65535;
+  const portShown = portDraft ?? String(ingest.port);
+  const portNum = Number(portShown);
+  const portInvalid =
+    portShown.trim() === "" ||
+    !Number.isInteger(portNum) ||
+    portNum < 1 ||
+    portNum > 65535;
 
   const onExport = async () => {
     try {
@@ -118,47 +139,76 @@ export function SettingsScreen() {
         <RTabs.Content value="obs">
           <Card className="mb-4">
             <h3 className="flex items-center gap-2 text-lg">
-              <Server className="size-5 text-brass" /> Endpoint de ingestão (OBS)
+              <Server className="size-5 text-brass" /> Endpoint de ingestão
+              (OBS)
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
-              Endereço local onde o OBS te entrega o vídeo. Mudou aqui, muda no OBS também. A
-              <strong className="text-ink-muted"> chave</strong> abaixo é local (OBS ↔ Corneta) — não
-              confunda com as chaves das plataformas, que ficam no cofre.
+              Endereço local onde o OBS te entrega o vídeo. Mudou aqui, muda no
+              OBS também. A<strong className="text-ink-muted"> chave</strong>{" "}
+              abaixo é local (OBS ↔ Corneta) — não confunda com as chaves das
+              plataformas, que ficam no cofre.
             </p>
 
             {live && (
               <div className="mb-3 flex items-center gap-2 rounded-md bg-warn/15 px-3 py-2 text-xs font-semibold text-warn">
                 <AlertTriangle className="size-4 shrink-0" />
-                Você está no ar — travei a edição do endpoint pra não derrubar o OBS no meio da live.
+                Você está no ar — travei a edição do endpoint pra não derrubar o
+                OBS no meio da live.
               </div>
             )}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Host">
-                <Input value={ingest.host} disabled={live} onChange={(e) => setIngest({ host: e.target.value })} />
+                <Input
+                  value={ingest.host}
+                  disabled={live}
+                  onChange={(e) => setIngest({ host: e.target.value })}
+                />
               </Field>
               <Field label="Porta">
                 <Input
                   type="number"
-                  value={ingest.port}
+                  value={portShown}
                   disabled={live}
                   invalid={portInvalid}
-                  onChange={(e) => setIngest({ port: Number(e.target.value) || 0 })}
+                  onChange={(e) => setPortDraft(e.target.value)}
+                  onBlur={(e) => {
+                    // No blur (como no EncodingScreen): clampa pra 1–65535; vazio/inválido volta pro valor da config.
+                    const v = Number(e.target.value);
+                    const port =
+                      e.target.value.trim() !== "" && Number.isFinite(v)
+                        ? Math.min(65535, Math.max(1, Math.round(v)))
+                        : ingest.port;
+                    if (port !== ingest.port) setIngest({ port });
+                    setPortDraft(null);
+                  }}
                 />
                 {portInvalid && (
-                  <span className="text-[11px] font-medium text-bad">A porta vai de 1 a 65535.</span>
+                  <span className="text-[11px] font-medium text-bad">
+                    A porta vai de 1 a 65535.
+                  </span>
                 )}
               </Field>
               <Field label="Aplicação (app)">
-                <Input value={ingest.app} disabled={live} onChange={(e) => setIngest({ app: e.target.value })} />
+                <Input
+                  value={ingest.app}
+                  disabled={live}
+                  onChange={(e) => setIngest({ app: e.target.value })}
+                />
               </Field>
               <Field label="Chave local">
-                <Input value={ingest.key} disabled={live} onChange={(e) => setIngest({ key: e.target.value })} />
+                <Input
+                  value={ingest.key}
+                  disabled={live}
+                  onChange={(e) => setIngest({ key: e.target.value })}
+                />
               </Field>
             </div>
 
             <div className="mt-4 rounded-md bg-surface-2 p-3">
-              <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">Cole no OBS</span>
+              <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                Cole no OBS
+              </span>
               <div className="mt-2 grid gap-2">
                 <CopyField label="Servidor" value={obsIngestUrl(ingest)} />
                 <CopyField label="Chave" value={ingest.key} mono />
@@ -171,19 +221,28 @@ export function SettingsScreen() {
               <Plug className="size-5 text-brass" /> OBS — auto-config
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
-              Pro botão <strong className="text-ink-muted">“Configura pra mim”</strong> (na tela Ao
-              vivo) funcionar, ative no OBS: <strong className="text-ink-muted">Ferramentas →
-              Configurações do Servidor WebSocket</strong>. Se tiver senha, cole aqui.
+              Pro botão{" "}
+              <strong className="text-ink-muted">“Configura pra mim”</strong>{" "}
+              (na tela Ao vivo) funcionar, ative no OBS:{" "}
+              <strong className="text-ink-muted">
+                Ferramentas → Configurações do Servidor WebSocket
+              </strong>
+              . Se tiver senha, cole aqui.
             </p>
             <div className="divide-y divide-border-soft">
-              <SettingRow title="Senha do obs-websocket" desc="Deixe vazio se o OBS não pedir senha.">
+              <SettingRow
+                title="Senha do obs-websocket"
+                desc="Deixe vazio se o OBS não pedir senha."
+              >
                 <div className="flex flex-col items-end gap-2">
                   <Input
                     type="password"
                     placeholder="(opcional)"
                     className="w-48"
                     value={settings.obsPassword}
-                    onChange={(e) => setSettings({ obsPassword: e.target.value })}
+                    onChange={(e) =>
+                      setSettings({ obsPassword: e.target.value })
+                    }
                   />
                   <ObsTestButton />
                 </div>
@@ -210,8 +269,8 @@ export function SettingsScreen() {
             </h3>
             <p className="mb-2 text-xs text-ink-faint">
               As redes que seguram a sua live quando algo dá errado. O escudo{" "}
-              <strong className="text-brass">acende</strong> quando a proteção está armada — igual na
-              tela Ao vivo.
+              <strong className="text-brass">acende</strong> quando a proteção
+              está armada — igual na tela Ao vivo.
             </p>
             <div className="divide-y divide-border-soft">
               <SecurityFeature
@@ -263,14 +322,33 @@ export function SettingsScreen() {
               <Keyboard className="size-5 text-brass" /> Atalho global
             </h3>
             <p className="mb-3 text-xs text-ink-faint">
-              Começa/para a transmissão de qualquer lugar — mesmo com a Corneta minimizada na bandeja.
+              Começa/para a transmissão de qualquer lugar — mesmo com a Corneta
+              minimizada na bandeja.
             </p>
             <div className="flex items-center gap-2">
               <ShortcutCapture
                 value={settings.liveShortcut}
-                onChange={(v) => {
+                onChange={async (v) => {
+                  const prev = settings.liveShortcut;
                   setSettings({ liveShortcut: v });
-                  void api.registerShortcut(v);
+                  try {
+                    await api.registerShortcut(v);
+                  } catch {
+                    // O backend desregistra o antigo antes de registrar — se o novo falhou
+                    // (em uso por outro programa), reverte e re-registra o anterior.
+                    toast.error(
+                      "Esse atalho já está em uso por outro programa — mantive o anterior.",
+                    );
+                    setSettings({ liveShortcut: prev });
+                    try {
+                      await api.registerShortcut(prev);
+                    } catch {
+                      setSettings({ liveShortcut: "" });
+                      toast.error(
+                        "Não consegui restaurar o atalho anterior — defina um novo.",
+                      );
+                    }
+                  }
                 }}
               />
               {settings.liveShortcut && (
@@ -321,7 +399,10 @@ export function SettingsScreen() {
               <Palette className="size-5 text-brass" /> Aparência
             </h3>
             <div className="divide-y divide-border-soft">
-              <SettingRow title="Tema claro" desc="Troca a interface pro modo claro (papel).">
+              <SettingRow
+                title="Tema claro"
+                desc="Troca a interface pro modo claro (papel)."
+              >
                 <Toggle
                   checked={settings.theme === "light"}
                   onChange={(v) => setSettings({ theme: v ? "light" : "dark" })}
@@ -344,8 +425,13 @@ export function SettingsScreen() {
                   <Button variant="subtle" size="sm" onClick={onExport}>
                     <Download className="size-4" /> Exportar
                   </Button>
-                  <Button variant={confirmImport ? "primary" : "subtle"} size="sm" onClick={onImport}>
-                    <Upload className="size-4" /> {confirmImport ? "Substituir?" : "Importar"}
+                  <Button
+                    variant={confirmImport ? "primary" : "subtle"}
+                    size="sm"
+                    onClick={onImport}
+                  >
+                    <Upload className="size-4" />{" "}
+                    {confirmImport ? "Substituir?" : "Importar"}
                   </Button>
                 </div>
               </SettingRow>
@@ -353,7 +439,11 @@ export function SettingsScreen() {
                 title="Logs"
                 desc="Abre a pasta de logs — útil pra diagnosticar ou mandar pro suporte."
               >
-                <Button variant="subtle" size="sm" onClick={() => void api.openLogsDir()}>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => void api.openLogsDir()}
+                >
                   <FileText className="size-4" /> Abrir logs
                 </Button>
               </SettingRow>
@@ -373,7 +463,14 @@ function ObsTestButton() {
     try {
       setObs(await api.obsCheck());
     } catch (e) {
-      setObs({ reachable: false, pointingAtCorneta: false, width: 0, height: 0, fps: 0, error: String(e) });
+      setObs({
+        reachable: false,
+        pointingAtCorneta: false,
+        width: 0,
+        height: 0,
+        fps: 0,
+        error: String(e),
+      });
     }
   };
   return (
@@ -385,11 +482,21 @@ function ObsTestButton() {
             obs.reachable ? "text-ok" : "text-bad",
           )}
         >
-          {obs.reachable ? <Check className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+          {obs.reachable ? (
+            <Check className="size-3.5" />
+          ) : (
+            <AlertTriangle className="size-3.5" />
+          )}
           {obs.reachable ? "Conectado" : "Não achei o OBS"}
         </span>
       )}
-      <Button variant="subtle" size="sm" onClick={run} loading={obs === "loading"} disabled={obs === "loading"}>
+      <Button
+        variant="subtle"
+        size="sm"
+        onClick={run}
+        loading={obs === "loading"}
+        disabled={obs === "loading"}
+      >
         {obs !== "loading" && <Plug className="size-4" />}
         Testar conexão
       </Button>
@@ -401,28 +508,31 @@ function ObsTestButton() {
 function GuardianEditor() {
   const settings = useStore((s) => s.config!.settings);
   const setSettings = useStore((s) => s.setSettings);
-  const watchCount = settings.guardianWatchlist.filter((t) => t.trim().length >= 3).length;
+  const watchCount = settings.guardianWatchlist.filter(
+    (t) => t.trim().length >= 3,
+  ).length;
 
   return (
     <div className="flex flex-col gap-3 py-3.5">
       <div className="rounded-md border-2 border-brass/40 bg-brass/[0.06] p-3 text-xs leading-relaxed text-ink-muted">
-        <div className="mb-1 font-display text-sm font-extrabold text-ink">🛡️ O preço da proteção</div>
+        <div className="mb-1 font-display text-sm font-extrabold text-ink">
+          🛡️ O preço da proteção
+        </div>
         Quando um termo da sua lista aparece, a Corneta troca pra tela{" "}
-        <strong className="text-ink">“JÁ VOLTO”</strong> antes daquele instante ir ao ar — nunca exposto,
-        nem num clipe. Pra garantir isso:
+        <strong className="text-ink">“JÁ VOLTO”</strong> antes daquele instante
+        ir ao ar — nunca exposto, nem num clipe. Pra garantir isso:
         <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
           <li>
-            A transmissão fica <strong className="text-ink">12s atrás</strong> do tempo real (fixo — é o
-            mínimo pra dar conta até de tela cheia de texto).
+            A transmissão fica <strong className="text-ink">12s atrás</strong>{" "}
+            do tempo real (fixo — é o mínimo pra dar conta até de tela cheia de
+            texto).
           </li>
           <li>O chat e a interação chegam até você com esse mesmo atraso.</li>
           <li>
-            Só vigia os termos que você listar — <strong className="text-ink">não</strong> “qualquer
-            segredo”.
+            Só vigia os termos que você listar —{" "}
+            <strong className="text-ink">não</strong> “qualquer segredo”.
           </li>
-          <li>
-            Texto miúdo ou OCR errando feio ainda pode escapar.
-          </li>
+          <li>Texto miúdo ou OCR errando feio ainda pode escapar.</li>
         </ul>
       </div>
       <label className="flex flex-col gap-1">
@@ -434,11 +544,17 @@ function GuardianEditor() {
         </span>
         <textarea
           value={settings.guardianWatchlist.join("\n")}
-          onChange={(e) => setSettings({ guardianWatchlist: e.target.value.split("\n") })}
+          onChange={(e) =>
+            setSettings({ guardianWatchlist: e.target.value.split("\n") })
+          }
           onBlur={() =>
             setSettings({
               guardianWatchlist: Array.from(
-                new Set(settings.guardianWatchlist.map((t) => t.trim()).filter(Boolean)),
+                new Set(
+                  settings.guardianWatchlist
+                    .map((t) => t.trim())
+                    .filter(Boolean),
+                ),
               ),
             })
           }
@@ -448,7 +564,8 @@ function GuardianEditor() {
         />
         {watchCount === 0 ? (
           <span className="text-xs font-semibold text-brass">
-            Sem termos (3+ letras), o guardião não faz nada — adicione ao menos um.
+            Sem termos (3+ letras), o guardião não faz nada — adicione ao menos
+            um.
           </span>
         ) : (
           <span className="text-xs font-semibold text-ok">
@@ -461,7 +578,13 @@ function GuardianEditor() {
 }
 
 /** Captura um atalho global: clica e pressiona a combinação (exige um modificador). */
-function ShortcutCapture({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ShortcutCapture({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   const [capturing, setCapturing] = useState(false);
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -486,7 +609,9 @@ function ShortcutCapture({ value, onChange }: { value: string; onChange: (v: str
       onKeyDown={onKey}
       className={cn(
         "rounded-md border-2 px-3 py-2 font-mono text-sm transition-colors",
-        capturing ? "border-brass text-brass" : "border-border text-ink hover:border-brass/60",
+        capturing
+          ? "border-brass text-brass"
+          : "border-border text-ink hover:border-brass/60",
       )}
     >
       {capturing ? "pressione as teclas…" : value || "definir atalho"}
@@ -526,7 +651,11 @@ function BrbPreview() {
 function BitratePreview() {
   return (
     <div className="absolute inset-0 bg-surface-2">
-      <svg viewBox="0 0 128 72" preserveAspectRatio="none" className="h-full w-full">
+      <svg
+        viewBox="0 0 128 72"
+        preserveAspectRatio="none"
+        className="h-full w-full"
+      >
         <path
           d="M2 16 H44 L64 40 H84 L126 16"
           fill="none"
@@ -535,7 +664,11 @@ function BitratePreview() {
           strokeDasharray="4 3"
           className="text-bad/70"
         />
-        <path d="M2 26 H44 L64 50 H84 L126 26 V72 H2 Z" fill="currentColor" className="text-brass/20" />
+        <path
+          d="M2 26 H44 L64 50 H84 L126 26 V72 H2 Z"
+          fill="currentColor"
+          className="text-brass/20"
+        />
         <path
           d="M2 26 H44 L64 50 H84 L126 26"
           fill="none"
@@ -559,7 +692,10 @@ function GuardianPreview() {
         <div className="h-3 flex-1 rounded-sm bg-night" />
       </div>
       <div className="h-1.5 w-3/5 rounded-full bg-ink-faint/40" />
-      <ScanEye className="absolute right-1.5 top-1.5 size-3.5 text-brass" strokeWidth={2.4} />
+      <ScanEye
+        className="absolute right-1.5 top-1.5 size-3.5 text-brass"
+        strokeWidth={2.4}
+      />
     </div>
   );
 }
@@ -586,7 +722,9 @@ function SecurityFeature({
       <div
         className={cn(
           "relative aspect-video w-32 shrink-0 overflow-hidden rounded-md transition-all",
-          on ? "pop-brass ring-2 ring-brass" : "opacity-60 grayscale ring-1 ring-border",
+          on
+            ? "pop-brass ring-2 ring-brass"
+            : "opacity-60 grayscale ring-1 ring-border",
         )}
       >
         {preview}

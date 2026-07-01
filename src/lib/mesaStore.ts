@@ -85,6 +85,17 @@ export const useMesa = create<MesaState>((set, get) => {
   const isLoopback = (host: string) =>
     host === "localhost" || host.startsWith("127.");
 
+  // Desliga câmera+mic locais (para as tracks → LED apaga e o dispositivo é liberado).
+  // Usado no leave() e em TODO caminho de erro de host()/join() após openLocal() ter
+  // dado certo — senão a stream ficaria viva sem nenhum caminho na UI pra desligar
+  // (leave() só é alcançável com a Mesa ativa).
+  const closeLocal = () => {
+    if (!localStream) return;
+    localStream.getTracks().forEach((t) => t.stop());
+    localStream = null;
+    set({ localStream: null });
+  };
+
   return {
     active: false,
     mode: null,
@@ -190,6 +201,7 @@ export const useMesa = create<MesaState>((set, get) => {
       } catch (e) {
         toast.error("Não consegui subir o servidor da Mesa.");
         set({ camError: String(e) });
+        closeLocal();
         return;
       }
       // Sem IP de LAN, o convite sairia como loopback (inalcançável pelos convidados).
@@ -200,6 +212,7 @@ export const useMesa = create<MesaState>((set, get) => {
         } catch {
           /* ignore */
         }
+        closeLocal();
         return;
       }
       const room = newRoomKey();
@@ -242,6 +255,7 @@ export const useMesa = create<MesaState>((set, get) => {
       } catch (e) {
         toast.error("Não consegui subir o servidor da Mesa.");
         set({ camError: String(e) });
+        closeLocal();
         return;
       }
       const signalUrl = `ws://${inv.addr}/ws`;
@@ -260,10 +274,7 @@ export const useMesa = create<MesaState>((set, get) => {
     async leave() {
       client?.stop();
       client = null;
-      if (localStream) {
-        localStream.getTracks().forEach((t) => t.stop());
-        localStream = null;
-      }
+      closeLocal();
       if (IS_TAURI) {
         try {
           await api.mesaObsRemoveSource();

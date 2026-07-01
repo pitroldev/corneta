@@ -13,7 +13,7 @@ function fromRadixPopper(target: EventTarget | null): boolean {
  * Modal on-brand via Radix Dialog: overlay, foco preso, Esc, trava de scroll e
  * portal — a11y de graça. O visual (bloco sólido, sombra dura) continua nosso.
  * `title` vira o nome acessível (Dialog.Title sr-only); o título visível segue
- * dentro de `children`. `lockOutside` bloqueia o fechar-clicando-fora.
+ * dentro de `children`. `lockOutside` bloqueia o fechar-clicando-fora e o Esc.
  */
 export function Modal({
   title,
@@ -40,10 +40,15 @@ export function Modal({
         <Dialog.Content
           aria-describedby={undefined}
           onPointerDownOutside={(e) => {
-            if (fromRadixPopper(e.detail.originalEvent.target) || lockOutside) e.preventDefault();
+            if (fromRadixPopper(e.detail.originalEvent.target) || lockOutside)
+              e.preventDefault();
           }}
           onInteractOutside={(e) => {
-            if (fromRadixPopper(e.detail.originalEvent.target) || lockOutside) e.preventDefault();
+            if (fromRadixPopper(e.detail.originalEvent.target) || lockOutside)
+              e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (lockOutside) e.preventDefault();
           }}
           className={cn(
             "fixed left-1/2 top-1/2 z-[90] max-h-[90vh] w-[calc(100%-3rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto outline-none",

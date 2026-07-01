@@ -40,19 +40,38 @@ import {
   type ReportEvent,
 } from "../lib/report";
 import { LineChart, type ChartMarker } from "../components/LineChart";
-import { Button, Card, EmptyState, PlatformGlyph, SectionTitle } from "../components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  PlatformGlyph,
+  SectionTitle,
+} from "../components/ui";
 import { Modal } from "../components/Modal";
-import { drawRecap, recapToBlob, RECAP_SIZE, type RecapData, type RecapStat } from "../lib/recap";
+import {
+  drawRecap,
+  recapToBlob,
+  RECAP_SIZE,
+  type RecapData,
+  type RecapStat,
+} from "../lib/recap";
 
 function fmtDur(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
+  const total = Math.round(sec / 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}min`;
 }
 const fmtDate = (ms: number) =>
-  new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  new Date(ms).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
 const fmtTime = (ms: number) =>
-  new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  new Date(ms).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 export function ReportsScreen() {
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
@@ -85,7 +104,11 @@ export function ReportsScreen() {
         title="Relatórios"
         subtitle="O retrato de cada live: o que travou e o que prendeu a galera."
         right={
-          <Button variant="subtle" size="sm" onClick={() => void api.openSessionsDir()}>
+          <Button
+            variant="subtle"
+            size="sm"
+            onClick={() => void api.openSessionsDir()}
+          >
             <FolderOpen className="size-4" /> Abrir pasta
           </Button>
         }
@@ -94,12 +117,16 @@ export function ReportsScreen() {
       {sessions === null ? (
         <div className="flex flex-col gap-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-surface-2" />
+            <div
+              key={i}
+              className="h-16 animate-pulse rounded-lg bg-surface-2"
+            />
           ))}
         </div>
       ) : sessions.length === 0 ? (
         <EmptyState title="Nenhuma live ainda">
-          Toda vez que você for ao ar eu anoto tudo, e monto o relatório aqui quando a live encerra.
+          Toda vez que você for ao ar eu anoto tudo, e monto o relatório aqui
+          quando a live encerra.
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
@@ -112,18 +139,30 @@ export function ReportsScreen() {
   );
 }
 
-function SessionRow({ meta, onOpen }: { meta: SessionMeta; onOpen: () => void }) {
+function SessionRow({
+  meta,
+  onOpen,
+}: {
+  meta: SessionMeta;
+  onOpen: () => void;
+}) {
   return (
     <button
       onClick={onOpen}
       className="group flex items-center gap-4 rounded-lg border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-brass"
     >
       <div className="flex w-20 shrink-0 flex-col">
-        <span className="font-display text-lg font-extrabold leading-none">{fmtDate(meta.startedAt)}</span>
-        <span className="text-[11px] font-semibold text-ink-faint">{fmtTime(meta.startedAt)}</span>
+        <span className="font-display text-lg font-extrabold leading-none">
+          {fmtDate(meta.startedAt)}
+        </span>
+        <span className="text-[11px] font-semibold text-ink-faint">
+          {fmtTime(meta.startedAt)}
+        </span>
       </div>
       <div className="flex flex-1 flex-col gap-1">
-        <span className="text-sm font-bold">{fmtDur(meta.durationSec)} no ar</span>
+        <span className="text-sm font-bold">
+          {fmtDur(meta.durationSec)} no ar
+        </span>
         <div className="flex items-center gap-1.5">
           {meta.platforms.map((p) => (
             <PlatformGlyph key={p.id} id={p.platformId} size={18} />
@@ -142,26 +181,52 @@ function SessionRow({ meta, onOpen }: { meta: SessionMeta; onOpen: () => void })
 function buildRecap(data: SessionData, a: ReportAnalysis): RecapData {
   const platforms = data.meta.platforms.map((p) => ({
     name: p.name,
-    color: PLATFORMS[p.platformId as keyof typeof PLATFORMS]?.color ?? "#ffb323",
+    color:
+      PLATFORMS[p.platformId as keyof typeof PLATFORMS]?.color ?? "#ffb323",
   }));
   const follows = a.alerts.byKind.follow ?? 0;
   const big: RecapStat[] = [];
-  if (a.viewers.hasData) big.push({ label: "pico de audiência", value: a.viewers.peak.toLocaleString("pt-BR") });
-  if (a.chat.hasData) big.push({ label: "mensagens", value: a.chat.total.toLocaleString("pt-BR") });
+  if (a.viewers.hasData)
+    big.push({
+      label: "pico de audiência",
+      value: a.viewers.peak.toLocaleString("pt-BR"),
+    });
+  if (a.chat.hasData)
+    big.push({
+      label: "mensagens",
+      value: a.chat.total.toLocaleString("pt-BR"),
+    });
   const small: RecapStat[] = [];
-  if (big.length > 0) small.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
-  if (a.viewers.hasData) small.push({ label: "média", value: a.viewers.avg.toLocaleString("pt-BR") });
-  if (follows > 0) small.push({ label: "novos seguidores", value: follows.toLocaleString("pt-BR") });
-  if (a.alerts.subs > 0) small.push({ label: "inscrições", value: String(a.alerts.subs) });
-  if (a.alerts.bits > 0) small.push({ label: "bits", value: a.alerts.bits.toLocaleString("pt-BR") });
-  if (a.alerts.raids > 0) small.push({ label: "raids", value: String(a.alerts.raids) });
+  if (big.length > 0)
+    small.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
+  if (a.viewers.hasData)
+    small.push({
+      label: "média",
+      value: a.viewers.avg.toLocaleString("pt-BR"),
+    });
+  if (follows > 0)
+    small.push({
+      label: "novos seguidores",
+      value: follows.toLocaleString("pt-BR"),
+    });
+  if (a.alerts.subs > 0)
+    small.push({ label: "inscrições", value: String(a.alerts.subs) });
+  if (a.alerts.bits > 0)
+    small.push({ label: "bits", value: a.alerts.bits.toLocaleString("pt-BR") });
+  if (a.alerts.raids > 0)
+    small.push({ label: "raids", value: String(a.alerts.raids) });
   // Sem audiência nem chat → promove tempo no ar (e inscrições) pros heróis.
   if (big.length === 0) {
     big.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
-    if (a.alerts.subs > 0) big.push({ label: "inscrições", value: String(a.alerts.subs) });
+    if (a.alerts.subs > 0)
+      big.push({ label: "inscrições", value: String(a.alerts.subs) });
   }
   const top = a.highlights[0]?.reason;
-  const moment = top ? (top.length > 44 ? `${top.slice(0, 43)}…` : top) : undefined;
+  const moment = top
+    ? top.length > 44
+      ? `${top.slice(0, 43)}…`
+      : top
+    : undefined;
   // não repete nos secundários um rótulo que já virou herói (ex.: "inscrições")
   const bigLabels = new Set(big.map((s) => s.label));
   return {
@@ -208,7 +273,9 @@ function RecapModal({
     if (!el) return;
     try {
       const blob = await recapToBlob(el);
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob }),
+      ]);
       toast.success("Imagem copiada — cola no WhatsApp/Discord/Twitter 📋");
     } catch {
       toast.error("Não consegui copiar; use o Baixar PNG");
@@ -229,7 +296,11 @@ function RecapModal({
   };
 
   return (
-    <Modal title="Recap da live" onClose={onClose} className="max-w-lg rounded-xl bg-surface p-5 pop">
+    <Modal
+      title="Recap da live"
+      onClose={onClose}
+      className="max-w-lg rounded-xl bg-surface p-5 pop"
+    >
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-xl">Recap pra postar</h3>
         <Button variant="ghost" size="sm" onClick={onClose}>
@@ -303,14 +374,17 @@ function ReportDetail({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="size-4" /> Voltar
         </Button>
-        <Card className="mt-4 text-sm text-ink-muted">Não consegui ler esta sessão.</Card>
+        <Card className="mt-4 text-sm text-ink-muted">
+          Não consegui ler esta sessão.
+        </Card>
       </div>
     );
   }
 
   const a = analyze(data);
   const n = data.samples.length;
-  const platColor = (pid: string) => PLATFORMS[pid as keyof typeof PLATFORMS]?.color ?? "#ffb323";
+  const platColor = (pid: string) =>
+    PLATFORMS[pid as keyof typeof PLATFORMS]?.color ?? "#ffb323";
 
   // Marcadores de evento (reconexão/erro) no eixo de tempo.
   const indexAt = (t: number) => {
@@ -319,7 +393,10 @@ function ReportDetail({
   };
   const markers: ChartMarker[] = a.events
     .filter((e) => e.kind === "reconnect" || e.kind === "error")
-    .map((e) => ({ index: indexAt(e.t), color: e.kind === "error" ? "#ef4444" : "#f97316" }));
+    .map((e) => ({
+      index: indexAt(e.t),
+      color: e.kind === "error" ? "#ef4444" : "#f97316",
+    }));
 
   const bitrateSeriesData = data.meta.platforms.map((p) => ({
     label: p.name,
@@ -352,7 +429,9 @@ function ReportDetail({
   const rel = (t: number) => {
     const s = Math.max(0, Math.round((t - data.meta.startedAt) / 1000));
     const h = Math.floor(s / 3600);
-    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, "0");
+    const mm = Math.floor((s % 3600) / 60)
+      .toString()
+      .padStart(2, "0");
     const ss = (s % 60).toString().padStart(2, "0");
     return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   };
@@ -360,14 +439,33 @@ function ReportDetail({
   // Stats de engajamento pro topo.
   const heroStats: { label: string; value: string; accent?: boolean }[] = [];
   if (a.viewers.hasData) {
-    heroStats.push({ label: "Pico de viewers", value: a.viewers.peak.toLocaleString("pt-BR"), accent: true });
-    heroStats.push({ label: "Média", value: a.viewers.avg.toLocaleString("pt-BR") });
+    heroStats.push({
+      label: "Pico de viewers",
+      value: a.viewers.peak.toLocaleString("pt-BR"),
+      accent: true,
+    });
+    heroStats.push({
+      label: "Média",
+      value: a.viewers.avg.toLocaleString("pt-BR"),
+    });
   }
-  if (a.alerts.subs > 0) heroStats.push({ label: "Inscrições", value: String(a.alerts.subs) });
-  if (a.alerts.bits > 0) heroStats.push({ label: "Bits", value: a.alerts.bits.toLocaleString("pt-BR") });
+  if (a.alerts.subs > 0)
+    heroStats.push({ label: "Inscrições", value: String(a.alerts.subs) });
+  if (a.alerts.bits > 0)
+    heroStats.push({
+      label: "Bits",
+      value: a.alerts.bits.toLocaleString("pt-BR"),
+    });
   if (a.alerts.raids > 0)
-    heroStats.push({ label: "Raids", value: `${a.alerts.raids} · +${a.alerts.raidViewers}` });
-  if (a.chat.hasData) heroStats.push({ label: "Mensagens", value: a.chat.total.toLocaleString("pt-BR") });
+    heroStats.push({
+      label: "Raids",
+      value: `${a.alerts.raids} · +${a.alerts.raidViewers}`,
+    });
+  if (a.chat.hasData)
+    heroStats.push({
+      label: "Mensagens",
+      value: a.chat.total.toLocaleString("pt-BR"),
+    });
 
   const tone =
     a.verdict.tone === "ok"
@@ -390,7 +488,13 @@ function ReportDetail({
           <DeleteButton onDelete={remove} />
         </div>
       </div>
-      {showRecap && <RecapModal data={data} analysis={a} onClose={() => setShowRecap(false)} />}
+      {showRecap && (
+        <RecapModal
+          data={data}
+          analysis={a}
+          onClose={() => setShowRecap(false)}
+        />
+      )}
 
       <div className="mb-1 font-display text-2xl font-extrabold">
         Live de {fmtDate(data.meta.startedAt)}
@@ -398,7 +502,8 @@ function ReportDetail({
       <div className="mb-4 text-sm text-ink-muted">
         {fmtDur(data.meta.durationSec)} · {fmtTime(data.meta.startedAt)}
         {data.meta.endedAt ? `–${fmtTime(data.meta.endedAt)}` : ""} ·{" "}
-        {data.meta.platforms.map((p) => p.name).join(", ")} · modo {data.meta.mode}
+        {data.meta.platforms.map((p) => p.name).join(", ")} · modo{" "}
+        {data.meta.mode}
       </div>
 
       {/* Painel de engajamento */}
@@ -409,7 +514,9 @@ function ReportDetail({
               key={s.label}
               className={cn(
                 "rounded-lg border-2 px-3 py-2.5",
-                s.accent ? "border-brass bg-brass/10" : "border-border-soft bg-surface-2"
+                s.accent
+                  ? "border-brass bg-brass/10"
+                  : "border-border-soft bg-surface-2",
               )}
             >
               <div className="font-display text-2xl font-extrabold leading-none tabular-nums">
@@ -436,25 +543,40 @@ function ReportDetail({
       {a.viewers.hasData && vN > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Eye className="size-4" /> Audiência ao vivo (quanto da galera ficou)
+            <Eye className="size-4" /> Audiência ao vivo (quanto da galera
+            ficou)
           </h3>
           <LineChart
-            series={[{ label: "Assistindo", color: "#56e39b", values: viewerSeries(data) }]}
+            series={[
+              {
+                label: "Assistindo",
+                color: "#56e39b",
+                values: viewerSeries(data),
+              },
+            ]}
             n={vN}
             markers={raidMarkers}
             formatValue={(v) => Math.round(v).toLocaleString("pt-BR")}
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
             <span>
-              Pico <strong className="text-ink">{a.viewers.peak.toLocaleString("pt-BR")}</strong>
+              Pico{" "}
+              <strong className="text-ink">
+                {a.viewers.peak.toLocaleString("pt-BR")}
+              </strong>
             </span>
             <span>
-              Média <strong className="text-ink">{a.viewers.avg.toLocaleString("pt-BR")}</strong>
+              Média{" "}
+              <strong className="text-ink">
+                {a.viewers.avg.toLocaleString("pt-BR")}
+              </strong>
             </span>
             <span>
               Começo {a.viewers.start} → fim {a.viewers.end}
             </span>
-            {raidMarkers.length > 0 && <span className="text-[#7c9cff]">● raids</span>}
+            {raidMarkers.length > 0 && (
+              <span className="text-[#7c9cff]">● raids</span>
+            )}
           </div>
           {a.viewers.byPlatform.length > 1 && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -464,7 +586,9 @@ function ReportDetail({
                   className="flex items-center gap-1.5 rounded bg-surface-2 px-2 py-1 text-xs text-ink-muted"
                 >
                   <PlatformGlyph id={p.platform} size={14} /> {p.source}:{" "}
-                  <strong className="text-ink">{p.peak.toLocaleString("pt-BR")}</strong>
+                  <strong className="text-ink">
+                    {p.peak.toLocaleString("pt-BR")}
+                  </strong>
                 </span>
               ))}
             </div>
@@ -476,7 +600,8 @@ function ReportDetail({
       {a.highlights.length > 0 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Scissors className="size-4 text-brass" /> Momentos de destaque (pra clipar)
+            <Scissors className="size-4 text-brass" /> Momentos de destaque (pra
+            clipar)
           </h3>
           <div className="flex flex-col gap-1.5">
             {a.highlights.map((h, i) => (
@@ -484,7 +609,8 @@ function ReportDetail({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            ⏱️ Os tempos contam a partir do início da live — ache esse minuto na gravação (o VOD) pra cortar o clipe.
+            ⏱️ Os tempos contam a partir do início da live — ache esse minuto na
+            gravação (o VOD) pra cortar o clipe.
           </p>
         </Card>
       )}
@@ -496,14 +622,24 @@ function ReportDetail({
             <MessageSquare className="size-4" /> Atividade do chat (msgs/min)
           </h3>
           <LineChart
-            series={[{ label: "msgs/min", color: "#ffb323", values: chatRateSeries(data) }]}
+            series={[
+              {
+                label: "msgs/min",
+                color: "#ffb323",
+                values: chatRateSeries(data),
+              },
+            ]}
             n={n}
             markers={chatMarkers}
             formatValue={(v) => Math.round(v).toString()}
           />
           <div className="mt-2 text-xs text-ink-muted">
-            Total <strong className="text-ink">{a.chat.total.toLocaleString("pt-BR")}</strong> · pico{" "}
-            <strong className="text-ink">{a.chat.peakPerMin}/min</strong> · média {a.chat.avgPerMin}
+            Total{" "}
+            <strong className="text-ink">
+              {a.chat.total.toLocaleString("pt-BR")}
+            </strong>{" "}
+            · pico <strong className="text-ink">{a.chat.peakPerMin}/min</strong>{" "}
+            · média {a.chat.avgPerMin}
             /min
           </div>
         </Card>
@@ -525,7 +661,7 @@ function ReportDetail({
                   <span>{emoji}</span> <strong>{a.alerts.byKind[k]}</strong>{" "}
                   <span className="text-ink-muted">{label}</span>
                 </span>
-              ) : null
+              ) : null,
             )}
             {a.alerts.bits > 0 && (
               <span className="flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 text-sm">
@@ -548,13 +684,14 @@ function ReportDetail({
       {n > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> Bitrate por plataforma — dados enviados por segundo (Mbps)
+            <Activity className="size-4" /> Bitrate por plataforma — dados
+            enviados por segundo (Mbps)
           </h3>
           <LineChart
             series={bitrateSeriesData}
             n={n}
             markers={markers}
-            formatValue={(v) => v.toFixed(1)}
+            formatValue={(v) => v.toFixed(1).replace(".", ",")}
           />
           {markers.length > 0 && (
             <div className="mt-2 flex gap-3 text-[11px] font-semibold text-ink-faint">
@@ -584,10 +721,17 @@ function ReportDetail({
       {n > 1 && hasObs(data) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> OBS — atraso pra montar o quadro (render lag, ms)
+            <Activity className="size-4" /> OBS — atraso pra montar o quadro
+            (render lag, ms)
           </h3>
           <LineChart
-            series={[{ label: "Render lag", color: "#a855f7", values: obsRenderSeries(data) }]}
+            series={[
+              {
+                label: "Render lag",
+                color: "#a855f7",
+                values: obsRenderSeries(data),
+              },
+            ]}
             n={n}
             markers={markers}
             formatValue={(v) => `${Math.round(v)}`}
@@ -597,15 +741,31 @@ function ReportDetail({
 
       {/* Resumo por plataforma */}
       <Card className="mb-4">
-        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-faint">Por plataforma</h3>
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+          Por plataforma
+        </h3>
         <div className="flex flex-col gap-2">
           {a.perTarget.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 rounded-md bg-surface-2 px-3 py-2">
+            <div
+              key={t.id}
+              className="flex items-center gap-3 rounded-md bg-surface-2 px-3 py-2"
+            >
               <PlatformGlyph id={t.platformId} size={22} />
-              <span className="min-w-24 flex-1 font-display font-bold">{t.name}</span>
-              <span className="text-xs text-ink-muted">~{(t.avgBitrate / 1000).toFixed(1)} Mbps méd.</span>
-              <span className="text-xs text-ink-muted">{t.maxDropped} quedas</span>
-              <span className={cn("text-xs", t.reconnects > 0 ? "text-warn" : "text-ink-faint")}>
+              <span className="min-w-24 flex-1 font-display font-bold">
+                {t.name}
+              </span>
+              <span className="text-xs text-ink-muted">
+                ~{(t.avgBitrate / 1000).toFixed(1).replace(".", ",")} Mbps méd.
+              </span>
+              <span className="text-xs text-ink-muted">
+                {t.maxDropped} quedas
+              </span>
+              <span
+                className={cn(
+                  "text-xs",
+                  t.reconnects > 0 ? "text-warn" : "text-ink-faint",
+                )}
+              >
                 {t.reconnects} reconex.
               </span>
             </div>
@@ -617,7 +777,8 @@ function ReportDetail({
       {a.windows.length > 0 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <AlertTriangle className="size-4 text-warn" /> Trechos que deram problema
+            <AlertTriangle className="size-4 text-warn" /> Trechos que deram
+            problema
           </h3>
           <div className="flex flex-col gap-2">
             {a.windows.map((w, i) => (
@@ -666,12 +827,16 @@ function WindowCard({ w }: { w: ProblemWindow }) {
   return (
     <div className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-2 text-sm">
-        <span className="font-display font-bold text-warn">{fmtTime(w.tStart)}</span>
+        <span className="font-display font-bold text-warn">
+          {fmtTime(w.tStart)}
+        </span>
         <span className="text-xs text-ink-faint">({w.durationSec}s)</span>
         <span className="font-semibold">{w.cause}</span>
       </div>
       {w.signals.length > 0 && (
-        <div className="mt-0.5 text-xs text-ink-muted">{w.signals.join(" · ")}</div>
+        <div className="mt-0.5 text-xs text-ink-muted">
+          {w.signals.join(" · ")}
+        </div>
       )}
       <div className="mt-1 text-xs text-ink">→ {w.advice}</div>
     </div>
@@ -691,7 +856,9 @@ const EVENT_DOT: Record<ReportEvent["kind"], string> = {
 function EventRow({ e }: { e: ReportEvent }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="w-12 shrink-0 text-xs tabular-nums text-ink-faint">{fmtTime(e.t)}</span>
+      <span className="w-12 shrink-0 text-xs tabular-nums text-ink-faint">
+        {fmtTime(e.t)}
+      </span>
       <span className={cn("size-2 shrink-0 rounded-full", EVENT_DOT[e.kind])} />
       <span className="text-ink-muted">{e.label}</span>
     </div>
@@ -719,7 +886,9 @@ function HighlightRow({ h, time }: { h: Highlight; time: string }) {
   return (
     <div className="flex items-center gap-2.5 rounded-md bg-surface-2 px-3 py-2">
       <span className="text-lg leading-none">{HL_ICON[h.kind]}</span>
-      <span className="w-16 shrink-0 font-display font-extrabold tabular-nums text-ink">{time}</span>
+      <span className="w-16 shrink-0 font-display font-extrabold tabular-nums text-ink">
+        {time}
+      </span>
       <span className="flex-1 text-sm text-ink-muted">{h.reason}</span>
       <button
         onClick={() => {

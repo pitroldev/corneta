@@ -72,13 +72,23 @@ pub fn start_alerts(app: &AppHandle) {
         };
         let (app2, run2, kind) = (app.clone(), running.clone(), src.kind.clone());
         tauri::async_runtime::spawn_blocking(move || {
+            // Backoff exponencial: 3s → 6 → 12 → … → 60s; volta ao mínimo quando conecta.
+            let mut backoff = Duration::from_secs(3);
             while run2.load(Ordering::Relaxed) {
-                match kind.as_str() {
+                let r = match kind.as_str() {
                     "streamlabs" => run_streamlabs(&token, &label, run2.clone(), app2.clone()),
                     "streamelements" => run_streamelements(&token, &label, run2.clone(), app2.clone()),
                     _ => return,
+                };
+                backoff = match r {
+                    ConnResult::Connected => Duration::from_secs(3), // conectou → zera
+                    ConnResult::AuthFailed => BACKOFF_MAX, // token inválido → teto direto
+                    ConnResult::Failed => backoff,
+                };
+                reconnect_wait(&run2, backoff); // caiu/erro → espera o backoff e tenta de novo
+                if !matches!(r, ConnResult::Connected) {
+                    backoff = (backoff * 2).min(BACKOFF_MAX); // dobra pra próxima falha
                 }
-                reconnect_wait(&run2); // caiu/erro → tenta de novo em ~3s
             }
         });
     }
@@ -89,19 +99,35 @@ pub fn stop_alerts(app: &AppHandle) {
     st.alerts.lock().unwrap().running.store(false, Ordering::Relaxed);
 }
 
-/// Espera ~3s antes de reconectar, abortando cedo se os alertas foram parados.
-fn reconnect_wait(running: &AtomicBool) {
-    for _ in 0..15 {
+/// Teto do backoff de reconexão.
+const BACKOFF_MAX: Duration = Duration::from_secs(60);
+
+/// Resultado de uma tentativa de conexão — orienta o backoff da reconexão.
+enum ConnResult {
+    /// Chegou a conectar (recebeu o `40`) — backoff volta ao mínimo.
+    Connected,
+    /// Falha transitória (rede, queda) — backoff dobra até o teto.
+    Failed,
+    /// Handshake recusado com 401/403 (token inválido/revogado) — teto direto.
+    AuthFailed,
+}
+
+/// Espera `dur` antes de reconectar, abortando cedo se os alertas foram parados.
+fn reconnect_wait(running: &AtomicBool, dur: Duration) {
+    let mut left = dur;
+    while left > Duration::ZERO {
         if !running.load(Ordering::Relaxed) {
             return;
         }
-        thread::sleep(Duration::from_millis(200));
+        let step = left.min(Duration::from_millis(200));
+        thread::sleep(step);
+        left -= step;
     }
 }
 
 // ----------------------------- Conectores --------------------------
 
-fn run_streamlabs(token: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+fn run_streamlabs(token: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) -> ConnResult {
     // O Streamlabs autentica pelo token na query — sem emit de auth depois do connect.
     let url = format!(
         "wss://sockets.streamlabs.com/socket.io/?token={token}&EIO=3&transport=websocket"
@@ -113,10 +139,10 @@ fn run_streamlabs(token: &str, source: &str, running: Arc<AtomicBool>, app: AppH
                 emit_alert(app, a);
             }
         }
-    });
+    })
 }
 
-fn run_streamelements(token: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+fn run_streamelements(token: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) -> ConnResult {
     // O realtime do SE precisa de um emit de autenticação com o JWT depois do connect.
     let url = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
     let auth = format!("42[\"authenticate\",{}]", json!({ "method": "jwt", "token": token }));
@@ -128,7 +154,7 @@ fn run_streamelements(token: &str, source: &str, running: Arc<AtomicBool>, app: 
                 emit_alert(app, a);
             }
         }
-    });
+    })
 }
 
 // ----------------------------- Mapeamento --------------------------
@@ -258,21 +284,41 @@ fn run_socketio<F>(
     running: Arc<AtomicBool>,
     app: AppHandle,
     mut on_event: F,
-) where
+) -> ConnResult
+where
     F: FnMut(&AppHandle, &str, &Value),
 {
+    // NUNCA logar o erro cru do connect: o Display pode embutir a URL inteira —
+    // que no Streamlabs carrega `?token=<segredo>` — e o log é persistido em arquivo.
     let mut socket = match tungstenite::connect(url) {
         Ok((s, _)) => s,
+        Err(tungstenite::Error::Http(resp)) if matches!(resp.status().as_u16(), 401 | 403) => {
+            // Token revogado/expirado: erro permanente — UI mostra e o backoff vai pro teto.
+            log::warn!(
+                "alerta ({source}): handshake recusado (HTTP {}) — token inválido/expirado",
+                resp.status().as_u16()
+            );
+            alert_status(&app, source, "token inválido");
+            return ConnResult::AuthFailed;
+        }
         Err(e) => {
-            log::warn!("alerta ({source}): {e}");
+            // Descrição segura do erro (sem URL/query string).
+            let desc = match &e {
+                tungstenite::Error::Io(io) => io.kind().to_string(),
+                tungstenite::Error::Http(r) => format!("HTTP {}", r.status().as_u16()),
+                _ => "handshake".into(),
+            };
+            log::warn!("alerta ({source}): falha ao conectar ({desc})");
             alert_status(&app, source, "error");
-            return;
+            return ConnResult::Failed;
         }
     };
     set_read_timeout(&mut socket, 400);
 
     let mut ping_every = Duration::from_secs(20);
+    let mut ping_grace = Duration::from_secs(20); // pingTimeout do handshake
     let mut last_ping = Instant::now();
+    let mut last_pong = Instant::now(); // último sinal de vida do servidor
     let mut connected = false;
 
     while running.load(Ordering::Relaxed) {
@@ -281,8 +327,15 @@ fn run_socketio<F>(
             let _ = socket.send(Message::Text("2".into()));
             last_ping = Instant::now();
         }
+        // Rede caiu em silêncio (sem FIN/RST): read() só dá WouldBlock e o ping some no
+        // buffer TCP sem erro — servidor mudo além do prazo → cai pro caminho de reconexão.
+        if last_pong.elapsed() > ping_every + ping_grace {
+            log::warn!("alerta ({source}): servidor sem responder — reconectando");
+            break;
+        }
         match socket.read() {
             Ok(Message::Text(t)) => {
+                last_pong = Instant::now(); // qualquer frame conta como sinal de vida
                 let t = t.as_str();
                 if let Some(start) = t.strip_prefix("42").and(t.find('[')) {
                     // EVENT: ["nome", dados?]
@@ -301,10 +354,13 @@ fn run_socketio<F>(
                         let _ = socket.send(Message::Text(a.clone().into()));
                     }
                 } else if t.starts_with('0') {
-                    // OPEN: lê o pingInterval e dispara o connect do namespace padrão.
+                    // OPEN: lê pingInterval/pingTimeout e dispara o connect do namespace padrão.
                     if let Ok(v) = serde_json::from_str::<Value>(&t[1..]) {
                         if let Some(pi) = v.get("pingInterval").and_then(|x| x.as_u64()) {
                             ping_every = Duration::from_millis(pi.clamp(5000, 25000));
+                        }
+                        if let Some(pt) = v.get("pingTimeout").and_then(|x| x.as_u64()) {
+                            ping_grace = Duration::from_millis(pt.clamp(5000, 60000));
                         }
                     }
                     let _ = socket.send(Message::Text("40".into()));
@@ -312,13 +368,17 @@ fn run_socketio<F>(
                     // ping do servidor (engine.io v4) → pong
                     let _ = socket.send(Message::Text("3".into()));
                 }
-                // "3" (pong), "41"/"44" (disconnect/erro de namespace) → ignora
+                // "3" (pong) já contou como sinal de vida acima;
+                // "41"/"44" (disconnect/erro de namespace) → ignora
             }
             Ok(Message::Ping(p)) => {
+                last_pong = Instant::now();
                 let _ = socket.send(Message::Pong(p));
             }
             Ok(Message::Close(_)) => break,
-            Ok(_) => {}
+            Ok(_) => {
+                last_pong = Instant::now(); // pong WS/binário também contam
+            }
             Err(tungstenite::Error::Io(e))
                 if matches!(
                     e.kind(),
@@ -332,4 +392,6 @@ fn run_socketio<F>(
     }
     let _ = socket.close(None);
     alert_status(&app, source, "disconnected");
+    // Conectou de verdade nesta tentativa? → o chamador zera o backoff.
+    if connected { ConnResult::Connected } else { ConnResult::Failed }
 }

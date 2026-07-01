@@ -40,15 +40,26 @@ function recommended(t: Target) {
   return PLATFORMS[t.platformId].recommended;
 }
 
-/** Menor denominador comum: o bitrate seguro para o modo "Encodar uma vez". */
+/** Menor denominador comum: o bitrate seguro do OBS entre os destinos cuja
+ *  ação EFETIVA é cópia (respeita o modo e o hybridOverride). Um destino
+ *  transcodificado não entra — ele recebe o próprio encode, não o do OBS.
+ *  Passthrough: todos copiam → varre todos. Híbrido: só os em cópia.
+ *  Per-platform: ninguém copia → videoKbps null (o LCD não limita nada). */
 export function lowestCommonDenominator(config: AppConfig) {
-  const enabled = config.targets.filter((t) => t.enabled);
-  if (enabled.length === 0) return { videoKbps: 6000, capBy: null as string | null };
-  let capBy = enabled[0];
-  for (const t of enabled) {
-    if (recommended(t).videoBitrateKbps < recommended(capBy).videoBitrateKbps) capBy = t;
+  const copies = config.targets.filter(
+    (t) => t.enabled && effectiveAction(config.mode, t) === "copy",
+  );
+  if (copies.length === 0)
+    return { videoKbps: null as number | null, capBy: null as string | null };
+  let capBy = copies[0];
+  for (const t of copies) {
+    if (recommended(t).videoBitrateKbps < recommended(capBy).videoBitrateKbps)
+      capBy = t;
   }
-  return { videoKbps: recommended(capBy).videoBitrateKbps, capBy: capBy.name };
+  return {
+    videoKbps: recommended(capBy).videoBitrateKbps as number | null,
+    capBy: capBy.name as string | null,
+  };
 }
 
 export interface EngineEstimate {
@@ -73,7 +84,9 @@ export function estimate(config: AppConfig): EngineEstimate {
     const act = effectiveAction(config.mode, t);
     const rec = recommended(t);
     const video =
-      act === "copy" ? lcd : t.encoding.preset?.videoBitrateKbps ?? rec.videoBitrateKbps;
+      act === "copy"
+        ? (lcd ?? rec.videoBitrateKbps)
+        : (t.encoding.preset?.videoBitrateKbps ?? rec.videoBitrateKbps);
     const audio = t.encoding.preset?.audioBitrateKbps ?? rec.audioBitrateKbps;
     uploadKbps += video + audio;
     if (act === "transcode") transcodeCount++;

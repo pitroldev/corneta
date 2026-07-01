@@ -86,7 +86,9 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         : "";
 
   // Avisa quando o OBS realmente conecta (stopped/starting → live).
-  const prevState = useRef<EngineState>("stopped");
+  // Inicia com o estado ATUAL: se a tela montar já "live" (voltou pra aba
+  // durante a transmissão), não é transição — não re-dispara o toast.
+  const prevState = useRef<EngineState>(state);
   useEffect(() => {
     if (state === "live" && prevState.current !== "live") {
       toast.success("No ar! A corneta tá tocando 📣");
@@ -149,7 +151,12 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Guarda contra duplo clique: o snapshot "starting" demora a voltar do
+  // backend (o start() ainda salva a config antes do IPC), então trava local.
+  const [startBusy, setStartBusy] = useState(false);
   const onStart = async () => {
+    if (startBusy) return;
+    setStartBusy(true);
     try {
       await start();
       toast.success(
@@ -159,6 +166,8 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
       );
     } catch (e) {
       toast.error(`Não rolou: ${e}`);
+    } finally {
+      setStartBusy(false);
     }
   };
   // Cortar uma live de verdade → puxa pro relatório fresquinho.
@@ -219,8 +228,8 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="primary" size="sm" onClick={onStart}>
-              <RefreshCw className="size-4" /> Tentar de novo
+            <Button variant="primary" size="sm" onClick={onStart} loading={startBusy} disabled={startBusy}>
+              {!startBusy && <RefreshCw className="size-4" />} Tentar de novo
             </Button>
             <Button variant="subtle" size="sm" onClick={() => setShowObs(true)}>
               <Zap className="size-4 text-brass" /> Configurar OBS
@@ -473,11 +482,12 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
             variant="tomate"
             size="lg"
             className="w-full"
-            disabled={!canStart}
+            disabled={!canStart || startBusy}
+            loading={startBusy}
             onClick={onStart}
             aria-label={canStart ? "Bora ao vivo" : `Bora ao vivo (travado: ${blockReason})`}
           >
-            <Radio className="size-6" strokeWidth={2.5} /> BORA AO VIVO
+            {!startBusy && <Radio className="size-6" strokeWidth={2.5} />} BORA AO VIVO
           </Button>
         )}
         {starting && (

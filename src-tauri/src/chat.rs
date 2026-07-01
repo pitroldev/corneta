@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
@@ -65,6 +65,10 @@ fn next_id() -> String {
 }
 /// Mensagens de chat desde a última amostra (o motor lê+zera a cada ~2s → taxa de chat).
 pub static MSG_COUNT: AtomicU64 = AtomicU64::new(0);
+/// Geração do chat: incrementa a cada start_chat. Thread de um start ANTIGO (que ainda
+/// estava conectando durante um restart) compara a própria geração antes de registrar
+/// sender ou emitir status — senão o sender velho (Receiver morto) sobrescreve o novo.
+static CHAT_GEN: AtomicU64 = AtomicU64::new(0);
 
 /// Caminho do NDJSON da sessão em gravação (None se não estiver transmitindo).
 fn session_path(app: &AppHandle) -> Option<std::path::PathBuf> {
@@ -92,6 +96,13 @@ fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
         "chat://status",
         json!({ "platform": platform, "source": source, "status": status }),
     );
+}
+/// `chat://status` com guard de geração: conexão de um start antigo não emite por cima
+/// da nova (ex.: "disconnected" da thread velha depois do "connected" da atual).
+fn chat_status_gen(app: &AppHandle, gen: u64, platform: &str, source: &str, status: &str) {
+    if CHAT_GEN.load(Ordering::SeqCst) == gen {
+        chat_status(app, platform, source, status);
+    }
 }
 /// Estado de login pra ENVIO de uma fonte (source id): logado como `login` (ok=true) ou
 /// sem permissão / token inválido (ok=false).
@@ -154,6 +165,9 @@ pub fn emit_alert(app: &AppHandle, alert: Alert) {
 /// (Re)inicia o chat com base nas fontes configuradas.
 pub fn start_chat(app: &AppHandle) {
     MSG_COUNT.store(0, Ordering::Relaxed);
+    // Nova geração ANTES de limpar as filas: qualquer thread antiga ainda conectando
+    // vê a geração mudada e não registra sender/status por cima dos novos.
+    let gen = CHAT_GEN.fetch_add(1, Ordering::SeqCst) + 1;
     let s = crate::config::load(app).settings;
     let running = {
         let st = app.state::<AppState>();
@@ -184,19 +198,28 @@ pub fn start_chat(app: &AppHandle) {
                 // logada (device flow, com refresh) — token expirado não fica preso.
                 let send_key = format!("chat_send_{}", src.id);
                 tauri::async_runtime::spawn_blocking(move || {
+                    // Backoff exponencial: 3s → 6 → 12 → … → 60s máx; reseta ao conectar.
+                    let mut backoff: u32 = 15; // em ticks de 200ms
                     while run2.load(Ordering::Relaxed) {
                         let tok = crate::keys::get_key(&send_key)
                             .or_else(|| crate::auth::twitch_token(&app2));
-                        run_twitch(&value, &label, &sid, tok, run2.clone(), app2.clone());
-                        reconnect_wait(&run2); // caiu/erro → tenta de novo em ~3s
+                        if run_twitch(&value, &label, &sid, tok, run2.clone(), app2.clone(), gen) {
+                            backoff = 15; // conectou → próxima queda volta pro ritmo normal
+                        }
+                        reconnect_for(&run2, backoff); // caiu/erro → tenta de novo
+                        backoff = (backoff * 2).min(300);
                     }
                 });
             }
             "kick" => {
                 tauri::async_runtime::spawn_blocking(move || {
+                    let mut backoff: u32 = 15; // idem Twitch: 3s dobrando até 60s
                     while run2.load(Ordering::Relaxed) {
-                        run_kick(&value, &label, run2.clone(), app2.clone());
-                        reconnect_wait(&run2);
+                        if run_kick(&value, &label, run2.clone(), app2.clone(), gen) {
+                            backoff = 15;
+                        }
+                        reconnect_for(&run2, backoff);
+                        backoff = (backoff * 2).min(300);
                     }
                 });
             }
@@ -204,10 +227,14 @@ pub fn start_chat(app: &AppHandle) {
                 // Sem guard de API key: o InnerTube lê o chat sem chave (igual Twitch).
                 let key = api_key.clone();
                 tauri::async_runtime::spawn_blocking(move || {
+                    // ~20s entre tentativas (aguardando a live começar), dobrando até 60s.
+                    let mut backoff: u32 = 100;
                     while run2.load(Ordering::Relaxed) {
-                        run_youtube(&key, &value, &label, run2.clone(), app2.clone());
-                        // ~20s entre tentativas: aguardando a live começar / re-resolver a nova
-                        reconnect_for(&run2, 100);
+                        if run_youtube(&key, &value, &label, run2.clone(), app2.clone(), gen) {
+                            backoff = 100;
+                        }
+                        reconnect_for(&run2, backoff);
+                        backoff = (backoff * 2).min(300);
                     }
                 });
             }
@@ -235,10 +262,6 @@ pub fn stop_chat(app: &AppHandle) {
     chat.senders.lock().unwrap().clear(); // sem fontes vivas → ninguém pra enviar
 }
 
-/// Espera ~3s antes de reconectar, abortando cedo se o chat foi parado.
-fn reconnect_wait(running: &AtomicBool) {
-    reconnect_for(running, 15);
-}
 /// Espera `ticks`×200ms antes de tentar de novo, abortando cedo se o chat foi parado.
 fn reconnect_for(running: &AtomicBool, ticks: u32) {
     for _ in 0..ticks {
@@ -251,6 +274,7 @@ fn reconnect_for(running: &AtomicBool, ticks: u32) {
 
 // ----------------------------- Twitch ------------------------------
 
+/// Devolve `true` se chegou a conectar (pro supervisor resetar o backoff).
 fn run_twitch(
     channel: &str,
     source: &str,
@@ -258,10 +282,11 @@ fn run_twitch(
     send_token: Option<String>,
     running: Arc<AtomicBool>,
     app: AppHandle,
-) {
+    gen: u64,
+) -> bool {
     let ch = channel.trim().trim_start_matches('#').to_lowercase();
     if ch.is_empty() {
-        return;
+        return false;
     }
 
     // Credencial de envio (opcional): valida o token → (login, raw). Sem escopo chat:edit ou
@@ -270,15 +295,18 @@ fn run_twitch(
         Some(t) => {
             let raw = t.trim().trim_start_matches("oauth:").trim().to_string();
             match twitch_validate(&raw) {
-                Some((login, true)) => Some((login, raw)),
-                Some((login, false)) => {
+                TokenCheck::Valid(login, true) => Some((login, raw)),
+                TokenCheck::Valid(login, false) => {
                     chat_auth(&app, source_id, &login, false);
                     None
                 }
-                None => {
+                TokenCheck::Invalid => {
                     chat_auth(&app, source_id, "", false);
                     None
                 }
+                // Falha de REDE (não é 401): o token pode estar válido — não avisa a UI
+                // nem cai pra leitura anônima; o supervisor tenta de novo em seguida.
+                TokenCheck::Network => return false,
             }
         }
         None => None,
@@ -289,8 +317,8 @@ fn run_twitch(
         Ok((s, _)) => s,
         Err(e) => {
             log::warn!("twitch chat ({source}): {e}");
-            chat_status(&app, "twitch", source, "error");
-            return;
+            chat_status_gen(&app, gen, "twitch", source, "error");
+            return false;
         }
     };
     match socket.get_mut() {
@@ -313,7 +341,7 @@ fn run_twitch(
     }
     let _ = socket.send(Message::Text(format!("JOIN #{ch}")));
     log::info!("twitch chat: conectado em #{ch}");
-    chat_status(&app, "twitch", source, "connected");
+    chat_status_gen(&app, gen, "twitch", source, "connected");
 
     // Fila de envio: registra um sender pra esta fonte e avisa "logado como X".
     let mut out_rx: Option<mpsc::Receiver<String>> = None;
@@ -321,10 +349,22 @@ fn run_twitch(
     if let Some((login, _)) = &creds {
         let (tx, rx) = mpsc::channel::<String>();
         let senders = app.state::<AppState>().chat.lock().unwrap().senders.clone();
-        senders.lock().unwrap().insert(source_id.to_string(), tx);
-        chat_auth(&app, source_id, login, true);
-        out_rx = Some(rx);
-        send_login = Some(login.clone());
+        // Só registra se ainda somos a geração atual: num restart, a thread antiga
+        // inseriria um sender de Receiver morto POR CIMA do novo (envio quebrado).
+        let registered = {
+            let mut map = senders.lock().unwrap();
+            if CHAT_GEN.load(Ordering::SeqCst) == gen && running.load(Ordering::Relaxed) {
+                map.insert(source_id.to_string(), tx);
+                true
+            } else {
+                false
+            }
+        };
+        if registered {
+            chat_auth(&app, source_id, login, true);
+            out_rx = Some(rx);
+            send_login = Some(login.clone());
+        }
     }
     let mut sends: Vec<Instant> = Vec::new();
 
@@ -386,9 +426,12 @@ fn run_twitch(
                             channel_emotes_done = true;
                         }
                     }
-                    if line.starts_with("PING") {
+                    // Dispatch pelo comando REAL da linha: substring casava com o TEXTO
+                    // da mensagem (ex.: "PRIVMSG" escrito num CLEARMSG/USERNOTICE).
+                    let cmd = irc_command(line);
+                    if cmd == "PING" {
                         let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
-                    } else if line.contains("PRIVMSG") {
+                    } else if cmd == "PRIVMSG" {
                         // Bits (cheer) vêm na tag `bits` de um PRIVMSG → vira alerta.
                         if let Some(b) =
                             tag_val(twitch_tags(line), "bits").and_then(|v| v.parse::<f64>().ok())
@@ -415,15 +458,15 @@ fn run_twitch(
                         if let Some(msg) = parse_privmsg(line, source, &emotes) {
                             emit_chat(&app, msg);
                         }
-                    } else if line.contains("USERNOTICE") {
+                    } else if cmd == "USERNOTICE" {
                         if let Some(alert) = parse_usernotice(line, source) {
                             emit_alert(&app, alert);
                         }
-                    } else if line.contains("CLEARMSG") {
+                    } else if cmd == "CLEARMSG" {
                         if let Some(id) = tag_val(twitch_tags(line), "target-msg-id") {
                             delete_message(&app, "twitch", &id);
                         }
-                    } else if line.contains("CLEARCHAT") {
+                    } else if cmd == "CLEARCHAT" {
                         match clearchat_user(line) {
                             Some(u) => delete_user(&app, "twitch", source, &u),
                             None => clear_source(&app, "twitch", source),
@@ -442,26 +485,54 @@ fn run_twitch(
         }
     }
     let _ = socket.close(None);
-    chat_status(&app, "twitch", source, "disconnected");
+    // Saída: só remove a fila/emite "disconnected" se a geração ainda é a nossa
+    // (num restart, a geração nova já limpou/recriou tudo).
+    if CHAT_GEN.load(Ordering::SeqCst) == gen {
+        if send_login.is_some() {
+            let senders = app.state::<AppState>().chat.lock().unwrap().senders.clone();
+            senders.lock().unwrap().remove(source_id);
+        }
+        chat_status(&app, "twitch", source, "disconnected");
+    }
+    true
 }
 
-/// Valida um token de envio na Twitch → (login minúsculo, tem escopo chat:edit?).
-fn twitch_validate(token: &str) -> Option<(String, bool)> {
-    let body = ureq::get("https://id.twitch.tv/oauth2/validate")
+/// Resultado da validação do token de envio (distingue 401 de queda de rede).
+enum TokenCheck {
+    Valid(String, bool), // (login minúsculo, tem escopo chat:edit?)
+    Invalid,             // HTTP 401 → token inválido de verdade
+    Network,             // transporte/timeout/outros status → vale tentar de novo
+}
+
+/// Valida um token de envio na Twitch. Só o 401 marca o token como inválido —
+/// falha de rede não pode derrubar a fonte pra leitura anônima por horas.
+fn twitch_validate(token: &str) -> TokenCheck {
+    let body = match ureq::get("https://id.twitch.tv/oauth2/validate")
         .set("Authorization", &format!("OAuth {token}"))
         .timeout(Duration::from_secs(5))
         .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    let login = v.get("login")?.as_str()?.to_lowercase();
-    let can_send = v
-        .get("scopes")
-        .and_then(|s| s.as_array())
-        .map(|arr| arr.iter().any(|x| x.as_str() == Some("chat:edit")))
-        .unwrap_or(false);
-    Some((login, can_send))
+    {
+        Ok(r) => match r.into_string() {
+            Ok(b) => b,
+            Err(_) => return TokenCheck::Network,
+        },
+        Err(ureq::Error::Status(401, _)) => return TokenCheck::Invalid,
+        Err(_) => return TokenCheck::Network,
+    };
+    let parsed = (|| -> Option<(String, bool)> {
+        let v: Value = serde_json::from_str(&body).ok()?;
+        let login = v.get("login")?.as_str()?.to_lowercase();
+        let can_send = v
+            .get("scopes")
+            .and_then(|s| s.as_array())
+            .map(|arr| arr.iter().any(|x| x.as_str() == Some("chat:edit")))
+            .unwrap_or(false);
+        Some((login, can_send))
+    })();
+    match parsed {
+        Some((login, can_send)) => TokenCheck::Valid(login, can_send),
+        None => TokenCheck::Network, // 200 sem o corpo esperado → melhor re-tentar
+    }
 }
 
 /// Sanitiza a mensagem de saída: sem quebras de linha, aparada e até 480 chars (limite IRC).
@@ -563,6 +634,26 @@ pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -
     Ok(())
 }
 
+/// Comando REAL de uma linha IRC: pula a seção de tags (`@…` até o espaço) e o prefixo
+/// (`:…` até o espaço) e devolve o primeiro token. Comparar com `==` evita casar
+/// substring no texto da mensagem.
+fn irc_command(line: &str) -> &str {
+    let mut rest = line;
+    if rest.starts_with('@') {
+        rest = match rest.find(' ') {
+            Some(i) => &rest[i + 1..],
+            None => return "",
+        };
+    }
+    if rest.starts_with(':') {
+        rest = match rest.find(' ') {
+            Some(i) => &rest[i + 1..],
+            None => return "",
+        };
+    }
+    rest.split(' ').next().unwrap_or("")
+}
+
 fn twitch_tags(line: &str) -> &str {
     line.strip_prefix('@')
         .and_then(|s| s.split(' ').next())
@@ -654,7 +745,14 @@ fn parse_privmsg(line: &str, source: &str, emotes: &HashMap<String, String>) -> 
     let privmsg_idx = rest.find("PRIVMSG")?;
     let after = &rest[privmsg_idx..];
     let msg_idx = after.find(':')?;
-    let text = after[msg_idx + 1..].trim_end().to_string();
+    let mut text = after[msg_idx + 1..].trim_end().to_string();
+    // CTCP ACTION (/me): chega como "\u{1}ACTION dança\u{1}" → usa só o texto da ação.
+    if let Some(inner) = text
+        .strip_prefix("\u{1}ACTION ")
+        .and_then(|s| s.strip_suffix('\u{1}'))
+    {
+        text = inner.to_string();
+    }
     if text.is_empty() {
         return None;
     }
@@ -767,7 +865,18 @@ fn add_7tv(emotes: &Value, map: &mut HashMap<String, String>) {
     }
 }
 
+/// Cache dos emotes globais com TTL de ~1h: reconexão não refaz os 3 fetches.
+static GLOBAL_3P: OnceLock<Mutex<Option<(Instant, HashMap<String, String>)>>> = OnceLock::new();
+
 fn fetch_global_thirdparty() -> HashMap<String, String> {
+    let cache = GLOBAL_3P.get_or_init(|| Mutex::new(None));
+    if let Ok(guard) = cache.lock() {
+        if let Some((at, map)) = guard.as_ref() {
+            if at.elapsed() < Duration::from_secs(3600) {
+                return map.clone();
+            }
+        }
+    }
     let mut map = HashMap::new();
     if let Some(v) = fetch_json("https://api.betterttv.net/3/cached/emotes/global") {
         add_bttv(&v, &mut map);
@@ -777,6 +886,12 @@ fn fetch_global_thirdparty() -> HashMap<String, String> {
     }
     if let Some(v) = fetch_json("https://7tv.io/v3/emote-sets/global") {
         add_7tv(v.get("emotes").unwrap_or(&Value::Null), &mut map);
+    }
+    // Só cacheia se veio algo — sem rede agora não pode significar 1h sem emote.
+    if !map.is_empty() {
+        if let Ok(mut guard) = cache.lock() {
+            *guard = Some((Instant::now(), map.clone()));
+        }
     }
     map
 }
@@ -1292,9 +1407,18 @@ fn parse_amount(s: &str) -> Option<f64> {
     }
     let norm = match kept.rfind([',', '.']) {
         Some(p) => {
-            let int: String = kept[..p].chars().filter(|c| c.is_ascii_digit()).collect();
             let frac: String = kept[p + 1..].chars().filter(|c| c.is_ascii_digit()).collect();
-            format!("{int}.{frac}")
+            // Milhar vs decimal: grupo de EXATAMENTE 3 dígitos após o último separador é
+            // milhar ("¥1,000", "R$ 1.234", "1,234,567") — centavos têm 1-2 dígitos e
+            // moeda sem centavos (JPY/KRW) nem usa decimal. Exceção: se o OUTRO separador
+            // aparece antes ("1.234,567"), o último é o decimal de verdade.
+            let other = if kept[p..].starts_with(',') { '.' } else { ',' };
+            if frac.len() == 3 && !kept[..p].contains(other) {
+                kept.chars().filter(|c| c.is_ascii_digit()).collect()
+            } else {
+                let int: String = kept[..p].chars().filter(|c| c.is_ascii_digit()).collect();
+                format!("{int}.{frac}")
+            }
         }
         None => kept,
     };
@@ -1392,12 +1516,13 @@ fn youtube_innertube(
     source: &str,
     running: &Arc<AtomicBool>,
     app: &AppHandle,
+    gen: u64,
 ) -> bool {
     let Some((key, version, mut cont)) = innertube_bootstrap(video_id) else {
         return false;
     };
     log::info!("youtube chat: InnerTube conectado ({source}) — vídeo {video_id}");
-    chat_status(app, "youtube", source, "connected");
+    chat_status_gen(app, gen, "youtube", source, "connected");
     let mut first = true;
     let mut errors = 0u32;
     while running.load(Ordering::Relaxed) {
@@ -1439,43 +1564,59 @@ fn youtube_innertube(
             slept += 200;
         }
     }
-    chat_status(app, "youtube", source, "disconnected");
+    chat_status_gen(app, gen, "youtube", source, "disconnected");
     true
 }
 
-fn run_youtube(api_key: &str, channel: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+/// Devolve `true` se chegou a conectar (pro supervisor resetar o backoff).
+fn run_youtube(
+    api_key: &str,
+    channel: &str,
+    source: &str,
+    running: Arc<AtomicBool>,
+    app: AppHandle,
+    gen: u64,
+) -> bool {
     // Resolve o CANAL → vídeo ao vivo atual (sem precisar colar o link toda vez).
     let vid = match resolve_youtube_video(channel, api_key) {
         LiveResolve::Video(v) => v,
         _ => {
             // canal ainda não está ao vivo (ou entrada inválida) → aguardando; o supervisor re-tenta
-            chat_status(&app, "youtube", source, "waiting");
-            return;
+            chat_status_gen(&app, gen, "youtube", source, "waiting");
+            return false;
         }
     };
     // 1) InnerTube — SEM API key (igual Twitch). Primário.
-    if youtube_innertube(&vid, source, &running, &app) {
-        return;
+    if youtube_innertube(&vid, source, &running, &app, gen) {
+        return true;
     }
     // 2) Fallback Data API — só se o InnerTube não inicializar E houver chave.
     if api_key.trim().is_empty() {
-        chat_status(&app, "youtube", source, "waiting");
-        return;
+        chat_status_gen(&app, gen, "youtube", source, "waiting");
+        return false;
     }
-    youtube_dataapi(api_key, &vid, source, running, app);
+    youtube_dataapi(api_key, &vid, source, running, app, gen)
 }
 
 /// Leitor via YouTube Data API v3 (precisa de API key). Fallback do InnerTube.
-fn youtube_dataapi(api_key: &str, vid: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+/// Devolve `true` se chegou a conectar (pro supervisor resetar o backoff).
+fn youtube_dataapi(
+    api_key: &str,
+    vid: &str,
+    source: &str,
+    running: Arc<AtomicBool>,
+    app: AppHandle,
+    gen: u64,
+) -> bool {
     let live_chat_id = match get_live_chat_id(api_key, vid) {
         Some(id) => id,
         None => {
-            chat_status(&app, "youtube", source, "waiting");
-            return;
+            chat_status_gen(&app, gen, "youtube", source, "waiting");
+            return false;
         }
     };
     log::info!("youtube chat: Data API conectado ({source})");
-    chat_status(&app, "youtube", source, "connected");
+    chat_status_gen(&app, gen, "youtube", source, "connected");
 
     let mut page_token: Option<String> = None;
     let mut first = true;
@@ -1675,7 +1816,8 @@ fn youtube_dataapi(api_key: &str, vid: &str, source: &str, running: Arc<AtomicBo
             slept += 200;
         }
     }
-    chat_status(&app, "youtube", source, "disconnected");
+    chat_status_gen(&app, gen, "youtube", source, "disconnected");
+    true
 }
 
 // ------------------------------- Kick ------------------------------
@@ -1697,17 +1839,18 @@ fn get_kick_ids(slug: &str) -> Option<(u64, u64)> {
     Some((chatroom, channel))
 }
 
-fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) {
+/// Devolve `true` se chegou a conectar (pro supervisor resetar o backoff).
+fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, gen: u64) -> bool {
     let slug = slug.trim().trim_start_matches('@').to_lowercase();
     if slug.is_empty() {
-        return;
+        return false;
     }
     let (chatroom_id, channel_id) = match get_kick_ids(&slug) {
         Some(ids) => ids,
         None => {
             log::warn!("kick chat ({source}): chatroom não resolvido (Cloudflare?)");
-            chat_status(&app, "kick", source, "error");
-            return;
+            chat_status_gen(&app, gen, "kick", source, "error");
+            return false;
         }
     };
     let url = "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=corneta&version=1.0&flash=false";
@@ -1715,8 +1858,8 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) 
         Ok((s, _)) => s,
         Err(e) => {
             log::warn!("kick chat ({source}): pusher {e}");
-            chat_status(&app, "kick", source, "error");
-            return;
+            chat_status_gen(&app, gen, "kick", source, "error");
+            return false;
         }
     };
     if let tungstenite::stream::MaybeTlsStream::Rustls(s) = socket.get_mut() {
@@ -1732,12 +1875,18 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) 
         )));
     }
     log::info!("kick chat: conectado em {slug} (chatroom {chatroom_id})");
-    chat_status(&app, "kick", source, "connected");
+    chat_status_gen(&app, gen, "kick", source, "connected");
 
     while running.load(Ordering::Relaxed) {
         match socket.read() {
             Ok(Message::Text(t)) => {
-                if t.contains("pusher:ping") {
+                // Ramifica pelo campo "event" do frame: substring "pusher:ping" engolia
+                // mensagem de chat cujo TEXTO continha isso.
+                let is_ping = serde_json::from_str::<Value>(&t)
+                    .ok()
+                    .and_then(|v| Some(v.get("event")?.as_str()? == "pusher:ping"))
+                    .unwrap_or(false);
+                if is_ping {
                     let _ = socket.send(Message::Text("{\"event\":\"pusher:pong\",\"data\":{}}".into()));
                 } else if let Some(msg) = parse_kick(&t, source) {
                     emit_chat(&app, msg);
@@ -1758,7 +1907,8 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) 
         }
     }
     let _ = socket.close(None);
-    chat_status(&app, "kick", source, "disconnected");
+    chat_status_gen(&app, gen, "kick", source, "disconnected");
+    true
 }
 
 fn parse_kick(raw: &str, source: &str) -> Option<ChatMessage> {
@@ -2038,4 +2188,28 @@ fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
             Some(ChatBadge { label, kind: kind.to_string() })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_amount;
+
+    #[test]
+    fn parse_amount_milhar() {
+        // grupo de 3 dígitos após o último separador = milhar, não decimal
+        assert_eq!(parse_amount("¥1,000"), Some(1000.0));
+        assert_eq!(parse_amount("R$ 1.234"), Some(1234.0));
+    }
+
+    #[test]
+    fn parse_amount_decimal() {
+        assert_eq!(parse_amount("$5.99"), Some(5.99));
+        assert_eq!(parse_amount("€2,50"), Some(2.5));
+    }
+
+    #[test]
+    fn parse_amount_misto() {
+        // com os dois separadores, o último é o decimal
+        assert_eq!(parse_amount("1,234.56"), Some(1234.56));
+    }
 }

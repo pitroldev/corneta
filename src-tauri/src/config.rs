@@ -98,6 +98,8 @@ pub struct Settings {
     pub chat_show_source: bool,
     #[serde(default)]
     pub chat_show_timestamps: bool,
+    #[serde(default = "default_true")]
+    pub chat_show_viewers: bool,
     /// Tema da interface: "dark" | "light".
     #[serde(default = "default_theme")]
     pub theme: String,
@@ -212,6 +214,7 @@ impl Default for Settings {
             chat_show_platform: true,
             chat_show_source: false,
             chat_show_timestamps: false,
+            chat_show_viewers: true,
             theme: default_theme(),
             chat_font_size: default_font(),
             chat_both_layout: default_both_layout(),
@@ -270,7 +273,7 @@ impl Default for AppConfig {
                 app: "live".into(),
                 key: "obs".into(),
             },
-            mode: "per-platform".into(),
+            mode: "hybrid".into(),
             targets: vec![],
             settings: Settings::default(),
             profiles: vec![],

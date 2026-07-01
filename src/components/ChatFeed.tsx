@@ -15,6 +15,9 @@ export interface ChatView {
   fontSize: number;
 }
 
+/** Altura estimada de uma linha antes de ser medida, em pixels. */
+const ROW_ESTIMATE = 28;
+
 const fmtTime = (ms: number) =>
   new Date(ms).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -55,7 +58,7 @@ export function ChatFeed({
   const virt = useVirtualizer({
     count: messages.length,
     getScrollElement: () => ref.current,
-    estimateSize: () => 28,
+    estimateSize: () => ROW_ESTIMATE,
     overscan: 12,
     getItemKey: (i) => messages[i].id,
   });
@@ -66,6 +69,44 @@ export function ChatFeed({
       ref.current.scrollTop = ref.current.scrollHeight;
     }
   }, [totalSize]);
+
+  // Com o buffer cheio (cap do store), cada mensagem nova expulsa a mais antiga
+  // do TOPO da lista; o conteúdo acima da viewport encurta e, com o usuário
+  // rolado pra cima (stick=false), o texto deslizaria junto com o chat — o
+  // scroll-anchoring nativo não atua porque as linhas são posicionadas por
+  // translateY. Antes do paint, subtraímos do scrollTop a soma das alturas das
+  // linhas que saíram do início, mantendo o que o usuário lê parado na tela.
+  const prevMsgs = useRef<ChatMessage[]>(messages);
+  useLayoutEffect(() => {
+    const prev = prevMsgs.current;
+    prevMsgs.current = messages;
+    const el = ref.current;
+    if (stick.current || !el || prev === messages) return;
+    const firstId = messages[0]?.id;
+    if (!firstId || prev.length === 0 || prev[0].id === firstId) return;
+    // Remoções acontecem só no início (cap do buffer): tudo antes do novo
+    // primeiro id saiu. Se ele nem existia antes, a lista inteira trocou
+    // (limpar/reconectar) — aí não há posição a preservar.
+    const cut = prev.findIndex((m) => m.id === firstId);
+    if (cut <= 0) return;
+    // O virtualizer guarda as alturas medidas por id e não descarta as das
+    // linhas removidas — dá pra somar o encolhimento exato acima da viewport.
+    const sizes = virt.itemSizeCache;
+    let removed = 0;
+    let unknown = 0;
+    for (let i = 0; i < cut; i++) {
+      const h = sizes.get(prev[i].id);
+      if (h !== undefined) removed += h;
+      else unknown++;
+    }
+    if (unknown > 0) {
+      // Linha removida sem medição: aproxima pela média das alturas conhecidas.
+      let sum = 0;
+      for (const h of sizes.values()) sum += h;
+      removed += unknown * (sizes.size > 0 ? sum / sizes.size : ROW_ESTIMATE);
+    }
+    el.scrollTop = Math.max(0, el.scrollTop - removed);
+  }, [messages, virt]);
 
   useEffect(() => {
     const newLast = messages[messages.length - 1];

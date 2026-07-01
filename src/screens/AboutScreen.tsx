@@ -1,11 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Globe, Heart, RefreshCw } from "lucide-react";
 import { siGithub } from "simple-icons";
 import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
-
-// Mantém em sincronia com package.json.
-const APP_VERSION = "0.1.0";
 
 // LinkedIn não está no simple-icons (removido por política de marca) — path oficial embutido.
 const LINKEDIN_PATH =
@@ -13,6 +10,20 @@ const LINKEDIN_PATH =
 import { readableOn } from "../lib/utils";
 import { Mascot, SoundWaves } from "../components/decor";
 import { SectionTitle } from "../components/ui";
+
+function useAppVersion(): string {
+  const [version, setVersion] = useState(__APP_VERSION__);
+  useEffect(() => {
+    if (!IS_TAURI) return;
+    void import("@tauri-apps/api/app")
+      .then(({ getVersion }) => getVersion())
+      .then(setVersion)
+      .catch(() => {
+        /* fica na versão do build */
+      });
+  }, []);
+  return version;
+}
 
 async function openUrl(url: string) {
   try {
@@ -36,12 +47,25 @@ interface LinkDef {
 }
 
 const LINKS: LinkDef[] = [
-  { label: "GitHub", sub: "@pitroldev", url: "https://github.com/pitroldev", brand: "#ffffff", path: siGithub.path },
-  { label: "LinkedIn", sub: "Petro Cardoso", url: "https://www.linkedin.com/in/petrocardoso/", brand: "#0a66c2", path: LINKEDIN_PATH },
+  {
+    label: "GitHub",
+    sub: "@pitroldev",
+    url: "https://github.com/pitroldev",
+    brand: "#ffffff",
+    path: siGithub.path,
+  },
+  {
+    label: "LinkedIn",
+    sub: "Petro Cardoso",
+    url: "https://www.linkedin.com/in/petrocardoso/",
+    brand: "#0a66c2",
+    path: LINKEDIN_PATH,
+  },
 ];
 
 export function AboutScreen() {
   const replayTour = useStore((s) => s.replayTour);
+  const appVersion = useAppVersion();
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle kicker="Quem soprou essa corneta" title="Sobre" />
@@ -56,8 +80,9 @@ export function AboutScreen() {
           <div>
             <h3 className="text-3xl">Oi, sou o Petro</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
-              Fiz a Corneta pra matar um perrengue meu: um stream do OBS vira live na Twitch, YouTube,
-              Kick e cia. de uma vez só — grátis e sem dor de cabeça.
+              Fiz a Corneta pra matar um perrengue meu: um stream do OBS vira
+              live na Twitch, YouTube, Kick e cia. de uma vez só — grátis e sem
+              dor de cabeça.
             </p>
           </div>
         </div>
@@ -72,10 +97,18 @@ export function AboutScreen() {
           <BlogIcon />
         </span>
         <span className="flex-1 text-left">
-          <span className="block font-display text-xl font-extrabold">pitrol.dev</span>
-          <span className="block text-sm text-ink-muted">Meu blog e meus projetos — dá um pulo lá pra ver no que ando trabalhando.</span>
+          <span className="block font-display text-xl font-extrabold">
+            pitrol.dev
+          </span>
+          <span className="block text-sm text-ink-muted">
+            Meu blog e meus projetos — dá um pulo lá pra ver no que ando
+            trabalhando.
+          </span>
         </span>
-        <ArrowUpRight className="size-6 text-ink-faint transition-colors group-hover:text-brass" strokeWidth={2.4} />
+        <ArrowUpRight
+          className="size-6 text-ink-faint transition-colors group-hover:text-brass"
+          strokeWidth={2.4}
+        />
       </button>
 
       {/* Redes */}
@@ -91,14 +124,24 @@ export function AboutScreen() {
               style={{ backgroundColor: l.brand }}
             >
               {l.path && (
-                <svg viewBox="0 0 24 24" width={18} height={18} fill={readableOn(l.brand)} aria-hidden>
+                <svg
+                  viewBox="0 0 24 24"
+                  width={18}
+                  height={18}
+                  fill={readableOn(l.brand)}
+                  aria-hidden
+                >
                   <path d={l.path} />
                 </svg>
               )}
             </span>
             <span className="min-w-0">
-              <span className="block truncate font-display font-bold">{l.label}</span>
-              <span className="block truncate text-[11px] text-ink-faint">{l.sub}</span>
+              <span className="block truncate font-display font-bold">
+                {l.label}
+              </span>
+              <span className="block truncate text-[11px] text-ink-faint">
+                {l.sub}
+              </span>
             </span>
           </button>
         ))}
@@ -114,10 +157,12 @@ export function AboutScreen() {
 
       {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
-        Corneta é grátis e de código aberto — espia como ela funciona por dentro. Feita com <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
+        Corneta é grátis e de código aberto — espia como ela funciona por
+        dentro. Feita com{" "}
+        <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
       </p>
       <p className="mt-1 text-center text-[11px] font-semibold text-ink-faint">
-        Corneta v{APP_VERSION} · multi-stream
+        Corneta v{appVersion} · multi-stream
       </p>
     </div>
   );
