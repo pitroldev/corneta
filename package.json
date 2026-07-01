@@ -1,7 +1,7 @@
 {
   "name": "corneta",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Corneta — transmita para todas as plataformas ao mesmo tempo, sem dor de cabeça.",
   "type": "module",
   "scripts": {
