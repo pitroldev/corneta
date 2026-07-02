@@ -17,18 +17,19 @@
 //!   do tempo binária "tinha segredo no quadro X?". Sem I/O → testável em isolamento.
 //! - **`Ocr`** (porta) — a fronteira pra LER o texto da tela. Adaptadores: PaddleOCR (CPU) e
 //!   Windows.Media.Ocr, em `ocr.rs`. Devolve só o texto (a posição não importa — slate é a tela toda).
-//! - **`pipeline`** — aplicação + adaptadores de I/O: processos FFmpeg (vídeo cru), composição do
-//!   slate yuv420p e eventos Tauri. Orquestra fonte → buffer/domínio → saída + a thread de OCR.
+//! - **`pipeline`** — o lado do OCR: worker + `Shared` (scan_slot/Timeline). A bomba de quadros
+//!   (buffer de delay, slate, encoder contínuo) mora no `compositor` — o guardião é o feed de
+//!   programa com delay + esta detecção pendurada.
 //!
 //! **Por que é viável (ao contrário do OCR-tarja anterior):** só vigia os termos EXPLÍCITOS do
 //! usuário (não lê "qualquer segredo"), a censura é binária (slate, sem precisão de posição), e o
 //! OCR pula quadros que não mudaram (diff). O atraso do OCR fica escondido pelo buffer fixo.
 
-mod domain;
+pub(crate) mod domain;
 mod ocr;
 mod pipeline;
 
-pub use pipeline::run_guard;
+pub(crate) use pipeline::{spawn_ocr, Shared};
 
 /// **Porta de OCR** (a fronteira do hexágono pra ler o texto da tela). Recebe um quadro em escala
 /// de cinza e devolve TODO o texto reconhecido (a watchlist é casada no domínio). Implementada

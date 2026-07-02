@@ -684,7 +684,7 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
     {
       on: settings.brbEnabled,
       label: "JÁ VOLTO",
-      desc: settings.brbEnabled ? "se o sinal do OBS cair, põe um aviso no ar e segura a live" : "desligado",
+      desc: settings.brbEnabled ? "se o sinal do OBS cair, o aviso entra no ar sem a live piscar" : "desligado",
       experimental: false,
       show: true,
     },

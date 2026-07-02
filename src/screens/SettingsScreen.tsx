@@ -278,7 +278,7 @@ export function SettingsScreen() {
                 preview={<BrbPreview />}
                 on={settings.brbEnabled}
                 title="Proteção contra quedas (JÁ VOLTO)"
-                desc="Se o OBS cair no meio da live, a Corneta segura no ar com a tela “JÁ VOLTO” até o sinal voltar — em vez de derrubar tudo. (Só depois que a transmissão já começou.)"
+                desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar SEM derrubar a conexão com as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna. Custo: a Corneta recodifica o sinal continuamente (usa a GPU quando tem; num PC fraco sem GPU pode pesar)."
               >
                 <Toggle
                   checked={settings.brbEnabled}

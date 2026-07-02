@@ -90,27 +90,76 @@ pub struct EncoderInfo {
     pub max_sessions: Option<u32>,
 }
 
+/// Encoders de hardware, em ORDEM DE PRIORIDADE do "Automático":
+/// (kind, rótulo, codec do FFmpeg, sessões simultâneas típicas).
+const HW_ENCODERS: [(&str, &str, &str, Option<u32>); 4] = [
+    ("nvenc", "NVIDIA NVENC", "h264_nvenc", Some(8)),
+    ("qsv", "Intel Quick Sync", "h264_qsv", None),
+    ("amf", "AMD AMF", "h264_amf", None),
+    ("videotoolbox", "Apple VideoToolbox", "h264_videotoolbox", None),
+];
+
+/// Cache da sonda (a GPU não muda durante a execução; sondar custa ~0,5–2 s).
+static HW_PROBE: std::sync::OnceLock<[bool; 4]> = std::sync::OnceLock::new();
+
+/// Sonda quais encoders de hardware REALMENTE funcionam (codifica 3 frames de verdade).
+/// A listagem `ffmpeg -encoders` MENTE: o build do BtbN lista nvenc/qsv/amf mesmo sem a GPU
+/// presente — só um encode real confirma. Resultado cacheado pra sessão do app.
+async fn probe_hw_encoders(app: &AppHandle) -> [bool; 4] {
+    if let Some(v) = HW_PROBE.get() {
+        return *v;
+    }
+    let mut ok = [false; 4];
+    for (i, (_, _, codec, _)) in HW_ENCODERS.iter().enumerate() {
+        let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
+            continue;
+        };
+        // 1280x720 (NÃO 128x128!): NVENC/QSV têm resolução MÍNIMA — um teste pequeno demais
+        // falha mesmo com a GPU presente (falso negativo → x264 → CPU estoura → live cai).
+        let res = cmd
+            .args([
+                "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                "color=c=black:s=1280x720:r=30", "-frames:v", "3", "-c:v", codec, "-f", "null", "-",
+            ])
+            .output()
+            .await;
+        ok[i] = matches!(res, Ok(ref o) if o.status.success());
+    }
+    log::info!(
+        "encoders de hardware reais: {}",
+        HW_ENCODERS
+            .iter()
+            .zip(ok)
+            .filter(|(_, k)| *k)
+            .map(|((kind, ..), _)| *kind)
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let _ = HW_PROBE.set(ok);
+    ok
+}
+
 #[tauri::command]
 pub async fn detect_encoders(app: AppHandle) -> Vec<EncoderInfo> {
-    let listing = match app.shell().sidecar("ffmpeg") {
-        Ok(cmd) => cmd
-            .args(["-hide_banner", "-encoders"])
-            .output()
-            .await
-            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-            .unwrap_or_default(),
-        Err(_) => String::new(),
-    };
-    let has = |needle: &str| listing.contains(needle);
-
-    vec![
-        EncoderInfo { kind: "nvenc".into(), label: "NVIDIA NVENC".into(), available: has("h264_nvenc"), max_sessions: Some(8) },
-        EncoderInfo { kind: "qsv".into(), label: "Intel Quick Sync".into(), available: has("h264_qsv"), max_sessions: None },
-        EncoderInfo { kind: "amf".into(), label: "AMD AMF".into(), available: has("h264_amf"), max_sessions: None },
-        EncoderInfo { kind: "videotoolbox".into(), label: "Apple VideoToolbox".into(), available: has("h264_videotoolbox"), max_sessions: None },
-        // Software está sempre disponível (libx264).
-        EncoderInfo { kind: "software".into(), label: "Software (x264)".into(), available: true, max_sessions: Some(1) },
-    ]
+    let ok = probe_hw_encoders(&app).await;
+    let mut out: Vec<EncoderInfo> = HW_ENCODERS
+        .iter()
+        .zip(ok)
+        .map(|((kind, label, _, max_sessions), available)| EncoderInfo {
+            kind: (*kind).into(),
+            label: (*label).into(),
+            available,
+            max_sessions: *max_sessions,
+        })
+        .collect();
+    // Software está sempre disponível (libx264).
+    out.push(EncoderInfo {
+        kind: "software".into(),
+        label: "Software (x264)".into(),
+        available: true,
+        max_sessions: Some(1),
+    });
+    out
 }
 
 /// Corpo de upload que faz streaming de bytes até um deadline, contando o que envia.
@@ -334,52 +383,48 @@ fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
     let _ = tray.set_tooltip(Some(tray_tooltip(snap)));
 }
 
-/// O MediaMTX tem algum publisher ativo? (= o OBS está mandando sinal pra ingestão.)
-fn mediamtx_has_publisher() -> bool {
-    let body = match ureq::get("http://127.0.0.1:9997/v3/paths/list")
-        .timeout(std::time::Duration::from_millis(700))
-        .call()
-    {
-        Ok(r) => r.into_string().unwrap_or_default(),
-        Err(_) => return false,
-    };
-    serde_json::from_str::<serde_json::Value>(&body)
-        .ok()
-        .and_then(|v| {
-            v.get("items").and_then(|i| i.as_array()).map(|arr| {
-                arr.iter()
-                    .any(|p| p.get("ready").and_then(|r| r.as_bool()) == Some(true))
-            })
-        })
-        .unwrap_or(false)
-}
-
-/// Estado da ingestão: (tem publisher pronto, total de bytes recebidos). O byte count
+/// Estado dos paths no MediaMTX: (ingestão pronta, bytes recebidos na ingestão, programa
+/// pronto). Filtra pelo NOME EXATO — o publisher do próprio compositor (`_program`) não pode
+/// contar como "sinal do OBS", senão o JÁ VOLTO nunca detectaria a queda. O byte count
 /// distingue OBS no ar de OBS travado/caído — num crash (sem desconexão limpa) o MediaMTX
 /// segura o `ready` true por até o readTimeout, mas os bytes param de subir na hora.
-fn mediamtx_ingest() -> (bool, u64) {
+fn mediamtx_paths(ingest_name: &str, program_name: &str) -> (bool, u64, bool) {
     let body = match ureq::get("http://127.0.0.1:9997/v3/paths/list")
         .timeout(std::time::Duration::from_millis(700))
         .call()
     {
         Ok(r) => r.into_string().unwrap_or_default(),
-        Err(_) => return (false, 0),
+        Err(_) => return (false, 0, false),
     };
     let v: serde_json::Value = match serde_json::from_str(&body) {
         Ok(v) => v,
-        Err(_) => return (false, 0),
+        Err(_) => return (false, 0, false),
     };
-    let mut ready = false;
+    let mut ingest_ready = false;
     let mut bytes = 0u64;
+    let mut prog_ready = false;
     if let Some(arr) = v.get("items").and_then(|i| i.as_array()) {
         for p in arr {
-            if p.get("ready").and_then(|r| r.as_bool()) == Some(true) {
-                ready = true;
-                bytes = bytes.max(p.get("bytesReceived").and_then(|b| b.as_u64()).unwrap_or(0));
+            let name = p.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            let ready = p.get("ready").and_then(|r| r.as_bool()) == Some(true);
+            if name == ingest_name {
+                ingest_ready = ready;
+                bytes = p.get("bytesReceived").and_then(|b| b.as_u64()).unwrap_or(0);
+            } else if name == program_name {
+                prog_ready = ready;
             }
         }
     }
-    (ready, bytes)
+    (ingest_ready, bytes, prog_ready)
+}
+
+/// O OBS está publicando na ingestão? (Path exato — ignora o `_program` do compositor.)
+fn mediamtx_ingest_ready(config: &crate::config::AppConfig) -> bool {
+    let (ready, _, _) = mediamtx_paths(
+        &engine::ingest_path_name(config),
+        &engine::program_path_name(config),
+    );
+    ready
 }
 
 fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -508,10 +553,10 @@ pub fn clear_brb_slate(app: AppHandle) -> Result<(), String> {
 /// Captura 1 frame do sinal atual (MediaMTX) como bytes JPEG. Helper reusável
 /// (preview do enquadramento + guardião anti-vazamento). `name` = arquivo temp.
 pub(crate) async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
-    if !mediamtx_has_publisher() {
+    let cfg = get_config(app.clone());
+    if !mediamtx_ingest_ready(&cfg) {
         return Err("sem sinal — entre ao vivo no OBS pra capturar o frame".into());
     }
-    let cfg = get_config(app.clone());
     let ingest = format!(
         "{}://{}:{}/{}/{}",
         cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app, cfg.ingest.key
@@ -609,71 +654,6 @@ fn set_target_state(app: &AppHandle, target_id: &str, new_state: &str) {
     }
 }
 
-/// Empurra o slate "JÁ VOLTO" pra plataforma até o sinal voltar (ou parar/pausar).
-async fn run_slate(
-    app: &AppHandle,
-    target_id: &str,
-    slate_args: &[String],
-    run_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-    pause_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-    signal: &std::sync::Arc<std::sync::atomic::AtomicBool>,
-) {
-    use std::sync::atomic::Ordering;
-    set_target_state(app, target_id, "brb");
-    let spawned = app
-        .shell()
-        .sidecar("ffmpeg")
-        .and_then(|c| c.args(slate_args.to_vec()).spawn());
-    let (mut rx, child) = match spawned {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("slate (JÁ VOLTO) não subiu pra {target_id}: {e}");
-            set_target_state(app, target_id, "waiting");
-            let _ = tauri::async_runtime::spawn_blocking(|| {
-                std::thread::sleep(std::time::Duration::from_millis(700))
-            })
-            .await;
-            return;
-        }
-    };
-    {
-        let st = app.state::<AppState>();
-        st.engine.lock().unwrap().ffmpegs.insert(target_id.to_string(), child);
-    }
-    // Mantém o slate até o sinal voltar / parar / pausar (checa a cada saída do FFmpeg).
-    while let Some(ev) = rx.recv().await {
-        if matches!(ev, CommandEvent::Terminated(_)) {
-            break;
-        }
-        if !run_flag.load(Ordering::Relaxed)
-            || pause_flag.load(Ordering::Relaxed)
-            || signal.load(Ordering::Relaxed)
-        {
-            break;
-        }
-    }
-    // Derruba o slate (se ainda vivo) e libera o slot.
-    let child = {
-        let st = app.state::<AppState>();
-        let removed = st.engine.lock().unwrap().ffmpegs.remove(target_id);
-        removed
-    };
-    if let Some(c) = child {
-        let pid = c.pid();
-        let _ = c.kill();
-        #[cfg(windows)]
-        {
-            let _ = quiet_command("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .output();
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = pid;
-        }
-    }
-}
-
 /// Mata sidecars (ffmpeg/mediamtx do Corneta) ÓRFÃOS de sessões que não morreram direito
 /// (app fechado à força, crash). Eles SEGURAM PORTAS — sobretudo a 1935 do MediaMTX — e fazem
 /// o boot falhar em loop ("a live nunca fica online").
@@ -714,31 +694,16 @@ fn kill_orphan_sidecars() {
     }
 }
 
-/// Testa qual encoder de hardware REALMENTE funciona (codifica 2 frames de uma cor sólida).
-/// O `-encoders` lista nvenc/qsv/amf no build do BtbN mesmo SEM a GPU, então só o teste real
-/// confirma. O protetor usa isso pra rodar na GPU (CPU ~zero) e acompanhar o tempo real —
-/// senão o MediaMTX derruba o leitor lento e a live cai.
+/// O MELHOR encoder de hardware que realmente funciona (1º da prioridade que passou na
+/// sonda real). É o que o "Automático" dos destinos usa — e o compositor/guardião também,
+/// pra rodar na GPU (CPU ~zero) e acompanhar o tempo real. `None` = só x264.
 async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
-    for codec in ["h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox"] {
-        let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
-            continue;
-        };
-        // 1280x720 (NÃO 128x128!): NVENC/QSV têm resolução MÍNIMA — um teste pequeno demais
-        // falha mesmo com a GPU presente (falso negativo → cai no libx264 → CPU estoura → live cai).
-        let res = cmd
-            .args([
-                "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
-                "color=c=black:s=1280x720:r=30", "-frames:v", "3", "-c:v", codec, "-f", "null", "-",
-            ])
-            .output()
-            .await;
-        if matches!(res, Ok(ref o) if o.status.success()) {
-            log::info!("protetor: encoder de hardware {codec} OK");
-            return Some(codec.to_string());
-        }
-    }
-    log::info!("protetor: sem encoder de hardware — libx264 ultrafast");
-    None
+    let ok = probe_hw_encoders(app).await;
+    HW_ENCODERS
+        .iter()
+        .zip(ok)
+        .find(|(_, works)| *works)
+        .map(|((_, _, codec, _), _)| (*codec).to_string())
 }
 
 /// Guarda RAII da trava de sessão: se o setup do start_engine abortar (erro/`?`/panic) antes de
@@ -810,8 +775,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let running = Arc::new(AtomicBool::new(true));
     // Sinal de ingestão: true quando o OBS está publicando no MediaMTX.
     let has_signal = Arc::new(AtomicBool::new(false));
-    // Já teve sinal ao menos uma vez nesta sessão? (slate "JÁ VOLTO" só vale em QUEDAS.)
-    let signal_seen = Arc::new(AtomicBool::new(false));
+    // O feed de programa (`_program`, publicado pelo compositor) está de pé?
+    let prog_ready = Arc::new(AtomicBool::new(false));
+    // "JÁ VOLTO no ar" (slate ou censura) — o compositor liga/desliga; a UI mostra nos destinos.
+    let slate_on = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
     chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
     // Uma flag de pausa por destino (controle ao vivo).
@@ -909,14 +876,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // 2b) Poller do sinal de ingestão (API do MediaMTX): há publisher (OBS no ar)?
     let run_sig = running.clone();
     let sig = has_signal.clone();
-    let seen_sig = signal_seen.clone();
+    let prog_sig = prog_ready.clone();
+    let ingest_name = engine::ingest_path_name(&config);
+    let program_name = engine::program_path_name(&config);
     tauri::async_runtime::spawn_blocking(move || {
         // Sinal vivo = publisher pronto E bytes subindo. Dois polls sem fluxo (~1.4s) = caiu,
         // mesmo que o MediaMTX ainda mostre `ready` (crash do OBS segura o ready por ~20s).
         let mut last_bytes = 0u64;
         let mut stalls = 0u32;
         while run_sig.load(Ordering::Relaxed) {
-            let (ready, bytes) = mediamtx_ingest();
+            let (ready, bytes, prog) = mediamtx_paths(&ingest_name, &program_name);
             let flowing = bytes != last_bytes; // qualquer mudança (sobe ou reseta) = atividade
             last_bytes = bytes;
             if ready && flowing {
@@ -926,9 +895,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             }
             let live = ready && stalls < 2;
             sig.store(live, Ordering::Relaxed);
-            if live {
-                seen_sig.store(true, Ordering::Relaxed);
-            }
+            prog_sig.store(prog, Ordering::Relaxed);
             std::thread::sleep(std::time::Duration::from_millis(700));
         }
     });
@@ -936,35 +903,58 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // 3) Um supervisor de FFmpeg POR destino — métricas reais e reconexão independentes.
     let brb_enabled = config.settings.brb_enabled;
     let auto_bitrate = config.settings.auto_bitrate;
-    // Slate do "JÁ VOLTO": imagem OU vídeo (custom) ou o PNG gerado. Detecta vídeo pela extensão
-    // e, se for vídeo, sonda uma vez se tem áudio (pra usar o do vídeo ou uma trilha silenciosa).
-    let slate_file = brb_slate_file(&app);
-    let slate_is_video = slate_file.as_deref().map(brb_slate_is_video).unwrap_or(false);
-    let slate_path: Option<String> = slate_file.map(|p| p.to_string_lossy().to_string());
-    let slate_has_audio = match (&slate_path, slate_is_video) {
-        (Some(p), true) => brb_slate_has_audio(&app, p).await,
-        _ => false,
-    };
 
-    // GUARDIÃO com BUFFER PRÓPRIO (compositor): segura o vídeo N segundos no nosso processo e, na
-    // SAÍDA, troca pelo slate "JÁ VOLTO" quando um termo do usuário aparece → preventivo garantido.
-    // As saídas leem o `_delayed` (genuinamente N atrás). Delay FIXO. Sem guardião → leem o `live`.
-    let delay_sec = if guard { engine::GUARD_DELAY_SEC } else { 0 };
-    let protect = guard;
-    let out_source = if protect {
-        engine::delayed_url(&config)
+    // COMPOSITOR (feed de programa): com JÁ VOLTO e/ou guardião ligados, o vídeo passa pela
+    // bomba e os destinos leem o `_program` CONTÍNUO — queda do OBS troca o CONTEÚDO pelo
+    // slate sem derrubar a conexão com as plataformas. Guardião = mesmo pipeline + delay/OCR.
+    // Sem os dois → destinos leem o `live` direto (zero custo extra; queda = "aguardando").
+    let compositor_on = brb_enabled || guard;
+    let out_source = if compositor_on {
+        engine::program_url(&config)
     } else {
         engine::ingest_url(&config)
     };
     log::info!(
-        "motor: guardião={protect} delay={delay_sec}s saídas-leem={}",
-        if protect { "_delayed" } else { "live" }
+        "motor: compositor={compositor_on} guardião={guard} saídas-leem={}",
+        if compositor_on { "_program" } else { "live" }
     );
-    if protect {
-        let hw = detect_hw_encoder(&app).await;
-        let (app_c, run_c, sig_c) = (app.clone(), running.clone(), has_signal.clone());
+    // Melhor encoder de HARDWARE real (sonda cacheada) — é o que o "Automático" dos destinos
+    // em transcode usa, e o compositor também. Só sonda se alguém for precisar.
+    let needs_hw = compositor_on
+        || enabled.iter().any(|t| {
+            engine::effective_action(&config.mode, t) == "transcode"
+                && t.encoding.encoder == "auto"
+        });
+    let hw_codec: Option<String> = if needs_hw { detect_hw_encoder(&app).await } else { None };
+    if compositor_on {
+        // Slate do "JÁ VOLTO": imagem OU vídeo (custom) ou o PNG gerado. Detecta vídeo pela
+        // extensão e, se for vídeo, sonda uma vez se tem trilha de áudio.
+        let slate_file = brb_slate_file(&app);
+        let slate_is_video = slate_file.as_deref().map(brb_slate_is_video).unwrap_or(false);
+        let spec = engine::program_spec(&config, guard);
+        let slate = match (&slate_file, slate_is_video) {
+            (Some(p), true) => {
+                let path = p.to_string_lossy().to_string();
+                let has_audio = brb_slate_has_audio(&app, &path).await;
+                crate::compositor::Slate::Video { path, has_audio }
+            }
+            _ => crate::compositor::Slate::Still(crate::compositor::load_slate_still(
+                &app,
+                &spec,
+                slate_file.as_deref(),
+            )),
+        };
+        let opts = crate::compositor::CompositorOpts {
+            spec,
+            delay_sec: if guard { engine::GUARD_DELAY_SEC } else { 0 },
+            hw_codec: hw_codec.clone(),
+            watchlist: if guard { guard_watchlist } else { Vec::new() },
+            slate,
+        };
+        let (app_c, run_c, sig_c, slate_c) =
+            (app.clone(), running.clone(), has_signal.clone(), slate_on.clone());
         tauri::async_runtime::spawn(async move {
-            crate::guardian::run_guard(app_c, run_c, sig_c, hw, guard_watchlist).await;
+            crate::compositor::run(app_c, run_c, sig_c, slate_c, opts).await;
         });
     }
 
@@ -978,13 +968,6 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 key = ykey.clone();
             }
         }
-        let slate_args = engine::ffmpeg_args_for_slate(
-            &target,
-            &key,
-            slate_path.as_deref(),
-            slate_is_video,
-            slate_has_audio,
-        );
         let cfg = config.clone();
         let is_transcode = engine::effective_action(&config.mode, t) == "transcode";
         let base_kbps = t
@@ -999,8 +982,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let app_t = app.clone();
         let run_flag = running.clone();
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
-        let signal = has_signal.clone();
-        let seen = signal_seen.clone();
+        // Com o compositor, a ENTRADA do destino é o `_program` — que fica de pé mesmo com o
+        // OBS caído. O "sinal" do destino passa a ser o programa; a queda do OBS não derruba
+        // nem reinicia este FFmpeg (o slate entra no MESMO fluxo, lá no compositor).
+        let signal = if compositor_on { prog_ready.clone() } else { has_signal.clone() };
+        let brb_flag = slate_on.clone();
+        let auto_codec = hw_codec.clone();
         let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
@@ -1016,25 +1003,27 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     continue;
                 }
 
-                // Sem sinal de ingestão: empurra o slate "JÁ VOLTO" — mas só se JÁ houve sinal
-                // antes (proteção contra QUEDAS). No começo, sem ingestão ainda, só aguarda.
+                // Sem fonte pra ler (OBS sem compositor; `_program` ainda não subiu com ele):
+                // aguarda. Com o compositor no ar isto praticamente não ocorre depois do começo —
+                // a queda do OBS NÃO passa por aqui (o programa segue publicando o slate).
                 if !signal.load(Ordering::Relaxed) {
-                    if brb_enabled && seen.load(Ordering::Relaxed) {
-                        run_slate(&app_t, &target_id, &slate_args, &run_flag, &pause_flag, &signal)
-                            .await;
-                    } else {
-                        set_target_state(&app_t, &target_id, "waiting");
-                        let _ = tauri::async_runtime::spawn_blocking(|| {
-                            std::thread::sleep(std::time::Duration::from_millis(700))
-                        })
-                        .await;
-                    }
+                    set_target_state(&app_t, &target_id, "waiting");
+                    let _ = tauri::async_runtime::spawn_blocking(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(700))
+                    })
+                    .await;
                     continue;
                 }
 
                 // Com sinal: FFmpeg normal (lê do MediaMTX → plataforma) no bitrate atual.
-                let args =
-                    engine::ffmpeg_args_for_target(&cfg, &target, &key, Some(current_kbps), &out_source);
+                let args = engine::ffmpeg_args_for_target(
+                    &cfg,
+                    &target,
+                    &key,
+                    Some(current_kbps),
+                    &out_source,
+                    auto_codec.as_deref(),
+                );
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")
@@ -1098,6 +1087,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                         &target_id,
                                         &line,
                                         signal.load(Ordering::Relaxed),
+                                        brb_flag.load(Ordering::Relaxed),
                                     );
                                     // Auto-bitrate: vigia a velocidade do FFmpeg (só em transcode).
                                     if auto_bitrate && is_transcode {
@@ -1364,7 +1354,9 @@ fn friendly_error(low: &str) -> (&'static str, String) {
 }
 
 /// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
-fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signal: bool) {
+/// `brb_on` = o compositor está com o slate "JÁ VOLTO" no ar → o destino continua
+/// transmitindo (stats fluindo), mas a UI mostra "brb" em vez de "live".
+fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signal: bool, brb_on: bool) {
     let is_stats = line.contains("frame=") || line.contains("bitrate=");
     const ERR_KEYS: [&str; 8] = [
         "error", "failed", "connection refused", "broken pipe",
@@ -1403,7 +1395,7 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
         if was_starting {
             snap.started_at = Some(started);
         }
-        st.state = "live".into();
+        st.state = if brb_on { "brb" } else { "live" }.into();
         st.message = None;
         st.uptime_sec = (now_ms().saturating_sub(started) as f64) / 1000.0;
         if let Some(f) = fps {

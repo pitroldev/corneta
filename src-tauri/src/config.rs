@@ -118,9 +118,10 @@ pub struct Settings {
     /// Posição do divisor do modo "Ambos": % que o painel de alertas ocupa (15–75).
     #[serde(default = "default_both_split")]
     pub chat_both_split: u32,
-    /// Proteção contra quedas: empurra um slate "JÁ VOLTO" pras plataformas se o sinal
-    /// cair NO MEIO da live (só após já ter tido sinal) — mantém a transmissão de pé.
-    #[serde(default = "default_true")]
+    /// Proteção contra quedas: liga o compositor (feed de programa contínuo) — se o sinal
+    /// cair NO MEIO da live, o slate "JÁ VOLTO" entra SEM derrubar a conexão das plataformas.
+    /// Padrão DESLIGADO: custa um re-encode contínuo (pesa em PC fraco sem GPU).
+    #[serde(default)]
     pub brb_enabled: bool,
     /// Tela "JÁ VOLTO": "auto" (gerada pela Corneta) | "image" | "video" (arquivo escolhido pelo
     /// usuário, salvo como brb-slate.* na pasta de config). Vídeo pode ter som.
@@ -231,7 +232,7 @@ impl Default for Settings {
             chat_both_layout: default_both_layout(),
             chat_both_alerts_first: false,
             chat_both_split: default_both_split(),
-            brb_enabled: true,
+            brb_enabled: false,
             brb_slate_kind: default_brb_slate_kind(),
             auto_bitrate: true,
             guardian_enabled: false,

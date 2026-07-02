@@ -65,13 +65,18 @@ pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
     }
 }
 
-fn ffmpeg_video_codec(encoder: &str) -> &'static str {
+/// Codec de vídeo do FFmpeg pra escolha do usuário. `auto_codec` = o melhor encoder de
+/// HARDWARE que realmente funciona nesta máquina (sondado com um encode de verdade em
+/// `detect_hw_encoder` — a listagem `-encoders` mente), na prioridade NVENC > QSV > AMF >
+/// VideoToolbox. "Automático" usa ele; sem hardware, x264.
+fn ffmpeg_video_codec<'a>(encoder: &str, auto_codec: Option<&'a str>) -> &'a str {
     match encoder {
         "nvenc" => "h264_nvenc",
         "qsv" => "h264_qsv",
         "amf" => "h264_amf",
         "videotoolbox" => "h264_videotoolbox",
-        _ => "libx264", // "software" e "auto" caem aqui (auto real escolheria o melhor disponível)
+        "software" => "libx264",
+        _ => auto_codec.unwrap_or("libx264"), // "auto": melhor hardware REAL, senão x264
     }
 }
 
@@ -103,12 +108,25 @@ pub fn ingest_url(config: &AppConfig) -> String {
         config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
     )
 }
-/// URL do sinal ATRASADO (republicado pelo delayer) — usada quando o delay de proteção está ligado.
-pub fn delayed_url(config: &AppConfig) -> String {
+/// URL do **feed de programa** — o sinal contínuo republicado pelo compositor (com ou sem
+/// delay do guardião). Os destinos leem DAQUI quando o compositor está ativo: como o encoder
+/// do programa nunca para de publicar, a conexão com as plataformas nunca cai.
+pub fn program_url(config: &AppConfig) -> String {
     format!(
-        "{}://{}:{}/{}/{}_delayed",
+        "{}://{}:{}/{}/{}_program",
         config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
     )
+}
+
+/// Nome do path do programa na API do MediaMTX (`<app>/<key>_program`).
+pub fn program_path_name(config: &AppConfig) -> String {
+    format!("{}/{}_program", config.ingest.app, config.ingest.key)
+}
+
+/// Nome do path de ingestão na API do MediaMTX (`<app>/<key>`). Usado pra checar o sinal do
+/// OBS SEM confundir com o publisher do próprio compositor (que fica em `_program`).
+pub fn ingest_path_name(config: &AppConfig) -> String {
+    format!("{}/{}", config.ingest.app, config.ingest.key)
 }
 
 pub fn ffmpeg_args_for_target(
@@ -117,6 +135,7 @@ pub fn ffmpeg_args_for_target(
     key: &str,
     br_override: Option<u32>,
     source_url: &str,
+    auto_codec: Option<&str>,
 ) -> Vec<String> {
     let ingest = source_url.to_string();
     let url = output_url(t, key);
@@ -141,7 +160,7 @@ pub fn ffmpeg_args_for_target(
                 .clone()
                 .unwrap_or_else(|| recommended_preset(&t.platform_id)),
         );
-        let codec = ffmpeg_video_codec(&t.encoding.encoder);
+        let codec = ffmpeg_video_codec(&t.encoding.encoder, auto_codec);
         let fps = p.fps.max(1);
         let gop = (fps * p.keyframe_sec.max(1)).to_string();
         // Saída vertical → recorta/enquadra 9:16; saída landscape → só escala.
@@ -200,18 +219,64 @@ pub fn ffmpeg_args_for_target(
 /// transmissão inteira (e o chat) fica esse tanto atrás do tempo real — o preço da cobertura.
 pub const GUARD_DELAY_SEC: u32 = 12;
 
-// --- Guardião com BUFFER próprio (compositor): delay REAL + slate preventivo ---
-// O vídeo passa CRU por um buffer no nosso processo (delay garantido) e a tarja é
-// desenhada por nós na saída. Ver docs/FEATURE-PROTETOR-BUFFER.md.
+// --- Compositor (feed de programa): vídeo CRU pelo nosso processo, saída CONTÍNUA ---
+// O vídeo passa CRU por uma bomba no nosso processo e a saída (encoder → `_program`) nunca
+// para: sinal caiu → a bomba injeta o slate "JÁ VOLTO" + silêncio NO MESMO fluxo, sem trocar
+// processo — a conexão com as plataformas não cai. O guardião roda em cima disto (delay+OCR).
+// Ver docs/FEATURE-PROTETOR-BUFFER.md.
 
-/// Resolução/FPS do compositor (v1 fixo — previsível p/ o buffer; destinos adaptam do `_delayed`).
-pub const COMP_W: usize = 1920;
-pub const COMP_H: usize = 1080;
-pub const COMP_FPS: usize = 30;
+/// Áudio do programa: sempre s16le 48 kHz estéreo (a bomba alinha vídeo e áudio por tick).
+pub const PROG_AUDIO_HZ: u32 = 48_000;
+pub const PROG_AUDIO_CH: u32 = 2;
 
-/// **Decoder**: lê o `live` e cospe vídeo CRU (yuv420p, tamanho/fps fixos) no stdout, que o
-/// compositor lê. Sem áudio aqui (o áudio vai pelo encoder, com adelay).
-pub fn ffmpeg_args_for_decoder(config: &AppConfig) -> Vec<String> {
+/// Dimensões/taxa/bitrate do feed de programa.
+#[derive(Clone, Copy, Debug)]
+pub struct ProgramSpec {
+    pub w: u32,
+    pub h: u32,
+    pub fps: u32,
+    pub video_kbps: u32,
+}
+
+impl ProgramSpec {
+    /// Bytes de um quadro yuv420p.
+    pub fn frame_size(&self) -> usize {
+        (self.w as usize) * (self.h as usize) * 3 / 2
+    }
+    /// Bytes de áudio (s16le estéreo 48 kHz) por quadro de vídeo — mantém A/V casados por tick.
+    pub fn audio_bytes_per_frame(&self) -> usize {
+        ((PROG_AUDIO_HZ * PROG_AUDIO_CH * 2) / self.fps.max(1)) as usize
+    }
+}
+
+/// Deriva o spec do programa dos destinos ativos: fps acompanha o maior preset (cap 60;
+/// TRAVADO em 30 com o guardião — o buffer de 12s a 60fps dobraria pra ~2 GB de RAM) e o
+/// bitrate acompanha o maior destino (os "copy" empurram o encode do programa como está).
+/// Resolução fixa 1920x1080 (fonte OBS típica; o scale normaliza qualquer entrada).
+pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
+    let mut max_fps = 30u32;
+    let mut max_kbps = 4500u32;
+    for t in config.targets.iter().filter(|t| t.enabled) {
+        let p = sanitize_preset(
+            t.encoding
+                .preset
+                .clone()
+                .unwrap_or_else(|| recommended_preset(&t.platform_id)),
+        );
+        max_fps = max_fps.max(p.fps);
+        max_kbps = max_kbps.max(p.video_bitrate_kbps);
+    }
+    ProgramSpec {
+        w: 1920,
+        h: 1080,
+        fps: if guard { 30 } else { max_fps.clamp(30, 60) },
+        video_kbps: max_kbps.clamp(2500, 12_000),
+    }
+}
+
+/// **Decoder de vídeo**: lê o `live` e cospe vídeo CRU (yuv420p, tamanho/fps do spec) no
+/// stdout, que a bomba lê. Sem áudio aqui (o áudio tem decoder próprio).
+pub fn ffmpeg_args_for_decoder(config: &AppConfig, spec: &ProgramSpec) -> Vec<String> {
     vec![
         "-hide_banner".into(),
         "-loglevel".into(),
@@ -225,7 +290,7 @@ pub fn ffmpeg_args_for_decoder(config: &AppConfig) -> Vec<String> {
         "-map".into(),
         "0:v".into(),
         "-vf".into(),
-        format!("scale={COMP_W}:{COMP_H},fps={COMP_FPS}"),
+        format!("scale={}:{},fps={}", spec.w, spec.h, spec.fps),
         "-f".into(),
         "rawvideo".into(),
         "-pix_fmt".into(),
@@ -234,163 +299,170 @@ pub fn ffmpeg_args_for_decoder(config: &AppConfig) -> Vec<String> {
     ]
 }
 
-/// **Encoder**: lê o vídeo CRU do compositor (stdin) + o áudio do `live` (atrasado por `adelay`
-/// pra casar com o vídeo, que já sai N atrás pelo buffer) e publica em `_delayed`.
+/// **Decoder de áudio**: lê o `live` e cospe PCM cru (s16le 48 kHz estéreo) no stdout.
+/// Se a fonte não tiver áudio, o FFmpeg sai na hora (sem stream de saída) e a bomba
+/// preenche com silêncio — mesma resiliência da queda de sinal.
+pub fn ffmpeg_args_for_audio_decoder(config: &AppConfig) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-i".into(),
+        ingest_url(config),
+        "-vn".into(),
+        "-map".into(),
+        "0:a".into(),
+        "-f".into(),
+        "s16le".into(),
+        "-ar".into(),
+        PROG_AUDIO_HZ.to_string(),
+        "-ac".into(),
+        PROG_AUDIO_CH.to_string(),
+        "-".into(),
+    ]
+}
+
+/// **Decoder do slate-vídeo**: loop INFINITO do arquivo escolhido pelo usuário → vídeo CRU
+/// no ritmo real (`-re`), pro slate animado entrar no MESMO fluxo do programa.
+pub fn ffmpeg_args_for_slate_video(path: &str, spec: &ProgramSpec) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-stream_loop".into(),
+        "-1".into(),
+        "-re".into(),
+        "-i".into(),
+        path.into(),
+        "-map".into(),
+        "0:v".into(),
+        "-vf".into(),
+        format!("scale={}:{},fps={}", spec.w, spec.h, spec.fps),
+        "-f".into(),
+        "rawvideo".into(),
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-".into(),
+    ]
+}
+
+/// **Decoder do áudio do slate-vídeo**: loop infinito da trilha do arquivo → PCM cru.
+pub fn ffmpeg_args_for_slate_audio(path: &str) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-stream_loop".into(),
+        "-1".into(),
+        "-re".into(),
+        "-i".into(),
+        path.into(),
+        "-vn".into(),
+        "-map".into(),
+        "0:a".into(),
+        "-f".into(),
+        "s16le".into(),
+        "-ar".into(),
+        PROG_AUDIO_HZ.to_string(),
+        "-ac".into(),
+        PROG_AUDIO_CH.to_string(),
+        "-".into(),
+    ]
+}
+
+/// **Encoder do programa**: lê o vídeo CRU da bomba (stdin) + o áudio CRU da bomba (TCP
+/// loopback — a bomba é o servidor) e publica CONTINUAMENTE em `_program`. Como as duas
+/// entradas vêm da bomba (que nunca para), este processo sobrevive à queda do OBS — e é
+/// isso que mantém a conexão das plataformas de pé. A/V já chegam alinhados (a bomba emite
+/// 1 quadro + N bytes de áudio por tick), então não há `adelay`.
 pub fn ffmpeg_args_for_encoder(
     config: &AppConfig,
-    delay_sec: u32,
+    spec: &ProgramSpec,
     hw_codec: Option<&str>,
+    audio_port: u16,
 ) -> Vec<String> {
+    let gop = (spec.fps * 2).to_string(); // keyframe 2s
+    let vbr = spec.video_kbps;
+    // CRÍTICO: `-analyzeduration 0 -probesize 32` nas DUAS entradas cruas. Os formatos são
+    // 100% forçados por flag (rawvideo/s16le + tamanho/taxa), então a sondagem do
+    // find_stream_info é inútil — e o padrão dela (~5 s de dados!) criava um deadlock:
+    // o FFmpeg segurava o stdin do vídeo enquanto esperava áudio suficiente pra análise,
+    // a bomba travava no write do quadro e o áudio parava de chegar. Círculo perfeito.
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
         "warning".into(),
-        // Entrada 0: vídeo cru do compositor (stdin).
+        // Entrada 0: vídeo cru da bomba (stdin).
+        "-analyzeduration".into(),
+        "0".into(),
+        "-probesize".into(),
+        "32".into(),
         "-f".into(),
         "rawvideo".into(),
         "-pix_fmt".into(),
         "yuv420p".into(),
         "-s".into(),
-        format!("{COMP_W}x{COMP_H}"),
+        format!("{}x{}", spec.w, spec.h),
         "-r".into(),
-        COMP_FPS.to_string(),
+        spec.fps.to_string(),
         "-i".into(),
         "-".into(),
-        // Entrada 1: áudio do live.
+        // Entrada 1: áudio cru da bomba (TCP local — o connect entra na backlog do listener,
+        // então não há deadlock com o accept).
+        "-analyzeduration".into(),
+        "0".into(),
+        "-probesize".into(),
+        "32".into(),
+        "-f".into(),
+        "s16le".into(),
+        "-ar".into(),
+        PROG_AUDIO_HZ.to_string(),
+        "-ac".into(),
+        PROG_AUDIO_CH.to_string(),
         "-i".into(),
-        ingest_url(config),
+        format!("tcp://127.0.0.1:{audio_port}"),
         "-map".into(),
         "0:v".into(),
         "-map".into(),
-        "1:a?".into(),
+        "1:a".into(),
     ];
     match hw_codec {
         Some(codec) => args.extend(
-            ["-c:v", codec, "-b:v", "6000k", "-maxrate", "6000k", "-bufsize", "6000k", "-g", "60"]
-                .map(String::from),
+            [
+                "-c:v", codec,
+                "-b:v", &format!("{vbr}k"),
+                "-maxrate", &format!("{vbr}k"),
+                "-bufsize", &format!("{}k", vbr * 2),
+                "-g", &gop,
+            ]
+            .map(String::from),
         ),
         None => args.extend(
             [
-                "-c:v", "libx264", "-preset", "veryfast", "-b:v", "6000k", "-maxrate", "6000k",
-                "-bufsize", "6000k", "-g", "60", "-pix_fmt", "yuv420p",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-b:v", &format!("{vbr}k"),
+                "-maxrate", &format!("{vbr}k"),
+                "-bufsize", &format!("{}k", vbr * 2),
+                "-g", &gop,
+                "-keyint_min", &gop,
+                "-sc_threshold", "0",
+                "-pix_fmt", "yuv420p",
             ]
             .map(String::from),
         ),
     }
-    // Áudio atrasado por N pra sincronizar com o vídeo (que sai N atrás pelo buffer).
-    let ms = (delay_sec.max(1)) * 1000;
     args.extend(
         [
-            "-af",
-            &format!("adelay=delays={ms}:all=1"),
-            "-c:a",
-            "aac",
-            "-ar",
-            "48000",
-            "-ac",
-            "2",
-            "-b:a",
-            "160k",
-            "-f",
-            "flv",
-        ]
-        .map(String::from),
-    );
-    args.push(delayed_url(config));
-    args
-}
-
-/// Monta o FFmpeg do **slate "JÁ VOLTO"** e empurra pra plataforma — mantém a live de pé
-/// quando o sinal cai. Três modos, conforme o que o usuário escolheu (ver brb_slate_kind):
-///   • gerada (slate_path=None): cor sólida + áudio silencioso;
-///   • imagem (is_video=false): loop de um still + áudio silencioso;
-///   • vídeo  (is_video=true):  loop INFINITO do vídeo, com o ÁUDIO do próprio vídeo quando
-///     existe (has_audio) — senão, trilha silenciosa (a plataforma exige áudio; um vídeo mudo
-///     não pode travar o FFmpeg num -map de áudio inexistente).
-pub fn ffmpeg_args_for_slate(
-    t: &Target,
-    key: &str,
-    slate_path: Option<&str>,
-    is_video: bool,
-    has_audio: bool,
-) -> Vec<String> {
-    let url = output_url(t, key);
-    let p = sanitize_preset(
-        t.encoding
-            .preset
-            .clone()
-            .unwrap_or_else(|| recommended_preset(&t.platform_id)),
-    );
-    let fps = p.fps.max(1);
-    let gop = (fps * 2).to_string(); // keyframe 2s
-    let vbitrate = p.video_bitrate_kbps.clamp(1000, 3000); // slate é leve
-    let scale = format!("scale={}:{},format=yuv420p", p.width, p.height);
-
-    let mut args: Vec<String> = vec![
-        "-hide_banner".into(),
-        "-loglevel".into(),
-        "warning".into(),
-        "-stats".into(),
-    ];
-    // Entrada 0: a fonte do slate.
-    match slate_path {
-        // Vídeo: loop INFINITO lido em tempo real (segura o slate no ar até o sinal voltar).
-        Some(path) if is_video => {
-            args.extend(["-stream_loop", "-1", "-re", "-i", path].map(String::from))
-        }
-        // Imagem: um still em loop.
-        Some(path) => args.extend(["-re", "-loop", "1", "-i", path].map(String::from)),
-        // Gerada: cor sólida.
-        None => args.extend(
-            [
-                "-re",
-                "-f",
-                "lavfi",
-                "-i",
-                &format!("color=c=0x14100a:s={}x{}:r={fps}", p.width, p.height),
-            ]
-            .map(String::from),
-        ),
-    }
-    // Entrada 1: áudio silencioso (usado na cor/still e como fallback do vídeo MUDO).
-    args.extend(
-        [
-            "-f", "lavfi",
-            "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-        ]
-        .map(String::from),
-    );
-    args.extend(["-map", "0:v", "-vf", &scale, "-r", &fps.to_string()].map(String::from));
-    args.extend(["-c:v", "libx264", "-preset", "veryfast"].map(String::from));
-    // `-tune stillimage` só ajuda numa tela PARADA — vídeo em movimento não usa.
-    if !is_video {
-        args.extend(["-tune", "stillimage"].map(String::from));
-    }
-    args.extend(
-        [
-            "-b:v", &format!("{vbitrate}k"),
-            "-maxrate", &format!("{vbitrate}k"),
-            "-bufsize", &format!("{}k", vbitrate * 2),
-            "-g", &gop,
-            "-keyint_min", &gop,
-            "-sc_threshold", "0",
-        ]
-        .map(String::from),
-    );
-    // Áudio: o do próprio vídeo quando há; senão, a trilha silenciosa (entrada 1).
-    let amap = if is_video && has_audio { "0:a" } else { "1:a" };
-    args.extend(
-        [
-            "-map", amap,
             "-c:a", "aac",
             "-ar", "48000",
             "-ac", "2",
-            "-b:a", "128k",
+            "-b:a", "160k",
             "-f", "flv",
-            &url,
         ]
         .map(String::from),
     );
+    args.push(program_url(config));
     args
 }
 

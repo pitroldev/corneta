@@ -76,7 +76,7 @@ export function ChatPopout() {
   const bindChatAuth = useStore((s) => s.bindChatAuth);
   const bindAuthFlow = useStore((s) => s.bindAuthFlow);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
-  const [tab, setTab] = useState<"chat" | "alerts" | "both">("chat");
+  const [tab, setTab] = useState<"chat" | "alerts" | "both">("both");
   const [showConfig, setShowConfig] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [maximized, setMaximized] = useState(false);
@@ -357,14 +357,14 @@ export function ChatPopout() {
       {/* Toolbar: abas + viewers + conexão + limpar + config */}
       <div className="flex items-center gap-1.5 border-b-2 border-border-soft px-2 py-1.5">
         <div className="flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5">
+          <TabBtn active={tab === "both"} onClick={() => setTab("both")}>
+            Ambos
+          </TabBtn>
           <TabBtn active={tab === "chat"} onClick={() => setTab("chat")}>
             Chat
           </TabBtn>
           <TabBtn active={tab === "alerts"} onClick={() => setTab("alerts")}>
             Alertas{alerts.length > 0 ? ` ${alerts.length}` : ""}
-          </TabBtn>
-          <TabBtn active={tab === "both"} onClick={() => setTab("both")}>
-            Ambos
           </TabBtn>
         </div>
         <div className="ml-auto flex items-center gap-1">

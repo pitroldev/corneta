@@ -58,7 +58,7 @@ export function defaultConfig(): AppConfig {
       chatBothLayout: "auto",
       chatBothAlertsFirst: false,
       chatBothSplit: 35,
-      brbEnabled: true,
+      brbEnabled: false,
       brbSlateKind: "auto",
       autoBitrate: true,
       guardianEnabled: false,
