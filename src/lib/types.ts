@@ -128,6 +128,8 @@ export interface AppSettings {
   theme: "dark" | "light";
   /** Tamanho da fonte do chat, em pixels. */
   chatFontSize: number;
+  /** Tamanho da fonte dos alertas, em pixels (slider próprio, igual ao do chat). */
+  alertFontSize: number;
   /** Layout do modo "Ambos" da janela do chat. */
   chatBothLayout: "auto" | "row" | "col";
   /** No modo "Ambos", mostrar os alertas antes do chat. */
@@ -140,6 +142,8 @@ export interface AppSettings {
   guardianWatchlist: string[];
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
+  /** Tela "JÁ VOLTO": "auto" (gerada) | "image" | "video" (arquivo escolhido pelo usuário). */
+  brbSlateKind: "auto" | "image" | "video";
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
   autoBitrate: boolean;
   /** YouTube automático: cria a transmissão (broadcast) e injeta a chave no BORA — sem Studio. */

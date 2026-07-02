@@ -39,6 +39,8 @@ interface State {
 
   load: () => Promise<void>;
   bindEngine: () => () => void;
+  /** Sincroniza a config quando OUTRA janela (ex.: popout do chat) a salva. */
+  bindConfigSync: () => () => void;
 
   addTarget: (platformId: PlatformId) => void;
   updateTarget: (id: string, patch: Partial<Target>) => void;
@@ -72,6 +74,8 @@ interface State {
   chatConnected: boolean;
   chatStatuses: Record<string, { platform: string; status: string }>;
   bindChat: () => () => void;
+  /** Espelha o estado "conectado" do chat entre janelas (é global no backend). */
+  bindChatRunning: () => () => void;
   connectChat: () => Promise<void>;
   disconnectChat: () => Promise<void>;
 
@@ -217,10 +221,24 @@ export const useStore = create<State>((set, get) => {
         };
       }
       set({ config, encoders, loaded: true });
+      // Semeia o estado de conexão do chat: a janela pode ter aberto (ou o popout montado)
+      // com o chat já no ar — sem isto o botão nasceria em "Conectar" com o chat rodando.
+      try {
+        set({ chatConnected: await api.chatRunning() });
+      } catch {
+        /* backend indisponível (demo) — mantém o default */
+      }
     },
 
     bindEngine() {
       return api.subscribe((snapshot) => set({ snapshot }));
+    },
+
+    bindConfigSync() {
+      // Config salva por outra janela → atualiza a base local SEM re-persistir (senão as
+      // janelas entrariam em loop sobrescrevendo o disco uma da outra). Fecha o clobber em
+      // que o popout revertia um destino/perfil criado na janela principal (e vice-versa).
+      return api.subscribeConfigChanged((config) => set({ config }));
     },
 
     addTarget(platformId) {
@@ -481,6 +499,13 @@ export const useStore = create<State>((set, get) => {
             chatMessages: s.chatMessages.map((m) => (keepMessage(m, d) ? m : { ...m, deleted: true })),
           }))
       );
+    },
+
+    bindChatRunning() {
+      // "Conectado" é estado global do backend: start/stop de qualquer janela reflete na outra
+      // (sem isto, desconectar pelo popout deixava a principal presa em "conectado", e o popout
+      // nascia mostrando "Conectar" com o chat já no ar). Não mexe nas mensagens.
+      return api.subscribeChatRunning((running) => set({ chatConnected: running }));
     },
 
     async connectChat() {

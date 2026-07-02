@@ -29,6 +29,8 @@ export const IS_TAURI =
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
   saveConfig(config: AppConfig): Promise<void>;
+  /** Config salva por QUALQUER janela → sincroniza as demais (evita clobber entre webviews). */
+  subscribeConfigChanged(cb: (c: AppConfig) => void): () => void;
   setKey(targetId: string, key: string): Promise<void>;
   clearKey(targetId: string): Promise<void>;
   detectEncoders(): Promise<EncoderInfo[]>;
@@ -46,6 +48,10 @@ export interface CornetaApi {
   // Chat unificado
   chatStart(): Promise<void>;
   chatStop(): Promise<void>;
+  /** Há sessão de chat no ar? (pro popout nascer com o estado da janela principal.) */
+  chatRunning(): Promise<boolean>;
+  /** Estado "conectado" do chat sincronizado entre janelas (start/stop de qualquer webview). */
+  subscribeChatRunning(cb: (running: boolean) => void): () => void;
   chatSend(text: string, sources?: string[]): Promise<void>;
   subscribeChatAuth(onAuth: (a: { source: string; login: string; ok: boolean }) => void): () => void;
   // OAuth (envio/moderação)
@@ -110,6 +116,10 @@ export interface CornetaApi {
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
   saveBrbSlate(b64: string): Promise<void>;
+  /** Escolhe imagem/vídeo como tela do "JÁ VOLTO". Devolve a kind ("image"/"video") ou "" se cancelou. */
+  setBrbSlate(): Promise<string>;
+  /** Volta a tela do "JÁ VOLTO" pro padrão gerado (apaga o custom). */
+  clearBrbSlate(): Promise<void>;
   captureFrame(): Promise<string>;
   // Guardião anti-vazamento
   subscribeGuardian(onLeak: (l: Leak) => void, onCensor: (on: boolean) => void): () => void;
@@ -144,6 +154,20 @@ function tauriApi(): CornetaApi {
     async saveConfig(config) {
       const { invoke } = await core();
       await invoke("save_config", { config });
+    },
+    subscribeConfigChanged(cb) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<AppConfig>("config://changed", (e) => cb(e.payload)).then((u) =>
+          cancelled ? u() : (unlisten = u)
+        )
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     async setKey(targetId, key) {
       const { invoke } = await core();
@@ -214,6 +238,24 @@ function tauriApi(): CornetaApi {
     async chatStop() {
       const { invoke } = await core();
       await invoke("chat_stop");
+    },
+    async chatRunning() {
+      const { invoke } = await core();
+      return invoke<boolean>("chat_running");
+    },
+    subscribeChatRunning(cb) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<boolean>("chat://running", (e) => cb(e.payload)).then((u) =>
+          cancelled ? u() : (unlisten = u)
+        )
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     async chatSend(text, sources) {
       const { invoke } = await core();
@@ -431,6 +473,14 @@ function tauriApi(): CornetaApi {
     async saveBrbSlate(b64) {
       const { invoke } = await core();
       await invoke("save_brb_slate", { data: b64 });
+    },
+    async setBrbSlate() {
+      const { invoke } = await core();
+      return invoke<string>("set_brb_slate");
+    },
+    async clearBrbSlate() {
+      const { invoke } = await core();
+      await invoke("clear_brb_slate");
     },
     async captureFrame() {
       const { invoke } = await core();
@@ -746,6 +796,10 @@ function mockApi(): CornetaApi {
     async saveConfig(config) {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
     },
+    subscribeConfigChanged() {
+      // Navegador = uma janela só; não há outra webview pra sincronizar.
+      return () => {};
+    },
     async setKey(targetId, key) {
       const v = loadVault();
       v[targetId] = key;
@@ -968,6 +1022,13 @@ function mockApi(): CornetaApi {
       viewerTimer = null;
       viewerListeners.forEach((l) => l({ total: 0, anyLive: false, items: [] }));
     },
+    async chatRunning() {
+      return chatTimer != null;
+    },
+    subscribeChatRunning() {
+      // Navegador = uma janela só; nada pra sincronizar entre webviews.
+      return () => {};
+    },
     async openChatWindow() {
       // No navegador não dá pra abrir janela nativa (no app instalado, abre a flutuante).
     },
@@ -1061,6 +1122,14 @@ function mockApi(): CornetaApi {
     },
     async saveBrbSlate() {
       // no-op no navegador (sem backend pra salvar o slate)
+    },
+    async setBrbSlate() {
+      // no-op no navegador (sem seletor de arquivo nativo)
+      console.log("[mock] setBrbSlate: sem seletor de arquivo no navegador");
+      return "";
+    },
+    async clearBrbSlate() {
+      // no-op no navegador
     },
     async captureFrame() {
       throw new Error("captura de frame só no app instalado (e ao vivo)");

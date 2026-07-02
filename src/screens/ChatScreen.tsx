@@ -625,14 +625,27 @@ export function ChatScreen() {
                 <ToggleRow icon={Eye} label="Quem assiste" hint="contador de espectadores" checked={s.chatShowViewers ?? true} onChange={(v) => setSettings({ chatShowViewers: v })} />
               </div>
               <div className="mt-3 flex items-center gap-3 border-t border-border-soft pt-3">
-                <span className="shrink-0 text-sm font-semibold text-ink-muted">Tamanho da fonte</span>
+                <span className="shrink-0 text-sm font-semibold text-ink-muted">Tamanho da fonte do chat</span>
                 <Slider
                   className="ml-auto max-w-52 flex-1"
                   value={view.fontSize}
-                  min={11}
-                  max={26}
+                  min={8}
+                  max={44}
                   onChange={(v) => setSettings({ chatFontSize: v })}
                   suffix="px"
+                  aria-label="Tamanho da fonte do chat"
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <span className="shrink-0 text-sm font-semibold text-ink-muted">Tamanho da fonte dos alertas</span>
+                <Slider
+                  className="ml-auto max-w-52 flex-1"
+                  value={s.alertFontSize ?? 14}
+                  min={8}
+                  max={44}
+                  onChange={(v) => setSettings({ alertFontSize: v })}
+                  suffix="px"
+                  aria-label="Tamanho da fonte dos alertas"
                 />
               </div>
             </div>
@@ -716,7 +729,7 @@ export function ChatScreen() {
                 {confirmClearAlerts ? "Limpar?" : <Trash2 className="size-3.5" />}
               </button>
             </div>
-            <AlertsFeed alerts={alerts} className="flex-1" />
+            <AlertsFeed alerts={alerts} className="flex-1" fontSize={s.alertFontSize ?? 14} />
           </Card>
         )}
       </div>
@@ -1137,32 +1150,63 @@ function YoutubeCredsForm({ onSave }: { onSave: (clientId: string, clientSecret:
       </div>
 
       {guide && (
-        <ol className="mb-2.5 list-decimal space-y-2 rounded-md bg-surface px-5 py-3 text-[11px] leading-relaxed text-ink-muted marker:font-bold marker:text-brass">
-          <li>
-            Abra o{" "}
-            <button
-              onClick={() => void openExternal("https://console.cloud.google.com/projectcreate")}
-              className="font-bold text-brass hover:underline"
-            >
-              Google Cloud Console
-            </button>{" "}
-            e crie um projeto.
-          </li>
-          <li>
-            Em <strong className="text-ink">APIs e Serviços → Biblioteca</strong>, procure e ative a{" "}
-            <strong className="text-ink">YouTube Data API v3</strong>.
-          </li>
-          <li>
-            Em <strong className="text-ink">Tela de permissão OAuth</strong>: escolha{" "}
-            <strong className="text-ink">External</strong> e adicione seu e-mail em{" "}
-            <strong className="text-ink">Usuários de teste</strong>.
-          </li>
-          <li>
-            Em <strong className="text-ink">Credenciais → Criar credenciais → ID do cliente OAuth</strong>,
-            escolha o tipo <strong className="text-ink">TVs e dispositivos de entrada limitada</strong>.
-          </li>
-          <li>Copie o Client ID e o Client Secret e cole abaixo. ↓</li>
-        </ol>
+        <>
+          <ol className="mb-2.5 list-decimal space-y-2 rounded-md bg-surface px-5 py-3 text-[11px] leading-relaxed text-ink-muted marker:font-bold marker:text-brass">
+            <li>
+              Abra o{" "}
+              <button
+                onClick={() => void openExternal("https://console.cloud.google.com/projectcreate")}
+                className="font-bold text-brass hover:underline"
+              >
+                Google Cloud Console
+              </button>{" "}
+              e crie um projeto (dê qualquer nome, ex.: “Corneta”). Quando terminar, confira lá no topo se
+              o projeto novo é o que está selecionado.
+            </li>
+            <li>
+              No menu <strong className="text-ink">☰ → APIs e serviços → Biblioteca</strong>, busque por{" "}
+              <strong className="text-ink">YouTube Data API v3</strong> e clique em{" "}
+              <strong className="text-ink">Ativar</strong>.
+            </li>
+            <li>
+              Ainda em <strong className="text-ink">APIs e serviços</strong>, procure por{" "}
+              <strong className="text-ink">Tela de permissão OAuth</strong> (nas versões novas isso aparece
+              como <strong className="text-ink">Público-alvo</strong> ou{" "}
+              <strong className="text-ink">Branding</strong>). Se pedir o{" "}
+              <strong className="text-ink">Tipo de usuário</strong>, escolha{" "}
+              <strong className="text-ink">Externo</strong> e siga.
+            </li>
+            <li>
+              Preencha os <strong className="text-ink">campos obrigatórios</strong>:{" "}
+              <strong className="text-ink">Nome do app</strong> (o que quiser),{" "}
+              <strong className="text-ink">E-mail de suporte do usuário</strong> (o seu e-mail) e, mais pra
+              baixo, <strong className="text-ink">E-mail de contato do desenvolvedor</strong> (o seu e-mail de
+              novo). Salve e continue.
+            </li>
+            <li>
+              Procure a seção <strong className="text-ink">Usuários de teste</strong> (fica na aba{" "}
+              <strong className="text-ink">Público-alvo</strong> / “Audience”) e{" "}
+              <strong className="text-ink">adicione o e-mail da sua conta do YouTube</strong>. Sem isso o
+              login nem funciona.
+            </li>
+            <li>
+              Em <strong className="text-ink">Credenciais → Criar credenciais → ID do cliente OAuth</strong>,
+              escolha o tipo <strong className="text-ink">TVs e dispositivos de entrada limitada</strong> e crie.
+            </li>
+            <li>
+              Copie o <strong className="text-ink">Client ID</strong> e o{" "}
+              <strong className="text-ink">Client Secret</strong> e cole aqui embaixo. ↓
+            </li>
+          </ol>
+          <p className="mb-2.5 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
+            <strong className="text-ink">⚠️ Importante:</strong> enquanto o app ficar em modo{" "}
+            <strong className="text-ink">“Teste” (Testing)</strong> — o normal, sem passar pela verificação
+            do Google — o login do YouTube <strong className="text-ink">expira a cada ~7 dias</strong>. Quando
+            cair, é só voltar aqui e clicar em <strong className="text-ink">Entrar</strong> de novo. Por isso o
+            passo de se colocar como <strong className="text-ink">Usuário de teste</strong> é obrigatório
+            (publicar/verificar o app é opcional e bem mais burocrático).
+          </p>
+        </>
       )}
 
       <div className="flex flex-col gap-2">

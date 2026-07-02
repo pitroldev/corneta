@@ -27,7 +27,9 @@ export default function App() {
   const loaded = useStore((s) => s.loaded);
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
+  const bindConfigSync = useStore((s) => s.bindConfigSync);
   const bindChat = useStore((s) => s.bindChat);
+  const bindChatRunning = useStore((s) => s.bindChatRunning);
   const bindAlerts = useStore((s) => s.bindAlerts);
   const bindViewers = useStore((s) => s.bindViewers);
   const bindGuardian = useStore((s) => s.bindGuardian);
@@ -39,6 +41,7 @@ export default function App() {
   const censored = useStore((s) => s.censored);
   const liveState = useStore((s) => s.snapshot.state);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
+  const brbSlateKind = useStore((s) => s.config?.settings.brbSlateKind);
 
   // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
   const liveLabel = censored
@@ -72,7 +75,9 @@ export default function App() {
     void load();
     void setupOauth();
     const unbind = bindEngine();
+    const unbindConfigSync = bindConfigSync();
     const unbindChat = bindChat();
+    const unbindChatRunning = bindChatRunning();
     const unbindAlerts = bindAlerts();
     const unbindViewers = bindViewers();
     const unbindGuardian = bindGuardian();
@@ -88,7 +93,9 @@ export default function App() {
     });
     return () => {
       unbind();
+      unbindConfigSync();
       unbindChat();
+      unbindChatRunning();
       unbindAlerts();
       unbindViewers();
       unbindGuardian();
@@ -97,7 +104,7 @@ export default function App() {
       unbindAuthFlow();
       unbindShortcut();
     };
-  }, [load, setupOauth, bindEngine, bindChat, bindAlerts, bindViewers, bindGuardian, bindAlertStatus, bindChatAuth, bindAuthFlow]);
+  }, [load, setupOauth, bindEngine, bindConfigSync, bindChat, bindChatRunning, bindAlerts, bindViewers, bindGuardian, bindAlertStatus, bindChatAuth, bindAuthFlow]);
 
   // Guardião: avisa por toast a cada novo vazamento detectado.
   const leakSeen = useRef(0);
@@ -117,13 +124,16 @@ export default function App() {
     firstTheme.current = false;
   }, [theme]);
 
-  // Gera o slate "JÁ VOLTO" e salva no disco (o FFmpeg usa quando o sinal cai).
+  // Gera o slate "JÁ VOLTO" e salva no disco — SÓ no modo "auto" (tela gerada). Se o usuário
+  // escolheu uma imagem/vídeo custom (image/video), NÃO sobrescreve. Espera o config carregar
+  // (`loaded`) pra não regerar por engano enquanto a kind ainda é desconhecida.
   useEffect(() => {
-    if (!IS_TAURI) return;
+    if (!IS_TAURI || !loaded) return;
+    if (brbSlateKind && brbSlateKind !== "auto") return;
     void renderBrbSlatePng().then((b64) => {
       if (b64) void api.saveBrbSlate(b64);
     });
-  }, []);
+  }, [loaded, brbSlateKind]);
 
   // Cada tela começa no topo: o container de scroll é compartilhado, então um
   // scrollIntoView (ex.: "Fora do ar" → botão BORA) deixava as outras telas cortadas.

@@ -31,6 +31,7 @@ import {
   blockingIssues,
   hasValidUrl,
   isUrlInvalid,
+  sanitizeStreamKey,
 } from "../lib/validation";
 import {
   Badge,
@@ -531,16 +532,24 @@ function KeyField({ target }: { target: Target }) {
   const paste = async () => {
     try {
       const t = await navigator.clipboard.readText();
-      if (t) setValue(t.trim());
+      if (!t) return;
+      // Já limpa na colagem pra o streamer VER a chave certa no campo.
+      const { key, strippedUrl } = sanitizeStreamKey(t, target.ingestUrl);
+      setValue(key);
+      if (strippedUrl) toast.info("Isso parecia a URL completa — guardei só a chave 👍");
     } catch {
       /* área de transferência bloqueada */
     }
   };
   const save = async () => {
     try {
-      await setKey(target.id, value.trim());
+      // Idempotente: se colou pelo botão já veio limpo; se digitou/colou a URL
+      // inteira no campo, cortamos o servidor aqui e avisamos.
+      const { key, strippedUrl } = sanitizeStreamKey(value, target.ingestUrl);
+      await setKey(target.id, key);
       setValue("");
       setEditing(false);
+      if (strippedUrl) toast.info("Isso parecia a URL completa — guardei só a chave 👍");
       toast.success("Chave guardada no cofre 🔒");
     } catch (e) {
       toast.error(`Falha ao guardar a chave: ${e}`);

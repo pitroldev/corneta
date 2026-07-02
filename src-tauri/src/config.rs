@@ -106,6 +106,9 @@ pub struct Settings {
     /// Tamanho da fonte do chat em pixels (slider). Aceita os antigos "sm/md/lg" salvos.
     #[serde(default = "default_font", deserialize_with = "de_font")]
     pub chat_font_size: u32,
+    /// Tamanho da fonte dos ALERTAS em pixels (slider próprio, igual ao do chat).
+    #[serde(default = "default_font", deserialize_with = "de_font")]
+    pub alert_font_size: u32,
     /// Layout do modo "Ambos" da janela do chat: "auto" | "row" (lado a lado) | "col" (empilhado).
     #[serde(default = "default_both_layout")]
     pub chat_both_layout: String,
@@ -119,6 +122,10 @@ pub struct Settings {
     /// cair NO MEIO da live (só após já ter tido sinal) — mantém a transmissão de pé.
     #[serde(default = "default_true")]
     pub brb_enabled: bool,
+    /// Tela "JÁ VOLTO": "auto" (gerada pela Corneta) | "image" | "video" (arquivo escolhido pelo
+    /// usuário, salvo como brb-slate.* na pasta de config). Vídeo pode ter som.
+    #[serde(default = "default_brb_slate_kind")]
+    pub brb_slate_kind: String,
     /// Auto-bitrate: baixa o bitrate de um destino que recodifica quando a banda aperta
     /// (e sobe de volta quando estabiliza). Só vale pra destinos em transcode.
     #[serde(default = "default_true")]
@@ -142,6 +149,9 @@ pub struct Settings {
 fn default_true() -> bool {
     true
 }
+fn default_brb_slate_kind() -> String {
+    "auto".to_string()
+}
 fn default_live_shortcut() -> String {
     "CommandOrControl+Alt+L".to_string()
 }
@@ -160,7 +170,7 @@ fn de_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
         S(String),
     }
     Ok(match Sz::deserialize(d)? {
-        Sz::N(n) => n.clamp(10, 28),
+        Sz::N(n) => n.clamp(8, 44),
         Sz::S(s) => match s.as_str() {
             "sm" => 12,
             "lg" => 16,
@@ -217,10 +227,12 @@ impl Default for Settings {
             chat_show_viewers: true,
             theme: default_theme(),
             chat_font_size: default_font(),
+            alert_font_size: default_font(),
             chat_both_layout: default_both_layout(),
             chat_both_alerts_first: false,
             chat_both_split: default_both_split(),
             brb_enabled: true,
+            brb_slate_kind: default_brb_slate_kind(),
             auto_bitrate: true,
             guardian_enabled: false,
             guardian_watchlist: Vec::new(),

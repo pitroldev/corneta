@@ -53,7 +53,12 @@ pub fn get_config(app: AppHandle) -> AppConfig {
 
 #[tauri::command]
 pub fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
-    config::save(&app, &config)
+    config::save(&app, &config)?;
+    // Sincroniza as OUTRAS janelas (o popout do chat é outro webview, com store zustand próprio):
+    // sem isto, cada janela persistia sua cópia inteira do AppConfig e revertia em disco as
+    // mudanças da outra. Cada janela reassina `config://changed` e atualiza a base SEM re-persistir.
+    let _ = app.emit("config://changed", &config);
+    Ok(())
 }
 
 // ----------------------------- Cofre ------------------------------
@@ -383,12 +388,66 @@ fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("mediamtx.yml"))
 }
 
-/// Caminho do slate "JÁ VOLTO" (PNG gerado pela interface).
-fn brb_slate_path(app: &AppHandle) -> Option<std::path::PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("brb-slate.png"))
+/// Procura o slate "JÁ VOLTO" na pasta de config: `brb-slate.<ext>` (qualquer extensão).
+/// No modo "auto" é o `brb-slate.png` gerado pela UI; no custom, a imagem/vídeo escolhido.
+/// Só pode existir UM por vez (set/clear/save garantem isso).
+fn brb_slate_file(app: &AppHandle) -> Option<std::path::PathBuf> {
+    let dir = app.path().app_config_dir().ok()?;
+    for entry in std::fs::read_dir(&dir).ok()?.flatten() {
+        let p = entry.path();
+        if is_brb_slate_path(&p) && p.is_file() {
+            return Some(p);
+        }
+    }
+    None
 }
 
-/// Salva o slate "JÁ VOLTO" (PNG em base64) que a UI desenhou.
+/// `true` se o caminho é um `brb-slate.*` (o nome, sem extensão, é exatamente "brb-slate").
+fn is_brb_slate_path(p: &std::path::Path) -> bool {
+    p.file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("brb-slate"))
+        .unwrap_or(false)
+}
+
+/// A extensão indica um VÍDEO (não uma imagem/still)?
+fn brb_slate_is_video(p: &std::path::Path) -> bool {
+    matches!(
+        p.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref(),
+        Some("mp4" | "mov" | "mkv" | "webm" | "m4v")
+    )
+}
+
+/// Apaga qualquer `brb-slate.*` da pasta de config (best-effort). Só existe um slate por vez.
+fn remove_brb_slate_files(dir: &std::path::Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if is_brb_slate_path(&p) && p.is_file() {
+                let _ = std::fs::remove_file(&p);
+            }
+        }
+    }
+}
+
+/// O vídeo do slate tem trilha de áudio? Leitura RÁPIDA dos cabeçalhos (`ffmpeg -i` sem saída
+/// só lista os streams e sai — não decodifica), pra decidir entre o áudio do vídeo e a trilha
+/// silenciosa (a plataforma exige áudio; um vídeo mudo faria o -map do áudio real falhar).
+async fn brb_slate_has_audio(app: &AppHandle, path: &str) -> bool {
+    let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
+        return false;
+    };
+    match cmd.args(["-hide_banner", "-i", path]).output().await {
+        // `-i` sem saída sai com erro (esperado), mas imprime os streams no stderr.
+        Ok(o) => String::from_utf8_lossy(&o.stderr).contains("Audio:"),
+        Err(_) => false,
+    }
+}
+
+/// Salva o slate "JÁ VOLTO" (PNG em base64) que a UI desenhou (modo "auto" — tela gerada).
 #[tauri::command]
 pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     use base64::Engine;
@@ -397,7 +456,52 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // Some qualquer custom anterior — no modo "auto" só vale o PNG gerado.
+    remove_brb_slate_files(&dir);
     std::fs::write(dir.join("brb-slate.png"), bytes).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Escolhe um arquivo (imagem OU vídeo) como slate do "JÁ VOLTO". Apaga o slate anterior,
+/// copia o escolhido pra `brb-slate.<ext>` (extensão original em minúsculas) e devolve a KIND
+/// detectada ("image"/"video"). Cancelou o seletor → devolve "" (o front trata como "sem
+/// mudança"). NÃO grava brb_slate_kind aqui — o front persiste via setSettings.
+#[tauri::command]
+pub async fn set_brb_slate(app: AppHandle) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let app2 = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app2.dialog()
+            .file()
+            .add_filter("Imagens", &["png", "jpg", "jpeg", "webp", "gif", "bmp"])
+            .add_filter("Vídeos", &["mp4", "mov", "mkv", "webm", "m4v"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?;
+    let Some(file) = picked else {
+        return Ok(String::new()); // cancelou
+    };
+    let src = file.into_path().map_err(|e| e.to_string())?;
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .filter(|e| !e.is_empty())
+        .ok_or("arquivo sem extensão — escolha uma imagem ou vídeo")?;
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    remove_brb_slate_files(&dir); // só um slate por vez
+    let dest = dir.join(format!("brb-slate.{ext}"));
+    std::fs::copy(&src, &dest).map_err(|e| format!("não consegui copiar o arquivo: {e}"))?;
+    Ok(if brb_slate_is_video(&dest) { "video" } else { "image" }.to_string())
+}
+
+/// Remove todo `brb-slate.*` → volta ao modo "auto" (o App.tsx regenera o PNG gerado).
+#[tauri::command]
+pub fn clear_brb_slate(app: AppHandle) -> Result<(), String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    remove_brb_slate_files(&dir);
     Ok(())
 }
 
@@ -832,9 +936,15 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // 3) Um supervisor de FFmpeg POR destino — métricas reais e reconexão independentes.
     let brb_enabled = config.settings.brb_enabled;
     let auto_bitrate = config.settings.auto_bitrate;
-    let slate_png: Option<String> = brb_slate_path(&app)
-        .filter(|p| p.exists())
-        .map(|p| p.to_string_lossy().to_string());
+    // Slate do "JÁ VOLTO": imagem OU vídeo (custom) ou o PNG gerado. Detecta vídeo pela extensão
+    // e, se for vídeo, sonda uma vez se tem áudio (pra usar o do vídeo ou uma trilha silenciosa).
+    let slate_file = brb_slate_file(&app);
+    let slate_is_video = slate_file.as_deref().map(brb_slate_is_video).unwrap_or(false);
+    let slate_path: Option<String> = slate_file.map(|p| p.to_string_lossy().to_string());
+    let slate_has_audio = match (&slate_path, slate_is_video) {
+        (Some(p), true) => brb_slate_has_audio(&app, p).await,
+        _ => false,
+    };
 
     // GUARDIÃO com BUFFER PRÓPRIO (compositor): segura o vídeo N segundos no nosso processo e, na
     // SAÍDA, troca pelo slate "JÁ VOLTO" quando um termo do usuário aparece → preventivo garantido.
@@ -868,7 +978,13 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 key = ykey.clone();
             }
         }
-        let slate_args = engine::ffmpeg_args_for_slate(&target, &key, slate_png.as_deref());
+        let slate_args = engine::ffmpeg_args_for_slate(
+            &target,
+            &key,
+            slate_path.as_deref(),
+            slate_is_video,
+            slate_has_audio,
+        );
         let cfg = config.clone();
         let is_transcode = engine::effective_action(&config.mode, t) == "transcode";
         let base_kbps = t
@@ -1493,11 +1609,24 @@ pub fn open_sessions_dir(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn chat_start(app: AppHandle) {
     chat::start_chat(&app);
+    // Sincroniza o estado "conectado" entre as janelas (principal + popout são webviews
+    // distintos, cada um com seu chatConnected local).
+    let _ = app.emit("chat://running", true);
 }
 
 #[tauri::command]
 pub fn chat_stop(app: AppHandle) {
     chat::stop_chat(&app);
+    let _ = app.emit("chat://running", false);
+}
+
+/// Estado atual do chat (há sessão no ar?). O popout consulta no mount pra nascer com o
+/// mesmo estado da janela principal (o evento `chat://running` cobre as mudanças ao vivo).
+#[tauri::command]
+pub fn chat_running(app: AppHandle) -> bool {
+    let st = app.state::<AppState>();
+    let running = st.chat.lock().unwrap().running.clone();
+    running.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 // ASYNC: o envio (sobretudo o insert HTTP do YouTube) bloqueia; comando síncrono trava

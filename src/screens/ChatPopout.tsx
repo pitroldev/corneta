@@ -6,11 +6,26 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Bell, Eye, Minus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
+import {
+  Bell,
+  Eye,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Send,
+  Settings2,
+  Trash2,
+  Wifi,
+  WifiOff,
+  X,
+} from "lucide-react";
+import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
+import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
+import type { ChatSource } from "../lib/types";
 import { Mascot } from "../components/decor";
-import { Toggle } from "../components/ui";
+import { Button, Input, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
@@ -50,28 +65,83 @@ export function ChatPopout() {
   const setSettings = useStore((s) => s.setSettings);
   const load = useStore((s) => s.load);
   const bindChat = useStore((s) => s.bindChat);
+  const bindChatRunning = useStore((s) => s.bindChatRunning);
+  const bindConfigSync = useStore((s) => s.bindConfigSync);
   const bindAlerts = useStore((s) => s.bindAlerts);
   const bindViewers = useStore((s) => s.bindViewers);
+  const sendChat = useStore((s) => s.sendChat);
+  const chatLogin = useStore((s) => s.chatLogin);
+  const chatAuth = useStore((s) => s.chatAuth);
+  const setupOauth = useStore((s) => s.setupOauth);
+  const bindChatAuth = useStore((s) => s.bindChatAuth);
+  const bindAuthFlow = useStore((s) => s.bindAuthFlow);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [tab, setTab] = useState<"chat" | "alerts" | "both">("chat");
   const [showConfig, setShowConfig] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [maximized, setMaximized] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendTo, setSendTo] = useState("all");
 
   // Setup próprio do popout (sem o motor/atalhos do app): config + chat + alertas + viewers.
   useEffect(() => {
     void load();
+    void setupOauth();
     const unbindChat = bindChat();
+    const unbindChatRunning = bindChatRunning();
+    const unbindConfigSync = bindConfigSync();
     const unbindAlerts = bindAlerts();
     const unbindViewers = bindViewers();
+    const unbindChatAuth = bindChatAuth();
+    const unbindAuthFlow = bindAuthFlow();
     return () => {
       unbindChat();
+      unbindChatRunning();
+      unbindConfigSync();
       unbindAlerts();
       unbindViewers();
+      unbindChatAuth();
+      unbindAuthFlow();
     };
-  }, [load, bindChat, bindAlerts, bindViewers]);
+  }, [
+    load,
+    setupOauth,
+    bindChat,
+    bindChatRunning,
+    bindConfigSync,
+    bindAlerts,
+    bindViewers,
+    bindChatAuth,
+    bindAuthFlow,
+  ]);
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+  // Estado maximizado da janela: sincroniza no mount e a cada resize (o usuário pode
+  // maximizar arrastando pra borda, não só pelo botão).
+  useEffect(() => {
+    if (!IS_TAURI) return;
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    void (async () => {
+      try {
+        const w = (await import("@tauri-apps/api/window")).getCurrentWindow();
+        const sync = async () => {
+          const m = await w.isMaximized();
+          if (alive) setMaximized(m);
+        };
+        await sync();
+        unlisten = await w.onResized(() => void sync());
+      } catch {
+        /* fora do Tauri */
+      }
+    })();
+    return () => {
+      alive = false;
+      unlisten?.();
+    };
+  }, []);
 
   const st = config?.settings;
   const view: ChatView = useMemo(
@@ -122,6 +192,50 @@ export function ChatPopout() {
     (await import("@tauri-apps/api/window")).getCurrentWindow();
   const minimize = () => void winApi().then((w) => w.minimize());
   const closeWin = () => void winApi().then((w) => w.close());
+  const toggleMaximize = () =>
+    void winApi().then(async (w) => {
+      await w.toggleMaximize();
+      setMaximized(await w.isMaximized());
+    });
+
+  // Envio pelo "modo janela": espelha a ChatScreen — fontes capazes conforme login/token.
+  const sendSources = st?.chatSources ?? [];
+  const twitchReady = chatLogin.twitch.state === "connected";
+  const youtubeReady = chatLogin.youtube.state === "connected";
+  const kickReady = chatLogin.kick.state === "connected";
+  const sendableSources = sendSources.filter(
+    (x) =>
+      (x.platform === "twitch" && (x.hasSendToken || twitchReady)) ||
+      (x.platform === "youtube" && youtubeReady) ||
+      (x.platform === "kick" && kickReady),
+  );
+  const srcLabel = (x: ChatSource) => (x.name.trim() === "" ? x.value : x.name);
+  const sendValid = sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
+  const effectiveSendTo = sendValid ? sendTo : "all";
+  const sendTargets =
+    effectiveSendTo === "all"
+      ? sendableSources
+      : sendableSources.filter((x) => x.id === effectiveSendTo);
+  // Twitch só envia depois que o IRC autentica (chatAuth.ok); YouTube/Kick mandam via HTTP.
+  const canSend = sendTargets.some((x) =>
+    x.platform === "youtube" ? youtubeReady : x.platform === "kick" ? kickReady : !!chatAuth[x.id]?.ok,
+  );
+  const doSend = async () => {
+    const t = draft.trim();
+    if (!t) return;
+    setSending(true);
+    try {
+      await sendChat(
+        t,
+        sendTargets.map((x) => x.id),
+      );
+      setDraft("");
+    } catch (e) {
+      toast.error(String(e).replace("Error: ", ""));
+    } finally {
+      setSending(false);
+    }
+  };
 
   // Arraste do divisor: redimensiona o painel de alertas (% do container no eixo ativo).
   const onDividerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -179,7 +293,7 @@ export function ChatPopout() {
           <Trash2 className="size-3.5" />
         </button>
       </div>
-      <AlertsFeed alerts={alerts} className="min-h-0 flex-1" />
+      <AlertsFeed alerts={alerts} className="min-h-0 flex-1" fontSize={st?.alertFontSize ?? 14} />
     </div>
   );
   const chatPanel = (
@@ -226,6 +340,13 @@ export function ChatPopout() {
         <div className="ml-auto flex h-full">
           <WinBtn onClick={minimize} label="Minimizar">
             <Minus className="size-3.5" strokeWidth={2.4} />
+          </WinBtn>
+          <WinBtn onClick={toggleMaximize} label={maximized ? "Restaurar" : "Maximizar"}>
+            {maximized ? (
+              <Minimize2 className="size-3.5" strokeWidth={2.4} />
+            ) : (
+              <Maximize2 className="size-3.5" strokeWidth={2.4} />
+            )}
           </WinBtn>
           <WinBtn onClick={closeWin} label="Fechar" danger>
             <X className="size-3.5" strokeWidth={2.4} />
@@ -322,14 +443,27 @@ export function ChatPopout() {
             </div>
           </div>
           <label className="flex items-center gap-2.5">
-            <span className="shrink-0 font-semibold text-ink-muted">Tamanho da fonte</span>
+            <span className="shrink-0 font-semibold text-ink-muted">Fonte do chat</span>
             <Slider
               className="ml-auto max-w-44 flex-1"
               value={view.fontSize}
-              min={11}
-              max={26}
+              min={8}
+              max={44}
               onChange={(v) => setSettings({ chatFontSize: v })}
               suffix="px"
+              aria-label="Tamanho da fonte do chat"
+            />
+          </label>
+          <label className="flex items-center gap-2.5">
+            <span className="shrink-0 font-semibold text-ink-muted">Fonte dos alertas</span>
+            <Slider
+              className="ml-auto max-w-44 flex-1"
+              value={st?.alertFontSize ?? 14}
+              min={8}
+              max={44}
+              onChange={(v) => setSettings({ alertFontSize: v })}
+              suffix="px"
+              aria-label="Tamanho da fonte dos alertas"
             />
           </label>
           {tab === "both" && (
@@ -369,7 +503,47 @@ export function ChatPopout() {
       ) : tab === "chat" ? (
         chatPanel
       ) : (
-        <AlertsFeed alerts={alerts} className="flex-1" />
+        <AlertsFeed alerts={alerts} className="flex-1" fontSize={st?.alertFontSize ?? 14} />
+      )}
+
+      {/* Barra de composição (modo janela): só com fonte enviável (login/token). */}
+      {IS_TAURI && sendableSources.length > 0 && (
+        <div className="flex shrink-0 items-center gap-1.5 border-t-2 border-border-soft px-2 py-1.5">
+          {sendableSources.length > 1 && (
+            <Select
+              className="w-24 shrink-0"
+              value={effectiveSendTo}
+              options={[
+                { value: "all", label: "Todas" },
+                ...sendableSources.map((x) => ({ value: x.id, label: srcLabel(x) })),
+              ]}
+              onChange={setSendTo}
+            />
+          )}
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void doSend();
+              }
+            }}
+            placeholder="Manda no chat…"
+            className="h-9 flex-1"
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            loading={sending}
+            disabled={!draft.trim() || sending || !canSend}
+            onClick={doSend}
+            aria-label="Enviar"
+            title="Enviar"
+          >
+            {!sending && <Send className="size-4" />}
+          </Button>
+        </div>
       )}
     </div>
   );

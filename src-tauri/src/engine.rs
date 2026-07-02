@@ -300,9 +300,20 @@ pub fn ffmpeg_args_for_encoder(
     args
 }
 
-/// Monta o FFmpeg do **slate "JÁ VOLTO"**: gera vídeo a partir de uma imagem (ou cor sólida)
-/// + áudio silencioso e empurra pra plataforma — mantém a live de pé quando o sinal cai.
-pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> Vec<String> {
+/// Monta o FFmpeg do **slate "JÁ VOLTO"** e empurra pra plataforma — mantém a live de pé
+/// quando o sinal cai. Três modos, conforme o que o usuário escolheu (ver brb_slate_kind):
+///   • gerada (slate_path=None): cor sólida + áudio silencioso;
+///   • imagem (is_video=false): loop de um still + áudio silencioso;
+///   • vídeo  (is_video=true):  loop INFINITO do vídeo, com o ÁUDIO do próprio vídeo quando
+///     existe (has_audio) — senão, trilha silenciosa (a plataforma exige áudio; um vídeo mudo
+///     não pode travar o FFmpeg num -map de áudio inexistente).
+pub fn ffmpeg_args_for_slate(
+    t: &Target,
+    key: &str,
+    slate_path: Option<&str>,
+    is_video: bool,
+    has_audio: bool,
+) -> Vec<String> {
     let url = output_url(t, key);
     let p = sanitize_preset(
         t.encoding
@@ -320,12 +331,19 @@ pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> 
         "-loglevel".into(),
         "warning".into(),
         "-stats".into(),
-        "-re".into(),
     ];
-    match slate_png {
-        Some(path) => args.extend(["-loop", "1", "-i", path].map(String::from)),
+    // Entrada 0: a fonte do slate.
+    match slate_path {
+        // Vídeo: loop INFINITO lido em tempo real (segura o slate no ar até o sinal voltar).
+        Some(path) if is_video => {
+            args.extend(["-stream_loop", "-1", "-re", "-i", path].map(String::from))
+        }
+        // Imagem: um still em loop.
+        Some(path) => args.extend(["-re", "-loop", "1", "-i", path].map(String::from)),
+        // Gerada: cor sólida.
         None => args.extend(
             [
+                "-re",
                 "-f",
                 "lavfi",
                 "-i",
@@ -334,7 +352,7 @@ pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> 
             .map(String::from),
         ),
     }
-    // Áudio silencioso (a plataforma exige uma trilha).
+    // Entrada 1: áudio silencioso (usado na cor/still e como fallback do vídeo MUDO).
     args.extend(
         [
             "-f", "lavfi",
@@ -342,21 +360,28 @@ pub fn ffmpeg_args_for_slate(t: &Target, key: &str, slate_png: Option<&str>) -> 
         ]
         .map(String::from),
     );
+    args.extend(["-map", "0:v", "-vf", &scale, "-r", &fps.to_string()].map(String::from));
+    args.extend(["-c:v", "libx264", "-preset", "veryfast"].map(String::from));
+    // `-tune stillimage` só ajuda numa tela PARADA — vídeo em movimento não usa.
+    if !is_video {
+        args.extend(["-tune", "stillimage"].map(String::from));
+    }
     args.extend(
         [
-            "-map", "0:v",
-            "-vf", &scale,
-            "-r", &fps.to_string(),
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-tune", "stillimage",
             "-b:v", &format!("{vbitrate}k"),
             "-maxrate", &format!("{vbitrate}k"),
             "-bufsize", &format!("{}k", vbitrate * 2),
             "-g", &gop,
             "-keyint_min", &gop,
             "-sc_threshold", "0",
-            "-map", "1:a",
+        ]
+        .map(String::from),
+    );
+    // Áudio: o do próprio vídeo quando há; senão, a trilha silenciosa (entrada 1).
+    let amap = if is_video && has_audio { "0:a" } else { "1:a" };
+    args.extend(
+        [
+            "-map", amap,
             "-c:a", "aac",
             "-ar", "48000",
             "-ac", "2",

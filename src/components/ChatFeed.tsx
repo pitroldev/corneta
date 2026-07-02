@@ -42,7 +42,7 @@ export function ChatFeed({
   /** Há mensagens, mas o filtro escondeu todas (vazio diferente de "sem chat"). */
   allFilteredOut?: boolean;
   className?: string;
-  /** Ctrl+scroll redimensiona a fonte (11–26px). */
+  /** Ctrl+scroll redimensiona a fonte (8–44px). */
   onFontSize?: (next: number) => void;
   /** Moderação: nível de ação permitido por mensagem ("full" Twitch, "delete" YouTube). */
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
@@ -133,7 +133,7 @@ export function ChatFeed({
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      const next = Math.min(26, Math.max(11, view.fontSize + (e.deltaY < 0 ? 1 : -1)));
+      const next = Math.min(44, Math.max(8, view.fontSize + (e.deltaY < 0 ? 1 : -1)));
       if (next !== view.fontSize) onFontSize(next);
     };
     el.addEventListener("wheel", onWheel, { passive: false });

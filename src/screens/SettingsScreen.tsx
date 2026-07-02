@@ -19,6 +19,7 @@ import * as RTabs from "@radix-ui/react-tabs";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
+import { renderBrbSlatePng } from "../lib/brbSlate";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import type { ObsCheck } from "../lib/types";
@@ -285,6 +286,7 @@ export function SettingsScreen() {
                   label="Proteção contra quedas"
                 />
               </SecurityFeature>
+              <BrbSlateChooser />
               <SecurityFeature
                 preview={<BitratePreview />}
                 on={settings.autoBitrate}
@@ -625,6 +627,85 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {label}
       {children}
     </label>
+  );
+}
+
+/** Escolhe a tela do "JÁ VOLTO": padrão gerada, imagem ou vídeo (com som). O arquivo
+ *  escolhido é copiado pro backend (brb-slate.*) e entra no ar quando o sinal cai. */
+function BrbSlateChooser() {
+  const kind = useStore((s) => s.config!.settings.brbSlateKind) ?? "auto";
+  const setSettings = useStore((s) => s.setSettings);
+  const [busy, setBusy] = useState(false);
+
+  // Imagem/Vídeo abrem o mesmo seletor (ambos os filtros); a kind real vem da extensão.
+  const pick = async () => {
+    setBusy(true);
+    try {
+      const k = await api.setBrbSlate();
+      if (k) {
+        setSettings({ brbSlateKind: k as "image" | "video" });
+        toast.success("Tela do JÁ VOLTO atualizada");
+      }
+      // k vazio = usuário cancelou o seletor → sem mudança.
+    } catch (e) {
+      toast.error(`Não consegui usar esse arquivo: ${e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Volta pro padrão: apaga o custom e regenera o PNG da Corneta (como o App faz no boot).
+  const useDefault = async () => {
+    setBusy(true);
+    try {
+      await api.clearBrbSlate();
+      setSettings({ brbSlateKind: "auto" });
+      const b64 = await renderBrbSlatePng();
+      if (b64) await api.saveBrbSlate(b64);
+      toast.success("Voltou pra tela padrão da Corneta");
+    } catch (e) {
+      toast.error(`Falha ao voltar pro padrão: ${e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const current =
+    kind === "image"
+      ? "Usando: imagem enviada"
+      : kind === "video"
+        ? "Usando: vídeo enviado (com som)"
+        : "Usando: tela padrão da Corneta";
+
+  const opt = (active: boolean) =>
+    cn(
+      "flex-1 rounded-md border-2 px-3 py-2 font-display text-sm font-bold transition-colors disabled:opacity-50",
+      active
+        ? "border-brass bg-brass/10 text-brass"
+        : "border-border text-ink-muted hover:border-brass/60",
+    );
+
+  return (
+    <div className="flex flex-col gap-2 py-3.5">
+      <span className="text-sm font-semibold text-ink-muted">
+        Tela do “JÁ VOLTO”
+      </span>
+      <div className="flex gap-2">
+        <button className={opt(kind === "auto")} disabled={busy} onClick={useDefault}>
+          Padrão (gerada)
+        </button>
+        <button className={opt(kind === "image")} disabled={busy} onClick={pick}>
+          Imagem
+        </button>
+        <button className={opt(kind === "video")} disabled={busy} onClick={pick}>
+          Vídeo (com som)
+        </button>
+      </div>
+      <span className="text-xs font-semibold text-ink-faint">
+        {current} — a imagem ou vídeo que você escolher entra no ar quando o sinal
+        cai. Vídeo toca em loop e pode ter som.
+      </span>
+    </div>
   );
 }
 
