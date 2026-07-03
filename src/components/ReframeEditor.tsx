@@ -131,8 +131,7 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
         </div>
         <p className="mb-4 text-sm text-ink-muted">
           Arraste o quadro pra escolher que parte do seu vídeo vai pro{" "}
-          <strong className="text-ink">{preset.width}×{preset.height}</strong> (vertical). Capture um
-          frame do OBS pra enquadrar exatamente.
+          <strong className="text-ink">{preset.width}×{preset.height}</strong> (vertical).
         </p>
 
         <div className="flex flex-col gap-4 sm:flex-row">

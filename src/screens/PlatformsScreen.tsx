@@ -64,7 +64,7 @@ export function PlatformsScreen() {
       <SectionTitle
         kicker="Pra onde a corneta toca"
         title="Plataformas"
-        subtitle="Escolha as plataformas, cole a chave de cada uma e eu pego seu vídeo do OBS e toco em todas de uma vez."
+        subtitle="Escolha as plataformas, cole a chave de cada uma e eu toco seu vídeo do OBS em todas de uma vez."
         right={
           <Button variant="primary" onClick={() => setPicking(true)}>
             <Plus className="size-4" strokeWidth={2.6} /> Adicionar
@@ -145,7 +145,7 @@ function ProfileBar() {
         <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
           Perfil de transmissão
         </span>
-        <Hint text="Um perfil é um conjunto salvo de plataformas. Crie um pra cada situação (ex.: 'Solo Twitch+YT', 'Evento com TikTok') e troque entre eles num clique — a lista de plataformas troca junto." />
+        <Hint text="Um perfil é um conjunto salvo de plataformas. Crie um pra cada situação (ex.: 'Solo Twitch+YT', 'Evento com TikTok') e troque num clique." />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

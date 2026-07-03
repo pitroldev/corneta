@@ -346,7 +346,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                   <strong className="text-ink-muted">
                     Configurações → Transmissão → Serviço “Personalizado”
                   </strong>{" "}
-                  e cole os dois campos abaixo — é por aqui que o OBS manda o vídeo pra mim.
+                  e cole os dois campos abaixo.
                 </p>
                 <Button variant="outline" size="sm" className="shrink-0" onClick={() => setShowObs(true)}>
                   <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configura pra mim
@@ -357,7 +357,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                 <CopyField label="Chave de transmissão" value={config.ingest.key} mono />
               </div>
               <p className="mt-3 text-xs text-ink-faint">
-                Essa chave é só entre o OBS e a Corneta, aqui no seu PC — não é de nenhuma plataforma. As das plataformas ficam no cofre do sistema.
+                Essa chave é só entre o OBS e a Corneta — não é de nenhuma plataforma.
               </p>
               <button
                 onClick={() => setShowGuide(true)}
@@ -434,7 +434,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                 <button
                   onClick={() => {
                     toggleTarget(p.target.id);
-                    toast.info(`${p.target.name} desligada — religue em Plataformas quando quiser.`);
+                    toast.info(`${p.target.name} desligada — religue em Plataformas.`);
                   }}
                   className="text-xs font-bold text-ink-faint hover:text-ink hover:underline"
                 >
@@ -795,7 +795,7 @@ function BrbNowButton({ live }: { live: boolean }) {
         live
           ? forced
             ? "Tira o aviso do ar e volta pro seu conteúdo"
-            : "Põe a tela “JÁ VOLTO” no ar (com o mic mudo) sem mexer no OBS"
+            : "Põe a tela “JÁ VOLTO” no ar (com o mic mudo)"
           : "Disponível quando estiver no ar"
       }
     >
@@ -974,7 +974,7 @@ function StreamInfoCard() {
             </span>
           </button>
           <p className="mt-1.5 text-[11px] text-ink-faint">
-            No YouTube a API muda só o <strong className="text-ink-muted">título</strong> (não o jogo).
+            No YouTube dá pra mudar só o <strong className="text-ink-muted">título</strong> (não o jogo).
           </p>
         </>
       )}
@@ -1009,7 +1009,7 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
     {
       on: settings.autoBitrate,
       label: "Auto-bitrate",
-      desc: settings.autoBitrate ? "baixa o bitrate (a qualidade) se a internet apertar" : "desligado",
+      desc: settings.autoBitrate ? "baixa a qualidade se a internet apertar" : "desligado",
       experimental: false,
       show: true,
     },
@@ -1116,7 +1116,7 @@ function Checkup({
         {obs && obs !== "loading" && (
           <>
             <CheckRow
-              label="OBS conectado (obs-websocket)"
+              label="OBS conectado"
               ok={obs.reachable}
               warn={!obs.reachable}
               detail={

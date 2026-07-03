@@ -63,7 +63,7 @@ function obsErrorHelp(raw: string): { title: string; tips: string[] } {
     title: "Não consegui configurar o OBS sozinha.",
     tips: [
       "Confira se o OBS está aberto e com o WebSocket ligado (Ferramentas → Configurações do Servidor WebSocket).",
-      "Sem estresse: dá pra configurar na mão logo abaixo, em 30 segundos.",
+      "Sem estresse: dá pra configurar na mão logo abaixo.",
     ],
   };
 }
@@ -124,7 +124,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-col gap-4 p-5">
           <Step n={1} title="Ative o WebSocket no OBS">
-            O WebSocket é o canal por onde eu falo com o OBS e configuro tudo pra você. No OBS:{" "}
+            No OBS:{" "}
             <strong className="text-ink">
               Ferramentas → Configurações do Servidor WebSocket
             </strong>{" "}
@@ -140,7 +140,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             copie e cole aqui. Sem senha? Deixe vazio.
             <Input
               type="password"
-              placeholder="senha do obs-websocket"
+              placeholder="senha do WebSocket"
               className="mt-2"
               value={settings.obsPassword}
               onChange={(e) => setSettings({ obsPassword: e.target.value })}
@@ -221,7 +221,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
                   <strong className="text-ink-muted">
                     Configurações → Transmissão → Serviço “Personalizado”
                   </strong>{" "}
-                  e cole estes dois campos (eles apontam o OBS pra mim):
+                  e cole estes dois campos:
                 </p>
                 <CopyField label="Servidor" value={obsIngestUrl(ingest)} />
                 <CopyField

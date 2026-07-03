@@ -184,8 +184,7 @@ export function ReportsScreen() {
         </div>
       ) : sessions.length === 0 ? (
         <EmptyState title="Nenhuma live ainda">
-          Toda vez que você for ao ar eu anoto tudo, e monto o relatório aqui
-          quando a live encerra.
+          Quando a live encerra, monto o relatório dela aqui.
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
@@ -268,7 +267,7 @@ function SessionRow({
             title={
               summary.problemWindows === 0
                 ? "Transmissão limpa"
-                : "Trechos com problema — abra pra ver o diagnóstico"
+                : "Trechos com problema — abra pra ver"
             }
           >
             <span
@@ -375,7 +374,7 @@ function RecapModal({
       }
       const ctx = el.getContext("2d");
       if (!ctx) {
-        toast.error("Não consegui desenhar o recap nesta máquina (canvas indisponível).");
+        toast.error("Não consegui desenhar o recap nesta máquina.");
         return;
       }
       try {
@@ -813,8 +812,8 @@ function ReportDetail({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            ⏱️ Os tempos contam a partir do início da live — ache esse minuto na
-            gravação (o VOD) pra cortar o clipe.
+            ⏱️ Os tempos contam do início da live — ache o minuto na gravação
+            (VOD) pra cortar o clipe.
           </p>
         </Card>
       )}
@@ -889,8 +888,7 @@ function ReportDetail({
       {n > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> Bitrate por plataforma — dados
-            enviados por segundo (Mbps)
+            <Activity className="size-4" /> Bitrate por plataforma (Mbps)
           </h3>
           <LineChart
             series={bitrateSeriesData}
@@ -930,8 +928,7 @@ function ReportDetail({
       {n > 1 && hasObs(data) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> OBS — atraso pra montar o quadro
-            (render lag, ms)
+            <Activity className="size-4" /> OBS — atraso pra montar o quadro (ms)
           </h3>
           <LineChart
             series={[
@@ -996,8 +993,7 @@ function ReportDetail({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            ⏱️ Os tempos contam a partir do início da live — mesmo relógio dos
-            momentos de destaque, pra achar o trecho no VOD.
+            ⏱️ Os tempos contam do início da live, pra achar o trecho no VOD.
           </p>
         </Card>
       )}

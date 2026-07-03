@@ -55,9 +55,9 @@ const PLACEHOLDER: Record<string, string> = {
   youtube: "ex.: @seucanal",
 };
 const HINT: Record<string, string> = {
-  twitch: "Só o nome do canal (o que vem depois de twitch.tv/) — sem link inteiro nem login.",
+  twitch: "Só o nome do canal — o que vem depois de twitch.tv/.",
   kick: "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
-  youtube: "Seu canal (@handle, URL ou ID). A Corneta acha a live e lê o chat sozinha — sem colar link.",
+  youtube: "Seu canal (@handle, URL ou ID).",
 };
 
 type ConfigTab = "canais" | "conta" | "alertas" | "exibicao";
@@ -317,7 +317,7 @@ export function ChatScreen() {
       <SectionTitle
         kicker="A galera junta"
         title="Chat unificado"
-        subtitle="Twitch, Kick e YouTube no mesmo feed (até 2 Twitches!) — com emotes, selos, de onde veio cada mensagem e o que foi apagado."
+        subtitle="Twitch, Kick e YouTube no mesmo feed — até 2 Twitches."
         right={
           <div className="flex items-center gap-2">
             {IS_TAURI && (
@@ -325,7 +325,7 @@ export function ChatScreen() {
                 variant="subtle"
                 size="sm"
                 onClick={() => void api.openChatWindow()}
-                title="Abre o chat numa janelinha que fica por cima de tudo — boa pra deixar sobre o jogo"
+                title="Uma janelinha do chat que fica por cima de tudo."
               >
                 <PictureInPicture2 className="size-4" /> Janela flutuante
               </Button>
@@ -386,7 +386,7 @@ export function ChatScreen() {
                 size="sm"
                 loading={reconnecting}
                 onClick={() => void reconnect()}
-                title="Religa as fontes que caíram — sem apagar o histórico do chat"
+                title="Religa as fontes que caíram."
               >
                 {!reconnecting && <RefreshCw className="size-3.5" />} Reconectar
               </Button>
@@ -497,7 +497,7 @@ export function ChatScreen() {
                 <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-5 text-center text-sm text-ink-muted">
                   Nenhum canal ainda. Adicione um da <strong className="text-ink">Twitch</strong>,{" "}
                   <strong className="text-ink">Kick</strong> ou{" "}
-                  <strong className="text-ink">YouTube</strong> pra ver o chat aqui — pode repetir a mesma (ex.: 2 Twitches).
+                  <strong className="text-ink">YouTube</strong> — pode repetir a mesma (ex.: 2 Twitches).
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -519,7 +519,7 @@ export function ChatScreen() {
                   <ToggleRow
                     icon={Wifi}
                     label="Conectar o chat sozinho quando eu entrar no ar"
-                    hint="No BORA AO VIVO, o chat já liga junto — sem clique manual toda live"
+                    hint="Sem clicar em Conectar toda live."
                     checked={s.chatAutoConnect ?? true}
                     onChange={(v) => setSettings({ chatAutoConnect: v })}
                   />
@@ -580,7 +580,7 @@ export function ChatScreen() {
               {alertSources.length === 0 ? (
                 <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-4 text-center text-xs text-ink-muted">
                   Nenhuma fonte de alerta. Adicione <strong className="text-ink">Streamlabs</strong> ou{" "}
-                  <strong className="text-ink">StreamElements</strong> pra ver doações no feed de Alertas.
+                  <strong className="text-ink">StreamElements</strong> pra ver doações.
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -655,7 +655,7 @@ export function ChatScreen() {
                   </div>
                   <p className="mt-3 text-[11px] text-ink-faint">
                     Entre pra <strong className="text-ink">enviar</strong> e{" "}
-                    <strong className="text-ink">moderar</strong>. O chat reconecta sozinho ao logar.
+                    <strong className="text-ink">moderar</strong>.
                   </p>
                 </>
               )}
@@ -758,7 +758,7 @@ export function ChatScreen() {
             onModerate={onModerate}
             disconnectedHint={
               configured
-                ? "Tudo pronto — é só clicar em Conectar pra puxar o chat."
+                ? "Tudo pronto — é só clicar em Conectar."
                 : "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar."
             }
             emptyAction={
@@ -1068,7 +1068,7 @@ const ALERT_META: Record<AlertSourceKind, { label: string; placeholder: string; 
   streamlabs: {
     label: "Streamlabs",
     placeholder: "Socket API Token",
-    hint: 'Streamlabs → Account Settings → API Settings → "Your Socket API Token". Pega doações, follows, subs e bits que você centraliza no Streamlabs.',
+    hint: 'Streamlabs → Account Settings → API Settings → "Your Socket API Token". Pega doações, follows, subs e bits.',
   },
   streamelements: {
     label: "StreamElements",
@@ -1112,7 +1112,7 @@ function YoutubeApiKeyField({
     <label className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
       <span className="flex flex-wrap items-center gap-1.5">
         <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
-        <Tooltip content="Sem ela a Corneta já lê o chat direto. Com ela você ganha a contagem de “assistindo” do YouTube e uma reserva, caso a leitura direta falhe.">
+        <Tooltip content="Sem ela a Corneta já lê o chat. Com ela você ganha a contagem de “assistindo” do YouTube.">
           <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
             · opcional (bom ter)
           </span>

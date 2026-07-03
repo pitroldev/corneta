@@ -52,7 +52,7 @@ const MODES: {
     tag: "Mais leve",
     tone: "neutral",
     icon: Layers,
-    desc: "O OBS recodifica uma vez e a mesma imagem vai pra todas. Quase não pesa na CPU — mas todas ficam no mesmo padrão.",
+    desc: "A mesma imagem vai pra todas as plataformas, no mesmo padrão.",
   },
   {
     id: "hybrid",
@@ -60,7 +60,7 @@ const MODES: {
     tag: "Recomendado",
     tone: "brass",
     icon: Wand2,
-    desc: "Copia onde dá e recodifica só onde precisa (ex.: vertical no TikTok). Decide sozinho.",
+    desc: "Ajusta cada plataforma só onde precisa. Decide sozinho.",
   },
   {
     id: "per-platform",
@@ -68,7 +68,7 @@ const MODES: {
     tag: "Máx. qualidade",
     tone: "neutral",
     icon: Sparkles,
-    desc: "Uma recodificação sob medida pra cada plataforma. Melhor imagem possível, mas é o mais pesado.",
+    desc: "Melhor imagem possível pra cada plataforma, mas é o mais pesado.",
   },
 ];
 
@@ -140,7 +140,7 @@ export function EncodingScreen() {
       <SectionTitle
         kicker="Como a corneta toca"
         title="Qualidade"
-        subtitle="Quantas vezes o vídeo é recodificado — e quanto a sua máquina vai suar."
+        subtitle="Quanto capricho na imagem — e quanto sua máquina vai suar."
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -285,7 +285,7 @@ export function EncodingScreen() {
                   )
                 }
               >
-                <Wand2 className="size-3.5 text-brass" /> Voltar pro Auto — recodifica em pé
+                <Wand2 className="size-3.5 text-brass" /> Voltar pro Auto — ajusta em pé
               </Button>
             )}
           </div>
@@ -376,19 +376,15 @@ export function EncodingScreen() {
         <div className="flex-1 text-sm text-ink-muted">
           {lcd.videoKbps != null && lcd.capBy ? (
             <p>
-              Plataformas <strong className="text-ink">em cópia</strong> recebem
-              o vídeo do OBS como saiu — a Corneta não mexe na qualidade delas.
-              Ajuste o OBS em{" "}
+              Plataformas <strong className="text-ink">em cópia</strong> precisam
+              do OBS em{" "}
               <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong>{" "}
-              pra caber no <strong className="text-ink">{lcd.capBy}</strong> (a
-              plataforma mais apertada).
+              pra caber no <strong className="text-ink">{lcd.capBy}</strong>.
             </p>
           ) : (
             <p>
               Nenhuma plataforma <strong className="text-ink">em cópia</strong>{" "}
-              agora: eu recodifico tudo, e o OBS só me entrega o sinal-fonte —
-              quanto melhor ele, melhor a minha saída (é local, não gasta a sua
-              internet).
+              agora: quanto melhor o sinal do OBS, melhor a saída.
             </p>
           )}
           <p className="mt-1 text-xs text-ink-faint">
@@ -427,16 +423,13 @@ export function EncodingScreen() {
                   )}
                 >
                   {e.label}
-                  {e.available && e.maxSessions
-                    ? ` · até ${e.maxSessions} ao mesmo tempo`
-                    : ""}
                 </span>
               ))}
             </div>
             {!anyHw && (
               <p className="mt-2 text-xs text-ink-faint">
-                Sem placa de vídeo compatível por aqui — vai de CPU (x264).
-                Funciona, só pesa mais.
+                Sem placa de vídeo por aqui — funciona no processador, só pesa
+                mais.
               </p>
             )}
           </>
@@ -466,8 +459,7 @@ export function EncodingScreen() {
           (config.mode === "passthrough" ? (
             <Card className="bg-surface-2 text-sm text-ink-muted">
               No <strong className="text-ink">Na lata</strong> não tem o que
-              ajustar: o vídeo vai pra todas exatamente como sai do OBS — a
-              qualidade se define lá.{" "}
+              ajustar — a qualidade se define no OBS.{" "}
               <button
                 onClick={() => setShowGuide(true)}
                 className="font-bold text-brass hover:underline"
@@ -654,7 +646,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
               <div className="flex flex-col gap-1.5 text-[11px] font-semibold text-ink-faint">
                 <span className="flex items-center gap-1">
                   Qualidade da imagem
-                  <Hint text="Por baixo é o bitrate: mais dados por segundo = imagem melhor, mas pede mais upload. O Padrão é o recomendado da plataforma." />
+                  <Hint text="Imagem melhor pede mais upload. O Padrão é o recomendado da plataforma." />
                 </span>
                 <div className="flex h-9 w-fit items-center overflow-hidden rounded-md border-2 border-border">
                   {stops.map((s, i) => (
@@ -751,7 +743,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
               <div className="flex flex-col gap-1.5 text-[11px] font-semibold text-ink-faint">
                 <span className="flex items-center gap-1">
                   Quem recodifica
-                  <Hint text="A placa de vídeo (NVENC/QSV) poupa o processador. O processador (x264) entrega a melhor imagem, mas pesa mais no PC." />
+                  <Hint text="A placa de vídeo poupa o processador. O processador entrega a melhor imagem, mas pesa mais no PC." />
                 </span>
                 <Select
                   className="w-52"
@@ -796,8 +788,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 </span>
               </div>
               <p className="text-xs text-ink-muted">
-                Eu não mexo na qualidade desta — quem define é o encoder do OBS
-                (bitrate, resolução, fps). Zero custo pra sua máquina.
+                A qualidade se define no OBS (bitrate, resolução, fps).
               </p>
               {recVertical && (
                 <p className="text-[11px] font-bold text-warn">

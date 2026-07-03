@@ -17,19 +17,19 @@ const STEPS = [
   },
   {
     title: "Escolha as plataformas",
-    text: "A Twitch e o YouTube já estão na lista — é só colar a chave de transmissão de cada um (e adicionar outros se quiser). As chaves ficam no cofre do sistema, nunca soltas num arquivo de texto.",
+    text: "A Twitch e o YouTube já estão na lista — é só colar a chave de transmissão de cada um. Quer mais? É só adicionar.",
   },
   {
     title: "Liga no OBS",
-    text: "Em Ao vivo, o botão “Configura pra mim” aponta o OBS pra Corneta sozinho — sem você caçar servidor e chave em menu técnico.",
+    text: "Em Ao vivo, o botão “Configura pra mim” acerta o OBS sozinho — sem mexer em menu técnico.",
   },
   {
     title: "Solta a corneta",
-    text: "Um clique e você entra no ar em todas. Veja os números de cada plataforma — e a saúde geral no ícone perto do relógio.",
+    text: "Um clique e você entra no ar em todas. Acompanhe os números de cada plataforma.",
   },
   {
     title: "Chat e relatórios",
-    text: "Todo o chat num lugar (dá pra soltar numa janela flutuante) e, ao encerrar, um relatório do que travou.",
+    text: "Todo o chat num lugar e, ao encerrar, um relatório do que travou.",
   },
 ];
 

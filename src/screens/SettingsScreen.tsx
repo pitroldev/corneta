@@ -106,7 +106,7 @@ export function SettingsScreen() {
         await load();
         // O backend guarda a config antiga antes de sobrescrever — dá o caminho de volta.
         toast.success(
-          "Config importada — a anterior ficou salva em backup na pasta da config",
+          "Config importada — a anterior ficou salva em backup.",
         );
       }
     } catch (e) {
@@ -152,9 +152,9 @@ export function SettingsScreen() {
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
               Endereço local onde o OBS te entrega o vídeo. A
-              <strong className="text-ink-muted"> chave</strong> abaixo é local
-              (OBS ↔ Corneta) — não confunda com as chaves das plataformas, que
-              ficam no cofre.
+              <strong className="text-ink-muted"> chave</strong> abaixo é só
+              entre OBS e Corneta — não é a chave da plataforma, que fica no
+              cofre.
             </p>
 
             {live && (
@@ -256,7 +256,7 @@ export function SettingsScreen() {
             </p>
             <div className="divide-y divide-border-soft">
               <SettingRow
-                title="Senha do obs-websocket"
+                title="Senha do WebSocket"
                 desc="A senha aparece nessa mesma janela do OBS, no botão “Mostrar Chave de Conexão”. Se “Ativar Autenticação” estiver desmarcado lá, deixe vazio."
               >
                 <div className="flex flex-col items-end gap-2">
@@ -274,7 +274,7 @@ export function SettingsScreen() {
               </SettingRow>
               <SettingRow
                 title="Ligar o OBS junto"
-                desc="No BORA AO VIVO, a Corneta também manda o OBS começar a transmitir (precisa do obs-websocket)."
+                desc="No BORA AO VIVO, a Corneta também manda o OBS começar a transmitir."
               >
                 <Toggle
                   checked={settings.autoStartObs}
@@ -293,16 +293,14 @@ export function SettingsScreen() {
               <Shield className="size-5 text-brass" /> Segurança ao vivo
             </h3>
             <p className="mb-2 text-xs text-ink-faint">
-              As redes que seguram a sua live quando algo dá errado. O escudo{" "}
-              <strong className="text-brass">acende</strong> quando a proteção
-              está armada — igual na tela Ao vivo.
+              As redes que seguram a sua live quando algo dá errado.
             </p>
             <div className="divide-y divide-border-soft">
               <SecurityFeature
                 preview={<BrbPreview />}
                 on={settings.brbEnabled}
                 title="Proteção contra quedas (JÁ VOLTO)"
-                desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar SEM derrubar a conexão com as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna. Leve: a Corneta copia o sinal do OBS pras plataformas sem recodificar, então quase não pesa no PC — roda até sem placa de vídeo. (Só o Guardião, abaixo, recodifica.)"
+                desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna."
               >
                 <Toggle
                   checked={settings.brbEnabled}
@@ -328,7 +326,7 @@ export function SettingsScreen() {
                 on={settings.guardianEnabled}
                 title="Guardião de privacidade"
                 badge={<ExperimentalBadge />}
-                desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. A leitura é local — OCR no seu PC, nada sai daqui. Rede de segurança, não garantia. Custo: a live inteira vai ao ar com 12s de atraso (o chat também)."
+                desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. Rede de segurança, não garantia. Custo: a live inteira sai com 12s de atraso (o chat também)."
               >
                 <Toggle
                   checked={settings.guardianEnabled}
@@ -427,7 +425,6 @@ export function SettingsScreen() {
             <div className="divide-y divide-border-soft">
               <SettingRow
                 title="Tema claro"
-                desc="Troca a interface pro modo claro (papel)."
               >
                 <Toggle
                   checked={settings.theme === "light"}
@@ -445,7 +442,7 @@ export function SettingsScreen() {
             <div className="divide-y divide-border-soft">
               <SettingRow
                 title="Backup da config"
-                desc="Exportar/importar perfis e ajustes num arquivo (as chaves não vão — ficam no cofre). Importar substitui a config atual."
+                desc="Salva seus ajustes num arquivo. As chaves ficam no cofre, não vão junto. Importar substitui a config atual."
               >
                 <div className="flex gap-2">
                   <Button variant="subtle" size="sm" onClick={onExport}>
@@ -463,7 +460,7 @@ export function SettingsScreen() {
               </SettingRow>
               <SettingRow
                 title="Logs"
-                desc="Abre a pasta de logs — útil pra diagnosticar ou mandar pro suporte."
+                desc="Abre a pasta de logs pra mandar pro suporte."
               >
                 <Button
                   variant="subtle"
@@ -585,15 +582,14 @@ function GuardianEditor() {
         <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
           <li>
             A transmissão fica <strong className="text-ink">12s atrás</strong>{" "}
-            do tempo real (fixo — é o mínimo pra dar conta até de tela cheia de
-            texto).
+            do tempo real.
           </li>
           <li>O chat e a interação chegam até você com esse mesmo atraso.</li>
           <li>
             Só vigia os termos que você listar —{" "}
             <strong className="text-ink">não</strong> “qualquer segredo”.
           </li>
-          <li>Texto miúdo ou OCR errando feio ainda pode escapar.</li>
+          <li>Texto muito pequeno ainda pode escapar.</li>
         </ul>
       </div>
       <label className="flex flex-col gap-1">
@@ -837,8 +833,8 @@ function BrbSlateChooser() {
           </button>
         </div>
         <span className="text-xs font-semibold text-ink-faint">
-          {current} — entra no ar quando o sinal cai. Vídeo (até 30s) toca em
-          loop e pode ter som.
+          {current} — entra no ar quando o sinal cai. Vídeo toca em loop e pode
+          ter som.
         </span>
       </div>
     </div>
@@ -977,7 +973,7 @@ function SettingRow({
   children,
 }: {
   title: string;
-  desc: string;
+  desc?: string;
   badge?: ReactNode;
   children: ReactNode;
 }) {
@@ -988,7 +984,7 @@ function SettingRow({
           {title}
           {badge}
         </div>
-        <div className="mt-0.5 max-w-md text-sm text-ink-muted">{desc}</div>
+        {desc && <div className="mt-0.5 max-w-md text-sm text-ink-muted">{desc}</div>}
       </div>
       {children}
     </div>

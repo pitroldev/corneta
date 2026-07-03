@@ -81,8 +81,7 @@ export function AboutScreen() {
             <h3 className="text-3xl">Oi, sou o Petro</h3>
             <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed opacity-90">
               Fiz a Corneta pra matar um perrengue meu: um stream do OBS vira
-              live na Twitch, YouTube, Kick e cia. de uma vez só — grátis e sem
-              dor de cabeça.
+              live na Twitch, YouTube, Kick e cia. de uma vez só — grátis.
             </p>
           </div>
         </div>
@@ -101,8 +100,7 @@ export function AboutScreen() {
             pitrol.dev
           </span>
           <span className="block text-sm text-ink-muted">
-            Meu blog e meus projetos — dá um pulo lá pra ver no que ando
-            trabalhando.
+            Meu blog e meus projetos.
           </span>
         </span>
         <ArrowUpRight
@@ -157,8 +155,7 @@ export function AboutScreen() {
 
       {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
-        Corneta é grátis e de código aberto — espia como ela funciona por
-        dentro. Feita com{" "}
+        Corneta é grátis e de código aberto. Feita com{" "}
         <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
       </p>
       <p className="mt-1 text-center text-[11px] font-semibold text-ink-faint">
