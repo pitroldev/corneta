@@ -39,11 +39,12 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   );
 
   // Resolução recomendada = a MAIOR saída que alguma plataforma realmente usa — mandar
-  // 1080p com tudo em 720p é peso puro no PC sem ganho nenhum. Plataforma vertical
-  // (recorte 9:16) precisa da fonte cheia em 1080p; com o compositor, o feed de
-  // programa é fixo em 1080p.
+  // 1080p com tudo em 720p é peso puro no PC sem ganho nenhum (e com o compositor no ar
+  // dobra, porque ele reencoda a live inteira). Plataforma vertical (recorte 9:16) precisa
+  // da fonte cheia em 1080p. O guardião fica sempre em 1080p (o OCR lê melhor no detalhe).
+  // Espelha engine.rs::program_resolution — o número aqui é o MESMO que o motor roda.
   const needsFullHd =
-    compositorOn ||
+    guardArmed ||
     enabled.length === 0 ||
     enabled.some((t) => {
       const p = t.encoding.preset ?? PLATFORMS[t.platformId].recommended;

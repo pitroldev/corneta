@@ -249,10 +249,37 @@ impl ProgramSpec {
     }
 }
 
+/// Resolução do feed de programa. Base **720p**; sobe pra 1080p só quando ALGUM destino
+/// ativo precisa — saída vertical (recorta 9:16 da fonte cheia) ou saída acima de 720p.
+/// Rodar 1080p com todo mundo em 720p é encode em DOBRO à toa: o compositor reencoda a live
+/// inteira e a 1080p isso custa ~2x um 720p, sem ganho nenhum pras plataformas. O guardião
+/// fica SEMPRE em 1080p (`guard`): o OCR é calibrado pra 1920 de largura (ver guardian/ocr.rs)
+/// e é recurso de segurança — não dá pra degradar a leitura pra poupar CPU. Espelhado em
+/// src/components/ObsQualityGuide.tsx (`needsFullHd`) pra o guia mandar o OBS enviar o MESMO.
+fn program_resolution(config: &AppConfig, guard: bool) -> (u32, u32) {
+    let enabled: Vec<&Target> = config.targets.iter().filter(|t| t.enabled).collect();
+    let needs_full_hd = guard
+        || enabled.is_empty()
+        || enabled.iter().any(|t| {
+            let p = sanitize_preset(
+                t.encoding
+                    .preset
+                    .clone()
+                    .unwrap_or_else(|| recommended_preset(&t.platform_id)),
+            );
+            p.height > p.width || p.width.min(p.height) > 720
+        });
+    if needs_full_hd {
+        (1920, 1080)
+    } else {
+        (1280, 720)
+    }
+}
+
 /// Deriva o spec do programa dos destinos ativos: fps acompanha o maior preset (cap 60;
-/// TRAVADO em 30 com o guardião — o buffer de 12s a 60fps dobraria pra ~2 GB de RAM) e o
-/// bitrate acompanha o maior destino (os "copy" empurram o encode do programa como está).
-/// Resolução fixa 1920x1080 (fonte OBS típica; o scale normaliza qualquer entrada).
+/// TRAVADO em 30 com o guardião — o buffer de 12s a 60fps dobraria pra ~2 GB de RAM), o
+/// bitrate acompanha o maior destino (os "copy" empurram o encode do programa como está) e
+/// a resolução é adaptativa (ver `program_resolution`) — 720p quando dá, poupando o encode.
 pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
     let mut max_fps = 30u32;
     let mut max_kbps = 4500u32;
@@ -266,9 +293,10 @@ pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
         max_fps = max_fps.max(p.fps);
         max_kbps = max_kbps.max(p.video_bitrate_kbps);
     }
+    let (w, h) = program_resolution(config, guard);
     ProgramSpec {
-        w: 1920,
-        h: 1080,
+        w,
+        h,
         fps: if guard { 30 } else { max_fps.clamp(30, 60) },
         video_kbps: max_kbps.clamp(2500, 12_000),
     }
