@@ -1,5 +1,6 @@
 import { Check, Gauge, Route, X } from "lucide-react";
 import { useStore } from "../lib/store";
+import { PLATFORMS } from "../lib/platforms";
 import { effectiveAction, lowestCommonDenominator } from "../lib/estimates";
 import { fmtBitrate } from "../lib/utils";
 import { Modal } from "./Modal";
@@ -37,13 +38,28 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
     Math.max(30, ...enabled.map((t) => t.encoding.preset?.fps ?? 30)),
   );
 
+  // Resolução recomendada = a MAIOR saída que alguma plataforma realmente usa — mandar
+  // 1080p com tudo em 720p é peso puro no PC sem ganho nenhum. Plataforma vertical
+  // (recorte 9:16) precisa da fonte cheia em 1080p; com o compositor, o feed de
+  // programa é fixo em 1080p.
+  const needsFullHd =
+    compositorOn ||
+    enabled.length === 0 ||
+    enabled.some((t) => {
+      const p = t.encoding.preset ?? PLATFORMS[t.platformId].recommended;
+      return p.height > p.width || Math.min(p.width, p.height) > 720;
+    });
+  const srcRes = needsFullHd ? "1920×1080" : "1280×720";
+
   // Bitrate recomendado pro OBS:
   // - com cópia: o teto é a plataforma mais apertada (menor denominador) — acima disso
   //   a live trava/cai NELA, porque o vídeo vai como saiu do OBS;
-  // - só recodificação: o OBS manda pro localhost — capricha (fonte melhor = saída melhor).
+  // - só recodificação: o OBS manda pro localhost — capricha (fonte melhor = saída melhor;
+  //   bitrate alto quase não pesa no encoder — quem pesa é resolução/fps).
   const lcd = lowestCommonDenominator(config);
   const hasCopy = copies.length > 0 && lcd.videoKbps != null;
-  const obsKbps = hasCopy ? lcd.videoKbps! : fps >= 60 ? 12000 : 10000;
+  const contribKbps = needsFullHd ? (fps >= 60 ? 12000 : 10000) : fps >= 60 ? 8000 : 6500;
+  const obsKbps = hasCopy ? lcd.videoKbps! : contribKbps;
 
   const hw = encoders.find((e) => e.available && e.kind !== "software");
   const encAdvice = hw
@@ -142,10 +158,23 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
           <GuideRow k="Intervalo de quadro-chave" v="2 s" />
           <GuideRow
             k="Vídeo (aba Vídeo)"
-            v={`1920×1080 · ${fps} FPS`}
-            note="mesma resolução da tela de saída — redimensionar duas vezes borra a imagem"
+            v={`${srcRes} · ${fps} FPS`}
+            note={
+              needsFullHd
+                ? "mesma resolução da tela de saída — redimensionar duas vezes borra a imagem"
+                : "suas plataformas saem em 720p — mandar mais que isso só pesa no PC, sem ganho"
+            }
           />
         </div>
+        {/* Válvula de escape pra PC fraco: x264 em 1080p60 pena — fps custa quase linear. */}
+        {!hw && (
+          <p className="mt-2 text-[11px] font-semibold leading-relaxed text-warn">
+            Sem placa de vídeo, o x264 pode penar em{" "}
+            {needsFullHd ? "1080p" : "720p"}
+            {fps >= 60 ? "60" : "30"}: se a live engasgar ou o jogo travar, baixe o FPS pra 30
+            (aba Vídeo) — pesa quase metade e, fora jogo muito rápido, ninguém nota.
+          </p>
+        )}
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
           No modo <strong className="text-ink-muted">Simples</strong> do OBS, só bitrate e encoder
           aparecem — já resolve. Esses ajustes são na mão mesmo: o obs-websocket não me deixa
