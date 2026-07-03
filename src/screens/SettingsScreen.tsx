@@ -24,6 +24,7 @@ import { obsIngestUrl } from "../lib/factory";
 import { renderBrbSlatePng } from "../lib/brbSlate";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
+import { sanitizeHost } from "../lib/validation";
 import type { ObsCheck } from "../lib/types";
 import {
   Badge,
@@ -196,6 +197,11 @@ export function SettingsScreen() {
                       value={ingest.host}
                       disabled={live}
                       onChange={(e) => setIngest({ host: e.target.value })}
+                      onBlur={(e) => {
+                        // Se colar a URL inteira no campo de host, fica só o host.
+                        const clean = sanitizeHost(e.target.value);
+                        if (clean !== e.target.value) setIngest({ host: clean });
+                      }}
                     />
                   </Field>
                   <Field label="Porta">

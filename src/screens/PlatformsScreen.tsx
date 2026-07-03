@@ -28,6 +28,7 @@ import { cn, openExternal, uid } from "../lib/utils";
 import type { ChatPlatform, PlatformId, Target } from "../lib/types";
 import {
   INGEST_URL_RE,
+  sanitizeIngestUrl,
   blockingIssues,
   hasValidUrl,
   isUrlInvalid,
@@ -489,6 +490,12 @@ function TargetRow({
                   onChange={(e) =>
                     updateTarget(target.id, { ingestUrl: e.target.value })
                   }
+                  onBlur={(e) => {
+                    // Tira espaços/aspas/quebras que colam junto com a URL.
+                    const clean = sanitizeIngestUrl(e.target.value);
+                    if (clean !== e.target.value)
+                      updateTarget(target.id, { ingestUrl: clean });
+                  }}
                   invalid={urlInvalid}
                 />
                 {urlInvalid && (

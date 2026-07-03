@@ -113,3 +113,69 @@ export function sanitizeStreamKey(
   // 3) Chave comum (ou recorte vazio): não mexe.
   return { key: trimmed, strippedUrl: false };
 }
+
+/** Tira aspas/apóstrofos que envolvem o valor inteiro (colagem de "…" ou '…'). */
+function stripWrappingQuotes(s: string): string {
+  const t = s.trim();
+  if (t.length >= 2 && /^["'`]/.test(t) && t.endsWith(t[0])) return t.slice(1, -1).trim();
+  return t;
+}
+
+/**
+ * Limpa a chave da API do YouTube (Data API v3). O streamer às vezes cola a URL do console do
+ * Google, um `key=…`, ou a chave entre aspas / com espaço no fim. A chave tem forma fixa
+ * (`AIza` + 35 chars), então extraímos ela de dentro de qualquer sujeira. Sem match, cai pro
+ * trim + tira aspas + remove espaços/quebras (a chave nunca tem espaço).
+ *
+ *   "AIzaSyABC…"                         → "AIzaSyABC…"
+ *   "key=AIzaSyABC…&foo"                 → "AIzaSyABC…"
+ *   "https://console.cloud…?key=AIza…"   → "AIza…"
+ *   ' "AIza…" '                          → "AIza…"
+ */
+export function sanitizeApiKey(raw: string): string {
+  const m = raw.match(/AIza[0-9A-Za-z_-]{35}/);
+  if (m) return m[0];
+  return stripWrappingQuotes(raw).replace(/\s+/g, "");
+}
+
+/**
+ * Limpa um TOKEN opaco colado (Socket API do Streamlabs, JWT do StreamElements, Client
+ * ID/Secret do OAuth). Não têm forma fixa, então limpamos o que cerca: aspas, `Bearer `,
+ * rótulo `token:`/`jwt:`/`token=` (inclui URL de socket `…?token=xxx`) e qualquer espaço
+ * interno (nenhum desses tokens tem espaço). Sem rótulo, é só o token trimado e sem aspas.
+ *
+ *   "Bearer eyJhbGciOi…"                       → "eyJhbGciOi…"
+ *   '"abc123"'                                 → "abc123"
+ *   "Your Socket API Token: abc123"            → "abc123"
+ *   "https://sockets.streamlabs.com/?token=ab" → "ab"
+ */
+export function sanitizeToken(raw: string): string {
+  let t = stripWrappingQuotes(raw).replace(/^bearer\s+/i, "").trim();
+  // Rótulo/lista tipo "token: xxx", "jwt = xxx", ou querystring "?token=xxx".
+  const labelled = t.match(/(?:token|jwt)\s*[:=]\s*([^\s&"']+)/i);
+  if (labelled) t = labelled[1];
+  return t.replace(/\s+/g, "");
+}
+
+/** Só o esquema+host+porta+caminho, sem espaços nem aspas (URL não tem espaço no meio). */
+export function sanitizeIngestUrl(raw: string): string {
+  const t = stripWrappingQuotes(raw).replace(/\s+/g, "");
+  return BARE_SCHEME_RE.test(t) ? "" : t;
+}
+
+/**
+ * Limpa o HOST de ingestão (avançado). Se o streamer colar a URL inteira no campo de host
+ * (`rtmp://localhost:1935/live`) ou `host:porta`, ficamos só com o host — a porta e o app
+ * têm campos próprios.
+ *
+ *   "localhost"                    → "localhost"
+ *   "rtmp://localhost:1935/live"   → "localhost"
+ *   "127.0.0.1:1935"               → "127.0.0.1"
+ */
+export function sanitizeHost(raw: string): string {
+  let t = stripWrappingQuotes(raw).replace(/\s+/g, "");
+  t = t.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ""); // tira esquema (rtmp://, srt://, http://…)
+  t = t.split(/[/?#]/)[0]; // corta caminho/query
+  t = t.replace(/:\d+$/, ""); // corta a porta
+  return t;
+}

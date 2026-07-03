@@ -28,6 +28,8 @@ import { useStore } from "../lib/store";
 import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { toast } from "../lib/toast";
 import { cn, openExternal, uid } from "../lib/utils";
+import { normalizeChatChannel } from "../lib/chatChannel";
+import { sanitizeApiKey, sanitizeToken } from "../lib/validation";
 import * as RTabs from "@radix-ui/react-tabs";
 import { HAS_KICK_OAUTH, HAS_TWITCH_OAUTH } from "../lib/oauth";
 import type { AlertSource, AlertSourceKind, ChatMessage, ChatPlatform, ChatSource } from "../lib/types";
@@ -1015,7 +1017,13 @@ function SourceCard({
               className="w-36"
               value={src.platform}
               options={PLATFORM_OPTS}
-              onChange={(v) => onChange({ platform: v as ChatPlatform })}
+              onChange={(v) =>
+                onChange({
+                  platform: v as ChatPlatform,
+                  // Re-limpa o valor pro formato da NOVA plataforma (ex.: @handle→login).
+                  value: normalizeChatChannel(v as ChatPlatform, src.value),
+                })
+              }
             />
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_11rem]">
@@ -1025,6 +1033,11 @@ function SourceCard({
                 value={src.value}
                 placeholder={PLACEHOLDER[src.platform]}
                 onChange={(e) => onChange({ value: e.target.value })}
+                onBlur={(e) => {
+                  // Ao sair do campo, limpa o que colou (URL/@/ID/subpágina) pro formato certo.
+                  const clean = normalizeChatChannel(src.platform, e.target.value);
+                  if (clean !== e.target.value) onChange({ value: clean });
+                }}
                 className={inputCls}
               />
             </label>
@@ -1123,6 +1136,10 @@ function YoutubeApiKeyField({
           value={value}
           placeholder="cole sua API key (Data API v3)"
           onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => {
+            const clean = sanitizeApiKey(e.target.value);
+            if (clean !== e.target.value) onChange(clean);
+          }}
           className="h-9 flex-1 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
         />
         <Button
@@ -1165,7 +1182,7 @@ function AlertSourceCard({
   const showInput = !src.hasToken || editing;
 
   const save = async () => {
-    const t = token.trim();
+    const t = sanitizeToken(token);
     if (!t) return;
     await onToken(t);
     setToken("");
@@ -1175,7 +1192,7 @@ function AlertSourceCard({
   const paste = async () => {
     try {
       const t = await navigator.clipboard.readText();
-      if (t) setToken(t.trim());
+      if (t) setToken(sanitizeToken(t));
     } catch {
       /* área de transferência bloqueada */
     }
@@ -1319,7 +1336,7 @@ function YoutubeCredsForm({ onSave }: { onSave: (clientId: string, clientSecret:
   const can = id.trim() !== "" && secret.trim() !== "";
   const save = () => {
     if (!can) return;
-    onSave(id.trim(), secret.trim());
+    onSave(sanitizeToken(id), sanitizeToken(secret));
     setId("");
     setSecret("");
     toast.success("Credenciais do YouTube no cofre 🔒");
