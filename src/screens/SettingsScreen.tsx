@@ -302,7 +302,7 @@ export function SettingsScreen() {
                 preview={<BrbPreview />}
                 on={settings.brbEnabled}
                 title="Proteção contra quedas (JÁ VOLTO)"
-                desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar SEM derrubar a conexão com as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna. Custo: a Corneta recodifica o sinal continuamente (usa a GPU quando tem; num PC fraco sem GPU pode pesar)."
+                desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar SEM derrubar a conexão com as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna. Leve: a Corneta copia o sinal do OBS pras plataformas sem recodificar, então quase não pesa no PC — roda até sem placa de vídeo. (Só o Guardião, abaixo, recodifica.)"
               >
                 <Toggle
                   checked={settings.brbEnabled}
@@ -837,8 +837,8 @@ function BrbSlateChooser() {
           </button>
         </div>
         <span className="text-xs font-semibold text-ink-faint">
-          {current} — entra no ar quando o sinal cai. Vídeo toca em loop e pode
-          ter som.
+          {current} — entra no ar quando o sinal cai. Vídeo (até 30s) toca em
+          loop e pode ter som.
         </span>
       </div>
     </div>

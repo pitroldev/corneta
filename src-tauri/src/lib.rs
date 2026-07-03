@@ -10,6 +10,7 @@ mod keys;
 mod obs;
 mod permissions;
 mod session;
+mod splicer;
 mod studio;
 
 use std::sync::Mutex;

@@ -118,9 +118,10 @@ pub struct Settings {
     /// Posição do divisor do modo "Ambos": % que o painel de alertas ocupa (15–75).
     #[serde(default = "default_both_split")]
     pub chat_both_split: u32,
-    /// Proteção contra quedas: liga o compositor (feed de programa contínuo) — se o sinal
-    /// cair NO MEIO da live, o slate "JÁ VOLTO" entra SEM derrubar a conexão das plataformas.
-    /// Padrão DESLIGADO: custa um re-encode contínuo (pesa em PC fraco sem GPU).
+    /// Proteção contra quedas: se o sinal cair NO MEIO da live, o slate "JÁ VOLTO" entra SEM
+    /// derrubar a conexão das plataformas. Sem o Guardião, usa o SPLICER (copia o sinal do OBS
+    /// pro programa, sem re-encode — quase não pesa, ver splicer.rs); com o Guardião, é o
+    /// compositor que recodifica (delay de 12s). Padrão DESLIGADO.
     #[serde(default)]
     pub brb_enabled: bool,
     /// Tela "JÁ VOLTO": "auto" (gerada pela Corneta) | "image" | "video" (arquivo escolhido pelo

@@ -1152,6 +1152,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         // extensão e, se for vídeo, sonda uma vez se tem trilha de áudio.
         let slate_file = brb_slate_file(&app);
         let slate_is_video = slate_file.as_deref().map(brb_slate_is_video).unwrap_or(false);
+        // JÁ VOLTO "leve" (splicer, sem re-encode): só com o guardião DESLIGADO (ele precisa dos
+        // pixels decodificados pro OCR). Slate de imagem OU vídeo — o vídeo é transcodado UMA vez
+        // no setup e reproduzido em loop na queda; a live saudável segue em cópia pura nos dois
+        // casos. Fora do splicer, o compositor de sempre. O splicer produz o MESMO `_program`
+        // (cópia + emenda do slate), então tudo a jusante (destinos lendo `prog_ready`) é idêntico.
+        let use_splicer = brb_enabled && !guard;
         let spec = engine::program_spec(&config, guard);
         let slate = match (&slate_file, slate_is_video) {
             (Some(p), true) => {
@@ -1181,9 +1187,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         };
         let (app_c, run_c, sig_c, slate_c) =
             (app.clone(), running.clone(), has_signal.clone(), slate_on.clone());
-        tauri::async_runtime::spawn(async move {
-            crate::compositor::run(app_c, run_c, sig_c, slate_c, opts).await;
-        });
+        if use_splicer {
+            // Cópia direta do OBS pro `_program` (zero re-encode); slate emendado na queda.
+            tauri::async_runtime::spawn(async move {
+                crate::splicer::run(app_c, run_c, sig_c, slate_c, opts).await;
+            });
+        } else {
+            tauri::async_runtime::spawn(async move {
+                crate::compositor::run(app_c, run_c, sig_c, slate_c, opts).await;
+            });
+        }
     }
 
     for &t in &enabled {

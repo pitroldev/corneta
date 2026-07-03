@@ -26,11 +26,12 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const guardArmed =
     config.settings.guardianEnabled &&
     config.settings.guardianWatchlist.some((t) => t.trim().length >= 3);
-  // Com o compositor no ar (JÁ VOLTO/Guardião), TUDO passa por uma recodificação da
-  // Corneta — o OBS vira um sinal de contribuição local (não gasta internet).
-  const compositorOn = config.settings.brbEnabled || guardArmed;
+  // Só o GUARDIÃO faz a Corneta recodificar TUDO (o OBS vira contribuição local). O JÁ VOLTO
+  // sozinho é o splicer: copia o sinal do OBS pras plataformas SEM recodificar — então, pro
+  // bitrate, se comporta igual a "sem compositor" (a cópia por-plataforma manda no teto).
+  const reencodesAll = guardArmed;
 
-  const copies = compositorOn ? [] : enabled.filter((t) => effectiveAction(config.mode, t) === "copy");
+  const copies = reencodesAll ? [] : enabled.filter((t) => effectiveAction(config.mode, t) === "copy");
   const transcodes = enabled.filter((t) => !copies.includes(t));
 
   const fps = Math.min(
@@ -39,7 +40,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   );
 
   // Resolução recomendada = a MAIOR saída que alguma plataforma realmente usa — mandar
-  // 1080p com tudo em 720p é peso puro no PC sem ganho nenhum (e com o compositor no ar
+  // 1080p com tudo em 720p é peso puro no PC sem ganho nenhum (e com o Guardião ligado
   // dobra, porque ele reencoda a live inteira). Plataforma vertical (recorte 9:16) precisa
   // da fonte cheia em 1080p. O guardião fica sempre em 1080p (o OCR lê melhor no detalhe).
   // Espelha engine.rs::program_resolution — o número aqui é o MESMO que o motor roda.
@@ -92,14 +93,13 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
           Daí:
         </p>
         <div className="mt-2 flex flex-col gap-1.5 text-xs">
-          {compositorOn ? (
+          {reencodesAll ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge tone="brass">recodifico tudo</Badge>
               <span className="text-ink-muted">
-                {config.settings.brbEnabled ? "JÁ VOLTO" : "Guardião"} ligado — o vídeo passa por
-                mim antes das plataformas. O OBS manda só pra cá (local,{" "}
-                <strong className="text-ink">não gasta sua internet</strong>), então capricha no
-                sinal.
+                Guardião ligado — o vídeo passa por mim antes das plataformas. O OBS manda só pra
+                cá (local, <strong className="text-ink">não gasta sua internet</strong>), então
+                capricha no sinal.
               </span>
             </div>
           ) : (
@@ -203,7 +203,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
         <p className="flex gap-2">
           <Check className="mt-0.5 size-3.5 shrink-0 text-ok" strokeWidth={2.8} />
           <span>
-            <strong className="text-ink">Mudou as plataformas ou ligou o JÁ VOLTO?</strong> Volta
+            <strong className="text-ink">Mudou as plataformas ou ligou o Guardião?</strong> Volta
             aqui — os números acima acompanham a sua config.
           </span>
         </p>
