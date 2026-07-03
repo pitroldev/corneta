@@ -527,24 +527,10 @@ export function ChatScreen() {
               )}
 
               {sources.some((x) => x.platform === "youtube") && (
-                <label className="mt-2 flex flex-col gap-1 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
-                    <Tooltip
-                      content="Sem ela a Corneta já lê o chat direto. Com ela você ganha a contagem de “assistindo” do YouTube e uma reserva, caso a leitura direta falhe."
-                    >
-                      <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
-                        · opcional (bom ter)
-                      </span>
-                    </Tooltip>
-                  </span>
-                  <input
-                    value={s.youtubeApiKey ?? ""}
-                    placeholder="cole sua API key (Data API v3)"
-                    onChange={(e) => setSettings({ youtubeApiKey: e.target.value })}
-                    className="h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
-                  />
-                </label>
+                <YoutubeApiKeyField
+                  value={s.youtubeApiKey ?? ""}
+                  onChange={(v) => setSettings({ youtubeApiKey: v })}
+                />
               )}
             </div>
             </RTabs.Content>
@@ -1097,6 +1083,67 @@ const ALERT_STATUS: Record<string, string> = {
   disconnected: "caiu",
 };
 
+// API key do YouTube: salva sozinha (onChange), mas ninguém saberia se presta — daí o
+// "Verificar", que faz uma chamada barata à Data API e mostra ✓/motivo real do Google.
+function YoutubeApiKeyField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  // Resultado envelhece: some ao editar a chave (senão um ✓ antigo fica mentindo).
+  useEffect(() => setResult(null), [value]);
+  const verify = async () => {
+    if (!value.trim()) return;
+    setTesting(true);
+    setResult(null);
+    try {
+      setResult({ ok: true, msg: await api.youtubeKeyCheck(value.trim()) });
+    } catch (e) {
+      setResult({ ok: false, msg: String(e).replace("Error: ", "") });
+    } finally {
+      setTesting(false);
+    }
+  };
+  return (
+    <label className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
+      <span className="flex flex-wrap items-center gap-1.5">
+        <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
+        <Tooltip content="Sem ela a Corneta já lê o chat direto. Com ela você ganha a contagem de “assistindo” do YouTube e uma reserva, caso a leitura direta falhe.">
+          <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
+            · opcional (bom ter)
+          </span>
+        </Tooltip>
+      </span>
+      <div className="flex items-center gap-2">
+        <input
+          value={value}
+          placeholder="cole sua API key (Data API v3)"
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 flex-1 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
+        />
+        <Button
+          variant="subtle"
+          size="sm"
+          className="h-9 shrink-0"
+          disabled={!value.trim() || testing}
+          onClick={verify}
+        >
+          <Wifi className="size-3.5" /> {testing ? "Verificando…" : "Verificar"}
+        </Button>
+      </div>
+      {result && (
+        <span className={cn("font-bold normal-case", result.ok ? "text-ok" : "text-bad")}>
+          {result.ok ? "✓" : "✕"} {result.msg}
+        </span>
+      )}
+    </label>
+  );
+}
+
 function AlertSourceCard({
   src,
   status,
@@ -1131,6 +1178,22 @@ function AlertSourceCard({
       if (t) setToken(t.trim());
     } catch {
       /* área de transferência bloqueada */
+    }
+  };
+
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  // O resultado do teste envelhece: some ao trocar o token (o card volta pro modo input).
+  useEffect(() => setTestResult(null), [src.hasToken, editing]);
+  const test = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult({ ok: true, msg: await api.alertTest(src.id) });
+    } catch (e) {
+      setTestResult({ ok: false, msg: String(e).replace("Error: ", "") });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -1196,18 +1259,32 @@ function AlertSourceCard({
             <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2">
               <Check className="size-4 text-ok" strokeWidth={2.6} />
               <span className="text-sm font-semibold">Token no cofre</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto"
-                onClick={() => {
-                  setToken("");
-                  setEditing(true);
-                }}
-              >
-                <Pencil className="size-3.5" /> Trocar
-              </Button>
+              <div className="ml-auto flex gap-1">
+                <Button variant="ghost" size="sm" onClick={test} disabled={testing}>
+                  <Wifi className="size-3.5" /> {testing ? "Testando…" : "Testar"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setToken("");
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil className="size-3.5" /> Trocar
+                </Button>
+              </div>
             </div>
+          )}
+          {testResult && (
+            <span
+              className={cn(
+                "text-[11px] font-bold",
+                testResult.ok ? "text-ok" : "text-bad",
+              )}
+            >
+              {testResult.ok ? "✓" : "✕"} {testResult.msg}
+            </span>
           )}
           <p className="text-[11px] text-ink-faint">{meta.hint}</p>
           <div className="flex justify-end border-t-2 border-border-soft pt-2.5">

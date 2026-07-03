@@ -167,12 +167,13 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
           />
         </div>
         {/* Válvula de escape pra PC fraco: x264 em 1080p60 pena — fps custa quase linear. */}
-        {!hw && (
+        {!hw && (needsFullHd || fps >= 60) && (
           <p className="mt-2 text-[11px] font-semibold leading-relaxed text-warn">
             Sem placa de vídeo, o x264 pode penar em{" "}
             {needsFullHd ? "1080p" : "720p"}
-            {fps >= 60 ? "60" : "30"}: se a live engasgar ou o jogo travar, baixe o FPS pra 30
-            (aba Vídeo) — pesa quase metade e, fora jogo muito rápido, ninguém nota.
+            {fps >= 60 ? "60" : "30"}: se a live engasgar ou o jogo travar,{" "}
+            {fps >= 60 ? "baixe o FPS pra 30 (aba Vídeo) — pesa quase metade" : "baixe a saída pra 720p (aba Vídeo)"}{" "}
+            e, fora jogo muito rápido, ninguém nota.
           </p>
         )}
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">

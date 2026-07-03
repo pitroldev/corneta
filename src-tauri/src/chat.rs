@@ -1207,6 +1207,50 @@ fn search_live_video_id(channel_id: &str, api_key: &str) -> Option<String> {
     v.pointer("/items/0/id/videoId").and_then(|x| x.as_str()).map(String::from)
 }
 
+/// Verifica se a API key (Data API v3) é válida com uma chamada barata (i18nLanguages, 1 unidade
+/// de cota). Ok(msg) = chave boa; Err(motivo) = inválida/mal configurada, em linguagem de gente.
+pub fn check_youtube_key(key: &str) -> Result<String, String> {
+    let key = key.trim();
+    if key.is_empty() {
+        return Err("cole a API key primeiro".into());
+    }
+    let url = format!(
+        "https://www.googleapis.com/youtube/v3/i18nLanguages?part=snippet&hl=pt&key={key}"
+    );
+    match ureq::get(&url).timeout(Duration::from_secs(10)).call() {
+        Ok(_) => Ok("chave válida".into()),
+        Err(ureq::Error::Status(code, r)) => {
+            let body = r.into_string().unwrap_or_default();
+            let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+            let reason = v
+                .pointer("/error/errors/0/reason")
+                .and_then(|x| x.as_str())
+                .unwrap_or("");
+            let status = v.pointer("/error/status").and_then(|x| x.as_str()).unwrap_or("");
+            let msg = v.pointer("/error/message").and_then(|x| x.as_str()).unwrap_or("");
+            Err(match reason {
+                "keyInvalid" | "badRequest" => "chave inválida — confira se copiou certo".into(),
+                "accessNotConfigured" => {
+                    "ative a YouTube Data API v3 no projeto dessa chave".into()
+                }
+                "ipRefererBlocked" | "forbidden" => {
+                    "essa chave tem restrição de app/IP — libere pra uso geral".into()
+                }
+                // cota estourada = a chave EM SI é válida; não trata como erro de credencial.
+                "quotaExceeded" | "dailyLimitExceeded" | "rateLimitExceeded" => {
+                    return Ok("chave válida (mas a cota do dia está no limite)".into())
+                }
+                _ if status == "PERMISSION_DENIED" => {
+                    "ative a YouTube Data API v3 no projeto dessa chave".into()
+                }
+                _ if !msg.is_empty() => format!("YouTube {code}: {msg}"),
+                _ => format!("YouTube respondeu {code}"),
+            })
+        }
+        Err(_) => Err("sem conexão com o YouTube (rede/proxy?)".into()),
+    }
+}
+
 /// Resolve a entrada (CANAL ou vídeo) no ID do vídeo ao vivo atual.
 /// Canal → scrape do `/live` (grátis); fallback `search.list` só se o scrape falhar.
 fn resolve_youtube_video(input: &str, api_key: &str) -> LiveResolve {

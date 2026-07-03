@@ -2073,6 +2073,35 @@ pub async fn test_target(app: AppHandle, target_id: String) -> Result<String, St
         .map_err(|e| format!("join: {e}"))?
 }
 
+/// Verifica se a API key do YouTube (Data API v3) é válida — chamada barata (1 unidade de cota).
+#[tauri::command]
+pub async fn youtube_key_check(key: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::chat::check_youtube_key(&key))
+        .await
+        .map_err(|e| format!("join: {e}"))?
+}
+
+/// Testa o token de uma fonte de alerta (Streamlabs/StreamElements) com UMA tentativa de conexão,
+/// sem ligar o motor persistente. Ok(msg) = válido; Err(motivo) = inválido/rede.
+#[tauri::command]
+pub async fn alert_test(app: AppHandle, source_id: String) -> Result<String, String> {
+    let cfg = get_config(app);
+    let src = cfg
+        .settings
+        .alert_sources
+        .into_iter()
+        .find(|s| s.id == source_id)
+        .ok_or("fonte não encontrada")?;
+    let token = crate::keys::get_key(&format!("alert_{}", src.id))
+        .filter(|t| !t.trim().is_empty())
+        .ok_or("cole o token primeiro")?;
+    let kind = src.kind;
+    tauri::async_runtime::spawn_blocking(move || crate::alerts::probe_alert(&kind, &token))
+        .await
+        .map_err(|e| format!("join: {e}"))?
+        .map(|_| "token válido".to_string())
+}
+
 #[tauri::command]
 pub fn open_logs_dir(app: AppHandle) -> Result<(), String> {
     let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;

@@ -206,6 +206,8 @@ pub fn run() {
             commands::open_chat_window,
             commands::obs_set_stream,
             commands::test_target,
+            commands::youtube_key_check,
+            commands::alert_test,
             commands::open_logs_dir,
             commands::register_shortcut,
             commands::obs_check,

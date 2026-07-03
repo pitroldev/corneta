@@ -58,6 +58,24 @@ fn post_form(url: &str, form: &[(&str, &str)]) -> Result<Value, (u16, Value)> {
     }
 }
 
+/// Mensagem legível de um erro do endpoint OAuth do Google (device/token). Evita o genérico
+/// "não consegui iniciar o login" — mostra a causa real (o caso comum é cliente do tipo errado,
+/// que o Google recusa com `invalid_client`). Seguro: o pedido de device_code só manda o
+/// client_id (público) + escopo, então a resposta de erro não carrega segredo.
+fn google_oauth_err(code: u16, e: &Value) -> String {
+    let err = e.get("error").and_then(|x| x.as_str()).unwrap_or("");
+    let desc = e.get("error_description").and_then(|x| x.as_str()).unwrap_or("");
+    match err {
+        "invalid_client" | "unauthorized_client" => {
+            "credenciais recusadas — o cliente OAuth precisa ser do tipo \"TVs e dispositivos de entrada limitada\" e no mesmo projeto do Client Secret".into()
+        }
+        _ if code == 0 => "sem conexão com o Google (rede/proxy?)".into(),
+        _ if !desc.is_empty() => format!("Google: {desc}"),
+        _ if !err.is_empty() => format!("Google: {err}"),
+        _ => format!("Google respondeu {code}"),
+    }
+}
+
 fn auth_event(app: &AppHandle, who: &str, state: &str, user_code: &str, verify: &str, login: &str) {
     let _ = app.emit(
         &format!("auth://{who}"),
@@ -325,7 +343,9 @@ pub fn youtube_login_start(app: AppHandle) {
             &[("client_id", &cfg.google_client_id), ("scope", GOOGLE_SCOPE)],
         ) {
             Ok(v) => v,
-            Err(_) => return auth_event(&app, "youtube", "error", "", "", "Não consegui iniciar o login"),
+            Err((code, e)) => {
+                return auth_event(&app, "youtube", "error", "", "", &google_oauth_err(code, &e))
+            }
         };
         let device_code = dev.get("device_code").and_then(|x| x.as_str()).unwrap_or("").to_string();
         let user_code = dev.get("user_code").and_then(|x| x.as_str()).unwrap_or("").to_string();

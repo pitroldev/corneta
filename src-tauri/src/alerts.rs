@@ -395,3 +395,101 @@ where
     // Conectou de verdade nesta tentativa? → o chamador zera o backoff.
     if connected { ConnResult::Connected } else { ConnResult::Failed }
 }
+
+// ----------------------------- Teste de token (sob demanda) --------
+// UMA tentativa de conexão pra dizer "esse token presta?" sem ligar o motor persistente.
+// Streamlabs: o token vai na URL → handshake 401/403 = inválido, `40` = ok.
+// StreamElements: conecta mesmo com JWT podre; a verdade vem no `authenticate` (evento
+// `authenticated` = ok, `unauthorized` = inválido) → por isso o probe ESPERA esse evento.
+
+/// Testa um token de alerta. Ok(()) = válido/conectou; Err(motivo) = inválido ou falha de rede.
+pub fn probe_alert(kind: &str, token: &str) -> Result<(), String> {
+    match kind {
+        "streamlabs" => probe_socketio(
+            &format!("wss://sockets.streamlabs.com/socket.io/?token={token}&EIO=3&transport=websocket"),
+            None,
+        ),
+        "streamelements" => probe_socketio(
+            "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket",
+            Some(format!("42[\"authenticate\",{}]", json!({ "method": "jwt", "token": token }))),
+        ),
+        _ => Err("fonte de alerta desconhecida".into()),
+    }
+}
+
+/// Uma tentativa de handshake Socket.IO. Sem `auth` (Streamlabs): `40` já confirma o token.
+/// Com `auth` (StreamElements): manda o frame e espera `authenticated`/`unauthorized`. Deadline 10s.
+fn probe_socketio(url: &str, auth: Option<String>) -> Result<(), String> {
+    let mut socket = match tungstenite::connect(url) {
+        Ok((s, _)) => s,
+        Err(tungstenite::Error::Http(resp)) if matches!(resp.status().as_u16(), 401 | 403) => {
+            return Err("token inválido ou expirado".into());
+        }
+        Err(tungstenite::Error::Io(io)) => return Err(format!("sem conexão ({})", io.kind())),
+        Err(_) => return Err("não consegui conectar".into()),
+    };
+    set_read_timeout(&mut socket, 400);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let waits_auth = auth.is_some();
+    let mut sent_auth = false;
+    while Instant::now() < deadline {
+        match socket.read() {
+            Ok(Message::Text(t)) => {
+                let t = t.as_str();
+                if let Some(start) = t.strip_prefix("42").and(t.find('[')) {
+                    if let Ok(Value::Array(arr)) = serde_json::from_str::<Value>(&t[start..]) {
+                        match arr.first().and_then(|x| x.as_str()).unwrap_or("") {
+                            "authenticated" => {
+                                let _ = socket.close(None);
+                                return Ok(());
+                            }
+                            "unauthorized" => {
+                                let _ = socket.close(None);
+                                return Err("token inválido ou expirado".into());
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if t.starts_with("40") {
+                    match &auth {
+                        // StreamElements: conectou — agora autentica e aguarda a resposta.
+                        Some(a) if !sent_auth => {
+                            let _ = socket.send(Message::Text(a.clone().into()));
+                            sent_auth = true;
+                        }
+                        // Streamlabs: conectar já valida (o token estava na URL).
+                        None => {
+                            let _ = socket.close(None);
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
+                } else if t.starts_with('0') {
+                    let _ = socket.send(Message::Text("40".into()));
+                } else if t == "2" {
+                    let _ = socket.send(Message::Text("3".into()));
+                }
+            }
+            Ok(Message::Ping(p)) => {
+                let _ = socket.send(Message::Pong(p));
+            }
+            Ok(Message::Close(_)) => break,
+            Ok(_) => {}
+            Err(tungstenite::Error::Io(e))
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                continue;
+            }
+            Err(_) => break,
+        }
+    }
+    let _ = socket.close(None);
+    if waits_auth && sent_auth {
+        Err("o StreamElements não confirmou a tempo — tente de novo".into())
+    } else {
+        Err("sem resposta a tempo — tente de novo".into())
+    }
+}

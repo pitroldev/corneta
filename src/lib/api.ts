@@ -112,6 +112,10 @@ export interface CornetaApi {
   // UX
   obsSetStream(start: boolean): Promise<void>;
   testTarget(targetId: string): Promise<string>;
+  /** Verifica a API key do YouTube (Data API v3). Resolve com msg de ok; rejeita com o motivo. */
+  youtubeKeyCheck(key: string): Promise<string>;
+  /** Testa o token de uma fonte de alerta. Resolve com msg de ok; rejeita com o motivo. */
+  alertTest(sourceId: string): Promise<string>;
   openLogsDir(): Promise<void>;
   registerShortcut(shortcut: string): Promise<void>;
   subscribeShortcut(cb: () => void): () => void;
@@ -445,6 +449,14 @@ function tauriApi(): CornetaApi {
     async testTarget(targetId) {
       const { invoke } = await core();
       return invoke<string>("test_target", { targetId });
+    },
+    async youtubeKeyCheck(key) {
+      const { invoke } = await core();
+      return invoke<string>("youtube_key_check", { key });
+    },
+    async alertTest(sourceId) {
+      const { invoke } = await core();
+      return invoke<string>("alert_test", { sourceId });
     },
     async openLogsDir() {
       const { invoke } = await core();
@@ -1131,6 +1143,12 @@ function mockApi(): CornetaApi {
     },
     async testTarget() {
       return "demo: alcançável";
+    },
+    async youtubeKeyCheck() {
+      return "demo: chave válida";
+    },
+    async alertTest() {
+      return "demo: token válido";
     },
     async openLogsDir() {
       // no-op no navegador.
