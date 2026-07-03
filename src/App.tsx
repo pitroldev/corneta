@@ -2,13 +2,25 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
+import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
 import { renderBrbSlatePng } from "./lib/brbSlate";
 import { applyTheme } from "./lib/theme";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const SCREENS: Screen[] = ["platforms", "encoding", "golive", "chat", "mesa", "reports", "about", "settings"];
+// Ordem = numeração dos atalhos Alt+1..N (espelha a sidebar: jornada primeiro, depois
+// utilitários). Configurações vem antes de Sobre — é a tela recorrente.
+const SCREENS: Screen[] = [
+  "platforms",
+  "encoding",
+  "golive",
+  "chat",
+  ...(MESA_ENABLED ? (["mesa"] as Screen[]) : []),
+  "reports",
+  "settings",
+  "about",
+];
 import { TitleBar } from "./components/TitleBar";
 import { LiveBar } from "./components/LiveBar";
 import { Toaster } from "./components/Toaster";
@@ -142,13 +154,13 @@ export default function App() {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [screen]);
 
-  // Alt+1..7 troca de tela (ignora quando o foco está num campo de texto).
+  // Alt+1..8 troca de tela (ignora quando o foco está num campo de texto).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
       const el = document.activeElement as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
-      const i = "1234567".indexOf(e.key);
+      const i = "12345678".indexOf(e.key);
       if (i >= 0 && i < SCREENS.length) {
         e.preventDefault();
         navigate(SCREENS[i]);
@@ -158,6 +170,32 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Deep-link global: qualquer tela pede navegação pelo store (ex.: "Configurar chat" em Plataformas).
+  const navRequest = useStore((s) => s.navRequest);
+  const requestNavigate = useStore((s) => s.requestNavigate);
+  useEffect(() => {
+    if (navRequest && SCREENS.includes(navRequest as Screen)) {
+      navigate(navRequest as Screen);
+      requestNavigate(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navRequest]);
+
+  // Atalho global: registra no boot COM feedback — se outro programa já usa a combinação,
+  // o streamer fica sabendo agora, não no meio da live com um atalho morto.
+  const liveShortcut = useStore((s) => s.config?.settings.liveShortcut);
+  const shortcutBootDone = useRef(false);
+  useEffect(() => {
+    if (!IS_TAURI || !loaded || shortcutBootDone.current) return;
+    shortcutBootDone.current = true;
+    if (!liveShortcut) return;
+    api.registerShortcut(liveShortcut).catch(() => {
+      toast.error(
+        `Seu atalho ${liveShortcut.replace("CommandOrControl", "Ctrl")} já está em uso por outro programa — troque em Configurações → Atalho global.`,
+      );
+    });
+  }, [loaded, liveShortcut]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -215,7 +253,7 @@ export default function App() {
                     {screen === "encoding" && <EncodingScreen />}
                     {screen === "golive" && <GoLiveScreen onNavigate={navigate} />}
                     {screen === "chat" && <ChatScreen />}
-                    {screen === "mesa" && <MesaScreen />}
+                    {screen === "mesa" && MESA_ENABLED && <MesaScreen />}
                     {screen === "reports" && <ReportsScreen />}
                     {screen === "about" && <AboutScreen />}
                     {screen === "settings" && <SettingsScreen />}

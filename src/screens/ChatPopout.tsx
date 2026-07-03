@@ -21,9 +21,9 @@ import {
 } from "lucide-react";
 import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
+import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
-import type { ChatSource } from "../lib/types";
 import { Mascot } from "../components/decor";
 import { Button, Input, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
@@ -79,6 +79,7 @@ export function ChatPopout() {
   const [tab, setTab] = useState<"chat" | "alerts" | "both">("both");
   const [showConfig, setShowConfig] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [maximized, setMaximized] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -165,13 +166,21 @@ export function ChatPopout() {
   const bothLayout = st?.chatBothLayout ?? "auto";
   const alertsFirst = st?.chatBothAlertsFirst ?? false;
   // Canais se configuram na janela principal — aqui só dá pra ligar se já houver.
-  const configured = (st?.chatSources ?? []).some((x) => x.enabled && x.value.trim());
+  // Fonte de alerta com token também conta (mesmo critério da ChatScreen): quem só tem
+  // Streamlabs/StreamElements consegue conectar os alertas por aqui.
+  const configured =
+    (st?.chatSources ?? []).some((x) => x.enabled && x.value.trim()) ||
+    (st?.alertSources ?? []).some((x) => x.enabled && x.hasToken);
   const containerRef = useRef<HTMLDivElement>(null);
   // Posição do divisor (local pra arrastar suave; persiste no fim do drag).
   const [split, setSplit] = useState(35);
   useEffect(() => {
     if (st?.chatBothSplit != null) setSplit(st.chatBothSplit);
   }, [st?.chatBothSplit]);
+  // Última aba escolhida persiste (default "both" — ordem Ambos→Chat→Alertas é decisão de produto).
+  useEffect(() => {
+    if (st?.chatPopoutTab) setTab(st.chatPopoutTab);
+  }, [st?.chatPopoutTab]);
 
   if (!loaded || !config) {
     return (
@@ -198,6 +207,12 @@ export function ChatPopout() {
       setMaximized(await w.isMaximized());
     });
 
+  // Troca de aba: aplica na hora e persiste (a janelinha reabre onde o streamer deixou).
+  const pickTab = (t: "chat" | "alerts" | "both") => {
+    setTab(t);
+    setSettings({ chatPopoutTab: t });
+  };
+
   // Envio pelo "modo janela": espelha a ChatScreen — fontes capazes conforme login/token.
   const sendSources = st?.chatSources ?? [];
   const twitchReady = chatLogin.twitch.state === "connected";
@@ -209,7 +224,6 @@ export function ChatPopout() {
       (x.platform === "youtube" && youtubeReady) ||
       (x.platform === "kick" && kickReady),
   );
-  const srcLabel = (x: ChatSource) => (x.name.trim() === "" ? x.value : x.name);
   const sendValid = sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
   const effectiveSendTo = sendValid ? sendTo : "all";
   const sendTargets =
@@ -220,6 +234,12 @@ export function ChatPopout() {
   const canSend = sendTargets.some((x) =>
     x.platform === "youtube" ? youtubeReady : x.platform === "kick" ? kickReady : !!chatAuth[x.id]?.ok,
   );
+  // Mesmo texto da tela principal — aqui vira title do Enviar desabilitado (espaço curto).
+  const sendStatus = sendStatusLine(sendTargets, chatAuth, {
+    twitch: twitchReady,
+    youtube: youtubeReady,
+    kick: kickReady,
+  });
   const doSend = async () => {
     const t = draft.trim();
     if (!t) return;
@@ -285,12 +305,24 @@ export function ChatPopout() {
           {alerts.length > 0 ? ` ${alerts.length}` : ""}
         </span>
         <button
-          onClick={clearAlerts}
-          title="Limpar alertas"
+          onClick={() => {
+            // Registro das doações da live — misclick não pode apagar: confirma em 2 cliques.
+            if (!confirmClearAlerts) {
+              setConfirmClearAlerts(true);
+              setTimeout(() => setConfirmClearAlerts(false), 3000);
+              return;
+            }
+            setConfirmClearAlerts(false);
+            clearAlerts();
+          }}
+          title={confirmClearAlerts ? "Clique pra confirmar" : "Limpar alertas"}
           aria-label="Limpar alertas"
-          className="text-ink-faint transition-colors hover:text-bad"
+          className={cn(
+            "transition-colors",
+            confirmClearAlerts ? "text-xs font-bold text-bad" : "text-ink-faint hover:text-bad",
+          )}
         >
-          <Trash2 className="size-3.5" />
+          {confirmClearAlerts ? "Limpar?" : <Trash2 className="size-3.5" />}
         </button>
       </div>
       <AlertsFeed alerts={alerts} className="min-h-0 flex-1" fontSize={st?.alertFontSize ?? 14} />
@@ -304,6 +336,18 @@ export function ChatPopout() {
       connected={connected}
       className="min-h-0 min-w-0 flex-1"
       onFontSize={(n) => setSettings({ chatFontSize: n })}
+      disconnectedHint={
+        configured
+          ? "Clique em Conectar pra puxar o chat."
+          : "Configure os canais na janela principal da Corneta e conecte por aqui."
+      }
+      emptyAction={
+        configured ? (
+          <Button variant="primary" size="sm" onClick={() => void connectChat()}>
+            <Wifi className="size-4" /> Conectar
+          </Button>
+        ) : undefined
+      }
     />
   );
   const divider = (
@@ -357,13 +401,13 @@ export function ChatPopout() {
       {/* Toolbar: abas + viewers + conexão + limpar + config */}
       <div className="flex items-center gap-1.5 border-b-2 border-border-soft px-2 py-1.5">
         <div className="flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5">
-          <TabBtn active={tab === "both"} onClick={() => setTab("both")}>
+          <TabBtn active={tab === "both"} onClick={() => pickTab("both")}>
             Ambos
           </TabBtn>
-          <TabBtn active={tab === "chat"} onClick={() => setTab("chat")}>
+          <TabBtn active={tab === "chat"} onClick={() => pickTab("chat")}>
             Chat
           </TabBtn>
-          <TabBtn active={tab === "alerts"} onClick={() => setTab("alerts")}>
+          <TabBtn active={tab === "alerts"} onClick={() => pickTab("alerts")}>
             Alertas{alerts.length > 0 ? ` ${alerts.length}` : ""}
           </TabBtn>
         </div>
@@ -411,7 +455,10 @@ export function ChatPopout() {
               if (tab === "alerts") clearAlerts();
               else clearChat();
             }}
-            title={confirmClear ? "Clique pra confirmar" : "Limpar"}
+            // Em "Ambos" a lixeira limpa SÓ o chat (os alertas têm a própria, no painel).
+            title={
+              confirmClear ? "Clique pra confirmar" : tab === "alerts" ? "Limpar alertas" : "Limpar chat"
+            }
             className={cn(iconBtn, confirmClear && "text-bad")}
           >
             <Trash2 className="size-4" />
@@ -539,7 +586,7 @@ export function ChatPopout() {
             disabled={!draft.trim() || sending || !canSend}
             onClick={doSend}
             aria-label="Enviar"
-            title="Enviar"
+            title={!canSend ? sendStatus : "Enviar"}
           >
             {!sending && <Send className="size-4" />}
           </Button>

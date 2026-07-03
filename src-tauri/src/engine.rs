@@ -504,7 +504,7 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
 pub struct TargetStatus {
     pub target_id: String,
     pub name: String,
-    pub state: String, // idle | connecting | live | reconnecting | error | paused | waiting | brb
+    pub state: String, // idle | connecting | live | reconnecting | error | paused | waiting | signal-lost | brb
     pub bitrate_kbps: u32,
     pub fps: u32,
     pub dropped_frames: u32,
@@ -529,6 +529,8 @@ pub struct EngineSnapshot {
     /// Estatísticas do OBS (render/encode lag, congestionamento), se conectado.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub obs: Option<ObsStats>,
+    /// "JÁ VOLTO agora" acionado pelo streamer (slate manual, sem queda de sinal).
+    pub forced_brb: bool,
 }
 
 /// Estatísticas do OBS via obs-websocket `GetStats`/`GetStreamStatus`.
@@ -553,6 +555,7 @@ impl EngineSnapshot {
             cpu: None,
             gpu: None,
             obs: None,
+            forced_brb: false,
         }
     }
 
@@ -566,19 +569,16 @@ impl EngineSnapshot {
     pub fn live(config: &AppConfig, started_at: u128) -> Self {
         let mut targets = HashMap::new();
         for t in config.targets.iter().filter(|t| t.enabled) {
-            let p = t
-                .encoding
-                .preset
-                .clone()
-                .unwrap_or_else(|| recommended_preset(&t.platform_id));
             targets.insert(
                 t.id.clone(),
                 TargetStatus {
                     target_id: t.id.clone(),
                     name: t.name.clone(),
                     state: "connecting".into(),
-                    bitrate_kbps: p.video_bitrate_kbps,
-                    fps: p.fps,
+                    // Zero até a PRIMEIRA medição real do FFmpeg — semear com o preset fazia
+                    // um destino travado exibir "6.0 Mbps / 60 FPS" como se estivesse saudável.
+                    bitrate_kbps: 0,
+                    fps: 0,
                     dropped_frames: 0,
                     uptime_sec: 0.0,
                     message: None,
@@ -593,6 +593,7 @@ impl EngineSnapshot {
             cpu: None,
             gpu: None,
             obs: None,
+            forced_brb: false,
         }
     }
 }
@@ -613,10 +614,22 @@ pub struct EngineRuntime {
     pub started_ms: u128,
     /// Última qualidade refletida no ícone da bandeja (evita redesenhar à toa).
     pub tray_quality: String,
+    /// Último título aplicado na janela principal (evita set_title repetido a cada emit).
+    pub win_title: String,
     /// Arquivo NDJSON da sessão em gravação (relatório pós-live).
     pub session_path: Option<std::path::PathBuf>,
     /// Flag de pausa por destino (controle ao vivo): true = supervisor não sobe FFmpeg.
     pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// Erro TERMINAL por destino (ex.: chave recusada): true = supervisor parqueia sem
+    /// respawn até o "Tentar de novo" (retry_target) limpar a flag.
+    pub auth_error:
+        std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// "JÁ VOLTO agora" manual — só existe quando o compositor está no ar.
+    pub force_brb: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// Geração da sessão: bump a cada claim do start_engine. O setup (cheio de awaits)
+    /// revalida `live && start_gen == minha_gen` antes de instalar/spawnar — um Cortar
+    /// (ou um segundo BORA) no meio do setup invalida a geração antiga.
+    pub start_gen: u64,
     /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
     pub last_emit_ms: u128,
 }

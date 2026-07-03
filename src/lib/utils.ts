@@ -12,6 +12,14 @@ export function fmtBitrate(kbps: number): string {
   return `${Math.round(kbps)} kbps`;
 }
 
+/** Resolução em linguagem de gente ("1080p 60fps"; vertical: "720p vertical 30fps"). */
+export function fmtResolution(w: number, h: number, fps: number): string {
+  const vertical = h > w;
+  // No vertical o "p" vem da largura (720×1280 é o 720p em pé).
+  const p = vertical ? w : h;
+  return `${p}p${vertical ? " vertical" : ""} ${fps}fps`;
+}
+
 /** Formata segundos como HH:MM:SS. */
 export function fmtUptime(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec));

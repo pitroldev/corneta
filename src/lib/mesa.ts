@@ -52,6 +52,10 @@ const DEFAULT_ICE: RTCIceServer[] = [
   { urls: "stun:stun1.l.google.com:19302" },
 ];
 
+/** Reconexões seguidas antes de desistir (~15s com o backoff) — sem teto, o convidado
+ *  com host inalcançável ficaria em "conectando…" pra sempre, sem nenhum aviso. */
+const MAX_ATTEMPTS = 6;
+
 function randomId(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
 }
@@ -169,6 +173,10 @@ export class MesaClient {
   private maxBitrateKbps = 0;
   private alive = false;
   private retry = 0;
+  /** Falhas de conexão seguidas (zera ao abrir) — controla o desistir. */
+  private attempts = 0;
+  /** Já esteve online nesta sessão? Muda a mensagem de desistência (caiu vs. nunca alcançou). */
+  private wasOnline = false;
   private keepalive: ReturnType<typeof setInterval> | null = null;
 
   constructor(opts: MesaClientOpts) {
@@ -200,6 +208,8 @@ export class MesaClient {
 
   start(): void {
     this.alive = true;
+    this.retry = 0;
+    this.attempts = 0;
     this.opts.onStatus("connecting");
     this.connect();
     if (this.keepalive) clearInterval(this.keepalive);
@@ -235,14 +245,16 @@ export class MesaClient {
     try {
       ws = new WebSocket(this.opts.signalUrl);
     } catch (e) {
-      this.opts.onError?.(`sinalização inválida: ${String(e)}`);
+      console.warn("[mesa] sinalização inválida:", e);
+      this.opts.onError?.("O endereço do convite é inválido — pede um convite novo pro host.");
       this.opts.onStatus("error");
       return;
     }
     this.ws = ws;
     ws.onopen = () => {
-      this.retry = 0;
-      this.opts.onStatus("online");
+      // NÃO zera attempts nem vira "online" aqui: o socket abrir não prova nada
+      // (proxy/host que aceita o handshake e derruba em seguida entraria num loop
+      // infinito de reconexão). Só o "welcome" — sala aceitou o join — confirma.
       this.opts.onReady?.(this.myId);
       this.send({
         t: "join",
@@ -264,6 +276,18 @@ export class MesaClient {
     };
     ws.onclose = () => {
       if (!this.alive) return;
+      this.attempts += 1;
+      if (this.attempts >= MAX_ATTEMPTS) {
+        // Desiste: erro claro com saída é melhor que "conectando…" eterno.
+        this.alive = false;
+        this.opts.onStatus("error");
+        this.opts.onError?.(
+          this.wasOnline
+            ? "A Mesa caiu ou o host saiu de vez."
+            : "Não consegui alcançar o host — vocês estão na mesma rede?",
+        );
+        return;
+      }
       this.opts.onStatus("offline");
       this.retry = Math.min(this.retry + 1, 6);
       setTimeout(() => this.alive && this.connect(), 400 * this.retry);
@@ -284,6 +308,12 @@ export class MesaClient {
   private async onMessage(m: Record<string, unknown>): Promise<void> {
     switch (m.t) {
       case "welcome": {
+        // Join aceito: só agora a conexão conta como estabelecida (zera o
+        // desistir e libera o status "online" — ver comentário no onopen).
+        this.retry = 0;
+        this.attempts = 0;
+        this.wasOnline = true;
+        this.opts.onStatus("online");
         const list = (m.peers as { peerId: string; role: MesaRole; name: string }[]) ?? [];
         for (const p of list) this.connectTo(p.peerId, p.role, p.name);
         break;
@@ -300,8 +330,23 @@ export class MesaClient {
         await this.onPeerSignal(m.from as string, m.data as SignalData);
         break;
       case "error": {
-        const code = typeof m.code === "string" ? m.code : "desconhecida";
-        this.opts.onError?.(`a Mesa recusou a entrada (${code})`);
+        const code = typeof m.code === "string" ? m.code : "";
+        console.warn("[mesa] sala recusou:", code || "(sem código)");
+        // O relay recusa o join mas mantém o socket aberto — sem isso o status
+        // ficaria "conectando" (ou pior, "online") com o convidado FORA da sala,
+        // e o ciclo de reconexão apagaria o erro a cada onopen.
+        this.alive = false;
+        try {
+          this.ws?.close();
+        } catch {
+          /* ignore */
+        }
+        this.opts.onStatus("error");
+        this.opts.onError?.(
+          code === "peer-taken"
+            ? "Alguém já tá no seu lugar na sala — espera um instante e tenta de novo."
+            : "A Mesa recusou a entrada — confere o convite ou pede um novo pro host.",
+        );
         break;
       }
     }

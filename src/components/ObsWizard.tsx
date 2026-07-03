@@ -147,16 +147,31 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             />
           </Step>
 
+          {/* O autoconfigure só grava servidor+chave no OBS — quem dá o play é o
+              BORA (se autoStartObs) ou o próprio streamer. A copy segue a realidade. */}
           <Step n={3} title="Conecte">
-            Eu conecto, configuro e já deixo o OBS mandando seu vídeo pra cá.
-            Depois é só dar{" "}
-            <strong className="text-ink">Iniciar transmissão</strong> no OBS.
+            {settings.autoStartObs ? (
+              <>
+                Eu conecto e configuro o OBS pra apontar pra cá. Na hora do{" "}
+                <strong className="text-ink">BORA AO VIVO</strong>, eu mesma dou
+                o play no OBS.
+              </>
+            ) : (
+              <>
+                Eu conecto e configuro o OBS pra apontar pra cá. Depois, na hora
+                da live, é só dar{" "}
+                <strong className="text-ink">Iniciar transmissão</strong> no
+                OBS.
+              </>
+            )}
           </Step>
 
           {status === "ok" && (
             <div className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok">
-              <Check className="size-4 shrink-0" strokeWidth={2.6} /> Conectado!
-              Já tá mandando o vídeo pra cá.
+              <Check className="size-4 shrink-0" strokeWidth={2.6} />{" "}
+              {settings.autoStartObs
+                ? "Conectado! O OBS já aponta pra Corneta. Quando você der BORA AO VIVO, eu mando o OBS transmitir sozinho."
+                : "Conectado! O OBS já aponta pra Corneta. Na hora da live, é só clicar Iniciar transmissão no OBS."}
             </div>
           )}
           {status === "error" && help && (
@@ -215,11 +230,27 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
                   mono
                 />
                 <p className="text-xs text-ink-faint">
-                  Depois é só dar{" "}
-                  <strong className="text-ink-muted">
-                    Iniciar transmissão
-                  </strong>{" "}
-                  no OBS.
+                  {/* Na mão, o WebSocket pode não estar de pé — promessa mais modesta. */}
+                  {settings.autoStartObs ? (
+                    <>
+                      Com isso colado, na hora do{" "}
+                      <strong className="text-ink-muted">BORA AO VIVO</strong>{" "}
+                      eu tento dar o play no OBS pra você — se nada acontecer,
+                      dê{" "}
+                      <strong className="text-ink-muted">
+                        Iniciar transmissão
+                      </strong>{" "}
+                      nele.
+                    </>
+                  ) : (
+                    <>
+                      Depois, na hora da live, é só dar{" "}
+                      <strong className="text-ink-muted">
+                        Iniciar transmissão
+                      </strong>{" "}
+                      no OBS.
+                    </>
+                  )}
                 </p>
               </div>
             )}

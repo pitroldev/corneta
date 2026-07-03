@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
+import { toast } from "../lib/toast";
 import { Modal } from "./Modal";
 import { Mascot, SoundWaves } from "./decor";
 import { Button } from "./ui";
@@ -15,12 +16,12 @@ const STEPS = [
     text: "Você manda 1 stream do OBS e a Corneta espalha pra Twitch, YouTube, Kick e mais — tudo de uma vez.",
   },
   {
-    title: "Escolha os destinos",
-    text: "Em Plataformas, adicione cada lugar e cole a chave de transmissão (o código secreto que liga a live à sua conta). Elas ficam no cofre do sistema, nunca soltas num arquivo de texto.",
+    title: "Escolha as plataformas",
+    text: "A Twitch e o YouTube já estão na lista — é só colar a chave de transmissão de cada um (e adicionar outros se quiser). As chaves ficam no cofre do sistema, nunca soltas num arquivo de texto.",
   },
   {
     title: "Liga no OBS",
-    text: "Em Ao vivo, o botão “Configura pra mim” ajusta o OBS pra mandar a live pra Corneta sozinho — sem você abrir menu técnico nenhum.",
+    text: "Em Ao vivo, o botão “Configura pra mim” aponta o OBS pra Corneta sozinho — sem você caçar servidor e chave em menu técnico.",
   },
   {
     title: "Solta a corneta",
@@ -37,7 +38,8 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     try {
       return localStorage.getItem(FLAG) !== "1";
     } catch {
-      return false;
+      // Na dúvida, mostra: inofensivo pro veterano, essencial pro novato.
+      return true;
     }
   });
   const [step, setStep] = useState(0);
@@ -53,13 +55,18 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   }, [replayNonce]);
 
   const close = (start: boolean) => {
+    let firstTime = false;
     try {
+      firstTime = localStorage.getItem(FLAG) !== "1";
       localStorage.setItem(FLAG, "1");
     } catch {
       /* ignore */
     }
     setOpen(false);
     if (start) onStart();
+    // Só na primeira dispensa — quem reabriu via Sobre já sabe o caminho.
+    else if (firstTime && replayNonce === 0)
+      toast.info("Sem pressa — o tour fica em Sobre → Rever o tour.");
   };
   const next = () => (last ? close(true) : setStep((s) => s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));

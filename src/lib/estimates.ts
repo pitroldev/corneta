@@ -62,22 +62,44 @@ export function lowestCommonDenominator(config: AppConfig) {
   };
 }
 
+/** Semáforo de banda compartilhado (Qualidade e Ao Vivo): "ok" exige 20% de folga
+ *  — a mesma régua nas duas telas, pra config não sair verde numa e amarela na outra. */
+export function bandFit(
+  neededKbps: number,
+  uploadMbps: number | null,
+): "unknown" | "ok" | "warn" | "bad" {
+  if (uploadMbps == null) return "unknown";
+  const neededMbps = neededKbps / 1000;
+  if (uploadMbps >= neededMbps * 1.2) return "ok";
+  if (uploadMbps >= neededMbps) return "warn";
+  return "bad";
+}
+
 export interface EngineEstimate {
   uploadKbps: number;
   transcodeCount: number;
+  /** Transcodes que caem na placa de vídeo — é ESSE número que disputa o limite
+   *  de sessões da GPU (x264 explícito roda na CPU e não conta). */
+  hwTranscodeCount: number;
   copyCount: number;
   enabledCount: number;
   /** Carga relativa 0..1 (heurística para a barra de CPU/GPU). */
   load: number;
 }
 
-/** Estima banda e carga para a config atual. */
-export function estimate(config: AppConfig): EngineEstimate {
+/** Estima banda e carga para a config atual. anyHwAvailable resolve o encoder
+ *  "auto" (mesma regra do autoResolved da UI); sem info, assume hardware. */
+export function estimate(
+  config: AppConfig,
+  opts?: { anyHwAvailable?: boolean },
+): EngineEstimate {
+  const anyHw = opts?.anyHwAvailable ?? true;
   const enabled = config.targets.filter((t) => t.enabled);
   const lcd = lowestCommonDenominator(config).videoKbps;
 
   let uploadKbps = 0;
   let transcodeCount = 0;
+  let hwTranscodeCount = 0;
   let copyCount = 0;
 
   for (const t of enabled) {
@@ -89,8 +111,16 @@ export function estimate(config: AppConfig): EngineEstimate {
         : (t.encoding.preset?.videoBitrateKbps ?? rec.videoBitrateKbps);
     const audio = t.encoding.preset?.audioBitrateKbps ?? rec.audioBitrateKbps;
     uploadKbps += video + audio;
-    if (act === "transcode") transcodeCount++;
-    else copyCount++;
+    if (act === "transcode") {
+      transcodeCount++;
+      const onHw =
+        t.encoding.encoder === "software"
+          ? false
+          : t.encoding.encoder === "auto"
+            ? anyHw
+            : true;
+      if (onHw) hwTranscodeCount++;
+    } else copyCount++;
   }
 
   // Carga: soma o custo de cada transcode (resolução×fps×encoder×bitrate). Cópia ~0.
@@ -106,6 +136,7 @@ export function estimate(config: AppConfig): EngineEstimate {
   return {
     uploadKbps,
     transcodeCount,
+    hwTranscodeCount,
     copyCount,
     enabledCount: enabled.length,
     load,

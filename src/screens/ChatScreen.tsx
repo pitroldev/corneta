@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   AtSign,
@@ -9,10 +9,11 @@ import {
   ClipboardPaste,
   Clock,
   Eye,
-  ExternalLink,
   LogIn,
   Pencil,
+  PictureInPicture2,
   Plus,
+  RefreshCw,
   Send,
   Settings2,
   Smile,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
+import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { toast } from "../lib/toast";
 import { cn, openExternal, uid } from "../lib/utils";
 import * as RTabs from "@radix-ui/react-tabs";
@@ -93,6 +95,8 @@ export function ChatScreen() {
   const setYoutubeOauth = useStore((s) => s.setYoutubeOauth);
   const clearYoutubeOauth = useStore((s) => s.clearYoutubeOauth);
   const moderate = useStore((s) => s.moderate);
+  const chatConfigRequest = useStore((s) => s.chatConfigRequest);
+  const requestChatConfig = useStore((s) => s.requestChatConfig);
 
   const [showConfig, setShowConfig] = useState(false);
   const [configTab, setConfigTab] = useState<ConfigTab>("canais");
@@ -101,15 +105,35 @@ export function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendTo, setSendTo] = useState("all");
-  const [showAlerts, setShowAlerts] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
+  const [alertPulse, setAlertPulse] = useState(false);
   const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
     twitch: true,
     youtube: true,
     kick: true,
   });
+
+  // Deep-link de outra tela (ex.: teaser "Título da live" no Ao vivo) → abre o modal
+  // já na aba pedida, e consome o pedido (mesmo padrão do settingsTab).
+  useEffect(() => {
+    if (chatConfigRequest) {
+      setConfigTab(chatConfigRequest as ConfigTab);
+      setShowConfig(true);
+      requestChatConfig(null);
+    }
+  }, [chatConfigRequest, requestChatConfig]);
+
+  // Painel de Alertas: preferência persistida (antes era estado local, esquecia toda visita).
+  const showAlerts = config?.settings.chatShowAlertsPanel ?? false;
+  // Alerta novo com o painel fechado → pulsa o botão (sem abrir sozinho: reflow no meio da live).
+  const prevAlerts = useRef(alerts.length);
+  useEffect(() => {
+    if (alerts.length > prevAlerts.current && !showAlerts) setAlertPulse(true);
+    prevAlerts.current = alerts.length;
+  }, [alerts.length, showAlerts]);
 
   if (!config) return null;
   const s = config.settings;
@@ -199,8 +223,6 @@ export function ChatScreen() {
   // configurável (cada um cola as credenciais do Google — BYOK).
   const canLoginSomewhere =
     (hasTwitchChannel && HAS_TWITCH_OAUTH) || hasYoutubeChannel || (hasKickChannel && HAS_KICK_OAUTH);
-  // Rótulo da fonte igual ao backend (value quando o nome é só espaço) — pra casar moderação.
-  const srcLabel = (x: ChatSource) => (x.name.trim() === "" ? x.value : x.name);
   // Alvo efetivo do envio (guarda contra id morto no seletor).
   const sendValid = sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
   const effectiveSendTo = sendValid ? sendTo : "all";
@@ -226,19 +248,43 @@ export function ChatScreen() {
       setSending(false);
     }
   };
-  const sendStatusLine = () =>
-    sendTargets
-      .map((x) => {
-        const label = srcLabel(x);
-        if (x.platform === "youtube") return youtubeReady ? "YouTube logado" : `${label}: entre no YouTube`;
-        if (x.platform === "kick") return kickReady ? "Kick logado" : `${label}: entre no Kick`;
-        const a = chatAuth[x.id];
-        if (a?.ok) return `logado como @${a.login}`;
-        if (twitchReady) return `${label}: reconecte o chat pra logar`;
-        if (a && !a.ok) return `${label}: token de envio inválido`;
-        return `${label}: conecte o chat pra logar`;
-      })
-      .join(" · ");
+  const sendStatus = sendStatusLine(sendTargets, chatAuth, {
+    twitch: twitchReady,
+    youtube: youtubeReady,
+    kick: kickReady,
+  });
+
+  // Conectar (botão do topo e do estado vazio). Sem canal configurado, abre a config.
+  const doConnect = async () => {
+    if (IS_TAURI && !configured) {
+      setConfigTab("canais");
+      setShowConfig(true);
+      return;
+    }
+    setConnecting(true);
+    try {
+      await connectChat();
+    } catch {
+      toast.error("Não consegui conectar o chat — confira os canais.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+  // Religa as fontes do zero SEM apagar o histórico (o backend descarta a geração antiga).
+  // Usa connectChat: limpa os status/auth antigos (senão uma fonte corrigida/removida fica
+  // pra sempre com bolinha vermelha fantasma) e religa também os ALERTAS (token trocado
+  // do Streamlabs/StreamElements só vale com o alerts_start de novo).
+  const hasErrored = Object.values(statuses).some((x) => x.status === "error");
+  const reconnect = async () => {
+    setReconnecting(true);
+    try {
+      await connectChat();
+    } catch (e) {
+      toast.error(String(e).replace("Error: ", ""));
+    } finally {
+      setReconnecting(false);
+    }
+  };
 
   // Moderação: acha a fonte de uma mensagem (rótulo+plataforma) e o nível permitido.
   const sourceForMessage = (m: ChatMessage) =>
@@ -275,8 +321,13 @@ export function ChatScreen() {
         right={
           <div className="flex items-center gap-2">
             {IS_TAURI && (
-              <Button variant="subtle" size="sm" onClick={() => void api.openChatWindow()}>
-                <ExternalLink className="size-4" /> Janela
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => void api.openChatWindow()}
+                title="Abre o chat numa janelinha que fica por cima de tudo — boa pra deixar sobre o jogo"
+              >
+                <PictureInPicture2 className="size-4" /> Janela flutuante
               </Button>
             )}
             {connected ? (
@@ -288,20 +339,7 @@ export function ChatScreen() {
                 variant="primary"
                 size="sm"
                 loading={connecting}
-                onClick={async () => {
-                  if (IS_TAURI && !configured) {
-                    setShowConfig(true);
-                    return;
-                  }
-                  setConnecting(true);
-                  try {
-                    await connectChat();
-                  } catch {
-                    toast.error("Não consegui conectar o chat — confira os canais.");
-                  } finally {
-                    setConnecting(false);
-                  }
-                }}
+                onClick={() => void doConnect()}
                 title={IS_TAURI && !configured ? "Adicione um canal primeiro" : undefined}
               >
                 {!connecting && <Wifi className="size-4" />} Conectar
@@ -319,7 +357,9 @@ export function ChatScreen() {
                 {connected
                   ? "conectando…"
                   : configured
-                    ? "Tudo pronto — é só conectar"
+                    ? (s.chatAutoConnect ?? true)
+                      ? "Tudo pronto — conecte, ou entre no ar que eu ligo sozinho"
+                      : "Tudo pronto — é só conectar"
                     : "Adicione um canal pra ver o chat aqui"}
               </span>
             ) : (
@@ -327,7 +367,7 @@ export function ChatScreen() {
                 <span
                   key={source}
                   className="flex items-center gap-1.5 text-sm"
-                  title={`${source}: ${statusLabel(st.status)}`}
+                  title={`${source}: ${statusExplain(st.platform, st.status)}`}
                 >
                   <PlatformGlyph id={st.platform as ChatPlatform} size={16} />
                   <span className={cn("size-2 rounded-full", statusDot(st.status))} aria-hidden />
@@ -339,6 +379,17 @@ export function ChatScreen() {
                   )}
                 </span>
               ))
+            )}
+            {connected && hasErrored && (
+              <Button
+                variant="subtle"
+                size="sm"
+                loading={reconnecting}
+                onClick={() => void reconnect()}
+                title="Religa as fontes que caíram — sem apagar o histórico do chat"
+              >
+                {!reconnecting && <RefreshCw className="size-3.5" />} Reconectar
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -458,6 +509,20 @@ export function ChatScreen() {
                       onRemove={() => removeSource(src.id)}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Também com setup só-de-alertas: o auto-connect dispara com alertSources
+                  (bindEngine), então o toggle pra desligar precisa aparecer nesse caso. */}
+              {(sources.length > 0 || alertSources.length > 0) && (
+                <div className="mt-3 border-t border-border-soft pt-3">
+                  <ToggleRow
+                    icon={Wifi}
+                    label="Conectar o chat sozinho quando eu entrar no ar"
+                    hint="No BORA AO VIVO, o chat já liga junto — sem clique manual toda live"
+                    checked={s.chatAutoConnect ?? true}
+                    onChange={(v) => setSettings({ chatAutoConnect: v })}
+                  />
                 </div>
               )}
 
@@ -668,8 +733,12 @@ export function ChatScreen() {
         <Button
           variant={showAlerts ? "primary" : "ghost"}
           size="sm"
-          className="ml-auto"
-          onClick={() => setShowAlerts((v) => !v)}
+          className={cn("ml-auto", alertPulse && "animate-pulse text-brass")}
+          onClick={() => {
+            setAlertPulse(false);
+            setSettings({ chatShowAlertsPanel: !showAlerts });
+          }}
+          title={alertPulse ? "Chegou alerta novo!" : undefined}
         >
           <Bell className="size-4" /> Alertas{alerts.length > 0 ? ` (${alerts.length})` : ""}
         </Button>
@@ -701,6 +770,29 @@ export function ChatScreen() {
             onFontSize={(n) => setSettings({ chatFontSize: n })}
             modLevel={modLevel}
             onModerate={onModerate}
+            disconnectedHint={
+              configured
+                ? "Tudo pronto — é só clicar em Conectar pra puxar o chat."
+                : "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar."
+            }
+            emptyAction={
+              configured ? (
+                <Button variant="primary" size="sm" loading={connecting} onClick={() => void doConnect()}>
+                  {!connecting && <Wifi className="size-4" />} Conectar
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setConfigTab("canais");
+                    setShowConfig(true);
+                  }}
+                >
+                  <Plus className="size-4" /> Adicionar canal
+                </Button>
+              )
+            }
           />
         </Card>
         {showAlerts && (
@@ -765,11 +857,12 @@ export function ChatScreen() {
               loading={sending}
               disabled={!draft.trim() || sending || !canSend}
               onClick={doSend}
+              title={!canSend ? sendStatus : undefined}
             >
               {!sending && <Send className="size-4" />} Enviar
             </Button>
           </div>
-          <div className="mt-1 px-0.5 text-[11px] text-ink-faint">{sendStatusLine()}</div>
+          <div className="mt-1 px-0.5 text-[11px] text-ink-faint">{sendStatus}</div>
         </div>
       )}
 
@@ -863,6 +956,24 @@ const statusLabel = (status: string) =>
       : status === "waiting"
         ? "aguardando"
         : "conectando";
+
+// Tooltip com o PORQUÊ do status (o label sozinho parece travado/quebrado).
+// O supervisor do backend já re-tenta sozinho com backoff — a dica avisa isso.
+const statusExplain = (platform: string, status: string) => {
+  if (status === "connected") return "no ar";
+  if (status === "waiting")
+    return platform === "youtube"
+      ? "esperando sua live do YouTube começar — conecto sozinho quando ela subir"
+      : "esperando a live começar — conecto sozinho quando ela subir";
+  if (status === "error") {
+    if (platform === "kick")
+      return "caiu — às vezes a Kick bloqueia a leitura; tô tentando de novo sozinho";
+    if (platform === "youtube")
+      return "caiu — confira o canal (@handle ou URL); tô tentando de novo sozinho";
+    return "caiu — confira o nome do canal; tô tentando de novo sozinho";
+  }
+  return "conectando…";
+};
 
 function SourceCard({
   src,
@@ -1258,7 +1369,7 @@ function LoginRow({
         {state.state === "error" && <span className="truncate text-xs text-bad">· {state.message}</span>}
         <div className="ml-auto shrink-0">
           {!enabled ? (
-            <span className="text-[11px] text-ink-faint">configure no .env</span>
+            <span className="text-[11px] text-ink-faint">indisponível nesta versão</span>
           ) : state.state === "connected" ? (
             <Button variant="ghost" size="sm" onClick={onLogout}>
               Sair

@@ -91,6 +91,14 @@ fn emit_chat(app: &AppHandle, msg: ChatMessage) {
     MSG_COUNT.fetch_add(1, Ordering::Relaxed);
     let _ = app.emit("chat://message", msg);
 }
+/// `chat://message` com guard de geração (igual chat_status_gen): num Reconectar, a
+/// conexão antiga ainda drenando não emite a MESMA mensagem que a nova já entregou
+/// (o front não zera mais o histórico, então a duplicata ficava visível no feed).
+fn emit_chat_gen(app: &AppHandle, gen: u64, msg: ChatMessage) {
+    if CHAT_GEN.load(Ordering::SeqCst) == gen {
+        emit_chat(app, msg);
+    }
+}
 fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
     let _ = app.emit(
         "chat://status",
@@ -397,8 +405,9 @@ fn run_twitch(
                 {
                     sends.push(Instant::now());
                     // Eco local: a Twitch não devolve o próprio PRIVMSG.
-                    emit_chat(
+                    emit_chat_gen(
                         &app,
+                        gen,
                         ChatMessage {
                             id: next_id(),
                             platform: "twitch".into(),
@@ -456,7 +465,7 @@ fn run_twitch(
                             }
                         }
                         if let Some(msg) = parse_privmsg(line, source, &emotes) {
-                            emit_chat(&app, msg);
+                            emit_chat_gen(&app, gen, msg);
                         }
                     } else if cmd == "USERNOTICE" {
                         if let Some(alert) = parse_usernotice(line, source) {
@@ -1426,7 +1435,7 @@ fn parse_amount(s: &str) -> Option<f64> {
 }
 
 /// Processa uma `action` do InnerTube → mensagem / super chat / membro / deleção.
-fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value) {
+fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u64) {
     if let Some(id) = action
         .pointer("/markChatItemAsDeletedAction/targetItemId")
         .and_then(|v| v.as_str())
@@ -1448,8 +1457,9 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value) {
             .and_then(|v| v.as_str())
             .unwrap_or("anon")
             .to_string();
-        emit_chat(
+        emit_chat_gen(
             app,
+            gen,
             ChatMessage {
                 id: next_id(),
                 platform: "youtube".into(),
@@ -1543,7 +1553,7 @@ fn youtube_innertube(
         if !first {
             if let Some(actions) = lcc.get("actions").and_then(|a| a.as_array()) {
                 for action in actions {
-                    handle_innertube_action(app, source, action);
+                    handle_innertube_action(app, source, action, gen);
                 }
             }
         }
@@ -1787,8 +1797,9 @@ fn youtube_dataapi(
                             if flag("isChatSponsor") {
                                 badges.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() });
                             }
-                            emit_chat(
+                            emit_chat_gen(
                                 &app,
+                                gen,
                                 ChatMessage {
                                     id: next_id(),
                                     platform: "youtube".into(),
@@ -1889,7 +1900,7 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, 
                 if is_ping {
                     let _ = socket.send(Message::Text("{\"event\":\"pusher:pong\",\"data\":{}}".into()));
                 } else if let Some(msg) = parse_kick(&t, source) {
-                    emit_chat(&app, msg);
+                    emit_chat_gen(&app, gen, msg);
                 } else if let Some(alert) = parse_kick_alert(&t, source) {
                     emit_alert(&app, alert);
                 } else {

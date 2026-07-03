@@ -47,6 +47,10 @@ interface MesaState {
   obsAdded: boolean;
   /** Erro de permissão de câmera (mostra o atalho pra privacidade do Windows). */
   camError: string | null;
+  /** Falha ao subir o servidor local da Mesa (nada a ver com câmera/privacidade). */
+  serverError: string | null;
+  /** Erro de conexão/sala vindo do MesaClient — some quando volta a ficar online. */
+  lastError: string | null;
 
   refreshDevices: () => Promise<void>;
   openLocal: () => Promise<void>;
@@ -57,6 +61,8 @@ interface MesaState {
   setHideSelf: (v: boolean) => void;
   host: (name: string) => Promise<void>;
   join: (code: string, name: string) => Promise<void>;
+  /** Reconecta do zero (mesmo cliente, mesmo id) depois de um erro de conexão. */
+  retry: () => void;
   leave: () => Promise<void>;
   addToObs: () => Promise<void>;
   removeFromObs: () => Promise<void>;
@@ -72,8 +78,14 @@ export const useMesa = create<MesaState>((set, get) => {
       name,
       onReady: (id) => set({ myId: id }),
       onPeers: (peers) => set({ peers }),
-      onStatus: (status) => set({ status }),
-      onError: (msg) => console.warn("[mesa]", msg),
+      // Voltou a ficar online → o erro antigo não vale mais.
+      onStatus: (status) => set(status === "online" ? { status, lastError: null } : { status }),
+      // Erro de sala/conexão precisa chegar na tela — em console.warn ninguém vê.
+      onError: (msg) => {
+        console.warn("[mesa]", msg);
+        toast.error(msg);
+        set({ lastError: msg });
+      },
     });
     // myId já existe na construção (é o peerId do join) — expõe já, sem esperar o onReady
     // (senão "Adicionar no OBS" antes do socket abrir gravaria self="" e quebraria o mute).
@@ -113,6 +125,8 @@ export const useMesa = create<MesaState>((set, get) => {
     hideSelf: false,
     obsAdded: false,
     camError: null,
+    serverError: null,
+    lastError: null,
 
     async refreshDevices() {
       try {
@@ -183,6 +197,24 @@ export const useMesa = create<MesaState>((set, get) => {
 
     setHideSelf(v) {
       set({ hideSelf: v });
+      // Com a Mesa já no OBS, o hideSelf vive na URL do Browser Source — sem re-adicionar
+      // (o backend faz add-or-update) o toggle seria no-op silencioso.
+      const { obsAdded, room, signalUrl, localPort, myId } = get();
+      if (!obsAdded || !room || !signalUrl || !localPort || !myId) return;
+      const url = buildStudioUrl({
+        base: `http://127.0.0.1:${localPort}`,
+        signalUrl,
+        room,
+        selfId: myId,
+        hideSelf: v,
+      });
+      api.mesaObsAddSource(url, 1920, 1080).then(
+        () => toast.success("Atualizei a grade no OBS"),
+        (e) => {
+          console.warn("[mesa] obs update:", e);
+          toast.error("Não consegui atualizar a grade no OBS — vê se ele tá aberto.");
+        },
+      );
     },
 
     async host(name) {
@@ -190,6 +222,7 @@ export const useMesa = create<MesaState>((set, get) => {
         toast.error("A Mesa precisa do app instalado (servidor local).");
         return;
       }
+      set({ serverError: null, lastError: null });
       try {
         await get().openLocal();
       } catch {
@@ -199,8 +232,8 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         info = await api.mesaStartServer();
       } catch (e) {
-        toast.error("Não consegui subir o servidor da Mesa.");
-        set({ camError: String(e) });
+        console.warn("[mesa] servidor:", e);
+        set({ serverError: "Não consegui subir o servidor da Mesa — tem outra Corneta aberta? Fecha e tenta de novo." });
         closeLocal();
         return;
       }
@@ -244,6 +277,7 @@ export const useMesa = create<MesaState>((set, get) => {
         toast.error("Esse convite aponta pra um endereço local. Pede um convite novo pro host.");
         return;
       }
+      set({ serverError: null, lastError: null });
       try {
         await get().openLocal();
       } catch {
@@ -253,8 +287,8 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         info = await api.mesaStartServer();
       } catch (e) {
-        toast.error("Não consegui subir o servidor da Mesa.");
-        set({ camError: String(e) });
+        console.warn("[mesa] servidor:", e);
+        set({ serverError: "Não consegui subir o servidor da Mesa — tem outra Corneta aberta? Fecha e tenta de novo." });
         closeLocal();
         return;
       }
@@ -269,6 +303,15 @@ export const useMesa = create<MesaState>((set, get) => {
         obsAdded: false,
       });
       startClient(signalUrl, inv.room, name);
+    },
+
+    retry() {
+      if (!client) return;
+      set({ lastError: null });
+      // stop() derruba o socket velho (senão a reconexão automática duplicaria a conexão)
+      // e start() volta do zero com o MESMO cliente — preserva myId e a stream local.
+      client.stop();
+      client.start();
     },
 
     async leave() {
@@ -300,6 +343,8 @@ export const useMesa = create<MesaState>((set, get) => {
         localStream: null,
         obsAdded: false,
         camError: null,
+        serverError: null,
+        lastError: null,
       });
     },
 
@@ -322,7 +367,8 @@ export const useMesa = create<MesaState>((set, get) => {
         set({ obsAdded: true });
         toast.success("Pus a Mesa na sua cena do OBS 🎥");
       } catch (e) {
-        toast.error(`O OBS recusou: ${String(e)}`);
+        console.warn("[mesa] obs add:", e);
+        toast.error("Não consegui pôr a Mesa no OBS — vê se ele tá aberto com o WebSocket ligado.");
       }
     },
 
@@ -332,7 +378,8 @@ export const useMesa = create<MesaState>((set, get) => {
         set({ obsAdded: false });
         toast.info("Tirei a Mesa do OBS.");
       } catch (e) {
-        toast.error(String(e));
+        console.warn("[mesa] obs remove:", e);
+        toast.error("Não consegui tirar a Mesa do OBS — vê se ele tá aberto.");
       }
     },
 

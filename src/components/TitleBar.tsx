@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Minus, Square, Copy, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { IS_TAURI } from "../lib/api";
+import { useStore } from "../lib/store";
 import { Mascot } from "./decor";
 
 async function getWin() {
@@ -11,6 +12,8 @@ async function getWin() {
 
 export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
+  // O X não fecha quando "minimizar pra bandeja" está ligado — o tooltip conta a verdade.
+  const minimizeToTray = useStore((s) => s.config?.settings.minimizeToTray ?? true);
 
   useEffect(() => {
     if (!IS_TAURI) return;
@@ -47,7 +50,7 @@ export function TitleBar() {
         <WinBtn onClick={toggleMax} label={maximized ? "Restaurar" : "Maximizar"}>
           {maximized ? <Copy className="size-3.5" strokeWidth={2.2} /> : <Square className="size-3.5" strokeWidth={2.4} />}
         </WinBtn>
-        <WinBtn onClick={close} label="Fechar" danger>
+        <WinBtn onClick={close} label={minimizeToTray ? "Fechar (fica na bandeja)" : "Fechar"} danger>
           <X className="size-4" strokeWidth={2.4} />
         </WinBtn>
       </div>

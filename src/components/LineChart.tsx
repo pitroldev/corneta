@@ -1,5 +1,7 @@
 // Gráfico de linhas em SVG (zero-dependência). Multi-série sobre um eixo de
-// tempo (índice de amostra), com marcadores de evento e tratamento de gaps.
+// tempo (índice de amostra), com marcadores de evento, tratamento de gaps,
+// rótulos de tempo no eixo X, linha de referência e tooltip no hover.
+import { useRef, useState } from "react";
 
 export interface ChartSeries {
   label: string;
@@ -12,6 +14,12 @@ export interface ChartMarker {
   color: string;
 }
 
+/** Linha horizontal tracejada de referência (ex.: zona de perigo da CPU). */
+export interface ChartRefLine {
+  value: number;
+  label: string;
+}
+
 export function LineChart({
   series,
   n,
@@ -19,6 +27,8 @@ export function LineChart({
   yMax: yMaxProp,
   markers = [],
   formatValue,
+  formatX,
+  refLine,
   className,
 }: {
   series: ChartSeries[];
@@ -28,14 +38,20 @@ export function LineChart({
   yMax?: number;
   markers?: ChartMarker[];
   formatValue?: (v: number) => string;
+  /** Rótulo do eixo X pra amostra i (ex.: tempo relativo ao início). Liga eixo X + tooltip com tempo. */
+  formatX?: (i: number) => string;
+  refLine?: ChartRefLine;
   className?: string;
 }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
   const W = 640;
   const H = height;
   const padL = 40;
   const padR = 10;
   const padT = 10;
-  const padB = 14;
+  const padB = formatX ? 26 : 14; // espaço extra pros rótulos de tempo
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
@@ -80,10 +96,102 @@ export function LineChart({
   };
 
   const ticks = [1, 0.5, 0].map((f) => yMax * f);
+  // 4 rótulos de tempo (início · 1/3 · 2/3 · fim), sem repetir índice em séries curtas.
+  const xTicks = formatX && n > 1 ? [...new Set([0, 1 / 3, 2 / 3, 1].map((f) => Math.round(f * (n - 1))))] : [];
+
+  // O SVG escala via viewBox: mapeia o mouse de px da tela → coordenada do gráfico
+  // pela matriz real do SVG (getScreenCTM), que já desconta o letterbox do
+  // preserveAspectRatio — regra de três com o rect erraria perto das bordas.
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const el = svgRef.current;
+    if (!el || n <= 1) return;
+    const ctm = el.getScreenCTM();
+    let x: number;
+    if (ctm) {
+      const pt = el.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      x = pt.matrixTransform(ctm.inverse()).x;
+    } else {
+      const rect = el.getBoundingClientRect();
+      x = ((e.clientX - rect.left) / rect.width) * W;
+    }
+    const i = Math.round(((x - padL) / innerW) * (n - 1));
+    setHover(Math.max(0, Math.min(n - 1, i)));
+  };
+
+  const renderTooltip = () => {
+    if (hover == null) return null;
+    const rows = series
+      .map((s) => ({ label: s.label, color: s.color, v: s.values[hover] }))
+      .filter((r): r is { label: string; color: string; v: number } => r.v != null);
+    if (!rows.length) return null;
+    const bx = xAt(hover);
+    const title = formatX ? formatX(hover) : null;
+    const lines = rows.map((r) => `${r.label}: ${fmt(r.v)}`);
+    // largura estimada por caracteres (canvas de medição seria exagero aqui)
+    const wEst = Math.max(...lines.map((t) => t.length), title?.length ?? 0) * 6 + 16;
+    const lineH = 13;
+    const bh = (rows.length + (title ? 1 : 0)) * lineH + 9;
+    const boxX = bx + 10 + wEst > W - padR ? bx - 10 - wEst : bx + 10;
+    const boxY = padT + 2;
+    return (
+      <g pointerEvents="none">
+        <line
+          x1={bx}
+          y1={padT}
+          x2={bx}
+          y2={H - padB}
+          className="text-ink-faint"
+          stroke="currentColor"
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          vectorEffect="non-scaling-stroke"
+        />
+        {rows.map((r, i) => (
+          <circle key={i} cx={bx} cy={yAt(r.v)} r={3} fill={r.color} />
+        ))}
+        <rect
+          x={boxX}
+          y={boxY}
+          width={wEst}
+          height={bh}
+          rx={4}
+          className="fill-surface-3 stroke-border"
+          strokeWidth={1}
+          opacity={0.95}
+        />
+        {title && (
+          <text x={boxX + 8} y={boxY + 13} className="fill-ink text-[10px] font-bold">
+            {title}
+          </text>
+        )}
+        {rows.map((r, i) => (
+          <text
+            key={i}
+            x={boxX + 8}
+            y={boxY + 13 + (i + (title ? 1 : 0)) * lineH}
+            fill={r.color}
+            className="text-[10px] font-semibold"
+          >
+            {lines[i]}
+          </text>
+        ))}
+      </g>
+    );
+  };
 
   return (
     <div className={className}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} className="overflow-visible">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        width="100%"
+        height={H}
+        className="overflow-visible"
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+      >
         {ticks.map((tv, i) => (
           <g key={i}>
             <line
@@ -101,6 +209,44 @@ export function LineChart({
             </text>
           </g>
         ))}
+
+        {formatX &&
+          xTicks.map((ti, k) => (
+            <text
+              key={`x${k}`}
+              x={xAt(ti)}
+              y={H - padB + 14}
+              textAnchor={k === 0 ? "start" : k === xTicks.length - 1 ? "end" : "middle"}
+              className="fill-ink-faint text-[10px]"
+            >
+              {formatX(ti)}
+            </text>
+          ))}
+
+        {refLine && refLine.value <= yMax && (
+          <g>
+            <line
+              x1={padL}
+              y1={yAt(refLine.value)}
+              x2={W - padR}
+              y2={yAt(refLine.value)}
+              className="text-bad"
+              stroke="currentColor"
+              strokeWidth={1}
+              strokeDasharray="5 4"
+              vectorEffect="non-scaling-stroke"
+              opacity={0.7}
+            />
+            <text
+              x={W - padR}
+              y={yAt(refLine.value) - 4}
+              textAnchor="end"
+              className="fill-bad text-[10px] font-semibold"
+            >
+              {refLine.label}
+            </text>
+          </g>
+        )}
 
         {markers.map((m, i) => (
           <line
@@ -129,6 +275,8 @@ export function LineChart({
             vectorEffect="non-scaling-stroke"
           />
         ))}
+
+        {renderTooltip()}
       </svg>
 
       {series.length > 0 && (

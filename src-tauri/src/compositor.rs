@@ -63,6 +63,9 @@ pub struct CompositorOpts {
     /// Termos do guardião (vazia = sem OCR/censura).
     pub watchlist: Vec<String>,
     pub slate: Slate,
+    /// "JÁ VOLTO agora": o streamer força o slate no ar (pausa manual — banheiro/água),
+    /// com o áudio do programa MUDO (o mic dele não vaza). Ligada/desligada por comando.
+    pub force_slate: Arc<AtomicBool>,
 }
 
 enum GenExit {
@@ -705,7 +708,8 @@ fn generation(
         let _ = v_dead;
 
         // Slate-vídeo: decoder em loop só enquanto o slate está no ar.
-        let want_slate_media = brb_active || *censoring;
+        let forced = opts.force_slate.load(Ordering::Relaxed);
+        let want_slate_media = brb_active || *censoring || forced;
         if let Slate::Video { path, has_audio } = &opts.slate {
             if want_slate_media
                 && slate_vsrc.is_none()
@@ -773,6 +777,17 @@ fn generation(
                     let audio = take_audio(&mut afifo, abpf);
                     if censor_now {
                         (slate_frame.clone(), audio, false)
+                    } else if forced {
+                        // "JÁ VOLTO agora" manual: slate no ar, áudio real DESCARTADO (consumido
+                        // acima pra manter o pareamento) e trocado pelo do slate/silêncio — o mic
+                        // do streamer não vaza na pausa. Os pops continuam: ao voltar, o conteúdo
+                        // é o ATUAL, não um replay da pausa.
+                        let slate_audio = if matches!(&opts.slate, Slate::Video { has_audio: true, .. }) {
+                            take_audio(&mut slate_afifo, abpf)
+                        } else {
+                            vec![0u8; abpf]
+                        };
+                        (slate_frame.clone(), slate_audio, true)
                     } else {
                         (f.clone(), audio, false)
                     }
@@ -780,7 +795,7 @@ fn generation(
                 // JÁ VOLTO — GRUDENTO: uma vez no slate, fica nele até conteúdo REAL voltar a
                 // sair (pop). Sem isso, no guardião o re-encher do buffer (12 s) cairia no ramo
                 // de congelamento e mostraria o último quadro de ANTES da queda, parado.
-                None if brb_active || (delay_buf.is_empty() && gap.as_millis() as u64 >= HOLD_MS) => {
+                None if forced || brb_active || (delay_buf.is_empty() && gap.as_millis() as u64 >= HOLD_MS) => {
                     // Slate + áudio do slate-vídeo (ou silêncio).
                     let audio = if matches!(&opts.slate, Slate::Video { has_audio: true, .. }) {
                         take_audio(&mut slate_afifo, abpf)

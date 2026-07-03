@@ -55,7 +55,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmps",
     ingestUrl: "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
     recommended: p(1920, 1080, 60, 6000, 160),
-    note: "Copie a URL e a chave certinhas no painel de criador da Kick — é lá que ela gera as suas.",
+    note: "A chave sai do painel de criador da Kick. A URL já vem preenchida com o servidor padrão — se o seu painel mostrar outra, é só trocar aqui.",
     keyUrl: "https://kick.com/dashboard/settings/stream",
     liveUrl: "https://kick.com/dashboard/stream",
   },
@@ -67,6 +67,8 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     ingestUrl: "rtmp://", // fornecido pelo painel (varia)
     recommended: p(720, 1280, 30, 3000, 128),
     note: "Vídeo em pé (720×1280, formato de celular). Pra transmitir, a TikTok precisa liberar sua conta — e nem todo mundo consegue a chave sozinho.",
+    // Raiz do LIVE Center — o path interno pode 404 pra quem não tem LIVE liberado.
+    keyUrl: "https://livecenter.tiktok.com/",
     experimental: true,
   },
   x: {
@@ -76,7 +78,8 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(1280, 720, 30, 3000, 128),
-    note: "A chave de transmissão sai do Media Studio do X — é lá que você a gera.",
+    note: "A URL e a chave saem do Media Studio do X (aba Producer) — o link aqui embaixo te leva lá.",
+    keyUrl: "https://studio.x.com/producer",
     experimental: true,
   },
   instagram: {
@@ -86,7 +89,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(720, 1280, 30, 2500, 128),
-    note: "O Instagram não tem uma entrada oficial firme pra receber transmissão de fora — por isso aqui é experimental e pode falhar.",
+    note: "O Instagram não recebe transmissão de fora oficialmente — use um serviço que gere uma URL RTMP pro seu perfil e cole a URL e a chave aqui. Ainda é experimental e pode falhar.",
     experimental: true,
   },
   custom: {
@@ -110,6 +113,19 @@ export const PLATFORM_LIST: PlatformPreset[] = [
   PLATFORMS.instagram,
   PLATFORMS.custom,
 ];
+
+// Descrição curta e humana pro picker — o pré-requisito aparece ANTES do clique
+// (protocolo em caixa alta não diz nada pra quem não é técnico).
+export const PLATFORM_TAGLINES: Record<PlatformId, string> = {
+  twitch: "A live de sempre",
+  youtube: "Aguenta qualidade alta numa boa",
+  facebook: "Live pra página ou perfil",
+  kick: "No estilo da Twitch",
+  tiktok: "Vídeo em pé — precisa de conta liberada",
+  x: "A chave sai do Media Studio",
+  instagram: "Vídeo em pé — sem entrada oficial, pode falhar",
+  custom: "Qualquer servidor RTMP, RTMPS ou SRT",
+};
 
 /** Iniciais para o "glifo" colorido da plataforma na UI. */
 export function platformInitials(id: PlatformId): string {

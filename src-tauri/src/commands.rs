@@ -285,7 +285,7 @@ fn emit(app: &AppHandle, snap: &EngineSnapshot) {
 }
 
 /// Notificação nativa do SO (entrou no ar / destino caiu).
-fn notify(app: &AppHandle, title: &str, body: &str) {
+pub(crate) fn notify(app: &AppHandle, title: &str, body: &str) {
     use tauri_plugin_notification::NotificationExt;
     let _ = app.notification().builder().title(title).body(body).show();
 }
@@ -309,7 +309,7 @@ fn quality_of(snap: &EngineSnapshot) -> &'static str {
             let mut warn = false;
             for st in snap.targets.values() {
                 match st.state.as_str() {
-                    "error" => bad = true,
+                    "error" | "signal-lost" => bad = true,
                     "reconnecting" | "connecting" | "waiting" | "brb" => warn = true,
                     _ => {}
                 }
@@ -343,6 +343,7 @@ fn tray_tooltip(snap: &EngineSnapshot) -> String {
             "live" => ("✓", fmt_mbps(st.bitrate_kbps)),
             "reconnecting" => ("⚠", "reconectando".to_string()),
             "error" => ("✕", "erro".to_string()),
+            "signal-lost" => ("✕", "sem sinal do OBS".to_string()),
             "paused" => ("⏸", "pausado".to_string()),
             "waiting" => ("◌", "aguardando sinal".to_string()),
             "brb" => ("◷", "JÁ VOLTO (slate no ar)".to_string()),
@@ -355,6 +356,29 @@ fn tray_tooltip(snap: &EngineSnapshot) -> String {
 
 /// Atualiza o ícone (só quando a qualidade muda) e o tooltip da bandeja.
 fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
+    // Título da janela espelha o estado — na taskbar (ou minimizado) dá pra ver a live de pé.
+    let title = match snap.state.as_str() {
+        "live" => "Corneta — NO AR",
+        "starting" => "Corneta — aguardando o OBS",
+        "error" => "Corneta — erro na transmissão",
+        _ => "Corneta",
+    };
+    let title_changed = {
+        let state = app.state::<AppState>();
+        let mut eng = state.engine.lock().unwrap();
+        if eng.win_title != title {
+            eng.win_title = title.to_string();
+            true
+        } else {
+            false
+        }
+    };
+    if title_changed {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.set_title(title);
+        }
+    }
+
     let Some(tray) = app.tray_by_id("corneta-tray") else {
         return;
     };
@@ -507,25 +531,37 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Info do slate escolhido: a kind detectada + o nome original (só exibição na UI).
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrbSlateInfo {
+    kind: String,
+    file_name: String,
+}
+
 /// Escolhe um arquivo (imagem OU vídeo) como slate do "JÁ VOLTO". Apaga o slate anterior,
-/// copia o escolhido pra `brb-slate.<ext>` (extensão original em minúsculas) e devolve a KIND
-/// detectada ("image"/"video"). Cancelou o seletor → devolve "" (o front trata como "sem
+/// copia o escolhido pra `brb-slate.<ext>` (extensão original em minúsculas) e devolve
+/// `{ kind, fileName }`. Cancelou o seletor → devolve None (o front trata como "sem
 /// mudança"). NÃO grava brb_slate_kind aqui — o front persiste via setSettings.
 #[tauri::command]
-pub async fn set_brb_slate(app: AppHandle) -> Result<String, String> {
+pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, String> {
     use tauri_plugin_dialog::DialogExt;
     let app2 = app.clone();
     let picked = tauri::async_runtime::spawn_blocking(move || {
         app2.dialog()
             .file()
-            .add_filter("Imagens", &["png", "jpg", "jpeg", "webp", "gif", "bmp"])
-            .add_filter("Vídeos", &["mp4", "mov", "mkv", "webm", "m4v"])
+            // Filtro ÚNICO: o botão da UI já diz "imagem ou vídeo" — dois filtros
+            // separados escondiam metade dos arquivos até o usuário achar o seletor "Tipo".
+            .add_filter(
+                "Imagem ou vídeo",
+                &["png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "mov", "mkv", "webm", "m4v"],
+            )
             .blocking_pick_file()
     })
     .await
     .map_err(|e| format!("join: {e}"))?;
     let Some(file) = picked else {
-        return Ok(String::new()); // cancelou
+        return Ok(None); // cancelou
     };
     let src = file.into_path().map_err(|e| e.to_string())?;
     let ext = src
@@ -534,12 +570,60 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<String, String> {
         .map(|e| e.to_ascii_lowercase())
         .filter(|e| !e.is_empty())
         .ok_or("arquivo sem extensão — escolha uma imagem ou vídeo")?;
+    let file_name = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("arquivo")
+        .to_string();
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     remove_brb_slate_files(&dir); // só um slate por vez
     let dest = dir.join(format!("brb-slate.{ext}"));
     std::fs::copy(&src, &dest).map_err(|e| format!("não consegui copiar o arquivo: {e}"))?;
-    Ok(if brb_slate_is_video(&dest) { "video" } else { "image" }.to_string())
+    let kind = if brb_slate_is_video(&dest) { "video" } else { "image" }.to_string();
+    Ok(Some(BrbSlateInfo { kind, file_name }))
+}
+
+/// Miniatura (JPEG base64) da tela do "JÁ VOLTO" atual — o streamer VÊ o que vai ao ar
+/// antes de precisar. Imagem: converte direto; vídeo: extrai 1 frame. "" = sem slate.
+#[tauri::command]
+pub async fn get_brb_slate_preview(app: AppHandle) -> Result<String, String> {
+    use base64::Engine;
+    let Some(src) = brb_slate_file(&app) else {
+        return Ok(String::new());
+    };
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let out = dir.join("brb-slate-preview.jpg");
+    // Mesmo caminho pra imagem e vídeo: 1 frame, reduzido a 480px de largura (é só um preview).
+    let args: Vec<String> = vec![
+        "-y".into(),
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-i".into(),
+        src.to_string_lossy().to_string(),
+        "-frames:v".into(),
+        "1".into(),
+        "-vf".into(),
+        "scale=480:-2".into(),
+        "-q:v".into(),
+        "5".into(),
+        out.to_string_lossy().to_string(),
+    ];
+    let output = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| e.to_string())?
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Ok(String::new()); // sem preview não é erro — a UI só esconde
+    }
+    let bytes = std::fs::read(&out).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_file(&out);
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 /// Remove todo `brb-slate.*` → volta ao modo "auto" (o App.tsx regenera o PNG gerado).
@@ -623,12 +707,77 @@ fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
             let was = st.state.clone();
             let name = st.name.clone();
             st.state = "reconnecting".into();
+            // Limpa a mensagem de erro velha — senão "Chave recusada" ficava pendurada
+            // sob o pill "Reconectando", contando uma história que já passou.
+            st.message = None;
             let out = snap.clone();
             drop(eng);
             emit(app, &out);
             if was != "reconnecting" {
-                notify(app, "Destino caiu", &format!("{name} — reconectando…"));
+                notify(app, "Plataforma caiu", &format!("{name} — reconectando…"));
             }
+        }
+    }
+}
+
+/// Reafirma o estado de erro terminal de um destino parqueado (idempotente — só emite se
+/// algo mudou). Sem isto, um pausar/despausar deixava o card em "Conectando…" pra sempre.
+fn reaffirm_auth_error(app: &AppHandle, target_id: &str) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let Some(snap) = eng.snapshot.as_mut() else { return };
+    if snap.state == "stopped" {
+        return;
+    }
+    let Some(st) = snap.targets.get_mut(target_id) else { return };
+    if st.state == "error" {
+        return;
+    }
+    st.state = "error".into();
+    st.message =
+        Some("Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into());
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+}
+
+/// Sem fonte pra ler: distingue "esperando a 1ª conexão" (waiting, azul calmo) do "sinal
+/// SUMIU no meio da live" (signal-lost — urgente, com notificação única). Sem o compositor
+/// (JÁ VOLTO desligado), a queda do OBS caía no MESMO pill calmo do pré-live e o streamer
+/// só descobria pelo chat que a live congelou.
+fn set_target_waiting(app: &AppHandle, target_id: &str) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    // Dedup entre destinos: todos perdem o sinal juntos — uma notificação basta.
+    static LAST_LOST_NOTIFY_MS: AtomicU64 = AtomicU64::new(0);
+
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let Some(snap) = eng.snapshot.as_mut() else { return };
+    if snap.state == "stopped" {
+        return;
+    }
+    // "No meio da live" = o snapshot global já chegou a "live" nesta sessão.
+    let mid_live = snap.state == "live";
+    let Some(st) = snap.targets.get_mut(target_id) else { return };
+    let new_state = if mid_live { "signal-lost" } else { "waiting" };
+    if st.state == new_state {
+        return;
+    }
+    st.state = new_state.into();
+    st.message = if mid_live {
+        Some("sua live está sem imagem — confira o OBS".into())
+    } else {
+        None
+    };
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+    if new_state == "signal-lost" {
+        let now = now_ms() as u64;
+        let last = LAST_LOST_NOTIFY_MS.load(Ordering::Relaxed);
+        if now.saturating_sub(last) > 10_000 {
+            LAST_LOST_NOTIFY_MS.store(now, Ordering::Relaxed);
+            notify(app, "O sinal do OBS caiu", "Sua live está SEM IMAGEM — confira o OBS.");
         }
     }
 }
@@ -706,6 +855,28 @@ async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
         .map(|((_, _, codec, _), _)| (*codec).to_string())
 }
 
+/// YouTube automático falhou (token expirado, quota): avisa e anota no destino — a live
+/// segue com a URL/chave manual do usuário, mas ele PRECISA saber que o canal pode estar
+/// sem live nenhuma enquanto a Corneta parece "no ar".
+fn yt_auto_fallback(app: &AppHandle, target_id: &str, err: &str) {
+    log::warn!("YouTube auto-broadcast: {err}");
+    notify(
+        app,
+        "YouTube automático falhou",
+        "Vou usar sua configuração manual — confira se a live apareceu no seu canal.",
+    );
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    if let Some(snap) = eng.snapshot.as_mut() {
+        if let Some(st) = snap.targets.get_mut(target_id) {
+            st.message = Some("YouTube automático falhou — usando sua config manual.".into());
+        }
+        let out = snap.clone();
+        drop(eng);
+        emit(app, &out);
+    }
+}
+
 /// Guarda RAII da trava de sessão: se o setup do start_engine abortar (erro/`?`/panic) antes de
 /// confirmar, solta a trava e limpa qualquer sidecar parcial. Sem isto, um start meio-feito
 /// (ex.: disco cheio, MediaMTX ausente) deixaria `live=true` e travaria todo BORA futuro com
@@ -731,24 +902,38 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // (kill_orphan/keyring/spawn). Sem isto, dois cliques em BORA (ou dois disparos do atalho)
     // passavam ambos pela checagem e subiam dois MediaMTX + dois conjuntos de supervisores no
     // mesmo mapa (TOCTOU → FFmpeg vazado, publish duplicado, supervisor imortal).
-    {
+    let my_gen = {
         let mut eng = state.engine.lock().unwrap();
         if eng.live {
             return Err("já está no ar.".into());
         }
         eng.live = true;
-    }
+        eng.start_gen = eng.start_gen.wrapping_add(1);
+        eng.start_gen
+    };
     // Daqui pra frente qualquer saída por erro solta a trava e limpa parciais (Drop). Só o
     // sucesso desarma a guarda (no fim da função).
     let mut start_guard = StartGuard { app: &app, armed: true };
-
-    kill_orphan_sidecars();
 
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
     if enabled.is_empty() {
         return Err("Nenhuma plataforma ativa.".into());
     }
+
+    // Feedback IMEDIATO: a UI sai do "Fora do ar" ANTES da limpeza de órfãos (PowerShell,
+    // 1-3s no Windows) — sem isto o clique no BORA parecia não ter pego.
+    let started = now_ms();
+    let snap = EngineSnapshot::starting(&config, started);
+    {
+        let mut eng = state.engine.lock().unwrap();
+        eng.snapshot = Some(snap.clone());
+        eng.started_ms = started;
+    }
+    emit(&app, &snap);
+
+    // Limpeza de órfãos fora do event-loop (o PowerShell bloqueia).
+    let _ = tauri::async_runtime::spawn_blocking(kill_orphan_sidecars).await;
 
     // Chaves do cofre + hosts (para erros por destino).
     let mut keymap: HashMap<String, String> = HashMap::new();
@@ -765,13 +950,15 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let (mut mtx_rx, mtx_child) = app
         .shell()
         .sidecar("mediamtx")
-        .map_err(|e| format!("sidecar mediamtx indisponível (rode scripts/fetch-binaries.ps1): {e}"))?
+        .map_err(|e| {
+            // Detalhe cru só no log — pra UI, uma frase que o streamer consegue agir em cima.
+            log::error!("sidecar mediamtx indisponível (fetch-binaries?): {e}");
+            "Faltam arquivos internos da Corneta — reinstale o app.".to_string()
+        })?
         .args([yml.to_string_lossy().to_string()])
         .spawn()
         .map_err(|e| format!("falha ao iniciar o MediaMTX: {e}"))?;
 
-    let started = now_ms();
-    let snap = EngineSnapshot::starting(&config, started);
     let running = Arc::new(AtomicBool::new(true));
     // Sinal de ingestão: true quando o OBS está publicando no MediaMTX.
     let has_signal = Arc::new(AtomicBool::new(false));
@@ -786,14 +973,34 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         .iter()
         .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
         .collect();
+    // Erro terminal por destino (chave recusada): o supervisor parqueia até o retry limpar.
+    let auth_flags: HashMap<String, Arc<AtomicBool>> = enabled
+        .iter()
+        .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
+        .collect();
     {
         let mut eng = state.engine.lock().unwrap();
+        // O usuário pode ter CANCELADO durante os awaits do setup (a UI já mostra
+        // "starting" desde o emit lá em cima) — instalar por cima deixaria um motor
+        // zumbi com eng.live=false que o Cortar não consegue mais parar.
+        if !eng.live || eng.start_gen != my_gen {
+            drop(eng);
+            log::info!("motor: início cancelado durante o setup — abortando");
+            let _ = mtx_child.kill();
+            // Sessão de relatório recém-criada não teve live nenhuma — apaga o arquivo.
+            if let Some(p) = session_path {
+                let _ = std::fs::remove_file(p);
+            }
+            start_guard.armed = false;
+            return Err("Início cancelado.".into());
+        }
         eng.mediamtx = Some(mtx_child);
         eng.snapshot = Some(snap.clone());
         eng.started_ms = started;
         eng.running = running.clone();
         eng.session_path = session_path;
         eng.paused = pause_flags.clone();
+        eng.auth_error = auth_flags.clone();
     }
     emit(&app, &snap);
 
@@ -819,8 +1026,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     log::info!("YouTube: transmissão criada automaticamente");
                     yt_override = Some((yid, addr, key));
                 }
-                Ok(Err(e)) => log::warn!("YouTube auto-broadcast: {e}"),
-                Err(e) => log::warn!("YouTube auto-broadcast: {e}"),
+                // Falha (token expirado, quota): cai pra config manual — mas AVISA, senão o
+                // streamer acha que está no ar no YouTube e o canal não tem live nenhuma.
+                Ok(Err(e)) => yt_auto_fallback(&app, &yid, &e),
+                Err(e) => yt_auto_fallback(&app, &yid, &e.to_string()),
             }
         }
     }
@@ -926,6 +1135,18 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 && t.encoding.encoder == "auto"
         });
     let hw_codec: Option<String> = if needs_hw { detect_hw_encoder(&app).await } else { None };
+    // Revalida a sessão após os awaits lentos (YouTube/sonda de encoder): um Cortar nesse
+    // meio-tempo já derrubou o MediaMTX — subir compositor/supervisores agora criaria
+    // processos órfãos de uma sessão morta (ou atropelaria um segundo BORA).
+    {
+        let eng = state.engine.lock().unwrap();
+        if !eng.live || eng.start_gen != my_gen {
+            drop(eng);
+            log::info!("motor: início cancelado após o setup — abortando antes dos supervisores");
+            start_guard.armed = false;
+            return Err("Início cancelado.".into());
+        }
+    }
     if compositor_on {
         // Slate do "JÁ VOLTO": imagem OU vídeo (custom) ou o PNG gerado. Detecta vídeo pela
         // extensão e, se for vídeo, sonda uma vez se tem trilha de áudio.
@@ -944,12 +1165,19 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 slate_file.as_deref(),
             )),
         };
+        // "JÁ VOLTO agora" (pausa manual): só existe com o compositor no ar.
+        let force_brb = Arc::new(AtomicBool::new(false));
+        {
+            let mut eng = state.engine.lock().unwrap();
+            eng.force_brb = Some(force_brb.clone());
+        }
         let opts = crate::compositor::CompositorOpts {
             spec,
             delay_sec: if guard { engine::GUARD_DELAY_SEC } else { 0 },
             hw_codec: hw_codec.clone(),
             watchlist: if guard { guard_watchlist } else { Vec::new() },
             slate,
+            force_slate: force_brb,
         };
         let (app_c, run_c, sig_c, slate_c) =
             (app.clone(), running.clone(), has_signal.clone(), slate_on.clone());
@@ -982,6 +1210,9 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let app_t = app.clone();
         let run_flag = running.clone();
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
+        let auth_flag = auth_flags.get(&t.id).cloned().unwrap_or_default();
+        // Chave provisionada pelo YouTube automático vence o cofre — não reler no retry.
+        let has_yt_override = yt_override.as_ref().is_some_and(|(yid, _, _)| *yid == t.id);
         // Com o compositor, a ENTRADA do destino é o `_program` — que fica de pé mesmo com o
         // OBS caído. O "sinal" do destino passa a ser o programa; a queda do OBS não derruba
         // nem reinicia este FFmpeg (o slate entra no MESMO fluxo, lá no compositor).
@@ -991,6 +1222,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
             let mut current_kbps = base_kbps;
+            // Auto-bitrate: notifica UMA vez por sequência de aperto (não a cada degrau).
+            let mut drop_notified = false;
             while run_flag.load(Ordering::Relaxed) {
                 // (A censura agora é feita pelo "protetor" via zmq — sem trocar este FFmpeg.)
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
@@ -1003,11 +1236,35 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     continue;
                 }
 
+                // Erro TERMINAL (ex.: chave recusada): parqueia SEM respawn — o card fica
+                // cravado em "Erro" com a mensagem e o "Tentar de novo" estáveis, em vez do
+                // pisca-pisca Erro↔Reconectando com notificação a cada 2s. O estado é
+                // REAFIRMADO (idempotente): pausar/despausar sobrescrevia pra "connecting"
+                // e o "Tentar de novo" sumia — beco sem saída.
+                if auth_flag.load(Ordering::Relaxed) {
+                    reaffirm_auth_error(&app_t, &target_id);
+                    let _ = tauri::async_runtime::spawn_blocking(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(300))
+                    })
+                    .await;
+                    // Saiu do parque (retry_target): relê a chave do cofre — o caso nº 1 é o
+                    // streamer ter colado a chave nova em Plataformas no meio da live.
+                    if !auth_flag.load(Ordering::Relaxed) && !has_yt_override {
+                        let tid = target_id.clone();
+                        if let Ok(Some(k)) =
+                            tauri::async_runtime::spawn_blocking(move || keys::get_key(&tid)).await
+                        {
+                            key = k;
+                        }
+                    }
+                    continue;
+                }
+
                 // Sem fonte pra ler (OBS sem compositor; `_program` ainda não subiu com ele):
                 // aguarda. Com o compositor no ar isto praticamente não ocorre depois do começo —
                 // a queda do OBS NÃO passa por aqui (o programa segue publicando o slate).
                 if !signal.load(Ordering::Relaxed) {
-                    set_target_state(&app_t, &target_id, "waiting");
+                    set_target_waiting(&app_t, &target_id);
                     let _ = tauri::async_runtime::spawn_blocking(|| {
                         std::thread::sleep(std::time::Duration::from_millis(700))
                     })
@@ -1031,7 +1288,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 let (mut rx, child) = match spawned {
                     Ok(v) => v,
                     Err(e) => {
-                        set_engine_error(&app_t, &format!("FFmpeg indisponível: {e}"));
+                        log::error!("sidecar ffmpeg indisponível: {e}");
+                        set_engine_error(&app_t, "Faltam arquivos internos da Corneta — reinstale o app.");
                         break;
                     }
                 };
@@ -1102,11 +1360,19 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                             if low >= 8 && current_kbps > floor_kbps {
                                                 current_kbps =
                                                     ((current_kbps as f64 * 0.75) as u32).max(floor_kbps);
-                                                notify(
-                                                    &app_t,
-                                                    "Banda apertou",
-                                                    &format!("{target_name}: baixei o bitrate pra {current_kbps} kbps"),
+                                                log::info!(
+                                                    "auto-bitrate: {target_name} baixando pra {current_kbps} kbps"
                                                 );
+                                                // Uma notificação por sequência de aperto — os
+                                                // degraus seguintes ficam só no log (sem spam).
+                                                if !drop_notified {
+                                                    drop_notified = true;
+                                                    notify(
+                                                        &app_t,
+                                                        "Internet apertou",
+                                                        &format!("{target_name}: baixei a qualidade por um tempo pra live não travar."),
+                                                    );
+                                                }
                                                 rebitrate = true;
                                                 break;
                                             } else if stable >= 60 && current_kbps < base_kbps {
@@ -1115,6 +1381,17 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                                 log::info!(
                                                     "auto-bitrate: {target_name} subindo pra {current_kbps} kbps"
                                                 );
+                                                // Recuperou TUDO: fecha o ciclo avisando — senão fica
+                                                // a impressão de que a qualidade caiu pra sempre.
+                                                // (Não zera em subida parcial: oscilação re-notificaria.)
+                                                if current_kbps >= base_kbps && drop_notified {
+                                                    drop_notified = false;
+                                                    notify(
+                                                        &app_t,
+                                                        "Internet estabilizou",
+                                                        &format!("{target_name}: qualidade de volta ao normal."),
+                                                    );
+                                                }
                                                 rebitrate = true;
                                                 break;
                                             }
@@ -1174,6 +1451,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 }
                 // Sinal sumiu enquanto rodava → volta ao topo (slate ou waiting).
                 if !signal.load(Ordering::Relaxed) {
+                    continue;
+                }
+                // Erro terminal detectado no log (chave recusada): NÃO é "reconectando" —
+                // o parque no topo do laço assume, com estado/mensagem estáveis.
+                if auth_flag.load(Ordering::Relaxed) {
                     continue;
                 }
                 // Sinal presente, mas o FFmpeg caiu → reconexão real.
@@ -1318,6 +1600,58 @@ pub async fn set_target_paused(
     Ok(())
 }
 
+/// Destino parqueado em erro terminal (chave recusada): limpa a flag e deixa o supervisor
+/// tentar de novo — relendo a chave do cofre no caminho (o streamer colou a nova em
+/// Plataformas SEM precisar cortar a live inteira).
+#[tauri::command]
+pub fn retry_target(app: AppHandle, target_id: String) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    match eng.auth_error.get(&target_id) {
+        Some(flag) => flag.store(false, Ordering::Relaxed),
+        None => return Err("essa plataforma não está nesta transmissão.".into()),
+    }
+    // Estado otimista: sai do "Erro" pra "Conectando" já no clique.
+    let out = eng.snapshot.as_mut().map(|snap| {
+        if let Some(st) = snap.targets.get_mut(&target_id) {
+            st.state = "connecting".into();
+            st.message = None;
+        }
+        snap.clone()
+    });
+    drop(eng);
+    if let Some(out) = out {
+        emit(&app, &out);
+    }
+    Ok(())
+}
+
+/// "JÁ VOLTO agora": liga/desliga o slate manual no compositor (pausa pro banheiro/água,
+/// com o mic mudo). Só existe quando a live subiu com o JÁ VOLTO/Guardião armado.
+#[tauri::command]
+pub fn set_force_brb(app: AppHandle, on: bool) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    if !eng.live {
+        return Err("a transmissão não está no ar.".into());
+    }
+    let Some(flag) = &eng.force_brb else {
+        return Err("o JÁ VOLTO não está armado nesta live — arme nas Configurações e recomece.".into());
+    };
+    flag.store(on, Ordering::Relaxed);
+    let out = eng.snapshot.as_mut().map(|snap| {
+        snap.forced_brb = on;
+        snap.clone()
+    });
+    drop(eng);
+    if let Some(out) = out {
+        emit(&app, &out);
+    }
+    Ok(())
+}
+
 /// Lê uma chave numérica do tipo "fps= 60" / "drop=5" do log do FFmpeg.
 fn parse_kv(line: &str, key: &str) -> Option<f64> {
     let idx = line.find(key)?;
@@ -1334,7 +1668,7 @@ fn friendly_error(low: &str) -> (&'static str, String) {
     if low.contains("403") || low.contains("forbidden") || low.contains("unauthorized")
         || low.contains("not authorized") || low.contains("rejected") || low.contains("auth")
     {
-        ("error", "Chave recusada pela plataforma — confira a stream key.".into())
+        ("error", "Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into())
     } else if low.contains("connection refused")
         || low.contains("cannot open")
         || low.contains("failed to connect")
@@ -1381,6 +1715,8 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
     }
     let started = eng.started_ms;
     let last_emit = eng.last_emit_ms;
+    // Clonado ANTES do empréstimo do snapshot (st borrows snap borrows eng).
+    let auth_flag = eng.auth_error.get(target_id).cloned();
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
@@ -1409,14 +1745,21 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
         }
         snap.state = "live".into();
     } else if !has_signal {
-        // OBS ainda não publicou: é falta de sinal, não erro do destino.
-        st.state = "waiting".into();
-        st.message = None;
+        // OBS ainda não publicou: é falta de sinal, não erro do destino. O estado urgente
+        // "signal-lost" (posto pelo supervisor no meio da live) não é rebaixado aqui.
+        if st.state != "signal-lost" {
+            st.state = "waiting".into();
+            st.message = None;
+        }
     } else {
         let (estate, msg) = friendly_error(&low);
         st.state = estate.into();
         if estate == "error" {
             err_msg = Some(msg.clone());
+            // Erro TERMINAL: o supervisor para de respawnar até o "Tentar de novo".
+            if let Some(f) = &auth_flag {
+                f.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
         }
         st.message = Some(msg);
     }
@@ -1532,6 +1875,8 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
         };
         eng.snapshot = Some(out.clone());
         eng.paused.clear();
+        eng.auth_error.clear();
+        eng.force_brb = None;
         let session_path = eng.session_path.take();
         let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
             eng.ffmpegs.drain().map(|(_, c)| c).collect();
@@ -1879,6 +2224,14 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     let pb = p.into_path().map_err(|e| e.to_string())?;
     let content = std::fs::read_to_string(pb).map_err(|e| e.to_string())?;
     let cfg: AppConfig = serde_json::from_str(&content).map_err(|e| format!("config inválida: {e}"))?;
+    // Rede de segurança: guarda a config ATUAL ao lado do config.json antes de sobrescrever —
+    // importar substitui perfis/plataformas/ajustes e não tinha caminho de volta.
+    if let Ok(dir) = app.path().app_config_dir() {
+        let current = config::load(&app);
+        if let Ok(json) = serde_json::to_string_pretty(&current) {
+            let _ = std::fs::write(dir.join("corneta-backup-antes-do-import.json"), json);
+        }
+    }
     config::save(&app, &cfg)?;
     Ok(true)
 }

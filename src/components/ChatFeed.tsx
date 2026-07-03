@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, Ban, Clock, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -35,6 +35,8 @@ export function ChatFeed({
   onFontSize,
   modLevel,
   onModerate,
+  disconnectedHint,
+  emptyAction,
 }: {
   messages: ChatMessage[];
   view: ChatView;
@@ -42,6 +44,10 @@ export function ChatFeed({
   /** Há mensagens, mas o filtro escondeu todas (vazio diferente de "sem chat"). */
   allFilteredOut?: boolean;
   className?: string;
+  /** Texto do estado vazio desconectado (cada tela sabe o próximo passo real). */
+  disconnectedHint?: string;
+  /** Ação do estado vazio desconectado (ex.: "Adicionar canal" / "Conectar"). */
+  emptyAction?: ReactNode;
   /** Ctrl+scroll redimensiona a fonte (8–44px). */
   onFontSize?: (next: number) => void;
   /** Moderação: nível de ação permitido por mensagem ("full" Twitch, "delete" YouTube). */
@@ -183,8 +189,10 @@ export function ChatFeed({
                 ? "Você desligou todas as plataformas. Religa um chip ali em cima pra ver o chat de novo."
                 : connected
                   ? "Assim que a galera mandar mensagem, aparece aqui."
-                  : "Escolha ao menos uma plataforma e clique em Conectar pra puxar o chat."}
+                  : disconnectedHint ??
+                    "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar pra puxar o chat."}
             </div>
+            {!connected && !allFilteredOut && emptyAction}
           </div>
         ) : (
           <div style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}>

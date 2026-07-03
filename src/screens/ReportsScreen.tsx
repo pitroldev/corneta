@@ -22,17 +22,21 @@ import { useStore } from "../lib/store";
 import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
-import type { SessionData, SessionMeta } from "../lib/types";
+import type { SessionData, SessionMeta, SessionSummary } from "../lib/types";
 import {
   analyze,
   bitrateSeries,
   chatRateSeries,
   cpuSeries,
+  dropCachedSummary,
+  getCachedSummary,
   gpuSeries,
   hasChat,
   hasObs,
   obsRenderSeries,
   parseSession,
+  setCachedSummary,
+  summarize,
   viewerSeries,
   type Highlight,
   type ProblemWindow,
@@ -62,20 +66,36 @@ function fmtDur(sec: number): string {
   const m = total % 60;
   return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}min`;
 }
+// Com ano: "Live de 02/07" fica ambígua depois de um ano de uso.
 const fmtDate = (ms: number) =>
   new Date(ms).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
+    year: "2-digit",
   });
 const fmtTime = (ms: number) =>
   new Date(ms).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
+// Data local em ISO pro nome de arquivo — não colide com o do ano anterior.
+const fmtDateFile = (ms: number) => {
+  const d = new Date(ms);
+  const p = (x: number) => x.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+// Nomes dos modos como na tela Qualidade (nunca o enum interno).
+const MODE_LABEL: Record<string, string> = {
+  "per-platform": "Caprichado",
+  passthrough: "Na lata",
+  hybrid: "Esperto",
+};
 
 export function ReportsScreen() {
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [summaries, setSummaries] = useState<Record<string, SessionSummary>>({});
 
   const markReportSeen = useStore((s) => s.markReportSeen);
   const refresh = () => api.listSessions().then(setSessions);
@@ -84,10 +104,49 @@ export function ReportsScreen() {
     markReportSeen(); // abriu Relatórios → some o selo "NOVO"
   }, [markReportSeen]);
 
+  // Resumos pros chips da lista: cache primeiro, o que faltar é computado em
+  // background (uma sessão por vez, pra não ler todos os NDJSON de uma tacada).
+  useEffect(() => {
+    if (!sessions?.length) return;
+    let alive = true;
+    void (async () => {
+      const cached: Record<string, SessionSummary> = {};
+      const missing: string[] = [];
+      for (const s of sessions) {
+        const c = getCachedSummary(s.id);
+        if (c) cached[s.id] = c;
+        else missing.push(s.id);
+      }
+      if (alive) setSummaries(cached);
+      for (const id of missing) {
+        try {
+          const raw = await api.readSession(id);
+          if (!alive) return;
+          const d = parseSession(raw);
+          if (!d) continue;
+          const sum = summarize(d, analyze(d));
+          // Sessão ainda no ar (sem registro "end") mostra os chips mas NÃO entra
+          // no cache — senão o resumo de meia live ficaria congelado pra sempre.
+          if (d.meta.endedAt != null) setCachedSummary(id, sum);
+          setSummaries((prev) => ({ ...prev, [id]: sum }));
+        } catch {
+          // sessão ilegível — segue sem chips
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [sessions]);
+
   if (selected) {
+    // Lista vem ordenada da mais nova pra mais velha → a "última live" é a seguinte.
+    const idx = sessions?.findIndex((s) => s.id === selected) ?? -1;
+    const prevId = (idx >= 0 ? sessions?.[idx + 1]?.id : null) ?? null;
     return (
       <ReportDetail
         id={selected}
+        prevId={prevId}
         onBack={() => setSelected(null)}
         onDeleted={() => {
           setSelected(null);
@@ -131,7 +190,12 @@ export function ReportsScreen() {
       ) : (
         <div className="flex flex-col gap-2">
           {sessions.map((s) => (
-            <SessionRow key={s.id} meta={s} onOpen={() => setSelected(s.id)} />
+            <SessionRow
+              key={s.id}
+              meta={s}
+              summary={summaries[s.id]}
+              onOpen={() => setSelected(s.id)}
+            />
           ))}
         </div>
       )}
@@ -139,11 +203,16 @@ export function ReportsScreen() {
   );
 }
 
+const TONE_DOT = { ok: "bg-ok", warn: "bg-warn", bad: "bg-bad" } as const;
+const TONE_TEXT = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
+
 function SessionRow({
   meta,
+  summary,
   onOpen,
 }: {
   meta: SessionMeta;
+  summary?: SessionSummary;
   onOpen: () => void;
 }) {
   return (
@@ -151,7 +220,7 @@ function SessionRow({
       onClick={onOpen}
       className="group flex items-center gap-4 rounded-lg border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-brass"
     >
-      <div className="flex w-20 shrink-0 flex-col">
+      <div className="flex w-24 shrink-0 flex-col">
         <span className="font-display text-lg font-extrabold leading-none">
           {fmtDate(meta.startedAt)}
         </span>
@@ -172,6 +241,45 @@ function SessionRow({
           </span>
         </div>
       </div>
+      {/* Como foi a live, sem precisar abrir: pico · chat · veredito */}
+      {summary?.hasData && (
+        <div className="hidden shrink-0 items-center gap-3 text-xs text-ink-muted sm:flex">
+          {summary.peakViewers != null && (
+            <span className="flex items-center gap-1" title="Pico de audiência">
+              <Eye className="size-3.5" />
+              <span className="tabular-nums">
+                {summary.peakViewers.toLocaleString("pt-BR")}
+              </span>
+            </span>
+          )}
+          {summary.chatTotal != null && (
+            <span className="flex items-center gap-1" title="Mensagens no chat">
+              <MessageSquare className="size-3.5" />
+              <span className="tabular-nums">
+                {summary.chatTotal.toLocaleString("pt-BR")}
+              </span>
+            </span>
+          )}
+          <span
+            className={cn(
+              "flex items-center gap-1.5 font-semibold",
+              TONE_TEXT[summary.verdictTone],
+            )}
+            title={
+              summary.problemWindows === 0
+                ? "Transmissão limpa"
+                : "Trechos com problema — abra pra ver o diagnóstico"
+            }
+          >
+            <span
+              className={cn("size-2 rounded-full", TONE_DOT[summary.verdictTone])}
+            />
+            {summary.problemWindows === 0
+              ? "limpa"
+              : `${summary.problemWindows} perrengue${summary.problemWindows > 1 ? "s" : ""}`}
+          </span>
+        </div>
+      )}
       <ChevronRight className="size-5 text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:text-brass" />
     </button>
   );
@@ -254,17 +362,36 @@ function RecapModal({
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     let alive = true;
-    const el = ref.current;
-    if (!el) return;
-    const ctx = el.getContext("2d");
-    if (!ctx) return;
-    const r = buildRecap(data, analysis);
-    // Espera as fontes carregarem pra o pôster não sair com fallback.
-    void (document.fonts?.ready ?? Promise.resolve()).then(() => {
-      if (alive) drawRecap(ctx, r);
-    });
+    let raf = 0;
+    // Desenha AGORA (com a fonte que tiver) e redesenha quando as fontes chegarem —
+    // esperar `fonts.ready` antes do 1º traço deixava o pôster em branco se a
+    // promise demorasse/pendurasse. Erro de desenho vira toast, não tela muda.
+    const paint = () => {
+      const el = ref.current;
+      if (!el) {
+        // Ref ainda não anexada (portal/animação do modal) — tenta no próximo frame.
+        raf = requestAnimationFrame(paint);
+        return;
+      }
+      const ctx = el.getContext("2d");
+      if (!ctx) {
+        toast.error("Não consegui desenhar o recap nesta máquina (canvas indisponível).");
+        return;
+      }
+      try {
+        const r = buildRecap(data, analysis);
+        drawRecap(ctx, r);
+        void (document.fonts?.ready ?? Promise.resolve()).then(() => {
+          if (alive) drawRecap(ctx, r);
+        });
+      } catch (e) {
+        toast.error(`O recap falhou ao desenhar: ${String(e).replace(/^Error:\s*/, "")}`);
+      }
+    };
+    paint();
     return () => {
       alive = false;
+      cancelAnimationFrame(raf);
     };
   }, [data, analysis]);
 
@@ -288,7 +415,7 @@ function RecapModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `corneta-live-${fmtDate(data.meta.startedAt).replace("/", "-")}.png`;
+    a.download = `corneta-live-${fmtDateFile(data.meta.startedAt)}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -327,29 +454,64 @@ function RecapModal({
 
 function ReportDetail({
   id,
+  prevId,
   onBack,
   onDeleted,
 }: {
   id: string;
+  /** Sessão imediatamente anterior (pra comparar com a última live). */
+  prevId: string | null;
   onBack: () => void;
   onDeleted: () => void;
 }) {
   const [data, setData] = useState<SessionData | null | "loading">("loading");
   const [showRecap, setShowRecap] = useState(false);
+  const [prevSummary, setPrevSummary] = useState<SessionSummary | null>(null);
 
   useEffect(() => {
     let alive = true;
     void api.readSession(id).then((raw) => {
       if (!alive) return;
-      setData(parseSession(raw));
+      const d = parseSession(raw);
+      setData(d);
+      // Aproveita a leitura pra deixar o resumo desta live no cache — só de
+      // sessão encerrada (a que ainda roda geraria um snapshot parcial eterno).
+      if (d && d.meta.endedAt != null) setCachedSummary(id, summarize(d, analyze(d)));
     });
     return () => {
       alive = false;
     };
   }, [id]);
 
+  // Resumo da live anterior: cache ou computa on-demand.
+  useEffect(() => {
+    setPrevSummary(null);
+    if (!prevId) return;
+    const cached = getCachedSummary(prevId);
+    if (cached) {
+      setPrevSummary(cached);
+      return;
+    }
+    let alive = true;
+    void api
+      .readSession(prevId)
+      .then((raw) => {
+        if (!alive) return;
+        const d = parseSession(raw);
+        if (!d) return;
+        const sum = summarize(d, analyze(d));
+        if (d.meta.endedAt != null) setCachedSummary(prevId, sum);
+        setPrevSummary(sum);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [prevId]);
+
   const remove = async () => {
     await api.deleteSession(id);
+    dropCachedSummary(id);
     toast.info("Relatório excluído");
     onDeleted();
   };
@@ -392,10 +554,10 @@ function ReportDetail({
     return Math.max(0, n - 1);
   };
   const markers: ChartMarker[] = a.events
-    .filter((e) => e.kind === "reconnect" || e.kind === "error")
+    .filter((e) => e.kind === "reconnect" || e.kind === "error" || e.kind === "signal")
     .map((e) => ({
       index: indexAt(e.t),
-      color: e.kind === "error" ? "#ef4444" : "#f97316",
+      color: e.kind === "error" ? "#ef4444" : e.kind === "signal" ? "#a855f7" : "#f97316",
     }));
 
   const bitrateSeriesData = data.meta.platforms.map((p) => ({
@@ -435,18 +597,44 @@ function ReportDetail({
     const ss = (s % 60).toString().padStart(2, "0");
     return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   };
+  // Eixo X dos gráficos: índice de amostra → tempo relativo (cada timeline tem a sua).
+  const relAtSample = (i: number) =>
+    rel(data.samples[Math.min(i, n - 1)]?.t ?? data.meta.startedAt);
+  const relAtViewer = (i: number) =>
+    rel(data.viewerSamples[Math.min(i, vN - 1)]?.t ?? data.meta.startedAt);
+
+  // Delta vs a live anterior ("essa foi melhor que a última?").
+  const delta = (
+    cur: number,
+    prev: number | null | undefined,
+  ): { text: string; tone: "ok" | "bad" | "neutral" } | undefined => {
+    if (prev == null || prev <= 0) return undefined;
+    const pct = Math.round(((cur - prev) / prev) * 100);
+    if (pct === 0) return { text: "igual à última live", tone: "neutral" };
+    return {
+      text: `${pct > 0 ? "+" : ""}${pct}% vs última live`,
+      tone: pct > 0 ? "ok" : "bad",
+    };
+  };
 
   // Stats de engajamento pro topo.
-  const heroStats: { label: string; value: string; accent?: boolean }[] = [];
+  const heroStats: {
+    label: string;
+    value: string;
+    accent?: boolean;
+    sub?: { text: string; tone: "ok" | "bad" | "neutral" };
+  }[] = [];
   if (a.viewers.hasData) {
     heroStats.push({
       label: "Pico de viewers",
       value: a.viewers.peak.toLocaleString("pt-BR"),
       accent: true,
+      sub: delta(a.viewers.peak, prevSummary?.peakViewers),
     });
     heroStats.push({
       label: "Média",
       value: a.viewers.avg.toLocaleString("pt-BR"),
+      sub: delta(a.viewers.avg, prevSummary?.avgViewers),
     });
   }
   if (a.alerts.subs > 0)
@@ -465,6 +653,7 @@ function ReportDetail({
     heroStats.push({
       label: "Mensagens",
       value: a.chat.total.toLocaleString("pt-BR"),
+      sub: delta(a.chat.total, prevSummary?.chatTotal),
     });
 
   const tone =
@@ -503,7 +692,7 @@ function ReportDetail({
         {fmtDur(data.meta.durationSec)} · {fmtTime(data.meta.startedAt)}
         {data.meta.endedAt ? `–${fmtTime(data.meta.endedAt)}` : ""} ·{" "}
         {data.meta.platforms.map((p) => p.name).join(", ")} · modo{" "}
-        {data.meta.mode}
+        {MODE_LABEL[data.meta.mode] ?? data.meta.mode}
       </div>
 
       {/* Painel de engajamento */}
@@ -525,6 +714,20 @@ function ReportDetail({
               <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                 {s.label}
               </div>
+              {s.sub && (
+                <div
+                  className={cn(
+                    "mt-0.5 text-[11px] font-semibold",
+                    s.sub.tone === "ok"
+                      ? "text-ok"
+                      : s.sub.tone === "bad"
+                        ? "text-bad"
+                        : "text-ink-faint",
+                  )}
+                >
+                  {s.sub.text}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -557,6 +760,7 @@ function ReportDetail({
             n={vN}
             markers={raidMarkers}
             formatValue={(v) => Math.round(v).toLocaleString("pt-BR")}
+            formatX={relAtViewer}
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
             <span>
@@ -632,6 +836,7 @@ function ReportDetail({
             n={n}
             markers={chatMarkers}
             formatValue={(v) => Math.round(v).toString()}
+            formatX={relAtSample}
           />
           <div className="mt-2 text-xs text-ink-muted">
             Total{" "}
@@ -692,11 +897,13 @@ function ReportDetail({
             n={n}
             markers={markers}
             formatValue={(v) => v.toFixed(1).replace(".", ",")}
+            formatX={relAtSample}
           />
           {markers.length > 0 && (
             <div className="mt-2 flex gap-3 text-[11px] font-semibold text-ink-faint">
               <span className="text-[#f97316]">● reconexão</span>
               <span className="text-[#ef4444]">● erro</span>
+              <span className="text-[#a855f7]">● sem sinal do OBS</span>
             </div>
           )}
         </Card>
@@ -713,6 +920,8 @@ function ReportDetail({
             n={n}
             yMax={100}
             formatValue={(v) => `${Math.round(v)}`}
+            formatX={relAtSample}
+            refLine={{ value: 92, label: "zona de perigo" }}
           />
         </Card>
       )}
@@ -735,6 +944,7 @@ function ReportDetail({
             n={n}
             markers={markers}
             formatValue={(v) => `${Math.round(v)}`}
+            formatX={relAtSample}
           />
         </Card>
       )}
@@ -782,9 +992,13 @@ function ReportDetail({
           </h3>
           <div className="flex flex-col gap-2">
             {a.windows.map((w, i) => (
-              <WindowCard key={i} w={w} />
+              <WindowCard key={i} w={w} time={rel(w.tStart)} />
             ))}
           </div>
+          <p className="mt-2 text-[11px] text-ink-faint">
+            ⏱️ Os tempos contam a partir do início da live — mesmo relógio dos
+            momentos de destaque, pra achar o trecho no VOD.
+          </p>
         </Card>
       )}
 
@@ -795,7 +1009,7 @@ function ReportDetail({
         </h3>
         <div className="flex flex-col gap-1">
           {a.events.map((e, i) => (
-            <EventRow key={i} e={e} />
+            <EventRow key={i} e={e} time={rel(e.t)} />
           ))}
         </div>
       </Card>
@@ -823,15 +1037,29 @@ function DeleteButton({ onDelete }: { onDelete: () => void }) {
   );
 }
 
-function WindowCard({ w }: { w: ProblemWindow }) {
+// Tempo relativo primário (acha no VOD), hora do relógio secundária.
+function WindowCard({ w, time }: { w: ProblemWindow; time: string }) {
   return (
     <div className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-2 text-sm">
-        <span className="font-display font-bold text-warn">
-          {fmtTime(w.tStart)}
+        <span className="font-display font-bold tabular-nums text-warn">
+          {time}
         </span>
-        <span className="text-xs text-ink-faint">({w.durationSec}s)</span>
+        <span className="text-xs text-ink-faint">
+          ({fmtTime(w.tStart)} · {w.durationSec}s)
+        </span>
         <span className="font-semibold">{w.cause}</span>
+        <button
+          onClick={() => {
+            void navigator.clipboard?.writeText(time);
+            toast.success("Tempo copiado");
+          }}
+          className="ml-auto rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+          title="Copiar tempo"
+          aria-label="Copiar tempo"
+        >
+          <Copy className="size-3.5" />
+        </button>
       </div>
       {w.signals.length > 0 && (
         <div className="mt-0.5 text-xs text-ink-muted">
@@ -851,16 +1079,21 @@ const EVENT_DOT: Record<ReportEvent["kind"], string> = {
   recover: "bg-ok",
   cpu: "bg-warn",
   marker: "bg-brass",
+  signal: "bg-bad",
 };
 
-function EventRow({ e }: { e: ReportEvent }) {
+// Mesmo relógio dos destaques/trechos (relativo ao início); hora real à direita.
+function EventRow({ e, time }: { e: ReportEvent; time: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="w-12 shrink-0 text-xs tabular-nums text-ink-faint">
-        {fmtTime(e.t)}
+      <span className="w-16 shrink-0 text-xs font-semibold tabular-nums text-ink">
+        {time}
       </span>
       <span className={cn("size-2 shrink-0 rounded-full", EVENT_DOT[e.kind])} />
-      <span className="text-ink-muted">{e.label}</span>
+      <span className="flex-1 text-ink-muted">{e.label}</span>
+      <span className="text-[11px] tabular-nums text-ink-faint">
+        {fmtTime(e.t)}
+      </span>
     </div>
   );
 }

@@ -77,6 +77,15 @@ const CONN_LABEL: Record<string, { text: string; down: boolean }> = {
   closed: { text: "saiu", down: true },
 };
 
+// MesaStatus em pt-BR (o badge do topo — senão vaza "connecting"/"offline" cru).
+const STATUS_LABEL: Record<string, string> = {
+  idle: "fora",
+  connecting: "conectando…",
+  online: "na mesa",
+  offline: "reconectando…",
+  error: "deu ruim",
+};
+
 // ---- Ilustrações da Mesa: tudo em "tiles" de webcam (moldura + busto) ----
 // Latão = você / a Mesa; tomate = a galera / o destaque; brass-ink = contorno duro.
 const BRASS = "var(--color-brass)";
@@ -242,9 +251,9 @@ export function MesaScreen() {
         subtitle="Webcam de cada um direto P2P, em alta — sem call do Discord, sem mosaico borrado. E quem cai vira 'JÁ VOLTO' no lugar, sem quebrar a sua cena."
         right={
           mesa.active ? (
-            <Badge tone={online ? "live" : "warn"}>
+            <Badge tone={online ? "live" : mesa.status === "error" ? "bad" : "warn"}>
               {online ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-              {online ? "na mesa" : mesa.status}
+              {STATUS_LABEL[mesa.status] ?? mesa.status}
             </Badge>
           ) : undefined
         }
@@ -254,6 +263,15 @@ export function MesaScreen() {
         <Card className="mb-6 border-l-4 border-warn bg-warn/10">
           <div className="text-sm font-semibold text-ink">
             Modo demonstração — a Mesa de verdade só roda no app instalado. Aqui dá pra testar a câmera e ver a interface.
+          </div>
+        </Card>
+      )}
+
+      {/* Falha do servidor local — card próprio (não é problema de câmera/privacidade) */}
+      {mesa.serverError && (
+        <Card className="mb-6 border-l-4 border-bad bg-bad/10">
+          <div className="flex items-center gap-2 text-sm font-bold text-bad">
+            <WifiOff className="size-4" /> {mesa.serverError}
           </div>
         </Card>
       )}
@@ -312,6 +330,17 @@ export function MesaScreen() {
               </div>
             )}
 
+            {/* Nome fora dos cards Criar/Entrar: vale pros DOIS fluxos (o convidado também
+                aparece com ele na grade — antes ele entrava como "Convidado" sem saber). */}
+            {!mesa.active && (
+              <div>
+                <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
+                  Seu nome na Mesa
+                </span>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ex.: Pitrol" />
+              </div>
+            )}
+
             <div>
               <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">Câmera</span>
               <Select
@@ -361,12 +390,6 @@ export function MesaScreen() {
               Você vira o host. A Corneta gera um <b>convite</b> — manda pra galera, eles entram, e as
               câmeras chegam direto na sua máquina.
             </p>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
-                Seu nome na Mesa
-              </span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ex.: Pitrol" />
-            </label>
             <Button variant="primary" className="mt-auto" onClick={() => void mesa.host(name || "Host")}>
               <Users className="size-4" /> Abrir a Mesa
             </Button>
@@ -382,8 +405,11 @@ export function MesaScreen() {
               </div>
               <h3 className="text-xl">Entrar numa Mesa</h3>
             </div>
-            <p className="mb-4 text-sm text-ink-muted">
+            <p className="mb-2 text-sm text-ink-muted">
               Recebeu um convite? Cola aqui pra entrar na Mesa de outro streamer.
+            </p>
+            <p className="mb-4 text-xs text-ink-faint">
+              Por enquanto funciona na mesma rede (ou com o host acessível pela internet) — relay tá vindo.
             </p>
             <label className="mb-3 block">
               <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">Convite</span>
@@ -407,6 +433,23 @@ export function MesaScreen() {
       ) : (
         // -------------------- Mesa ativa --------------------
         <div className="flex flex-col gap-6">
+          {/* Erro de conexão/sala: destacado, com saída — antes morria no console */}
+          {mesa.lastError && (
+            <Card className="border-l-4 border-bad bg-bad/10">
+              <div className="flex items-center gap-2 text-sm font-bold text-bad">
+                <WifiOff className="size-4" /> {mesa.lastError}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => mesa.retry()}>
+                  Tentar de novo
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => void mesa.leave()}>
+                  <Power className="size-4" /> Sair da Mesa
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {mesa.mode === "host" && mesa.invite && (
             <Card accent>
               <h3 className="mb-1 text-lg">Convite da Mesa</h3>
@@ -464,6 +507,7 @@ export function MesaScreen() {
                   <Button
                     variant="primary"
                     disabled={!online || !mesa.myId}
+                    title={!online || !mesa.myId ? "Conectando à Mesa… libero assim que conectar" : undefined}
                     onClick={() => void mesa.addToObs()}
                   >
                     <MonitorPlay className="size-4" /> Adicionar no OBS

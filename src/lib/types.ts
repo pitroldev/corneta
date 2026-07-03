@@ -144,12 +144,20 @@ export interface AppSettings {
   brbEnabled: boolean;
   /** Tela "JÁ VOLTO": "auto" (gerada) | "image" | "video" (arquivo escolhido pelo usuário). */
   brbSlateKind: "auto" | "image" | "video";
+  /** Nome original do arquivo custom do "JÁ VOLTO" (só exibição — o arquivo vira brb-slate.*). */
+  brbSlateFileName?: string;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
   autoBitrate: boolean;
   /** YouTube automático: cria a transmissão (broadcast) e injeta a chave no BORA — sem Studio. */
   youtubeAutoLive: boolean;
   /** Título da live, lembrado entre sessões (alimenta o broadcast automático do YouTube). */
   streamTitle: string;
+  /** Conectar o chat sozinho quando a transmissão entra no ar. */
+  chatAutoConnect: boolean;
+  /** Última aba usada na janela flutuante do chat (persistida entre aberturas). */
+  chatPopoutTab: "chat" | "alerts" | "both";
+  /** Painel de alertas da tela de Chat aberto (persistido entre visitas). */
+  chatShowAlertsPanel: boolean;
 }
 
 export interface ObsCheck {
@@ -299,6 +307,8 @@ export type TargetState =
   | "error"
   | "paused"
   | "waiting"
+  /** Estava AO VIVO e o sinal do OBS sumiu (sem JÁ VOLTO) — urgente, diferente do waiting pré-live. */
+  | "signal-lost"
   | "brb"
   | "censor";
 
@@ -332,6 +342,8 @@ export interface EngineSnapshot {
   gpu?: number;
   /** Stats do OBS (se conectado via obs-websocket). */
   obs?: ObsStats;
+  /** "JÁ VOLTO agora" manual acionado pelo streamer (botão na sala de guerra). */
+  forcedBrb?: boolean;
 }
 
 export interface EncoderInfo {
@@ -403,4 +415,18 @@ export interface SessionData {
   markers: SessionMarker[];
   viewerSamples: SessionViewerSample[];
   alertEvents: SessionAlertEvent[];
+}
+
+/** Resumo de uma sessão pra lista/comparação (computado no front a partir de analyze(), cacheado). */
+export interface SessionSummary {
+  /** false = sessão sem amostras úteis (não mostrar chips). */
+  hasData: boolean;
+  peakViewers: number | null;
+  avgViewers: number | null;
+  /** Total de mensagens de chat na live. */
+  chatTotal: number | null;
+  /** Quantidade de trechos com problema detectados pela análise. */
+  problemWindows: number;
+  /** Cor do veredito da análise (bolinha na lista). */
+  verdictTone: "ok" | "warn" | "bad";
 }

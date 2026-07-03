@@ -39,6 +39,10 @@ export interface CornetaApi {
   start(): Promise<void>;
   stop(): Promise<void>;
   setTargetPaused(targetId: string, paused: boolean): Promise<void>;
+  /** Destino parqueado em erro (ex.: chave recusada): relê a chave do cofre e tenta de novo. */
+  retryTarget(targetId: string): Promise<void>;
+  /** "JÁ VOLTO agora": liga/desliga o slate manual (pausa) — exige JÁ VOLTO armado na live. */
+  setForceBrb(on: boolean): Promise<void>;
   subscribe(cb: (s: EngineSnapshot) => void): () => void;
   // Relatórios pós-live
   listSessions(): Promise<SessionMeta[]>;
@@ -116,10 +120,12 @@ export interface CornetaApi {
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
   saveBrbSlate(b64: string): Promise<void>;
-  /** Escolhe imagem/vídeo como tela do "JÁ VOLTO". Devolve a kind ("image"/"video") ou "" se cancelou. */
-  setBrbSlate(): Promise<string>;
+  /** Escolhe imagem/vídeo como tela do "JÁ VOLTO". Devolve { kind, fileName } ou null se cancelou. */
+  setBrbSlate(): Promise<{ kind: "image" | "video"; fileName: string } | null>;
   /** Volta a tela do "JÁ VOLTO" pro padrão gerado (apaga o custom). */
   clearBrbSlate(): Promise<void>;
+  /** Miniatura (JPEG base64, sem prefixo data:) da tela do "JÁ VOLTO" atual; "" se indisponível. */
+  getBrbSlatePreview(): Promise<string>;
   captureFrame(): Promise<string>;
   // Guardião anti-vazamento
   subscribeGuardian(onLeak: (l: Leak) => void, onCensor: (on: boolean) => void): () => void;
@@ -200,6 +206,14 @@ function tauriApi(): CornetaApi {
     async setTargetPaused(targetId, paused) {
       const { invoke } = await core();
       await invoke("set_target_paused", { targetId, paused });
+    },
+    async retryTarget(targetId) {
+      const { invoke } = await core();
+      await invoke("retry_target", { targetId });
+    },
+    async setForceBrb(on) {
+      const { invoke } = await core();
+      await invoke("set_force_brb", { on });
     },
     subscribe(cb) {
       let cancelled = false;
@@ -476,11 +490,15 @@ function tauriApi(): CornetaApi {
     },
     async setBrbSlate() {
       const { invoke } = await core();
-      return invoke<string>("set_brb_slate");
+      return invoke<{ kind: "image" | "video"; fileName: string } | null>("set_brb_slate");
     },
     async clearBrbSlate() {
       const { invoke } = await core();
       await invoke("clear_brb_slate");
+    },
+    async getBrbSlatePreview() {
+      const { invoke } = await core();
+      return invoke<string>("get_brb_slate_preview");
     },
     async captureFrame() {
       const { invoke } = await core();
@@ -877,6 +895,21 @@ function mockApi(): CornetaApi {
       if (st) st.state = paused ? "paused" : "connecting";
       emit();
     },
+    async retryTarget(targetId) {
+      const st = snapshot.targets[targetId];
+      if (st) {
+        st.state = "connecting";
+        st.message = undefined;
+      }
+      emit();
+    },
+    async setForceBrb(on) {
+      snapshot.forcedBrb = on;
+      for (const st of Object.values(snapshot.targets)) {
+        if (st.state === "live" || st.state === "brb") st.state = on ? "brb" : "live";
+      }
+      emit();
+    },
     subscribe(cb) {
       listeners.add(cb);
       cb(structuredClone(snapshot));
@@ -1126,10 +1159,13 @@ function mockApi(): CornetaApi {
     async setBrbSlate() {
       // no-op no navegador (sem seletor de arquivo nativo)
       console.log("[mock] setBrbSlate: sem seletor de arquivo no navegador");
-      return "";
+      return null;
     },
     async clearBrbSlate() {
       // no-op no navegador
+    },
+    async getBrbSlatePreview() {
+      return "";
     },
     async captureFrame() {
       throw new Error("captura de frame só no app instalado (e ao vivo)");

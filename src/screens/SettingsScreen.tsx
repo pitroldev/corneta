@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   Database,
   Download,
   FileText,
@@ -15,6 +16,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import * as Collapsible from "@radix-ui/react-collapsible";
 import * as RTabs from "@radix-ui/react-tabs";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -58,6 +60,8 @@ export function SettingsScreen() {
     () => (requestedTab as SettingsTab) || "geral",
   );
   const [portDraft, setPortDraft] = useState<string | null>(null);
+  // C20: os campos crus do endpoint nascem escondidos — a persona só copia.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Deep-link do "Ajustar" (Ao vivo) → abre direto na aba certa, e consome o pedido.
   useEffect(() => {
@@ -100,7 +104,10 @@ export function SettingsScreen() {
     try {
       if (await api.importConfig()) {
         await load();
-        toast.success("Config importada");
+        // O backend guarda a config antiga antes de sobrescrever — dá o caminho de volta.
+        toast.success(
+          "Config importada — a anterior ficou salva em backup na pasta da config",
+        );
       }
     } catch (e) {
       toast.error(`Falha ao importar: ${e}`);
@@ -144,10 +151,10 @@ export function SettingsScreen() {
               (OBS)
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
-              Endereço local onde o OBS te entrega o vídeo. Mudou aqui, muda no
-              OBS também. A<strong className="text-ink-muted"> chave</strong>{" "}
-              abaixo é local (OBS ↔ Corneta) — não confunda com as chaves das
-              plataformas, que ficam no cofre.
+              Endereço local onde o OBS te entrega o vídeo. A
+              <strong className="text-ink-muted"> chave</strong> abaixo é local
+              (OBS ↔ Corneta) — não confunda com as chaves das plataformas, que
+              ficam no cofre.
             </p>
 
             {live && (
@@ -158,55 +165,8 @@ export function SettingsScreen() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Host">
-                <Input
-                  value={ingest.host}
-                  disabled={live}
-                  onChange={(e) => setIngest({ host: e.target.value })}
-                />
-              </Field>
-              <Field label="Porta">
-                <Input
-                  type="number"
-                  value={portShown}
-                  disabled={live}
-                  invalid={portInvalid}
-                  onChange={(e) => setPortDraft(e.target.value)}
-                  onBlur={(e) => {
-                    // No blur (como no EncodingScreen): clampa pra 1–65535; vazio/inválido volta pro valor da config.
-                    const v = Number(e.target.value);
-                    const port =
-                      e.target.value.trim() !== "" && Number.isFinite(v)
-                        ? Math.min(65535, Math.max(1, Math.round(v)))
-                        : ingest.port;
-                    if (port !== ingest.port) setIngest({ port });
-                    setPortDraft(null);
-                  }}
-                />
-                {portInvalid && (
-                  <span className="text-[11px] font-medium text-bad">
-                    A porta vai de 1 a 65535.
-                  </span>
-                )}
-              </Field>
-              <Field label="Aplicação (app)">
-                <Input
-                  value={ingest.app}
-                  disabled={live}
-                  onChange={(e) => setIngest({ app: e.target.value })}
-                />
-              </Field>
-              <Field label="Chave local">
-                <Input
-                  value={ingest.key}
-                  disabled={live}
-                  onChange={(e) => setIngest({ key: e.target.value })}
-                />
-              </Field>
-            </div>
-
-            <div className="mt-4 rounded-md bg-surface-2 p-3">
+            {/* A tarefa nº1 aqui é COPIAR, não editar — os campos crus ficam no "Avançado". */}
+            <div className="rounded-md bg-surface-2 p-3">
               <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
                 Cole no OBS
               </span>
@@ -215,6 +175,70 @@ export function SettingsScreen() {
                 <CopyField label="Chave" value={ingest.key} mono />
               </div>
             </div>
+
+            <Collapsible.Root
+              open={advancedOpen}
+              onOpenChange={setAdvancedOpen}
+              className="mt-4"
+            >
+              <Collapsible.Trigger className="group flex w-full items-center gap-2 text-left text-sm font-bold text-ink-muted transition-colors hover:text-ink">
+                Avançado — mudar o endereço local
+                <ChevronDown className="size-4 shrink-0 text-ink-faint transition-transform group-data-[state=open]:rotate-180" />
+              </Collapsible.Trigger>
+              <Collapsible.Content className="mt-3">
+                <p className="mb-3 text-xs text-ink-faint">
+                  Só mexa aqui se a porta padrão (1935) já estiver em uso por
+                  outro programa. Mudou aqui, muda no OBS também.
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Host">
+                    <Input
+                      value={ingest.host}
+                      disabled={live}
+                      onChange={(e) => setIngest({ host: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Porta">
+                    <Input
+                      type="number"
+                      value={portShown}
+                      disabled={live}
+                      invalid={portInvalid}
+                      onChange={(e) => setPortDraft(e.target.value)}
+                      onBlur={(e) => {
+                        // No blur (como no EncodingScreen): clampa pra 1–65535; vazio/inválido volta pro valor da config.
+                        const v = Number(e.target.value);
+                        const port =
+                          e.target.value.trim() !== "" && Number.isFinite(v)
+                            ? Math.min(65535, Math.max(1, Math.round(v)))
+                            : ingest.port;
+                        if (port !== ingest.port) setIngest({ port });
+                        setPortDraft(null);
+                      }}
+                    />
+                    {portInvalid && (
+                      <span className="text-[11px] font-medium text-bad">
+                        A porta vai de 1 a 65535.
+                      </span>
+                    )}
+                  </Field>
+                  <Field label="Aplicação (app)">
+                    <Input
+                      value={ingest.app}
+                      disabled={live}
+                      onChange={(e) => setIngest({ app: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Chave local">
+                    <Input
+                      value={ingest.key}
+                      disabled={live}
+                      onChange={(e) => setIngest({ key: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              </Collapsible.Content>
+            </Collapsible.Root>
           </Card>
 
           <Card className="mb-4">
@@ -233,7 +257,7 @@ export function SettingsScreen() {
             <div className="divide-y divide-border-soft">
               <SettingRow
                 title="Senha do obs-websocket"
-                desc="Deixe vazio se o OBS não pedir senha."
+                desc="A senha aparece nessa mesma janela do OBS, no botão “Mostrar Chave de Conexão”. Se “Ativar Autenticação” estiver desmarcado lá, deixe vazio."
               >
                 <div className="flex flex-col items-end gap-2">
                   <Input
@@ -290,8 +314,8 @@ export function SettingsScreen() {
               <SecurityFeature
                 preview={<BitratePreview />}
                 on={settings.autoBitrate}
-                title="Auto-bitrate quando a banda aperta"
-                desc="Se um destino que a Corneta recodifica não dá conta do upload, ela baixa o bitrate dele e sobe de volta quando estabiliza — em vez de derrubar."
+                title="Segurar a live quando a internet aperta (auto-bitrate)"
+                desc="Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo por um tempo em vez de deixar a live travar ou cair — e volta ao normal sozinha."
               >
                 <Toggle
                   checked={settings.autoBitrate}
@@ -304,7 +328,7 @@ export function SettingsScreen() {
                 on={settings.guardianEnabled}
                 title="Guardião de privacidade"
                 badge={<ExperimentalBadge />}
-                desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. A leitura é local — OCR no seu PC, nada sai daqui. Rede de segurança, não garantia."
+                desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. A leitura é local — OCR no seu PC, nada sai daqui. Rede de segurança, não garantia. Custo: a live inteira vai ao ar com 12s de atraso (o chat também)."
               >
                 <Toggle
                   checked={settings.guardianEnabled}
@@ -428,12 +452,12 @@ export function SettingsScreen() {
                     <Download className="size-4" /> Exportar
                   </Button>
                   <Button
-                    variant={confirmImport ? "primary" : "subtle"}
+                    variant={confirmImport ? "danger" : "subtle"}
                     size="sm"
                     onClick={onImport}
                   >
                     <Upload className="size-4" />{" "}
-                    {confirmImport ? "Substituir?" : "Importar"}
+                    {confirmImport ? "Substituir a config atual?" : "Importar"}
                   </Button>
                 </div>
               </SettingRow>
@@ -457,7 +481,8 @@ export function SettingsScreen() {
   );
 }
 
-/** Testa o obs-websocket ali mesmo, com estado carregando/ok/erro. */
+/** Testa o obs-websocket ali mesmo. Quatro desfechos, não dois: não achei /
+ *  senha recusada / conectado mas apontando pra outro lugar / conectado de verdade. */
 function ObsTestButton() {
   const [obs, setObs] = useState<ObsCheck | "loading" | null>(null);
   const run = async () => {
@@ -475,23 +500,38 @@ function ObsTestButton() {
       });
     }
   };
+
+  // O backend já manda o motivo em pt-BR no error; a senha é o caso que dá pra apontar direto.
+  const verdict = (() => {
+    if (!obs || obs === "loading") return null;
+    if (!obs.reachable) {
+      const authFail = /senha|identificar|autentic/i.test(obs.error ?? "");
+      return authFail
+        ? {
+            tone: "text-bad",
+            msg: "Senha recusada — confira a senha do WebSocket no OBS (botão “Mostrar Chave de Conexão”).",
+          }
+        : {
+            tone: "text-bad",
+            msg: "Não achei o OBS — ele está aberto? O WebSocket está ativado em Ferramentas → Configurações do Servidor WebSocket?",
+          };
+    }
+    if (!obs.pointingAtCorneta)
+      return {
+        tone: "text-warn",
+        msg: "Conectado, mas o OBS não está apontando pra Corneta — use “Configura pra mim” na tela Ao vivo.",
+      };
+    return {
+      tone: "text-ok",
+      msg:
+        obs.width > 0
+          ? `Conectado · ${obs.width}×${obs.height} · ${obs.fps}fps`
+          : "Conectado",
+    };
+  })();
+
   return (
-    <div className="flex items-center gap-2">
-      {obs && obs !== "loading" && (
-        <span
-          className={cn(
-            "flex items-center gap-1 text-xs font-semibold",
-            obs.reachable ? "text-ok" : "text-bad",
-          )}
-        >
-          {obs.reachable ? (
-            <Check className="size-3.5" />
-          ) : (
-            <AlertTriangle className="size-3.5" />
-          )}
-          {obs.reachable ? "Conectado" : "Não achei o OBS"}
-        </span>
-      )}
+    <div className="flex flex-col items-end gap-1.5">
       <Button
         variant="subtle"
         size="sm"
@@ -502,6 +542,21 @@ function ObsTestButton() {
         {obs !== "loading" && <Plug className="size-4" />}
         Testar conexão
       </Button>
+      {verdict && (
+        <span
+          className={cn(
+            "flex max-w-64 items-start gap-1 text-right text-xs font-semibold",
+            verdict.tone,
+          )}
+        >
+          {verdict.tone === "text-ok" ? (
+            <Check className="mt-0.5 size-3.5 shrink-0" />
+          ) : (
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          )}
+          {verdict.msg}
+        </span>
+      )}
     </div>
   );
 }
@@ -513,6 +568,10 @@ function GuardianEditor() {
   const watchCount = settings.guardianWatchlist.filter(
     (t) => t.trim().length >= 3,
   ).length;
+  // Termos de 1–2 letras são descartados pelo motor — avisar em vez de fingir proteção.
+  const shortTerms = settings.guardianWatchlist
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && t.length < 3);
 
   return (
     <div className="flex flex-col gap-3 py-3.5">
@@ -569,6 +628,14 @@ function GuardianEditor() {
             Sem termos (3+ letras), o guardião não faz nada — adicione ao menos
             um.
           </span>
+        ) : shortTerms.length > 0 ? (
+          <span className="text-xs font-semibold text-brass">
+            Vigiando {watchCount} termo{watchCount > 1 ? "s" : ""} —{" "}
+            {shortTerms.length === 1
+              ? `1 ignorado por ser curto demais (mínimo 3 letras): "${shortTerms[0]}"`
+              : `${shortTerms.length} ignorados por serem curtos demais (mínimo 3 letras): ${shortTerms.map((t) => `"${t}"`).join(", ")}`}
+            .
+          </span>
         ) : (
           <span className="text-xs font-semibold text-ok">
             Vigiando {watchCount} termo{watchCount > 1 ? "s" : ""}.
@@ -579,7 +646,8 @@ function GuardianEditor() {
   );
 }
 
-/** Captura um atalho global: clica e pressiona a combinação (exige um modificador). */
+/** Captura um atalho global: clica e pressiona a combinação (exige um modificador).
+ *  Tecla solta não passa batido: avisa na hora que precisa de Ctrl/Alt/Shift. Esc cancela. */
 function ShortcutCapture({
   value,
   onChange,
@@ -588,35 +656,70 @@ function ShortcutCapture({
   onChange: (v: string) => void;
 }) {
   const [capturing, setCapturing] = useState(false);
+  const [hint, setHint] = useState(false);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Feedback de ~1.5s quando vier tecla sem modificador — some sozinho (reinicia se repetir).
+  const flashHint = useCallback(() => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setHint(true);
+    hintTimer.current = setTimeout(() => setHint(false), 1500);
+  }, []);
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
 
   const onKey = (e: React.KeyboardEvent) => {
     if (!capturing) return;
     e.preventDefault();
     const k = e.key;
+    if (k === "Escape") {
+      // Cancela sem mexer no atalho atual.
+      setCapturing(false);
+      setHint(false);
+      return;
+    }
     if (["Control", "Alt", "Shift", "Meta", "OS"].includes(k)) return;
     const parts: string[] = [];
     if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl");
     if (e.altKey) parts.push("Alt");
     if (e.shiftKey) parts.push("Shift");
-    if (parts.length === 0) return; // exige ao menos um modificador
+    if (parts.length === 0) {
+      // Atalho global exige modificador — avisar em vez de ignorar em silêncio.
+      flashHint();
+      return;
+    }
     parts.push(k.length === 1 ? k.toUpperCase() : k);
     onChange(parts.join("+"));
     setCapturing(false);
+    setHint(false);
   };
 
   return (
     <button
       onClick={() => setCapturing(true)}
-      onBlur={() => setCapturing(false)}
+      onBlur={() => {
+        setCapturing(false);
+        setHint(false);
+      }}
       onKeyDown={onKey}
       className={cn(
         "rounded-md border-2 px-3 py-2 font-mono text-sm transition-colors",
-        capturing
-          ? "border-brass text-brass"
-          : "border-border text-ink hover:border-brass/60",
+        capturing && hint
+          ? "border-warn text-warn"
+          : capturing
+            ? "border-brass text-brass"
+            : "border-border text-ink hover:border-brass/60",
       )}
     >
-      {capturing ? "pressione as teclas…" : value || "definir atalho"}
+      {capturing
+        ? hint
+          ? "precisa de Ctrl, Alt ou Shift junto"
+          : "pressione Ctrl, Alt ou Shift + tecla… (Esc cancela)"
+        : value || "definir atalho"}
     </button>
   );
 }
@@ -630,23 +733,38 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Escolhe a tela do "JÁ VOLTO": padrão gerada, imagem ou vídeo (com som). O arquivo
- *  escolhido é copiado pro backend (brb-slate.*) e entra no ar quando o sinal cai. */
+/** Escolhe a tela do "JÁ VOLTO": padrão gerada ou arquivo próprio (imagem ou vídeo —
+ *  a kind vem da extensão). O arquivo é copiado pro backend (brb-slate.*) e entra no
+ *  ar quando o sinal cai. Preview 16:9 pra conferir o que vai pro ar de verdade. */
 function BrbSlateChooser() {
   const kind = useStore((s) => s.config!.settings.brbSlateKind) ?? "auto";
+  const fileName = useStore((s) => s.config!.settings.brbSlateFileName);
   const setSettings = useStore((s) => s.setSettings);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<string>("");
 
-  // Imagem/Vídeo abrem o mesmo seletor (ambos os filtros); a kind real vem da extensão.
+  // Preview vem do backend em JPEG base64 (vídeo = 1 frame); "" = indisponível.
+  const loadPreview = useCallback(async () => {
+    try {
+      setPreview(await api.getBrbSlatePreview());
+    } catch {
+      setPreview("");
+    }
+  }, []);
+  useEffect(() => {
+    void loadPreview();
+  }, [loadPreview]);
+
   const pick = async () => {
     setBusy(true);
     try {
-      const k = await api.setBrbSlate();
-      if (k) {
-        setSettings({ brbSlateKind: k as "image" | "video" });
+      const r = await api.setBrbSlate();
+      if (r) {
+        setSettings({ brbSlateKind: r.kind, brbSlateFileName: r.fileName });
         toast.success("Tela do JÁ VOLTO atualizada");
+        await loadPreview();
       }
-      // k vazio = usuário cancelou o seletor → sem mudança.
+      // null = usuário cancelou o seletor → sem mudança.
     } catch (e) {
       toast.error(`Não consegui usar esse arquivo: ${e}`);
     } finally {
@@ -659,10 +777,11 @@ function BrbSlateChooser() {
     setBusy(true);
     try {
       await api.clearBrbSlate();
-      setSettings({ brbSlateKind: "auto" });
+      setSettings({ brbSlateKind: "auto", brbSlateFileName: undefined });
       const b64 = await renderBrbSlatePng();
       if (b64) await api.saveBrbSlate(b64);
       toast.success("Voltou pra tela padrão da Corneta");
+      await loadPreview();
     } catch (e) {
       toast.error(`Falha ao voltar pro padrão: ${e}`);
     } finally {
@@ -672,9 +791,9 @@ function BrbSlateChooser() {
 
   const current =
     kind === "image"
-      ? "Usando: imagem enviada"
+      ? `Usando: ${fileName ?? "imagem enviada"} (imagem)`
       : kind === "video"
-        ? "Usando: vídeo enviado (com som)"
+        ? `Usando: ${fileName ?? "vídeo enviado"} (vídeo, com som)`
         : "Usando: tela padrão da Corneta";
 
   const opt = (active: boolean) =>
@@ -686,25 +805,42 @@ function BrbSlateChooser() {
     );
 
   return (
-    <div className="flex flex-col gap-2 py-3.5">
-      <span className="text-sm font-semibold text-ink-muted">
-        Tela do “JÁ VOLTO”
-      </span>
-      <div className="flex gap-2">
-        <button className={opt(kind === "auto")} disabled={busy} onClick={useDefault}>
-          Padrão (gerada)
-        </button>
-        <button className={opt(kind === "image")} disabled={busy} onClick={pick}>
-          Imagem
-        </button>
-        <button className={opt(kind === "video")} disabled={busy} onClick={pick}>
-          Vídeo (com som)
-        </button>
+    <div className="flex items-start gap-4 py-3.5">
+      {/* Mesmo formato 16:9 dos previews de SecurityFeature — é isso que vai pro ar. */}
+      {preview && (
+        <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md ring-1 ring-border">
+          <img
+            src={`data:image/jpeg;base64,${preview}`}
+            alt="Prévia da tela do JÁ VOLTO"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <span className="text-sm font-semibold text-ink-muted">
+          Tela do “JÁ VOLTO”
+        </span>
+        <div className="flex gap-2">
+          <button
+            className={opt(kind === "auto")}
+            disabled={busy}
+            onClick={useDefault}
+          >
+            Padrão (gerada)
+          </button>
+          <button
+            className={opt(kind === "image" || kind === "video")}
+            disabled={busy}
+            onClick={pick}
+          >
+            Usar arquivo meu (imagem ou vídeo)
+          </button>
+        </div>
+        <span className="text-xs font-semibold text-ink-faint">
+          {current} — entra no ar quando o sinal cai. Vídeo toca em loop e pode
+          ter som.
+        </span>
       </div>
-      <span className="text-xs font-semibold text-ink-faint">
-        {current} — a imagem ou vídeo que você escolher entra no ar quando o sinal
-        cai. Vídeo toca em loop e pode ter som.
-      </span>
     </div>
   );
 }

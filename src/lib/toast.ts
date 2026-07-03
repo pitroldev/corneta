@@ -34,7 +34,8 @@ export const useToasts = create<ToastState>((set) => ({
 /** Atalho para disparar toasts de qualquer lugar (fora de componentes também). */
 export const toast = {
   success: (m: string) => useToasts.getState().push("success", m),
-  error: (m: string) => useToasts.getState().push("error", m),
+  // Erro fica mais tempo na tela: instrução de correção precisa dar tempo de ler.
+  error: (m: string) => useToasts.getState().push("error", m, undefined, m.length > 60 ? 10000 : 6000),
   info: (m: string) => useToasts.getState().push("info", m),
   /** Toast com botão de ação (ex.: "desfazer"), com tempo maior. */
   action: (m: string, label: string, onClick: () => void) =>

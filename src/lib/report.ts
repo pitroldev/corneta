@@ -11,6 +11,7 @@ import type {
   SessionMarker,
   SessionMeta,
   SessionSample,
+  SessionSummary,
   SessionViewerSample,
 } from "./types";
 
@@ -81,9 +82,10 @@ export function parseSession(ndjson: string): SessionData | null {
 
   if (!meta || !Number.isFinite(meta.startedAt)) return null;
   const last = samples.length ? samples[samples.length - 1].t : meta.startedAt;
-  const end = endedAt ?? last;
-  meta.endedAt = end;
-  meta.durationSec = Math.max(0, Math.round((end - meta.startedAt) / 1000));
+  // endedAt só existe com o registro "end" — sessão AINDA NO AR fica sem, e o
+  // ReportsScreen usa isso pra não gravar resumo parcial no cache.
+  meta.endedAt = endedAt;
+  meta.durationSec = Math.max(0, Math.round(((endedAt ?? last) - meta.startedAt) / 1000));
   return { meta, samples, markers, viewerSamples, alertEvents };
 }
 
@@ -127,9 +129,13 @@ export const hasChat = (d: SessionData): boolean => d.samples.some((s) => (s.cha
 // ---------------------------------------------------------------------------
 export interface ReportEvent {
   t: number;
-  kind: "start" | "end" | "reconnect" | "error" | "recover" | "cpu" | "marker";
+  kind: "start" | "end" | "reconnect" | "error" | "recover" | "cpu" | "marker" | "signal";
   label: string;
 }
+
+/** Estados de destino que contam como problema (mesma régua em toda a análise). */
+const isProblemState = (state: string): boolean =>
+  state === "reconnecting" || state === "error" || state === "signal-lost";
 
 export interface ProblemWindow {
   tStart: number;
@@ -137,6 +143,8 @@ export interface ProblemWindow {
   durationSec: number;
   signals: string[];
   cause: string;
+  /** Classificação estável da causa (o texto de `cause` é copy, pode mudar). */
+  causeKind: "render" | "encoding" | "network" | "platform" | "signal" | "unknown";
   advice: string;
   targetName?: string;
 }
@@ -203,16 +211,58 @@ const CPU_HIGH = 92;
 const BITRATE_DROP = 0.6; // < 60% do típico = queda
 const OBS_CONGEST = 0.3; // congestionamento de saída > 30%
 const OBS_RENDER_MS = 25; // render lag do OBS acima disso = cena pesada
+// Sinais LEVES (bitrate/congestion/render/CPU) só viram "trecho com problema" se
+// persistirem — um blip de 1 amostra (~2s) não é incidente que espectador percebe.
+const SOFT_WINDOW_MIN_MS = 10_000;
+// Warm-up: primeiras amostras "live" de um destino têm a média de bitrate do FFmpeg
+// ainda subindo do zero — comparar com a mediana acusava "queda" em TODO começo de live.
+const WARMUP_LIVE_SAMPLES = 8; // ~16s
+// Antes do PRIMEIRO "live" de um destino, reconexão é setup (ninguém assistindo ainda).
 
 const maxOf = (a: number[]) => a.reduce((m, v) => (v > m ? v : m), -Infinity);
 const minOf = (a: number[]) => a.reduce((m, v) => (v < m ? v : m), Infinity);
 
-/** Bitrate "típico" (mediana) por destino, considerando só amostras no ar. */
-function typicalBitrates(samples: SessionSample[]): Record<string, number> {
+/** Contexto por destino em cada amostra: separa incidente real de ruído de partida. */
+interface TargetCtx {
+  /** Já esteve "live" ao menos uma vez — antes disso, reconexão é SETUP, não queda. */
+  everLive: boolean;
+  /** Live há amostras suficientes (média de bitrate do FFmpeg já aquecida). */
+  warm: boolean;
+}
+
+/** Pré-computa everLive/warm por amostra×destino (warm zera quando sai do ar). */
+function targetCtxs(samples: SessionSample[]): Array<Record<string, TargetCtx>> {
+  const everLive: Record<string, boolean> = {};
+  const liveRun: Record<string, number> = {};
+  return samples.map((s) => {
+    const m: Record<string, TargetCtx> = {};
+    for (const t of s.targets) {
+      if (t.state === "live") {
+        everLive[t.id] = true;
+        liveRun[t.id] = (liveRun[t.id] ?? 0) + 1;
+      } else {
+        liveRun[t.id] = 0;
+      }
+      m[t.id] = {
+        everLive: everLive[t.id] ?? false,
+        warm: (liveRun[t.id] ?? 0) > WARMUP_LIVE_SAMPLES,
+      };
+    }
+    return m;
+  });
+}
+
+/** Bitrate "típico" (mediana) por destino — só de amostras aquecidas, senão o warm-up
+ *  puxa a mediana e o começo de TODA live vira "queda". */
+function typicalBitrates(
+  samples: SessionSample[],
+  ctxs: Array<Record<string, TargetCtx>>
+): Record<string, number> {
   const byId: Record<string, number[]> = {};
-  for (const s of samples)
+  samples.forEach((s, i) => {
     for (const t of s.targets)
-      if (t.state === "live") (byId[t.id] ??= []).push(t.bitrate);
+      if (t.state === "live" && ctxs[i][t.id]?.warm) (byId[t.id] ??= []).push(t.bitrate);
+  });
   const out: Record<string, number> = {};
   for (const [id, arr] of Object.entries(byId)) {
     arr.sort((a, b) => a - b);
@@ -221,11 +271,18 @@ function typicalBitrates(samples: SessionSample[]): Record<string, number> {
   return out;
 }
 
-function isBad(s: SessionSample, typical: Record<string, number>): boolean {
+function isBad(
+  s: SessionSample,
+  typical: Record<string, number>,
+  ctx: Record<string, TargetCtx>
+): boolean {
   for (const t of s.targets) {
-    if (t.state === "reconnecting" || t.state === "error") return true;
+    // Problema de estado só conta DEPOIS do destino ter ido ao ar — o ciclo
+    // conectar→tentar de novo da partida acusava "reconectou" em toda live.
+    if (isProblemState(t.state) && ctx[t.id]?.everLive) return true;
     const typ = typical[t.id];
-    if (t.state === "live" && typ && t.bitrate < typ * BITRATE_DROP) return true;
+    if (t.state === "live" && ctx[t.id]?.warm && typ && t.bitrate < typ * BITRATE_DROP)
+      return true;
   }
   if (s.cpu != null && s.cpu > CPU_HIGH) return true;
   if (s.gpu != null && s.gpu > CPU_HIGH) return true;
@@ -235,6 +292,7 @@ function isBad(s: SessionSample, typical: Record<string, number>): boolean {
 
 function buildWindow(
   slice: SessionSample[],
+  sliceCtxs: Array<Record<string, TargetCtx>>,
   totalTargets: number,
   typical: Record<string, number>
 ): ProblemWindow {
@@ -246,9 +304,10 @@ function buildWindow(
   let maxRenderMs = 0;
   let reconnect = false;
   let bitrateDrop = false;
+  let signalLost = false;
   const affected = new Set<string>();
 
-  for (const s of slice) {
+  slice.forEach((s, i) => {
     if (s.cpu != null) maxCpu = Math.max(maxCpu, s.cpu);
     if (s.gpu != null) maxGpu = Math.max(maxGpu, s.gpu);
     if (s.obs) {
@@ -256,17 +315,21 @@ function buildWindow(
       maxRenderMs = Math.max(maxRenderMs, s.obs.avgRenderMs);
     }
     for (const t of s.targets) {
+      const ctx = sliceCtxs[i][t.id];
       const typ = typical[t.id];
-      if (t.state === "reconnecting" || t.state === "error") {
+      if (t.state === "signal-lost") {
+        signalLost = true;
+        affected.add(t.name);
+      } else if ((t.state === "reconnecting" || t.state === "error") && ctx?.everLive) {
         reconnect = true;
         affected.add(t.name);
       }
-      if (t.state === "live" && typ && t.bitrate < typ * BITRATE_DROP) {
+      if (t.state === "live" && ctx?.warm && typ && t.bitrate < typ * BITRATE_DROP) {
         bitrateDrop = true;
         affected.add(t.name);
       }
     }
-  }
+  });
 
   const cpuHigh = maxCpu > CPU_HIGH;
   const gpuHigh = maxGpu > CPU_HIGH;
@@ -275,6 +338,7 @@ function buildWindow(
   const singleTarget = affected.size === 1 && totalTargets > 1;
 
   const signals: string[] = [];
+  if (signalLost) signals.push("sem sinal do OBS");
   if (reconnect) signals.push(`${[...affected].join(", ")} reconectou`);
   if (bitrateDrop) signals.push("bitrate caiu");
   if (cpuHigh) signals.push(`CPU ${Math.round(maxCpu)}%`);
@@ -282,20 +346,31 @@ function buildWindow(
   if (renderLag) signals.push(`OBS render ${Math.round(maxRenderMs)}ms`);
   if (congested) signals.push(`OBS congestionado ${Math.round(maxCongestion * 100)}%`);
 
+  // Copy em português de streamer: o que houve + passo concreto, termo técnico entre parênteses.
   let cause = "Causa indeterminada";
-  let advice = "Veja os sinais desta janela.";
-  if (renderLag && !cpuHigh && !gpuHigh) {
+  let causeKind: ProblemWindow["causeKind"] = "unknown";
+  let advice = "Veja os sinais deste trecho.";
+  if (signalLost) {
+    cause = "O sinal do OBS caiu (sem vídeo chegando)";
+    causeKind = "signal";
+    advice = "Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta — nesse trecho a galera ficou sem imagem.";
+  } else if (renderLag && !cpuHigh && !gpuHigh) {
     cause = "Cena pesada no OBS (render lag)";
-    advice = "Alivie a cena (fontes/efeitos/filtros) ou baixe a resolução base no OBS.";
+    causeKind = "render";
+    advice = "Alivie a cena no OBS — menos fontes, filtros e efeitos — ou baixe a resolução base lá.";
   } else if (cpuHigh || gpuHigh) {
-    cause = "Gargalo de encoding";
-    advice = "Reduza o bitrate/resolução ou use um encoder de hardware (NVENC/QSV).";
+    cause = "Seu PC não deu conta de gerar o vídeo (encoding)";
+    causeKind = "encoding";
+    advice =
+      "No OBS: Configurações → Saída → Encoder → escolha o da placa de vídeo (NVENC/QSV). Ou baixe o bitrate/resolução na tela Qualidade.";
   } else if (congested || ((bitrateDrop || reconnect) && !singleTarget)) {
-    cause = "Gargalo de rede/upload";
-    advice = "Reduza o bitrate total ou tire uma plataforma.";
+    cause = "A internet não deu conta do upload";
+    causeKind = "network";
+    advice = "Baixe o bitrate na tela Qualidade ou tire uma plataforma da live.";
   } else if (singleTarget) {
     cause = `Instabilidade em ${[...affected][0]}`;
-    advice = "Provavelmente do lado da plataforma (ingest/chave). Confira a chave e o status dela.";
+    causeKind = "platform";
+    advice = "Provavelmente foi do lado da plataforma (o servidor dela, não você). Confira a chave e o status dela.";
   }
 
   return {
@@ -304,6 +379,7 @@ function buildWindow(
     durationSec: Math.max(1, Math.round((tEnd - tStart) / 1000)),
     signals,
     cause,
+    causeKind,
     advice,
     targetName: affected.size === 1 ? [...affected][0] : undefined,
   };
@@ -311,10 +387,11 @@ function buildWindow(
 
 function problemWindows(
   data: SessionData,
-  typical: Record<string, number>
+  typical: Record<string, number>,
+  ctxs: Array<Record<string, TargetCtx>>
 ): ProblemWindow[] {
   const { samples } = data;
-  const flags = samples.map((s) => isBad(s, typical));
+  const flags = samples.map((s, i) => isBad(s, typical, ctxs[i]));
 
   // Agrupa amostras ruins consecutivas em intervalos.
   const ranges: [number, number][] = [];
@@ -336,7 +413,23 @@ function problemWindows(
   }
 
   const totalTargets = data.meta.platforms.length || 1;
-  return merged.map(([a, b]) => buildWindow(samples.slice(a, b + 1), totalTargets, typical));
+  return merged
+    .filter(([a, b]) => {
+      // Sinal DURO (queda de estado real) vale em qualquer duração; sinal leve
+      // (bitrate/congestion/render/CPU) só vira incidente se PERSISTIR — um blip
+      // de 2s pintava o veredito de vermelho sem espectador ter visto nada.
+      const hard = samples
+        .slice(a, b + 1)
+        .some((s, i) =>
+          s.targets.some(
+            (t) => isProblemState(t.state) && ctxs[a + i][t.id]?.everLive
+          )
+        );
+      return hard || samples[b].t - samples[a].t >= SOFT_WINDOW_MIN_MS;
+    })
+    .map(([a, b]) =>
+      buildWindow(samples.slice(a, b + 1), ctxs.slice(a, b + 1), totalTargets, typical)
+    );
 }
 
 function deriveEvents(data: SessionData): ReportEvent[] {
@@ -345,18 +438,32 @@ function deriveEvents(data: SessionData): ReportEvent[] {
     { t: meta.startedAt, kind: "start", label: "Início da transmissão" },
   ];
   const prev: Record<string, string> = {};
+  // Recuperação só faz sentido depois de uma QUEDA anunciada — sem isso, o primeiro
+  // "live" após o setup gerava um "voltou" órfão.
+  const droppedSince: Record<string, boolean> = {};
   let prevCpuHigh = false;
 
   for (const s of samples) {
     for (const t of s.targets) {
-      const was = prev[t.id] ?? "live";
-      if ((t.state === "reconnecting" || t.state === "error") && was === "live") {
+      // prev inicia no PRÓPRIO estado (não "live"): a partida conectando/tentando
+      // não é transição — era daqui que saía o "reconectou" fantasma de toda live.
+      const was = prev[t.id] ?? t.state;
+      if (isProblemState(t.state) && was === "live") {
+        droppedSince[t.id] = true;
         events.push({
           t: s.t,
-          kind: t.state === "error" ? "error" : "reconnect",
-          label: `${t.name} ${t.state === "error" ? "com erro" : "reconectou"}`,
+          kind:
+            t.state === "error" ? "error" : t.state === "signal-lost" ? "signal" : "reconnect",
+          label: `${t.name} ${
+            t.state === "error"
+              ? "com erro"
+              : t.state === "signal-lost"
+                ? "ficou sem sinal do OBS"
+                : "reconectou"
+          }`,
         });
-      } else if (t.state === "live" && (was === "reconnecting" || was === "error")) {
+      } else if (t.state === "live" && isProblemState(was) && droppedSince[t.id]) {
+        droppedSince[t.id] = false;
         events.push({ t: s.t, kind: "recover", label: `${t.name} voltou` });
       }
       prev[t.id] = t.state;
@@ -388,10 +495,12 @@ function aggregates(data: SessionData) {
   > = {};
   for (const s of samples)
     for (const t of s.targets) {
-      const e = (byId[t.id] ??= { name: t.name, brs: [], maxDropped: 0, reconnects: 0, prev: "live" });
+      // prev inicia no próprio estado: o conectando/tentando da PARTIDA não conta
+      // como reconexão (só transições live→problema são quedas de verdade).
+      const e = (byId[t.id] ??= { name: t.name, brs: [], maxDropped: 0, reconnects: 0, prev: t.state });
       if (t.state === "live") e.brs.push(t.bitrate);
       e.maxDropped = Math.max(e.maxDropped, t.dropped);
-      if ((t.state === "reconnecting" || t.state === "error") && e.prev === "live") e.reconnects++;
+      if (isProblemState(t.state) && e.prev === "live") e.reconnects++;
       e.prev = t.state;
     }
 
@@ -418,39 +527,54 @@ function aggregates(data: SessionData) {
 
 function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   if (!windows.length)
-    return { tone: "ok", title: "Transmissão limpa", detail: "Nenhum incidente detectado nesta sessão." };
-  const enc = windows.filter((w) => w.cause.startsWith("Gargalo de encoding")).length;
-  const render = windows.filter((w) => w.cause.startsWith("Cena pesada")).length;
-  const net = windows.filter((w) => w.cause.startsWith("Gargalo de rede")).length;
-  const plat = windows.filter((w) => w.cause.startsWith("Instabilidade")).length;
-  if (enc)
+    return { tone: "ok", title: "Transmissão limpa", detail: "Nenhum perrengue detectado nessa live." };
+  const count = (k: ProblemWindow["causeKind"]) => windows.filter((w) => w.causeKind === k).length;
+  const enc = count("encoding");
+  const render = count("render");
+  const net = count("network");
+  const plat = count("platform");
+  const sig = count("signal");
+  // Perrengue CURTO (≤30s somados, sem perda de sinal) não merece veredito vermelho:
+  // o espectador quase certamente nem viu — o tom acompanha a experiência real.
+  const totalBadSec = windows.reduce((a, w) => a + w.durationSec, 0);
+  const brief = sig === 0 && totalBadSec <= 30;
+  const briefNote = brief
+    ? ` Foi coisa rápida (${totalBadSec}s no total) — a galera provavelmente nem percebeu.`
+    : "";
+  if (sig)
     return {
       tone: "bad",
-      title: "Provável gargalo de ENCODING",
-      detail: `${enc} janela(s) com CPU/GPU saturada. Reduza bitrate/resolução ou use encoder de hardware.`,
+      title: "O sinal do OBS caiu",
+      detail: `${sig} trecho(s) sem vídeo chegando do OBS — a galera ficou vendo tela parada. Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta.`,
+    };
+  if (enc)
+    return {
+      tone: brief ? "warn" : "bad",
+      title: brief ? "Engasgo rápido de encoding" : "Seu PC não deu conta (encoding)",
+      detail: `${enc} trecho(s) com CPU/GPU no talo.${briefNote} No OBS: Configurações → Saída → troque o Encoder pro da placa de vídeo (NVENC/QSV) — ou baixe o bitrate/resolução na tela Qualidade.`,
     };
   if (render)
     return {
       tone: "warn",
-      title: "Provável CENA PESADA no OBS",
-      detail: `${render} janela(s) com render lag do OBS — alivie a cena ou baixe a resolução base.`,
+      title: "Cena pesada no OBS",
+      detail: `${render} trecho(s) com o OBS penando pra montar o quadro (render lag) — alivie a cena (fontes/filtros/efeitos) ou baixe a resolução base no OBS.${briefNote}`,
     };
   if (net)
     return {
-      tone: "bad",
-      title: "Provável gargalo de REDE/UPLOAD",
-      detail: `${net} janela(s) com queda de bitrate/reconexão sem CPU alta. Reduza o bitrate ou tire uma plataforma.`,
+      tone: brief ? "warn" : "bad",
+      title: brief ? "Engasgo rápido de internet" : "A internet não deu conta (upload)",
+      detail: `${net} trecho(s) com bitrate caindo/reconexão sem o PC estar sobrecarregado.${briefNote} Se repetir, baixe o bitrate na tela Qualidade ou tire uma plataforma.`,
     };
   if (plat)
     return {
       tone: "warn",
       title: "Instabilidade de plataforma",
-      detail: `${plat} janela(s) afetando um destino só — provavelmente do lado da plataforma.`,
+      detail: `${plat} trecho(s) afetando uma plataforma só — provavelmente o problema foi do lado dela, não seu.${briefNote}`,
     };
   return {
     tone: "warn",
-    title: `${windows.length} janela(s) problemática(s)`,
-    detail: "Veja os detalhes de cada uma abaixo.",
+    title: `${windows.length} trecho(s) com problema`,
+    detail: "Veja os detalhes de cada um abaixo.",
   };
 }
 
@@ -548,8 +672,9 @@ function highlights(d: SessionData): Highlight[] {
 }
 
 export function analyze(data: SessionData): ReportAnalysis {
-  const typical = typicalBitrates(data.samples);
-  const windows = problemWindows(data, typical);
+  const ctxs = targetCtxs(data.samples);
+  const typical = typicalBitrates(data.samples, ctxs);
+  const windows = problemWindows(data, typical, ctxs);
   return {
     events: deriveEvents(data),
     windows,
@@ -560,4 +685,57 @@ export function analyze(data: SessionData): ReportAnalysis {
     alerts: alertStats(data),
     highlights: highlights(data),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Mini-resumo por sessão (chips na lista + comparação com a live anterior)
+// ---------------------------------------------------------------------------
+
+/** Extrai o resumo de uma análise completa — zero duplicação de heurística. */
+export function summarize(data: SessionData, a: ReportAnalysis): SessionSummary {
+  return {
+    hasData: data.samples.length > 1 || a.viewers.hasData,
+    peakViewers: a.viewers.hasData ? a.viewers.peak : null,
+    avgViewers: a.viewers.hasData ? a.viewers.avg : null,
+    chatTotal: a.chat.hasData ? a.chat.total : null,
+    problemWindows: a.windows.length,
+    verdictTone: a.verdict.tone,
+  };
+}
+
+// Cache em localStorage keyed por session id: evita reparsear NDJSON grande
+// toda vez que a lista abre. Entrada órfã de sessão excluída é inofensiva.
+const SUMMARY_CACHE_KEY = "corneta.session-summaries";
+
+function readSummaryCache(): Record<string, SessionSummary> {
+  try {
+    return JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) ?? "{}") as Record<string, SessionSummary>;
+  } catch {
+    return {};
+  }
+}
+
+export function getCachedSummary(id: string): SessionSummary | null {
+  return readSummaryCache()[id] ?? null;
+}
+
+export function setCachedSummary(id: string, s: SessionSummary): void {
+  try {
+    const all = readSummaryCache();
+    all[id] = s;
+    localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(all));
+  } catch {
+    // localStorage indisponível/cheio — segue sem cache
+  }
+}
+
+export function dropCachedSummary(id: string): void {
+  try {
+    const all = readSummaryCache();
+    if (!(id in all)) return;
+    delete all[id];
+    localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(all));
+  } catch {
+    // sem cache, sem drama
+  }
 }

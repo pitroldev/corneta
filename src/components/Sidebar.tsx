@@ -1,6 +1,7 @@
 import { BarChart3, Eye, Info, MessageSquare, Radio, Settings, Sliders, Tv2, Users } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
+import { MESA_ENABLED } from "../lib/flags";
 import { Mascot } from "./decor";
 
 export type Screen =
@@ -13,13 +14,22 @@ export type Screen =
   | "about"
   | "settings";
 
+// Relatórios entra na jornada numerada (é o passo que FECHA o ciclo da live) — no rodapé
+// apagado ninguém descobria que o app gera relatório.
 const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
   { id: "platforms", label: "Plataformas", icon: Tv2, hint: "onde sua live aparece" },
   { id: "encoding", label: "Qualidade", icon: Sliders, hint: "capricho da imagem" },
   { id: "golive", label: "Ao vivo", icon: Radio, hint: "bota tudo no ar" },
   { id: "chat", label: "Chat", icon: MessageSquare, hint: "todo chat num lugar" },
-  { id: "mesa", label: "Mesa", icon: Users, hint: "co-stream com a galera" },
+  ...(MESA_ENABLED
+    ? [{ id: "mesa" as Screen, label: "Mesa", icon: Users, hint: "co-stream com a galera" }]
+    : []),
+  { id: "reports", label: "Relatórios", icon: BarChart3, hint: "como foi a live" },
 ];
+
+// Numeração dos utilitários do rodapé segue a nav (Alt+N contínuo, com ou sem Mesa).
+const SETTINGS_N = NAV.length + 1;
+const ABOUT_N = NAV.length + 2;
 
 export function Sidebar({
   screen,
@@ -58,6 +68,7 @@ export function Sidebar({
               onClick={() => onNavigate(item.id)}
               aria-current={active ? "page" : undefined}
               data-on-brass={active ? "" : undefined}
+              title={`Alt+${i + 1}`}
               className={cn(
                 "group relative flex items-center gap-3 rounded-md px-3 py-3 text-left transition-all",
                 active
@@ -84,49 +95,43 @@ export function Sidebar({
                   {item.hint}
                 </span>
               </div>
-              <span
-                className={cn(
-                  "ml-auto font-display text-xs font-bold opacity-40",
-                  active && "opacity-60"
-                )}
-              >
-                0{i + 1}
-              </span>
+              {item.id === "reports" && unseenReport && !active ? (
+                <span className="ml-auto -rotate-3 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
+                  novo
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    "ml-auto font-display text-xs font-bold opacity-40",
+                    active && "opacity-60"
+                  )}
+                >
+                  0{i + 1}
+                </span>
+              )}
             </button>
           );
         })}
       </nav>
 
-      {/* Relatórios + Configurações + Sobre + estado ao vivo */}
+      {/* Configurações + Sobre + estado ao vivo */}
       <div className="mt-auto flex flex-col gap-2">
-        <button
-          onClick={() => onNavigate("reports")}
-          aria-current={screen === "reports" ? "page" : undefined}
-          className={cn(
-            "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
-            screen === "reports" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
-          )}
-        >
-          <BarChart3 className="size-4" strokeWidth={2.3} /> Relatórios
-          {unseenReport && screen !== "reports" && (
-            <span className="ml-auto -rotate-3 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
-              novo
-            </span>
-          )}
-        </button>
         <button
           onClick={() => onNavigate("settings")}
           aria-current={screen === "settings" ? "page" : undefined}
+          title={`Alt+${SETTINGS_N}`}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
             screen === "settings" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
           )}
         >
           <Settings className="size-4" strokeWidth={2.3} /> Configurações
+          <span className="ml-auto font-display text-xs font-bold opacity-40">0{SETTINGS_N}</span>
         </button>
         <button
           onClick={() => onNavigate("about")}
           aria-current={screen === "about" ? "page" : undefined}
+          title={`Alt+${ABOUT_N}`}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
             screen === "about" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"

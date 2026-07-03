@@ -41,13 +41,18 @@ export function hasValidUrl(t: Target): boolean {
  *
  * Regras:
  * - Trim sempre.
+ * - Se o valor é SÓ a URL do servidor (a própria `ingestUrl` conhecida, um
+ *   prefixo dela, ou uma URL cujo último segmento é o mesmo "app" da base —
+ *   ex.: ingest regional da Twitch), NÃO há chave ali: devolvemos key vazia
+ *   com `strippedUrl=true` pra UI recusar, em vez de salvar "app" como chave.
  * - Se `ingestUrl` foi passada e o valor começa exatamente com ela (+ "/"),
  *   removemos esse prefixo — recorte exato, é o caso mais confiável.
  * - Senão, se o valor tem "://" (colou uma URL), pegamos tudo depois do último
  *   "/" do caminho, PRESERVANDO a querystring (a Twitch às vezes anexa
  *   `?bandwidthtest=true` na chave).
  * - Se não tem "://", é uma chave comum — devolve o próprio valor trimado.
- * - Nunca "come" a chave: se o recorte ficar vazio, devolve o raw trimado.
+ * - Fora o caso "só a URL do servidor", nunca "come" a chave: se o recorte
+ *   ficar vazio, devolve o raw trimado.
  *
  * Exemplos (antes → depois):
  *   sanitizeStreamKey("live_123")                                   → "live_123"                 (chave pura, strippedUrl=false)
@@ -57,6 +62,8 @@ export function hasValidUrl(t: Target): boolean {
  *   sanitizeStreamKey("rtmp://live.twitch.tv/app/live_123")         → "live_123"                 (fallback: último "/")
  *   sanitizeStreamKey("rtmps://x.live-video.net/app/sk_abc")        → "sk_abc"                   (Kick)
  *   sanitizeStreamKey("rtmp://live.twitch.tv/app/live_9?bwtest=true") → "live_9?bwtest=true"     (querystring preservada)
+ *   sanitizeStreamKey("rtmp://live.twitch.tv/app",
+ *                     "rtmp://live.twitch.tv/app")                  → ""                         (só o servidor: sem chave, strippedUrl=true)
  */
 export function sanitizeStreamKey(
   raw: string,
@@ -64,8 +71,30 @@ export function sanitizeStreamKey(
 ): { key: string; strippedUrl: boolean } {
   const trimmed = raw.trim();
 
-  // 1) Recorte exato: valor começa com o servidor de ingestão conhecido.
   const base = ingestUrl?.trim().replace(/\/+$/, "");
+  // Base só vale como referência se tem host (presets "rtmp://" ficam de fora).
+  const hasBase = !!base && base.includes("://");
+
+  // 0) Colou SÓ a URL do servidor (sem chave): o valor é a própria base (ou um
+  //    prefixo dela, ex.: sem o "/app" final), ou uma URL cujo último segmento
+  //    do caminho é o mesmo "app" da base (ingest regional). Não tem chave aqui.
+  if (hasBase && trimmed.includes("://") && !trimmed.includes("?")) {
+    const noSlash = trimmed.replace(/\/+$/, "").toLowerCase();
+    const baseLower = base.toLowerCase();
+    const isPrefixOfBase =
+      baseLower === noSlash || baseLower.startsWith(noSlash + "/");
+    // Último segmento do CAMINHO (vazio se a URL não tem caminho após o host).
+    const lastPathSeg = (u: string) => {
+      const rest = u.slice(u.indexOf("://") + 3);
+      const s = rest.indexOf("/");
+      return s === -1 ? "" : rest.slice(rest.lastIndexOf("/") + 1);
+    };
+    const baseApp = lastPathSeg(baseLower);
+    const sameApp = baseApp !== "" && lastPathSeg(noSlash) === baseApp;
+    if (isPrefixOfBase || sameApp) return { key: "", strippedUrl: true };
+  }
+
+  // 1) Recorte exato: valor começa com o servidor de ingestão conhecido.
   if (base && trimmed.startsWith(base + "/")) {
     const key = trimmed.slice(base.length).replace(/^\/+/, "");
     if (key) return { key, strippedUrl: true };

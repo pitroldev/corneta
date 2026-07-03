@@ -10,11 +10,13 @@ import type {
   EngineSnapshot,
   IngestConfig,
   Leak,
+  ObsCheck,
   PlatformId,
   Target,
   Viewers,
 } from "./types";
 import { api } from "./api";
+import { toast } from "./toast";
 import { OAUTH } from "./oauth";
 import { makeTarget } from "./factory";
 import { openExternal, uid } from "./utils";
@@ -30,6 +32,9 @@ interface LoginState {
 // Última remoção de destino (para o "desfazer").
 let pendingRemoval: { target: Target; index: number } | null = null;
 
+// Momento da última consulta ao OBS (cache curto do runObsCheck).
+let lastObsCheckAt = 0;
+
 interface State {
   loaded: boolean;
   config: AppConfig | null;
@@ -42,7 +47,8 @@ interface State {
   /** Sincroniza a config quando OUTRA janela (ex.: popout do chat) a salva. */
   bindConfigSync: () => () => void;
 
-  addTarget: (platformId: PlatformId) => void;
+  /** Adiciona um destino e devolve o id (pra tela rolar/focar no card novo). */
+  addTarget: (platformId: PlatformId) => string | undefined;
   updateTarget: (id: string, patch: Partial<Target>) => void;
   removeTarget: (id: string) => void;
   toggleTarget: (id: string) => void;
@@ -66,7 +72,13 @@ interface State {
   refreshEncoders: () => Promise<void>;
   runUploadTest: () => Promise<void>;
 
-  start: () => Promise<void>;
+  /** Estado do OBS compartilhado entre telas (Ao vivo, Configurações, checklist). */
+  obs: ObsCheck | "loading" | null;
+  /** Consulta o OBS via obs-websocket (com cache curto; force=true ignora o cache). */
+  runObsCheck: (force?: boolean) => Promise<void>;
+
+  /** Devolve como o OBS reagiu ao BORA: ligado junto, falhou ou é manual. */
+  start: () => Promise<"obs-ok" | "obs-failed" | "manual">;
   stop: () => Promise<void>;
 
   // Chat unificado
@@ -142,6 +154,14 @@ interface State {
   // UI: aba pedida ao abrir Configurações (deep-link do "Ajustar").
   settingsTab: string | null;
   setSettingsTab: (v: string | null) => void;
+
+  // UI: navegação global (qualquer tela pede, o App executa) — deep-links entre telas.
+  navRequest: string | null;
+  requestNavigate: (screen: string | null) => void;
+
+  // UI: pedido pra abrir o modal "Configurar o chat" numa aba (deep-link de outras telas).
+  chatConfigRequest: string | null;
+  requestChatConfig: (tab: string | null) => void;
 }
 
 const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
@@ -175,6 +195,10 @@ export const useStore = create<State>((set, get) => {
   };
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", () => void flushSave());
+    // Duas janelas (principal + popout) editam a mesma config: descarrega o save pendente
+    // ao perder o foco — encolhe a janela em que um debounce velho desta janela poderia
+    // sobrescrever o que a outra acabou de salvar (ex.: a aba escolhida no popout).
+    window.addEventListener("blur", () => void flushSave());
   }
   const persist = (config: AppConfig) => {
     const profiles = config.profiles.map((p) =>
@@ -228,10 +252,43 @@ export const useStore = create<State>((set, get) => {
       } catch {
         /* backend indisponível (demo) — mantém o default */
       }
+      // Selo "NOVO" de relatório sobrevive ao fechar o app: se existe sessão mais nova
+      // que a última visita a Relatórios, o selo volta aceso.
+      try {
+        const sessions = await api.listSessions();
+        const newest = sessions[0];
+        const seenAt = Number(localStorage.getItem("corneta.lastSeenReportAt") || 0);
+        if (seenAt === 0) {
+          // Migração (1ª execução com o recurso): sessões antigas não acendem o selo —
+          // o usuário pode já tê-las visto antes de existir o carimbo.
+          localStorage.setItem("corneta.lastSeenReportAt", String(Date.now()));
+        } else if (newest && (newest.endedAt ?? newest.startedAt) > seenAt) {
+          set({ unseenReport: true });
+        }
+      } catch {
+        /* sem sessões ainda */
+      }
     },
 
     bindEngine() {
-      return api.subscribe((snapshot) => set({ snapshot }));
+      return api.subscribe((snapshot) => {
+        const prev = get().snapshot.state;
+        set({ snapshot });
+        // Entrou no ar → liga o chat sozinho (se tem fonte configurada e a opção está on).
+        // O streamer médio esquece o clique manual em outra tela — e conclui que "o chat não funciona".
+        if (prev !== "live" && snapshot.state === "live") {
+          const s = get();
+          const st = s.config?.settings;
+          const hasSources =
+            (st?.chatSources ?? []).some((x) => x.enabled && x.value.trim()) ||
+            (st?.alertSources ?? []).some((x) => x.enabled && x.hasToken);
+          if ((st?.chatAutoConnect ?? true) && hasSources && !s.chatConnected) {
+            s.connectChat().catch(() =>
+              toast.error("Não consegui ligar o chat sozinho — vá na tela Chat e clique em Conectar."),
+            );
+          }
+        }
+      });
     },
 
     bindConfigSync() {
@@ -253,6 +310,7 @@ export const useStore = create<State>((set, get) => {
         t.name = `${t.name} ${n}`;
       }
       persist({ ...config, targets: [...config.targets, t] });
+      return t.id;
     },
 
     updateTarget(id, patch) {
@@ -435,6 +493,35 @@ export const useStore = create<State>((set, get) => {
       set({ encoders: await api.detectEncoders() });
     },
 
+    obs: null,
+    async runObsCheck(force = false) {
+      // Cache curto: várias telas consultam (Ao vivo, checklist, Configurações) sem
+      // martelar o obs-websocket a cada troca de tela.
+      if (!force && Date.now() - lastObsCheckAt < 5000 && get().obs !== null && get().obs !== "loading")
+        return;
+      if (get().obs === "loading") return;
+      // force = clique explícito em "Verificar OBS" → feedback visível (spinner);
+      // polls de fundo trocam o resultado em silêncio pra não piscar a tela.
+      if (force || get().obs === null) set({ obs: "loading" });
+      try {
+        const r = await api.obsCheck();
+        lastObsCheckAt = Date.now();
+        set({ obs: r });
+      } catch (e) {
+        lastObsCheckAt = Date.now();
+        set({
+          obs: {
+            reachable: false,
+            pointingAtCorneta: false,
+            width: 0,
+            height: 0,
+            fps: 0,
+            error: String(e),
+          },
+        });
+      }
+    },
+
     async runUploadTest() {
       // Propaga o erro pra a tela mostrar um toast (ex.: sem internet).
       set({ uploadMbps: await api.testUpload() });
@@ -444,14 +531,17 @@ export const useStore = create<State>((set, get) => {
       await flushSave();
       set({ leaks: [], censored: false, viewers: { total: 0, anyLive: false, items: [] } });
       await api.start();
-      // A1: liga o OBS junto (melhor-esforço — pode não estar acessível).
+      // A1: liga o OBS junto (melhor-esforço) — e CONTA pra tela o que aconteceu,
+      // pra o toast não mentir "no ar" quando o OBS nem recebeu o play.
       if (get().config?.settings.autoStartObs) {
         try {
           await api.obsSetStream(true);
+          return "obs-ok";
         } catch {
-          /* OBS sem obs-websocket → o usuário dá play manualmente */
+          return "obs-failed";
         }
       }
+      return "manual";
     },
 
     async stop() {
@@ -509,7 +599,9 @@ export const useStore = create<State>((set, get) => {
     },
 
     async connectChat() {
-      set({ chatMessages: [], chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
+      // NÃO zera chatMessages: reconectar (ex.: pra ressuscitar uma fonte que caiu)
+      // não pode apagar o histórico das outras. Limpar é só no botão "Limpar" (clearChat).
+      set({ chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
       await api.chatStart();
       await api.alertsStart();
       set({ chatConnected: true });
@@ -724,6 +816,12 @@ export const useStore = create<State>((set, get) => {
     unseenReport: false,
     markReportSeen() {
       set({ unseenReport: false });
+      // Persistido: o selo não deve reacender ao reabrir o app pra um relatório já visto.
+      try {
+        localStorage.setItem("corneta.lastSeenReportAt", String(Date.now()));
+      } catch {
+        /* ignore */
+      }
     },
 
     tourNonce: 0,
@@ -734,6 +832,16 @@ export const useStore = create<State>((set, get) => {
     settingsTab: null,
     setSettingsTab(v) {
       set({ settingsTab: v });
+    },
+
+    navRequest: null,
+    requestNavigate(screen) {
+      set({ navRequest: screen });
+    },
+
+    chatConfigRequest: null,
+    requestChatConfig(tab) {
+      set({ chatConfigRequest: tab });
     },
   };
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { Modal } from "../components/Modal";
@@ -22,10 +22,10 @@ import {
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
-import { PLATFORM_LIST, PLATFORMS } from "../lib/platforms";
+import { PLATFORM_LIST, PLATFORM_TAGLINES, PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn, openExternal } from "../lib/utils";
-import type { PlatformId, Target } from "../lib/types";
+import { cn, openExternal, uid } from "../lib/utils";
+import type { ChatPlatform, PlatformId, Target } from "../lib/types";
 import {
   INGEST_URL_RE,
   blockingIssues,
@@ -45,6 +45,7 @@ import {
   Toggle,
 } from "../components/ui";
 import { ReframeEditor } from "../components/ReframeEditor";
+import { FirstLiveChecklist } from "../components/FirstLiveChecklist";
 import { Mascot } from "../components/decor";
 
 export function PlatformsScreen() {
@@ -53,6 +54,8 @@ export function PlatformsScreen() {
   const reorderTargets = useStore((s) => s.reorderTargets);
   const [picking, setPicking] = useState(false);
   const [reframeTarget, setReframeTarget] = useState<Target | null>(null);
+  // Plataforma recém-adicionada: rola até o card novo e foca o campo da chave.
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   if (!config) return null;
 
@@ -61,13 +64,15 @@ export function PlatformsScreen() {
       <SectionTitle
         kicker="Pra onde a corneta toca"
         title="Plataformas"
-        subtitle="Escolha os destinos, cole a chave de cada um e eu pego seu vídeo do OBS e toco em todos de uma vez."
+        subtitle="Escolha as plataformas, cole a chave de cada uma e eu pego seu vídeo do OBS e toco em todas de uma vez."
         right={
           <Button variant="primary" onClick={() => setPicking(true)}>
             <Plus className="size-4" strokeWidth={2.6} /> Adicionar
           </Button>
         }
       />
+
+      <FirstLiveChecklist />
 
       <ProfileBar />
 
@@ -87,6 +92,8 @@ export function PlatformsScreen() {
                 key={t.id}
                 target={t}
                 onReframe={() => setReframeTarget(t)}
+                justAdded={t.id === justAddedId}
+                onSpotlightDone={() => setJustAddedId(null)}
               />
             ))}
           </Reorder.Group>
@@ -103,7 +110,8 @@ export function PlatformsScreen() {
       {picking && (
         <PlatformPicker
           onPick={(id) => {
-            addTarget(id);
+            const newId = addTarget(id);
+            if (newId) setJustAddedId(newId);
             setPicking(false);
             toast.success(`${PLATFORMS[id].name} entrou na corneta 📣`);
           }}
@@ -114,9 +122,9 @@ export function PlatformsScreen() {
   );
 }
 
-// Perfis = combos salvos de destinos (+ modo de qualidade). Cada perfil é uma pílula:
-// vê todos de relance, troca num clique. A pílula ativa renomeia ao clicar; "Novo" e
-// "Excluir" agem no ativo. Trocou o Select escondido por algo direto e legível.
+// Perfis = combos salvos de plataformas (+ modo de qualidade). Cada perfil é uma pílula:
+// vê todos de relance, troca num clique. Renomear é só pelo botão dedicado (clicar na
+// pílula ativa não faz nada — evitava renomeio acidental no mesmo gesto da troca).
 function ProfileBar() {
   const config = useStore((s) => s.config)!;
   const loadProfile = useStore((s) => s.loadProfile);
@@ -137,7 +145,7 @@ function ProfileBar() {
         <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
           Perfil de transmissão
         </span>
-        <Hint text="Um perfil é um conjunto salvo de destinos. Crie um pra cada situação (ex.: 'Solo Twitch+YT', 'Evento com TikTok') e troque entre eles num clique — a lista de plataformas troca junto." />
+        <Hint text="Um perfil é um conjunto salvo de plataformas. Crie um pra cada situação (ex.: 'Solo Twitch+YT', 'Evento com TikTok') e troque entre eles num clique — a lista de plataformas troca junto." />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -163,12 +171,12 @@ function ProfileBar() {
           return (
             <button
               key={p.id}
-              onClick={() => (on ? setEditing(true) : loadProfile(p.id))}
+              onClick={() => {
+                if (!on) loadProfile(p.id);
+              }}
               aria-pressed={on}
               title={
-                on
-                  ? "Clique pra renomear"
-                  : `Trocar pra "${p.name || "Sem nome"}"`
+                on ? "Perfil ativo" : `Trocar pra "${p.name || "Sem nome"}"`
               }
               className={cn(
                 "flex h-9 items-center gap-2 rounded-md px-3 font-display text-sm font-bold transition-all",
@@ -187,7 +195,7 @@ function ProfileBar() {
                     ? "bg-brass-ink/15 text-brass-ink"
                     : "bg-surface-2 text-ink-faint",
                 )}
-                title={`${p.targets.length} destino${p.targets.length === 1 ? "" : "s"}`}
+                title={`${p.targets.length} plataforma${p.targets.length === 1 ? "" : "s"}`}
               >
                 {p.targets.length}
               </span>
@@ -243,7 +251,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <div className="mx-auto mb-4 grid size-16 rotate-[-4deg] place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
         <Mascot className="size-9 animate-shout" />
       </div>
-      <h3 className="text-2xl">Cadê os destinos?</h3>
+      <h3 className="text-2xl">Cadê as plataformas?</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">
         Sua corneta ainda não aponta pra lugar nenhum. Bora colocar a primeira
         plataforma?
@@ -276,8 +284,9 @@ function ReadinessSummary({ targets }: { targets: Target[] }) {
           {ready === 1 ? "" : "s"}
         </span>
       )}
+      {/* Chave ausente é pendência (warn), não erro — vermelho fica pra URL quebrada. */}
       {semChave > 0 && (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-bad/15 px-2.5 py-1 font-bold text-bad">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-warn/15 px-2.5 py-1 font-bold text-warn">
           <KeyRound className="size-3.5" /> {semChave} sem chave
         </span>
       )}
@@ -298,9 +307,13 @@ function ReadinessSummary({ targets }: { targets: Target[] }) {
 function TargetRow({
   target,
   onReframe,
+  justAdded,
+  onSpotlightDone,
 }: {
   target: Target;
   onReframe: () => void;
+  justAdded?: boolean;
+  onSpotlightDone?: () => void;
 }) {
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
@@ -312,24 +325,37 @@ function TargetRow({
   const isCustom = target.platformId === "custom";
   // Mostra o campo de URL quando o preset não traz uma URL completa (custom + betas
   // TikTok/X/Instagram, que vêm com "rtmp://" e dependem do painel da plataforma).
+  // A Kick também mostra, pré-preenchido: a URL dela varia por conta/região.
   const presetUrlIncomplete = !INGEST_URL_RE.test(preset.ingestUrl.trim());
-  const showUrlField = isCustom || presetUrlIncomplete;
+  const showUrlField =
+    isCustom || presetUrlIncomplete || target.platformId === "kick";
   const urlInvalid = isUrlInvalid(target);
   const urlOk = hasValidUrl(target);
   // Selo de prontidão (independe de estar ligado): o erro deixa de aparecer só no Ao vivo.
+  // Chave ausente é pendência convidativa (warn) — vermelho só pra URL quebrada/faltando.
   const readiness = !urlOk
     ? { tone: "bad" as const, label: urlInvalid ? "URL inválida" : "Sem URL" }
     : !target.hasKey
-      ? { tone: "bad" as const, label: "Falta chave" }
+      ? { tone: "warn" as const, label: "Cole a chave" }
       : !target.name.trim()
         ? { tone: "warn" as const, label: "Sem nome" }
         : { tone: "ok" as const, label: "Pronto" };
 
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
-  // Bloqueios reais (chave/URL) — acendem o acento vermelho e abrem o cartão por padrão.
+  // Bloqueios reais (chave/URL) — acendem o acento na borda e abrem o cartão por padrão.
+  // Só chave faltando (URL ok) = warn; URL quebrada = vermelho.
   const blocking = blockingIssues(target);
+  const keyOnlyPending = blocking.length > 0 && urlOk;
   const [open, setOpen] = useState(() => blocking.length > 0);
+
+  // Recém-adicionada: rola até o card (o foco da chave vai via autoFocus no KeyField).
+  const itemRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (!justAdded) return;
+    itemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    onSpotlightDone?.();
+  }, [justAdded, onSpotlightDone]);
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -354,6 +380,7 @@ function TargetRow({
 
   return (
     <Reorder.Item
+      ref={itemRef}
       value={target}
       dragListener={false}
       dragControls={controls}
@@ -363,7 +390,8 @@ function TargetRow({
         className={cn(
           "transition-opacity",
           !target.enabled && "opacity-50",
-          blocking.length > 0 && "border-l-4 border-bad",
+          blocking.length > 0 &&
+            (keyOnlyPending ? "border-l-4 border-warn" : "border-l-4 border-bad"),
         )}
       >
         <Collapsible.Root open={open} onOpenChange={setOpen}>
@@ -376,7 +404,7 @@ function TargetRow({
                 else if (e.key === "ArrowDown")
                   (e.preventDefault(), moveTarget(target.id, 1));
               }}
-              aria-label="Reordenar destino (setas ↑/↓)"
+              aria-label="Reordenar plataforma (setas ↑/↓)"
               title="Arraste ou use ↑/↓"
               className="shrink-0 cursor-grab touch-none text-ink-faint active:cursor-grabbing"
             >
@@ -390,10 +418,19 @@ function TargetRow({
                   onChange={(e) =>
                     updateTarget(target.id, { name: e.target.value })
                   }
-                  aria-label="Nome do destino"
+                  aria-label="Nome da plataforma"
                   className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
                 />
-                <Badge color={preset.color}>{preset.protocol}</Badge>
+                {/* Protocolo é jargão — só interessa no Personalizado, e aí reflete
+                    o esquema da URL digitada (rtmp/rtmps/srt), não o preset fixo. */}
+                {isCustom && (
+                  <Badge color={preset.color}>
+                    {target.ingestUrl
+                      .trim()
+                      .match(/^(rtmps?|srt):\/\//i)?.[1]
+                      ?.toLowerCase() ?? preset.protocol}
+                  </Badge>
+                )}
                 {preset.experimental && <ExperimentalBadge />}
               </div>
               <div className="mt-0.5 truncate text-xs text-ink-faint">
@@ -408,7 +445,7 @@ function TargetRow({
             />
             <Collapsible.Trigger asChild>
               <button
-                aria-label={open ? "Recolher destino" : "Expandir destino"}
+                aria-label={open ? "Recolher plataforma" : "Expandir plataforma"}
                 className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
               >
                 <ChevronDown
@@ -422,6 +459,12 @@ function TargetRow({
           </div>
 
           <Collapsible.Content className="mt-4 flex flex-col gap-4">
+            {/* A nota didática vem ANTES dos campos: é o que precisa ser lido
+                antes de preencher (liberação de conta, onde pegar a chave etc.). */}
+            {preset.note && (
+              <p className="text-xs text-ink-faint">{preset.note}</p>
+            )}
+
             {showUrlField && (
               <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
                 <span>
@@ -429,8 +472,10 @@ function TargetRow({
                   {!isCustom && (
                     <span className="font-normal text-ink-faint">
                       {" "}
-                      — o endereço pra onde seu vídeo vai; cole a que o painel
-                      da {preset.name} te deu
+                      — o endereço pra onde seu vídeo vai;{" "}
+                      {target.platformId === "kick"
+                        ? "essa já vem pronta, só troque se o painel da Kick mostrar outra"
+                        : `cole a que o painel da ${preset.name} te deu`}
                     </span>
                   )}
                 </span>
@@ -454,7 +499,7 @@ function TargetRow({
               </label>
             )}
 
-            <KeyField target={target} />
+            <KeyField target={target} autoFocusKey={justAdded} />
 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <Button
@@ -511,9 +556,6 @@ function TargetRow({
               </Button>
             </div>
 
-            {preset.note && (
-              <p className="text-xs text-ink-faint">{preset.note}</p>
-            )}
           </Collapsible.Content>
         </Collapsible.Root>
       </Card>
@@ -521,7 +563,59 @@ function TargetRow({
   );
 }
 
-function KeyField({ target }: { target: Target }) {
+// Ponte plataforma→chat: guardar a chave NÃO configura o chat agregado (são
+// cadastros separados). Depois de salvar, oferece criar a fonte na tela de Chat.
+const CHAT_BRIDGE_LABEL: Record<ChatPlatform, string> = {
+  twitch: "da Twitch",
+  youtube: "do YouTube",
+  kick: "da Kick",
+};
+
+function isChatPlatform(id: PlatformId): id is ChatPlatform {
+  return id === "twitch" || id === "youtube" || id === "kick";
+}
+
+function offerChatBridge(platformId: PlatformId) {
+  if (!isChatPlatform(platformId)) return;
+  const sources = useStore.getState().config?.settings.chatSources ?? [];
+  if (sources.some((s) => s.platform === platformId)) return;
+  // Oferece UMA vez por plataforma: quem trocar a chave 3x não leva 3 toasts.
+  // Marcamos no momento da oferta (aceitar/ignorar não re-oferece).
+  const offeredKey = `corneta.chatBridgeOffered.${platformId}`;
+  try {
+    if (localStorage.getItem(offeredKey)) return;
+    localStorage.setItem(offeredKey, "1");
+  } catch {
+    /* storage indisponível: melhor arriscar oferecer de novo que nunca */
+  }
+  toast.action(
+    `Quer o chat ${CHAT_BRIDGE_LABEL[platformId]} aqui na Corneta também?`,
+    "Configurar",
+    () => {
+      const st = useStore.getState();
+      const cur = st.config?.settings.chatSources ?? [];
+      // Pode ter sido criada enquanto o toast estava na tela — não duplica.
+      if (!cur.some((s) => s.platform === platformId)) {
+        st.setSettings({
+          chatSources: [
+            ...cur,
+            { id: uid("src"), platform: platformId, value: "", name: "", enabled: true },
+          ],
+        });
+      }
+      st.requestChatConfig("canais");
+      st.requestNavigate("chat");
+    },
+  );
+}
+
+function KeyField({
+  target,
+  autoFocusKey,
+}: {
+  target: Target;
+  autoFocusKey?: boolean;
+}) {
   const setKey = useStore((s) => s.setKey);
   const clearKey = useStore((s) => s.clearKey);
   const [editing, setEditing] = useState(false);
@@ -529,30 +623,37 @@ function KeyField({ target }: { target: Target }) {
   const [reveal, setReveal] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const paste = async () => {
+  const save = async (raw: string = value) => {
     try {
-      const t = await navigator.clipboard.readText();
-      if (!t) return;
-      // Já limpa na colagem pra o streamer VER a chave certa no campo.
-      const { key, strippedUrl } = sanitizeStreamKey(t, target.ingestUrl);
-      setValue(key);
-      if (strippedUrl) toast.info("Isso parecia a URL completa — guardei só a chave 👍");
-    } catch {
-      /* área de transferência bloqueada */
-    }
-  };
-  const save = async () => {
-    try {
-      // Idempotente: se colou pelo botão já veio limpo; se digitou/colou a URL
-      // inteira no campo, cortamos o servidor aqui e avisamos.
-      const { key, strippedUrl } = sanitizeStreamKey(value, target.ingestUrl);
+      // Idempotente: se digitou/colou a URL inteira, cortamos o servidor e avisamos.
+      const { key, strippedUrl } = sanitizeStreamKey(raw, target.ingestUrl);
+      if (!key) {
+        // Colou só a URL do servidor (ou nada): não tem chave pra guardar.
+        if (strippedUrl)
+          toast.error(
+            "Isso é o endereço do servidor, não a chave — cole a stream key que fica ao lado dela no painel 🔑",
+          );
+        return;
+      }
       await setKey(target.id, key);
       setValue("");
       setEditing(false);
       if (strippedUrl) toast.info("Isso parecia a URL completa — guardei só a chave 👍");
       toast.success("Chave guardada no cofre 🔒");
+      offerChatBridge(target.platformId);
     } catch (e) {
       toast.error(`Falha ao guardar a chave: ${e}`);
+    }
+  };
+  // Colar já salva: um clique a menos no caminho mais quente do onboarding
+  // (quem prefere digitar continua com o campo + Salvar).
+  const paste = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (!t.trim()) return;
+      await save(t);
+    } catch {
+      /* área de transferência bloqueada */
     }
   };
 
@@ -604,7 +705,7 @@ function KeyField({ target }: { target: Target }) {
         <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
         <Input
           type={reveal ? "text" : "password"}
-          autoFocus={editing}
+          autoFocus={editing || autoFocusKey}
           className="pl-9 pr-9"
           placeholder="Cole a chave de transmissão (stream key) que a plataforma te deu"
           value={value}
@@ -625,15 +726,15 @@ function KeyField({ target }: { target: Target }) {
         variant="subtle"
         size="sm"
         onClick={paste}
-        title="Colar da área de transferência"
+        title="Cola da área de transferência e já guarda no cofre"
       >
-        <ClipboardPaste className="size-4" /> Colar
+        <ClipboardPaste className="size-4" /> Colar e salvar
       </Button>
       <Button
         variant="primary"
         size="sm"
         disabled={!value.trim()}
-        onClick={save}
+        onClick={() => void save()}
       >
         Salvar
       </Button>
@@ -689,8 +790,10 @@ function PlatformPicker({
                   <ExperimentalBadge className="shrink-0 scale-90" />
                 )}
               </div>
-              <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
-                {p.protocol}
+              {/* Descrição humana no lugar do protocolo: o pré-requisito
+                  (conta liberada, vídeo em pé) aparece antes do clique. */}
+              <div className="mt-0.5 text-[11px] font-medium text-ink-faint">
+                {PLATFORM_TAGLINES[p.id]}
               </div>
             </div>
             {countOf(p.id) > 0 && (

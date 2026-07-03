@@ -145,10 +145,25 @@ pub struct Settings {
     /// Título da live, lembrado entre sessões. Alimenta o broadcast automático do YouTube.
     #[serde(default)]
     pub stream_title: String,
+    /// Conectar o chat sozinho quando a transmissão entra no ar.
+    #[serde(default = "default_true")]
+    pub chat_auto_connect: bool,
+    /// Última aba usada na janela flutuante do chat: "chat" | "alerts" | "both".
+    #[serde(default = "default_popout_tab")]
+    pub chat_popout_tab: String,
+    /// Painel de alertas da tela de Chat aberto (persistido entre visitas).
+    #[serde(default)]
+    pub chat_show_alerts_panel: bool,
+    /// Nome original do arquivo custom do "JÁ VOLTO" (só exibição; o arquivo vira brb-slate.*).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brb_slate_file_name: Option<String>,
 }
 
 fn default_true() -> bool {
     true
+}
+fn default_popout_tab() -> String {
+    "both".to_string()
 }
 fn default_brb_slate_kind() -> String {
     "auto".to_string()
@@ -239,6 +254,10 @@ impl Default for Settings {
             guardian_watchlist: Vec::new(),
             youtube_auto_live: true,
             stream_title: String::new(),
+            chat_auto_connect: true,
+            chat_popout_tab: default_popout_tab(),
+            chat_show_alerts_panel: false,
+            brb_slate_file_name: None,
         }
     }
 }

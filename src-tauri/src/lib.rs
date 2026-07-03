@@ -34,6 +34,64 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+/// A transmissão está de pé? Checa a trava REAL da sessão (`eng.live`) — o snapshot pode
+/// ficar em "error" com o motor já morto, e "Você está AO VIVO" falso é pior que nada.
+fn engine_live(app: &tauri::AppHandle) -> bool {
+    let st = app.state::<AppState>();
+    let eng = st.engine.lock().unwrap();
+    eng.live
+}
+
+/// Diálogo bloqueante "encerrar a live?" — compartilhado pelo "Sair" da bandeja e pelo X
+/// da janela (o X era o único caminho que derrubava a live SEM perguntar).
+fn confirm_end_live(app: &tauri::AppHandle, msg: &str) -> bool {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    app.dialog()
+        .message(msg)
+        .title("Sair da Corneta?")
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Encerrar e sair".into(),
+            "Cancelar".into(),
+        ))
+        .blocking_show()
+}
+
+/// Sequência única de encerramento (Mesa + broadcast do YouTube + motor).
+fn shutdown_engine(app: &tauri::AppHandle) {
+    studio::stop(&app.state::<AppState>().studio);
+    auth::youtube_complete_active(app); // encerra o broadcast do YouTube
+    commands::kill_engine(app);
+}
+
+/// Feedback da ida pra bandeja: na primeira vez avisa que o app NÃO fechou (o botão se
+/// chama "Fechar"…); com live no ar avisa SEMPRE que ela continua de pé.
+fn tray_hide_hint(app: &tauri::AppHandle, live: bool) {
+    let marker = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("tray-hint-shown"));
+    let first = marker.as_ref().map(|m| !m.exists()).unwrap_or(false);
+    if live {
+        commands::notify(
+            app,
+            "Sua live continua no ar",
+            "A Corneta ficou na bandeja, perto do relógio. Pra sair de vez, use o menu da bandeja.",
+        );
+    } else if first {
+        commands::notify(
+            app,
+            "A Corneta continua aqui",
+            "Ela ficou na bandeja, perto do relógio — não fechou. Pra sair de vez, use o menu da bandeja.",
+        );
+    }
+    if first {
+        if let Some(m) = marker {
+            let _ = std::fs::write(m, "1");
+        }
+    }
+}
+
 /// Garante que a janela caiba na tela. Se a altura (vinda do config ou de um tamanho
 /// salvo pelo window-state) passar da área útil do monitor atual — descontando a barra
 /// de tarefas —, reduz e recentraliza. Em telas grandes não mexe; em 720p/768p evita
@@ -121,6 +179,8 @@ pub fn run() {
             commands::start_engine,
             commands::stop_engine,
             commands::set_target_paused,
+            commands::retry_target,
+            commands::set_force_brb,
             commands::list_sessions,
             commands::read_session,
             commands::delete_session,
@@ -155,6 +215,7 @@ pub fn run() {
             commands::save_brb_slate,
             commands::set_brb_slate,
             commands::clear_brb_slate,
+            commands::get_brb_slate_preview,
             commands::capture_frame,
             commands::mesa_start_server,
             commands::mesa_stop_server,
@@ -169,14 +230,8 @@ pub fn run() {
                 // Nunca deixa a janela mais alta que a tela (720p/768p incluídos).
                 clamp_window_to_screen(&w);
             }
-            // Registra o atalho global de começar/parar a partir das settings.
-            {
-                use tauri_plugin_global_shortcut::GlobalShortcutExt;
-                let sc = config::load(app.handle()).settings.live_shortcut;
-                if !sc.trim().is_empty() {
-                    let _ = app.global_shortcut().register(sc.as_str());
-                }
-            }
+            // O atalho global é registrado pelo frontend no boot (App.tsx → register_shortcut),
+            // que MOSTRA o erro quando a combinação já está em uso — aqui era um `let _ =` mudo.
             // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.
             if let Some(icon) = app.default_window_icon().cloned() {
                 let show = MenuItem::with_id(app, "show", "Abrir Corneta", true, None::<&str>)?;
@@ -191,31 +246,10 @@ pub fn run() {
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "show" => show_main(app),
                         "quit" => {
-                            let live = {
-                                let st = app.state::<AppState>();
-                                let eng = st.engine.lock().unwrap();
-                                eng.snapshot
-                                    .as_ref()
-                                    .map(|s| s.state != "stopped")
-                                    .unwrap_or(false)
-                            };
-                            let ok = if live {
-                                use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
-                                app.dialog()
-                                    .message("Você está AO VIVO. Sair encerra a transmissão.")
-                                    .title("Sair da Corneta?")
-                                    .buttons(MessageDialogButtons::OkCancelCustom(
-                                        "Encerrar e sair".into(),
-                                        "Cancelar".into(),
-                                    ))
-                                    .blocking_show()
-                            } else {
-                                true
-                            };
+                            let ok = !engine_live(app)
+                                || confirm_end_live(app, "Você está AO VIVO. Sair encerra a transmissão.");
                             if ok {
-                                studio::stop(&app.state::<AppState>().studio);
-                                auth::youtube_complete_active(app); // encerra o broadcast do YouTube
-                                commands::kill_engine(app);
+                                shutdown_engine(app);
                                 app.exit(0);
                             }
                         }
@@ -243,15 +277,25 @@ pub fn run() {
                 }
                 let app = window.app_handle();
                 let cfg = config::load(app);
+                let live = engine_live(app);
                 if cfg.settings.minimize_to_tray {
                     // Esconde na bandeja em vez de fechar — a transmissão continua (§14.8).
+                    // Com feedback: sem ele, o app "sumia" num botão chamado "Fechar".
                     api.prevent_close();
                     let _ = window.hide();
+                    tray_hide_hint(app, live);
+                } else if live {
+                    // X com a live NO AR: confirma antes — um clique acidental derrubava a
+                    // transmissão em todas as plataformas (o "Sair" da bandeja já perguntava).
+                    api.prevent_close();
+                    if confirm_end_live(app, "Você está AO VIVO. Fechar encerra a transmissão.") {
+                        shutdown_engine(app);
+                        // prevent_close já cancelou o fechamento — encerra explicitamente.
+                        app.exit(0);
+                    }
                 } else {
                     // Fechar de verdade: mata FFmpeg para não deixar processo órfão (§14.2).
-                    studio::stop(&app.state::<AppState>().studio);
-                    auth::youtube_complete_active(app); // encerra o broadcast do YouTube
-                    commands::kill_engine(app);
+                    shutdown_engine(app);
                 }
             }
         })

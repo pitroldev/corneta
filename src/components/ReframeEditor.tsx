@@ -204,7 +204,7 @@ export function ReframeEditor({ target, onClose }: { target: Target; onClose: ()
                   setZoom(1);
                 }}
               >
-                Do zero
+                Centralizar
               </Button>
             </div>
           </div>
