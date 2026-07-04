@@ -1,6 +1,13 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertTriangle,
+  AudioLines,
   Check,
   ChevronDown,
   Database,
@@ -106,9 +113,7 @@ export function SettingsScreen() {
       if (await api.importConfig()) {
         await load();
         // O backend guarda a config antiga antes de sobrescrever — dá o caminho de volta.
-        toast.success(
-          "Config importada — a anterior ficou salva em backup.",
-        );
+        toast.success("Config importada — a anterior ficou salva em backup.");
       }
     } catch (e) {
       toast.error(`Falha ao importar: ${e}`);
@@ -200,7 +205,8 @@ export function SettingsScreen() {
                       onBlur={(e) => {
                         // Se colar a URL inteira no campo de host, fica só o host.
                         const clean = sanitizeHost(e.target.value);
-                        if (clean !== e.target.value) setIngest({ host: clean });
+                        if (clean !== e.target.value)
+                          setIngest({ host: clean });
                       }}
                     />
                   </Field>
@@ -301,46 +307,84 @@ export function SettingsScreen() {
             <p className="mb-2 text-xs text-ink-faint">
               As redes que seguram a sua live quando algo dá errado.
             </p>
+            {/* Cada feature + seus parâmetros formam um GRUPO: o divisor fica entre grupos, e os
+                parâmetros só aparecem com a feature ligada, aninhados (colados) logo abaixo dela. */}
             <div className="divide-y divide-border-soft">
-              <SecurityFeature
-                preview={<BrbPreview />}
-                on={settings.brbEnabled}
-                title="Proteção contra quedas (JÁ VOLTO)"
-                desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna."
-              >
-                <Toggle
-                  checked={settings.brbEnabled}
-                  onChange={(v) => setSettings({ brbEnabled: v })}
-                  label="Proteção contra quedas"
-                />
-              </SecurityFeature>
-              <BrbSlateChooser />
-              <SecurityFeature
-                preview={<BitratePreview />}
-                on={settings.autoBitrate}
-                title="Segurar a live quando a internet aperta (auto-bitrate)"
-                desc="Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo por um tempo em vez de deixar a live travar ou cair — e volta ao normal sozinha."
-              >
-                <Toggle
-                  checked={settings.autoBitrate}
-                  onChange={(v) => setSettings({ autoBitrate: v })}
-                  label="Auto-bitrate"
-                />
-              </SecurityFeature>
-              <SecurityFeature
-                preview={<GuardianPreview />}
-                on={settings.guardianEnabled}
-                title="Guardião de privacidade"
-                badge={<ExperimentalBadge />}
-                desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. Rede de segurança, não garantia. Custo: a live inteira sai com 12s de atraso (o chat também)."
-              >
-                <Toggle
-                  checked={settings.guardianEnabled}
-                  onChange={(v) => setSettings({ guardianEnabled: v })}
-                  label="Guardião"
-                />
-              </SecurityFeature>
-              {settings.guardianEnabled && <GuardianEditor />}
+              <div>
+                <SecurityFeature
+                  preview={<BrbPreview />}
+                  on={settings.brbEnabled}
+                  title="Proteção contra quedas (JÁ VOLTO)"
+                  desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna."
+                >
+                  <Toggle
+                    checked={settings.brbEnabled}
+                    onChange={(v) => setSettings({ brbEnabled: v })}
+                    label="Proteção contra quedas"
+                  />
+                </SecurityFeature>
+                {settings.brbEnabled && (
+                  <SubSettings>
+                    <BrbSlateChooser />
+                  </SubSettings>
+                )}
+              </div>
+
+              <div>
+                <SecurityFeature
+                  preview={<BitratePreview />}
+                  on={settings.autoBitrate}
+                  title="Segurar a live quando a internet aperta (auto-bitrate)"
+                  desc="Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo por um tempo em vez de deixar a live travar ou cair — e volta ao normal sozinha."
+                >
+                  <Toggle
+                    checked={settings.autoBitrate}
+                    onChange={(v) => setSettings({ autoBitrate: v })}
+                    label="Auto-bitrate"
+                  />
+                </SecurityFeature>
+              </div>
+
+              <div>
+                <SecurityFeature
+                  preview={<GuardianPreview />}
+                  on={settings.guardianEnabled}
+                  title="Guardião de privacidade"
+                  badge={<ExperimentalBadge />}
+                  desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. Rede de segurança, não garantia. Custo: a live inteira sai com 12s de atraso (o chat também)."
+                >
+                  <Toggle
+                    checked={settings.guardianEnabled}
+                    onChange={(v) => setSettings({ guardianEnabled: v })}
+                    label="Guardião"
+                  />
+                </SecurityFeature>
+                {settings.guardianEnabled && (
+                  <SubSettings>
+                    <GuardianEditor />
+                  </SubSettings>
+                )}
+              </div>
+
+              <div>
+                <SecurityFeature
+                  preview={<LoudnessPreview />}
+                  on={settings.loudnessNormalize}
+                  title="Normalizador de áudio"
+                  desc="A Corneta acerta o volume do seu som antes de enviar — sem “tá baixo” nem estourando na troca de cena. Se você já normaliza no OBS, deixe desligado pra não brigar."
+                >
+                  <Toggle
+                    checked={settings.loudnessNormalize}
+                    onChange={(v) => setSettings({ loudnessNormalize: v })}
+                    label="Normalizar"
+                  />
+                </SecurityFeature>
+                {settings.loudnessNormalize && (
+                  <SubSettings>
+                    <LoudnessTarget />
+                  </SubSettings>
+                )}
+              </div>
             </div>
           </Card>
         </RTabs.Content>
@@ -429,9 +473,7 @@ export function SettingsScreen() {
               <Palette className="size-5 text-brass" /> Aparência
             </h3>
             <div className="divide-y divide-border-soft">
-              <SettingRow
-                title="Tema claro"
-              >
+              <SettingRow title="Tema claro">
                 <Toggle
                   checked={settings.theme === "light"}
                   onChange={(v) => setSettings({ theme: v ? "light" : "dark" })}
@@ -902,6 +944,65 @@ function BitratePreview() {
 }
 
 /** Uma linha da tela com um termo seu tampado — o Guardião viu e cortou. */
+/** Sub-painel dos parâmetros de uma feature: acento de latão à esquerda + fundo sutil, colado
+ *  logo abaixo do toggle. Renderizado só quando a feature está ligada — deixa claro que aquilo
+ *  pertence à feature acima (em vez de virar uma linha solta na lista). */
+function SubSettings({ children }: { children: ReactNode }) {
+  return (
+    <div className="-mt-1 mb-3 ml-1 rounded-md border-l-2 border-brass/30 bg-surface-2/40 px-3">
+      {children}
+    </div>
+  );
+}
+
+/** Prévia do guardião de áudio: um medidor com a agulha na zona-alvo (verde). */
+function LoudnessPreview() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-surface-2 px-2.5">
+      <div className="relative h-2.5 w-4/5 overflow-hidden rounded-sm bg-night">
+        <div className="absolute inset-y-0 left-[45%] right-[25%] bg-ok/40" />
+        <div className="absolute inset-y-0 left-[58%] w-1 rounded-sm bg-ok" />
+      </div>
+      <AudioLines
+        className="absolute right-1.5 top-1.5 size-3.5 text-brass"
+        strokeWidth={2.4}
+      />
+    </div>
+  );
+}
+
+/** Alvo de volume (LUFS) do normalizador: presets comuns. -14 é o padrão de Twitch/YouTube. */
+function LoudnessTarget() {
+  const target = useStore((s) => s.config!.settings.loudnessTargetLufs);
+  const setSettings = useStore((s) => s.setSettings);
+  const opts = [
+    { v: -14, label: "-14 · padrão (Twitch/YT)" },
+    { v: -16, label: "-16 · mais suave" },
+    { v: -18, label: "-18 · podcast/voz" },
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-3.5">
+      <span className="text-xs font-semibold text-ink-faint">
+        Alvo de volume
+      </span>
+      {opts.map((o) => (
+        <button
+          key={o.v}
+          onClick={() => setSettings({ loudnessTargetLufs: o.v })}
+          className={cn(
+            "rounded-md border-2 px-2.5 py-1 text-xs font-bold transition-colors",
+            target === o.v
+              ? "border-brass bg-brass/10 text-brass"
+              : "border-border text-ink-muted hover:border-brass/60",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function GuardianPreview() {
   return (
     <div className="absolute inset-0 flex flex-col justify-center gap-1.5 bg-surface-2 px-2.5">
@@ -990,7 +1091,9 @@ function SettingRow({
           {title}
           {badge}
         </div>
-        {desc && <div className="mt-0.5 max-w-md text-sm text-ink-muted">{desc}</div>}
+        {desc && (
+          <div className="mt-0.5 max-w-md text-sm text-ink-muted">{desc}</div>
+        )}
       </div>
       {children}
     </div>

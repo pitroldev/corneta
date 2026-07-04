@@ -1013,6 +1013,13 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
       experimental: false,
       show: true,
     },
+    {
+      on: settings.loudnessNormalize,
+      label: "Normalizador de áudio",
+      desc: "acertando seu volume automaticamente",
+      experimental: false,
+      show: settings.loudnessNormalize, // opt-in → só aparece quando ligado
+    },
   ].filter((it) => it.show);
   return (
     <Card accent className="mb-2 bg-surface-2">

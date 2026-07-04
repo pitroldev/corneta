@@ -63,6 +63,8 @@ export function defaultConfig(): AppConfig {
       autoBitrate: true,
       guardianEnabled: false,
       guardianWatchlist: [],
+      loudnessNormalize: false,
+      loudnessTargetLufs: -14,
       youtubeAutoLive: true,
       streamTitle: "",
       chatAutoConnect: true,

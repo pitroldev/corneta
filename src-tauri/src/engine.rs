@@ -198,9 +198,20 @@ pub fn ffmpeg_args_for_target(
     // Áudio: sempre AAC 48 kHz estéreo (todas as plataformas exigem AAC).
     // `0:a?` torna o mapeamento opcional, para não falhar se a fonte não tiver áudio.
     let audio_kbps = effective_preset(t).audio_bitrate_kbps;
+    args.extend(["-map", "0:a?"].map(String::from));
+    // Normalização de loudness (opt-in): como a Corneta JÁ reencoda o áudio de TODO destino
+    // (mesmo no modo cópia, onde só o vídeo é copiado), o `loudnorm` é só mais um filtro de
+    // áudio no encode que já existe — praticamente DE GRAÇA e sem tocar no vídeo. Passada única
+    // (ao vivo não dá 2 passadas): puxa pro alvo com o true-peak travado em -1.5 dBTP.
+    if config.settings.loudness_normalize {
+        args.push("-af".into());
+        args.push(format!(
+            "loudnorm=I={:.1}:TP=-1.5:LRA=11",
+            config.settings.loudness_target_lufs
+        ));
+    }
     args.extend(
         [
-            "-map", "0:a?",
             "-c:a", "aac",
             "-ar", "48000",
             "-ac", "2",
@@ -790,5 +801,23 @@ mod tests {
         assert!(s.contains("-bufsize 9000k"), "bufsize = vbr*2");
         assert!(s.contains("-vf scale=1920:1080"), "escala landscape: {s}");
         assert!(s.contains("-g 120"), "gop = fps*keyframe_sec (60*2): {s}");
+        // sem normalização por padrão → nada de loudnorm.
+        assert!(!s.contains("loudnorm"));
+    }
+
+    #[test]
+    fn ffmpeg_args_loudnorm_when_enabled() {
+        let mut c = cfg("passthrough", vec![tgt("twitch", None)]);
+        // desligado → sem loudnorm (mesmo alvo definido).
+        c.settings.loudness_target_lufs = -16.0;
+        assert!(!ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None)
+            .join(" ")
+            .contains("loudnorm"));
+        // ligado → injeta loudnorm no alvo, com TP travado; e NÃO reencoda o vídeo (segue em cópia).
+        c.settings.loudness_normalize = true;
+        let s = ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None).join(" ");
+        assert!(s.contains("-af loudnorm=I=-16.0:TP=-1.5:LRA=11"), "{s}");
+        assert!(s.contains("-c:v copy"), "áudio normaliza, vídeo segue em cópia: {s}");
+        assert!(s.contains("-c:a aac"));
     }
 }

@@ -139,6 +139,14 @@ pub struct Settings {
     /// Termos EXPLÍCITOS a vigiar (endereço, nome real, @, placa…). É o único gatilho da feature.
     #[serde(default)]
     pub guardian_watchlist: Vec<String>,
+    /// Normalizador de ÁUDIO: acerta o volume (loudness) pro alvo antes de enviar, via `loudnorm`
+    /// no encode que a Corneta JÁ faz por destino → quase sem custo e sem tocar no vídeo. Opt-in
+    /// (padrão DESLIGADO): a passada única pode bombear e briga com quem já normaliza no OBS.
+    #[serde(default)]
+    pub loudness_normalize: bool,
+    /// Alvo de loudness integrado (LUFS) do normalizador. -14 é o comum de Twitch/YouTube.
+    #[serde(default = "default_loudness_target")]
+    pub loudness_target_lufs: f64,
     /// YouTube automático: ao dar BORA, a Corneta cria a transmissão (broadcast) e injeta a
     /// chave RTMP do YouTube sozinha — o streamer não abre o YouTube Studio.
     #[serde(default = "default_true")]
@@ -162,6 +170,9 @@ pub struct Settings {
 
 fn default_true() -> bool {
     true
+}
+fn default_loudness_target() -> f64 {
+    -14.0
 }
 fn default_popout_tab() -> String {
     "both".to_string()
@@ -253,6 +264,8 @@ impl Default for Settings {
             auto_bitrate: true,
             guardian_enabled: false,
             guardian_watchlist: Vec::new(),
+            loudness_normalize: false,
+            loudness_target_lufs: -14.0,
             youtube_auto_live: true,
             stream_title: String::new(),
             chat_auto_connect: true,

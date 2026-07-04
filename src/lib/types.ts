@@ -140,6 +140,10 @@ export interface AppSettings {
   guardianEnabled: boolean;
   /** Termos EXPLÍCITOS a vigiar (e-mail, nome real, endereço, @…). Único gatilho da feature. */
   guardianWatchlist: string[];
+  /** Normalizador de áudio: acerta o volume pro alvo antes de enviar (loudnorm no encode que já roda). */
+  loudnessNormalize: boolean;
+  /** Alvo de loudness integrado (LUFS) do normalizador — ~-14 pra Twitch/YouTube. */
+  loudnessTargetLufs: number;
   /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
   /** Tela "JÁ VOLTO": "auto" (gerada) | "image" | "video" (arquivo escolhido pelo usuário). */
