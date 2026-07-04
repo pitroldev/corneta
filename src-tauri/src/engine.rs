@@ -629,6 +629,99 @@ impl EngineSnapshot {
     }
 }
 
+/// O que o auto-bitrate decidiu a partir de uma leitura de `speed=` do FFmpeg.
+pub enum BitrateAction {
+    /// Segura o bitrate atual.
+    Hold,
+    /// Aperto de internet: baixou pra X kbps (respawna o FFmpeg com esse valor).
+    Down(u32),
+    /// Recuperou: subiu pra X kbps.
+    Up(u32),
+}
+
+/// Auto-bitrate PURO e testável de UM destino (transcode). A cada `speed=` do FFmpeg (≈1/s),
+/// decide baixar/subir o bitrate dentro de `[floor, base]` — AIMD com reação proporcional:
+///
+/// - **BAIXA rápido e proporcional ao aperto:** `speed<0.6` (severo) age em 3 amostras cortando
+///   40%; `speed<0.9` (leve) age em 8 cortando 20%. Aperto sério some da tela em ~3s, não ~8s.
+/// - **SOBE aditivo** (passos de ~⅛ do base), só após estabilidade sustentada — sem o ×1.2 antigo
+///   que estourava acima e voltava a apertar (a gangorra de reconexões).
+/// - **COOLDOWN** após cada mudança: cada troca de bitrate reinicia o FFmpeg (reconecta a
+///   plataforma), então espera algumas amostras antes de reagir de novo — evita thrash de restart.
+///
+/// Só decide; o supervisor em `commands.rs` é quem respawna o FFmpeg com o novo valor.
+pub struct AutoBitrate {
+    base: u32,     // teto: o bitrate configurado do destino
+    floor: u32,    // piso: nunca abaixo disso (imagem mínima aceitável)
+    current: u32,  // bitrate ativo
+    slow: u32,     // leituras lentas consecutivas
+    fast: u32,     // leituras boas consecutivas
+    cooldown: u32, // amostras a ignorar após uma mudança
+}
+
+impl AutoBitrate {
+    const SLOW: f64 = 0.9; // abaixo disso o FFmpeg não segura o tempo real
+    const SEVERE: f64 = 0.6; // aperto sério → reage mais rápido e corta mais
+    const COOLDOWN: u32 = 5; // ~5s de carência após cada mudança (anti-thrash)
+    const RECOVER: u32 = 45; // ~45s de estabilidade antes de tentar subir
+    const NEED_MILD: u32 = 8; // amostras lentas leves antes de baixar
+    const NEED_SEVERE: u32 = 3; // amostras lentas severas antes de baixar
+
+    pub fn new(base: u32, floor: u32) -> Self {
+        let floor = floor.min(base);
+        Self { base, floor, current: base, slow: 0, fast: 0, cooldown: 0 }
+    }
+
+    pub fn current(&self) -> u32 {
+        self.current
+    }
+
+    /// Nova conexão (respawn do FFmpeg): zera os contadores por-instância; MANTÉM bitrate e
+    /// cooldown (a carência da última mudança não pode ser apagada pelo respawn que ela causou).
+    pub fn on_reconnect(&mut self) {
+        self.slow = 0;
+        self.fast = 0;
+    }
+
+    /// Uma leitura de `speed=` → decisão. `Down`/`Up` já atualizam `current`.
+    pub fn on_speed(&mut self, speed: f64) -> BitrateAction {
+        if self.cooldown > 0 {
+            self.cooldown -= 1;
+        }
+        if speed < Self::SLOW {
+            self.fast = 0;
+            self.slow += 1;
+            if self.cooldown == 0 && self.current > self.floor {
+                let severe = speed < Self::SEVERE;
+                let need = if severe { Self::NEED_SEVERE } else { Self::NEED_MILD };
+                if self.slow >= need {
+                    let cut = if severe { 0.6 } else { 0.8 };
+                    let next = ((self.current as f64 * cut) as u32).max(self.floor);
+                    if next < self.current {
+                        self.current = next;
+                        self.slow = 0;
+                        self.cooldown = Self::COOLDOWN;
+                        return BitrateAction::Down(next);
+                    }
+                }
+            }
+        } else {
+            self.slow = 0;
+            self.fast += 1;
+            if self.cooldown == 0 && self.fast >= Self::RECOVER && self.current < self.base {
+                // Aditivo (não ×fator): sobe um passo fixo, sem estourar acima do base.
+                let step = (self.base / 8).max(300);
+                let next = (self.current + step).min(self.base);
+                self.current = next;
+                self.fast = 0;
+                self.cooldown = Self::COOLDOWN;
+                return BitrateAction::Up(next);
+            }
+        }
+        BitrateAction::Hold
+    }
+}
+
 /// Runtime guardado no state do Tauri (handles dos sidecars + último snapshot).
 #[derive(Default)]
 pub struct EngineRuntime {
@@ -819,5 +912,85 @@ mod tests {
         assert!(s.contains("-af loudnorm=I=-16.0:TP=-1.5:LRA=11"), "{s}");
         assert!(s.contains("-c:v copy"), "áudio normaliza, vídeo segue em cópia: {s}");
         assert!(s.contains("-c:a aac"));
+    }
+
+    // ---- auto-bitrate (AIMD) ----
+
+    fn feed_down(abr: &mut AutoBitrate, speed: f64, n: u32) -> Option<u32> {
+        let mut last = None;
+        for _ in 0..n {
+            if let BitrateAction::Down(k) = abr.on_speed(speed) {
+                last = Some(k);
+            }
+        }
+        last
+    }
+
+    #[test]
+    fn abr_starts_at_base() {
+        assert_eq!(AutoBitrate::new(6000, 2400).current(), 6000);
+    }
+
+    #[test]
+    fn abr_mild_congestion_cuts_20pct_after_8() {
+        let mut a = AutoBitrate::new(6000, 2400);
+        // 7 amostras leves não bastam; a 8ª corta 20% → 4800.
+        assert_eq!(feed_down(&mut a, 0.85, 7), None);
+        assert_eq!(feed_down(&mut a, 0.85, 1), Some(4800));
+        assert_eq!(a.current(), 4800);
+    }
+
+    #[test]
+    fn abr_severe_congestion_cuts_40pct_fast() {
+        let mut a = AutoBitrate::new(6000, 2400);
+        // aperto severo (speed<0.6) age em 3 amostras cortando 40% → 3600 (vs 8 no leve).
+        assert_eq!(feed_down(&mut a, 0.5, 3), Some(3600));
+        assert_eq!(a.current(), 3600);
+    }
+
+    #[test]
+    fn abr_never_below_floor() {
+        let mut a = AutoBitrate::new(6000, 2400);
+        for _ in 0..200 {
+            a.on_speed(0.3);
+        }
+        assert_eq!(a.current(), 2400); // 6000→3600→2400 (piso), nunca abaixo
+    }
+
+    #[test]
+    fn abr_recovers_additively_capped_at_base() {
+        let mut a = AutoBitrate::new(6000, 2400);
+        feed_down(&mut a, 0.85, 8); // → 4800
+        assert_eq!(a.current(), 4800);
+        // muitas amostras boas: sobe em passos aditivos (+base/8=750), sem passar do base.
+        let mut ups = vec![];
+        for _ in 0..300 {
+            if let BitrateAction::Up(k) = a.on_speed(1.0) {
+                ups.push(k);
+            }
+        }
+        assert!(ups.contains(&5550), "primeiro passo aditivo 4800+750: {ups:?}");
+        assert_eq!(a.current(), 6000);
+        assert!(ups.iter().all(|&k| k <= 6000), "nunca acima do base: {ups:?}");
+    }
+
+    #[test]
+    fn abr_cooldown_blocks_immediate_rethrash() {
+        let mut a = AutoBitrate::new(6000, 2400);
+        feed_down(&mut a, 0.5, 3); // → 3600, cooldown liga
+        // durante o cooldown, mesmo com aperto, NÃO muda de novo...
+        for _ in 0..4 {
+            assert!(matches!(a.on_speed(0.5), BitrateAction::Hold));
+        }
+        // ...e ao fim do cooldown volta a baixar (o aperto persistiu).
+        assert!(matches!(a.on_speed(0.5), BitrateAction::Down(_)));
+    }
+
+    #[test]
+    fn abr_on_reconnect_keeps_bitrate() {
+        let mut a = AutoBitrate::new(6000, 2400);
+        feed_down(&mut a, 0.85, 8); // → 4800
+        a.on_reconnect();
+        assert_eq!(a.current(), 4800); // respawn mantém o bitrate; só zera contadores
     }
 }

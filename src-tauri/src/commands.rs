@@ -1157,8 +1157,9 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         let auto_codec = hw_codec.clone();
         let out_source = out_source.clone();
         tauri::async_runtime::spawn(async move {
-            let mut current_kbps = base_kbps;
-            // Auto-bitrate: notifica UMA vez por sequência de aperto (não a cada degrau).
+            // Auto-bitrate: state machine PURO decide baixar/subir; persiste entre respawns.
+            let mut abr = engine::AutoBitrate::new(base_kbps, floor_kbps);
+            // Notifica UMA vez por sequência de aperto (não a cada degrau).
             let mut drop_notified = false;
             while run_flag.load(Ordering::Relaxed) {
                 // (A censura agora é feita pelo "protetor" via zmq — sem trocar este FFmpeg.)
@@ -1213,7 +1214,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     &cfg,
                     &target,
                     &key,
-                    Some(current_kbps),
+                    Some(abr.current()),
                     &out_source,
                     auto_codec.as_deref(),
                 );
@@ -1248,8 +1249,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     }
                     break;
                 }
-                let mut low = 0u32;
-                let mut stable = 0u32;
+                // Contadores por-instância do auto-bitrate zeram a cada (re)conexão.
+                abr.on_reconnect();
                 let mut rebitrate = false;
                 let mut signal_lost = false;
                 let mut paused_kill = false;
@@ -1272,53 +1273,43 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                         signal.load(Ordering::Relaxed),
                                         brb_flag.load(Ordering::Relaxed),
                                     );
-                                    // Auto-bitrate: vigia a velocidade do FFmpeg (só em transcode).
+                                    // Auto-bitrate (só em transcode): o state machine puro decide a
+                                    // partir do `speed=`. Down/Up já ajustam o bitrate interno; aqui
+                                    // só notificamos e quebramos pra respawnar o FFmpeg com o valor novo.
                                     if auto_bitrate && is_transcode {
                                         if let Some(speed) = parse_kv(&line, "speed=") {
-                                            if speed < 0.9 {
-                                                low += 1;
-                                                stable = 0;
-                                            } else {
-                                                low = 0;
-                                                stable += 1;
-                                            }
-                                            if low >= 8 && current_kbps > floor_kbps {
-                                                current_kbps =
-                                                    ((current_kbps as f64 * 0.75) as u32).max(floor_kbps);
-                                                log::info!(
-                                                    "auto-bitrate: {target_name} baixando pra {current_kbps} kbps"
-                                                );
-                                                // Uma notificação por sequência de aperto — os
-                                                // degraus seguintes ficam só no log (sem spam).
-                                                if !drop_notified {
-                                                    drop_notified = true;
-                                                    notify(
-                                                        &app_t,
-                                                        "Internet apertou",
-                                                        &format!("{target_name}: baixei a qualidade por um tempo pra live não travar."),
-                                                    );
+                                            match abr.on_speed(speed) {
+                                                engine::BitrateAction::Down(kbps) => {
+                                                    log::info!("auto-bitrate: {target_name} baixando pra {kbps} kbps");
+                                                    // Uma notificação por sequência de aperto (degraus
+                                                    // seguintes ficam só no log — sem spam).
+                                                    if !drop_notified {
+                                                        drop_notified = true;
+                                                        notify(
+                                                            &app_t,
+                                                            "Internet apertou",
+                                                            &format!("{target_name}: baixei a qualidade por um tempo pra live não travar."),
+                                                        );
+                                                    }
+                                                    rebitrate = true;
+                                                    break;
                                                 }
-                                                rebitrate = true;
-                                                break;
-                                            } else if stable >= 60 && current_kbps < base_kbps {
-                                                current_kbps =
-                                                    ((current_kbps as f64 * 1.2) as u32).min(base_kbps);
-                                                log::info!(
-                                                    "auto-bitrate: {target_name} subindo pra {current_kbps} kbps"
-                                                );
-                                                // Recuperou TUDO: fecha o ciclo avisando — senão fica
-                                                // a impressão de que a qualidade caiu pra sempre.
-                                                // (Não zera em subida parcial: oscilação re-notificaria.)
-                                                if current_kbps >= base_kbps && drop_notified {
-                                                    drop_notified = false;
-                                                    notify(
-                                                        &app_t,
-                                                        "Internet estabilizou",
-                                                        &format!("{target_name}: qualidade de volta ao normal."),
-                                                    );
+                                                engine::BitrateAction::Up(kbps) => {
+                                                    log::info!("auto-bitrate: {target_name} subindo pra {kbps} kbps");
+                                                    // Recuperou TUDO: fecha o ciclo avisando (senão fica
+                                                    // a impressão de que a qualidade caiu pra sempre).
+                                                    if kbps >= base_kbps && drop_notified {
+                                                        drop_notified = false;
+                                                        notify(
+                                                            &app_t,
+                                                            "Internet estabilizou",
+                                                            &format!("{target_name}: qualidade de volta ao normal."),
+                                                        );
+                                                    }
+                                                    rebitrate = true;
+                                                    break;
                                                 }
-                                                rebitrate = true;
-                                                break;
+                                                engine::BitrateAction::Hold => {}
                                             }
                                         }
                                     }
