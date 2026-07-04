@@ -703,39 +703,6 @@ export function summarize(data: SessionData, a: ReportAnalysis): SessionSummary 
   };
 }
 
-// Cache em localStorage keyed por session id: evita reparsear NDJSON grande
-// toda vez que a lista abre. Entrada órfã de sessão excluída é inofensiva.
-const SUMMARY_CACHE_KEY = "corneta.session-summaries";
-
-function readSummaryCache(): Record<string, SessionSummary> {
-  try {
-    return JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) ?? "{}") as Record<string, SessionSummary>;
-  } catch {
-    return {};
-  }
-}
-
-export function getCachedSummary(id: string): SessionSummary | null {
-  return readSummaryCache()[id] ?? null;
-}
-
-export function setCachedSummary(id: string, s: SessionSummary): void {
-  try {
-    const all = readSummaryCache();
-    all[id] = s;
-    localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(all));
-  } catch {
-    // localStorage indisponível/cheio — segue sem cache
-  }
-}
-
-export function dropCachedSummary(id: string): void {
-  try {
-    const all = readSummaryCache();
-    if (!(id in all)) return;
-    delete all[id];
-    localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(all));
-  } catch {
-    // sem cache, sem drama
-  }
-}
+// Cache do resumo em localStorage (adapter de I/O) — extraído pra summaryCache.ts e re-exportado
+// aqui pra não mexer nos callers, deixando o report.ts 100% puro (só parse/análise).
+export { getCachedSummary, setCachedSummary, dropCachedSummary } from "./summaryCache";

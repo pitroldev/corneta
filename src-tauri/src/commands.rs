@@ -2,6 +2,10 @@
 use crate::config::{self, AppConfig};
 use crate::chat;
 use crate::engine::{self, EngineSnapshot};
+use crate::engine_policy::{
+    brb_slate_is_video, friendly_error, is_brb_slate_path, parse_ingest_hostport, parse_kv,
+    parse_mediamtx_paths, quality_of, tray_tooltip,
+};
 use crate::keys;
 use crate::session;
 use crate::AppState;
@@ -31,6 +35,27 @@ fn quiet_command(program: &str) -> std::process::Command {
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     cmd
+}
+
+/// Endereço padrão do obs-websocket (o OBS abre o servidor em 127.0.0.1:4455).
+const OBS_WS_HOST: &str = "127.0.0.1";
+const OBS_WS_PORT: u16 = 4455;
+
+/// Mata um sidecar (FFmpeg/MediaMTX) e seus netos órfãos — `taskkill /T /F` no Windows, onde
+/// `child.kill()` sozinho não leva a árvore junto. Fonte ÚNICA do encerramento de processo.
+fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) {
+    let pid = child.pid();
+    let _ = child.kill();
+    #[cfg(windows)]
+    {
+        let _ = quiet_command("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .output();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+    }
 }
 
 // ----------------------------- Config -----------------------------
@@ -258,7 +283,7 @@ pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), String> {
     let key = cfg.ingest.key.clone();
     let password = cfg.settings.obs_password.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::autoconfigure("127.0.0.1", 4455, &password, &server, &key)
+        crate::obs::autoconfigure(OBS_WS_HOST, OBS_WS_PORT, &password, &server, &key)
     })
     .await
     .map_err(|e| format!("join: {e}"))?
@@ -288,70 +313,6 @@ fn emit(app: &AppHandle, snap: &EngineSnapshot) {
 pub(crate) fn notify(app: &AppHandle, title: &str, body: &str) {
     use tauri_plugin_notification::NotificationExt;
     let _ = app.notification().builder().title(title).body(body).show();
-}
-
-fn fmt_mbps(kbps: u32) -> String {
-    if kbps >= 1000 {
-        format!("{:.1} Mbps", kbps as f64 / 1000.0)
-    } else {
-        format!("{kbps} kbps")
-    }
-}
-
-/// Qualidade geral do multistream → cor do ícone da bandeja.
-fn quality_of(snap: &EngineSnapshot) -> &'static str {
-    match snap.state.as_str() {
-        "stopped" => "idle",
-        "error" => "bad",
-        "starting" => "warn",
-        _ => {
-            let mut bad = false;
-            let mut warn = false;
-            for st in snap.targets.values() {
-                match st.state.as_str() {
-                    "error" | "signal-lost" => bad = true,
-                    "reconnecting" | "connecting" | "waiting" | "brb" => warn = true,
-                    _ => {}
-                }
-            }
-            if bad {
-                "bad"
-            } else if warn {
-                "warn"
-            } else {
-                "good"
-            }
-        }
-    }
-}
-
-/// Tooltip da bandeja: cabeçalho + uma linha por plataforma (métrica/estado).
-fn tray_tooltip(snap: &EngineSnapshot) -> String {
-    if snap.state == "stopped" {
-        return "Corneta".into();
-    }
-    let header = match snap.state.as_str() {
-        "starting" => "Corneta · aguardando OBS".to_string(),
-        "error" => "Corneta · erro".to_string(),
-        _ => format!("Corneta · no ar ({})", snap.targets.len()),
-    };
-    let mut items: Vec<&engine::TargetStatus> = snap.targets.values().collect();
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    let mut lines = vec![header];
-    for st in items {
-        let (mark, detail) = match st.state.as_str() {
-            "live" => ("✓", fmt_mbps(st.bitrate_kbps)),
-            "reconnecting" => ("⚠", "reconectando".to_string()),
-            "error" => ("✕", "erro".to_string()),
-            "signal-lost" => ("✕", "sem sinal do OBS".to_string()),
-            "paused" => ("⏸", "pausado".to_string()),
-            "waiting" => ("◌", "aguardando sinal".to_string()),
-            "brb" => ("◷", "JÁ VOLTO (slate no ar)".to_string()),
-            _ => ("…", "conectando".to_string()),
-        };
-        lines.push(format!("{mark} {} · {detail}", st.name));
-    }
-    lines.join("\n")
 }
 
 /// Atualiza o ícone (só quando a qualidade muda) e o tooltip da bandeja.
@@ -420,26 +381,7 @@ fn mediamtx_paths(ingest_name: &str, program_name: &str) -> (bool, u64, bool) {
         Ok(r) => r.into_string().unwrap_or_default(),
         Err(_) => return (false, 0, false),
     };
-    let v: serde_json::Value = match serde_json::from_str(&body) {
-        Ok(v) => v,
-        Err(_) => return (false, 0, false),
-    };
-    let mut ingest_ready = false;
-    let mut bytes = 0u64;
-    let mut prog_ready = false;
-    if let Some(arr) = v.get("items").and_then(|i| i.as_array()) {
-        for p in arr {
-            let name = p.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            let ready = p.get("ready").and_then(|r| r.as_bool()) == Some(true);
-            if name == ingest_name {
-                ingest_ready = ready;
-                bytes = p.get("bytesReceived").and_then(|b| b.as_u64()).unwrap_or(0);
-            } else if name == program_name {
-                prog_ready = ready;
-            }
-        }
-    }
-    (ingest_ready, bytes, prog_ready)
+    parse_mediamtx_paths(&body, ingest_name, program_name)
 }
 
 /// O OBS está publicando na ingestão? (Path exato — ignora o `_program` do compositor.)
@@ -469,25 +411,6 @@ fn brb_slate_file(app: &AppHandle) -> Option<std::path::PathBuf> {
         }
     }
     None
-}
-
-/// `true` se o caminho é um `brb-slate.*` (o nome, sem extensão, é exatamente "brb-slate").
-fn is_brb_slate_path(p: &std::path::Path) -> bool {
-    p.file_stem()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("brb-slate"))
-        .unwrap_or(false)
-}
-
-/// A extensão indica um VÍDEO (não uma imagem/still)?
-fn brb_slate_is_video(p: &std::path::Path) -> bool {
-    matches!(
-        p.extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
-            .as_deref(),
-        Some("mp4" | "mov" | "mkv" | "webm" | "m4v")
-    )
 }
 
 /// Apaga qualquer `brb-slate.*` da pasta de config (best-effort). Só existe um slate por vez.
@@ -1321,18 +1244,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                         removed
                     };
                     if let Some(c) = leftover {
-                        let pid = c.pid();
-                        let _ = c.kill();
-                        #[cfg(windows)]
-                        {
-                            let _ = quiet_command("taskkill")
-                                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                                .output();
-                        }
-                        #[cfg(not(windows))]
-                        {
-                            let _ = pid;
-                        }
+                        kill_child_tree(c);
                     }
                     break;
                 }
@@ -1438,18 +1350,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 };
                 if rebitrate || signal_lost || paused_kill {
                     if let Some(c) = leftover {
-                        let pid = c.pid();
-                        let _ = c.kill();
-                        #[cfg(windows)]
-                        {
-                            let _ = quiet_command("taskkill")
-                                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                                .output();
-                        }
-                        #[cfg(not(windows))]
-                        {
-                            let _ = pid;
-                        }
+                        kill_child_tree(c);
                     }
                 }
                 if !run_flag.load(Ordering::Relaxed) {
@@ -1514,7 +1415,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     tauri::async_runtime::spawn_blocking(move || {
         // Religa sozinho se a conexão cair, enquanto o motor estiver no ar.
         while run_o.load(Ordering::Relaxed) {
-            crate::obs::poll_stats("127.0.0.1", 4455, &obs_pw, &run_o, |stats| {
+            crate::obs::poll_stats(OBS_WS_HOST, OBS_WS_PORT, &obs_pw, &run_o, |stats| {
                 update_obs_stats(&app_o, stats);
             });
             for _ in 0..25 {
@@ -1594,18 +1495,7 @@ pub async fn set_target_paused(
     // Mata o FFmpeg pausado FORA da thread do event-loop.
     if let Some(child) = child {
         tauri::async_runtime::spawn_blocking(move || {
-            let pid = child.pid();
-            let _ = child.kill();
-            #[cfg(windows)]
-            {
-                let _ = quiet_command("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                    .output();
-            }
-            #[cfg(not(windows))]
-            {
-                let _ = pid;
-            }
+            kill_child_tree(child);
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -1663,41 +1553,6 @@ pub fn set_force_brb(app: AppHandle, on: bool) -> Result<(), String> {
         emit(&app, &out);
     }
     Ok(())
-}
-
-/// Lê uma chave numérica do tipo "fps= 60" / "drop=5" do log do FFmpeg.
-fn parse_kv(line: &str, key: &str) -> Option<f64> {
-    let idx = line.find(key)?;
-    let rest = line[idx + key.len()..].trim_start();
-    let num: String = rest
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect();
-    num.parse().ok()
-}
-
-/// Traduz uma linha de erro do FFmpeg para (estado, mensagem amigável).
-fn friendly_error(low: &str) -> (&'static str, String) {
-    if low.contains("403") || low.contains("forbidden") || low.contains("unauthorized")
-        || low.contains("not authorized") || low.contains("rejected") || low.contains("auth")
-    {
-        ("error", "Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into())
-    } else if low.contains("connection refused")
-        || low.contains("cannot open")
-        || low.contains("failed to connect")
-        || low.contains("no route")
-        || low.contains("name or service not known")
-    {
-        ("reconnecting", "Sem conexão com a plataforma — tentando de novo.".into())
-    } else if low.contains("broken pipe")
-        || low.contains("connection reset")
-        || low.contains("end of file")
-        || low.contains("timed out")
-    {
-        ("reconnecting", "A conexão caiu — reconectando.".into())
-    } else {
-        ("reconnecting", "Instabilidade no envio — reconectando.".into())
-    }
 }
 
 /// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
@@ -1902,19 +1757,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
     emit(app, &out);
 
     for child in children {
-        let pid = child.pid();
-        let _ = child.kill();
-        // Mata eventuais subprocessos (netos órfãos) — Windows-first.
-        #[cfg(windows)]
-        {
-            let _ = quiet_command("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .output();
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = pid; // em Unix, child.kill() já encerra; árvore tratada no futuro
-        }
+        kill_child_tree(child);
     }
     // Fecha a gravação da sessão (relatório pós-live).
     if let Some(path) = session_path {
@@ -2037,7 +1880,7 @@ pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
 pub async fn obs_set_stream(app: AppHandle, start: bool) -> Result<(), String> {
     let password = get_config(app).settings.obs_password;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::set_stream("127.0.0.1", 4455, &password, start)
+        crate::obs::set_stream(OBS_WS_HOST, OBS_WS_PORT, &password, start)
     })
     .await
     .map_err(|e| format!("join: {e}"))?
@@ -2048,18 +1891,7 @@ fn tcp_reach(ingest_url: &str) -> Result<String, String> {
     if ingest_url.starts_with("srt") {
         return Ok("SRT (UDP) — teste de alcance indisponível".into());
     }
-    let after = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
-    let hostport = after.split('/').next().unwrap_or("");
-    let (host, port) = match hostport.rsplit_once(':') {
-        Some((h, p)) => (h.to_string(), p.parse::<u16>().unwrap_or(1935)),
-        None => {
-            let default = if ingest_url.starts_with("rtmps") { 443 } else { 1935 };
-            (hostport.to_string(), default)
-        }
-    };
-    if host.is_empty() {
-        return Err("URL de ingestão inválida".into());
-    }
+    let (host, port) = parse_ingest_hostport(ingest_url)?;
     use std::net::ToSocketAddrs;
     let addr = format!("{host}:{port}")
         .to_socket_addrs()
@@ -2152,7 +1984,7 @@ pub async fn obs_check(app: AppHandle) -> Result<crate::obs::ObsCheck, String> {
         cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
     );
     let password = cfg.settings.obs_password;
-    tauri::async_runtime::spawn_blocking(move || crate::obs::check("127.0.0.1", 4455, &password, &server))
+    tauri::async_runtime::spawn_blocking(move || crate::obs::check(OBS_WS_HOST, OBS_WS_PORT, &password, &server))
         .await
         .map_err(|e| format!("join: {e}"))
 }
@@ -2182,7 +2014,7 @@ pub fn mesa_stop_server(state: State<'_, AppState>) {
 pub async fn mesa_obs_add_source(app: AppHandle, url: String, width: u32, height: u32) -> Result<(), String> {
     let password = get_config(app).settings.obs_password;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::add_or_update_browser_source("127.0.0.1", 4455, &password, MESA_OBS_SOURCE, &url, width, height)
+        crate::obs::add_or_update_browser_source(OBS_WS_HOST, OBS_WS_PORT, &password, MESA_OBS_SOURCE, &url, width, height)
     })
     .await
     .map_err(|e| format!("join: {e}"))?
@@ -2193,7 +2025,7 @@ pub async fn mesa_obs_add_source(app: AppHandle, url: String, width: u32, height
 pub async fn mesa_obs_remove_source(app: AppHandle) -> Result<(), String> {
     let password = get_config(app).settings.obs_password;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::remove_input("127.0.0.1", 4455, &password, MESA_OBS_SOURCE)
+        crate::obs::remove_input(OBS_WS_HOST, OBS_WS_PORT, &password, MESA_OBS_SOURCE)
     })
     .await
     .map_err(|e| format!("join: {e}"))?

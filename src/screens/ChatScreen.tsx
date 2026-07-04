@@ -27,7 +27,7 @@ import { api, IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { toast } from "../lib/toast";
-import { cn, openExternal, uid } from "../lib/utils";
+import { cn, errMsg, openExternal, uid } from "../lib/utils";
 import { normalizeChatChannel } from "../lib/chatChannel";
 import { sanitizeApiKey, sanitizeToken } from "../lib/validation";
 import * as RTabs from "@radix-ui/react-tabs";
@@ -245,7 +245,7 @@ export function ChatScreen() {
       );
       setDraft("");
     } catch (e) {
-      toast.error(String(e).replace("Error: ", ""));
+      toast.error(errMsg(e));
     } finally {
       setSending(false);
     }
@@ -282,7 +282,7 @@ export function ChatScreen() {
     try {
       await connectChat();
     } catch (e) {
-      toast.error(String(e).replace("Error: ", ""));
+      toast.error(errMsg(e));
     } finally {
       setReconnecting(false);
     }
@@ -310,7 +310,7 @@ export function ChatScreen() {
         toast.success(
           action === "delete" ? "Mensagem apagada" : action === "ban" ? "Usuário banido" : "Timeout aplicado",
         ),
-      (e) => toast.error(String(e).replace("Error: ", "")),
+      (e) => toast.error(errMsg(e)),
     );
   };
 
@@ -1116,7 +1116,7 @@ function YoutubeApiKeyField({
     try {
       setResult({ ok: true, msg: await api.youtubeKeyCheck(value.trim()) });
     } catch (e) {
-      setResult({ ok: false, msg: String(e).replace("Error: ", "") });
+      setResult({ ok: false, msg: errMsg(e) });
     } finally {
       setTesting(false);
     }
@@ -1208,7 +1208,7 @@ function AlertSourceCard({
     try {
       setTestResult({ ok: true, msg: await api.alertTest(src.id) });
     } catch (e) {
-      setTestResult({ ok: false, msg: String(e).replace("Error: ", "") });
+      setTestResult({ ok: false, msg: errMsg(e) });
     } finally {
       setTesting(false);
     }

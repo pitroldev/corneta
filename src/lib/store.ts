@@ -18,7 +18,7 @@ import type {
 import { api } from "./api";
 import { toast } from "./toast";
 import { OAUTH } from "./oauth";
-import { makeTarget } from "./factory";
+import * as cfgOps from "./configOps";
 import { openExternal, uid } from "./utils";
 
 interface LoginState {
@@ -298,95 +298,54 @@ export const useStore = create<State>((set, get) => {
       return api.subscribeConfigChanged((config) => set({ config }));
     },
 
+    // Coordenadores finos: lê a config, chama o reducer PURO (configOps), persiste se mudou.
     addTarget(platformId) {
       const config = get().config;
       if (!config) return;
-      const t = makeTarget(platformId);
-      // Nome único: se já existe "Twitch", o próximo vira "Twitch 2", etc.
-      const names = new Set(config.targets.map((x) => x.name));
-      if (names.has(t.name)) {
-        let n = 2;
-        while (names.has(`${t.name} ${n}`)) n++;
-        t.name = `${t.name} ${n}`;
-      }
-      persist({ ...config, targets: [...config.targets, t] });
-      return t.id;
+      const { config: next, id } = cfgOps.addTarget(config, platformId);
+      persist(next);
+      return id;
     },
 
     updateTarget(id, patch) {
       const config = get().config;
       if (!config) return;
-      persist({
-        ...config,
-        targets: config.targets.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-      });
+      persist(cfgOps.updateTarget(config, id, patch));
     },
 
     removeTarget(id) {
       const config = get().config;
       if (!config) return;
-      const index = config.targets.findIndex((t) => t.id === id);
-      const target = config.targets[index];
-      if (target) pendingRemoval = { target, index };
+      const { config: next, removed } = cfgOps.removeTarget(config, id);
       // Não apaga a chave do cofre — assim o "desfazer" restaura tudo, chave inclusa.
-      persist({ ...config, targets: config.targets.filter((t) => t.id !== id) });
+      if (removed) pendingRemoval = removed;
+      persist(next);
     },
 
     toggleTarget(id) {
       const config = get().config;
       if (!config) return;
-      persist({
-        ...config,
-        targets: config.targets.map((t) =>
-          t.id === id ? { ...t, enabled: !t.enabled } : t
-        ),
-      });
+      persist(cfgOps.toggleTarget(config, id));
     },
 
     reorderTargets(ordered) {
       const config = get().config;
       if (!config) return;
-      persist({ ...config, targets: ordered });
+      persist(cfgOps.reorderTargets(config, ordered));
     },
 
     duplicateTarget(id) {
       const config = get().config;
       if (!config) return;
-      const index = config.targets.findIndex((t) => t.id === id);
-      const t = config.targets[index];
-      if (!t) return;
-      // Mesma convenção do "Adicionar": sufixo numérico (Twitch → Twitch 2…).
-      const names = new Set(config.targets.map((x) => x.name));
-      let n = 2;
-      let copyName = `${t.name} ${n}`;
-      while (names.has(copyName)) {
-        n++;
-        copyName = `${t.name} ${n}`;
-      }
-      const copy: Target = {
-        ...t,
-        id: uid("tgt"),
-        name: copyName,
-        hasKey: false,
-        encoding: {
-          ...t.encoding,
-          preset: t.encoding.preset ? { ...t.encoding.preset } : undefined,
-        },
-      };
-      const targets = [...config.targets];
-      targets.splice(index + 1, 0, copy);
-      persist({ ...config, targets });
+      const next = cfgOps.duplicateTarget(config, id, uid("tgt"));
+      if (next !== config) persist(next);
     },
 
     moveTarget(id, dir) {
       const config = get().config;
       if (!config) return;
-      const i = config.targets.findIndex((t) => t.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= config.targets.length) return;
-      const targets = [...config.targets];
-      [targets[i], targets[j]] = [targets[j], targets[i]];
-      persist({ ...config, targets });
+      const next = cfgOps.moveTarget(config, id, dir);
+      if (next !== config) persist(next);
     },
 
     undoRemoveTarget() {
@@ -394,9 +353,7 @@ export const useStore = create<State>((set, get) => {
       if (!config || !pendingRemoval) return;
       const { target, index } = pendingRemoval;
       pendingRemoval = null;
-      const targets = [...config.targets];
-      targets.splice(Math.min(index, targets.length), 0, target);
-      persist({ ...config, targets });
+      persist(cfgOps.insertTarget(config, target, index));
     },
 
     setMode(mode) {
@@ -423,60 +380,29 @@ export const useStore = create<State>((set, get) => {
       pendingRemoval = null;
       const config = get().config;
       if (!config) return;
-      const prof = config.profiles.find((p) => p.id === id);
-      if (!prof) return;
-      persist({
-        ...config,
-        activeProfileId: id,
-        mode: prof.mode,
-        targets: prof.targets.map((t) => ({ ...t })),
-      });
+      const next = cfgOps.loadProfile(config, id);
+      if (next !== config) persist(next);
     },
 
     addProfile() {
       pendingRemoval = null;
       const config = get().config;
       if (!config) return;
-      // Novo perfil = cópia do atual (compartilha as chaves por id), com nome único.
-      const names = new Set(config.profiles.map((p) => p.name));
-      let n = config.profiles.length + 1;
-      while (names.has(`Perfil ${n}`)) n++;
-      const id = uid("prof");
-      const prof = {
-        id,
-        name: `Perfil ${n}`,
-        mode: config.mode,
-        targets: config.targets.map((t) => ({ ...t })),
-      };
-      persist({ ...config, profiles: [...config.profiles, prof], activeProfileId: id });
+      persist(cfgOps.addProfile(config, uid("prof")));
     },
 
     removeProfile(id) {
       pendingRemoval = null;
       const config = get().config;
-      if (!config || config.profiles.length <= 1) return;
-      const profiles = config.profiles.filter((p) => p.id !== id);
-      if (config.activeProfileId === id) {
-        const first = profiles[0];
-        persist({
-          ...config,
-          profiles,
-          activeProfileId: first.id,
-          mode: first.mode,
-          targets: first.targets.map((t) => ({ ...t })),
-        });
-      } else {
-        persist({ ...config, profiles });
-      }
+      if (!config) return;
+      const next = cfgOps.removeProfile(config, id);
+      if (next !== config) persist(next);
     },
 
     renameProfile(id, name) {
       const config = get().config;
       if (!config) return;
-      persist({
-        ...config,
-        profiles: config.profiles.map((p) => (p.id === id ? { ...p, name } : p)),
-      });
+      persist(cfgOps.renameProfile(config, id, name));
     },
 
     async setKey(id, key) {

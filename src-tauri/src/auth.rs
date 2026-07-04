@@ -1317,3 +1317,47 @@ pub fn youtube_complete_active(app: &AppHandle) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pkce_matches_rfc7636_vector() {
+        // RFC 7636 Apêndice B: verifier → challenge (S256).
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        assert_eq!(pkce_challenge(verifier), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+
+    #[test]
+    fn pct_encode_and_roundtrip() {
+        assert_eq!(pct("a b/c=d"), "a%20b%2Fc%3Dd");
+        // pct nunca produz '+', então decodificar volta ao original.
+        assert_eq!(pct_decode(&pct("olá mundo/?&=")), "olá mundo/?&=");
+        // '+' na query decodifica como espaço; %2B é o '+' literal.
+        assert_eq!(pct_decode("a+b"), "a b");
+        assert_eq!(pct_decode("a%2Bb"), "a+b");
+    }
+
+    #[test]
+    fn rfc3339_known_instants() {
+        assert_eq!(rfc3339_utc(0), "1970-01-01T00:00:00Z");
+        assert_eq!(rfc3339_utc(1_700_000_000), "2023-11-14T22:13:20Z");
+    }
+
+    #[test]
+    fn google_oauth_err_classifies() {
+        let e = serde_json::json!({ "error": "invalid_client" });
+        assert!(google_oauth_err(401, &e).contains("cliente OAuth"));
+        assert!(google_oauth_err(0, &serde_json::json!({})).contains("sem conexão"));
+        let e2 = serde_json::json!({ "error_description": "bad scope" });
+        assert_eq!(google_oauth_err(400, &e2), "Google: bad scope");
+    }
+
+    #[test]
+    fn result_json_shapes() {
+        assert_eq!(result_json(Ok(None)), serde_json::json!({ "ok": true }));
+        assert_eq!(result_json(Ok(Some("aviso".into()))), serde_json::json!({ "ok": true, "warn": "aviso" }));
+        assert_eq!(result_json(Err("x".into())), serde_json::json!({ "ok": false, "error": "x" }));
+    }
+}

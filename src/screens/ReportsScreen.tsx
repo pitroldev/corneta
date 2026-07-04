@@ -21,7 +21,7 @@ import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn } from "../lib/utils";
+import { cn, errMsg } from "../lib/utils";
 import type { SessionData, SessionMeta, SessionSummary } from "../lib/types";
 import {
   analyze,
@@ -384,7 +384,7 @@ function RecapModal({
           if (alive) drawRecap(ctx, r);
         });
       } catch (e) {
-        toast.error(`O recap falhou ao desenhar: ${String(e).replace(/^Error:\s*/, "")}`);
+        toast.error(`O recap falhou ao desenhar: ${errMsg(e)}`);
       }
     };
     paint();

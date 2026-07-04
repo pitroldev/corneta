@@ -5,6 +5,7 @@ mod commands;
 mod compositor;
 mod config;
 mod engine;
+mod engine_policy;
 mod guardian;
 mod keys;
 mod obs;

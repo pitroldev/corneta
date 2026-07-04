@@ -41,6 +41,18 @@ fn sanitize_preset(mut p: VideoPreset) -> VideoPreset {
     p
 }
 
+/// Preset EFETIVO de um destino: o do usuário (sanitizado) ou o recomendado da plataforma
+/// (também sanitizado). Fonte ÚNICA — o encode real e o spec/relatório não podem divergir por
+/// derivarem o preset de jeitos diferentes em lugares diferentes.
+fn effective_preset(t: &Target) -> VideoPreset {
+    sanitize_preset(
+        t.encoding
+            .preset
+            .clone()
+            .unwrap_or_else(|| recommended_preset(&t.platform_id)),
+    )
+}
+
 /// No híbrido sem override: copia plataformas landscape, recodifica as verticais
 /// (ex.: TikTok/Instagram), que precisam de formato diferente do stream do OBS.
 fn smart_hybrid_action(platform_id: &str) -> &'static str {
@@ -154,12 +166,7 @@ pub fn ffmpeg_args_for_target(
         // Vídeo sem reencode (lossless).
         args.extend(["-map", "0:v", "-c:v", "copy"].map(String::from));
     } else {
-        let p = sanitize_preset(
-            t.encoding
-                .preset
-                .clone()
-                .unwrap_or_else(|| recommended_preset(&t.platform_id)),
-        );
+        let p = effective_preset(t);
         let codec = ffmpeg_video_codec(&t.encoding.encoder, auto_codec);
         let fps = p.fps.max(1);
         let gop = (fps * p.keyframe_sec.max(1)).to_string();
@@ -190,12 +197,7 @@ pub fn ffmpeg_args_for_target(
 
     // Áudio: sempre AAC 48 kHz estéreo (todas as plataformas exigem AAC).
     // `0:a?` torna o mapeamento opcional, para não falhar se a fonte não tiver áudio.
-    let audio_kbps = t
-        .encoding
-        .preset
-        .clone()
-        .map(|p| sanitize_preset(p).audio_bitrate_kbps)
-        .unwrap_or_else(|| recommended_preset(&t.platform_id).audio_bitrate_kbps);
+    let audio_kbps = effective_preset(t).audio_bitrate_kbps;
     args.extend(
         [
             "-map", "0:a?",
@@ -261,12 +263,7 @@ fn program_resolution(config: &AppConfig, guard: bool) -> (u32, u32) {
     let needs_full_hd = guard
         || enabled.is_empty()
         || enabled.iter().any(|t| {
-            let p = sanitize_preset(
-                t.encoding
-                    .preset
-                    .clone()
-                    .unwrap_or_else(|| recommended_preset(&t.platform_id)),
-            );
+            let p = effective_preset(t);
             p.height > p.width || p.width.min(p.height) > 720
         });
     if needs_full_hd {
@@ -284,12 +281,7 @@ pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
     let mut max_fps = 30u32;
     let mut max_kbps = 4500u32;
     for t in config.targets.iter().filter(|t| t.enabled) {
-        let p = sanitize_preset(
-            t.encoding
-                .preset
-                .clone()
-                .unwrap_or_else(|| recommended_preset(&t.platform_id)),
-        );
+        let p = effective_preset(t);
         max_fps = max_fps.max(p.fps);
         max_kbps = max_kbps.max(p.video_bitrate_kbps);
     }
@@ -660,4 +652,143 @@ pub struct EngineRuntime {
     pub start_gen: u64,
     /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
     pub last_emit_ms: u128,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{IngestConfig, Settings, TargetEncoding};
+
+    fn preset(w: u32, h: u32, fps: u32, vb: u32) -> VideoPreset {
+        VideoPreset { width: w, height: h, fps, video_bitrate_kbps: vb, audio_bitrate_kbps: 160, keyframe_sec: 2 }
+    }
+    fn tgt(platform: &str, preset: Option<VideoPreset>) -> Target {
+        Target {
+            id: "t".into(),
+            platform_id: platform.into(),
+            name: platform.into(),
+            enabled: true,
+            protocol: "rtmp".into(),
+            ingest_url: "rtmp://x/app".into(),
+            has_key: true,
+            encoding: TargetEncoding {
+                action: "transcode".into(),
+                preset,
+                encoder: "auto".into(),
+                hybrid_override: None,
+                reframe: None,
+            },
+        }
+    }
+    fn cfg(mode: &str, targets: Vec<Target>) -> AppConfig {
+        AppConfig {
+            ingest: IngestConfig { protocol: "rtmp".into(), host: "127.0.0.1".into(), port: 1935, app: "live".into(), key: "obs".into() },
+            mode: mode.into(),
+            targets,
+            settings: Settings::default(),
+            profiles: vec![],
+            active_profile_id: String::new(),
+        }
+    }
+
+    #[test]
+    fn effective_action_by_mode() {
+        assert_eq!(effective_action("passthrough", &tgt("twitch", None)), "copy");
+        assert_eq!(effective_action("per-platform", &tgt("twitch", None)), "transcode");
+        // híbrido "esperto": landscape copia, vertical (TikTok) recodifica.
+        assert_eq!(effective_action("hybrid", &tgt("twitch", None)), "copy");
+        assert_eq!(effective_action("hybrid", &tgt("tiktok", None)), "transcode");
+    }
+
+    #[test]
+    fn effective_action_respects_override() {
+        let mut t = tgt("twitch", None);
+        t.encoding.hybrid_override = Some("transcode".into());
+        assert_eq!(effective_action("hybrid", &t), "transcode");
+    }
+
+    #[test]
+    fn video_codec_mapping() {
+        assert_eq!(ffmpeg_video_codec("nvenc", None), "h264_nvenc");
+        assert_eq!(ffmpeg_video_codec("software", None), "libx264");
+        assert_eq!(ffmpeg_video_codec("auto", Some("h264_qsv")), "h264_qsv");
+        assert_eq!(ffmpeg_video_codec("auto", None), "libx264");
+    }
+
+    #[test]
+    fn sanitize_clamps_absurd_values() {
+        let p = sanitize_preset(preset(999_999, 0, 999, 5));
+        assert_eq!(p.width, 7680);
+        assert_eq!(p.height, 16);
+        assert_eq!(p.fps, 240);
+        assert_eq!(p.video_bitrate_kbps, 100);
+    }
+
+    #[test]
+    fn effective_preset_is_single_source() {
+        // sem preset → cai no recomendado (sanitizado) da plataforma.
+        let t = tgt("twitch", None);
+        assert_eq!(effective_preset(&t), sanitize_preset(recommended_preset("twitch")));
+        // com preset absurdo → sanitizado.
+        let t2 = tgt("twitch", Some(preset(999_999, 1080, 60, 6000)));
+        assert_eq!(effective_preset(&t2).width, 7680);
+    }
+
+    #[test]
+    fn program_resolution_adapts() {
+        // tudo 720p landscape → programa em 720p (não desperdiça encode em 1080p).
+        let c = cfg("hybrid", vec![tgt("facebook", Some(preset(1280, 720, 30, 4000)))]);
+        assert_eq!(program_resolution(&c, false), (1280, 720));
+        // algum destino 1080p → 1080p.
+        let c2 = cfg("hybrid", vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))]);
+        assert_eq!(program_resolution(&c2, false), (1920, 1080));
+        // vertical (recorte 9:16) precisa da fonte cheia → 1080p.
+        let c3 = cfg("hybrid", vec![tgt("tiktok", Some(preset(720, 1280, 30, 3000)))]);
+        assert_eq!(program_resolution(&c3, false), (1920, 1080));
+        // guardião sempre 1080p.
+        assert_eq!(program_resolution(&c, true), (1920, 1080));
+    }
+
+    #[test]
+    fn program_spec_fps_and_bitrate() {
+        // fps acompanha o maior preset (cap 60); guardião trava em 30.
+        let c = cfg("hybrid", vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))]);
+        assert_eq!(program_spec(&c, false).fps, 60);
+        assert_eq!(program_spec(&c, true).fps, 30);
+        // bitrate do programa acompanha o maior destino, com piso de 2500.
+        let low = cfg("hybrid", vec![tgt("facebook", Some(preset(1280, 720, 30, 1000)))]);
+        assert!(program_spec(&low, false).video_kbps >= 2500);
+    }
+
+    #[test]
+    fn reframe_filter_crops_and_scales() {
+        let vf = reframe_filter(None, 720, 1280);
+        assert!(vf.contains("crop="));
+        assert!(vf.contains("scale=720:1280"));
+    }
+
+    #[test]
+    fn ffmpeg_args_copy_path() {
+        let c = cfg("passthrough", vec![tgt("twitch", None)]);
+        let args = ffmpeg_args_for_target(&c, &c.targets[0], "streamkey", None, "rtmp://127.0.0.1:1935/live/obs", None);
+        let s = args.join(" ");
+        assert!(s.contains("-c:v copy"), "cópia lossless de vídeo: {s}");
+        assert!(s.contains("-c:a aac"), "áudio sempre AAC");
+        assert!(s.contains("-f flv"));
+        assert!(s.ends_with("streamkey"), "saída termina com a chave: {s}");
+        assert!(!s.contains("-b:v"), "cópia NÃO seta bitrate de vídeo: {s}");
+    }
+
+    #[test]
+    fn ffmpeg_args_transcode_path() {
+        let c = cfg("per-platform", vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))]);
+        let args = ffmpeg_args_for_target(&c, &c.targets[0], "sk", Some(4500), "rtmp://x/live/obs", Some("h264_nvenc"));
+        let s = args.join(" ");
+        assert!(s.contains("-c:v h264_nvenc"), "encoder auto→nvenc: {s}");
+        assert!(s.contains("-b:v 4500k"), "br_override aplicado: {s}");
+        assert!(s.contains("-maxrate 4500k"));
+        assert!(s.contains("-bufsize 9000k"), "bufsize = vbr*2");
+        assert!(s.contains("-vf scale=1920:1080"), "escala landscape: {s}");
+        assert!(s.contains("-g 120"), "gop = fps*keyframe_sec (60*2): {s}");
+    }
 }

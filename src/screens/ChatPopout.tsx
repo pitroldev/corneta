@@ -23,7 +23,7 @@ import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { toast } from "../lib/toast";
-import { cn } from "../lib/utils";
+import { cn, errMsg } from "../lib/utils";
 import { Mascot } from "../components/decor";
 import { Button, Input, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
@@ -251,7 +251,7 @@ export function ChatPopout() {
       );
       setDraft("");
     } catch (e) {
-      toast.error(String(e).replace("Error: ", ""));
+      toast.error(errMsg(e));
     } finally {
       setSending(false);
     }

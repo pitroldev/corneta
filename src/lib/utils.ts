@@ -6,6 +6,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Mensagem de erro pra UI: tira o "Error:" que o JS/Tauri prefixa. */
+export function errMsg(e: unknown): string {
+  return String(e).replace(/^Error:\s*/, "");
+}
+
 /** Formata kbps de forma legível (ex.: 6000 -> "6,0 Mbps"). */
 export function fmtBitrate(kbps: number): string {
   if (kbps >= 1000) return `${(kbps / 1000).toFixed(1).replace(".", ",")} Mbps`;

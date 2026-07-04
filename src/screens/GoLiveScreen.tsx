@@ -28,7 +28,7 @@ import { obsIngestUrl } from "../lib/factory";
 import { bandFit, effectiveAction, estimate } from "../lib/estimates";
 import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn, fmtBitrate, fmtUptime, openExternal } from "../lib/utils";
+import { cn, errMsg, fmtBitrate, fmtUptime, openExternal } from "../lib/utils";
 import type { EngineState, ObsCheck, TargetState } from "../lib/types";
 import type { Screen } from "../components/Sidebar";
 import { blockingIssues } from "../lib/validation";
@@ -189,7 +189,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         );
       else toast.success("Servidor no ar! Agora é só dar play no OBS 📣");
     } catch (e) {
-      const msg = String(e).replace(/^Error:\s*/, "");
+      const msg = errMsg(e);
       // "Início cancelado" = o próprio usuário cancelou no meio do setup — sem drama.
       if (!msg.includes("Início cancelado")) toast.error(`Não rolou: ${msg}`);
     } finally {
@@ -593,7 +593,7 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                               onClick={() =>
                                 void api
                                   .retryTarget(t.id)
-                                  .catch((e) => toast.error(String(e).replace(/^Error:\s*/, "")))
+                                  .catch((e) => toast.error(errMsg(e)))
                               }
                               className="text-[11px] font-bold text-brass hover:underline"
                             >
@@ -779,7 +779,7 @@ function BrbNowButton({ live }: { live: boolean }) {
       await api.setForceBrb(!forced);
       toast.success(forced ? "Voltou! Conteúdo no ar de novo 📣" : "JÁ VOLTO no ar — pode ir tranquilo, o mic tá mudo");
     } catch (e) {
-      toast.error(String(e).replace(/^Error:\s*/, ""));
+      toast.error(errMsg(e));
     } finally {
       setBusy(false);
     }
@@ -885,7 +885,7 @@ function StreamInfoCard() {
       if (okN === total) toast.success(`Título atualizado em ${okN} plataforma${okN > 1 ? "s" : ""} 📣`);
       else toast.error(`${okN}/${total} ok — veja os detalhes`);
     } catch (e) {
-      toast.error(String(e).replace("Error: ", ""));
+      toast.error(errMsg(e));
     } finally {
       setBusy(false);
     }

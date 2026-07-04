@@ -18,6 +18,13 @@ fn sha256_b64(input: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(h.finalize())
 }
 
+/// Resposta de autenticação do obs-websocket v5 (pura, testável):
+/// `base64(sha256( base64(sha256(password + salt)) + challenge ))`.
+fn obs_auth_response(password: &str, salt: &str, challenge: &str) -> String {
+    let secret = sha256_b64(&format!("{password}{salt}"));
+    sha256_b64(&format!("{secret}{challenge}"))
+}
+
 fn read_json(socket: &mut Socket) -> Result<Value, String> {
     loop {
         match socket.read().map_err(|e| e.to_string())? {
@@ -58,9 +65,8 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Str
         }
         let challenge = auth.get("challenge").and_then(|v| v.as_str()).unwrap_or("");
         let salt = auth.get("salt").and_then(|v| v.as_str()).unwrap_or("");
-        let secret = sha256_b64(&format!("{password}{salt}"));
-        let auth_response = sha256_b64(&format!("{secret}{challenge}"));
-        identify["d"]["authentication"] = Value::String(auth_response);
+        identify["d"]["authentication"] =
+            Value::String(obs_auth_response(password, salt, challenge));
     }
 
     send_json(&mut socket, &identify)?;
@@ -381,4 +387,33 @@ pub fn poll_stats(
         }
     }
     let _ = socket.close(None);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn obs_auth_is_deterministic_and_input_sensitive() {
+        let (p, s, c) = ("senha", "c2FsdA==", "Y2hhbGxlbmdl");
+        let a = obs_auth_response(p, s, c);
+        // base64 de um sha256 (32 bytes) = 44 chars com padding.
+        assert_eq!(a.len(), 44);
+        // determinístico.
+        assert_eq!(a, obs_auth_response(p, s, c));
+        // sensível a CADA entrada (senão o handshake autenticaria errado sem avisar).
+        assert_ne!(a, obs_auth_response("outra", s, c));
+        assert_ne!(a, obs_auth_response(p, "b3V0cm8=", c));
+        assert_ne!(a, obs_auth_response(p, s, "b3V0cm8="));
+    }
+
+    #[test]
+    fn obs_auth_matches_known_vector() {
+        // KAT computado INDEPENDENTE (Python): fixa a ordem de concatenação + o hash do
+        // handshake v5. base64(sha256( base64(sha256("senha"+"c2FsdA==")) + "Y2hhbGxlbmdl" )).
+        assert_eq!(
+            obs_auth_response("senha", "c2FsdA==", "Y2hhbGxlbmdl"),
+            "+8Ytw+UBaCto3PZWaabX3QK0lhU/2NwTnVBbh4BAt80="
+        );
+    }
 }
