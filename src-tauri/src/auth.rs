@@ -21,7 +21,12 @@ use crate::AppState;
 
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast";
-const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube.force-ssl";
+// TEM que ser `youtube` (não `youtube.force-ssl`): o device flow do Google (TVs/entrada
+// limitada) só aceita `youtube` e `youtube.readonly` na allowlist — pedir `force-ssl` volta
+// "Invalid device flow scope" e o login nem começa. O `youtube` (gerenciar a conta) cobre tudo
+// que a Corneta faz: criar/encerrar broadcast e ler/enviar no chat ao vivo (liveChatMessages
+// aceita os dois scopes). Ver developers.google.com/identity/protocols/oauth2/limited-input-device.
+const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 // Kick: API oficial (OAuth 2.1 + PKCE, sem device flow). Redirect loopback numa porta fixa.
 const KICK_SCOPES: &str = "user:read channel:read channel:write chat:write moderation:chat_message:manage";
