@@ -1567,6 +1567,14 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
 
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
+
+    if eng
+        .paused
+        .get(target_id)
+        .is_some_and(|f| f.load(std::sync::atomic::Ordering::Relaxed))
+    {
+        return;
+    }
     let was_starting = matches!(eng.snapshot.as_ref().map(|s| s.state.as_str()), Some("starting"));
     // O cronômetro "no ar" começa quando o sinal real chega — não no clique de BORA.
     if is_stats && was_starting {
