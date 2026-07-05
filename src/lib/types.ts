@@ -162,6 +162,14 @@ export interface AppSettings {
   chatPopoutTab: "chat" | "alerts" | "both";
   /** Painel de alertas da tela de Chat aberto (persistido entre visitas). */
   chatShowAlertsPanel: boolean;
+  /** Overlay de alertas pro OBS: servidor local (Browser Source) ligado. URL fixa pra colar 1x. */
+  overlayEnabled: boolean;
+  /** Overlay: tocar um som (chime) quando um alerta aparece. */
+  overlaySound: boolean;
+  /** Overlay: posição do card na tela (top | bottom | center | top-left | …). */
+  overlayPosition: string;
+  /** Overlay: porta do servidor local (URL fixa pro OBS). */
+  overlayPort: number;
 }
 
 export interface ObsCheck {

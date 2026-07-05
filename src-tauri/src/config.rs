@@ -163,6 +163,20 @@ pub struct Settings {
     /// Painel de alertas da tela de Chat aberto (persistido entre visitas).
     #[serde(default)]
     pub chat_show_alerts_panel: bool,
+    /// Overlay de alertas pro OBS: mantém o servidor local (Browser Source) de pé. A URL é fixa
+    /// (porta abaixo) pra colar no OBS UMA vez. Só loopback — nome/valor de quem doou não vaza
+    /// pra LAN. Padrão DESLIGADO.
+    #[serde(default)]
+    pub overlay_enabled: bool,
+    /// Overlay: tocar um som (chime) quando um alerta aparece.
+    #[serde(default = "default_true")]
+    pub overlay_sound: bool,
+    /// Overlay: posição do card na tela (top | bottom | center | top-left | top-right | …).
+    #[serde(default = "default_overlay_position")]
+    pub overlay_position: String,
+    /// Overlay: porta do servidor local (URL fixa pro OBS). Troque se a 7393 estiver ocupada.
+    #[serde(default = "default_overlay_port")]
+    pub overlay_port: u32,
     /// Nome original do arquivo custom do "JÁ VOLTO" (só exibição; o arquivo vira brb-slate.*).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brb_slate_file_name: Option<String>,
@@ -176,6 +190,12 @@ fn default_loudness_target() -> f64 {
 }
 fn default_popout_tab() -> String {
     "both".to_string()
+}
+fn default_overlay_position() -> String {
+    "top".to_string()
+}
+fn default_overlay_port() -> u32 {
+    7393
 }
 fn default_brb_slate_kind() -> String {
     "auto".to_string()
@@ -271,6 +291,10 @@ impl Default for Settings {
             chat_auto_connect: true,
             chat_popout_tab: default_popout_tab(),
             chat_show_alerts_panel: false,
+            overlay_enabled: false,
+            overlay_sound: true,
+            overlay_position: default_overlay_position(),
+            overlay_port: default_overlay_port(),
             brb_slate_file_name: None,
         }
     }

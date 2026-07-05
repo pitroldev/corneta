@@ -3,7 +3,7 @@
 > Planejamento da feature que junta os **alertas** (seguidor, inscrição, gift, bits/donate, raid,
 > membro, super chat…) de **todas as plataformas** num lugar só — painel no app e **overlay pro OBS**.
 
-- **Status:** Decisões fechadas · **Fase 1 em implementação** · 2026-06-23
+- **Status:** ✅ **Fases 1–3 implementadas** (chat + Streamlabs/StreamElements + overlay pro OBS) · 2026-07-04
 - **Relacionado:** [`CHAT.md`](./CHAT.md) (reaproveita as conexões), [`PLANEJAMENTO.md`](./PLANEJAMENTO.md)
 
 ---
@@ -115,9 +115,9 @@ O OBS mostra alertas via **Browser Source** (uma URL). Três caminhos:
 
 | Fase | Entrega | Precisa de quê? |
 |---|---|---|
-| **1 — Alertas via chat** | Parse de USERNOTICE/bits (Twitch), event types (YouTube), eventos Pusher (Kick) → `alert://event` + **painel** no app | nada (reusa o chat) |
-| **2 — Follows & donates** | Twitch **EventSub** (follow/cheer/sub) por WebSocket + OAuth; Streamlabs/StreamElements (tips) | 🧑 OAuth/app |
-| **3 — Overlay pro OBS** | Servidor local + overlay animado (texto + **som**), adicionável como browser source | mini-servidor http |
+| **1 — Alertas via chat** ✅ | Parse de USERNOTICE/bits (Twitch), event types (YouTube), eventos Pusher (Kick) → `alert://event` + **painel** no app | nada (reusa o chat) |
+| **2 — Follows & donates** ✅🟡 | **Streamlabs/StreamElements** (tips/follows/subs/bits/raids) via Socket.IO em `alerts.rs` ✅. Twitch **EventSub** (follow NATIVO por WebSocket+OAuth) **pendente** — redundante com Streamlabs/SE, baixo valor | 🧑 OAuth/app (só o EventSub nativo) |
+| **3 — Overlay pro OBS** ✅ | Servidor local (`overlay.rs`, axum, loopback + porta fixa 7393) + `overlay.html` animado (texto + **som** via WebAudio), adicionável como browser source. Fonte = `chat::emit_alert` → `overlay::push` (broadcast) | — (feito) |
 | **4 — Alert box completo** | Temas/sons customizáveis, **metas (goals)**, TTS, fila/replay, "agradecer" | — |
 
 ---
@@ -161,8 +161,10 @@ O OBS mostra alertas via **Browser Source** (uma URL). Três caminhos:
 
 1. **Painel junto do Chat** — os alertas aparecem como uma **coluna "Alertas"** na tela de Chat
    (toggleável), reusando as conexões e o ciclo de vida do chat. Sem item de navegação novo.
-2. **Overlay na Fase 3** — a Fase 1 entrega só o **painel no app**; o overlay (servidor local +
-   *browser source*) vem depois.
+2. **Overlay na Fase 3** ✅ — feito: `overlay.rs` (servidor local, mesma família do `studio.rs`
+   da Mesa) serve `overlay.html` e empurra cada alerta por WebSocket. Loopback + porta fixa (URL
+   colável no OBS uma vez). Config em `overlayEnabled/overlaySound/overlayPosition/overlayPort`;
+   UI na aba **Alertas** da tela de Chat (copiar URL, testar, "Adicionar no OBS").
 3. **Follows só na Fase 2** — não compensa o OAuth na v1. A Fase 1 pega só o que vem **sem login**
    (subs/resubs/gift subs/bits/raids/membros/super chats).
 4. **Sem som/TTS na Fase 1** — som e voz ficam pro overlay (Fase 3/4); o painel é silencioso (visual).

@@ -138,6 +138,16 @@ export interface CornetaApi {
   mesaStopServer(): Promise<void>;
   mesaObsAddSource(url: string, width: number, height: number): Promise<void>;
   mesaObsRemoveSource(): Promise<void>;
+  // Overlay de alertas pro OBS (servidor local + browser source)
+  /** Sobe o servidor local do overlay e devolve a URL fixa pra colar no OBS. */
+  overlayStart(): Promise<OverlayInfo>;
+  overlayStop(): Promise<void>;
+  /** Info do overlay agora (URL/porta) — null se estiver parado. */
+  overlayStatus(): Promise<OverlayInfo | null>;
+  /** Empurra um alerta de exemplo pro overlay (preview no OBS). */
+  overlayTest(): Promise<void>;
+  /** Adiciona/atualiza o Browser Source do overlay na cena atual do OBS. */
+  overlayObsAddSource(url: string): Promise<void>;
   openPrivacySettings(which: "camera" | "microphone"): Promise<void>;
 }
 
@@ -146,6 +156,13 @@ export interface MesaServerInfo {
   port: number;
   /** IPv4 da LAN (pra montar o convite que o convidado alcança). */
   lanIp: string;
+}
+
+export interface OverlayInfo {
+  /** Porta do servidor local do overlay. */
+  port: number;
+  /** URL base (sem query) pra colar no OBS como Browser Source. */
+  url: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -545,6 +562,26 @@ function tauriApi(): CornetaApi {
     async mesaObsRemoveSource() {
       const { invoke } = await core();
       await invoke("mesa_obs_remove_source");
+    },
+    async overlayStart() {
+      const { invoke } = await core();
+      return invoke<OverlayInfo>("overlay_start");
+    },
+    async overlayStop() {
+      const { invoke } = await core();
+      await invoke("overlay_stop");
+    },
+    async overlayStatus() {
+      const { invoke } = await core();
+      return invoke<OverlayInfo | null>("overlay_status");
+    },
+    async overlayTest() {
+      const { invoke } = await core();
+      await invoke("overlay_test");
+    },
+    async overlayObsAddSource(url) {
+      const { invoke } = await core();
+      await invoke("overlay_obs_add_source", { url });
     },
     async openPrivacySettings(which) {
       const { invoke } = await core();
@@ -1203,6 +1240,22 @@ function mockApi(): CornetaApi {
     },
     async mesaObsRemoveSource() {
       /* no-op no navegador */
+    },
+    // Overlay: sem backend no navegador — só roda no app instalado.
+    async overlayStart() {
+      return { port: 7393, url: "http://127.0.0.1:7393/overlay" };
+    },
+    async overlayStop() {
+      /* no-op no navegador */
+    },
+    async overlayStatus() {
+      return null;
+    },
+    async overlayTest() {
+      /* no-op no navegador */
+    },
+    async overlayObsAddSource() {
+      /* no-op no navegador (sem OBS) */
     },
     async openPrivacySettings() {
       /* no-op no navegador */

@@ -8,8 +8,10 @@ import {
   ChevronDown,
   ClipboardPaste,
   Clock,
+  Copy,
   Eye,
   LogIn,
+  MonitorPlay,
   Pencil,
   PictureInPicture2,
   Plus,
@@ -32,7 +34,7 @@ import { normalizeChatChannel } from "../lib/chatChannel";
 import { sanitizeApiKey, sanitizeToken } from "../lib/validation";
 import * as RTabs from "@radix-ui/react-tabs";
 import { HAS_KICK_OAUTH, HAS_TWITCH_OAUTH } from "../lib/oauth";
-import type { AlertSource, AlertSourceKind, ChatMessage, ChatPlatform, ChatSource } from "../lib/types";
+import type { AlertSource, AlertSourceKind, AppSettings, ChatMessage, ChatPlatform, ChatSource } from "../lib/types";
 import { Button, Card, Input, PlatformGlyph, SectionTitle, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
@@ -599,6 +601,9 @@ export function ChatScreen() {
                 </div>
               )}
             </div>
+
+            {/* Overlay pro OBS: onde os alertas APARECEM na live (Browser Source). */}
+            <OverlayCard settings={s} setSettings={setSettings} />
             </RTabs.Content>
 
             <RTabs.Content value="conta">
@@ -897,6 +902,164 @@ function FilterChip({
     >
       <PlatformGlyph id={id} size={14} /> {label}
     </button>
+  );
+}
+
+const OVERLAY_POS_OPTS = [
+  { value: "top", label: "Em cima" },
+  { value: "bottom", label: "Embaixo" },
+  { value: "center", label: "No centro" },
+  { value: "top-left", label: "Canto sup. esquerdo" },
+  { value: "top-right", label: "Canto sup. direito" },
+  { value: "bottom-left", label: "Canto inf. esquerdo" },
+  { value: "bottom-right", label: "Canto inf. direito" },
+];
+
+/** Overlay de alertas pro OBS: liga o servidor local e mostra a URL (Browser Source). */
+function OverlayCard({
+  settings,
+  setSettings,
+}: {
+  settings: AppSettings;
+  setSettings: (patch: Partial<AppSettings>) => void;
+}) {
+  const enabled = settings.overlayEnabled ?? false;
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // O backend sobe o servidor no boot quando ligado; aqui só buscamos a URL pra exibir.
+  useEffect(() => {
+    if (!IS_TAURI || !enabled) return;
+    let alive = true;
+    api
+      .overlayStatus()
+      .then((info) => {
+        if (alive && info) setUrl(info.url);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const displayUrl = url
+    ? `${url}?sound=${(settings.overlaySound ?? true) ? 1 : 0}&pos=${settings.overlayPosition || "top"}`
+    : "";
+
+  const toggle = async (on: boolean) => {
+    setSettings({ overlayEnabled: on });
+    if (!IS_TAURI) return;
+    setBusy(true);
+    try {
+      if (on) {
+        const info = await api.overlayStart();
+        setUrl(info.url);
+      } else {
+        await api.overlayStop();
+        setUrl(null);
+      }
+    } catch (e) {
+      toast.error(errMsg(e));
+      setSettings({ overlayEnabled: !on }); // reverte se não subiu (porta ocupada etc.)
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!displayUrl) return;
+    try {
+      await navigator.clipboard.writeText(displayUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard indisponível */
+    }
+  };
+
+  const addToObs = () =>
+    api
+      .overlayObsAddSource(displayUrl)
+      .then(() => toast.success("Overlay adicionado no OBS 📺"))
+      .catch((e) => toast.error(errMsg(e)));
+
+  const test = () =>
+    api
+      .overlayTest()
+      .then(() => toast.success("Mandei um alerta de teste — olha no OBS 📣"))
+      .catch((e) => toast.error(errMsg(e)));
+
+  return (
+    <div className="mt-3 border-t border-border-soft pt-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MonitorPlay className="size-4 text-brass" />
+          <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+            Overlay pro OBS
+          </span>
+        </div>
+        <Toggle checked={enabled} onChange={(v) => void toggle(v)} disabled={busy} label="Overlay pro OBS" />
+      </div>
+      <p className="mb-2 text-[11px] text-ink-faint">
+        Mostra os alertas <strong className="text-ink">animados na sua live</strong>. Adicione a URL
+        como <strong className="text-ink">Browser Source</strong> no OBS — uma vez só.
+      </p>
+
+      {enabled &&
+        (!IS_TAURI ? (
+          <p className="text-xs text-ink-muted">Disponível no app instalado.</p>
+        ) : url ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <code className="min-w-0 flex-1 truncate rounded-md bg-surface-2 px-2.5 py-2 text-[11px] text-ink-muted ring-1 ring-border">
+                {displayUrl}
+              </code>
+              <Button variant="subtle" size="sm" onClick={() => void copy()}>
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                {copied ? "Copiado" : "Copiar"}
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="subtle" size="sm" onClick={() => void addToObs()}>
+                <Tv2 className="size-3.5" /> Adicionar no OBS
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => void test()}>
+                <Bell className="size-3.5" /> Testar
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md bg-surface-2 px-3 py-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+                <Toggle
+                  checked={settings.overlaySound ?? true}
+                  onChange={(v) => setSettings({ overlaySound: v })}
+                  label="Som no alerta"
+                />
+                <span>Som no alerta</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+                <span>Posição</span>
+                <Select
+                  className="w-44"
+                  value={settings.overlayPosition || "top"}
+                  options={OVERLAY_POS_OPTS}
+                  onChange={(v) => setSettings({ overlayPosition: v })}
+                  aria-label="Posição do overlay"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-ink-faint">
+              Mudou som ou posição? Clique <strong className="text-ink">Adicionar no OBS</strong> de
+              novo (ou atualize a URL da fonte lá).
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
+            {busy ? "Ligando o overlay…" : "Overlay ligado — reabra esta aba pra ver a URL."}
+          </div>
+        ))}
+    </div>
   );
 }
 

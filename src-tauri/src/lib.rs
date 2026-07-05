@@ -9,6 +9,7 @@ mod engine_policy;
 mod guardian;
 mod keys;
 mod obs;
+mod overlay;
 mod permissions;
 mod session;
 mod splicer;
@@ -26,6 +27,7 @@ pub struct AppState {
     pub alerts: Mutex<alerts::AlertRuntime>,
     pub oauth: Mutex<auth::OauthConfig>,
     pub studio: Mutex<studio::StudioServer>,
+    pub overlay: Mutex<overlay::OverlayServer>,
 }
 
 fn show_main(app: &tauri::AppHandle) {
@@ -61,6 +63,7 @@ fn confirm_end_live(app: &tauri::AppHandle, msg: &str) -> bool {
 /// Sequência única de encerramento (Mesa + broadcast do YouTube + motor).
 fn shutdown_engine(app: &tauri::AppHandle) {
     studio::stop(&app.state::<AppState>().studio);
+    overlay::stop(&app.state::<AppState>().overlay);
     auth::youtube_complete_active(app); // encerra o broadcast do YouTube
     commands::kill_engine(app);
 }
@@ -167,6 +170,7 @@ pub fn run() {
             alerts: Mutex::new(alerts::AlertRuntime::default()),
             oauth: Mutex::new(auth::OauthConfig::default()),
             studio: Mutex::new(studio::StudioServer::default()),
+            overlay: Mutex::new(overlay::OverlayServer::default()),
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
@@ -225,6 +229,11 @@ pub fn run() {
             commands::mesa_stop_server,
             commands::mesa_obs_add_source,
             commands::mesa_obs_remove_source,
+            commands::overlay_start,
+            commands::overlay_stop,
+            commands::overlay_status,
+            commands::overlay_test,
+            commands::overlay_obs_add_source,
             commands::open_privacy_settings,
         ])
         .setup(|app| {
@@ -233,6 +242,21 @@ pub fn run() {
                 permissions::grant_av_permissions(&w);
                 // Nunca deixa a janela mais alta que a tela (720p/768p incluídos).
                 clamp_window_to_screen(&w);
+            }
+            // Overlay de alertas: se ligado, sobe o servidor local já no boot pra a Browser
+            // Source do OBS conectar assim que o streamer abre a cena (porta fixa → URL estável).
+            {
+                let cfg = config::load(app.handle());
+                if cfg.settings.overlay_enabled {
+                    let handle = app.handle().clone();
+                    let port = cfg.settings.overlay_port as u16;
+                    tauri::async_runtime::spawn(async move {
+                        let st = handle.state::<AppState>();
+                        if let Err(e) = overlay::start(&st.overlay, port).await {
+                            log::warn!("overlay: {e}");
+                        }
+                    });
+                }
             }
             // O atalho global é registrado pelo frontend no boot (App.tsx → register_shortcut),
             // que MOSTRA o erro quando a combinação já está em uso — aqui era um `let _ =` mudo.

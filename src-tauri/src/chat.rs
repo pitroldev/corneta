@@ -165,6 +165,9 @@ pub fn emit_alert(app: &AppHandle, alert: Alert) {
     if let Some(p) = session_path(app) {
         crate::session::record_alert(&p, &alert.platform, &alert.kind, &alert.user, alert.amount);
     }
+    // Espelha no overlay do OBS (se o servidor local estiver de pé). Vem ANTES do emit — que
+    // consome `alert` por valor — pra empurrar por referência sem clonar. No-op sem overlay.
+    crate::overlay::push(&app.state::<AppState>().overlay, &alert);
     let _ = app.emit("alert://event", alert);
 }
 

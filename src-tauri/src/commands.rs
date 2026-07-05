@@ -2022,6 +2022,63 @@ pub async fn mesa_obs_remove_source(app: AppHandle) -> Result<(), String> {
     .map_err(|e| format!("join: {e}"))?
 }
 
+/// Nome do Browser Source que o overlay de alertas cria/atualiza no OBS.
+const OVERLAY_OBS_SOURCE: &str = "Corneta · Alertas";
+
+/// Sobe (ou reaproveita) o servidor local do overlay de alertas na porta configurada.
+/// Devolve a URL fixa pra colar no OBS como Browser Source.
+#[tauri::command]
+pub async fn overlay_start(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<crate::overlay::OverlayInfo, String> {
+    let port = get_config(app).settings.overlay_port as u16;
+    crate::overlay::start(&state.overlay, port).await
+}
+
+/// Encerra o servidor local do overlay (fecha as páginas conectadas e libera a porta).
+#[tauri::command]
+pub fn overlay_stop(state: State<'_, AppState>) {
+    crate::overlay::stop(&state.overlay);
+}
+
+/// Info do overlay agora (URL/porta) sem reiniciar — `null` se estiver parado.
+#[tauri::command]
+pub fn overlay_status(state: State<'_, AppState>) -> Option<crate::overlay::OverlayInfo> {
+    crate::overlay::info(&state.overlay)
+}
+
+/// Empurra um alerta de EXEMPLO pro overlay (preview no OBS). Não passa pelo painel nem
+/// pela gravação da sessão — é só pra ver o card animar.
+#[tauri::command]
+pub fn overlay_test(state: State<'_, AppState>) {
+    let demo = chat::Alert {
+        id: "overlay-test".into(),
+        platform: "twitch".into(),
+        source: "teste".into(),
+        kind: "subgift".into(),
+        user: "fulano_dtal".into(),
+        amount: Some(5.0),
+        currency: None,
+        tier: None,
+        message: Some("bora cornetar! 📣".into()),
+        ts: 0,
+    };
+    crate::overlay::push(&state.overlay, &demo);
+}
+
+/// Adiciona (ou atualiza) o Browser Source do overlay na cena atual do OBS (canvas cheio,
+/// transparente — a página posiciona os alertas). Um clique em vez de colar a URL na mão.
+#[tauri::command]
+pub async fn overlay_obs_add_source(app: AppHandle, url: String) -> Result<(), String> {
+    let password = get_config(app).settings.obs_password;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::add_or_update_browser_source(OBS_WS_HOST, OBS_WS_PORT, &password, OVERLAY_OBS_SOURCE, &url, 1920, 1080)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?
+}
+
 /// Abre as Configurações de Privacidade do Windows (câmera/mic) quando o getUserMedia
 /// falha por causa do bloqueio do SO (que o handler do WebView2 não consegue cobrir).
 /// Vai pelo Rust porque o open() do plugin-shell no JS é barrado pelo escopo padrão.

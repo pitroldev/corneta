@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Corneta · Overlay de alertas</title>
+  <!--
+    Overlay de ALERTAS — carregado pelo OBS como Browser Source. Ouve o WebSocket da Corneta
+    (mesma origem, /ws) e anima um card por alerta (sub, doação, raid…). Fundo transparente.
+    Servido em http://127.0.0.1:<porta>/overlay.
+
+    Parâmetros (query):
+      sound = "1" (padrão) | "0"   — toca um chime ao aparecer o alerta
+      pos   = top (padrão) | bottom | center | top-left | top-right | bottom-left | bottom-right
+      dur   = segundos que cada card fica na tela (padrão 6)
+      demo  = "1" faz um alerta de exemplo em loop (só pra ver no navegador)
+  -->
+  <style>
+    :root {
+      --brass: #ffb323;
+      --ink: #fff;
+      --card: rgba(14, 11, 6, 0.82);
+      --accent: var(--brass);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: transparent;
+      font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    #stage {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      padding: 48px;
+      gap: 14px;
+      pointer-events: none;
+    }
+    /* Vertical: top/bottom/center. */
+    body[data-pos^="top"] #stage { justify-content: flex-start; }
+    body[data-pos^="bottom"] #stage { justify-content: flex-end; }
+    body[data-pos="center"] #stage { justify-content: center; }
+    /* Horizontal: sufixo -left / -right, senão centraliza. */
+    body[data-pos$="left"] #stage { align-items: flex-start; }
+    body[data-pos$="right"] #stage { align-items: flex-end; }
+    body[data-pos="top"] #stage,
+    body[data-pos="bottom"] #stage,
+    body[data-pos="center"] #stage { align-items: center; }
+
+    .alert {
+      display: flex; align-items: center; gap: 16px;
+      max-width: min(560px, 80vw);
+      padding: 16px 22px 16px 18px;
+      background: var(--card);
+      border-left: 6px solid var(--accent);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      backdrop-filter: blur(3px);
+      /* Estado de entrada — a classe .in tira o deslocamento (transição no toggle). */
+      opacity: 0;
+      transform: translateY(var(--slide, -22px)) scale(0.96);
+      transition: opacity 0.32s ease, transform 0.42s cubic-bezier(0.18, 0.9, 0.28, 1.2);
+    }
+    body[data-pos^="bottom"] .alert { --slide: 22px; }
+    .alert.in { opacity: 1; transform: translateY(0) scale(1); }
+
+    .alert .emoji {
+      font-size: 40px; line-height: 1;
+      filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent));
+      flex-shrink: 0;
+    }
+    .alert .body { min-width: 0; }
+    .alert .head {
+      color: var(--ink); font-weight: 800; font-size: 22px; line-height: 1.15;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+      overflow-wrap: anywhere;
+    }
+    .alert .head b { color: var(--accent); }
+    .alert .msg {
+      margin-top: 4px;
+      color: rgba(255, 255, 255, 0.82); font-weight: 600; font-size: 15px; line-height: 1.25;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      overflow-wrap: anywhere;
+      display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .alert .plat {
+      margin-top: 6px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+      color: color-mix(in srgb, var(--accent) 80%, #fff 20%);
+      opacity: 0.85;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .alert { transition: opacity 0.2s ease; transform: none; }
+      .alert.in { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <script>
+  (() => {
+    "use strict";
+    const q = new URLSearchParams(location.search);
+    const SOUND = q.get("sound") !== "0";
+    const POS = q.get("pos") || "top";
+    const DUR = Math.max(2, Math.min(30, parseInt(q.get("dur") || "6", 10) || 6)) * 1000;
+    const DEMO = q.get("demo") === "1";
+
+    document.body.dataset.pos = POS;
+    const stage = document.getElementById("stage");
+
+    // --- Apresentação por tipo de alerta (emoji + texto + cor de destaque) ---
+    const ACCENT = {
+      green: "#34d399", brass: "#ffb323", blue: "#5eb0ef", tomate: "#ff5a3c", cyan: "#3ad1c8",
+    };
+    function fmtAmount(n) {
+      if (n == null || isNaN(n)) return "";
+      // Sem casas quando é inteiro (5, não 5.0); com casas quando tem centavos.
+      return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ",");
+    }
+    function money(a) {
+      const cur = (raw.currency || "").toString().trim();
+      const v = fmtAmount(a);
+      return cur ? `${cur === "BRL" ? "R$" : cur} ${v}` : v;
+    }
+    // `raw` é preenchido em present() — money()/fmt usam a moeda do alerta atual.
+    let raw = {};
+    function present(a) {
+      raw = a || {};
+      const user = (a.user || "alguém").toString();
+      const amt = typeof a.amount === "number" ? a.amount : Number(a.amount);
+      const U = `<b>${esc(user)}</b>`;
+      switch (a.kind) {
+        case "follow": return { emoji: "🎉", head: `${U} seguiu o canal!`, accent: "green" };
+        case "sub": return { emoji: "⭐", head: `${U} assinou!`, accent: "brass" };
+        case "resub": return { emoji: "⭐", head: `${U} assinou de novo!`, note: amt > 1 ? `${fmtAmount(amt)} meses seguidos` : "", accent: "brass" };
+        case "subgift": return { emoji: "🎁", head: `${U} presenteou ${fmtAmount(amt) || "1"} ${amt > 1 ? "subs" : "sub"}!`, accent: "brass" };
+        case "bits": return { emoji: "💎", head: `${U} mandou ${fmtAmount(amt)} bits!`, accent: "cyan" };
+        case "tip": return { emoji: "💰", head: `${U} doou ${money(amt)}!`, accent: "green" };
+        case "raid": return { emoji: "🚀", head: `${U} chegou com ${fmtAmount(amt) || "a galera"} na raid!`, accent: "tomate" };
+        case "member": return { emoji: "🌟", head: `${U} virou membro!`, accent: "brass" };
+        case "superchat": return { emoji: "💬", head: `${U} — super chat ${money(amt)}`, accent: "blue" };
+        default: return { emoji: "📣", head: U, note: a.kind || "", accent: "brass" };
+      }
+    }
+    function esc(s) {
+      return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    }
+
+    // --- Fila: um card por vez, na ordem de chegada ---
+    const queue = [];
+    let showing = false;
+    function enqueue(a) {
+      if (!a || typeof a !== "object" || !a.kind) return;
+      queue.push(a);
+      if (!showing) next();
+    }
+    function next() {
+      const a = queue.shift();
+      if (!a) { showing = false; return; }
+      showing = true;
+      render(a, () => setTimeout(next, 250)); // pequeno respiro entre alertas
+    }
+    function render(a, done) {
+      const p = present(a);
+      const el = document.createElement("div");
+      el.className = "alert";
+      el.style.setProperty("--accent", ACCENT[p.accent] || ACCENT.brass);
+      const platLabel = (a.platform || "").toString();
+      // Mostra a mensagem do alerta (resub/superchat/doação) ou, na falta dela, a nota do tipo.
+      const msg = a.message ? esc(a.message) : (p.note || "");
+      el.innerHTML =
+        `<div class="emoji">${p.emoji}</div>` +
+        `<div class="body">` +
+          `<div class="head">${p.head}</div>` +
+          (msg ? `<div class="msg">${msg}</div>` : "") +
+          (platLabel ? `<div class="plat">${esc(platLabel)}</div>` : "") +
+        `</div>`;
+      stage.appendChild(el);
+      // força reflow antes de aplicar .in pra a transição rodar
+      void el.offsetWidth;
+      el.classList.add("in");
+      if (SOUND) chime(p.accent);
+      setTimeout(() => {
+        el.classList.remove("in");
+        setTimeout(() => { el.remove(); done(); }, 480); // espera a saída
+      }, DUR);
+    }
+
+    // --- Som: chime curto via WebAudio (sem baixar arquivo). No OBS o áudio autoplay é liberado. ---
+    let actx = null;
+    function chime() {
+      try {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === "suspended") actx.resume();
+        const now = actx.currentTime;
+        const notes = [660, 880]; // duas notas ascendentes, curtas
+        notes.forEach((f, i) => {
+          const o = actx.createOscillator();
+          const g = actx.createGain();
+          o.type = "triangle";
+          o.frequency.value = f;
+          const t0 = now + i * 0.12;
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+          o.connect(g).connect(actx.destination);
+          o.start(t0);
+          o.stop(t0 + 0.32);
+        });
+      } catch (_) { /* som é opcional */ }
+    }
+
+    // --- WebSocket + reconexão (mesmo backoff do estúdio da Mesa) ---
+    let ws = null, retry = 0, alive = true;
+    function connect() {
+      try { ws = new WebSocket(`ws://${location.host}/ws`); } catch (_) { return; }
+      ws.onopen = () => { retry = 0; };
+      ws.onmessage = (ev) => {
+        let a; try { a = JSON.parse(ev.data); } catch (_) { return; }
+        enqueue(a);
+      };
+      ws.onclose = () => {
+        if (!alive) return;
+        retry = Math.min(retry + 1, 6);
+        setTimeout(connect, 400 * retry);
+      };
+      ws.onerror = () => { try { ws.close(); } catch (_) {} };
+    }
+    window.addEventListener("beforeunload", () => { alive = false; try { ws && ws.close(); } catch (_) {} });
+    connect();
+
+    // --- Modo demo (só no navegador): alertas de exemplo em loop ---
+    if (DEMO) {
+      const samples = [
+        { kind: "sub", platform: "twitch", user: "joao_gamer" },
+        { kind: "tip", platform: "streamlabs", user: "maria", amount: 15, currency: "BRL", message: "arrasou hoje!" },
+        { kind: "raid", platform: "twitch", user: "canal_amigo", amount: 128 },
+        { kind: "subgift", platform: "twitch", user: "patrocinador", amount: 5 },
+        { kind: "superchat", platform: "youtube", user: "ana", amount: 20, currency: "BRL", message: "primeira vez aqui 🎉" },
+        { kind: "follow", platform: "kick", user: "novato99" },
+      ];
+      let i = 0;
+      setInterval(() => enqueue(samples[i++ % samples.length]), 3200);
+    }
+  })();
+  </script>
+</body>
+</html>
