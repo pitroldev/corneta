@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Corneta · Overlay de chat</title>
+  <!--
+    Overlay do CHAT unificado — carregado pelo OBS como Browser Source. Ouve o WebSocket da
+    Corneta (mesma origem, /chat-ws) e imprime cada mensagem com EMOTES (BTTV/FFZ/7TV + nativos
+    da Twitch/YouTube/Kick — já vêm prontos nos `fragments`). Fundo transparente.
+    Servido em http://127.0.0.1:<porta>/chat.
+
+    Parâmetros (query):
+      pos      = bottom (padrão) | top     — de onde a lista cresce
+      size     = tamanho da fonte em px (padrão 22)
+      max      = máximo de mensagens na tela (padrão 12)
+      badges   = "1" (padrão) mostra os selos (mod/sub/vip…)
+      platform = "1" (padrão) mostra o pontinho da plataforma
+      demo     = "1" injeta mensagens de exemplo (só pra ver no navegador)
+  -->
+  <style>
+    :root { --brass: #ffb323; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: transparent;
+      font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    #feed {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      gap: 6px; padding: 20px;
+      overflow: hidden;
+    }
+    body[data-pos="bottom"] #feed { justify-content: flex-end; }
+    body[data-pos="top"] #feed { justify-content: flex-start; }
+
+    .msg {
+      width: fit-content; max-width: 100%;
+      padding: 6px 12px;
+      background: rgba(14, 11, 6, 0.72);
+      border-radius: 12px;
+      line-height: 1.35;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+      overflow-wrap: anywhere;
+      /* entrada */
+      animation: pop 0.28s cubic-bezier(0.18, 0.9, 0.28, 1.2) both;
+    }
+    @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .msg { animation: none; } }
+
+    .msg .dot {
+      display: inline-block; width: 0.55em; height: 0.55em; border-radius: 999px;
+      margin-right: 0.4em; vertical-align: 0.05em;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+    }
+    .msg .badge {
+      display: inline-block; margin-right: 0.35em; padding: 0 0.4em;
+      border-radius: 5px; font-size: 0.62em; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.03em; vertical-align: 0.15em;
+    }
+    .msg .author { font-weight: 800; }
+    .msg .author::after { content: ":"; color: rgba(255, 255, 255, 0.55); font-weight: 700; }
+    .msg .body { margin-left: 0.35em; font-weight: 600; color: rgba(255, 255, 255, 0.95); }
+    .msg .emote { height: 1.5em; width: auto; vertical-align: -0.4em; margin: 0 1px; }
+  </style>
+</head>
+<body>
+  <div id="feed"></div>
+  <script>
+  (() => {
+    "use strict";
+    const q = new URLSearchParams(location.search);
+    const POS = q.get("pos") === "top" ? "top" : "bottom";
+    const SIZE = Math.max(10, Math.min(48, parseInt(q.get("size") || "22", 10) || 22));
+    const MAX = Math.max(1, Math.min(40, parseInt(q.get("max") || "12", 10) || 12));
+    const SHOW_BADGES = q.get("badges") !== "0";
+    const SHOW_PLATFORM = q.get("platform") !== "0";
+    const NOCMD = q.get("nocmd") === "1";
+    const FADE = Math.max(0, Math.min(600, parseInt(q.get("fade") || "0", 10) || 0)) * 1000;
+    const DEMO = q.get("demo") === "1";
+
+    document.body.dataset.pos = POS;
+    const feed = document.getElementById("feed");
+    feed.style.fontSize = SIZE + "px";
+
+    const PLAT_COLOR = { twitch: "#a970ff", youtube: "#ff4e45", kick: "#53fc18" };
+    const BADGE_COLOR = {
+      broadcaster: "#ff5a3c", moderator: "#22c55e", vip: "#e879f9",
+      subscriber: "#ffb323", staff: "#7c9cff", partner: "#7c9cff",
+    };
+    function badgeStyle(kind) {
+      const bg = BADGE_COLOR[kind] || "#4a4136";
+      const ink = kind === "subscriber" ? "#2a1c00" : "#fff";
+      return `background:${bg};color:${ink}`;
+    }
+    function esc(s) {
+      return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    }
+    function fragsHtml(m) {
+      const frags = Array.isArray(m.fragments) && m.fragments.length
+        ? m.fragments
+        : [{ kind: "text", text: m.text || "" }];
+      return frags
+        .map((f) =>
+          f.kind === "emote" && f.url
+            ? `<img class="emote" src="${esc(f.url)}" alt="${esc(f.text || "")}" />`
+            : esc(f.text || ""),
+        )
+        .join("");
+    }
+
+    function render(m) {
+      if (!m || m.deleted) return;
+      if (NOCMD && (m.text || "").trim().startsWith("!")) return; // esconde comandos de bot
+      const el = document.createElement("div");
+      el.className = "msg";
+      const dot = SHOW_PLATFORM
+        ? `<span class="dot" style="background:${PLAT_COLOR[m.platform] || "#999"}"></span>`
+        : "";
+      const badges =
+        SHOW_BADGES && Array.isArray(m.badges)
+          ? m.badges
+              .map((b) => `<span class="badge" style="${badgeStyle(b.kind)}">${esc(b.label)}</span>`)
+              .join("")
+          : "";
+      const authorColor = m.color ? `color:${esc(m.color)}` : "color:var(--brass)";
+      el.innerHTML =
+        dot +
+        badges +
+        `<span class="author" style="${authorColor}">${esc(m.author || "")}</span>` +
+        `<span class="body">${fragsHtml(m)}</span>`;
+      feed.appendChild(el);
+      // Cap: no bottom, a mais antiga sai do topo; no top, idem (a lista não cresce sem fim).
+      while (feed.childElementCount > MAX) feed.removeChild(feed.firstElementChild);
+      // Sumir após N segundos (0 = nunca): esvazia o overlay quando o chat esfria.
+      if (FADE > 0) {
+        setTimeout(() => {
+          el.style.transition = "opacity 0.5s ease";
+          el.style.opacity = "0";
+          setTimeout(() => el.remove(), 500);
+        }, FADE);
+      }
+    }
+
+    // --- WebSocket + reconexão (mesmo backoff do estúdio da Mesa) ---
+    let ws = null, retry = 0, alive = true;
+    function connect() {
+      try { ws = new WebSocket(`ws://${location.host}/chat-ws`); } catch (_) { return; }
+      ws.onopen = () => { retry = 0; };
+      ws.onmessage = (ev) => {
+        let m; try { m = JSON.parse(ev.data); } catch (_) { return; }
+        render(m);
+      };
+      ws.onclose = () => {
+        if (!alive) return;
+        retry = Math.min(retry + 1, 6);
+        setTimeout(connect, 400 * retry);
+      };
+      ws.onerror = () => { try { ws.close(); } catch (_) {} };
+    }
+    window.addEventListener("beforeunload", () => { alive = false; try { ws && ws.close(); } catch (_) {} });
+    connect();
+
+    if (DEMO) {
+      const samples = [
+        { platform: "twitch", author: "joao_gamer", color: "#ff7f50", badges: [{ label: "sub", kind: "subscriber" }], text: "salve galera!", fragments: [{ kind: "text", text: "salve galera! " }, { kind: "emote", text: "Kappa", url: "https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0" }] },
+        { platform: "kick", author: "maria", color: "#53fc18", badges: [], fragments: [{ kind: "text", text: "esse clutch foi surreal 🔥" }] },
+        { platform: "youtube", author: "ana", color: "#ff4e45", badges: [{ label: "membro", kind: "vip" }], fragments: [{ kind: "text", text: "primeira vez na live, curtindo demais" }] },
+        { platform: "twitch", author: "mod_do_canal", color: "#22c55e", badges: [{ label: "mod", kind: "moderator" }], fragments: [{ kind: "text", text: "bora cornetar!" }] },
+      ];
+      let i = 0;
+      setInterval(() => render(samples[i++ % samples.length]), 2200);
+    }
+  })();
+  </script>
+</body>
+</html>

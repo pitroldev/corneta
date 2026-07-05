@@ -89,6 +89,7 @@ fn frags_to_text(frags: &[ChatFragment]) -> String {
 
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
     MSG_COUNT.fetch_add(1, Ordering::Relaxed);
+    crate::overlay::push_chat(&app.state::<AppState>().overlay, &msg);
     let _ = app.emit("chat://message", msg);
 }
 /// `chat://message` com guard de geração (igual chat_status_gen): num Reconectar, a
@@ -158,6 +159,10 @@ pub struct Alert {
     pub tier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// Fragmentos com EMOTES (BTTV/FFZ/7TV + nativos) da mensagem — hoje só Twitch (resub/sub).
+    /// Vazio = a UI renderiza `message` como texto puro (YouTube/Kick/agregadores).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fragments: Vec<ChatFragment>,
     pub ts: u64,
 }
 
@@ -462,6 +467,7 @@ fn run_twitch(
                                         currency: None,
                                         tier: None,
                                         message: None,
+                                        fragments: Vec::new(),
                                         ts: now_ms(),
                                     },
                                 );
@@ -471,7 +477,7 @@ fn run_twitch(
                             emit_chat_gen(&app, gen, msg);
                         }
                     } else if cmd == "USERNOTICE" {
-                        if let Some(alert) = parse_usernotice(line, source) {
+                        if let Some(alert) = parse_usernotice(line, source, &emotes) {
                             emit_alert(&app, alert);
                         }
                     } else if cmd == "CLEARMSG" {
@@ -688,8 +694,9 @@ fn clearchat_user(line: &str) -> Option<String> {
     (!u.is_empty()).then(|| u.to_string())
 }
 
-/// Inscrição/resub/gift/raid via USERNOTICE do IRC → alerta.
-fn parse_usernotice(line: &str, source: &str) -> Option<Alert> {
+/// Inscrição/resub/gift/raid via USERNOTICE do IRC → alerta. `emotes` = mapa de emotes de
+/// terceiros (BTTV/FFZ/7TV) pra renderizar a mensagem do resub/sub com as imagens, igual ao chat.
+fn parse_usernotice(line: &str, source: &str, emotes: &HashMap<String, String>) -> Option<Alert> {
     let tags = twitch_tags(line);
     let msg_id = tag_val(tags, "msg-id")?;
     let user = tag_val(tags, "display-name")
@@ -719,10 +726,21 @@ fn parse_usernotice(line: &str, source: &str) -> Option<Alert> {
         ),
         _ => return None,
     };
-    let message = if kind == "subgift" {
-        tag_val(tags, "msg-param-recipient-display-name").map(|r| format!("🎁 para {r}"))
+    let emotes_tag = tag_val(tags, "emotes").unwrap_or_default();
+    let (message, fragments) = if kind == "subgift" {
+        (
+            tag_val(tags, "msg-param-recipient-display-name").map(|r| format!("🎁 para {r}")),
+            Vec::new(),
+        )
     } else {
-        usernotice_text(line)
+        match usernotice_text(line) {
+            // Mesma pipeline do chat: emotes nativos (tag) + BTTV/FFZ/7TV (mapa) → fragmentos.
+            Some(t) => {
+                let frags = apply_thirdparty(twitch_fragments(&t, &emotes_tag), emotes);
+                (Some(t), frags)
+            }
+            None => (None, Vec::new()),
+        }
     };
     Some(Alert {
         id: next_id(),
@@ -734,6 +752,7 @@ fn parse_usernotice(line: &str, source: &str) -> Option<Alert> {
         currency: None,
         tier,
         message,
+        fragments,
         ts: now_ms(),
     })
 }
@@ -1320,6 +1339,7 @@ fn yt_alert(
         currency,
         tier,
         message,
+        fragments: Vec::new(),
         ts: now_ms(),
     }
 }
@@ -2034,6 +2054,7 @@ fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
         currency: None,
         tier: None,
         message: None,
+        fragments: Vec::new(),
         ts: now_ms(),
     };
     if event.ends_with("SubscriptionEvent") {

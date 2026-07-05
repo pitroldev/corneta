@@ -170,6 +170,26 @@ export interface AppSettings {
   overlayPosition: string;
   /** Overlay: porta do servidor local (URL fixa pro OBS). */
   overlayPort: number;
+  /** Overlay do chat: de onde a lista cresce ("bottom" | "top"). */
+  overlayChatPosition: string;
+  /** Overlay de alertas: tempo que cada card fica na tela (s). */
+  overlayDurationSecs: number;
+  /** Overlay de alertas: escala do card ("sm" | "md" | "lg"). */
+  overlayScale: string;
+  /** Overlay de alertas: mostrar alertas de seguidor. */
+  overlayShowFollows: boolean;
+  /** Overlay do chat: tamanho da fonte (px). */
+  overlayChatSize: number;
+  /** Overlay do chat: máximo de mensagens na tela. */
+  overlayChatMax: number;
+  /** Overlay do chat: mostrar selos (mod/sub/vip). */
+  overlayChatBadges: boolean;
+  /** Overlay do chat: mostrar o pontinho da plataforma. */
+  overlayChatPlatform: boolean;
+  /** Overlay do chat: esconder mensagens de comando (começam com "!"). */
+  overlayChatHideCommands: boolean;
+  /** Overlay do chat: sumir com a mensagem após N segundos (0 = nunca). */
+  overlayChatFadeSecs: number;
 }
 
 export interface ObsCheck {
@@ -282,6 +302,9 @@ export interface Alert {
   currency?: string;
   tier?: string;
   message?: string;
+  /** Fragmentos com emotes (BTTV/FFZ/7TV + nativos) da mensagem — hoje só Twitch (resub/sub).
+   *  Vazio/ausente = renderiza `message` como texto puro. */
+  fragments?: ChatFragment[];
   ts: number;
 }
 

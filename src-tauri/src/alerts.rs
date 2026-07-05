@@ -211,6 +211,7 @@ fn parse_streamlabs(source: &str, data: &Value) -> Option<Alert> {
         currency,
         tier,
         message,
+        fragments: Vec::new(),
         ts: now_ms(),
     })
 }
@@ -257,6 +258,7 @@ fn parse_streamelements(source: &str, ev: &Value) -> Option<Alert> {
         currency,
         tier,
         message,
+        fragments: Vec::new(),
         ts: now_ms(),
     })
 }

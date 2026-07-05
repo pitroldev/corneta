@@ -2070,9 +2070,40 @@ pub fn overlay_test(state: State<'_, AppState>) {
         currency: None,
         tier: None,
         message: Some("bora cornetar! 📣".into()),
+        fragments: Vec::new(),
         ts: 0,
     };
     crate::overlay::push(&state.overlay, &demo);
+}
+
+/// Empurra uma MENSAGEM de chat de EXEMPLO pro overlay de chat (preview no OBS), com um emote.
+#[tauri::command]
+pub fn overlay_chat_test(state: State<'_, AppState>) {
+    let demo = chat::ChatMessage {
+        id: "overlay-chat-test".into(),
+        platform: "twitch".into(),
+        source: "teste".into(),
+        author: "fulano_dtal".into(),
+        author_id: None,
+        native_id: None,
+        color: Some("#ffb323".into()),
+        text: "salve, bora cornetar! Kappa".into(),
+        fragments: vec![
+            chat::ChatFragment {
+                kind: "text".into(),
+                text: Some("salve, bora cornetar! ".into()),
+                url: None,
+            },
+            chat::ChatFragment {
+                kind: "emote".into(),
+                text: Some("Kappa".into()),
+                url: Some("https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0".into()),
+            },
+        ],
+        badges: vec![chat::ChatBadge { label: "sub".into(), kind: "subscriber".into() }],
+        ts: 0,
+    };
+    crate::overlay::push_chat(&state.overlay, &demo);
 }
 
 /// Adiciona (ou atualiza) o Browser Source do overlay na cena atual do OBS (canvas cheio,

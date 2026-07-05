@@ -79,13 +79,30 @@ const AlertRow = memo(function AlertRow({ a, fontSize }: { a: Alert; fontSize: n
           {meta.verb}
           {d && <span className="font-bold text-ink"> · {d}</span>}
         </div>
-        {a.message && (
+        {(a.fragments?.length || a.message) && (
           <div
             className="mt-0.5 truncate italic text-ink-faint"
             style={{ fontSize: "0.85em" }}
             title={a.message}
           >
-            “{a.message}”
+            “
+            {a.fragments?.length
+              ? a.fragments.map((f, i) =>
+                  f.kind === "emote" && f.url ? (
+                    <img
+                      key={i}
+                      src={f.url}
+                      alt={f.text}
+                      title={f.text}
+                      className="mx-0.5 inline-block h-[1.4em] w-auto not-italic align-middle"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span key={i}>{f.text}</span>
+                  ),
+                )
+              : a.message}
+            ”
           </div>
         )}
       </div>

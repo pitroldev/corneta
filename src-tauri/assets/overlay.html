@@ -7,7 +7,7 @@
   <!--
     Overlay de ALERTAS — carregado pelo OBS como Browser Source. Ouve o WebSocket da Corneta
     (mesma origem, /ws) e anima um card por alerta (sub, doação, raid…). Fundo transparente.
-    Servido em http://127.0.0.1:<porta>/overlay.
+    Servido em http://127.0.0.1:<porta>/alerts.
 
     Parâmetros (query):
       sound = "1" (padrão) | "0"   — toca um chime ao aparecer o alerta
@@ -47,13 +47,14 @@
     body[data-pos="bottom"] #stage,
     body[data-pos="center"] #stage { align-items: center; }
 
+    /* Tamanhos em `em` → o `scale` (fonte-base do #stage) redimensiona o card inteiro junto. */
     .alert {
-      display: flex; align-items: center; gap: 16px;
+      display: flex; align-items: center; gap: 1em;
       max-width: min(560px, 80vw);
-      padding: 16px 22px 16px 18px;
+      padding: 1em 1.375em 1em 1.125em;
       background: var(--card);
-      border-left: 6px solid var(--accent);
-      border-radius: 14px;
+      border-left: 0.375em solid var(--accent);
+      border-radius: 0.875em;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
       backdrop-filter: blur(3px);
       /* Estado de entrada — a classe .in tira o deslocamento (transição no toggle). */
@@ -65,27 +66,28 @@
     .alert.in { opacity: 1; transform: translateY(0) scale(1); }
 
     .alert .emoji {
-      font-size: 40px; line-height: 1;
+      font-size: 2.5em; line-height: 1;
       filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent));
       flex-shrink: 0;
     }
     .alert .body { min-width: 0; }
     .alert .head {
-      color: var(--ink); font-weight: 800; font-size: 22px; line-height: 1.15;
+      color: var(--ink); font-weight: 800; font-size: 1.375em; line-height: 1.15;
       text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
       overflow-wrap: anywhere;
     }
     .alert .head b { color: var(--accent); }
     .alert .msg {
-      margin-top: 4px;
-      color: rgba(255, 255, 255, 0.82); font-weight: 600; font-size: 15px; line-height: 1.25;
+      margin-top: 0.25em;
+      color: rgba(255, 255, 255, 0.82); font-weight: 600; font-size: 0.9375em; line-height: 1.25;
       text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
       overflow-wrap: anywhere;
       display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
     }
+    .alert .msg .emote { height: 1.4em; width: auto; vertical-align: -0.35em; margin: 0 1px; }
     .alert .plat {
-      margin-top: 6px;
-      font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+      margin-top: 0.375em;
+      font-size: 0.6875em; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
       color: color-mix(in srgb, var(--accent) 80%, #fff 20%);
       opacity: 0.85;
     }
@@ -104,10 +106,14 @@
     const SOUND = q.get("sound") !== "0";
     const POS = q.get("pos") || "top";
     const DUR = Math.max(2, Math.min(30, parseInt(q.get("dur") || "6", 10) || 6)) * 1000;
+    const SCALE = { sm: 0.8, md: 1, lg: 1.25 }[q.get("scale")] || 1;
+    const FOLLOWS = q.get("follows") !== "0";
     const DEMO = q.get("demo") === "1";
 
     document.body.dataset.pos = POS;
     const stage = document.getElementById("stage");
+    // Escala tudo de uma vez: o card usa `em`, então mexer na fonte-base do palco redimensiona junto.
+    stage.style.fontSize = 16 * SCALE + "px";
 
     // --- Apresentação por tipo de alerta (emoji + texto + cor de destaque) ---
     const ACCENT = {
@@ -146,12 +152,26 @@
     function esc(s) {
       return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     }
+    // Mensagem do alerta com EMOTES: fragmentos (BTTV/FFZ/7TV + nativos) viram <img>; senão, texto.
+    function msgHtml(a) {
+      if (Array.isArray(a.fragments) && a.fragments.length) {
+        return a.fragments
+          .map((f) =>
+            f.kind === "emote" && f.url
+              ? `<img class="emote" src="${esc(f.url)}" alt="${esc(f.text || "")}" />`
+              : esc(f.text || ""),
+          )
+          .join("");
+      }
+      return a.message ? esc(a.message) : "";
+    }
 
     // --- Fila: um card por vez, na ordem de chegada ---
     const queue = [];
     let showing = false;
     function enqueue(a) {
       if (!a || typeof a !== "object" || !a.kind) return;
+      if (!FOLLOWS && a.kind === "follow") return; // seguidor escondido pela config
       queue.push(a);
       if (!showing) next();
     }
@@ -167,8 +187,8 @@
       el.className = "alert";
       el.style.setProperty("--accent", ACCENT[p.accent] || ACCENT.brass);
       const platLabel = (a.platform || "").toString();
-      // Mostra a mensagem do alerta (resub/superchat/doação) ou, na falta dela, a nota do tipo.
-      const msg = a.message ? esc(a.message) : (p.note || "");
+      // Mensagem do alerta (resub/superchat/doação) com emotes; na falta dela, a nota do tipo.
+      const msg = msgHtml(a) || p.note || "";
       el.innerHTML =
         `<div class="emoji">${p.emoji}</div>` +
         `<div class="body">` +
@@ -214,7 +234,7 @@
     // --- WebSocket + reconexão (mesmo backoff do estúdio da Mesa) ---
     let ws = null, retry = 0, alive = true;
     function connect() {
-      try { ws = new WebSocket(`ws://${location.host}/ws`); } catch (_) { return; }
+      try { ws = new WebSocket(`ws://${location.host}/alerts-ws`); } catch (_) { return; }
       ws.onopen = () => { retry = 0; };
       ws.onmessage = (ev) => {
         let a; try { a = JSON.parse(ev.data); } catch (_) { return; }

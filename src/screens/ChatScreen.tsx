@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   AtSign,
@@ -25,7 +25,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { api, IS_TAURI } from "../lib/api";
+import { api, IS_TAURI, type OverlayInfo } from "../lib/api";
 import { useStore } from "../lib/store";
 import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { toast } from "../lib/toast";
@@ -64,11 +64,12 @@ const HINT: Record<string, string> = {
   youtube: "Seu canal (@handle, URL ou ID).",
 };
 
-type ConfigTab = "canais" | "conta" | "alertas" | "exibicao";
+type ConfigTab = "canais" | "conta" | "alertas" | "overlays" | "exibicao";
 const CONFIG_TABS: { id: ConfigTab; label: string; icon: typeof Tv2 }[] = [
   { id: "canais", label: "Canais", icon: Tv2 },
   { id: "conta", label: "Conta", icon: LogIn },
   { id: "alertas", label: "Alertas", icon: Bell },
+  { id: "overlays", label: "Overlays", icon: MonitorPlay },
   { id: "exibicao", label: "Exibição", icon: Eye },
 ];
 
@@ -601,9 +602,11 @@ export function ChatScreen() {
                 </div>
               )}
             </div>
+            </RTabs.Content>
 
-            {/* Overlay pro OBS: onde os alertas APARECEM na live (Browser Source). */}
-            <OverlayCard settings={s} setSettings={setSettings} />
+            <RTabs.Content value="overlays">
+              {/* Overlays pro OBS: alertas + chat como Browser Source (com emotes). */}
+              <OverlayCard settings={s} setSettings={setSettings} />
             </RTabs.Content>
 
             <RTabs.Content value="conta">
@@ -915,7 +918,94 @@ const OVERLAY_POS_OPTS = [
   { value: "bottom-right", label: "Canto inf. direito" },
 ];
 
-/** Overlay de alertas pro OBS: liga o servidor local e mostra a URL (Browser Source). */
+const CHAT_POS_OPTS = [
+  { value: "bottom", label: "Embaixo (sobe)" },
+  { value: "top", label: "Em cima (desce)" },
+];
+
+const SCALE_OPTS = [
+  { value: "sm", label: "Pequeno" },
+  { value: "md", label: "Médio" },
+  { value: "lg", label: "Grande" },
+];
+
+/** Linha de opção: rótulo à esquerda, controle à direita. */
+function OptRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="shrink-0 text-xs font-semibold text-ink-muted">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+/** Um overlay (alertas ou chat): URL + copiar + adicionar no OBS + testar + opções. */
+function OverlayBlock({
+  title,
+  url,
+  onTest,
+  testMsg,
+  children,
+}: {
+  title: string;
+  url: string;
+  onTest: () => Promise<void>;
+  testMsg: string;
+  children?: ReactNode;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard indisponível */
+    }
+  };
+  const addToObs = () =>
+    api
+      .overlayObsAddSource(url)
+      .then(() => toast.success(`Overlay de ${title.toLowerCase()} no OBS 📺`))
+      .catch((e) => toast.error(errMsg(e)));
+  const test = () =>
+    onTest()
+      .then(() => toast.success(testMsg))
+      .catch((e) => toast.error(errMsg(e)));
+  return (
+    <div className="rounded-md bg-surface-2/60 p-2.5 ring-1 ring-border">
+      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-brass">{title}</div>
+      <div className="flex items-center gap-1.5">
+        <code className="min-w-0 flex-1 truncate rounded-md bg-surface px-2.5 py-2 text-[11px] text-ink-muted ring-1 ring-border">
+          {url}
+        </code>
+        <Button variant="subtle" size="sm" onClick={() => void copy()}>
+          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+          {copied ? "Copiado" : "Copiar"}
+        </Button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button variant="subtle" size="sm" onClick={() => void addToObs()}>
+          <Tv2 className="size-3.5" /> Adicionar no OBS
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => void test()}>
+          <Bell className="size-3.5" /> Testar
+        </Button>
+      </div>
+      {children && (
+        <div className="mt-2 flex flex-col gap-2 rounded-md bg-surface px-3 py-2">
+          {children}
+        </div>
+      )}
+      <p className="mt-1.5 text-[11px] text-ink-faint">
+        Mudou uma opção? Clique <strong className="text-ink">Adicionar no OBS</strong> de novo (ou
+        atualize a URL da fonte lá).
+      </p>
+    </div>
+  );
+}
+
+/** Overlays pro OBS: um servidor local serve alertas e chat (Browser Source), com emotes. */
 function OverlayCard({
   settings,
   setSettings,
@@ -924,18 +1014,17 @@ function OverlayCard({
   setSettings: (patch: Partial<AppSettings>) => void;
 }) {
   const enabled = settings.overlayEnabled ?? false;
-  const [url, setUrl] = useState<string | null>(null);
+  const [info, setInfo] = useState<OverlayInfo | null>(null);
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
 
-  // O backend sobe o servidor no boot quando ligado; aqui só buscamos a URL pra exibir.
+  // O backend sobe o servidor no boot quando ligado; aqui só buscamos as URLs pra exibir.
   useEffect(() => {
     if (!IS_TAURI || !enabled) return;
     let alive = true;
     api
       .overlayStatus()
-      .then((info) => {
-        if (alive && info) setUrl(info.url);
+      .then((i) => {
+        if (alive && i) setInfo(i);
       })
       .catch(() => {});
     return () => {
@@ -944,8 +1033,21 @@ function OverlayCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const displayUrl = url
-    ? `${url}?sound=${(settings.overlaySound ?? true) ? 1 : 0}&pos=${settings.overlayPosition || "top"}`
+  const alertUrl = info
+    ? `${info.url}?sound=${(settings.overlaySound ?? true) ? 1 : 0}` +
+      `&pos=${settings.overlayPosition || "top"}` +
+      `&dur=${settings.overlayDurationSecs ?? 6}` +
+      `&scale=${settings.overlayScale || "md"}` +
+      `&follows=${(settings.overlayShowFollows ?? true) ? 1 : 0}`
+    : "";
+  const chatUrl = info
+    ? `${info.chatUrl}?pos=${settings.overlayChatPosition || "bottom"}` +
+      `&size=${settings.overlayChatSize ?? 22}` +
+      `&max=${settings.overlayChatMax ?? 12}` +
+      `&badges=${(settings.overlayChatBadges ?? true) ? 1 : 0}` +
+      `&platform=${(settings.overlayChatPlatform ?? true) ? 1 : 0}` +
+      `&nocmd=${(settings.overlayChatHideCommands ?? false) ? 1 : 0}` +
+      `&fade=${settings.overlayChatFadeSecs ?? 0}`
     : "";
 
   const toggle = async (on: boolean) => {
@@ -953,12 +1055,10 @@ function OverlayCard({
     if (!IS_TAURI) return;
     setBusy(true);
     try {
-      if (on) {
-        const info = await api.overlayStart();
-        setUrl(info.url);
-      } else {
+      if (on) setInfo(await api.overlayStart());
+      else {
         await api.overlayStop();
-        setUrl(null);
+        setInfo(null);
       }
     } catch (e) {
       toast.error(errMsg(e));
@@ -968,95 +1068,152 @@ function OverlayCard({
     }
   };
 
-  const copy = async () => {
-    if (!displayUrl) return;
-    try {
-      await navigator.clipboard.writeText(displayUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard indisponível */
-    }
-  };
-
-  const addToObs = () =>
-    api
-      .overlayObsAddSource(displayUrl)
-      .then(() => toast.success("Overlay adicionado no OBS 📺"))
-      .catch((e) => toast.error(errMsg(e)));
-
-  const test = () =>
-    api
-      .overlayTest()
-      .then(() => toast.success("Mandei um alerta de teste — olha no OBS 📣"))
-      .catch((e) => toast.error(errMsg(e)));
-
   return (
-    <div className="mt-3 border-t border-border-soft pt-3">
+    <div>
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MonitorPlay className="size-4 text-brass" />
           <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-            Overlay pro OBS
+            Overlays pro OBS
           </span>
         </div>
-        <Toggle checked={enabled} onChange={(v) => void toggle(v)} disabled={busy} label="Overlay pro OBS" />
+        <Toggle checked={enabled} onChange={(v) => void toggle(v)} disabled={busy} label="Overlays pro OBS" />
       </div>
       <p className="mb-2 text-[11px] text-ink-faint">
-        Mostra os alertas <strong className="text-ink">animados na sua live</strong>. Adicione a URL
-        como <strong className="text-ink">Browser Source</strong> no OBS — uma vez só.
+        Servidor local que joga os <strong className="text-ink">alertas</strong> e o{" "}
+        <strong className="text-ink">chat</strong> (com emotes) no OBS. Adicione a URL como{" "}
+        <strong className="text-ink">Browser Source</strong> — uma vez só.
       </p>
 
       {enabled &&
         (!IS_TAURI ? (
           <p className="text-xs text-ink-muted">Disponível no app instalado.</p>
-        ) : url ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1.5">
-              <code className="min-w-0 flex-1 truncate rounded-md bg-surface-2 px-2.5 py-2 text-[11px] text-ink-muted ring-1 ring-border">
-                {displayUrl}
-              </code>
-              <Button variant="subtle" size="sm" onClick={() => void copy()}>
-                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                {copied ? "Copiado" : "Copiar"}
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="subtle" size="sm" onClick={() => void addToObs()}>
-                <Tv2 className="size-3.5" /> Adicionar no OBS
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => void test()}>
-                <Bell className="size-3.5" /> Testar
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md bg-surface-2 px-3 py-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
-                <Toggle
-                  checked={settings.overlaySound ?? true}
-                  onChange={(v) => setSettings({ overlaySound: v })}
-                  label="Som no alerta"
-                />
-                <span>Som no alerta</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
-                <span>Posição</span>
+        ) : !info ? (
+          <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
+            {busy ? "Ligando o overlay…" : "Overlay ligado — reabra esta aba pra ver as URLs."}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <OverlayBlock
+              title="Alertas"
+              url={alertUrl}
+              onTest={() => api.overlayTest()}
+              testMsg="Mandei um alerta de teste — olha no OBS 📣"
+            >
+              <OptRow label="Posição">
                 <Select
-                  className="w-44"
+                  className="w-40"
                   value={settings.overlayPosition || "top"}
                   options={OVERLAY_POS_OPTS}
                   onChange={(v) => setSettings({ overlayPosition: v })}
-                  aria-label="Posição do overlay"
+                  aria-label="Posição do overlay de alertas"
                 />
-              </div>
-            </div>
-            <p className="text-[11px] text-ink-faint">
-              Mudou som ou posição? Clique <strong className="text-ink">Adicionar no OBS</strong> de
-              novo (ou atualize a URL da fonte lá).
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
-            {busy ? "Ligando o overlay…" : "Overlay ligado — reabra esta aba pra ver a URL."}
+              </OptRow>
+              <OptRow label="Tamanho">
+                <Select
+                  className="w-40"
+                  value={settings.overlayScale || "md"}
+                  options={SCALE_OPTS}
+                  onChange={(v) => setSettings({ overlayScale: v })}
+                  aria-label="Tamanho do overlay de alertas"
+                />
+              </OptRow>
+              <OptRow label="Tempo na tela">
+                <Slider
+                  className="w-40"
+                  value={settings.overlayDurationSecs ?? 6}
+                  min={3}
+                  max={15}
+                  suffix="s"
+                  onChange={(v) => setSettings({ overlayDurationSecs: v })}
+                  aria-label="Tempo na tela"
+                />
+              </OptRow>
+              <OptRow label="Som ao aparecer">
+                <Toggle
+                  checked={settings.overlaySound ?? true}
+                  onChange={(v) => setSettings({ overlaySound: v })}
+                  label="Som ao aparecer"
+                />
+              </OptRow>
+              <OptRow label="Mostrar seguidores">
+                <Toggle
+                  checked={settings.overlayShowFollows ?? true}
+                  onChange={(v) => setSettings({ overlayShowFollows: v })}
+                  label="Mostrar seguidores"
+                />
+              </OptRow>
+            </OverlayBlock>
+
+            <OverlayBlock
+              title="Chat"
+              url={chatUrl}
+              onTest={() => api.overlayChatTest()}
+              testMsg="Mandei uma mensagem de teste — olha no OBS 💬"
+            >
+              <OptRow label="Posição">
+                <Select
+                  className="w-40"
+                  value={settings.overlayChatPosition || "bottom"}
+                  options={CHAT_POS_OPTS}
+                  onChange={(v) => setSettings({ overlayChatPosition: v })}
+                  aria-label="Posição do overlay de chat"
+                />
+              </OptRow>
+              <OptRow label="Tamanho da fonte">
+                <Slider
+                  className="w-40"
+                  value={settings.overlayChatSize ?? 22}
+                  min={12}
+                  max={40}
+                  suffix="px"
+                  onChange={(v) => setSettings({ overlayChatSize: v })}
+                  aria-label="Tamanho da fonte do chat"
+                />
+              </OptRow>
+              <OptRow label="Máx. de mensagens">
+                <Slider
+                  className="w-40"
+                  value={settings.overlayChatMax ?? 12}
+                  min={3}
+                  max={30}
+                  onChange={(v) => setSettings({ overlayChatMax: v })}
+                  aria-label="Máximo de mensagens"
+                />
+              </OptRow>
+              <OptRow label="Sumir após (0 = nunca)">
+                <Slider
+                  className="w-40"
+                  value={settings.overlayChatFadeSecs ?? 0}
+                  min={0}
+                  max={60}
+                  suffix="s"
+                  onChange={(v) => setSettings({ overlayChatFadeSecs: v })}
+                  aria-label="Sumir após"
+                />
+              </OptRow>
+              <OptRow label="Selos (mod/sub)">
+                <Toggle
+                  checked={settings.overlayChatBadges ?? true}
+                  onChange={(v) => setSettings({ overlayChatBadges: v })}
+                  label="Selos"
+                />
+              </OptRow>
+              <OptRow label="Ícone da plataforma">
+                <Toggle
+                  checked={settings.overlayChatPlatform ?? true}
+                  onChange={(v) => setSettings({ overlayChatPlatform: v })}
+                  label="Ícone da plataforma"
+                />
+              </OptRow>
+              <OptRow label="Esconder comandos (!)">
+                <Toggle
+                  checked={settings.overlayChatHideCommands ?? false}
+                  onChange={(v) => setSettings({ overlayChatHideCommands: v })}
+                  label="Esconder comandos"
+                />
+              </OptRow>
+            </OverlayBlock>
           </div>
         ))}
     </div>

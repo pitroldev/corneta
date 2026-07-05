@@ -233,6 +233,7 @@ pub fn run() {
             commands::overlay_stop,
             commands::overlay_status,
             commands::overlay_test,
+            commands::overlay_chat_test,
             commands::overlay_obs_add_source,
             commands::open_privacy_settings,
         ])

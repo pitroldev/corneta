@@ -177,6 +177,36 @@ pub struct Settings {
     /// Overlay: porta do servidor local (URL fixa pro OBS). Troque se a 7393 estiver ocupada.
     #[serde(default = "default_overlay_port")]
     pub overlay_port: u32,
+    /// Overlay do CHAT: de onde a lista cresce na tela ("bottom" | "top").
+    #[serde(default = "default_overlay_chat_position")]
+    pub overlay_chat_position: String,
+    /// Overlay de alertas: quanto tempo cada card fica na tela (segundos).
+    #[serde(default = "default_overlay_duration")]
+    pub overlay_duration_secs: u32,
+    /// Overlay de alertas: escala do card ("sm" | "md" | "lg").
+    #[serde(default = "default_overlay_scale")]
+    pub overlay_scale: String,
+    /// Overlay de alertas: mostrar alertas de seguidor (os mais frequentes — dá pra esconder).
+    #[serde(default = "default_true")]
+    pub overlay_show_follows: bool,
+    /// Overlay do chat: tamanho da fonte (px).
+    #[serde(default = "default_overlay_chat_size")]
+    pub overlay_chat_size: u32,
+    /// Overlay do chat: máximo de mensagens na tela.
+    #[serde(default = "default_overlay_chat_max")]
+    pub overlay_chat_max: u32,
+    /// Overlay do chat: mostrar os selos (mod/sub/vip).
+    #[serde(default = "default_true")]
+    pub overlay_chat_badges: bool,
+    /// Overlay do chat: mostrar o pontinho da plataforma.
+    #[serde(default = "default_true")]
+    pub overlay_chat_platform: bool,
+    /// Overlay do chat: esconder mensagens de comando (começam com "!").
+    #[serde(default)]
+    pub overlay_chat_hide_commands: bool,
+    /// Overlay do chat: sumir com a mensagem após N segundos (0 = nunca).
+    #[serde(default)]
+    pub overlay_chat_fade_secs: u32,
     /// Nome original do arquivo custom do "JÁ VOLTO" (só exibição; o arquivo vira brb-slate.*).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brb_slate_file_name: Option<String>,
@@ -196,6 +226,21 @@ fn default_overlay_position() -> String {
 }
 fn default_overlay_port() -> u32 {
     7393
+}
+fn default_overlay_chat_position() -> String {
+    "bottom".to_string()
+}
+fn default_overlay_duration() -> u32 {
+    6
+}
+fn default_overlay_scale() -> String {
+    "md".to_string()
+}
+fn default_overlay_chat_size() -> u32 {
+    22
+}
+fn default_overlay_chat_max() -> u32 {
+    12
 }
 fn default_brb_slate_kind() -> String {
     "auto".to_string()
@@ -295,6 +340,16 @@ impl Default for Settings {
             overlay_sound: true,
             overlay_position: default_overlay_position(),
             overlay_port: default_overlay_port(),
+            overlay_chat_position: default_overlay_chat_position(),
+            overlay_duration_secs: default_overlay_duration(),
+            overlay_scale: default_overlay_scale(),
+            overlay_show_follows: true,
+            overlay_chat_size: default_overlay_chat_size(),
+            overlay_chat_max: default_overlay_chat_max(),
+            overlay_chat_badges: true,
+            overlay_chat_platform: true,
+            overlay_chat_hide_commands: false,
+            overlay_chat_fade_secs: 0,
             brb_slate_file_name: None,
         }
     }

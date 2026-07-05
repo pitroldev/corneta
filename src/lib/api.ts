@@ -146,7 +146,9 @@ export interface CornetaApi {
   overlayStatus(): Promise<OverlayInfo | null>;
   /** Empurra um alerta de exemplo pro overlay (preview no OBS). */
   overlayTest(): Promise<void>;
-  /** Adiciona/atualiza o Browser Source do overlay na cena atual do OBS. */
+  /** Empurra uma mensagem de chat de exemplo pro overlay de chat (preview no OBS). */
+  overlayChatTest(): Promise<void>;
+  /** Adiciona/atualiza um Browser Source do overlay na cena atual do OBS. */
   overlayObsAddSource(url: string): Promise<void>;
   openPrivacySettings(which: "camera" | "microphone"): Promise<void>;
 }
@@ -161,8 +163,10 @@ export interface MesaServerInfo {
 export interface OverlayInfo {
   /** Porta do servidor local do overlay. */
   port: number;
-  /** URL base (sem query) pra colar no OBS como Browser Source. */
+  /** URL base do overlay de ALERTAS (sem query) pra colar no OBS como Browser Source. */
   url: string;
+  /** URL base do overlay de CHAT (sem query). */
+  chatUrl: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -578,6 +582,10 @@ function tauriApi(): CornetaApi {
     async overlayTest() {
       const { invoke } = await core();
       await invoke("overlay_test");
+    },
+    async overlayChatTest() {
+      const { invoke } = await core();
+      await invoke("overlay_chat_test");
     },
     async overlayObsAddSource(url) {
       const { invoke } = await core();
@@ -1243,7 +1251,11 @@ function mockApi(): CornetaApi {
     },
     // Overlay: sem backend no navegador — só roda no app instalado.
     async overlayStart() {
-      return { port: 7393, url: "http://127.0.0.1:7393/overlay" };
+      return {
+        port: 7393,
+        url: "http://127.0.0.1:7393/overlay",
+        chatUrl: "http://127.0.0.1:7393/chat",
+      };
     },
     async overlayStop() {
       /* no-op no navegador */
@@ -1252,6 +1264,9 @@ function mockApi(): CornetaApi {
       return null;
     },
     async overlayTest() {
+      /* no-op no navegador */
+    },
+    async overlayChatTest() {
       /* no-op no navegador */
     },
     async overlayObsAddSource() {
