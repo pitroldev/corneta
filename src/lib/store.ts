@@ -26,6 +26,8 @@ interface LoginState {
   login?: string;
   userCode?: string;
   verifyUri?: string;
+  /** URL já com o código embutido (Twitch manda; Google não) — abre direto na autorização. */
+  verifyUriComplete?: string;
   message?: string;
 }
 
@@ -655,7 +657,13 @@ export const useStore = create<State>((set, get) => {
         set((s) => {
           const k = who as "twitch" | "youtube" | "kick";
           let next: LoginState = s.chatLogin[k];
-          if (a.state === "code") next = { state: "code", userCode: a.userCode, verifyUri: a.verifyUri };
+          if (a.state === "code")
+            next = {
+              state: "code",
+              userCode: a.userCode,
+              verifyUri: a.verifyUri,
+              verifyUriComplete: a.verifyUriComplete,
+            };
           else if (a.state === "connected") next = { state: "connected", login: a.login || undefined };
           else if (a.state === "error") next = { state: "error", message: a.login || "erro no login" };
           else if (a.state === "loggedout") next = { state: "out" };
@@ -664,6 +672,16 @@ export const useStore = create<State>((set, get) => {
         // Código chegou → abre o navegador direto na autorização (a URL completa, quando existe,
         // já pré-preenche o código). O link no app continua como plano B.
         if (a.state === "code") {
+          // Facilita o device flow do Google (que NÃO pré-preenche): copia o código pro clipboard
+          // ANTES de abrir o navegador — o open tira o foco e trava o clipboard write. Aí é só
+          // colar na página do Google. O botão "Copiar" no app é o plano B se isto falhar.
+          if (a.userCode) {
+            try {
+              void navigator.clipboard.writeText(a.userCode);
+            } catch {
+              /* clipboard indisponível */
+            }
+          }
           const url = a.verifyUriComplete || a.verifyUri;
           if (url) void openExternal(url);
         }

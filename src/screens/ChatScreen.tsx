@@ -9,6 +9,7 @@ import {
   ClipboardPaste,
   Clock,
   Copy,
+  ExternalLink,
   Eye,
   LogIn,
   MonitorPlay,
@@ -1755,6 +1756,15 @@ function YoutubeCredsForm({ onSave }: { onSave: (clientId: string, clientSecret:
 }
 
 // Linha de login OAuth (Twitch/YouTube): entrar no navegador (device flow) pra enviar/moderar.
+/** Passo numerado do fluxo de login (bolinha com o número). */
+function StepNum({ n }: { n: number }) {
+  return (
+    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brass text-[11px] font-extrabold text-brass-ink">
+      {n}
+    </span>
+  );
+}
+
 function LoginRow({
   platform,
   label,
@@ -1765,11 +1775,33 @@ function LoginRow({
 }: {
   platform: ChatPlatform;
   label: string;
-  state: { state: string; login?: string; userCode?: string; verifyUri?: string; message?: string };
+  state: {
+    state: string;
+    login?: string;
+    userCode?: string;
+    verifyUri?: string;
+    verifyUriComplete?: string;
+    message?: string;
+  };
   enabled: boolean;
   onLogin: () => void;
   onLogout: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+  const openPage = () => {
+    const url = state.verifyUriComplete || state.verifyUri;
+    if (url) void openExternal(url);
+  };
+  const copyCode = async () => {
+    if (!state.userCode) return;
+    try {
+      await navigator.clipboard.writeText(state.userCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard indisponível */
+    }
+  };
   return (
     <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
       <div className="flex items-center gap-2">
@@ -1801,23 +1833,59 @@ function LoginRow({
           )}
         </div>
       </div>
-      {state.state === "code" && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
-          <span>Abrimos o navegador — {state.userCode ? "confirme com o código:" : "é só autorizar."}</span>
-          {state.userCode && (
-            <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
-              {state.userCode}
-            </span>
-          )}
-          <span className="text-ink-faint">aguardando…</span>
-          <button
-            onClick={() => state.verifyUri && void openExternal(state.verifyUri)}
-            className="ml-auto text-[11px] font-semibold text-brass hover:underline"
-          >
-            não abriu? abrir
-          </button>
-        </div>
-      )}
+      {state.state === "code" &&
+        (state.userCode && !state.verifyUriComplete ? (
+          // Device flow SEM URL pré-preenchida (YouTube/Google): guiamos copiar → colar →
+          // autorizar de forma explícita — era a maior fonte de confusão.
+          <div className="mt-2 rounded-md bg-brass/5 px-3 py-2.5 ring-1 ring-brass/25">
+            <div className="mb-2 text-xs font-bold text-ink">Falta 1 passo — autorizar no navegador:</div>
+            <div className="flex flex-col gap-2 text-xs text-ink-muted">
+              <div className="flex flex-wrap items-center gap-2">
+                <StepNum n={1} />
+                <span className="shrink-0">Copie o código</span>
+                <span className="select-all rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
+                  {state.userCode}
+                </span>
+                <Button variant="subtle" size="sm" onClick={() => void copyCode()}>
+                  {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                  {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StepNum n={2} />
+                <span className="shrink-0">Cole na página que abrimos</span>
+                <Button variant="subtle" size="sm" onClick={openPage}>
+                  <ExternalLink className="size-3.5" /> Abrir a página
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <StepNum n={3} />
+                <span>
+                  Autorize e pronto — a Corneta entra sozinha.{" "}
+                  <span className="text-ink-faint">(aguardando…)</span>
+                </span>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-ink-faint">
+              Já copiamos o código e abrimos a página do Google pra você — é só colar e autorizar.
+            </p>
+          </div>
+        ) : (
+          // Twitch (a URL já pré-preenche o código) ou Kick (sem código): abrir + autorizar.
+          // Mostra o código como referência quando houver (a Twitch pede pra conferir).
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
+            <span>Abrimos a autorização no navegador — é só confirmar.</span>
+            {state.userCode && (
+              <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
+                {state.userCode}
+              </span>
+            )}
+            <Button variant="subtle" size="sm" className="ml-auto" onClick={openPage}>
+              <ExternalLink className="size-3.5" /> Abrir de novo
+            </Button>
+            <span className="text-ink-faint">aguardando…</span>
+          </div>
+        ))}
     </div>
   );
 }
