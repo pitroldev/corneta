@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { MotionConfig, motion } from "framer-motion";
 import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { MESA_ENABLED } from "./lib/flags";
@@ -116,7 +116,20 @@ export default function App() {
       unbindAuthFlow();
       unbindShortcut();
     };
-  }, [load, setupOauth, bindEngine, bindConfigSync, bindChat, bindChatRunning, bindAlerts, bindViewers, bindGuardian, bindAlertStatus, bindChatAuth, bindAuthFlow]);
+  }, [
+    load,
+    setupOauth,
+    bindEngine,
+    bindConfigSync,
+    bindChat,
+    bindChatRunning,
+    bindAlerts,
+    bindViewers,
+    bindGuardian,
+    bindAlertStatus,
+    bindChatAuth,
+    bindAuthFlow,
+  ]);
 
   // Guardião: avisa por toast a cada novo vazamento detectado.
   const leakSeen = useRef(0);
@@ -159,7 +172,13 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
       const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      )
+        return;
       const i = "12345678".indexOf(e.key);
       if (i >= 0 && i < SCREENS.length) {
         e.preventDefault();
@@ -199,59 +218,60 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="flex h-full flex-col overflow-hidden border border-border-soft">
-      <TitleBar />
+      <div className="flex h-full flex-col overflow-hidden border border-border-soft">
+        <TitleBar />
 
-      <div className="sr-only" role="status" aria-live="polite">
-        {liveLabel}
-      </div>
+        <div className="sr-only" role="status" aria-live="polite">
+          {liveLabel}
+        </div>
 
-      {censored && (
-        <div className="flex items-center gap-3 border-b-2 border-bad bg-bad px-4 py-2 text-white">
-          <span className="animate-pulse text-lg">🛑</span>
-          <div className="min-w-0 flex-1">
-            <div className="font-display text-sm font-extrabold leading-tight">
-              JÁ VOLTO no ar
-            </div>
-            <div className="truncate text-xs text-white/85">
-              Um termo seu apareceu na tela — a live volta sozinha quando ele sumir.
+        {censored && (
+          <div className="flex items-center gap-3 border-b-2 border-bad bg-bad px-4 py-2 text-white">
+            <span className="animate-pulse text-lg">🛑</span>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-sm font-extrabold leading-tight">
+                JÁ VOLTO no ar
+              </div>
+              <div className="truncate text-xs text-white/85">
+                Um termo seu apareceu na tela — a live volta sozinha quando ele
+                sumir.
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!censored && <LiveBar onOpen={() => navigate("golive")} />}
+        {!censored && <LiveBar onOpen={() => navigate("golive")} />}
 
-      {!loaded ? (
-        <div className="grid flex-1 place-items-center">
-          <div className="grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
-            <Mascot className="size-9" />
+        {!loaded ? (
+          <div className="grid flex-1 place-items-center">
+            <div className="grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
+              <Mascot className="size-9" />
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          <Sidebar screen={screen} onNavigate={navigate} />
+        ) : (
+          <div className="flex min-h-0 flex-1">
+            <Sidebar screen={screen} onNavigate={navigate} />
 
-          <main className="relative flex-1 overflow-hidden">
-            <SoundWaves className="pointer-events-none absolute -bottom-20 -right-16 size-80 text-brass/[0.05]" />
+            <main className="relative flex-1 overflow-hidden">
+              <SoundWaves className="pointer-events-none absolute -bottom-20 -right-16 size-80 text-brass/[0.05]" />
 
-            <div
-              ref={scrollRef}
-              id="screen-scroll"
-              className="h-full overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]"
-            >
-              <AnimatePresence mode="wait">
+              <div
+                ref={scrollRef}
+                id="screen-scroll"
+                className="h-full overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]"
+              >
                 <motion.div
                   key={screen}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
                   <ErrorBoundary>
                     {screen === "platforms" && <PlatformsScreen />}
                     {screen === "encoding" && <EncodingScreen />}
-                    {screen === "golive" && <GoLiveScreen onNavigate={navigate} />}
+                    {screen === "golive" && (
+                      <GoLiveScreen onNavigate={navigate} />
+                    )}
                     {screen === "chat" && <ChatScreen />}
                     {screen === "mesa" && MESA_ENABLED && <MesaScreen />}
                     {screen === "reports" && <ReportsScreen />}
@@ -259,15 +279,14 @@ export default function App() {
                     {screen === "settings" && <SettingsScreen />}
                   </ErrorBoundary>
                 </motion.div>
-              </AnimatePresence>
-            </div>
-          </main>
-        </div>
-      )}
+              </div>
+            </main>
+          </div>
+        )}
 
-      <Toaster />
-      <Onboarding onStart={() => navigate("platforms")} />
-    </div>
+        <Toaster />
+        <Onboarding onStart={() => navigate("platforms")} />
+      </div>
     </MotionConfig>
   );
 }

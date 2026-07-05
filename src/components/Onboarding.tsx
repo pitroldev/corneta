@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
@@ -80,76 +80,82 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
       onClose={() => close(false)}
       className="max-w-md overflow-hidden rounded-xl bg-surface pop"
     >
-            <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
+      <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
+      <button
+        onClick={() => close(false)}
+        aria-label="Pular o tour"
+        className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-md text-brass-ink/70 transition-colors hover:bg-brass-ink/10 hover:text-brass-ink"
+      >
+        <X className="size-5" />
+      </button>
+      <div className="bg-brass px-6 py-7 text-brass-ink">
+        <div className="mb-3 grid size-14 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
+          <Mascot className="size-8 animate-shout" />
+        </div>
+        <h2 id="onb-title" className="text-3xl">
+          Opa! Bora cornetar?
+        </h2>
+        <p className="mt-1 text-sm font-semibold opacity-80">
+          Em {STEPS.length} passos você manda bem.
+        </p>
+      </div>
+
+      <div className="p-6">
+        <div className="min-h-[14rem]">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <StepArt step={step} />
+            <div className="font-display text-lg font-extrabold">
+              {cur.title}
+            </div>
+            <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
+              {cur.text}
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="my-4 flex justify-center gap-1.5">
+          {STEPS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setStep(i)}
+              aria-label={`Passo ${i + 1}`}
+              className={cn(
+                "h-2 rounded-full transition-all",
+                i === step
+                  ? "w-5 bg-brass"
+                  : "w-2 bg-surface-3 hover:bg-border",
+              )}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          {step > 0 ? (
+            <button
+              onClick={back}
+              className="flex items-center gap-1 text-sm font-semibold text-ink-faint hover:text-ink-muted"
+            >
+              <ArrowLeft className="size-4" /> Voltar
+            </button>
+          ) : (
             <button
               onClick={() => close(false)}
-              aria-label="Pular o tour"
-              className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-md text-brass-ink/70 transition-colors hover:bg-brass-ink/10 hover:text-brass-ink"
+              className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
             >
-              <X className="size-5" />
+              Pular
             </button>
-            <div className="bg-brass px-6 py-7 text-brass-ink">
-              <div className="mb-3 grid size-14 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
-                <Mascot className="size-8 animate-shout" />
-              </div>
-              <h2 id="onb-title" className="text-3xl">Opa! Bora cornetar?</h2>
-              <p className="mt-1 text-sm font-semibold opacity-80">
-                Em {STEPS.length} passos você manda bem.
-              </p>
-            </div>
-
-            <div className="p-6">
-              <div className="min-h-[14rem]">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={step}
-                    initial={{ opacity: 0, x: 24 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -24 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <StepArt step={step} />
-                    <div className="font-display text-lg font-extrabold">{cur.title}</div>
-                    <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">{cur.text}</div>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-
-              <div className="my-4 flex justify-center gap-1.5">
-                {STEPS.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setStep(i)}
-                    aria-label={`Passo ${i + 1}`}
-                    className={cn(
-                      "h-2 rounded-full transition-all",
-                      i === step ? "w-5 bg-brass" : "w-2 bg-surface-3 hover:bg-border"
-                    )}
-                  />
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                {step > 0 ? (
-                  <button
-                    onClick={back}
-                    className="flex items-center gap-1 text-sm font-semibold text-ink-faint hover:text-ink-muted"
-                  >
-                    <ArrowLeft className="size-4" /> Voltar
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => close(false)}
-                    className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
-                  >
-                    Pular
-                  </button>
-                )}
-                <Button variant="primary" size="lg" onClick={next}>
-                  {last ? "Bora começar" : "Próximo"} <ArrowRight className="size-5" />
-                </Button>
-              </div>
-            </div>
+          )}
+          <Button variant="primary" size="lg" onClick={next}>
+            {last ? "Bora começar" : "Próximo"}{" "}
+            <ArrowRight className="size-5" />
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -166,8 +172,22 @@ const INK = "var(--color-brass-ink)";
 function PChip({ cx, cy, label }: { cx: number; cy: number; label: string }) {
   return (
     <>
-      <circle cx={cx} cy={cy} r="12" fill={BRASS} stroke={INK} strokeWidth="1.5" />
-      <text x={cx} y={cy + 4} textAnchor="middle" fontSize="12" fontWeight="800" fill={INK}>
+      <circle
+        cx={cx}
+        cy={cy}
+        r="12"
+        fill={BRASS}
+        stroke={INK}
+        strokeWidth="1.5"
+      />
+      <text
+        x={cx}
+        y={cy + 4}
+        textAnchor="middle"
+        fontSize="12"
+        fontWeight="800"
+        fill={INK}
+      >
         {label}
       </text>
     </>
@@ -183,10 +203,44 @@ function ArtFanout() {
         <path d="M120 52 H196" />
         <path d="M120 52 C152 52 152 76 196 76" />
       </g>
-      <rect x="20" y="38" width="60" height="28" rx="6" fill={BRASS} stroke={INK} strokeWidth="2" />
-      <text x="50" y="56" textAnchor="middle" fontSize="14" fontWeight="800" fill={INK}>OBS</text>
-      <circle cx="78" cy="36" r="10" fill={TOMATE} stroke={INK} strokeWidth="1.5" />
-      <text x="78" y="40" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">1</text>
+      <rect
+        x="20"
+        y="38"
+        width="60"
+        height="28"
+        rx="6"
+        fill={BRASS}
+        stroke={INK}
+        strokeWidth="2"
+      />
+      <text
+        x="50"
+        y="56"
+        textAnchor="middle"
+        fontSize="14"
+        fontWeight="800"
+        fill={INK}
+      >
+        OBS
+      </text>
+      <circle
+        cx="78"
+        cy="36"
+        r="10"
+        fill={TOMATE}
+        stroke={INK}
+        strokeWidth="1.5"
+      />
+      <text
+        x="78"
+        y="40"
+        textAnchor="middle"
+        fontSize="11"
+        fontWeight="800"
+        fill="#fff"
+      >
+        1
+      </text>
       <PChip cx={208} cy={28} label="T" />
       <PChip cx={208} cy={52} label="Y" />
       <PChip cx={208} cy={76} label="K" />
@@ -197,15 +251,56 @@ function ArtFanout() {
 function ArtKeyVault() {
   return (
     <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
-      <rect x="18" y="32" width="92" height="26" rx="13" fill={BRASS} stroke={INK} strokeWidth="2" />
-      <text x="64" y="50" textAnchor="middle" fontSize="17" fontWeight="800" fill={INK} letterSpacing="3">••••</text>
-      <text x="64" y="72" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--color-ink-faint)">sua chave</text>
-      <g stroke={TOMATE} strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <rect
+        x="18"
+        y="32"
+        width="92"
+        height="26"
+        rx="13"
+        fill={BRASS}
+        stroke={INK}
+        strokeWidth="2"
+      />
+      <text
+        x="64"
+        y="50"
+        textAnchor="middle"
+        fontSize="17"
+        fontWeight="800"
+        fill={INK}
+        letterSpacing="3"
+      >
+        ••••
+      </text>
+      <text
+        x="64"
+        y="72"
+        textAnchor="middle"
+        fontSize="9"
+        fontWeight="700"
+        fill="var(--color-ink-faint)"
+      >
+        sua chave
+      </text>
+      <g
+        stroke={TOMATE}
+        strokeWidth="4"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M118 45 H150" />
         <path d="M143 38 L152 45 L143 52" />
       </g>
       <rect x="166" y="22" width="76" height="62" rx="8" fill={INK} />
-      <circle cx="204" cy="53" r="15" fill="none" stroke={BRASS} strokeWidth="3" />
+      <circle
+        cx="204"
+        cy="53"
+        r="15"
+        fill="none"
+        stroke={BRASS}
+        strokeWidth="3"
+      />
       <circle cx="204" cy="53" r="4" fill={BRASS} />
       <rect x="200" y="53" width="8" height="16" fill={BRASS} />
     </svg>
@@ -215,7 +310,16 @@ function ArtKeyVault() {
 function ArtObsSetup() {
   return (
     <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
-      <rect x="22" y="18" width="150" height="68" rx="8" fill="none" stroke={INK} strokeWidth="2.5" />
+      <rect
+        x="22"
+        y="18"
+        width="150"
+        height="68"
+        rx="8"
+        fill="none"
+        stroke={INK}
+        strokeWidth="2.5"
+      />
       <g stroke={INK} strokeWidth="3" strokeLinecap="round" opacity="0.3">
         <path d="M38 36 H156" />
         <path d="M38 52 H156" />
@@ -232,8 +336,26 @@ function ArtObsSetup() {
         <path d="M205 29 l10 10" />
         <path d="M215 29 l-10 10" />
       </g>
-      <rect x="188" y="56" width="52" height="22" rx="5" fill={BRASS} stroke={INK} strokeWidth="2" />
-      <text x="214" y="71" textAnchor="middle" fontSize="9" fontWeight="800" fill={INK}>AUTO</text>
+      <rect
+        x="188"
+        y="56"
+        width="52"
+        height="22"
+        rx="5"
+        fill={BRASS}
+        stroke={INK}
+        strokeWidth="2"
+      />
+      <text
+        x="214"
+        y="71"
+        textAnchor="middle"
+        fontSize="9"
+        fontWeight="800"
+        fill={INK}
+      >
+        AUTO
+      </text>
     </svg>
   );
 }
@@ -246,9 +368,27 @@ function ArtOnAir() {
   ];
   return (
     <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
-      <rect x="20" y="22" width="96" height="28" rx="6" fill={TOMATE} stroke={INK} strokeWidth="2" />
+      <rect
+        x="20"
+        y="22"
+        width="96"
+        height="28"
+        rx="6"
+        fill={TOMATE}
+        stroke={INK}
+        strokeWidth="2"
+      />
       <circle cx="38" cy="36" r="5" fill="#fff" />
-      <text x="76" y="41" textAnchor="middle" fontSize="13" fontWeight="800" fill="#fff">NO AR</text>
+      <text
+        x="76"
+        y="41"
+        textAnchor="middle"
+        fontSize="13"
+        fontWeight="800"
+        fill="#fff"
+      >
+        NO AR
+      </text>
       <path
         d="M20 80 H44 L52 66 L62 92 L72 72 L80 80 H120"
         fill="none"
@@ -289,7 +429,16 @@ function ArtFunnel() {
       </g>
       {bubbles.map(([y, w, dot]) => (
         <g key={y}>
-          <rect x="150" y={y} width={w} height="16" rx="6" fill="var(--color-surface-3)" stroke={INK} strokeWidth="1.5" />
+          <rect
+            x="150"
+            y={y}
+            width={w}
+            height="16"
+            rx="6"
+            fill="var(--color-surface-3)"
+            stroke={INK}
+            strokeWidth="1.5"
+          />
           <circle cx="158" cy={y + 8} r="3" fill={dot} />
         </g>
       ))}
