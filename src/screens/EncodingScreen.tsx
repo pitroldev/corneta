@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -80,9 +80,14 @@ export function EncodingScreen() {
   const uploadMbps = useStore((s) => s.uploadMbps);
   const snapshot = useStore((s) => s.snapshot);
   const runUploadTest = useStore((s) => s.runUploadTest);
+  const refreshEncoders = useStore((s) => s.refreshEncoders);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [measuring, setMeasuring] = useState(false);
+
+  useEffect(() => {
+    if (encoders.length === 0) void refreshEncoders();
+  }, [encoders.length, refreshEncoders]);
 
   if (!config) return null;
 

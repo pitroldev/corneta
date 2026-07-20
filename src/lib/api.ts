@@ -139,7 +139,8 @@ export interface CornetaApi {
   markMoment(label?: string): Promise<void>;
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
-  saveBrbSlate(b64: string): Promise<void>;
+  saveBrbSlate(b64: string, generation?: string): Promise<void>;
+  brbSlateNeedsRefresh(generation: string): Promise<boolean>;
   /** Escolhe imagem/vídeo como tela do "JÁ VOLTO". Devolve { kind, fileName } ou null se cancelou. */
   setBrbSlate(): Promise<{ kind: "image" | "video"; fileName: string } | null>;
   /** Volta a tela do "JÁ VOLTO" pro padrão gerado (apaga o custom). */
@@ -564,9 +565,16 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return invoke<boolean>("import_config");
     },
-    async saveBrbSlate(b64) {
+    async saveBrbSlate(b64, generation) {
       const { invoke } = await core();
-      await invoke("save_brb_slate", { data: b64 });
+      await invoke("save_brb_slate", {
+        data: b64,
+        generation: generation ?? null,
+      });
+    },
+    async brbSlateNeedsRefresh(generation) {
+      const { invoke } = await core();
+      return invoke<boolean>("brb_slate_needs_refresh", { generation });
     },
     async setBrbSlate() {
       const { invoke } = await core();
@@ -1437,6 +1445,9 @@ function mockApi(): CornetaApi {
     },
     async saveBrbSlate() {
       // no-op no navegador (sem backend pra salvar o slate)
+    },
+    async brbSlateNeedsRefresh() {
+      return false;
     },
     async setBrbSlate() {
       // no-op no navegador (sem seletor de arquivo nativo)

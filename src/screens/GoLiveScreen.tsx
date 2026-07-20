@@ -65,6 +65,8 @@ export function GoLiveScreen({
   const toggleTarget = useStore((s) => s.toggleTarget);
   const uploadMbps = useStore((s) => s.uploadMbps);
   const runUploadTest = useStore((s) => s.runUploadTest);
+  const encoders = useStore((s) => s.encoders);
+  const refreshEncoders = useStore((s) => s.refreshEncoders);
   const goLiveFocus = useStore((s) => s.goLiveFocus);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const setSettingsTab = useStore((s) => s.setSettingsTab);
@@ -123,6 +125,10 @@ export function GoLiveScreen({
   const [showObs, setShowObs] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [obsOpen, setObsOpen] = useState(false);
+
+  useEffect(() => {
+    if (encoders.length === 0) void refreshEncoders();
+  }, [encoders.length, refreshEncoders]);
   // Estado do OBS vem do store (compartilhado com o checklist/Configurações, cache de 5s).
   const obs = useStore((s) => s.obs);
   const runObsCheck = useStore((s) => s.runObsCheck);
@@ -1327,6 +1333,8 @@ function Checkup({
         <CheckRow
           label="Encoder disponível"
           ok={encoders.some((e) => e.available)}
+          warn={encoders.length === 0}
+          detail={encoders.length === 0 ? "verificando…" : undefined}
         />
         <CheckRow
           label="Chaves e URLs"

@@ -28,7 +28,7 @@ import * as RTabs from "@radix-ui/react-tabs";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
-import { renderBrbSlatePng } from "../lib/brbSlate";
+import { BRB_SLATE_GENERATION, renderBrbSlatePng } from "../lib/brbSlate";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { sanitizeHost } from "../lib/validation";
@@ -831,9 +831,9 @@ function BrbSlateChooser() {
     setBusy(true);
     try {
       await api.clearBrbSlate();
-      setSettings({ brbSlateKind: "auto", brbSlateFileName: undefined });
       const b64 = await renderBrbSlatePng();
-      if (b64) await api.saveBrbSlate(b64);
+      if (b64) await api.saveBrbSlate(b64, BRB_SLATE_GENERATION);
+      setSettings({ brbSlateKind: "auto", brbSlateFileName: undefined });
       toast.success("Voltou pra tela padrão da Corneta");
       await loadPreview();
     } catch (e) {

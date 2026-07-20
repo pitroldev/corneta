@@ -2,6 +2,9 @@
 // em base64 (sem o prefixo data:). O backend faz loop dessa imagem no FFmpeg pra
 // manter a live de pé quando o sinal do OBS cai.
 
+/** Incremente somente quando o desenho padrão mudar; evita reencodar o mesmo PNG em todo boot. */
+export const BRB_SLATE_GENERATION = "corneta-slate-v1";
+
 export async function renderBrbSlatePng(): Promise<string | null> {
   if (typeof document === "undefined") return null;
   // Garante que a fonte de marca (Baloo 2) esteja carregada antes de rasterizar.

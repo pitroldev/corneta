@@ -4,7 +4,8 @@ import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
-import { renderBrbSlatePng } from "./lib/brbSlate";
+import { BRB_SLATE_GENERATION, renderBrbSlatePng } from "./lib/brbSlate";
+import { runWhenIdle } from "./lib/idle";
 import { applyTheme } from "./lib/theme";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -27,31 +28,61 @@ import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
 import { Mascot, SoundWaves } from "./components/decor";
 import { PlatformsScreen } from "./screens/PlatformsScreen";
-const EncodingScreen = lazy(() =>
+const loadEncodingScreen = () =>
   import("./screens/EncodingScreen").then((m) => ({
     default: m.EncodingScreen,
-  })),
-);
-const GoLiveScreen = lazy(() =>
-  import("./screens/GoLiveScreen").then((m) => ({ default: m.GoLiveScreen })),
-);
-const ChatScreen = lazy(() =>
-  import("./screens/ChatScreen").then((m) => ({ default: m.ChatScreen })),
-);
-const MesaScreen = lazy(() =>
-  import("./screens/MesaScreen").then((m) => ({ default: m.MesaScreen })),
-);
-const ReportsScreen = lazy(() =>
-  import("./screens/ReportsScreen").then((m) => ({ default: m.ReportsScreen })),
-);
-const AboutScreen = lazy(() =>
-  import("./screens/AboutScreen").then((m) => ({ default: m.AboutScreen })),
-);
-const SettingsScreen = lazy(() =>
+  }));
+const EncodingScreen = lazy(loadEncodingScreen);
+const loadGoLiveScreen = () =>
+  import("./screens/GoLiveScreen").then((m) => ({ default: m.GoLiveScreen }));
+const GoLiveScreen = lazy(loadGoLiveScreen);
+const loadChatScreen = () =>
+  import("./screens/ChatScreen").then((m) => ({ default: m.ChatScreen }));
+const ChatScreen = lazy(loadChatScreen);
+const loadMesaScreen = () =>
+  import("./screens/MesaScreen").then((m) => ({ default: m.MesaScreen }));
+const MesaScreen = lazy(loadMesaScreen);
+const loadReportsScreen = () =>
+  import("./screens/ReportsScreen").then((m) => ({ default: m.ReportsScreen }));
+const ReportsScreen = lazy(loadReportsScreen);
+const loadAboutScreen = () =>
+  import("./screens/AboutScreen").then((m) => ({ default: m.AboutScreen }));
+const AboutScreen = lazy(loadAboutScreen);
+const loadSettingsScreen = () =>
   import("./screens/SettingsScreen").then((m) => ({
     default: m.SettingsScreen,
-  })),
-);
+  }));
+const SettingsScreen = lazy(loadSettingsScreen);
+
+const SCREEN_PRELOADERS: Partial<Record<Screen, () => Promise<unknown>>> = {
+  encoding: loadEncodingScreen,
+  golive: loadGoLiveScreen,
+  chat: loadChatScreen,
+  mesa: loadMesaScreen,
+  reports: loadReportsScreen,
+  settings: loadSettingsScreen,
+  about: loadAboutScreen,
+};
+
+function preloadScreen(screen: Screen) {
+  void SCREEN_PRELOADERS[screen]?.();
+}
+
+function ScreenLoading() {
+  return (
+    <div className="mx-auto max-w-3xl py-8" role="status" aria-live="polite">
+      <div className="mb-5 flex items-center gap-3 text-sm font-bold text-ink-muted">
+        <span className="size-2 animate-pulse rounded-full bg-brass" />
+        Afinando esta tela…
+      </div>
+      <div className="space-y-3" aria-hidden>
+        <div className="h-8 w-2/5 animate-pulse rounded-sm bg-surface-3" />
+        <div className="h-24 animate-pulse rounded-md bg-surface-2" />
+        <div className="h-16 animate-pulse rounded-md bg-surface-2" />
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const loaded = useStore((s) => s.loaded);
@@ -93,6 +124,7 @@ export default function App() {
   });
   // D3: lembra a última tela aberta.
   const navigate = (s: Screen) => {
+    preloadScreen(s);
     setScreen(s);
     try {
       localStorage.setItem("corneta.screen", s);
@@ -100,6 +132,9 @@ export default function App() {
       /* ignore */
     }
   };
+
+  // A última tela lembrada baixa em paralelo ao config; hover/foco cuida das próximas.
+  useEffect(() => preloadScreen(screen), [screen]);
 
   useEffect(() => {
     void load();
@@ -173,9 +208,34 @@ export default function App() {
   useEffect(() => {
     if (!IS_TAURI || !loaded) return;
     if (brbSlateKind && brbSlateKind !== "auto") return;
-    void renderBrbSlatePng().then((b64) => {
-      if (b64) void api.saveBrbSlate(b64);
-    });
+    let cancelled = false;
+    let cancelIdle = () => {};
+    void api
+      .brbSlateNeedsRefresh(BRB_SLATE_GENERATION)
+      .then((needsRefresh) => {
+        if (!needsRefresh || cancelled) return;
+        cancelIdle = runWhenIdle(() => {
+          if (cancelled) return;
+          void renderBrbSlatePng().then((b64) => {
+            if (b64 && !cancelled)
+              void api
+                .saveBrbSlate(b64, BRB_SLATE_GENERATION)
+                .catch((error) =>
+                  console.warn(
+                    "Não foi possível atualizar o slate padrão",
+                    error,
+                  ),
+                );
+          });
+        });
+      })
+      .catch((error) =>
+        console.warn("Não foi possível verificar o slate padrão", error),
+      );
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
   }, [loaded, brbSlateKind]);
 
   // Cada tela começa no topo: o container de scroll é compartilhado, então um
@@ -261,14 +321,23 @@ export default function App() {
         {!censored && <LiveBar onOpen={() => navigate("golive")} />}
 
         {!loaded ? (
-          <div className="grid flex-1 place-items-center">
-            <div className="grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
-              <Mascot className="size-9" />
+          <div className="grid flex-1 place-items-center" role="status">
+            <div className="flex flex-col items-center gap-4">
+              <div className="grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
+                <Mascot className="size-9" />
+              </div>
+              <span className="font-display text-sm font-bold text-ink-muted">
+                Abrindo sua bancada…
+              </span>
             </div>
           </div>
         ) : (
           <div className="flex min-h-0 flex-1">
-            <Sidebar screen={screen} onNavigate={navigate} />
+            <Sidebar
+              screen={screen}
+              onNavigate={navigate}
+              onPreload={preloadScreen}
+            />
 
             <main className="relative flex-1 overflow-hidden">
               <SoundWaves className="pointer-events-none absolute -bottom-20 -right-16 size-80 text-brass/[0.05]" />
@@ -280,21 +349,12 @@ export default function App() {
               >
                 <motion.div
                   key={screen}
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  transition={{ duration: 0.11, ease: "easeOut" }}
                 >
                   <ErrorBoundary>
-                    <Suspense
-                      fallback={
-                        <div
-                          className="py-12 text-center text-sm text-muted"
-                          role="status"
-                        >
-                          Carregando tela…
-                        </div>
-                      }
-                    >
+                    <Suspense fallback={<ScreenLoading />}>
                       {screen === "platforms" && <PlatformsScreen />}
                       {screen === "encoding" && <EncodingScreen />}
                       {screen === "golive" && (

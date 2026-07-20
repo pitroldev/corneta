@@ -9,7 +9,7 @@ use crate::engine_policy::{
 use crate::keys;
 use crate::session;
 use crate::AppState;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -178,56 +178,198 @@ const HW_ENCODERS: [(&str, &str, &str, Option<u32>); 4] = [
     ),
 ];
 
-/// Cache da sonda (a GPU não muda durante a execução; sondar custa ~0,5–2 s).
-static HW_PROBE: std::sync::OnceLock<[bool; 4]> = std::sync::OnceLock::new();
+/// Deduplica chamadas simultâneas vindas da tela de Qualidade e do BORA.
+static HW_PROBE: tokio::sync::OnceCell<[bool; 4]> = tokio::sync::OnceCell::const_new();
+const ENCODER_CACHE_SCHEMA: u8 = 1;
+const ENCODER_CACHE_TTL_SEC: u64 = 30 * 24 * 60 * 60;
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EncoderProbeCache {
+    schema: u8,
+    signature: String,
+    saved_at: u64,
+    available: [bool; 4],
+}
+
+fn epoch_sec() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn encoder_cache_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    Some(app.path().app_config_dir().ok()?.join("encoder-probe.json"))
+}
+
+fn cached_encoder_probe(app: &AppHandle, signature: &str) -> Option<[bool; 4]> {
+    let path = encoder_cache_path(app)?;
+    if std::fs::metadata(&path).ok()?.len() > 16 * 1024 {
+        return None;
+    }
+    let cache: EncoderProbeCache = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+    encoder_cache_is_valid(&cache, signature, epoch_sec()).then_some(cache.available)
+}
+
+fn encoder_cache_is_valid(cache: &EncoderProbeCache, signature: &str, now: u64) -> bool {
+    cache.schema == ENCODER_CACHE_SCHEMA
+        && cache.signature == signature
+        && now.saturating_sub(cache.saved_at) <= ENCODER_CACHE_TTL_SEC
+}
+
+fn save_encoder_probe(app: &AppHandle, signature: String, available: [bool; 4]) {
+    let Some(path) = encoder_cache_path(app) else {
+        return;
+    };
+    let Some(dir) = path.parent() else { return };
+    if std::fs::create_dir_all(dir).is_err() {
+        return;
+    }
+    let cache = EncoderProbeCache {
+        schema: ENCODER_CACHE_SCHEMA,
+        signature,
+        saved_at: epoch_sec(),
+        available,
+    };
+    let Ok(bytes) = serde_json::to_vec(&cache) else {
+        return;
+    };
+    let tmp = path.with_extension("json.tmp");
+    if std::fs::write(&tmp, bytes).is_ok() {
+        let _ = std::fs::remove_file(&path);
+        if std::fs::rename(&tmp, &path).is_err() {
+            let _ = std::fs::remove_file(tmp);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn gpu_driver_signature() -> String {
+    // PNPDeviceID + versão do driver invalidam o cache quando a placa ou seu driver muda.
+    let script = "Get-CimInstance Win32_VideoController | Sort-Object PNPDeviceID | ForEach-Object { '{0}:{1}:{2}' -f $_.PNPDeviceID,$_.DriverVersion,$_.VideoProcessor }";
+    quiet_command("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        .filter(|signature| !signature.is_empty())
+        .unwrap_or_else(|| "gpu-desconhecida".into())
+}
+
+#[cfg(not(windows))]
+fn gpu_driver_signature() -> String {
+    // VideoToolbox acompanha o hardware/driver do SO; a versão do sistema invalida o cache.
+    sysinfo::System::long_os_version().unwrap_or_else(|| "sistema-desconhecido".into())
+}
+
+async fn encoder_environment_signature(app: &AppHandle) -> String {
+    let ffmpeg_version = async {
+        match app.shell().sidecar("ffmpeg") {
+            Ok(command) => command
+                .args(["-version"])
+                .output()
+                .await
+                .ok()
+                .and_then(|output| {
+                    String::from_utf8_lossy(&output.stdout)
+                        .lines()
+                        .next()
+                        .map(str::to_owned)
+                })
+                .unwrap_or_else(|| "ffmpeg-desconhecido".into()),
+            Err(_) => "ffmpeg-indisponível".into(),
+        }
+    };
+    let (ffmpeg, gpu) = tokio::join!(
+        ffmpeg_version,
+        tauri::async_runtime::spawn_blocking(gpu_driver_signature)
+    );
+    let gpu = gpu.unwrap_or_else(|_| "gpu-desconhecida".into());
+    format!(
+        "{}|{}|{}|{}|{}",
+        ENCODER_CACHE_SCHEMA,
+        app.package_info().version,
+        std::env::consts::OS,
+        ffmpeg.trim(),
+        gpu.trim()
+    )
+}
+
+async fn probe_encoder(app: AppHandle, codec: &'static str) -> bool {
+    let Ok(command) = app.shell().sidecar("ffmpeg") else {
+        return false;
+    };
+    let result = command
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=1280x720:r=30",
+            "-frames:v",
+            "3",
+            "-c:v",
+            codec,
+            "-f",
+            "null",
+            "-",
+        ])
+        .output()
+        .await;
+    matches!(result, Ok(ref output) if output.status.success())
+}
 
 /// Sonda quais encoders de hardware REALMENTE funcionam (codifica 3 frames de verdade).
 /// A listagem `ffmpeg -encoders` MENTE: o build do BtbN lista nvenc/qsv/amf mesmo sem a GPU
 /// presente — só um encode real confirma. Resultado cacheado pra sessão do app.
 async fn probe_hw_encoders(app: &AppHandle) -> [bool; 4] {
-    if let Some(v) = HW_PROBE.get() {
-        return *v;
-    }
-    let mut ok = [false; 4];
-    for (i, (_, _, codec, _)) in HW_ENCODERS.iter().enumerate() {
-        let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
-            continue;
-        };
-        // 1280x720 (NÃO 128x128!): NVENC/QSV têm resolução MÍNIMA — um teste pequeno demais
-        // falha mesmo com a GPU presente (falso negativo → x264 → CPU estoura → live cai).
-        let res = cmd
-            .args([
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-f",
-                "lavfi",
-                "-i",
-                "color=c=black:s=1280x720:r=30",
-                "-frames:v",
-                "3",
-                "-c:v",
-                codec,
-                "-f",
-                "null",
-                "-",
-            ])
-            .output()
-            .await;
-        ok[i] = matches!(res, Ok(ref o) if o.status.success());
-    }
-    log::info!(
-        "encoders de hardware reais: {}",
-        HW_ENCODERS
-            .iter()
-            .zip(ok)
-            .filter(|(_, k)| *k)
-            .map(|((kind, ..), _)| *kind)
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-    let _ = HW_PROBE.set(ok);
-    ok
+    let app = app.clone();
+    *HW_PROBE
+        .get_or_init(|| async move {
+            let signature = encoder_environment_signature(&app).await;
+            let app_for_cache = app.clone();
+            let signature_for_cache = signature.clone();
+            if let Ok(Some(cached)) = tauri::async_runtime::spawn_blocking(move || {
+                cached_encoder_probe(&app_for_cache, &signature_for_cache)
+            })
+            .await
+            {
+                log::info!("encoders de hardware: cache persistente válido");
+                return cached;
+            }
+
+            // As quatro sondagens são independentes. Em paralelo, o cold path custa o tempo da
+            // mais lenta (na máquina de referência ~1,3 s), não a soma (~2,4 s).
+            let (nvenc, qsv, amf, videotoolbox) = tokio::join!(
+                probe_encoder(app.clone(), HW_ENCODERS[0].2),
+                probe_encoder(app.clone(), HW_ENCODERS[1].2),
+                probe_encoder(app.clone(), HW_ENCODERS[2].2),
+                probe_encoder(app.clone(), HW_ENCODERS[3].2),
+            );
+            let available = [nvenc, qsv, amf, videotoolbox];
+            log::info!(
+                "encoders de hardware reais: {}",
+                HW_ENCODERS
+                    .iter()
+                    .zip(available)
+                    .filter(|(_, works)| *works)
+                    .map(|((kind, ..), _)| *kind)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            let app_for_cache = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                save_encoder_probe(&app_for_cache, signature, available)
+            })
+            .await
+            .ok();
+            available
+        })
+        .await
 }
 
 #[tauri::command]
@@ -511,9 +653,25 @@ async fn brb_slate_has_audio(app: &AppHandle, path: &str) -> bool {
     }
 }
 
+const GENERATED_SLATE_MARKER: &str = "generated-slate.version";
+
+/// O PNG padrão só precisa ser redesenhado quando a geração visual muda ou o arquivo sumiu.
+#[tauri::command]
+pub fn brb_slate_needs_refresh(app: AppHandle, generation: String) -> bool {
+    let Ok(dir) = app.path().app_config_dir() else {
+        return true;
+    };
+    let marker = std::fs::read_to_string(dir.join(GENERATED_SLATE_MARKER)).unwrap_or_default();
+    marker.trim() != generation || !dir.join("brb-slate.png").is_file()
+}
+
 /// Salva o slate "JÁ VOLTO" (PNG em base64) que a UI desenhou (modo "auto" — tela gerada).
 #[tauri::command]
-pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
+pub fn save_brb_slate(
+    app: AppHandle,
+    data: String,
+    generation: Option<String>,
+) -> Result<(), String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data.trim())
@@ -523,6 +681,9 @@ pub fn save_brb_slate(app: AppHandle, data: String) -> Result<(), String> {
     // Some qualquer custom anterior — no modo "auto" só vale o PNG gerado.
     remove_brb_slate_files(&dir);
     std::fs::write(dir.join("brb-slate.png"), bytes).map_err(|e| e.to_string())?;
+    if let Some(generation) = generation {
+        std::fs::write(dir.join(GENERATED_SLATE_MARKER), generation).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -575,6 +736,7 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, Strin
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     remove_brb_slate_files(&dir); // só um slate por vez
+    let _ = std::fs::remove_file(dir.join(GENERATED_SLATE_MARKER));
     let dest = dir.join(format!("brb-slate.{ext}"));
     std::fs::copy(&src, &dest).map_err(|e| format!("não consegui copiar o arquivo: {e}"))?;
     let kind = if brb_slate_is_video(&dest) {
@@ -633,6 +795,7 @@ pub async fn get_brb_slate_preview(app: AppHandle) -> Result<String, String> {
 pub fn clear_brb_slate(app: AppHandle) -> Result<(), String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     remove_brb_slate_files(&dir);
+    let _ = std::fs::remove_file(dir.join(GENERATED_SLATE_MARKER));
     Ok(())
 }
 
@@ -2445,4 +2608,37 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     config::save(&app, &cfg)?;
     let _ = app.emit("config://changed", &cfg);
     Ok(true)
+}
+
+#[cfg(test)]
+mod encoder_cache_tests {
+    use super::{
+        encoder_cache_is_valid, EncoderProbeCache, ENCODER_CACHE_SCHEMA, ENCODER_CACHE_TTL_SEC,
+    };
+
+    fn cache(saved_at: u64) -> EncoderProbeCache {
+        EncoderProbeCache {
+            schema: ENCODER_CACHE_SCHEMA,
+            signature: "app|ffmpeg|gpu|driver".into(),
+            saved_at,
+            available: [true, false, false, false],
+        }
+    }
+
+    #[test]
+    fn encoder_cache_requires_matching_environment() {
+        let cache = cache(100);
+        assert!(encoder_cache_is_valid(&cache, "app|ffmpeg|gpu|driver", 101));
+        assert!(!encoder_cache_is_valid(&cache, "driver-novo", 101));
+    }
+
+    #[test]
+    fn encoder_cache_expires() {
+        let cache = cache(100);
+        assert!(!encoder_cache_is_valid(
+            &cache,
+            "app|ffmpeg|gpu|driver",
+            101 + ENCODER_CACHE_TTL_SEC,
+        ));
+    }
 }

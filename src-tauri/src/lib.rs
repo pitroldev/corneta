@@ -228,6 +228,7 @@ pub fn run() {
             commands::export_config,
             commands::import_config,
             commands::save_brb_slate,
+            commands::brb_slate_needs_refresh,
             commands::set_brb_slate,
             commands::clear_brb_slate,
             commands::get_brb_slate_preview,

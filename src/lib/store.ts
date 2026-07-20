@@ -36,6 +36,9 @@ let pendingRemoval: { target: Target; index: number } | null = null;
 
 // Momento da última consulta ao OBS (cache curto do runObsCheck).
 let lastObsCheckAt = 0;
+// Uma única sonda por WebView. Encoding/Ao vivo podem montar quase juntos; ambas aguardam
+// a mesma Promise em vez de abrir processos FFmpeg duplicados.
+let encoderLoadPromise: Promise<EncoderInfo[]> | null = null;
 
 interface State {
   loaded: boolean;
@@ -234,10 +237,9 @@ export const useStore = create<State>((set, get) => {
     uploadMbps: null,
 
     async load() {
-      const [loaded, encoders] = await Promise.all([
-        api.getConfig(),
-        api.detectEncoders(),
-      ]);
+      // A configuração é tudo de que a primeira tela precisa. A sonda real dos encoders abre
+      // processos FFmpeg e agora é lazy (Qualidade/Ao vivo/BORA), fora do caminho crítico do boot.
+      const loaded = await api.getConfig();
       let config = loaded;
       // Migração: configs antigas sem perfis ganham um "Padrão" com o estado atual.
       if (!config.profiles || config.profiles.length === 0) {
@@ -262,7 +264,7 @@ export const useStore = create<State>((set, get) => {
         };
       }
       saveRevision = config.revision;
-      set({ config, encoders, loaded: true });
+      set({ config, loaded: true });
       // Semeia o estado de conexão do chat: a janela pode ter aberto (ou o popout montado)
       // com o chat já no ar — sem isto o botão nasceria em "Conectar" com o chat rodando.
       try {
@@ -441,7 +443,15 @@ export const useStore = create<State>((set, get) => {
     },
 
     async refreshEncoders() {
-      set({ encoders: await api.detectEncoders() });
+      if (get().encoders.length > 0) return;
+      encoderLoadPromise ??= api.detectEncoders();
+      try {
+        set({ encoders: await encoderLoadPromise });
+      } catch (error) {
+        console.error("Falha ao detectar encoders", error);
+      } finally {
+        encoderLoadPromise = null;
+      }
     },
 
     obs: null,

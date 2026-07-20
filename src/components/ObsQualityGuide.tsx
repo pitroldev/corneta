@@ -72,9 +72,12 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const obsKbps = hasCopy ? lcd.videoKbps! : contribKbps;
 
   const hw = encoders.find((e) => e.available && e.kind !== "software");
-  const encAdvice = hw
-    ? encoderLabel(hw.kind, hw.label)
-    : "Processador — é o que essa máquina tem";
+  const encAdvice =
+    encoders.length === 0
+      ? "Verificando a placa de vídeo…"
+      : hw
+        ? encoderLabel(hw.kind, hw.label)
+        : "Processador — é o que essa máquina tem";
 
   return (
     <Modal

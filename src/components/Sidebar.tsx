@@ -71,9 +71,11 @@ const ABOUT_N = NAV.length + 2;
 export function Sidebar({
   screen,
   onNavigate,
+  onPreload,
 }: {
   screen: Screen;
   onNavigate: (s: Screen) => void;
+  onPreload?: (s: Screen) => void;
 }) {
   const state = useStore((s) => s.snapshot.state);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
@@ -105,6 +107,8 @@ export function Sidebar({
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
+              onPointerEnter={() => onPreload?.(item.id)}
+              onFocus={() => onPreload?.(item.id)}
               aria-current={active ? "page" : undefined}
               data-on-brass={active ? "" : undefined}
               title={`Alt+${i + 1}`}
@@ -161,6 +165,8 @@ export function Sidebar({
       <div className="mt-auto flex flex-col gap-2">
         <button
           onClick={() => onNavigate("settings")}
+          onPointerEnter={() => onPreload?.("settings")}
+          onFocus={() => onPreload?.("settings")}
           aria-current={screen === "settings" ? "page" : undefined}
           title={`Alt+${SETTINGS_N}`}
           className={cn(
@@ -177,6 +183,8 @@ export function Sidebar({
         </button>
         <button
           onClick={() => onNavigate("about")}
+          onPointerEnter={() => onPreload?.("about")}
+          onFocus={() => onPreload?.("about")}
           aria-current={screen === "about" ? "page" : undefined}
           title={`Alt+${ABOUT_N}`}
           className={cn(
