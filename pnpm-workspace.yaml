@@ -1,4 +1,9 @@
+packages:
+  - landing
+
 # Autoriza build-scripts de dependências confiáveis (pnpm 11).
 # esbuild precisa do seu postinstall para preparar o binário usado pelo Vite.
 allowBuilds:
   esbuild: true
+  sharp: true
+  unrs-resolver: true

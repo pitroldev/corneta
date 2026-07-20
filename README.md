@@ -27,6 +27,20 @@ bloqueada pelos gates manuais de assinatura, conformidade GPL e matriz real de p
 
 ## Rodando
 
+### Landing page (Next.js)
+
+A página pública fica isolada em `landing/`, com Next.js App Router, React Server Components e
+Tailwind CSS. Ela não interfere no bundle do aplicativo desktop.
+
+```bash
+pnpm install
+pnpm lp:dev       # abre http://localhost:3000
+pnpm lp:check     # lint + tipos + build de produção
+```
+
+Defina `NEXT_PUBLIC_SITE_URL` no deploy. Quando houver um instalador ou página de release pública,
+defina também `NEXT_PUBLIC_PRIMARY_CTA_URL`; até lá, a CTA permanece honestamente interna à página.
+
 ### 1. Frontend (demonstração, sem Rust)
 
 A UI roda no navegador com um **motor simulado** (dados mock), ótimo para ver/testar o fluxo:
