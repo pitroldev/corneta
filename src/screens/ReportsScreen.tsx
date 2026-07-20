@@ -594,8 +594,16 @@ function ReportDetail({
   // Retenção (viewers) — timeline própria; marca raids (costumam dar pico).
   const vN = data.viewerSamples.length;
   const viewerIndexAt = (t: number) => {
-    for (let i = 0; i < vN; i++) if (data.viewerSamples[i].t >= t) return i;
-    return Math.max(0, vN - 1);
+    // As amostras já estão em ordem temporal; busca binária evita uma varredura completa
+    // para cada raid/marcador em sessões longas.
+    let lo = 0;
+    let hi = vN;
+    while (lo < hi) {
+      const mid = lo + ((hi - lo) >> 1);
+      if (data.viewerSamples[mid].t < t) lo = mid + 1;
+      else hi = mid;
+    }
+    return Math.min(lo, Math.max(0, vN - 1));
   };
   const raidMarkers: ChartMarker[] = data.alertEvents
     .filter((e) => e.kind === "raid")

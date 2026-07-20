@@ -10,7 +10,7 @@
 use super::Ocr;
 use image::{DynamicImage, GrayImage};
 use sha2::{Digest, Sha256};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::time::Duration;
 use tauri::AppHandle;
 
@@ -91,10 +91,25 @@ const MODELS: [(&str, u64, &str); 3] = [
 ];
 
 fn verify_model(path: &std::path::Path, size: u64, expected_sha256: &str) -> bool {
-    let Ok(bytes) = std::fs::read(path) else {
+    let Ok(file) = std::fs::File::open(path) else {
         return false;
     };
-    bytes.len() as u64 == size && format!("{:x}", Sha256::digest(&bytes)) == expected_sha256
+    if file.metadata().map(|m| m.len()).ok() != Some(size) {
+        return false;
+    }
+    let mut reader = std::io::BufReader::with_capacity(64 * 1024, file);
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let Ok(read) = reader.read(&mut buffer) else {
+            return false;
+        };
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    format!("{:x}", hasher.finalize()) == expected_sha256
 }
 
 fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
@@ -118,6 +133,7 @@ static DL_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// Com timeout por arquivo — uma rede ruim falha rápido (cai pro Windows OCR) em vez de pendurar.
 fn ensure_paddle_models(
     app: &AppHandle,
+    cache_already_verified: bool,
 ) -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
     let _guard = DL_GUARD.lock().ok()?;
     let dir = models_dir(app)?;
@@ -126,26 +142,42 @@ fn ensure_paddle_models(
     let mut paths = Vec::new();
     for (n, size, expected_sha256) in MODELS {
         let p = dir.join(n);
-        if !verify_model(&p, size, expected_sha256) {
+        if !cache_already_verified && !verify_model(&p, size, expected_sha256) {
             log::info!("OCR: baixando modelo {n}…");
             let resp = ureq::get(&format!("{base}/{n}"))
                 .timeout(Duration::from_secs(60))
                 .call()
                 .ok()?;
-            let mut bytes = Vec::with_capacity(size as usize);
-            std::io::Read::read_to_end(&mut resp.into_reader().take(size + 1), &mut bytes).ok()?;
-            if bytes.len() as u64 != size
-                || format!("{:x}", Sha256::digest(&bytes)) != expected_sha256
-            {
+            // Baixa e calcula o hash em streaming: o maior modelo não precisa existir duas vezes
+            // (buffer HTTP + buffer de escrita) na memória do processo.
+            let tmp = p.with_extension("part");
+            let mut reader = resp.into_reader().take(size + 1);
+            let mut output =
+                std::io::BufWriter::with_capacity(64 * 1024, std::fs::File::create(&tmp).ok()?);
+            let mut hasher = Sha256::new();
+            let mut total = 0u64;
+            let mut buffer = [0u8; 64 * 1024];
+            loop {
+                let read = reader.read(&mut buffer).ok()?;
+                if read == 0 {
+                    break;
+                }
+                total += read as u64;
+                hasher.update(&buffer[..read]);
+                output.write_all(&buffer[..read]).ok()?;
+            }
+            output.flush().ok()?;
+            drop(output);
+            if total != size || format!("{:x}", hasher.finalize()) != expected_sha256 {
+                let _ = std::fs::remove_file(&tmp);
                 log::error!("OCR: integridade inválida em {n}; download descartado");
                 return None;
             }
             // Escreve em .part e troca atômico → um download interrompido NUNCA deixa um arquivo
             // parcial que o `models_cached` trataria como válido.
-            let tmp = p.with_extension("part");
-            std::fs::write(&tmp, &bytes).ok()?;
+            let _ = std::fs::remove_file(&p);
             std::fs::rename(&tmp, &p).ok()?;
-            log::info!("OCR: {n} ok ({} KB)", bytes.len() / 1024);
+            log::info!("OCR: {n} ok ({} KB)", total / 1024);
         }
         paths.push(p);
     }
@@ -155,9 +187,9 @@ fn ensure_paddle_models(
 /// Constrói o pipeline PaddleOCR (uma vez) na CPU, afinado pra latência baixa. None se falhar.
 /// CPU (não GPU): o decode/encode já ocupam a GPU (NVDEC/NVENC) e o OCR na GPU disputava o codec,
 /// degradando pra 5-15s ao vivo. Intra-threads limitado (sobra core pro encoder/compositor).
-fn build_paddle(app: &AppHandle) -> Option<PaddleOcr> {
+fn build_paddle(app: &AppHandle, cache_already_verified: bool) -> Option<PaddleOcr> {
     use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
-    let (det, rec, dict) = ensure_paddle_models(app)?;
+    let (det, rec, dict) = ensure_paddle_models(app, cache_already_verified)?;
     let cores = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4);
@@ -252,7 +284,7 @@ impl Ocr for NullOcr {
 /// Chame DENTRO da thread que vai usar o OCR (evita mover sessões ONNX entre threads).
 pub(super) fn build_ocr(app: &AppHandle) -> Box<dyn Ocr> {
     if models_cached(app) {
-        if let Some(p) = build_paddle(app) {
+        if let Some(p) = build_paddle(app, true) {
             return Box::new(p);
         }
         log::warn!("OCR: modelos em cache mas o PaddleOCR não subiu — fallback");
@@ -261,13 +293,13 @@ pub(super) fn build_ocr(app: &AppHandle) -> Box<dyn Ocr> {
         {
             let app2 = app.clone();
             std::thread::spawn(move || {
-                let _ = ensure_paddle_models(&app2);
+                let _ = ensure_paddle_models(&app2, false);
             });
             log::info!("OCR: baixando PaddleOCR no fundo; Windows OCR nesta sessão");
         }
         #[cfg(not(windows))]
         {
-            if let Some(p) = build_paddle(app) {
+            if let Some(p) = build_paddle(app, false) {
                 return Box::new(p);
             }
         }

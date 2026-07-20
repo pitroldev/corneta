@@ -11,7 +11,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use image::GrayImage;
 use tauri::{AppHandle, Emitter};
 
 use super::domain::{self, Timeline};
@@ -33,7 +32,9 @@ const SLOW_WARN_MS: u128 = 1500;
 /// aninhados.
 pub(crate) struct Shared {
     /// O quadro mais novo oferecido pro OCR (índice + plano Y). O worker dá `take()` quando livre.
-    pub(crate) scan_slot: Mutex<Option<(u64, Vec<u8>)>>,
+    scan_slot: Mutex<Option<(u64, Vec<u8>)>>,
+    /// Um único buffer reciclado evita alocar ~2 MiB a cada amostra em 1080p.
+    scan_pool: Mutex<Option<Vec<u8>>>,
     /// Linha do tempo binária "tinha segredo no quadro X?".
     pub(crate) timeline: Mutex<Timeline>,
 }
@@ -42,8 +43,36 @@ impl Shared {
     pub(crate) fn new() -> Self {
         Shared {
             scan_slot: Mutex::new(None),
+            scan_pool: Mutex::new(None),
             timeline: Mutex::new(Timeline::new()),
         }
+    }
+
+    pub(crate) fn offer_scan(&self, idx: u64, gray: &[u8]) {
+        // Há um único produtor (o compositor). Verificar antes de copiar poupa trabalho quando o
+        // OCR ainda está ocupado; o segundo teste mantém a operação robusta caso isso mude.
+        if self.scan_slot.lock().unwrap().is_some() {
+            return;
+        }
+        let mut buffer = self.scan_pool.lock().unwrap().take().unwrap_or_default();
+        buffer.clear();
+        buffer.extend_from_slice(gray);
+        let mut slot = self.scan_slot.lock().unwrap();
+        if slot.is_none() {
+            *slot = Some((idx, buffer));
+        } else {
+            drop(slot);
+            self.recycle_scan(buffer);
+        }
+    }
+
+    fn take_scan(&self) -> Option<(u64, Vec<u8>)> {
+        self.scan_slot.lock().unwrap().take()
+    }
+
+    fn recycle_scan(&self, mut buffer: Vec<u8>) {
+        buffer.clear();
+        *self.scan_pool.lock().unwrap() = Some(buffer);
     }
 }
 
@@ -70,20 +99,36 @@ pub(crate) fn spawn_ocr(
     });
 }
 
-/// Encolhe o plano Y pra o buffer de diff (DIFF_W de largura).
-fn diff_small(gray: &[u8], w: usize, h: usize) -> Vec<u8> {
-    match GrayImage::from_raw(w as u32, h as u32, gray.to_vec()) {
-        Some(img) => {
-            let nh = (h * DIFF_W / w.max(1)).max(1) as u32;
-            image::imageops::resize(
-                &img,
-                DIFF_W as u32,
-                nh,
-                image::imageops::FilterType::Triangle,
-            )
-            .into_raw()
+/// Encolhe o plano Y para o diff sem copiar o quadro inteiro para um `GrayImage`. A média da
+/// célula visita cada pixel de origem uma vez e não perde traços finos entre pontos de amostragem.
+fn diff_small_into(gray: &[u8], w: usize, h: usize, out: &mut Vec<u8>) {
+    if w == 0 || h == 0 || gray.len() < w.saturating_mul(h) {
+        out.clear();
+        return;
+    }
+    let dw = DIFF_W.min(w);
+    let dh = (h * dw / w).max(1).min(h);
+    out.resize(dw * dh, 0);
+    if dw == w && dh == h {
+        out.copy_from_slice(&gray[..w * h]);
+        return;
+    }
+    for dy in 0..dh {
+        let y0 = dy * h / dh;
+        let y1 = ((dy + 1) * h / dh).max(y0 + 1);
+        let dst = &mut out[dy * dw..(dy + 1) * dw];
+        for (dx, value) in dst.iter_mut().enumerate() {
+            let x0 = dx * w / dw;
+            let x1 = ((dx + 1) * w / dw).max(x0 + 1);
+            let mut sum = 0u32;
+            for sy in y0..y1 {
+                sum += gray[sy * w + x0..sy * w + x1]
+                    .iter()
+                    .map(|pixel| *pixel as u32)
+                    .sum::<u32>();
+            }
+            *value = (sum / ((x1 - x0) * (y1 - y0)) as u32) as u8;
         }
-        None => vec![],
     }
 }
 
@@ -106,23 +151,26 @@ fn ocr_worker(
 ) {
     log::info!("guardião/OCR: {}", ocr.name());
     let _ = ocr.read_text(&vec![16u8; w * h], w, h); // warmup (paga o JIT)
+    let watchlist = domain::prepare_watchlist(&watchlist);
     let mut last_small: Vec<u8> = vec![];
+    let mut small: Vec<u8> = vec![];
     let mut had_secret = false;
     let mut last_ocr = Instant::now();
     let mut last_diag = Instant::now();
     while running.load(Ordering::Relaxed) {
         let iter = Instant::now();
-        let job = shared.scan_slot.lock().unwrap().take();
+        let job = shared.take_scan();
         let Some((idx, gray)) = job else {
             std::thread::sleep(Duration::from_millis(8));
             continue;
         };
-        let small = diff_small(&gray, w, h);
+        diff_small_into(&gray, w, h, &mut small);
         // Faz OCR se a tela MUDOU OU se faz tempo demais sem OCR (rede de segurança por tempo).
         let force = last_ocr.elapsed() >= Duration::from_millis(FORCE_MS);
         let changed = force || domain::frames_differ(&last_small, &small, DIFF_PIX, DIFF_FRAC);
-        last_small = small;
+        std::mem::swap(&mut last_small, &mut small);
         if !changed {
+            shared.recycle_scan(gray);
             // Tela igual → NÃO grava nada (não mascara a detecção real). Só descansa.
             let spent = iter.elapsed();
             if spent < Duration::from_millis(THROTTLE_MS) {
@@ -132,7 +180,7 @@ fn ocr_worker(
         }
         let t = Instant::now();
         let text = ocr.read_text(&gray, w, h);
-        let leaks = domain::find_watchlist(&text, &watchlist);
+        let leaks = domain::find_prepared_watchlist(&text, &watchlist);
         let secret = !leaks.is_empty();
         last_ocr = Instant::now();
         if t.elapsed().as_millis() > SLOW_WARN_MS {
@@ -157,10 +205,36 @@ fn ocr_worker(
             }
         }
         had_secret = secret;
+        shared.recycle_scan(gray);
 
         let spent = iter.elapsed();
         if spent < Duration::from_millis(THROTTLE_MS) {
             std::thread::sleep(Duration::from_millis(THROTTLE_MS) - spent);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::diff_small_into;
+
+    #[test]
+    fn diff_resize_preserves_uniform_frame_and_reuses_buffer() {
+        let frame = vec![73u8; 1920 * 12];
+        let mut out = Vec::new();
+        diff_small_into(&frame, 1920, 12, &mut out);
+        assert_eq!(out.len(), 640 * 4);
+        assert!(out.iter().all(|value| *value == 73));
+        let capacity = out.capacity();
+
+        diff_small_into(&frame, 1920, 12, &mut out);
+        assert_eq!(out.capacity(), capacity);
+    }
+
+    #[test]
+    fn diff_resize_clears_output_for_invalid_input() {
+        let mut out = vec![1, 2, 3];
+        diff_small_into(&[0; 3], 2, 2, &mut out);
+        assert!(out.is_empty());
     }
 }

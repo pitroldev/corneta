@@ -67,6 +67,21 @@ export function ChatFeed({
   const [paused, setPaused] = useState(false);
   const [missed, setMissed] = useState(0);
   const lastId = useRef<string | undefined>(messages[messages.length - 1]?.id);
+  const onFontSizeRef = useRef(onFontSize);
+  const modLevelRef = useRef(modLevel);
+  const onModerateRef = useRef(onModerate);
+  onFontSizeRef.current = onFontSize;
+  modLevelRef.current = modLevel;
+  onModerateRef.current = onModerate;
+  // Os pais derivam essas funções de estado e por isso recriam closures com frequência.
+  // Indireções estáveis preservam o memo das linhas sem capturar estado antigo.
+  const stableModLevel = useRef(
+    (m: ChatMessage) => modLevelRef.current?.(m) ?? "none",
+  ).current;
+  const stableModerate = useRef((m: ChatMessage, action: string) =>
+    onModerateRef.current?.(m, action),
+  ).current;
+  const fontResizeEnabled = onFontSize !== undefined;
 
   const virt = useVirtualizer({
     count: messages.length,
@@ -142,7 +157,7 @@ export function ChatFeed({
   // cancelar o zoom padrão do navegador.
   useEffect(() => {
     const el = ref.current;
-    if (!el || !onFontSize) return;
+    if (!el || !fontResizeEnabled) return;
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
@@ -150,11 +165,11 @@ export function ChatFeed({
         44,
         Math.max(8, view.fontSize + (e.deltaY < 0 ? 1 : -1)),
       );
-      if (next !== view.fontSize) onFontSize(next);
+      if (next !== view.fontSize) onFontSizeRef.current?.(next);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [view.fontSize, onFontSize]);
+  }, [fontResizeEnabled, view.fontSize]);
 
   const onScroll = () => {
     const el = ref.current;
@@ -228,8 +243,8 @@ export function ChatFeed({
                 <MsgRow
                   m={messages[vi.index]}
                   view={view}
-                  modLevel={modLevel}
-                  onModerate={onModerate}
+                  modLevel={stableModLevel}
+                  onModerate={stableModerate}
                 />
               </div>
             ))}
@@ -250,17 +265,19 @@ export function ChatFeed({
   );
 }
 
+interface MsgRowProps {
+  m: ChatMessage;
+  view: ChatView;
+  modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
+  onModerate?: (m: ChatMessage, action: string) => void;
+}
+
 const MsgRow = memo(function MsgRow({
   m,
   view,
   modLevel,
   onModerate,
-}: {
-  m: ChatMessage;
-  view: ChatView;
-  modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
-  onModerate?: (m: ChatMessage, action: string) => void;
-}) {
+}: MsgRowProps) {
   if (m.deleted) {
     return (
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-1 leading-snug">
@@ -333,7 +350,20 @@ const MsgRow = memo(function MsgRow({
       <ModButtons m={m} modLevel={modLevel} onModerate={onModerate} />
     </div>
   );
-});
+}, areRowPropsEqual);
+
+function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
+  return (
+    prev.m === next.m &&
+    prev.view.emotes === next.view.emotes &&
+    prev.view.badges === next.view.badges &&
+    prev.view.platform === next.view.platform &&
+    prev.view.source === next.view.source &&
+    prev.view.timestamps === next.view.timestamps &&
+    prev.modLevel === next.modLevel &&
+    prev.onModerate === next.onModerate
+  );
+}
 
 /** Botões de moderação que aparecem ao passar o mouse na mensagem. */
 function ModButtons({

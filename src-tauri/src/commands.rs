@@ -11,6 +11,7 @@ use crate::session;
 use crate::AppState;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::io::{Read, Seek};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandEvent;
@@ -21,6 +22,16 @@ fn now_ms() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0)
+}
+
+fn read_file_tail(path: &std::path::Path, max_bytes: u64) -> std::io::Result<Vec<u8>> {
+    let mut file = std::fs::File::open(path)?;
+    let len = file.metadata()?.len();
+    let start = len.saturating_sub(max_bytes);
+    file.seek(std::io::SeekFrom::Start(start))?;
+    let mut bytes = Vec::with_capacity((len - start) as usize);
+    file.read_to_end(&mut bytes)?;
+    Ok(bytes)
 }
 
 /// `std::process::Command` que NÃO pisca uma janela de console no Windows. Os sidecars
@@ -2140,11 +2151,10 @@ pub fn export_diagnostics(app: AppHandle) -> Result<bool, String> {
             .collect();
         files.sort();
         for path in files.into_iter().rev().take(3) {
-            let Ok(bytes) = std::fs::read(&path) else {
+            let Ok(bytes) = read_file_tail(&path, 512 * 1024) else {
                 continue;
             };
-            let start = bytes.len().saturating_sub(512 * 1024);
-            let text = String::from_utf8_lossy(&bytes[start..]);
+            let text = String::from_utf8_lossy(&bytes);
             let safe = redact_authorization.replace_all(&text, "$1<redacted>");
             let safe = redact.replace_all(&safe, "$1$2<redacted>");
             report.push_str(&format!(

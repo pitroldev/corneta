@@ -2,7 +2,7 @@
 //! para o relatório pós-live. Ver docs/RELATORIO-POS-LIVE.md.
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -188,9 +188,21 @@ pub fn recover_incomplete_sessions(app: &AppHandle) {
         if meta.len() == 0 || meta.len() > MAX_SESSION_BYTES {
             continue;
         }
-        let Ok(raw) = fs::read_to_string(&path) else {
+        // O estado da sessão está na última linha. Ler só a cauda evita carregar até 32 MiB
+        // para cada uma das 50 sessões durante o boot.
+        const TAIL_BYTES: u64 = 64 * 1024;
+        let Ok(mut file) = File::open(&path) else {
             continue;
         };
+        let start = meta.len().saturating_sub(TAIL_BYTES);
+        if file.seek(SeekFrom::Start(start)).is_err() {
+            continue;
+        }
+        let mut tail = Vec::with_capacity((meta.len() - start) as usize);
+        if file.read_to_end(&mut tail).is_err() {
+            continue;
+        }
+        let raw = String::from_utf8_lossy(&tail);
         let ended = raw
             .lines()
             .rev()

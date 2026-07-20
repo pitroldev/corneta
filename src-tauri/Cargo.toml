@@ -38,6 +38,9 @@ sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 tungstenite = { version = "0.23", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 sha2 = "0.10"
 base64 = "0.22"
+# Quadros crus são imutáveis depois de decodificados. `Bytes` permite compartilhar o
+# mesmo backing buffer entre delay, freeze e encoder sem copiar ~3 MiB por frame.
+bytes = "1"
 # Aleatoriedade do SO (PKCE verifier/state do login do Kick). Já está no lock (transitivo).
 getrandom = "0.2"
 # Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
@@ -71,5 +74,7 @@ webview2-com = "0.38"
 panic = "abort"
 codegen-units = 1
 lto = true
-opt-level = "s"
+# O processo está no hot path de vídeo/OCR; priorize throughput e latência. LTO + strip ainda
+# controlam o tamanho final do instalador.
+opt-level = 3
 strip = true

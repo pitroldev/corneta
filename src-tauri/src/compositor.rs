@@ -35,6 +35,7 @@ use std::sync::mpsc::{Receiver, SyncSender, TryRecvError, TrySendError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bytes::Bytes;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::engine::{self, ProgramSpec};
@@ -245,8 +246,9 @@ fn drain_audio(src: &mut Option<ByteSource>, fifo: &mut VecDeque<u8>, cap: usize
             }
         }
     }
-    while fifo.len() > cap {
-        fifo.pop_front();
+    let excess = fifo.len().saturating_sub(cap);
+    if excess > 0 {
+        fifo.drain(..excess);
     }
     if dead {
         if let Some(mut s) = src.take() {
@@ -258,12 +260,18 @@ fn drain_audio(src: &mut Option<ByteSource>, fifo: &mut VecDeque<u8>, cap: usize
 
 /// Tira exatamente `n` bytes do FIFO (completa com silêncio se faltar).
 fn take_audio(fifo: &mut VecDeque<u8>, n: usize) -> Vec<u8> {
-    let mut out = Vec::with_capacity(n);
+    let mut out = vec![0; n];
     let avail = fifo.len().min(n);
-    for _ in 0..avail {
-        out.push(fifo.pop_front().unwrap_or(0));
+    if avail > 0 {
+        let (front, back) = fifo.as_slices();
+        let front_len = front.len().min(avail);
+        out[..front_len].copy_from_slice(&front[..front_len]);
+        let back_len = avail - front_len;
+        if back_len > 0 {
+            out[front_len..avail].copy_from_slice(&back[..back_len]);
+        }
+        fifo.drain(..avail);
     }
-    out.resize(n, 0);
     out
 }
 
@@ -579,7 +587,7 @@ fn generation(
     // única parava no write do quadro e estrangulava o áudio: deadlock circular, mudo.
     // Com filas, o áudio continua fluindo em tempo real enquanto o vídeo espera a vez.
     let mut ein = enc.stdin.take().unwrap();
-    let (vtx, vrx): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = std::sync::mpsc::sync_channel(8);
+    let (vtx, vrx): (SyncSender<Bytes>, Receiver<Bytes>) = std::sync::mpsc::sync_channel(8);
     std::thread::spawn(move || {
         for f in vrx {
             if ein.write_all(&f).is_err() {
@@ -627,13 +635,13 @@ fn generation(
 
     // 4) Estado da bomba.
     let tick_ns: u64 = 1_000_000_000 / (spec.fps as u64);
-    let mut delay_buf: VecDeque<(u64, Vec<u8>)> = VecDeque::with_capacity(delay_frames + 8);
+    let mut delay_buf: VecDeque<(u64, Bytes)> = VecDeque::with_capacity(delay_frames + 8);
     let mut afifo: VecDeque<u8> = VecDeque::new();
     let mut slate_afifo: VecDeque<u8> = VecDeque::new();
     let mut slate_vsrc: Option<FrameSource> = None;
     let mut slate_asrc: Option<ByteSource> = None;
-    let mut slate_frame: Vec<u8> = still.to_vec();
-    let mut last_out: Vec<u8> = black_frame(spec);
+    let mut slate_frame = Bytes::copy_from_slice(still);
+    let mut last_out = Bytes::from(black_frame(spec));
     let mut last_arrival = Instant::now();
     let mut last_respawn = Instant::now();
     let mut last_slate_spawn: Option<Instant> = None;
@@ -643,7 +651,7 @@ fn generation(
     // O 1º quadro entra antes do relógio partir.
     *head += 1;
     offer_scan(shared, *head, &first, ysize);
-    delay_buf.push_back((*head, first));
+    delay_buf.push_back((*head, Bytes::from(first)));
     afifo.resize(delay_buf.len() * abpf, 0); // pareia A/V do zero
 
     let clock = Instant::now();
@@ -700,7 +708,7 @@ fn generation(
         let (got, v_dead) = drain_frames(&mut vsrc, |f| {
             *head += 1;
             offer_scan(shared, *head, &f, ysize);
-            delay_buf.push_back((*head, f));
+            delay_buf.push_back((*head, Bytes::from(f)));
         });
         if got > 0 {
             last_arrival = Instant::now();
@@ -709,8 +717,9 @@ fn generation(
         // Deriva OBS×relógio: buffer estourou a folga → derruba o mais antigo (e o áudio par).
         while delay_buf.len() > delay_frames + spec.fps as usize {
             delay_buf.pop_front();
-            for _ in 0..abpf {
-                afifo.pop_front();
+            let audio_to_drop = abpf.min(afifo.len());
+            if audio_to_drop > 0 {
+                afifo.drain(..audio_to_drop);
             }
             if !drift_logged {
                 drift_logged = true;
@@ -785,7 +794,7 @@ fn generation(
                 }
                 slate_afifo.clear();
             }
-            let _ = drain_frames(&mut slate_vsrc, |f| slate_frame = f);
+            let _ = drain_frames(&mut slate_vsrc, |f| slate_frame = Bytes::from(f));
             let _ = drain_audio(&mut slate_asrc, &mut slate_afifo, abpf * spec.fps as usize);
         }
 
@@ -810,7 +819,7 @@ fn generation(
                 None
             };
 
-            let (frame_out, audio_out, brb_now): (Vec<u8>, Vec<u8>, bool) = match &popped {
+            let (frame_out, audio_out, brb_now): (Bytes, Vec<u8>, bool) = match &popped {
                 Some((idx, f)) => {
                     // Censura do guardião (só com watchlist): troca o QUADRO, áudio segue.
                     let censor_now = shared
@@ -952,10 +961,31 @@ fn generation(
 /// Oferece o plano Y do quadro pro OCR do guardião (se ligado e o slot estiver livre).
 fn offer_scan(shared: Option<&guardian::Shared>, idx: u64, frame: &[u8], ysize: usize) {
     if let Some(sh) = shared {
-        if let Ok(mut slot) = sh.scan_slot.lock() {
-            if slot.is_none() {
-                *slot = Some((idx, frame[..ysize].to_vec()));
-            }
-        }
+        sh.offer_scan(idx, &frame[..ysize]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::take_audio;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn take_audio_copies_wrapped_fifo_and_pads_silence() {
+        let mut fifo = VecDeque::with_capacity(5);
+        fifo.extend([1, 2, 3, 4, 5]);
+        fifo.pop_front();
+        fifo.pop_front();
+        fifo.extend([6, 7]);
+
+        assert_eq!(take_audio(&mut fifo, 7), vec![3, 4, 5, 6, 7, 0, 0]);
+        assert!(fifo.is_empty());
+    }
+
+    #[test]
+    fn take_audio_leaves_remaining_samples_in_order() {
+        let mut fifo = VecDeque::from([10, 11, 12, 13]);
+        assert_eq!(take_audio(&mut fifo, 2), vec![10, 11]);
+        assert_eq!(fifo, VecDeque::from([12, 13]));
     }
 }

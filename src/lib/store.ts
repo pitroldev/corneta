@@ -536,13 +536,14 @@ export const useStore = create<State>((set, get) => {
       return api.subscribeChat(
         (m) =>
           set((s) => {
-            const next = [...s.chatMessages, m];
-            return {
-              chatMessages:
-                next.length > CHAT_CAP
-                  ? next.slice(next.length - CHAT_CAP)
-                  : next,
-            };
+            if (s.chatMessages.length < CHAT_CAP) {
+              return { chatMessages: [...s.chatMessages, m] };
+            }
+            // Uma única cópia quando o ring lógico está cheio (antes criava o array
+            // ampliado e logo em seguida outro array com `slice`).
+            const next = s.chatMessages.slice(-(CHAT_CAP - 1));
+            next.push(m);
+            return { chatMessages: next };
           }),
         (st) =>
           set((s) => ({
@@ -812,13 +813,12 @@ export const useStore = create<State>((set, get) => {
     bindAlerts() {
       return api.subscribeAlerts((a) =>
         set((s) => {
-          const next = [...s.alerts, a];
-          return {
-            alerts:
-              next.length > ALERT_CAP
-                ? next.slice(next.length - ALERT_CAP)
-                : next,
-          };
+          if (s.alerts.length < ALERT_CAP) {
+            return { alerts: [...s.alerts, a] };
+          }
+          const next = s.alerts.slice(-(ALERT_CAP - 1));
+          next.push(a);
+          return { alerts: next };
         }),
       );
     },

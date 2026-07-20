@@ -871,6 +871,7 @@ fn youtube_moderate(
 // Leitura continua no Pusher anônimo (run_kick) — não muda.
 
 static KICK_IDS: Mutex<BTreeMap<String, i64>> = Mutex::new(BTreeMap::new());
+const KICK_ID_CACHE_CAP: usize = 64;
 
 /// Token aleatório (32 bytes do CSPRNG do SO → base64url, ~43 chars) pro PKCE verifier e o
 /// state anti-CSRF (RFC 7636 exige aleatoriedade real, não time/pid).
@@ -1227,7 +1228,11 @@ fn kick_broadcaster_id(app: &AppHandle, slug: &str) -> Result<i64, String> {
         .and_then(|c| c.get("broadcaster_user_id"))
         .and_then(|x| x.as_i64())
         .ok_or("Kick: canal não encontrado")?;
-    KICK_IDS.lock().unwrap().insert(slug, id);
+    let mut cache = KICK_IDS.lock().unwrap();
+    if cache.len() >= KICK_ID_CACHE_CAP {
+        cache.pop_first();
+    }
+    cache.insert(slug, id);
     Ok(id)
 }
 

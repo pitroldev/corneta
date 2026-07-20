@@ -35,10 +35,9 @@ fn mask(s: &str) -> String {
 /// Minúsculas + troca tudo que não é alfanumérico por espaço (junta espaços). Assim "joao@email.com"
 /// e "joao @ emaiI . com" (jeito que o OCR às vezes lê) viram comparáveis por TOKEN.
 fn normalize(s: &str) -> String {
-    let lowered = s.to_lowercase();
-    let mut out = String::with_capacity(lowered.len());
+    let mut out = String::with_capacity(s.len());
     let mut prev_space = true;
-    for c in lowered.chars() {
+    for c in s.chars().flat_map(char::to_lowercase) {
         if c.is_alphanumeric() {
             out.push(c);
             prev_space = false;
@@ -47,7 +46,10 @@ fn normalize(s: &str) -> String {
             prev_space = true;
         }
     }
-    out.trim_end().to_string()
+    if out.ends_with(' ') {
+        out.pop();
+    }
+    out
 }
 
 /// Distância de edição ≤ `max_d`? (Levenshtein com saída antecipada — tolera erro do OCR.)
@@ -58,8 +60,9 @@ fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
         return false;
     }
     let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut cur = vec![0; b.len() + 1];
     for (i, &ca) in a.iter().enumerate() {
-        let mut cur = vec![i + 1; b.len() + 1];
+        cur[0] = i + 1;
         let mut row_min = cur[0];
         for (j, &cb) in b.iter().enumerate() {
             let cost = usize::from(ca != cb);
@@ -69,7 +72,7 @@ fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
         if row_min > max_d {
             return false; // nenhuma continuação cabe no orçamento
         }
-        prev = cur;
+        std::mem::swap(&mut prev, &mut cur);
     }
     prev[b.len()] <= max_d
 }
@@ -77,18 +80,16 @@ fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
 /// O `needle` aparece no `hay` como SUBSTRING dentro de `max_k` edições, começando em QUALQUER
 /// posição? (Levenshtein com a 1ª linha zerada → o casamento pode começar em qualquer ponto do
 /// hay.) Pega o nome/endereço lido com 1-2 erros de OCR em qualquer lugar, na ordem.
-fn fuzzy_contains(needle: &str, hay: &str, max_k: usize) -> bool {
-    let n: Vec<char> = needle.chars().collect();
-    let h: Vec<char> = hay.chars().collect();
-    if n.is_empty() {
+fn fuzzy_contains(needle: &[char], hay: &[char], max_k: usize) -> bool {
+    if needle.is_empty() {
         return true;
     }
-    let mut prev = vec![0usize; h.len() + 1]; // i=0: casar needle vazio = 0 em qualquer coluna
-    for (i, &nc) in n.iter().enumerate() {
-        let mut cur = vec![0usize; h.len() + 1];
+    let mut prev = vec![0usize; hay.len() + 1]; // i=0: casar needle vazio = 0 em qualquer coluna
+    let mut cur = vec![0usize; hay.len() + 1];
+    for (i, &nc) in needle.iter().enumerate() {
         cur[0] = i + 1; // needle[..i+1] vs hay vazio = i+1 inserções
         let mut row_min = cur[0];
-        for (j, &hc) in h.iter().enumerate() {
+        for (j, &hc) in hay.iter().enumerate() {
             let cost = usize::from(nc != hc);
             cur[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(cur[j] + 1);
             row_min = row_min.min(cur[j + 1]);
@@ -96,7 +97,7 @@ fn fuzzy_contains(needle: &str, hay: &str, max_k: usize) -> bool {
         if row_min > max_k {
             return false; // nenhuma continuação cabe no orçamento
         }
-        prev = cur;
+        std::mem::swap(&mut prev, &mut cur);
     }
     prev.iter().any(|&c| c <= max_k)
 }
@@ -104,23 +105,19 @@ fn fuzzy_contains(needle: &str, hay: &str, max_k: usize) -> bool {
 /// O termo aparece no texto do OCR? (1) frase inteira por substring FUZZY (pega erro de OCR em
 /// qualquer ponto, na ordem — caso comum: nome/endereço); (2) fallback por TOKEN (reordenado/
 /// separado). Recall alto de propósito — é dado do usuário.
-fn matches_term(term: &str, hay: &str, hay_words: &[&str]) -> bool {
-    let phrase = normalize(term);
-    if phrase.is_empty() {
-        return false;
-    }
-    let plen = phrase.chars().count();
+fn matches_term(term: &PreparedTerm, hay: &str, hay_chars: &[char], hay_words: &[&str]) -> bool {
     // Orçamento de erro ∝ tamanho (≥6 chars). Termo curto exige exato (senão casa qualquer coisa).
-    let max_k = if plen >= 6 { (plen / 6).clamp(1, 3) } else { 0 };
-    if fuzzy_contains(&phrase, hay, max_k) {
+    let max_k = if term.char_len >= 6 {
+        (term.char_len / 6).clamp(1, 3)
+    } else {
+        0
+    };
+    if hay.contains(&term.normalized)
+        || (max_k > 0 && fuzzy_contains(&term.normalized_chars, hay_chars, max_k))
+    {
         return true;
     }
-    let toks: Vec<String> = phrase
-        .split_whitespace()
-        .filter(|w| w.chars().count() >= 3)
-        .map(String::from)
-        .collect();
-    if toks.is_empty() {
+    if term.tokens.is_empty() {
         return false;
     }
     let token_hit = |tok: &str| -> bool {
@@ -131,38 +128,74 @@ fn matches_term(term: &str, hay: &str, hay_words: &[&str]) -> bool {
         tok.chars().count() >= 5 && hay_words.iter().any(|w| within_edit(tok, w, 1))
     };
     // Um token DISTINTIVO (≥6) sozinho já casa (ex.: "growthedge", "cardoso").
-    if toks
+    if term
+        .tokens
         .iter()
         .any(|tok| tok.chars().count() >= 6 && token_hit(tok))
     {
         return true;
     }
     // Senão, a MAIORIA (~60%) dos tokens precisa casar.
-    let matched = toks.iter().filter(|tok| token_hit(tok)).count();
-    matched * 5 >= toks.len() * 3
+    let matched = term.tokens.iter().filter(|tok| token_hit(tok)).count();
+    matched * 5 >= term.tokens.len() * 3
+}
+
+pub(crate) struct PreparedTerm {
+    original: String,
+    normalized: String,
+    normalized_chars: Vec<char>,
+    char_len: usize,
+    tokens: Vec<String>,
+}
+
+/// Normaliza e tokeniza a watchlist uma vez por sessão, não uma vez por resultado do OCR.
+pub(crate) fn prepare_watchlist(watchlist: &[String]) -> Vec<PreparedTerm> {
+    let mut seen = std::collections::HashSet::new();
+    watchlist
+        .iter()
+        .filter_map(|term| {
+            let original = term.trim();
+            let normalized = normalize(original);
+            let char_len = normalized.chars().count();
+            if char_len < 3 || !seen.insert(normalized.clone()) {
+                return None;
+            }
+            let tokens = normalized
+                .split_whitespace()
+                .filter(|word| word.chars().count() >= 3)
+                .map(String::from)
+                .collect();
+            let normalized_chars = normalized.chars().collect();
+            Some(PreparedTerm {
+                original: original.to_owned(),
+                normalized,
+                normalized_chars,
+                char_len,
+                tokens,
+            })
+        })
+        .collect()
+}
+
+pub(crate) fn find_prepared_watchlist(text: &str, watchlist: &[PreparedTerm]) -> Vec<Leak> {
+    let hay = normalize(text);
+    let hay_chars: Vec<char> = hay.chars().collect();
+    let hay_words: Vec<&str> = hay.split_whitespace().collect();
+    watchlist
+        .iter()
+        .filter(|term| matches_term(term, &hay, &hay_chars, &hay_words))
+        .map(|term| Leak {
+            label: "Termo seu".into(),
+            snippet: mask(&term.original),
+        })
+        .collect()
 }
 
 /// Casa os termos EXPLÍCITOS da watchlist no texto do OCR. Devolve os termos achados (pra
 /// avisar/logar). Vazio = nada do usuário na tela → não dá slate.
+#[cfg(test)]
 pub fn find_watchlist(text: &str, watchlist: &[String]) -> Vec<Leak> {
-    let hay = normalize(text);
-    let hay_words: Vec<&str> = hay.split_whitespace().collect();
-    let mut out = vec![];
-    let mut seen = std::collections::HashSet::new();
-    for term in watchlist {
-        let t = term.trim();
-        // Termos curtos demais casariam em qualquer coisa (falso-positivo) → ignora.
-        if normalize(t).chars().count() < 3 {
-            continue;
-        }
-        if matches_term(t, &hay, &hay_words) && seen.insert(t.to_lowercase()) {
-            out.push(Leak {
-                label: "Termo seu".into(),
-                snippet: mask(t),
-            });
-        }
-    }
-    out
+    find_prepared_watchlist(text, &prepare_watchlist(watchlist))
 }
 
 /// Mudou o suficiente entre dois quadros cinza reduzidos (mesmas dims) pra valer um novo OCR?
@@ -173,12 +206,16 @@ pub fn frames_differ(prev: &[u8], cur: &[u8], pix_thresh: u8, frac: f32) -> bool
         return true;
     }
     let mut changed = 0usize;
+    let limit = frac * prev.len() as f32;
     for (a, b) in prev.iter().zip(cur) {
         if a.abs_diff(*b) > pix_thresh {
             changed += 1;
+            if changed as f32 > limit {
+                return true;
+            }
         }
     }
-    changed as f32 > frac * prev.len() as f32
+    false
 }
 
 /// Uma amostra: tinha segredo no quadro `index`?
