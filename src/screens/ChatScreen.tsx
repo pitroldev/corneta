@@ -125,6 +125,8 @@ export function ChatScreen() {
   const [configTab, setConfigTab] = useState<ConfigTab>("canais");
   const [adding, setAdding] = useState(false);
   const [addingAlert, setAddingAlert] = useState(false);
+  const [showYoutubeByok, setShowYoutubeByok] = useState(false);
+  const [showKickByok, setShowKickByok] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendTo, setSendTo] = useState("all");
@@ -723,11 +725,28 @@ export function ChatScreen() {
                             onLogout={() => void youtubeLogout()}
                           />
                           <button
-                            onClick={() => void clearYoutubeOauth()}
+                            onClick={() =>
+                              setShowYoutubeByok((value) => !value)
+                            }
                             className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
                           >
-                            trocar credenciais do Google
+                            {showYoutubeByok
+                              ? "ocultar opções avançadas"
+                              : "usar credenciais próprias"}
                           </button>
+                          {showYoutubeByok && (
+                            <YoutubeCredsForm
+                              onSave={(id, secret) => {
+                                void setYoutubeOauth(id, secret).then(() =>
+                                  setShowYoutubeByok(false),
+                                );
+                              }}
+                              onUseOfficial={() => {
+                                void clearYoutubeOauth();
+                                setShowYoutubeByok(false);
+                              }}
+                            />
+                          )}
                         </div>
                       ) : (
                         <YoutubeCredsForm
@@ -746,11 +765,26 @@ export function ChatScreen() {
                             onLogout={() => void kickLogout()}
                           />
                           <button
-                            onClick={() => void clearKickOauth()}
+                            onClick={() => setShowKickByok((value) => !value)}
                             className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
                           >
-                            trocar credenciais da Kick
+                            {showKickByok
+                              ? "ocultar opções avançadas"
+                              : "usar credenciais próprias"}
                           </button>
+                          {showKickByok && (
+                            <KickCredsForm
+                              onSave={(id, secret) => {
+                                void setKickOauth(id, secret).then(() =>
+                                  setShowKickByok(false),
+                                );
+                              }}
+                              onUseOfficial={() => {
+                                void clearKickOauth();
+                                setShowKickByok(false);
+                              }}
+                            />
+                          )}
                         </div>
                       ) : (
                         <KickCredsForm
@@ -1902,8 +1936,10 @@ function AlertSourceCard({
 // Assim cada um tem a própria cota — sem limite/verificação compartilhados.
 function YoutubeCredsForm({
   onSave,
+  onUseOfficial,
 }: {
   onSave: (clientId: string, clientSecret: string) => void;
+  onUseOfficial?: () => void;
 }) {
   const [id, setId] = useState("");
   const [secret, setSecret] = useState("");
@@ -1928,6 +1964,15 @@ function YoutubeCredsForm({
           {guide ? "ocultar guia" : "como conseguir?"}
         </button>
       </div>
+
+      {onUseOfficial && (
+        <button
+          onClick={onUseOfficial}
+          className="mb-2 text-[11px] font-bold text-brass hover:underline"
+        >
+          Restaurar login oficial da Corneta
+        </button>
+      )}
 
       {guide && (
         <>
@@ -2050,8 +2095,10 @@ function YoutubeCredsForm({
 
 function KickCredsForm({
   onSave,
+  onUseOfficial,
 }: {
   onSave: (clientId: string, clientSecret: string) => void;
+  onUseOfficial?: () => void;
 }) {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -2081,6 +2128,14 @@ function KickCredsForm({
         Use o redirect <strong>http://localhost:7395/callback</strong>. O
         segredo fica somente no cofre do sistema.
       </p>
+      {onUseOfficial && (
+        <button
+          onClick={onUseOfficial}
+          className="mb-2 text-[11px] font-bold text-brass hover:underline"
+        >
+          Restaurar login oficial da Corneta
+        </button>
+      )}
       <div className="flex flex-col gap-2">
         <Input
           name="kick-client-id"

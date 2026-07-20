@@ -65,6 +65,7 @@ export interface CornetaApi {
     twitchClientId: string;
     googleClientId: string;
     kickClientId: string;
+    setupApiUrl: string;
   }): Promise<void>;
   authStatus(): Promise<{
     twitchLogin: string | null;

@@ -1,10 +1,8 @@
 //! OAuth (device flow) pra ENVIAR e MODERAR pelo chat.
 //!
-//! Twitch e Google usam o "device authorization grant": o app pede um código, o usuário
-//! digita no navegador (sem redirect/servidor local) e o app faz polling até autorizar.
-//! Somente client_ids públicos vêm do `.env` (frontend → `set_oauth_config`). Segredos e tokens ficam no keyring
-//! (`twitch_oauth`/`twitch_refresh`/`youtube_oauth`/`youtube_refresh`) com refresh automático.
-//! A UI acompanha por `auth://twitch` e `auth://youtube`.
+//! Twitch usa o device grant público diretamente. YouTube e Kick preferem o broker Next.js,
+//! que guarda os secrets oficiais e devolve tokens uma única vez; BYOK permanece como fallback.
+//! Tokens continuam exclusivamente no keyring nativo, com refresh automático.
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
@@ -42,6 +40,9 @@ pub struct OauthConfig {
     pub google_client_secret: String,
     pub kick_client_id: String,
     pub kick_client_secret: String,
+    pub setup_api_url: String,
+    pub youtube_brokered: bool,
+    pub kick_brokered: bool,
 }
 
 fn oauth(app: &AppHandle) -> OauthConfig {
@@ -67,6 +68,100 @@ fn post_form(url: &str, form: &[(&str, &str)]) -> Result<Value, (u16, Value)> {
         }
         Err(_) => Err((0, Value::Null)),
     }
+}
+
+/// POST JSON para a setup API. Respostas de erro são desserializadas, mas nunca logadas aqui:
+/// elas podem estar correlacionadas a uma troca de token.
+fn post_json(url: &str, body: &Value) -> Result<Value, (u16, Value)> {
+    let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap_or(Value::Null);
+    match ureq::post(url)
+        .set("Accept", "application/json")
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(12))
+        .send_string(&body.to_string())
+    {
+        Ok(r) => Ok(parse(r.into_string().unwrap_or_default())),
+        Err(ureq::Error::Status(code, r)) => {
+            Err((code, parse(r.into_string().unwrap_or_default())))
+        }
+        Err(_) => Err((0, Value::Null)),
+    }
+}
+
+fn get_json(url: &str) -> Result<Value, (u16, Value)> {
+    let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap_or(Value::Null);
+    match ureq::get(url)
+        .set("Accept", "application/json")
+        .timeout(Duration::from_secs(8))
+        .call()
+    {
+        Ok(r) => Ok(parse(r.into_string().unwrap_or_default())),
+        Err(ureq::Error::Status(code, r)) => {
+            Err((code, parse(r.into_string().unwrap_or_default())))
+        }
+        Err(_) => Err((0, Value::Null)),
+    }
+}
+
+fn setup_url(cfg: &OauthConfig, path: &str) -> Option<String> {
+    let base = cfg.setup_api_url.trim().trim_end_matches('/');
+    let secure = base.starts_with("https://");
+    let local = cfg!(debug_assertions)
+        && (base.starts_with("http://localhost:")
+            || base.starts_with("http://127.0.0.1:")
+            || base == "http://localhost"
+            || base == "http://127.0.0.1");
+    if base.is_empty() || (!secure && !local) {
+        return None;
+    }
+    Some(format!("{base}{path}"))
+}
+
+fn broker_error(code: u16, body: &Value, fallback: &str) -> String {
+    let message = body
+        .get("error")
+        .and_then(|e| e.get("message"))
+        .and_then(|m| m.as_str())
+        .unwrap_or("");
+    if !message.is_empty() {
+        message.to_string()
+    } else if code == 0 {
+        "Serviço de login indisponível — confira sua conexão".into()
+    } else {
+        fallback.into()
+    }
+}
+
+/// Atualiza apenas configuração pública/capacidade. Client Secrets nunca saem do servidor.
+fn refresh_broker_config(app: &AppHandle) {
+    let current = oauth(app);
+    let Some(url) = setup_url(&current, "/api/v1/bootstrap") else {
+        return;
+    };
+    let Ok(value) = get_json(&url) else { return };
+    let providers = value.get("providers").unwrap_or(&Value::Null);
+    let twitch = providers.get("twitch").unwrap_or(&Value::Null);
+    let youtube = providers.get("youtube").unwrap_or(&Value::Null);
+    let kick = providers.get("kick").unwrap_or(&Value::Null);
+
+    let state = app.state::<AppState>();
+    let mut config = state.oauth.lock().unwrap();
+    if let Some(id) = twitch.get("clientId").and_then(|v| v.as_str()) {
+        if !id.trim().is_empty() {
+            config.twitch_client_id = id.trim().to_string();
+        }
+    }
+    let youtube_byok = keys::get_key("youtube_oauth_preference").as_deref() == Some("byok");
+    let kick_byok = keys::get_key("kick_oauth_preference").as_deref() == Some("byok");
+    let youtube_enabled = youtube.get("enabled").and_then(|v| v.as_bool()) == Some(true);
+    let kick_enabled = kick.get("enabled").and_then(|v| v.as_bool()) == Some(true);
+    if let Some(id) = kick.get("clientId").and_then(|v| v.as_str()) {
+        if kick_enabled && !kick_byok && !id.trim().is_empty() {
+            config.kick_client_id = id.trim().to_string();
+        }
+    }
+    config.youtube_brokered = youtube_enabled && !youtube_byok;
+    config.kick_brokered = kick_enabled && !kick_byok;
 }
 
 /// Mensagem legível de um erro do endpoint OAuth do Google (device/token). Evita o genérico
@@ -126,6 +221,7 @@ pub fn set_oauth_config(
     twitch_client_id: String,
     google_client_id: String,
     kick_client_id: Option<String>,
+    setup_api_url: String,
 ) {
     // BYOK: valores privados nunca atravessam o bundler nem ficam no JavaScript distribuído.
     let g_id =
@@ -142,6 +238,9 @@ pub fn set_oauth_config(
         google_client_secret: g_secret.trim().to_string(),
         kick_client_id: k_id,
         kick_client_secret: k_secret,
+        setup_api_url: setup_api_url.trim().trim_end_matches('/').to_string(),
+        youtube_brokered: false,
+        kick_brokered: false,
     };
 }
 
@@ -159,10 +258,17 @@ pub fn set_youtube_oauth(
     }
     keys::set_key("youtube_client_id", id)?;
     keys::set_key("youtube_client_secret", secret)?;
+    keys::set_key("youtube_oauth_preference", "byok")?;
+    let _ = keys::clear_key("youtube_oauth");
+    let _ = keys::clear_key("youtube_refresh");
+    let _ = keys::clear_key("youtube_oauth_mode");
+    *YT_TOKEN.lock().unwrap() = None;
+    *YT_CHAT.lock().unwrap() = None;
     let st = app.state::<AppState>();
     let mut o = st.oauth.lock().unwrap();
     o.google_client_id = id.to_string();
     o.google_client_secret = secret.to_string();
+    o.youtube_brokered = false;
     Ok(())
 }
 
@@ -174,6 +280,8 @@ pub fn clear_youtube_oauth(app: AppHandle) {
         "youtube_client_secret",
         "youtube_oauth",
         "youtube_refresh",
+        "youtube_oauth_mode",
+        "youtube_oauth_preference",
     ] {
         let _ = keys::clear_key(k);
     }
@@ -199,10 +307,15 @@ pub fn set_kick_oauth(
     }
     keys::set_key("kick_client_id", id)?;
     keys::set_key("kick_client_secret", secret)?;
+    keys::set_key("kick_oauth_preference", "byok")?;
+    let _ = keys::clear_key("kick_oauth");
+    let _ = keys::clear_key("kick_refresh");
+    let _ = keys::clear_key("kick_oauth_mode");
     let state = app.state::<AppState>();
     let mut oauth = state.oauth.lock().unwrap();
     oauth.kick_client_id = id.to_string();
     oauth.kick_client_secret = secret.to_string();
+    oauth.kick_brokered = false;
     Ok(())
 }
 
@@ -213,6 +326,8 @@ pub fn clear_kick_oauth(app: AppHandle) {
         "kick_client_secret",
         "kick_oauth",
         "kick_refresh",
+        "kick_oauth_mode",
+        "kick_oauth_preference",
     ] {
         let _ = keys::clear_key(key);
     }
@@ -228,12 +343,15 @@ pub fn clear_kick_oauth(app: AppHandle) {
 #[tauri::command]
 pub async fn auth_status(app: AppHandle) -> Value {
     tauri::async_runtime::spawn_blocking(move || {
+        refresh_broker_config(&app);
         let twitch = twitch_token(&app).and_then(|t| twitch_validate(&t)).map(|i| i.login);
         let youtube = keys::has_key("youtube_refresh");
-        let youtube_configured = !app.state::<AppState>().oauth.lock().unwrap().google_client_id.is_empty();
+        let cfg = oauth(&app);
+        let youtube_configured = cfg.youtube_brokered
+            || (!cfg.google_client_id.is_empty() && !cfg.google_client_secret.is_empty());
         let kick = keys::has_key("kick_refresh");
-        let kick_configured = !app.state::<AppState>().oauth.lock().unwrap().kick_client_id.is_empty()
-            && keys::has_key("kick_client_secret");
+        let kick_configured = cfg.kick_brokered
+            || (!cfg.kick_client_id.is_empty() && !cfg.kick_client_secret.is_empty());
         json!({ "twitchLogin": twitch, "youtube": youtube, "youtubeConfigured": youtube_configured, "kick": kick, "kickConfigured": kick_configured })
     })
     .await
@@ -447,19 +565,22 @@ fn twitch_refresh(app: &AppHandle) -> Option<String> {
 
 #[tauri::command]
 pub fn youtube_login_start(app: AppHandle) {
-    let cfg = oauth(&app);
-    if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
-        auth_event(
-            &app,
-            "youtube",
-            "error",
-            "",
-            "",
-            "Configure o Client ID público e salve o Client Secret no cofre pela aba Conta",
-        );
-        return;
-    }
     tauri::async_runtime::spawn_blocking(move || {
+        refresh_broker_config(&app);
+        let cfg = oauth(&app);
+        if cfg.youtube_brokered {
+            return youtube_broker_login(&app, &cfg);
+        }
+        if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
+            return auth_event(
+                &app,
+                "youtube",
+                "error",
+                "",
+                "",
+                "Login oficial indisponível. Use credenciais próprias nas opções avançadas",
+            );
+        }
         let dev = match post_form(
             "https://oauth2.googleapis.com/device/code",
             &[
@@ -558,6 +679,7 @@ pub fn youtube_login_start(app: AppHandle) {
                             return auth_event(&app, "youtube", "error", "", "", &e);
                         }
                     }
+                    let _ = keys::set_key("youtube_oauth_mode", "byok");
                     return auth_event(&app, "youtube", "connected", "", "", "");
                 }
                 Err((_, e)) => {
@@ -576,10 +698,156 @@ pub fn youtube_login_start(app: AppHandle) {
     });
 }
 
+fn youtube_broker_login(app: &AppHandle, cfg: &OauthConfig) {
+    let Some(start_url) = setup_url(cfg, "/api/v1/oauth/youtube/device/start") else {
+        return auth_event(
+            app,
+            "youtube",
+            "error",
+            "",
+            "",
+            "Serviço de login oficial não configurado",
+        );
+    };
+    let start = match post_json(&start_url, &json!({})) {
+        Ok(value) => value,
+        Err((code, value)) => {
+            return auth_event(
+                app,
+                "youtube",
+                "error",
+                "",
+                "",
+                &broker_error(code, &value, "Não consegui iniciar o login do YouTube"),
+            )
+        }
+    };
+    let attempt = start
+        .get("attempt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let user_code = start
+        .get("userCode")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let verify = start
+        .get("verificationUri")
+        .and_then(|v| v.as_str())
+        .unwrap_or("https://www.google.com/device")
+        .to_string();
+    let verify_complete = start
+        .get("verificationUriComplete")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let mut interval = start
+        .get("interval")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(5)
+        .max(1);
+    let expires = start
+        .get("expiresIn")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1_800);
+    if attempt.is_empty() || user_code.is_empty() {
+        return auth_event(
+            app,
+            "youtube",
+            "error",
+            "",
+            "",
+            "Serviço de login retornou uma resposta inválida",
+        );
+    }
+    auth_code_event(app, "youtube", &user_code, &verify, &verify_complete);
+
+    let Some(poll_url) = setup_url(cfg, "/api/v1/oauth/youtube/device/poll") else {
+        return auth_event(app, "youtube", "error", "", "", "Serviço indisponível");
+    };
+    let deadline = Instant::now() + Duration::from_secs(expires);
+    loop {
+        std::thread::sleep(Duration::from_secs(interval));
+        if Instant::now() > deadline {
+            return auth_event(
+                app,
+                "youtube",
+                "error",
+                "",
+                "",
+                "Código expirou — tente de novo",
+            );
+        }
+        match post_json(&poll_url, &json!({ "attempt": attempt.as_str() })) {
+            Ok(value) => {
+                if value.get("status").and_then(|v| v.as_str()) != Some("connected") {
+                    interval = value
+                        .get("retryAfter")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(interval)
+                        .max(1);
+                    continue;
+                }
+                let access = value
+                    .get("accessToken")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let refresh = value
+                    .get("refreshToken")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if access.is_empty() || refresh.is_empty() {
+                    return auth_event(
+                        app,
+                        "youtube",
+                        "error",
+                        "",
+                        "",
+                        "O Google não retornou uma sessão renovável",
+                    );
+                }
+                if let Err(e) = keys::set_key("youtube_oauth", access) {
+                    return auth_event(app, "youtube", "error", "", "", &e);
+                }
+                if let Err(e) = keys::set_key("youtube_refresh", refresh) {
+                    let _ = keys::clear_key("youtube_oauth");
+                    return auth_event(app, "youtube", "error", "", "", &e);
+                }
+                let _ = keys::set_key("youtube_oauth_mode", "broker");
+                let exp = value
+                    .get("expiresIn")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(3_600);
+                *YT_TOKEN.lock().unwrap() = Some((access.to_string(), now_ms() + exp * 1_000));
+                return auth_event(app, "youtube", "connected", "", "", "");
+            }
+            Err((code, value)) if code == 429 => {
+                interval = value
+                    .get("retryAfter")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(interval + 5)
+                    .max(interval);
+            }
+            Err((code, value)) => {
+                return auth_event(
+                    app,
+                    "youtube",
+                    "error",
+                    "",
+                    "",
+                    &broker_error(code, &value, "Não consegui concluir o login do YouTube"),
+                )
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn youtube_logout(app: AppHandle) {
     let _ = keys::clear_key("youtube_oauth");
     let _ = keys::clear_key("youtube_refresh");
+    let _ = keys::clear_key("youtube_oauth_mode");
     *YT_TOKEN.lock().unwrap() = None;
     *YT_CHAT.lock().unwrap() = None;
     auth_event(&app, "youtube", "loggedout", "", "", "");
@@ -599,18 +867,46 @@ pub fn youtube_token(app: &AppHandle) -> Option<String> {
     }
     let cfg = oauth(app);
     let refresh = keys::get_key("youtube_refresh")?;
-    let v = post_form(
-        "https://oauth2.googleapis.com/token",
-        &[
-            ("client_id", &cfg.google_client_id),
-            ("client_secret", &cfg.google_client_secret),
-            ("refresh_token", &refresh),
-            ("grant_type", "refresh_token"),
-        ],
-    )
-    .ok()?;
-    let access = v.get("access_token").and_then(|x| x.as_str())?.to_string();
-    let exp = v.get("expires_in").and_then(|x| x.as_u64()).unwrap_or(3600);
+    let brokered = keys::get_key("youtube_oauth_mode").as_deref() == Some("broker");
+    let v = if brokered {
+        let url = setup_url(&cfg, "/api/v1/oauth/youtube/refresh")?;
+        post_json(&url, &json!({ "refreshToken": refresh })).ok()?
+    } else {
+        post_form(
+            "https://oauth2.googleapis.com/token",
+            &[
+                ("client_id", &cfg.google_client_id),
+                ("client_secret", &cfg.google_client_secret),
+                ("refresh_token", &refresh),
+                ("grant_type", "refresh_token"),
+            ],
+        )
+        .ok()?
+    };
+    let access = v
+        .get(if brokered {
+            "accessToken"
+        } else {
+            "access_token"
+        })
+        .and_then(|x| x.as_str())?
+        .to_string();
+    let exp = v
+        .get(if brokered { "expiresIn" } else { "expires_in" })
+        .and_then(|x| x.as_u64())
+        .unwrap_or(3600);
+    if let Some(rotated) = v
+        .get(if brokered {
+            "refreshToken"
+        } else {
+            "refresh_token"
+        })
+        .and_then(|x| x.as_str())
+    {
+        if !rotated.is_empty() {
+            let _ = keys::set_key("youtube_refresh", rotated);
+        }
+    }
     *YT_TOKEN.lock().unwrap() = Some((access.clone(), now + exp * 1000));
     let _ = keys::set_key("youtube_oauth", &access);
     Some(access)
@@ -929,19 +1225,21 @@ fn pct_decode(s: &str) -> String {
 
 #[tauri::command]
 pub fn kick_login_start(app: AppHandle) {
-    let cfg = oauth(&app);
-    if cfg.kick_client_id.is_empty() || cfg.kick_client_secret.is_empty() {
-        auth_event(
-            &app,
-            "kick",
-            "error",
-            "",
-            "",
-            "Configure o Client ID público e o Client Secret da Kick no cofre nativo",
-        );
-        return;
-    }
     tauri::async_runtime::spawn_blocking(move || {
+        refresh_broker_config(&app);
+        let cfg = oauth(&app);
+        if cfg.kick_client_id.is_empty()
+            || (!cfg.kick_brokered && cfg.kick_client_secret.is_empty())
+        {
+            return auth_event(
+                &app,
+                "kick",
+                "error",
+                "",
+                "",
+                "Login oficial indisponível. Use credenciais próprias nas opções avançadas",
+            );
+        }
         let verifier = rand_token();
         let challenge = pkce_challenge(&verifier);
         let state = rand_token();
@@ -1087,26 +1385,58 @@ fn kick_exchange(
     verifier: &str,
     redirect: &str,
 ) -> Result<(), String> {
-    let v = post_form(
-        "https://id.kick.com/oauth/token",
-        &[
-            ("grant_type", "authorization_code"),
-            ("client_id", cfg.kick_client_id.as_str()),
-            ("client_secret", cfg.kick_client_secret.as_str()),
-            ("redirect_uri", redirect),
-            ("code_verifier", verifier),
-            ("code", code),
-        ],
-    )
-    .map_err(|(c, e)| format!("Kick token {c}: {e}"))?;
+    let brokered = cfg.kick_brokered;
+    let v = if brokered {
+        let url = setup_url(cfg, "/api/v1/oauth/kick/exchange")
+            .ok_or("Serviço de login da Kick não configurado")?;
+        post_json(
+            &url,
+            &json!({
+                "code": code,
+                "codeVerifier": verifier,
+                "redirectUri": redirect,
+            }),
+        )
+        .map_err(|(status, body)| {
+            broker_error(status, &body, "Não consegui concluir o login da Kick")
+        })?
+    } else {
+        post_form(
+            "https://id.kick.com/oauth/token",
+            &[
+                ("grant_type", "authorization_code"),
+                ("client_id", cfg.kick_client_id.as_str()),
+                ("client_secret", cfg.kick_client_secret.as_str()),
+                ("redirect_uri", redirect),
+                ("code_verifier", verifier),
+                ("code", code),
+            ],
+        )
+        .map_err(|(status, _)| format!("Kick recusou o login ({status})"))?
+    };
     let access = v
-        .get("access_token")
+        .get(if brokered {
+            "accessToken"
+        } else {
+            "access_token"
+        })
         .and_then(|x| x.as_str())
         .ok_or("Kick: token vazio")?;
     keys::set_key("kick_oauth", access)?;
-    if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
-        let _ = keys::set_key("kick_refresh", r);
+    let refresh = v
+        .get(if brokered {
+            "refreshToken"
+        } else {
+            "refresh_token"
+        })
+        .and_then(|x| x.as_str())
+        .unwrap_or("");
+    if refresh.is_empty() {
+        let _ = keys::clear_key("kick_oauth");
+        return Err("Kick não retornou uma sessão renovável".into());
     }
+    keys::set_key("kick_refresh", refresh)?;
+    keys::set_key("kick_oauth_mode", if brokered { "broker" } else { "byok" })?;
     Ok(())
 }
 
@@ -1114,6 +1444,7 @@ fn kick_exchange(
 pub fn kick_logout(app: AppHandle) {
     let _ = keys::clear_key("kick_oauth");
     let _ = keys::clear_key("kick_refresh");
+    let _ = keys::clear_key("kick_oauth_mode");
     KICK_IDS.lock().unwrap().clear();
     auth_event(&app, "kick", "loggedout", "", "", "");
 }
@@ -1131,35 +1462,64 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
     if atual != refresh {
         return keys::get_key("kick_oauth");
     }
-    let v = match post_form(
-        "https://id.kick.com/oauth/token",
-        &[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", atual.as_str()),
-            ("client_id", cfg.kick_client_id.as_str()),
-            ("client_secret", cfg.kick_client_secret.as_str()),
-        ],
-    ) {
+    let brokered = keys::get_key("kick_oauth_mode").as_deref() == Some("broker");
+    let result = if brokered {
+        let url = setup_url(&cfg, "/api/v1/oauth/kick/refresh")?;
+        post_json(&url, &json!({ "refreshToken": atual.as_str() }))
+    } else {
+        post_form(
+            "https://id.kick.com/oauth/token",
+            &[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", atual.as_str()),
+                ("client_id", cfg.kick_client_id.as_str()),
+                ("client_secret", cfg.kick_client_secret.as_str()),
+            ],
+        )
+    };
+    let v = match result {
         Ok(v) => v,
         Err((code, e)) => {
             // refresh morto (revogado/expirado) → desloga de vez pra UI refletir. Erro de rede
             // (status 0) ou 5xx → mantém a sessão pra tentar de novo.
-            let dead =
-                code == 400 || e.get("error").and_then(|x| x.as_str()) == Some("invalid_grant");
+            let broker_dead = e
+                .get("error")
+                .and_then(|x| x.get("code"))
+                .and_then(|x| x.as_str())
+                == Some("OAUTH_SESSION_EXPIRED");
+            let dead = code == 400
+                || code == 401
+                || broker_dead
+                || e.get("error").and_then(|x| x.as_str()) == Some("invalid_grant");
             // Só apaga se o refresh que falhou ainda for o gravado — senão apagaria tokens
             // recém-renovados por outro fluxo (ex.: re-login concluído nesse meio-tempo).
             if dead && keys::get_key("kick_refresh").as_deref() == Some(atual.as_str()) {
                 let _ = keys::clear_key("kick_oauth");
                 let _ = keys::clear_key("kick_refresh");
+                let _ = keys::clear_key("kick_oauth_mode");
                 KICK_IDS.lock().unwrap().clear();
                 auth_event(app, "kick", "loggedout", "", "", "");
             }
             return None;
         }
     };
-    let access = v.get("access_token").and_then(|x| x.as_str())?.to_string();
+    let access = v
+        .get(if brokered {
+            "accessToken"
+        } else {
+            "access_token"
+        })
+        .and_then(|x| x.as_str())?
+        .to_string();
     let _ = keys::set_key("kick_oauth", &access);
-    if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
+    if let Some(r) = v
+        .get(if brokered {
+            "refreshToken"
+        } else {
+            "refresh_token"
+        })
+        .and_then(|x| x.as_str())
+    {
         let _ = keys::set_key("kick_refresh", r);
     }
     Some(access)

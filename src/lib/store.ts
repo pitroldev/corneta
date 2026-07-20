@@ -692,6 +692,7 @@ export const useStore = create<State>((set, get) => {
         twitchClientId: OAUTH.twitchClientId,
         googleClientId: OAUTH.googleClientId,
         kickClientId: OAUTH.kickClientId,
+        setupApiUrl: OAUTH.setupApiUrl,
       });
       try {
         const a = await api.authStatus();
@@ -713,7 +714,10 @@ export const useStore = create<State>((set, get) => {
 
     async setYoutubeOauth(clientId, clientSecret) {
       await api.setYoutubeOauth(clientId, clientSecret);
-      set({ youtubeOauthReady: true });
+      set((s) => ({
+        youtubeOauthReady: true,
+        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
+      }));
     },
     async clearYoutubeOauth() {
       await api.clearYoutubeOauth();
@@ -721,10 +725,14 @@ export const useStore = create<State>((set, get) => {
         youtubeOauthReady: false,
         chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
       }));
+      await get().setupOauth();
     },
     async setKickOauth(clientId, clientSecret) {
       await api.setKickOauth(clientId, clientSecret);
-      set({ kickOauthReady: true });
+      set((s) => ({
+        kickOauthReady: true,
+        chatLogin: { ...s.chatLogin, kick: { state: "out" } },
+      }));
     },
     async clearKickOauth() {
       await api.clearKickOauth();
@@ -732,6 +740,7 @@ export const useStore = create<State>((set, get) => {
         kickOauthReady: false,
         chatLogin: { ...s.chatLogin, kick: { state: "out" } },
       }));
+      await get().setupOauth();
     },
 
     bindAuthFlow() {
