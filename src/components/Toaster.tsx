@@ -42,7 +42,10 @@ export function Toaster() {
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
               className={`pointer-events-auto flex items-start gap-3 rounded-md border-l-4 bg-surface-2 pop p-3.5 ${STRIPE[t.kind]}`}
             >
-              <Icon className={`mt-0.5 size-5 shrink-0 ${ACCENT[t.kind]}`} />
+              <Icon
+                className={`mt-0.5 size-5 shrink-0 ${ACCENT[t.kind]}`}
+                aria-hidden
+              />
               <p className="flex-1 text-sm text-ink">{t.message}</p>
               {t.action && (
                 <button
@@ -55,8 +58,12 @@ export function Toaster() {
                   {t.action.label}
                 </button>
               )}
-              <button onClick={() => dismiss(t.id)} className="text-ink-faint hover:text-ink">
-                <X className="size-4" />
+              <button
+                aria-label="Fechar aviso"
+                onClick={() => dismiss(t.id)}
+                className="text-ink-faint hover:text-ink"
+              >
+                <X className="size-4" aria-hidden />
               </button>
             </motion.div>
           );

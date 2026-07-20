@@ -51,7 +51,7 @@ export function Modal({
             if (lockOutside) e.preventDefault();
           }}
           className={cn(
-            "fixed left-1/2 top-1/2 z-[90] max-h-[90vh] w-[calc(100%-3rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto outline-none",
+            "fixed left-1/2 top-1/2 z-[90] max-h-[90vh] w-[calc(100%-3rem)] -translate-x-1/2 -translate-y-1/2 overscroll-contain overflow-y-auto outline-none",
             "data-[state=open]:animate-[modal-in_150ms_ease-out]",
             className,
           )}

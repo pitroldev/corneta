@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MotionConfig, motion } from "framer-motion";
 import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
@@ -27,13 +27,31 @@ import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
 import { Mascot, SoundWaves } from "./components/decor";
 import { PlatformsScreen } from "./screens/PlatformsScreen";
-import { EncodingScreen } from "./screens/EncodingScreen";
-import { GoLiveScreen } from "./screens/GoLiveScreen";
-import { ChatScreen } from "./screens/ChatScreen";
-import { MesaScreen } from "./screens/MesaScreen";
-import { ReportsScreen } from "./screens/ReportsScreen";
-import { AboutScreen } from "./screens/AboutScreen";
-import { SettingsScreen } from "./screens/SettingsScreen";
+const EncodingScreen = lazy(() =>
+  import("./screens/EncodingScreen").then((m) => ({
+    default: m.EncodingScreen,
+  })),
+);
+const GoLiveScreen = lazy(() =>
+  import("./screens/GoLiveScreen").then((m) => ({ default: m.GoLiveScreen })),
+);
+const ChatScreen = lazy(() =>
+  import("./screens/ChatScreen").then((m) => ({ default: m.ChatScreen })),
+);
+const MesaScreen = lazy(() =>
+  import("./screens/MesaScreen").then((m) => ({ default: m.MesaScreen })),
+);
+const ReportsScreen = lazy(() =>
+  import("./screens/ReportsScreen").then((m) => ({ default: m.ReportsScreen })),
+);
+const AboutScreen = lazy(() =>
+  import("./screens/AboutScreen").then((m) => ({ default: m.AboutScreen })),
+);
+const SettingsScreen = lazy(() =>
+  import("./screens/SettingsScreen").then((m) => ({
+    default: m.SettingsScreen,
+  })),
+);
 
 export default function App() {
   const loaded = useStore((s) => s.loaded);
@@ -267,16 +285,27 @@ export default function App() {
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
                   <ErrorBoundary>
-                    {screen === "platforms" && <PlatformsScreen />}
-                    {screen === "encoding" && <EncodingScreen />}
-                    {screen === "golive" && (
-                      <GoLiveScreen onNavigate={navigate} />
-                    )}
-                    {screen === "chat" && <ChatScreen />}
-                    {screen === "mesa" && MESA_ENABLED && <MesaScreen />}
-                    {screen === "reports" && <ReportsScreen />}
-                    {screen === "about" && <AboutScreen />}
-                    {screen === "settings" && <SettingsScreen />}
+                    <Suspense
+                      fallback={
+                        <div
+                          className="py-12 text-center text-sm text-muted"
+                          role="status"
+                        >
+                          Carregando tela…
+                        </div>
+                      }
+                    >
+                      {screen === "platforms" && <PlatformsScreen />}
+                      {screen === "encoding" && <EncodingScreen />}
+                      {screen === "golive" && (
+                        <GoLiveScreen onNavigate={navigate} />
+                      )}
+                      {screen === "chat" && <ChatScreen />}
+                      {screen === "mesa" && MESA_ENABLED && <MesaScreen />}
+                      {screen === "reports" && <ReportsScreen />}
+                      {screen === "about" && <AboutScreen />}
+                      {screen === "settings" && <SettingsScreen />}
+                    </Suspense>
                   </ErrorBoundary>
                 </motion.div>
               </div>

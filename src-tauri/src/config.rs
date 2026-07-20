@@ -3,6 +3,42 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
+pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+const MAX_TARGETS: usize = 32;
+const MAX_PROFILES: usize = 20;
+
+fn default_schema_version() -> u32 {
+    CURRENT_SCHEMA_VERSION
+}
+
+fn valid_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 80
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+}
+
+fn limited(label: &str, value: &str, max: usize) -> Result<(), String> {
+    if value.len() > max {
+        Err(format!("{label} excede o limite de {max} bytes"))
+    } else {
+        Ok(())
+    }
+}
+
+pub fn validate_secret_namespace(value: &str) -> Result<(), String> {
+    let id = value
+        .strip_prefix("alert_")
+        .or_else(|| value.strip_prefix("chat_send_"))
+        .unwrap_or(value);
+    if valid_id(id) && !value.starts_with("oauth_") {
+        Ok(())
+    } else {
+        Err("namespace de segredo inválido".into())
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct VideoPreset {
@@ -375,6 +411,10 @@ pub struct Profile {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub revision: u64,
     pub ingest: IngestConfig,
     /// "per-platform" | "passthrough" | "hybrid"
     pub mode: String,
@@ -391,6 +431,8 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         AppConfig {
+            schema_version: CURRENT_SCHEMA_VERSION,
+            revision: 0,
             ingest: IngestConfig {
                 protocol: "rtmp".into(),
                 host: "127.0.0.1".into(),
@@ -404,6 +446,137 @@ impl Default for AppConfig {
             profiles: vec![],
             active_profile_id: String::new(),
         }
+    }
+}
+
+impl AppConfig {
+    pub fn validate_and_normalize(mut self) -> Result<Self, String> {
+        if self.schema_version > CURRENT_SCHEMA_VERSION {
+            return Err(format!(
+                "config criada por uma versão mais nova (schema {})",
+                self.schema_version
+            ));
+        }
+        self.schema_version = CURRENT_SCHEMA_VERSION;
+        if self.targets.len() > MAX_TARGETS || self.profiles.len() > MAX_PROFILES {
+            return Err("config excede o limite de destinos ou perfis".into());
+        }
+        if self.ingest.protocol != "rtmp" {
+            return Err("o ingest local deve usar RTMP".into());
+        }
+        self.ingest.host = match self.ingest.host.trim().to_ascii_lowercase().as_str() {
+            "127.0.0.1" | "localhost" => "127.0.0.1".into(),
+            _ => return Err("o ingest deve escutar somente em 127.0.0.1".into()),
+        };
+        if !(1..=65_535).contains(&self.ingest.port) {
+            return Err("porta de ingest inválida".into());
+        }
+        for (label, value) in [
+            ("app do ingest", &self.ingest.app),
+            ("chave do ingest", &self.ingest.key),
+        ] {
+            if !valid_id(value) {
+                return Err(format!("{label} inválido"));
+            }
+        }
+        if !matches!(
+            self.mode.as_str(),
+            "per-platform" | "passthrough" | "hybrid"
+        ) {
+            return Err("modo de encoding inválido".into());
+        }
+
+        let allowed_platforms = [
+            "twitch",
+            "youtube",
+            "facebook",
+            "kick",
+            "tiktok",
+            "x",
+            "instagram",
+            "custom",
+        ];
+        for target in &mut self.targets {
+            if !valid_id(&target.id) || !allowed_platforms.contains(&target.platform_id.as_str()) {
+                return Err("destino possui id ou plataforma inválida".into());
+            }
+            limited("nome do destino", &target.name, 120)?;
+            if !matches!(target.protocol.as_str(), "rtmp" | "rtmps") {
+                return Err("protocolo de saída não suportado; use RTMP ou RTMPS".into());
+            }
+            let expected = format!("{}://", target.protocol);
+            if !target.ingest_url.starts_with(&expected)
+                || target.ingest_url.len() > 2_048
+                || target.ingest_url[expected.len()..]
+                    .trim_matches('/')
+                    .is_empty()
+                || target.ingest_url.chars().any(char::is_whitespace)
+            {
+                return Err(format!("URL de ingest inválida em {}", target.name));
+            }
+            if !matches!(target.encoding.action.as_str(), "copy" | "transcode")
+                || !matches!(
+                    target.encoding.encoder.as_str(),
+                    "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software"
+                )
+                || target
+                    .encoding
+                    .hybrid_override
+                    .as_deref()
+                    .is_some_and(|v| !matches!(v, "copy" | "transcode"))
+            {
+                return Err(format!("encoding inválido em {}", target.name));
+            }
+            if let Some(p) = &mut target.encoding.preset {
+                if !(160..=7_680).contains(&p.width)
+                    || !(160..=4_320).contains(&p.height)
+                    || !(1..=120).contains(&p.fps)
+                    || !(100..=100_000).contains(&p.video_bitrate_kbps)
+                    || !(32..=1_536).contains(&p.audio_bitrate_kbps)
+                    || !(1..=10).contains(&p.keyframe_sec)
+                {
+                    return Err(format!("preset fora dos limites em {}", target.name));
+                }
+            }
+            target.has_key = false;
+        }
+        for profile in &self.profiles {
+            if !valid_id(&profile.id) || profile.targets.len() > MAX_TARGETS {
+                return Err("perfil possui id inválido ou destinos demais".into());
+            }
+            limited("nome do perfil", &profile.name, 120)?;
+            if !matches!(
+                profile.mode.as_str(),
+                "per-platform" | "passthrough" | "hybrid"
+            ) {
+                return Err("perfil possui modo inválido".into());
+            }
+        }
+        if !self.active_profile_id.is_empty() && !valid_id(&self.active_profile_id) {
+            return Err("perfil ativo inválido".into());
+        }
+        let s = &mut self.settings;
+        s.obs_password = s.obs_password.chars().take(512).collect();
+        s.youtube_api_key = s.youtube_api_key.chars().take(512).collect();
+        s.stream_title = s.stream_title.chars().take(200).collect();
+        s.guardian_watchlist.truncate(100);
+        for term in &mut s.guardian_watchlist {
+            *term = term.trim().chars().take(200).collect();
+        }
+        s.chat_sources.truncate(32);
+        s.alert_sources.truncate(16);
+        if !(1..=65_535).contains(&s.overlay_port) {
+            return Err("porta do overlay inválida".into());
+        }
+        s.overlay_duration_secs = s.overlay_duration_secs.clamp(1, 60);
+        s.overlay_chat_size = s.overlay_chat_size.clamp(8, 72);
+        s.overlay_chat_max = s.overlay_chat_max.clamp(1, 100);
+        s.chat_font_size = s.chat_font_size.clamp(8, 44);
+        s.alert_font_size = s.alert_font_size.clamp(8, 44);
+        if !matches!(s.theme.as_str(), "dark" | "light") {
+            s.theme = default_theme();
+        }
+        Ok(self)
     }
 }
 
@@ -422,18 +595,52 @@ pub fn load(app: &AppHandle) -> AppConfig {
         Err(_) => return AppConfig::default(),
     };
     match std::fs::read_to_string(&path) {
-        Ok(raw) => match serde_json::from_str(&raw) {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                log::error!("config.json inválido ({e}); preservando como .corrupt e usando o padrão");
-                let ts = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let _ = std::fs::rename(&path, path.with_extension(format!("corrupt-{ts}.json")));
-                AppConfig::default()
+        Ok(raw) if raw.len() <= 2 * 1024 * 1024 => {
+            match serde_json::from_str::<serde_json::Value>(&raw) {
+                Ok(value) => {
+                    let old_schema = value
+                        .get("schemaVersion")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    match serde_json::from_value::<AppConfig>(value)
+                        .map_err(|e| e.to_string())
+                        .and_then(AppConfig::validate_and_normalize)
+                    {
+                        Ok(cfg) => {
+                            if old_schema < CURRENT_SCHEMA_VERSION {
+                                let backup =
+                                    path.with_extension(format!("schema-{old_schema}.json.bak"));
+                                let _ = std::fs::copy(&path, backup);
+                                if let Err(e) = save(app, &cfg) {
+                                    log::warn!("não foi possível persistir a migração: {e}");
+                                }
+                            }
+                            cfg
+                        }
+                        Err(e) => {
+                            log::error!("config.json rejeitado: {e}");
+                            AppConfig::default()
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "config.json inválido ({e}); preservando como .corrupt e usando o padrão"
+                    );
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    let _ =
+                        std::fs::rename(&path, path.with_extension(format!("corrupt-{ts}.json")));
+                    AppConfig::default()
+                }
             }
-        },
+        }
+        Ok(_) => {
+            log::error!("config.json excede o limite de 2 MiB");
+            AppConfig::default()
+        }
         Err(_) => AppConfig::default(),
     }
 }
@@ -444,4 +651,43 @@ pub fn save(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, raw).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_network_listener_and_unsupported_protocol() {
+        let mut cfg = AppConfig::default();
+        cfg.ingest.host = "0.0.0.0".into();
+        assert!(cfg.validate_and_normalize().is_err());
+
+        let mut cfg = AppConfig::default();
+        cfg.targets.push(Target {
+            id: "target_1".into(),
+            platform_id: "custom".into(),
+            name: "SRT".into(),
+            enabled: true,
+            protocol: "srt".into(),
+            ingest_url: "srt://host:9000".into(),
+            has_key: true,
+            encoding: TargetEncoding {
+                action: "copy".into(),
+                preset: None,
+                encoder: "auto".into(),
+                hybrid_override: None,
+                reframe: None,
+            },
+        });
+        assert!(cfg.validate_and_normalize().is_err());
+    }
+
+    #[test]
+    fn validates_secret_namespaces() {
+        assert!(validate_secret_namespace("target_abc-1").is_ok());
+        assert!(validate_secret_namespace("alert_source_1").is_ok());
+        assert!(validate_secret_namespace("../oauth_token").is_err());
+        assert!(validate_secret_namespace("oauth_refresh").is_err());
+    }
 }

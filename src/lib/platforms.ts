@@ -11,8 +11,15 @@ const p = (
   fps: number,
   videoBitrateKbps: number,
   audioBitrateKbps = 160,
-  keyframeSec = 2
-): VideoPreset => ({ width, height, fps, videoBitrateKbps, audioBitrateKbps, keyframeSec });
+  keyframeSec = 2,
+): VideoPreset => ({
+  width,
+  height,
+  fps,
+  videoBitrateKbps,
+  audioBitrateKbps,
+  keyframeSec,
+});
 
 export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
   twitch: {
@@ -99,7 +106,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(1920, 1080, 30, 4500, 160),
-    note: "Você mesmo informa o endereço e o tipo de conexão (RTMP, RTMPS ou SRT) — serve pra qualquer destino fora da lista.",
+    note: "Você informa o endereço RTMP ou RTMPS — serve para qualquer destino compatível fora da lista.",
   },
 };
 
@@ -124,19 +131,27 @@ export const PLATFORM_TAGLINES: Record<PlatformId, string> = {
   tiktok: "Vídeo em pé — precisa de conta liberada",
   x: "A chave sai do Media Studio",
   instagram: "Vídeo em pé — sem entrada oficial, pode falhar",
-  custom: "Qualquer servidor RTMP, RTMPS ou SRT",
+  custom: "Qualquer servidor RTMP ou RTMPS",
 };
 
 /** Iniciais para o "glifo" colorido da plataforma na UI. */
 export function platformInitials(id: PlatformId): string {
   switch (id) {
-    case "twitch": return "Tw";
-    case "youtube": return "YT";
-    case "facebook": return "Fb";
-    case "kick": return "Ki";
-    case "tiktok": return "Tk";
-    case "x": return "X";
-    case "instagram": return "Ig";
-    default: return "•";
+    case "twitch":
+      return "Tw";
+    case "youtube":
+      return "YT";
+    case "facebook":
+      return "Fb";
+    case "kick":
+      return "Ki";
+    case "tiktok":
+      return "Tk";
+    case "x":
+      return "X";
+    case "instagram":
+      return "Ig";
+    default:
+      return "•";
   }
 }

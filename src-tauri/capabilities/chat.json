@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "chat",
+  "description": "Permissões mínimas da janela flutuante do chat.",
+  "windows": ["chat"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-close"
+  ]
+}

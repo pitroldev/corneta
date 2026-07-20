@@ -24,7 +24,13 @@ export function Slider({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-2.5", disabled && "opacity-40", className)}>
+    <div
+      className={cn(
+        "flex items-center gap-2.5",
+        disabled && "opacity-40",
+        className,
+      )}
+    >
       <RSlider.Root
         min={min}
         max={max}

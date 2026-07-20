@@ -79,7 +79,8 @@ export const useMesa = create<MesaState>((set, get) => {
       onReady: (id) => set({ myId: id }),
       onPeers: (peers) => set({ peers }),
       // Voltou a ficar online → o erro antigo não vale mais.
-      onStatus: (status) => set(status === "online" ? { status, lastError: null } : { status }),
+      onStatus: (status) =>
+        set(status === "online" ? { status, lastError: null } : { status }),
       // Erro de sala/conexão precisa chegar na tela — em console.warn ninguém vê.
       onError: (msg) => {
         console.warn("[mesa]", msg);
@@ -212,7 +213,9 @@ export const useMesa = create<MesaState>((set, get) => {
         () => toast.success("Atualizei a grade no OBS"),
         (e) => {
           console.warn("[mesa] obs update:", e);
-          toast.error("Não consegui atualizar a grade no OBS — vê se ele tá aberto.");
+          toast.error(
+            "Não consegui atualizar a grade no OBS — vê se ele tá aberto.",
+          );
         },
       );
     },
@@ -233,13 +236,18 @@ export const useMesa = create<MesaState>((set, get) => {
         info = await api.mesaStartServer();
       } catch (e) {
         console.warn("[mesa] servidor:", e);
-        set({ serverError: "Não consegui subir o servidor da Mesa — tem outra Corneta aberta? Fecha e tenta de novo." });
+        set({
+          serverError:
+            "Não consegui subir o servidor da Mesa — tem outra Corneta aberta? Fecha e tenta de novo.",
+        });
         closeLocal();
         return;
       }
       // Sem IP de LAN, o convite sairia como loopback (inalcançável pelos convidados).
       if (isLoopback(info.lanIp)) {
-        toast.error("Sem rede local — não consigo gerar um convite que a galera alcance.");
+        toast.error(
+          "Sem rede local — não consigo gerar um convite que a galera alcance.",
+        );
         try {
           await api.mesaStopServer();
         } catch {
@@ -250,7 +258,11 @@ export const useMesa = create<MesaState>((set, get) => {
       }
       const room = newRoomKey();
       const signalUrl = `ws://127.0.0.1:${info.port}/ws`;
-      const invite = encodeInvite({ addr: `${info.lanIp}:${info.port}`, room, title: name });
+      const invite = encodeInvite({
+        addr: `${info.lanIp}:${info.port}`,
+        room,
+        title: name,
+      });
       set({
         active: true,
         mode: "host",
@@ -274,7 +286,9 @@ export const useMesa = create<MesaState>((set, get) => {
         return;
       }
       if (isLoopback(inv.addr.split(":")[0])) {
-        toast.error("Esse convite aponta pra um endereço local. Pede um convite novo pro host.");
+        toast.error(
+          "Esse convite aponta pra um endereço local. Pede um convite novo pro host.",
+        );
         return;
       }
       set({ serverError: null, lastError: null });
@@ -288,7 +302,10 @@ export const useMesa = create<MesaState>((set, get) => {
         info = await api.mesaStartServer();
       } catch (e) {
         console.warn("[mesa] servidor:", e);
-        set({ serverError: "Não consegui subir o servidor da Mesa — tem outra Corneta aberta? Fecha e tenta de novo." });
+        set({
+          serverError:
+            "Não consegui subir o servidor da Mesa — tem outra Corneta aberta? Fecha e tenta de novo.",
+        });
         closeLocal();
         return;
       }
@@ -368,7 +385,9 @@ export const useMesa = create<MesaState>((set, get) => {
         toast.success("Pus a Mesa na sua cena do OBS 🎥");
       } catch (e) {
         console.warn("[mesa] obs add:", e);
-        toast.error("Não consegui pôr a Mesa no OBS — vê se ele tá aberto com o WebSocket ligado.");
+        toast.error(
+          "Não consegui pôr a Mesa no OBS — vê se ele tá aberto com o WebSocket ligado.",
+        );
       }
     },
 

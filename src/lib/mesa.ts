@@ -90,7 +90,9 @@ function b64urlEncode(s: string): string {
 
 function b64urlDecode(s: string): string {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
-  return decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad)));
+  return decodeURIComponent(
+    escape(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad)),
+  );
 }
 
 export function encodeInvite(inv: MesaInvite): string {
@@ -181,7 +183,8 @@ export class MesaClient {
 
   constructor(opts: MesaClientOpts) {
     this.opts = opts;
-    this.ice = opts.iceServers && opts.iceServers.length ? opts.iceServers : DEFAULT_ICE;
+    this.ice =
+      opts.iceServers && opts.iceServers.length ? opts.iceServers : DEFAULT_ICE;
   }
 
   /** Define/atualiza a stream local publicada pra todos os pares. */
@@ -246,7 +249,9 @@ export class MesaClient {
       ws = new WebSocket(this.opts.signalUrl);
     } catch (e) {
       console.warn("[mesa] sinalização inválida:", e);
-      this.opts.onError?.("O endereço do convite é inválido — pede um convite novo pro host.");
+      this.opts.onError?.(
+        "O endereço do convite é inválido — pede um convite novo pro host.",
+      );
       this.opts.onStatus("error");
       return;
     }
@@ -302,7 +307,8 @@ export class MesaClient {
   }
 
   private send(obj: Record<string, unknown>): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(obj));
+    if (this.ws && this.ws.readyState === WebSocket.OPEN)
+      this.ws.send(JSON.stringify(obj));
   }
 
   private async onMessage(m: Record<string, unknown>): Promise<void> {
@@ -314,12 +320,14 @@ export class MesaClient {
         this.attempts = 0;
         this.wasOnline = true;
         this.opts.onStatus("online");
-        const list = (m.peers as { peerId: string; role: MesaRole; name: string }[]) ?? [];
+        const list =
+          (m.peers as { peerId: string; role: MesaRole; name: string }[]) ?? [];
         for (const p of list) this.connectTo(p.peerId, p.role, p.name);
         break;
       }
       case "peer-join": {
-        const p = m.peer as { peerId: string; role: MesaRole; name: string } | undefined;
+        const p = m.peer as
+          { peerId: string; role: MesaRole; name: string } | undefined;
         if (p) this.connectTo(p.peerId, p.role, p.name);
         break;
       }
@@ -353,12 +361,19 @@ export class MesaClient {
   }
 
   // ---------------- WebRTC (perfect negotiation) ----------------
-  private connectTo(remoteId: string, role: MesaRole, name: string): PeerRec | null {
+  private connectTo(
+    remoteId: string,
+    role: MesaRole,
+    name: string,
+  ): PeerRec | null {
     if (remoteId === this.myId) return null;
     let rec = this.recs.get(remoteId);
     if (rec) return rec;
 
-    const pc = new RTCPeerConnection({ iceServers: this.ice, bundlePolicy: "max-bundle" });
+    const pc = new RTCPeerConnection({
+      iceServers: this.ice,
+      bundlePolicy: "max-bundle",
+    });
     rec = {
       pc,
       polite: this.myId > remoteId,
@@ -371,7 +386,8 @@ export class MesaClient {
     this.recs.set(remoteId, rec);
 
     pc.onicecandidate = ({ candidate }) => {
-      if (candidate) this.send({ t: "signal", to: remoteId, data: { candidate } });
+      if (candidate)
+        this.send({ t: "signal", to: remoteId, data: { candidate } });
     };
     pc.ontrack = ({ streams }) => {
       if (streams[0]) {
@@ -394,7 +410,11 @@ export class MesaClient {
       try {
         rec!.makingOffer = true;
         await pc.setLocalDescription();
-        this.send({ t: "signal", to: remoteId, data: { description: pc.localDescription ?? undefined } });
+        this.send({
+          t: "signal",
+          to: remoteId,
+          data: { description: pc.localDescription ?? undefined },
+        });
       } catch {
         /* ignore */
       } finally {
@@ -429,7 +449,8 @@ export class MesaClient {
     if (!rec.videoSender || this.maxBitrateKbps <= 0) return;
     try {
       const params = rec.videoSender.getParameters();
-      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+      if (!params.encodings || params.encodings.length === 0)
+        params.encodings = [{}];
       params.encodings[0].maxBitrate = this.maxBitrateKbps * 1000;
       await rec.videoSender.setParameters(params);
     } catch {
@@ -447,13 +468,18 @@ export class MesaClient {
       if (data.description) {
         const desc = data.description;
         const collision =
-          desc.type === "offer" && (rec.makingOffer || pc.signalingState !== "stable");
+          desc.type === "offer" &&
+          (rec.makingOffer || pc.signalingState !== "stable");
         rec.ignoreOffer = !rec.polite && collision;
         if (rec.ignoreOffer) return;
         await pc.setRemoteDescription(desc);
         if (desc.type === "offer") {
           await pc.setLocalDescription();
-          this.send({ t: "signal", to: fromId, data: { description: pc.localDescription ?? undefined } });
+          this.send({
+            t: "signal",
+            to: fromId,
+            data: { description: pc.localDescription ?? undefined },
+          });
         }
       } else if (data.candidate) {
         try {
@@ -512,6 +538,7 @@ export function buildStudioUrl(o: StudioUrlOpts): string {
   if (o.peer) p.set("peer", o.peer);
   if (o.hideSelf) p.set("hideSelf", "1");
   if (o.labels) p.set("labels", "1");
-  if (o.iceServers && o.iceServers.length) p.set("ice", JSON.stringify(o.iceServers));
+  if (o.iceServers && o.iceServers.length)
+    p.set("ice", JSON.stringify(o.iceServers));
   return `${o.base.replace(/\/$/, "")}/studio?${p.toString()}`;
 }

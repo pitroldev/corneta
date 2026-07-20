@@ -8,8 +8,7 @@
 # Uso:  pwsh -File scripts/fetch-binaries.ps1
 #       pwsh -File scripts/fetch-binaries.ps1 -AllowSystemFfmpeg   # dev only!
 #
-# Depois, descomente "externalBin" em src-tauri/tauri.conf.json:
-#   "externalBin": ["binaries/ffmpeg", "binaries/mediamtx"]
+# `externalBin` já está ativo em src-tauri/tauri.conf.json.
 
 param(
   # Atalho de conveniência p/ dev: copia o ffmpeg encontrado no PATH em vez de
@@ -111,5 +110,5 @@ $exe = Get-ChildItem $mtxDir -Recurse -Filter 'mediamtx.exe' | Select-Object -Fi
 Copy-Item $exe.FullName $mtxOut -Force
 Write-Host "  -> $mtxOut"
 
-Write-Host "`nPronto. Agora descomente 'externalBin' em src-tauri/tauri.conf.json."
+Write-Host "`nPronto. Os sidecars verificados estão disponíveis para o Tauri."
 Get-ChildItem $binDir | Select-Object Name, Length | Format-Table -AutoSize

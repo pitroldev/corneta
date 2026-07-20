@@ -60,12 +60,12 @@
 
 ## P2 — Robustez & qualidade
 
-- ✅ **Validação de entrada**: URL custom (rtmp/rtmps/srt), chave faltando e nome — inline em Plataformas + **bloqueia o Iniciar** com a lista de problemas.
+- ✅ **Validação de entrada**: URL custom RTMP/RTMPS, chave faltando e nome — inline em Plataformas + **bloqueia o Iniciar** com a lista de problemas. SRT permanece no roadmap até existir muxer/teste dedicado.
 - ✅ **Áudio**: sempre **AAC 48 kHz estéreo** em todos os destinos (vídeo copy ou transcode; `-map 0:a?` se não houver áudio).
 - ✅ **Tratamento de erro do FFmpeg**: mensagens amigáveis por destino (chave recusada/403, sem conexão, queda) com estado `error`/`reconnecting`.
 - ✅ **Múltiplos destinos da mesma plataforma**: auto-sufixo de nome (Twitch 2…) + **nome editável** em todos os destinos.
 - 🟡 **TikTok/Instagram/X**: URLs de ingestão são placeholders (`rtmp://`) marcadas como experimentais — precisam de fluxo manual claro.
-- ⛔ **Testes** (Vitest no front; testes do builder de comando FFmpeg no Rust).
+- ✅ **Testes automatizados**: Vitest no frontend, testes Rust, Clippy estrito e E2E de mídia em job dedicado do CI. A matriz ao vivo com contas reais continua manual.
 
 ---
 

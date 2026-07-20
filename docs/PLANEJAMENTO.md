@@ -433,7 +433,7 @@ supervisão de saúde ficam por conta do Core.
 | TikTok Live | RTMP | fornecido (acesso ao Live exige elegibilidade) | Chave nem sempre é auto-serviço |
 | X (Twitter) | RTMP/RTMPS | fornecido pelo Media Studio | — |
 | Instagram | — | sem ingestão RTMP oficial estável | Tratar como "não suportado/experimental" |
-| Custom | RTMP/RTMPS/SRT | definido pelo usuário | Campo livre + validação |
+| Custom | RTMP/RTMPS | definido pelo usuário | Campo livre + validação; SRT só após implementação e matriz real |
 
 > Os presets reduzem erro humano, mas **URLs mudam**: tratar a lista de presets como **dado
 > atualizável remotamente** (um JSON versionado baixado pelo app), não hard-coded no binário.

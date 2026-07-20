@@ -38,11 +38,16 @@ fn now_ms() -> u64 {
 }
 /// Número que pode vir como número OU string (ex.: "10.00"); aceita vírgula decimal.
 fn num(v: &Value) -> Option<f64> {
-    v.as_f64()
-        .or_else(|| v.as_str().and_then(|s| s.trim().replace(',', ".").parse().ok()))
+    v.as_f64().or_else(|| {
+        v.as_str()
+            .and_then(|s| s.trim().replace(',', ".").parse().ok())
+    })
 }
 fn alert_status(app: &AppHandle, source: &str, status: &str) {
-    let _ = app.emit("alert://status", json!({ "source": source, "status": status }));
+    let _ = app.emit(
+        "alert://status",
+        json!({ "source": source, "status": status }),
+    );
 }
 
 // ----------------------------- Controle ----------------------------
@@ -77,12 +82,14 @@ pub fn start_alerts(app: &AppHandle) {
             while run2.load(Ordering::Relaxed) {
                 let r = match kind.as_str() {
                     "streamlabs" => run_streamlabs(&token, &label, run2.clone(), app2.clone()),
-                    "streamelements" => run_streamelements(&token, &label, run2.clone(), app2.clone()),
+                    "streamelements" => {
+                        run_streamelements(&token, &label, run2.clone(), app2.clone())
+                    }
                     _ => return,
                 };
                 backoff = match r {
                     ConnResult::Connected => Duration::from_secs(3), // conectou → zera
-                    ConnResult::AuthFailed => BACKOFF_MAX, // token inválido → teto direto
+                    ConnResult::AuthFailed => BACKOFF_MAX,           // token inválido → teto direto
                     ConnResult::Failed => backoff,
                 };
                 reconnect_wait(&run2, backoff); // caiu/erro → espera o backoff e tenta de novo
@@ -96,7 +103,11 @@ pub fn start_alerts(app: &AppHandle) {
 
 pub fn stop_alerts(app: &AppHandle) {
     let st = app.state::<AppState>();
-    st.alerts.lock().unwrap().running.store(false, Ordering::Relaxed);
+    st.alerts
+        .lock()
+        .unwrap()
+        .running
+        .store(false, Ordering::Relaxed);
 }
 
 /// Teto do backoff de reconexão.
@@ -127,11 +138,15 @@ fn reconnect_wait(running: &AtomicBool, dur: Duration) {
 
 // ----------------------------- Conectores --------------------------
 
-fn run_streamlabs(token: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) -> ConnResult {
+fn run_streamlabs(
+    token: &str,
+    source: &str,
+    running: Arc<AtomicBool>,
+    app: AppHandle,
+) -> ConnResult {
     // O Streamlabs autentica pelo token na query — sem emit de auth depois do connect.
-    let url = format!(
-        "wss://sockets.streamlabs.com/socket.io/?token={token}&EIO=3&transport=websocket"
-    );
+    let url =
+        format!("wss://sockets.streamlabs.com/socket.io/?token={token}&EIO=3&transport=websocket");
     let src = source.to_string();
     run_socketio(&url, source, None, running, app, move |app, name, data| {
         if name == "event" {
@@ -142,19 +157,34 @@ fn run_streamlabs(token: &str, source: &str, running: Arc<AtomicBool>, app: AppH
     })
 }
 
-fn run_streamelements(token: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle) -> ConnResult {
+fn run_streamelements(
+    token: &str,
+    source: &str,
+    running: Arc<AtomicBool>,
+    app: AppHandle,
+) -> ConnResult {
     // O realtime do SE precisa de um emit de autenticação com o JWT depois do connect.
     let url = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
-    let auth = format!("42[\"authenticate\",{}]", json!({ "method": "jwt", "token": token }));
+    let auth = format!(
+        "42[\"authenticate\",{}]",
+        json!({ "method": "jwt", "token": token })
+    );
     let src = source.to_string();
-    run_socketio(url, source, Some(auth), running, app, move |app, name, data| {
-        // `event` (real) e `event:test` (o botão "testar" do dashboard) — os dois mostram.
-        if name == "event" || name == "event:test" {
-            if let Some(a) = parse_streamelements(&src, data) {
-                emit_alert(app, a);
+    run_socketio(
+        url,
+        source,
+        Some(auth),
+        running,
+        app,
+        move |app, name, data| {
+            // `event` (real) e `event:test` (o botão "testar" do dashboard) — os dois mostram.
+            if name == "event" || name == "event:test" {
+                if let Some(a) = parse_streamelements(&src, data) {
+                    emit_alert(app, a);
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 // ----------------------------- Mapeamento --------------------------
@@ -189,13 +219,24 @@ fn parse_streamlabs(source: &str, data: &Value) -> Option<Alert> {
         "follow" => ("follow", None, None, None),
         "subscription" | "resub" => {
             let months = m.get("months").and_then(num);
-            let kind = if months.unwrap_or(1.0) > 1.0 { "resub" } else { "sub" };
-            (kind, months, None, m.get("sub_plan").and_then(|x| x.as_str()).map(String::from))
+            let kind = if months.unwrap_or(1.0) > 1.0 {
+                "resub"
+            } else {
+                "sub"
+            };
+            (
+                kind,
+                months,
+                None,
+                m.get("sub_plan").and_then(|x| x.as_str()).map(String::from),
+            )
         }
         "bits" => ("bits", m.get("amount").and_then(num), None, None),
         "host" | "raid" => (
             "raid",
-            m.get("viewers").and_then(num).or_else(|| m.get("raiders").and_then(num)),
+            m.get("viewers")
+                .and_then(num)
+                .or_else(|| m.get("raiders").and_then(num)),
             None,
             None,
         ),
@@ -242,8 +283,17 @@ fn parse_streamelements(source: &str, ev: &Value) -> Option<Alert> {
         "follow" => ("follow", None, None, None),
         "subscriber" => {
             let months = d.get("amount").and_then(num);
-            let kind = if months.unwrap_or(1.0) > 1.0 { "resub" } else { "sub" };
-            (kind, months, None, d.get("tier").and_then(|x| x.as_str()).map(String::from))
+            let kind = if months.unwrap_or(1.0) > 1.0 {
+                "resub"
+            } else {
+                "sub"
+            };
+            (
+                kind,
+                months,
+                None,
+                d.get("tier").and_then(|x| x.as_str()).map(String::from),
+            )
         }
         "raid" | "host" => ("raid", d.get("amount").and_then(num), None, None),
         _ => return None,
@@ -353,11 +403,11 @@ where
                         connected = true;
                     }
                     if let Some(a) = &auth {
-                        let _ = socket.send(Message::Text(a.clone().into()));
+                        let _ = socket.send(Message::Text(a.clone()));
                     }
-                } else if t.starts_with('0') {
+                } else if let Some(open) = t.strip_prefix('0') {
                     // OPEN: lê pingInterval/pingTimeout e dispara o connect do namespace padrão.
-                    if let Ok(v) = serde_json::from_str::<Value>(&t[1..]) {
+                    if let Ok(v) = serde_json::from_str::<Value>(open) {
                         if let Some(pi) = v.get("pingInterval").and_then(|x| x.as_u64()) {
                             ping_every = Duration::from_millis(pi.clamp(5000, 25000));
                         }
@@ -395,7 +445,11 @@ where
     let _ = socket.close(None);
     alert_status(&app, source, "disconnected");
     // Conectou de verdade nesta tentativa? → o chamador zera o backoff.
-    if connected { ConnResult::Connected } else { ConnResult::Failed }
+    if connected {
+        ConnResult::Connected
+    } else {
+        ConnResult::Failed
+    }
 }
 
 // ----------------------------- Teste de token (sob demanda) --------
@@ -408,12 +462,17 @@ where
 pub fn probe_alert(kind: &str, token: &str) -> Result<(), String> {
     match kind {
         "streamlabs" => probe_socketio(
-            &format!("wss://sockets.streamlabs.com/socket.io/?token={token}&EIO=3&transport=websocket"),
+            &format!(
+                "wss://sockets.streamlabs.com/socket.io/?token={token}&EIO=3&transport=websocket"
+            ),
             None,
         ),
         "streamelements" => probe_socketio(
             "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket",
-            Some(format!("42[\"authenticate\",{}]", json!({ "method": "jwt", "token": token }))),
+            Some(format!(
+                "42[\"authenticate\",{}]",
+                json!({ "method": "jwt", "token": token })
+            )),
         ),
         _ => Err("fonte de alerta desconhecida".into()),
     }
@@ -456,7 +515,7 @@ fn probe_socketio(url: &str, auth: Option<String>) -> Result<(), String> {
                     match &auth {
                         // StreamElements: conectou — agora autentica e aguarda a resposta.
                         Some(a) if !sent_auth => {
-                            let _ = socket.send(Message::Text(a.clone().into()));
+                            let _ = socket.send(Message::Text(a.clone()));
                             sent_auth = true;
                         }
                         // Streamlabs: conectar já valida (o token estava na URL).

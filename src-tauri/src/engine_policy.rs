@@ -84,17 +84,27 @@ pub(crate) fn parse_kv(line: &str, key: &str) -> Option<f64> {
 
 /// Traduz uma linha de erro do FFmpeg para (estado, mensagem amigável).
 pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
-    if low.contains("403") || low.contains("forbidden") || low.contains("unauthorized")
-        || low.contains("not authorized") || low.contains("rejected") || low.contains("auth")
+    if low.contains("403")
+        || low.contains("forbidden")
+        || low.contains("unauthorized")
+        || low.contains("not authorized")
+        || low.contains("rejected")
+        || low.contains("auth")
     {
-        ("error", "Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into())
+        (
+            "error",
+            "Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into(),
+        )
     } else if low.contains("connection refused")
         || low.contains("cannot open")
         || low.contains("failed to connect")
         || low.contains("no route")
         || low.contains("name or service not known")
     {
-        ("reconnecting", "Sem conexão com a plataforma — tentando de novo.".into())
+        (
+            "reconnecting",
+            "Sem conexão com a plataforma — tentando de novo.".into(),
+        )
     } else if low.contains("broken pipe")
         || low.contains("connection reset")
         || low.contains("end of file")
@@ -102,7 +112,10 @@ pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
     {
         ("reconnecting", "A conexão caiu — reconectando.".into())
     } else {
-        ("reconnecting", "Instabilidade no envio — reconectando.".into())
+        (
+            "reconnecting",
+            "Instabilidade no envio — reconectando.".into(),
+        )
     }
 }
 
@@ -128,7 +141,11 @@ pub(crate) fn brb_slate_is_video(p: &Path) -> bool {
 /// Parte PURA do estado dos paths do MediaMTX: lê o JSON da API `/v3/paths/list` e devolve
 /// (ingestão pronta, bytes recebidos na ingestão, programa pronto). O byte count distingue OBS
 /// no ar de OBS travado. JSON inválido/ausente → (false, 0, false), igual à falha de rede.
-pub(crate) fn parse_mediamtx_paths(body: &str, ingest_name: &str, program_name: &str) -> (bool, u64, bool) {
+pub(crate) fn parse_mediamtx_paths(
+    body: &str,
+    ingest_name: &str,
+    program_name: &str,
+) -> (bool, u64, bool) {
     let v: serde_json::Value = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(_) => return (false, 0, false),
@@ -159,7 +176,11 @@ pub(crate) fn parse_ingest_hostport(ingest_url: &str) -> Result<(String, u16), S
     let (host, port) = match hostport.rsplit_once(':') {
         Some((h, p)) => (h.to_string(), p.parse::<u16>().unwrap_or(1935)),
         None => {
-            let default = if ingest_url.starts_with("rtmps") { 443 } else { 1935 };
+            let default = if ingest_url.starts_with("rtmps") {
+                443
+            } else {
+                1935
+            };
             (hostport.to_string(), default)
         }
     };
@@ -217,27 +238,46 @@ mod tests {
         assert_eq!(quality_of(&snap("starting", vec![])), "warn");
         // um destino em erro → bad, mesmo com outro no ar.
         assert_eq!(
-            quality_of(&snap("live", vec![target("a", "live", 6000), target("b", "error", 0)])),
+            quality_of(&snap(
+                "live",
+                vec![target("a", "live", 6000), target("b", "error", 0)]
+            )),
             "bad"
         );
         // reconectando sem erro → warn.
         assert_eq!(
-            quality_of(&snap("live", vec![target("a", "live", 6000), target("b", "reconnecting", 0)])),
+            quality_of(&snap(
+                "live",
+                vec![target("a", "live", 6000), target("b", "reconnecting", 0)]
+            )),
             "warn"
         );
         // tudo live → good.
-        assert_eq!(quality_of(&snap("live", vec![target("a", "live", 6000)])), "good");
+        assert_eq!(
+            quality_of(&snap("live", vec![target("a", "live", 6000)])),
+            "good"
+        );
         // signal-lost também é bad.
-        assert_eq!(quality_of(&snap("live", vec![target("a", "signal-lost", 0)])), "bad");
+        assert_eq!(
+            quality_of(&snap("live", vec![target("a", "signal-lost", 0)])),
+            "bad"
+        );
         // connecting / waiting / brb → warn (não bad).
         for st in ["connecting", "waiting", "brb"] {
-            assert_eq!(quality_of(&snap("live", vec![target("a", st, 0)])), "warn", "{st}");
+            assert_eq!(
+                quality_of(&snap("live", vec![target("a", st, 0)])),
+                "warn",
+                "{st}"
+            );
         }
     }
 
     #[test]
     fn tray_tooltip_lists_platforms() {
-        let s = snap("live", vec![target("YouTube", "live", 9000), target("Twitch", "brb", 0)]);
+        let s = snap(
+            "live",
+            vec![target("YouTube", "live", 9000), target("Twitch", "brb", 0)],
+        );
         let t = tray_tooltip(&s);
         assert!(t.starts_with("Corneta · no ar (2)"));
         assert!(t.contains("✓ YouTube · 9.0 Mbps"));
@@ -247,7 +287,10 @@ mod tests {
 
     #[test]
     fn friendly_error_classifies() {
-        assert_eq!(friendly_error("stream key rejected: 403 forbidden").0, "error");
+        assert_eq!(
+            friendly_error("stream key rejected: 403 forbidden").0,
+            "error"
+        );
         assert_eq!(friendly_error("not authorized").0, "error");
         assert_eq!(friendly_error("connection refused").0, "reconnecting");
         assert_eq!(friendly_error("broken pipe").0, "reconnecting");
@@ -255,14 +298,26 @@ mod tests {
         // a mensagem de chave recusada guia o streamer pra Plataformas.
         assert!(friendly_error("auth failed").1.contains("Plataformas"));
         // cada tier de reconexão tem a sua mensagem.
-        assert_eq!(friendly_error("connection refused").1, "Sem conexão com a plataforma — tentando de novo.");
-        assert_eq!(friendly_error("broken pipe").1, "A conexão caiu — reconectando.");
-        assert_eq!(friendly_error("algo estranho").1, "Instabilidade no envio — reconectando.");
+        assert_eq!(
+            friendly_error("connection refused").1,
+            "Sem conexão com a plataforma — tentando de novo."
+        );
+        assert_eq!(
+            friendly_error("broken pipe").1,
+            "A conexão caiu — reconectando."
+        );
+        assert_eq!(
+            friendly_error("algo estranho").1,
+            "Instabilidade no envio — reconectando."
+        );
     }
 
     #[test]
     fn parse_kv_reads_ffmpeg_stats() {
-        assert_eq!(parse_kv("frame= 120 fps= 60 bitrate= 6000.5kbits/s", "fps="), Some(60.0));
+        assert_eq!(
+            parse_kv("frame= 120 fps= 60 bitrate= 6000.5kbits/s", "fps="),
+            Some(60.0)
+        );
         assert_eq!(parse_kv("bitrate= 6000.5kbits/s", "bitrate="), Some(6000.5));
         assert_eq!(parse_kv("drop=5", "drop="), Some(5.0));
         assert_eq!(parse_kv("sem chave aqui", "fps="), None);
@@ -286,25 +341,52 @@ mod tests {
             {"name":"live/obs","ready":true,"bytesReceived":12345},
             {"name":"live/obs_program","ready":false}
         ]}"#;
-        assert_eq!(parse_mediamtx_paths(body, "live/obs", "live/obs_program"), (true, 12345, false));
+        assert_eq!(
+            parse_mediamtx_paths(body, "live/obs", "live/obs_program"),
+            (true, 12345, false)
+        );
         // JSON inválido → tudo falso (igual falha de rede).
-        assert_eq!(parse_mediamtx_paths("nao é json", "live/obs", "live/obs_program"), (false, 0, false));
+        assert_eq!(
+            parse_mediamtx_paths("nao é json", "live/obs", "live/obs_program"),
+            (false, 0, false)
+        );
         // path ausente → não pronto.
-        assert_eq!(parse_mediamtx_paths(r#"{"items":[]}"#, "live/obs", "live/obs_program"), (false, 0, false));
+        assert_eq!(
+            parse_mediamtx_paths(r#"{"items":[]}"#, "live/obs", "live/obs_program"),
+            (false, 0, false)
+        );
         // só o _program pronto (OBS ainda não publicou) → prog_ready=true, ingest false.
         let prog = r#"{"items":[{"name":"live/obs_program","ready":true}]}"#;
-        assert_eq!(parse_mediamtx_paths(prog, "live/obs", "live/obs_program"), (false, 0, true));
+        assert_eq!(
+            parse_mediamtx_paths(prog, "live/obs", "live/obs_program"),
+            (false, 0, true)
+        );
     }
 
     #[test]
     fn ingest_hostport_defaults() {
-        assert_eq!(parse_ingest_hostport("rtmp://live.twitch.tv/app").unwrap(), ("live.twitch.tv".into(), 1935));
-        assert_eq!(parse_ingest_hostport("rtmps://x.live-video.net/app").unwrap(), ("x.live-video.net".into(), 443));
-        assert_eq!(parse_ingest_hostport("rtmp://host:1234/app").unwrap(), ("host".into(), 1234));
+        assert_eq!(
+            parse_ingest_hostport("rtmp://live.twitch.tv/app").unwrap(),
+            ("live.twitch.tv".into(), 1935)
+        );
+        assert_eq!(
+            parse_ingest_hostport("rtmps://x.live-video.net/app").unwrap(),
+            ("x.live-video.net".into(), 443)
+        );
+        assert_eq!(
+            parse_ingest_hostport("rtmp://host:1234/app").unwrap(),
+            ("host".into(), 1234)
+        );
         assert!(parse_ingest_hostport("rtmp:///app").is_err());
         // porta não-numérica → cai pro default 1935 (unwrap_or).
-        assert_eq!(parse_ingest_hostport("rtmp://host:abc/app").unwrap(), ("host".into(), 1935));
+        assert_eq!(
+            parse_ingest_hostport("rtmp://host:abc/app").unwrap(),
+            ("host".into(), 1935)
+        );
         // múltiplos ':' → rsplit_once pega o ÚLTIMO como porta.
-        assert_eq!(parse_ingest_hostport("rtmp://host:1234:5/app").unwrap(), ("host:1234".into(), 5));
+        assert_eq!(
+            parse_ingest_hostport("rtmp://host:1234:5/app").unwrap(),
+            ("host:1234".into(), 5)
+        );
     }
 }

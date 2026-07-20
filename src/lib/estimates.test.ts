@@ -10,7 +10,11 @@ import { defaultConfig, makeTarget } from "./factory";
 import type { AppConfig, EncodingMode, PlatformId } from "./types";
 
 function cfg(mode: EncodingMode, platforms: PlatformId[]): AppConfig {
-  return { ...defaultConfig(), mode, targets: platforms.map((p) => makeTarget(p)) };
+  return {
+    ...defaultConfig(),
+    mode,
+    targets: platforms.map((p) => makeTarget(p)),
+  };
 }
 
 describe("smartHybridAction / effectiveAction", () => {
@@ -32,13 +36,18 @@ describe("smartHybridAction / effectiveAction", () => {
 
 describe("lowestCommonDenominator", () => {
   it("passthrough: teto = plataforma mais apertada em cópia", () => {
-    const lcd = lowestCommonDenominator(cfg("passthrough", ["twitch", "facebook"]));
+    const lcd = lowestCommonDenominator(
+      cfg("passthrough", ["twitch", "facebook"]),
+    );
     expect(lcd.videoKbps).toBe(4000); // facebook 4000 < twitch 6000
     expect(lcd.capBy).toBe("Facebook");
   });
 
   it("per-platform: ninguém copia → null (não limita o OBS)", () => {
-    expect(lowestCommonDenominator(cfg("per-platform", ["twitch", "facebook"])).videoKbps).toBeNull();
+    expect(
+      lowestCommonDenominator(cfg("per-platform", ["twitch", "facebook"]))
+        .videoKbps,
+    ).toBeNull();
   });
 
   it("desabilitado não conta", () => {
@@ -67,10 +76,14 @@ describe("estimate", () => {
   });
 
   it("per-platform: todos transcode; hw conta só com placa", () => {
-    const withHw = estimate(cfg("per-platform", ["twitch", "youtube"]), { anyHwAvailable: true });
+    const withHw = estimate(cfg("per-platform", ["twitch", "youtube"]), {
+      anyHwAvailable: true,
+    });
     expect(withHw.transcodeCount).toBe(2);
     expect(withHw.hwTranscodeCount).toBe(2); // encoder "auto" + placa disponível
-    const noHw = estimate(cfg("per-platform", ["twitch", "youtube"]), { anyHwAvailable: false });
+    const noHw = estimate(cfg("per-platform", ["twitch", "youtube"]), {
+      anyHwAvailable: false,
+    });
     expect(noHw.hwTranscodeCount).toBe(0); // "auto" cai pro processador (não disputa sessão da GPU)
     // Nota: a `load` NÃO muda com anyHwAvailable — o loop de carga usa o encoder cru "auto"
     // (peso de hardware), sem resolver pra software. Gap de modelagem PRÉ-EXISTENTE em estimates.ts.

@@ -26,7 +26,11 @@ function setFlagDone() {
  * Plataformas e Ao vivo até a primeira live acontecer (ou o veterano dispensar), com cada
  * passo clicável levando pro lugar certo. Fecha o buraco entre "fechei o tour" e "tô no ar".
  */
-export function FirstLiveChecklist({ onSetupObs }: { onSetupObs?: () => void }) {
+export function FirstLiveChecklist({
+  onSetupObs,
+}: {
+  onSetupObs?: () => void;
+}) {
   const config = useStore((s) => s.config);
   const obs = useStore((s) => s.obs);
   const runObsCheck = useStore((s) => s.runObsCheck);
@@ -49,7 +53,8 @@ export function FirstLiveChecklist({ onSetupObs }: { onSetupObs?: () => void }) 
   if (hidden || !config) return null;
 
   const keyOk = config.targets.some((t) => t.enabled && t.hasKey);
-  const obsOk = obs !== null && obs !== "loading" && obs.reachable && obs.pointingAtCorneta;
+  const obsOk =
+    obs !== null && obs !== "loading" && obs.reachable && obs.pointingAtCorneta;
 
   const steps: { label: string; done: boolean; onClick: () => void }[] = [
     {
@@ -76,7 +81,9 @@ export function FirstLiveChecklist({ onSetupObs }: { onSetupObs?: () => void }) 
     <div className="mb-4 rounded-lg border-2 border-brass/40 bg-brass/[0.06] px-4 py-3">
       <div className="flex items-center gap-2">
         <Radio className="size-4 text-brass" strokeWidth={2.6} />
-        <span className="font-display text-sm font-extrabold">Sua 1ª live em 3 passos</span>
+        <span className="font-display text-sm font-extrabold">
+          Sua 1ª live em 3 passos
+        </span>
         <button
           onClick={() => {
             setFlagDone();
@@ -107,9 +114,15 @@ export function FirstLiveChecklist({ onSetupObs }: { onSetupObs?: () => void }) 
                   : "border-brass text-brass",
               )}
             >
-              {s.done ? <Check className="size-3.5" strokeWidth={3.2} /> : i + 1}
+              {s.done ? (
+                <Check className="size-3.5" strokeWidth={3.2} />
+              ) : (
+                i + 1
+              )}
             </span>
-            <span className={cn("font-semibold", s.done && "line-through")}>{s.label}</span>
+            <span className={cn("font-semibold", s.done && "line-through")}>
+              {s.label}
+            </span>
             {!s.done && (
               <ChevronRight className="size-3.5 text-ink-faint transition-transform group-hover:translate-x-0.5" />
             )}

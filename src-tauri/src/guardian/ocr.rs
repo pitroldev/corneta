@@ -9,6 +9,8 @@
 
 use super::Ocr;
 use image::{DynamicImage, GrayImage};
+use sha2::{Digest, Sha256};
+use std::io::Read;
 use std::time::Duration;
 use tauri::AppHandle;
 
@@ -26,7 +28,12 @@ fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {
         return Some(img);
     }
     let nh = (h as u32 * OCR_TARGET_W / w as u32).max(1);
-    Some(image::imageops::resize(&img, OCR_TARGET_W, nh, image::imageops::FilterType::Triangle))
+    Some(image::imageops::resize(
+        &img,
+        OCR_TARGET_W,
+        nh,
+        image::imageops::FilterType::Triangle,
+    ))
 }
 
 // ----------------------------- PaddleOCR (CPU) -----------------------------
@@ -65,11 +72,30 @@ impl Ocr for PaddleOcr {
     }
 }
 
-const MODEL_NAMES: [&str; 3] = [
-    "pp-ocrv5_mobile_det.onnx",
-    "pp-ocrv5_mobile_rec.onnx",
-    "ppocrv5_dict.txt",
+const MODELS: [(&str, u64, &str); 3] = [
+    (
+        "pp-ocrv5_mobile_det.onnx",
+        4_826_518,
+        "1eb7b4f7ab657ebd1c66d5f79bca7497f29768a2e3c15e52daecbba1a8e4a039",
+    ),
+    (
+        "pp-ocrv5_mobile_rec.onnx",
+        16_562_373,
+        "243a0f06d826761323e9045e9b113ab2c191c3aa50565585e628300b8eda0224",
+    ),
+    (
+        "ppocrv5_dict.txt",
+        74_012,
+        "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b",
+    ),
 ];
+
+fn verify_model(path: &std::path::Path, size: u64, expected_sha256: &str) -> bool {
+    let Ok(bytes) = std::fs::read(path) else {
+        return false;
+    };
+    bytes.len() as u64 == size && format!("{:x}", Sha256::digest(&bytes)) == expected_sha256
+}
 
 fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
     use tauri::Manager;
@@ -79,7 +105,9 @@ fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
 /// Os 3 modelos PP-OCRv5 já estão baixados? (Paddle agora vs Windows OCR + baixar no fundo).
 fn models_cached(app: &AppHandle) -> bool {
     match models_dir(app) {
-        Some(dir) => MODEL_NAMES.iter().all(|n| dir.join(n).exists()),
+        Some(dir) => MODELS
+            .iter()
+            .all(|(n, size, hash)| verify_model(&dir.join(n), *size, hash)),
         None => false,
     }
 }
@@ -96,16 +124,22 @@ fn ensure_paddle_models(
     std::fs::create_dir_all(&dir).ok()?;
     let base = "https://github.com/GreatV/oar-ocr/releases/download/v0.3.0";
     let mut paths = Vec::new();
-    for n in MODEL_NAMES {
+    for (n, size, expected_sha256) in MODELS {
         let p = dir.join(n);
-        if !p.exists() {
+        if !verify_model(&p, size, expected_sha256) {
             log::info!("OCR: baixando modelo {n}…");
             let resp = ureq::get(&format!("{base}/{n}"))
                 .timeout(Duration::from_secs(60))
                 .call()
                 .ok()?;
-            let mut bytes = Vec::new();
-            std::io::Read::read_to_end(&mut resp.into_reader(), &mut bytes).ok()?;
+            let mut bytes = Vec::with_capacity(size as usize);
+            std::io::Read::read_to_end(&mut resp.into_reader().take(size + 1), &mut bytes).ok()?;
+            if bytes.len() as u64 != size
+                || format!("{:x}", Sha256::digest(&bytes)) != expected_sha256
+            {
+                log::error!("OCR: integridade inválida em {n}; download descartado");
+                return None;
+            }
             // Escreve em .part e troca atômico → um download interrompido NUNCA deixa um arquivo
             // parcial que o `models_cached` trataria como válido.
             let tmp = p.with_extension("part");
@@ -124,7 +158,9 @@ fn ensure_paddle_models(
 fn build_paddle(app: &AppHandle) -> Option<PaddleOcr> {
     use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
     let (det, rec, dict) = ensure_paddle_models(app)?;
-    let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     let intra = (cores / 2).clamp(2, 8);
     let ort_cfg = OrtSessionConfig::new()
         .with_execution_providers(vec![OrtExecutionProvider::CPU])
@@ -160,7 +196,10 @@ impl Ocr for WindowsOcr {
         };
         let mut jpeg = Vec::new();
         if small
-            .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+            .write_to(
+                &mut std::io::Cursor::new(&mut jpeg),
+                image::ImageFormat::Jpeg,
+            )
             .is_err()
         {
             return String::new();

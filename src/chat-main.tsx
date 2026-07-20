@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "@fontsource-variable/inter/wght.css";
 import "@fontsource/baloo-2/latin-600.css";
 import "@fontsource/baloo-2/latin-700.css";
 import "@fontsource/baloo-2/latin-800.css";
@@ -32,9 +31,15 @@ class ErrorBoundary extends React.Component<
           }}
         >
           <strong>O chat falhou ao carregar.</strong>
-          <pre style={{ whiteSpace: "pre-wrap", marginTop: 8, color: "#ff8a6a" }}>
-            {String(this.state.error?.stack || this.state.error)}
-          </pre>
+          <p style={{ color: "#ff8a6a" }}>{this.state.error.message}</p>
+          <details style={{ marginTop: 8 }}>
+            <summary>Detalhes técnicos</summary>
+            <pre
+              style={{ whiteSpace: "pre-wrap", marginTop: 8, color: "#ff8a6a" }}
+            >
+              {String(this.state.error.stack || this.state.error)}
+            </pre>
+          </details>
         </div>
       );
     }
@@ -47,5 +52,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <ErrorBoundary>
       <ChatPopout />
     </ErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

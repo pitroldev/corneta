@@ -27,7 +27,7 @@
 > - **Fase 4 (Kick)** — ✅ **envio + moderação (apagar) pela API OFICIAL** do Kick (OAuth 2.1 + PKCE,
 >   redirect loopback `localhost:7395`, sem device flow). `auth.rs`: `kick_login_start`/`kick_wait`
 >   (servidor loopback IPv4+IPv6), `kick_send` (`POST /public/v1/chat`), `kick_moderate` (DELETE).
->   Client no `.env` (`VITE_KICK_CLIENT_ID/SECRET`), app self-serve sem revisão. Leitura segue no
+>   Client ID público no `.env`; o Client Secret fica somente no cofre nativo. Leitura segue no
 >   Pusher anônimo. Ban/timeout pendente (falta o `user_id` do autor no feed).
 >
 > **Facebook e TikTok — avaliados e NÃO implementados** (limite das plataformas, não do código):

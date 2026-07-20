@@ -125,7 +125,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
               onClick={() => setStep(i)}
               aria-label={`Passo ${i + 1}`}
               className={cn(
-                "h-2 rounded-full transition-all",
+                "h-2 rounded-full transition-[width,background-color]",
                 i === step
                   ? "w-5 bg-brass"
                   : "w-2 bg-surface-3 hover:bg-border",

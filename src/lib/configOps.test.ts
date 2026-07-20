@@ -8,7 +8,9 @@ describe("configOps", () => {
   it("suffixName acrescenta sufixo só quando colide", () => {
     expect(ops.suffixName("Twitch", new Set())).toBe("Twitch");
     expect(ops.suffixName("Twitch", new Set(["Twitch"]))).toBe("Twitch 2");
-    expect(ops.suffixName("Twitch", new Set(["Twitch", "Twitch 2"]))).toBe("Twitch 3");
+    expect(ops.suffixName("Twitch", new Set(["Twitch", "Twitch 2"]))).toBe(
+      "Twitch 3",
+    );
   });
 
   it("addTarget dá nome único ao repetir plataforma", () => {
@@ -35,7 +37,9 @@ describe("configOps", () => {
   it("toggleTarget inverte o enabled", () => {
     const c = base();
     const id = c.targets[0].id;
-    expect(ops.toggleTarget(c, id).targets[0].enabled).toBe(!c.targets[0].enabled);
+    expect(ops.toggleTarget(c, id).targets[0].enabled).toBe(
+      !c.targets[0].enabled,
+    );
   });
 
   it("duplicateTarget clona sem chave, com sufixo, logo depois do original", () => {

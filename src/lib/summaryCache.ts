@@ -7,7 +7,9 @@ const SUMMARY_CACHE_KEY = "corneta.session-summaries";
 
 function readSummaryCache(): Record<string, SessionSummary> {
   try {
-    return JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) ?? "{}") as Record<string, SessionSummary>;
+    return JSON.parse(
+      localStorage.getItem(SUMMARY_CACHE_KEY) ?? "{}",
+    ) as Record<string, SessionSummary>;
   } catch {
     return {};
   }

@@ -72,7 +72,12 @@ static CHAT_GEN: AtomicU64 = AtomicU64::new(0);
 
 /// Caminho do NDJSON da sessão em gravação (None se não estiver transmitindo).
 fn session_path(app: &AppHandle) -> Option<std::path::PathBuf> {
-    app.state::<AppState>().engine.lock().ok()?.session_path.clone()
+    app.state::<AppState>()
+        .engine
+        .lock()
+        .ok()?
+        .session_path
+        .clone()
 }
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -81,10 +86,18 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 fn text_frag(t: &str) -> ChatFragment {
-    ChatFragment { kind: "text".into(), text: Some(t.to_string()), url: None }
+    ChatFragment {
+        kind: "text".into(),
+        text: Some(t.to_string()),
+        url: None,
+    }
 }
 fn frags_to_text(frags: &[ChatFragment]) -> String {
-    frags.iter().filter_map(|f| f.text.clone()).collect::<Vec<_>>().join("")
+    frags
+        .iter()
+        .filter_map(|f| f.text.clone())
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
@@ -346,14 +359,19 @@ fn run_twitch(
         }
         _ => {}
     }
-    let _ = socket.send(Message::Text("CAP REQ :twitch.tv/tags twitch.tv/commands".into()));
+    let _ = socket.send(Message::Text(
+        "CAP REQ :twitch.tv/tags twitch.tv/commands".into(),
+    ));
     // Autenticada (PASS/NICK com o login do token) pra poder ENVIAR; senão, anônima.
     if let Some((login, raw)) = &creds {
         let _ = socket.send(Message::Text(format!("PASS oauth:{raw}")));
         let _ = socket.send(Message::Text(format!("NICK {login}")));
     } else {
         let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
-        let _ = socket.send(Message::Text(format!("NICK justinfan{}", now_ms() % 100000)));
+        let _ = socket.send(Message::Text(format!(
+            "NICK justinfan{}",
+            now_ms() % 100000
+        )));
     }
     let _ = socket.send(Message::Text(format!("JOIN #{ch}")));
     log::info!("twitch chat: conectado em #{ch}");
@@ -495,7 +513,10 @@ fn run_twitch(
             Ok(Message::Close(_)) => break,
             Ok(_) => {}
             Err(tungstenite::Error::Io(e))
-                if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) =>
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
             {
                 continue;
             }
@@ -563,7 +584,11 @@ fn sanitize_outgoing(s: &str) -> String {
 }
 
 /// Enfileira `text` pra envio nas fontes dadas (ou todas as logadas). Erro se nenhuma logada.
-pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -> Result<(), String> {
+pub fn send_message(
+    app: &AppHandle,
+    text: &str,
+    sources: Option<Vec<String>>,
+) -> Result<(), String> {
     let text = sanitize_outgoing(text);
     if text.is_empty() {
         return Err("mensagem vazia".into());
@@ -592,7 +617,13 @@ pub fn send_message(app: &AppHandle, text: &str, sources: Option<Vec<String>>) -
             .chat_sources
             .iter()
             .find(|s| s.id == id)
-            .map(|s| if s.name.trim().is_empty() { s.value.clone() } else { s.name.clone() })
+            .map(|s| {
+                if s.name.trim().is_empty() {
+                    s.value.clone()
+                } else {
+                    s.name.clone()
+                }
+            })
             .unwrap_or_default()
     };
     let mut sent = 0u32;
@@ -766,7 +797,11 @@ fn usernotice_text(line: &str) -> Option<String> {
     (!t.is_empty()).then(|| t.to_string())
 }
 
-fn parse_privmsg(line: &str, source: &str, emotes: &HashMap<String, String>) -> Option<ChatMessage> {
+fn parse_privmsg(
+    line: &str,
+    source: &str,
+    emotes: &HashMap<String, String>,
+) -> Option<ChatMessage> {
     let (tags, rest) = if let Some(stripped) = line.strip_prefix('@') {
         let sp = stripped.find(' ')?;
         (&stripped[..sp], &stripped[sp + 1..])
@@ -849,7 +884,10 @@ fn add_bttv(v: &Value, map: &mut HashMap<String, String>) {
                 e.get("code").and_then(|x| x.as_str()),
                 e.get("id").and_then(|x| x.as_str()),
             ) {
-                map.insert(code.to_string(), format!("https://cdn.betterttv.net/emote/{id}/2x"));
+                map.insert(
+                    code.to_string(),
+                    format!("https://cdn.betterttv.net/emote/{id}/2x"),
+                );
             }
         }
     }
@@ -890,14 +928,18 @@ fn add_7tv(emotes: &Value, map: &mut HashMap<String, String>) {
                 e.get("name").and_then(|x| x.as_str()),
                 e.get("id").and_then(|x| x.as_str()),
             ) {
-                map.insert(name.to_string(), format!("https://cdn.7tv.app/emote/{id}/2x.webp"));
+                map.insert(
+                    name.to_string(),
+                    format!("https://cdn.7tv.app/emote/{id}/2x.webp"),
+                );
             }
         }
     }
 }
 
 /// Cache dos emotes globais com TTL de ~1h: reconexão não refaz os 3 fetches.
-static GLOBAL_3P: OnceLock<Mutex<Option<(Instant, HashMap<String, String>)>>> = OnceLock::new();
+type ThirdPartyCache = Mutex<Option<(Instant, HashMap<String, String>)>>;
+static GLOBAL_3P: OnceLock<ThirdPartyCache> = OnceLock::new();
 
 fn fetch_global_thirdparty() -> HashMap<String, String> {
     let cache = GLOBAL_3P.get_or_init(|| Mutex::new(None));
@@ -928,11 +970,15 @@ fn fetch_global_thirdparty() -> HashMap<String, String> {
 }
 
 fn fetch_channel_thirdparty(room_id: &str, map: &mut HashMap<String, String>) {
-    if let Some(v) = fetch_json(&format!("https://api.betterttv.net/3/cached/users/twitch/{room_id}")) {
+    if let Some(v) = fetch_json(&format!(
+        "https://api.betterttv.net/3/cached/users/twitch/{room_id}"
+    )) {
         add_bttv(v.get("channelEmotes").unwrap_or(&Value::Null), map);
         add_bttv(v.get("sharedEmotes").unwrap_or(&Value::Null), map);
     }
-    if let Some(v) = fetch_json(&format!("https://api.frankerfacez.com/v1/room/id/{room_id}")) {
+    if let Some(v) = fetch_json(&format!(
+        "https://api.frankerfacez.com/v1/room/id/{room_id}"
+    )) {
         add_ffz(&v, map);
     }
     if let Some(v) = fetch_json(&format!("https://7tv.io/v3/users/twitch/{room_id}")) {
@@ -941,7 +987,10 @@ fn fetch_channel_thirdparty(room_id: &str, map: &mut HashMap<String, String>) {
 }
 
 /// Substitui palavras que batem com emotes de terceiros por fragmentos de imagem.
-fn apply_thirdparty(frags: Vec<ChatFragment>, emotes: &HashMap<String, String>) -> Vec<ChatFragment> {
+fn apply_thirdparty(
+    frags: Vec<ChatFragment>,
+    emotes: &HashMap<String, String>,
+) -> Vec<ChatFragment> {
     if emotes.is_empty() {
         return frags;
     }
@@ -1053,7 +1102,10 @@ fn twitch_badges(tag: &str) -> Vec<ChatBadge> {
                 "artist-badge" => ("ART", "artist"),
                 _ => return None,
             };
-            Some(ChatBadge { label: label.into(), kind: kind.into() })
+            Some(ChatBadge {
+                label: label.into(),
+                kind: kind.into(),
+            })
         })
         .collect()
 }
@@ -1063,7 +1115,11 @@ fn twitch_badges(tag: &str) -> Vec<ChatBadge> {
 fn extract_video_id(input: &str) -> String {
     let s = input.trim();
     if let Some(i) = s.find("v=") {
-        return s[i + 2..].split(['&', '#']).next().unwrap_or("").to_string();
+        return s[i + 2..]
+            .split(['&', '#'])
+            .next()
+            .unwrap_or("")
+            .to_string();
     }
     for marker in ["youtu.be/", "/live/", "/shorts/", "/embed/"] {
         if let Some(i) = s.find(marker) {
@@ -1082,9 +1138,9 @@ const BROWSER_UA: &str =
 
 /// Resultado de resolver um canal → o vídeo ao vivo atual.
 enum LiveResolve {
-    Video(String),  // achou a live
-    NotLive,        // canal existe mas não está ao vivo (ou entrada inválida)
-    ScrapeFailed,   // não deu pra raspar a página (rede/HTML) → vale tentar o fallback
+    Video(String), // achou a live
+    NotLive,       // canal existe mas não está ao vivo (ou entrada inválida)
+    ScrapeFailed,  // não deu pra raspar a página (rede/HTML) → vale tentar o fallback
 }
 
 /// É uma referência direta de VÍDEO (URL/ID)? Devolve o ID. (Compatibilidade.)
@@ -1102,9 +1158,9 @@ fn direct_video_id(s: &str) -> Option<String> {
     // ID cru de 11 chars (não-handle, não-channelId)
     if !s.contains('/')
         && !s.starts_with('@')
-        && !(s.starts_with("UC") && s.len() == 24)
         && s.len() == 11
-        && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
     {
         return Some(s.to_string());
     }
@@ -1211,9 +1267,16 @@ fn channel_id_of(input: &str, api_key: &str) -> Option<String> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=@{handle}&key={api_key}"
     );
-    let body = ureq::get(&url).timeout(Duration::from_secs(6)).call().ok()?.into_string().ok()?;
+    let body = ureq::get(&url)
+        .timeout(Duration::from_secs(6))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/items/0/id").and_then(|x| x.as_str()).map(String::from)
+    v.pointer("/items/0/id")
+        .and_then(|x| x.as_str())
+        .map(String::from)
 }
 
 /// Fallback oficial: search.list (eventType=live). Custa 100 unidades — só quando o scrape falha.
@@ -1224,9 +1287,16 @@ fn search_live_video_id(channel_id: &str, api_key: &str) -> Option<String> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/search?part=id&channelId={channel_id}&eventType=live&type=video&key={api_key}"
     );
-    let body = ureq::get(&url).timeout(Duration::from_secs(8)).call().ok()?.into_string().ok()?;
+    let body = ureq::get(&url)
+        .timeout(Duration::from_secs(8))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/items/0/id/videoId").and_then(|x| x.as_str()).map(String::from)
+    v.pointer("/items/0/id/videoId")
+        .and_then(|x| x.as_str())
+        .map(String::from)
 }
 
 /// Verifica se a API key (Data API v3) é válida com uma chamada barata (i18nLanguages, 1 unidade
@@ -1236,9 +1306,8 @@ pub fn check_youtube_key(key: &str) -> Result<String, String> {
     if key.is_empty() {
         return Err("cole a API key primeiro".into());
     }
-    let url = format!(
-        "https://www.googleapis.com/youtube/v3/i18nLanguages?part=snippet&hl=pt&key={key}"
-    );
+    let url =
+        format!("https://www.googleapis.com/youtube/v3/i18nLanguages?part=snippet&hl=pt&key={key}");
     match ureq::get(&url).timeout(Duration::from_secs(10)).call() {
         Ok(_) => Ok("chave válida".into()),
         Err(ureq::Error::Status(code, r)) => {
@@ -1248,8 +1317,14 @@ pub fn check_youtube_key(key: &str) -> Result<String, String> {
                 .pointer("/error/errors/0/reason")
                 .and_then(|x| x.as_str())
                 .unwrap_or("");
-            let status = v.pointer("/error/status").and_then(|x| x.as_str()).unwrap_or("");
-            let msg = v.pointer("/error/message").and_then(|x| x.as_str()).unwrap_or("");
+            let status = v
+                .pointer("/error/status")
+                .and_then(|x| x.as_str())
+                .unwrap_or("");
+            let msg = v
+                .pointer("/error/message")
+                .and_then(|x| x.as_str())
+                .unwrap_or("");
             Err(match reason {
                 "keyInvalid" | "badRequest" => "chave inválida — confira se copiou certo".into(),
                 "accessNotConfigured" => {
@@ -1418,7 +1493,8 @@ fn innertube_poll(key: &str, version: &str, cont: &str) -> Option<Value> {
         .into_string()
         .ok()?;
     let v: Value = serde_json::from_str(&txt).ok()?;
-    v.pointer("/continuationContents/liveChatContinuation").cloned()
+    v.pointer("/continuationContents/liveChatContinuation")
+        .cloned()
 }
 
 /// `message.runs[]` (texto + emojis) → (texto puro, fragmentos).
@@ -1436,7 +1512,10 @@ fn yt_message_fragments(message: &Value) -> (String, Vec<ChatFragment>) {
                     .and_then(|x| x.as_str())
                     .unwrap_or("");
                 text.push_str(label);
-                match emoji.pointer("/image/thumbnails/0/url").and_then(|x| x.as_str()) {
+                match emoji
+                    .pointer("/image/thumbnails/0/url")
+                    .and_then(|x| x.as_str())
+                {
                     Some(u) => frags.push(ChatFragment {
                         kind: "emote".into(),
                         text: Some(label.to_string()),
@@ -1458,13 +1537,26 @@ fn yt_innertube_badges(renderer: &Value) -> Vec<ChatBadge> {
     if let Some(badges) = renderer.get("authorBadges").and_then(|b| b.as_array()) {
         for b in badges {
             let r = b.get("liveChatAuthorBadgeRenderer");
-            match r.and_then(|x| x.pointer("/icon/iconType")).and_then(|x| x.as_str()) {
-                Some("OWNER") => out.push(ChatBadge { label: "HOST".into(), kind: "broadcaster".into() }),
-                Some("MODERATOR") => out.push(ChatBadge { label: "MOD".into(), kind: "moderator".into() }),
-                Some("VERIFIED") => out.push(ChatBadge { label: "✓".into(), kind: "verified".into() }),
-                _ if r.and_then(|x| x.get("customThumbnail")).is_some() => {
-                    out.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() })
-                }
+            match r
+                .and_then(|x| x.pointer("/icon/iconType"))
+                .and_then(|x| x.as_str())
+            {
+                Some("OWNER") => out.push(ChatBadge {
+                    label: "HOST".into(),
+                    kind: "broadcaster".into(),
+                }),
+                Some("MODERATOR") => out.push(ChatBadge {
+                    label: "MOD".into(),
+                    kind: "moderator".into(),
+                }),
+                Some("VERIFIED") => out.push(ChatBadge {
+                    label: "✓".into(),
+                    kind: "verified".into(),
+                }),
+                _ if r.and_then(|x| x.get("customThumbnail")).is_some() => out.push(ChatBadge {
+                    label: "MEMBRO".into(),
+                    kind: "subscriber".into(),
+                }),
                 _ => {}
             }
         }
@@ -1483,7 +1575,10 @@ fn parse_amount(s: &str) -> Option<f64> {
     }
     let norm = match kept.rfind([',', '.']) {
         Some(p) => {
-            let frac: String = kept[p + 1..].chars().filter(|c| c.is_ascii_digit()).collect();
+            let frac: String = kept[p + 1..]
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .collect();
             // Milhar vs decimal: grupo de EXATAMENTE 3 dígitos após o último separador é
             // milhar ("¥1,000", "R$ 1.234", "1,234,567") — centavos têm 1-2 dígitos e
             // moeda sem centavos (JPY/KRW) nem usa decimal. Exceção: se o OUTRO separador
@@ -1562,7 +1657,15 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u
         };
         emit_alert(
             app,
-            yt_alert(source, "superchat", author, parse_amount(amount_text), None, None, Some(display)),
+            yt_alert(
+                source,
+                "superchat",
+                author,
+                parse_amount(amount_text),
+                None,
+                None,
+                Some(display),
+            ),
         );
         return;
     }
@@ -1573,7 +1676,10 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u
             .and_then(|v| v.as_str())
             .unwrap_or("alguém")
             .to_string();
-        emit_alert(app, yt_alert(source, "member", author, None, None, None, None));
+        emit_alert(
+            app,
+            yt_alert(source, "member", author, None, None, None, None),
+        );
         return;
     }
     // Presente de memberships
@@ -1583,7 +1689,10 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u
             .and_then(|v| v.as_str())
             .unwrap_or("alguém")
             .to_string();
-        emit_alert(app, yt_alert(source, "subgift", author, None, None, None, None));
+        emit_alert(
+            app,
+            yt_alert(source, "subgift", author, None, None, None, None),
+        );
     }
 }
 
@@ -1721,7 +1830,10 @@ fn youtube_dataapi(
                 continue;
             }
         };
-        page_token = json.get("nextPageToken").and_then(|v| v.as_str()).map(String::from);
+        page_token = json
+            .get("nextPageToken")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let interval = json
             .get("pollingIntervalMillis")
             .and_then(|v| v.as_u64())
@@ -1805,9 +1917,11 @@ fn youtube_dataapi(
                                     yt_author(item),
                                     months,
                                     None,
-                                    item.pointer("/snippet/memberMilestoneChatDetails/memberLevelName")
-                                        .and_then(|v| v.as_str())
-                                        .map(String::from),
+                                    item.pointer(
+                                        "/snippet/memberMilestoneChatDetails/memberLevelName",
+                                    )
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from),
                                     item.pointer("/snippet/memberMilestoneChatDetails/userComment")
                                         .and_then(|v| v.as_str())
                                         .filter(|s| !s.is_empty())
@@ -1856,13 +1970,22 @@ fn youtube_dataapi(
                                     == Some(true)
                             };
                             if flag("isChatOwner") {
-                                badges.push(ChatBadge { label: "HOST".into(), kind: "broadcaster".into() });
+                                badges.push(ChatBadge {
+                                    label: "HOST".into(),
+                                    kind: "broadcaster".into(),
+                                });
                             }
                             if flag("isChatModerator") {
-                                badges.push(ChatBadge { label: "MOD".into(), kind: "moderator".into() });
+                                badges.push(ChatBadge {
+                                    label: "MOD".into(),
+                                    kind: "moderator".into(),
+                                });
                             }
                             if flag("isChatSponsor") {
-                                badges.push(ChatBadge { label: "MEMBRO".into(), kind: "subscriber".into() });
+                                badges.push(ChatBadge {
+                                    label: "MEMBRO".into(),
+                                    kind: "subscriber".into(),
+                                });
                             }
                             emit_chat_gen(
                                 &app,
@@ -1873,7 +1996,10 @@ fn youtube_dataapi(
                                     source: source.to_string(),
                                     author,
                                     author_id: None,
-                                    native_id: item.get("id").and_then(|v| v.as_str()).map(String::from),
+                                    native_id: item
+                                        .get("id")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
                                     color: None,
                                     fragments: vec![text_frag(&text)],
                                     badges,
@@ -1965,7 +2091,9 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, 
                     .and_then(|v| Some(v.get("event")?.as_str()? == "pusher:ping"))
                     .unwrap_or(false);
                 if is_ping {
-                    let _ = socket.send(Message::Text("{\"event\":\"pusher:pong\",\"data\":{}}".into()));
+                    let _ = socket.send(Message::Text(
+                        "{\"event\":\"pusher:pong\",\"data\":{}}".into(),
+                    ));
                 } else if let Some(msg) = parse_kick(&t, source) {
                     emit_chat_gen(&app, gen, msg);
                 } else if let Some(alert) = parse_kick_alert(&t, source) {
@@ -1977,7 +2105,10 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, 
             Ok(Message::Close(_)) => break,
             Ok(_) => {}
             Err(tungstenite::Error::Io(e))
-                if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) =>
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
             {
                 continue;
             }
@@ -2058,15 +2189,40 @@ fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
         ts: now_ms(),
     };
     if event.ends_with("SubscriptionEvent") {
-        let user = d.get("username").and_then(|x| x.as_str()).unwrap_or("alguém").to_string();
-        Some(mk("sub", user, d.get("months").and_then(|x| x.as_u64()).map(|m| m as f64)))
+        let user = d
+            .get("username")
+            .and_then(|x| x.as_str())
+            .unwrap_or("alguém")
+            .to_string();
+        Some(mk(
+            "sub",
+            user,
+            d.get("months").and_then(|x| x.as_u64()).map(|m| m as f64),
+        ))
     } else if event.ends_with("GiftedSubscriptionsEvent") {
-        let user = d.get("gifter_username").and_then(|x| x.as_str()).unwrap_or("alguém").to_string();
-        let count = d.get("gifted_usernames").and_then(|x| x.as_array()).map(|a| a.len() as f64);
+        let user = d
+            .get("gifter_username")
+            .and_then(|x| x.as_str())
+            .unwrap_or("alguém")
+            .to_string();
+        let count = d
+            .get("gifted_usernames")
+            .and_then(|x| x.as_array())
+            .map(|a| a.len() as f64);
         Some(mk("subgift", user, count))
     } else if event.ends_with("StreamHostEvent") {
-        let user = d.get("host_username").and_then(|x| x.as_str()).unwrap_or("alguém").to_string();
-        Some(mk("raid", user, d.get("number_viewers").and_then(|x| x.as_u64()).map(|m| m as f64)))
+        let user = d
+            .get("host_username")
+            .and_then(|x| x.as_str())
+            .unwrap_or("alguém")
+            .to_string();
+        Some(mk(
+            "raid",
+            user,
+            d.get("number_viewers")
+                .and_then(|x| x.as_u64())
+                .map(|m| m as f64),
+        ))
     } else {
         None
     }
@@ -2088,7 +2244,11 @@ fn kick_fragments(content: &str) -> Vec<ChatFragment> {
             if !id.is_empty() {
                 frags.push(ChatFragment {
                     kind: "emote".into(),
-                    text: Some(if name.is_empty() { id.to_string() } else { name.to_string() }),
+                    text: Some(if name.is_empty() {
+                        id.to_string()
+                    } else {
+                        name.to_string()
+                    }),
                     url: Some(format!("https://files.kick.com/emotes/{id}/fullsize")),
                 });
             }
@@ -2129,7 +2289,8 @@ fn twitch_viewers(channel: &str) -> Option<u64> {
         .into_string()
         .ok()?;
     let v: Value = serde_json::from_str(&resp).ok()?;
-    v.pointer("/data/user/stream/viewersCount").and_then(|x| x.as_u64())
+    v.pointer("/data/user/stream/viewersCount")
+        .and_then(|x| x.as_u64())
 }
 
 /// `concurrentViewers` de um vídeo já conhecido (chamada barata da Data API).
@@ -2137,7 +2298,12 @@ fn yt_concurrent(api_key: &str, vid: &str) -> Option<u64> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}&key={api_key}"
     );
-    let body = ureq::get(&url).timeout(Duration::from_secs(6)).call().ok()?.into_string().ok()?;
+    let body = ureq::get(&url)
+        .timeout(Duration::from_secs(6))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
     v.pointer("/items/0/liveStreamingDetails/concurrentViewers")
         .and_then(|x| x.as_str())
@@ -2186,7 +2352,8 @@ fn kick_viewers(slug: &str) -> Option<u64> {
         .into_string()
         .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/livestream/viewer_count").and_then(|x| x.as_u64())
+    v.pointer("/livestream/viewer_count")
+        .and_then(|x| x.as_u64())
 }
 
 /// Poll periódico das fontes → emite `viewers://update` com o total + por fonte.
@@ -2264,7 +2431,10 @@ fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
                 _ => return None,
             };
             let kind = if kind.is_empty() { "subscriber" } else { kind };
-            Some(ChatBadge { label, kind: kind.to_string() })
+            Some(ChatBadge {
+                label,
+                kind: kind.to_string(),
+            })
         })
         .collect()
 }

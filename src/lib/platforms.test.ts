@@ -9,7 +9,7 @@ describe("PLATFORMS catálogo", () => {
     const p = PLATFORMS[id];
     expect(p.id).toBe(id); // a chave bate com o id interno
     expect(p.name.length).toBeGreaterThan(0);
-    expect(["rtmp", "rtmps", "srt"]).toContain(p.protocol);
+    expect(["rtmp", "rtmps"]).toContain(p.protocol);
     const r = p.recommended;
     expect(r.width).toBeGreaterThan(0);
     expect(r.height).toBeGreaterThan(0);

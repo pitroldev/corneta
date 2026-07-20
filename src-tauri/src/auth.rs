@@ -2,7 +2,7 @@
 //!
 //! Twitch e Google usam o "device authorization grant": o app pede um código, o usuário
 //! digita no navegador (sem redirect/servidor local) e o app faz polling até autorizar.
-//! Os client_ids vêm do `.env` (frontend → `set_oauth_config`). Tokens ficam no keyring
+//! Somente client_ids públicos vêm do `.env` (frontend → `set_oauth_config`). Segredos e tokens ficam no keyring
 //! (`twitch_oauth`/`twitch_refresh`/`youtube_oauth`/`youtube_refresh`) com refresh automático.
 //! A UI acompanha por `auth://twitch` e `auth://youtube`.
 
@@ -29,10 +29,11 @@ const TWITCH_SCOPES: &str =
 const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 // Kick: API oficial (OAuth 2.1 + PKCE, sem device flow). Redirect loopback numa porta fixa.
-const KICK_SCOPES: &str = "user:read channel:read channel:write chat:write moderation:chat_message:manage";
+const KICK_SCOPES: &str =
+    "user:read channel:read channel:write chat:write moderation:chat_message:manage";
 const KICK_PORT: u16 = 7395;
 
-/// Client ids/secrets vindos do `.env` (definidos pelo frontend no boot).
+/// Client IDs públicos + segredos recuperados exclusivamente do cofre nativo.
 #[derive(Default, Clone)]
 pub struct OauthConfig {
     pub twitch_client_id: String,
@@ -56,9 +57,14 @@ fn now_ms() -> u64 {
 /// POST application/x-www-form-urlencoded → JSON (Ok) ou (status, JSON) no erro.
 fn post_form(url: &str, form: &[(&str, &str)]) -> Result<Value, (u16, Value)> {
     let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap_or(Value::Null);
-    match ureq::post(url).timeout(Duration::from_secs(12)).send_form(form) {
+    match ureq::post(url)
+        .timeout(Duration::from_secs(12))
+        .send_form(form)
+    {
         Ok(r) => Ok(parse(r.into_string().unwrap_or_default())),
-        Err(ureq::Error::Status(code, r)) => Err((code, parse(r.into_string().unwrap_or_default()))),
+        Err(ureq::Error::Status(code, r)) => {
+            Err((code, parse(r.into_string().unwrap_or_default())))
+        }
         Err(_) => Err((0, Value::Null)),
     }
 }
@@ -69,7 +75,10 @@ fn post_form(url: &str, form: &[(&str, &str)]) -> Result<Value, (u16, Value)> {
 /// client_id (público) + escopo, então a resposta de erro não carrega segredo.
 fn google_oauth_err(code: u16, e: &Value) -> String {
     let err = e.get("error").and_then(|x| x.as_str()).unwrap_or("");
-    let desc = e.get("error_description").and_then(|x| x.as_str()).unwrap_or("");
+    let desc = e
+        .get("error_description")
+        .and_then(|x| x.as_str())
+        .unwrap_or("");
     match err {
         "invalid_client" | "unauthorized_client" => {
             "credenciais recusadas — o cliente OAuth precisa ser do tipo \"TVs e dispositivos de entrada limitada\" e no mesmo projeto do Client Secret".into()
@@ -90,7 +99,13 @@ fn auth_event(app: &AppHandle, who: &str, state: &str, user_code: &str, verify: 
 
 /// Evento de "code" com a URL completa (já com o código embutido, quando a plataforma manda)
 /// pra abrir o navegador direto na tela de autorização.
-fn auth_code_event(app: &AppHandle, who: &str, user_code: &str, verify: &str, verify_complete: &str) {
+fn auth_code_event(
+    app: &AppHandle,
+    who: &str,
+    user_code: &str,
+    verify: &str,
+    verify_complete: &str,
+) {
     let _ = app.emit(
         &format!("auth://{who}"),
         json!({
@@ -109,31 +124,34 @@ fn auth_code_event(app: &AppHandle, who: &str, user_code: &str, verify: &str, ve
 pub fn set_oauth_config(
     app: AppHandle,
     twitch_client_id: String,
-    twitch_client_secret: Option<String>,
     google_client_id: String,
-    google_client_secret: Option<String>,
     kick_client_id: Option<String>,
-    kick_client_secret: Option<String>,
 ) {
-    // BYOK: credenciais do YouTube que o usuário colou NO APP (cofre) vencem as do .env (build),
-    // pra cada um usar a própria conta do Google — própria cota, sem verificação compartilhada.
-    let g_id = keys::get_key("youtube_client_id").unwrap_or_else(|| google_client_id.trim().to_string());
-    let g_secret = keys::get_key("youtube_client_secret")
-        .unwrap_or_else(|| google_client_secret.unwrap_or_default().trim().to_string());
+    // BYOK: valores privados nunca atravessam o bundler nem ficam no JavaScript distribuído.
+    let g_id =
+        keys::get_key("youtube_client_id").unwrap_or_else(|| google_client_id.trim().to_string());
+    let g_secret = keys::get_key("youtube_client_secret").unwrap_or_default();
+    let k_id = keys::get_key("kick_client_id")
+        .unwrap_or_else(|| kick_client_id.unwrap_or_default().trim().to_string());
+    let k_secret = keys::get_key("kick_client_secret").unwrap_or_default();
     let st = app.state::<AppState>();
     *st.oauth.lock().unwrap() = OauthConfig {
         twitch_client_id: twitch_client_id.trim().to_string(),
-        twitch_client_secret: twitch_client_secret.unwrap_or_default().trim().to_string(),
+        twitch_client_secret: String::new(),
         google_client_id: g_id.trim().to_string(),
         google_client_secret: g_secret.trim().to_string(),
-        kick_client_id: kick_client_id.unwrap_or_default().trim().to_string(),
-        kick_client_secret: kick_client_secret.unwrap_or_default().trim().to_string(),
+        kick_client_id: k_id,
+        kick_client_secret: k_secret,
     };
 }
 
 /// Credenciais do Google coladas pelo usuário (BYOK) — vão pro cofre e valem na hora.
 #[tauri::command]
-pub fn set_youtube_oauth(app: AppHandle, client_id: String, client_secret: String) -> Result<(), String> {
+pub fn set_youtube_oauth(
+    app: AppHandle,
+    client_id: String,
+    client_secret: String,
+) -> Result<(), String> {
     let id = client_id.trim();
     let secret = client_secret.trim();
     if id.is_empty() || secret.is_empty() {
@@ -151,7 +169,12 @@ pub fn set_youtube_oauth(app: AppHandle, client_id: String, client_secret: Strin
 /// Esquece as credenciais do Google e desloga (pra trocar de conta/projeto).
 #[tauri::command]
 pub fn clear_youtube_oauth(app: AppHandle) {
-    for k in ["youtube_client_id", "youtube_client_secret", "youtube_oauth", "youtube_refresh"] {
+    for k in [
+        "youtube_client_id",
+        "youtube_client_secret",
+        "youtube_oauth",
+        "youtube_refresh",
+    ] {
         let _ = keys::clear_key(k);
     }
     *YT_TOKEN.lock().unwrap() = None;
@@ -163,6 +186,43 @@ pub fn clear_youtube_oauth(app: AppHandle) {
     auth_event(&app, "youtube", "loggedout", "", "", "");
 }
 
+#[tauri::command]
+pub fn set_kick_oauth(
+    app: AppHandle,
+    client_id: String,
+    client_secret: String,
+) -> Result<(), String> {
+    let id = client_id.trim();
+    let secret = client_secret.trim();
+    if id.is_empty() || secret.is_empty() || id.len() > 512 || secret.len() > 512 {
+        return Err("preencha credenciais válidas da Kick".into());
+    }
+    keys::set_key("kick_client_id", id)?;
+    keys::set_key("kick_client_secret", secret)?;
+    let state = app.state::<AppState>();
+    let mut oauth = state.oauth.lock().unwrap();
+    oauth.kick_client_id = id.to_string();
+    oauth.kick_client_secret = secret.to_string();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn clear_kick_oauth(app: AppHandle) {
+    for key in [
+        "kick_client_id",
+        "kick_client_secret",
+        "kick_oauth",
+        "kick_refresh",
+    ] {
+        let _ = keys::clear_key(key);
+    }
+    let state = app.state::<AppState>();
+    let mut oauth = state.oauth.lock().unwrap();
+    oauth.kick_client_id.clear();
+    oauth.kick_client_secret.clear();
+    auth_event(&app, "kick", "loggedout", "", "", "");
+}
+
 /// Estado de login pras duas plataformas (pro frontend semear no boot). Renova se preciso.
 /// ASYNC: valida/renova via HTTP — síncrono travaria o boot na thread principal.
 #[tauri::command]
@@ -172,10 +232,12 @@ pub async fn auth_status(app: AppHandle) -> Value {
         let youtube = keys::has_key("youtube_refresh");
         let youtube_configured = !app.state::<AppState>().oauth.lock().unwrap().google_client_id.is_empty();
         let kick = keys::has_key("kick_refresh");
-        json!({ "twitchLogin": twitch, "youtube": youtube, "youtubeConfigured": youtube_configured, "kick": kick })
+        let kick_configured = !app.state::<AppState>().oauth.lock().unwrap().kick_client_id.is_empty()
+            && keys::has_key("kick_client_secret");
+        json!({ "twitchLogin": twitch, "youtube": youtube, "youtubeConfigured": youtube_configured, "kick": kick, "kickConfigured": kick_configured })
     })
     .await
-    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false, "kick": false }))
+    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false, "kick": false, "kickConfigured": false }))
 }
 
 // ----------------------------- Twitch ------------------------------
@@ -205,19 +267,46 @@ pub fn twitch_validate(token: &str) -> Option<TwitchInfo> {
 pub fn twitch_login_start(app: AppHandle) {
     let cfg = oauth(&app);
     if cfg.twitch_client_id.is_empty() {
-        auth_event(&app, "twitch", "error", "", "", "Falta VITE_TWITCH_CLIENT_ID no .env");
+        auth_event(
+            &app,
+            "twitch",
+            "error",
+            "",
+            "",
+            "Falta VITE_TWITCH_CLIENT_ID no .env",
+        );
         return;
     }
     tauri::async_runtime::spawn_blocking(move || {
         let dev = match post_form(
             "https://id.twitch.tv/oauth2/device",
-            &[("client_id", &cfg.twitch_client_id), ("scopes", TWITCH_SCOPES)],
+            &[
+                ("client_id", &cfg.twitch_client_id),
+                ("scopes", TWITCH_SCOPES),
+            ],
         ) {
             Ok(v) => v,
-            Err(_) => return auth_event(&app, "twitch", "error", "", "", "Não consegui iniciar o login"),
+            Err(_) => {
+                return auth_event(
+                    &app,
+                    "twitch",
+                    "error",
+                    "",
+                    "",
+                    "Não consegui iniciar o login",
+                )
+            }
         };
-        let device_code = dev.get("device_code").and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let user_code = dev.get("user_code").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let device_code = dev
+            .get("device_code")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        let user_code = dev
+            .get("user_code")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         let verify = dev
             .get("verification_uri")
             .and_then(|x| x.as_str())
@@ -228,10 +317,24 @@ pub fn twitch_login_start(app: AppHandle) {
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
-        let interval = dev.get("interval").and_then(|x| x.as_u64()).unwrap_or(5).max(1);
-        let expires = dev.get("expires_in").and_then(|x| x.as_u64()).unwrap_or(1800);
+        let interval = dev
+            .get("interval")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(5)
+            .max(1);
+        let expires = dev
+            .get("expires_in")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(1800);
         if device_code.is_empty() {
-            return auth_event(&app, "twitch", "error", "", "", "Resposta inválida da Twitch");
+            return auth_event(
+                &app,
+                "twitch",
+                "error",
+                "",
+                "",
+                "Resposta inválida da Twitch",
+            );
         }
         auth_code_event(&app, "twitch", &user_code, &verify, &verify_complete);
 
@@ -239,7 +342,14 @@ pub fn twitch_login_start(app: AppHandle) {
         loop {
             std::thread::sleep(Duration::from_secs(interval));
             if Instant::now() > deadline {
-                return auth_event(&app, "twitch", "error", "", "", "Código expirou — tente de novo");
+                return auth_event(
+                    &app,
+                    "twitch",
+                    "error",
+                    "",
+                    "",
+                    "Código expirou — tente de novo",
+                );
             }
             match post_form(
                 "https://id.twitch.tv/oauth2/token",
@@ -339,21 +449,46 @@ fn twitch_refresh(app: &AppHandle) -> Option<String> {
 pub fn youtube_login_start(app: AppHandle) {
     let cfg = oauth(&app);
     if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
-        auth_event(&app, "youtube", "error", "", "", "Falta VITE_GOOGLE_CLIENT_ID/SECRET no .env");
+        auth_event(
+            &app,
+            "youtube",
+            "error",
+            "",
+            "",
+            "Configure o Client ID público e salve o Client Secret no cofre pela aba Conta",
+        );
         return;
     }
     tauri::async_runtime::spawn_blocking(move || {
         let dev = match post_form(
             "https://oauth2.googleapis.com/device/code",
-            &[("client_id", &cfg.google_client_id), ("scope", GOOGLE_SCOPE)],
+            &[
+                ("client_id", &cfg.google_client_id),
+                ("scope", GOOGLE_SCOPE),
+            ],
         ) {
             Ok(v) => v,
             Err((code, e)) => {
-                return auth_event(&app, "youtube", "error", "", "", &google_oauth_err(code, &e))
+                return auth_event(
+                    &app,
+                    "youtube",
+                    "error",
+                    "",
+                    "",
+                    &google_oauth_err(code, &e),
+                )
             }
         };
-        let device_code = dev.get("device_code").and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let user_code = dev.get("user_code").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let device_code = dev
+            .get("device_code")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        let user_code = dev
+            .get("user_code")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         let verify = dev
             .get("verification_url")
             .or_else(|| dev.get("verification_uri"))
@@ -366,10 +501,24 @@ pub fn youtube_login_start(app: AppHandle) {
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
-        let interval = dev.get("interval").and_then(|x| x.as_u64()).unwrap_or(5).max(1);
-        let expires = dev.get("expires_in").and_then(|x| x.as_u64()).unwrap_or(1800);
+        let interval = dev
+            .get("interval")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(5)
+            .max(1);
+        let expires = dev
+            .get("expires_in")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(1800);
         if device_code.is_empty() {
-            return auth_event(&app, "youtube", "error", "", "", "Resposta inválida do Google");
+            return auth_event(
+                &app,
+                "youtube",
+                "error",
+                "",
+                "",
+                "Resposta inválida do Google",
+            );
         }
         auth_code_event(&app, "youtube", &user_code, &verify, &verify_complete);
 
@@ -377,7 +526,14 @@ pub fn youtube_login_start(app: AppHandle) {
         loop {
             std::thread::sleep(Duration::from_secs(interval));
             if Instant::now() > deadline {
-                return auth_event(&app, "youtube", "error", "", "", "Código expirou — tente de novo");
+                return auth_event(
+                    &app,
+                    "youtube",
+                    "error",
+                    "",
+                    "",
+                    "Código expirou — tente de novo",
+                );
             }
             match post_form(
                 "https://oauth2.googleapis.com/token",
@@ -516,7 +672,12 @@ pub fn youtube_send(app: &AppHandle, text: &str) -> Result<(), String> {
 // ----------------------------- HTTP helpers ------------------------
 
 /// Chamada JSON ao Google (Bearer). Retorna o corpo ou um erro legível.
-fn google_json(method: &str, url: &str, token: &str, body: Option<&Value>) -> Result<String, String> {
+fn google_json(
+    method: &str,
+    url: &str,
+    token: &str,
+    body: Option<&Value>,
+) -> Result<String, String> {
     let req = match method {
         "POST" => ureq::post(url),
         "PUT" => ureq::request("PUT", url),
@@ -526,14 +687,17 @@ fn google_json(method: &str, url: &str, token: &str, body: Option<&Value>) -> Re
     .set("Authorization", &format!("Bearer {token}"))
     .timeout(Duration::from_secs(12));
     let res = match body {
-        Some(b) => req.set("Content-Type", "application/json").send_string(&b.to_string()),
+        Some(b) => req
+            .set("Content-Type", "application/json")
+            .send_string(&b.to_string()),
         None => req.call(),
     };
     match res {
         Ok(r) => Ok(r.into_string().unwrap_or_default()),
-        Err(ureq::Error::Status(c, r)) => {
-            Err(format!("YouTube {c}: {}", r.into_string().unwrap_or_default()))
-        }
+        Err(ureq::Error::Status(c, r)) => Err(format!(
+            "YouTube {c}: {}",
+            r.into_string().unwrap_or_default()
+        )),
         Err(e) => Err(format!("YouTube: {e}")),
     }
 }
@@ -552,8 +716,19 @@ fn helix(token: &str, client_id: &str, url: &str) -> Option<Value> {
 }
 
 fn helix_user_id(token: &str, client_id: &str, login: &str) -> Option<String> {
-    let v = helix(token, client_id, &format!("https://api.twitch.tv/helix/users?login={login}"))?;
-    Some(v.get("data")?.as_array()?.first()?.get("id")?.as_str()?.to_string())
+    let v = helix(
+        token,
+        client_id,
+        &format!("https://api.twitch.tv/helix/users?login={login}"),
+    )?;
+    Some(
+        v.get("data")?
+            .as_array()?
+            .first()?
+            .get("id")?
+            .as_str()?
+            .to_string(),
+    )
 }
 
 // ----------------------------- Moderação ---------------------------
@@ -578,7 +753,9 @@ pub async fn chat_moderate(
             .find(|s| s.id == source_id)
             .ok_or("fonte não encontrada")?;
         match src.platform.as_str() {
-            "twitch" => twitch_moderate(&app, &src.value, &action, native_id, author, author_id, seconds),
+            "twitch" => twitch_moderate(
+                &app, &src.value, &action, native_id, author, author_id, seconds,
+            ),
             "youtube" => youtube_moderate(&app, &action, native_id),
             "kick" => kick_moderate(&app, &action, native_id),
             _ => Err("essa plataforma não tem moderação".into()),
@@ -613,14 +790,17 @@ fn twitch_moderate(
         .set("Client-Id", &client_id)
         .timeout(Duration::from_secs(12));
         let res = match &body {
-            Some(b) => req.set("Content-Type", "application/json").send_string(&b.to_string()),
+            Some(b) => req
+                .set("Content-Type", "application/json")
+                .send_string(&b.to_string()),
             None => req.call(),
         };
         match res {
             Ok(_) => Ok(()),
-            Err(ureq::Error::Status(c, r)) => {
-                Err(format!("Twitch {c}: {}", r.into_string().unwrap_or_default()))
-            }
+            Err(ureq::Error::Status(c, r)) => Err(format!(
+                "Twitch {c}: {}",
+                r.into_string().unwrap_or_default()
+            )),
             Err(e) => Err(format!("Twitch: {e}")),
         }
     };
@@ -662,7 +842,11 @@ fn twitch_moderate(
     }
 }
 
-fn youtube_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Result<(), String> {
+fn youtube_moderate(
+    app: &AppHandle,
+    action: &str,
+    native_id: Option<String>,
+) -> Result<(), String> {
     let token = youtube_token(app).ok_or("entre no YouTube pra moderar")?;
     match action {
         "delete" => {
@@ -704,7 +888,9 @@ fn pkce_challenge(verifier: &str) -> String {
 fn pct(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
             _ => format!("%{b:02X}"),
         })
         .collect()
@@ -718,7 +904,10 @@ fn pct_decode(s: &str) -> String {
         match b[i] {
             b'%' if i + 3 <= b.len() => {
                 // decodifica por bytes (não fatia o &str → evita panic em fronteira UTF-8).
-                match ((b[i + 1] as char).to_digit(16), (b[i + 2] as char).to_digit(16)) {
+                match (
+                    (b[i + 1] as char).to_digit(16),
+                    (b[i + 2] as char).to_digit(16),
+                ) {
                     (Some(h), Some(l)) => out.push((h * 16 + l) as u8),
                     _ => out.push(b'%'),
                 }
@@ -741,7 +930,14 @@ fn pct_decode(s: &str) -> String {
 pub fn kick_login_start(app: AppHandle) {
     let cfg = oauth(&app);
     if cfg.kick_client_id.is_empty() || cfg.kick_client_secret.is_empty() {
-        auth_event(&app, "kick", "error", "", "", "Falta VITE_KICK_CLIENT_ID/SECRET no .env");
+        auth_event(
+            &app,
+            "kick",
+            "error",
+            "",
+            "",
+            "Configure o Client ID público e o Client Secret da Kick no cofre nativo",
+        );
         return;
     }
     tauri::async_runtime::spawn_blocking(move || {
@@ -752,14 +948,24 @@ pub fn kick_login_start(app: AppHandle) {
         // Abre a porta ANTES do navegador. Escuta em IPv4 E IPv6 — no Windows "localhost" pode
         // resolver pra ::1 ou 127.0.0.1, então pegamos os dois.
         let mut listeners = Vec::new();
-        for ip in [IpAddr::V4(Ipv4Addr::LOCALHOST), IpAddr::V6(Ipv6Addr::LOCALHOST)] {
+        for ip in [
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+        ] {
             if let Ok(l) = TcpListener::bind(SocketAddr::new(ip, KICK_PORT)) {
                 let _ = l.set_nonblocking(true);
                 listeners.push(l);
             }
         }
         if listeners.is_empty() {
-            return auth_event(&app, "kick", "error", "", "", &format!("Porta {KICK_PORT} ocupada"));
+            return auth_event(
+                &app,
+                "kick",
+                "error",
+                "",
+                "",
+                &format!("Porta {KICK_PORT} ocupada"),
+            );
         }
         let url = format!(
             "https://id.kick.com/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&state={}",
@@ -874,7 +1080,12 @@ fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, 
     }
 }
 
-fn kick_exchange(cfg: &OauthConfig, code: &str, verifier: &str, redirect: &str) -> Result<(), String> {
+fn kick_exchange(
+    cfg: &OauthConfig,
+    code: &str,
+    verifier: &str,
+    redirect: &str,
+) -> Result<(), String> {
     let v = post_form(
         "https://id.kick.com/oauth/token",
         &[
@@ -887,7 +1098,10 @@ fn kick_exchange(cfg: &OauthConfig, code: &str, verifier: &str, redirect: &str) 
         ],
     )
     .map_err(|(c, e)| format!("Kick token {c}: {e}"))?;
-    let access = v.get("access_token").and_then(|x| x.as_str()).ok_or("Kick: token vazio")?;
+    let access = v
+        .get("access_token")
+        .and_then(|x| x.as_str())
+        .ok_or("Kick: token vazio")?;
     keys::set_key("kick_oauth", access)?;
     if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
         let _ = keys::set_key("kick_refresh", r);
@@ -929,7 +1143,8 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
         Err((code, e)) => {
             // refresh morto (revogado/expirado) → desloga de vez pra UI refletir. Erro de rede
             // (status 0) ou 5xx → mantém a sessão pra tentar de novo.
-            let dead = code == 400 || e.get("error").and_then(|x| x.as_str()) == Some("invalid_grant");
+            let dead =
+                code == 400 || e.get("error").and_then(|x| x.as_str()) == Some("invalid_grant");
             // Só apaga se o refresh que falhou ainda for o gravado — senão apagaria tokens
             // recém-renovados por outro fluxo (ex.: re-login concluído nesse meio-tempo).
             if dead && keys::get_key("kick_refresh").as_deref() == Some(atual.as_str()) {
@@ -950,7 +1165,12 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
 }
 
 /// Chamada à API oficial do Kick (Bearer), com refresh automático no 401.
-fn kick_api(app: &AppHandle, method: &str, url: &str, body: Option<&Value>) -> Result<String, String> {
+fn kick_api(
+    app: &AppHandle,
+    method: &str,
+    url: &str,
+    body: Option<&Value>,
+) -> Result<String, String> {
     let mut token = keys::get_key("kick_oauth").ok_or("entre no Kick primeiro")?;
     for attempt in 0..2 {
         let req = match method {
@@ -962,7 +1182,9 @@ fn kick_api(app: &AppHandle, method: &str, url: &str, body: Option<&Value>) -> R
         .set("Authorization", &format!("Bearer {token}"))
         .timeout(Duration::from_secs(12));
         let res = match body {
-            Some(b) => req.set("Content-Type", "application/json").send_string(&b.to_string()),
+            Some(b) => req
+                .set("Content-Type", "application/json")
+                .send_string(&b.to_string()),
             None => req.call(),
         };
         match res {
@@ -990,10 +1212,14 @@ fn kick_broadcaster_id(app: &AppHandle, slug: &str) -> Result<i64, String> {
     let body = kick_api(
         app,
         "GET",
-        &format!("https://api.kick.com/public/v1/channels?slug={}", pct(&slug)),
+        &format!(
+            "https://api.kick.com/public/v1/channels?slug={}",
+            pct(&slug)
+        ),
         None,
     )?;
-    let v: Value = serde_json::from_str(&body).map_err(|_| "Kick: resposta inválida".to_string())?;
+    let v: Value =
+        serde_json::from_str(&body).map_err(|_| "Kick: resposta inválida".to_string())?;
     let id = v
         .get("data")
         .and_then(|d| d.as_array())
@@ -1010,7 +1236,13 @@ pub fn kick_send(app: &AppHandle, text: &str, slug: &str) -> Result<(), String> 
     let bid = kick_broadcaster_id(app, slug)?;
     let content: String = text.chars().take(500).collect();
     let body = json!({ "type": "user", "content": content, "broadcaster_user_id": bid });
-    kick_api(app, "POST", "https://api.kick.com/public/v1/chat", Some(&body)).map(|_| ())
+    kick_api(
+        app,
+        "POST",
+        "https://api.kick.com/public/v1/chat",
+        Some(&body),
+    )
+    .map(|_| ())
 }
 
 /// Nome da conta logada (pra mostrar "logado como X"). Best-effort.
@@ -1029,7 +1261,13 @@ fn kick_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Re
     match action {
         "delete" => {
             let id = native_id.ok_or("sem id da mensagem")?;
-            kick_api(app, "DELETE", &format!("https://api.kick.com/public/v1/chat/{id}"), None).map(|_| ())
+            kick_api(
+                app,
+                "DELETE",
+                &format!("https://api.kick.com/public/v1/chat/{id}"),
+                None,
+            )
+            .map(|_| ())
         }
         // banir/timeout precisa do user_id do autor (o feed Pusher só dá username) → evolução.
         _ => Err("no Kick, por enquanto só dá pra apagar a mensagem".into()),
@@ -1052,7 +1290,11 @@ fn result_json(r: Result<Option<String>, String>) -> Value {
 }
 
 #[tauri::command]
-pub async fn set_stream_info(app: AppHandle, title: String, category: Option<String>) -> Result<Value, String> {
+pub async fn set_stream_info(
+    app: AppHandle,
+    title: String,
+    category: Option<String>,
+) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let title = title.trim().to_string();
         if title.is_empty() {
@@ -1061,13 +1303,22 @@ pub async fn set_stream_info(app: AppHandle, title: String, category: Option<Str
         let category = category.unwrap_or_default().trim().to_string();
         let mut out = serde_json::Map::new();
         if keys::has_key("twitch_oauth") {
-            out.insert("twitch".into(), result_json(twitch_set_info(&app, &title, &category)));
+            out.insert(
+                "twitch".into(),
+                result_json(twitch_set_info(&app, &title, &category)),
+            );
         }
         if keys::has_key("youtube_refresh") {
-            out.insert("youtube".into(), result_json(youtube_set_title(&app, &title)));
+            out.insert(
+                "youtube".into(),
+                result_json(youtube_set_title(&app, &title)),
+            );
         }
         if keys::has_key("kick_refresh") {
-            out.insert("kick".into(), result_json(kick_set_info(&app, &title, &category)));
+            out.insert(
+                "kick".into(),
+                result_json(kick_set_info(&app, &title, &category)),
+            );
         }
         if out.is_empty() {
             return Err("entre em alguma plataforma primeiro (aba Conta)".to_string());
@@ -1090,7 +1341,10 @@ fn twitch_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Optio
             None => warn = Some(format!("categoria \"{category}\" não encontrada")),
         }
     }
-    let url = format!("https://api.twitch.tv/helix/channels?broadcaster_id={}", info.user_id);
+    let url = format!(
+        "https://api.twitch.tv/helix/channels?broadcaster_id={}",
+        info.user_id
+    );
     match ureq::request("PATCH", &url)
         .set("Authorization", &format!("Bearer {token}"))
         .set("Client-Id", &client_id)
@@ -1102,7 +1356,10 @@ fn twitch_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Optio
         Err(ureq::Error::Status(401, _)) | Err(ureq::Error::Status(403, _)) => {
             Err("re-entre na Twitch (faltou a permissão de editar a live)".into())
         }
-        Err(ureq::Error::Status(c, r)) => Err(format!("Twitch {c}: {}", r.into_string().unwrap_or_default())),
+        Err(ureq::Error::Status(c, r)) => Err(format!(
+            "Twitch {c}: {}",
+            r.into_string().unwrap_or_default()
+        )),
         Err(e) => Err(format!("Twitch: {e}")),
     }
 }
@@ -1111,14 +1368,25 @@ fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
     let v = helix(
         token,
         client_id,
-        &format!("https://api.twitch.tv/helix/search/categories?query={}&first=1", pct(name)),
+        &format!(
+            "https://api.twitch.tv/helix/search/categories?query={}&first=1",
+            pct(name)
+        ),
     )?;
-    Some(v.get("data")?.as_array()?.first()?.get("id")?.as_str()?.to_string())
+    Some(
+        v.get("data")?
+            .as_array()?
+            .first()?
+            .get("id")?
+            .as_str()?
+            .to_string(),
+    )
 }
 
 fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, String> {
     let token = youtube_token(app).ok_or("entre no YouTube")?;
-    let vid = youtube_active_video_id(&token).ok_or("nenhuma transmissão ativa no YouTube agora")?;
+    let vid =
+        youtube_active_video_id(&token).ok_or("nenhuma transmissão ativa no YouTube agora")?;
     // GET do snippet atual (o update re-envia o snippet inteiro — omitir apaga description/tags).
     let body = google_json(
         "GET",
@@ -1126,7 +1394,8 @@ fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, Str
         &token,
         None,
     )?;
-    let v: Value = serde_json::from_str(&body).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let v: Value =
+        serde_json::from_str(&body).map_err(|_| "YouTube: resposta inválida".to_string())?;
     let mut snippet = v
         .get("items")
         .and_then(|i| i.as_array())
@@ -1137,7 +1406,12 @@ fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, Str
     let cut = title.chars().count() > 100;
     snippet["title"] = json!(title.chars().take(100).collect::<String>());
     // categoryId é obrigatório no update; preserva o atual ou cai pra "24" (Entretenimento, neutro).
-    if snippet.get("categoryId").and_then(|x| x.as_str()).unwrap_or("").is_empty() {
+    if snippet
+        .get("categoryId")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .is_empty()
+    {
         snippet["categoryId"] = json!("24");
     }
     let put = json!({ "id": vid, "snippet": snippet });
@@ -1147,7 +1421,13 @@ fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, Str
         &token,
         Some(&put),
     )
-    .map(|_| if cut { Some("título cortado em 100 (limite do YouTube)".into()) } else { None })
+    .map(|_| {
+        if cut {
+            Some("título cortado em 100 (limite do YouTube)".into())
+        } else {
+            None
+        }
+    })
 }
 
 fn youtube_active_video_id(token: &str) -> Option<String> {
@@ -1161,7 +1441,12 @@ fn youtube_active_video_id(token: &str) -> Option<String> {
     .into_string()
     .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
-    v.get("items")?.as_array()?.first()?.get("id")?.as_str().map(|s| s.to_string())
+    v.get("items")?
+        .as_array()?
+        .first()?
+        .get("id")?
+        .as_str()
+        .map(|s| s.to_string())
 }
 
 fn kick_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<String>, String> {
@@ -1173,7 +1458,12 @@ fn kick_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<
             None => warn = Some(format!("categoria \"{category}\" não encontrada")),
         }
     }
-    match kick_api(app, "PATCH", "https://api.kick.com/public/v1/channels", Some(&body)) {
+    match kick_api(
+        app,
+        "PATCH",
+        "https://api.kick.com/public/v1/channels",
+        Some(&body),
+    ) {
         Ok(_) => Ok(warn),
         Err(e) if e.contains("Kick 401") || e.contains("Kick 403") => {
             Err("re-entre no Kick (faltou a permissão channel:write)".into())
@@ -1186,7 +1476,10 @@ fn kick_category_id(app: &AppHandle, name: &str) -> Option<i64> {
     let body = kick_api(
         app,
         "GET",
-        &format!("https://api.kick.com/public/v2/categories?name={}", pct(name)),
+        &format!(
+            "https://api.kick.com/public/v2/categories?name={}",
+            pct(name)
+        ),
         None,
     )
     .ok()?;
@@ -1238,11 +1531,27 @@ fn youtube_reusable_stream(token: &str) -> Result<(String, String, String), Stri
         token,
         Some(&body),
     )?;
-    let v: Value = serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
-    let id = v.get("id").and_then(|x| x.as_str()).ok_or("YouTube: stream sem id")?.to_string();
-    let info = v.get("cdn").and_then(|c| c.get("ingestionInfo")).ok_or("YouTube: sem ingestionInfo")?;
-    let addr = info.get("ingestionAddress").and_then(|x| x.as_str()).ok_or("YouTube: sem ingestionAddress")?.to_string();
-    let key = info.get("streamName").and_then(|x| x.as_str()).ok_or("YouTube: sem streamName")?.to_string();
+    let v: Value =
+        serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let id = v
+        .get("id")
+        .and_then(|x| x.as_str())
+        .ok_or("YouTube: stream sem id")?
+        .to_string();
+    let info = v
+        .get("cdn")
+        .and_then(|c| c.get("ingestionInfo"))
+        .ok_or("YouTube: sem ingestionInfo")?;
+    let addr = info
+        .get("ingestionAddress")
+        .and_then(|x| x.as_str())
+        .ok_or("YouTube: sem ingestionAddress")?
+        .to_string();
+    let key = info
+        .get("streamName")
+        .and_then(|x| x.as_str())
+        .ok_or("YouTube: sem streamName")?
+        .to_string();
     let _ = keys::set_key("youtube_stream_id", &id);
     let _ = keys::set_key("youtube_ingest_addr", &addr);
     let _ = keys::set_key("youtube_stream_key", &key);
@@ -1258,7 +1567,10 @@ fn youtube_bind(token: &str, broadcast_id: &str, stream_id: &str) -> Result<(), 
 
 /// Cria a transmissão pública do YouTube (autostart) e amarra ao ingest reutilizável.
 /// Retorna (ingestionAddress, streamKey); guarda o broadcastId no cofre pra encerrar no corte.
-pub fn youtube_provision_broadcast(app: &AppHandle, title: &str) -> Result<(String, String), String> {
+pub fn youtube_provision_broadcast(
+    app: &AppHandle,
+    title: &str,
+) -> Result<(String, String), String> {
     // Encerra qualquer transmissão pendente de uma sessão anterior (app fechou/crashou no ar).
     youtube_complete_active(app);
     let token = youtube_token(app).ok_or("entre no YouTube")?;
@@ -1281,18 +1593,28 @@ pub fn youtube_provision_broadcast(app: &AppHandle, title: &str) -> Result<(Stri
         &token,
         Some(&body),
     )?;
-    let v: Value = serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
-    let broadcast_id = v.get("id").and_then(|x| x.as_str()).ok_or("YouTube: broadcast sem id")?.to_string();
+    let v: Value =
+        serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let broadcast_id = v
+        .get("id")
+        .and_then(|x| x.as_str())
+        .ok_or("YouTube: broadcast sem id")?
+        .to_string();
     // Grava o id JÁ — se o stream/bind falhar depois, ainda dá pra encerrar (sem broadcast órfão).
     let _ = keys::set_key("youtube_live_broadcast", &broadcast_id);
     // stream reutilizável + bind (recria o stream SÓ se ele sumiu na conta — não em erro transitório).
     let (mut sid, mut addr, mut key) = youtube_reusable_stream(&token)?;
     if let Err(e) = youtube_bind(&token, &broadcast_id, &sid) {
-        let missing = e.contains("YouTube 404") || e.contains("streamNotFound") || e.contains("notFound");
+        let missing =
+            e.contains("YouTube 404") || e.contains("streamNotFound") || e.contains("notFound");
         if !missing {
             return Err(e); // rede/5xx/401/cota: mantém o stream cacheado e propaga
         }
-        for k in ["youtube_stream_id", "youtube_ingest_addr", "youtube_stream_key"] {
+        for k in [
+            "youtube_stream_id",
+            "youtube_ingest_addr",
+            "youtube_stream_key",
+        ] {
             let _ = keys::clear_key(k);
         }
         let s = youtube_reusable_stream(&token)?;
@@ -1331,7 +1653,10 @@ mod tests {
     fn pkce_matches_rfc7636_vector() {
         // RFC 7636 Apêndice B: verifier → challenge (S256).
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-        assert_eq!(pkce_challenge(verifier), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        assert_eq!(
+            pkce_challenge(verifier),
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        );
     }
 
     #[test]
@@ -1362,7 +1687,13 @@ mod tests {
     #[test]
     fn result_json_shapes() {
         assert_eq!(result_json(Ok(None)), serde_json::json!({ "ok": true }));
-        assert_eq!(result_json(Ok(Some("aviso".into()))), serde_json::json!({ "ok": true, "warn": "aviso" }));
-        assert_eq!(result_json(Err("x".into())), serde_json::json!({ "ok": false, "error": "x" }));
+        assert_eq!(
+            result_json(Ok(Some("aviso".into()))),
+            serde_json::json!({ "ok": true, "warn": "aviso" })
+        );
+        assert_eq!(
+            result_json(Err("x".into())),
+            serde_json::json!({ "ok": false, "error": "x" })
+        );
     }
 }

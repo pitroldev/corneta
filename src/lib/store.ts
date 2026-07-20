@@ -112,6 +112,9 @@ interface State {
   youtubeOauthReady: boolean;
   setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
   clearYoutubeOauth: () => Promise<void>;
+  kickOauthReady: boolean;
+  setKickOauth: (clientId: string, clientSecret: string) => Promise<void>;
+  clearKickOauth: () => Promise<void>;
   setupOauth: () => Promise<void>;
   bindAuthFlow: () => () => void;
   twitchLogin: () => Promise<void>;
@@ -123,7 +126,12 @@ interface State {
   moderate: (
     sourceId: string,
     action: string,
-    opts?: { nativeId?: string; author?: string; authorId?: string; seconds?: number },
+    opts?: {
+      nativeId?: string;
+      author?: string;
+      authorId?: string;
+      seconds?: number;
+    },
   ) => Promise<void>;
   clearChat: () => void;
 
@@ -166,7 +174,11 @@ interface State {
   requestChatConfig: (tab: string | null) => void;
 }
 
-const EMPTY_SNAPSHOT: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
+const EMPTY_SNAPSHOT: EngineSnapshot = {
+  state: "stopped",
+  startedAt: null,
+  targets: {},
+};
 const CHAT_CAP = 400;
 const ALERT_CAP = 100;
 
@@ -175,44 +187,43 @@ function keepMessage(m: ChatMessage, d: ChatDelete): boolean {
   if (m.platform !== d.platform) return true;
   if (d.scope === "message") return m.nativeId !== d.nativeId;
   if (d.scope === "user")
-    return !(m.source === d.source && m.author.toLowerCase() === (d.author ?? "").toLowerCase());
+    return !(
+      m.source === d.source &&
+      m.author.toLowerCase() === (d.author ?? "").toLowerCase()
+    );
   if (d.scope === "all") return m.source !== d.source;
   return true;
 }
 
 export const useStore = create<State>((set, get) => {
   // Persiste a config + mantém o perfil ativo em sincronia com o working set.
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let pendingSave: AppConfig | null = null;
-  const flushSave = async () => {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    if (pendingSave) {
-      const c = pendingSave;
-      pendingSave = null;
-      await api.saveConfig(c);
-    }
-  };
-  if (typeof window !== "undefined") {
-    window.addEventListener("beforeunload", () => void flushSave());
-    // Duas janelas (principal + popout) editam a mesma config: descarrega o save pendente
-    // ao perder o foco — encolhe a janela em que um debounce velho desta janela poderia
-    // sobrescrever o que a outra acabou de salvar (ex.: a aba escolhida no popout).
-    window.addEventListener("blur", () => void flushSave());
-  }
+  // Enfileira cada gravação imediatamente. Não dependemos de beforeunload (assíncrono e não
+  // garantido por WebView); a fila preserva a ordem quando duas edições acontecem em sequência.
+  let saveChain: Promise<void> = Promise.resolve();
+  let saveRevision = 0;
+  let pendingSaves = 0;
+  const flushSave = () => saveChain;
   const persist = (config: AppConfig) => {
     const profiles = config.profiles.map((p) =>
       p.id === config.activeProfileId
         ? { ...p, mode: config.mode, targets: config.targets }
-        : p
+        : p,
     );
     const next = { ...config, profiles };
     set({ config: next });
-    pendingSave = next;
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => void flushSave(), 400);
+    pendingSaves += 1;
+    saveChain = saveChain
+      .catch(() => undefined)
+      .then(async () => {
+        const saved = await api.saveConfig({ ...next, revision: saveRevision });
+        saveRevision = saved.revision;
+        pendingSaves -= 1;
+        if (pendingSaves === 0) set({ config: saved });
+      })
+      .catch((error) => {
+        pendingSaves = Math.max(0, pendingSaves - 1);
+        console.error("Falha ao salvar configuração", error);
+      });
   };
 
   return {
@@ -233,11 +244,15 @@ export const useStore = create<State>((set, get) => {
         const id = uid("prof");
         config = {
           ...config,
-          profiles: [{ id, name: "Padrão", mode: config.mode, targets: config.targets }],
+          profiles: [
+            { id, name: "Padrão", mode: config.mode, targets: config.targets },
+          ],
           activeProfileId: id,
         };
-        void api.saveConfig(config);
-      } else if (!config.profiles.some((p) => p.id === config.activeProfileId)) {
+        config = await api.saveConfig(config);
+      } else if (
+        !config.profiles.some((p) => p.id === config.activeProfileId)
+      ) {
         const p = config.profiles[0];
         config = {
           ...config,
@@ -246,6 +261,7 @@ export const useStore = create<State>((set, get) => {
           targets: p.targets.map((t) => ({ ...t })),
         };
       }
+      saveRevision = config.revision;
       set({ config, encoders, loaded: true });
       // Semeia o estado de conexão do chat: a janela pode ter aberto (ou o popout montado)
       // com o chat já no ar — sem isto o botão nasceria em "Conectar" com o chat rodando.
@@ -259,7 +275,9 @@ export const useStore = create<State>((set, get) => {
       try {
         const sessions = await api.listSessions();
         const newest = sessions[0];
-        const seenAt = Number(localStorage.getItem("corneta.lastSeenReportAt") || 0);
+        const seenAt = Number(
+          localStorage.getItem("corneta.lastSeenReportAt") || 0,
+        );
         if (seenAt === 0) {
           // Migração (1ª execução com o recurso): sessões antigas não acendem o selo —
           // o usuário pode já tê-las visto antes de existir o carimbo.
@@ -286,7 +304,9 @@ export const useStore = create<State>((set, get) => {
             (st?.alertSources ?? []).some((x) => x.enabled && x.hasToken);
           if ((st?.chatAutoConnect ?? true) && hasSources && !s.chatConnected) {
             s.connectChat().catch(() =>
-              toast.error("Não consegui ligar o chat sozinho — vá na tela Chat e clique em Conectar."),
+              toast.error(
+                "Não consegui ligar o chat sozinho — vá na tela Chat e clique em Conectar.",
+              ),
             );
           }
         }
@@ -297,7 +317,10 @@ export const useStore = create<State>((set, get) => {
       // Config salva por outra janela → atualiza a base local SEM re-persistir (senão as
       // janelas entrariam em loop sobrescrevendo o disco uma da outra). Fecha o clobber em
       // que o popout revertia um destino/perfil criado na janela principal (e vice-versa).
-      return api.subscribeConfigChanged((config) => set({ config }));
+      return api.subscribeConfigChanged((config) => {
+        saveRevision = Math.max(saveRevision, config.revision);
+        if (pendingSaves === 0) set({ config });
+      });
     },
 
     // Coordenadores finos: lê a config, chama o reducer PURO (configOps), persiste se mudou.
@@ -425,7 +448,12 @@ export const useStore = create<State>((set, get) => {
     async runObsCheck(force = false) {
       // Cache curto: várias telas consultam (Ao vivo, checklist, Configurações) sem
       // martelar o obs-websocket a cada troca de tela.
-      if (!force && Date.now() - lastObsCheckAt < 5000 && get().obs !== null && get().obs !== "loading")
+      if (
+        !force &&
+        Date.now() - lastObsCheckAt < 5000 &&
+        get().obs !== null &&
+        get().obs !== "loading"
+      )
         return;
       if (get().obs === "loading") return;
       // force = clique explícito em "Verificar OBS" → feedback visível (spinner);
@@ -457,7 +485,11 @@ export const useStore = create<State>((set, get) => {
 
     async start() {
       await flushSave();
-      set({ leaks: [], censored: false, viewers: { total: 0, anyLive: false, items: [] } });
+      set({
+        leaks: [],
+        censored: false,
+        viewers: { total: 0, anyLive: false, items: [] },
+      });
       await api.start();
       // A1: liga o OBS junto (melhor-esforço) — e CONTA pra tela o que aconteceu,
       // pra o toast não mentir "no ar" quando o OBS nem recebeu o play.
@@ -492,8 +524,13 @@ export const useStore = create<State>((set, get) => {
     chatStatuses: {},
     alertStatuses: {},
     chatAuth: {},
-    chatLogin: { twitch: { state: "out" }, youtube: { state: "out" }, kick: { state: "out" } },
+    chatLogin: {
+      twitch: { state: "out" },
+      youtube: { state: "out" },
+      kick: { state: "out" },
+    },
     youtubeOauthReady: false,
+    kickOauthReady: false,
 
     bindChat() {
       return api.subscribeChat(
@@ -501,21 +538,29 @@ export const useStore = create<State>((set, get) => {
           set((s) => {
             const next = [...s.chatMessages, m];
             return {
-              chatMessages: next.length > CHAT_CAP ? next.slice(next.length - CHAT_CAP) : next,
+              chatMessages:
+                next.length > CHAT_CAP
+                  ? next.slice(next.length - CHAT_CAP)
+                  : next,
             };
           }),
         (st) =>
           set((s) => ({
             chatStatuses: {
               ...s.chatStatuses,
-              [st.source || st.platform]: { platform: st.platform, status: st.status },
+              [st.source || st.platform]: {
+                platform: st.platform,
+                status: st.status,
+              },
             },
           })),
         // Moderação: em vez de sumir, marca como removida (vira lápide no feed).
         (d) =>
           set((s) => ({
-            chatMessages: s.chatMessages.map((m) => (keepMessage(m, d) ? m : { ...m, deleted: true })),
-          }))
+            chatMessages: s.chatMessages.map((m) =>
+              keepMessage(m, d) ? m : { ...m, deleted: true },
+            ),
+          })),
       );
     },
 
@@ -523,7 +568,9 @@ export const useStore = create<State>((set, get) => {
       // "Conectado" é estado global do backend: start/stop de qualquer janela reflete na outra
       // (sem isto, desconectar pelo popout deixava a principal presa em "conectado", e o popout
       // nascia mostrando "Conectar" com o chat já no ar). Não mexe nas mensagens.
-      return api.subscribeChatRunning((running) => set({ chatConnected: running }));
+      return api.subscribeChatRunning((running) =>
+        set({ chatConnected: running }),
+      );
     },
 
     async connectChat() {
@@ -538,14 +585,22 @@ export const useStore = create<State>((set, get) => {
     async disconnectChat() {
       await api.chatStop();
       await api.alertsStop();
-      set({ chatConnected: false, chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
+      set({
+        chatConnected: false,
+        chatStatuses: {},
+        alertStatuses: {},
+        chatAuth: {},
+      });
     },
 
     bindAlertStatus() {
       return api.subscribeAlertStatus((st) =>
         set((s) => ({
-          alertStatuses: { ...s.alertStatuses, [st.source]: { status: st.status } },
-        }))
+          alertStatuses: {
+            ...s.alertStatuses,
+            [st.source]: { status: st.status },
+          },
+        })),
       );
     },
 
@@ -581,7 +636,9 @@ export const useStore = create<State>((set, get) => {
 
     bindChatAuth() {
       return api.subscribeChatAuth((a) =>
-        set((s) => ({ chatAuth: { ...s.chatAuth, [a.source]: { login: a.login, ok: a.ok } } })),
+        set((s) => ({
+          chatAuth: { ...s.chatAuth, [a.source]: { login: a.login, ok: a.ok } },
+        })),
       );
     },
 
@@ -622,21 +679,21 @@ export const useStore = create<State>((set, get) => {
     async setupOauth() {
       await api.setOauthConfig({
         twitchClientId: OAUTH.twitchClientId,
-        twitchClientSecret: OAUTH.twitchClientSecret,
         googleClientId: OAUTH.googleClientId,
-        googleClientSecret: OAUTH.googleClientSecret,
         kickClientId: OAUTH.kickClientId,
-        kickClientSecret: OAUTH.kickClientSecret,
       });
       try {
         const a = await api.authStatus();
         set({
           chatLogin: {
-            twitch: a.twitchLogin ? { state: "connected", login: a.twitchLogin } : { state: "out" },
+            twitch: a.twitchLogin
+              ? { state: "connected", login: a.twitchLogin }
+              : { state: "out" },
             youtube: a.youtube ? { state: "connected" } : { state: "out" },
             kick: a.kick ? { state: "connected" } : { state: "out" },
           },
           youtubeOauthReady: a.youtubeConfigured,
+          kickOauthReady: a.kickConfigured,
         });
       } catch {
         /* sem login ainda */
@@ -649,7 +706,21 @@ export const useStore = create<State>((set, get) => {
     },
     async clearYoutubeOauth() {
       await api.clearYoutubeOauth();
-      set((s) => ({ youtubeOauthReady: false, chatLogin: { ...s.chatLogin, youtube: { state: "out" } } }));
+      set((s) => ({
+        youtubeOauthReady: false,
+        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
+      }));
+    },
+    async setKickOauth(clientId, clientSecret) {
+      await api.setKickOauth(clientId, clientSecret);
+      set({ kickOauthReady: true });
+    },
+    async clearKickOauth() {
+      await api.clearKickOauth();
+      set((s) => ({
+        kickOauthReady: false,
+        chatLogin: { ...s.chatLogin, kick: { state: "out" } },
+      }));
     },
 
     bindAuthFlow() {
@@ -664,8 +735,10 @@ export const useStore = create<State>((set, get) => {
               verifyUri: a.verifyUri,
               verifyUriComplete: a.verifyUriComplete,
             };
-          else if (a.state === "connected") next = { state: "connected", login: a.login || undefined };
-          else if (a.state === "error") next = { state: "error", message: a.login || "erro no login" };
+          else if (a.state === "connected")
+            next = { state: "connected", login: a.login || undefined };
+          else if (a.state === "error")
+            next = { state: "error", message: a.login || "erro no login" };
           else if (a.state === "loggedout") next = { state: "out" };
           return { chatLogin: { ...s.chatLogin, [k]: next } };
         });
@@ -686,14 +759,20 @@ export const useStore = create<State>((set, get) => {
           if (url) void openExternal(url);
         }
         // Twitch logou e o chat está no ar → reconecta pra o IRC autenticar (mantém o histórico).
-        if (who === "twitch" && a.state === "connected" && get().chatConnected) {
+        if (
+          who === "twitch" &&
+          a.state === "connected" &&
+          get().chatConnected
+        ) {
           void api.chatStart();
         }
       });
     },
 
     async twitchLogin() {
-      set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "code" } } }));
+      set((s) => ({
+        chatLogin: { ...s.chatLogin, twitch: { state: "code" } },
+      }));
       await api.twitchLoginStart();
     },
     async twitchLogout() {
@@ -701,12 +780,16 @@ export const useStore = create<State>((set, get) => {
       set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "out" } } }));
     },
     async youtubeLogin() {
-      set((s) => ({ chatLogin: { ...s.chatLogin, youtube: { state: "code" } } }));
+      set((s) => ({
+        chatLogin: { ...s.chatLogin, youtube: { state: "code" } },
+      }));
       await api.youtubeLoginStart();
     },
     async youtubeLogout() {
       await api.youtubeLogout();
-      set((s) => ({ chatLogin: { ...s.chatLogin, youtube: { state: "out" } } }));
+      set((s) => ({
+        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
+      }));
     },
     async kickLogin() {
       set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
@@ -730,8 +813,13 @@ export const useStore = create<State>((set, get) => {
       return api.subscribeAlerts((a) =>
         set((s) => {
           const next = [...s.alerts, a];
-          return { alerts: next.length > ALERT_CAP ? next.slice(next.length - ALERT_CAP) : next };
-        })
+          return {
+            alerts:
+              next.length > ALERT_CAP
+                ? next.slice(next.length - ALERT_CAP)
+                : next,
+          };
+        }),
       );
     },
     clearAlerts() {
@@ -748,7 +836,7 @@ export const useStore = create<State>((set, get) => {
     bindGuardian() {
       return api.subscribeGuardian(
         (l) => set((s) => ({ leaks: [...s.leaks, l].slice(-20) })),
-        (on) => set({ censored: on })
+        (on) => set({ censored: on }),
       );
     },
 

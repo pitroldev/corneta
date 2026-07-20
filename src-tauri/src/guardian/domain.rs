@@ -131,7 +131,10 @@ fn matches_term(term: &str, hay: &str, hay_words: &[&str]) -> bool {
         tok.chars().count() >= 5 && hay_words.iter().any(|w| within_edit(tok, w, 1))
     };
     // Um token DISTINTIVO (≥6) sozinho já casa (ex.: "growthedge", "cardoso").
-    if toks.iter().any(|tok| tok.chars().count() >= 6 && token_hit(tok)) {
+    if toks
+        .iter()
+        .any(|tok| tok.chars().count() >= 6 && token_hit(tok))
+    {
         return true;
     }
     // Senão, a MAIORIA (~60%) dos tokens precisa casar.
@@ -193,7 +196,9 @@ pub struct Timeline {
 
 impl Timeline {
     pub fn new() -> Self {
-        Self { marks: VecDeque::new() }
+        Self {
+            marks: VecDeque::new(),
+        }
     }
 
     /// Registra o resultado do quadro `index` (índices chegam ~crescentes).
@@ -274,7 +279,10 @@ mod tests {
 
     #[test]
     fn nao_casa_texto_qualquer() {
-        let leaks = find_watchlist("resultados da busca sobre receitas de bolo", &["Petro Cardoso".into()]);
+        let leaks = find_watchlist(
+            "resultados da busca sobre receitas de bolo",
+            &["Petro Cardoso".into()],
+        );
         assert!(leaks.is_empty());
     }
 
@@ -328,8 +336,14 @@ mod tests {
         let mut t = Timeline::new();
         t.record(100, false); // último OCR antes do termo aparecer
         t.record(160, true); // detecção (diff/rede de segurança) depois
-        assert!(t.should_censor(130, 90), "false perto não pode mascarar a true dentro do gap");
-        assert!(t.should_censor(105, 90), "logo após o false, a true seguinte cobre");
+        assert!(
+            t.should_censor(130, 90),
+            "false perto não pode mascarar a true dentro do gap"
+        );
+        assert!(
+            t.should_censor(105, 90),
+            "logo após o false, a true seguinte cobre"
+        );
     }
 
     #[test]

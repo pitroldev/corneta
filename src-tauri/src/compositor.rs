@@ -80,7 +80,11 @@ enum GenExit {
 /// triple (vira `ffmpeg.exe`), tanto em dev (target/debug) quanto no bundle de produção.
 fn ffmpeg_path() -> Option<std::path::PathBuf> {
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let name = if cfg!(windows) {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    };
     let p = dir.join(name);
     p.exists().then_some(p)
 }
@@ -198,10 +202,7 @@ fn spawn_byte_source(ffmpeg: &std::path::Path, args: &[String]) -> std::io::Resu
 }
 
 /// Drena o canal de quadros: devolve quantos chegaram e se a fonte morreu (desconectou).
-fn drain_frames(
-    src: &mut Option<FrameSource>,
-    mut on_frame: impl FnMut(Vec<u8>),
-) -> (usize, bool) {
+fn drain_frames(src: &mut Option<FrameSource>, mut on_frame: impl FnMut(Vec<u8>)) -> (usize, bool) {
     let Some(s) = src.as_mut() else {
         return (0, false);
     };
@@ -331,9 +332,12 @@ pub fn load_slate_still(
     spec: &ProgramSpec,
     path: Option<&std::path::Path>,
 ) -> Vec<u8> {
-    let candidate = path
-        .map(|p| p.to_path_buf())
-        .or_else(|| app.path().app_config_dir().ok().map(|d| d.join("brb-slate.png")));
+    let candidate = path.map(|p| p.to_path_buf()).or_else(|| {
+        app.path()
+            .app_config_dir()
+            .ok()
+            .map(|d| d.join("brb-slate.png"))
+    });
     if let Some(p) = candidate {
         if let Ok(img) = image::open(&p) {
             let rgb = img
@@ -371,9 +375,17 @@ pub async fn run(
         let max_gap = (delay_frames as u64).saturating_sub(spec.fps as u64);
         log::info!(
             "compositor: {}x{}@{} {}kbps delay={}s hw={:?} termos={} slate={}",
-            spec.w, spec.h, spec.fps, spec.video_kbps, opts.delay_sec, opts.hw_codec,
+            spec.w,
+            spec.h,
+            spec.fps,
+            spec.video_kbps,
+            opts.delay_sec,
+            opts.hw_codec,
             opts.watchlist.len(),
-            match &opts.slate { Slate::Still(_) => "imagem", Slate::Video { .. } => "vídeo" },
+            match &opts.slate {
+                Slate::Still(_) => "imagem",
+                Slate::Video { .. } => "vídeo",
+            },
         );
 
         // OCR do guardião (só com watchlist).
@@ -405,8 +417,20 @@ pub async fn run(
         let mut censoring = false;
         while running.load(Ordering::Relaxed) {
             let exit = generation(
-                &app, &ffmpeg, &cfg, &spec, delay_frames, max_gap, &opts, &still,
-                shared.as_deref(), &running, &has_signal, &slate_on, &mut head, &mut censoring,
+                &app,
+                &ffmpeg,
+                &cfg,
+                &spec,
+                delay_frames,
+                max_gap,
+                &opts,
+                &still,
+                shared.as_deref(),
+                &running,
+                &has_signal,
+                &slate_on,
+                &mut head,
+                &mut censoring,
             );
             match exit {
                 GenExit::Stop => break,
@@ -480,24 +504,39 @@ fn generation(
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             if !running.load(Ordering::Relaxed) {
-                if let Some(mut s) = vsrc.take() { kill(&mut s.child); }
-                if let Some(mut s) = asrc.take() { kill(&mut s.child); }
+                if let Some(mut s) = vsrc.take() {
+                    kill(&mut s.child);
+                }
+                if let Some(mut s) = asrc.take() {
+                    kill(&mut s.child);
+                }
                 return GenExit::Stop;
             }
-            match vsrc.as_ref().map(|s| s.rx.recv_timeout(Duration::from_millis(150))) {
+            match vsrc
+                .as_ref()
+                .map(|s| s.rx.recv_timeout(Duration::from_millis(150)))
+            {
                 Some(Ok(f)) => break f,
                 Some(Err(std::sync::mpsc::RecvTimeoutError::Timeout)) => {
                     if Instant::now() > deadline {
                         log::warn!("compositor: decoder não entregou o 1º quadro em 10s — tentando de novo");
-                        if let Some(mut s) = vsrc.take() { kill(&mut s.child); }
-                        if let Some(mut s) = asrc.take() { kill(&mut s.child); }
+                        if let Some(mut s) = vsrc.take() {
+                            kill(&mut s.child);
+                        }
+                        if let Some(mut s) = asrc.take() {
+                            kill(&mut s.child);
+                        }
                         return GenExit::SetupFailed;
                     }
                 }
                 _ => {
                     log::warn!("compositor: decoder morreu antes do 1º quadro (sinal instável?) — tentando de novo");
-                    if let Some(mut s) = vsrc.take() { kill(&mut s.child); }
-                    if let Some(mut s) = asrc.take() { kill(&mut s.child); }
+                    if let Some(mut s) = vsrc.take() {
+                        kill(&mut s.child);
+                    }
+                    if let Some(mut s) = asrc.take() {
+                        kill(&mut s.child);
+                    }
                     return GenExit::SetupFailed;
                 }
             }
@@ -510,8 +549,12 @@ fn generation(
         Ok(l) => l,
         Err(e) => {
             log::error!("compositor: listener de áudio: {e}");
-            if let Some(mut s) = vsrc.take() { kill(&mut s.child); }
-            if let Some(mut s) = asrc.take() { kill(&mut s.child); }
+            if let Some(mut s) = vsrc.take() {
+                kill(&mut s.child);
+            }
+            if let Some(mut s) = asrc.take() {
+                kill(&mut s.child);
+            }
             return GenExit::SetupFailed;
         }
     };
@@ -521,8 +564,12 @@ fn generation(
         Ok(c) => c,
         Err(e) => {
             log::error!("compositor: encoder não subiu: {e}");
-            if let Some(mut s) = vsrc.take() { kill(&mut s.child); }
-            if let Some(mut s) = asrc.take() { kill(&mut s.child); }
+            if let Some(mut s) = vsrc.take() {
+                kill(&mut s.child);
+            }
+            if let Some(mut s) = asrc.take() {
+                kill(&mut s.child);
+            }
             return GenExit::SetupFailed;
         }
     };
@@ -730,8 +777,12 @@ fn generation(
                 slate_afifo.clear();
             }
             if !want_slate_media && slate_vsrc.is_some() {
-                if let Some(mut s) = slate_vsrc.take() { kill(&mut s.child); }
-                if let Some(mut s) = slate_asrc.take() { kill(&mut s.child); }
+                if let Some(mut s) = slate_vsrc.take() {
+                    kill(&mut s.child);
+                }
+                if let Some(mut s) = slate_asrc.take() {
+                    kill(&mut s.child);
+                }
                 slate_afifo.clear();
             }
             let _ = drain_frames(&mut slate_vsrc, |f| slate_frame = f);
@@ -782,7 +833,13 @@ fn generation(
                         // acima pra manter o pareamento) e trocado pelo do slate/silêncio — o mic
                         // do streamer não vaza na pausa. Os pops continuam: ao voltar, o conteúdo
                         // é o ATUAL, não um replay da pausa.
-                        let slate_audio = if matches!(&opts.slate, Slate::Video { has_audio: true, .. }) {
+                        let slate_audio = if matches!(
+                            &opts.slate,
+                            Slate::Video {
+                                has_audio: true,
+                                ..
+                            }
+                        ) {
                             take_audio(&mut slate_afifo, abpf)
                         } else {
                             vec![0u8; abpf]
@@ -795,9 +852,18 @@ fn generation(
                 // JÁ VOLTO — GRUDENTO: uma vez no slate, fica nele até conteúdo REAL voltar a
                 // sair (pop). Sem isso, no guardião o re-encher do buffer (12 s) cairia no ramo
                 // de congelamento e mostraria o último quadro de ANTES da queda, parado.
-                None if forced || brb_active || (delay_buf.is_empty() && gap.as_millis() as u64 >= HOLD_MS) => {
+                None if forced
+                    || brb_active
+                    || (delay_buf.is_empty() && gap.as_millis() as u64 >= HOLD_MS) =>
+                {
                     // Slate + áudio do slate-vídeo (ou silêncio).
-                    let audio = if matches!(&opts.slate, Slate::Video { has_audio: true, .. }) {
+                    let audio = if matches!(
+                        &opts.slate,
+                        Slate::Video {
+                            has_audio: true,
+                            ..
+                        }
+                    ) {
                         take_audio(&mut slate_afifo, abpf)
                     } else {
                         vec![0u8; abpf]
@@ -816,7 +882,11 @@ fn generation(
                 let _ = app.emit("brb://active", brb_active);
                 log::info!(
                     "compositor: JÁ VOLTO {}",
-                    if brb_active { "NO AR (sem derrubar as plataformas)" } else { "saiu — sinal de volta" }
+                    if brb_active {
+                        "NO AR (sem derrubar as plataformas)"
+                    } else {
+                        "saiu — sinal de volta"
+                    }
                 );
             } else {
                 slate_on.store(brb_active || *censoring, Ordering::Relaxed);
@@ -863,10 +933,18 @@ fn generation(
     // Teardown da geração.
     gen_done.store(true, Ordering::Relaxed); // desarma o vigia (não matar PID reciclado)
     kill(&mut enc);
-    if let Some(mut s) = vsrc.take() { kill(&mut s.child); }
-    if let Some(mut s) = asrc.take() { kill(&mut s.child); }
-    if let Some(mut s) = slate_vsrc.take() { kill(&mut s.child); }
-    if let Some(mut s) = slate_asrc.take() { kill(&mut s.child); }
+    if let Some(mut s) = vsrc.take() {
+        kill(&mut s.child);
+    }
+    if let Some(mut s) = asrc.take() {
+        kill(&mut s.child);
+    }
+    if let Some(mut s) = slate_vsrc.take() {
+        kill(&mut s.child);
+    }
+    if let Some(mut s) = slate_asrc.take() {
+        kill(&mut s.child);
+    }
     slate_on.store(false, Ordering::Relaxed);
     exit
 }

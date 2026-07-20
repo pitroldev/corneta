@@ -18,13 +18,19 @@ if (typeof window !== "undefined") {
 }
 
 function reducedMotion(): boolean {
-  return typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return (
+    typeof matchMedia !== "undefined" &&
+    matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 /** Aplica o tema no documento. `animate` liga o sopro (deixe `false` no 1º load). */
 export function applyTheme(theme: "dark" | "light", animate: boolean): void {
   const root = document.documentElement;
-  const set = () => root.setAttribute("data-theme", theme);
+  const set = () => {
+    root.setAttribute("data-theme", theme);
+    root.style.colorScheme = theme;
+  };
 
   if (!animate || !pointerSeen || reducedMotion()) {
     set();

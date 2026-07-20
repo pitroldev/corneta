@@ -126,11 +126,31 @@ fn handle_msg(
     let t = v.get("t").and_then(|x| x.as_str()).unwrap_or("");
     match t {
         "join" => {
-            let room = v.get("room").and_then(|x| x.as_str()).unwrap_or("").to_string();
-            let peer_id = v.get("peerId").and_then(|x| x.as_str()).unwrap_or("").to_string();
-            let role = v.get("role").and_then(|x| x.as_str()).unwrap_or("control").to_string();
-            let name = v.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
-            let secret = v.get("secret").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let room = v
+                .get("room")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
+            let peer_id = v
+                .get("peerId")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
+            let role = v
+                .get("role")
+                .and_then(|x| x.as_str())
+                .unwrap_or("control")
+                .to_string();
+            let name = v
+                .get("name")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
+            let secret = v
+                .get("secret")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
             if room.is_empty() || peer_id.is_empty() {
                 return;
             }
@@ -151,7 +171,8 @@ fn handle_msg(
             // reassume o slot; um terceiro não conhece o segredo → entra recusado.
             if let Some(existing) = r.get(&peer_id) {
                 if existing.secret != secret {
-                    let _ = my_tx.try_send(json!({ "t": "error", "code": "peer-taken" }).to_string());
+                    let _ =
+                        my_tx.try_send(json!({ "t": "error", "code": "peer-taken" }).to_string());
                     return;
                 }
             }
@@ -172,7 +193,16 @@ fn handle_msg(
                     let _ = p.tx.try_send(join_evt.clone());
                 }
             }
-            r.insert(peer_id.clone(), Peer { role, name, tx: my_tx.clone(), token, secret });
+            r.insert(
+                peer_id.clone(),
+                Peer {
+                    role,
+                    name,
+                    tx: my_tx.clone(),
+                    token,
+                    secret,
+                },
+            );
             *joined = Some((room, peer_id));
         }
         "signal" => {
@@ -187,7 +217,8 @@ fn handle_msg(
             let data = v.get("data").cloned().unwrap_or(Value::Null);
             let rooms = ctx.rooms.lock().unwrap();
             if let Some(p) = rooms.map.get(&room).and_then(|r| r.get(to)) {
-                let _ = p.tx.try_send(json!({ "t": "signal", "from": from, "data": data }).to_string());
+                let _ =
+                    p.tx.try_send(json!({ "t": "signal", "from": from, "data": data }).to_string());
             }
         }
         "leave" => {
@@ -226,7 +257,7 @@ fn on_leave(ctx: &Ctx, room: &str, peer_id: &str, token: u64) {
 #[derive(Default)]
 pub struct StudioServer {
     handle: Option<JoinHandle<()>>,
-    shutdown: Option<oneshot::Sender<()>>,   // para o accept loop
+    shutdown: Option<oneshot::Sender<()>>, // para o accept loop
     disconnect: Option<watch::Sender<bool>>, // fecha conexões vivas
     pub port: u16,
 }
@@ -239,7 +270,9 @@ pub struct MesaServerInfo {
 }
 
 fn current_lan_ip() -> String {
-    lan_ipv4().map(|ip| ip.to_string()).unwrap_or_else(|| "127.0.0.1".into())
+    lan_ipv4()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|| "127.0.0.1".into())
 }
 
 /// Sobe o servidor (porta efêmera) ou devolve a info se já estiver rodando (idempotente).
@@ -247,7 +280,10 @@ pub async fn start(server: &Mutex<StudioServer>) -> Result<MesaServerInfo, Strin
     {
         let s = server.lock().unwrap();
         if s.handle.is_some() && s.port != 0 {
-            return Ok(MesaServerInfo { port: s.port, lan_ip: current_lan_ip() });
+            return Ok(MesaServerInfo {
+                port: s.port,
+                lan_ip: current_lan_ip(),
+            });
         }
     }
 
@@ -282,7 +318,10 @@ pub async fn start(server: &Mutex<StudioServer>) -> Result<MesaServerInfo, Strin
     s.shutdown = Some(sh_tx);
     s.disconnect = Some(kick_tx);
     s.port = bound;
-    Ok(MesaServerInfo { port: bound, lan_ip: current_lan_ip() })
+    Ok(MesaServerInfo {
+        port: bound,
+        lan_ip: current_lan_ip(),
+    })
 }
 
 pub fn stop(server: &Mutex<StudioServer>) {

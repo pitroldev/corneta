@@ -1,4 +1,14 @@
-import { BarChart3, Eye, Info, MessageSquare, Radio, Settings, Sliders, Tv2, Users } from "lucide-react";
+import {
+  BarChart3,
+  Eye,
+  Info,
+  MessageSquare,
+  Radio,
+  Settings,
+  Sliders,
+  Tv2,
+  Users,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 import { useStore } from "../lib/store";
 import { MESA_ENABLED } from "../lib/flags";
@@ -17,14 +27,41 @@ export type Screen =
 // Relatórios entra na jornada numerada (é o passo que FECHA o ciclo da live) — no rodapé
 // apagado ninguém descobria que o app gera relatório.
 const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
-  { id: "platforms", label: "Plataformas", icon: Tv2, hint: "onde sua live aparece" },
-  { id: "encoding", label: "Qualidade", icon: Sliders, hint: "capricho da imagem" },
+  {
+    id: "platforms",
+    label: "Plataformas",
+    icon: Tv2,
+    hint: "onde sua live aparece",
+  },
+  {
+    id: "encoding",
+    label: "Qualidade",
+    icon: Sliders,
+    hint: "capricho da imagem",
+  },
   { id: "golive", label: "Ao vivo", icon: Radio, hint: "bota tudo no ar" },
-  { id: "chat", label: "Chat", icon: MessageSquare, hint: "todo chat num lugar" },
+  {
+    id: "chat",
+    label: "Chat",
+    icon: MessageSquare,
+    hint: "todo chat num lugar",
+  },
   ...(MESA_ENABLED
-    ? [{ id: "mesa" as Screen, label: "Mesa", icon: Users, hint: "co-stream com a galera" }]
+    ? [
+        {
+          id: "mesa" as Screen,
+          label: "Mesa",
+          icon: Users,
+          hint: "co-stream com a galera",
+        },
+      ]
     : []),
-  { id: "reports", label: "Relatórios", icon: BarChart3, hint: "como foi a live" },
+  {
+    id: "reports",
+    label: "Relatórios",
+    icon: BarChart3,
+    hint: "como foi a live",
+  },
 ];
 
 // Numeração dos utilitários do rodapé segue a nav (Alt+N contínuo, com ou sem Mesa).
@@ -51,7 +88,9 @@ export function Sidebar({
           <Mascot className="size-7" />
         </div>
         <div>
-          <div className="font-display text-2xl font-extrabold leading-none">Corneta</div>
+          <div className="font-display text-2xl font-extrabold leading-none">
+            Corneta
+          </div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
             multi-stream
           </div>
@@ -70,26 +109,30 @@ export function Sidebar({
               data-on-brass={active ? "" : undefined}
               title={`Alt+${i + 1}`}
               className={cn(
-                "group relative flex items-center gap-3 rounded-md px-3 py-3 text-left transition-all",
+                "group relative flex items-center gap-3 rounded-md px-3 py-3 text-left transition",
                 active
                   ? "bg-brass text-brass-ink pop-brass"
-                  : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+                  : "text-ink-muted hover:bg-surface-2 hover:text-ink",
               )}
             >
               <span
                 className={cn(
                   "grid size-7 place-items-center rounded-sm",
-                  active ? "bg-brass-ink/15" : "bg-surface-2 group-hover:bg-surface-3"
+                  active
+                    ? "bg-brass-ink/15"
+                    : "bg-surface-2 group-hover:bg-surface-3",
                 )}
               >
                 <Icon className="size-4" strokeWidth={2.4} />
               </span>
               <div className="flex flex-col">
-                <span className="font-display text-base font-bold leading-tight">{item.label}</span>
+                <span className="font-display text-base font-bold leading-tight">
+                  {item.label}
+                </span>
                 <span
                   className={cn(
                     "text-[11px] font-medium",
-                    active ? "text-brass-ink/70" : "text-ink-faint"
+                    active ? "text-brass-ink/70" : "text-ink-faint",
                   )}
                 >
                   {item.hint}
@@ -103,7 +146,7 @@ export function Sidebar({
                 <span
                   className={cn(
                     "ml-auto font-display text-xs font-bold opacity-40",
-                    active && "opacity-60"
+                    active && "opacity-60",
                   )}
                 >
                   0{i + 1}
@@ -122,11 +165,15 @@ export function Sidebar({
           title={`Alt+${SETTINGS_N}`}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
-            screen === "settings" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
+            screen === "settings"
+              ? "bg-surface-2 text-ink"
+              : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted",
           )}
         >
           <Settings className="size-4" strokeWidth={2.3} /> Configurações
-          <span className="ml-auto font-display text-xs font-bold opacity-40">0{SETTINGS_N}</span>
+          <span className="ml-auto font-display text-xs font-bold opacity-40">
+            0{SETTINGS_N}
+          </span>
         </button>
         <button
           onClick={() => onNavigate("about")}
@@ -134,11 +181,15 @@ export function Sidebar({
           title={`Alt+${ABOUT_N}`}
           className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
-            screen === "about" ? "bg-surface-2 text-ink" : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted"
+            screen === "about"
+              ? "bg-surface-2 text-ink"
+              : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted",
           )}
         >
           <Info className="size-4" strokeWidth={2.3} /> Sobre
-          <span className="ml-auto text-[11px] font-bold text-brass">pitrol.dev</span>
+          <span className="ml-auto text-[11px] font-bold text-brass">
+            pitrol.dev
+          </span>
         </button>
 
         {state === "live" ? (
@@ -170,7 +221,9 @@ export function Sidebar({
             className="flex w-full items-center gap-2 rounded-md bg-bad/15 px-3 py-2.5 text-left text-bad transition-transform hover:translate-x-0.5"
           >
             <span className="size-2.5 rounded-full bg-bad" />
-            <span className="font-display text-sm font-bold uppercase tracking-wide">Erro</span>
+            <span className="font-display text-sm font-bold uppercase tracking-wide">
+              Erro
+            </span>
           </button>
         ) : (
           <button
@@ -193,7 +246,10 @@ export function Sidebar({
             className="flex items-center justify-center gap-1.5 pt-0.5 text-xs text-ink-faint"
             title={viewers.items
               .filter((i) => i.live)
-              .map((i) => `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`)
+              .map(
+                (i) =>
+                  `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`,
+              )
               .join("\n")}
           >
             <Eye className="size-3.5" />

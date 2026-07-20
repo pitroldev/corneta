@@ -13,7 +13,9 @@ async function getWin() {
 export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
   // O X não fecha quando "minimizar pra bandeja" está ligado — o tooltip conta a verdade.
-  const minimizeToTray = useStore((s) => s.config?.settings.minimizeToTray ?? true);
+  const minimizeToTray = useStore(
+    (s) => s.config?.settings.minimizeToTray ?? true,
+  );
 
   useEffect(() => {
     if (!IS_TAURI) return;
@@ -21,7 +23,9 @@ export function TitleBar() {
     (async () => {
       const w = await getWin();
       setMaximized(await w.isMaximized());
-      unlisten = await w.onResized(async () => setMaximized(await w.isMaximized()));
+      unlisten = await w.onResized(async () =>
+        setMaximized(await w.isMaximized()),
+      );
     })();
     return () => unlisten?.();
   }, []);
@@ -35,22 +39,40 @@ export function TitleBar() {
       data-tauri-drag-region
       className="flex h-9 shrink-0 items-center justify-between border-b border-border-soft bg-panel pl-3 select-none"
     >
-      <div data-tauri-drag-region className="pointer-events-none flex items-center gap-2">
+      <div
+        data-tauri-drag-region
+        className="pointer-events-none flex items-center gap-2"
+      >
         <div className="grid size-5 place-items-center rounded-[5px] bg-brass text-brass-ink">
           <Mascot className="size-3.5" />
         </div>
-        <span className="font-display text-sm font-bold leading-none">Corneta</span>
-        <span className="text-[11px] font-medium text-ink-faint">multi-stream</span>
+        <span className="font-display text-sm font-bold leading-none">
+          Corneta
+        </span>
+        <span className="text-[11px] font-medium text-ink-faint">
+          multi-stream
+        </span>
       </div>
 
       <div className="flex h-full">
         <WinBtn onClick={min} label="Minimizar">
           <Minus className="size-4" strokeWidth={2.4} />
         </WinBtn>
-        <WinBtn onClick={toggleMax} label={maximized ? "Restaurar" : "Maximizar"}>
-          {maximized ? <Copy className="size-3.5" strokeWidth={2.2} /> : <Square className="size-3.5" strokeWidth={2.4} />}
+        <WinBtn
+          onClick={toggleMax}
+          label={maximized ? "Restaurar" : "Maximizar"}
+        >
+          {maximized ? (
+            <Copy className="size-3.5" strokeWidth={2.2} />
+          ) : (
+            <Square className="size-3.5" strokeWidth={2.4} />
+          )}
         </WinBtn>
-        <WinBtn onClick={close} label={minimizeToTray ? "Fechar (fica na bandeja)" : "Fechar"} danger>
+        <WinBtn
+          onClick={close}
+          label={minimizeToTray ? "Fechar (fica na bandeja)" : "Fechar"}
+          danger
+        >
           <X className="size-4" strokeWidth={2.4} />
         </WinBtn>
       </div>
@@ -76,7 +98,9 @@ function WinBtn({
       title={label}
       className={cn(
         "grid h-full w-12 place-items-center text-ink-muted transition-colors",
-        danger ? "hover:bg-bad hover:text-white" : "hover:bg-surface-2 hover:text-ink"
+        danger
+          ? "hover:bg-bad hover:text-white"
+          : "hover:bg-surface-2 hover:text-ink",
       )}
     >
       {children}

@@ -32,7 +32,14 @@ describe("defaultConfig", () => {
 
 describe("obsIngestUrl", () => {
   it("monta a URL sem expor a chave", () => {
-    expect(obsIngestUrl({ protocol: "rtmp", host: "127.0.0.1", port: 1935, app: "live", key: "obs" }))
-      .toBe("rtmp://127.0.0.1:1935/live");
+    expect(
+      obsIngestUrl({
+        protocol: "rtmp",
+        host: "127.0.0.1",
+        port: 1935,
+        app: "live",
+        key: "obs",
+      }),
+    ).toBe("rtmp://127.0.0.1:1935/live");
   });
 });

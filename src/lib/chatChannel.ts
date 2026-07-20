@@ -11,7 +11,10 @@ import type { ChatPlatform } from "./types";
  * - YouTube: preserva VÍDEO × CANAL — vídeo vira o ID; canal vira `@handle`, `UC…`, ou
  *   `youtube.com/c|user/<nome>`; um token solto vira `@handle` (é campo de "canal").
  */
-export function normalizeChatChannel(platform: ChatPlatform, raw: string): string {
+export function normalizeChatChannel(
+  platform: ChatPlatform,
+  raw: string,
+): string {
   const s = (raw ?? "").trim();
   if (!s) return "";
   switch (platform) {
@@ -38,7 +41,10 @@ function afterHost(s: string, needles: string[]): string {
 
 /** Primeiro segmento do caminho (corta em / ? #), sem @ na frente. */
 function firstSeg(path: string): string {
-  return (path.split(/[/?#]/).find((x) => x.length > 0) ?? "").replace(/^@+/, "");
+  return (path.split(/[/?#]/).find((x) => x.length > 0) ?? "").replace(
+    /^@+/,
+    "",
+  );
 }
 
 /** Dobra acento pro ASCII base (ã→a, é→e) antes de descartar o resto — senão o login fica furado. */
@@ -52,9 +58,27 @@ function foldAscii(s: string): string {
 const TWITCH_SKIP = new Set(["popout", "moderator", "mod", "u", "embed"]);
 // Rotas da Twitch que NÃO são canais — nenhum login pode ter esses nomes (são reservados).
 const TWITCH_RESERVED = new Set([
-  "videos", "video", "directory", "team", "collections", "clips", "clip", "settings",
-  "prime", "turbo", "downloads", "store", "jobs", "p", "subscriptions", "following",
-  "friends", "wallet", "drops", "bits", "search",
+  "videos",
+  "video",
+  "directory",
+  "team",
+  "collections",
+  "clips",
+  "clip",
+  "settings",
+  "prime",
+  "turbo",
+  "downloads",
+  "store",
+  "jobs",
+  "p",
+  "subscriptions",
+  "following",
+  "friends",
+  "wallet",
+  "drops",
+  "bits",
+  "search",
 ]);
 
 function normTwitch(s: string): string {
@@ -71,7 +95,10 @@ function normTwitch(s: string): string {
   if (TWITCH_SKIP.has(seg.toLowerCase()) && segs[1]) seg = segs[1];
   if (TWITCH_RESERVED.has(seg.toLowerCase())) return "";
   // login da Twitch: só [a-z0-9_], minúsculo (acento vira base ASCII antes do corte).
-  return foldAscii(seg).replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+  return foldAscii(seg)
+    .replace(/^@+/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
 }
 
 // -------------------------------- Kick --------------------------------
@@ -85,7 +112,9 @@ function normKick(s: string): string {
   t = t.replace(/^@+/, "");
   const seg = firstSeg(t);
   // slug da Kick: [a-z0-9_], minúsculo (acento → base ASCII).
-  return foldAscii(seg).toLowerCase().replace(/[^a-z0-9_]/g, "");
+  return foldAscii(seg)
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
 }
 
 // ------------------------------- YouTube ------------------------------

@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
 /* ============================================================
    CORNETA — sistema de design v2
    Direção: pôster/quadrinho. Blocos sólidos, sombras DURAS (offset, sem blur),
@@ -74,7 +83,10 @@
   --color-panel: #e9ddc1;
 }
 :root[data-theme="light"] body {
-  background-image: radial-gradient(rgba(42, 28, 10, 0.05) 1px, transparent 1.5px);
+  background-image: radial-gradient(
+    rgba(42, 28, 10, 0.05) 1px,
+    transparent 1.5px
+  );
 }
 
 @layer base {

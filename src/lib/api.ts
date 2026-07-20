@@ -28,7 +28,7 @@ export const IS_TAURI =
 
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
-  saveConfig(config: AppConfig): Promise<void>;
+  saveConfig(config: AppConfig): Promise<AppConfig>;
   /** Config salva por QUALQUER janela → sincroniza as demais (evita clobber entre webviews). */
   subscribeConfigChanged(cb: (c: AppConfig) => void): () => void;
   setKey(targetId: string, key: string): Promise<void>;
@@ -57,21 +57,21 @@ export interface CornetaApi {
   /** Estado "conectado" do chat sincronizado entre janelas (start/stop de qualquer webview). */
   subscribeChatRunning(cb: (running: boolean) => void): () => void;
   chatSend(text: string, sources?: string[]): Promise<void>;
-  subscribeChatAuth(onAuth: (a: { source: string; login: string; ok: boolean }) => void): () => void;
+  subscribeChatAuth(
+    onAuth: (a: { source: string; login: string; ok: boolean }) => void,
+  ): () => void;
   // OAuth (envio/moderação)
   setOauthConfig(c: {
     twitchClientId: string;
-    twitchClientSecret: string;
     googleClientId: string;
-    googleClientSecret: string;
     kickClientId: string;
-    kickClientSecret: string;
   }): Promise<void>;
   authStatus(): Promise<{
     twitchLogin: string | null;
     youtube: boolean;
     youtubeConfigured: boolean;
     kick: boolean;
+    kickConfigured: boolean;
   }>;
   twitchLoginStart(): Promise<void>;
   twitchLogout(): Promise<void>;
@@ -87,27 +87,42 @@ export interface CornetaApi {
   /** BYOK: salva/limpa as credenciais do Google do próprio usuário (cofre). */
   setYoutubeOauth(clientId: string, clientSecret: string): Promise<void>;
   clearYoutubeOauth(): Promise<void>;
+  setKickOauth(clientId: string, clientSecret: string): Promise<void>;
+  clearKickOauth(): Promise<void>;
   chatModerate(
     sourceId: string,
     action: string,
-    opts?: { nativeId?: string; author?: string; authorId?: string; seconds?: number }
+    opts?: {
+      nativeId?: string;
+      author?: string;
+      authorId?: string;
+      seconds?: number;
+    },
   ): Promise<void>;
   subscribeAuthFlow(
     onAuth: (
       who: string,
-      a: { state: string; userCode: string; verifyUri: string; verifyUriComplete?: string; login: string }
-    ) => void
+      a: {
+        state: string;
+        userCode: string;
+        verifyUri: string;
+        verifyUriComplete?: string;
+        login: string;
+      },
+    ) => void,
   ): () => void;
   openChatWindow(): Promise<void>;
   subscribeChat(
     onMsg: (m: ChatMessage) => void,
     onStatus: (s: ChatStatus) => void,
-    onDelete: (d: ChatDelete) => void
+    onDelete: (d: ChatDelete) => void,
   ): () => void;
   subscribeAlerts(onAlert: (a: Alert) => void): () => void;
   alertsStart(): Promise<void>;
   alertsStop(): Promise<void>;
-  subscribeAlertStatus(onStatus: (s: { source: string; status: string }) => void): () => void;
+  subscribeAlertStatus(
+    onStatus: (s: { source: string; status: string }) => void,
+  ): () => void;
   subscribeViewers(onViewers: (v: Viewers) => void): () => void;
   // UX
   obsSetStream(start: boolean): Promise<void>;
@@ -117,6 +132,7 @@ export interface CornetaApi {
   /** Testa o token de uma fonte de alerta. Resolve com msg de ok; rejeita com o motivo. */
   alertTest(sourceId: string): Promise<string>;
   openLogsDir(): Promise<void>;
+  exportDiagnostics(): Promise<boolean>;
   registerShortcut(shortcut: string): Promise<void>;
   subscribeShortcut(cb: () => void): () => void;
   obsCheck(): Promise<ObsCheck>;
@@ -132,7 +148,10 @@ export interface CornetaApi {
   getBrbSlatePreview(): Promise<string>;
   captureFrame(): Promise<string>;
   // Guardião anti-vazamento
-  subscribeGuardian(onLeak: (l: Leak) => void, onCensor: (on: boolean) => void): () => void;
+  subscribeGuardian(
+    onLeak: (l: Leak) => void,
+    onCensor: (on: boolean) => void,
+  ): () => void;
   // Mesa (co-stream P2P): servidor local (HTTP + sinalização) + auto-fonte no OBS
   mesaStartServer(): Promise<MesaServerInfo>;
   mesaStopServer(): Promise<void>;
@@ -184,15 +203,15 @@ function tauriApi(): CornetaApi {
     },
     async saveConfig(config) {
       const { invoke } = await core();
-      await invoke("save_config", { config });
+      return invoke<AppConfig>("save_config", { config });
     },
     subscribeConfigChanged(cb) {
       let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
         listen<AppConfig>("config://changed", (e) => cb(e.payload)).then((u) =>
-          cancelled ? u() : (unlisten = u)
-        )
+          cancelled ? u() : (unlisten = u),
+        ),
       );
       return () => {
         cancelled = true;
@@ -244,9 +263,9 @@ function tauriApi(): CornetaApi {
       let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen<EngineSnapshot>("engine://status", (e) => cb(e.payload)).then((u) =>
-          cancelled ? u() : (unlisten = u)
-        )
+        listen<EngineSnapshot>("engine://status", (e) => cb(e.payload)).then(
+          (u) => (cancelled ? u() : (unlisten = u)),
+        ),
       );
       return () => {
         cancelled = true;
@@ -287,8 +306,8 @@ function tauriApi(): CornetaApi {
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
         listen<boolean>("chat://running", (e) => cb(e.payload)).then((u) =>
-          cancelled ? u() : (unlisten = u)
-        )
+          cancelled ? u() : (unlisten = u),
+        ),
       );
       return () => {
         cancelled = true;
@@ -304,9 +323,10 @@ function tauriApi(): CornetaApi {
       let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen<{ source: string; login: string; ok: boolean }>("chat://auth", (e) => onAuth(e.payload)).then(
-          (u) => (cancelled ? u() : (unlisten = u))
-        )
+        listen<{ source: string; login: string; ok: boolean }>(
+          "chat://auth",
+          (e) => onAuth(e.payload),
+        ).then((u) => (cancelled ? u() : (unlisten = u))),
       );
       return () => {
         cancelled = true;
@@ -348,7 +368,10 @@ function tauriApi(): CornetaApi {
     },
     async setStreamInfo(title, category) {
       const { invoke } = await core();
-      return await invoke("set_stream_info", { title, category: category ?? null });
+      return await invoke("set_stream_info", {
+        title,
+        category: category ?? null,
+      });
     },
     async setYoutubeOauth(clientId, clientSecret) {
       const { invoke } = await core();
@@ -357,6 +380,14 @@ function tauriApi(): CornetaApi {
     async clearYoutubeOauth() {
       const { invoke } = await core();
       await invoke("clear_youtube_oauth");
+    },
+    async setKickOauth(clientId, clientSecret) {
+      const { invoke } = await core();
+      await invoke("set_kick_oauth", { clientId, clientSecret });
+    },
+    async clearKickOauth() {
+      const { invoke } = await core();
+      await invoke("clear_kick_oauth");
     },
     async chatModerate(sourceId, action, opts) {
       const { invoke } = await core();
@@ -381,9 +412,15 @@ function tauriApi(): CornetaApi {
         login: string;
       };
       void event().then(({ listen }) => {
-        void listen<AuthPayload>("auth://twitch", (e) => onAuth("twitch", e.payload)).then(add);
-        void listen<AuthPayload>("auth://youtube", (e) => onAuth("youtube", e.payload)).then(add);
-        void listen<AuthPayload>("auth://kick", (e) => onAuth("kick", e.payload)).then(add);
+        void listen<AuthPayload>("auth://twitch", (e) =>
+          onAuth("twitch", e.payload),
+        ).then(add);
+        void listen<AuthPayload>("auth://youtube", (e) =>
+          onAuth("youtube", e.payload),
+        ).then(add);
+        void listen<AuthPayload>("auth://kick", (e) =>
+          onAuth("kick", e.payload),
+        ).then(add);
       });
       return () => {
         cancelled = true;
@@ -403,9 +440,15 @@ function tauriApi(): CornetaApi {
       const uns: Array<() => void> = [];
       const add = (u: () => void) => (cancelled ? u() : uns.push(u));
       void event().then(({ listen }) => {
-        void listen<ChatMessage>("chat://message", (e) => onMsg(e.payload)).then(add);
-        void listen<ChatStatus>("chat://status", (e) => onStatus(e.payload)).then(add);
-        void listen<ChatDelete>("chat://delete", (e) => onDelete(e.payload)).then(add);
+        void listen<ChatMessage>("chat://message", (e) =>
+          onMsg(e.payload),
+        ).then(add);
+        void listen<ChatStatus>("chat://status", (e) =>
+          onStatus(e.payload),
+        ).then(add);
+        void listen<ChatDelete>("chat://delete", (e) =>
+          onDelete(e.payload),
+        ).then(add);
       });
       return () => {
         cancelled = true;
@@ -418,8 +461,8 @@ function tauriApi(): CornetaApi {
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
         listen<Alert>("alert://event", (e) => onAlert(e.payload)).then((u) =>
-          cancelled ? u() : (unlisten = u)
-        )
+          cancelled ? u() : (unlisten = u),
+        ),
       );
       return () => {
         cancelled = true;
@@ -439,9 +482,9 @@ function tauriApi(): CornetaApi {
       let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen<{ source: string; status: string }>("alert://status", (e) => onStatus(e.payload)).then(
-          (u) => (cancelled ? u() : (unlisten = u))
-        )
+        listen<{ source: string; status: string }>("alert://status", (e) =>
+          onStatus(e.payload),
+        ).then((u) => (cancelled ? u() : (unlisten = u))),
       );
       return () => {
         cancelled = true;
@@ -453,9 +496,9 @@ function tauriApi(): CornetaApi {
       let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen<Viewers>("viewers://update", (e) => onViewers(e.payload)).then((u) =>
-          cancelled ? u() : (unlisten = u)
-        )
+        listen<Viewers>("viewers://update", (e) => onViewers(e.payload)).then(
+          (u) => (cancelled ? u() : (unlisten = u)),
+        ),
       );
       return () => {
         cancelled = true;
@@ -483,6 +526,10 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("open_logs_dir");
     },
+    async exportDiagnostics() {
+      const { invoke } = await core();
+      return invoke<boolean>("export_diagnostics");
+    },
     async registerShortcut(shortcut) {
       const { invoke } = await core();
       await invoke("register_shortcut", { shortcut });
@@ -492,8 +539,8 @@ function tauriApi(): CornetaApi {
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
         listen("shortcut://toggle-live", () => cb()).then((u) =>
-          cancelled ? u() : (unlisten = u)
-        )
+          cancelled ? u() : (unlisten = u),
+        ),
       );
       return () => {
         cancelled = true;
@@ -523,7 +570,9 @@ function tauriApi(): CornetaApi {
     },
     async setBrbSlate() {
       const { invoke } = await core();
-      return invoke<{ kind: "image" | "video"; fileName: string } | null>("set_brb_slate");
+      return invoke<{ kind: "image" | "video"; fileName: string } | null>(
+        "set_brb_slate",
+      );
     },
     async clearBrbSlate() {
       const { invoke } = await core();
@@ -543,7 +592,9 @@ function tauriApi(): CornetaApi {
       const add = (u: () => void) => (cancelled ? u() : uns.push(u));
       void event().then(({ listen }) => {
         void listen<Leak>("leak://alert", (e) => onLeak(e.payload)).then(add);
-        void listen<boolean>("leak://censor", (e) => onCensor(e.payload)).then(add);
+        void listen<boolean>("leak://censor", (e) => onCensor(e.payload)).then(
+          add,
+        );
       });
       return () => {
         cancelled = true;
@@ -618,7 +669,17 @@ function mockApi(): CornetaApi {
   const loadConfig = (): AppConfig => {
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<AppConfig>;
+        return {
+          ...defaultConfig(),
+          ...parsed,
+          schemaVersion: 1,
+          revision: Number.isSafeInteger(parsed.revision)
+            ? Number(parsed.revision)
+            : 0,
+        };
+      }
     } catch {
       /* ignore */
     }
@@ -644,9 +705,15 @@ function mockApi(): CornetaApi {
     startedAt: number,
     mins: number,
     plats: { id: string; name: string; platformId: string }[],
-    opts?: { dropAtMin?: number; dropIdx?: number; highCpu?: boolean }
+    opts?: { dropAtMin?: number; dropIdx?: number; highCpu?: boolean },
   ): string => {
-    const meta = { kind: "meta", id: String(startedAt), startedAt, mode: "per-platform", platforms: plats };
+    const meta = {
+      kind: "meta",
+      id: String(startedAt),
+      startedAt,
+      mode: "per-platform",
+      platforms: plats,
+    };
     const lines = [JSON.stringify(meta)];
     const step = 2000;
     const n = Math.round((mins * 60 * 1000) / step);
@@ -661,19 +728,31 @@ function mockApi(): CornetaApi {
       let cpu = 46 + Math.sin(k / 9) * 7 + Math.random() * 5;
       const gpu = 32 + Math.sin(k / 7) * 6 + Math.random() * 4;
       const targets = plats.map((p, i) => {
-        let bitrate = Math.round(base[i % base.length] * (0.96 + Math.random() * 0.07));
+        let bitrate = Math.round(
+          base[i % base.length] * (0.96 + Math.random() * 0.07),
+        );
         let state = "live";
         const isDrop =
-          opts?.dropAtMin != null && Math.abs(minNow - opts.dropAtMin) < 0.18 && i === (opts.dropIdx ?? 0);
+          opts?.dropAtMin != null &&
+          Math.abs(minNow - opts.dropAtMin) < 0.18 &&
+          i === (opts.dropIdx ?? 0);
         if (isDrop) {
           bitrate = Math.round(base[i % base.length] * 0.3);
           state = "reconnecting";
           drops[i] += 25;
           if (opts?.highCpu) cpu = 97;
         }
-        return { id: p.id, name: p.name, state, bitrate, fps: 60, dropped: drops[i] };
+        return {
+          id: p.id,
+          name: p.name,
+          state,
+          bitrate,
+          fps: 60,
+          dropped: drops[i],
+        };
       });
-      const incident = opts?.dropAtMin != null && Math.abs(minNow - opts.dropAtMin) < 0.18;
+      const incident =
+        opts?.dropAtMin != null && Math.abs(minNow - opts.dropAtMin) < 0.18;
       const obs = {
         activeFps: 60,
         avgRenderMs: incident ? 28 + Math.random() * 5 : 7 + Math.random() * 3,
@@ -694,7 +773,7 @@ function mockApi(): CornetaApi {
           obs,
           chat,
           targets,
-        })
+        }),
       );
       if (k % 15 === 0) {
         const ramp = Math.min(1, minNow / 5);
@@ -710,7 +789,14 @@ function mockApi(): CornetaApi {
     // Alertas de exemplo: raid (pico), subs/membros espalhados, gift bomb e bits.
     const at = (mm: number) => startedAt + mm * 60000;
     lines.push(
-      JSON.stringify({ kind: "alert", t: at(raidAtMin), platform: plats[0].platformId, alertKind: "raid", user: "Gaules", amount: raidViewers })
+      JSON.stringify({
+        kind: "alert",
+        t: at(raidAtMin),
+        platform: plats[0].platformId,
+        alertKind: "raid",
+        user: "Gaules",
+        amount: raidViewers,
+      }),
     );
     ["sub", "resub", "sub", "member", "resub"].forEach((kd, idx) => {
       const mm = 3 + idx * 6;
@@ -721,20 +807,44 @@ function mockApi(): CornetaApi {
             t: at(mm),
             platform: plats[idx % plats.length].platformId,
             alertKind: kd,
-            user: ["ana_live", "brabo_do_rio", "zedapeça", "kraderson", "luluzinha"][idx],
+            user: [
+              "ana_live",
+              "brabo_do_rio",
+              "zedapeça",
+              "kraderson",
+              "luluzinha",
+            ][idx],
             amount: kd === "resub" ? 2 + idx : 1,
-          })
+          }),
         );
     });
     lines.push(
-      JSON.stringify({ kind: "alert", t: at(Math.min(mins * 0.55, 16)), platform: plats[0].platformId, alertKind: "subgift", user: "Patrocinador", amount: 10 })
+      JSON.stringify({
+        kind: "alert",
+        t: at(Math.min(mins * 0.55, 16)),
+        platform: plats[0].platformId,
+        alertKind: "subgift",
+        user: "Patrocinador",
+        amount: 10,
+      }),
     );
     lines.push(
-      JSON.stringify({ kind: "alert", t: at(Math.min(mins * 0.28, 8)), platform: plats[0].platformId, alertKind: "bits", user: "fa_numero_1", amount: 1000 })
+      JSON.stringify({
+        kind: "alert",
+        t: at(Math.min(mins * 0.28, 8)),
+        platform: plats[0].platformId,
+        alertKind: "bits",
+        user: "fa_numero_1",
+        amount: 1000,
+      }),
     );
     if (opts?.dropAtMin != null) {
       lines.push(
-        JSON.stringify({ kind: "marker", t: startedAt + opts.dropAtMin * 60000, label: "Twitch caiu" })
+        JSON.stringify({
+          kind: "marker",
+          t: startedAt + opts.dropAtMin * 60000,
+          label: "Twitch caiu",
+        }),
       );
     }
     lines.push(JSON.stringify({ kind: "end", endedAt: startedAt + n * step }));
@@ -749,12 +859,20 @@ function mockApi(): CornetaApi {
     const a = Date.now() - 26 * 3600 * 1000;
     const b = Date.now() - 3 * 3600 * 1000;
     m[String(a)] = genSession(a, 35, [tw, yt]); // sem incidentes
-    m[String(b)] = genSession(b, 48, [tw, yt], { dropAtMin: 23, dropIdx: 0, highCpu: true }); // com incidente
+    m[String(b)] = genSession(b, 48, [tw, yt], {
+      dropAtMin: 23,
+      dropIdx: 0,
+      highCpu: true,
+    }); // com incidente
     saveSessions(m);
   };
 
   // --- simulador do motor ---
-  let snapshot: EngineSnapshot = { state: "stopped", startedAt: null, targets: {} };
+  let snapshot: EngineSnapshot = {
+    state: "stopped",
+    startedAt: null,
+    targets: {},
+  };
   const listeners = new Set<(s: EngineSnapshot) => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
   // Gravação da sessão demo em andamento.
@@ -778,23 +896,67 @@ function mockApi(): CornetaApi {
     { platform: "kick" as const, source: "XQC" },
     { platform: "youtube" as const, source: "Live" },
   ];
-  const ALERT_USERS = ["brabo_do_rio", "ana_live", "kraderson", "Maria Silva", "zedapeça", "miron_tv"];
+  const ALERT_USERS = [
+    "brabo_do_rio",
+    "ana_live",
+    "kraderson",
+    "Maria Silva",
+    "zedapeça",
+    "miron_tv",
+  ];
   const randomAlert = (seq: number): Alert => {
     const src = ALERT_SOURCES[Math.floor(Math.random() * ALERT_SOURCES.length)];
     const user = ALERT_USERS[Math.floor(Math.random() * ALERT_USERS.length)];
-    const kinds: Alert["kind"][] = ["sub", "resub", "subgift", "bits", "raid", "member", "superchat"];
+    const kinds: Alert["kind"][] = [
+      "sub",
+      "resub",
+      "subgift",
+      "bits",
+      "raid",
+      "member",
+      "superchat",
+    ];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
-    const base: Alert = { id: `a${seq}-${Date.now()}`, platform: src.platform, source: src.source, kind, user, ts: Date.now() };
+    const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+    const base: Alert = {
+      id: `a${seq}-${Date.now()}`,
+      platform: src.platform,
+      source: src.source,
+      kind,
+      user,
+      ts: Date.now(),
+    };
     switch (kind) {
-      case "bits": return { ...base, amount: pick([100, 500, 1000]) };
-      case "resub": return { ...base, amount: 1 + Math.floor(Math.random() * 24), tier: "T1", message: "valeu demais!" };
-      case "sub": return { ...base, tier: "T1" };
-      case "subgift": return { ...base, amount: pick([1, 5, 10]) };
-      case "raid": return { ...base, amount: 10 + Math.floor(Math.random() * 200) };
-      case "member": return { ...base, tier: "Membro", amount: 1 + Math.floor(Math.random() * 12) };
-      case "superchat": return { ...base, amount: pick([5, 10, 50]), currency: "BRL", message: "manda salve!" };
-      default: return base;
+      case "bits":
+        return { ...base, amount: pick([100, 500, 1000]) };
+      case "resub":
+        return {
+          ...base,
+          amount: 1 + Math.floor(Math.random() * 24),
+          tier: "T1",
+          message: "valeu demais!",
+        };
+      case "sub":
+        return { ...base, tier: "T1" };
+      case "subgift":
+        return { ...base, amount: pick([1, 5, 10]) };
+      case "raid":
+        return { ...base, amount: 10 + Math.floor(Math.random() * 200) };
+      case "member":
+        return {
+          ...base,
+          tier: "Membro",
+          amount: 1 + Math.floor(Math.random() * 12),
+        };
+      case "superchat":
+        return {
+          ...base,
+          amount: pick([5, 10, 50]),
+          currency: "BRL",
+          message: "manda salve!",
+        };
+      default:
+        return base;
     }
   };
   const CHAT_MSGS = [
@@ -829,7 +991,8 @@ function mockApi(): CornetaApi {
         const jitter = (Math.random() - 0.5) * 0.06;
         st.bitrateKbps = Math.max(0, Math.round(st.bitrateKbps * (1 + jitter)));
         st.fps = 30 + Math.round(Math.random() * 30);
-        if (Math.random() < 0.04) st.droppedFrames += Math.round(Math.random() * 3);
+        if (Math.random() < 0.04)
+          st.droppedFrames += Math.round(Math.random() * 3);
       }
       st.uptimeSec = snapshot.startedAt ? (now - snapshot.startedAt) / 1000 : 0;
     }
@@ -858,7 +1021,7 @@ function mockApi(): CornetaApi {
             fps: s.fps,
             dropped: s.droppedFrames,
           })),
-        })
+        }),
       );
     }
     emit();
@@ -869,7 +1032,9 @@ function mockApi(): CornetaApi {
       return loadConfig();
     },
     async saveConfig(config) {
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+      const saved = { ...config, revision: config.revision + 1 };
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(saved));
+      return saved;
     },
     subscribeConfigChanged() {
       // Navegador = uma janela só; não há outra webview pra sincronizar.
@@ -887,10 +1052,20 @@ function mockApi(): CornetaApi {
     },
     async detectEncoders() {
       return [
-        { kind: "nvenc", label: "NVIDIA NVENC", available: true, maxSessions: 8 },
+        {
+          kind: "nvenc",
+          label: "NVIDIA NVENC",
+          available: true,
+          maxSessions: 8,
+        },
         { kind: "qsv", label: "Intel Quick Sync", available: false },
         { kind: "amf", label: "AMD AMF", available: false },
-        { kind: "software", label: "Software (x264)", available: true, maxSessions: 1 },
+        {
+          kind: "software",
+          label: "Software (x264)",
+          available: true,
+          maxSessions: 1,
+        },
       ];
     },
     async testUpload() {
@@ -905,7 +1080,9 @@ function mockApi(): CornetaApi {
       pausedTargets.clear();
       const targets: Record<string, TargetStatus> = {};
       for (const t of cfg.targets.filter((x) => x.enabled)) {
-        const target = t.encoding.preset?.videoBitrateKbps ?? PLATFORMS[t.platformId].recommended.videoBitrateKbps;
+        const target =
+          t.encoding.preset?.videoBitrateKbps ??
+          PLATFORMS[t.platformId].recommended.videoBitrateKbps;
         targets[t.id] = {
           targetId: t.id,
           name: t.name,
@@ -924,7 +1101,13 @@ function mockApi(): CornetaApi {
       rec = {
         id: sid,
         lines: [
-          JSON.stringify({ kind: "meta", id: sid, startedAt: snapshot.startedAt, mode: cfg.mode, platforms: plats }),
+          JSON.stringify({
+            kind: "meta",
+            id: sid,
+            startedAt: snapshot.startedAt,
+            mode: cfg.mode,
+            platforms: plats,
+          }),
         ],
       };
       emit();
@@ -963,7 +1146,8 @@ function mockApi(): CornetaApi {
     async setForceBrb(on) {
       snapshot.forcedBrb = on;
       for (const st of Object.values(snapshot.targets)) {
-        if (st.state === "live" || st.state === "brb") st.state = on ? "brb" : "live";
+        if (st.state === "live" || st.state === "brb")
+          st.state = on ? "brb" : "live";
       }
       emit();
     },
@@ -978,7 +1162,12 @@ function mockApi(): CornetaApi {
       const out: SessionMeta[] = [];
       for (const [id, ndjson] of Object.entries(m)) {
         const lines = ndjson.trim().split("\n");
-        let meta: { kind?: string; startedAt?: number; mode?: string; platforms?: unknown };
+        let meta: {
+          kind?: string;
+          startedAt?: number;
+          mode?: string;
+          platforms?: unknown;
+        };
         try {
           meta = JSON.parse(lines[0]);
         } catch {
@@ -989,7 +1178,7 @@ function mockApi(): CornetaApi {
         let endedAt = startedAt;
         try {
           const last = JSON.parse(lines[lines.length - 1]);
-          endedAt = last.kind === "end" ? last.endedAt : last.t ?? startedAt;
+          endedAt = last.kind === "end" ? last.endedAt : (last.t ?? startedAt);
         } catch {
           /* ignore */
         }
@@ -1025,15 +1214,23 @@ function mockApi(): CornetaApi {
       ] as const;
       SOURCES.forEach((src) =>
         chatStatusListeners.forEach((l) =>
-          l({ platform: src.platform, source: src.name, status: "connected" })
-        )
+          l({ platform: src.platform, source: src.name, status: "connected" }),
+        ),
       );
       // Viewers simulados (oscilam ao redor de uma base por canal).
-      const VBASE: Record<string, number> = { Pitrol: 820, Gaules: 4200, XQC: 1500, Live: 300 };
+      const VBASE: Record<string, number> = {
+        Pitrol: 820,
+        Gaules: 4200,
+        XQC: 1500,
+        Live: 300,
+      };
       const emitViewers = () => {
         const items = SOURCES.map((s) => {
           const base = VBASE[s.name] ?? 100;
-          const viewers = Math.max(0, Math.round(base * (0.9 + Math.random() * 0.2)));
+          const viewers = Math.max(
+            0,
+            Math.round(base * (0.9 + Math.random() * 0.2)),
+          );
           return { platform: s.platform, source: s.name, viewers, live: true };
         });
         const total = items.reduce((a, b) => a + (b.viewers ?? 0), 0);
@@ -1054,7 +1251,7 @@ function mockApi(): CornetaApi {
         if (recentIds.length > 8 && Math.random() < 0.08) {
           const r = recentIds[Math.floor(Math.random() * recentIds.length)];
           chatDeleteListeners.forEach((l) =>
-            l({ scope: "message", platform: r.platform, nativeId: r.nativeId })
+            l({ scope: "message", platform: r.platform, nativeId: r.nativeId }),
           );
         }
         // De vez em quando, dispara um alerta de exemplo.
@@ -1096,12 +1293,15 @@ function mockApi(): CornetaApi {
             source: src.name,
             author: pool[Math.floor(Math.random() * pool.length)],
             nativeId,
-            color: platform === "youtube" ? undefined : COLORS[Math.floor(Math.random() * COLORS.length)],
+            color:
+              platform === "youtube"
+                ? undefined
+                : COLORS[Math.floor(Math.random() * COLORS.length)],
             text,
             fragments,
             badges,
             ts: Date.now(),
-          })
+          }),
         );
       }, 1100);
     },
@@ -1110,7 +1310,9 @@ function mockApi(): CornetaApi {
       chatTimer = null;
       if (viewerTimer) clearInterval(viewerTimer);
       viewerTimer = null;
-      viewerListeners.forEach((l) => l({ total: 0, anyLive: false, items: [] }));
+      viewerListeners.forEach((l) =>
+        l({ total: 0, anyLive: false, items: [] }),
+      );
     },
     async chatRunning() {
       return chatTimer != null;
@@ -1135,7 +1337,7 @@ function mockApi(): CornetaApi {
           fragments: [{ kind: "text", text }],
           badges: [],
           ts: Date.now(),
-        })
+        }),
       );
     },
     subscribeChatAuth() {
@@ -1143,7 +1345,13 @@ function mockApi(): CornetaApi {
     },
     async setOauthConfig() {},
     async authStatus() {
-      return { twitchLogin: null, youtube: false, youtubeConfigured: false, kick: false };
+      return {
+        twitchLogin: null,
+        youtube: false,
+        youtubeConfigured: false,
+        kick: false,
+        kickConfigured: false,
+      };
     },
     async twitchLoginStart() {},
     async twitchLogout() {},
@@ -1156,6 +1364,8 @@ function mockApi(): CornetaApi {
     },
     async setYoutubeOauth() {},
     async clearYoutubeOauth() {},
+    async setKickOauth() {},
+    async clearKickOauth() {},
     async chatModerate() {},
     subscribeAuthFlow() {
       return () => {};
@@ -1198,6 +1408,9 @@ function mockApi(): CornetaApi {
     async openLogsDir() {
       // no-op no navegador.
     },
+    async exportDiagnostics() {
+      return true;
+    },
     async registerShortcut() {
       // no-op no navegador (atalho global é do SO).
     },
@@ -1205,7 +1418,13 @@ function mockApi(): CornetaApi {
       return () => {};
     },
     async obsCheck() {
-      return { reachable: true, pointingAtCorneta: true, width: 1920, height: 1080, fps: 60 };
+      return {
+        reachable: true,
+        pointingAtCorneta: true,
+        width: 1920,
+        height: 1080,
+        fps: 60,
+      };
     },
     async markMoment() {
       // no-op no navegador (sem sessão real gravando)

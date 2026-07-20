@@ -19,7 +19,10 @@ type RawLine = { kind?: string; [k: string]: unknown };
 
 /** Converte o NDJSON cru numa sessão estruturada. */
 export function parseSession(ndjson: string): SessionData | null {
-  const lines = ndjson.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = ndjson
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   let meta: SessionMeta | null = null;
   const samples: SessionSample[] = [];
   const markers: SessionMarker[] = [];
@@ -73,7 +76,8 @@ export function parseSession(ndjson: string): SessionData | null {
       });
     } else if (o.kind === "marker") {
       const t = Number(o.t);
-      if (Number.isFinite(t)) markers.push({ t, label: String(o.label ?? "Momento") });
+      if (Number.isFinite(t))
+        markers.push({ t, label: String(o.label ?? "Momento") });
     } else if (o.kind === "end") {
       const e = Number(o.endedAt);
       if (Number.isFinite(e)) endedAt = e;
@@ -85,7 +89,10 @@ export function parseSession(ndjson: string): SessionData | null {
   // endedAt só existe com o registro "end" — sessão AINDA NO AR fica sem, e o
   // ReportsScreen usa isso pra não gravar resumo parcial no cache.
   meta.endedAt = endedAt;
-  meta.durationSec = Math.max(0, Math.round(((endedAt ?? last) - meta.startedAt) / 1000));
+  meta.durationSec = Math.max(
+    0,
+    Math.round(((endedAt ?? last) - meta.startedAt) / 1000),
+  );
   return { meta, samples, markers, viewerSamples, alertEvents };
 }
 
@@ -97,13 +104,17 @@ export const cpuSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => s.cpu ?? null);
 export const gpuSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => s.gpu ?? null);
-export function bitrateSeries(d: SessionData, targetId: string): (number | null)[] {
+export function bitrateSeries(
+  d: SessionData,
+  targetId: string,
+): (number | null)[] {
   return d.samples.map((s) => {
     const t = s.targets.find((x) => x.id === targetId);
     return t ? t.bitrate : null;
   });
 }
-export const hasObs = (d: SessionData): boolean => d.samples.some((s) => s.obs != null);
+export const hasObs = (d: SessionData): boolean =>
+  d.samples.some((s) => s.obs != null);
 export const obsCongestionSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => (s.obs ? Math.round(s.obs.congestion * 100) : null));
 export const obsRenderSeries = (d: SessionData): (number | null)[] =>
@@ -122,14 +133,23 @@ export function chatRateSeries(d: SessionData): (number | null)[] {
     return dt > 0 ? Math.round((x.chat * 60) / dt) : 0;
   });
 }
-export const hasChat = (d: SessionData): boolean => d.samples.some((s) => (s.chat ?? 0) > 0);
+export const hasChat = (d: SessionData): boolean =>
+  d.samples.some((s) => (s.chat ?? 0) > 0);
 
 // ---------------------------------------------------------------------------
 // Análise
 // ---------------------------------------------------------------------------
 export interface ReportEvent {
   t: number;
-  kind: "start" | "end" | "reconnect" | "error" | "recover" | "cpu" | "marker" | "signal";
+  kind:
+    | "start"
+    | "end"
+    | "reconnect"
+    | "error"
+    | "recover"
+    | "cpu"
+    | "marker"
+    | "signal";
   label: string;
 }
 
@@ -144,7 +164,8 @@ export interface ProblemWindow {
   signals: string[];
   cause: string;
   /** Classificação estável da causa (o texto de `cause` é copy, pode mudar). */
-  causeKind: "render" | "encoding" | "network" | "platform" | "signal" | "unknown";
+  causeKind:
+    "render" | "encoding" | "network" | "platform" | "signal" | "unknown";
   advice: string;
   targetName?: string;
 }
@@ -231,7 +252,9 @@ interface TargetCtx {
 }
 
 /** Pré-computa everLive/warm por amostra×destino (warm zera quando sai do ar). */
-function targetCtxs(samples: SessionSample[]): Array<Record<string, TargetCtx>> {
+function targetCtxs(
+  samples: SessionSample[],
+): Array<Record<string, TargetCtx>> {
   const everLive: Record<string, boolean> = {};
   const liveRun: Record<string, number> = {};
   return samples.map((s) => {
@@ -256,12 +279,13 @@ function targetCtxs(samples: SessionSample[]): Array<Record<string, TargetCtx>> 
  *  puxa a mediana e o começo de TODA live vira "queda". */
 function typicalBitrates(
   samples: SessionSample[],
-  ctxs: Array<Record<string, TargetCtx>>
+  ctxs: Array<Record<string, TargetCtx>>,
 ): Record<string, number> {
   const byId: Record<string, number[]> = {};
   samples.forEach((s, i) => {
     for (const t of s.targets)
-      if (t.state === "live" && ctxs[i][t.id]?.warm) (byId[t.id] ??= []).push(t.bitrate);
+      if (t.state === "live" && ctxs[i][t.id]?.warm)
+        (byId[t.id] ??= []).push(t.bitrate);
   });
   const out: Record<string, number> = {};
   for (const [id, arr] of Object.entries(byId)) {
@@ -274,19 +298,28 @@ function typicalBitrates(
 function isBad(
   s: SessionSample,
   typical: Record<string, number>,
-  ctx: Record<string, TargetCtx>
+  ctx: Record<string, TargetCtx>,
 ): boolean {
   for (const t of s.targets) {
     // Problema de estado só conta DEPOIS do destino ter ido ao ar — o ciclo
     // conectar→tentar de novo da partida acusava "reconectou" em toda live.
     if (isProblemState(t.state) && ctx[t.id]?.everLive) return true;
     const typ = typical[t.id];
-    if (t.state === "live" && ctx[t.id]?.warm && typ && t.bitrate < typ * BITRATE_DROP)
+    if (
+      t.state === "live" &&
+      ctx[t.id]?.warm &&
+      typ &&
+      t.bitrate < typ * BITRATE_DROP
+    )
       return true;
   }
   if (s.cpu != null && s.cpu > CPU_HIGH) return true;
   if (s.gpu != null && s.gpu > CPU_HIGH) return true;
-  if (s.obs && (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)) return true;
+  if (
+    s.obs &&
+    (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)
+  )
+    return true;
   return false;
 }
 
@@ -294,7 +327,7 @@ function buildWindow(
   slice: SessionSample[],
   sliceCtxs: Array<Record<string, TargetCtx>>,
   totalTargets: number,
-  typical: Record<string, number>
+  typical: Record<string, number>,
 ): ProblemWindow {
   const tStart = slice[0].t;
   const tEnd = slice[slice.length - 1].t;
@@ -320,11 +353,19 @@ function buildWindow(
       if (t.state === "signal-lost") {
         signalLost = true;
         affected.add(t.name);
-      } else if ((t.state === "reconnecting" || t.state === "error") && ctx?.everLive) {
+      } else if (
+        (t.state === "reconnecting" || t.state === "error") &&
+        ctx?.everLive
+      ) {
         reconnect = true;
         affected.add(t.name);
       }
-      if (t.state === "live" && ctx?.warm && typ && t.bitrate < typ * BITRATE_DROP) {
+      if (
+        t.state === "live" &&
+        ctx?.warm &&
+        typ &&
+        t.bitrate < typ * BITRATE_DROP
+      ) {
         bitrateDrop = true;
         affected.add(t.name);
       }
@@ -344,7 +385,8 @@ function buildWindow(
   if (cpuHigh) signals.push(`CPU ${Math.round(maxCpu)}%`);
   if (gpuHigh) signals.push(`GPU ${Math.round(maxGpu)}%`);
   if (renderLag) signals.push(`OBS render ${Math.round(maxRenderMs)}ms`);
-  if (congested) signals.push(`OBS congestionado ${Math.round(maxCongestion * 100)}%`);
+  if (congested)
+    signals.push(`OBS congestionado ${Math.round(maxCongestion * 100)}%`);
 
   // Copy em português de streamer: o que houve + passo concreto, termo técnico entre parênteses.
   let cause = "Causa indeterminada";
@@ -353,11 +395,13 @@ function buildWindow(
   if (signalLost) {
     cause = "O sinal do OBS caiu (sem vídeo chegando)";
     causeKind = "signal";
-    advice = "Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta — nesse trecho a galera ficou sem imagem.";
+    advice =
+      "Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta — nesse trecho a galera ficou sem imagem.";
   } else if (renderLag && !cpuHigh && !gpuHigh) {
     cause = "Cena pesada no OBS (render lag)";
     causeKind = "render";
-    advice = "Alivie a cena no OBS — menos fontes, filtros e efeitos — ou baixe a resolução base lá.";
+    advice =
+      "Alivie a cena no OBS — menos fontes, filtros e efeitos — ou baixe a resolução base lá.";
   } else if (cpuHigh || gpuHigh) {
     cause = "Seu PC não deu conta de gerar o vídeo (encoding)";
     causeKind = "encoding";
@@ -366,11 +410,13 @@ function buildWindow(
   } else if (congested || ((bitrateDrop || reconnect) && !singleTarget)) {
     cause = "A internet não deu conta do upload";
     causeKind = "network";
-    advice = "Baixe o bitrate na tela Qualidade ou tire uma plataforma da live.";
+    advice =
+      "Baixe o bitrate na tela Qualidade ou tire uma plataforma da live.";
   } else if (singleTarget) {
     cause = `Instabilidade em ${[...affected][0]}`;
     causeKind = "platform";
-    advice = "Provavelmente foi do lado da plataforma (o servidor dela, não você). Confira a chave e o status dela.";
+    advice =
+      "Provavelmente foi do lado da plataforma (o servidor dela, não você). Confira a chave e o status dela.";
   }
 
   return {
@@ -388,7 +434,7 @@ function buildWindow(
 function problemWindows(
   data: SessionData,
   typical: Record<string, number>,
-  ctxs: Array<Record<string, TargetCtx>>
+  ctxs: Array<Record<string, TargetCtx>>,
 ): ProblemWindow[] {
   const { samples } = data;
   const flags = samples.map((s, i) => isBad(s, typical, ctxs[i]));
@@ -422,13 +468,18 @@ function problemWindows(
         .slice(a, b + 1)
         .some((s, i) =>
           s.targets.some(
-            (t) => isProblemState(t.state) && ctxs[a + i][t.id]?.everLive
-          )
+            (t) => isProblemState(t.state) && ctxs[a + i][t.id]?.everLive,
+          ),
         );
       return hard || samples[b].t - samples[a].t >= SOFT_WINDOW_MIN_MS;
     })
     .map(([a, b]) =>
-      buildWindow(samples.slice(a, b + 1), ctxs.slice(a, b + 1), totalTargets, typical)
+      buildWindow(
+        samples.slice(a, b + 1),
+        ctxs.slice(a, b + 1),
+        totalTargets,
+        typical,
+      ),
     );
 }
 
@@ -453,7 +504,11 @@ function deriveEvents(data: SessionData): ReportEvent[] {
         events.push({
           t: s.t,
           kind:
-            t.state === "error" ? "error" : t.state === "signal-lost" ? "signal" : "reconnect",
+            t.state === "error"
+              ? "error"
+              : t.state === "signal-lost"
+                ? "signal"
+                : "reconnect",
           label: `${t.name} ${
             t.state === "error"
               ? "com erro"
@@ -462,7 +517,11 @@ function deriveEvents(data: SessionData): ReportEvent[] {
                 : "reconectou"
           }`,
         });
-      } else if (t.state === "live" && isProblemState(was) && droppedSince[t.id]) {
+      } else if (
+        t.state === "live" &&
+        isProblemState(was) &&
+        droppedSince[t.id]
+      ) {
         droppedSince[t.id] = false;
         events.push({ t: s.t, kind: "recover", label: `${t.name} voltou` });
       }
@@ -470,11 +529,16 @@ function deriveEvents(data: SessionData): ReportEvent[] {
     }
     const cpuHigh = s.cpu != null && s.cpu > CPU_HIGH;
     if (cpuHigh && !prevCpuHigh)
-      events.push({ t: s.t, kind: "cpu", label: `CPU em ${Math.round(s.cpu as number)}%` });
+      events.push({
+        t: s.t,
+        kind: "cpu",
+        label: `CPU em ${Math.round(s.cpu as number)}%`,
+      });
     prevCpuHigh = cpuHigh;
   }
 
-  if (meta.endedAt) events.push({ t: meta.endedAt, kind: "end", label: "Fim da transmissão" });
+  if (meta.endedAt)
+    events.push({ t: meta.endedAt, kind: "end", label: "Fim da transmissão" });
   for (const m of data.markers) {
     events.push({ t: m.t, kind: "marker", label: `📍 ${m.label}` });
   }
@@ -487,17 +551,30 @@ function aggregates(data: SessionData) {
   const cpus = samples.map((s) => s.cpu).filter((x): x is number => x != null);
   const gpus = samples.map((s) => s.gpu).filter((x): x is number => x != null);
   const platOf = (id: string): PlatformId =>
-    (meta.platforms.find((p) => p.id === id)?.platformId ?? "custom") as PlatformId;
+    (meta.platforms.find((p) => p.id === id)?.platformId ??
+      "custom") as PlatformId;
 
   const byId: Record<
     string,
-    { name: string; brs: number[]; maxDropped: number; reconnects: number; prev: string }
+    {
+      name: string;
+      brs: number[];
+      maxDropped: number;
+      reconnects: number;
+      prev: string;
+    }
   > = {};
   for (const s of samples)
     for (const t of s.targets) {
       // prev inicia no próprio estado: o conectando/tentando da PARTIDA não conta
       // como reconexão (só transições live→problema são quedas de verdade).
-      const e = (byId[t.id] ??= { name: t.name, brs: [], maxDropped: 0, reconnects: 0, prev: t.state });
+      const e = (byId[t.id] ??= {
+        name: t.name,
+        brs: [],
+        maxDropped: 0,
+        reconnects: 0,
+        prev: t.state,
+      });
       if (t.state === "live") e.brs.push(t.bitrate);
       e.maxDropped = Math.max(e.maxDropped, t.dropped);
       if (isProblemState(t.state) && e.prev === "live") e.reconnects++;
@@ -508,14 +585,18 @@ function aggregates(data: SessionData) {
     id,
     name: e.name,
     platformId: platOf(id),
-    avgBitrate: e.brs.length ? Math.round(e.brs.reduce((a, b) => a + b, 0) / e.brs.length) : 0,
+    avgBitrate: e.brs.length
+      ? Math.round(e.brs.reduce((a, b) => a + b, 0) / e.brs.length)
+      : 0,
     minBitrate: e.brs.length ? minOf(e.brs) : 0,
     maxDropped: e.maxDropped,
     reconnects: e.reconnects,
   }));
 
   const avg = (a: number[]) =>
-    a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : null;
+    a.length
+      ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10
+      : null;
   return {
     avgCpu: avg(cpus),
     maxCpu: cpus.length ? maxOf(cpus) : null,
@@ -527,8 +608,13 @@ function aggregates(data: SessionData) {
 
 function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   if (!windows.length)
-    return { tone: "ok", title: "Transmissão limpa", detail: "Nenhum perrengue detectado nessa live." };
-  const count = (k: ProblemWindow["causeKind"]) => windows.filter((w) => w.causeKind === k).length;
+    return {
+      tone: "ok",
+      title: "Transmissão limpa",
+      detail: "Nenhum perrengue detectado nessa live.",
+    };
+  const count = (k: ProblemWindow["causeKind"]) =>
+    windows.filter((w) => w.causeKind === k).length;
   const enc = count("encoding");
   const render = count("render");
   const net = count("network");
@@ -550,7 +636,9 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   if (enc)
     return {
       tone: brief ? "warn" : "bad",
-      title: brief ? "Engasgo rápido de encoding" : "Seu PC não deu conta (encoding)",
+      title: brief
+        ? "Engasgo rápido de encoding"
+        : "Seu PC não deu conta (encoding)",
       detail: `${enc} trecho(s) com CPU/GPU no talo.${briefNote} No OBS: Configurações → Saída → troque o Encoder pro da placa de vídeo (NVENC/QSV) — ou baixe o bitrate/resolução na tela Qualidade.`,
     };
   if (render)
@@ -562,7 +650,9 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   if (net)
     return {
       tone: brief ? "warn" : "bad",
-      title: brief ? "Engasgo rápido de internet" : "A internet não deu conta (upload)",
+      title: brief
+        ? "Engasgo rápido de internet"
+        : "A internet não deu conta (upload)",
       detail: `${net} trecho(s) com bitrate caindo/reconexão sem o PC estar sobrecarregado.${briefNote} Se repetir, baixe o bitrate na tela Qualidade ou tire uma plataforma.`,
     };
   if (plat)
@@ -580,13 +670,28 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
 
 function viewerStats(d: SessionData): ViewerStats {
   const vs = d.viewerSamples;
-  if (!vs.length) return { peak: 0, avg: 0, start: 0, end: 0, byPlatform: [], hasData: false };
+  if (!vs.length)
+    return {
+      peak: 0,
+      avg: 0,
+      start: 0,
+      end: 0,
+      byPlatform: [],
+      hasData: false,
+    };
   const totals = vs.map((v) => v.total);
-  const peakByKey: Record<string, { platform: ChatPlatform; source: string; peak: number }> = {};
+  const peakByKey: Record<
+    string,
+    { platform: ChatPlatform; source: string; peak: number }
+  > = {};
   for (const v of vs)
     for (const it of v.items) {
       const k = `${it.platform}:${it.source}`;
-      const cur = peakByKey[k] ?? { platform: it.platform, source: it.source, peak: 0 };
+      const cur = peakByKey[k] ?? {
+        platform: it.platform,
+        source: it.source,
+        peak: 0,
+      };
       cur.peak = Math.max(cur.peak, it.viewers ?? 0);
       peakByKey[k] = cur;
     }
@@ -602,7 +707,8 @@ function viewerStats(d: SessionData): ViewerStats {
 
 function chatStats(d: SessionData): ChatStats {
   const total = d.samples.reduce((a, s) => a + (s.chat ?? 0), 0);
-  if (total === 0) return { total: 0, peakPerMin: 0, avgPerMin: 0, hasData: false };
+  if (total === 0)
+    return { total: 0, peakPerMin: 0, avgPerMin: 0, hasData: false };
   const rate = chatRateSeries(d).filter((x): x is number => x != null);
   const durMin = Math.max(1, d.meta.durationSec / 60);
   return {
@@ -631,8 +737,20 @@ function alertStats(d: SessionData): AlertStats {
     }
   }
   const subs =
-    (byKind.sub ?? 0) + (byKind.resub ?? 0) + (byKind.subgift ?? 0) + (byKind.member ?? 0);
-  return { total: a.length, byKind, subs, bits, raids, raidViewers, topRaid, hasData: a.length > 0 };
+    (byKind.sub ?? 0) +
+    (byKind.resub ?? 0) +
+    (byKind.subgift ?? 0) +
+    (byKind.member ?? 0);
+  return {
+    total: a.length,
+    byKind,
+    subs,
+    bits,
+    raids,
+    raidViewers,
+    topRaid,
+    hasData: a.length > 0,
+  };
 }
 
 /** Momentos de destaque (clipes sugeridos): picos de chat, alertas fortes e saltos de audiência. */
@@ -645,29 +763,60 @@ function highlights(d: SessionData): Highlight[] {
     const thresh = Math.max(avg * 2.5, avg + 15);
     rate.forEach((r, i) => {
       if (r != null && r >= thresh)
-        out.push({ t: d.samples[i].t, kind: "chat", reason: `Chat explodiu (${r}/min)`, score: r });
+        out.push({
+          t: d.samples[i].t,
+          kind: "chat",
+          reason: `Chat explodiu (${r}/min)`,
+          score: r,
+        });
     });
   }
   for (const e of d.alertEvents) {
     const amt = e.amount ?? 0;
     if (e.kind === "raid" && amt >= 8)
-      out.push({ t: e.t, kind: "raid", reason: `Raid de ${e.user} (+${Math.round(amt)})`, score: 1000 + amt });
+      out.push({
+        t: e.t,
+        kind: "raid",
+        reason: `Raid de ${e.user} (+${Math.round(amt)})`,
+        score: 1000 + amt,
+      });
     else if (e.kind === "subgift" && amt >= 5)
-      out.push({ t: e.t, kind: "alert", reason: `${e.user} presenteou ${Math.round(amt)} subs`, score: 500 + amt });
+      out.push({
+        t: e.t,
+        kind: "alert",
+        reason: `${e.user} presenteou ${Math.round(amt)} subs`,
+        score: 500 + amt,
+      });
     else if (e.kind === "superchat" && amt >= 20)
-      out.push({ t: e.t, kind: "alert", reason: `Super chat gordo de ${e.user}`, score: 400 + amt });
+      out.push({
+        t: e.t,
+        kind: "alert",
+        reason: `Super chat gordo de ${e.user}`,
+        score: 400 + amt,
+      });
     else if (e.kind === "bits" && amt >= 500)
-      out.push({ t: e.t, kind: "alert", reason: `${e.user}: ${Math.round(amt)} bits`, score: 300 + amt });
+      out.push({
+        t: e.t,
+        kind: "alert",
+        reason: `${e.user}: ${Math.round(amt)} bits`,
+        score: 300 + amt,
+      });
   }
   const vs = d.viewerSamples;
   for (let i = 1; i < vs.length; i++) {
     const delta = vs[i].total - vs[i - 1].total;
     if (delta >= 15 && delta >= vs[i - 1].total * 0.2)
-      out.push({ t: vs[i].t, kind: "viewers", reason: `+${delta} assistindo de uma vez`, score: 150 + delta });
+      out.push({
+        t: vs[i].t,
+        kind: "viewers",
+        reason: `+${delta} assistindo de uma vez`,
+        score: 150 + delta,
+      });
   }
   out.sort((a, b) => b.score - a.score);
   const kept: Highlight[] = [];
-  for (const h of out) if (!kept.some((k) => Math.abs(k.t - h.t) < 40_000)) kept.push(h);
+  for (const h of out)
+    if (!kept.some((k) => Math.abs(k.t - h.t) < 40_000)) kept.push(h);
   return kept.sort((a, b) => a.t - b.t).slice(0, 10);
 }
 
@@ -692,7 +841,10 @@ export function analyze(data: SessionData): ReportAnalysis {
 // ---------------------------------------------------------------------------
 
 /** Extrai o resumo de uma análise completa — zero duplicação de heurística. */
-export function summarize(data: SessionData, a: ReportAnalysis): SessionSummary {
+export function summarize(
+  data: SessionData,
+  a: ReportAnalysis,
+): SessionSummary {
   return {
     hasData: data.samples.length > 1 || a.viewers.hasData,
     peakViewers: a.viewers.hasData ? a.viewers.peak : null,
@@ -705,4 +857,8 @@ export function summarize(data: SessionData, a: ReportAnalysis): SessionSummary 
 
 // Cache do resumo em localStorage (adapter de I/O) — extraído pra summaryCache.ts e re-exportado
 // aqui pra não mexer nos callers, deixando o report.ts 100% puro (só parse/análise).
-export { getCachedSummary, setCachedSummary, dropCachedSummary } from "./summaryCache";
+export {
+  getCachedSummary,
+  setCachedSummary,
+  dropCachedSummary,
+} from "./summaryCache";

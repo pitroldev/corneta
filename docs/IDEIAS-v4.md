@@ -1,5 +1,9 @@
 # Ideias de features — v4 (o que está SAINDO está certo?)
 
+> **Snapshot histórico.** O status atual vive em `PENDENCIAS.md` e
+> `GATES-DE-RELEASE.md`. Normalização de loudness e metadados cross-platform já foram
+> implementados; os itens abaixo preservam o raciocínio original.
+
 > Quarta leva. As três anteriores perguntaram *"o que a Corneta pode **gerar** cruzando sinal + chat?"*
 > (clipes, comunidade, legendas, copiloto). O v4 vira a moeda e faz a pergunta oposta — igualmente
 > óbvia em retrospecto: **"o que está SAINDO está certo?"** — somada à dor nº1 puramente operacional

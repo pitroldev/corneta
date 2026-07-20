@@ -9,7 +9,10 @@ const ORIGIN: Record<string, string> = {
   streamelements: "StreamElements",
 };
 
-const KIND_META: Record<AlertKind, { emoji: string; verb: string; accent: string }> = {
+const KIND_META: Record<
+  AlertKind,
+  { emoji: string; verb: string; accent: string }
+> = {
   follow: { emoji: "💜", verb: "seguiu", accent: "info" },
   sub: { emoji: "⭐", verb: "se inscreveu", accent: "brass" },
   resub: { emoji: "🔁", verb: "renovou a inscrição", accent: "brass" },
@@ -35,7 +38,9 @@ function detail(a: Alert): string {
     case "bits":
       return a.amount ? `${a.amount} bits` : "";
     case "resub":
-      return [a.amount ? months(a.amount) : "", a.tier].filter(Boolean).join(" · ");
+      return [a.amount ? months(a.amount) : "", a.tier]
+        .filter(Boolean)
+        .join(" · ");
     case "sub":
       return a.tier ?? "";
     case "subgift":
@@ -43,7 +48,9 @@ function detail(a: Alert): string {
     case "raid":
       return a.amount ? `${a.amount} viewers` : "";
     case "member":
-      return [a.tier, a.amount && a.amount > 1 ? months(a.amount) : ""].filter(Boolean).join(" · ");
+      return [a.tier, a.amount && a.amount > 1 ? months(a.amount) : ""]
+        .filter(Boolean)
+        .join(" · ");
     case "superchat":
     case "tip":
       return a.amount ? `${a.currency ? a.currency + " " : ""}${a.amount}` : "";
@@ -52,14 +59,23 @@ function detail(a: Alert): string {
   }
 }
 
-const AlertRow = memo(function AlertRow({ a, fontSize }: { a: Alert; fontSize: number }) {
+const AlertRow = memo(function AlertRow({
+  a,
+  fontSize,
+}: {
+  a: Alert;
+  fontSize: number;
+}) {
   const meta = KIND_META[a.kind];
   const accent = ACCENT[meta.accent] ?? ACCENT.brass;
   const d = detail(a);
   return (
     <div
       style={{ fontSize }}
-      className={cn("flex items-start gap-2 rounded-sm border-l-4 bg-surface-2 px-2.5 py-2", accent.bar)}
+      className={cn(
+        "flex items-start gap-2 rounded-sm border-l-4 bg-surface-2 px-2.5 py-2",
+        accent.bar,
+      )}
     >
       <span className="leading-none" style={{ fontSize: "1.25em" }}>
         {meta.emoji}
@@ -128,7 +144,8 @@ export function AlertsFeed({
         <div className="grid h-full place-items-center p-5 text-center text-sm text-ink-faint">
           <div>
             <div className="mb-1 text-2xl">🔔</div>
-            Inscrições, gifts, bits, raids e super chats de todas as plataformas aparecem aqui.
+            Inscrições, gifts, bits, raids e super chats de todas as plataformas
+            aparecem aqui.
           </div>
         </div>
       ) : (

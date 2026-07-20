@@ -134,6 +134,8 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
+                .max_file_size(5 * 1024 * 1024)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(5))
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Stdout,
                 ))
@@ -145,6 +147,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         // Autostart (abrir com o sistema) — controlado pela tela de Configurações.
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -191,6 +194,7 @@ pub fn run() {
             commands::read_session,
             commands::delete_session,
             commands::open_sessions_dir,
+            commands::open_external,
             commands::chat_start,
             commands::chat_stop,
             commands::chat_running,
@@ -198,6 +202,8 @@ pub fn run() {
             auth::set_oauth_config,
             auth::set_youtube_oauth,
             auth::clear_youtube_oauth,
+            auth::set_kick_oauth,
+            auth::clear_kick_oauth,
             auth::auth_status,
             auth::twitch_login_start,
             auth::twitch_logout,
@@ -215,6 +221,7 @@ pub fn run() {
             commands::youtube_key_check,
             commands::alert_test,
             commands::open_logs_dir,
+            commands::export_diagnostics,
             commands::register_shortcut,
             commands::obs_check,
             commands::mark_moment,
@@ -238,6 +245,7 @@ pub fn run() {
             commands::open_privacy_settings,
         ])
         .setup(|app| {
+            session::recover_incomplete_sessions(app.handle());
             // Mesa: auto-concede câmera/mic no WebView2 (getUserMedia sem prompt/lock).
             if let Some(w) = app.get_webview_window("main") {
                 permissions::grant_av_permissions(&w);
@@ -276,7 +284,10 @@ pub fn run() {
                         "show" => show_main(app),
                         "quit" => {
                             let ok = !engine_live(app)
-                                || confirm_end_live(app, "Você está AO VIVO. Sair encerra a transmissão.");
+                                || confirm_end_live(
+                                    app,
+                                    "Você está AO VIVO. Sair encerra a transmissão.",
+                                );
                             if ok {
                                 shutdown_engine(app);
                                 app.exit(0);
@@ -317,7 +328,8 @@ pub fn run() {
                     // X com a live NO AR: confirma antes — um clique acidental derrubava a
                     // transmissão em todas as plataformas (o "Sair" da bandeja já perguntava).
                     api.prevent_close();
-                    if confirm_end_live(app, "Você está AO VIVO. Fechar encerra a transmissão.") {
+                    if confirm_end_live(app, "Você está AO VIVO. Fechar encerra a transmissão.")
+                    {
                         shutdown_engine(app);
                         // prevent_close já cancelou o fechamento — encerra explicitamente.
                         app.exit(0);

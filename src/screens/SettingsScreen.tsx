@@ -138,7 +138,7 @@ export function SettingsScreen() {
                 value={t.id}
                 data-on-brass={tab === t.id ? "" : undefined}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-md px-4 py-2 font-display text-sm font-bold transition-all",
+                  "inline-flex items-center gap-2 rounded-md px-4 py-2 font-display text-sm font-bold transition",
                   "bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink",
                   "data-[state=active]:bg-brass data-[state=active]:text-brass-ink data-[state=active]:pop-brass",
                 )}
@@ -508,15 +508,25 @@ export function SettingsScreen() {
               </SettingRow>
               <SettingRow
                 title="Logs"
-                desc="Abre a pasta de logs pra mandar pro suporte."
+                desc="Exporte um diagnóstico redigido para o suporte ou abra os arquivos locais."
               >
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={() => void api.openLogsDir()}
-                >
-                  <FileText className="size-4" /> Abrir logs
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => void api.exportDiagnostics()}
+                  >
+                    <Download className="size-4" aria-hidden /> Exportar
+                    diagnóstico
+                  </Button>
+                  <Button
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => void api.openLogsDir()}
+                  >
+                    <FileText className="size-4" aria-hidden /> Abrir logs
+                  </Button>
+                </div>
               </SettingRow>
             </div>
           </Card>
@@ -1041,7 +1051,7 @@ function SecurityFeature({
     <div className="flex items-center gap-4 py-4">
       <div
         className={cn(
-          "relative aspect-video w-32 shrink-0 overflow-hidden rounded-md transition-all",
+          "relative aspect-video w-32 shrink-0 overflow-hidden rounded-md transition",
           on
             ? "pop-brass ring-2 ring-brass"
             : "opacity-60 grayscale ring-1 ring-border",

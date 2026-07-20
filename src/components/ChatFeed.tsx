@@ -1,4 +1,11 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, Ban, Clock, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -139,7 +146,10 @@ export function ChatFeed({
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      const next = Math.min(44, Math.max(8, view.fontSize + (e.deltaY < 0 ? 1 : -1)));
+      const next = Math.min(
+        44,
+        Math.max(8, view.fontSize + (e.deltaY < 0 ? 1 : -1)),
+      );
       if (next !== view.fontSize) onFontSize(next);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -189,13 +199,19 @@ export function ChatFeed({
                 ? "Você desligou todas as plataformas. Religa um chip ali em cima pra ver o chat de novo."
                 : connected
                   ? "Assim que a galera mandar mensagem, aparece aqui."
-                  : disconnectedHint ??
-                    "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar pra puxar o chat."}
+                  : (disconnectedHint ??
+                    "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar pra puxar o chat.")}
             </div>
             {!connected && !allFilteredOut && emptyAction}
           </div>
         ) : (
-          <div style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}>
+          <div
+            style={{
+              height: virt.getTotalSize(),
+              position: "relative",
+              width: "100%",
+            }}
+          >
             {virt.getVirtualItems().map((vi) => (
               <div
                 key={vi.key}
@@ -332,10 +348,15 @@ function ModButtons({
   if (!onModerate || !modLevel) return null;
   const lvl = modLevel(m);
   if (lvl === "none") return null;
-  const btn = "grid size-6 place-items-center rounded text-ink-faint transition-colors";
+  const btn =
+    "grid size-6 place-items-center rounded text-ink-faint transition-colors";
   return (
     <div className="absolute right-1.5 top-0.5 hidden items-center gap-0.5 rounded-md bg-surface ring-1 ring-border group-hover:flex">
-      <button onClick={() => onModerate(m, "delete")} title="Apagar" className={cn(btn, "hover:text-bad")}>
+      <button
+        onClick={() => onModerate(m, "delete")}
+        title="Apagar"
+        className={cn(btn, "hover:text-bad")}
+      >
         <Trash2 className="size-3.5" />
       </button>
       {lvl === "full" && (
@@ -347,7 +368,11 @@ function ModButtons({
           >
             <Clock className="size-3.5" />
           </button>
-          <button onClick={() => onModerate(m, "ban")} title="Banir" className={cn(btn, "hover:text-bad")}>
+          <button
+            onClick={() => onModerate(m, "ban")}
+            title="Banir"
+            className={cn(btn, "hover:text-bad")}
+          >
             <Ban className="size-3.5" />
           </button>
         </>
@@ -365,8 +390,18 @@ function ChatFunnel() {
         <PlatformGlyph id="kick" size={20} />
         <PlatformGlyph id="youtube" size={20} />
       </div>
-      <svg viewBox="0 0 44 72" className="h-[4.5rem] w-11 text-brass" fill="none" aria-hidden>
-        <g stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 44 72"
+        className="h-[4.5rem] w-11 text-brass"
+        fill="none"
+        aria-hidden
+      >
+        <g
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M4 12 C26 12 20 36 36 36" />
           <path d="M4 36 H36" />
           <path d="M4 60 C26 60 20 36 36 36" />

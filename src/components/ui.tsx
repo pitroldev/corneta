@@ -30,13 +30,7 @@ const PLATFORM_ICON: Partial<Record<PlatformId, string>> = {
 // "tomate" é o nome canônico do botão de ação (bloco tomate, sombra dura).
 // "pop" segue como alias retrocompatível — a utility `.pop` é a sombra, não a variante.
 type Variant =
-  | "primary"
-  | "tomate"
-  | "pop"
-  | "ghost"
-  | "outline"
-  | "danger"
-  | "subtle";
+  "primary" | "tomate" | "pop" | "ghost" | "outline" | "danger" | "subtle";
 type Size = "sm" | "md" | "lg";
 
 const TOMATE =
@@ -76,7 +70,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap transition-all duration-75 disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none",
+        "inline-flex items-center justify-center whitespace-nowrap transition duration-75 disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none",
         VARIANTS[variant],
         SIZES[size],
         className,

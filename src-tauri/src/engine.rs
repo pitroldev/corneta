@@ -103,7 +103,11 @@ fn output_url(t: &Target, key: &str) -> String {
 fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
     let ar = out_w as f64 / out_h as f64;
     let (x, y, z) = match reframe {
-        Some(r) => (r.x.clamp(0.0, 1.0), r.y.clamp(0.0, 1.0), r.zoom.clamp(0.25, 1.0)),
+        Some(r) => (
+            r.x.clamp(0.0, 1.0),
+            r.y.clamp(0.0, 1.0),
+            r.zoom.clamp(0.25, 1.0),
+        ),
         None => (0.5, 0.5, 1.0), // centralizado, altura cheia
     };
     let cw = format!("min(iw\\,ih*{z:.4}*{ar:.4})");
@@ -117,7 +121,11 @@ fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
 pub fn ingest_url(config: &AppConfig) -> String {
     format!(
         "{}://{}:{}/{}/{}",
-        config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
+        config.ingest.protocol,
+        config.ingest.host,
+        config.ingest.port,
+        config.ingest.app,
+        config.ingest.key
     )
 }
 /// URL do **feed de programa** — o sinal contínuo republicado pelo compositor (com ou sem
@@ -126,7 +134,11 @@ pub fn ingest_url(config: &AppConfig) -> String {
 pub fn program_url(config: &AppConfig) -> String {
     format!(
         "{}://{}:{}/{}/{}_program",
-        config.ingest.protocol, config.ingest.host, config.ingest.port, config.ingest.app, config.ingest.key
+        config.ingest.protocol,
+        config.ingest.host,
+        config.ingest.port,
+        config.ingest.app,
+        config.ingest.key
     )
 }
 
@@ -178,18 +190,28 @@ pub fn ffmpeg_args_for_target(
         };
         // Bitrate efetivo: o auto-bitrate pode estar empurrando um valor menor. O clamp
         // protege o `vbr * 2` do bufsize (o override parte do preset cru da config).
-        let vbr = br_override.unwrap_or(p.video_bitrate_kbps).clamp(100, 100_000);
+        let vbr = br_override
+            .unwrap_or(p.video_bitrate_kbps)
+            .clamp(100, 100_000);
 
         args.extend(
             [
-                "-map", "0:v",
-                "-vf", &vf,
-                "-r", &fps.to_string(),
-                "-c:v", codec,
-                "-b:v", &format!("{vbr}k"),
-                "-maxrate", &format!("{vbr}k"),
-                "-bufsize", &format!("{}k", vbr * 2),
-                "-g", &gop,
+                "-map",
+                "0:v",
+                "-vf",
+                &vf,
+                "-r",
+                &fps.to_string(),
+                "-c:v",
+                codec,
+                "-b:v",
+                &format!("{vbr}k"),
+                "-maxrate",
+                &format!("{vbr}k"),
+                "-bufsize",
+                &format!("{}k", vbr * 2),
+                "-g",
+                &gop,
             ]
             .map(String::from),
         );
@@ -212,11 +234,16 @@ pub fn ffmpeg_args_for_target(
     }
     args.extend(
         [
-            "-c:a", "aac",
-            "-ar", "48000",
-            "-ac", "2",
-            "-b:a", &format!("{}k", audio_kbps),
-            "-f", "flv",
+            "-c:a",
+            "aac",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-b:a",
+            &format!("{}k", audio_kbps),
+            "-f",
+            "flv",
             &url,
         ]
         .map(String::from),
@@ -460,36 +487,46 @@ pub fn ffmpeg_args_for_encoder(
     match hw_codec {
         Some(codec) => args.extend(
             [
-                "-c:v", codec,
-                "-b:v", &format!("{vbr}k"),
-                "-maxrate", &format!("{vbr}k"),
-                "-bufsize", &format!("{}k", vbr * 2),
-                "-g", &gop,
+                "-c:v",
+                codec,
+                "-b:v",
+                &format!("{vbr}k"),
+                "-maxrate",
+                &format!("{vbr}k"),
+                "-bufsize",
+                &format!("{}k", vbr * 2),
+                "-g",
+                &gop,
             ]
             .map(String::from),
         ),
         None => args.extend(
             [
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-b:v", &format!("{vbr}k"),
-                "-maxrate", &format!("{vbr}k"),
-                "-bufsize", &format!("{}k", vbr * 2),
-                "-g", &gop,
-                "-keyint_min", &gop,
-                "-sc_threshold", "0",
-                "-pix_fmt", "yuv420p",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-b:v",
+                &format!("{vbr}k"),
+                "-maxrate",
+                &format!("{vbr}k"),
+                "-bufsize",
+                &format!("{}k", vbr * 2),
+                "-g",
+                &gop,
+                "-keyint_min",
+                &gop,
+                "-sc_threshold",
+                "0",
+                "-pix_fmt",
+                "yuv420p",
             ]
             .map(String::from),
         ),
     }
     args.extend(
         [
-            "-c:a", "aac",
-            "-ar", "48000",
-            "-ac", "2",
-            "-b:a", "160k",
-            "-f", "flv",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "160k", "-f", "flv",
         ]
         .map(String::from),
     );
@@ -669,7 +706,14 @@ impl AutoBitrate {
 
     pub fn new(base: u32, floor: u32) -> Self {
         let floor = floor.min(base);
-        Self { base, floor, current: base, slow: 0, fast: 0, cooldown: 0 }
+        Self {
+            base,
+            floor,
+            current: base,
+            slow: 0,
+            fast: 0,
+            cooldown: 0,
+        }
     }
 
     pub fn current(&self) -> u32 {
@@ -693,7 +737,11 @@ impl AutoBitrate {
             self.slow += 1;
             if self.cooldown == 0 && self.current > self.floor {
                 let severe = speed < Self::SEVERE;
-                let need = if severe { Self::NEED_SEVERE } else { Self::NEED_MILD };
+                let need = if severe {
+                    Self::NEED_SEVERE
+                } else {
+                    Self::NEED_MILD
+                };
                 if self.slow >= need {
                     let cut = if severe { 0.6 } else { 0.8 };
                     let next = ((self.current as f64 * cut) as u32).max(self.floor);
@@ -764,7 +812,14 @@ mod tests {
     use crate::config::{IngestConfig, Settings, TargetEncoding};
 
     fn preset(w: u32, h: u32, fps: u32, vb: u32) -> VideoPreset {
-        VideoPreset { width: w, height: h, fps, video_bitrate_kbps: vb, audio_bitrate_kbps: 160, keyframe_sec: 2 }
+        VideoPreset {
+            width: w,
+            height: h,
+            fps,
+            video_bitrate_kbps: vb,
+            audio_bitrate_kbps: 160,
+            keyframe_sec: 2,
+        }
     }
     fn tgt(platform: &str, preset: Option<VideoPreset>) -> Target {
         Target {
@@ -786,7 +841,15 @@ mod tests {
     }
     fn cfg(mode: &str, targets: Vec<Target>) -> AppConfig {
         AppConfig {
-            ingest: IngestConfig { protocol: "rtmp".into(), host: "127.0.0.1".into(), port: 1935, app: "live".into(), key: "obs".into() },
+            schema_version: crate::config::CURRENT_SCHEMA_VERSION,
+            revision: 0,
+            ingest: IngestConfig {
+                protocol: "rtmp".into(),
+                host: "127.0.0.1".into(),
+                port: 1935,
+                app: "live".into(),
+                key: "obs".into(),
+            },
             mode: mode.into(),
             targets,
             settings: Settings::default(),
@@ -797,11 +860,20 @@ mod tests {
 
     #[test]
     fn effective_action_by_mode() {
-        assert_eq!(effective_action("passthrough", &tgt("twitch", None)), "copy");
-        assert_eq!(effective_action("per-platform", &tgt("twitch", None)), "transcode");
+        assert_eq!(
+            effective_action("passthrough", &tgt("twitch", None)),
+            "copy"
+        );
+        assert_eq!(
+            effective_action("per-platform", &tgt("twitch", None)),
+            "transcode"
+        );
         // híbrido "esperto": landscape copia, vertical (TikTok) recodifica.
         assert_eq!(effective_action("hybrid", &tgt("twitch", None)), "copy");
-        assert_eq!(effective_action("hybrid", &tgt("tiktok", None)), "transcode");
+        assert_eq!(
+            effective_action("hybrid", &tgt("tiktok", None)),
+            "transcode"
+        );
     }
 
     #[test]
@@ -832,7 +904,10 @@ mod tests {
     fn effective_preset_is_single_source() {
         // sem preset → cai no recomendado (sanitizado) da plataforma.
         let t = tgt("twitch", None);
-        assert_eq!(effective_preset(&t), sanitize_preset(recommended_preset("twitch")));
+        assert_eq!(
+            effective_preset(&t),
+            sanitize_preset(recommended_preset("twitch"))
+        );
         // com preset absurdo → sanitizado.
         let t2 = tgt("twitch", Some(preset(999_999, 1080, 60, 6000)));
         assert_eq!(effective_preset(&t2).width, 7680);
@@ -841,13 +916,22 @@ mod tests {
     #[test]
     fn program_resolution_adapts() {
         // tudo 720p landscape → programa em 720p (não desperdiça encode em 1080p).
-        let c = cfg("hybrid", vec![tgt("facebook", Some(preset(1280, 720, 30, 4000)))]);
+        let c = cfg(
+            "hybrid",
+            vec![tgt("facebook", Some(preset(1280, 720, 30, 4000)))],
+        );
         assert_eq!(program_resolution(&c, false), (1280, 720));
         // algum destino 1080p → 1080p.
-        let c2 = cfg("hybrid", vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))]);
+        let c2 = cfg(
+            "hybrid",
+            vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
+        );
         assert_eq!(program_resolution(&c2, false), (1920, 1080));
         // vertical (recorte 9:16) precisa da fonte cheia → 1080p.
-        let c3 = cfg("hybrid", vec![tgt("tiktok", Some(preset(720, 1280, 30, 3000)))]);
+        let c3 = cfg(
+            "hybrid",
+            vec![tgt("tiktok", Some(preset(720, 1280, 30, 3000)))],
+        );
         assert_eq!(program_resolution(&c3, false), (1920, 1080));
         // guardião sempre 1080p.
         assert_eq!(program_resolution(&c, true), (1920, 1080));
@@ -856,11 +940,17 @@ mod tests {
     #[test]
     fn program_spec_fps_and_bitrate() {
         // fps acompanha o maior preset (cap 60); guardião trava em 30.
-        let c = cfg("hybrid", vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))]);
+        let c = cfg(
+            "hybrid",
+            vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
+        );
         assert_eq!(program_spec(&c, false).fps, 60);
         assert_eq!(program_spec(&c, true).fps, 30);
         // bitrate do programa acompanha o maior destino, com piso de 2500.
-        let low = cfg("hybrid", vec![tgt("facebook", Some(preset(1280, 720, 30, 1000)))]);
+        let low = cfg(
+            "hybrid",
+            vec![tgt("facebook", Some(preset(1280, 720, 30, 1000)))],
+        );
         assert!(program_spec(&low, false).video_kbps >= 2500);
     }
 
@@ -874,7 +964,14 @@ mod tests {
     #[test]
     fn ffmpeg_args_copy_path() {
         let c = cfg("passthrough", vec![tgt("twitch", None)]);
-        let args = ffmpeg_args_for_target(&c, &c.targets[0], "streamkey", None, "rtmp://127.0.0.1:1935/live/obs", None);
+        let args = ffmpeg_args_for_target(
+            &c,
+            &c.targets[0],
+            "streamkey",
+            None,
+            "rtmp://127.0.0.1:1935/live/obs",
+            None,
+        );
         let s = args.join(" ");
         assert!(s.contains("-c:v copy"), "cópia lossless de vídeo: {s}");
         assert!(s.contains("-c:a aac"), "áudio sempre AAC");
@@ -885,8 +982,18 @@ mod tests {
 
     #[test]
     fn ffmpeg_args_transcode_path() {
-        let c = cfg("per-platform", vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))]);
-        let args = ffmpeg_args_for_target(&c, &c.targets[0], "sk", Some(4500), "rtmp://x/live/obs", Some("h264_nvenc"));
+        let c = cfg(
+            "per-platform",
+            vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
+        );
+        let args = ffmpeg_args_for_target(
+            &c,
+            &c.targets[0],
+            "sk",
+            Some(4500),
+            "rtmp://x/live/obs",
+            Some("h264_nvenc"),
+        );
         let s = args.join(" ");
         assert!(s.contains("-c:v h264_nvenc"), "encoder auto→nvenc: {s}");
         assert!(s.contains("-b:v 4500k"), "br_override aplicado: {s}");
@@ -903,14 +1010,20 @@ mod tests {
         let mut c = cfg("passthrough", vec![tgt("twitch", None)]);
         // desligado → sem loudnorm (mesmo alvo definido).
         c.settings.loudness_target_lufs = -16.0;
-        assert!(!ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None)
-            .join(" ")
-            .contains("loudnorm"));
+        assert!(
+            !ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None)
+                .join(" ")
+                .contains("loudnorm")
+        );
         // ligado → injeta loudnorm no alvo, com TP travado; e NÃO reencoda o vídeo (segue em cópia).
         c.settings.loudness_normalize = true;
-        let s = ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None).join(" ");
+        let s = ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None)
+            .join(" ");
         assert!(s.contains("-af loudnorm=I=-16.0:TP=-1.5:LRA=11"), "{s}");
-        assert!(s.contains("-c:v copy"), "áudio normaliza, vídeo segue em cópia: {s}");
+        assert!(
+            s.contains("-c:v copy"),
+            "áudio normaliza, vídeo segue em cópia: {s}"
+        );
         assert!(s.contains("-c:a aac"));
     }
 
@@ -969,16 +1082,22 @@ mod tests {
                 ups.push(k);
             }
         }
-        assert!(ups.contains(&5550), "primeiro passo aditivo 4800+750: {ups:?}");
+        assert!(
+            ups.contains(&5550),
+            "primeiro passo aditivo 4800+750: {ups:?}"
+        );
         assert_eq!(a.current(), 6000);
-        assert!(ups.iter().all(|&k| k <= 6000), "nunca acima do base: {ups:?}");
+        assert!(
+            ups.iter().all(|&k| k <= 6000),
+            "nunca acima do base: {ups:?}"
+        );
     }
 
     #[test]
     fn abr_cooldown_blocks_immediate_rethrash() {
         let mut a = AutoBitrate::new(6000, 2400);
         feed_down(&mut a, 0.5, 3); // → 3600, cooldown liga
-        // durante o cooldown, mesmo com aperto, NÃO muda de novo...
+                                   // durante o cooldown, mesmo com aperto, NÃO muda de novo...
         for _ in 0..4 {
             assert!(matches!(a.on_speed(0.5), BitrateAction::Hold));
         }

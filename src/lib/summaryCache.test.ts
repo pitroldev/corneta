@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getCachedSummary, setCachedSummary, dropCachedSummary } from "./summaryCache";
+import {
+  getCachedSummary,
+  setCachedSummary,
+  dropCachedSummary,
+} from "./summaryCache";
 import type { SessionSummary } from "./types";
 
 // Node não tem localStorage — mock em memória.

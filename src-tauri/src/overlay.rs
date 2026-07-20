@@ -1,6 +1,7 @@
 //! Overlays pro OBS (Browser Source). UM servidor HTTP local serve DUAS páginas:
 //!   - `/alerts` (+ `/alerts-ws`) → alertas animados (sub, doação, raid…)
 //!   - `/chat`   (+ `/chat-ws`)   → o chat unificado, com emotes (BTTV/FFZ/7TV + nativos)
+//!
 //! Mesma família do `studio.rs` da Mesa, com duas diferenças de propósito:
 //!   1. **Porta FIXA** (não efêmera): a URL é colada no OBS UMA vez e precisa valer entre
 //!      reinícios do app — porta efêmera quebraria a Browser Source a cada boot.
@@ -27,9 +28,12 @@ use tokio::sync::{broadcast, oneshot, watch};
 use crate::chat::{Alert, ChatMessage};
 
 /// Páginas self-contained (CSS/JS inline). CARGO_MANIFEST_DIR = src-tauri/.
-const OVERLAY_HTML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/overlay.html"));
-const CHAT_OVERLAY_HTML: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/chat-overlay.html"));
+const OVERLAY_HTML: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/overlay.html"));
+const CHAT_OVERLAY_HTML: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/chat-overlay.html"
+));
 
 /// Buffer do broadcast de ALERTAS: raros; 64 cobre uma rajada (raid + gifts) sem crescer memória.
 const ALERT_BUF: usize = 64;
@@ -118,7 +122,11 @@ async fn handle_conn(
 /// Empurra um ALERTA pras páginas de overlay conectadas. No-op se o servidor está parado
 /// (ou sem nenhuma página aberta) — nunca bloqueia o funil de alertas do chat.
 pub fn push(server: &Mutex<OverlayServer>, alert: &Alert) {
-    push_json(server, |s| s.alerts.clone(), || serde_json::to_string(alert));
+    push_json(
+        server,
+        |s| s.alerts.clone(),
+        || serde_json::to_string(alert),
+    );
 }
 
 /// Empurra uma MENSAGEM de chat pras páginas do overlay de chat conectadas. No-op sem servidor.
@@ -152,7 +160,11 @@ fn chat_url(port: u16) -> String {
     format!("http://127.0.0.1:{port}/chat")
 }
 fn info_for(port: u16) -> OverlayInfo {
-    OverlayInfo { port, url: overlay_url(port), chat_url: chat_url(port) }
+    OverlayInfo {
+        port,
+        url: overlay_url(port),
+        chat_url: chat_url(port),
+    }
 }
 
 /// Sobe o servidor na porta FIXA `port`, ou devolve a info se já estiver rodando (idempotente).
@@ -166,19 +178,25 @@ pub async fn start(server: &Mutex<OverlayServer>, port: u16) -> Result<OverlayIn
 
     // Só loopback + porta fixa: URL estável pro OBS e sem exposição na LAN. bind antes do lock
     // final fecha a corrida (TOCTOU) entre dois starts.
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await.map_err(|e| {
-        format!(
-            "não consegui abrir o overlay na porta {port} — parece ocupada por outro programa \
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port))
+        .await
+        .map_err(|e| {
+            format!(
+                "não consegui abrir o overlay na porta {port} — parece ocupada por outro programa \
              ({e}). Feche o que estiver usando essa porta e ligue o overlay de novo."
-        )
-    })?;
+            )
+        })?;
     let bound = listener.local_addr().map_err(|e| e.to_string())?.port();
 
     let (sh_tx, sh_rx) = oneshot::channel::<()>();
     let (kick_tx, kick_rx) = watch::channel(false);
     let (alert_tx, _alert_rx) = broadcast::channel::<String>(ALERT_BUF);
     let (chat_tx, _chat_rx) = broadcast::channel::<String>(CHAT_BUF);
-    let ctx = Ctx { alerts: alert_tx.clone(), chat: chat_tx.clone(), shutdown: kick_rx };
+    let ctx = Ctx {
+        alerts: alert_tx.clone(),
+        chat: chat_tx.clone(),
+        shutdown: kick_rx,
+    };
     let app = Router::new()
         .route("/alerts", get(overlay_page))
         .route("/alerts-ws", get(ws_alerts))

@@ -180,7 +180,7 @@ function ProfileBar() {
                 on ? "Perfil ativo" : `Trocar pra "${p.name || "Sem nome"}"`
               }
               className={cn(
-                "flex h-9 items-center gap-2 rounded-md px-3 font-display text-sm font-bold transition-all",
+                "flex h-9 items-center gap-2 rounded-md px-3 font-display text-sm font-bold transition",
                 on
                   ? "bg-brass text-brass-ink pop-brass"
                   : "bg-surface text-ink-muted ring-1 ring-border hover:-translate-y-px hover:text-ink",
@@ -392,7 +392,9 @@ function TargetRow({
           "transition-opacity",
           !target.enabled && "opacity-50",
           blocking.length > 0 &&
-            (keyOnlyPending ? "border-l-4 border-warn" : "border-l-4 border-bad"),
+            (keyOnlyPending
+              ? "border-l-4 border-warn"
+              : "border-l-4 border-bad"),
         )}
       >
         <Collapsible.Root open={open} onOpenChange={setOpen}>
@@ -400,10 +402,13 @@ function TargetRow({
             <button
               onPointerDown={(e) => controls.start(e)}
               onKeyDown={(e) => {
-                if (e.key === "ArrowUp")
-                  (e.preventDefault(), moveTarget(target.id, -1));
-                else if (e.key === "ArrowDown")
-                  (e.preventDefault(), moveTarget(target.id, 1));
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  moveTarget(target.id, -1);
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  moveTarget(target.id, 1);
+                }
               }}
               aria-label="Reordenar plataforma (setas ↑/↓)"
               title="Arraste ou use ↑/↓"
@@ -423,12 +428,12 @@ function TargetRow({
                   className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
                 />
                 {/* Protocolo é jargão — só interessa no Personalizado, e aí reflete
-                    o esquema da URL digitada (rtmp/rtmps/srt), não o preset fixo. */}
+                    o esquema da URL digitada (rtmp/rtmps), não o preset fixo. */}
                 {isCustom && (
                   <Badge color={preset.color}>
                     {target.ingestUrl
                       .trim()
-                      .match(/^(rtmps?|srt):\/\//i)?.[1]
+                      .match(/^(rtmps?):\/\//i)?.[1]
                       ?.toLowerCase() ?? preset.protocol}
                   </Badge>
                 )}
@@ -446,7 +451,9 @@ function TargetRow({
             />
             <Collapsible.Trigger asChild>
               <button
-                aria-label={open ? "Recolher plataforma" : "Expandir plataforma"}
+                aria-label={
+                  open ? "Recolher plataforma" : "Expandir plataforma"
+                }
                 className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
               >
                 <ChevronDown
@@ -484,9 +491,9 @@ function TargetRow({
                   value={
                     INGEST_URL_RE.test(target.ingestUrl)
                       ? target.ingestUrl
-                      : target.ingestUrl.replace(/^(rtmps?|srt):\/\/$/i, "")
+                      : target.ingestUrl.replace(/^(rtmps?):\/\/$/i, "")
                   }
-                  placeholder="rtmp://servidor/app  (rtmp://, rtmps:// ou srt://)"
+                  placeholder="rtmp://servidor/app  (rtmp:// ou rtmps://)"
                   onChange={(e) =>
                     updateTarget(target.id, { ingestUrl: e.target.value })
                   }
@@ -500,7 +507,7 @@ function TargetRow({
                 />
                 {urlInvalid && (
                   <span className="text-[11px] font-medium text-bad">
-                    URL inválida — use rtmp://, rtmps:// ou srt://
+                    URL inválida — use rtmp:// ou rtmps://
                   </span>
                 )}
               </label>
@@ -562,7 +569,6 @@ function TargetRow({
                 <Trash2 className="size-4" /> Remover
               </Button>
             </div>
-
           </Collapsible.Content>
         </Collapsible.Root>
       </Card>
@@ -606,7 +612,13 @@ function offerChatBridge(platformId: PlatformId) {
         st.setSettings({
           chatSources: [
             ...cur,
-            { id: uid("src"), platform: platformId, value: "", name: "", enabled: true },
+            {
+              id: uid("src"),
+              platform: platformId,
+              value: "",
+              name: "",
+              enabled: true,
+            },
           ],
         });
       }
@@ -645,7 +657,8 @@ function KeyField({
       await setKey(target.id, key);
       setValue("");
       setEditing(false);
-      if (strippedUrl) toast.info("Isso parecia a URL completa — guardei só a chave 👍");
+      if (strippedUrl)
+        toast.info("Isso parecia a URL completa — guardei só a chave 👍");
       toast.success("Chave guardada no cofre 🔒");
       offerChatBridge(target.platformId);
     } catch (e) {
@@ -785,7 +798,7 @@ function PlatformPicker({
             key={p.id}
             onClick={() => onPick(p.id)}
             title={p.note}
-            className="flex items-center gap-3 rounded-md bg-surface-2 p-3 text-left transition-all hover:translate-x-0.5 hover:-translate-y-0.5 hover:bg-surface-3"
+            className="flex items-center gap-3 rounded-md bg-surface-2 p-3 text-left transition hover:translate-x-0.5 hover:-translate-y-0.5 hover:bg-surface-3"
           >
             <PlatformGlyph id={p.id} size={38} />
             <div className="min-w-0 flex-1">

@@ -1,8 +1,10 @@
 //! Gravação da sessão de transmissão em NDJSON (uma linha por amostra/evento)
 //! para o relatório pós-live. Ver docs/RELATORIO-POS-LIVE.md.
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
@@ -14,6 +16,27 @@ use crate::engine::EngineSnapshot;
 
 /// Quantas sessões manter no disco (as mais antigas são podadas).
 const KEEP: usize = 50;
+const MAX_SESSION_BYTES: u64 = 32 * 1024 * 1024;
+struct SessionWriter {
+    writer: BufWriter<File>,
+    pending_lines: u8,
+}
+static WRITERS: OnceLock<Mutex<HashMap<PathBuf, SessionWriter>>> = OnceLock::new();
+
+fn writers() -> &'static Mutex<HashMap<PathBuf, SessionWriter>> {
+    WRITERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn valid_session_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 20 && id.bytes().all(|b| b.is_ascii_digit())
+}
+
+fn session_path(app: &AppHandle, id: &str) -> Option<PathBuf> {
+    if !valid_session_id(id) {
+        return None;
+    }
+    Some(sessions_dir(app)?.join(format!("{id}.ndjson")))
+}
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -30,10 +53,25 @@ pub fn sessions_dir(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn append_line(path: &Path, value: &Value) {
-    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
-        let mut line = value.to_string();
-        line.push('\n');
-        let _ = f.write_all(line.as_bytes());
+    if std::fs::metadata(path).map(|m| m.len()).unwrap_or(0) >= MAX_SESSION_BYTES {
+        log::warn!("sessão atingiu o limite de {MAX_SESSION_BYTES} bytes; amostra descartada");
+        return;
+    }
+    let mut line = value.to_string();
+    line.push('\n');
+    if let Ok(mut map) = writers().lock() {
+        if let Some(session) = map.get_mut(path) {
+            let _ = session.writer.write_all(line.as_bytes());
+            session.pending_lines += 1;
+            if session.pending_lines >= 10 {
+                let _ = session.writer.flush();
+                session.pending_lines = 0;
+            }
+            return;
+        }
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = file.write_all(line.as_bytes());
     }
 }
 
@@ -51,13 +89,25 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
         .collect();
     let meta = json!({
         "kind": "meta",
+        "schemaVersion": 1,
         "id": id.to_string(),
         "startedAt": id,
         "mode": config.mode,
         "platforms": platforms,
     });
-    if let Ok(mut f) = File::create(&path) {
-        let _ = writeln!(f, "{meta}");
+    if let Ok(file) = File::create(&path) {
+        let mut writer = BufWriter::new(file);
+        let _ = writeln!(writer, "{meta}");
+        let _ = writer.flush();
+        if let Ok(mut map) = writers().lock() {
+            map.insert(
+                path.clone(),
+                SessionWriter {
+                    writer,
+                    pending_lines: 0,
+                },
+            );
+        }
     }
     log::info!("relatório: gravando sessão em {}", path.display());
     Some(path)
@@ -113,11 +163,57 @@ pub fn record_alert(path: &Path, platform: &str, kind: &str, user: &str, amount:
 /// Fecha a sessão (marca o fim).
 pub fn end_session(path: &Path) {
     append_line(path, &json!({ "kind": "end", "endedAt": now_ms() }));
+    if let Ok(mut map) = writers().lock() {
+        if let Some(mut session) = map.remove(path) {
+            let _ = session.writer.flush();
+        }
+    }
+}
+
+/// Fecha sessões deixadas sem evento `end` por queda de energia/processo. Executado uma vez no
+/// boot, antes que uma nova sessão possa ser iniciada.
+pub fn recover_incomplete_sessions(app: &AppHandle) {
+    let Some(dir) = sessions_dir(app) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for path in entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("ndjson"))
+    {
+        let Ok(meta) = fs::metadata(&path) else {
+            continue;
+        };
+        if meta.len() == 0 || meta.len() > MAX_SESSION_BYTES {
+            continue;
+        }
+        let Ok(raw) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let ended = raw
+            .lines()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+            .and_then(|line| serde_json::from_str::<Value>(line).ok())
+            .and_then(|value| value.get("kind").and_then(Value::as_str).map(str::to_owned))
+            .as_deref()
+            == Some("end");
+        if !ended {
+            append_line(
+                &path,
+                &json!({ "kind": "end", "endedAt": now_ms(), "recovered": true }),
+            );
+        }
+    }
 }
 
 /// Crava um marcador ("momento") na sessão — aparece na linha do tempo do relatório.
 pub fn record_marker(path: &Path, label: &str) {
-    append_line(path, &json!({ "kind": "marker", "t": now_ms(), "label": label }));
+    append_line(
+        path,
+        &json!({ "kind": "marker", "t": now_ms(), "label": label }),
+    );
 }
 
 #[derive(Serialize)]
@@ -145,7 +241,7 @@ pub fn list_sessions(app: &AppHandle) -> Vec<SessionMeta> {
         .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("ndjson"))
         .filter_map(|p| read_meta(&p))
         .collect();
-    out.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    out.sort_by_key(|item| std::cmp::Reverse(item.started_at));
     out
 }
 
@@ -172,20 +268,31 @@ fn read_meta(path: &Path) -> Option<SessionMeta> {
         started_at,
         ended_at,
         duration_sec,
-        mode: v.get("mode").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+        mode: v
+            .get("mode")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
         platforms: v.get("platforms").cloned().unwrap_or_else(|| json!([])),
     })
 }
 
 /// Conteúdo NDJSON cru de uma sessão (o frontend parseia e analisa).
 pub fn read_session(app: &AppHandle, id: &str) -> Option<String> {
-    let dir = sessions_dir(app)?;
-    fs::read_to_string(dir.join(format!("{id}.ndjson"))).ok()
+    let path = session_path(app, id)?;
+    if fs::metadata(&path).ok()?.len() > MAX_SESSION_BYTES {
+        log::warn!("sessão recusada: arquivo excede {MAX_SESSION_BYTES} bytes");
+        return None;
+    }
+    fs::read_to_string(path).ok()
 }
 
-pub fn delete_session(app: &AppHandle, id: &str) {
-    if let Some(dir) = sessions_dir(app) {
-        let _ = fs::remove_file(dir.join(format!("{id}.ndjson")));
+pub fn delete_session(app: &AppHandle, id: &str) -> Result<(), String> {
+    let path = session_path(app, id).ok_or_else(|| "id de sessão inválido".to_string())?;
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("não foi possível apagar a sessão: {e}")),
     }
 }
 
@@ -206,5 +313,19 @@ fn prune(dir: &Path, keep: usize) {
     let remove = files.len() - keep;
     for p in files.into_iter().take(remove) {
         let _ = fs::remove_file(p);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::valid_session_id;
+
+    #[test]
+    fn session_id_accepts_only_timestamp_digits() {
+        assert!(valid_session_id("1721400000000"));
+        assert!(!valid_session_id("../config"));
+        assert!(!valid_session_id("1/2"));
+        assert!(!valid_session_id(""));
+        assert!(!valid_session_id("123456789012345678901"));
     }
 }

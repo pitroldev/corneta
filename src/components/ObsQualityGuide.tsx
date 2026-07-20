@@ -31,7 +31,9 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   // bitrate, se comporta igual a "sem compositor" (a cópia por-plataforma manda no teto).
   const reencodesAll = guardArmed;
 
-  const copies = reencodesAll ? [] : enabled.filter((t) => effectiveAction(config.mode, t) === "copy");
+  const copies = reencodesAll
+    ? []
+    : enabled.filter((t) => effectiveAction(config.mode, t) === "copy");
   const transcodes = enabled.filter((t) => !copies.includes(t));
 
   const fps = Math.min(
@@ -60,7 +62,13 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   //   bitrate alto quase não pesa no encoder — quem pesa é resolução/fps).
   const lcd = lowestCommonDenominator(config);
   const hasCopy = copies.length > 0 && lcd.videoKbps != null;
-  const contribKbps = needsFullHd ? (fps >= 60 ? 12000 : 10000) : fps >= 60 ? 8000 : 6500;
+  const contribKbps = needsFullHd
+    ? fps >= 60
+      ? 12000
+      : 10000
+    : fps >= 60
+      ? 8000
+      : 6500;
   const obsKbps = hasCopy ? lcd.videoKbps! : contribKbps;
 
   const hw = encoders.find((e) => e.available && e.kind !== "software");
@@ -89,13 +97,16 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
           <Route className="size-4 text-brass" /> O caminho do seu vídeo hoje
         </div>
         <p className="text-xs leading-relaxed text-ink-muted">
-          O OBS encoda seu vídeo <strong className="text-ink">uma vez</strong>. Daí:
+          O OBS encoda seu vídeo <strong className="text-ink">uma vez</strong>.
+          Daí:
         </p>
         <div className="mt-2 flex flex-col gap-1.5 text-xs">
           {reencodesAll ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge tone="brass">eu refaço</Badge>
-              <span className="text-ink-muted">Guardião ligado — capricha no sinal do OBS.</span>
+              <span className="text-ink-muted">
+                Guardião ligado — capricha no sinal do OBS.
+              </span>
             </div>
           ) : (
             <>
@@ -103,13 +114,17 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge tone="neutral">em cópia</Badge>
                   {copies.map((t) => (
-                    <span key={t.id} className="flex items-center gap-1 text-ink-muted">
+                    <span
+                      key={t.id}
+                      className="flex items-center gap-1 text-ink-muted"
+                    >
                       <PlatformGlyph id={t.platformId} size={14} /> {t.name}
                     </span>
                   ))}
                   <span className="text-ink-faint">
-                    — recebem <strong className="text-ink-muted">exatamente</strong> o que sai do
-                    OBS
+                    — recebem{" "}
+                    <strong className="text-ink-muted">exatamente</strong> o que
+                    sai do OBS
                   </span>
                 </div>
               )}
@@ -117,7 +132,10 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge tone="brass">eu refaço</Badge>
                   {transcodes.map((t) => (
-                    <span key={t.id} className="flex items-center gap-1 text-ink-muted">
+                    <span
+                      key={t.id}
+                      className="flex items-center gap-1 text-ink-muted"
+                    >
                       <PlatformGlyph id={t.platformId} size={14} /> {t.name}
                     </span>
                   ))}
@@ -125,7 +143,8 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
               )}
               {enabled.length === 0 && (
                 <span className="text-ink-faint">
-                  (nenhuma plataforma ativa ainda — os números abaixo assumem 1080p)
+                  (nenhuma plataforma ativa ainda — os números abaixo assumem
+                  1080p)
                 </span>
               )}
             </>
@@ -136,7 +155,8 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
       {/* 2. Os números — prontos pra copiar no OBS */}
       <div className="mt-3">
         <div className="mb-1.5 text-sm font-bold">
-          Configure assim: OBS → Configurações → <strong className="text-brass">Saída</strong>
+          Configure assim: OBS → Configurações →{" "}
+          <strong className="text-brass">Saída</strong>
         </div>
         <div className="divide-y divide-border-soft rounded-md bg-surface-2 px-3 text-sm">
           <GuideRow k="Encoder" v={encAdvice} />
@@ -167,37 +187,52 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
             Sem placa de vídeo, seu PC pode penar em{" "}
             {needsFullHd ? "1080p" : "720p"}
             {fps >= 60 ? "60" : "30"}: se a live engasgar ou o jogo travar,{" "}
-            {fps >= 60 ? "baixe o FPS pra 30 (aba Vídeo) — pesa quase metade" : "baixe a saída pra 720p (aba Vídeo)"}{" "}
+            {fps >= 60
+              ? "baixe o FPS pra 30 (aba Vídeo) — pesa quase metade"
+              : "baixe a saída pra 720p (aba Vídeo)"}{" "}
             e, fora jogo muito rápido, ninguém nota.
           </p>
         )}
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-          No modo <strong className="text-ink-muted">Simples</strong> do OBS, só bitrate e encoder
-          aparecem — já resolve. Esses ajustes são na mão mesmo.
+          No modo <strong className="text-ink-muted">Simples</strong> do OBS, só
+          bitrate e encoder aparecem — já resolve. Esses ajustes são na mão
+          mesmo.
         </p>
       </div>
 
       {/* 3. O porquê, em 3 linhas */}
       <div className="mt-3 flex flex-col gap-1.5 text-xs text-ink-muted">
         <p className="flex gap-2">
-          <Check className="mt-0.5 size-3.5 shrink-0 text-ok" strokeWidth={2.8} />
+          <Check
+            className="mt-0.5 size-3.5 shrink-0 text-ok"
+            strokeWidth={2.8}
+          />
           <span>
-            <strong className="text-ink">Uma passada só.</strong> Refazer o vídeo à toa perde
-            qualidade de graça.
+            <strong className="text-ink">Uma passada só.</strong> Refazer o
+            vídeo à toa perde qualidade de graça.
           </span>
         </p>
         <p className="flex gap-2">
-          <Check className="mt-0.5 size-3.5 shrink-0 text-ok" strokeWidth={2.8} />
+          <Check
+            className="mt-0.5 size-3.5 shrink-0 text-ok"
+            strokeWidth={2.8}
+          />
           <span>
-            <strong className="text-ink">CBR + quadro-chave 2 s</strong> é exigência das
-            plataformas — fora disso a live buferiza pros espectadores.
+            <strong className="text-ink">CBR + quadro-chave 2 s</strong> é
+            exigência das plataformas — fora disso a live buferiza pros
+            espectadores.
           </span>
         </p>
         <p className="flex gap-2">
-          <Check className="mt-0.5 size-3.5 shrink-0 text-ok" strokeWidth={2.8} />
+          <Check
+            className="mt-0.5 size-3.5 shrink-0 text-ok"
+            strokeWidth={2.8}
+          />
           <span>
-            <strong className="text-ink">Mudou as plataformas ou ligou o Guardião?</strong> Volta
-            aqui — os números acima acompanham a sua config.
+            <strong className="text-ink">
+              Mudou as plataformas ou ligou o Guardião?
+            </strong>{" "}
+            Volta aqui — os números acima acompanham a sua config.
           </span>
         </p>
       </div>
@@ -214,9 +249,15 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
 function GuideRow({ k, v, note }: { k: string; v: string; note?: string }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 py-2">
-      <span className="w-44 shrink-0 text-xs font-semibold text-ink-faint">{k}</span>
+      <span className="w-44 shrink-0 text-xs font-semibold text-ink-faint">
+        {k}
+      </span>
       <span className="font-display font-bold">{v}</span>
-      {note && <span className="min-w-0 flex-1 text-[11px] text-ink-faint">— {note}</span>}
+      {note && (
+        <span className="min-w-0 flex-1 text-[11px] text-ink-faint">
+          — {note}
+        </span>
+      )}
     </div>
   );
 }

@@ -224,7 +224,8 @@ export function ChatPopout() {
       (x.platform === "youtube" && youtubeReady) ||
       (x.platform === "kick" && kickReady),
   );
-  const sendValid = sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
+  const sendValid =
+    sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
   const effectiveSendTo = sendValid ? sendTo : "all";
   const sendTargets =
     effectiveSendTo === "all"
@@ -232,7 +233,11 @@ export function ChatPopout() {
       : sendableSources.filter((x) => x.id === effectiveSendTo);
   // Twitch só envia depois que o IRC autentica (chatAuth.ok); YouTube/Kick mandam via HTTP.
   const canSend = sendTargets.some((x) =>
-    x.platform === "youtube" ? youtubeReady : x.platform === "kick" ? kickReady : !!chatAuth[x.id]?.ok,
+    x.platform === "youtube"
+      ? youtubeReady
+      : x.platform === "kick"
+        ? kickReady
+        : !!chatAuth[x.id]?.ok,
   );
   // Mesmo texto da tela principal — aqui vira title do Enviar desabilitado (espaço curto).
   const sendStatus = sendStatusLine(sendTargets, chatAuth, {
@@ -319,13 +324,19 @@ export function ChatPopout() {
           aria-label="Limpar alertas"
           className={cn(
             "transition-colors",
-            confirmClearAlerts ? "text-xs font-bold text-bad" : "text-ink-faint hover:text-bad",
+            confirmClearAlerts
+              ? "text-xs font-bold text-bad"
+              : "text-ink-faint hover:text-bad",
           )}
         >
           {confirmClearAlerts ? "Limpar?" : <Trash2 className="size-3.5" />}
         </button>
       </div>
-      <AlertsFeed alerts={alerts} className="min-h-0 flex-1" fontSize={st?.alertFontSize ?? 14} />
+      <AlertsFeed
+        alerts={alerts}
+        className="min-h-0 flex-1"
+        fontSize={st?.alertFontSize ?? 14}
+      />
     </div>
   );
   const chatPanel = (
@@ -343,7 +354,11 @@ export function ChatPopout() {
       }
       emptyAction={
         configured ? (
-          <Button variant="primary" size="sm" onClick={() => void connectChat()}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void connectChat()}
+          >
             <Wifi className="size-4" /> Conectar
           </Button>
         ) : undefined
@@ -385,7 +400,10 @@ export function ChatPopout() {
           <WinBtn onClick={minimize} label="Minimizar">
             <Minus className="size-3.5" strokeWidth={2.4} />
           </WinBtn>
-          <WinBtn onClick={toggleMaximize} label={maximized ? "Restaurar" : "Maximizar"}>
+          <WinBtn
+            onClick={toggleMaximize}
+            label={maximized ? "Restaurar" : "Maximizar"}
+          >
             {maximized ? (
               <Minimize2 className="size-3.5" strokeWidth={2.4} />
             ) : (
@@ -420,7 +438,10 @@ export function ChatPopout() {
               title={
                 viewers.items
                   .filter((i) => i.live)
-                  .map((i) => `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`)
+                  .map(
+                    (i) =>
+                      `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`,
+                  )
                   .join("\n") + "\nClique pra esconder (volta na config)"
               }
             >
@@ -429,7 +450,11 @@ export function ChatPopout() {
             </button>
           )}
           {connected ? (
-            <button onClick={() => void disconnectChat()} title="Desconectar" className={iconBtn}>
+            <button
+              onClick={() => void disconnectChat()}
+              title="Desconectar"
+              className={iconBtn}
+            >
               <WifiOff className="size-4" />
             </button>
           ) : (
@@ -438,7 +463,11 @@ export function ChatPopout() {
                 if (configured) void connectChat();
               }}
               disabled={!configured}
-              title={configured ? "Conectar" : "Configure os canais na janela principal da Corneta"}
+              title={
+                configured
+                  ? "Conectar"
+                  : "Configure os canais na janela principal da Corneta"
+              }
               className={cn(iconBtn, !configured && "opacity-40")}
             >
               <Wifi className="size-4" />
@@ -457,7 +486,11 @@ export function ChatPopout() {
             }}
             // Em "Ambos" a lixeira limpa SÓ o chat (os alertas têm a própria, no painel).
             title={
-              confirmClear ? "Clique pra confirmar" : tab === "alerts" ? "Limpar alertas" : "Limpar chat"
+              confirmClear
+                ? "Clique pra confirmar"
+                : tab === "alerts"
+                  ? "Limpar alertas"
+                  : "Limpar chat"
             }
             className={cn(iconBtn, confirmClear && "text-bad")}
           >
@@ -481,16 +514,42 @@ export function ChatPopout() {
               O que mostrar no feed
             </span>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-              <CfgToggle label="Emotes" checked={view.emotes} onChange={(v) => setSettings({ chatShowEmotes: v })} />
-              <CfgToggle label="Badges" checked={view.badges} onChange={(v) => setSettings({ chatShowBadges: v })} />
-              <CfgToggle label="Plataforma" checked={view.platform} onChange={(v) => setSettings({ chatShowPlatform: v })} />
-              <CfgToggle label="Canal" checked={view.source} onChange={(v) => setSettings({ chatShowSource: v })} />
-              <CfgToggle label="Horário" checked={view.timestamps} onChange={(v) => setSettings({ chatShowTimestamps: v })} />
-              <CfgToggle label="Quem assiste" checked={st?.chatShowViewers ?? true} onChange={(v) => setSettings({ chatShowViewers: v })} />
+              <CfgToggle
+                label="Emotes"
+                checked={view.emotes}
+                onChange={(v) => setSettings({ chatShowEmotes: v })}
+              />
+              <CfgToggle
+                label="Badges"
+                checked={view.badges}
+                onChange={(v) => setSettings({ chatShowBadges: v })}
+              />
+              <CfgToggle
+                label="Plataforma"
+                checked={view.platform}
+                onChange={(v) => setSettings({ chatShowPlatform: v })}
+              />
+              <CfgToggle
+                label="Canal"
+                checked={view.source}
+                onChange={(v) => setSettings({ chatShowSource: v })}
+              />
+              <CfgToggle
+                label="Horário"
+                checked={view.timestamps}
+                onChange={(v) => setSettings({ chatShowTimestamps: v })}
+              />
+              <CfgToggle
+                label="Quem assiste"
+                checked={st?.chatShowViewers ?? true}
+                onChange={(v) => setSettings({ chatShowViewers: v })}
+              />
             </div>
           </div>
           <label className="flex items-center gap-2.5">
-            <span className="shrink-0 font-semibold text-ink-muted">Fonte do chat</span>
+            <span className="shrink-0 font-semibold text-ink-muted">
+              Fonte do chat
+            </span>
             <Slider
               className="ml-auto max-w-44 flex-1"
               value={view.fontSize}
@@ -502,7 +561,9 @@ export function ChatPopout() {
             />
           </label>
           <label className="flex items-center gap-2.5">
-            <span className="shrink-0 font-semibold text-ink-muted">Fonte dos alertas</span>
+            <span className="shrink-0 font-semibold text-ink-muted">
+              Fonte dos alertas
+            </span>
             <Slider
               className="ml-auto max-w-44 flex-1"
               value={st?.alertFontSize ?? 14}
@@ -524,7 +585,9 @@ export function ChatPopout() {
                   className="w-32"
                   value={bothLayout}
                   options={LAYOUT_OPTS}
-                  onChange={(v) => setSettings({ chatBothLayout: v as "auto" | "row" | "col" })}
+                  onChange={(v) =>
+                    setSettings({ chatBothLayout: v as "auto" | "row" | "col" })
+                  }
                 />
               </label>
               <CfgToggle
@@ -541,7 +604,10 @@ export function ChatPopout() {
       {tab === "both" ? (
         <div
           ref={containerRef}
-          className={cn("flex min-h-0 flex-1 overflow-hidden", BOTH_DIR[bothLayout])}
+          className={cn(
+            "flex min-h-0 flex-1 overflow-hidden",
+            BOTH_DIR[bothLayout],
+          )}
         >
           {alertsFirst
             ? [alertsPanel, divider, chatPanel]
@@ -550,7 +616,11 @@ export function ChatPopout() {
       ) : tab === "chat" ? (
         chatPanel
       ) : (
-        <AlertsFeed alerts={alerts} className="flex-1" fontSize={st?.alertFontSize ?? 14} />
+        <AlertsFeed
+          alerts={alerts}
+          className="flex-1"
+          fontSize={st?.alertFontSize ?? 14}
+        />
       )}
 
       {/* Barra de composição (modo janela): só com fonte enviável (login/token). */}
@@ -562,7 +632,10 @@ export function ChatPopout() {
               value={effectiveSendTo}
               options={[
                 { value: "all", label: "Todas" },
-                ...sendableSources.map((x) => ({ value: x.id, label: srcLabel(x) })),
+                ...sendableSources.map((x) => ({
+                  value: x.id,
+                  label: srcLabel(x),
+                })),
               ]}
               onChange={setSendTo}
             />
@@ -653,7 +726,9 @@ function WinBtn({
       title={label}
       className={cn(
         "grid h-full w-9 place-items-center text-ink-muted transition-colors",
-        danger ? "hover:bg-bad hover:text-white" : "hover:bg-surface-2 hover:text-ink"
+        danger
+          ? "hover:bg-bad hover:text-white"
+          : "hover:bg-surface-2 hover:text-ink",
       )}
     >
       {children}

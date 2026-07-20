@@ -107,7 +107,11 @@ export function EncodingScreen() {
   // ficava num texto de 11px dentro do acordeão fechado.
   const verticalCopies = config.targets.filter((t) => {
     const r = PLATFORMS[t.platformId].recommended;
-    return t.enabled && r.height > r.width && effectiveAction(config.mode, t) === "copy";
+    return (
+      t.enabled &&
+      r.height > r.width &&
+      effectiveAction(config.mode, t) === "copy"
+    );
   });
   const verticalNames = verticalCopies.map((t) => t.name);
 
@@ -116,7 +120,8 @@ export function EncodingScreen() {
   const hybridFit =
     config.mode !== "hybrid"
       ? bandFit(
-          estimate({ ...config, mode: "hybrid" }, { anyHwAvailable: anyHw }).uploadKbps,
+          estimate({ ...config, mode: "hybrid" }, { anyHwAvailable: anyHw })
+            .uploadKbps,
           uploadMbps,
         )
       : "bad";
@@ -159,7 +164,7 @@ export function EncodingScreen() {
               whileTap={{ scale: 0.97 }}
               aria-pressed={active}
               className={cn(
-                "relative flex flex-col rounded-lg p-4 text-left transition-all",
+                "relative flex flex-col rounded-lg p-4 text-left transition",
                 active
                   ? "border-2 border-brass bg-surface pop-brass"
                   : "border-2 border-transparent bg-surface-2 hover:bg-surface-3",
@@ -246,7 +251,11 @@ export function EncodingScreen() {
             disabled={measuring}
             className="font-bold text-brass hover:underline disabled:opacity-60"
           >
-            {measuring ? "medindo…" : uploadMbps == null ? "medir agora" : "medir de novo"}
+            {measuring
+              ? "medindo…"
+              : uploadMbps == null
+                ? "medir agora"
+                : "medir de novo"}
           </button>
         )}
       </p>
@@ -256,11 +265,11 @@ export function EncodingScreen() {
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
           <div className="flex-1 text-sm text-ink-muted">
             <p>
-              {config.mode === "passthrough" ? "Na lata manda" : "Em cópia vai"} o vídeo
-              deitado pra{" "}
-              <strong className="text-ink">{verticalNames.join(" e ")}</strong>, que só
-              aceita{verticalNames.length > 1 ? "m" : ""} vídeo em pé — a live vai sair
-              torta ou nem entrar.
+              {config.mode === "passthrough" ? "Na lata manda" : "Em cópia vai"}{" "}
+              o vídeo deitado pra{" "}
+              <strong className="text-ink">{verticalNames.join(" e ")}</strong>,
+              que só aceita{verticalNames.length > 1 ? "m" : ""} vídeo em pé — a
+              live vai sair torta ou nem entrar.
             </p>
             {config.mode === "passthrough" ? (
               <Button
@@ -269,8 +278,8 @@ export function EncodingScreen() {
                 className="mt-2"
                 onClick={() => setMode("hybrid")}
               >
-                <Wand2 className="size-3.5 text-brass" /> Usar o Esperto — ele arruma isso
-                sozinho
+                <Wand2 className="size-3.5 text-brass" /> Usar o Esperto — ele
+                arruma isso sozinho
               </Button>
             ) : (
               <Button
@@ -285,7 +294,8 @@ export function EncodingScreen() {
                   )
                 }
               >
-                <Wand2 className="size-3.5 text-brass" /> Voltar pro Auto — ajusta em pé
+                <Wand2 className="size-3.5 text-brass" /> Voltar pro Auto —
+                ajusta em pé
               </Button>
             )}
           </div>
@@ -321,8 +331,8 @@ export function EncodingScreen() {
               // No Na lata a qualidade se define no OBS — mandar pro "ajuste fino"
               // (que aqui diz "não tem o que ajustar") era um beco sem saída.
               <p className="mt-1">
-                Baixe a <strong className="text-ink">Taxa de bits no OBS</strong>{" "}
-                (
+                Baixe a{" "}
+                <strong className="text-ink">Taxa de bits no OBS</strong> (
                 <button
                   onClick={() => setShowGuide(true)}
                   className="font-bold text-brass hover:underline"
@@ -376,8 +386,8 @@ export function EncodingScreen() {
         <div className="flex-1 text-sm text-ink-muted">
           {lcd.videoKbps != null && lcd.capBy ? (
             <p>
-              Plataformas <strong className="text-ink">em cópia</strong> precisam
-              do OBS em{" "}
+              Plataformas <strong className="text-ink">em cópia</strong>{" "}
+              precisam do OBS em{" "}
               <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong>{" "}
               pra caber no <strong className="text-ink">{lcd.capBy}</strong>.
             </p>
@@ -545,7 +555,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const recBr = preset.recommended.videoBitrateKbps;
   const draftNum = brDraft == null ? p.videoBitrateKbps : Number(brDraft);
   const brInvalid = !(
-    Number.isFinite(draftNum) && draftNum >= MIN_BR && draftNum <= MAX_BR
+    Number.isFinite(draftNum) &&
+    draftNum >= MIN_BR &&
+    draftNum <= MAX_BR
   );
 
   const patchPreset = (patch: Partial<typeof p>) =>
@@ -596,7 +608,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <PlatformGlyph id={t.platformId} size={36} />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-display text-sm font-bold">{t.name}</div>
+            <div className="truncate font-display text-sm font-bold">
+              {t.name}
+            </div>
             <div className="text-[11px] text-ink-faint">
               {/* Em cópia a resolução/fps são as do OBS — mostrar as do preset aqui
                   parecia promessa de "mando 1080p60" que a cópia não cumpre. */}
@@ -680,13 +694,17 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                         // fazia os cards de modo lá em cima piscarem com "1 kbps".
                         onChange={(e) => setBrDraft(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          if (e.key === "Enter")
+                            (e.target as HTMLInputElement).blur();
                         }}
                         onBlur={(e) => {
                           const v = Number(e.target.value);
                           const clamped =
                             e.target.value.trim() !== "" && Number.isFinite(v)
-                              ? Math.min(MAX_BR, Math.max(MIN_BR, Math.round(v)))
+                              ? Math.min(
+                                  MAX_BR,
+                                  Math.max(MIN_BR, Math.round(v)),
+                                )
                               : recBr;
                           if (clamped !== p.videoBitrateKbps)
                             patchPreset({ videoBitrateKbps: clamped });
@@ -696,7 +714,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                         aria-label={`Bitrate de ${t.name} em kbps`}
                         className={cn(
                           "h-8 w-24 rounded-md border-2 bg-surface px-2 text-sm tabular-nums outline-none focus:border-brass",
-                          brInvalid ? "border-bad focus:border-bad" : "border-border",
+                          brInvalid
+                            ? "border-bad focus:border-bad"
+                            : "border-border",
                         )}
                       />
                       <span className="font-normal">kbps</span>
@@ -716,7 +736,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => patchPreset({ videoBitrateKbps: recBr })}
+                          onClick={() =>
+                            patchPreset({ videoBitrateKbps: recBr })
+                          }
                           className="font-bold text-brass hover:underline"
                         >
                           usar recomendado ({recBr})
@@ -760,10 +782,14 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   <span
                     className="min-w-0 flex-1 truncate font-normal text-ink-faint"
                     title={
-                      enc.encoder === "auto" && autoResolved ? `usa ${autoResolved}` : undefined
+                      enc.encoder === "auto" && autoResolved
+                        ? `usa ${autoResolved}`
+                        : undefined
                     }
                   >
-                    {enc.encoder === "auto" && autoResolved ? `usa ${autoResolved}` : " "}
+                    {enc.encoder === "auto" && autoResolved
+                      ? `usa ${autoResolved}`
+                      : " "}
                   </span>
                   {isVertical && (
                     <button

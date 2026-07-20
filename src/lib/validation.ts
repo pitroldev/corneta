@@ -1,9 +1,9 @@
 import type { Target } from "./types";
 
-/** URL de ingestão aceita (rtmp/rtmps/srt) — exige host após o esquema. */
-export const INGEST_URL_RE = /^(rtmps?|srt):\/\/\S+/i;
+/** URL de ingestão aceita (RTMP/RTMPS) — exige host após o esquema. */
+export const INGEST_URL_RE = /^rtmps?:\/\/\S+/i;
 /** Só o esquema, sem host (ex.: "rtmp://") — preset incompleto, tratar como vazio. */
-const BARE_SCHEME_RE = /^(rtmps?|srt):\/\/$/i;
+const BARE_SCHEME_RE = /^rtmps?:\/\/$/i;
 
 /** Problemas de configuração de um destino (lista vazia = ok). */
 export function targetIssues(t: Target): string[] {
@@ -11,7 +11,8 @@ export function targetIssues(t: Target): string[] {
   if (!t.name.trim()) issues.push("nome vazio");
   const url = t.ingestUrl.trim();
   if (!url || BARE_SCHEME_RE.test(url)) issues.push("URL não definida");
-  else if (!INGEST_URL_RE.test(url)) issues.push("URL inválida — use rtmp://, rtmps:// ou srt://");
+  else if (!INGEST_URL_RE.test(url))
+    issues.push("URL inválida — use rtmp:// ou rtmps://");
   if (t.enabled && !t.hasKey) issues.push("sem chave");
   return issues;
 }
@@ -24,7 +25,9 @@ export function blockingIssues(t: Target): string[] {
 /** True se a URL foi digitada e está num formato inválido (pra marcar o campo). */
 export function isUrlInvalid(t: Target): boolean {
   const url = t.ingestUrl.trim();
-  return url.length > 0 && !BARE_SCHEME_RE.test(url) && !INGEST_URL_RE.test(url);
+  return (
+    url.length > 0 && !BARE_SCHEME_RE.test(url) && !INGEST_URL_RE.test(url)
+  );
 }
 
 /** True se o destino tem uma URL de ingestão válida (host presente). */
@@ -117,7 +120,8 @@ export function sanitizeStreamKey(
 /** Tira aspas/apóstrofos que envolvem o valor inteiro (colagem de "…" ou '…'). */
 function stripWrappingQuotes(s: string): string {
   const t = s.trim();
-  if (t.length >= 2 && /^["'`]/.test(t) && t.endsWith(t[0])) return t.slice(1, -1).trim();
+  if (t.length >= 2 && /^["'`]/.test(t) && t.endsWith(t[0]))
+    return t.slice(1, -1).trim();
   return t;
 }
 
@@ -150,7 +154,9 @@ export function sanitizeApiKey(raw: string): string {
  *   "https://sockets.streamlabs.com/?token=ab" → "ab"
  */
 export function sanitizeToken(raw: string): string {
-  let t = stripWrappingQuotes(raw).replace(/^bearer\s+/i, "").trim();
+  let t = stripWrappingQuotes(raw)
+    .replace(/^bearer\s+/i, "")
+    .trim();
   // Rótulo/lista tipo "token: xxx", "jwt = xxx", ou querystring "?token=xxx".
   const labelled = t.match(/(?:token|jwt)\s*[:=]\s*([^\s&"']+)/i);
   if (labelled) t = labelled[1];

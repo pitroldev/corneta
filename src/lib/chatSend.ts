@@ -1,7 +1,8 @@
 import type { ChatSource } from "./types";
 
 /** Rótulo da fonte igual ao backend (value quando o nome é só espaço) — pra casar moderação. */
-export const srcLabel = (x: ChatSource) => (x.name.trim() === "" ? x.value : x.name);
+export const srcLabel = (x: ChatSource) =>
+  x.name.trim() === "" ? x.value : x.name;
 
 /** Estado de login por plataforma (derivado de chatLogin.*.state === "connected"). */
 export interface SendReady {
@@ -23,8 +24,10 @@ export function sendStatusLine(
   return sendTargets
     .map((x) => {
       const label = srcLabel(x);
-      if (x.platform === "youtube") return ready.youtube ? "YouTube logado" : `${label}: entre no YouTube`;
-      if (x.platform === "kick") return ready.kick ? "Kick logado" : `${label}: entre no Kick`;
+      if (x.platform === "youtube")
+        return ready.youtube ? "YouTube logado" : `${label}: entre no YouTube`;
+      if (x.platform === "kick")
+        return ready.kick ? "Kick logado" : `${label}: entre no Kick`;
       const a = chatAuth[x.id];
       if (a?.ok) return `logado como @${a.login}`;
       if (ready.twitch) return `${label}: reconecte o chat pra logar`;

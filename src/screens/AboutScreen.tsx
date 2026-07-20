@@ -7,7 +7,7 @@ import { useStore } from "../lib/store";
 // LinkedIn não está no simple-icons (removido por política de marca) — path oficial embutido.
 const LINKEDIN_PATH =
   "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z";
-import { readableOn } from "../lib/utils";
+import { openExternal, readableOn } from "../lib/utils";
 import { Mascot, SoundWaves } from "../components/decor";
 import { SectionTitle } from "../components/ui";
 
@@ -26,16 +26,7 @@ function useAppVersion(): string {
 }
 
 async function openUrl(url: string) {
-  try {
-    if (IS_TAURI) {
-      const { open } = await import("@tauri-apps/plugin-shell");
-      await open(url);
-      return;
-    }
-  } catch {
-    /* cai pro fallback do navegador */
-  }
-  window.open(url, "_blank", "noopener,noreferrer");
+  await openExternal(url);
 }
 
 interface LinkDef {
@@ -115,7 +106,7 @@ export function AboutScreen() {
           <button
             key={l.label}
             onClick={() => openUrl(l.url)}
-            className="flex items-center gap-3 rounded-lg bg-surface-2 p-3 text-left transition-all hover:translate-x-0.5 hover:-translate-y-0.5 hover:bg-surface-3"
+            className="flex items-center gap-3 rounded-lg bg-surface-2 p-3 text-left transition hover:translate-x-0.5 hover:-translate-y-0.5 hover:bg-surface-3"
           >
             <span
               className="grid size-9 shrink-0 place-items-center rounded-md"
@@ -156,7 +147,8 @@ export function AboutScreen() {
       {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
         Corneta é grátis e de código aberto. Feita com{" "}
-        <Heart className="size-4 text-tomate" fill="currentColor" /> e código.
+        <Heart className="size-4 text-tomate" fill="currentColor" aria-hidden />{" "}
+        e código.
       </p>
       <p className="mt-1 text-center text-[11px] font-semibold text-ink-faint">
         Corneta v{appVersion} · multi-stream
@@ -165,18 +157,7 @@ export function AboutScreen() {
   );
 }
 
-/** Favicon do pitrol.dev, com fallback pro globo se não carregar. */
+/** Ícone local: evita que a tela Sobre faça uma requisição externa só para buscar favicon. */
 function BlogIcon() {
-  const [err, setErr] = useState(false);
-  if (err) {
-    return <Globe className="size-6 text-tomate" strokeWidth={2.3} />;
-  }
-  return (
-    <img
-      src="https://pitrol.dev/favicon.ico"
-      alt=""
-      className="size-6 rounded"
-      onError={() => setErr(true)}
-    />
-  );
+  return <Globe className="size-6 text-tomate" strokeWidth={2.3} aria-hidden />;
 }

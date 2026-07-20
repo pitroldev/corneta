@@ -12,7 +12,7 @@ export type PlatformId =
   | "instagram"
   | "custom";
 
-export type Protocol = "rtmp" | "rtmps" | "srt";
+export type Protocol = "rtmp" | "rtmps";
 
 /** O que o relay faz com cada destino. */
 export type EncodingAction = "copy" | "transcode";
@@ -22,12 +22,7 @@ export type EncodingMode = "per-platform" | "passthrough" | "hybrid";
 
 /** Encoders de hardware suportados. */
 export type EncoderKind =
-  | "auto"
-  | "nvenc"
-  | "qsv"
-  | "amf"
-  | "videotoolbox"
-  | "software";
+  "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software";
 
 export interface VideoPreset {
   width: number;
@@ -322,6 +317,8 @@ export interface Profile {
 }
 
 export interface AppConfig {
+  schemaVersion: number;
+  revision: number;
   ingest: IngestConfig;
   mode: EncodingMode;
   targets: Target[];

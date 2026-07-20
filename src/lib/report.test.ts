@@ -7,7 +7,13 @@ describe("parseSession", () => {
   it("lê meta + samples e calcula a duração até o 'end'", () => {
     const d = parseSession(
       nd([
-        { kind: "meta", id: "s1", startedAt: 1000, mode: "hybrid", platforms: [] },
+        {
+          kind: "meta",
+          id: "s1",
+          startedAt: 1000,
+          mode: "hybrid",
+          platforms: [],
+        },
         { kind: "sample", t: 2000, cpu: 40, gpu: 10, targets: [] },
         { kind: "sample", t: 3000, cpu: 50, targets: [] },
         { kind: "end", endedAt: 5000 },
@@ -24,7 +30,13 @@ describe("parseSession", () => {
   it("sem 'end' (ainda no ar): duração vai até o último sample e endedAt fica indefinido", () => {
     const d = parseSession(
       nd([
-        { kind: "meta", id: "s2", startedAt: 0, mode: "per-platform", platforms: [] },
+        {
+          kind: "meta",
+          id: "s2",
+          startedAt: 0,
+          mode: "per-platform",
+          platforms: [],
+        },
         { kind: "sample", t: 10000, targets: [] },
       ]),
     )!;
@@ -57,7 +69,13 @@ describe("parseSession", () => {
     const comObs = parseSession(
       nd([
         { kind: "meta", id: "s5", startedAt: 0, platforms: [] },
-        { kind: "sample", t: 1000, obs: { congestion: 0.1, renderMs: 5 }, chat: 3, targets: [] },
+        {
+          kind: "sample",
+          t: 1000,
+          obs: { congestion: 0.1, renderMs: 5 },
+          chat: 3,
+          targets: [],
+        },
       ]),
     )!;
     expect(hasObs(comObs)).toBe(true);

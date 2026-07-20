@@ -56,7 +56,8 @@ export function LineChart({
   const innerH = H - padT - padB;
 
   let peak = 1;
-  for (const s of series) for (const v of s.values) if (v != null && v > peak) peak = v;
+  for (const s of series)
+    for (const v of s.values) if (v != null && v > peak) peak = v;
   const yMax = yMaxProp ?? peak * 1.1;
   const xAt = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - Math.min(v, yMax) / yMax) * innerH;
@@ -97,7 +98,10 @@ export function LineChart({
 
   const ticks = [1, 0.5, 0].map((f) => yMax * f);
   // 4 rótulos de tempo (início · 1/3 · 2/3 · fim), sem repetir índice em séries curtas.
-  const xTicks = formatX && n > 1 ? [...new Set([0, 1 / 3, 2 / 3, 1].map((f) => Math.round(f * (n - 1))))] : [];
+  const xTicks =
+    formatX && n > 1
+      ? [...new Set([0, 1 / 3, 2 / 3, 1].map((f) => Math.round(f * (n - 1))))]
+      : [];
 
   // O SVG escala via viewBox: mapeia o mouse de px da tela → coordenada do gráfico
   // pela matriz real do SVG (getScreenCTM), que já desconta o letterbox do
@@ -124,13 +128,16 @@ export function LineChart({
     if (hover == null) return null;
     const rows = series
       .map((s) => ({ label: s.label, color: s.color, v: s.values[hover] }))
-      .filter((r): r is { label: string; color: string; v: number } => r.v != null);
+      .filter(
+        (r): r is { label: string; color: string; v: number } => r.v != null,
+      );
     if (!rows.length) return null;
     const bx = xAt(hover);
     const title = formatX ? formatX(hover) : null;
     const lines = rows.map((r) => `${r.label}: ${fmt(r.v)}`);
     // largura estimada por caracteres (canvas de medição seria exagero aqui)
-    const wEst = Math.max(...lines.map((t) => t.length), title?.length ?? 0) * 6 + 16;
+    const wEst =
+      Math.max(...lines.map((t) => t.length), title?.length ?? 0) * 6 + 16;
     const lineH = 13;
     const bh = (rows.length + (title ? 1 : 0)) * lineH + 9;
     const boxX = bx + 10 + wEst > W - padR ? bx - 10 - wEst : bx + 10;
@@ -162,7 +169,11 @@ export function LineChart({
           opacity={0.95}
         />
         {title && (
-          <text x={boxX + 8} y={boxY + 13} className="fill-ink text-[10px] font-bold">
+          <text
+            x={boxX + 8}
+            y={boxY + 13}
+            className="fill-ink text-[10px] font-bold"
+          >
             {title}
           </text>
         )}
@@ -204,7 +215,12 @@ export function LineChart({
               strokeWidth={1}
               vectorEffect="non-scaling-stroke"
             />
-            <text x={padL - 6} y={yAt(tv) + 3} textAnchor="end" className="fill-ink-faint text-[10px]">
+            <text
+              x={padL - 6}
+              y={yAt(tv) + 3}
+              textAnchor="end"
+              className="fill-ink-faint text-[10px]"
+            >
               {fmt(tv)}
             </text>
           </g>
@@ -216,7 +232,9 @@ export function LineChart({
               key={`x${k}`}
               x={xAt(ti)}
               y={H - padB + 14}
-              textAnchor={k === 0 ? "start" : k === xTicks.length - 1 ? "end" : "middle"}
+              textAnchor={
+                k === 0 ? "start" : k === xTicks.length - 1 ? "end" : "middle"
+              }
               className="fill-ink-faint text-[10px]"
             >
               {formatX(ti)}
@@ -282,8 +300,15 @@ export function LineChart({
       {series.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
           {series.map((s, i) => (
-            <span key={i} className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-muted">
-              <span className="size-2.5 rounded-sm" style={{ background: s.color }} /> {s.label}
+            <span
+              key={i}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-muted"
+            >
+              <span
+                className="size-2.5 rounded-sm"
+                style={{ background: s.color }}
+              />{" "}
+              {s.label}
             </span>
           ))}
         </div>

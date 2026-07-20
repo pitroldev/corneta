@@ -192,6 +192,9 @@ export function drawRecap(ctx: CanvasRenderingContext2D, r: RecapData): void {
 
 export function recapToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("falha ao gerar PNG"))), "image/png"),
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("falha ao gerar PNG"))),
+      "image/png",
+    ),
   );
 }

@@ -24,8 +24,8 @@ const DIFF_W: usize = 640;
 const DIFF_PIX: u8 = 18; // ignora ruído de compressão
 const DIFF_FRAC: f32 = 0.0008; // ~0,08% dos pixels mudou → re-OCR
 const THROTTLE_MS: u64 = 100; // teto da taxa de diff (o buffer absorve de sobra)
-// Rede de segurança: força um OCR cheio se passou TANTO sem OCR (pega mudança que o diff perdeu).
-// Por tempo de PAREDE (não por nº de pulos) pra ser previsível. < delay → preventivo.
+                              // Rede de segurança: força um OCR cheio se passou TANTO sem OCR (pega mudança que o diff perdeu).
+                              // Por tempo de PAREDE (não por nº de pulos) pra ser previsível. < delay → preventivo.
 const FORCE_MS: u64 = 1200;
 const SLOW_WARN_MS: u128 = 1500;
 
@@ -75,8 +75,13 @@ fn diff_small(gray: &[u8], w: usize, h: usize) -> Vec<u8> {
     match GrayImage::from_raw(w as u32, h as u32, gray.to_vec()) {
         Some(img) => {
             let nh = (h * DIFF_W / w.max(1)).max(1) as u32;
-            image::imageops::resize(&img, DIFF_W as u32, nh, image::imageops::FilterType::Triangle)
-                .into_raw()
+            image::imageops::resize(
+                &img,
+                DIFF_W as u32,
+                nh,
+                image::imageops::FilterType::Triangle,
+            )
+            .into_raw()
         }
         None => vec![],
     }
@@ -136,12 +141,14 @@ fn ocr_worker(
                 t.elapsed().as_millis()
             );
         }
-        // Diagnóstico (a cada ~4s): mostra match + um trecho do que o OCR LEU. Ajuda a saber se a
-        // falha é de LEITURA (o termo nem aparece no texto) ou de CASAMENTO. Log local (sua tela).
+        // Diagnóstico sem conteúdo: texto reconhecido pode conter senhas, documentos e endereços.
         if last_diag.elapsed() >= Duration::from_secs(4) {
             last_diag = Instant::now();
-            let sample: String = text.chars().take(300).collect::<String>().replace('\n', " ");
-            log::info!("guardião/OCR diag: match={secret} chars={} | leu: {sample}", text.len());
+            log::debug!(
+                "guardião/OCR diag: match={secret} chars={} matches={}",
+                text.chars().count(),
+                leaks.len()
+            );
         }
         shared.timeline.lock().unwrap().record(idx, secret);
         if secret && !had_secret {

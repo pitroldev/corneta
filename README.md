@@ -14,20 +14,21 @@ painel ao vivo. Veja o racional completo em [`PLANEJAMENTO.md`](./docs/PLANEJAME
 
 ## Status
 
-🟢 **Fase 1 (MVP) em andamento.** Frontend completo e navegável; backend Rust escrito
-(pendente de compilação local — requer toolchain Rust).
+🟡 **MVP em estabilização.** Frontend e backend compilam localmente; a publicação continua
+bloqueada pelos gates manuais de assinatura, conformidade GPL e matriz real de plataformas.
 
-| Camada | Estado |
-|---|---|
-| UI (React + Tailwind v4) | ✅ funcional — roda no navegador em modo demonstração |
-| Modelo de dados, presets, estimativas | ✅ |
-| Backend Rust (config, cofre, motor FFmpeg, supervisão) | ✅ escrito — falta compilar |
-| Sidecars (FFmpeg/MediaMTX) embutidos | ⏳ via `scripts/fetch-binaries.ps1` |
-| Auto-config OBS / teste de upload | ⏳ stubs |
+| Camada                                                 | Estado                                                |
+| ------------------------------------------------------ | ----------------------------------------------------- |
+| UI (React + Tailwind v4)                               | ✅ funcional — roda no navegador em modo demonstração |
+| Modelo de dados, presets, estimativas                  | ✅                                                    |
+| Backend Rust (config, cofre, motor FFmpeg, supervisão) | ✅ compila e possui testes                            |
+| Sidecars (FFmpeg/MediaMTX) embutidos                   | ⏳ via `scripts/fetch-binaries.ps1`                   |
+| Auto-config OBS / teste de upload                      | ✅ implementados                                      |
 
 ## Rodando
 
 ### 1. Frontend (demonstração, sem Rust)
+
 A UI roda no navegador com um **motor simulado** (dados mock), ótimo para ver/testar o fluxo:
 
 ```bash
@@ -36,6 +37,7 @@ pnpm dev          # abre http://localhost:1420
 ```
 
 ### 2. App completo (Tauri)
+
 Pré-requisitos: **Rust** (rustup), **VS Build Tools com C++/MSVC** e **WebView2** (Win 11 já traz).
 
 ```bash
@@ -50,6 +52,7 @@ pnpm app:build                          # gera o instalador (NSIS)
 > baixados pelo `fetch-binaries.ps1`.
 
 ### 3. Testar ao vivo (OBS)
+
 1. No app: **Plataformas** → adicione um destino e cole a stream key.
 2. **Ao vivo** → **BORA AO VIVO** (status: "Aguardando OBS").
 3. No OBS → Transmissão → Serviço **Personalizado**:
@@ -71,8 +74,8 @@ OBS ──RTMP──▶ [ Corneta ]
 ```
 
 - **Encoding** (`src/screens/EncodingScreen.tsx` + `src-tauri/src/engine.rs`): modos
-  *Otimizado* (um por plataforma), *Simples* (encodar uma vez) e *Híbrido*. Ver §8.
-- **Segurança**: chaves no keychain do SO, shell escopado aos sidecars, *tree-kill* ao
+  _Otimizado_ (um por plataforma), _Simples_ (encodar uma vez) e _Híbrido_. Ver §8.
+- **Segurança**: chaves no keychain do SO, webviews sem permissão direta de shell, _tree-kill_ ao
   fechar. Ver §14.
 
 ## Estrutura
@@ -93,10 +96,11 @@ legacy/              setup antigo (nginx-rtmp + docker)
 ## Documentação
 
 - [`PLANEJAMENTO.md`](./docs/PLANEJAMENTO.md) — visão de produto, arquitetura, stacks e decisões.
-- [`NOMES.md`](./NOMES.md) — como chegamos no nome "Corneta".
 - [`docs/PENDENCIAS.md`](./docs/PENDENCIAS.md) — **o que falta** para o app ficar pronto (com prioridades).
 - [`docs/ATUALIZACAO-AUTOMATICA.md`](./docs/ATUALIZACAO-AUTOMATICA.md) — auto-update via GitHub Releases.
 - [`docs/ASSINATURA.md`](./docs/ASSINATURA.md) — assinatura de código (Windows) + chave do updater.
+- [`docs/GATES-DE-RELEASE.md`](./docs/GATES-DE-RELEASE.md) — gates automatizados e matriz manual obrigatória.
+- [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) — licenças e obrigações dos sidecars.
 
 ## Licença
 

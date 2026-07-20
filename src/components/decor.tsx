@@ -5,7 +5,14 @@ export function Mascot({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       <path d="M3.4 9.1 L13 5.9 V18.1 L3.4 14.9 Z" fill="currentColor" />
-      <rect x="4.7" y="13.9" width="2.5" height="4.6" rx="1.1" fill="currentColor" />
+      <rect
+        x="4.7"
+        y="13.9"
+        width="2.5"
+        height="4.6"
+        rx="1.1"
+        fill="currentColor"
+      />
       <path
         d="M15.6 8.4a5 5 0 0 1 0 7.2"
         stroke="currentColor"
@@ -60,7 +67,10 @@ export function SoundWaves({
 export function WaveCorner({ className }: { className?: string }) {
   return (
     <SoundWaves
-      className={cn("pointer-events-none absolute select-none text-brass", className)}
+      className={cn(
+        "pointer-events-none absolute select-none text-brass",
+        className,
+      )}
     />
   );
 }

@@ -1,6 +1,6 @@
 //! Comandos expostos ao frontend (invoke) + supervisão do sidecar FFmpeg.
-use crate::config::{self, AppConfig};
 use crate::chat;
+use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
     brb_slate_is_video, friendly_error, is_brb_slate_path, parse_ingest_hostport, parse_kv,
@@ -12,6 +12,7 @@ use crate::AppState;
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
@@ -77,30 +78,67 @@ pub fn get_config(app: AppHandle) -> AppConfig {
 }
 
 #[tauri::command]
-pub fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
+pub fn save_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
+    let mut config = config.validate_and_normalize()?;
+    let disk_revision = config::load(&app).revision;
+    if config.revision < disk_revision {
+        return Err("configuração mudou em outra janela; tente novamente".into());
+    }
+    config.revision = disk_revision.saturating_add(1);
     config::save(&app, &config)?;
     // Sincroniza as OUTRAS janelas (o popout do chat é outro webview, com store zustand próprio):
     // sem isto, cada janela persistia sua cópia inteira do AppConfig e revertia em disco as
     // mudanças da outra. Cada janela reassina `config://changed` e atualiza a base SEM re-persistir.
     let _ = app.emit("config://changed", &config);
-    Ok(())
+    Ok(config)
 }
 
 // ----------------------------- Cofre ------------------------------
 
+fn secret_namespace_exists(config: &AppConfig, namespace: &str) -> bool {
+    config.targets.iter().any(|target| target.id == namespace)
+        || namespace.strip_prefix("alert_").is_some_and(|id| {
+            config
+                .settings
+                .alert_sources
+                .iter()
+                .any(|source| source.id == id)
+        })
+        || namespace.strip_prefix("chat_send_").is_some_and(|id| {
+            config
+                .settings
+                .chat_sources
+                .iter()
+                .any(|source| source.id == id)
+        })
+}
+
 #[tauri::command]
-pub fn set_key(target_id: String, key: String) -> Result<(), String> {
+pub fn set_key(app: AppHandle, target_id: String, key: String) -> Result<(), String> {
+    config::validate_secret_namespace(&target_id)?;
+    if !secret_namespace_exists(&config::load(&app), &target_id) {
+        return Err("namespace de segredo não pertence à configuração atual".into());
+    }
+    if key.len() > 8_192 {
+        return Err("segredo excede o limite de 8 KiB".into());
+    }
     keys::set_key(&target_id, &key)
 }
 
 #[tauri::command]
-pub fn clear_key(target_id: String) -> Result<(), String> {
+pub fn clear_key(app: AppHandle, target_id: String) -> Result<(), String> {
+    config::validate_secret_namespace(&target_id)?;
+    if !secret_namespace_exists(&config::load(&app), &target_id) {
+        return Err("namespace de segredo não pertence à configuração atual".into());
+    }
     keys::clear_key(&target_id)
 }
 
 #[tauri::command]
-pub fn has_key(target_id: String) -> bool {
-    keys::has_key(&target_id)
+pub fn has_key(app: AppHandle, target_id: String) -> bool {
+    config::validate_secret_namespace(&target_id).is_ok()
+        && secret_namespace_exists(&config::load(&app), &target_id)
+        && keys::has_key(&target_id)
 }
 
 // ------------------------- Encoders / banda -----------------------
@@ -121,7 +159,12 @@ const HW_ENCODERS: [(&str, &str, &str, Option<u32>); 4] = [
     ("nvenc", "NVIDIA NVENC", "h264_nvenc", Some(8)),
     ("qsv", "Intel Quick Sync", "h264_qsv", None),
     ("amf", "AMD AMF", "h264_amf", None),
-    ("videotoolbox", "Apple VideoToolbox", "h264_videotoolbox", None),
+    (
+        "videotoolbox",
+        "Apple VideoToolbox",
+        "h264_videotoolbox",
+        None,
+    ),
 ];
 
 /// Cache da sonda (a GPU não muda durante a execução; sondar custa ~0,5–2 s).
@@ -143,8 +186,20 @@ async fn probe_hw_encoders(app: &AppHandle) -> [bool; 4] {
         // falha mesmo com a GPU presente (falso negativo → x264 → CPU estoura → live cai).
         let res = cmd
             .args([
-                "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
-                "color=c=black:s=1280x720:r=30", "-frames:v", "3", "-c:v", codec, "-f", "null", "-",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=1280x720:r=30",
+                "-frames:v",
+                "3",
+                "-c:v",
+                codec,
+                "-f",
+                "null",
+                "-",
             ])
             .output()
             .await;
@@ -232,7 +287,10 @@ pub async fn test_upload() -> Result<f64, String> {
                             .timeout_write(Duration::from_secs(20))
                             .timeout_read(Duration::from_secs(20))
                             .build();
-                        let body = UploadBody { deadline, sent: sent.clone() };
+                        let body = UploadBody {
+                            deadline,
+                            sent: sent.clone(),
+                        };
                         let _ = agent.post("https://speed.cloudflare.com/__up").send(body);
                     }
                 })
@@ -299,8 +357,11 @@ fn emit(app: &AppHandle, snap: &EngineSnapshot) {
     {
         let state = app.state::<AppState>();
         let eng = state.engine.lock().unwrap();
-        let authoritative_stopped =
-            eng.snapshot.as_ref().map(|s| s.state == "stopped").unwrap_or(false);
+        let authoritative_stopped = eng
+            .snapshot
+            .as_ref()
+            .map(|s| s.state == "stopped")
+            .unwrap_or(false);
         if authoritative_stopped && snap.state != "stopped" {
             return;
         }
@@ -477,7 +538,9 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, Strin
             // separados escondiam metade dos arquivos até o usuário achar o seletor "Tipo".
             .add_filter(
                 "Imagem ou vídeo",
-                &["png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "mov", "mkv", "webm", "m4v"],
+                &[
+                    "png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "mov", "mkv", "webm", "m4v",
+                ],
             )
             .blocking_pick_file()
     })
@@ -503,7 +566,12 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, Strin
     remove_brb_slate_files(&dir); // só um slate por vez
     let dest = dir.join(format!("brb-slate.{ext}"));
     std::fs::copy(&src, &dest).map_err(|e| format!("não consegui copiar o arquivo: {e}"))?;
-    let kind = if brb_slate_is_video(&dest) { "video" } else { "image" }.to_string();
+    let kind = if brb_slate_is_video(&dest) {
+        "video"
+    } else {
+        "image"
+    }
+    .to_string();
     Ok(Some(BrbSlateInfo { kind, file_name }))
 }
 
@@ -608,7 +676,6 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
-
 /// Erro FATAL do motor: derruba sidecars + supervisores e SOLTA a trava de sessão (pra o
 /// "Tentar de novo" ser aceito), preservando a mensagem no snapshot ("error"). Antes, o motor
 /// só trocava o snapshot pra "error" e deixava `live=true`/supervisores rodando — todo retry
@@ -648,11 +715,15 @@ fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
 fn reaffirm_auth_error(app: &AppHandle, target_id: &str) {
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
-    let Some(snap) = eng.snapshot.as_mut() else { return };
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
     if snap.state == "stopped" {
         return;
     }
-    let Some(st) = snap.targets.get_mut(target_id) else { return };
+    let Some(st) = snap.targets.get_mut(target_id) else {
+        return;
+    };
     if st.state == "error" {
         return;
     }
@@ -675,13 +746,17 @@ fn set_target_waiting(app: &AppHandle, target_id: &str) {
 
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
-    let Some(snap) = eng.snapshot.as_mut() else { return };
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
     if snap.state == "stopped" {
         return;
     }
     // "No meio da live" = o snapshot global já chegou a "live" nesta sessão.
     let mid_live = snap.state == "live";
-    let Some(st) = snap.targets.get_mut(target_id) else { return };
+    let Some(st) = snap.targets.get_mut(target_id) else {
+        return;
+    };
     let new_state = if mid_live { "signal-lost" } else { "waiting" };
     if st.state == new_state {
         return;
@@ -700,7 +775,11 @@ fn set_target_waiting(app: &AppHandle, target_id: &str) {
         let last = LAST_LOST_NOTIFY_MS.load(Ordering::Relaxed);
         if now.saturating_sub(last) > 10_000 {
             LAST_LOST_NOTIFY_MS.store(now, Ordering::Relaxed);
-            notify(app, "O sinal do OBS caiu", "Sua live está SEM IMAGEM — confira o OBS.");
+            notify(
+                app,
+                "O sinal do OBS caiu",
+                "Sua live está SEM IMAGEM — confira o OBS.",
+            );
         }
     }
 }
@@ -836,7 +915,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     };
     // Daqui pra frente qualquer saída por erro solta a trava e limpa parciais (Drop). Só o
     // sucesso desarma a guarda (no fim da função).
-    let mut start_guard = StartGuard { app: &app, armed: true };
+    let mut start_guard = StartGuard {
+        app: &app,
+        armed: true,
+    };
 
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
@@ -891,7 +973,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let slate_on = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
     chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
-    // Uma flag de pausa por destino (controle ao vivo).
+                                                 // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
         .iter()
         .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
@@ -937,7 +1019,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             let yid = yt.id.clone();
             let title = {
                 let t = config.settings.stream_title.trim();
-                if t.is_empty() { "Ao vivo".to_string() } else { t.to_string() }
+                if t.is_empty() {
+                    "Ao vivo".to_string()
+                } else {
+                    t.to_string()
+                }
             };
             let app2 = app.clone();
             match tauri::async_runtime::spawn_blocking(move || {
@@ -997,7 +1083,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 // ficaria preso em "starting"/"aguardando OBS" pra sempre. No-op se já parou
                 // (ex.: fomos nós que matamos o MediaMTX no stop_engine).
                 CommandEvent::Terminated(_) => {
-                    set_engine_error(&app_m, "O servidor de ingestão (MediaMTX) caiu. Tente de novo.");
+                    set_engine_error(
+                        &app_m,
+                        "O servidor de ingestão (MediaMTX) caiu. Tente de novo.",
+                    );
                     break;
                 }
                 _ => {}
@@ -1054,10 +1143,13 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // em transcode usa, e o compositor também. Só sonda se alguém for precisar.
     let needs_hw = compositor_on
         || enabled.iter().any(|t| {
-            engine::effective_action(&config.mode, t) == "transcode"
-                && t.encoding.encoder == "auto"
+            engine::effective_action(&config.mode, t) == "transcode" && t.encoding.encoder == "auto"
         });
-    let hw_codec: Option<String> = if needs_hw { detect_hw_encoder(&app).await } else { None };
+    let hw_codec: Option<String> = if needs_hw {
+        detect_hw_encoder(&app).await
+    } else {
+        None
+    };
     // Revalida a sessão após os awaits lentos (YouTube/sonda de encoder): um Cortar nesse
     // meio-tempo já derrubou o MediaMTX — subir compositor/supervisores agora criaria
     // processos órfãos de uma sessão morta (ou atropelaria um segundo BORA).
@@ -1074,7 +1166,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         // Slate do "JÁ VOLTO": imagem OU vídeo (custom) ou o PNG gerado. Detecta vídeo pela
         // extensão e, se for vídeo, sonda uma vez se tem trilha de áudio.
         let slate_file = brb_slate_file(&app);
-        let slate_is_video = slate_file.as_deref().map(brb_slate_is_video).unwrap_or(false);
+        let slate_is_video = slate_file
+            .as_deref()
+            .map(brb_slate_is_video)
+            .unwrap_or(false);
         // JÁ VOLTO "leve" (splicer, sem re-encode): só com o guardião DESLIGADO (ele precisa dos
         // pixels decodificados pro OCR). Slate de imagem OU vídeo — o vídeo é transcodado UMA vez
         // no setup e reproduzido em loop na queda; a live saudável segue em cópia pura nos dois
@@ -1108,8 +1203,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             slate,
             force_slate: force_brb,
         };
-        let (app_c, run_c, sig_c, slate_c) =
-            (app.clone(), running.clone(), has_signal.clone(), slate_on.clone());
+        let (app_c, run_c, sig_c, slate_c) = (
+            app.clone(),
+            running.clone(),
+            has_signal.clone(),
+            slate_on.clone(),
+        );
         if use_splicer {
             // Cópia direta do OBS pro `_program` (zero re-encode); slate emendado na queda.
             tauri::async_runtime::spawn(async move {
@@ -1152,7 +1251,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         // Com o compositor, a ENTRADA do destino é o `_program` — que fica de pé mesmo com o
         // OBS caído. O "sinal" do destino passa a ser o programa; a queda do OBS não derruba
         // nem reinicia este FFmpeg (o slate entra no MESMO fluxo, lá no compositor).
-        let signal = if compositor_on { prog_ready.clone() } else { has_signal.clone() };
+        let signal = if compositor_on {
+            prog_ready.clone()
+        } else {
+            has_signal.clone()
+        };
         let brb_flag = slate_on.clone();
         let auto_codec = hw_codec.clone();
         let out_source = out_source.clone();
@@ -1226,13 +1329,20 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("sidecar ffmpeg indisponível: {e}");
-                        set_engine_error(&app_t, "Faltam arquivos internos da Corneta — reinstale o app.");
+                        set_engine_error(
+                            &app_t,
+                            "Faltam arquivos internos da Corneta — reinstale o app.",
+                        );
                         break;
                     }
                 };
                 {
                     let st = app_t.state::<AppState>();
-                    st.engine.lock().unwrap().ffmpegs.insert(target_id.clone(), child);
+                    st.engine
+                        .lock()
+                        .unwrap()
+                        .ffmpegs
+                        .insert(target_id.clone(), child);
                 }
                 // Corrida com o stop: o kill_engine pode ter drenado o mapa ENTRE o topo do laço
                 // e este insert (o FFmpeg recém-spawnado escaparia do kill e transmitiria segundos
@@ -1532,7 +1642,9 @@ pub fn set_force_brb(app: AppHandle, on: bool) -> Result<(), String> {
         return Err("a transmissão não está no ar.".into());
     }
     let Some(flag) = &eng.force_brb else {
-        return Err("o JÁ VOLTO não está armado nesta live — arme nas Configurações e recomece.".into());
+        return Err(
+            "o JÁ VOLTO não está armado nesta live — arme nas Configurações e recomece.".into(),
+        );
     };
     flag.store(on, Ordering::Relaxed);
     let out = eng.snapshot.as_mut().map(|snap| {
@@ -1549,13 +1661,29 @@ pub fn set_force_brb(app: AppHandle, on: bool) -> Result<(), String> {
 /// Atualiza as métricas REAIS de UM destino a partir do log do seu próprio FFmpeg.
 /// `brb_on` = o compositor está com o slate "JÁ VOLTO" no ar → o destino continua
 /// transmitindo (stats fluindo), mas a UI mostra "brb" em vez de "live".
-fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signal: bool, brb_on: bool) {
+fn update_target_metrics(
+    app: &AppHandle,
+    target_id: &str,
+    line: &str,
+    has_signal: bool,
+    brb_on: bool,
+) {
     let is_stats = line.contains("frame=") || line.contains("bitrate=");
     const ERR_KEYS: [&str; 8] = [
-        "error", "failed", "connection refused", "broken pipe",
-        "unable to", "connection reset", "i/o error", "end of file",
+        "error",
+        "failed",
+        "connection refused",
+        "broken pipe",
+        "unable to",
+        "connection reset",
+        "i/o error",
+        "end of file",
     ];
-    let low = if is_stats { String::new() } else { line.to_lowercase() };
+    let low = if is_stats {
+        String::new()
+    } else {
+        line.to_lowercase()
+    };
     let is_error = !is_stats && ERR_KEYS.iter().any(|k| low.contains(k));
     if !is_stats && !is_error {
         return;
@@ -1575,7 +1703,10 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
     {
         return;
     }
-    let was_starting = matches!(eng.snapshot.as_ref().map(|s| s.state.as_str()), Some("starting"));
+    let was_starting = matches!(
+        eng.snapshot.as_ref().map(|s| s.state.as_str()),
+        Some("starting")
+    );
     // O cronômetro "no ar" começa quando o sinal real chega — não no clique de BORA.
     if is_stats && was_starting {
         eng.started_ms = now_ms();
@@ -1637,7 +1768,11 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
     let now = now_ms();
     let should_emit =
         new_state != prev_target || was_starting || now.saturating_sub(last_emit) >= 250;
-    let out = if should_emit { Some(snap.clone()) } else { None };
+    let out = if should_emit {
+        Some(snap.clone())
+    } else {
+        None
+    };
     if should_emit {
         eng.last_emit_ms = now;
     }
@@ -1658,7 +1793,10 @@ fn update_target_metrics(app: &AppHandle, target_id: &str, line: &str, has_signa
 /// Lê a utilização da GPU NVIDIA (%) via nvidia-smi. None se não houver NVIDIA.
 fn read_gpu() -> Option<f64> {
     let out = quiet_command("nvidia-smi")
-        .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
+        .args([
+            "--query-gpu=utilization.gpu",
+            "--format=csv,noheader,nounits",
+        ])
         .output()
         .ok()?;
     if !out.status.success() {
@@ -1778,8 +1916,7 @@ pub fn read_session(app: AppHandle, id: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn delete_session(app: AppHandle, id: String) -> Result<(), String> {
-    session::delete_session(&app, &id);
-    Ok(())
+    session::delete_session(&app, &id)
 }
 
 #[tauri::command]
@@ -1794,6 +1931,18 @@ pub fn open_sessions_dir(app: AppHandle) -> Result<(), String> {
         let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
     }
     Ok(())
+}
+
+/// Abre somente URLs HTTPS no navegador padrão. A allowlist fica no backend para que um
+/// webview comprometido não transforme a permissão de shell em execução arbitrária.
+#[tauri::command]
+pub fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+    if url.len() > 2_048 || !url.starts_with("https://") || url.chars().any(char::is_whitespace) {
+        return Err("URL externa recusada".into());
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| format!("abrir URL: {e}"))
 }
 
 // ------------------------- Chat unificado -------------------------
@@ -1856,19 +2005,15 @@ pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
         let _ = w.set_focus();
         return Ok(());
     }
-    tauri::WebviewWindowBuilder::new(
-        &app,
-        "chat",
-        tauri::WebviewUrl::App("chat.html".into()),
-    )
-    .title("Corneta — Chat")
-    .inner_size(380.0, 600.0)
-    .min_inner_size(300.0, 360.0)
-    .resizable(true)
-    .always_on_top(true)
-    .decorations(false) // borda/titlebar custom (igual a janela principal)
-    .build()
-    .map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(&app, "chat", tauri::WebviewUrl::App("chat.html".into()))
+        .title("Corneta — Chat")
+        .inner_size(380.0, 600.0)
+        .min_inner_size(300.0, 360.0)
+        .resizable(true)
+        .always_on_top(true)
+        .decorations(false) // borda/titlebar custom (igual a janela principal)
+        .build()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1887,9 +2032,6 @@ pub async fn obs_set_stream(app: AppHandle, start: bool) -> Result<(), String> {
 
 /// Testa o ALCANCE do servidor de ingestão (TCP). Não valida a chave — só uma live real valida.
 fn tcp_reach(ingest_url: &str) -> Result<String, String> {
-    if ingest_url.starts_with("srt") {
-        return Ok("SRT (UDP) — teste de alcance indisponível".into());
-    }
     let (host, port) = parse_ingest_hostport(ingest_url)?;
     use std::net::ToSocketAddrs;
     let addr = format!("{host}:{port}")
@@ -1899,7 +2041,9 @@ fn tcp_reach(ingest_url: &str) -> Result<String, String> {
         .ok_or_else(|| format!("endereço não resolvido: {host}"))?;
     match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(5)) {
         Ok(_) => Ok(format!("{host} respondeu")),
-        Err(_) => Err(format!("sem resposta de {host}:{port} — confira a URL/rede")),
+        Err(_) => Err(format!(
+            "sem resposta de {host}:{port} — confira a URL/rede"
+        )),
     }
 }
 
@@ -1961,6 +2105,68 @@ pub fn open_logs_dir(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Exporta um relatório de suporte limitado e redigido. Não inclui tokens do keyring,
+/// watchlist do Guardião, senha do OBS nem API key do YouTube.
+#[tauri::command]
+pub fn export_diagnostics(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut cfg = config::load(&app);
+    cfg.settings.obs_password.clear();
+    cfg.settings.youtube_api_key.clear();
+    cfg.settings.guardian_watchlist = vec![format!(
+        "<{} termos omitidos>",
+        cfg.settings.guardian_watchlist.len()
+    )];
+    let mut report = format!(
+        "Corneta {}\nSO: {} {}\n\nCONFIG (segredos removidos)\n{}\n\nLOGS RECENTES\n",
+        app.package_info().version,
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?
+    );
+    let redact_authorization =
+        regex::Regex::new(r"(?i)(authorization\s*[:=]\s*)[^\r\n]+").map_err(|e| e.to_string())?;
+    let redact = regex::Regex::new(
+        r"(?i)(access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|password|stream[_ -]?key)(\s*[:=]\s*)([^\s,;]+)",
+    )
+    .map_err(|e| e.to_string())?;
+    if let Ok(dir) = app.path().app_log_dir() {
+        let mut files: Vec<_> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_file())
+            .collect();
+        files.sort();
+        for path in files.into_iter().rev().take(3) {
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            let start = bytes.len().saturating_sub(512 * 1024);
+            let text = String::from_utf8_lossy(&bytes[start..]);
+            let safe = redact_authorization.replace_all(&text, "$1<redacted>");
+            let safe = redact.replace_all(&safe, "$1$2<redacted>");
+            report.push_str(&format!(
+                "\n--- {} ---\n{safe}",
+                path.file_name().and_then(|n| n.to_str()).unwrap_or("log")
+            ));
+        }
+    }
+    let Some(path) = app
+        .dialog()
+        .file()
+        .add_filter("Diagnóstico da Corneta", &["txt"])
+        .set_file_name("corneta-diagnostico.txt")
+        .blocking_save_file()
+    else {
+        return Ok(false);
+    };
+    let path = path.into_path().map_err(|e| e.to_string())?;
+    std::fs::write(path, report).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
 /// (Re)registra o atalho global de começar/parar.
 #[tauri::command]
 pub fn register_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
@@ -1983,9 +2189,11 @@ pub async fn obs_check(app: AppHandle) -> Result<crate::obs::ObsCheck, String> {
         cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
     );
     let password = cfg.settings.obs_password;
-    tauri::async_runtime::spawn_blocking(move || crate::obs::check(OBS_WS_HOST, OBS_WS_PORT, &password, &server))
-        .await
-        .map_err(|e| format!("join: {e}"))
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::check(OBS_WS_HOST, OBS_WS_PORT, &password, &server)
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))
 }
 
 // ------------------------------- Mesa (co-stream P2P) -------------------------------
@@ -2010,10 +2218,23 @@ pub fn mesa_stop_server(state: State<'_, AppState>) {
 
 /// Adiciona (ou atualiza) o Browser Source da Mesa na cena atual do OBS.
 #[tauri::command]
-pub async fn mesa_obs_add_source(app: AppHandle, url: String, width: u32, height: u32) -> Result<(), String> {
+pub async fn mesa_obs_add_source(
+    app: AppHandle,
+    url: String,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
     let password = get_config(app).settings.obs_password;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::add_or_update_browser_source(OBS_WS_HOST, OBS_WS_PORT, &password, MESA_OBS_SOURCE, &url, width, height)
+        crate::obs::add_or_update_browser_source(
+            OBS_WS_HOST,
+            OBS_WS_PORT,
+            &password,
+            MESA_OBS_SOURCE,
+            &url,
+            width,
+            height,
+        )
     })
     .await
     .map_err(|e| format!("join: {e}"))?
@@ -2100,7 +2321,10 @@ pub fn overlay_chat_test(state: State<'_, AppState>) {
                 url: Some("https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0".into()),
             },
         ],
-        badges: vec![chat::ChatBadge { label: "sub".into(), kind: "subscriber".into() }],
+        badges: vec![chat::ChatBadge {
+            label: "sub".into(),
+            kind: "subscriber".into(),
+        }],
         ts: 0,
     };
     crate::overlay::push_chat(&state.overlay, &demo);
@@ -2112,7 +2336,15 @@ pub fn overlay_chat_test(state: State<'_, AppState>) {
 pub async fn overlay_obs_add_source(app: AppHandle, url: String) -> Result<(), String> {
     let password = get_config(app).settings.obs_password;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::add_or_update_browser_source(OBS_WS_HOST, OBS_WS_PORT, &password, OVERLAY_OBS_SOURCE, &url, 1920, 1080)
+        crate::obs::add_or_update_browser_source(
+            OBS_WS_HOST,
+            OBS_WS_PORT,
+            &password,
+            OVERLAY_OBS_SOURCE,
+            &url,
+            1920,
+            1080,
+        )
     })
     .await
     .map_err(|e| format!("join: {e}"))?
@@ -2120,7 +2352,7 @@ pub async fn overlay_obs_add_source(app: AppHandle, url: String) -> Result<(), S
 
 /// Abre as Configurações de Privacidade do Windows (câmera/mic) quando o getUserMedia
 /// falha por causa do bloqueio do SO (que o handler do WebView2 não consegue cobrir).
-/// Vai pelo Rust porque o open() do plugin-shell no JS é barrado pelo escopo padrão.
+/// Vai pelo Rust para manter a abertura fora do webview e validar o destino.
 #[tauri::command]
 pub fn open_privacy_settings(app: AppHandle, which: String) -> Result<(), String> {
     let uri = match which.as_str() {
@@ -2183,8 +2415,14 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
         return Ok(false);
     };
     let pb = p.into_path().map_err(|e| e.to_string())?;
+    const MAX_IMPORT_BYTES: u64 = 2 * 1024 * 1024;
+    if std::fs::metadata(&pb).map_err(|e| e.to_string())?.len() > MAX_IMPORT_BYTES {
+        return Err("config excede o limite de 2 MiB".into());
+    }
     let content = std::fs::read_to_string(pb).map_err(|e| e.to_string())?;
-    let cfg: AppConfig = serde_json::from_str(&content).map_err(|e| format!("config inválida: {e}"))?;
+    let cfg: AppConfig =
+        serde_json::from_str(&content).map_err(|e| format!("config inválida: {e}"))?;
+    let mut cfg = cfg.validate_and_normalize()?;
     // Rede de segurança: guarda a config ATUAL ao lado do config.json antes de sobrescrever —
     // importar substitui perfis/plataformas/ajustes e não tinha caminho de volta.
     if let Ok(dir) = app.path().app_config_dir() {
@@ -2193,6 +2431,8 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
             let _ = std::fs::write(dir.join("corneta-backup-antes-do-import.json"), json);
         }
     }
+    cfg.revision = config::load(&app).revision.saturating_add(1);
     config::save(&app, &cfg)?;
+    let _ = app.emit("config://changed", &cfg);
     Ok(true)
 }

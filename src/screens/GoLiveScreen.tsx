@@ -52,7 +52,11 @@ let autoOpenedObsOnce = false;
 // Quem transmite sem OBS local (fonte RTMP externa) dispensa o pré-voo pra sempre.
 const SKIP_PREFLIGHT_FLAG = "corneta.skipObsPreflight";
 
-export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void }) {
+export function GoLiveScreen({
+  onNavigate,
+}: {
+  onNavigate?: (s: Screen) => void;
+}) {
   const config = useStore((s) => s.config)!;
   const snapshot = useStore((s) => s.snapshot);
   const viewers = useStore((s) => s.viewers);
@@ -164,7 +168,11 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
   // configurado" — a ação mais importante do primeiro uso nascia escondida num acordeão.
   useEffect(() => {
     if (autoOpenedObsOnce) return;
-    if (obs !== null && obs !== "loading" && !(obs.reachable && obs.pointingAtCorneta)) {
+    if (
+      obs !== null &&
+      obs !== "loading" &&
+      !(obs.reachable && obs.pointingAtCorneta)
+    ) {
       autoOpenedObsOnce = true;
       setObsOpen(true);
     }
@@ -182,10 +190,13 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
     try {
       const obsRes = await start();
       // O toast conta a VERDADE do momento — "No ar!" só sai na transição real (efeito acima).
-      if (obsRes === "obs-ok") toast.success("Mandei o OBS transmitir — entrando no ar… 📣");
+      if (obsRes === "obs-ok")
+        toast.success("Mandei o OBS transmitir — entrando no ar… 📣");
       else if (obsRes === "obs-failed")
-        toast.action("Não consegui dar play no OBS — dê play manualmente.", "Configurar OBS", () =>
-          setShowObs(true),
+        toast.action(
+          "Não consegui dar play no OBS — dê play manualmente.",
+          "Configurar OBS",
+          () => setShowObs(true),
         );
       else toast.success("Servidor no ar! Agora é só dar play no OBS 📣");
     } catch (e) {
@@ -244,7 +255,9 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
   const confirmStopAt = useRef(0);
   const onStop = async () => {
     await stop();
-    toast.action("Cortou! Tá fora do ar 👋", "Ver relatório", () => onNavigate?.("reports"));
+    toast.action("Cortou! Tá fora do ar 👋", "Ver relatório", () =>
+      onNavigate?.("reports"),
+    );
   };
   const onStopClick = () => {
     if (!confirmStop) {
@@ -300,27 +313,42 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         subtitle="Liga o OBS uma vez, vê se a internet aguenta e entra no ar em todo lugar — de uma tacada."
       />
 
-      {!live && !starting && <FirstLiveChecklist onSetupObs={() => setShowObs(true)} />}
+      {!live && !starting && (
+        <FirstLiveChecklist onSetupObs={() => setShowObs(true)} />
+      )}
 
       {state === "error" && (
         <Card className="mb-4 border-2 border-bad/40 bg-bad/10">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
             <div>
-              <div className="font-display font-bold text-bad">Algo deu errado</div>
+              <div className="font-display font-bold text-bad">
+                Algo deu errado
+              </div>
               <div className="text-sm text-ink-muted" data-selectable>
-                {snapshot.message || "A transmissão parou. Veja os logs ou tente de novo."}
+                {snapshot.message ||
+                  "A transmissão parou. Veja os logs ou tente de novo."}
               </div>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="primary" size="sm" onClick={onStart} loading={startBusy} disabled={startBusy}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onStart}
+              loading={startBusy}
+              disabled={startBusy}
+            >
               {!startBusy && <RefreshCw className="size-4" />} Tentar de novo
             </Button>
             <Button variant="subtle" size="sm" onClick={() => setShowObs(true)}>
               <Zap className="size-4 text-brass" /> Configura pra mim
             </Button>
-            <Button variant="subtle" size="sm" onClick={() => void api.openLogsDir()}>
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => void api.openLogsDir()}
+            >
               <FileText className="size-4" /> Ver logs
             </Button>
           </div>
@@ -348,22 +376,37 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                   </strong>{" "}
                   e cole os dois campos abaixo.
                 </p>
-                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setShowObs(true)}>
-                  <Zap className="size-4 text-brass" strokeWidth={2.6} /> Configura pra mim
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setShowObs(true)}
+                >
+                  <Zap className="size-4 text-brass" strokeWidth={2.6} />{" "}
+                  Configura pra mim
                 </Button>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                <CopyField label="Servidor" value={obsIngestUrl(config.ingest)} />
-                <CopyField label="Chave de transmissão" value={config.ingest.key} mono />
+                <CopyField
+                  label="Servidor"
+                  value={obsIngestUrl(config.ingest)}
+                />
+                <CopyField
+                  label="Chave de transmissão"
+                  value={config.ingest.key}
+                  mono
+                />
               </div>
               <p className="mt-3 text-xs text-ink-faint">
-                Essa chave é só entre o OBS e a Corneta — não é de nenhuma plataforma.
+                Essa chave é só entre o OBS e a Corneta — não é de nenhuma
+                plataforma.
               </p>
               <button
                 onClick={() => setShowGuide(true)}
                 className="mt-2 flex items-center gap-1.5 text-xs font-bold text-brass hover:underline"
               >
-                <Gauge className="size-3.5" /> Qual a melhor qualidade pro OBS? Guia rápido →
+                <Gauge className="size-3.5" /> Qual a melhor qualidade pro OBS?
+                Guia rápido →
               </button>
             </Collapsible.Content>
           </Collapsible.Root>
@@ -374,13 +417,23 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         <Card className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 bg-surface-2 py-3">
           <span className="flex items-center gap-2">
             <Gauge className="size-4 text-brass" />
-            <span className="text-sm font-semibold text-ink-muted">Banda de upload</span>
+            <span className="text-sm font-semibold text-ink-muted">
+              Banda de upload
+            </span>
           </span>
           <span className="text-sm">
-            <span className={cn("font-display text-lg font-extrabold tabular-nums", bandColor)}>
+            <span
+              className={cn(
+                "font-display text-lg font-extrabold tabular-nums",
+                bandColor,
+              )}
+            >
               {uploadMbps == null ? "—" : uploadMbps}
             </span>
-            <span className="text-ink-faint"> / {neededMbps.toFixed(1).replace(".", ",")} Mbps</span>
+            <span className="text-ink-faint">
+              {" "}
+              / {neededMbps.toFixed(1).replace(".", ",")} Mbps
+            </span>
           </span>
           {uploadMbps != null && bandTone === "bad" ? (
             <button
@@ -404,7 +457,11 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
             onClick={onTest}
             loading={testing}
             disabled={testing || starting}
-            title={starting ? "Espera entrar no ar pra não competir pela banda" : undefined}
+            title={
+              starting
+                ? "Espera entrar no ar pra não competir pela banda"
+                : undefined
+            }
           >
             {!testing && <Wifi className="size-4" />}
             {testing ? "Testando…" : "Testar"}
@@ -419,10 +476,15 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
           </div>
           <ul className="mt-1.5 space-y-1.5 text-sm text-ink-muted">
             {problems.map((p) => (
-              <li key={p.target.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <li
+                key={p.target.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1"
+              >
                 <span>
-                  <strong className="text-ink">{p.target.name || "(sem nome)"}</strong>:{" "}
-                  {p.issues.join(", ")}
+                  <strong className="text-ink">
+                    {p.target.name || "(sem nome)"}
+                  </strong>
+                  : {p.issues.join(", ")}
                 </span>
                 {/* A saída fica a 1 clique — antes o usuário travava numa plataforma que nunca tocou. */}
                 <button
@@ -434,7 +496,9 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                 <button
                   onClick={() => {
                     toggleTarget(p.target.id);
-                    toast.info(`${p.target.name} desligada — religue em Plataformas.`);
+                    toast.info(
+                      `${p.target.name} desligada — religue em Plataformas.`,
+                    );
                   }}
                   className="text-xs font-bold text-ink-faint hover:text-ink hover:underline"
                 >
@@ -448,13 +512,18 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
 
       {!live && !starting && enabled.length === 0 && (
         <Card className="mb-4 bg-surface-2 text-sm text-ink-muted">
-          Nenhuma plataforma ativa. Vá em <strong className="text-ink">Plataformas</strong>, ative pelo
-          menos uma e cole a chave.
+          Nenhuma plataforma ativa. Vá em{" "}
+          <strong className="text-ink">Plataformas</strong>, ative pelo menos
+          uma e cole a chave.
         </Card>
       )}
 
       {!live && !starting && (
-        <Checkup obs={obs} onRecheck={runObs} onGuide={() => setShowGuide(true)} />
+        <Checkup
+          obs={obs}
+          onRecheck={runObs}
+          onGuide={() => setShowGuide(true)}
+        />
       )}
 
       {/* Confirma a rede de proteção ANTES do BORA (e durante, lá embaixo). */}
@@ -485,7 +554,11 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                 size="sm"
                 onClick={onMark}
                 disabled={!live}
-                title={live ? "Cravar um marcador no relatório" : "Disponível quando estiver no ar"}
+                title={
+                  live
+                    ? "Cravar um marcador no relatório"
+                    : "Disponível quando estiver no ar"
+                }
               >
                 <MapPin className="size-4" /> Marcar momento
               </Button>
@@ -493,37 +566,46 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
           </div>
 
           {/* O sinal do OBS SUMIU no meio da live (sem JÁ VOLTO): urgência máxima. */}
-          {live && enabled.some((t) => snapshot.targets[t.id]?.state === "signal-lost") && (
-            <Card className="mb-2 border-2 border-bad/40 bg-bad/10">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-display font-bold text-bad">
-                    O sinal do OBS sumiu — sua live está SEM IMAGEM
-                  </div>
-                  <div className="text-sm text-ink-muted">
-                    Pros espectadores a tela congelou. Confira o OBS (fechou? parou de transmitir?) —
-                    quando o sinal voltar, eu retomo sozinha.
+          {live &&
+            enabled.some(
+              (t) => snapshot.targets[t.id]?.state === "signal-lost",
+            ) && (
+              <Card className="mb-2 border-2 border-bad/40 bg-bad/10">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-display font-bold text-bad">
+                      O sinal do OBS sumiu — sua live está SEM IMAGEM
+                    </div>
+                    <div className="text-sm text-ink-muted">
+                      Pros espectadores a tela congelou. Confira o OBS (fechou?
+                      parou de transmitir?) — quando o sinal voltar, eu retomo
+                      sozinha.
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button variant="primary" size="sm" onClick={() => setShowObs(true)}>
-                  <Zap className="size-4" /> Configura pra mim
-                </Button>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={runObs}
-                  loading={obs === "loading"}
-                  disabled={obs === "loading"}
-                >
-                  {obs !== "loading" && <RefreshCw className="size-4" />} Verificar OBS
-                </Button>
-                <Badge tone={obsStatus.tone}>OBS: {obsStatus.label}</Badge>
-              </div>
-            </Card>
-          )}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowObs(true)}
+                  >
+                    <Zap className="size-4" /> Configura pra mim
+                  </Button>
+                  <Button
+                    variant="subtle"
+                    size="sm"
+                    onClick={runObs}
+                    loading={obs === "loading"}
+                    disabled={obs === "loading"}
+                  >
+                    {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
+                    Verificar OBS
+                  </Button>
+                  <Badge tone={obsStatus.tone}>OBS: {obsStatus.label}</Badge>
+                </div>
+              </Card>
+            )}
 
           {/* Resgate do limbo: 20s aguardando o OBS sem sinal → diagnóstico e saída. */}
           {starting && rescue && (
@@ -531,30 +613,47 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warn" />
                 <div className="min-w-0 flex-1">
-                  <div className="font-display font-bold text-warn">O OBS ainda não conectou</div>
+                  <div className="font-display font-bold text-warn">
+                    O OBS ainda não conectou
+                  </div>
                   <div className="text-sm text-ink-muted">
-                    Ele está aberto? Deu <strong className="text-ink">Iniciar transmissão</strong>?{" "}
+                    Ele está aberto? Deu{" "}
+                    <strong className="text-ink">Iniciar transmissão</strong>?{" "}
                     {obs !== null && obs !== "loading" && !obs.reachable
                       ? "Não achei o OBS por aqui — parece fechado ou sem o WebSocket ligado."
-                      : obs !== null && obs !== "loading" && !obs.pointingAtCorneta
+                      : obs !== null &&
+                          obs !== "loading" &&
+                          !obs.pointingAtCorneta
                         ? "Achei o OBS, mas ele não está apontando pra Corneta."
                         : null}
                   </div>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="primary" size="sm" onClick={() => setShowObs(true)}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowObs(true)}
+                >
                   <Zap className="size-4" /> Configura pra mim
                 </Button>
-                <Button variant="subtle" size="sm" onClick={runObs} loading={obs === "loading"}>
-                  {obs !== "loading" && <RefreshCw className="size-4" />} Verificar OBS
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={runObs}
+                  loading={obs === "loading"}
+                >
+                  {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
+                  Verificar OBS
                 </Button>
               </div>
             </Card>
           )}
 
           <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
-            <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">Máquina</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+              Máquina
+            </span>
             <Usage label="CPU" value={snapshot.cpu} />
             <Usage label="GPU" value={snapshot.gpu} />
           </Card>
@@ -576,7 +675,12 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                     initial={{ opacity: 0, x: -16 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0 }}
-                    transition={{ delay: i * 0.05, type: "spring", stiffness: 320, damping: 28 }}
+                    transition={{
+                      delay: i * 0.05,
+                      type: "spring",
+                      stiffness: 320,
+                      damping: 28,
+                    }}
                   >
                     <Card className="flex items-center gap-4 bg-surface-2 py-3">
                       <PlatformGlyph id={t.platformId} size={36} />
@@ -584,7 +688,9 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                         <div className="font-display font-bold">{t.name}</div>
                         <StatePill state={st?.state ?? "idle"} />
                         {st?.message && (
-                          <div className="mt-0.5 text-[11px] text-bad">{st.message}</div>
+                          <div className="mt-0.5 text-[11px] text-bad">
+                            {st.message}
+                          </div>
                         )}
                         {st?.state === "error" && (
                           <div className="mt-0.5 flex flex-wrap gap-x-3">
@@ -609,27 +715,53 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                         )}
                       </div>
                       <div className="hidden gap-6 sm:flex">
-                        <MiniStat label="Bitrate" value={flowing ? fmtBitrate(st?.bitrateKbps ?? 0) : "—"} />
-                        <MiniStat label="FPS" value={flowing ? String(st?.fps ?? 0) : "—"} />
+                        <MiniStat
+                          label="Bitrate"
+                          value={
+                            flowing ? fmtBitrate(st?.bitrateKbps ?? 0) : "—"
+                          }
+                        />
+                        <MiniStat
+                          label="FPS"
+                          value={flowing ? String(st?.fps ?? 0) : "—"}
+                        />
                         <MiniStat
                           label="Quedas"
                           value={flowing ? String(st?.droppedFrames ?? 0) : "—"}
-                          tone={flowing && st && st.droppedFrames > 0 ? "warn" : "default"}
+                          tone={
+                            flowing && st && st.droppedFrames > 0
+                              ? "warn"
+                              : "default"
+                          }
                         />
-                        <MiniStat label="No ar" value={flowing ? fmtUptime(st?.uptimeSec ?? 0) : "—"} />
+                        <MiniStat
+                          label="No ar"
+                          value={flowing ? fmtUptime(st?.uptimeSec ?? 0) : "—"}
+                        />
                       </div>
                       {/* Em telas estreitas mantém ao menos Bitrate + Quedas. */}
                       <div className="flex gap-4 sm:hidden">
-                        <MiniStat label="Bitrate" value={flowing ? fmtBitrate(st?.bitrateKbps ?? 0) : "—"} />
+                        <MiniStat
+                          label="Bitrate"
+                          value={
+                            flowing ? fmtBitrate(st?.bitrateKbps ?? 0) : "—"
+                          }
+                        />
                         <MiniStat
                           label="Quedas"
                           value={flowing ? String(st?.droppedFrames ?? 0) : "—"}
-                          tone={flowing && st && st.droppedFrames > 0 ? "warn" : "default"}
+                          tone={
+                            flowing && st && st.droppedFrames > 0
+                              ? "warn"
+                              : "default"
+                          }
                         />
                       </div>
                       {PLATFORMS[t.platformId].liveUrl && (
                         <button
-                          onClick={() => void openExternal(PLATFORMS[t.platformId].liveUrl!)}
+                          onClick={() =>
+                            void openExternal(PLATFORMS[t.platformId].liveUrl!)
+                          }
                           className="grid size-9 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
                           title="Abrir o canal na plataforma"
                           aria-label={`Abrir o canal de ${t.name}`}
@@ -645,9 +777,17 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
                             ? "bg-brass/15 text-brass hover:bg-brass/25"
                             : "bg-surface-3 text-ink-muted hover:text-ink",
                         )}
-                        title={paused ? "Retomar esta plataforma" : "Pausar esta plataforma"}
+                        title={
+                          paused
+                            ? "Retomar esta plataforma"
+                            : "Pausar esta plataforma"
+                        }
                       >
-                        {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+                        {paused ? (
+                          <Play className="size-3.5" />
+                        ) : (
+                          <Pause className="size-3.5" />
+                        )}
                         {paused ? "Retomar" : "Pausar"}
                       </button>
                     </Card>
@@ -665,10 +805,12 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
         {preflightWarn && !live && !starting && (
           <div className="mb-2 rounded-md border-2 border-warn/40 bg-warn/10 p-3">
             <div className="flex items-center gap-2 text-sm font-bold text-warn">
-              <AlertTriangle className="size-4 shrink-0" /> O OBS ainda não está apontando pra cá
+              <AlertTriangle className="size-4 shrink-0" /> O OBS ainda não está
+              apontando pra cá
             </div>
             <p className="mt-0.5 text-xs text-ink-muted">
-              Dá pra entrar no ar mesmo assim — a live só começa quando o OBS mandar o vídeo.
+              Dá pra entrar no ar mesmo assim — a live só começa quando o OBS
+              mandar o vídeo.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button
@@ -684,7 +826,11 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
               <Button variant="subtle" size="sm" onClick={skipPreflightForever}>
                 Ir assim mesmo
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setPreflightWarn(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPreflightWarn(false)}
+              >
                 Cancelar
               </Button>
             </div>
@@ -695,16 +841,24 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
           // (costume herdado do BORA no mesmo lugar) matava a inicialização.
           <div className="flex items-stretch gap-2">
             <div className="flex h-14 flex-1 items-center justify-center gap-2.5 rounded-md bg-surface-2 font-display text-lg font-bold text-ink-muted">
-              <Loader2 className="size-5 animate-spin" /> Aguardando o OBS conectar…
+              <Loader2 className="size-5 animate-spin" /> Aguardando o OBS
+              conectar…
             </div>
             <Button variant="outline" size="lg" onClick={onCancel}>
               Cancelar
             </Button>
           </div>
         ) : live ? (
-          <Button variant="danger" size="lg" className="w-full" onClick={onStopClick}>
+          <Button
+            variant="danger"
+            size="lg"
+            className="w-full"
+            onClick={onStopClick}
+          >
             <Square className="size-5" />{" "}
-            {confirmStop ? "Cortar mesmo? (clica de novo)" : "Cortar transmissão"}
+            {confirmStop
+              ? "Cortar mesmo? (clica de novo)"
+              : "Cortar transmissão"}
           </Button>
         ) : (
           <Button
@@ -714,28 +868,38 @@ export function GoLiveScreen({ onNavigate }: { onNavigate?: (s: Screen) => void 
             disabled={!canStart || startBusy}
             loading={startBusy}
             onClick={onStart}
-            aria-label={canStart ? "Bora ao vivo" : `Bora ao vivo (travado: ${blockReason})`}
+            aria-label={
+              canStart
+                ? "Bora ao vivo"
+                : `Bora ao vivo (travado: ${blockReason})`
+            }
           >
-            {!startBusy && <Radio className="size-6" strokeWidth={2.5} />} BORA AO VIVO
+            {!startBusy && <Radio className="size-6" strokeWidth={2.5} />} BORA
+            AO VIVO
           </Button>
         )}
         {starting && (
           <p className="mt-2 text-center text-xs text-ink-faint">
             {config.settings.autoStartObs ? (
               <>
-                Chamei o OBS pra transmitir — se em alguns segundos nada mudar aqui, dê{" "}
-                <strong className="text-ink-muted">Iniciar transmissão</strong> nele.
+                Chamei o OBS pra transmitir — se em alguns segundos nada mudar
+                aqui, dê{" "}
+                <strong className="text-ink-muted">Iniciar transmissão</strong>{" "}
+                nele.
               </>
             ) : (
               <>
-                No OBS, clique <strong className="text-ink-muted">Iniciar transmissão</strong> — a
-                Corneta entra no ar sozinha.
+                No OBS, clique{" "}
+                <strong className="text-ink-muted">Iniciar transmissão</strong>{" "}
+                — a Corneta entra no ar sozinha.
               </>
             )}
           </p>
         )}
         {!live && !starting && !canStart && blockReason && (
-          <p className="mt-2 text-center text-xs text-ink-faint">{blockReason}</p>
+          <p className="mt-2 text-center text-xs text-ink-faint">
+            {blockReason}
+          </p>
         )}
       </div>
 
@@ -766,8 +930,9 @@ function BrbNowButton({ live }: { live: boolean }) {
   if (!armed && !forced) {
     return live ? (
       <span className="max-w-52 text-right text-[11px] leading-tight text-ink-faint">
-        Quer pausa com um clique? Arme o <strong className="text-ink-muted">JÁ VOLTO</strong> nas
-        Configurações pra próxima live.
+        Quer pausa com um clique? Arme o{" "}
+        <strong className="text-ink-muted">JÁ VOLTO</strong> nas Configurações
+        pra próxima live.
       </span>
     ) : null;
   }
@@ -777,7 +942,11 @@ function BrbNowButton({ live }: { live: boolean }) {
     setBusy(true);
     try {
       await api.setForceBrb(!forced);
-      toast.success(forced ? "Voltou! Conteúdo no ar de novo 📣" : "JÁ VOLTO no ar — pode ir tranquilo, o mic tá mudo");
+      toast.success(
+        forced
+          ? "Voltou! Conteúdo no ar de novo 📣"
+          : "JÁ VOLTO no ar — pode ir tranquilo, o mic tá mudo",
+      );
     } catch (e) {
       toast.error(errMsg(e));
     } finally {
@@ -805,7 +974,11 @@ function BrbNowButton({ live }: { live: boolean }) {
   );
 }
 
-const PLAT_LABEL: Record<string, string> = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" };
+const PLAT_LABEL: Record<string, string> = {
+  twitch: "Twitch",
+  youtube: "YouTube",
+  kick: "Kick",
+};
 
 /** Define título (+jogo) da live em todas as plataformas logadas de uma vez. */
 function StreamInfoCard() {
@@ -819,7 +992,9 @@ function StreamInfoCard() {
     youtube: chatLogin.youtube.state === "connected",
     kick: chatLogin.kick.state === "connected",
   };
-  const targets = (["twitch", "youtube", "kick"] as const).filter((p) => ready[p]);
+  const targets = (["twitch", "youtube", "kick"] as const).filter(
+    (p) => ready[p],
+  );
   const [title, setTitleLocal] = useState(settings.streamTitle ?? "");
   const [game, setGame] = useState("");
   const [busy, setBusy] = useState(false);
@@ -837,8 +1012,8 @@ function StreamInfoCard() {
           <Megaphone className="size-5 text-brass" /> Título da live
         </h3>
         <p className="min-w-48 flex-1 text-xs text-ink-faint">
-          Entre na sua conta e defina o título (e o jogo) de todas as plataformas daqui — sem
-          abrir Studio nem dashboard.
+          Entre na sua conta e defina o título (e o jogo) de todas as
+          plataformas daqui — sem abrir Studio nem dashboard.
         </p>
         <Button
           variant="subtle"
@@ -882,7 +1057,10 @@ function StreamInfoCard() {
       setResults(r);
       const okN = Object.values(r).filter((x) => x.ok).length;
       const total = Object.keys(r).length;
-      if (okN === total) toast.success(`Título atualizado em ${okN} plataforma${okN > 1 ? "s" : ""} 📣`);
+      if (okN === total)
+        toast.success(
+          `Título atualizado em ${okN} plataforma${okN > 1 ? "s" : ""} 📣`,
+        );
       else toast.error(`${okN}/${total} ok — veja os detalhes`);
     } catch (e) {
       toast.error(errMsg(e));
@@ -913,7 +1091,9 @@ function StreamInfoCard() {
           value={title}
           onChange={(e) => onTitle(e.target.value)}
           onBlur={persistTitle}
-          onKeyDown={(e) => e.key === "Enter" && !busy && title.trim() && void apply()}
+          onKeyDown={(e) =>
+            e.key === "Enter" && !busy && title.trim() && void apply()
+          }
           placeholder="Título da transmissão (vale pra todas)"
           maxLength={140}
           className="h-10 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
@@ -922,11 +1102,18 @@ function StreamInfoCard() {
           <input
             value={game}
             onChange={(e) => onGame(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !busy && title.trim() && void apply()}
+            onKeyDown={(e) =>
+              e.key === "Enter" && !busy && title.trim() && void apply()
+            }
             placeholder="Jogo / categoria (opcional)"
             className="h-10 flex-1 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
           />
-          <Button variant="primary" onClick={apply} loading={busy} disabled={busy || !title.trim()}>
+          <Button
+            variant="primary"
+            onClick={apply}
+            loading={busy}
+            disabled={busy || !title.trim()}
+          >
             {!busy && <Megaphone className="size-4" />} Aplicar
           </Button>
         </div>
@@ -940,11 +1127,18 @@ function StreamInfoCard() {
               ) : r.warn ? (
                 <AlertTriangle className="size-3.5 shrink-0 text-warn" />
               ) : (
-                <Check className="size-3.5 shrink-0 text-ok" strokeWidth={2.6} />
+                <Check
+                  className="size-3.5 shrink-0 text-ok"
+                  strokeWidth={2.6}
+                />
               )}
-              <span className="shrink-0 font-semibold">{PLAT_LABEL[p] ?? p}</span>
+              <span className="shrink-0 font-semibold">
+                {PLAT_LABEL[p] ?? p}
+              </span>
               {!r.ok && <span className="truncate text-bad">· {r.error}</span>}
-              {r.ok && r.warn && <span className="truncate text-warn">· {r.warn}</span>}
+              {r.ok && r.warn && (
+                <span className="truncate text-warn">· {r.warn}</span>
+              )}
             </div>
           ))}
         </div>
@@ -952,7 +1146,9 @@ function StreamInfoCard() {
       {ready.youtube && (
         <>
           <button
-            onClick={() => setSettings({ youtubeAutoLive: !settings.youtubeAutoLive })}
+            onClick={() =>
+              setSettings({ youtubeAutoLive: !settings.youtubeAutoLive })
+            }
             className="mt-2.5 flex w-full items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-left"
           >
             <span
@@ -969,12 +1165,14 @@ function StreamInfoCard() {
               <strong className="text-ink">YouTube automático</strong>
               <span className="text-ink-faint">
                 {" "}
-                — a Corneta cria a transmissão no BORA AO VIVO, sem abrir o Studio.
+                — a Corneta cria a transmissão no BORA AO VIVO, sem abrir o
+                Studio.
               </span>
             </span>
           </button>
           <p className="mt-1.5 text-[11px] text-ink-faint">
-            No YouTube dá pra mudar só o <strong className="text-ink-muted">título</strong> (não o jogo).
+            No YouTube dá pra mudar só o{" "}
+            <strong className="text-ink-muted">título</strong> (não o jogo).
           </p>
         </>
       )}
@@ -985,7 +1183,9 @@ function StreamInfoCard() {
 /** Painel "Seu segurança": Guardião / JÁ VOLTO / Auto-bitrate visíveis e confirmáveis. */
 function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
   const settings = useStore((s) => s.config!.settings);
-  const watchCount = settings.guardianWatchlist.filter((t) => t.trim().length >= 3).length;
+  const watchCount = settings.guardianWatchlist.filter(
+    (t) => t.trim().length >= 3,
+  ).length;
   const items = [
     {
       on: settings.guardianEnabled && watchCount > 0,
@@ -1002,14 +1202,18 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
     {
       on: settings.brbEnabled,
       label: "JÁ VOLTO",
-      desc: settings.brbEnabled ? "se o sinal do OBS cair, o aviso entra no ar sem a live piscar" : "desligado",
+      desc: settings.brbEnabled
+        ? "se o sinal do OBS cair, o aviso entra no ar sem a live piscar"
+        : "desligado",
       experimental: false,
       show: true,
     },
     {
       on: settings.autoBitrate,
       label: "Auto-bitrate",
-      desc: settings.autoBitrate ? "baixa a qualidade se a internet apertar" : "desligado",
+      desc: settings.autoBitrate
+        ? "baixa a qualidade se a internet apertar"
+        : "desligado",
       experimental: false,
       show: true,
     },
@@ -1034,7 +1238,9 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
       <div className="flex flex-col gap-2">
         {items.map((it) => (
           <div key={it.label} className="flex items-center gap-2 text-sm">
-            <Badge tone={it.on ? "brass" : "neutral"}>{it.on ? "Armado" : "Off"}</Badge>
+            <Badge tone={it.on ? "brass" : "neutral"}>
+              {it.on ? "Armado" : "Off"}
+            </Badge>
             <span className="font-semibold">{it.label}</span>
             {it.experimental && <ExperimentalBadge />}
             <span className="text-xs text-ink-faint">· {it.desc}</span>
@@ -1045,7 +1251,13 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
   );
 }
 
-function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolean }) {
+function LiveTimer({
+  startedAt,
+  live,
+}: {
+  startedAt: number | null;
+  live: boolean;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -1068,7 +1280,9 @@ function LiveTimer({ startedAt, live }: { startedAt: number | null; live: boolea
       <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
         {fmtUptime(secs)}
       </span>
-      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">no ar</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+        no ar
+      </span>
     </div>
   );
 }
@@ -1098,16 +1312,28 @@ function Checkup({
         <h3 className="flex items-center gap-2 text-lg">
           <ClipboardCheck className="size-5 text-brass" /> Check-up pré-live
         </h3>
-        <Button variant="subtle" size="sm" onClick={onRecheck} loading={obs === "loading"} disabled={obs === "loading"}>
+        <Button
+          variant="subtle"
+          size="sm"
+          onClick={onRecheck}
+          loading={obs === "loading"}
+          disabled={obs === "loading"}
+        >
           {obs !== "loading" && <Zap className="size-4 text-brass" />}
           Verificar OBS
         </Button>
       </div>
       <div className="flex flex-col gap-1.5">
-        <CheckRow label="Encoder disponível" ok={encoders.some((e) => e.available)} />
+        <CheckRow
+          label="Encoder disponível"
+          ok={encoders.some((e) => e.available)}
+        />
         <CheckRow
           label="Chaves e URLs"
-          ok={enabled.length > 0 && enabled.every((t) => blockingIssues(t).length === 0)}
+          ok={
+            enabled.length > 0 &&
+            enabled.every((t) => blockingIssues(t).length === 0)
+          }
           detail={enabled.length === 0 ? "nenhuma plataforma ativa" : undefined}
         />
         <CheckRow
@@ -1151,13 +1377,19 @@ function Checkup({
           Corneta já força GOP 2s/CBR e a dica viraria ruído. E agora diz ONDE fica. */}
       {enabled.some((t) => effectiveAction(config.mode, t) === "copy") && (
         <p className="mt-2 text-xs text-ink-faint">
-          💡 No OBS, em <strong className="text-ink-muted">Configurações → Saída</strong>: no modo
-          Simples já está certo — relaxa. No modo Avançado, confira{" "}
+          💡 No OBS, em{" "}
+          <strong className="text-ink-muted">Configurações → Saída</strong>: no
+          modo Simples já está certo — relaxa. No modo Avançado, confira{" "}
           <strong className="text-ink-muted">Controle de taxa: CBR</strong> e{" "}
-          <strong className="text-ink-muted">Intervalo de quadro-chave: 2 s</strong> — é o que as
-          plataformas pedem pra não travar.{" "}
+          <strong className="text-ink-muted">
+            Intervalo de quadro-chave: 2 s
+          </strong>{" "}
+          — é o que as plataformas pedem pra não travar.{" "}
           {onGuide && (
-            <button onClick={onGuide} className="font-bold text-brass hover:underline">
+            <button
+              onClick={onGuide}
+              className="font-bold text-brass hover:underline"
+            >
               Ver o guia completo →
             </button>
           )}
@@ -1190,18 +1422,35 @@ function CheckRow({
 }
 
 function StatePill({ state }: { state: TargetState }) {
-  const map: Record<TargetState, { label: string; cls: string; dot: string }> = {
-    idle: { label: "Aguardando", cls: "text-ink-faint", dot: "bg-ink-faint" },
-    connecting: { label: "Conectando", cls: "text-warn", dot: "bg-warn" },
-    live: { label: "No ar", cls: "text-ok", dot: "bg-live live-dot" },
-    reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
-    error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
-    paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
-    waiting: { label: "Aguardando sinal", cls: "text-info", dot: "bg-info animate-pulse" },
-    "signal-lost": { label: "SEM SINAL DO OBS", cls: "text-bad", dot: "bg-bad animate-pulse" },
-    brb: { label: "JÁ VOLTO no ar", cls: "text-brass", dot: "bg-brass animate-pulse" },
-    censor: { label: "Censurado", cls: "text-bad", dot: "bg-bad animate-pulse" },
-  };
+  const map: Record<TargetState, { label: string; cls: string; dot: string }> =
+    {
+      idle: { label: "Aguardando", cls: "text-ink-faint", dot: "bg-ink-faint" },
+      connecting: { label: "Conectando", cls: "text-warn", dot: "bg-warn" },
+      live: { label: "No ar", cls: "text-ok", dot: "bg-live live-dot" },
+      reconnecting: { label: "Reconectando", cls: "text-warn", dot: "bg-warn" },
+      error: { label: "Erro", cls: "text-bad", dot: "bg-bad" },
+      paused: { label: "Pausado", cls: "text-ink-muted", dot: "bg-ink-faint" },
+      waiting: {
+        label: "Aguardando sinal",
+        cls: "text-info",
+        dot: "bg-info animate-pulse",
+      },
+      "signal-lost": {
+        label: "SEM SINAL DO OBS",
+        cls: "text-bad",
+        dot: "bg-bad animate-pulse",
+      },
+      brb: {
+        label: "JÁ VOLTO no ar",
+        cls: "text-brass",
+        dot: "bg-brass animate-pulse",
+      },
+      censor: {
+        label: "Censurado",
+        cls: "text-bad",
+        dot: "bg-bad animate-pulse",
+      },
+    };
   const m = map[state] ?? map.idle;
   return (
     <span
@@ -1226,7 +1475,9 @@ function MiniStat({
 }) {
   return (
     <div className="text-right">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">{label}</div>
+      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">
+        {label}
+      </div>
       <div
         className={cn(
           "font-display text-base font-extrabold tabular-nums",
@@ -1244,9 +1495,14 @@ function Usage({ label, value }: { label: string; value?: number }) {
   const tone = pct > 85 ? "bg-bad" : pct > 60 ? "bg-warn" : "bg-ok";
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+        {label}
+      </span>
       <div className="h-2 w-24 overflow-hidden rounded-sm bg-surface">
-        <div className={cn("h-full rounded-sm", tone)} style={{ width: `${Math.min(100, pct)}%` }} />
+        <div
+          className={cn("h-full rounded-sm", tone)}
+          style={{ width: `${Math.min(100, pct)}%` }}
+        />
       </div>
       <span className="w-12 font-display text-sm font-bold tabular-nums">
         {value == null ? "—" : `${value}%`}

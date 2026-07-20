@@ -73,7 +73,9 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Str
     let identified = read_json(&mut socket)?;
     if identified.get("op").and_then(|v| v.as_i64()) != Some(2) {
         let _ = socket.close(None);
-        return Err(format!("falha ao identificar no OBS (senha errada?): {identified}"));
+        return Err(format!(
+            "falha ao identificar no OBS (senha errada?): {identified}"
+        ));
     }
     Ok(socket)
 }
@@ -160,7 +162,10 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
     let mut socket = match connect_identify(host, port, password) {
         Ok(s) => s,
         Err(e) => {
-            return ObsCheck { error: Some(e), ..Default::default() };
+            return ObsCheck {
+                error: Some(e),
+                ..Default::default()
+            };
         }
     };
     let svc = request(&mut socket, "GetStreamServiceSettings", "corneta-svc").ok();
@@ -170,13 +175,23 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
         .and_then(|x| x.as_str())
         .unwrap_or("")
         .to_string();
-    let pointing = !server.is_empty() && server.trim_end_matches('/') == expected_server.trim_end_matches('/');
+    let pointing =
+        !server.is_empty() && server.trim_end_matches('/') == expected_server.trim_end_matches('/');
 
     let vid = request(&mut socket, "GetVideoSettings", "corneta-vid").ok();
-    let g = |k: &str| vid.as_ref().and_then(|v| v.get(k)).and_then(|x| x.as_f64()).unwrap_or(0.0);
+    let g = |k: &str| {
+        vid.as_ref()
+            .and_then(|v| v.get(k))
+            .and_then(|x| x.as_f64())
+            .unwrap_or(0.0)
+    };
     let num = g("fpsNumerator");
     let den = g("fpsDenominator");
-    let fps = if den > 0.0 { (num / den * 10.0).round() / 10.0 } else { 0.0 };
+    let fps = if den > 0.0 {
+        (num / den * 10.0).round() / 10.0
+    } else {
+        0.0
+    };
     let _ = socket.close(None);
 
     ObsCheck {
@@ -196,11 +211,19 @@ fn request(socket: &mut Socket, req_type: &str, id: &str) -> Result<Value, Strin
         &json!({ "op": 6, "d": { "requestType": req_type, "requestId": id } }),
     )?;
     let resp = read_json(socket)?;
-    Ok(resp.pointer("/d/responseData").cloned().unwrap_or(Value::Null))
+    Ok(resp
+        .pointer("/d/responseData")
+        .cloned()
+        .unwrap_or(Value::Null))
 }
 
 /// Envia um request COM `requestData` e devolve a resposta inteira (pra inspecionar o status).
-fn request_with(socket: &mut Socket, req_type: &str, id: &str, data: Value) -> Result<Value, String> {
+fn request_with(
+    socket: &mut Socket,
+    req_type: &str,
+    id: &str,
+    data: Value,
+) -> Result<Value, String> {
     send_json(
         socket,
         &json!({ "op": 6, "d": { "requestType": req_type, "requestId": id, "requestData": data } }),
@@ -241,16 +264,19 @@ pub fn add_or_update_browser_source(
     // Já existe um input com esse nome? Nomes são GLOBAIS no OBS (entre cenas E tipos),
     // então também conferimos o tipo: se existir com OUTRO tipo, é colisão de nome.
     let list = request(&mut socket, "GetInputList", "corneta-inputs")?;
-    let existing_kind = list.get("inputs").and_then(|v| v.as_array()).and_then(|arr| {
-        arr.iter()
-            .find(|i| i.get("inputName").and_then(|n| n.as_str()) == Some(input_name))
-            .map(|i| {
-                i.get("inputKind")
-                    .and_then(|k| k.as_str())
-                    .unwrap_or("")
-                    .to_string()
-            })
-    });
+    let existing_kind = list
+        .get("inputs")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|i| i.get("inputName").and_then(|n| n.as_str()) == Some(input_name))
+                .map(|i| {
+                    i.get("inputKind")
+                        .and_then(|k| k.as_str())
+                        .unwrap_or("")
+                        .to_string()
+                })
+        });
     if let Some(kind) = &existing_kind {
         if kind != "browser_source" {
             let _ = socket.close(None);
@@ -279,7 +305,10 @@ pub fn add_or_update_browser_source(
             "corneta-itemid",
             json!({ "sceneName": scene, "sourceName": input_name }),
         )?;
-        let missing = item.pointer("/d/requestStatus/code").and_then(|v| v.as_u64()) == Some(600);
+        let missing = item
+            .pointer("/d/requestStatus/code")
+            .and_then(|v| v.as_u64())
+            == Some(600);
         if missing {
             let added = request_with(
                 &mut socket,

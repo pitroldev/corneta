@@ -95,7 +95,9 @@ const MODE_LABEL: Record<string, string> = {
 export function ReportsScreen() {
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [summaries, setSummaries] = useState<Record<string, SessionSummary>>({});
+  const [summaries, setSummaries] = useState<Record<string, SessionSummary>>(
+    {},
+  );
 
   const markReportSeen = useStore((s) => s.markReportSeen);
   const refresh = () => api.listSessions().then(setSessions);
@@ -203,7 +205,11 @@ export function ReportsScreen() {
 }
 
 const TONE_DOT = { ok: "bg-ok", warn: "bg-warn", bad: "bg-bad" } as const;
-const TONE_TEXT = { ok: "text-ok", warn: "text-warn", bad: "text-bad" } as const;
+const TONE_TEXT = {
+  ok: "text-ok",
+  warn: "text-warn",
+  bad: "text-bad",
+} as const;
 
 function SessionRow({
   meta,
@@ -271,7 +277,10 @@ function SessionRow({
             }
           >
             <span
-              className={cn("size-2 rounded-full", TONE_DOT[summary.verdictTone])}
+              className={cn(
+                "size-2 rounded-full",
+                TONE_DOT[summary.verdictTone],
+              )}
             />
             {summary.problemWindows === 0
               ? "limpa"
@@ -475,7 +484,8 @@ function ReportDetail({
       setData(d);
       // Aproveita a leitura pra deixar o resumo desta live no cache — só de
       // sessão encerrada (a que ainda roda geraria um snapshot parcial eterno).
-      if (d && d.meta.endedAt != null) setCachedSummary(id, summarize(d, analyze(d)));
+      if (d && d.meta.endedAt != null)
+        setCachedSummary(id, summarize(d, analyze(d)));
     });
     return () => {
       alive = false;
@@ -553,10 +563,18 @@ function ReportDetail({
     return Math.max(0, n - 1);
   };
   const markers: ChartMarker[] = a.events
-    .filter((e) => e.kind === "reconnect" || e.kind === "error" || e.kind === "signal")
+    .filter(
+      (e) =>
+        e.kind === "reconnect" || e.kind === "error" || e.kind === "signal",
+    )
     .map((e) => ({
       index: indexAt(e.t),
-      color: e.kind === "error" ? "#ef4444" : e.kind === "signal" ? "#a855f7" : "#f97316",
+      color:
+        e.kind === "error"
+          ? "#ef4444"
+          : e.kind === "signal"
+            ? "#a855f7"
+            : "#f97316",
     }));
 
   const bitrateSeriesData = data.meta.platforms.map((p) => ({
@@ -928,7 +946,8 @@ function ReportDetail({
       {n > 1 && hasObs(data) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> OBS — atraso pra montar o quadro (ms)
+            <Activity className="size-4" /> OBS — atraso pra montar o quadro
+            (ms)
           </h3>
           <LineChart
             series={[

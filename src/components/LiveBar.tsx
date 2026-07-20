@@ -14,9 +14,13 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const startedAt = useStore((s) => s.snapshot.startedAt);
   const targets = useStore((s) => s.snapshot.targets);
   const viewersTotal = useStore((s) => s.viewers.total);
-  const guardianOn = useStore((s) => s.config?.settings.guardianEnabled ?? false);
+  const guardianOn = useStore(
+    (s) => s.config?.settings.guardianEnabled ?? false,
+  );
   const brbOn = useStore((s) => s.config?.settings.brbEnabled ?? false);
-  const autoBitrateOn = useStore((s) => s.config?.settings.autoBitrate ?? false);
+  const autoBitrateOn = useStore(
+    (s) => s.config?.settings.autoBitrate ?? false,
+  );
 
   const live = state === "live";
   const starting = state === "starting";
@@ -74,7 +78,10 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
 
   const secs = live && startedAt ? (now - startedAt) / 1000 : 0;
   const down = Object.values(targets).filter(
-    (t) => t.state === "error" || t.state === "reconnecting" || t.state === "signal-lost",
+    (t) =>
+      t.state === "error" ||
+      t.state === "reconnecting" ||
+      t.state === "signal-lost",
   ).length;
   const protections = [
     guardianOn && "Guardião",
@@ -95,7 +102,9 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
           <span className="font-display text-lg font-extrabold leading-none tabular-nums">
             {fmtUptime(secs)}
           </span>
-          <span className="text-[11px] font-bold uppercase tracking-wide">no ar</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide">
+            no ar
+          </span>
         </span>
       ) : (
         <span className="flex items-center gap-2">
@@ -112,7 +121,9 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
           <span className="font-display text-lg font-extrabold leading-none tabular-nums">
             {viewersTotal.toLocaleString("pt-BR")}
           </span>
-          <span className="text-[11px] font-bold uppercase tracking-wide">assistindo</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide">
+            assistindo
+          </span>
         </span>
       )}
 

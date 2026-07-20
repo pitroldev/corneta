@@ -29,7 +29,7 @@ use std::collections::VecDeque;
 use std::io::{BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, SyncSender, TryRecvError};
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -67,7 +67,9 @@ struct FlvTag {
 /// Preâmbulo do FLV: cabeçalho (9) + PrevTagSize0 (4). Emitido UMA vez no começo do `_program`.
 fn write_preamble(w: &mut impl Write) -> std::io::Result<()> {
     // "FLV" | v1 | flags(bit0 vídeo + bit2 áudio = 0x05) | headerlen=9 | PrevTagSize0=0
-    w.write_all(&[0x46, 0x4C, 0x56, 0x01, 0x05, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00])
+    w.write_all(&[
+        0x46, 0x4C, 0x56, 0x01, 0x05, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00,
+    ])
 }
 
 /// Escreve um tag: [type][datasize:3][ts_low:3][ts_ext][streamID=0:3][data][prevTagSize:4].
@@ -82,7 +84,7 @@ fn write_tag(w: &mut impl Write, tag_type: u8, ts: u32, data: &[u8]) -> std::io:
     hdr[5] = (ts >> 8) as u8;
     hdr[6] = ts as u8;
     hdr[7] = (ts >> 24) as u8; // ts_ext (mandatório > ~4.6h)
-    // streamID = 0 (hdr[8..11] já são 0)
+                               // streamID = 0 (hdr[8..11] já são 0)
     w.write_all(&hdr)?;
     w.write_all(data)?;
     let prev = 11 + n;
@@ -94,7 +96,10 @@ fn read_flv_header(r: &mut impl Read) -> std::io::Result<()> {
     let mut h = [0u8; 9];
     r.read_exact(&mut h)?;
     if &h[0..3] != b"FLV" {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "sem assinatura FLV"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "sem assinatura FLV",
+        ));
     }
     // DataOffset (h[5..9]) é sempre 9; pula o PrevTagSize0.
     let mut skip = [0u8; 4];
@@ -112,7 +117,10 @@ fn read_tag(r: &mut impl Read) -> std::io::Result<Option<FlvTag>> {
     }
     let tag_type = hdr[0];
     let datasize = ((hdr[1] as usize) << 16) | ((hdr[2] as usize) << 8) | (hdr[3] as usize);
-    let ts = ((hdr[7] as u32) << 24) | ((hdr[4] as u32) << 16) | ((hdr[5] as u32) << 8) | (hdr[6] as u32);
+    let ts = ((hdr[7] as u32) << 24)
+        | ((hdr[4] as u32) << 16)
+        | ((hdr[5] as u32) << 8)
+        | (hdr[6] as u32);
     let mut data = vec![0u8; datasize];
     r.read_exact(&mut data)?;
     let mut prev = [0u8; 4];
@@ -177,7 +185,9 @@ struct Asc {
 
 impl Asc {
     fn semantically_eq(&self, o: &Asc) -> bool {
-        self.sample_rate == o.sample_rate && self.channels == o.channels && self.object_type == o.object_type
+        self.sample_rate == o.sample_rate
+            && self.channels == o.channels
+            && self.object_type == o.object_type
     }
 }
 
@@ -189,7 +199,11 @@ struct BitReader<'a> {
 }
 impl<'a> BitReader<'a> {
     fn new(data: &'a [u8]) -> Self {
-        BitReader { data, byte: 0, bit: 0 }
+        BitReader {
+            data,
+            byte: 0,
+            bit: 0,
+        }
     }
     fn bit(&mut self) -> Option<u32> {
         let b = *self.data.get(self.byte)?;
@@ -284,7 +298,10 @@ fn parse_sps(nal: &[u8]) -> Option<SpsInfo> {
     let mut chroma_format_idc = 1u32;
     let mut bit_depth_luma_minus8 = 0u32;
     let mut bit_depth_chroma_minus8 = 0u32;
-    let high = matches!(profile_idc, 100 | 110 | 122 | 244 | 44 | 83 | 86 | 118 | 128 | 138 | 139 | 134 | 135);
+    let high = matches!(
+        profile_idc,
+        100 | 110 | 122 | 244 | 44 | 83 | 86 | 118 | 128 | 138 | 139 | 134 | 135
+    );
     if high {
         chroma_format_idc = br.ue()?;
         if chroma_format_idc == 3 {
@@ -337,13 +354,17 @@ fn parse_sps(nal: &[u8]) -> Option<SpsInfo> {
         crop_b = br.ue()?;
     }
     // yuv420 (chroma=1): unidade de crop = 2 horizontal, 2*(2-frame_mbs_only) vertical.
-    let sub_w = if chroma_format_idc == 1 || chroma_format_idc == 2 { 2 } else { 1 };
+    let sub_w = if chroma_format_idc == 1 || chroma_format_idc == 2 {
+        2
+    } else {
+        1
+    };
     let sub_h = if chroma_format_idc == 1 { 2 } else { 1 };
     let crop_unit_x = sub_w;
     let crop_unit_y = sub_h * (2 - frame_mbs_only as u32);
     let width = (pic_width_in_mbs_minus1 + 1) * 16 - (crop_l + crop_r) * crop_unit_x;
-    let height =
-        (2 - frame_mbs_only as u32) * (pic_height_in_map_units_minus1 + 1) * 16 - (crop_t + crop_b) * crop_unit_y;
+    let height = (2 - frame_mbs_only as u32) * (pic_height_in_map_units_minus1 + 1) * 16
+        - (crop_t + crop_b) * crop_unit_y;
     Some(SpsInfo {
         width,
         height,
@@ -399,7 +420,13 @@ fn parse_avcc(cfg: &[u8]) -> Option<AvcC> {
         i += len;
     }
     let info = parse_sps(sps.first()?)?;
-    Some(AvcC { sps, pps, length_size, info, raw: cfg.to_vec() })
+    Some(AvcC {
+        sps,
+        pps,
+        length_size,
+        info,
+        raw: cfg.to_vec(),
+    })
 }
 
 /// Parseia o ASC (corpo do tag de áudio AACPacketType==0). data = tag inteiro (0xAF 0x00 ...).
@@ -428,12 +455,17 @@ fn parse_asc(data: &[u8]) -> Option<Asc> {
         _ => return None,
     };
     let channels = br.bits(4)? as u8;
-    Some(Asc { bytes: data.to_vec(), sample_rate: sr, channels, object_type })
+    Some(Asc {
+        bytes: data.to_vec(),
+        sample_rate: sr,
+        channels,
+        object_type,
+    })
 }
 
 /// Itera os NALUs length-prefixed de um payload AVCC (após os 5 bytes de cabeçalho AVC do tag),
 /// com checagem de limites. `length_size` vem do avcC.
-fn each_nalu<'a>(payload: &'a [u8], length_size: u8) -> Vec<&'a [u8]> {
+fn each_nalu(payload: &[u8], length_size: u8) -> Vec<&[u8]> {
     let ls = length_size as usize;
     let mut out = Vec::new();
     let mut i = 0;
@@ -457,7 +489,9 @@ fn tag_is_idr(data: &[u8], length_size: u8) -> bool {
     if data.len() < 5 || (data[0] & 0x0F) != 7 || data[1] != 1 {
         return false;
     }
-    each_nalu(&data[5..], length_size).iter().any(|n| !n.is_empty() && (n[0] & 0x1F) == 5)
+    each_nalu(&data[5..], length_size)
+        .iter()
+        .any(|n| !n.is_empty() && (n[0] & 0x1F) == 5)
 }
 
 /// É o sequence header (avcC) de vídeo? (codecID==7 && AVCPacketType==0)
@@ -486,7 +520,11 @@ fn prefix_param_sets(sps: &[Vec<u8>], pps: &[Vec<u8>], length_size: u8) -> Vec<u
 /// Caminho do sidecar ffmpeg (ao lado do exe, sem sufixo do triple — dev e bundle).
 fn ffmpeg_path() -> Option<std::path::PathBuf> {
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let name = if cfg!(windows) {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    };
     let p = dir.join(name);
     p.exists().then_some(p)
 }
@@ -524,10 +562,18 @@ fn kill(child: &mut Child) {
 fn spawn_input(ffmpeg: &std::path::Path, ingest: &str) -> std::io::Result<Child> {
     base_cmd(ffmpeg)
         .args([
-            "-hide_banner", "-loglevel", "error",
-            "-fflags", "+genpts",
-            "-i", ingest,
-            "-c", "copy", "-f", "flv", "pipe:1",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-fflags",
+            "+genpts",
+            "-i",
+            ingest,
+            "-c",
+            "copy",
+            "-f",
+            "flv",
+            "pipe:1",
         ])
         .stdout(Stdio::piped())
         .stdin(Stdio::null())
@@ -540,9 +586,18 @@ fn spawn_input(ffmpeg: &std::path::Path, ingest: &str) -> std::io::Result<Child>
 fn spawn_output(ffmpeg: &std::path::Path, program_url: &str) -> std::io::Result<Child> {
     base_cmd(ffmpeg)
         .args([
-            "-hide_banner", "-loglevel", "error",
-            "-f", "flv", "-i", "pipe:0",
-            "-c", "copy", "-f", "flv", program_url,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "flv",
+            "-i",
+            "pipe:0",
+            "-c",
+            "copy",
+            "-f",
+            "flv",
+            program_url,
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -552,9 +607,12 @@ fn spawn_output(ffmpeg: &std::path::Path, program_url: &str) -> std::io::Result<
 
 /// Thread leitora do ffmpeg de entrada: parseia tags e despeja no canal com a GERAÇÃO atual.
 /// Canal desconectado = ffmpeg morreu (queda do OBS). Retorna o handle da thread pra dar join.
-fn spawn_reader(child: &mut Child, gen: u64) -> (Receiver<(u64, FlvTag)>, std::thread::JoinHandle<()>) {
+fn spawn_reader(
+    child: &mut Child,
+    gen: u64,
+) -> (Receiver<(u64, FlvTag)>, std::thread::JoinHandle<()>) {
     let stdout = child.stdout.take().expect("input ffmpeg sem stdout");
-    let (tx, rx): (SyncSender<(u64, FlvTag)>, Receiver<(u64, FlvTag)>) = std::sync::mpsc::sync_channel(256);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<(u64, FlvTag)>(256);
     let handle = std::thread::spawn(move || {
         let mut r = BufReader::with_capacity(1 << 16, stdout);
         if read_flv_header(&mut r).is_err() {
@@ -604,6 +662,13 @@ struct SlateFrame {
     data: Vec<u8>, // corpo do tag de vídeo (0x17/0x27, 0x01, CTS=0, NALUs)
 }
 
+struct SlateMediaSpec {
+    width: u32,
+    height: u32,
+    sample_rate: u32,
+    channels: u8,
+}
+
 fn map_profile(profile_idc: u8) -> Option<&'static str> {
     match profile_idc {
         66 => Some("baseline"),
@@ -620,18 +685,23 @@ fn build_slate_media(
     app: &AppHandle,
     ffmpeg: &std::path::Path,
     slate: &Slate,
-    spec_w: u32,
-    spec_h: u32,
     obs: &SpsInfo,
-    sr: u32,
-    ch: u8,
+    spec: &SlateMediaSpec,
 ) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
     match slate {
         Slate::Still(still) => {
-            let frames = build_slate_still(app, ffmpeg, still, spec_w, spec_h, obs)?;
+            let frames = build_slate_still(app, ffmpeg, still, spec.width, spec.height, obs)?;
             Some((frames, Vec::new())) // imagem = sem áudio → silêncio no laço
         }
-        Slate::Video { path, has_audio } => build_slate_video(app, ffmpeg, path, *has_audio, obs, sr, ch),
+        Slate::Video { path, has_audio } => build_slate_video(
+            app,
+            ffmpeg,
+            path,
+            *has_audio,
+            obs,
+            spec.sample_rate,
+            spec.channels,
+        ),
     }
 }
 
@@ -653,18 +723,41 @@ fn build_slate_still(
     let gop = (SLATE_FPS * 2).to_string();
     let status = base_cmd(ffmpeg)
         .args([
-            "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "rawvideo", "-pix_fmt", "yuv420p",
-            "-s", &format!("{spec_w}x{spec_h}"),
-            "-framerate", &SLATE_FPS.to_string(),
-            "-stream_loop", "-1",
-            "-i", &src.to_string_lossy(),
-            "-t", "2",
-            "-vf", &format!("scale={}:{}", obs.width, obs.height),
-            "-c:v", "libx264", "-profile:v", profile, "-preset", "veryfast",
-            "-pix_fmt", "yuv420p",
-            "-x264-params", &format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
-            "-bf", "0", "-an", "-f", "flv",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "yuv420p",
+            "-s",
+            &format!("{spec_w}x{spec_h}"),
+            "-framerate",
+            &SLATE_FPS.to_string(),
+            "-stream_loop",
+            "-1",
+            "-i",
+            &src.to_string_lossy(),
+            "-t",
+            "2",
+            "-vf",
+            &format!("scale={}:{}", obs.width, obs.height),
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            profile,
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-x264-params",
+            &format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
+            "-bf",
+            "0",
+            "-an",
+            "-f",
+            "flv",
             &out.to_string_lossy(),
         ])
         .stdin(Stdio::null()) // sem `-y` + stdin herdado, um arquivo temporário residual faria
@@ -700,20 +793,43 @@ fn build_slate_video(
     let out = dir.join("slate_vid.flv");
     let gop = (SLATE_FPS * 2).to_string();
     let mut args: Vec<String> = vec![
-        "-hide_banner".into(), "-loglevel".into(), "error".into(), "-y".into(),
-        "-i".into(), path.into(),
-        "-t".into(), SLATE_VIDEO_MAX_SEC.to_string(),
-        "-vf".into(), format!("scale={}:{},fps={}", obs.width, obs.height, SLATE_FPS),
-        "-c:v".into(), "libx264".into(), "-profile:v".into(), profile.into(),
-        "-preset".into(), "veryfast".into(), "-pix_fmt".into(), "yuv420p".into(),
-        "-x264-params".into(), format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
-        "-bf".into(), "0".into(),
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-y".into(),
+        "-i".into(),
+        path.into(),
+        "-t".into(),
+        SLATE_VIDEO_MAX_SEC.to_string(),
+        "-vf".into(),
+        format!("scale={}:{},fps={}", obs.width, obs.height, SLATE_FPS),
+        "-c:v".into(),
+        "libx264".into(),
+        "-profile:v".into(),
+        profile.into(),
+        "-preset".into(),
+        "veryfast".into(),
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-x264-params".into(),
+        format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
+        "-bf".into(),
+        "0".into(),
     ];
     if has_audio {
         // conforma a trilha ao ASC do OBS (mesma taxa/canais, AAC-LC) — decodifica sob o ASC out-of-band.
         args.extend(
-            ["-c:a", "aac", "-ar", &sr.to_string(), "-ac", &ch.to_string(), "-b:a", "160k"]
-                .map(String::from),
+            [
+                "-c:a",
+                "aac",
+                "-ar",
+                &sr.to_string(),
+                "-ac",
+                &ch.to_string(),
+                "-b:a",
+                "160k",
+            ]
+            .map(String::from),
         );
     } else {
         args.push("-an".into());
@@ -768,7 +884,10 @@ fn extract_slate_media(flv: &[u8]) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
         } else {
             tag.data.clone()
         };
-        frames.push(SlateFrame { keyframe: is_key, data });
+        frames.push(SlateFrame {
+            keyframe: is_key,
+            data,
+        });
     }
     if frames.is_empty() || avcc.is_none() {
         return None;
@@ -793,7 +912,12 @@ fn build_silence(app: &AppHandle, ffmpeg: &std::path::Path, sr: u32, ch: u8) -> 
         }
         v
     };
-    let Some(dir) = app.path().app_config_dir().ok().map(|d| d.join("splice-tmp")) else {
+    let Some(dir) = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("splice-tmp"))
+    else {
         return fallback(ch);
     };
     let _ = std::fs::create_dir_all(&dir);
@@ -801,10 +925,26 @@ fn build_silence(app: &AppHandle, ffmpeg: &std::path::Path, sr: u32, ch: u8) -> 
     let cl = if ch >= 2 { "stereo" } else { "mono" };
     let ok = base_cmd(ffmpeg)
         .args([
-            "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "lavfi", "-i", &format!("anullsrc=r={sr}:cl={cl}"),
-            "-t", "1", "-c:a", "aac", "-ar", &sr.to_string(), "-ac", &ch.to_string(),
-            "-b:a", "160k", "-f", "flv",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("anullsrc=r={sr}:cl={cl}"),
+            "-t",
+            "1",
+            "-c:a",
+            "aac",
+            "-ar",
+            &sr.to_string(),
+            "-ac",
+            &ch.to_string(),
+            "-b:a",
+            "160k",
+            "-f",
+            "flv",
             &out.to_string_lossy(),
         ])
         .stdin(Stdio::null()) // ver build_slate_still: sem isto, temp residual trava o setup
@@ -816,7 +956,9 @@ fn build_silence(app: &AppHandle, ffmpeg: &std::path::Path, sr: u32, ch: u8) -> 
     if !ok {
         return fallback(ch);
     }
-    let Ok(flv) = std::fs::read(&out) else { return fallback(ch) };
+    let Ok(flv) = std::fs::read(&out) else {
+        return fallback(ch);
+    };
     let _ = std::fs::remove_file(&out);
     let mut r = &flv[..];
     if read_flv_header(&mut r).is_err() {
@@ -829,7 +971,10 @@ fn build_silence(app: &AppHandle, ffmpeg: &std::path::Path, sr: u32, ch: u8) -> 
             audio_frames.push(tag.data);
         }
     }
-    audio_frames.into_iter().nth(1).unwrap_or_else(|| fallback(ch))
+    audio_frames
+        .into_iter()
+        .nth(1)
+        .unwrap_or_else(|| fallback(ch))
 }
 
 // ----------------------------- state machine -----------------------------
@@ -900,10 +1045,17 @@ pub async fn run(
     slate_on: Arc<AtomicBool>,
     opts: CompositorOpts,
 ) {
-    let (app_c, run_c, sig_c, slate_c) = (app.clone(), running.clone(), has_signal.clone(), slate_on.clone());
-    let outcome = tauri::async_runtime::spawn_blocking(move || setup_and_pump(&app_c, &run_c, &sig_c, &slate_c, opts))
-        .await
-        .unwrap_or(SetupOutcome::Done);
+    let (app_c, run_c, sig_c, slate_c) = (
+        app.clone(),
+        running.clone(),
+        has_signal.clone(),
+        slate_on.clone(),
+    );
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        setup_and_pump(&app_c, &run_c, &sig_c, &slate_c, opts)
+    })
+    .await
+    .unwrap_or(SetupOutcome::Done);
     // Fallback SÓ é alcançável na fase de setup (antes do 1º publish) — aqui é seguro delegar.
     if let SetupOutcome::Fallback(opts) = outcome {
         log::warn!("splicer: não estabeleceu — caindo pro compositor (comportamento de hoje)");
@@ -959,10 +1111,17 @@ fn setup_and_pump(
         if Instant::now() > deadline {
             // Sem áudio? Sintetiza ASC 48k estéreo e segue (a plataforma exige trilha).
             if avcc.is_some() && asc.is_none() {
-                asc = Some(Asc { bytes: vec![0xAF, 0x00, 0x11, 0x90, 0x56, 0xE5, 0x00], sample_rate: 48000, channels: 2, object_type: 2 });
+                asc = Some(Asc {
+                    bytes: vec![0xAF, 0x00, 0x11, 0x90, 0x56, 0xE5, 0x00],
+                    sample_rate: 48000,
+                    channels: 2,
+                    object_type: 2,
+                });
                 break;
             }
-            log::warn!("splicer: não achei o sequence header do OBS em {SETUP_DEADLINE_MS}ms — fallback");
+            log::warn!(
+                "splicer: não achei o sequence header do OBS em {SETUP_DEADLINE_MS}ms — fallback"
+            );
             kill(&mut in_child);
             drain_and_join(&rx, Some(reader));
             return SetupOutcome::Fallback(opts);
@@ -979,15 +1138,19 @@ fn setup_and_pump(
                     if asc.is_none() {
                         return fail_setup(&mut in_child, &rx, reader, opts, "ASC ilegível");
                     }
-                } else if tag.tag_type == 9 || tag.tag_type == 8 {
-                    if pending.len() < 512 {
-                        pending.push_back(tag);
-                    }
+                } else if (tag.tag_type == 9 || tag.tag_type == 8) && pending.len() < 512 {
+                    pending.push_back(tag);
                 }
             }
             Err(TryRecvError::Empty) => std::thread::sleep(Duration::from_millis(20)),
             Err(TryRecvError::Disconnected) => {
-                return fail_setup(&mut in_child, &rx, reader, opts, "OBS caiu antes do sequence header");
+                return fail_setup(
+                    &mut in_child,
+                    &rx,
+                    reader,
+                    opts,
+                    "OBS caiu antes do sequence header",
+                );
             }
         }
     }
@@ -1017,7 +1180,16 @@ fn setup_and_pump(
 
     // 4) Prepara o slate (imagem OU vídeo) na resolução/ASC do OBS + o silêncio de reserva.
     let (slate, slate_audio) = match build_slate_media(
-        app, &ffmpeg, &opts.slate, opts.spec.w, opts.spec.h, &avcc.info, asc.sample_rate, asc.channels,
+        app,
+        &ffmpeg,
+        &opts.slate,
+        &avcc.info,
+        &SlateMediaSpec {
+            width: opts.spec.w,
+            height: opts.spec.h,
+            sample_rate: asc.sample_rate,
+            channels: asc.channels,
+        },
     ) {
         Some(m) => m,
         None => return fail_setup(&mut in_child, &rx, reader, opts, "preparo do slate falhou"),
@@ -1027,7 +1199,9 @@ fn setup_and_pump(
     if matches!(opts.slate, Slate::Video { .. }) {
         log::info!(
             "splicer: slate de vídeo pronto — {} quadros, {} de áudio (loop, cap {}s)",
-            slate.len(), slate_audio.len(), SLATE_VIDEO_MAX_SEC
+            slate.len(),
+            slate_audio.len(),
+            SLATE_VIDEO_MAX_SEC
         );
     }
 
@@ -1036,7 +1210,13 @@ fn setup_and_pump(
         Ok(c) => c,
         Err(e) => {
             log::error!("splicer: ffmpeg de saída não subiu: {e}");
-            return fail_setup(&mut in_child, &rx, reader, opts, "ffmpeg de saída não subiu");
+            return fail_setup(
+                &mut in_child,
+                &rx,
+                reader,
+                opts,
+                "ffmpeg de saída não subiu",
+            );
         }
     };
     let mut out_stdin = out_child.stdin.take().expect("output ffmpeg sem stdin");
@@ -1050,7 +1230,13 @@ fn setup_and_pump(
     {
         gen_done.store(true, Ordering::Relaxed);
         kill(&mut out_child);
-        return fail_setup(&mut in_child, &rx, reader, opts, "não consegui publicar o _program");
+        return fail_setup(
+            &mut in_child,
+            &rx,
+            reader,
+            opts,
+            "não consegui publicar o _program",
+        );
     }
 
     log::info!(
@@ -1098,8 +1284,18 @@ fn setup_and_pump(
                         continue; // tag de uma geração antiga (respawn) — ignora
                     }
                     handle_input_tag(
-                        tag, forced, &avcc, &asc, &mut video_ok, &mut audio_ok, &mut state, &mut clock,
-                        &mut need_copy_epoch, &mut v_epoch, &mut last_video_at, &mut ops,
+                        tag,
+                        forced,
+                        &avcc,
+                        &asc,
+                        &mut video_ok,
+                        &mut audio_ok,
+                        &mut state,
+                        &mut clock,
+                        &mut need_copy_epoch,
+                        &mut v_epoch,
+                        &mut last_video_at,
+                        &mut ops,
                     );
                 }
                 Err(TryRecvError::Empty) => break,
@@ -1117,7 +1313,8 @@ fn setup_and_pump(
         }
 
         // ---- decide entrar no slate (gap ou forçado) ----
-        let gap = got_disconnect || (state == State::Copy && last_video_at.elapsed() > Duration::from_millis(HOLD_MS));
+        let gap = got_disconnect
+            || (state == State::Copy && last_video_at.elapsed() > Duration::from_millis(HOLD_MS));
         if state == State::Copy && (gap || forced) {
             state = State::Slate;
         }
@@ -1150,11 +1347,16 @@ fn setup_and_pump(
                 slate_n += 1;
                 // grade FRACIONÁRIA de 30fps (33.33ms, não 33) — senão o DTS deriva num JÁ VOLTO
                 // longo e colide/afasta do relógio real.
-                let dts = slate_base_dts.wrapping_add(((slate_n as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
+                let dts = slate_base_dts
+                    .wrapping_add(((slate_n as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
                 clock.out_dts = dts;
                 clock.out_pts_hwm = clock.out_pts_hwm.max(dts);
                 clock.started = true;
-                ops.push(WriteOp { tag_type: 9, ts: dts, data: frame.data.clone() });
+                ops.push(WriteOp {
+                    tag_type: 9,
+                    ts: dts,
+                    data: frame.data.clone(),
+                });
                 // áudio até alcançar o vídeo: a trilha do slate-vídeo (em loop) ou silêncio.
                 while clock.audio_ts() < dts {
                     let audio = if slate_audio.is_empty() {
@@ -1164,7 +1366,11 @@ fn setup_and_pump(
                         slate_a_i += 1;
                         a
                     };
-                    ops.push(WriteOp { tag_type: 8, ts: clock.audio_ts(), data: audio });
+                    ops.push(WriteOp {
+                        tag_type: 8,
+                        ts: clock.audio_ts(),
+                        data: audio,
+                    });
                     clock.a_idx += 1;
                 }
                 emitted += 1;
@@ -1182,7 +1388,10 @@ fn setup_and_pump(
         }
 
         // ---- respawn da entrada quando o OBS voltar ----
-        if !input_alive && has_signal.load(Ordering::Relaxed) && last_respawn.elapsed() >= Duration::from_millis(RESPAWN_MS) {
+        if !input_alive
+            && has_signal.load(Ordering::Relaxed)
+            && last_respawn.elapsed() >= Duration::from_millis(RESPAWN_MS)
+        {
             last_respawn = Instant::now();
             // fecha a geração antiga: mata o ffmpeg, junta a thread, bumpa a geração.
             kill(&mut in_child);
@@ -1242,7 +1451,10 @@ fn handle_input_tag(
                 if *state != State::HoldIncompat {
                     log::warn!(
                         "splicer: OBS mudou o vídeo ({}x{}→{}x{}) — segurando no JÁ VOLTO",
-                        avcc.info.width, avcc.info.height, new.info.width, new.info.height
+                        avcc.info.width,
+                        avcc.info.height,
+                        new.info.width,
+                        new.info.height
                     );
                 }
                 *state = State::HoldIncompat;
@@ -1263,7 +1475,10 @@ fn handle_input_tag(
                 if *state != State::HoldIncompat {
                     log::warn!(
                         "splicer: OBS mudou o áudio ({}Hz/{}ch→{}Hz/{}ch) — segurando no JÁ VOLTO",
-                        asc.sample_rate, asc.channels, new.sample_rate, new.channels
+                        asc.sample_rate,
+                        asc.channels,
+                        new.sample_rate,
+                        new.channels
                     );
                 }
                 *state = State::HoldIncompat;
@@ -1305,7 +1520,11 @@ fn handle_input_tag(
                 8 => {
                     // áudio real do OBS, retimado pela contagem (drift-free).
                     let ts = clock.audio_ts();
-                    ops.push(WriteOp { tag_type: 8, ts, data: tag.data });
+                    ops.push(WriteOp {
+                        tag_type: 8,
+                        ts,
+                        data: tag.data,
+                    });
                     clock.a_idx += 1;
                 }
                 _ => {}
@@ -1315,7 +1534,14 @@ fn handle_input_tag(
 }
 
 /// Emite um quadro de vídeo em cópia (só reescreve o DTS pra linha do tempo contínua).
-fn emit_copy_video(tag: &FlvTag, _avcc: &AvcC, clock: &mut Clock, need_epoch: &mut bool, v_epoch: &mut i64, ops: &mut Vec<WriteOp>) {
+fn emit_copy_video(
+    tag: &FlvTag,
+    _avcc: &AvcC,
+    clock: &mut Clock,
+    need_epoch: &mut bool,
+    v_epoch: &mut i64,
+    ops: &mut Vec<WriteOp>,
+) {
     if *need_epoch {
         // ponte: o novo ffmpeg reinicia o ts do OBS perto de 0.
         *v_epoch = if clock.started {
@@ -1333,11 +1559,22 @@ fn emit_copy_video(tag: &FlvTag, _avcc: &AvcC, clock: &mut Clock, need_epoch: &m
     clock.out_dts = dts;
     clock.out_pts_hwm = clock.out_pts_hwm.max(dts.wrapping_add(cts as u32));
     clock.started = true;
-    ops.push(WriteOp { tag_type: 9, ts: dts, data: tag.data.clone() });
+    ops.push(WriteOp {
+        tag_type: 9,
+        ts: dts,
+        data: tag.data.clone(),
+    });
 }
 
 /// Emite o IDR de retorno do OBS com o SPS/PPS do OBS reafirmado in-band.
-fn emit_resume_idr(tag: &FlvTag, avcc: &AvcC, clock: &mut Clock, need_epoch: &mut bool, v_epoch: &mut i64, ops: &mut Vec<WriteOp>) {
+fn emit_resume_idr(
+    tag: &FlvTag,
+    avcc: &AvcC,
+    clock: &mut Clock,
+    need_epoch: &mut bool,
+    v_epoch: &mut i64,
+    ops: &mut Vec<WriteOp>,
+) {
     *need_epoch = false;
     *v_epoch = if clock.started {
         (clock.out_dts as i64 + clock.frame_dt as i64) - tag.ts as i64
@@ -1356,7 +1593,11 @@ fn emit_resume_idr(tag: &FlvTag, avcc: &AvcC, clock: &mut Clock, need_epoch: &mu
     clock.out_dts = dts;
     clock.out_pts_hwm = clock.out_pts_hwm.max(dts.wrapping_add(cts as u32));
     clock.started = true;
-    ops.push(WriteOp { tag_type: 9, ts: dts, data });
+    ops.push(WriteOp {
+        tag_type: 9,
+        ts: dts,
+        data,
+    });
 }
 
 /// CompositionTime (24 bits com sinal) dos bytes 2..5 do tag de vídeo AVC.
@@ -1427,7 +1668,9 @@ mod tests {
     /// avcC real do OBS (do de-risk): 1080p high, 1 SPS + 1 PPS.
     fn sample_avcc() -> Vec<u8> {
         // 01 42c01f ff e1 0017 <sps> 01 0004 <pps>
-        let sps = [0x67, 0x42, 0xc0, 0x1f, 0xda, 0x01, 0x40, 0x16, 0xe8, 0x06, 0xd0, 0xa1, 0x35];
+        let sps = [
+            0x67, 0x42, 0xc0, 0x1f, 0xda, 0x01, 0x40, 0x16, 0xe8, 0x06, 0xd0, 0xa1, 0x35,
+        ];
         let pps = [0x68, 0xce, 0x3c, 0x80];
         let mut v = vec![0x01, 0x42, 0xc0, 0x1f, 0xff, 0xe1];
         v.extend_from_slice(&(sps.len() as u16).to_be_bytes());
@@ -1482,7 +1725,19 @@ mod tests {
 
     #[test]
     fn semantic_eq_ignores_vui_bytes() {
-        let a = SpsInfo { width: 1920, height: 1080, profile_idc: 100, level_idc: 42, chroma_format_idc: 1, frame_mbs_only: 1, bit_depth_luma_minus8: 0, bit_depth_chroma_minus8: 0, log2_max_frame_num: 4, pic_order_cnt_type: 0, log2_max_pic_order_cnt_lsb: 4 };
+        let a = SpsInfo {
+            width: 1920,
+            height: 1080,
+            profile_idc: 100,
+            level_idc: 42,
+            chroma_format_idc: 1,
+            frame_mbs_only: 1,
+            bit_depth_luma_minus8: 0,
+            bit_depth_chroma_minus8: 0,
+            log2_max_frame_num: 4,
+            pic_order_cnt_type: 0,
+            log2_max_pic_order_cnt_lsb: 4,
+        };
         let mut b = a.clone();
         assert!(a.semantically_eq(&b));
         b.height = 720;
@@ -1535,7 +1790,11 @@ mod tests {
     use std::process::Command as PCommand;
 
     fn ff(args: &[&str]) -> bool {
-        PCommand::new("ffmpeg").args(args).output().map(|o| o.status.success()).unwrap_or(false)
+        PCommand::new("ffmpeg")
+            .args(args)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
     }
     fn read_video_tags(flv: &[u8]) -> (AvcC, Vec<FlvTag>) {
         let mut r = flv;
@@ -1566,23 +1825,91 @@ mod tests {
 
         // 1) "OBS": x264 high 720p30, keyint 60 (2s), sem áudio (o vídeo é a parte difícil).
         assert!(
-            ff(&["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
-                 "testsrc2=size=1280x720:rate=30", "-t", "6", "-c:v", "libx264", "-profile:v",
-                 "high", "-preset", "veryfast", "-g", "60", "-keyint_min", "60", "-sc_threshold",
-                 "0", "-bf", "3", "-pix_fmt", "yuv420p", "-an", "-f", "flv", &obs]),
+            ff(&[
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=1280x720:rate=30",
+                "-t",
+                "6",
+                "-c:v",
+                "libx264",
+                "-profile:v",
+                "high",
+                "-preset",
+                "veryfast",
+                "-g",
+                "60",
+                "-keyint_min",
+                "60",
+                "-sc_threshold",
+                "0",
+                "-bf",
+                "3",
+                "-pix_fmt",
+                "yuv420p",
+                "-an",
+                "-f",
+                "flv",
+                &obs
+            ]),
             "gerar obs.flv (ffmpeg no PATH?)"
         );
         // 2) slate na MESMA resolução/perfil do OBS.
-        assert!(ff(&["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
-                     "color=c=teal:size=1280x720", "-frames:v", "1", &slate_png]));
-        assert!(ff(&["-y", "-hide_banner", "-loglevel", "error", "-loop", "1", "-i", &slate_png,
-                     "-t", "2", "-r", "30", "-s", "1280x720", "-c:v", "libx264", "-profile:v",
-                     "high", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-x264-params",
-                     "keyint=60:min-keyint=60:scenecut=0", "-bf", "0", "-an", "-f", "flv", &slate_flv]));
+        assert!(ff(&[
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=teal:size=1280x720",
+            "-frames:v",
+            "1",
+            &slate_png
+        ]));
+        assert!(ff(&[
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-loop",
+            "1",
+            "-i",
+            &slate_png,
+            "-t",
+            "2",
+            "-r",
+            "30",
+            "-s",
+            "1280x720",
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "high",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-x264-params",
+            "keyint=60:min-keyint=60:scenecut=0",
+            "-bf",
+            "0",
+            "-an",
+            "-f",
+            "flv",
+            &slate_flv
+        ]));
 
         let obs_flv = std::fs::read(&obs).unwrap();
         let (avcc, obs_tags) = read_video_tags(&obs_flv);
-        let (slate_frames, _) = extract_slate_media(&std::fs::read(&slate_flv).unwrap()).expect("slate frames");
+        let (slate_frames, _) =
+            extract_slate_media(&std::fs::read(&slate_flv).unwrap()).expect("slate frames");
 
         // índices dos IDR do OBS
         let idrs: Vec<usize> = obs_tags
@@ -1602,22 +1929,48 @@ mod tests {
 
         // copia o 1º GOP do OBS
         for t in &obs_tags[..cut] {
-            emit_copy_video(t, &avcc, &mut clock, &mut need_epoch, &mut v_epoch, &mut ops);
+            emit_copy_video(
+                t,
+                &avcc,
+                &mut clock,
+                &mut need_epoch,
+                &mut v_epoch,
+                &mut ops,
+            );
         }
         // slate por ~2s (loopando o GOP do slate), DTS na grade fracionária de 30fps
         let slate_base = clock.out_dts;
         for i in 0..60u32 {
             let f = &slate_frames[(i as usize) % slate_frames.len()];
-            let dts = slate_base.wrapping_add((((i + 1) as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
+            let dts = slate_base
+                .wrapping_add((((i + 1) as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
             clock.out_dts = dts;
-            ops.push(WriteOp { tag_type: 9, ts: dts, data: f.data.clone() });
+            ops.push(WriteOp {
+                tag_type: 9,
+                ts: dts,
+                data: f.data.clone(),
+            });
         }
         // retoma no próximo IDR do OBS (reafirma SPS/PPS do OBS), copia o resto
         let resume = idrs.iter().copied().find(|&i| i > cut).unwrap_or(cut);
         need_epoch = true;
-        emit_resume_idr(&obs_tags[resume], &avcc, &mut clock, &mut need_epoch, &mut v_epoch, &mut ops);
+        emit_resume_idr(
+            &obs_tags[resume],
+            &avcc,
+            &mut clock,
+            &mut need_epoch,
+            &mut v_epoch,
+            &mut ops,
+        );
         for t in &obs_tags[resume + 1..] {
-            emit_copy_video(t, &avcc, &mut clock, &mut need_epoch, &mut v_epoch, &mut ops);
+            emit_copy_video(
+                t,
+                &avcc,
+                &mut clock,
+                &mut need_epoch,
+                &mut v_epoch,
+                &mut ops,
+            );
         }
 
         // escreve o FLV de saída (preâmbulo + seq header do OBS + ops)
@@ -1645,17 +1998,34 @@ mod tests {
                     prev = Some(t.ts);
                 }
             }
-            assert_eq!(seqhdrs, 1, "deve haver exatamente 1 sequence header out-of-band");
+            assert_eq!(
+                seqhdrs, 1,
+                "deve haver exatamente 1 sequence header out-of-band"
+            );
         }
 
         // 4) PORTÃO DE OURO: framemd5 = decode REAL por quadro (sem o re-timing CFR do -f null,
         // que colide a grade). Qualquer erro de h264 (PPS/slice/conceal) sai no stderr.
         let decode = PCommand::new("ffmpeg")
-            .args(["-hide_banner", "-v", "error", "-fflags", "+genpts", "-i", &out, "-f", "framemd5", "-"])
+            .args([
+                "-hide_banner",
+                "-v",
+                "error",
+                "-fflags",
+                "+genpts",
+                "-i",
+                &out,
+                "-f",
+                "framemd5",
+                "-",
+            ])
             .output()
             .expect("rodar ffmpeg de decode");
         let stderr = String::from_utf8_lossy(&decode.stderr);
-        assert!(stderr.trim().is_empty(), "decode da emenda acusou erro de h264:\n{stderr}");
+        assert!(
+            stderr.trim().is_empty(),
+            "decode da emenda acusou erro de h264:\n{stderr}"
+        );
     }
 
     /// Lê um FLV inteiro: (avcC, ASC, tags de vídeo em ordem).
@@ -1685,41 +2055,148 @@ mod tests {
         let dir = std::env::temp_dir().join("corneta-splice-e2e-vid");
         let _ = std::fs::create_dir_all(&dir);
         let p = |n: &str| dir.join(n).to_string_lossy().to_string();
-        let (obs, src, slate_flv, out) = (p("obs.flv"), p("src.mp4"), p("slate_vid.flv"), p("out.flv"));
+        let (obs, src, slate_flv, out) =
+            (p("obs.flv"), p("src.mp4"), p("slate_vid.flv"), p("out.flv"));
 
         // "OBS": 720p30 high COM áudio (pra ter um ASC out-of-band real).
-        assert!(ff(&["-y", "-hide_banner", "-loglevel", "error",
-            "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30",
-            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
-            "-t", "6", "-c:v", "libx264", "-profile:v", "high", "-preset", "veryfast",
-            "-g", "60", "-keyint_min", "60", "-sc_threshold", "0", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "160k", "-f", "flv", &obs]),
-            "gerar obs.flv");
+        assert!(
+            ff(&[
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=1280x720:rate=30",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:sample_rate=48000",
+                "-t",
+                "6",
+                "-c:v",
+                "libx264",
+                "-profile:v",
+                "high",
+                "-preset",
+                "veryfast",
+                "-g",
+                "60",
+                "-keyint_min",
+                "60",
+                "-sc_threshold",
+                "0",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
+                "-b:a",
+                "160k",
+                "-f",
+                "flv",
+                &obs
+            ]),
+            "gerar obs.flv"
+        );
         // Vídeo-fonte do slate: resolução DIFERENTE (640x480) + áudio, num container real (mp4).
-        assert!(ff(&["-y", "-hide_banner", "-loglevel", "error",
-            "-f", "lavfi", "-i", "testsrc2=size=640x480:rate=25",
-            "-f", "lavfi", "-i", "sine=frequency=880:sample_rate=44100",
-            "-t", "4", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2", "-f", "mp4", &src]),
-            "gerar src.mp4");
+        assert!(
+            ff(&[
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=640x480:rate=25",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=880:sample_rate=44100",
+                "-t",
+                "4",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-ar",
+                "44100",
+                "-ac",
+                "2",
+                "-f",
+                "mp4",
+                &src
+            ]),
+            "gerar src.mp4"
+        );
         // Transcoda o slate conformado ao OBS (mimetiza build_slate_video: scale+fps, high, ASC 48k/2ch).
-        assert!(ff(&["-y", "-hide_banner", "-loglevel", "error", "-i", &src,
-            "-t", "30", "-vf", "scale=1280:720,fps=30", "-c:v", "libx264", "-profile:v", "high",
-            "-preset", "veryfast", "-pix_fmt", "yuv420p", "-x264-params",
-            "keyint=60:min-keyint=60:scenecut=0", "-bf", "0",
-            "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "160k", "-f", "flv", &slate_flv]),
-            "transcodar slate de vídeo");
+        assert!(
+            ff(&[
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                &src,
+                "-t",
+                "30",
+                "-vf",
+                "scale=1280:720,fps=30",
+                "-c:v",
+                "libx264",
+                "-profile:v",
+                "high",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-x264-params",
+                "keyint=60:min-keyint=60:scenecut=0",
+                "-bf",
+                "0",
+                "-c:a",
+                "aac",
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
+                "-b:a",
+                "160k",
+                "-f",
+                "flv",
+                &slate_flv
+            ]),
+            "transcodar slate de vídeo"
+        );
 
         let (avcc, obs_asc, obs_tags) = read_flv_all(&std::fs::read(&obs).unwrap());
         let (slate_frames, slate_audio) =
             extract_slate_media(&std::fs::read(&slate_flv).unwrap()).expect("slate media");
         // O novo caminho: vários GOPs de vídeo E áudio extraídos.
-        assert!(slate_frames.len() > 60, "slate de vídeo deve ter vários GOPs, tem {}", slate_frames.len());
-        assert!(!slate_audio.is_empty(), "slate de vídeo com trilha deve extrair áudio");
+        assert!(
+            slate_frames.len() > 60,
+            "slate de vídeo deve ter vários GOPs, tem {}",
+            slate_frames.len()
+        );
+        assert!(
+            !slate_audio.is_empty(),
+            "slate de vídeo com trilha deve extrair áudio"
+        );
         assert!(slate_frames[0].keyframe, "1º quadro do slate deve ser IDR");
 
-        let idrs: Vec<usize> = obs_tags.iter().enumerate()
-            .filter(|(_, t)| tag_is_idr(&t.data, avcc.length_size)).map(|(i, _)| i).collect();
+        let idrs: Vec<usize> = obs_tags
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| tag_is_idr(&t.data, avcc.length_size))
+            .map(|(i, _)| i)
+            .collect();
         assert!(idrs.len() >= 2);
         let cut = idrs[1];
 
@@ -1729,30 +2206,60 @@ mod tests {
         let mut ops: Vec<WriteOp> = Vec::new();
         for t in &obs_tags[..cut] {
             if t.tag_type == 9 {
-                emit_copy_video(t, &avcc, &mut clock, &mut need_epoch, &mut v_epoch, &mut ops);
+                emit_copy_video(
+                    t,
+                    &avcc,
+                    &mut clock,
+                    &mut need_epoch,
+                    &mut v_epoch,
+                    &mut ops,
+                );
             }
         }
         // slate de vídeo por ~3s (loopa quadros E trilha), grade fracionária de 30fps.
         let slate_base = clock.out_dts;
         let (mut si, mut ai) = (0usize, 0usize);
         for i in 0..90u32 {
-            let dts = slate_base.wrapping_add((((i + 1) as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
+            let dts = slate_base
+                .wrapping_add((((i + 1) as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
             clock.out_dts = dts;
             clock.started = true;
-            ops.push(WriteOp { tag_type: 9, ts: dts, data: slate_frames[si % slate_frames.len()].data.clone() });
+            ops.push(WriteOp {
+                tag_type: 9,
+                ts: dts,
+                data: slate_frames[si % slate_frames.len()].data.clone(),
+            });
             si += 1;
             while clock.audio_ts() < dts {
-                ops.push(WriteOp { tag_type: 8, ts: clock.audio_ts(), data: slate_audio[ai % slate_audio.len()].clone() });
+                ops.push(WriteOp {
+                    tag_type: 8,
+                    ts: clock.audio_ts(),
+                    data: slate_audio[ai % slate_audio.len()].clone(),
+                });
                 ai += 1;
                 clock.a_idx += 1;
             }
         }
         let resume = idrs.iter().copied().find(|&i| i > cut).unwrap_or(cut);
         need_epoch = true;
-        emit_resume_idr(&obs_tags[resume], &avcc, &mut clock, &mut need_epoch, &mut v_epoch, &mut ops);
+        emit_resume_idr(
+            &obs_tags[resume],
+            &avcc,
+            &mut clock,
+            &mut need_epoch,
+            &mut v_epoch,
+            &mut ops,
+        );
         for t in &obs_tags[resume + 1..] {
             if t.tag_type == 9 {
-                emit_copy_video(t, &avcc, &mut clock, &mut need_epoch, &mut v_epoch, &mut ops);
+                emit_copy_video(
+                    t,
+                    &avcc,
+                    &mut clock,
+                    &mut need_epoch,
+                    &mut v_epoch,
+                    &mut ops,
+                );
             }
         }
 
@@ -1765,16 +2272,44 @@ mod tests {
 
         // PORTÃO DE OURO: framemd5 decodifica vídeo E áudio; erro em qualquer um sai no stderr.
         let decode = PCommand::new("ffmpeg")
-            .args(["-hide_banner", "-v", "error", "-fflags", "+genpts", "-i", &out, "-f", "framemd5", "-"])
-            .output().expect("rodar ffmpeg de decode");
+            .args([
+                "-hide_banner",
+                "-v",
+                "error",
+                "-fflags",
+                "+genpts",
+                "-i",
+                &out,
+                "-f",
+                "framemd5",
+                "-",
+            ])
+            .output()
+            .expect("rodar ffmpeg de decode");
         let stderr = String::from_utf8_lossy(&decode.stderr);
-        assert!(stderr.trim().is_empty(), "decode do slate de vídeo acusou erro:\n{stderr}");
+        assert!(
+            stderr.trim().is_empty(),
+            "decode do slate de vídeo acusou erro:\n{stderr}"
+        );
 
         // A saída tem trilha de áudio decodável?
         let probe = PCommand::new("ffprobe")
-            .args(["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_name",
-                   "-of", "csv=p=0", &out])
-            .output().expect("rodar ffprobe");
-        assert!(String::from_utf8_lossy(&probe.stdout).contains("aac"), "saída deve ter trilha AAC");
+            .args([
+                "-v",
+                "error",
+                "-select_streams",
+                "a",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "csv=p=0",
+                &out,
+            ])
+            .output()
+            .expect("rodar ffprobe");
+        assert!(
+            String::from_utf8_lossy(&probe.stdout).contains("aac"),
+            "saída deve ter trilha AAC"
+        );
     }
 }

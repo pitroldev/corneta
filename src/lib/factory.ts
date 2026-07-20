@@ -28,6 +28,8 @@ export function defaultConfig(): AppConfig {
   const targets = [makeTarget("twitch"), makeTarget("youtube")];
   const profId = uid("prof");
   return {
+    schemaVersion: 1,
+    revision: 0,
     ingest: {
       protocol: "rtmp",
       host: "127.0.0.1",
