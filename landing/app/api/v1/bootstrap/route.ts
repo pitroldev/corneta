@@ -15,10 +15,9 @@ export function GET() {
         flow: "direct-device",
       },
       youtube: {
-        enabled: Boolean(
-          config.youtube.clientId && config.youtube.clientSecret,
-        ),
-        flow: "brokered-device",
+        enabled: Boolean(config.youtube.clientId),
+        clientId: config.youtube.clientId || null,
+        flow: "direct-pkce",
       },
       kick: {
         enabled: Boolean(config.kick.clientId && config.kick.clientSecret),

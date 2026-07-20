@@ -244,8 +244,8 @@ export function ChatScreen() {
   const hasTwitchChannel = sources.some((x) => x.platform === "twitch");
   const hasYoutubeChannel = sources.some((x) => x.platform === "youtube");
   const hasKickChannel = sources.some((x) => x.platform === "kick");
-  // Pode habilitar envio/moderação? Twitch/Kick precisam do client_id shippado; YouTube é sempre
-  // configurável (cada um cola as credenciais do Google — BYOK).
+  // YouTube e Kick podem receber configuração oficial pelo bootstrap ou credenciais próprias;
+  // por isso continuam acessíveis mesmo quando o fallback público não veio no build.
   const canLoginSomewhere =
     (hasTwitchChannel && HAS_TWITCH_OAUTH) ||
     hasYoutubeChannel ||
@@ -2169,7 +2169,7 @@ function KickCredsForm({
   );
 }
 
-// Linha de login OAuth (Twitch/YouTube): entrar no navegador (device flow) pra enviar/moderar.
+// Linha de login OAuth: abre o navegador e acompanha device flow ou callback loopback.
 /** Passo numerado do fluxo de login (bolinha com o número). */
 function StepNum({ n }: { n: number }) {
   return (
@@ -2253,8 +2253,7 @@ function LoginRow({
       </div>
       {state.state === "code" &&
         (state.userCode && !state.verifyUriComplete ? (
-          // Device flow SEM URL pré-preenchida (YouTube/Google): guiamos copiar → colar →
-          // autorizar de forma explícita — era a maior fonte de confusão.
+          // Fallback BYOK do Google sem URL pré-preenchida: guiamos copiar → colar → autorizar.
           <div className="mt-2 rounded-md bg-brass/5 px-3 py-2.5 ring-1 ring-brass/25">
             <div className="mb-2 text-xs font-bold text-ink">
               Falta 1 passo — autorizar no navegador:
@@ -2300,8 +2299,8 @@ function LoginRow({
             </p>
           </div>
         ) : (
-          // Twitch (a URL já pré-preenche o código) ou Kick (sem código): abrir + autorizar.
-          // Mostra o código como referência quando houver (a Twitch pede pra conferir).
+          // Twitch, YouTube oficial ou Kick: abrir e autorizar. Mostra o código como referência
+          // quando houver (a Twitch pede para conferi-lo).
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
             <span>Abrimos a autorização no navegador — é só confirmar.</span>
             {state.userCode && (

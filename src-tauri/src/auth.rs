@@ -1,8 +1,8 @@
 //! OAuth (device flow) pra ENVIAR e MODERAR pelo chat.
 //!
-//! Twitch usa o device grant público diretamente. YouTube e Kick preferem o broker Next.js,
-//! que guarda os secrets oficiais e devolve tokens uma única vez; BYOK permanece como fallback.
-//! Tokens continuam exclusivamente no keyring nativo, com refresh automático.
+//! Twitch usa o device grant público diretamente. YouTube usa Authorization Code + PKCE com
+//! callback loopback direto no desktop. Kick usa o broker Next.js porque seu token endpoint exige
+//! Client Secret. BYOK permanece como fallback e tokens ficam exclusivamente no keyring nativo.
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
@@ -19,11 +19,8 @@ use crate::AppState;
 
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast";
-// TEM que ser `youtube` (não `youtube.force-ssl`): o device flow do Google (TVs/entrada
-// limitada) só aceita `youtube` e `youtube.readonly` na allowlist — pedir `force-ssl` volta
-// "Invalid device flow scope" e o login nem começa. O `youtube` (gerenciar a conta) cobre tudo
-// que a Corneta faz: criar/encerrar broadcast e ler/enviar no chat ao vivo (liveChatMessages
-// aceita os dois scopes). Ver developers.google.com/identity/protocols/oauth2/limited-input-device.
+// O escopo `youtube` cobre criar/encerrar broadcast e ler/enviar no chat ao vivo. O fallback
+// BYOK ainda usa o device flow de TVs/entrada limitada, cuja allowlist também aceita esse escopo.
 const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 // Kick: API oficial (OAuth 2.1 + PKCE, sem device flow). Redirect loopback numa porta fixa.
@@ -41,7 +38,7 @@ pub struct OauthConfig {
     pub kick_client_id: String,
     pub kick_client_secret: String,
     pub setup_api_url: String,
-    pub youtube_brokered: bool,
+    pub youtube_direct: bool,
     pub kick_brokered: bool,
 }
 
@@ -155,12 +152,17 @@ fn refresh_broker_config(app: &AppHandle) {
     let kick_byok = keys::get_key("kick_oauth_preference").as_deref() == Some("byok");
     let youtube_enabled = youtube.get("enabled").and_then(|v| v.as_bool()) == Some(true);
     let kick_enabled = kick.get("enabled").and_then(|v| v.as_bool()) == Some(true);
+    if let Some(id) = youtube.get("clientId").and_then(|v| v.as_str()) {
+        if youtube_enabled && !youtube_byok && !id.trim().is_empty() {
+            config.google_client_id = id.trim().to_string();
+        }
+    }
     if let Some(id) = kick.get("clientId").and_then(|v| v.as_str()) {
         if kick_enabled && !kick_byok && !id.trim().is_empty() {
             config.kick_client_id = id.trim().to_string();
         }
     }
-    config.youtube_brokered = youtube_enabled && !youtube_byok;
+    config.youtube_direct = youtube_enabled && !youtube_byok;
     config.kick_brokered = kick_enabled && !kick_byok;
 }
 
@@ -239,7 +241,8 @@ pub fn set_oauth_config(
         kick_client_id: k_id,
         kick_client_secret: k_secret,
         setup_api_url: setup_api_url.trim().trim_end_matches('/').to_string(),
-        youtube_brokered: false,
+        youtube_direct: !google_client_id.trim().is_empty()
+            && keys::get_key("youtube_oauth_preference").as_deref() != Some("byok"),
         kick_brokered: false,
     };
 }
@@ -268,7 +271,7 @@ pub fn set_youtube_oauth(
     let mut o = st.oauth.lock().unwrap();
     o.google_client_id = id.to_string();
     o.google_client_secret = secret.to_string();
-    o.youtube_brokered = false;
+    o.youtube_direct = false;
     Ok(())
 }
 
@@ -347,7 +350,7 @@ pub async fn auth_status(app: AppHandle) -> Value {
         let twitch = twitch_token(&app).and_then(|t| twitch_validate(&t)).map(|i| i.login);
         let youtube = keys::has_key("youtube_refresh");
         let cfg = oauth(&app);
-        let youtube_configured = cfg.youtube_brokered
+        let youtube_configured = cfg.youtube_direct
             || (!cfg.google_client_id.is_empty() && !cfg.google_client_secret.is_empty());
         let kick = keys::has_key("kick_refresh");
         let kick_configured = cfg.kick_brokered
@@ -568,8 +571,8 @@ pub fn youtube_login_start(app: AppHandle) {
     tauri::async_runtime::spawn_blocking(move || {
         refresh_broker_config(&app);
         let cfg = oauth(&app);
-        if cfg.youtube_brokered {
-            return youtube_broker_login(&app, &cfg);
+        if cfg.youtube_direct {
+            return youtube_direct_login(&app, &cfg);
         }
         if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
             return auth_event(
@@ -698,149 +701,135 @@ pub fn youtube_login_start(app: AppHandle) {
     });
 }
 
-fn youtube_broker_login(app: &AppHandle, cfg: &OauthConfig) {
-    let Some(start_url) = setup_url(cfg, "/api/v1/oauth/youtube/device/start") else {
+fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
+    if cfg.google_client_id.is_empty() {
         return auth_event(
             app,
             "youtube",
             "error",
             "",
             "",
-            "Serviço de login oficial não configurado",
+            "Login oficial do YouTube não configurado",
         );
-    };
-    let start = match post_json(&start_url, &json!({})) {
-        Ok(value) => value,
-        Err((code, value)) => {
+    }
+
+    // O Google permite loopback com porta efêmera para clientes OAuth do tipo Desktop. Abrir o
+    // listener primeiro elimina a corrida entre o navegador e o servidor local de uso único.
+    let listener = match TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)) {
+        Ok(listener) => listener,
+        Err(_) => {
             return auth_event(
                 app,
                 "youtube",
                 "error",
                 "",
                 "",
-                &broker_error(code, &value, "Não consegui iniciar o login do YouTube"),
+                "Não consegui abrir o callback local do YouTube",
             )
         }
     };
-    let attempt = start
-        .get("attempt")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let user_code = start
-        .get("userCode")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let verify = start
-        .get("verificationUri")
-        .and_then(|v| v.as_str())
-        .unwrap_or("https://www.google.com/device")
-        .to_string();
-    let verify_complete = start
-        .get("verificationUriComplete")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let mut interval = start
-        .get("interval")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(5)
-        .max(1);
-    let expires = start
-        .get("expiresIn")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1_800);
-    if attempt.is_empty() || user_code.is_empty() {
-        return auth_event(
-            app,
-            "youtube",
-            "error",
-            "",
-            "",
-            "Serviço de login retornou uma resposta inválida",
-        );
-    }
-    auth_code_event(app, "youtube", &user_code, &verify, &verify_complete);
-
-    let Some(poll_url) = setup_url(cfg, "/api/v1/oauth/youtube/device/poll") else {
-        return auth_event(app, "youtube", "error", "", "", "Serviço indisponível");
-    };
-    let deadline = Instant::now() + Duration::from_secs(expires);
-    loop {
-        std::thread::sleep(Duration::from_secs(interval));
-        if Instant::now() > deadline {
+    let port = match listener.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(_) => {
             return auth_event(
                 app,
                 "youtube",
                 "error",
                 "",
                 "",
-                "Código expirou — tente de novo",
-            );
+                "Não consegui preparar o callback local do YouTube",
+            )
         }
-        match post_json(&poll_url, &json!({ "attempt": attempt.as_str() })) {
-            Ok(value) => {
-                if value.get("status").and_then(|v| v.as_str()) != Some("connected") {
-                    interval = value
-                        .get("retryAfter")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(interval)
-                        .max(1);
-                    continue;
-                }
-                let access = value
-                    .get("accessToken")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let refresh = value
-                    .get("refreshToken")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                if access.is_empty() || refresh.is_empty() {
-                    return auth_event(
-                        app,
-                        "youtube",
-                        "error",
-                        "",
-                        "",
-                        "O Google não retornou uma sessão renovável",
-                    );
-                }
-                if let Err(e) = keys::set_key("youtube_oauth", access) {
-                    return auth_event(app, "youtube", "error", "", "", &e);
-                }
-                if let Err(e) = keys::set_key("youtube_refresh", refresh) {
-                    let _ = keys::clear_key("youtube_oauth");
-                    return auth_event(app, "youtube", "error", "", "", &e);
-                }
-                let _ = keys::set_key("youtube_oauth_mode", "broker");
-                let exp = value
-                    .get("expiresIn")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(3_600);
-                *YT_TOKEN.lock().unwrap() = Some((access.to_string(), now_ms() + exp * 1_000));
-                return auth_event(app, "youtube", "connected", "", "", "");
-            }
-            Err((code, value)) if code == 429 => {
-                interval = value
-                    .get("retryAfter")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(interval + 5)
-                    .max(interval);
-            }
-            Err((code, value)) => {
-                return auth_event(
-                    app,
-                    "youtube",
-                    "error",
-                    "",
-                    "",
-                    &broker_error(code, &value, "Não consegui concluir o login do YouTube"),
-                )
-            }
-        }
+    };
+    if listener.set_nonblocking(true).is_err() {
+        return auth_event(
+            app,
+            "youtube",
+            "error",
+            "",
+            "",
+            "Não consegui preparar o callback local do YouTube",
+        );
     }
+
+    let verifier = rand_token();
+    let challenge = pkce_challenge(&verifier);
+    let state = rand_token();
+    let redirect = format!("http://127.0.0.1:{port}/callback");
+    let url = format!(
+        "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={}&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&state={}&access_type=offline&prompt=consent&include_granted_scopes=true",
+        pct(&cfg.google_client_id),
+        pct(&redirect),
+        pct(GOOGLE_SCOPE),
+        pct(&challenge),
+        pct(&state),
+    );
+    auth_code_event(app, "youtube", "", &url, &url);
+
+    let code = match oauth_wait(&[listener], &state, "YouTube") {
+        Ok(code) => code,
+        Err(error) => return auth_event(app, "youtube", "error", "", "", &error),
+    };
+    let value = match post_form(
+        "https://oauth2.googleapis.com/token",
+        &[
+            ("client_id", cfg.google_client_id.as_str()),
+            ("code", code.as_str()),
+            ("code_verifier", verifier.as_str()),
+            ("redirect_uri", redirect.as_str()),
+            ("grant_type", "authorization_code"),
+        ],
+    ) {
+        Ok(value) => value,
+        Err((status, body)) => {
+            let description = body
+                .get("error_description")
+                .and_then(|value| value.as_str())
+                .or_else(|| body.get("error").and_then(|value| value.as_str()));
+            let message = if matches!(description, Some("invalid_client")) {
+                "O Client ID do Google precisa ser do tipo Aplicativo para computador".into()
+            } else if status == 0 {
+                "Sem conexão com o Google (rede/proxy?)".into()
+            } else if let Some(description) = description {
+                format!("Google: {description}")
+            } else {
+                format!("Google recusou o login ({status})")
+            };
+            return auth_event(app, "youtube", "error", "", "", &message);
+        }
+    };
+    let access = value
+        .get("access_token")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let refresh = value
+        .get("refresh_token")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    if access.is_empty() || refresh.is_empty() {
+        return auth_event(
+            app,
+            "youtube",
+            "error",
+            "",
+            "",
+            "O Google não retornou uma sessão renovável",
+        );
+    }
+    if let Err(error) = keys::set_key("youtube_oauth", access) {
+        return auth_event(app, "youtube", "error", "", "", &error);
+    }
+    if let Err(error) = keys::set_key("youtube_refresh", refresh) {
+        let _ = keys::clear_key("youtube_oauth");
+        return auth_event(app, "youtube", "error", "", "", &error);
+    }
+    let _ = keys::set_key("youtube_oauth_mode", "official");
+    let expires = value
+        .get("expires_in")
+        .and_then(|value| value.as_u64())
+        .unwrap_or(3_600);
+    *YT_TOKEN.lock().unwrap() = Some((access.to_string(), now_ms() + expires * 1_000));
+    auth_event(app, "youtube", "connected", "", "", "");
 }
 
 #[tauri::command]
@@ -867,42 +856,21 @@ pub fn youtube_token(app: &AppHandle) -> Option<String> {
     }
     let cfg = oauth(app);
     let refresh = keys::get_key("youtube_refresh")?;
-    let brokered = keys::get_key("youtube_oauth_mode").as_deref() == Some("broker");
-    let v = if brokered {
-        let url = setup_url(&cfg, "/api/v1/oauth/youtube/refresh")?;
-        post_json(&url, &json!({ "refreshToken": refresh })).ok()?
-    } else {
-        post_form(
-            "https://oauth2.googleapis.com/token",
-            &[
-                ("client_id", &cfg.google_client_id),
-                ("client_secret", &cfg.google_client_secret),
-                ("refresh_token", &refresh),
-                ("grant_type", "refresh_token"),
-            ],
-        )
-        .ok()?
-    };
-    let access = v
-        .get(if brokered {
-            "accessToken"
-        } else {
-            "access_token"
-        })
-        .and_then(|x| x.as_str())?
-        .to_string();
-    let exp = v
-        .get(if brokered { "expiresIn" } else { "expires_in" })
-        .and_then(|x| x.as_u64())
-        .unwrap_or(3600);
-    if let Some(rotated) = v
-        .get(if brokered {
-            "refreshToken"
-        } else {
-            "refresh_token"
-        })
-        .and_then(|x| x.as_str())
-    {
+    let mode = keys::get_key("youtube_oauth_mode");
+    let byok =
+        mode.as_deref() == Some("byok") || (mode.is_none() && !cfg.google_client_secret.is_empty());
+    let mut form = vec![
+        ("client_id", cfg.google_client_id.as_str()),
+        ("refresh_token", refresh.as_str()),
+        ("grant_type", "refresh_token"),
+    ];
+    if byok {
+        form.push(("client_secret", cfg.google_client_secret.as_str()));
+    }
+    let v = post_form("https://oauth2.googleapis.com/token", &form).ok()?;
+    let access = v.get("access_token").and_then(|x| x.as_str())?.to_string();
+    let exp = v.get("expires_in").and_then(|x| x.as_u64()).unwrap_or(3600);
+    if let Some(rotated) = v.get("refresh_token").and_then(|x| x.as_str()) {
         if !rotated.is_empty() {
             let _ = keys::set_key("youtube_refresh", rotated);
         }
@@ -1276,7 +1244,7 @@ pub fn kick_login_start(app: AppHandle) {
         );
         // o front abre o navegador (auth://kick "code" → openExternal). Sem user_code (não é device).
         auth_code_event(&app, "kick", "", &url, &url);
-        match kick_wait(&listeners, &state) {
+        match oauth_wait(&listeners, &state, "Kick") {
             Ok(code) => match kick_exchange(&cfg, &code, &verifier, &redirect) {
                 Ok(()) => {
                     let login = kick_whoami(&app).unwrap_or_default();
@@ -1292,11 +1260,15 @@ pub fn kick_login_start(app: AppHandle) {
 /// Servidor loopback (IPv4+IPv6) de uso único: espera o GET /callback?code=...&state=..., confere
 /// o state (CSRF), trata negação (`error`, só com state correto) e IGNORA conexões espúrias ou
 /// forjadas (preconnect/favicon/state errado) em vez de matar o login. Timeout de 5 min.
-fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, String> {
+fn oauth_wait(
+    listeners: &[TcpListener],
+    expected_state: &str,
+    provider: &str,
+) -> Result<String, String> {
     let deadline = Instant::now() + Duration::from_secs(300);
     loop {
         if Instant::now() > deadline {
-            return Err("Login do Kick expirou (5 min)".into());
+            return Err(format!("Login do {provider} expirou (5 min)"));
         }
         let mut idle = true;
         for listener in listeners {
@@ -1352,7 +1324,7 @@ fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, 
             } else if is_callback {
                 "Algo deu errado. Volte pra Corneta e tente de novo."
             } else {
-                "Corneta — aguardando o login do Kick…"
+                "Corneta — aguardando a conclusão do login…"
             };
             let html = format!(
                 "<!doctype html><meta charset=utf-8><body style=\"font-family:sans-serif;text-align:center;padding-top:3rem\"><h2>{msg}</h2>"
@@ -1369,7 +1341,7 @@ fn kick_wait(listeners: &[TcpListener], expected_state: &str) -> Result<String, 
             }
             // `error` só é definitivo se veio com o state correto (senão pode ser forjado).
             if state_ok && !err.is_empty() {
-                return Err(format!("Autorização negada no Kick ({err})"));
+                return Err(format!("Autorização negada no {provider} ({err})"));
             }
             // conexão espúria ou state errado/ausente → ignora e segue esperando o callback real.
         }
@@ -2032,6 +2004,31 @@ mod tests {
         // '+' na query decodifica como espaço; %2B é o '+' literal.
         assert_eq!(pct_decode("a+b"), "a b");
         assert_eq!(pct_decode("a%2Bb"), "a+b");
+    }
+
+    #[test]
+    fn loopback_ignores_wrong_state_then_accepts_valid_callback() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let client = std::thread::spawn(move || {
+            for request in [
+                "GET /callback?code=forged&state=wrong HTTP/1.1\r\nHost: localhost\r\n\r\n",
+                "GET /callback?code=real%2Bcode&state=expected HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            ] {
+                let mut stream = std::net::TcpStream::connect(address).unwrap();
+                stream.write_all(request.as_bytes()).unwrap();
+                let mut response = String::new();
+                stream.read_to_string(&mut response).unwrap();
+                assert!(response.starts_with("HTTP/1.1 200 OK"));
+            }
+        });
+
+        assert_eq!(
+            oauth_wait(&[listener], "expected", "Teste").unwrap(),
+            "real+code"
+        );
+        client.join().unwrap();
     }
 
     #[test]

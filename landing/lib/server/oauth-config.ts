@@ -9,9 +9,8 @@ const first = (...names: string[]) => {
 };
 
 export type OAuthServerConfig = {
-  brokerSecret: string;
   twitch: { clientId: string };
-  youtube: { clientId: string; clientSecret: string };
+  youtube: { clientId: string };
   kick: {
     clientId: string;
     clientSecret: string;
@@ -26,37 +25,16 @@ export function getOAuthConfig(): OAuthServerConfig {
     "YOUTUBE_CLIENT_ID",
     "VITE_GOOGLE_CLIENT_ID",
   );
-  const youtubeClientSecret = first(
-    "GOOGLE_CLIENT_SECRET",
-    "YOUTUBE_CLIENT_SECRET",
-    "VITE_GOOGLE_CLIENT_SECRET",
-  );
   const kickClientId = first("KICK_CLIENT_ID", "VITE_KICK_CLIENT_ID");
-  const kickClientSecret = first(
-    "KICK_CLIENT_SECRET",
-    "VITE_KICK_CLIENT_SECRET",
-  );
-  const brokerSecret = first(
-    "OAUTH_BROKER_SECRET",
-    "GOOGLE_CLIENT_SECRET",
-    "VITE_GOOGLE_CLIENT_SECRET",
-    "KICK_CLIENT_SECRET",
-    "VITE_KICK_CLIENT_SECRET",
-    "TWITCH_CLIENT_SECRET",
-    "VITE_TWITCH_CLIENT_SECRET",
-  );
+  const kickClientSecret = first("KICK_CLIENT_SECRET");
   const redirectUris = first("KICK_REDIRECT_URIS")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
 
   return {
-    brokerSecret,
     twitch: { clientId: twitchClientId },
-    youtube: {
-      clientId: youtubeClientId,
-      clientSecret: youtubeClientSecret,
-    },
+    youtube: { clientId: youtubeClientId },
     kick: {
       clientId: kickClientId,
       clientSecret: kickClientSecret,

@@ -26,7 +26,7 @@ interface LoginState {
   login?: string;
   userCode?: string;
   verifyUri?: string;
-  /** URL já com o código embutido (Twitch manda; Google não) — abre direto na autorização. */
+  /** URL completa de autorização, quando o provedor oferece — abre direto no navegador. */
   verifyUriComplete?: string;
   message?: string;
 }
@@ -111,7 +111,7 @@ interface State {
 
   // OAuth (login no navegador) — envio/moderação por conta
   chatLogin: { twitch: LoginState; youtube: LoginState; kick: LoginState };
-  /** YouTube tem credenciais do Google configuradas (.env do dev OU coladas pelo usuário). */
+  /** YouTube tem Client ID oficial ou credenciais próprias configuradas. */
   youtubeOauthReady: boolean;
   setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
   clearYoutubeOauth: () => Promise<void>;
@@ -765,9 +765,8 @@ export const useStore = create<State>((set, get) => {
         // Código chegou → abre o navegador direto na autorização (a URL completa, quando existe,
         // já pré-preenche o código). O link no app continua como plano B.
         if (a.state === "code") {
-          // Facilita o device flow do Google (que NÃO pré-preenche): copia o código pro clipboard
-          // ANTES de abrir o navegador — o open tira o foco e trava o clipboard write. Aí é só
-          // colar na página do Google. O botão "Copiar" no app é o plano B se isto falhar.
+          // No fallback BYOK por device flow, copia o código antes de abrir o navegador. Twitch e
+          // o fluxo oficial PKCE do YouTube já levam tudo na URL e não entram neste bloco.
           if (a.userCode) {
             try {
               void navigator.clipboard.writeText(a.userCode);

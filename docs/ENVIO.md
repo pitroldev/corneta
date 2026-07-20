@@ -6,26 +6,25 @@
 - **Status:** Rascunho para discussão (v0.1) · 2026-06-23
 - **Relacionado:** [`CHAT.md`](./CHAT.md) (leitura já existe), [`ALERTAS.md`](./ALERTAS.md)
 
-> ✅ **Fases 1–3 implementadas** (falta só o Kick, Fase 4):
+> ✅ **Fases 1–4 implementadas**:
 > - **Fase 1** — Twitch via token colado: IRC autenticado, fila de saída por fonte, `PRIVMSG`,
 >   eco local, rate-limit (~18/30s), `chat://auth`, token no cofre (`chat_send_<id>`).
-> - **Fase 2** — **login no navegador (device flow)** na Twitch e **envio no YouTube** (OAuth):
->   `src-tauri/src/auth.rs` faz os dois device flows, guarda tokens no cofre com refresh, eventos
+> - **Fase 2** — **login no navegador** na Twitch e **envio no YouTube** (OAuth):
+>   `src-tauri/src/auth.rs` usa device flow na Twitch e Authorization Code + PKCE/loopback no
+>   YouTube oficial, guarda tokens no cofre com refresh e emite eventos
 >   `auth://twitch`/`auth://youtube`. YouTube resolve a live ativa e usa `liveChatMessages.insert`.
 >   Logado, todas as fontes Twitch enviam pela conta; a caixa de envio inclui YouTube.
 > - **Escala (local) das credenciais** — pensado pra distribuir o app:
 >   - **Twitch:** o `client_id` (público) é shippado pelo dev via `.env` (`VITE_TWITCH_CLIENT_ID`).
 >     Um app serve todos os usuários (cada um loga na própria conta; rate limit é por token). Escala.
->   - **YouTube (BYOK):** a cota do YouTube é **por projeto do Google**, então shippar um `client_id`
->     do dev NÃO escala (cota e verificação compartilhadas). Por isso **cada usuário cola as próprias
->     credenciais do Google no app** (`set_youtube_oauth` → cofre `youtube_client_id`/`_secret`), com
->     guia embutido. Assim cada um tem a própria cota (10k/dia) e não precisa de verificação do dev.
->     O `.env` Google vira só um padrão de dev; o que o usuário cola sempre vence.
+>   - **YouTube:** o fluxo oficial usa um Client ID Desktop público da Corneta, sem secret no app ou
+>     no broker. Como a cota é compartilhada por projeto, BYOK continua disponível nas opções
+>     avançadas (`set_youtube_oauth` → keyring) como contingência e para cota própria.
 > - **Fase 3** — **moderação**: hover numa mensagem → apagar/timeout/ban. Twitch via Helix
 >   (`moderation/chat`, `moderation/bans`); YouTube via `liveChat/messages.delete` (ban/timeout do YT
 >   ficou de fora — precisa do channelId do autor, que o feed não carrega ainda).
 > - **Fase 4 (Kick)** — ✅ **envio + moderação (apagar) pela API OFICIAL** do Kick (OAuth 2.1 + PKCE,
->   redirect loopback `localhost:7395`, sem device flow). `auth.rs`: `kick_login_start`/`kick_wait`
+>   redirect loopback `localhost:7395`, sem device flow). `auth.rs`: `kick_login_start`/`oauth_wait`
 >   (servidor loopback IPv4+IPv6), `kick_send` (`POST /public/v1/chat`), `kick_moderate` (DELETE).
 >   Client ID público no `.env`; o Client Secret fica somente no cofre nativo. Leitura segue no
 >   Pusher anônimo. Ban/timeout pendente (falta o `user_id` do autor no feed).
