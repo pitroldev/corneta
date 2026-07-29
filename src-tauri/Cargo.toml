@@ -31,7 +31,7 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Cliente HTTP leve (bloqueante) para o teste de upload — rodado em spawn_blocking.
-ureq = "2"
+ureq = "3"
 # Uso de CPU ao vivo (GPU via nvidia-smi). Só o módulo "system".
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 # WebSocket para obs-websocket v5 (ws://) e chat da Twitch/Kick (Kick/Pusher é wss:// → TLS).
