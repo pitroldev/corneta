@@ -42,7 +42,7 @@ base64 = "0.22"
 # mesmo backing buffer entre delay, freeze e encoder sem copiar ~3 MiB por frame.
 bytes = "1"
 # Aleatoriedade do SO (PKCE verifier/state do login do Kick). Já está no lock (transitivo).
-getrandom = "0.2"
+getrandom = "0.4"
 # Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
 regex = "1"
 # Guardião: encolhe o quadro antes do OCR (resize), diff de quadros e renderiza o slate "JÁ VOLTO"
