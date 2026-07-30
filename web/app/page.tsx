@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { FAQS, STEPS } from "@/lib/content";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
+import { homeJsonLd, jsonLdScript } from "@/lib/seo";
 import { BrandMark } from "./_components/brand-mark";
 import { ChatHub } from "./_components/chat-hub";
 import {
@@ -42,59 +44,6 @@ const downloadUrl =
   process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ||
   "https://example.com/corneta-download";
 
-const faqs = [
-  {
-    question:
-      "Posso transmitir na Twitch e no YouTube ao mesmo tempo? Não dá ban?",
-    answer:
-      "Quem decide isso é cada plataforma, não a Corneta — e essas regras mudaram nos últimos anos: hoje várias permitem, com condições que dependem do seu tipo de conta ou de contrato assinado. A Corneta não muda esse combinado, ela só manda o sinal pra onde você mandar. Antes da primeira live simultânea, dá uma lida nos termos de quem você já tem compromisso. São cinco minutos que evitam dor de cabeça.",
-  },
-  {
-    question: "Uso Streamlabs (ou XSplit). Funciona?",
-    answer:
-      "Funciona. A Corneta aceita qualquer programa que transmita por RTMP — é só apontar ele pro endereço que o app mostra, igual você faria com uma plataforma. No OBS tem um atalho a mais: a Corneta configura sozinha e ainda dá play nele quando você aperta o BORA.",
-  },
-  {
-    question: "A Corneta substitui o OBS?",
-    answer:
-      "Não. Você continua montando cenas, câmera e áudio no seu programa de sempre. A Corneta entra depois: pega esse sinal e cuida das plataformas, do acompanhamento e das proteções da transmissão.",
-  },
-  {
-    question: "É grátis mesmo? Vai virar assinatura depois?",
-    answer:
-      "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC — multistream, chat, alertas, relatórios e proteções — é open source com licença MIT e vai continuar assim. Se um dia existir algo pago, será um serviço opcional na nuvem, e você vai saber antes de instalar qualquer coisa.",
-  },
-  {
-    question: "Vai travar meu jogo? Preciso de placa de vídeo boa?",
-    answer:
-      "Depende do modo. Copiando o sinal do seu programa, o custo é quase zero — dá pra usar em máquina modesta. Melhorando a imagem pra cada plataforma, o trabalho vai pra placa de vídeo (as NVIDIA, Intel e AMD das últimas gerações dão conta) ou, sem ela, pro processador, que pesa mais. A Corneta estima essa carga e quantas conversões sua placa aguenta antes de você entrar ao vivo.",
-  },
-  {
-    question: "Vou precisar de muita internet?",
-    answer:
-      "Cada plataforma come um pedaço do seu upload. Antes da live, a Corneta mede sua conexão, soma tudo e ajuda você a escolher uma configuração que caiba com folga.",
-  },
-  {
-    question: "Dá pra mandar vídeo em pé pro TikTok?",
-    answer:
-      "A Corneta recorta um 9:16 do seu vídeo deitado e você escolhe o enquadramento, com prévia do resultado. TikTok e Instagram seguem experimentais porque a entrada depende de liberação da própria plataforma; o mesmo recorte serve pra qualquer destino RTMP vertical.",
-  },
-  {
-    question: "Tem overlay pra usar no OBS?",
-    answer:
-      "Tem. Um servidor dentro da sua máquina serve os alertas e o chat (com emotes) numa URL que você adiciona como Browser Source — uma vez só. Posição, tamanho, duração, som e limite de mensagens são ajustáveis, e tem botão de alerta de teste pra você conferir na hora.",
-  },
-  {
-    question: "Quais plataformas aparecem no app?",
-    answer:
-      "Twitch, YouTube, Kick, Facebook e qualquer servidor RTMP que você quiser somar. TikTok, Instagram e X aparecem como experimentais porque dependem de liberação e de fluxos das próprias plataformas.",
-  },
-  {
-    question: "Funciona em macOS ou Linux?",
-    answer:
-      "Hoje o download é só pra Windows. A arquitetura já considera outros sistemas, mas ainda não tem data pública pra esses builds — e a gente prefere avisar isso agora do que depois do download.",
-  },
-];
 
 // As frases são as mesmas que o app mostra no seletor de plataformas
 // (PLATFORM_TAGLINES em ../src/lib/platforms.ts) — quem já viu o app reconhece,
@@ -218,6 +167,14 @@ export default function Home() {
           __html:
             "<!-- THESIS: um sinal do OBS berrado pra várias comunidades, contado com o MESMO material do app desktop e provado recurso por recurso; recusa o palco azul 'creator live room' e a grade de cards SaaS. OWN-WORLD: pôster/gibi impresso — breu #100b07 com meio-tom, blocos sólidos de latão #ffb323 e tomate #ff5a36, sombras DURAS 4px 4px 0 sem blur, cantos secos 4–14px, adesivos tortos, Baloo 2 + Inter; faixas de papel #f3ead7 (tema claro do app) para leitura longa. STORY: reconhece a tela do app, vê cada recurso funcionando (modos de qualidade, vertical 9:16, chat/alertas/overlay, painel ao vivo, relatório, proteções) e baixa pro Windows. FIRST VIEWPORT: adesivo de latão, título de 3 linhas com 'Várias comunidades' numa laje de latão desalinhada em tomate, pitch curto à direita, réplica da tela Ao vivo em largura total e o botão tomate abaixo dela. FORM: mundo herdado do app (pinado pelo brief) — palco escuro + faixas de papel, réplica fiel da tela Ao vivo, demonstrações interativas em CSS puro. -->",
         }}
+      />
+
+      {/* Dados estruturados: Organization, WebSite, SoftwareApplication,
+          FAQPage e HowTo num grafo só. A FAQ aqui é a mesma constante que a
+          lista visível renderiza, então não tem como divergir. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(homeJsonLd()) }}
       />
 
       <a className="skip-link" href="#conteudo">
@@ -708,41 +665,20 @@ export default function Home() {
             </div>
 
             <ol className="steps">
-              <li>
-                <b>1</b>
-                <div>
-                  <h3>Escolha onde quer aparecer</h3>
-                  <p>
-                    A Corneta abre a página certa de cada plataforma pra você
-                    copiar a chave, e guarda ela no cofre do Windows — nunca num
-                    arquivo de configuração.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <b>2</b>
-                <div>
-                  <h3>Ligue o seu programa de live</h3>
-                  <p>
-                    No OBS, a Corneta configura sozinha. Em qualquer outro
-                    (Streamlabs, XSplit), é colar um endereço e uma chave — uma
-                    vez só, e nunca mais.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <b>3</b>
-                <div>
-                  <h3>Aperte BORA AO VIVO</h3>
-                  <p>
-                    Acompanhe cada plataforma e siga cuidando do conteúdo. Se
-                    quiser, a Corneta manda o OBS começar a transmitir junto.
-                  </p>
-                  <em>
-                    <RadioIcon /> BORA AO VIVO
-                  </em>
-                </div>
-              </li>
+              {STEPS.map((step, i) => (
+                <li key={step.title}>
+                  <b>{i + 1}</b>
+                  <div>
+                    <h3>{step.title}</h3>
+                    <p>{step.text}</p>
+                    {i === STEPS.length - 1 && (
+                      <em>
+                        <RadioIcon /> BORA AO VIVO
+                      </em>
+                    )}
+                  </div>
+                </li>
+              ))}
             </ol>
           </div>
         </section>
@@ -890,7 +826,7 @@ export default function Home() {
             </div>
 
             <div className="faq-list">
-              {faqs.map((faq, index) => (
+              {FAQS.map((faq, index) => (
                 <details key={faq.question} open={index === 0}>
                   <summary>
                     <span>{faq.question}</span>

@@ -18,6 +18,7 @@ import {
   LEGAL_UPDATED_LABEL,
   LEGAL_VENUE,
 } from "@/lib/legal";
+import { jsonLdScript, legalJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Termos de uso",
@@ -54,6 +55,11 @@ const sections = [
 export default function TermsPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(legalJsonLd("terms")) }}
+      />
+
       <LegalHero
         kicker="Termos de uso"
         title="As regras do jogo, em português de gente."

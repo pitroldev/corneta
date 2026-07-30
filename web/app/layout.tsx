@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Inter } from "next/font/google";
+import { LEGAL_AUTHOR, LEGAL_OPERATOR } from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -25,17 +26,35 @@ export const metadata: Metadata = {
   description:
     "Transmita para Twitch, YouTube, Kick e mais ao mesmo tempo, direto do seu PC: cada plataforma independente, chat reunido e nada de mensalidade. Grátis para Windows.",
   applicationName: "Corneta",
+  category: "technology",
+  creator: LEGAL_OPERATOR,
+  publisher: LEGAL_OPERATOR,
+  authors: [{ name: LEGAL_AUTHOR, url: "https://github.com/pitroldev" }],
   keywords: [
     "multistream",
-    "streaming",
-    "OBS",
-    "Twitch",
-    "YouTube",
+    "transmitir em várias plataformas ao mesmo tempo",
+    "multistream grátis",
+    "OBS multistream",
+    "Twitch e YouTube ao mesmo tempo",
+    "streaming simultâneo",
+    "restream alternativa",
+    "chat unificado streamer",
+    "overlay de alertas OBS",
     "Kick",
-    "live",
     "open source",
   ],
   alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",

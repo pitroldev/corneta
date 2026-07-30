@@ -18,6 +18,7 @@ import {
   LEGAL_ROUTES,
   LEGAL_UPDATED_LABEL,
 } from "@/lib/legal";
+import { jsonLdScript, legalJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Política de privacidade",
@@ -54,6 +55,11 @@ const sections = [
 export default function PrivacyPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(legalJsonLd("privacy")) }}
+      />
+
       <LegalHero
         kicker="Política de privacidade"
         title="Seus dados ficam onde você já está: no seu PC."
