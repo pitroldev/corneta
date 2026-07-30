@@ -1,5 +1,12 @@
 import { PlatformGlyph } from "./decor";
-import { BellIcon, CoinIcon, HeartIcon, InfoIcon, RaidIcon, StarIcon } from "./icons";
+import {
+  BellIcon,
+  CoinIcon,
+  HeartIcon,
+  InfoIcon,
+  RaidIcon,
+  StarIcon,
+} from "./icons";
 
 // Chat unificado, alertas e overlay pro OBS — as três coisas que a tela de Chat
 // do app faz. Abas em CSS puro (radios), sem JavaScript.
@@ -11,7 +18,11 @@ export function ChatHub() {
       <input type="radio" name="hub" id="hub-alertas" />
       <input type="radio" name="hub" id="hub-overlay" />
 
-      <div className="switch-tabs" role="group" aria-label="Chat, alertas e overlay">
+      <div
+        className="switch-tabs"
+        role="group"
+        aria-label="Chat, alertas e overlay"
+      >
         <label className="switch-tab" htmlFor="hub-chat">
           <strong>Chat unificado</strong>
           <em>ler, responder, moderar</em>
@@ -32,7 +43,7 @@ export function ChatHub() {
           <div className="hub-board">
             <div className="demo-label">
               <span>chat reunido · 3 plataformas</span>
-              <span>prévia ilustrativa</span>
+              <span>exemplo</span>
             </div>
 
             <div className="msg">
@@ -97,10 +108,11 @@ export function ChatHub() {
           <p className="hub-note">
             <InfoIcon />
             <span>
-            Twitch, Kick e YouTube no mesmo feed — até dois canais da Twitch de
-            uma vez. Emotes (BTTV, FFZ, 7TV), selos, horário e envio pelo mesmo
-            campo. Apagar e dar timeout acontece direto daqui: a mensagem vira
-            lápide no feed em vez de sumir sem explicação.
+              Twitch, Kick e YouTube no mesmo feed — até dois canais da Twitch
+              de uma vez. Emotes de BTTV, FFZ e 7TV, selos, horário e envio pelo
+              mesmo campo. Apagar e dar timeout é ali mesmo: a mensagem vira
+              lápide no feed em vez de sumir sem explicação e deixar você no
+              escuro.
             </span>
           </p>
         </div>
@@ -110,7 +122,7 @@ export function ChatHub() {
           <div className="hub-board">
             <div className="demo-label">
               <span>alertas ao vivo</span>
-              <span>prévia ilustrativa</span>
+              <span>exemplo</span>
             </div>
 
             <div className="alert">
@@ -169,10 +181,11 @@ export function ChatHub() {
           <p className="hub-note">
             <InfoIcon />
             <span>
-            Seguidor, sub, resub, subgift, bits, raid, membro e superchat chegam
-            das plataformas; doações e metas entram pelo Streamlabs ou
-            StreamElements com o token guardado no cofre. O painel de alertas
-            fica ao lado do chat — ou numa janelinha só dele.
+              Seguidor, sub, resub, subgift, bits, raid, membro e superchat
+              chegam direto das plataformas. Doação e meta entram pelo
+              Streamlabs ou StreamElements, com o token guardado no cofre. O
+              painel fica ao lado do chat — ou numa janelinha só dele, por cima
+              do jogo.
             </span>
           </p>
         </div>
@@ -182,7 +195,7 @@ export function ChatHub() {
           <div className="hub-board">
             <div className="demo-label">
               <span>sua cena no OBS</span>
-              <span>prévia ilustrativa</span>
+              <span>exemplo</span>
             </div>
 
             <div className="obs-scene">
@@ -205,8 +218,8 @@ export function ChatHub() {
                   salve!
                 </span>
                 <span>
-                  <i style={{ background: "var(--youtube)" }} /> Marcos L.: áudio
-                  tá limpo
+                  <i style={{ background: "var(--youtube)" }} /> Marcos L.:
+                  áudio tá limpo
                 </span>
                 <span>
                   <i style={{ background: "var(--kick)" }} /> duduxx: bora
@@ -228,12 +241,12 @@ export function ChatHub() {
           <p className="hub-note">
             <InfoIcon />
             <span>
-            Um servidor local joga os alertas e o chat (com emotes) numa URL que
-            você adiciona como <strong>Browser Source</strong> — uma vez só, e a
-            Corneta consegue até criar a fonte no OBS pra você. Posição, tamanho,
-            duração, som, quantas mensagens ficam na tela e esconder comandos
-            (“!”) são ajustáveis. Tem botão de alerta de teste pra você conferir
-            sem esperar ninguém.
+              Um servidor local joga os alertas e o chat (com emotes) numa URL
+              que você adiciona como <strong>Browser Source</strong> — uma vez
+              só, e a Corneta consegue até criar a fonte no OBS pra você.
+              Posição, tamanho, duração, som, quantas mensagens ficam na tela e
+              esconder comandos (“!”) são ajustáveis. Tem botão de alerta de
+              teste pra você conferir sem esperar ninguém.
             </span>
           </p>
         </div>

@@ -1473,6 +1473,43 @@ svg {
   gap: 10px 20px;
 }
 
+/* Prova honesta perto da decisão: sem depoimento inventado, o que existe é o
+   código aberto. */
+.proof {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 2px solid var(--border);
+  color: var(--muted-on-dark);
+  font-size: 0.88rem;
+  font-weight: 550;
+  line-height: 1.55;
+}
+
+.proof svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--brass);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.proof a {
+  color: var(--brass);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
 .honest-note {
   display: flex;
   flex-direction: column;
@@ -1599,6 +1636,13 @@ svg {
   align-items: start;
   gap: clamp(44px, 7vw, 100px);
   grid-template-columns: minmax(0, 0.78fr) minmax(440px, 1.22fr);
+}
+
+/* CTA no meio do caminho: a página é longa e o botão do topo é o único até aqui. */
+.faq-cta {
+  margin-top: 28px;
+  color: var(--brass-ink);
+  box-shadow: 4px 4px 0 0 var(--ink);
 }
 
 .faq-list {

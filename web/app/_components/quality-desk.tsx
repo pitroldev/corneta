@@ -24,10 +24,34 @@ const MODES = [
     tag: "Mais leve",
     lead: "A mesma imagem vai pra todas as plataformas, no mesmo padrão.",
     rows: [
-      { id: "twitch", name: "Twitch", detail: "1080p60 · 3000 kbps", tag: "Cópia", tone: "copy" },
-      { id: "youtube", name: "YouTube", detail: "1080p60 · 3000 kbps", tag: "Cópia", tone: "copy" },
-      { id: "kick", name: "Kick", detail: "1080p60 · 3000 kbps", tag: "Cópia", tone: "copy" },
-      { id: "tiktok", name: "TikTok", detail: "recebe vídeo deitado", tag: "Não serve", tone: "warn" },
+      {
+        id: "twitch",
+        name: "Twitch",
+        detail: "1080p60 · 3000 kbps",
+        tag: "Cópia",
+        tone: "copy",
+      },
+      {
+        id: "youtube",
+        name: "YouTube",
+        detail: "1080p60 · 3000 kbps",
+        tag: "Cópia",
+        tone: "copy",
+      },
+      {
+        id: "kick",
+        name: "Kick",
+        detail: "1080p60 · 3000 kbps",
+        tag: "Cópia",
+        tone: "copy",
+      },
+      {
+        id: "tiktok",
+        name: "TikTok",
+        detail: "recebe vídeo deitado",
+        tag: "Não serve",
+        tone: "warn",
+      },
     ] as Row[],
     upload: "12,6 Mb/s",
     encodes: "nenhuma",
@@ -42,16 +66,39 @@ const MODES = [
     tag: "Recomendado",
     lead: "Ajusta cada plataforma só onde precisa. Decide sozinho.",
     rows: [
-      { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps", tag: "Cópia", tone: "copy" },
-      { id: "youtube", name: "YouTube", detail: "1080p60 · 6000 kbps", tag: "Cópia", tone: "copy" },
-      { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps", tag: "Cópia", tone: "copy" },
-      { id: "tiktok", name: "TikTok", detail: "720×1280 · 3000 kbps", tag: "Recodifica" },
+      {
+        id: "twitch",
+        name: "Twitch",
+        detail: "1080p60 · 6000 kbps",
+        tag: "Cópia",
+        tone: "copy",
+      },
+      {
+        id: "youtube",
+        name: "YouTube",
+        detail: "1080p60 · 6000 kbps",
+        tag: "Cópia",
+        tone: "copy",
+      },
+      {
+        id: "kick",
+        name: "Kick",
+        detail: "1080p60 · 6000 kbps",
+        tag: "Cópia",
+        tone: "copy",
+      },
+      {
+        id: "tiktok",
+        name: "TikTok",
+        detail: "720×1280 · 3000 kbps",
+        tag: "Converte",
+      },
     ] as Row[],
     upload: "21,6 Mb/s",
     encodes: "1 (na placa)",
     load: "~2%",
     verdict:
-      "Uma recodificação só, pro vertical. O resto sai na cópia: sua máquina quase não sente e ninguém perde qualidade no caminho.",
+      "Uma conversão só, pro vertical. O resto vai na cópia: sua máquina quase não sente e ninguém perde qualidade no caminho.",
   },
   {
     id: "caprichado",
@@ -60,16 +107,36 @@ const MODES = [
     tag: "Máx. qualidade",
     lead: "Melhor imagem possível pra cada plataforma, mas é o mais pesado.",
     rows: [
-      { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps", tag: "Recodifica" },
-      { id: "youtube", name: "YouTube", detail: "1080p60 · 9000 kbps", tag: "Recodifica" },
-      { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps", tag: "Recodifica" },
-      { id: "tiktok", name: "TikTok", detail: "720×1280 · 3000 kbps", tag: "Recodifica" },
+      {
+        id: "twitch",
+        name: "Twitch",
+        detail: "1080p60 · 6000 kbps",
+        tag: "Converte",
+      },
+      {
+        id: "youtube",
+        name: "YouTube",
+        detail: "1080p60 · 9000 kbps",
+        tag: "Converte",
+      },
+      {
+        id: "kick",
+        name: "Kick",
+        detail: "1080p60 · 6000 kbps",
+        tag: "Converte",
+      },
+      {
+        id: "tiktok",
+        name: "TikTok",
+        detail: "720×1280 · 3000 kbps",
+        tag: "Converte",
+      },
     ] as Row[],
     upload: "24,6 Mb/s",
     encodes: "4 (na placa)",
     load: "~40%",
     verdict:
-      "O YouTube aproveita os 9000 kbps que ele aguenta, cada destino recebe o encode ideal — e a conta de upload e de placa sobe. A Corneta soma isso na sua frente antes do BORA.",
+      "O YouTube aproveita os 9000 kbps que ele aguenta e cada plataforma recebe a imagem ideal — mas a conta de internet e de placa sobe junto. Você vê essa soma antes do BORA.",
   },
 ] as const;
 
@@ -96,7 +163,7 @@ export function QualityDesk() {
 
             <div className="mode-board">
               <div className="demo-label">
-                <span>4 destinos ligados</span>
+                <span>4 plataformas ligadas</span>
                 <span>estimativa do app</span>
               </div>
 
@@ -123,7 +190,7 @@ export function QualityDesk() {
                   <strong>{mode.upload}</strong>
                 </div>
                 <div>
-                  <span>recodificações</span>
+                  <span>conversões</span>
                   <strong>{mode.encodes}</strong>
                 </div>
                 <div>
@@ -188,8 +255,9 @@ export function VerticalCopy() {
         <h3>Sua live deitada virando vídeo em pé</h3>
         <p>
           TikTok e Instagram só aceitam vídeo em pé. Em vez de montar outra cena
-          no OBS, a Corneta recorta um 9:16 do sinal que já está no ar — e você
-          escolhe o enquadramento arrastando o quadro, com prévia do resultado.
+          e transmitir duas vezes, a Corneta recorta um 9:16 do que já tá no ar
+          — e você escolhe o enquadramento arrastando o quadro, vendo o
+          resultado.
         </p>
         <ul className="checklist">
           <li>
@@ -200,8 +268,8 @@ export function VerticalCopy() {
           </li>
         </ul>
         <span className="benefit-note">
-          <InfoIcon /> TikTok e Instagram seguem experimentais: a entrada depende
-          de liberação da própria plataforma.
+          <InfoIcon /> TikTok e Instagram seguem experimentais: entrar neles
+          depende de liberação da própria plataforma.
         </span>
       </div>
     </div>

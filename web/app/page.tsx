@@ -2,7 +2,12 @@ import Link from "next/link";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
 import { BrandMark } from "./_components/brand-mark";
 import { ChatHub } from "./_components/chat-hub";
-import { Mascot, ObsMark, PlatformGlyph, SoundWaves } from "./_components/decor";
+import {
+  Mascot,
+  ObsMark,
+  PlatformGlyph,
+  SoundWaves,
+} from "./_components/decor";
 import {
   ArrowIcon,
   BoltIcon,
@@ -26,7 +31,11 @@ import {
 } from "./_components/icons";
 import { LiveRoom, ReportChart } from "./_components/live-room";
 import { ProductPreview } from "./_components/product-preview";
-import { QualityDesk, VerticalCopy, VerticalCrop } from "./_components/quality-desk";
+import {
+  QualityDesk,
+  VerticalCopy,
+  VerticalCrop,
+} from "./_components/quality-desk";
 
 // Placeholder: substitua pela URL real do instalador ou da release.
 const downloadUrl =
@@ -35,44 +44,55 @@ const downloadUrl =
 
 const faqs = [
   {
+    question:
+      "Posso transmitir na Twitch e no YouTube ao mesmo tempo? Não dá ban?",
+    answer:
+      "Quem decide isso é cada plataforma, não a Corneta — e essas regras mudaram nos últimos anos: hoje várias permitem, com condições que dependem do seu tipo de conta ou de contrato assinado. A Corneta não muda esse combinado, ela só manda o sinal pra onde você mandar. Antes da primeira live simultânea, dá uma lida nos termos de quem você já tem compromisso. São cinco minutos que evitam dor de cabeça.",
+  },
+  {
+    question: "Uso Streamlabs (ou XSplit). Funciona?",
+    answer:
+      "Funciona. A Corneta aceita qualquer programa que transmita por RTMP — é só apontar ele pro endereço que o app mostra, igual você faria com uma plataforma. No OBS tem um atalho a mais: a Corneta configura sozinha e ainda dá play nele quando você aperta o BORA.",
+  },
+  {
     question: "A Corneta substitui o OBS?",
     answer:
-      "Não. Você continua montando cenas, câmera e áudio no OBS. A Corneta entra depois: recebe esse sinal e cuida dos destinos, do acompanhamento e das proteções da transmissão.",
+      "Não. Você continua montando cenas, câmera e áudio no seu programa de sempre. A Corneta entra depois: pega esse sinal e cuida das plataformas, do acompanhamento e das proteções da transmissão.",
   },
   {
-    question: "Dá para usar de graça?",
+    question: "É grátis mesmo? Vai virar assinatura depois?",
     answer:
-      "Sim. O núcleo local da Corneta é grátis e open source: multistream, chat, alertas, relatórios e proteções que rodam no seu PC não exigem assinatura.",
+      "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC — multistream, chat, alertas, relatórios e proteções — é open source com licença MIT e vai continuar assim. Se um dia existir algo pago, será um serviço opcional na nuvem, e você vai saber antes de instalar qualquer coisa.",
   },
   {
-    question: "Preciso de uma placa de vídeo boa?",
+    question: "Vai travar meu jogo? Preciso de placa de vídeo boa?",
     answer:
-      "Depende do modo. Quando a Corneta só copia o sinal do OBS, o custo é quase zero. Quando recodifica, ela usa a placa (NVENC, QSV ou AMF) se existir, cai pra CPU se não existir, e mostra a estimativa de carga e quantas recodificações sua placa aguenta antes de você entrar ao vivo.",
-  },
-  {
-    question: "Dá para mandar vídeo em pé pro TikTok?",
-    answer:
-      "A Corneta recorta um 9:16 do seu sinal deitado e você escolhe o enquadramento, com prévia do resultado. TikTok e Instagram seguem experimentais porque a entrada depende de liberação da própria plataforma; o mesmo recorte serve para qualquer destino RTMP vertical.",
-  },
-  {
-    question: "Tem overlay pra usar no OBS?",
-    answer:
-      "Sim. Um servidor local na sua máquina serve os alertas e o chat (com emotes) numa URL que você adiciona no OBS como Browser Source — uma vez só. Posição, tamanho, duração, som e limite de mensagens são ajustáveis, e existe um botão de alerta de teste.",
-  },
-  {
-    question: "Quais plataformas aparecem no app?",
-    answer:
-      "A Corneta traz Twitch, YouTube, Kick, Facebook e destinos RTMP personalizados. TikTok, Instagram e X ainda aparecem como experimentais porque dependem de fluxos e liberações das próprias plataformas.",
+      "Depende do modo. Copiando o sinal do seu programa, o custo é quase zero — dá pra usar em máquina modesta. Melhorando a imagem pra cada plataforma, o trabalho vai pra placa de vídeo (as NVIDIA, Intel e AMD das últimas gerações dão conta) ou, sem ela, pro processador, que pesa mais. A Corneta estima essa carga e quantas conversões sua placa aguenta antes de você entrar ao vivo.",
   },
   {
     question: "Vou precisar de muita internet?",
     answer:
-      "Cada destino usa uma parte do seu upload. Antes da live, a Corneta mede sua conexão, soma os bitrates e ajuda você a escolher uma configuração segura.",
+      "Cada plataforma come um pedaço do seu upload. Antes da live, a Corneta mede sua conexão, soma tudo e ajuda você a escolher uma configuração que caiba com folga.",
+  },
+  {
+    question: "Dá pra mandar vídeo em pé pro TikTok?",
+    answer:
+      "A Corneta recorta um 9:16 do seu vídeo deitado e você escolhe o enquadramento, com prévia do resultado. TikTok e Instagram seguem experimentais porque a entrada depende de liberação da própria plataforma; o mesmo recorte serve pra qualquer destino RTMP vertical.",
+  },
+  {
+    question: "Tem overlay pra usar no OBS?",
+    answer:
+      "Tem. Um servidor dentro da sua máquina serve os alertas e o chat (com emotes) numa URL que você adiciona como Browser Source — uma vez só. Posição, tamanho, duração, som e limite de mensagens são ajustáveis, e tem botão de alerta de teste pra você conferir na hora.",
+  },
+  {
+    question: "Quais plataformas aparecem no app?",
+    answer:
+      "Twitch, YouTube, Kick, Facebook e qualquer servidor RTMP que você quiser somar. TikTok, Instagram e X aparecem como experimentais porque dependem de liberação e de fluxos das próprias plataformas.",
   },
   {
     question: "Funciona em macOS ou Linux?",
     answer:
-      "Hoje, o download é para Windows. A arquitetura já considera outros sistemas, mas ainda não existe uma data pública para esses builds.",
+      "Hoje o download é só pra Windows. A arquitetura já considera outros sistemas, mas ainda não tem data pública pra esses builds — e a gente prefere avisar isso agora do que depois do download.",
   },
 ];
 
@@ -84,8 +104,16 @@ const destinations = [
   { id: "youtube", name: "YouTube", note: "Aguenta qualidade alta numa boa" },
   { id: "kick", name: "Kick", note: "No estilo da Twitch" },
   { id: "facebook", name: "Facebook", note: "Live pra página ou perfil" },
-  { id: "custom", name: "RTMP personalizado", note: "Qualquer servidor RTMP ou RTMPS" },
-  { id: "tiktok", name: "TikTok", note: "Vídeo em pé — precisa de conta liberada" },
+  {
+    id: "custom",
+    name: "RTMP personalizado",
+    note: "Qualquer servidor RTMP ou RTMPS",
+  },
+  {
+    id: "tiktok",
+    name: "TikTok",
+    note: "Vídeo em pé — precisa de conta liberada",
+  },
   {
     id: "instagram",
     name: "Instagram",
@@ -112,8 +140,8 @@ const tinyThings = [
   },
   {
     icon: <LayersIcon />,
-    title: "Perfis de destino",
-    text: "Conjuntos salvos de plataformas e qualidade: a live de sempre, a com convidado, a de teste.",
+    title: "Perfis salvos",
+    text: "Conjuntos de plataformas e qualidade prontos: a live de sempre, a com convidado, a de teste.",
   },
   {
     icon: <TrayIcon />,
@@ -152,7 +180,9 @@ function DownloadButton({
       aria-label="Baixar a Corneta grátis para Windows"
     >
       <WindowsIcon />
-      <span>{label ?? (compact ? "Baixar" : "Baixar grátis para Windows")}</span>
+      <span>
+        {label ?? (compact ? "Baixar" : "Baixar grátis para Windows")}
+      </span>
       {!compact && <DownloadIcon />}
     </a>
   );
@@ -222,7 +252,7 @@ export default function Home() {
               <div>
                 <span className="sticker hero-kicker">
                   <Mascot />
-                  Multistream local · Windows
+                  Multistream no seu PC · Windows
                 </span>
                 <h1>
                   <span>Uma live.</span>
@@ -235,9 +265,9 @@ export default function Home() {
 
               <div className="hero-pitch">
                 <p>
-                  A Corneta recebe um sinal do OBS e leva sua live para vários
-                  destinos — cada saída independente, tudo num app só, rodando na
-                  máquina que já está transmitindo.
+                  Você transmite como sempre. A Corneta pega esse sinal e joga
+                  nas plataformas que você escolher — cada uma com a sua própria
+                  conexão, tudo num app só, rodando no PC que já tá no ar.
                 </p>
                 <div className="hero-trust" aria-label="Informações principais">
                   <span>
@@ -259,26 +289,29 @@ export default function Home() {
 
             <div className="download-dock">
               <DownloadButton />
-              <p>Windows 10/11 · sem cadastro · núcleo local sem assinatura</p>
+              <p>Windows 10/11 · sem cadastro · sem assinatura</p>
             </div>
           </div>
         </section>
 
-        <section className="mechanism-strip" aria-label="Como a Corneta funciona">
+        <section
+          className="mechanism-strip"
+          aria-label="Como a Corneta funciona"
+        >
           <div className="shell mechanism-grid">
             <div>
               <strong>1 sinal</strong>
-              <span>saindo do OBS</span>
+              <span>do OBS, Streamlabs, XSplit…</span>
             </div>
             <i aria-hidden="true" />
             <div>
-              <strong>Saídas independentes</strong>
-              <span>uma queda não precisa levar as outras</span>
+              <strong>Cada plataforma por conta própria</strong>
+              <span>se uma cair, as outras seguem no ar</span>
             </div>
             <i aria-hidden="true" />
             <div>
               <strong>Tudo no seu PC</strong>
-              <span>chaves, configurações e relatórios</span>
+              <span>suas chaves, seus ajustes, seus relatórios</span>
             </div>
           </div>
         </section>
@@ -286,11 +319,11 @@ export default function Home() {
         <section id="por-que" className="section section-paper">
           <div className="shell">
             <div className="section-heading section-heading-centered">
-              <span className="kicker">Feita para a rotina de quem faz live</span>
+              <span className="kicker">Feita pra rotina de quem faz live</span>
               <h2>Você cuida do conteúdo. A Corneta cuida do caminho.</h2>
               <p>
-                Menos janela para vigiar, menos susto no meio da transmissão e
-                mais tempo para falar com quem está assistindo.
+                Menos janela pra vigiar, menos susto no meio da live e mais
+                tempo pra falar com quem tá assistindo.
               </p>
             </div>
 
@@ -303,20 +336,20 @@ export default function Home() {
                   <div>
                     <h3>Chegue em mais lugares sem perder o controle</h3>
                     <p>
-                      Escolha os destinos e acompanhe cada um separadamente. Se
-                      uma plataforma precisar reconectar, as outras continuam no
-                      ar — e você vê isso acontecendo, sem adivinhar.
+                      Você liga as plataformas que quiser e acompanha uma por
+                      uma. Se alguma precisar reconectar, as outras seguem no ar
+                      — e você vê isso acontecendo, sem ficar adivinhando.
                     </p>
                     <span className="benefit-note">
-                      <Mascot /> Cada saída tem seu próprio interruptor
+                      <Mascot /> Cada plataforma tem seu próprio interruptor
                     </span>
                   </div>
                 </div>
 
                 <div className="demo-panel">
                   <div className="demo-label">
-                    <span>destinos</span>
-                    <span>prévia ilustrativa</span>
+                    <span>suas plataformas</span>
+                    <span>exemplo</span>
                   </div>
                   <div className="route">
                     <span className="route-source">
@@ -369,8 +402,8 @@ export default function Home() {
                   <div>
                     <h3>Converse com todo mundo sem malabarismo</h3>
                     <p>
-                      Chat, alertas e público aparecem juntos. Você acompanha a
-                      comunidade sem pular entre várias janelas — e responde de
+                      Chat, alertas e audiência aparecem juntos. Você acompanha
+                      a galera sem pular entre janela e janela — e responde de
                       um lugar só.
                     </p>
                     <span className="benefit-note">
@@ -382,7 +415,7 @@ export default function Home() {
                 <div className="demo-panel">
                   <div className="demo-label">
                     <span>chat reunido</span>
-                    <span>prévia ilustrativa</span>
+                    <span>exemplo</span>
                   </div>
                   <div className="chat-demo">
                     <div className="chat-line">
@@ -421,14 +454,17 @@ export default function Home() {
           <div className="shell">
             <div className="mode-layout">
               <div className="section-heading">
-                <span className="kicker kicker-light">Quanto capricho na imagem</span>
-                <h2>Uma imagem pra todas ou uma pra cada. Sem adivinhar o preço.</h2>
+                <span className="kicker kicker-light">
+                  Quanto capricho na imagem
+                </span>
+                <h2>
+                  Uma imagem pra todas ou uma pra cada. Sem adivinhar o preço.
+                </h2>
                 <p>
-                  Copiar o sinal do OBS é leve; recodificar dá a melhor imagem em
-                  cada plataforma e pesa mais. A Corneta faz essa conta na sua
-                  frente — upload somado, recodificações e carga estimada — antes
-                  de você entrar ao vivo. Veja o que cada modo do app faz com os
-                  seus destinos:
+                  Sua live pode sair caprichada em toda plataforma sem fritar o
+                  PC — mas isso é uma escolha, e ela custa internet e placa de
+                  vídeo. Você vê essa conta antes de entrar no ar, não no meio
+                  dela. Veja o que muda em cada modo:
                 </p>
               </div>
 
@@ -457,9 +493,9 @@ export default function Home() {
                 </div>
                 <div className="journey-copy">
                   <p>
-                    Conecte as plataformas, meça seu upload e deixe o OBS pronto
-                    com poucos cliques — a Corneta consegue configurar o OBS
-                    sozinha e até dar play nele quando você aperta o BORA.
+                    Ligue as plataformas, meça seu upload e deixe tudo pronto
+                    com poucos cliques. No OBS, a Corneta configura sozinha — e
+                    ainda dá play nele quando você aperta o BORA.
                   </p>
                   <ul className="checklist checklist-ink">
                     <li>
@@ -474,7 +510,7 @@ export default function Home() {
                   </ul>
                 </div>
                 <div className="stat-panel">
-                  <span>seu upload · prévia</span>
+                  <span>seu upload · exemplo</span>
                   <div className="bars" aria-hidden="true">
                     <i />
                     <i />
@@ -483,7 +519,7 @@ export default function Home() {
                     <i />
                   </div>
                   <strong>25 Mb/s</strong>
-                  <small>dá pros quatro destinos com folga</small>
+                  <small>dá pra três plataformas com folga</small>
                 </div>
               </article>
 
@@ -492,9 +528,9 @@ export default function Home() {
                   <span className="sticker sticker-tomate">Durante a live</span>
                   <h3>Veja o que importa sem sair do seu conteúdo.</h3>
                   <p>
-                    Bitrate, fps, quadros perdidos e tempo no ar de cada destino,
-                    mais CPU e placa reais. Pause um destino sem encerrar os
-                    outros; quem cair volta sozinho.
+                    Bitrate, fps, quadros perdidos e tempo no ar de cada
+                    plataforma, mais CPU e placa de verdade. Dá pra pausar uma
+                    sem encerrar as outras — e quem cai volta sozinha.
                   </p>
                 </div>
                 <LiveRoom />
@@ -505,8 +541,8 @@ export default function Home() {
                   <span className="sticker">Depois da live</span>
                   <h3>Entenda o que aconteceu e melhore a próxima.</h3>
                   <p>
-                    O relatório fica no seu PC e junta audiência, taxa de chat,
-                    alertas, momentos marcados e os trechos em que o sinal
+                    O relatório fica no seu PC e junta audiência, movimento do
+                    chat, alertas, momentos marcados e os trechos em que o sinal
                     sofreu — com um veredito honesto no fim.
                   </p>
                 </div>
@@ -521,11 +557,13 @@ export default function Home() {
             <div className="hub-layout">
               <div className="section-heading">
                 <span className="kicker kicker-light">A galera junta</span>
-                <h2>O chat de todas, os alertas de todas — e um overlay pronto.</h2>
+                <h2>
+                  O chat de todas, os alertas de todas — e um overlay pronto.
+                </h2>
                 <p>
-                  Ler, responder e moderar sem trocar de janela; os alertas das
-                  plataformas e dos agregadores no mesmo painel; e um overlay
-                  local que você cola no OBS uma vez e esquece.
+                  Ler, responder e moderar sem trocar de janela. Os alertas das
+                  plataformas e do Streamlabs no mesmo painel. E um overlay que
+                  você cola no OBS uma vez e esquece.
                 </p>
               </div>
 
@@ -554,14 +592,15 @@ export default function Home() {
                   <div>
                     <h3>“JÁ VOLTO”: o sinal cai, a live continua</h3>
                     <p>
-                      Se o OBS cair no meio da transmissão, esta tela entra no ar
-                      sem derrubar as plataformas — pro espectador a live nem
-                      pisca, e volta sozinha quando o sinal retorna. Também serve
-                      pra pausa manual: um clique e você sai da cadeira com o
-                      microfone mudo.
+                      Se o OBS cair no meio da transmissão, esta tela entra no
+                      ar sem derrubar as plataformas — pro espectador a live nem
+                      pisca, e volta sozinha quando o sinal retorna. Também
+                      serve pra pausa manual: um clique e você sai da cadeira
+                      com o microfone mudo.
                     </p>
                     <span className="benefit-note">
-                      <InfoIcon /> Use o slate da Corneta ou a sua imagem ou vídeo
+                      <InfoIcon /> Use o slate da Corneta ou a sua imagem ou
+                      vídeo
                     </span>
                   </div>
                 </div>
@@ -586,13 +625,13 @@ export default function Home() {
                   <h3>Auto-bitrate</h3>
                 </div>
                 <p>
-                  Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo
-                  por um tempo em vez de deixar a live travar ou cair — e volta ao
-                  normal sozinha.
+                  Se a sua internet engasgar, a Corneta baixa a qualidade do
+                  vídeo por um tempo em vez de deixar a live travar ou cair — e
+                  volta ao normal sozinha.
                 </p>
                 <span className="guard-cost">
-                  <InfoIcon /> Age nos destinos que estão recodificando; quem vai
-                  na cópia sai do jeito que o OBS mandou.
+                  <InfoIcon /> Age nas plataformas que estão convertendo; quem
+                  vai na cópia sai do jeito que o OBS mandou.
                 </span>
                 <span className="guard-switch">
                   <span className="app-toggle" aria-hidden="true">
@@ -634,15 +673,18 @@ export default function Home() {
                 </div>
                 <p>
                   A Corneta acerta o volume do seu som antes de enviar — sem “tá
-                  baixo” do chat nem estouro na troca de cena, no mesmo encode que
-                  já estava rodando.
+                  baixo” do chat nem estouro na troca de cena, no mesmo encode
+                  que já estava rodando.
                 </p>
                 <span className="guard-cost">
                   <InfoIcon /> Se você já normaliza no OBS, deixe desligado pra
                   não brigar com ele.
                 </span>
                 <span className="guard-switch">
-                  <span className="app-toggle app-toggle-off" aria-hidden="true">
+                  <span
+                    className="app-toggle app-toggle-off"
+                    aria-hidden="true"
+                  >
                     <i />
                   </span>
                   opcional
@@ -652,12 +694,17 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="como-funciona" className="section section-paper section-paper-raised">
+        <section
+          id="como-funciona"
+          className="section section-paper section-paper-raised"
+        >
           <div className="shell how-layout">
             <div className="section-heading">
-              <span className="kicker">Do OBS para o público</span>
+              <span className="kicker">Do seu programa pro público</span>
               <h2>Você entra ao vivo em três passos.</h2>
-              <p>Sem terminal, sem Docker, sem endereço de servidor para decorar.</p>
+              <p>
+                Sem terminal, sem Docker, sem endereço de servidor pra decorar.
+              </p>
             </div>
 
             <ol className="steps">
@@ -667,7 +714,7 @@ export default function Home() {
                   <h3>Escolha onde quer aparecer</h3>
                   <p>
                     A Corneta abre a página certa de cada plataforma pra você
-                    copiar a chave, e guarda ela no cofre do Windows — nunca no
+                    copiar a chave, e guarda ela no cofre do Windows — nunca num
                     arquivo de configuração.
                   </p>
                 </div>
@@ -675,19 +722,20 @@ export default function Home() {
               <li>
                 <b>2</b>
                 <div>
-                  <h3>Conecte o OBS</h3>
+                  <h3>Ligue o seu programa de live</h3>
                   <p>
-                    Deixe a Corneta configurar pra você pelo obs-websocket ou siga
-                    o passo a passo com os valores prontos pra colar.
+                    No OBS, a Corneta configura sozinha. Em qualquer outro
+                    (Streamlabs, XSplit), é colar um endereço e uma chave — uma
+                    vez só, e nunca mais.
                   </p>
                 </div>
               </li>
               <li>
                 <b>3</b>
                 <div>
-                  <h3>Aperte o botão</h3>
+                  <h3>Aperte BORA AO VIVO</h3>
                   <p>
-                    Acompanhe cada destino e continue cuidando do conteúdo. Se
+                    Acompanhe cada plataforma e siga cuidando do conteúdo. Se
                     quiser, a Corneta manda o OBS começar a transmitir junto.
                   </p>
                   <em>
@@ -702,41 +750,58 @@ export default function Home() {
         <section className="section section-dark">
           <div className="shell local-layout">
             <div className="local-main">
-              <span className="kicker kicker-light">Local de verdade</span>
+              <span className="kicker kicker-light">
+                Roda no seu PC, de verdade
+              </span>
               <h2>
-                Sem mensalidade de restream. Sem mandar suas chaves para a nossa
-                nuvem.
+                Sem mensalidade de serviço de retransmissão. Sem mandar suas
+                chaves pra nuvem de ninguém.
               </h2>
               <p>
-                O trabalho pesado acontece na máquina que já está transmitindo.
-                Configurações, chaves e relatórios continuam com você — e o
-                overlay do OBS é um servidor que só responde no seu computador.
+                O trabalho pesado acontece na máquina que já tá transmitindo.
+                Ajustes, chaves e relatórios ficam com você — e até o overlay do
+                OBS é um servidor que só responde dentro do seu computador.
               </p>
               <ul className="checklist">
                 <li>
-                  <CheckIcon /> Núcleo local grátis
+                  <CheckIcon /> Grátis, sem cadastro
                 </li>
                 <li>
                   <CheckIcon /> Código aberto com licença MIT
                 </li>
                 <li>
-                  <CheckIcon /> Chaves no cofre do sistema
+                  <CheckIcon /> Chaves no cofre do Windows
                 </li>
                 <li>
                   <CheckIcon /> Sem marca-d&apos;água
                 </li>
               </ul>
+
+              <p className="proof">
+                <LockIcon />
+                <span>
+                  Código aberto: dá pra abrir o repositório e ver exatamente o
+                  que o app faz com a sua chave.{" "}
+                  <a
+                    href="https://github.com/pitroldev"
+                    rel="noreferrer noopener"
+                    target="_blank"
+                  >
+                    Ver o código
+                  </a>
+                </span>
+              </p>
             </div>
 
             <aside className="honest-note">
               <span>
                 <Mascot /> A conta honesta
               </span>
-              <h3>Cada destino usa upload.</h3>
+              <h3>Cada plataforma come um pedaço do seu upload.</h3>
               <p>
-                E recodificar pode usar GPU ou CPU. A Corneta mede sua conexão,
-                soma os bitrates e mostra essa conta antes da live — não no meio
-                dela.
+                E melhorar a imagem pra cada uma pesa na placa ou no
+                processador. A Corneta mede sua conexão, soma tudo e te mostra a
+                conta antes da live — não no meio dela.
               </p>
             </aside>
           </div>
@@ -745,11 +810,13 @@ export default function Home() {
         <section id="plataformas" className="section section-paper">
           <div className="shell platforms-layout">
             <div className="section-heading">
-              <span className="kicker">Do seu canal para todo lugar</span>
-              <h2>Leve sua live para as plataformas que fazem sentido para você.</h2>
+              <span className="kicker">Do seu canal pra todo lugar</span>
+              <h2>
+                Leve sua live pras plataformas que fazem sentido pra você.
+              </h2>
               <p>
-                Os quatro grandes já vêm prontos, com o endereço de cada um
-                preenchido. Some quantos quiser — inclusive qualquer servidor
+                As quatro grandes já vêm prontas, com o endereço de cada uma
+                preenchido. Some quantas quiser — inclusive qualquer servidor
                 RTMP que não esteja nesta lista.
               </p>
             </div>
@@ -785,7 +852,7 @@ export default function Home() {
         <section className="section section-dark">
           <div className="shell">
             <div className="section-heading">
-              <span className="kicker kicker-light">Miudezas que salvam a live</span>
+              <span className="kicker kicker-light">As miudezas</span>
               <h2>O resto do cuidado, que só aparece quando você usa.</h2>
             </div>
 
@@ -803,12 +870,23 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="duvidas" className="section section-paper section-paper-raised">
+        <section
+          id="duvidas"
+          className="section section-paper section-paper-raised"
+        >
           <div className="shell faq-layout">
             <div className="section-heading">
               <span className="kicker">Antes de baixar</span>
               <h2>Dúvidas que vale resolver agora.</h2>
               <p>Sem letrinha miúda aparecendo depois que você instalou.</p>
+              <a
+                className="download-button download-button-compact faq-cta"
+                href={downloadUrl}
+                data-placeholder-link="replace-me"
+              >
+                <WindowsIcon />
+                <span>Baixar grátis para Windows</span>
+              </a>
             </div>
 
             <div className="faq-list">
@@ -839,11 +917,11 @@ export default function Home() {
               <span className="final-mascot" aria-hidden="true">
                 <Mascot />
               </span>
-              <h2>Baixe, conecte o OBS e faça sua live chegar mais longe.</h2>
+              <h2>Baixe, ligue no seu programa de live e chegue mais longe.</h2>
             </div>
             <div className="final-cta-actions">
               <DownloadButton />
-              <p>Windows 10/11 · sem cadastro · núcleo local sem assinatura</p>
+              <p>Windows 10/11 · sem cadastro · sem assinatura</p>
             </div>
           </div>
         </section>

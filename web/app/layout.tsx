@@ -19,11 +19,11 @@ const body = Inter({
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title: {
-    default: "Corneta — multistream local para streamers",
+    default: "Corneta — multistream: uma live, várias comunidades",
     template: "%s | Corneta",
   },
   description:
-    "Leve um sinal do OBS para várias plataformas com saídas independentes, chat reunido e controle no seu PC. Baixe grátis para Windows.",
+    "Transmita para Twitch, YouTube, Kick e mais ao mesmo tempo, direto do seu PC: cada plataforma independente, chat reunido e nada de mensalidade. Grátis para Windows.",
   applicationName: "Corneta",
   keywords: [
     "multistream",
@@ -43,13 +43,13 @@ export const metadata: Metadata = {
     siteName: "Corneta",
     title: "Corneta — uma live, várias comunidades",
     description:
-      "Multistream local para streamers, com saídas independentes, chat reunido e download grátis para Windows.",
+      "Multistream que roda no seu PC: cada plataforma independente, chat reunido e download grátis para Windows.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Corneta — uma live, várias comunidades",
     description:
-      "Leve seu OBS para várias plataformas e mantenha tudo no seu controle.",
+      "Uma live sua em várias plataformas ao mesmo tempo, com tudo no seu controle.",
   },
 };
 
