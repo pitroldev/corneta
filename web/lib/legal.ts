@@ -32,9 +32,18 @@ export const LEGAL_VENUE = "Rio de Janeiro, RJ";
 /** Provedor de hospedagem do site e da API (operador dos logs de acesso). */
 export const LEGAL_HOST = "Vercel Inc.";
 
-/** Data da última revisão dos dois documentos. */
+/** Data da última revisão dos dois documentos. Sobe a cada correção, inclusive
+ *  de vírgula — é informativa, e não vale como versão de aceite. */
 export const LEGAL_UPDATED_ISO = "2026-07-30";
 export const LEGAL_UPDATED_LABEL = "30 de julho de 2026";
+
+/** Versão que exige aceite, espelhada em `src/lib/legal.ts` (o app é outro
+ *  workspace e não importa daqui). Só sobe em mudança MATERIAL — passar a cobrar,
+ *  pedir escopo novo de OAuth, limitar o login oficial. Subir invalida o aceite
+ *  guardado em cada instalação e faz o app avisar de novo quem já usava.
+ *
+ *  Mudou aqui, mude lá: são dois arquivos porque não há build compartilhado. */
+export const LEGAL_ACCEPT_VERSION = "2026-07-30";
 
 export const LEGAL_ROUTES = {
   privacy: "/legal/privacy",

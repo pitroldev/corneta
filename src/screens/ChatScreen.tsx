@@ -35,6 +35,8 @@ import { normalizeChatChannel } from "../lib/chatChannel";
 import { sanitizeApiKey, sanitizeToken } from "../lib/validation";
 import * as RTabs from "@radix-ui/react-tabs";
 import { HAS_TWITCH_OAUTH } from "../lib/oauth";
+import { LEGAL_URLS } from "../lib/legal";
+import { LegalLink } from "../components/legal";
 import type {
   AlertSource,
   AlertSourceKind,
@@ -737,6 +739,17 @@ export function ChatScreen() {
                       nas opções avançadas.
                     </p>
                   )}
+                  {/* Divulgação NO MOMENTO da autorização. A Limited Use do Google exige
+                      que o uso dos dados esteja claro antes ou durante o consentimento —
+                      a política publicada satisfaz o "antes", isto satisfaz o "durante", e
+                      é o que o revisor vê no vídeo de verificação. */}
+                  <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
+                    A Corneta usa sua conta só pro que está na{" "}
+                    <LegalLink href={LEGAL_URLS.privacy}>
+                      Política de Privacidade
+                    </LegalLink>
+                    . Dá pra desconectar quando quiser.
+                  </p>
                   <div className="flex flex-col gap-2">
                     {hasTwitchChannel && (
                       <LoginRow

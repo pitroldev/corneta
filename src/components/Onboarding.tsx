@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ScrollText, X } from "lucide-react";
 import { cn } from "../lib/utils";
+import { acceptedCurrent, recordAcceptance } from "../lib/legal";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
+import { LegalAcceptNote } from "./legal";
 import { Modal } from "./Modal";
 import { Mascot, SoundWaves } from "./decor";
 import { Button } from "./ui";
@@ -33,15 +35,23 @@ const STEPS = [
   },
 ];
 
+/** Qual modal está na tela: o tour de boas-vindas, o reaviso dos termos, ou nada. */
+type Flow = "tour" | "reaccept" | null;
+
+function initialFlow(): Flow {
+  let welcomed = false;
+  try {
+    welcomed = localStorage.getItem(FLAG) === "1";
+  } catch {
+    // Na dúvida, mostra: inofensivo pro veterano, essencial pro novato.
+  }
+  if (!welcomed) return "tour";
+  // Já viu o tour, mas os termos mudaram de forma material desde então.
+  return acceptedCurrent() ? null : "reaccept";
+}
+
 export function Onboarding({ onStart }: { onStart: () => void }) {
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(FLAG) !== "1";
-    } catch {
-      // Na dúvida, mostra: inofensivo pro veterano, essencial pro novato.
-      return true;
-    }
-  });
+  const [flow, setFlow] = useState<Flow>(initialFlow);
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
 
@@ -50,7 +60,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   useEffect(() => {
     if (replayNonce > 0) {
       setStep(0);
-      setOpen(true);
+      setFlow("tour");
     }
   }, [replayNonce]);
 
@@ -62,7 +72,11 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     } catch {
       /* ignore */
     }
-    setOpen(false);
+    // Dispensar este modal É entrar no app, e o aviso de aceite esteve na tela
+    // o tempo todo — em qualquer caminho de saída. Por isso registra aqui, e não
+    // só no "Bora começar".
+    recordAcceptance();
+    setFlow(null);
     if (start) onStart();
     // Só na primeira dispensa — quem reabriu via Sobre já sabe o caminho.
     else if (firstTime && replayNonce === 0)
@@ -73,7 +87,16 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
 
   const cur = STEPS[step];
 
-  if (!open) return null;
+  if (flow === null) return null;
+  if (flow === "reaccept")
+    return (
+      <LegalUpdate
+        onClose={() => {
+          recordAcceptance();
+          setFlow(null);
+        }}
+      />
+    );
   return (
     <Modal
       title="Opa! Bora cornetar?"
@@ -153,6 +176,47 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
           <Button variant="primary" size="lg" onClick={next}>
             {last ? "Bora começar" : "Próximo"}{" "}
             <ArrowRight className="size-5" />
+          </Button>
+        </div>
+
+        <LegalAcceptNote className="mt-4 border-t-2 border-border pt-3" />
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Os termos mudaram de forma material (`LEGAL_ACCEPT_VERSION` subiu) e este
+ * usuário já tinha aceitado uma versão anterior. Avisa UMA vez, sem arrastar o
+ * veterano pelos cinco passos do tour de novo.
+ */
+function LegalUpdate({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal
+      title="Os termos mudaram"
+      onClose={onClose}
+      className="max-w-md overflow-hidden rounded-xl bg-surface pop"
+    >
+      <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
+      <div className="bg-brass px-6 py-6 text-brass-ink">
+        <div className="mb-3 grid size-14 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
+          <ScrollText className="size-8" />
+        </div>
+        <h2 className="text-3xl">Os termos mudaram</h2>
+      </div>
+
+      <div className="p-6">
+        <p className="text-sm leading-relaxed text-ink-muted">
+          A gente atualizou os Termos de Uso e a Política de Privacidade. Dá uma
+          olhada no que mudou — seguir usando a Corneta significa aceitar a
+          versão nova.
+        </p>
+
+        <LegalAcceptNote className="mt-4 border-t-2 border-border pt-3" />
+
+        <div className="mt-5 flex justify-end">
+          <Button variant="primary" size="lg" onClick={onClose}>
+            Entendi <ArrowRight className="size-5" />
           </Button>
         </div>
       </div>

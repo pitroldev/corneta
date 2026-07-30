@@ -1,0 +1,46 @@
+﻿CORNETA — LICENÇA E CONDIÇÕES DE USO
+
+A Corneta é software livre, distribuído sob a licença MIT. Você pode usar,
+copiar, modificar e redistribuir à vontade. O texto completo da licença está no
+fim deste documento, em inglês — licenças não se traduzem, para não mudar o
+sentido jurídico do original.
+
+A licença acima trata do CÓDIGO. O uso do aplicativo, do site e do serviço de
+login oficial é regido por dois documentos publicados na internet:
+
+    Termos de Uso .............. https://www.corneta.live/legal/terms-of-use
+    Politica de Privacidade .... https://www.corneta.live/legal/privacy
+
+Vale a pena ler os dois. Eles explicam, entre outras coisas, que a Corneta roda
+inteira no seu computador, que o vídeo não passa por nenhum servidor nosso, e
+que você continua responsável por seguir as regras de cada plataforma para onde
+transmite.
+
+Os dois estão sempre a um clique dentro do aplicativo, na tela "Sobre".
+
+Aplicativo e serviço de login oferecidos por PCL DE SOUZA TECNOLOGIA,
+CNPJ 44.638.580/0001-12. Contato: corneta@pitrol.dev
+
+-------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 Petro Cardoso (Pitrol)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

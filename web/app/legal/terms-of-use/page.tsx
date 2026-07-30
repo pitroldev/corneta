@@ -87,9 +87,17 @@ export default function TermsPage() {
               Estes termos regem o uso do aplicativo Corneta, deste site e do serviço
               de login descrito abaixo, todos oferecidos por{" "}
               <strong>{LEGAL_OPERATOR}</strong>, inscrita no CNPJ sob o nº{" "}
-              <strong>{LEGAL_CNPJ}</strong>. Ao baixar, instalar ou usar a Corneta,
-              você concorda com eles. Se não concordar, não instale o aplicativo — e,
-              se já tiver instalado, desinstale.
+              <strong>{LEGAL_CNPJ}</strong>. Se não concordar com eles, não instale o
+              aplicativo — e, se já tiver instalado, desinstale.
+            </p>
+            <p>
+              Você aceita estes termos ao concluir ou dispensar a tela de boas-vindas
+              do aplicativo, onde este documento e a Política de Privacidade aparecem
+              como links antes de qualquer uso. O instalador também exibe as duas
+              referências, e elas ficam permanentemente acessíveis na tela{" "}
+              <strong>Sobre</strong>. O registro de que você passou por esse aviso
+              fica apenas no seu computador: não existe cadastro, conta ou servidor
+              nosso guardando esse dado.
             </p>
             <p>
               Se você usa a Corneta em nome de uma empresa, canal ou equipe, declara ter
@@ -334,8 +342,15 @@ export default function TermsPage() {
               alterados ou removidos, e versões novas podem exigir passos de
               reconfiguração. Estes termos podem ser atualizados para acompanhar essas
               mudanças; a data de revisão no topo indica a versão vigente, hoje de{" "}
-              {LEGAL_UPDATED_LABEL}. Continuar usando o aplicativo depois de uma
-              atualização significa concordar com a versão publicada.
+              {LEGAL_UPDATED_LABEL}.
+            </p>
+            <p>
+              Correções de redação valem a partir da publicação. Já uma mudança{" "}
+              <strong>material</strong> — passar a cobrar por algo hoje gratuito, pedir
+              uma permissão nova nas suas contas ou restringir o serviço de login — faz
+              o aplicativo avisar você de novo, com estes documentos à mão, antes de
+              continuar. Seguir usando depois desse aviso significa concordar com a
+              versão publicada.
             </p>
           </LegalSection>
 

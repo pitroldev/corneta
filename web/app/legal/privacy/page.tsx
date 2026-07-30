@@ -330,6 +330,13 @@ export default function PrivacyPage() {
                 computador (<code>127.0.0.1</code>), para que o OBS leia alertas
                 e chat como Browser Source. Ele não é exposto à internet.
               </li>
+              <li>
+                <strong>Aceite destes documentos</strong> — a data e a versão dos
+                termos que você viu na tela de boas-vindas ficam guardadas
+                localmente, só para o aplicativo saber quando precisa avisar de
+                novo. Esse registro não acompanha a exportação da configuração e
+                nunca é enviado para nós.
+              </li>
             </ul>
             <p>
               Desinstalar o aplicativo, apagar o arquivo de configuração e
