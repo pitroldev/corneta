@@ -111,9 +111,9 @@
       "css": ".ds-hero-title { margin: 0; color: #fcf3e3; font-family: 'Baloo 2', system-ui, sans-serif; font-size: clamp(2.95rem, 4.9vw, 4.45rem); font-weight: 800; line-height: 0.95; letter-spacing: -0.035em; } .ds-hero-title > span { display: block; } .ds-slab { display: inline-block; margin: 0.1em 0 0.16em; padding: 0.04em 0.2em 0.1em; color: #2a1c00; background: #ffb323; box-shadow: 7px 7px 0 0 #ff5a36; font-size: 0.94em; font-style: normal; white-space: nowrap; transform: rotate(-1.4deg); }"
     },
     {
-      "name": "Chip de plataforma",
+      "name": "Linha de destino",
       "kind": "chip",
-      "refersTo": "platform-chip",
+      "refersTo": "destination-row",
       "description": "Destino com o logo oficial na cor da marca, do mesmo jeito que o app mostra.",
       "html": "<span class=\"ds-platform-chip\"><span class=\"ds-glyph\" style=\"background:#9146FF;color:#fff\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z\"/></svg></span>Twitch</span>",
       "css": ".ds-platform-chip { display: inline-flex; min-height: 46px; align-items: center; gap: 10px; padding: 5px 13px 5px 6px; color: #fcf3e3; background: #221a10; border-radius: 7px; font-family: Inter, system-ui, sans-serif; font-size: 0.86rem; font-weight: 700; } .ds-glyph { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 4px; box-shadow: 3px 3px 0 0 #0b0805; } .ds-glyph svg { width: 56%; height: 56%; fill: currentColor; }"

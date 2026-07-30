@@ -106,8 +106,10 @@ export function ReportChart() {
         <line className="chart-grid" x1="0" y1="56" x2="360" y2="56" />
         <path className="chart-area" d={`${CURVE} L360,96 L0,96 Z`} />
         <path className="chart-line" d={CURVE} />
-        <circle className="chart-mark-ok" cx="180" cy="22" r="4.5" />
-        <circle className="chart-mark" cx="252" cy="24" r="4.5" />
+        {/* As bolinhas usam a cor da legenda correspondente: latão = raid,
+            âmbar = trecho com queda. */}
+        <circle className="chart-mark-raid" cx="180" cy="22" r="4.5" />
+        <circle className="chart-mark-warn" cx="252" cy="24" r="4.5" />
       </svg>
 
       <div className="chart-scale">

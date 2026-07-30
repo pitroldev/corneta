@@ -152,12 +152,11 @@ components:
     textColor: "{colors.brass-ink}"
     rounded: "{rounded.xl}"
     padding: "clamp(26px, 3.5vw, 42px)"
-  platform-chip:
+  destination-row:
     backgroundColor: "{colors.surface-raised}"
     textColor: "{colors.ink-on-dark}"
     rounded: "{rounded.md}"
-    padding: "5px 13px 5px 6px"
-    height: "46px"
+    padding: "12px 13px"
   app-window:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink-on-dark}"
@@ -368,9 +367,11 @@ não silhueta.
   Latão e rotação de -2.2°. A variante tomate gira +1.8° e mantém a tinta escura.
 - **Chip de estado (`.chip`):** bloco sólido pequeno; menta = testado/no ar, âmbar = pode
   falhar, superfície alta = neutro. Texto sempre em tinta escura.
-- **Chip de plataforma:** superfície elevada com o glifo oficial da plataforma na cor da marca
-  (32–38px, canto 4px, sombra Pop Pequeno) puxando a fila. Experimental não muda a silhueta —
-  muda o rótulo do grupo.
+- **Linha de destino:** superfície elevada com o glifo oficial da plataforma na cor da marca
+  (38px, canto 4px, sombra Pop Pequeno), nome em Baloo e, abaixo, a frase que o próprio app usa
+  pra aquele destino. A ressalva de cada plataforma vive nessa frase, na linguagem do produto —
+  o painel **não** classifica destinos por status interno de validação, e nenhum selo de
+  “testado”, “pendente” ou “pode falhar” aparece sobre eles.
 
 ### Cards / Containers
 
@@ -425,6 +426,13 @@ A tela que o app coloca no ar quando o OBS cai é reproduzida como está: fundo 
 meio-tom, kicker "CORNETA · MULTI-STREAM" em latão, "JÁ VOLTO" em laje de latão girada -1.7°
 com sombra dura e a legenda "já já tô de volta — segura a corneta 📣".
 
+### Listra de acento
+
+Herdada do app (`.accent-l`): uma barra de latão de 4px na borda esquerda de um bloco de
+superfície mais funda. É o único lugar onde uma borda colorida grossa é permitida, e existe para
+destacar uma observação dentro de texto corrido (o callout das páginas legais). Fora dessa
+função, borda colorida grossa continua proibida.
+
 ### Bloco de proteção
 
 Cada rede de segurança é um bloco escuro com ícone de latão inclinado, título em Baloo, a
@@ -472,4 +480,6 @@ corta todos.
 - **Don't** escrever texto branco sobre latão, menta ou âmbar.
 - **Don't** inventar métrica, depoimento ou logo de cliente: não existem.
 - **Don't** mostrar um recurso desligado por feature flag (a “Mesa” de co-stream está fora).
+- **Don't** organizar a página por status interno de QA (“validado”, “pendente”): isso é
+  papelada do projeto. A ressalva vai junto do item, na linguagem de quem usa.
 - **Don't** usar monoespaçado fora de valor copiável.

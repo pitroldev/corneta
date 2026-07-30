@@ -827,19 +827,23 @@ svg {
 }
 
 .benefit-note {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 16px;
   color: var(--ink-faint);
   font-size: 0.78rem;
   font-weight: 700;
+  line-height: 1.45;
 }
 
+/* Alinha com a primeira linha, não com o centro do bloco: em nota de duas
+   linhas o ícone centralizado flutuava entre elas. */
 .benefit-note svg {
   width: 17px;
   height: 17px;
   flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 /* Linha de benefício sobre o palco escuro */
@@ -913,13 +917,15 @@ svg {
   fill: currentColor;
 }
 
+/* Estica junto com a lista: com min-height fixo o leque ficava mais curto que
+   as linhas e o grid centralizava a diferença — daí o desalinho de ~5px. */
 .route-fan {
-  height: 100%;
-  min-height: 132px;
+  align-self: stretch;
   color: var(--brass);
 }
 
 .route-fan svg {
+  display: block;
   width: 34px;
   height: 100%;
 }
@@ -952,6 +958,14 @@ svg {
 
 .route-row-down {
   background: var(--surface-3);
+}
+
+/* Glifo em coluna de grid precisa de altura própria — sem ela o quadrado da
+   marca vira retângulo, porque o SVG interno é 56% de uma altura indefinida. */
+.route-row .glyph,
+.chat-line .glyph {
+  width: 26px;
+  height: 26px;
 }
 
 .state {
@@ -1069,6 +1083,7 @@ svg {
   place-content: center;
   justify-items: center;
   padding: 26px 20px;
+  color: var(--ink-on-dark);
   border-radius: var(--r-lg);
   background-color: #14100a;
   background-image: var(--halftone-dark);
@@ -1198,9 +1213,12 @@ svg {
 }
 
 /* Blocos-demo da jornada (cara de "Stat" do app: topo de latão) */
-/* Mesmo bloco "Stat" do app: régua de latão no topo, canto seco. */
+/* Mesmo bloco "Stat" do app: régua de latão no topo, canto seco.
+   A cor é declarada aqui porque o bloco pousa em seção de papel — sem isso o
+   número herda a tinta escura e some no fundo escuro. */
 .stat-panel {
   padding: 16px 18px;
+  color: var(--ink-on-dark);
   border-top: 3px solid var(--brass);
   background: var(--surface-2);
   box-shadow: var(--pop);
@@ -1246,7 +1264,7 @@ svg {
   width: 16%;
   border-radius: var(--r-sm) var(--r-sm) 0 0;
   background: var(--brass);
-  opacity: 0.5;
+  opacity: 0.72;
 }
 
 .bars i:nth-child(1) { height: 34%; }
@@ -1504,8 +1522,10 @@ svg {
   grid-template-columns: minmax(0, 1fr) minmax(430px, 1.02fr);
 }
 
-.platform-board {
-  overflow: hidden;
+/* Painel de destinos: o mesmo picker da tela Plataformas do app — cada destino
+   com a frase que o app usa pra ele, sem classificar por status interno. */
+.dest-board {
+  padding: 22px;
   color: var(--ink-on-dark);
   border-radius: var(--r-xl);
   background-color: var(--surface);
@@ -1514,62 +1534,62 @@ svg {
   box-shadow: var(--pop-ink-lg);
 }
 
-.platform-group {
-  padding: 24px 26px;
-}
-
-.platform-group + .platform-group {
-  border-top: 2px solid var(--border-soft);
-}
-
-.platform-group-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.platform-group-label > span {
-  color: var(--brass);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.platform-group-experimental .platform-group-label > span {
-  color: var(--muted-on-dark);
-}
-
-.platform-chips {
-  display: flex;
-  flex-wrap: wrap;
+.dest-grid {
+  display: grid;
   gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.platform-chip {
-  display: inline-flex;
-  min-height: 46px;
+.dest {
+  display: grid;
   align-items: center;
-  gap: 10px;
-  padding: 5px 13px 5px 6px;
+  gap: 12px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  padding: 12px 13px;
   border-radius: var(--r-md);
   background: var(--surface-2);
-  font-size: 0.86rem;
+}
+
+.dest .glyph {
+  width: 38px;
+  height: 38px;
+}
+
+.dest strong {
+  display: block;
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 0.98rem;
   font-weight: 700;
+  line-height: 1.1;
 }
 
-.platform-chip .glyph {
-  width: 34px;
-  height: 34px;
-}
-
-.platform-group p {
-  margin-top: 15px;
+.dest p {
+  margin-top: 3px;
   color: var(--faint-on-raised);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 550;
+  line-height: 1.35;
+}
+
+.dest-note {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 2px solid var(--border-soft);
+  color: var(--muted-on-dark);
+  font-size: 0.8rem;
+  font-weight: 550;
+  line-height: 1.55;
+}
+
+.dest-note + .dest-note {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dest-note strong {
+  color: var(--ink-on-dark);
+  font-weight: 750;
 }
 
 /* ---- FAQ ---- */
@@ -1770,11 +1790,54 @@ svg {
   padding-block: 22px;
 }
 
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .site-footer p {
   max-width: 40ch;
   color: var(--faint-on-dark);
   font-size: 0.82rem;
   font-weight: 550;
+}
+
+/* Identificação da pessoa jurídica que opera o site — letra miúda, mas presente.
+   Dupla classe porque `.site-footer p` vence o seletor simples e o max-width
+   herdado quebrava o CNPJ em duas linhas. */
+.site-footer .footer-id {
+  max-width: none;
+  color: var(--faint-on-dark);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.footer-links a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 6px 11px;
+  color: var(--muted-on-dark);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.footer-links a:hover {
+  color: var(--brass-ink);
+  background: var(--brass);
 }
 
 .footer-link {
@@ -2606,11 +2669,12 @@ svg {
   font-variant-numeric: tabular-nums;
 }
 
+/* Mesmo motivo do .guard-cost: ícone fora do fluxo, texto livre pra ter
+   <strong> no meio sem colapsar. */
 .mode-verdict {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
+  position: relative;
   margin-top: 14px;
+  padding-left: 26px;
   color: var(--muted-on-dark);
   font-size: 0.8rem;
   font-weight: 550;
@@ -2618,10 +2682,11 @@ svg {
 }
 
 .mode-verdict svg {
+  position: absolute;
+  top: 2px;
+  left: 0;
   width: 17px;
   height: 17px;
-  flex: 0 0 auto;
-  margin-top: 1px;
   color: var(--brass);
   fill: currentColor;
 }
@@ -2698,6 +2763,11 @@ svg {
 .vpick-meio { left: 33.3%; width: 33.4%; }
 .vpick-dir { right: 0; width: 33.3%; }
 
+/* Dá a entender que os lados são clicáveis antes do clique acontecer. */
+.vpick:hover {
+  background: rgb(255 179 35 / 7%);
+}
+
 #crop-esq:checked ~ .vframe .vcrop { left: 4%; }
 #crop-meio:checked ~ .vframe .vcrop { left: 50%; translate: -50% 0; }
 #crop-dir:checked ~ .vframe .vcrop { right: 4%; left: auto; }
@@ -2734,6 +2804,7 @@ svg {
 
 .warroom {
   padding: 18px;
+  color: var(--ink-on-dark);
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: var(--pop-ink-lg);
@@ -2792,6 +2863,18 @@ svg {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.meter svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .meter i {
@@ -2818,6 +2901,7 @@ svg {
 
 .chart-panel {
   padding: 18px;
+  color: var(--ink-on-dark);
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: var(--pop-ink-lg);
@@ -2850,12 +2934,16 @@ svg {
   vector-effect: non-scaling-stroke;
 }
 
-.chart-mark {
-  fill: var(--tomate);
+.chart-mark-raid {
+  fill: var(--brass);
+  stroke: var(--surface);
+  stroke-width: 2;
 }
 
-.chart-mark-ok {
-  fill: var(--ok);
+.chart-mark-warn {
+  fill: var(--warn);
+  stroke: var(--surface);
+  stroke-width: 2;
 }
 
 .chart-scale {
@@ -3132,6 +3220,25 @@ svg {
   fill: currentColor;
 }
 
+.obs-cam {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  width: 27%;
+  aspect-ratio: 4 / 3;
+  align-content: end;
+  justify-content: end;
+  padding: 7px 9px;
+  color: var(--faint-on-raised);
+  border: 2px dashed var(--border);
+  border-radius: var(--r-md);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .obs-chat {
   position: absolute;
   bottom: 12px;
@@ -3276,12 +3383,13 @@ svg {
   color: var(--brass-ink);
 }
 
+/* Bloco com ícone absoluto em vez de flex: assim um <strong> no meio do texto
+   não vira item de flex e não se espreme numa coluna. */
 .guard-cost {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  position: relative;
   margin-top: auto;
   padding-top: 15px;
+  padding-left: 23px;
   color: var(--faint-on-raised);
   font-size: 0.74rem;
   font-weight: 700;
@@ -3294,10 +3402,11 @@ svg {
 }
 
 .guard-cost svg {
+  position: absolute;
+  top: 16px;
+  left: 0;
   width: 15px;
   height: 15px;
-  flex: 0 0 auto;
-  margin-top: 1px;
   fill: currentColor;
 }
 
@@ -3326,7 +3435,7 @@ svg {
   gap: 2px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: clamp(36px, 4vw, 56px);
-  background: var(--border-soft);
+  background: var(--border);
 }
 
 .tiny {
@@ -3337,10 +3446,13 @@ svg {
   background: var(--breu);
 }
 
+/* A caixa do ícone tem a altura da PRIMEIRA LINHA do título, não 30px: assim o
+   centro óptico do ícone bate com o centro do texto ao lado em vez de flutuar
+   entre o título e a descrição. */
 .tiny > i {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 1.15rem;
   flex: 0 0 auto;
   place-items: center;
   color: var(--brass);
@@ -3370,6 +3482,443 @@ svg {
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.45;
+}
+
+/* ============================================================
+   Páginas legais — leitura longa sobre papel
+   ============================================================ */
+
+.legal {
+  min-height: 100vh;
+  color: var(--ink);
+  background-color: var(--paper-raised);
+  background-image: var(--halftone-light);
+  background-size: 20px 20px;
+}
+
+.legal .main-nav {
+  color: var(--muted-on-dark);
+}
+
+.legal-header {
+  color: var(--ink-on-dark);
+  border-bottom: 2px solid var(--paper-line);
+  background: var(--panel);
+}
+
+.legal-hero {
+  padding-block: clamp(46px, 5vw, 74px) clamp(30px, 3.5vw, 44px);
+}
+
+.legal-hero h1 {
+  max-width: 22ch;
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+}
+
+.legal-hero > p {
+  max-width: 62ch;
+  margin-top: 20px;
+  color: var(--ink-muted);
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.68;
+}
+
+.legal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 24px;
+}
+
+.legal-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--paper-sunk);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+/* Resumo em bloco de latão — não substitui o texto, e diz isso */
+.legal-tldr {
+  padding: clamp(22px, 2.6vw, 32px);
+  color: var(--brass-ink);
+  border-radius: var(--r-xl);
+  background: var(--brass);
+  box-shadow: var(--pop-ink-lg);
+}
+
+.legal-tldr > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.legal-tldr > span svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.legal-tldr ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legal-tldr li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.95rem;
+  font-weight: 550;
+  line-height: 1.5;
+}
+
+.legal-tldr li svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  margin-top: 3px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.legal-tldr > small {
+  display: block;
+  margin-top: 16px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.legal-layout {
+  display: grid;
+  align-items: start;
+  gap: clamp(34px, 5vw, 72px);
+  grid-template-columns: minmax(210px, 0.32fr) minmax(0, 1fr);
+  padding-bottom: clamp(70px, 8vw, 110px);
+}
+
+/* Sumário */
+.legal-toc {
+  position: sticky;
+  top: 92px;
+}
+
+.legal-toc > strong {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--tomate-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.legal-toc ol {
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--paper-line);
+  list-style: none;
+  counter-reset: toc;
+}
+
+.legal-toc li {
+  border-bottom: 2px solid var(--paper-line);
+  counter-increment: toc;
+}
+
+.legal-toc a {
+  display: flex;
+  gap: 9px;
+  padding: 9px 2px;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.35;
+  transition: color 120ms ease;
+}
+
+.legal-toc a::before {
+  color: var(--brass-ink);
+  content: counter(toc, decimal-leading-zero);
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  opacity: 0.55;
+}
+
+.legal-toc a:hover {
+  color: var(--tomate-ink);
+}
+
+/* Corpo do documento */
+.legal-body {
+  max-width: 72ch;
+}
+
+.legal-body section {
+  padding-top: clamp(30px, 3.5vw, 46px);
+}
+
+.legal-body section + section {
+  margin-top: clamp(26px, 3vw, 38px);
+  border-top: 2px solid var(--paper-line);
+}
+
+.legal-body h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  scroll-margin-top: 96px;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  line-height: 1.1;
+}
+
+.legal-body h2 > b {
+  color: var(--brass-ink);
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 0.78em;
+  font-weight: 800;
+  opacity: 0.5;
+}
+
+.legal-body h3 {
+  margin-top: 26px;
+  font-size: 1.12rem;
+  line-height: 1.25;
+}
+
+.legal-body p {
+  margin-top: 14px;
+  color: var(--ink-muted);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.72;
+}
+
+.legal-body strong {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.legal-body a:not(.legal-back, .legal-pair a) {
+  color: var(--tomate-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.legal-body ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Bloco, não flex: com `display: flex` um <strong> no início do item virava um
+   item de flex próprio e se espremia numa coluna de duas palavras. */
+.legal-body ul li {
+  position: relative;
+  padding-left: 21px;
+  color: var(--ink-muted);
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.legal-body ul li::before {
+  position: absolute;
+  top: 9px;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  background: var(--brass);
+  content: "";
+}
+
+/* Host/URL no meio do texto é um token que não quebra: sem isto ele empurra a
+   página inteira e cria rolagem horizontal no celular. */
+.legal-body code {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+/* Tabela de dados/finalidade */
+.legal-table {
+  margin-top: 20px;
+  overflow-x: auto;
+}
+
+.legal-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.legal-table th,
+.legal-table td {
+  padding: 11px 13px;
+  border-bottom: 2px solid var(--paper-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-table th {
+  color: var(--ink);
+  border-bottom-width: 3px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.legal-table td {
+  color: var(--ink-muted);
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+/* Na tabela a rota tem coluna própria e o wrapper rola: deixa o token inteiro
+   em vez de picar no meio da palavra. */
+.legal-table code {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 0.82rem;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.legal-table th:first-child,
+.legal-table td:first-child {
+  min-width: 21ch;
+}
+
+/* Bloco de destaque dentro do texto */
+.legal-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px 18px;
+  color: var(--ink);
+  border-left: 4px solid var(--brass);
+  background: var(--paper-sunk);
+  font-size: 0.94rem;
+  font-weight: 550;
+  line-height: 1.6;
+}
+
+.legal-callout svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--tomate-ink);
+  fill: currentColor;
+}
+
+/* Valor que o dono do site precisa preencher antes de publicar */
+.legal-todo {
+  padding: 1px 6px;
+  color: #fff;
+  border-radius: var(--r-sm);
+  background: var(--tomate-ink);
+  font-size: 0.82em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.legal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: clamp(34px, 4vw, 52px);
+  padding-top: clamp(24px, 3vw, 34px);
+  border-top: 3px solid var(--ink);
+}
+
+.legal-back {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.legal-back svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* A seta da LP aponta pra frente; aqui ela volta. */
+  transform: scaleX(-1);
+  transition: transform 150ms ease;
+}
+
+.legal-back:hover svg {
+  transform: scaleX(-1) translateX(4px);
+}
+
+.legal-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.legal-pair a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 6px 12px;
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--paper-sunk);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.legal-pair a:hover {
+  background: var(--brass);
+}
+
+/* Precisa da dupla classe: `.legal-body p` venceria a cor no seletor simples. */
+.legal-body .legal-id {
+  margin-top: 20px;
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+  font-weight: 650;
 }
 
 /* ============================================================
@@ -3479,6 +4028,29 @@ svg {
     grid-template-columns: 1fr;
   }
 
+  /* minmax(0, 1fr) e não 1fr: com a tabela larga dentro, o min-content do
+     item estourava a coluna e a página ganhava rolagem horizontal. */
+  .legal-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .legal-toc {
+    position: static;
+    padding: 20px;
+    border-radius: var(--r-lg);
+    background: var(--paper-sunk);
+  }
+
+  .legal-toc ol {
+    columns: 2;
+    column-gap: 26px;
+    border-top: 0;
+  }
+
+  .legal-toc li {
+    break-inside: avoid;
+  }
+
   .shell {
     width: min(calc(100% - 2.5rem), 780px);
   }
@@ -3509,7 +4081,7 @@ svg {
     transform: none;
   }
 
-  .platform-board,
+  .dest-board,
   .faq-list,
   .steps {
     max-width: 720px;
@@ -3602,8 +4174,8 @@ svg {
     flex-direction: column;
   }
 
-  .platform-chip {
-    width: 100%;
+  .dest-grid {
+    grid-template-columns: 1fr;
   }
 
   .faq-list details p {
@@ -3614,6 +4186,14 @@ svg {
     flex-direction: column;
     align-items: flex-start;
     gap: 20px;
+  }
+
+  .legal-toc ol {
+    columns: 1;
+  }
+
+  .legal-body {
+    max-width: none;
   }
 
   /* Janela do app: a sidebar vira faixa de navegação em cima */

@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { LEGAL_CNPJ, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
 import { BrandMark } from "./_components/brand-mark";
 import { ChatHub } from "./_components/chat-hub";
 import { Mascot, ObsMark, PlatformGlyph, SoundWaves } from "./_components/decor";
@@ -73,6 +75,24 @@ const faqs = [
       "Hoje, o download é para Windows. A arquitetura já considera outros sistemas, mas ainda não existe uma data pública para esses builds.",
   },
 ];
+
+// As frases são as mesmas que o app mostra no seletor de plataformas
+// (PLATFORM_TAGLINES em ../src/lib/platforms.ts) — quem já viu o app reconhece,
+// e a ressalva de cada destino vem na linguagem dele, não num selo de status.
+const destinations = [
+  { id: "twitch", name: "Twitch", note: "A live de sempre" },
+  { id: "youtube", name: "YouTube", note: "Aguenta qualidade alta numa boa" },
+  { id: "kick", name: "Kick", note: "No estilo da Twitch" },
+  { id: "facebook", name: "Facebook", note: "Live pra página ou perfil" },
+  { id: "custom", name: "RTMP personalizado", note: "Qualquer servidor RTMP ou RTMPS" },
+  { id: "tiktok", name: "TikTok", note: "Vídeo em pé — precisa de conta liberada" },
+  {
+    id: "instagram",
+    name: "Instagram",
+    note: "Vídeo em pé — sem entrada oficial, pode falhar",
+  },
+  { id: "x", name: "X (Twitter)", note: "A chave sai do Media Studio" },
+] as const;
 
 const tinyThings = [
   {
@@ -303,11 +323,15 @@ export default function Home() {
                       <ObsMark />
                       OBS
                     </span>
+                    {/* Em porcentagem da altura: com 3 linhas de 42px e 8px de
+                        respiro, os centros caem em 14,79% / 50% / 85,21% —
+                        assim o leque encosta no meio de cada destino em
+                        qualquer altura de linha. */}
                     <span className="route-fan" aria-hidden="true">
-                      <svg viewBox="0 0 34 140" preserveAspectRatio="none">
-                        <path d="M0 70H12V25H34" />
-                        <path d="M0 70H34" />
-                        <path d="M0 70H12V115H34" />
+                      <svg viewBox="0 0 34 100" preserveAspectRatio="none">
+                        <path d="M0 50H12V14.79H34" />
+                        <path d="M0 50H34" />
+                        <path d="M0 50H12V85.21H34" />
                       </svg>
                     </span>
                     <div className="route-list">
@@ -724,74 +748,36 @@ export default function Home() {
               <span className="kicker">Do seu canal para todo lugar</span>
               <h2>Leve sua live para as plataformas que fazem sentido para você.</h2>
               <p>
-                Comece com seus destinos principais e adicione outros quando
-                quiser. Somos honestos sobre o que já foi testado ao vivo e o que
-                ainda não.
+                Os quatro grandes já vêm prontos, com o endereço de cada um
+                preenchido. Some quantos quiser — inclusive qualquer servidor
+                RTMP que não esteja nesta lista.
               </p>
             </div>
 
-            <div className="platform-board">
-              <div className="platform-group">
-                <div className="platform-group-label">
-                  <span>Validado ao vivo</span>
-                  <span className="chip chip-ok">testado</span>
-                </div>
-                <div className="platform-chips">
-                  <span className="platform-chip">
-                    <PlatformGlyph id="twitch" />
-                    Twitch
-                  </span>
-                </div>
-                <p>Destino testado em transmissão real.</p>
+            <div className="dest-board">
+              <div className="dest-grid">
+                {destinations.map((destination) => (
+                  <article className="dest" key={destination.name}>
+                    <PlatformGlyph id={destination.id} />
+                    <div>
+                      <strong>{destination.name}</strong>
+                      <p>{destination.note}</p>
+                    </div>
+                  </article>
+                ))}
               </div>
 
-              <div className="platform-group">
-                <div className="platform-group-label">
-                  <span>Disponível no app</span>
-                </div>
-                <div className="platform-chips">
-                  {(
-                    [
-                      ["youtube", "YouTube"],
-                      ["kick", "Kick"],
-                      ["facebook", "Facebook"],
-                      ["custom", "RTMP personalizado"],
-                    ] as const
-                  ).map(([id, name]) => (
-                    <span className="platform-chip" key={name}>
-                      <PlatformGlyph id={id} />
-                      {name}
-                    </span>
-                  ))}
-                </div>
-                <p>
-                  Integrações prontas no app, com validação pública pendente. No
-                  YouTube, a Corneta ainda cria a transmissão e injeta a chave
-                  sozinha.
-                </p>
-              </div>
-
-              <div className="platform-group platform-group-experimental">
-                <div className="platform-group-label">
-                  <span>Experimental</span>
-                  <span className="chip chip-warn">pode falhar</span>
-                </div>
-                <div className="platform-chips">
-                  {(
-                    [
-                      ["tiktok", "TikTok"],
-                      ["instagram", "Instagram"],
-                      ["x", "X (Twitter)"],
-                    ] as const
-                  ).map(([id, name]) => (
-                    <span className="platform-chip" key={name}>
-                      <PlatformGlyph id={id} />
-                      {name}
-                    </span>
-                  ))}
-                </div>
-                <p>Dependem de liberações e fluxos das próprias plataformas.</p>
-              </div>
+              <p className="dest-note">
+                <strong>TikTok, Instagram e X são experimentais.</strong> A
+                entrada depende de liberação e de fluxos das próprias
+                plataformas, então podem simplesmente não funcionar para a sua
+                conta.
+              </p>
+              <p className="dest-note">
+                Até aqui, a Twitch é a plataforma com transmissão real
+                documentada de ponta a ponta. As outras estão implementadas no
+                app e seguem em validação pública.
+              </p>
             </div>
           </div>
         </section>
@@ -865,8 +851,26 @@ export default function Home() {
 
       <footer className="site-footer">
         <div className="shell footer-inner">
-          <BrandMark />
-          <p>Multistream local para quem quer criar, não manter servidor.</p>
+          <div className="footer-brand">
+            <BrandMark />
+            <p>Multistream local para quem quer criar, não manter servidor.</p>
+            <p className="footer-id">
+              {LEGAL_OPERATOR} · CNPJ {LEGAL_CNPJ}
+            </p>
+          </div>
+
+          <nav className="footer-links" aria-label="Links do rodapé">
+            <Link href={LEGAL_ROUTES.privacy}>Privacidade</Link>
+            <Link href={LEGAL_ROUTES.terms}>Termos de uso</Link>
+            <a
+              href="https://github.com/pitroldev"
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              Código-fonte
+            </a>
+          </nav>
+
           <a
             className="footer-link"
             href={downloadUrl}

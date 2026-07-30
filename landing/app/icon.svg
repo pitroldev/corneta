@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="8" fill="#ffb323"/>
-  <path d="M9 25 36 16v32L9 39zM13 38l9 3-3 13h-8z" fill="#100b07"/>
-  <path d="M44 22a15 15 0 0 1 0 20M51 14a25 25 0 0 1 0 36" fill="none" stroke="#100b07" stroke-width="5" stroke-linecap="round"/>
+  <!-- Mesma geometria do mascote do app (src/components/decor.tsx, viewBox 24).
+       O glifo tem bbox 17,64 × 13,1 naquele espaço; em escala 2,1 ele ocupa
+       ~58% da largura da caixa e fica centrado de verdade — antes eram ~70%,
+       encostando nas bordas e deslocado pra esquerda. -->
+  <rect width="64" height="64" rx="14" fill="#ffb323"/>
+  <g transform="translate(6.34 6.8) scale(2.1)" fill="none" stroke="#2a1c00">
+    <path d="M3.4 9.1 13 5.9V18.1L3.4 14.9Z" fill="#2a1c00" stroke="none"/>
+    <rect x="4.7" y="13.9" width="2.5" height="4.6" rx="1.1" fill="#2a1c00" stroke="none"/>
+    <path d="M15.6 8.4a5 5 0 0 1 0 7.2" stroke-width="1.9" stroke-linecap="round"/>
+    <path d="M17.8 6.4a8 8 0 0 1 0 11.2" stroke-width="1.9" stroke-linecap="round"/>
+  </g>
 </svg>
