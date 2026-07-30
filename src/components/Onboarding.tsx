@@ -1,16 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, ScrollText, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ScrollText, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { acceptedCurrent, recordAcceptance } from "../lib/legal";
+import { PLATFORMS } from "../lib/platforms";
+import { INGEST_URL_RE } from "../lib/validation";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
+import type { PlatformId } from "../lib/types";
 import { LegalAcceptNote } from "./legal";
 import { Modal } from "./Modal";
 import { Mascot, SoundWaves } from "./decor";
 import { Button } from "./ui";
 
 const FLAG = "corneta.welcomed";
+
+/**
+ * Plataformas oferecidas no passo 2.
+ *
+ * Filtro derivado, não lista fixa: só entram as que têm endereço de ingest real
+ * e página de chave — ou seja, aquelas em que "marcar e colar a chave" basta. As
+ * experimentais (TikTok, X, Instagram) exigem que o usuário descubra e informe a
+ * própria URL RTMP, o que é conversa pra tela Plataformas, com as ressalvas que
+ * ela já mostra. Se um preset amadurecer em platforms.ts, aparece aqui sozinho.
+ */
+const PICKABLE = Object.values(PLATFORMS).filter(
+  (p) => !p.experimental && p.keyUrl && INGEST_URL_RE.test(p.ingestUrl),
+);
+const PICKER_STEP = 1;
 
 const STEPS = [
   {
@@ -19,7 +36,7 @@ const STEPS = [
   },
   {
     title: "Escolha as plataformas",
-    text: "A Twitch e o YouTube já estão na lista — é só colar a chave de transmissão de cada um. Quer mais? É só adicionar.",
+    text: "Cada plataforma vira um destino com a sua própria chave de transmissão — é só colar a de cada uma.",
   },
   {
     title: "Liga no OBS",
@@ -55,6 +72,38 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
 
+  // O seletor só aparece com a config intocada. Quem já colou uma chave (ou
+  // voltou pelo "Rever o tour") vê o passo 2 explicativo de sempre, e nada na
+  // config dele é mexido.
+  const config = useStore((s) => s.config);
+  const setPlatforms = useStore((s) => s.setPlatforms);
+  const pristine = !!config && config.targets.every((t) => !t.hasKey);
+  const [selected, setSelected] = useState<Set<PlatformId>>(
+    () => new Set<PlatformId>(["twitch", "youtube"]),
+  );
+  const touched = useRef(false);
+  // Enquanto o usuário não mexer, o seletor espelha a config (que chega async).
+  useEffect(() => {
+    if (touched.current || !config) return;
+    const ids = config.targets
+      .map((t) => t.platformId)
+      .filter((id) => PICKABLE.some((p) => p.id === id));
+    if (ids.length > 0) setSelected(new Set(ids));
+  }, [config]);
+
+  const toggle = (id: PlatformId) => {
+    touched.current = true;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      // Sempre pelo menos uma: sem destino nenhum a tela seguinte não faz sentido.
+      if (next.has(id)) {
+        if (next.size === 1) return prev;
+        next.delete(id);
+      } else next.add(id);
+      return next;
+    });
+  };
+
   // "Rever o tour" (a partir de Sobre): reabre no passo 1.
   const replayNonce = useStore((s) => s.tourNonce);
   useEffect(() => {
@@ -76,6 +125,11 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     // o tempo todo — em qualquer caminho de saída. Por isso registra aqui, e não
     // só no "Bora começar".
     recordAcceptance();
+    // Vale também pra quem pulou: a seleção começa espelhando a config, então
+    // sem mexer no seletor isso não muda nada. A ordem sai de PICKABLE pra os
+    // destinos nascerem sempre na mesma sequência.
+    if (pristine)
+      setPlatforms(PICKABLE.filter((p) => selected.has(p.id)).map((p) => p.id));
     setFlow(null);
     if (start) onStart();
     // Só na primeira dispensa — quem reabriu via Sobre já sabe o caminho.
@@ -86,6 +140,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const cur = STEPS[step];
+  const isPicker = pristine && step === PICKER_STEP;
 
   if (flow === null) return null;
   if (flow === "reaccept")
@@ -124,20 +179,35 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
       </div>
 
       <div className="p-6">
-        <div className="min-h-[14rem]">
+        <div className="min-h-56">
           <motion.div
             key={step}
             initial={{ opacity: 0, x: 24 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <StepArt step={step} />
-            <div className="font-display text-lg font-extrabold">
-              {cur.title}
-            </div>
-            <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
-              {cur.text}
-            </div>
+            {isPicker ? (
+              <>
+                <div className="font-display text-lg font-extrabold">
+                  Onde você transmite?
+                </div>
+                <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
+                  Marque onde você faz live e a Corneta já deixa os destinos
+                  prontos — depois é só colar a chave de cada um.
+                </div>
+                <PlatformPicker selected={selected} onToggle={toggle} />
+              </>
+            ) : (
+              <>
+                <StepArt step={step} />
+                <div className="font-display text-lg font-extrabold">
+                  {cur.title}
+                </div>
+                <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
+                  {cur.text}
+                </div>
+              </>
+            )}
           </motion.div>
         </div>
 
@@ -182,6 +252,60 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
         <LegalAcceptNote className="mt-4 border-t-2 border-border pt-3" />
       </div>
     </Modal>
+  );
+}
+
+/** Grade de plataformas do passo 2 — o único passo do tour que MUDA alguma coisa. */
+function PlatformPicker({
+  selected,
+  onToggle,
+}: {
+  selected: Set<PlatformId>;
+  onToggle: (id: PlatformId) => void;
+}) {
+  return (
+    <>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {PICKABLE.map((p) => {
+          const on = selected.has(p.id);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(p.id)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg border-2 px-3 py-2.5 text-left transition-colors",
+                on
+                  ? "border-brass bg-brass/10"
+                  : "border-border bg-surface-2 hover:border-brass/50",
+              )}
+            >
+              <span
+                className="grid size-5 shrink-0 place-items-center rounded-md"
+                style={{ backgroundColor: p.color }}
+              >
+                {on && (
+                  <Check className="size-3.5 text-white" strokeWidth={3.4} />
+                )}
+              </span>
+              <span
+                className={cn(
+                  "font-display text-sm font-extrabold",
+                  !on && "text-ink-muted",
+                )}
+              >
+                {p.name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2.5 text-[11px] leading-relaxed text-ink-faint">
+        Dá pra mudar depois. TikTok, X e qualquer RTMP seu ficam na tela
+        Plataformas.
+      </p>
+    </>
   );
 }
 

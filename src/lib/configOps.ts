@@ -24,6 +24,30 @@ export function addTarget(
   return { config: { ...config, targets: [...config.targets, t] }, id: t.id };
 }
 
+/**
+ * Alinha os destinos às plataformas escolhidas nas boas-vindas: cria o que falta,
+ * remove o que sobra, numa passada só.
+ *
+ * Duas garantias que valem mais que a conveniência:
+ *  • NUNCA remove destino que já tem chave — ali o usuário investiu, e a tela de
+ *    boas-vindas não é lugar de faxina;
+ *  • NUNCA esvazia a lista — sem escolha nenhuma, devolve a config intacta.
+ */
+export function syncTargetsToPlatforms(
+  config: AppConfig,
+  selected: PlatformId[],
+): AppConfig {
+  const want = new Set(selected);
+  if (want.size === 0) return config;
+  const kept = config.targets.filter((t) => want.has(t.platformId) || t.hasKey);
+  const have = new Set(kept.map((t) => t.platformId));
+  let next: AppConfig = { ...config, targets: kept };
+  for (const id of selected) {
+    if (!have.has(id)) next = addTarget(next, id).config;
+  }
+  return next;
+}
+
 export function updateTarget(
   config: AppConfig,
   id: string,

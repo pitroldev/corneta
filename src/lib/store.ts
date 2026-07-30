@@ -67,6 +67,8 @@ interface State {
 
   /** Adiciona um destino e devolve o id (pra tela rolar/focar no card novo). */
   addTarget: (platformId: PlatformId) => string | undefined;
+  /** Boas-vindas: alinha os destinos às plataformas escolhidas, numa gravação só. */
+  setPlatforms: (ids: PlatformId[]) => void;
   updateTarget: (id: string, patch: Partial<Target>) => void;
   removeTarget: (id: string) => void;
   toggleTarget: (id: string) => void;
@@ -354,6 +356,12 @@ export const useStore = create<State>((set, get) => {
       const { config: next, id } = cfgOps.addTarget(config, platformId);
       persist(next);
       return id;
+    },
+
+    setPlatforms(ids) {
+      const config = get().config;
+      if (!config) return;
+      persist(cfgOps.syncTargetsToPlatforms(config, ids));
     },
 
     updateTarget(id, patch) {

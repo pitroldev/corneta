@@ -101,6 +101,50 @@ describe("configOps", () => {
     expect(ops.moveTarget(c, last, 1)).toBe(c);
   });
 
+  // syncTargetsToPlatforms — o seletor das boas-vindas. As duas primeiras são
+  // regras de segurança: o passo é de boas-vindas, não de faxina.
+  it("syncTargetsToPlatforms NÃO remove destino que já tem chave", () => {
+    let c = base(); // Twitch, YouTube
+    const yt = c.targets.find((t) => t.platformId === "youtube")!;
+    c = ops.updateTarget(c, yt.id, { hasKey: true });
+    const next = ops.syncTargetsToPlatforms(c, ["kick"]); // YouTube fora da escolha
+    expect(next.targets.map((t) => t.platformId).sort()).toEqual([
+      "kick",
+      "youtube",
+    ]);
+  });
+
+  it("syncTargetsToPlatforms com escolha VAZIA devolve a config intacta", () => {
+    const c = base();
+    expect(ops.syncTargetsToPlatforms(c, [])).toBe(c);
+  });
+
+  it("syncTargetsToPlatforms cria o que falta e remove o que sobra (sem chave)", () => {
+    const next = ops.syncTargetsToPlatforms(base(), ["twitch", "kick"]);
+    expect(next.targets.map((t) => t.platformId)).toEqual(["twitch", "kick"]);
+  });
+
+  it("syncTargetsToPlatforms é idempotente: repetir não duplica destino", () => {
+    const once = ops.syncTargetsToPlatforms(base(), ["twitch", "kick"]);
+    const twice = ops.syncTargetsToPlatforms(once, ["twitch", "kick"]);
+    expect(twice.targets.map((t) => t.platformId)).toEqual(["twitch", "kick"]);
+  });
+
+  it("syncTargetsToPlatforms respeita a ordem pedida ao criar", () => {
+    const next = ops.syncTargetsToPlatforms(base(), [
+      "twitch",
+      "youtube",
+      "facebook",
+      "kick",
+    ]);
+    expect(next.targets.map((t) => t.platformId)).toEqual([
+      "twitch",
+      "youtube",
+      "facebook",
+      "kick",
+    ]);
+  });
+
   it("addProfile pula nomes 'Perfil N' já tomados", () => {
     let c = base(); // "Padrão"
     c = ops.addProfile(c, "p2"); // "Perfil 2"
