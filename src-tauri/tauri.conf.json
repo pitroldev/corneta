@@ -48,6 +48,17 @@
     "externalBin": [
       "binaries/ffmpeg",
       "binaries/mediamtx"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "languages": [
+          "PortugueseBR",
+          "English"
+        ],
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp",
+        "installerHooks": "installer/theme.nsh"
+      }
+    }
   }
 }
