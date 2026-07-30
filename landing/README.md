@@ -15,5 +15,6 @@ pnpm --dir landing check
 Copie `.env.example` para `.env.local` quando necessário:
 
 - `NEXT_PUBLIC_SITE_URL`: URL canônica usada em metadata, sitemap e robots;
-- `NEXT_PUBLIC_PRIMARY_CTA_URL`: URL pública do instalador/release. Sem ela, a CTA leva à seção
-  “Como funciona” e não promete um download ainda indisponível.
+- `NEXT_PUBLIC_PRIMARY_CTA_URL`: URL pública do instalador/release. Enquanto a URL real não
+  estiver disponível, a página usa `https://example.com/corneta-download` como placeholder
+  explícito.

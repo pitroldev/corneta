@@ -1,0 +1,209 @@
+import { PlatformGlyph } from "./decor";
+import { CheckIcon, CropIcon, InfoIcon } from "./icons";
+
+// Mesa de qualidade: os três modos do app ("Na lata", "Esperto", "Caprichado")
+// com o que cada destino recebe. Os números saem da mesma conta do app
+// (src/lib/estimates.ts + os presets de src/lib/platforms.ts):
+// cópia usa o menor bitrate da lista (menor denominador comum) e recodificação
+// usa o recomendado da plataforma. Twitch 6000/160 · YouTube 9000/192 ·
+// Kick 6000/160 · TikTok 720×1280 3000/128.
+
+type Row = {
+  id: "twitch" | "youtube" | "kick" | "tiktok";
+  name: string;
+  detail: string;
+  tag: string;
+  tone?: "copy" | "warn";
+};
+
+const MODES = [
+  {
+    id: "lata",
+    input: "mode-lata",
+    title: "Na lata",
+    tag: "Mais leve",
+    lead: "A mesma imagem vai pra todas as plataformas, no mesmo padrão.",
+    rows: [
+      { id: "twitch", name: "Twitch", detail: "1080p60 · 3000 kbps", tag: "Cópia", tone: "copy" },
+      { id: "youtube", name: "YouTube", detail: "1080p60 · 3000 kbps", tag: "Cópia", tone: "copy" },
+      { id: "kick", name: "Kick", detail: "1080p60 · 3000 kbps", tag: "Cópia", tone: "copy" },
+      { id: "tiktok", name: "TikTok", detail: "recebe vídeo deitado", tag: "Não serve", tone: "warn" },
+    ] as Row[],
+    upload: "12,6 Mb/s",
+    encodes: "nenhuma",
+    load: "quase zero",
+    verdict:
+      "O TikTok é o mais fraco da lista, então todo mundo cai pro bitrate dele — e ainda recebe vídeo deitado. A Corneta mostra esse estrago antes de você entrar no ar, com o conserto a um clique.",
+  },
+  {
+    id: "esperto",
+    input: "mode-esperto",
+    title: "Esperto",
+    tag: "Recomendado",
+    lead: "Ajusta cada plataforma só onde precisa. Decide sozinho.",
+    rows: [
+      { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps", tag: "Cópia", tone: "copy" },
+      { id: "youtube", name: "YouTube", detail: "1080p60 · 6000 kbps", tag: "Cópia", tone: "copy" },
+      { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps", tag: "Cópia", tone: "copy" },
+      { id: "tiktok", name: "TikTok", detail: "720×1280 · 3000 kbps", tag: "Recodifica" },
+    ] as Row[],
+    upload: "21,6 Mb/s",
+    encodes: "1 (na placa)",
+    load: "~2%",
+    verdict:
+      "Uma recodificação só, pro vertical. O resto sai na cópia: sua máquina quase não sente e ninguém perde qualidade no caminho.",
+  },
+  {
+    id: "caprichado",
+    input: "mode-caprichado",
+    title: "Caprichado",
+    tag: "Máx. qualidade",
+    lead: "Melhor imagem possível pra cada plataforma, mas é o mais pesado.",
+    rows: [
+      { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps", tag: "Recodifica" },
+      { id: "youtube", name: "YouTube", detail: "1080p60 · 9000 kbps", tag: "Recodifica" },
+      { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps", tag: "Recodifica" },
+      { id: "tiktok", name: "TikTok", detail: "720×1280 · 3000 kbps", tag: "Recodifica" },
+    ] as Row[],
+    upload: "24,6 Mb/s",
+    encodes: "4 (na placa)",
+    load: "~40%",
+    verdict:
+      "O YouTube aproveita os 9000 kbps que ele aguenta, cada destino recebe o encode ideal — e a conta de upload e de placa sobe. A Corneta soma isso na sua frente antes do BORA.",
+  },
+] as const;
+
+export function QualityDesk() {
+  return (
+    <div className="switch">
+      <input type="radio" name="modo" id="mode-lata" defaultChecked />
+      <input type="radio" name="modo" id="mode-esperto" />
+      <input type="radio" name="modo" id="mode-caprichado" />
+
+      <div className="switch-tabs" role="group" aria-label="Modos de qualidade">
+        {MODES.map((mode) => (
+          <label className="switch-tab" htmlFor={mode.input} key={mode.id}>
+            <strong>{mode.title}</strong>
+            <em>{mode.tag}</em>
+          </label>
+        ))}
+      </div>
+
+      <div className="switch-panels">
+        {MODES.map((mode) => (
+          <div className="switch-panel" data-panel={mode.id} key={mode.id}>
+            <p className="mode-lead">{mode.lead}</p>
+
+            <div className="mode-board">
+              <div className="demo-label">
+                <span>4 destinos ligados</span>
+                <span>estimativa do app</span>
+              </div>
+
+              <div className="mode-rows">
+                {mode.rows.map((row) => (
+                  <div className="mode-row" key={row.id}>
+                    <PlatformGlyph id={row.id} />
+                    <div>
+                      <strong>{row.name}</strong>
+                      <small>{row.detail}</small>
+                    </div>
+                    <span
+                      className={`tag${row.tone === "copy" ? " tag-copy" : ""}${row.tone === "warn" ? " tag-warn" : ""}`}
+                    >
+                      {row.tag}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mode-summary">
+                <div>
+                  <span>upload somado</span>
+                  <strong>{mode.upload}</strong>
+                </div>
+                <div>
+                  <span>recodificações</span>
+                  <strong>{mode.encodes}</strong>
+                </div>
+                <div>
+                  <span>carga estimada</span>
+                  <strong>{mode.load}</strong>
+                </div>
+              </div>
+            </div>
+
+            <p className="mode-verdict">
+              <InfoIcon />
+              {mode.verdict}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function VerticalCrop() {
+  return (
+    <div className="switch">
+      <input type="radio" name="crop" id="crop-esq" />
+      <input type="radio" name="crop" id="crop-meio" defaultChecked />
+      <input type="radio" name="crop" id="crop-dir" />
+
+      <div className="vframe">
+        <span className="vframe-label">seu sinal do OBS · 1920×1080</span>
+        <div className="vcrop">
+          <span>720×1280</span>
+        </div>
+        <label className="vpick vpick-esq" htmlFor="crop-esq">
+          <span className="sr-only">Enquadrar à esquerda</span>
+        </label>
+        <label className="vpick vpick-meio" htmlFor="crop-meio">
+          <span className="sr-only">Enquadrar no centro</span>
+        </label>
+        <label className="vpick vpick-dir" htmlFor="crop-dir">
+          <span className="sr-only">Enquadrar à direita</span>
+        </label>
+      </div>
+
+      <p className="vhint">
+        <CropIcon />
+        <span>
+          Escolha um lado do quadro: é assim que você define{" "}
+          <b>o que vai pro vertical</b>.
+        </span>
+      </p>
+    </div>
+  );
+}
+
+export function VerticalCopy() {
+  return (
+    <div className="benefit-copy">
+      <span className="benefit-icon">
+        <CropIcon />
+      </span>
+      <div>
+        <h3>Sua live deitada virando vídeo em pé</h3>
+        <p>
+          TikTok e Instagram só aceitam vídeo em pé. Em vez de montar outra cena
+          no OBS, a Corneta recorta um 9:16 do sinal que já está no ar — e você
+          escolhe o enquadramento arrastando o quadro, com prévia do resultado.
+        </p>
+        <ul className="checklist">
+          <li>
+            <CheckIcon /> Recorte 9:16 com panorâmica e zoom
+          </li>
+          <li>
+            <CheckIcon /> Serve pra qualquer destino RTMP vertical
+          </li>
+        </ul>
+        <span className="benefit-note">
+          <InfoIcon /> TikTok e Instagram seguem experimentais: a entrada depende
+          de liberação da própria plataforma.
+        </span>
+      </div>
+    </div>
+  );
+}

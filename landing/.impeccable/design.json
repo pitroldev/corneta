@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-30T00:00:00.000Z",
+  "title": "Design System: Corneta",
+  "extensions": {
+    "colorMeta": {
+      "breu": {
+        "role": "primary",
+        "displayName": "Breu Quente",
+        "canonical": "#100b07",
+        "tonalRamp": ["#0b0805", "#100b07", "#1a130c", "#221a10", "#2e2314", "#3d301c", "#6f5d3f", "#c6b69b"]
+      },
+      "brass": {
+        "role": "primary",
+        "displayName": "Latão",
+        "canonical": "#ffb323",
+        "tonalRamp": ["#2a1c00", "#513600", "#7d5300", "#a97000", "#d68e00", "#ffb323", "#ffc857", "#ffe0a3"]
+      },
+      "tomate": {
+        "role": "secondary",
+        "displayName": "Tomate",
+        "canonical": "#ff5a36",
+        "tonalRamp": ["#3d1207", "#63200c", "#8c2f14", "#b83218", "#e0431f", "#ff5a36", "#ff7a55", "#ffb49e"]
+      },
+      "ok": {
+        "role": "tertiary",
+        "displayName": "Menta",
+        "canonical": "#56e39b",
+        "tonalRamp": ["#0c2e1e", "#12472d", "#18603d", "#1f9d57", "#2fc477", "#56e39b", "#8bf0bd", "#c6f8dd"]
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Âmbar de Aviso",
+        "canonical": "#ffc23d",
+        "tonalRamp": ["#2e2100", "#4d3800", "#6f5100", "#946c00", "#c08c07", "#ffc23d", "#ffd678", "#ffe9b8"]
+      },
+      "faint-on-raised": {
+        "role": "neutral",
+        "displayName": "Creme Apagado Elevado",
+        "canonical": "#a08d70",
+        "tonalRamp": ["#0b0805", "#221a10", "#3d301c", "#6f5d3f", "#8c7a60", "#a08d70", "#c6b69b", "#fcf3e3"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "#f3ead7",
+        "tonalRamp": ["#2a1c0a", "#453116", "#5f4e36", "#8b7853", "#cbb88f", "#e3d6b8", "#f3ead7", "#fffaf0"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#2a1c0a",
+        "tonalRamp": ["#160e04", "#2a1c0a", "#453116", "#5f4e36", "#6f5d3f", "#8b7853", "#cbb88f", "#f3ead7"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Só a promessa do herói, em três linhas, com a linha do meio na laje de latão." },
+      "headline": { "displayName": "Headline", "purpose": "Viradas de seção e CTA final; desce um passo em coluna estreita." },
+      "title": { "displayName": "Title", "purpose": "Títulos de benefício, passo e etapa da jornada." },
+      "body": { "displayName": "Body", "purpose": "Explicações e ressalvas, medida de 46–68ch." },
+      "label": { "displayName": "Label", "purpose": "Kicker, rótulo de painel, adesivo e estado — sempre caixa alta." },
+      "action": { "displayName": "Action", "purpose": "Botão de download; fala com a fonte da marca." }
+    },
+    "shadows": [
+      { "name": "pop", "value": "4px 4px 0 0 #0b0805", "purpose": "Peça padrão sobre superfície escura: adesivo, faixa AO VIVO, bloco de estatística." },
+      { "name": "pop-sm", "value": "3px 3px 0 0 #0b0805", "purpose": "Chips de confiança e glifos de plataforma." },
+      { "name": "pop-brass", "value": "4px 4px 0 0 #2a1c00", "purpose": "Peças de latão sobre painel escuro." },
+      { "name": "pop-ink", "value": "4px 4px 0 0 #2a1c0a", "purpose": "Blocos pousados sobre papel." },
+      { "name": "pop-ink-lg", "value": "7px 7px 0 0 #2a1c0a", "purpose": "Painéis de demonstração escuros sobre papel." },
+      { "name": "pop-cream", "value": "4px 4px 0 0 #fcf3e3", "purpose": "Botão de download sobre o palco escuro." },
+      { "name": "title-misregister", "value": "7px 7px 0 0 #ff5a36", "purpose": "Exclusivo da laje de latão do herói — impressão fora de registro." },
+      { "name": "app-window", "value": "10px 10px 0 0 #0b0805, 0 30px 60px rgb(0 0 0 / 42%)", "purpose": "Única peça com sombra dura + halo ambiente." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Entrada do herói (adesivo, título, pitch, janela) em 500–720ms escalonados." },
+      { "name": "press", "value": "90ms ease", "purpose": "Afundamento do botão: translate(4px,4px) e sombra a zero." },
+      { "name": "live-pulse", "value": "1.4s infinite", "purpose": "Pulso do ponto AO VIVO, igual ao do app." },
+      { "name": "marquee", "value": "34s linear infinite", "purpose": "Ticker de tomate antes do CTA final." },
+      { "name": "shout", "value": "2.4s ease-in-out infinite", "purpose": "Respiro do mascote no CTA final." }
+    ],
+    "breakpoints": [
+      { "name": "chat-out", "value": "1180px" },
+      { "name": "stack", "value": "980px" },
+      { "name": "mobile", "value": "760px" },
+      { "name": "narrow", "value": "420px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão de download",
+      "kind": "button",
+      "refersTo": "button-download",
+      "description": "Ação única da página: baixar para Windows. Afunda no clique como o botão do app.",
+      "html": "<a class=\"ds-btn-download\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 4.2 11 3v8H3V4.2Zm9-1.35L21 1.5V11h-9V2.85ZM3 12h8v8l-8-1.2V12Zm9 0h9v10.5l-9-1.35V12Z\"/></svg><span>Baixar grátis para Windows</span></a>",
+      "css": ".ds-btn-download { display: inline-flex; min-height: 70px; align-items: center; justify-content: center; gap: 13px; padding: 0 26px; color: #2a1c00; background: #ff5a36; border-radius: 7px; box-shadow: 4px 4px 0 0 #fcf3e3; font-family: 'Baloo 2', system-ui, sans-serif; font-size: 1.24rem; font-weight: 800; line-height: 1; text-decoration: none; transition: background-color 90ms ease, transform 90ms ease, box-shadow 90ms ease; } .ds-btn-download svg { width: 23px; height: 23px; fill: currentColor; } .ds-btn-download:hover { background: #ff7a55; } .ds-btn-download:focus-visible { outline: 3px solid #ffb323; outline-offset: 3px; } .ds-btn-download:active { box-shadow: none; transform: translate(4px, 4px); }"
+    },
+    {
+      "name": "Adesivo",
+      "kind": "chip",
+      "refersTo": "sticker",
+      "description": "Selo torto de latão com tinta escura — kicker do herói, etapa da jornada, rótulo de grupo.",
+      "html": "<span class=\"ds-sticker\"><svg viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3.4 9.1 13 5.9V18.1L3.4 14.9Z\" fill=\"currentColor\"/><path d=\"M15.6 8.4a5 5 0 0 1 0 7.2M17.8 6.4a8 8 0 0 1 0 11.2\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\"/></svg>Multistream local · Windows</span>",
+      "css": ".ds-sticker { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; color: #2a1c00; background: #ffb323; border-radius: 4px; box-shadow: 4px 4px 0 0 #2a1c00; font-family: Inter, system-ui, sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; transform: rotate(-2.2deg); } .ds-sticker svg { width: 15px; height: 15px; flex: 0 0 auto; }"
+    },
+    {
+      "name": "Laje de título",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Bloco de latão inclinado com sombra de tomate fora de registro; carrega uma linha do título do herói.",
+      "html": "<h1 class=\"ds-hero-title\"><span>Uma live.</span><span><em class=\"ds-slab\">Várias comunidades.</em></span><span>Tudo no seu controle.</span></h1>",
+      "css": ".ds-hero-title { margin: 0; color: #fcf3e3; font-family: 'Baloo 2', system-ui, sans-serif; font-size: clamp(2.95rem, 4.9vw, 4.45rem); font-weight: 800; line-height: 0.95; letter-spacing: -0.035em; } .ds-hero-title > span { display: block; } .ds-slab { display: inline-block; margin: 0.1em 0 0.16em; padding: 0.04em 0.2em 0.1em; color: #2a1c00; background: #ffb323; box-shadow: 7px 7px 0 0 #ff5a36; font-size: 0.94em; font-style: normal; white-space: nowrap; transform: rotate(-1.4deg); }"
+    },
+    {
+      "name": "Chip de plataforma",
+      "kind": "chip",
+      "refersTo": "platform-chip",
+      "description": "Destino com o logo oficial na cor da marca, do mesmo jeito que o app mostra.",
+      "html": "<span class=\"ds-platform-chip\"><span class=\"ds-glyph\" style=\"background:#9146FF;color:#fff\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z\"/></svg></span>Twitch</span>",
+      "css": ".ds-platform-chip { display: inline-flex; min-height: 46px; align-items: center; gap: 10px; padding: 5px 13px 5px 6px; color: #fcf3e3; background: #221a10; border-radius: 7px; font-family: Inter, system-ui, sans-serif; font-size: 0.86rem; font-weight: 700; } .ds-glyph { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 4px; box-shadow: 3px 3px 0 0 #0b0805; } .ds-glyph svg { width: 56%; height: 56%; fill: currentColor; }"
+    },
+    {
+      "name": "Linha de destino",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Linha da tela Ao vivo: glifo da plataforma, qualidade e interruptor de canto seco.",
+      "html": "<div class=\"ds-target\"><span class=\"ds-glyph\" style=\"background:#FF0000;color:#fff\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z\"/></svg></span><span class=\"ds-target-name\"><strong>YouTube</strong><small>1080p60 · 9000 kbps</small></span><span class=\"ds-quality\">Recomendado</span><span class=\"ds-toggle\"><i></i></span></div>",
+      "css": ".ds-target { display: grid; align-items: center; gap: 11px; grid-template-columns: 38px minmax(0,1fr) auto auto; padding: 9px 11px; color: #fcf3e3; background: #221a10; border-radius: 7px; font-family: Inter, system-ui, sans-serif; } .ds-target .ds-glyph { width: 38px; height: 38px; } .ds-target strong { display: block; font-family: 'Baloo 2', system-ui, sans-serif; font-size: 0.92rem; font-weight: 700; } .ds-target small { display: block; margin-top: 2px; color: #8c7a60; font-size: 0.62rem; } .ds-quality { padding: 4px 7px; color: #c6b69b; border: 1px solid #3d301c; border-radius: 4px; font-size: 0.58rem; font-weight: 700; } .ds-toggle { display: flex; width: 38px; height: 21px; align-items: center; justify-content: flex-end; padding: 3px; background: #ffb323; border-radius: 7px; } .ds-toggle i { width: 14px; height: 14px; background: #2a1c00; border-radius: 4px; }"
+    },
+    {
+      "name": "Bloco de estatística",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Número com régua de latão no topo e canto seco — o Stat do app.",
+      "html": "<div class=\"ds-stat\"><span>seu upload</span><strong>22 Mb/s</strong><small>dá pra três destinos com folga</small></div>",
+      "css": ".ds-stat { padding: 16px 18px; color: #fcf3e3; background: #221a10; border-top: 3px solid #ffb323; box-shadow: 4px 4px 0 0 #0b0805; font-family: Inter, system-ui, sans-serif; } .ds-stat span { display: block; color: #8c7a60; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; } .ds-stat strong { display: block; margin-top: 4px; font-family: 'Baloo 2', system-ui, sans-serif; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-stat small { display: block; margin-top: 3px; color: #c6b69b; font-size: 0.76rem; }"
+    },
+    {
+      "name": "Faixa AO VIVO",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Barra de latão do app com tempo no ar e audiência; o ponto vermelho pulsa.",
+      "html": "<div class=\"ds-livebar\"><span class=\"ds-livebar-time\"><i class=\"ds-live-dot\"></i>01:42:08<em>no ar</em></span><span class=\"ds-livebar-viewers\">1.284</span></div>",
+      "css": ".ds-livebar { display: flex; align-items: center; gap: 14px; padding: 10px 13px; color: #2a1c00; background: #ffb323; border-radius: 7px; box-shadow: 4px 4px 0 0 #0b0805; font-family: 'Baloo 2', system-ui, sans-serif; } .ds-livebar-time { display: flex; align-items: center; gap: 8px; font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-livebar em { font-size: 0.66rem; font-style: normal; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; } .ds-livebar-viewers { margin-left: auto; font-size: 1.1rem; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-live-dot { width: 10px; height: 10px; background: #ff4733; border-radius: 999px; animation: ds-live-pulse 1.4s infinite; } @keyframes ds-live-pulse { 0% { box-shadow: 0 0 0 0 rgb(255 71 51 / 65%); } 70% { box-shadow: 0 0 0 9px rgb(255 71 51 / 0%); } 100% { box-shadow: 0 0 0 0 rgb(255 71 51 / 0%); } }"
+    },
+    {
+      "name": "Aba da chave de troca",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Aba de demonstração sem JavaScript: radio escondido + label. Ativa vira bloco de latão.",
+      "html": "<div class=\"ds-switch\"><input type=\"radio\" name=\"ds-modo\" id=\"ds-a\" checked><input type=\"radio\" name=\"ds-modo\" id=\"ds-b\"><div class=\"ds-tabs\"><label for=\"ds-a\"><strong>Esperto</strong><em>recomendado</em></label><label for=\"ds-b\"><strong>Caprichado</strong><em>máx. qualidade</em></label></div></div>",
+      "css": ".ds-switch > input { position: absolute; width: 1px; height: 1px; opacity: 0; } .ds-tabs { display: flex; gap: 9px; } .ds-tabs label { display: flex; cursor: pointer; flex-direction: column; gap: 2px; padding: 10px 15px; color: #c6b69b; background: #221a10; border-radius: 7px; font-family: Inter, system-ui, sans-serif; transition: background-color 90ms ease, color 90ms ease; } .ds-tabs strong { font-family: 'Baloo 2', system-ui, sans-serif; font-size: 1.05rem; font-weight: 700; } .ds-tabs em { font-size: 0.66rem; font-style: normal; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; } .ds-tabs label:hover { color: #fcf3e3; background: #2e2314; } #ds-a:checked ~ .ds-tabs label[for=\"ds-a\"], #ds-b:checked ~ .ds-tabs label[for=\"ds-b\"] { color: #2a1c00; background: #ffb323; box-shadow: 4px 4px 0 0 #2a1c00; } #ds-a:focus-visible ~ .ds-tabs label[for=\"ds-a\"], #ds-b:focus-visible ~ .ds-tabs label[for=\"ds-b\"] { outline: 3px solid #ffb323; outline-offset: 3px; }"
+    },
+    {
+      "name": "Bloco de proteção",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Recurso de segurança com ícone de latão, explicação e a linha obrigatória de custo.",
+      "html": "<div class=\"ds-guard\"><div class=\"ds-guard-head\"><i><svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M4 18a9 9 0 1 1 16 0\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\"/><path d=\"m12 14 4-4\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\"/></svg></i><h3>Auto-bitrate</h3></div><p>Se a internet engasgar, a Corneta baixa a qualidade por um tempo em vez de deixar a live cair.</p><span class=\"ds-guard-cost\">Age nos destinos que estão recodificando.</span></div>",
+      "css": ".ds-guard { display: flex; max-width: 360px; flex-direction: column; padding: 24px; color: #fcf3e3; background: #1a130c; border-radius: 10px; box-shadow: 8px 8px 0 0 #0b0805; font-family: Inter, system-ui, sans-serif; } .ds-guard-head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; } .ds-guard-head i { display: grid; width: 40px; height: 40px; place-items: center; color: #ffb323; background: #221a10; border-radius: 7px; transform: rotate(-3deg); } .ds-guard-head svg { width: 21px; height: 21px; } .ds-guard h3 { margin: 0; font-family: 'Baloo 2', system-ui, sans-serif; font-size: 1.28rem; font-weight: 800; } .ds-guard p { margin: 0; color: #c6b69b; font-size: 0.9rem; font-weight: 550; line-height: 1.55; } .ds-guard-cost { margin-top: 15px; color: #a08d70; font-size: 0.74rem; font-weight: 700; }"
+    },
+    {
+      "name": "Navegação do header",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Links em creme fosco com régua de latão crescendo no hover, sobre painel translúcido.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">Por que Corneta</a><a href=\"#\">Como funciona</a><a href=\"#\">Plataformas</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 26px; padding: 14px 18px; background: rgb(11 8 5 / 94%); color: #c6b69b; font-family: Inter, system-ui, sans-serif; font-size: 0.88rem; font-weight: 650; } .ds-nav a { position: relative; padding-block: 8px; color: inherit; text-decoration: none; } .ds-nav a::after { position: absolute; right: 0; bottom: 2px; left: 0; height: 3px; content: ''; background: #ffb323; transform: scaleX(0); transform-origin: right; transition: transform 140ms ease; } .ds-nav a:hover { color: #fcf3e3; } .ds-nav a:hover::after { transform: scaleX(1); transform-origin: left; } .ds-nav a:focus-visible { outline: 3px solid #ffb323; outline-offset: 3px; }"
+    },
+    {
+      "name": "Painel da conta honesta",
+      "kind": "card",
+      "refersTo": "panel-brass",
+      "description": "Bloco de latão inclinado para a única ressalva que merece destaque na página.",
+      "html": "<aside class=\"ds-honest\"><span>A conta honesta</span><h3>Cada destino usa upload.</h3><p>E adaptar o vídeo pode usar GPU ou CPU. A Corneta mostra essa conta antes da live.</p></aside>",
+      "css": ".ds-honest { display: flex; max-width: 380px; flex-direction: column; padding: 32px; color: #2a1c00; background: #ffb323; border-radius: 14px; box-shadow: 8px 8px 0 0 #0b0805; font-family: Inter, system-ui, sans-serif; transform: rotate(-1.2deg); } .ds-honest > span { margin-bottom: 14px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; } .ds-honest h3 { margin: 0; font-family: 'Baloo 2', system-ui, sans-serif; font-size: 2rem; font-weight: 800; line-height: 1; } .ds-honest p { margin: 18px 0 0; font-weight: 550; line-height: 1.62; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "O pôster do megafone",
+    "overview": "A Corneta é um app de desktop desenhado como pôster de gibi impresso, e a LP é a mesma gráfica: blocos sólidos de cor, sombras duras (deslocadas, sem desfoque), cantos secos e tipografia gorda que fala alto. O mundo não é inventado para a página — ele é herdado de src/index.css do app. Quem baixa reconhece a tela; quem chega pela LP já viu o produto.\n\nO palco é o breu quente do app (#100b07) com meio-tom impresso, cortado por faixas de papel (#f3ead7, o tema claro do app) onde há leitura longa. O latão manda: é o bloco de destaque, o item ativo, o adesivo torto e a régua sobre os números. O tomate é o pedido de ação — baixar e entrar no ar. Menta reporta saúde, âmbar reporta reconexão. Nada de azul, nada de glow, nada de sombra difusa decorativa: essas foram as marcas do mundo anterior (\"creator live room\") e são a anti-referência declarada deste sistema.\n\nA voz é brasileira e direta, sem virar infantil. Baloo 2 fala; Inter explica e opera. Toda demonstração de produto é rotulada como prévia ilustrativa, porque a honestidade é parte do tom da marca.",
+    "keyCharacteristics": [
+      "Palco escuro com meio-tom impresso, interrompido por faixas de papel para leitura.",
+      "Sombras duras de 3–10px sem desfoque; a peça parece adesivo colado, não elemento flutuante.",
+      "Blocos sólidos de latão com tinta escura — inclusive a laje inclinada do título.",
+      "Cantos secos (4–14px). Pílula só para pontos de estado e ondas sonoras.",
+      "Logos oficiais das plataformas em chips de marca, iguais aos do app.",
+      "Réplica funcional da tela \"Ao vivo\" como primeira prova, não mockup genérico."
+    ],
+    "rules": [
+      { "name": "A Regra dos Dois Trabalhos", "body": "Latão é marca e destaque; tomate é ação. Se um bloco de tomate não abre um download nem entra no ar, ele está errado. Menta reporta saúde, âmbar reporta ressalva — nunca o contrário.", "section": "colors" },
+      { "name": "A Regra do Sem Azul", "body": "O sistema não tem azul. Roteamento, links e estados usam latão, menta ou âmbar. Azul era o mundo descartado.", "section": "colors" },
+      { "name": "A Regra da Tinta sobre Cor", "body": "Todo bloco saturado (latão, tomate, menta, âmbar) recebe texto em tinta escura (#2a1c00 ou #0b0805), não branco — exceto o BORA do app, que é o gesto do próprio produto.", "section": "colors" },
+      { "name": "A Regra de Quem Fala", "body": "Baloo 2 para promessas, nomes e botões; Inter para tudo que o streamer precisa entender ou operar. Um parágrafo em Baloo é erro.", "section": "typography" },
+      { "name": "A Regra do Palco antes da Grade", "body": "Comece por uma cena de produto funcionando ou por uma sequência ordenada. Nunca por uma grade de cards de ícone + título + texto.", "section": "layout" },
+      { "name": "A Regra do Ritmo Alternado", "body": "Duas seções claras encostadas trocam de tom (#f3ead7 ↔ #fffaf0); duas escuras encostadas ganham uma faixa de latão ou tomate entre elas.", "section": "layout" },
+      { "name": "A Regra da Sombra Seca", "body": "Sombra tem offset e não tem blur. Se apareceu blur fora da janela do app, virou glow — e glow é o mundo antigo.", "section": "elevation" },
+      { "name": "A Regra do Offset que Aparece", "body": "A cor da sombra depende do fundo: #0b0805 sobre o escuro, #2a1c0a sobre papel, #fcf3e3 para o botão de ação no palco. Sombra invisível é sombra errada.", "section": "elevation" },
+      { "name": "A Regra do Canto Seco", "body": "Se o raio passou de 14px, o desenho saiu do mundo. Pílula é estado, não silhueta.", "section": "shapes" },
+      { "name": "A Regra do Custo Visível", "body": "Nenhum bloco de proteção fecha sem dizer o que ele cobra (atraso, carga, conflito com o OBS). Vender a rede sem o preço é o oposto do tom da marca.", "section": "components" }
+    ],
+    "dos": [
+      "Do herdar tokens de ../src/index.css: mudou no app, muda aqui.",
+      "Do usar sombra dura com offset e sem blur, com a cor escolhida pelo fundo.",
+      "Do manter o latão como marca/destaque e o tomate como única cor de ação.",
+      "Do mostrar o app trabalhando (janela Ao vivo, slate JÁ VOLTO, chat reunido) em vez de ilustrar conceito.",
+      "Do rotular toda demonstração como prévia ilustrativa e todo número como exemplo.",
+      "Do usar os logos oficiais das plataformas nas cores reais, como o app faz.",
+      "Do alternar palco escuro e faixa de papel para dar ritmo à leitura.",
+      "Do tirar os números de banda e carga da conta do app (src/lib/estimates.ts) em vez de inventar valores bonitos.",
+      "Do fazer as demonstrações trocarem de estado com radio + CSS: a página não carrega JavaScript de interação.",
+      "Do dizer o custo de cada recurso na mesma peça que o vende."
+    ],
+    "donts": [
+      "Don't usar azul, gradiente, glow, vidro ou sombra difusa decorativa.",
+      "Don't passar de 14px de raio nem usar pílula como silhueta de botão, chip ou painel.",
+      "Don't transformar a página em grade de cards iguais de ícone + título + texto.",
+      "Don't girar texto corrido; a inclinação é só para adesivo e bloco sólido pequeno.",
+      "Don't colocar o botão de download colado ao BORA AO VIVO da prévia — dois blocos de tomate vizinhos viram um só borrão de ação.",
+      "Don't escrever texto branco sobre latão, menta ou âmbar.",
+      "Don't inventar métrica, depoimento ou logo de cliente: não existem.",
+      "Don't mostrar um recurso desligado por feature flag (a “Mesa” de co-stream está fora).",
+      "Don't usar monoespaçado fora de valor copiável."
+    ]
+  }
+}

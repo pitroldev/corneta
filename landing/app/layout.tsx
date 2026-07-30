@@ -1,29 +1,29 @@
 import type { Metadata, Viewport } from "next";
-import { Baloo_2, IBM_Plex_Sans } from "next/font/google";
+import { Baloo_2, Inter } from "next/font/google";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
+// As MESMAS fontes do app: Baloo 2 para as falas e Inter para o que se lê e opera.
 const display = Baloo_2({
   subsets: ["latin"],
   variable: "--font-baloo",
   display: "swap",
 });
 
-const body = IBM_Plex_Sans({
+const body = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex",
+  variable: "--font-inter",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title: {
-    default: "Corneta — uma live, todo mundo ouvindo",
+    default: "Corneta — multistream local para streamers",
     template: "%s | Corneta",
   },
   description:
-    "Multistream local, grátis e open source. Leve seu OBS para Twitch, YouTube, Kick e outras plataformas com chat, alertas e proteção numa central só.",
+    "Leve um sinal do OBS para várias plataformas com saídas independentes, chat reunido e controle no seu PC. Baixe grátis para Windows.",
   applicationName: "Corneta",
   keywords: [
     "multistream",
@@ -41,15 +41,15 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     url: "/",
     siteName: "Corneta",
-    title: "Corneta — uma live, todo mundo ouvindo",
+    title: "Corneta — uma live, várias comunidades",
     description:
-      "Multistream local, grátis e open source, com chat, alertas e proteção numa central só.",
+      "Multistream local para streamers, com saídas independentes, chat reunido e download grátis para Windows.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Corneta — uma live, todo mundo ouvindo",
+    title: "Corneta — uma live, várias comunidades",
     description:
-      "Multistream local, grátis e open source, com chat, alertas e proteção numa central só.",
+      "Leve seu OBS para várias plataformas e mantenha tudo no seu controle.",
   },
 };
 

@@ -1,22 +1,25 @@
 import Link from "next/link";
 import { BrandMark } from "./_components/brand-mark";
+import { SoundWaves } from "./_components/decor";
 
 export default function NotFound() {
   return (
-    <main className="grid min-h-screen place-items-center bg-ink px-6 text-center text-cream">
-      <div>
-        <BrandMark className="justify-center" />
-        <p className="mt-12 text-xs font-extrabold tracking-[.2em] text-tomato">
-          ERRO 404
-        </p>
-        <h1 className="mt-3 font-display text-6xl leading-[.85] md:text-8xl">
-          ESSA PÁGINA SAIU DO AR.
+    <main className="notfound">
+      <SoundWaves className="hero-waves" />
+      <div className="shell notfound-inner">
+        <BrandMark />
+        <span className="sticker sticker-tomate notfound-badge">Erro 404</span>
+        <h1>
+          <span>Essa página</span>
+          <span>
+            <em className="slab">saiu do ar.</em>
+          </span>
         </h1>
-        <p className="mx-auto mt-6 max-w-md text-cream/60">
-          A transmissão principal continua firme. Volte para a central e tente
+        <p>
+          A transmissão principal continua firme. Volte para o início e tente
           outro caminho.
         </p>
-        <Link className="button mt-9" href="/">
+        <Link className="download-button" href="/">
           Voltar ao início
         </Link>
       </div>

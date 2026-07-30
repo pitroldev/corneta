@@ -1,427 +1,881 @@
 import { BrandMark } from "./_components/brand-mark";
+import { ChatHub } from "./_components/chat-hub";
+import { Mascot, ObsMark, PlatformGlyph, SoundWaves } from "./_components/decor";
+import {
+  ArrowIcon,
+  BoltIcon,
+  ChatIcon,
+  CheckIcon,
+  DownloadIcon,
+  GaugeIcon,
+  InfoIcon,
+  KeyboardIcon,
+  LayersIcon,
+  LockIcon,
+  PopoutIcon,
+  PowerIcon,
+  RadioIcon,
+  SaveIcon,
+  ShieldIcon,
+  ThemeIcon,
+  TrayIcon,
+  VolumeIcon,
+  WindowsIcon,
+} from "./_components/icons";
+import { LiveRoom, ReportChart } from "./_components/live-room";
 import { ProductPreview } from "./_components/product-preview";
+import { QualityDesk, VerticalCopy, VerticalCrop } from "./_components/quality-desk";
 
-const primaryCtaUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL;
-const primaryCta = primaryCtaUrl
-  ? { href: primaryCtaUrl, label: "Baixar a Corneta" }
-  : { href: "#como-funciona", label: "Conhecer a Corneta" };
-
-const platforms = [
-  "TWITCH",
-  "YOUTUBE",
-  "KICK",
-  "TIKTOK",
-  "FACEBOOK",
-  "INSTAGRAM",
-];
-
-const features = [
-  {
-    number: "01",
-    title: "Uma live. Vários destinos.",
-    body: "O OBS envia uma vez para a Corneta. Você escolhe onde quer aparecer e acompanha cada plataforma separadamente.",
-    accent: "brass",
-    size: "wide",
-  },
-  {
-    number: "02",
-    title: "Chat sem malabarismo.",
-    body: "Twitch, YouTube e Kick reunidos numa conversa só — com alertas e público somado.",
-    accent: "tomato",
-    size: "normal",
-  },
-  {
-    number: "03",
-    title: "Seu sinal tem um guardião.",
-    body: "Tela preta, queda, segredo exposto: a Corneta pode agir antes do problema chegar ao público.",
-    accent: "cream",
-    size: "normal",
-  },
-  {
-    number: "04",
-    title: "Cada plataforma no seu formato.",
-    body: "Horizontal, vertical, bitrate e resolução por destino. A aceleração disponível na sua GPU entra primeiro.",
-    accent: "tomato",
-    size: "normal",
-  },
-  {
-    number: "05",
-    title: "A live termina. A leitura começa.",
-    body: "Retenção, picos, raids, alertas e momentos importantes viram um relatório local para a próxima transmissão ser melhor.",
-    accent: "brass",
-    size: "wide",
-  },
-];
+// Placeholder: substitua pela URL real do instalador ou da release.
+const downloadUrl =
+  process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ||
+  "https://example.com/corneta-download";
 
 const faqs = [
   {
     question: "A Corneta substitui o OBS?",
     answer:
-      "Não. O OBS continua cuidando das cenas, câmera e áudio. A Corneta entra depois dele para distribuir, proteger e acompanhar a transmissão.",
+      "Não. Você continua montando cenas, câmera e áudio no OBS. A Corneta entra depois: recebe esse sinal e cuida dos destinos, do acompanhamento e das proteções da transmissão.",
   },
   {
-    question: "É grátis mesmo?",
+    question: "Dá para usar de graça?",
     answer:
-      "O que roda localmente é grátis para sempre: multistream, chat, alertas, relatórios e proteções. Se houver serviços de nuvem no futuro, eles serão opcionais e cobrados apenas quando gerarem custo de servidor.",
+      "Sim. O núcleo local da Corneta é grátis e open source: multistream, chat, alertas, relatórios e proteções que rodam no seu PC não exigem assinatura.",
   },
   {
-    question: "Preciso de uma internet muito forte?",
+    question: "Preciso de uma placa de vídeo boa?",
     answer:
-      "No modo local, cada destino usa uma fatia do seu upload. A Corneta calcula essa necessidade antes da live e ajuda a escolher um bitrate seguro — sem esconder a conta.",
+      "Depende do modo. Quando a Corneta só copia o sinal do OBS, o custo é quase zero. Quando recodifica, ela usa a placa (NVENC, QSV ou AMF) se existir, cai pra CPU se não existir, e mostra a estimativa de carga e quantas recodificações sua placa aguenta antes de você entrar ao vivo.",
   },
   {
-    question: "Minhas chaves de transmissão ficam seguras?",
+    question: "Dá para mandar vídeo em pé pro TikTok?",
     answer:
-      "As chaves ficam no cofre nativo do sistema operacional. Elas não são gravadas em texto puro no arquivo de configuração.",
+      "A Corneta recorta um 9:16 do seu sinal deitado e você escolhe o enquadramento, com prévia do resultado. TikTok e Instagram seguem experimentais porque a entrada depende de liberação da própria plataforma; o mesmo recorte serve para qualquer destino RTMP vertical.",
   },
   {
-    question: "Quais sistemas são suportados?",
+    question: "Tem overlay pra usar no OBS?",
     answer:
-      "O desenvolvimento atual é Windows-first. A arquitetura foi preparada para macOS e Linux, mas ainda não há uma data pública para essas versões.",
+      "Sim. Um servidor local na sua máquina serve os alertas e o chat (com emotes) numa URL que você adiciona no OBS como Browser Source — uma vez só. Posição, tamanho, duração, som e limite de mensagens são ajustáveis, e existe um botão de alerta de teste.",
+  },
+  {
+    question: "Quais plataformas aparecem no app?",
+    answer:
+      "A Corneta traz Twitch, YouTube, Kick, Facebook e destinos RTMP personalizados. TikTok, Instagram e X ainda aparecem como experimentais porque dependem de fluxos e liberações das próprias plataformas.",
+  },
+  {
+    question: "Vou precisar de muita internet?",
+    answer:
+      "Cada destino usa uma parte do seu upload. Antes da live, a Corneta mede sua conexão, soma os bitrates e ajuda você a escolher uma configuração segura.",
+  },
+  {
+    question: "Funciona em macOS ou Linux?",
+    answer:
+      "Hoje, o download é para Windows. A arquitetura já considera outros sistemas, mas ainda não existe uma data pública para esses builds.",
   },
 ];
 
-function Arrow({ diagonal = false }: { diagonal?: boolean }) {
+const tinyThings = [
+  {
+    icon: <KeyboardIcon />,
+    title: "Atalho global",
+    text: "Começa e corta a live sem sair do jogo — a tecla vale com a Corneta em segundo plano.",
+  },
+  {
+    icon: <BoltIcon />,
+    title: "YouTube automático",
+    text: "Com a conta conectada, a Corneta cria a transmissão e injeta a chave no BORA. Sem abrir o Studio.",
+  },
+  {
+    icon: <PopoutIcon />,
+    title: "Janelinha do chat",
+    text: "Chat, alertas ou os dois numa janela que fica por cima de tudo, do tamanho que você quiser.",
+  },
+  {
+    icon: <LayersIcon />,
+    title: "Perfis de destino",
+    text: "Conjuntos salvos de plataformas e qualidade: a live de sempre, a com convidado, a de teste.",
+  },
+  {
+    icon: <TrayIcon />,
+    title: "Vive na bandeja",
+    text: "Fechar a janela esconde a Corneta perto do relógio — a transmissão continua de pé.",
+  },
+  {
+    icon: <PowerIcon />,
+    title: "Abre com o Windows",
+    text: "Já sobe junto com o PC, pronta pra live, se você quiser.",
+  },
+  {
+    icon: <ThemeIcon />,
+    title: "Tema claro e escuro",
+    text: "O mesmo pôster no breu ou no papel — e a troca acontece com um sopro de corneta.",
+  },
+  {
+    icon: <SaveIcon />,
+    title: "Backup dos ajustes",
+    text: "Exporta sua configuração num arquivo. As chaves ficam no cofre e não vão junto.",
+  },
+];
+
+function DownloadButton({
+  compact = false,
+  label,
+}: {
+  compact?: boolean;
+  label?: string;
+}) {
   return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d={diagonal ? "M5 15 15 5m-8 0h8v8" : "M3 10h14m-5-5 5 5-5 5"}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-    </svg>
+    <a
+      className={`download-button${compact ? " download-button-compact" : ""}`}
+      href={downloadUrl}
+      data-placeholder-link="replace-me"
+      aria-label="Baixar a Corneta grátis para Windows"
+    >
+      <WindowsIcon />
+      <span>{label ?? (compact ? "Baixar" : "Baixar grátis para Windows")}</span>
+      {!compact && <DownloadIcon />}
+    </a>
   );
 }
 
-function Check() {
+const tickerItems = [
+  "Bora cornetar",
+  "Uma live · várias comunidades",
+  "Multistream que roda no seu PC",
+  "Grátis e open source",
+];
+
+function TickerRow() {
   return (
-    <svg viewBox="0 0 18 18" fill="none" aria-hidden="true">
-      <path
-        d="m3 9 4 4 8-9"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="square"
-      />
-    </svg>
+    <span>
+      {tickerItems.map((item) => (
+        <span key={item}>
+          <Mascot />
+          {item}
+        </span>
+      ))}
+    </span>
   );
 }
 
 export default function Home() {
   return (
-    <main className="overflow-hidden">
+    <>
+      <span
+        hidden
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{
+          __html:
+            "<!-- THESIS: um sinal do OBS berrado pra várias comunidades, contado com o MESMO material do app desktop e provado recurso por recurso; recusa o palco azul 'creator live room' e a grade de cards SaaS. OWN-WORLD: pôster/gibi impresso — breu #100b07 com meio-tom, blocos sólidos de latão #ffb323 e tomate #ff5a36, sombras DURAS 4px 4px 0 sem blur, cantos secos 4–14px, adesivos tortos, Baloo 2 + Inter; faixas de papel #f3ead7 (tema claro do app) para leitura longa. STORY: reconhece a tela do app, vê cada recurso funcionando (modos de qualidade, vertical 9:16, chat/alertas/overlay, painel ao vivo, relatório, proteções) e baixa pro Windows. FIRST VIEWPORT: adesivo de latão, título de 3 linhas com 'Várias comunidades' numa laje de latão desalinhada em tomate, pitch curto à direita, réplica da tela Ao vivo em largura total e o botão tomate abaixo dela. FORM: mundo herdado do app (pinado pelo brief) — palco escuro + faixas de papel, réplica fiel da tela Ao vivo, demonstrações interativas em CSS puro. -->",
+        }}
+      />
+
+      <a className="skip-link" href="#conteudo">
+        Pular para o conteúdo
+      </a>
+
       <header className="site-header">
-        <div className="shell flex h-20 items-center justify-between gap-6">
-          <a href="#topo" aria-label="Corneta — voltar ao início">
+        <div className="shell header-inner">
+          <a className="brand-link" href="#topo" aria-label="Corneta — início">
             <BrandMark />
           </a>
 
-          <nav
-            className="hidden items-center gap-7 text-sm font-bold lg:flex"
-            aria-label="Principal"
-          >
-            <a className="nav-link" href="#recursos">
-              Recursos
-            </a>
-            <a className="nav-link" href="#como-funciona">
-              Como funciona
-            </a>
-            <a className="nav-link" href="#manifesto">
-              Nosso combinado
-            </a>
-            <a className="nav-link" href="#duvidas">
-              Dúvidas
-            </a>
+          <nav className="main-nav" aria-label="Navegação principal">
+            <a href="#por-que">Por que</a>
+            <a href="#qualidade">Qualidade</a>
+            <a href="#chat">Chat e alertas</a>
+            <a href="#protecao">Proteção</a>
+            <a href="#plataformas">Plataformas</a>
+            <a href="#duvidas">Dúvidas</a>
           </nav>
 
-          <a className="button button-small" href={primaryCta.href}>
-            {primaryCta.label}
-            <Arrow diagonal={Boolean(primaryCtaUrl)} />
-          </a>
+          <DownloadButton compact label="Baixar no Windows" />
         </div>
       </header>
 
-      <section id="topo" className="hero-section">
-        <div className="hero-noise" aria-hidden="true" />
-        <div className="shell relative z-10 grid min-h-[calc(100svh-5rem)] items-center gap-12 py-16 lg:grid-cols-[.9fr_1.1fr] lg:py-20">
-          <div className="hero-copy">
-            <div className="eyebrow reveal reveal-1">
-              <span className="live-dot" />
-              MULTISTREAM LOCAL · GRÁTIS · OPEN SOURCE
+      <main id="conteudo">
+        <section id="topo" className="hero">
+          <SoundWaves className="hero-waves" />
+
+          <div className="shell">
+            <div className="hero-intro">
+              <div>
+                <span className="sticker hero-kicker">
+                  <Mascot />
+                  Multistream local · Windows
+                </span>
+                <h1>
+                  <span>Uma live.</span>
+                  <span>
+                    <em className="slab">Várias comunidades.</em>
+                  </span>
+                  <span>Tudo no seu controle.</span>
+                </h1>
+              </div>
+
+              <div className="hero-pitch">
+                <p>
+                  A Corneta recebe um sinal do OBS e leva sua live para vários
+                  destinos — cada saída independente, tudo num app só, rodando na
+                  máquina que já está transmitindo.
+                </p>
+                <div className="hero-trust" aria-label="Informações principais">
+                  <span>
+                    <CheckIcon /> Grátis
+                  </span>
+                  <span>
+                    <CheckIcon /> Sem marca-d&apos;água
+                  </span>
+                  <span>
+                    <CheckIcon /> Open source (MIT)
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <h1 className="hero-title reveal reveal-2">
-              UMA LIVE.
-              <span>TODO MUNDO</span>
-              OUVINDO.
-            </h1>
-
-            <p className="hero-subtitle reveal reveal-3">
-              A Corneta leva seu OBS para Twitch, YouTube, Kick e outras
-              plataformas ao mesmo tempo — com chat, alertas e proteção rodando
-              na sua máquina.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row reveal reveal-4">
-              <a className="button" href={primaryCta.href}>
-                {primaryCta.label}
-                <Arrow diagonal={Boolean(primaryCtaUrl)} />
-              </a>
-              <a className="button button-ghost" href="#recursos">
-                Ver o que ela faz
-                <Arrow />
-              </a>
-            </div>
-
-            <ul
-              className="trust-list reveal reveal-5"
-              aria-label="Compromissos da Corneta"
-            >
-              <li>
-                <Check /> Sem marca-d&apos;água
-              </li>
-              <li>
-                <Check /> Sem limite artificial
-              </li>
-              <li>
-                <Check /> Seus dados ficam seus
-              </li>
-            </ul>
-          </div>
-
-          <div className="relative reveal reveal-3 lg:pl-5">
-            <div className="burst-label" aria-hidden="true">
-              <span>FEITO</span>
-              <span>NO BRASIL</span>
-            </div>
-            <div className="preview-tilt">
+            <div className="hero-stage">
               <ProductPreview />
             </div>
-            <div className="signal-lines" aria-hidden="true">
-              <i />
-              <i />
-              <i />
+
+            <div className="download-dock">
+              <DownloadButton />
+              <p>Windows 10/11 · sem cadastro · núcleo local sem assinatura</p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <div
-        className="platform-ticker"
-        aria-label={`Plataformas: ${platforms.join(", ")}`}
-      >
-        <div className="ticker-track" aria-hidden="true">
-          {[...platforms, ...platforms].map((platform, index) => (
-            <span key={`${platform}-${index}`}>
-              {platform}
-              <b>●</b>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <section className="section bg-paper text-ink">
-        <div className="shell">
-          <div className="section-kicker">O PROBLEMA</div>
-          <div className="grid gap-10 lg:grid-cols-[.9fr_1.1fr] lg:gap-24">
-            <h2 className="section-title max-w-[12ch]">
-              SUA LIVE NÃO PRECISA VIRAR UMA{" "}
-              <span className="marker">OPERAÇÃO DE GUERRA.</span>
-            </h2>
-            <div className="self-end">
-              <p className="lede">
-                Uma janela para cada chat. Uma regra de vídeo para cada
-                plataforma. Chaves espalhadas. E aquela dúvida:{" "}
-                <em>“está no ar mesmo?”</em>
-              </p>
-              <p className="mt-6 max-w-2xl text-base leading-relaxed text-ink/65 md:text-lg">
-                A Corneta organiza o caminho entre o OBS e o público. Você
-                continua criando; ela cuida da distribuição, do sinal e dos
-                sinais de problema.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="recursos" className="section bg-ink text-cream">
-        <div className="shell">
-          <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+        <section className="mechanism-strip" aria-label="Como a Corneta funciona">
+          <div className="shell mechanism-grid">
             <div>
-              <div className="section-kicker section-kicker-dark">
-                O QUE ENTRA NA BANCADA
-              </div>
-              <h2 className="section-title max-w-[13ch]">
-                MENOS PAINÉIS. MAIS CONTROLE.
-              </h2>
+              <strong>1 sinal</strong>
+              <span>saindo do OBS</span>
             </div>
-            <p className="max-w-sm text-base leading-relaxed text-cream/60">
-              Tudo conversa no mesmo app e cada parte continua independente: uma
-              plataforma cair não precisa levar as outras junto.
-            </p>
+            <i aria-hidden="true" />
+            <div>
+              <strong>Saídas independentes</strong>
+              <span>uma queda não precisa levar as outras</span>
+            </div>
+            <i aria-hidden="true" />
+            <div>
+              <strong>Tudo no seu PC</strong>
+              <span>chaves, configurações e relatórios</span>
+            </div>
           </div>
+        </section>
 
-          <div className="feature-grid">
-            {features.map((feature) => (
-              <article
-                key={feature.number}
-                className={`feature-card feature-${feature.accent} ${feature.size === "wide" ? "feature-wide" : ""}`}
-              >
-                <span className="feature-number">{feature.number}</span>
-                <div>
-                  <h3>{feature.title}</h3>
-                  <p>{feature.body}</p>
+        <section id="por-que" className="section section-paper">
+          <div className="shell">
+            <div className="section-heading section-heading-centered">
+              <span className="kicker">Feita para a rotina de quem faz live</span>
+              <h2>Você cuida do conteúdo. A Corneta cuida do caminho.</h2>
+              <p>
+                Menos janela para vigiar, menos susto no meio da transmissão e
+                mais tempo para falar com quem está assistindo.
+              </p>
+            </div>
+
+            <div className="benefit-flow">
+              <article className="benefit-row">
+                <div className="benefit-copy">
+                  <span className="benefit-icon">
+                    <RadioIcon />
+                  </span>
+                  <div>
+                    <h3>Chegue em mais lugares sem perder o controle</h3>
+                    <p>
+                      Escolha os destinos e acompanhe cada um separadamente. Se
+                      uma plataforma precisar reconectar, as outras continuam no
+                      ar — e você vê isso acontecendo, sem adivinhar.
+                    </p>
+                    <span className="benefit-note">
+                      <Mascot /> Cada saída tem seu próprio interruptor
+                    </span>
+                  </div>
+                </div>
+
+                <div className="demo-panel">
+                  <div className="demo-label">
+                    <span>destinos</span>
+                    <span>prévia ilustrativa</span>
+                  </div>
+                  <div className="route">
+                    <span className="route-source">
+                      <ObsMark />
+                      OBS
+                    </span>
+                    <span className="route-fan" aria-hidden="true">
+                      <svg viewBox="0 0 34 140" preserveAspectRatio="none">
+                        <path d="M0 70H12V25H34" />
+                        <path d="M0 70H34" />
+                        <path d="M0 70H12V115H34" />
+                      </svg>
+                    </span>
+                    <div className="route-list">
+                      <div className="route-row">
+                        <PlatformGlyph id="twitch" />
+                        Twitch
+                        <span className="state">
+                          <i /> no ar
+                        </span>
+                      </div>
+                      <div className="route-row">
+                        <PlatformGlyph id="youtube" />
+                        YouTube
+                        <span className="state">
+                          <i /> no ar
+                        </span>
+                      </div>
+                      <div className="route-row route-row-down">
+                        <PlatformGlyph id="kick" />
+                        Kick
+                        <span className="state state-warn">
+                          <i /> reconectando
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </article>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      <section id="manifesto" className="manifesto-section">
-        <div className="manifesto-rays" aria-hidden="true" />
-        <div className="shell relative z-10 grid gap-10 lg:grid-cols-[.7fr_1.3fr] lg:items-center">
-          <div className="manifesto-stamp">
-            <BrandMark showName={false} />
-            <span>COMBINADO</span>
-          </div>
-          <div>
-            <div className="section-kicker">SEM LETRINHA MIÚDA</div>
-            <h2 className="manifesto-title">
-              O QUE RODA NA SUA MÁQUINA É <span>GRÁTIS.</span> PRA SEMPRE.
-            </h2>
-            <p>
-              Multistream, chat, alertas, relatórios e proteção local não viram
-              assinatura depois. Se um dia existir recurso pago, será porque
-              existe servidor nosso trabalhando por você — e ele será opcional.
-            </p>
-          </div>
-        </div>
-      </section>
+              <article className="benefit-row benefit-row-brass">
+                <div className="benefit-copy">
+                  <span className="benefit-icon">
+                    <ChatIcon />
+                  </span>
+                  <div>
+                    <h3>Converse com todo mundo sem malabarismo</h3>
+                    <p>
+                      Chat, alertas e público aparecem juntos. Você acompanha a
+                      comunidade sem pular entre várias janelas — e responde de
+                      um lugar só.
+                    </p>
+                    <span className="benefit-note">
+                      <Mascot /> Twitch, YouTube e Kick na mesma coluna
+                    </span>
+                  </div>
+                </div>
 
-      <section id="como-funciona" className="section bg-paper text-ink">
-        <div className="shell">
-          <div className="section-kicker">DO OBS AO PÚBLICO</div>
-          <div className="grid gap-8 lg:grid-cols-[.72fr_1.28fr] lg:gap-20">
-            <div>
-              <h2 className="section-title max-w-[10ch]">
-                TRÊS PASSOS. ZERO TERMINAL.
-              </h2>
-              <p className="mt-6 max-w-sm text-base leading-relaxed text-ink/60">
-                Nada de Docker, arquivo de configuração ou URL RTMP decorada. A
-                complexidade continua existindo — só não cai no seu colo.
+                <div className="demo-panel">
+                  <div className="demo-label">
+                    <span>chat reunido</span>
+                    <span>prévia ilustrativa</span>
+                  </div>
+                  <div className="chat-demo">
+                    <div className="chat-line">
+                      <PlatformGlyph id="twitch" />
+                      <div>
+                        <strong>gabizera · Twitch</strong>
+                        <p>salve salve, chegando!</p>
+                      </div>
+                    </div>
+                    <div className="chat-line">
+                      <PlatformGlyph id="youtube" />
+                      <div>
+                        <strong>Marcos L. · YouTube</strong>
+                        <p>áudio tá limpo hoje 👏</p>
+                      </div>
+                    </div>
+                    <div className="chat-line">
+                      <PlatformGlyph id="kick" />
+                      <div>
+                        <strong>duduxx · Kick</strong>
+                        <p>bora cornetar!!</p>
+                      </div>
+                    </div>
+                    <div className="chat-compose">
+                      Responde de uma vez…
+                      <b>enviar</b>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="qualidade" className="section section-dark">
+          <div className="shell">
+            <div className="mode-layout">
+              <div className="section-heading">
+                <span className="kicker kicker-light">Quanto capricho na imagem</span>
+                <h2>Uma imagem pra todas ou uma pra cada. Sem adivinhar o preço.</h2>
+                <p>
+                  Copiar o sinal do OBS é leve; recodificar dá a melhor imagem em
+                  cada plataforma e pesa mais. A Corneta faz essa conta na sua
+                  frente — upload somado, recodificações e carga estimada — antes
+                  de você entrar ao vivo. Veja o que cada modo do app faz com os
+                  seus destinos:
+                </p>
+              </div>
+
+              <QualityDesk />
+            </div>
+
+            <div className="vertical-layout">
+              <VerticalCopy />
+              <VerticalCrop />
+            </div>
+          </div>
+        </section>
+
+        <section className="section section-paper section-paper-raised">
+          <div className="shell">
+            <div className="section-heading">
+              <span className="kicker">Um app para a live inteira</span>
+              <h2>Antes, durante e depois. Sem trocar de bancada.</h2>
+            </div>
+
+            <div className="journey journey-ink">
+              <article className="journey-row">
+                <div className="journey-label">
+                  <span className="sticker">Antes da live</span>
+                  <h3>Prepare sem medo de esquecer alguma coisa.</h3>
+                </div>
+                <div className="journey-copy">
+                  <p>
+                    Conecte as plataformas, meça seu upload e deixe o OBS pronto
+                    com poucos cliques — a Corneta consegue configurar o OBS
+                    sozinha e até dar play nele quando você aperta o BORA.
+                  </p>
+                  <ul className="checklist checklist-ink">
+                    <li>
+                      <CheckIcon /> Teste de upload de verdade
+                    </li>
+                    <li>
+                      <CheckIcon /> Configuração guiada do OBS
+                    </li>
+                    <li>
+                      <CheckIcon /> Checklist da primeira live
+                    </li>
+                  </ul>
+                </div>
+                <div className="stat-panel">
+                  <span>seu upload · prévia</span>
+                  <div className="bars" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                  <strong>25 Mb/s</strong>
+                  <small>dá pros quatro destinos com folga</small>
+                </div>
+              </article>
+
+              <article className="journey-row journey-row-wide">
+                <div className="journey-label">
+                  <span className="sticker sticker-tomate">Durante a live</span>
+                  <h3>Veja o que importa sem sair do seu conteúdo.</h3>
+                  <p>
+                    Bitrate, fps, quadros perdidos e tempo no ar de cada destino,
+                    mais CPU e placa reais. Pause um destino sem encerrar os
+                    outros; quem cair volta sozinho.
+                  </p>
+                </div>
+                <LiveRoom />
+              </article>
+
+              <article className="journey-row journey-row-wide">
+                <div className="journey-label">
+                  <span className="sticker">Depois da live</span>
+                  <h3>Entenda o que aconteceu e melhore a próxima.</h3>
+                  <p>
+                    O relatório fica no seu PC e junta audiência, taxa de chat,
+                    alertas, momentos marcados e os trechos em que o sinal
+                    sofreu — com um veredito honesto no fim.
+                  </p>
+                </div>
+                <ReportChart />
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="chat" className="section section-dark">
+          <div className="shell">
+            <div className="hub-layout">
+              <div className="section-heading">
+                <span className="kicker kicker-light">A galera junta</span>
+                <h2>O chat de todas, os alertas de todas — e um overlay pronto.</h2>
+                <p>
+                  Ler, responder e moderar sem trocar de janela; os alertas das
+                  plataformas e dos agregadores no mesmo painel; e um overlay
+                  local que você cola no OBS uma vez e esquece.
+                </p>
+              </div>
+
+              <ChatHub />
+            </div>
+          </div>
+        </section>
+
+        <section id="protecao" className="section section-paper">
+          <div className="shell">
+            <div className="section-heading">
+              <span className="kicker">Rede de proteção</span>
+              <h2>Quando algo dá errado, a live não precisa morrer.</h2>
+              <p>
+                Quatro redes que você liga (ou não) nas Configurações. Cada uma
+                tem um custo — e a Corneta conta ele antes, não no meio da live.
               </p>
+            </div>
+
+            <div className="benefit-flow">
+              <article className="benefit-row">
+                <div className="benefit-copy">
+                  <span className="benefit-icon">
+                    <ShieldIcon />
+                  </span>
+                  <div>
+                    <h3>“JÁ VOLTO”: o sinal cai, a live continua</h3>
+                    <p>
+                      Se o OBS cair no meio da transmissão, esta tela entra no ar
+                      sem derrubar as plataformas — pro espectador a live nem
+                      pisca, e volta sozinha quando o sinal retorna. Também serve
+                      pra pausa manual: um clique e você sai da cadeira com o
+                      microfone mudo.
+                    </p>
+                    <span className="benefit-note">
+                      <InfoIcon /> Use o slate da Corneta ou a sua imagem ou vídeo
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="brb-slate"
+                  aria-label="Tela JÁ VOLTO que a Corneta coloca no ar"
+                >
+                  <small>CORNETA · MULTI-STREAM</small>
+                  <strong>JÁ VOLTO</strong>
+                  <p>já já tô de volta — segura a corneta 📣</p>
+                </div>
+              </article>
+            </div>
+
+            <div className="guard-grid guard-grid-3">
+              <div className="guard">
+                <div className="guard-head">
+                  <i>
+                    <GaugeIcon />
+                  </i>
+                  <h3>Auto-bitrate</h3>
+                </div>
+                <p>
+                  Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo
+                  por um tempo em vez de deixar a live travar ou cair — e volta ao
+                  normal sozinha.
+                </p>
+                <span className="guard-cost">
+                  <InfoIcon /> Age nos destinos que estão recodificando; quem vai
+                  na cópia sai do jeito que o OBS mandou.
+                </span>
+                <span className="guard-switch">
+                  <span className="app-toggle" aria-hidden="true">
+                    <i />
+                  </span>
+                  ligado por padrão
+                </span>
+              </div>
+
+              <div className="guard">
+                <div className="guard-head">
+                  <i>
+                    <LockIcon />
+                  </i>
+                  <h3>Guardião de privacidade</h3>
+                </div>
+                <p>
+                  Você lista os termos que não podem vazar — e-mail, nome real,
+                  endereço. Se um deles aparece na tela, a Corneta corta pro “JÁ
+                  VOLTO” antes de ir ao ar.
+                </p>
+                <span className="guard-cost">
+                  <InfoIcon /> Custa 12s de atraso na live inteira (o chat
+                  também). Rede de segurança, não garantia.
+                </span>
+                <span className="guard-switch">
+                  <span className="sticker sticker-tomate guard-sticker">
+                    experimental
+                  </span>
+                </span>
+              </div>
+
+              <div className="guard">
+                <div className="guard-head">
+                  <i>
+                    <VolumeIcon />
+                  </i>
+                  <h3>Normalizador de áudio</h3>
+                </div>
+                <p>
+                  A Corneta acerta o volume do seu som antes de enviar — sem “tá
+                  baixo” do chat nem estouro na troca de cena, no mesmo encode que
+                  já estava rodando.
+                </p>
+                <span className="guard-cost">
+                  <InfoIcon /> Se você já normaliza no OBS, deixe desligado pra
+                  não brigar com ele.
+                </span>
+                <span className="guard-switch">
+                  <span className="app-toggle app-toggle-off" aria-hidden="true">
+                    <i />
+                  </span>
+                  opcional
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="como-funciona" className="section section-paper section-paper-raised">
+          <div className="shell how-layout">
+            <div className="section-heading">
+              <span className="kicker">Do OBS para o público</span>
+              <h2>Você entra ao vivo em três passos.</h2>
+              <p>Sem terminal, sem Docker, sem endereço de servidor para decorar.</p>
             </div>
 
             <ol className="steps">
               <li>
-                <span>1</span>
+                <b>1</b>
                 <div>
-                  <h3>Escolha onde quer aparecer.</h3>
+                  <h3>Escolha onde quer aparecer</h3>
                   <p>
-                    Adicione as plataformas e guarde cada chave no cofre do
-                    sistema.
+                    A Corneta abre a página certa de cada plataforma pra você
+                    copiar a chave, e guarda ela no cofre do Windows — nunca no
+                    arquivo de configuração.
                   </p>
                 </div>
               </li>
               <li>
-                <span>2</span>
+                <b>2</b>
                 <div>
-                  <h3>Conecte o OBS.</h3>
+                  <h3>Conecte o OBS</h3>
                   <p>
-                    A Corneta configura automaticamente ou mostra o caminho,
-                    passo a passo.
+                    Deixe a Corneta configurar pra você pelo obs-websocket ou siga
+                    o passo a passo com os valores prontos pra colar.
                   </p>
                 </div>
               </li>
               <li>
-                <span>3</span>
+                <b>3</b>
                 <div>
-                  <h3>Aperte BORA AO VIVO.</h3>
+                  <h3>Aperte o botão</h3>
                   <p>
-                    Veja sinal, bitrate, público, alertas e reconexões numa
-                    central só.
+                    Acompanhe cada destino e continue cuidando do conteúdo. Se
+                    quiser, a Corneta manda o OBS começar a transmitir junto.
                   </p>
+                  <em>
+                    <RadioIcon /> BORA AO VIVO
+                  </em>
                 </div>
               </li>
             </ol>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="section border-y-4 border-ink bg-cream text-ink">
-        <div className="shell grid gap-8 lg:grid-cols-2 lg:gap-0">
-          <div className="honesty-panel lg:pr-16">
-            <span className="honesty-label">POR QUE LOCAL?</span>
-            <h2>Mais privacidade. Menos dependência.</h2>
-            <p>
-              Seu vídeo e suas chaves não precisam passear por um servidor de
-              terceiros. A Corneta usa a máquina que já está transmitindo e
-              mantém o núcleo útil mesmo sem uma assinatura.
-            </p>
-          </div>
-          <div className="honesty-panel honesty-caveat lg:border-l-4 lg:border-ink lg:pl-16">
-            <span className="honesty-label">A CONTA HONESTA</span>
-            <h2>Cada destino usa upload.</h2>
-            <p>
-              Multistream local economiza mensalidade, não banda. Antes de
-              entrar no ar, a Corneta soma os bitrates e avisa se a sua conexão
-              aguenta — para a surpresa não chegar no meio da live.
-            </p>
-          </div>
-        </div>
-      </section>
+        <section className="section section-dark">
+          <div className="shell local-layout">
+            <div className="local-main">
+              <span className="kicker kicker-light">Local de verdade</span>
+              <h2>
+                Sem mensalidade de restream. Sem mandar suas chaves para a nossa
+                nuvem.
+              </h2>
+              <p>
+                O trabalho pesado acontece na máquina que já está transmitindo.
+                Configurações, chaves e relatórios continuam com você — e o
+                overlay do OBS é um servidor que só responde no seu computador.
+              </p>
+              <ul className="checklist">
+                <li>
+                  <CheckIcon /> Núcleo local grátis
+                </li>
+                <li>
+                  <CheckIcon /> Código aberto com licença MIT
+                </li>
+                <li>
+                  <CheckIcon /> Chaves no cofre do sistema
+                </li>
+                <li>
+                  <CheckIcon /> Sem marca-d&apos;água
+                </li>
+              </ul>
+            </div>
 
-      <section id="duvidas" className="section bg-paper text-ink">
-        <div className="shell grid gap-12 lg:grid-cols-[.72fr_1.28fr] lg:gap-20">
-          <div>
-            <div className="section-kicker">SEM ENROLAÇÃO</div>
-            <h2 className="section-title max-w-[9ch]">
-              PERGUNTAS QUE IMPORTAM.
-            </h2>
+            <aside className="honest-note">
+              <span>
+                <Mascot /> A conta honesta
+              </span>
+              <h3>Cada destino usa upload.</h3>
+              <p>
+                E recodificar pode usar GPU ou CPU. A Corneta mede sua conexão,
+                soma os bitrates e mostra essa conta antes da live — não no meio
+                dela.
+              </p>
+            </aside>
           </div>
-          <div className="faq-list">
-            {faqs.map((faq, index) => (
-              <details key={faq.question} open={index === 0}>
-                <summary>
-                  <span>{faq.question}</span>
-                  <i aria-hidden="true" />
-                </summary>
-                <p>{faq.answer}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="final-cta">
-        <div className="final-cta-word" aria-hidden="true">
-          CORNETA
+        <section id="plataformas" className="section section-paper">
+          <div className="shell platforms-layout">
+            <div className="section-heading">
+              <span className="kicker">Do seu canal para todo lugar</span>
+              <h2>Leve sua live para as plataformas que fazem sentido para você.</h2>
+              <p>
+                Comece com seus destinos principais e adicione outros quando
+                quiser. Somos honestos sobre o que já foi testado ao vivo e o que
+                ainda não.
+              </p>
+            </div>
+
+            <div className="platform-board">
+              <div className="platform-group">
+                <div className="platform-group-label">
+                  <span>Validado ao vivo</span>
+                  <span className="chip chip-ok">testado</span>
+                </div>
+                <div className="platform-chips">
+                  <span className="platform-chip">
+                    <PlatformGlyph id="twitch" />
+                    Twitch
+                  </span>
+                </div>
+                <p>Destino testado em transmissão real.</p>
+              </div>
+
+              <div className="platform-group">
+                <div className="platform-group-label">
+                  <span>Disponível no app</span>
+                </div>
+                <div className="platform-chips">
+                  {(
+                    [
+                      ["youtube", "YouTube"],
+                      ["kick", "Kick"],
+                      ["facebook", "Facebook"],
+                      ["custom", "RTMP personalizado"],
+                    ] as const
+                  ).map(([id, name]) => (
+                    <span className="platform-chip" key={name}>
+                      <PlatformGlyph id={id} />
+                      {name}
+                    </span>
+                  ))}
+                </div>
+                <p>
+                  Integrações prontas no app, com validação pública pendente. No
+                  YouTube, a Corneta ainda cria a transmissão e injeta a chave
+                  sozinha.
+                </p>
+              </div>
+
+              <div className="platform-group platform-group-experimental">
+                <div className="platform-group-label">
+                  <span>Experimental</span>
+                  <span className="chip chip-warn">pode falhar</span>
+                </div>
+                <div className="platform-chips">
+                  {(
+                    [
+                      ["tiktok", "TikTok"],
+                      ["instagram", "Instagram"],
+                      ["x", "X (Twitter)"],
+                    ] as const
+                  ).map(([id, name]) => (
+                    <span className="platform-chip" key={name}>
+                      <PlatformGlyph id={id} />
+                      {name}
+                    </span>
+                  ))}
+                </div>
+                <p>Dependem de liberações e fluxos das próprias plataformas.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section section-dark">
+          <div className="shell">
+            <div className="section-heading">
+              <span className="kicker kicker-light">Miudezas que salvam a live</span>
+              <h2>O resto do cuidado, que só aparece quando você usa.</h2>
+            </div>
+
+            <div className="tiny-grid">
+              {tinyThings.map((item) => (
+                <div className="tiny" key={item.title}>
+                  <i>{item.icon}</i>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="duvidas" className="section section-paper section-paper-raised">
+          <div className="shell faq-layout">
+            <div className="section-heading">
+              <span className="kicker">Antes de baixar</span>
+              <h2>Dúvidas que vale resolver agora.</h2>
+              <p>Sem letrinha miúda aparecendo depois que você instalou.</p>
+            </div>
+
+            <div className="faq-list">
+              {faqs.map((faq, index) => (
+                <details key={faq.question} open={index === 0}>
+                  <summary>
+                    <span>{faq.question}</span>
+                    <i aria-hidden="true" />
+                  </summary>
+                  <p>{faq.answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <div className="ticker" aria-hidden="true">
+          <div className="ticker-track">
+            <TickerRow />
+            <TickerRow />
+          </div>
         </div>
-        <div className="shell relative z-10 text-center">
-          <BrandMark className="justify-center" />
-          <h2>UMA LIVE BOA MERECE CHEGAR LONGE.</h2>
-          <p>
-            A Corneta ainda está afinando o instalador. Enquanto isso, conheça o
-            projeto e acompanhe a evolução sem promessa vazia.
-          </p>
-          <a className="button button-light" href={primaryCta.href}>
-            {primaryCta.label}
-            <Arrow diagonal={Boolean(primaryCtaUrl)} />
-          </a>
-        </div>
-      </section>
+
+        <section className="final-cta">
+          <SoundWaves className="final-waves" />
+          <div className="shell final-cta-inner">
+            <div>
+              <span className="final-mascot" aria-hidden="true">
+                <Mascot />
+              </span>
+              <h2>Baixe, conecte o OBS e faça sua live chegar mais longe.</h2>
+            </div>
+            <div className="final-cta-actions">
+              <DownloadButton />
+              <p>Windows 10/11 · sem cadastro · núcleo local sem assinatura</p>
+            </div>
+          </div>
+        </section>
+      </main>
 
       <footer className="site-footer">
-        <div className="shell flex flex-col gap-6 py-9 md:flex-row md:items-center md:justify-between">
+        <div className="shell footer-inner">
           <BrandMark />
-          <p>
-            Multistream local para quem quer criar, não configurar servidor.
-          </p>
-          <span>EM DESENVOLVIMENTO · WINDOWS-FIRST</span>
+          <p>Multistream local para quem quer criar, não manter servidor.</p>
+          <a
+            className="footer-link"
+            href={downloadUrl}
+            data-placeholder-link="replace-me"
+          >
+            Baixar para Windows <ArrowIcon />
+          </a>
         </div>
       </footer>
-    </main>
+    </>
   );
 }
