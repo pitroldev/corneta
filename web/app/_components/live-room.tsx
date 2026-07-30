@@ -73,8 +73,7 @@ export function LiveRoom() {
           31%
         </span>
         <span className="meter">
-          <EyeIcon />
-          1 284 assistindo
+          <EyeIcon />1 284 assistindo
         </span>
       </div>
     </div>

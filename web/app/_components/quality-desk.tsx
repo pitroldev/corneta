@@ -1,4 +1,5 @@
 import { PlatformGlyph } from "./decor";
+import { Switch } from "./switch";
 import { CheckIcon, CropIcon, InfoIcon } from "./icons";
 
 // Mesa de qualidade: os três modos do app ("Na lata", "Esperto", "Caprichado")
@@ -19,7 +20,6 @@ type Row = {
 const MODES = [
   {
     id: "lata",
-    input: "mode-lata",
     title: "Na lata",
     tag: "Mais leve",
     lead: "A mesma imagem vai pra todas as plataformas, no mesmo padrão.",
@@ -61,7 +61,6 @@ const MODES = [
   },
   {
     id: "esperto",
-    input: "mode-esperto",
     title: "Esperto",
     tag: "Recomendado",
     lead: "Ajusta cada plataforma só onde precisa. Decide sozinho.",
@@ -102,7 +101,6 @@ const MODES = [
   },
   {
     id: "caprichado",
-    input: "mode-caprichado",
     title: "Caprichado",
     tag: "Máx. qualidade",
     lead: "Melhor imagem possível pra cada plataforma, mas é o mais pesado.",
@@ -142,104 +140,65 @@ const MODES = [
 
 export function QualityDesk() {
   return (
-    <div className="switch">
-      <input type="radio" name="modo" id="mode-lata" defaultChecked />
-      <input type="radio" name="modo" id="mode-esperto" />
-      <input type="radio" name="modo" id="mode-caprichado" />
-
-      <div className="switch-tabs" role="group" aria-label="Modos de qualidade">
-        {MODES.map((mode) => (
-          <label className="switch-tab" htmlFor={mode.input} key={mode.id}>
-            <strong>{mode.title}</strong>
-            <em>{mode.tag}</em>
-          </label>
-        ))}
-      </div>
-
-      <div className="switch-panels">
-        {MODES.map((mode) => (
-          <div className="switch-panel" data-panel={mode.id} key={mode.id}>
-            <p className="mode-lead">{mode.lead}</p>
-
-            <div className="mode-board">
-              <div className="demo-label">
-                <span>4 plataformas ligadas</span>
-                <span>estimativa do app</span>
-              </div>
-
-              <div className="mode-rows">
-                {mode.rows.map((row) => (
-                  <div className="mode-row" key={row.id}>
-                    <PlatformGlyph id={row.id} />
-                    <div>
-                      <strong>{row.name}</strong>
-                      <small>{row.detail}</small>
-                    </div>
-                    <span
-                      className={`tag${row.tone === "copy" ? " tag-copy" : ""}${row.tone === "warn" ? " tag-warn" : ""}`}
-                    >
-                      {row.tag}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mode-summary">
-                <div>
-                  <span>upload somado</span>
-                  <strong>{mode.upload}</strong>
-                </div>
-                <div>
-                  <span>conversões</span>
-                  <strong>{mode.encodes}</strong>
-                </div>
-                <div>
-                  <span>carga estimada</span>
-                  <strong>{mode.load}</strong>
-                </div>
-              </div>
-            </div>
-
-            <p className="mode-verdict">
-              <InfoIcon />
-              {mode.verdict}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
+    <Switch
+      label="Modos de qualidade"
+      items={MODES.map((mode) => ({
+        id: mode.id,
+        title: mode.title,
+        hint: mode.tag,
+        panel: <ModePanel mode={mode} />,
+      }))}
+    />
   );
 }
 
-export function VerticalCrop() {
+function ModePanel({ mode }: { mode: (typeof MODES)[number] }) {
   return (
-    <div className="switch">
-      <input type="radio" name="crop" id="crop-esq" />
-      <input type="radio" name="crop" id="crop-meio" defaultChecked />
-      <input type="radio" name="crop" id="crop-dir" />
+    <div>
+      <p className="mode-lead">{mode.lead}</p>
 
-      <div className="vframe">
-        <span className="vframe-label">seu sinal do OBS · 1920×1080</span>
-        <div className="vcrop">
-          <span>720×1280</span>
+      <div className="mode-board">
+        <div className="demo-label">
+          <span>4 plataformas ligadas</span>
+          <span>estimativa do app</span>
         </div>
-        <label className="vpick vpick-esq" htmlFor="crop-esq">
-          <span className="sr-only">Enquadrar à esquerda</span>
-        </label>
-        <label className="vpick vpick-meio" htmlFor="crop-meio">
-          <span className="sr-only">Enquadrar no centro</span>
-        </label>
-        <label className="vpick vpick-dir" htmlFor="crop-dir">
-          <span className="sr-only">Enquadrar à direita</span>
-        </label>
+
+        <div className="mode-rows">
+          {mode.rows.map((row) => (
+            <div className="mode-row" key={row.id}>
+              <PlatformGlyph id={row.id} />
+              <div>
+                <strong>{row.name}</strong>
+                <small>{row.detail}</small>
+              </div>
+              <span
+                className={`tag${row.tone === "copy" ? " tag-copy" : ""}${row.tone === "warn" ? " tag-warn" : ""}`}
+              >
+                {row.tag}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mode-summary">
+          <div>
+            <span>upload somado</span>
+            <strong>{mode.upload}</strong>
+          </div>
+          <div>
+            <span>conversões</span>
+            <strong>{mode.encodes}</strong>
+          </div>
+          <div>
+            <span>carga estimada</span>
+            <strong>{mode.load}</strong>
+          </div>
+        </div>
       </div>
 
-      <p className="vhint">
-        <CropIcon />
-        <span>
-          Escolha um lado do quadro: é assim que você define{" "}
-          <b>o que vai pro vertical</b>.
-        </span>
+      <p className="mode-verdict">
+        <InfoIcon />
+        {mode.verdict}
       </p>
     </div>
   );

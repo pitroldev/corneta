@@ -4,9 +4,21 @@
 /** Mascote: o megafone. Herda a cor via currentColor. */
 export function Mascot({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
       <path d="M3.4 9.1 L13 5.9 V18.1 L3.4 14.9 Z" fill="currentColor" />
-      <rect x="4.7" y="13.9" width="2.5" height="4.6" rx="1.1" fill="currentColor" />
+      <rect
+        x="4.7"
+        y="13.9"
+        width="2.5"
+        height="4.6"
+        rx="1.1"
+        fill="currentColor"
+      />
       <path
         d="M15.6 8.4a5 5 0 0 1 0 7.2"
         stroke="currentColor"
@@ -35,7 +47,12 @@ export function SoundWaves({
   const cy = 100;
   const a = (52 * Math.PI) / 180;
   return (
-    <svg viewBox="0 0 200 200" className={className} fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 200 200"
+      className={className}
+      fill="none"
+      aria-hidden="true"
+    >
       {Array.from({ length: count }).map((_, i) => {
         const r = 32 + i * 30;
         const x1 = (cx + r * Math.cos(-a)).toFixed(1);
@@ -100,9 +117,18 @@ const COLORS: Record<PlatformId, string> = {
 const DARK_INK = new Set<PlatformId>(["kick", "tiktok", "custom"]);
 
 /** Chip quadrado com o logo oficial da plataforma (app: PlatformGlyph). */
+// O tamanho NÃO vem daqui de propósito: cada contexto define o seu. O que é
+// fixo é o quadrado com canto seco, sombra dura e o SVG a 56% — o mesmo do app.
+//
+// O `glyph` solto no fim é um MARCADOR, não estilo: regras de pai ainda não
+// migradas (`.route-row .glyph`, `.chat-line .glyph`) dimensionam por ele. Sai
+// quando esses pais virarem utilitário.
+const GLYPH =
+  "grid place-items-center rounded-sm shadow-pop-sm [&>svg]:h-[56%] [&>svg]:w-[56%] [&>svg]:fill-current glyph";
+
 export function PlatformGlyph({
   id,
-  className = "glyph",
+  className = GLYPH,
 }: {
   id: PlatformId;
   className?: string;

@@ -15,14 +15,34 @@ const nav = [
 // Modo "Esperto" com três destinos deitados: todos recebem a cópia do OBS no
 // menor bitrate da lista (6000). A soma bate com src/lib/estimates.ts.
 const targets = [
-  { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps", quality: "Cópia" },
-  { id: "youtube", name: "YouTube", detail: "1080p60 · 6000 kbps", quality: "Cópia" },
+  {
+    id: "twitch",
+    name: "Twitch",
+    detail: "1080p60 · 6000 kbps",
+    quality: "Cópia",
+  },
+  {
+    id: "youtube",
+    name: "YouTube",
+    detail: "1080p60 · 6000 kbps",
+    quality: "Cópia",
+  },
   { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps", quality: "Cópia" },
 ] as const;
 
 const chat = [
-  { id: "twitch", who: "Twitch", from: "gabizera", text: "salve salve, chegando!" },
-  { id: "youtube", who: "YouTube", from: "Marcos L.", text: "áudio tá limpo hoje 👏" },
+  {
+    id: "twitch",
+    who: "Twitch",
+    from: "gabizera",
+    text: "salve salve, chegando!",
+  },
+  {
+    id: "youtube",
+    who: "YouTube",
+    from: "Marcos L.",
+    text: "áudio tá limpo hoje 👏",
+  },
   { id: "kick", who: "Kick", from: "duduxx", text: "bora cornetar!!" },
 ] as const;
 
@@ -71,8 +91,9 @@ export function ProductPreview() {
     <figure className="app-window">
       <figcaption className="sr-only">
         Prévia ilustrativa do app da Corneta na tela “Ao vivo”: o sinal do OBS
-        sai para Twitch, YouTube e Kick, cada destino com sua própria qualidade e
-        seu próprio interruptor, com o chat das três plataformas reunido ao lado.
+        sai para Twitch, YouTube e Kick, cada destino com sua própria qualidade
+        e seu próprio interruptor, com o chat das três plataformas reunido ao
+        lado.
       </figcaption>
 
       <div className="app-titlebar">

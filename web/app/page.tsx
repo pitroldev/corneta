@@ -33,11 +33,8 @@ import {
 } from "./_components/icons";
 import { LiveRoom, ReportChart } from "./_components/live-room";
 import { ProductPreview } from "./_components/product-preview";
-import {
-  QualityDesk,
-  VerticalCopy,
-  VerticalCrop,
-} from "./_components/quality-desk";
+import { QualityDesk, VerticalCopy } from "./_components/quality-desk";
+import { VerticalCrop } from "./_components/crop-picker";
 
 // Placeholder: substitua pela URL real do instalador ou da release.
 const downloadUrl =

@@ -3,3 +3,6 @@
 out/
 .vercel/
 *.tsbuildinfo
+
+# capturas do scripts/shot.mjs (comparação visual, não é fonte)
+.shots/
