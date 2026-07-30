@@ -27,15 +27,17 @@ bloqueada pelos gates manuais de assinatura, conformidade GPL e matriz real de p
 
 ## Rodando
 
-### Landing page (Next.js)
+### Web: site público + setup API (Next.js)
 
-A página pública fica isolada em `landing/`, com Next.js App Router, React Server Components e
-Tailwind CSS. Ela não interfere no bundle do aplicativo desktop.
+Tudo da Corneta que roda fora do PC do streamer fica em `web/`: a página pública, as páginas
+legais e a **setup API** (`/api/v1/*`) que entrega os Client IDs e faz o exchange/refresh do
+OAuth da Kick. Next.js App Router com React Server Components e Tailwind CSS, isolado do bundle
+do aplicativo desktop.
 
 ```bash
 pnpm install
-pnpm lp:dev       # abre http://localhost:3000
-pnpm lp:check     # lint + tipos + build de produção
+pnpm web:dev       # site + API em http://localhost:7390
+pnpm web:check     # lint + tipos + build de produção
 ```
 
 Defina `NEXT_PUBLIC_SITE_URL` no deploy. Quando houver um instalador ou página de release pública,

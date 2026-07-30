@@ -213,7 +213,8 @@ capturando quem confia ou procura naturalmente um `.com`.
 Arquitetura sugerida:
 
 ```text
-corneta.live                 landing page e domínio canônico
+corneta.live                 site público, páginas legais e domínio canônico
+corneta.live/api/v1          setup API (bootstrap + broker OAuth da Kick)
 usecorneta.com               redirecionamento 301
 corneta.live/download        releases e instaladores
 docs.corneta.live            documentação de usuário

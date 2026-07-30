@@ -1,13 +1,22 @@
-# Landing page da Corneta
+# Web da Corneta
 
-LP pública em Next.js 16, React Server Components e Tailwind CSS 4. O HTML principal é renderizado
-no servidor e a página não envia JavaScript de interação desnecessário ao navegador.
+A parte da Corneta que roda fora do PC do streamer, em Next.js 16, React Server Components e
+Tailwind CSS 4. São duas coisas no mesmo app:
+
+- **Site público** — a página de apresentação e as páginas legais. O HTML é renderizado no
+  servidor e a página não envia JavaScript de interação ao navegador: as demonstrações
+  interativas são radio + CSS.
+- **Setup API** (`/api/v1/*`) — entrega os Client IDs públicos no bootstrap e faz o
+  exchange/refresh do OAuth da Kick, a única plataforma que exige Client Secret. O app desktop
+  depende dela para o login oficial da Kick.
 
 ## Desenvolvimento
 
+Da raiz do repositório:
+
 ```bash
-pnpm --dir landing dev
-pnpm --dir landing check
+pnpm web:dev      # site + API em http://localhost:7390
+pnpm web:check    # lint + tipos + build de produção
 ```
 
 ## Variáveis

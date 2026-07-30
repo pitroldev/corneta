@@ -4,7 +4,7 @@
 
 **Atualizado em:** 20/07/2026
 
-**Escopo:** usar a aplicação Next.js em [`landing/`](../landing/) como um control plane mínimo, removendo do usuário final o setup técnico de OAuth.
+**Escopo:** usar a aplicação Next.js em [`web/`](../web/) como um control plane mínimo, removendo do usuário final o setup técnico de OAuth.
 
 ## Resultado para o usuário
 
@@ -55,7 +55,7 @@ onde a plataforma obriga.
 ```text
                            configuração pública
 ┌────────────────────┐  <────────────────────────  ┌──────────────────────┐
-│  Corneta Desktop   │                              │ Next.js / landing    │
+│  Corneta Desktop   │                              │ Next.js / web        │
 │  Tauri + Rust      │  ── Kick exchange/refresh ─>│ Setup API / broker   │
 └─────────┬──────────┘                              └──────────┬───────────┘
           │                                                    │
@@ -167,9 +167,9 @@ Somente o secret da Kick é necessário no servidor. Nunca usar prefixo `NEXT_PU
 ### Rodando local
 
 O login oficial só existe enquanto a setup API responde, então em desenvolvimento são dois
-processos: `pnpm lp:dev` e `pnpm app:dev`.
+processos: `pnpm web:dev` e `pnpm app:dev`.
 
-A landing sobe em **`http://localhost:7390`** — porta fixa, que é também o fallback do desktop
+O app web sobe em **`http://localhost:7390`** — porta fixa, que é também o fallback do desktop
 quando `VITE_SETUP_API_URL` está vazio em dev. A porta 3000 foi abandonada de propósito: ela é
 disputada com qualquer outro projeto Node da máquina e o app acabava conversando com a API errada.
 
@@ -196,7 +196,7 @@ O rate limit atual é em memória e por instância. Antes de escalar horizontalm
 1. Criar o cliente Google OAuth do tipo **Aplicativo para computador** e configurar `GOOGLE_CLIENT_ID`.
 2. Configurar a tela de consentimento, política de privacidade, termos e domínios autorizados.
 3. Concluir a verificação OAuth do Google e a auditoria/extensão de cota da YouTube Data API, se exigidas.
-4. Publicar a landing/API em HTTPS e preencher `VITE_SETUP_API_URL` no build desktop.
+4. Publicar o site/API em HTTPS e preencher `VITE_SETUP_API_URL` no build desktop.
 5. Manter `KICK_CLIENT_SECRET` em secret manager e cadastrar exatamente o redirect permitido.
 6. Adicionar métricas sem dados sensíveis: sucesso/erro/latência por provedor e motivo categorizado.
 7. Migrar rate limit para Redis/KV antes de múltiplas instâncias.
@@ -209,7 +209,7 @@ O rate limit atual é em memória e por instância. Antes de escalar horizontalm
 - Um usuário novo conecta as três plataformas sem criar aplicações próprias.
 - YouTube oficial não envia tokens ou Client Secret ao Next.js.
 - Kick nunca inclui Client Secret no binário, bundle Vite ou respostas da API.
-- Fechar ou indisponibilizar a landing não interrompe uma live já autenticada.
+- Fechar ou indisponibilizar o site não interrompe uma live já autenticada.
 - Logout limpa access/refresh tokens locais.
 - Callback com `state` errado não conclui nem aborta a tentativa legítima.
 - Refresh concorrente da Kick não perde o token rotacionado.

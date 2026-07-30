@@ -6,7 +6,7 @@
 **Atualizado em:** 29/07/2026
 
 **Escopo:** como o login oficial de Kick e YouTube deve depender da setup API em
-[`landing/`](../landing/). Complementa o [plano de backend](PLANO-BACKEND-NEXTJS-OAUTH.md), que
+[`web/`](../web/). Complementa o [plano de backend](PLANO-BACKEND-NEXTJS-OAUTH.md), que
 descreve o que está implementado; aqui estão os caminhos possíveis e o que cada um custa.
 
 ## A ambiguidade que trava a decisão
@@ -63,7 +63,7 @@ O bootstrap entrega o Client ID de um cliente **Desktop**; o desktop abre o nave
 - **O que falta:** um cliente OAuth do tipo "Aplicativo para computador" no Google Cloud. Cinco
   minutos no console — e é o único passo que eu não consigo executar.
 - **Trade-off:** nossa API decide *se* e *com qual identidade* o login acontece, mas não vê token
-  nenhum. Se a landing cair, quem já está logado continua logado e renovando (o refresh vai direto
+  nenhum. Se o site cair, quem já está logado continua logado e renovando (o refresh vai direto
   ao Google, e lá o secret é opcional).
 - **Risco:** se o Google algum dia passar a exigir `client_secret` para clientes Desktop, este
   caminho quebra e vira Y3. Hoje a doc marca o campo como *Optional* — risco real, probabilidade
@@ -85,7 +85,7 @@ Nossa API guarda o secret do cliente TV que já existe e expõe `/api/v1/oauth/y
   renovação, para sempre. É exatamente o que o refactor removeu de propósito.
 - **Risco alto — continuidade:** o refresh depende da nossa API. Se ela estiver fora quando o access
   token vencer (~1h), o envio e a moderação do YouTube param **no meio da live**. Deixa de valer o
-  critério de aceite "indisponibilizar a landing não interrompe uma live já autenticada".
+  critério de aceite "indisponibilizar o site não interrompe uma live já autenticada".
 - **Risco de review:** escolher o fluxo de TV para um app de desktop é uma escolha que a verificação
   do Google pode questionar, já que a recomendação dela para apps instalados é PKCE loopback.
 - **Risco de descarte:** quando o cliente Desktop existir, esses endpoints viram código morto — e
@@ -209,7 +209,7 @@ O que já está no código, com o teste que impede a regressão:
 | **T3** — degradação honesta com a nossa API fora | aplicado | a aba Conta mostra o motivo vindo de `brokerError`, em vez de esconder o login sem explicação |
 | **T4** — nenhum secret no bundle | aplicado | `scripts/check-bundle.mjs` falha o `pnpm check:app`; verificado plantando um vazamento de propósito (var do `.env` e padrão `GOCSPX-`) |
 | **Item 4** — refresh proativo da Kick antes de ir ao ar | aplicado | `warm_kick_session` no `start_engine`, destacado do caminho crítico do BORA |
-| **Y2/Y3/Y4 não construídos** | por decisão | a `landing/` só expõe `bootstrap`, `health` e os dois endpoints da Kick — nenhuma rota de YouTube |
+| **Y2/Y3/Y4 não construídos** | por decisão | a `web/` só expõe `bootstrap`, `health` e os dois endpoints da Kick — nenhuma rota de YouTube |
 
 O que **não** é código e continua aberto:
 

@@ -12,7 +12,7 @@ Streamers brasileiros que usam OBS e querem transmitir para mais de uma platafor
 
 ## Product Purpose
 
-A landing page apresenta e distribui a Corneta, um app desktop que recebe um único sinal do OBS e o envia para múltiplos destinos. O sucesso da superfície pública é fazer o visitante entender o benefício em poucos segundos e baixar o app para Windows.
+O site público apresenta e distribui a Corneta, um app desktop que recebe um único sinal do OBS e o envia para múltiplos destinos. O sucesso da superfície pública é fazer o visitante entender o benefício em poucos segundos e baixar o app para Windows.
 
 ## Positioning
 
@@ -76,4 +76,4 @@ O streamer prepara cenas, câmera e áudio no OBS. A Corneta entra depois dele: 
 
 ## Accessibility & Inclusion
 
-A landing page deve funcionar por teclado, respeitar redução de movimento, manter contraste WCAG AA, usar estrutura semântica clara e permanecer utilizável em mobile e com zoom de 200%.
+O site deve funcionar por teclado, respeitar redução de movimento, manter contraste WCAG AA, usar estrutura semântica clara e permanecer utilizável em mobile e com zoom de 200%.
