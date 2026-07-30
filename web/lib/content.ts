@@ -100,6 +100,39 @@ export const FEATURES = [
   "Chaves de transmissão guardadas no cofre de credenciais do Windows",
 ];
 
+/** O que cada login oficial pede e por quê.
+ *
+ *  Existe por dois motivos: o streamer merece saber o que está autorizando, e a
+ *  verificação de marca do Google exige que a home explique o uso dos dados do
+ *  usuário. Os escopos são os mesmos do código (src-tauri/src/auth.rs) — se
+ *  mudarem lá, mudam aqui. */
+export const ACCOUNT_SCOPES = [
+  {
+    platform: "youtube" as const,
+    title: "Conta do YouTube (Google)",
+    permission: "Gerenciar sua conta do YouTube",
+    why: "Criar a transmissão ao vivo e pegar a chave sozinha, encerrar a transmissão no fim, ler e enviar mensagens no chat ao vivo e mostrar quantas pessoas estão assistindo.",
+    never:
+      "A Corneta não publica vídeo no seu canal, não altera vídeos existentes, não lê seu histórico e não usa esses dados para anúncio ou treinamento de modelo.",
+  },
+  {
+    platform: "twitch" as const,
+    title: "Conta da Twitch",
+    permission: "Ler e enviar no chat, moderar e gerenciar a transmissão",
+    why: "Mostrar o chat no app, responder por lá, apagar mensagem ou dar timeout quando você mandar, e acompanhar o estado da sua live.",
+    never:
+      "Nada é postado no seu canal sem você pedir, e a Corneta não segue, não inscreve nem altera nada da sua conta.",
+  },
+  {
+    platform: "kick" as const,
+    title: "Conta da Kick",
+    permission: "Ler o canal, enviar no chat e moderar",
+    why: "As mesmas coisas do chat unificado: ler, responder e moderar sem sair do app.",
+    never:
+      "É o único login que passa pelo nosso servidor, porque a Kick exige um segredo de servidor na troca — e mesmo assim o token não é armazenado em lugar nenhum.",
+  },
+];
+
 /** Frase única e citável: é o que motor generativo tende a extrair. */
 export const ONE_LINER =
   "A Corneta é um aplicativo gratuito e de código aberto para Windows que recebe um único sinal de vídeo do OBS (ou de qualquer programa que transmita por RTMP) e o retransmite ao mesmo tempo para Twitch, YouTube, Kick, Facebook e outros destinos, com cada plataforma em conexão independente, chat e alertas reunidos e processamento inteiramente no computador do streamer.";

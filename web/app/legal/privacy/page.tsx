@@ -41,6 +41,7 @@ const sections = [
   { id: "api", title: "Dados na API de login" },
   { id: "app", title: "Dados no seu computador" },
   { id: "bases", title: "Bases legais" },
+  { id: "google", title: "Dados do Google e do YouTube" },
   { id: "terceiros", title: "Terceiros e conexões do app" },
   { id: "internacional", title: "Transferência internacional" },
   { id: "retencao", title: "Por quanto tempo guardamos" },
@@ -57,7 +58,9 @@ export default function PrivacyPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdScript(legalJsonLd("privacy")) }}
+        dangerouslySetInnerHTML={{
+          __html: jsonLdScript(legalJsonLd("privacy")),
+        }}
       />
 
       <LegalHero
@@ -361,9 +364,88 @@ export default function PrivacyPage() {
             </ul>
           </LegalSection>
 
+          <LegalSection id="google" n={8} title="Dados do Google e do YouTube">
+            <p>
+              Se você conectar a sua conta do YouTube, a Corneta pede a
+              permissão <strong>“gerenciar sua conta do YouTube”</strong> (o
+              escopo <code>https://www.googleapis.com/auth/youtube</code>). Ela
+              é usada exclusivamente para:
+            </p>
+            <ul>
+              <li>
+                <strong>Criar e encerrar a sua transmissão ao vivo</strong>, e
+                obter a chave de transmissão correspondente, para que você não
+                precise abrir o YouTube Studio a cada live.
+              </li>
+              <li>
+                <strong>Ler e enviar mensagens no chat ao vivo</strong>, que é o
+                que permite o chat unificado e a resposta pelo aplicativo.
+              </li>
+              <li>
+                <strong>Ler a contagem de espectadores</strong> da transmissão
+                em andamento, para mostrar a audiência somada.
+              </li>
+            </ul>
+            <p>
+              Esses dados são solicitados pelo aplicativo instalado na sua
+              máquina, diretamente ao Google, e ficam nela. O login do YouTube
+              usa o fluxo PKCE oficial para aplicativos instalados e{" "}
+              <strong>não passa pelos nossos servidores</strong>: nem o código
+              de autorização, nem o token, nem a renovação. Os tokens são
+              guardados no cofre de credenciais do Windows.
+            </p>
+
+            <h3>Uso limitado (Limited Use)</h3>
+            <p>
+              O uso e a transferência, pela Corneta, de informações recebidas
+              das APIs do Google obedecem à{" "}
+              <a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                Política de Dados do Usuário dos Serviços de API do Google
+              </a>
+              , incluindo os requisitos de Uso Limitado. Na prática, isso
+              significa que a Corneta:
+            </p>
+            <ul>
+              <li>
+                <strong>não transfere</strong> dados do Google para terceiros,
+                exceto quando necessário para prover o próprio recurso pedido
+                por você ou por exigência legal;
+              </li>
+              <li>
+                <strong>não usa</strong> esses dados para publicidade,
+                perfilamento ou venda;
+              </li>
+              <li>
+                <strong>não usa</strong> esses dados para treinar modelos de
+                inteligência artificial, generalizados ou não;
+              </li>
+              <li>
+                <strong>não permite</strong> leitura humana desses dados, salvo
+                com o seu consentimento explícito, por segurança, para cumprir a
+                lei ou sobre dados agregados e anonimizados.
+              </li>
+            </ul>
+            <Callout>
+              Você pode revogar o acesso a qualquer momento em{" "}
+              <a
+                href="https://myaccount.google.com/permissions"
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                myaccount.google.com/permissions
+              </a>
+              . A revogação vale imediatamente; o que estiver no cofre da sua
+              máquina some ao desinstalar o aplicativo.
+            </Callout>
+          </LegalSection>
+
           <LegalSection
             id="terceiros"
-            n={8}
+            n={9}
             title="Terceiros e conexões do app"
           >
             <p>
@@ -408,7 +490,7 @@ export default function PrivacyPage() {
 
           <LegalSection
             id="internacional"
-            n={9}
+            n={10}
             title="Transferência internacional"
           >
             <p>
@@ -432,7 +514,7 @@ export default function PrivacyPage() {
             </p>
           </LegalSection>
 
-          <LegalSection id="retencao" n={10} title="Por quanto tempo guardamos">
+          <LegalSection id="retencao" n={11} title="Por quanto tempo guardamos">
             <div className="legal-table">
               <table>
                 <thead>
@@ -474,7 +556,7 @@ export default function PrivacyPage() {
             </div>
           </LegalSection>
 
-          <LegalSection id="seguranca" n={11} title="Segurança">
+          <LegalSection id="seguranca" n={12} title="Segurança">
             <p>
               Adotamos medidas técnicas proporcionais ao que o serviço faz: as
               credenciais sensíveis ficam no cofre do sistema operacional em vez
@@ -495,7 +577,7 @@ export default function PrivacyPage() {
             </Callout>
           </LegalSection>
 
-          <LegalSection id="direitos" n={12} title="Seus direitos">
+          <LegalSection id="direitos" n={13} title="Seus direitos">
             <p>
               A LGPD garante a você, entre outros, o direito de confirmar a
               existência de tratamento, acessar os dados, corrigir dados
@@ -515,7 +597,7 @@ export default function PrivacyPage() {
 
           <LegalSection
             id="espectadores"
-            n={13}
+            n={14}
             title="Dados dos seus espectadores"
           >
             <p>
@@ -533,7 +615,7 @@ export default function PrivacyPage() {
             </p>
           </LegalSection>
 
-          <LegalSection id="criancas" n={14} title="Crianças e adolescentes">
+          <LegalSection id="criancas" n={15} title="Crianças e adolescentes">
             <p>
               A Corneta é uma ferramenta de produção para quem transmite ao vivo
               e não é direcionada a crianças. As plataformas de transmissão têm
@@ -543,7 +625,7 @@ export default function PrivacyPage() {
             </p>
           </LegalSection>
 
-          <LegalSection id="cookies" n={15} title="Cookies">
+          <LegalSection id="cookies" n={16} title="Cookies">
             <p>
               Este site não usa cookies, armazenamento local, fingerprinting ou
               qualquer outro mecanismo de rastreamento. Como não há cookie a
@@ -551,7 +633,7 @@ export default function PrivacyPage() {
             </p>
           </LegalSection>
 
-          <LegalSection id="mudancas" n={16} title="Mudanças nesta política">
+          <LegalSection id="mudancas" n={17} title="Mudanças nesta política">
             <p>
               Se o produto mudar de forma que altere o tratamento de dados — por
               exemplo, se algum dia existir uma função opcional que dependa de

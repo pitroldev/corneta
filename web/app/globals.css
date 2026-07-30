@@ -1629,6 +1629,120 @@ svg {
   font-weight: 750;
 }
 
+/* ---- Contas conectadas: o que cada permissão faz ---- */
+
+.accounts-heading {
+  max-width: 720px;
+  margin-top: clamp(56px, 7vw, 96px);
+  padding-top: clamp(40px, 5vw, 64px);
+  border-top: 2px solid var(--paper-line);
+}
+
+.accounts-grid {
+  display: grid;
+  gap: clamp(14px, 2vw, 20px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: clamp(32px, 4vw, 48px);
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(20px, 2.4vw, 26px);
+  color: var(--ink-on-dark);
+  border-radius: var(--r-lg);
+  background-color: var(--surface);
+  background-image: var(--halftone-dark);
+  background-size: 18px 18px;
+  box-shadow: var(--pop-ink-lg);
+}
+
+.account-head {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  margin-bottom: 16px;
+}
+
+.account-head .glyph {
+  width: 40px;
+  height: 40px;
+}
+
+.account-head strong {
+  display: block;
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 1.06rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.account-head small {
+  display: block;
+  margin-top: 3px;
+  color: var(--brass);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.account p {
+  color: var(--muted-on-dark);
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.account p + p {
+  margin-top: 12px;
+}
+
+.account b {
+  color: var(--ink-on-dark);
+  font-weight: 750;
+}
+
+.account-never {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 2px solid var(--border-soft);
+  color: var(--faint-on-raised) !important;
+  font-size: 0.8rem !important;
+}
+
+.accounts-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 90ch;
+  margin-top: clamp(22px, 2.5vw, 30px);
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.accounts-note svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--tomate-ink);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.accounts-note a {
+  color: var(--tomate-ink);
+  font-weight: 750;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
 /* ---- FAQ ---- */
 
 .faq-layout {
@@ -4068,6 +4182,7 @@ svg {
 
   .guard-grid,
   .guard-grid-3,
+  .accounts-grid,
   .tiny-grid {
     grid-template-columns: 1fr;
   }

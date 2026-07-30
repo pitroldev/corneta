@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FAQS, STEPS } from "@/lib/content";
+import { ACCOUNT_SCOPES, FAQS, STEPS } from "@/lib/content";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
 import { homeJsonLd, jsonLdScript } from "@/lib/seo";
 import { BrandMark } from "./_components/brand-mark";
@@ -43,7 +43,6 @@ import {
 const downloadUrl =
   process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ||
   "https://example.com/corneta-download";
-
 
 // As frases são as mesmas que o app mostra no seletor de plataformas
 // (PLATFORM_TAGLINES em ../src/lib/platforms.ts) — quem já viu o app reconhece,
@@ -222,9 +221,10 @@ export default function Home() {
 
               <div className="hero-pitch">
                 <p>
-                  Você transmite como sempre. A Corneta pega esse sinal e joga
-                  nas plataformas que você escolher — cada uma com a sua própria
-                  conexão, tudo num app só, rodando no PC que já tá no ar.
+                  Você transmite como sempre. A <strong>Corneta</strong> pega
+                  esse sinal e joga nas plataformas que você escolher — Twitch,
+                  YouTube, Kick e mais, cada uma com a sua própria conexão, tudo
+                  rodando no seu PC.
                 </p>
                 <div className="hero-trust" aria-label="Informações principais">
                   <span>
@@ -783,6 +783,52 @@ export default function Home() {
               </p>
             </div>
           </div>
+
+          <div className="shell" id="contas">
+            <div className="section-heading accounts-heading">
+              <span className="kicker">Entrar com a sua conta</span>
+              <h2>O que a Corneta pede — e o que ela faz com isso.</h2>
+              <p>
+                Dá pra usar só colando a chave de transmissão. Mas se você
+                conectar a conta, o app faz o trabalho chato sozinho: cria a
+                live, pega a chave e traz o chat. Aqui está exatamente o que
+                cada permissão serve.
+              </p>
+            </div>
+
+            <div className="accounts-grid">
+              {ACCOUNT_SCOPES.map((account) => (
+                <article className="account" key={account.platform}>
+                  <div className="account-head">
+                    <PlatformGlyph id={account.platform} />
+                    <div>
+                      <strong>{account.title}</strong>
+                      <small>{account.permission}</small>
+                    </div>
+                  </div>
+                  <p>
+                    <b>Pra quê:</b> {account.why}
+                  </p>
+                  <p className="account-never">
+                    <b>O que não acontece:</b> {account.never}
+                  </p>
+                </article>
+              ))}
+            </div>
+
+            <p className="accounts-note">
+              <LockIcon />
+              <span>
+                Os tokens de acesso ficam no cofre de credenciais do Windows, na
+                sua máquina — não em servidor nosso, porque não existe conta
+                Corneta nem banco de dados de usuário. Dá pra revogar o acesso a
+                qualquer momento na própria plataforma, e desinstalar o app
+                apaga o que ficou no cofre. Os detalhes estão na{" "}
+                <Link href={LEGAL_ROUTES.privacy}>política de privacidade</Link>
+                .
+              </span>
+            </p>
+          </div>
         </section>
 
         <section className="section section-dark">
@@ -873,8 +919,11 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Rótulo por extenso de propósito: a verificação do Google procura
+              um link de "política de privacidade" na home, e "Privacidade"
+              sozinho é ambíguo pra quem revisa sem ler português. */}
           <nav className="footer-links" aria-label="Links do rodapé">
-            <Link href={LEGAL_ROUTES.privacy}>Privacidade</Link>
+            <Link href={LEGAL_ROUTES.privacy}>Política de privacidade</Link>
             <Link href={LEGAL_ROUTES.terms}>Termos de uso</Link>
             <a
               href="https://github.com/pitroldev"
