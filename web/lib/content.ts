@@ -111,9 +111,9 @@ export const ACCOUNT_SCOPES = [
     platform: "youtube" as const,
     title: "Conta do YouTube (Google)",
     permission: "Gerenciar sua conta do YouTube",
-    why: "Criar a transmissão ao vivo e pegar a chave sozinha, encerrar a transmissão no fim, ler e enviar mensagens no chat ao vivo e mostrar quantas pessoas estão assistindo.",
+    why: "Criar a transmissão ao vivo e pegar a chave sozinha, dar a ela o título que você escreveu no app, encerrar no fim, ler e enviar mensagens no chat ao vivo e mostrar quantas pessoas estão assistindo.",
     never:
-      "A Corneta não publica vídeo no seu canal, não altera vídeos existentes, não lê seu histórico e não usa esses dados para anúncio ou treinamento de modelo.",
+      "A Corneta não envia vídeo gravado pro seu canal, não mexe nos vídeos que já estão lá, não lê seu histórico e não usa esses dados para anúncio ou treinamento de modelo.",
   },
   {
     platform: "twitch" as const,

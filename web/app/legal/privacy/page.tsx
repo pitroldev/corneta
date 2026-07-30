@@ -373,9 +373,12 @@ export default function PrivacyPage() {
             </p>
             <ul>
               <li>
-                <strong>Criar e encerrar a sua transmissão ao vivo</strong>, e
-                obter a chave de transmissão correspondente, para que você não
-                precise abrir o YouTube Studio a cada live.
+                <strong>Criar e encerrar a sua transmissão ao vivo</strong>,
+                obter a chave de transmissão correspondente e definir o título
+                que você digitou no aplicativo, para que você não precise abrir
+                o YouTube Studio a cada live. A alteração de título atinge
+                apenas a transmissão em andamento — nenhum vídeo já publicado no
+                seu canal é modificado.
               </li>
               <li>
                 <strong>Ler e enviar mensagens no chat ao vivo</strong>, que é o
