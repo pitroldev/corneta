@@ -16,6 +16,8 @@ O fluxo principal passa a ser:
 
 O usuário não precisa criar aplicação, cadastrar redirect URI ou copiar Client ID/Client Secret. O modo **usar credenciais próprias** continua disponível nas opções avançadas para contingência e para separar a cota do YouTube.
 
+Alternar entre oficial e credenciais próprias é **só preferência**: as credenciais do usuário ficam no cofre, dá pra voltar sem redigitar, e a Corneta **recusa** a troca quando o outro modo não está disponível. Apagar as credenciais é uma ação separada, oferecida apenas quando o login oficial pode assumir o lugar — nenhum clique deixa a plataforma sem nenhum caminho de login.
+
 ## Decisão final por provedor
 
 | Provedor | Fluxo oficial | Papel do Next.js | Onde ficam os tokens |
@@ -36,11 +38,17 @@ Twitch e YouTube não enviam tokens ao backend da Corneta. A Kick envia code/ver
 | YouTube oficial | PKCE S256, `state`, navegador do sistema e callback loopback direto no Rust |
 | Refresh do YouTube | Direto entre o Rust e o Google, sem Client Secret |
 | Kick oficial | PKCE/callback no desktop; exchange e refresh no Next.js |
-| BYOK | Disponível para YouTube e Kick; segredos ficam no keyring |
+| BYOK | Disponível para YouTube e Kick; segredos ficam no keyring, e alternar de modo nunca apaga credencial |
 | Proteções do broker | `server-only`, Node runtime, `no-store`, limites de corpo, timeouts, rate limit e allowlist exata de redirect |
+| Segredo fora do bundle | Verificado por `scripts/check-bundle.mjs` no `pnpm check:app` — deixou de ser disciplina |
+| Refresh proativo da Kick | `warm_kick_session` no go-live: o único refresh que depende da nossa API vence antes do BORA, não no meio da live |
 | Produção | Pendente: domínio HTTPS, credenciais oficiais, aprovação/verificação, cota e observabilidade |
 
 As credenciais atuais do repositório habilitam Twitch e Kick. Para ativar o YouTube oficial, ainda é necessário configurar um Client ID OAuth do Google do tipo **Aplicativo para computador**.
+
+A escolha entre manter esse PKCE direto e brokear o YouTube como a Kick está fechada em
+[DECISAO-OAUTH-VIA-API.md](DECISAO-OAUTH-VIA-API.md): control plane pela nossa API, data plane só
+onde a plataforma obriga.
 
 ## Arquitetura
 
@@ -86,6 +94,16 @@ Esse fluxo é público e não ganha segurança ao passar pelo Next.js.
 7. Access e refresh tokens são gravados no keyring; refreshes futuros também são diretos.
 
 O fluxo oficial não usa mais endpoints `youtube/device/start`, `youtube/device/poll` ou `youtube/refresh`, não faz polling e não expõe tokens ao serviço da Corneta. O device flow permanece somente no modo avançado BYOK, para compatibilidade com as credenciais do tipo TVs/entrada limitada já usadas por usuários atuais.
+
+**Por que o device flow não pode ser o fluxo oficial.** Só o primeiro passo dele é público: o pedido
+a `oauth2.googleapis.com/device/code` leva apenas `client_id` + `scope`. Mas o Google, ao contrário
+da RFC 8628, marca `client_secret` como **obrigatório** no polling do token
+(`grant_type=urn:ietf:params:oauth:grant-type:device_code`) — só no refresh é que ele fica opcional.
+Ou seja: adotar device flow como oficial exigiria embutir o secret no binário (extraível) ou passar
+cada poll pelo broker, como a Kick. O PKCE com cliente **Desktop** resolve sem nada disso, porque lá
+`client_secret` é **opcional** e o `code_verifier` faz o papel de prova de posse. Fontes:
+[device flow](https://developers.google.com/identity/protocols/oauth2/limited-input-device) e
+[installed apps](https://developers.google.com/identity/protocols/oauth2/native-app).
 
 ### Kick
 
@@ -145,6 +163,18 @@ KICK_REDIRECT_URIS=http://localhost:7395/callback
 ```
 
 Somente o secret da Kick é necessário no servidor. Nunca usar prefixo `NEXT_PUBLIC_` ou `VITE_` para ele em produção.
+
+### Rodando local
+
+O login oficial só existe enquanto a setup API responde, então em desenvolvimento são dois
+processos: `pnpm lp:dev` e `pnpm app:dev`.
+
+A landing sobe em **`http://localhost:7390`** — porta fixa, que é também o fallback do desktop
+quando `VITE_SETUP_API_URL` está vazio em dev. A porta 3000 foi abandonada de propósito: ela é
+disputada com qualquer outro projeto Node da máquina e o app acabava conversando com a API errada.
+
+Se o bootstrap não responder (ou responder sem `providers`), o desktop diz o motivo na tela de
+login em vez de só "indisponível" — o que aparecia como bug do app quando era setup API errada.
 
 ## Segurança e privacidade
 

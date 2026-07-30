@@ -112,11 +112,18 @@ export function ChatScreen() {
   const kickLogin = useStore((s) => s.kickLogin);
   const kickLogout = useStore((s) => s.kickLogout);
   const youtubeOauthReady = useStore((s) => s.youtubeOauthReady);
+  const youtubeOauthModes = useStore((s) => s.youtubeOauthModes);
   const setYoutubeOauth = useStore((s) => s.setYoutubeOauth);
   const clearYoutubeOauth = useStore((s) => s.clearYoutubeOauth);
+  const youtubeUseOfficial = useStore((s) => s.youtubeUseOfficial);
+  const youtubeUseOwnCreds = useStore((s) => s.youtubeUseOwnCreds);
   const kickOauthReady = useStore((s) => s.kickOauthReady);
+  const kickOauthModes = useStore((s) => s.kickOauthModes);
   const setKickOauth = useStore((s) => s.setKickOauth);
   const clearKickOauth = useStore((s) => s.clearKickOauth);
+  const kickUseOfficial = useStore((s) => s.kickUseOfficial);
+  const kickUseOwnCreds = useStore((s) => s.kickUseOwnCreds);
+  const oauthBrokerError = useStore((s) => s.oauthBrokerError);
   const moderate = useStore((s) => s.moderate);
   const chatConfigRequest = useStore((s) => s.chatConfigRequest);
   const requestChatConfig = useStore((s) => s.requestChatConfig);
@@ -287,6 +294,23 @@ export function ChatScreen() {
     youtube: youtubeReady,
     kick: kickReady,
   });
+
+  // Troca de modo de OAuth (oficial ↔ credenciais próprias) e o "esquecer". Fecha as opções
+  // avançadas quando dá certo e MOSTRA o motivo quando a Corneta recusa — a recusa (ex.: login
+  // oficial fora do ar) é justamente a informação que o streamer precisa ver.
+  const modeAction =
+    (close: (open: boolean) => void) =>
+    async (action: Promise<void>, ok?: string) => {
+      try {
+        await action;
+        if (ok) toast.success(ok);
+        close(false);
+      } catch (e) {
+        toast.error(errMsg(e));
+      }
+    };
+  const youtubeMode = modeAction(setShowYoutubeByok);
+  const kickMode = modeAction(setShowKickByok);
 
   // Conectar (botão do topo e do estado vazio). Sem canal configurado, abre a config.
   const doConnect = async () => {
@@ -702,6 +726,17 @@ export function ChatScreen() {
                 </p>
               ) : (
                 <>
+                  {/* Quando a nossa setup API não responde, o login oficial simplesmente não
+                      aparece. Dizer o motivo evita o streamer achar que o app está quebrado. */}
+                  {oauthBrokerError && (
+                    <p className="mb-2 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
+                      <strong className="text-ink">
+                        Login oficial da Corneta fora do ar:
+                      </strong>{" "}
+                      {oauthBrokerError}. Dá pra entrar com credenciais próprias
+                      nas opções avançadas.
+                    </p>
+                  )}
                   <div className="flex flex-col gap-2">
                     {hasTwitchChannel && (
                       <LoginRow
@@ -737,20 +772,42 @@ export function ChatScreen() {
                           {showYoutubeByok && (
                             <YoutubeCredsForm
                               onSave={(id, secret) => {
-                                void setYoutubeOauth(id, secret).then(() =>
-                                  setShowYoutubeByok(false),
-                                );
+                                void youtubeMode(setYoutubeOauth(id, secret));
                               }}
-                              onUseOfficial={() => {
-                                void clearYoutubeOauth();
-                                setShowYoutubeByok(false);
-                              }}
+                              modes={youtubeOauthModes}
+                              onUseOfficial={() =>
+                                void youtubeMode(
+                                  youtubeUseOfficial(),
+                                  "Login oficial do YouTube de volta",
+                                )
+                              }
+                              onUseSaved={() =>
+                                void youtubeMode(
+                                  youtubeUseOwnCreds(),
+                                  "Usando suas credenciais do YouTube 🔒",
+                                )
+                              }
+                              onForget={() =>
+                                void youtubeMode(
+                                  clearYoutubeOauth(),
+                                  "Credenciais do YouTube esquecidas",
+                                )
+                              }
                             />
                           )}
                         </div>
                       ) : (
                         <YoutubeCredsForm
-                          onSave={(id, sec) => void setYoutubeOauth(id, sec)}
+                          onSave={(id, sec) =>
+                            void youtubeMode(setYoutubeOauth(id, sec))
+                          }
+                          modes={youtubeOauthModes}
+                          onUseSaved={() =>
+                            void youtubeMode(
+                              youtubeUseOwnCreds(),
+                              "Usando suas credenciais do YouTube 🔒",
+                            )
+                          }
                         />
                       ))}
                     {hasKickChannel &&
@@ -775,20 +832,42 @@ export function ChatScreen() {
                           {showKickByok && (
                             <KickCredsForm
                               onSave={(id, secret) => {
-                                void setKickOauth(id, secret).then(() =>
-                                  setShowKickByok(false),
-                                );
+                                void kickMode(setKickOauth(id, secret));
                               }}
-                              onUseOfficial={() => {
-                                void clearKickOauth();
-                                setShowKickByok(false);
-                              }}
+                              modes={kickOauthModes}
+                              onUseOfficial={() =>
+                                void kickMode(
+                                  kickUseOfficial(),
+                                  "Login oficial da Kick de volta",
+                                )
+                              }
+                              onUseSaved={() =>
+                                void kickMode(
+                                  kickUseOwnCreds(),
+                                  "Usando suas credenciais da Kick 🔒",
+                                )
+                              }
+                              onForget={() =>
+                                void kickMode(
+                                  clearKickOauth(),
+                                  "Credenciais da Kick esquecidas",
+                                )
+                              }
                             />
                           )}
                         </div>
                       ) : (
                         <KickCredsForm
-                          onSave={(id, secret) => void setKickOauth(id, secret)}
+                          onSave={(id, secret) =>
+                            void kickMode(setKickOauth(id, secret))
+                          }
+                          modes={kickOauthModes}
+                          onUseSaved={() =>
+                            void kickMode(
+                              kickUseOwnCreds(),
+                              "Usando suas credenciais da Kick 🔒",
+                            )
+                          }
                         />
                       ))}
                   </div>
@@ -1934,12 +2013,80 @@ function AlertSourceCard({
 
 // BYOK do YouTube: cada usuário cria as credenciais do Google dele e cola aqui (cofre).
 // Assim cada um tem a própria cota — sem limite/verificação compartilhados.
+/** Quais caminhos de login existem numa plataforma, e qual está em uso. */
+type ByokModes = {
+  officialReady: boolean;
+  ownCreds: boolean;
+  usingOwnCreds: boolean;
+};
+
+/**
+ * Ações de modo do BYOK. Ficam separadas do "esquecer credenciais" de propósito: trocar pro
+ * login oficial não apaga nada (e a Corneta recusa a troca se o oficial não estiver de pé), então
+ * nenhum clique aqui consegue deixar a plataforma sem nenhum jeito de logar.
+ */
+function ByokModeActions({
+  modes,
+  onUseOfficial,
+  onUseSaved,
+  onForget,
+}: {
+  modes?: ByokModes;
+  onUseOfficial?: () => void;
+  onUseSaved?: () => void;
+  onForget?: () => void;
+}) {
+  if (!modes) return null;
+  const back = modes.ownCreds && !modes.usingOwnCreds;
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      {modes.usingOwnCreds && onUseOfficial && (
+        <button
+          onClick={onUseOfficial}
+          className="text-[11px] font-bold text-brass hover:underline"
+        >
+          Voltar pro login oficial da Corneta
+        </button>
+      )}
+      {back && onUseSaved && (
+        <button
+          onClick={onUseSaved}
+          className="text-[11px] font-bold text-brass hover:underline"
+        >
+          Usar as credenciais que já salvei
+        </button>
+      )}
+      {/* Esquecer é destrutivo: só aparece quando o oficial pode assumir no lugar. */}
+      {modes.ownCreds && modes.officialReady && onForget && (
+        <button
+          onClick={onForget}
+          className="text-[11px] font-semibold text-ink-faint hover:text-danger hover:underline"
+        >
+          esquecer minhas credenciais
+        </button>
+      )}
+      {modes.usingOwnCreds && !modes.officialReady && (
+        <span className="text-[11px] text-ink-faint">
+          (o oficial não respondeu na última checagem — suas credenciais ficam
+          salvas de qualquer jeito)
+        </span>
+      )}
+    </div>
+  );
+}
+
 function YoutubeCredsForm({
   onSave,
+  modes,
   onUseOfficial,
+  onUseSaved,
+  onForget,
 }: {
   onSave: (clientId: string, clientSecret: string) => void;
+  modes?: ByokModes;
   onUseOfficial?: () => void;
+  onUseSaved?: () => void;
+  onForget?: () => void;
 }) {
   const [id, setId] = useState("");
   const [secret, setSecret] = useState("");
@@ -1965,14 +2112,12 @@ function YoutubeCredsForm({
         </button>
       </div>
 
-      {onUseOfficial && (
-        <button
-          onClick={onUseOfficial}
-          className="mb-2 text-[11px] font-bold text-brass hover:underline"
-        >
-          Restaurar login oficial da Corneta
-        </button>
-      )}
+      <ByokModeActions
+        modes={modes}
+        onUseOfficial={onUseOfficial}
+        onUseSaved={onUseSaved}
+        onForget={onForget}
+      />
 
       {guide && (
         <>
@@ -2095,10 +2240,16 @@ function YoutubeCredsForm({
 
 function KickCredsForm({
   onSave,
+  modes,
   onUseOfficial,
+  onUseSaved,
+  onForget,
 }: {
   onSave: (clientId: string, clientSecret: string) => void;
+  modes?: ByokModes;
   onUseOfficial?: () => void;
+  onUseSaved?: () => void;
+  onForget?: () => void;
 }) {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -2128,14 +2279,12 @@ function KickCredsForm({
         Use o redirect <strong>http://localhost:7395/callback</strong>. O
         segredo fica somente no cofre do sistema.
       </p>
-      {onUseOfficial && (
-        <button
-          onClick={onUseOfficial}
-          className="mb-2 text-[11px] font-bold text-brass hover:underline"
-        >
-          Restaurar login oficial da Corneta
-        </button>
-      )}
+      <ByokModeActions
+        modes={modes}
+        onUseOfficial={onUseOfficial}
+        onUseSaved={onUseSaved}
+        onForget={onForget}
+      />
       <div className="flex flex-col gap-2">
         <Input
           name="kick-client-id"

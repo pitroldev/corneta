@@ -29,10 +29,17 @@ const KICK_SCOPES: &str =
 const KICK_PORT: u16 = 7395;
 
 /// Client IDs públicos + segredos recuperados exclusivamente do cofre nativo.
+///
+/// Os campos `*_official_id` guardam o Client ID público (do build ou do bootstrap) e NUNCA são
+/// apagados por mexer no BYOK: é o que garante que trocar de modo não faça um fluxo desaparecer.
+/// `google_client_id`/`kick_client_id` são os ATIVOS — iguais ao oficial no modo oficial, ou às
+/// credenciais do cofre no BYOK (ver `apply_youtube_mode`/`apply_kick_mode`).
 #[derive(Default, Clone)]
 pub struct OauthConfig {
     pub twitch_client_id: String,
     pub twitch_client_secret: String,
+    pub youtube_official_id: String,
+    pub kick_official_id: String,
     pub google_client_id: String,
     pub google_client_secret: String,
     pub kick_client_id: String,
@@ -40,6 +47,9 @@ pub struct OauthConfig {
     pub setup_api_url: String,
     pub youtube_direct: bool,
     pub kick_brokered: bool,
+    /// A setup API confirmou o broker da Kick (o Client Secret vive lá, então sem ela não há
+    /// fluxo oficial de Kick — diferente do YouTube, que é PKCE direto).
+    pub kick_broker_ready: bool,
 }
 
 fn oauth(app: &AppHandle) -> OauthConfig {
@@ -129,41 +139,133 @@ fn broker_error(code: u16, body: &Value, fallback: &str) -> String {
     }
 }
 
+/// O modo BYOK vale enquanto existirem credenciais próprias COMPLETAS no cofre e o usuário não
+/// tiver pedido o fluxo oficial. Duas consequências de propósito:
+///   • trocar pro oficial é só preferência — as credenciais ficam no cofre e dá pra voltar;
+///   • preferência sem credenciais completas cai no oficial em vez de virar um modo quebrado.
+/// Instalações antigas gravaram credenciais antes de a preferência existir (`None`) → seguem BYOK.
+fn byok_active(preference: Option<&str>, has_own_creds: bool) -> bool {
+    has_own_creds && preference != Some("official")
+}
+
+/// Credenciais próprias completas do cofre (id + secret), já sem espaços.
+fn own_creds(id_key: &str, secret_key: &str) -> Option<(String, String)> {
+    let id = keys::get_key(id_key)?.trim().to_string();
+    let secret = keys::get_key(secret_key)?.trim().to_string();
+    (!id.is_empty() && !secret.is_empty()).then_some((id, secret))
+}
+
+/// Núcleo puro: resolve as credenciais ativas do YouTube a partir do cofre + preferência.
+fn resolve_youtube_mode(
+    config: &mut OauthConfig,
+    own: Option<(String, String)>,
+    preference: Option<&str>,
+) {
+    match own {
+        Some((id, secret)) if byok_active(preference, true) => {
+            config.google_client_id = id;
+            config.google_client_secret = secret;
+            config.youtube_direct = false;
+        }
+        _ => {
+            config.google_client_id = config.youtube_official_id.clone();
+            config.google_client_secret.clear();
+            config.youtube_direct = !config.youtube_official_id.is_empty();
+        }
+    }
+}
+
+fn resolve_kick_mode(
+    config: &mut OauthConfig,
+    own: Option<(String, String)>,
+    preference: Option<&str>,
+) {
+    match own {
+        Some((id, secret)) if byok_active(preference, true) => {
+            config.kick_client_id = id;
+            config.kick_client_secret = secret;
+            config.kick_brokered = false;
+        }
+        _ => {
+            config.kick_client_id = config.kick_official_id.clone();
+            config.kick_client_secret.clear();
+            config.kick_brokered = config.kick_broker_ready && !config.kick_official_id.is_empty();
+        }
+    }
+}
+
+/// Reaplica o modo do YouTube na config ativa. Chamada sempre que preferência, cofre ou bootstrap
+/// mudam — assim `youtube_direct` nunca descreve um modo que já não existe.
+fn apply_youtube_mode(config: &mut OauthConfig) {
+    let own = own_creds("youtube_client_id", "youtube_client_secret");
+    let preference = keys::get_key("youtube_oauth_preference");
+    resolve_youtube_mode(config, own, preference.as_deref());
+}
+
+fn apply_kick_mode(config: &mut OauthConfig) {
+    let own = own_creds("kick_client_id", "kick_client_secret");
+    let preference = keys::get_key("kick_oauth_preference");
+    resolve_kick_mode(config, own, preference.as_deref());
+}
+
 /// Atualiza apenas configuração pública/capacidade. Client Secrets nunca saem do servidor.
-fn refresh_broker_config(app: &AppHandle) {
+/// `Err` = motivo legível de por que o login oficial não apareceu (a UI mostra em vez de um
+/// "indisponível" mudo, que é o que fazia parecer bug de app quando era setup API errada).
+fn refresh_broker_config(app: &AppHandle) -> Result<(), String> {
     let current = oauth(app);
+    let base = current.setup_api_url.trim().trim_end_matches('/').to_string();
     let Some(url) = setup_url(&current, "/api/v1/bootstrap") else {
-        return;
+        return Err(if base.is_empty() {
+            "serviço de login não configurado (VITE_SETUP_API_URL vazio)".into()
+        } else {
+            format!("o serviço de login precisa ser HTTPS ({base})")
+        });
     };
-    let Ok(value) = get_json(&url) else { return };
-    let providers = value.get("providers").unwrap_or(&Value::Null);
-    let twitch = providers.get("twitch").unwrap_or(&Value::Null);
-    let youtube = providers.get("youtube").unwrap_or(&Value::Null);
-    let kick = providers.get("kick").unwrap_or(&Value::Null);
+    let value = get_json(&url).map_err(|(code, _)| match code {
+        0 => format!("não consegui falar com o serviço de login em {base}"),
+        code => format!("o serviço de login em {base} respondeu {code}"),
+    })?;
+    // Sem `providers` a URL aponta pra outro serviço (o caso comum é a porta 3000 já ocupada
+    // por outro projeto). Melhor dizer isso do que agir como se o bootstrap tivesse funcionado.
+    let providers = value
+        .get("providers")
+        .filter(|p| p.is_object())
+        .ok_or_else(|| format!("{base} respondeu, mas não é a setup API da Corneta"))?
+        .clone();
+    let provider = |name: &str| providers.get(name).cloned().unwrap_or(Value::Null);
+    let twitch = provider("twitch");
+    let youtube = provider("youtube");
+    let kick = provider("kick");
+    let enabled = |p: &Value| p.get("enabled").and_then(|v| v.as_bool()) == Some(true);
+    let client_id = |p: &Value| {
+        p.get("clientId")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(str::to_string)
+    };
 
     let state = app.state::<AppState>();
     let mut config = state.oauth.lock().unwrap();
-    if let Some(id) = twitch.get("clientId").and_then(|v| v.as_str()) {
-        if !id.trim().is_empty() {
-            config.twitch_client_id = id.trim().to_string();
+    if let Some(id) = client_id(&twitch) {
+        config.twitch_client_id = id;
+    }
+    // Só sobrescreve o Client ID oficial quando o servidor tem um habilitado: o valor do build
+    // continua valendo como fallback (é o contrato documentado do bootstrap).
+    if enabled(&youtube) {
+        if let Some(id) = client_id(&youtube) {
+            config.youtube_official_id = id;
         }
     }
-    let youtube_byok = keys::get_key("youtube_oauth_preference").as_deref() == Some("byok");
-    let kick_byok = keys::get_key("kick_oauth_preference").as_deref() == Some("byok");
-    let youtube_enabled = youtube.get("enabled").and_then(|v| v.as_bool()) == Some(true);
-    let kick_enabled = kick.get("enabled").and_then(|v| v.as_bool()) == Some(true);
-    if let Some(id) = youtube.get("clientId").and_then(|v| v.as_str()) {
-        if youtube_enabled && !youtube_byok && !id.trim().is_empty() {
-            config.google_client_id = id.trim().to_string();
+    if enabled(&kick) {
+        if let Some(id) = client_id(&kick) {
+            config.kick_official_id = id;
         }
     }
-    if let Some(id) = kick.get("clientId").and_then(|v| v.as_str()) {
-        if kick_enabled && !kick_byok && !id.trim().is_empty() {
-            config.kick_client_id = id.trim().to_string();
-        }
-    }
-    config.youtube_direct = youtube_enabled && !youtube_byok;
-    config.kick_brokered = kick_enabled && !kick_byok;
+    config.kick_broker_ready = enabled(&kick);
+    apply_youtube_mode(&mut config);
+    apply_kick_mode(&mut config);
+    Ok(())
 }
 
 /// Mensagem legível de um erro do endpoint OAuth do Google (device/token). Evita o genérico
@@ -185,6 +287,61 @@ fn google_oauth_err(code: u16, e: &Value) -> String {
         _ if !err.is_empty() => format!("Google: {err}"),
         _ => format!("Google respondeu {code}"),
     }
+}
+
+// ---- Forms de token do YouTube -------------------------------------
+// Extraídos em funções puras porque a decisão Y1 (docs/DECISAO-OAUTH-VIA-API.md) vive exatamente
+// aqui: o fluxo oficial NÃO manda `client_secret`, e é isso que o mantém sem segredo no binário.
+// Um teste trava cada um desses forms pra ninguém "consertar" o oficial acrescentando o secret.
+
+/// Troca do fluxo OFICIAL (Authorization Code + PKCE, cliente Desktop). Sem `client_secret` de
+/// propósito: o Google marca o campo como opcional aqui e o `code_verifier` faz a prova de posse.
+fn youtube_official_exchange_form<'a>(
+    client_id: &'a str,
+    code: &'a str,
+    verifier: &'a str,
+    redirect: &'a str,
+) -> Vec<(&'a str, &'a str)> {
+    vec![
+        ("client_id", client_id),
+        ("code", code),
+        ("code_verifier", verifier),
+        ("redirect_uri", redirect),
+        ("grant_type", "authorization_code"),
+    ]
+}
+
+/// Polling do device flow (só modo BYOK). O Google EXIGE `client_secret` aqui — é precisamente por
+/// isso que o device flow não pode ser o fluxo oficial de um app desktop.
+fn youtube_device_poll_form<'a>(
+    client_id: &'a str,
+    client_secret: &'a str,
+    device_code: &'a str,
+) -> Vec<(&'a str, &'a str)> {
+    vec![
+        ("client_id", client_id),
+        ("client_secret", client_secret),
+        ("device_code", device_code),
+        ("grant_type", GRANT_DEVICE),
+    ]
+}
+
+/// Refresh. `client_secret` só no BYOK: no oficial ele é opcional na doc do Google e a gente não
+/// tem nenhum pra mandar.
+fn youtube_refresh_form<'a>(
+    client_id: &'a str,
+    refresh: &'a str,
+    client_secret: Option<&'a str>,
+) -> Vec<(&'a str, &'a str)> {
+    let mut form = vec![
+        ("client_id", client_id),
+        ("refresh_token", refresh),
+        ("grant_type", "refresh_token"),
+    ];
+    if let Some(secret) = client_secret {
+        form.push(("client_secret", secret));
+    }
+    form
 }
 
 fn auth_event(app: &AppHandle, who: &str, state: &str, user_code: &str, verify: &str, login: &str) {
@@ -225,26 +382,42 @@ pub fn set_oauth_config(
     kick_client_id: Option<String>,
     setup_api_url: String,
 ) {
+    // Atualiza no lugar em vez de recriar: a UI chama isso de novo depois de mexer no BYOK, e
+    // recriar zerava o que o bootstrap já tinha entregado (Client IDs oficiais + broker pronto).
     // BYOK: valores privados nunca atravessam o bundler nem ficam no JavaScript distribuído.
-    let g_id =
-        keys::get_key("youtube_client_id").unwrap_or_else(|| google_client_id.trim().to_string());
-    let g_secret = keys::get_key("youtube_client_secret").unwrap_or_default();
-    let k_id = keys::get_key("kick_client_id")
-        .unwrap_or_else(|| kick_client_id.unwrap_or_default().trim().to_string());
-    let k_secret = keys::get_key("kick_client_secret").unwrap_or_default();
     let st = app.state::<AppState>();
-    *st.oauth.lock().unwrap() = OauthConfig {
-        twitch_client_id: twitch_client_id.trim().to_string(),
-        twitch_client_secret: String::new(),
-        google_client_id: g_id.trim().to_string(),
-        google_client_secret: g_secret.trim().to_string(),
-        kick_client_id: k_id,
-        kick_client_secret: k_secret,
-        setup_api_url: setup_api_url.trim().trim_end_matches('/').to_string(),
-        youtube_direct: !google_client_id.trim().is_empty()
-            && keys::get_key("youtube_oauth_preference").as_deref() != Some("byok"),
-        kick_brokered: false,
+    let mut config = st.oauth.lock().unwrap();
+    config.setup_api_url = setup_api_url.trim().trim_end_matches('/').to_string();
+    config.twitch_client_secret.clear();
+    let keep = |slot: &mut String, value: &str| {
+        if !value.trim().is_empty() {
+            *slot = value.trim().to_string();
+        }
     };
+    keep(&mut config.twitch_client_id, &twitch_client_id);
+    keep(&mut config.youtube_official_id, &google_client_id);
+    keep(
+        &mut config.kick_official_id,
+        &kick_client_id.unwrap_or_default(),
+    );
+    apply_youtube_mode(&mut config);
+    apply_kick_mode(&mut config);
+}
+
+/// Sessão do YouTube fora: tokens do cofre + caches em memória. Não toca em credenciais.
+fn forget_youtube_session() {
+    let _ = keys::clear_key("youtube_oauth");
+    let _ = keys::clear_key("youtube_refresh");
+    let _ = keys::clear_key("youtube_oauth_mode");
+    *YT_TOKEN.lock().unwrap() = None;
+    *YT_CHAT.lock().unwrap() = None;
+}
+
+/// Reaplica o modo do YouTube na config ativa e avisa a UI que a sessão caiu.
+fn youtube_mode_changed(app: &AppHandle) {
+    // O guard morre no fim da statement — `auth_event` não emite com a config travada.
+    apply_youtube_mode(&mut app.state::<AppState>().oauth.lock().unwrap());
+    auth_event(app, "youtube", "loggedout", "", "", "");
 }
 
 /// Credenciais do Google coladas pelo usuário (BYOK) — vão pro cofre e valem na hora.
@@ -262,39 +435,68 @@ pub fn set_youtube_oauth(
     keys::set_key("youtube_client_id", id)?;
     keys::set_key("youtube_client_secret", secret)?;
     keys::set_key("youtube_oauth_preference", "byok")?;
-    let _ = keys::clear_key("youtube_oauth");
-    let _ = keys::clear_key("youtube_refresh");
-    let _ = keys::clear_key("youtube_oauth_mode");
-    *YT_TOKEN.lock().unwrap() = None;
-    *YT_CHAT.lock().unwrap() = None;
-    let st = app.state::<AppState>();
-    let mut o = st.oauth.lock().unwrap();
-    o.google_client_id = id.to_string();
-    o.google_client_secret = secret.to_string();
-    o.youtube_direct = false;
+    forget_youtube_session();
+    youtube_mode_changed(&app);
     Ok(())
 }
 
-/// Esquece as credenciais do Google e desloga (pra trocar de conta/projeto).
+/// Volta pro login oficial da Corneta SEM apagar as credenciais próprias: é só preferência, então
+/// dá pra alternar de novo depois. Recusa quando não existe fluxo oficial — trocar nesse caso
+/// deixava o YouTube sem NENHUM login possível, e era esse clique que sumia com o fluxo pra sempre.
+#[tauri::command]
+pub fn youtube_use_official(app: AppHandle) -> Result<(), String> {
+    let broker = refresh_broker_config(&app);
+    if oauth(&app).youtube_official_id.is_empty() {
+        return Err(match broker {
+            Err(reason) => format!(
+                "Login oficial do YouTube indisponível: {reason}. Suas credenciais continuam salvas"
+            ),
+            Ok(()) => "O login oficial do YouTube ainda não está habilitado no servidor. Suas credenciais continuam salvas".into(),
+        });
+    }
+    keys::set_key("youtube_oauth_preference", "official")?;
+    forget_youtube_session();
+    youtube_mode_changed(&app);
+    Ok(())
+}
+
+/// Volta pras credenciais próprias já guardadas no cofre (sem redigitar).
+#[tauri::command]
+pub fn youtube_use_own_creds(app: AppHandle) -> Result<(), String> {
+    if own_creds("youtube_client_id", "youtube_client_secret").is_none() {
+        return Err("não achei credenciais próprias salvas — cole o Client ID e o Secret".into());
+    }
+    keys::set_key("youtube_oauth_preference", "byok")?;
+    forget_youtube_session();
+    youtube_mode_changed(&app);
+    Ok(())
+}
+
+/// Esquece as credenciais do Google e desloga (pra trocar de conta/projeto). Ação destrutiva de
+/// verdade: a UI só oferece quando o login oficial está pronto pra assumir.
 #[tauri::command]
 pub fn clear_youtube_oauth(app: AppHandle) {
     for k in [
         "youtube_client_id",
         "youtube_client_secret",
-        "youtube_oauth",
-        "youtube_refresh",
-        "youtube_oauth_mode",
         "youtube_oauth_preference",
     ] {
         let _ = keys::clear_key(k);
     }
-    *YT_TOKEN.lock().unwrap() = None;
-    *YT_CHAT.lock().unwrap() = None;
-    let st = app.state::<AppState>();
-    let mut o = st.oauth.lock().unwrap();
-    o.google_client_id.clear();
-    o.google_client_secret.clear();
-    auth_event(&app, "youtube", "loggedout", "", "", "");
+    forget_youtube_session();
+    youtube_mode_changed(&app);
+}
+
+fn forget_kick_session() {
+    let _ = keys::clear_key("kick_oauth");
+    let _ = keys::clear_key("kick_refresh");
+    let _ = keys::clear_key("kick_oauth_mode");
+    KICK_IDS.lock().unwrap().clear();
+}
+
+fn kick_mode_changed(app: &AppHandle) {
+    apply_kick_mode(&mut app.state::<AppState>().oauth.lock().unwrap());
+    auth_event(app, "kick", "loggedout", "", "", "");
 }
 
 #[tauri::command]
@@ -311,14 +513,39 @@ pub fn set_kick_oauth(
     keys::set_key("kick_client_id", id)?;
     keys::set_key("kick_client_secret", secret)?;
     keys::set_key("kick_oauth_preference", "byok")?;
-    let _ = keys::clear_key("kick_oauth");
-    let _ = keys::clear_key("kick_refresh");
-    let _ = keys::clear_key("kick_oauth_mode");
-    let state = app.state::<AppState>();
-    let mut oauth = state.oauth.lock().unwrap();
-    oauth.kick_client_id = id.to_string();
-    oauth.kick_client_secret = secret.to_string();
-    oauth.kick_brokered = false;
+    forget_kick_session();
+    kick_mode_changed(&app);
+    Ok(())
+}
+
+/// Volta pro login oficial da Kick mantendo as credenciais próprias no cofre (ver
+/// `youtube_use_official` — mesma regra: sem fluxo oficial pronto, não troca).
+#[tauri::command]
+pub fn kick_use_official(app: AppHandle) -> Result<(), String> {
+    let broker = refresh_broker_config(&app);
+    let cfg = oauth(&app);
+    if cfg.kick_official_id.is_empty() || !cfg.kick_broker_ready {
+        return Err(match broker {
+            Err(reason) => format!(
+                "Login oficial da Kick indisponível: {reason}. Suas credenciais continuam salvas"
+            ),
+            Ok(()) => "O login oficial da Kick ainda não está habilitado no servidor. Suas credenciais continuam salvas".into(),
+        });
+    }
+    keys::set_key("kick_oauth_preference", "official")?;
+    forget_kick_session();
+    kick_mode_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn kick_use_own_creds(app: AppHandle) -> Result<(), String> {
+    if own_creds("kick_client_id", "kick_client_secret").is_none() {
+        return Err("não achei credenciais próprias salvas — cole o Client ID e o Secret".into());
+    }
+    keys::set_key("kick_oauth_preference", "byok")?;
+    forget_kick_session();
+    kick_mode_changed(&app);
     Ok(())
 }
 
@@ -327,38 +554,47 @@ pub fn clear_kick_oauth(app: AppHandle) {
     for key in [
         "kick_client_id",
         "kick_client_secret",
-        "kick_oauth",
-        "kick_refresh",
-        "kick_oauth_mode",
         "kick_oauth_preference",
     ] {
         let _ = keys::clear_key(key);
     }
-    let state = app.state::<AppState>();
-    let mut oauth = state.oauth.lock().unwrap();
-    oauth.kick_client_id.clear();
-    oauth.kick_client_secret.clear();
-    auth_event(&app, "kick", "loggedout", "", "", "");
+    forget_kick_session();
+    kick_mode_changed(&app);
 }
 
-/// Estado de login pras duas plataformas (pro frontend semear no boot). Renova se preciso.
+/// Estado de login das plataformas (pro frontend semear no boot). Renova se preciso.
+/// Além de "logado", diz QUAIS caminhos existem — a UI precisa disso pra não oferecer uma troca
+/// de modo que deixaria a plataforma sem login nenhum, e pra explicar um oficial indisponível.
 /// ASYNC: valida/renova via HTTP — síncrono travaria o boot na thread principal.
 #[tauri::command]
 pub async fn auth_status(app: AppHandle) -> Value {
     tauri::async_runtime::spawn_blocking(move || {
-        refresh_broker_config(&app);
+        let broker = refresh_broker_config(&app);
         let twitch = twitch_token(&app).and_then(|t| twitch_validate(&t)).map(|i| i.login);
         let youtube = keys::has_key("youtube_refresh");
         let cfg = oauth(&app);
-        let youtube_configured = cfg.youtube_direct
-            || (!cfg.google_client_id.is_empty() && !cfg.google_client_secret.is_empty());
+        let youtube_own = own_creds("youtube_client_id", "youtube_client_secret").is_some();
+        let kick_own = own_creds("kick_client_id", "kick_client_secret").is_some();
+        let youtube_configured = cfg.youtube_direct || !cfg.google_client_secret.is_empty();
         let kick = keys::has_key("kick_refresh");
-        let kick_configured = cfg.kick_brokered
-            || (!cfg.kick_client_id.is_empty() && !cfg.kick_client_secret.is_empty());
-        json!({ "twitchLogin": twitch, "youtube": youtube, "youtubeConfigured": youtube_configured, "kick": kick, "kickConfigured": kick_configured })
+        let kick_configured = cfg.kick_brokered || !cfg.kick_client_secret.is_empty();
+        json!({
+            "twitchLogin": twitch,
+            "youtube": youtube,
+            "youtubeConfigured": youtube_configured,
+            "youtubeOfficialReady": !cfg.youtube_official_id.is_empty(),
+            "youtubeOwnCreds": youtube_own,
+            "youtubeUsingOwnCreds": !cfg.google_client_secret.is_empty(),
+            "kick": kick,
+            "kickConfigured": kick_configured,
+            "kickOfficialReady": cfg.kick_broker_ready && !cfg.kick_official_id.is_empty(),
+            "kickOwnCreds": kick_own,
+            "kickUsingOwnCreds": !cfg.kick_client_secret.is_empty(),
+            "brokerError": broker.err(),
+        })
     })
     .await
-    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false, "kick": false, "kickConfigured": false }))
+    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "brokerError": null }))
 }
 
 // ----------------------------- Twitch ------------------------------
@@ -569,19 +805,24 @@ fn twitch_refresh(app: &AppHandle) -> Option<String> {
 #[tauri::command]
 pub fn youtube_login_start(app: AppHandle) {
     tauri::async_runtime::spawn_blocking(move || {
-        refresh_broker_config(&app);
+        let broker = refresh_broker_config(&app);
         let cfg = oauth(&app);
         if cfg.youtube_direct {
             return youtube_direct_login(&app, &cfg);
         }
         if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
+            let motivo = broker.err().unwrap_or_else(|| {
+                "o servidor ainda não habilitou o YouTube oficial".to_string()
+            });
             return auth_event(
                 &app,
                 "youtube",
                 "error",
                 "",
                 "",
-                "Login oficial indisponível. Use credenciais próprias nas opções avançadas",
+                &format!(
+                    "Login oficial indisponível ({motivo}). Use credenciais próprias nas opções avançadas"
+                ),
             );
         }
         let dev = match post_form(
@@ -661,12 +902,11 @@ pub fn youtube_login_start(app: AppHandle) {
             }
             match post_form(
                 "https://oauth2.googleapis.com/token",
-                &[
-                    ("client_id", &cfg.google_client_id),
-                    ("client_secret", &cfg.google_client_secret),
-                    ("device_code", &device_code),
-                    ("grant_type", GRANT_DEVICE),
-                ],
+                &youtube_device_poll_form(
+                    &cfg.google_client_id,
+                    &cfg.google_client_secret,
+                    &device_code,
+                ),
             ) {
                 Ok(v) => {
                     let access = v.get("access_token").and_then(|x| x.as_str()).unwrap_or("");
@@ -772,13 +1012,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
     };
     let value = match post_form(
         "https://oauth2.googleapis.com/token",
-        &[
-            ("client_id", cfg.google_client_id.as_str()),
-            ("code", code.as_str()),
-            ("code_verifier", verifier.as_str()),
-            ("redirect_uri", redirect.as_str()),
-            ("grant_type", "authorization_code"),
-        ],
+        &youtube_official_exchange_form(&cfg.google_client_id, &code, &verifier, &redirect),
     ) {
         Ok(value) => value,
         Err((status, body)) => {
@@ -859,14 +1093,11 @@ pub fn youtube_token(app: &AppHandle) -> Option<String> {
     let mode = keys::get_key("youtube_oauth_mode");
     let byok =
         mode.as_deref() == Some("byok") || (mode.is_none() && !cfg.google_client_secret.is_empty());
-    let mut form = vec![
-        ("client_id", cfg.google_client_id.as_str()),
-        ("refresh_token", refresh.as_str()),
-        ("grant_type", "refresh_token"),
-    ];
-    if byok {
-        form.push(("client_secret", cfg.google_client_secret.as_str()));
-    }
+    let form = youtube_refresh_form(
+        &cfg.google_client_id,
+        &refresh,
+        byok.then_some(cfg.google_client_secret.as_str()),
+    );
     let v = post_form("https://oauth2.googleapis.com/token", &form).ok()?;
     let access = v.get("access_token").and_then(|x| x.as_str())?.to_string();
     let exp = v.get("expires_in").and_then(|x| x.as_u64()).unwrap_or(3600);
@@ -1194,18 +1425,23 @@ fn pct_decode(s: &str) -> String {
 #[tauri::command]
 pub fn kick_login_start(app: AppHandle) {
     tauri::async_runtime::spawn_blocking(move || {
-        refresh_broker_config(&app);
+        let broker = refresh_broker_config(&app);
         let cfg = oauth(&app);
         if cfg.kick_client_id.is_empty()
             || (!cfg.kick_brokered && cfg.kick_client_secret.is_empty())
         {
+            let motivo = broker
+                .err()
+                .unwrap_or_else(|| "o servidor ainda não habilitou a Kick oficial".to_string());
             return auth_event(
                 &app,
                 "kick",
                 "error",
                 "",
                 "",
-                "Login oficial indisponível. Use credenciais próprias nas opções avançadas",
+                &format!(
+                    "Login oficial indisponível ({motivo}). Use credenciais próprias nas opções avançadas"
+                ),
             );
         }
         let verifier = rand_token();
@@ -1495,6 +1731,24 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
         let _ = keys::set_key("kick_refresh", r);
     }
     Some(access)
+}
+
+/// Renova a sessão da Kick ANTES de ir ao ar, em vez de esperar o primeiro 401 no meio da live.
+///
+/// A Kick é a única plataforma cujo refresh passa pela nossa API (o token endpoint dela exige
+/// Client Secret) — então uma queda da setup API com a live rodando derruba o envio e a moderação.
+/// Renovar aqui move essa falha pra ANTES do BORA, onde o streamer ainda pode reagir.
+///
+/// Best-effort e destacado: nunca atrasa o start nem faz o go-live falhar. Se a setup API estiver
+/// fora (status 0/5xx), `kick_refresh` preserva a sessão; só um refresh de fato morto desloga.
+pub fn warm_kick_session(app: &AppHandle) {
+    if !keys::has_key("kick_refresh") {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _ = kick_refresh(&app);
+    });
 }
 
 /// Chamada à API oficial do Kick (Bearer), com refresh automático no 401.
@@ -2044,6 +2298,127 @@ mod tests {
         assert!(google_oauth_err(0, &serde_json::json!({})).contains("sem conexão"));
         let e2 = serde_json::json!({ "error_description": "bad scope" });
         assert_eq!(google_oauth_err(400, &e2), "Google: bad scope");
+    }
+
+    #[test]
+    fn byok_survives_switch_to_official() {
+        // Credenciais próprias sem preferência gravada = instalação antiga → segue no BYOK.
+        assert!(byok_active(None, true));
+        assert!(byok_active(Some("byok"), true));
+        // Trocar pro oficial é só preferência: as credenciais ficam no cofre e voltam depois.
+        assert!(!byok_active(Some("official"), true));
+        assert!(byok_active(Some("byok"), true));
+        // Preferência sem credenciais completas cai no oficial em vez de virar modo quebrado.
+        assert!(!byok_active(Some("byok"), false));
+        assert!(!byok_active(None, false));
+    }
+
+    #[test]
+    fn youtube_mode_round_trips_without_losing_either_flow() {
+        let own = || Some(("meu-id".to_string(), "meu-secret".to_string()));
+        let mut config = OauthConfig {
+            youtube_official_id: "oficial".into(),
+            ..Default::default()
+        };
+
+        // BYOK ativo → device flow com as credenciais do usuário.
+        resolve_youtube_mode(&mut config, own(), Some("byok"));
+        assert_eq!(config.google_client_id, "meu-id");
+        assert_eq!(config.google_client_secret, "meu-secret");
+        assert!(!config.youtube_direct);
+
+        // Trocou pro oficial: PKCE com o Client ID público, secret fora da config ativa...
+        resolve_youtube_mode(&mut config, own(), Some("official"));
+        assert_eq!(config.google_client_id, "oficial");
+        assert!(config.google_client_secret.is_empty());
+        assert!(config.youtube_direct);
+
+        // ...e voltar pro BYOK reaproveita o cofre, sem redigitar nada.
+        resolve_youtube_mode(&mut config, own(), Some("byok"));
+        assert_eq!(config.google_client_id, "meu-id");
+        assert!(!config.youtube_direct);
+    }
+
+    #[test]
+    fn youtube_without_official_id_has_no_direct_flow() {
+        // Sem Client ID oficial não existe fluxo oficial — é o estado em que trocar de modo
+        // deixaria o YouTube sem login nenhum, então `youtube_use_official` recusa.
+        let mut config = OauthConfig::default();
+        resolve_youtube_mode(&mut config, None, Some("official"));
+        assert!(!config.youtube_direct);
+        assert!(config.google_client_id.is_empty());
+    }
+
+    #[test]
+    fn oficial_do_youtube_nunca_manda_client_secret() {
+        // Decisão Y1: o fluxo oficial é PKCE sem segredo nenhum. Se alguém "consertar" um
+        // invalid_client acrescentando client_secret aqui, o oficial passa a exigir um segredo
+        // distribuído no binário — este teste existe pra barrar isso.
+        let oficial = youtube_official_exchange_form("id", "code", "verifier", "http://127.0.0.1:1");
+        assert!(!oficial.iter().any(|(k, _)| *k == "client_secret"));
+        assert!(oficial
+            .iter()
+            .any(|(k, v)| *k == "code_verifier" && *v == "verifier"));
+
+        // BYOK é o oposto: o Google exige o secret no polling do device flow.
+        let device = youtube_device_poll_form("id", "segredo", "device");
+        assert!(device
+            .iter()
+            .any(|(k, v)| *k == "client_secret" && *v == "segredo"));
+
+        // Refresh: secret só no BYOK (no oficial a doc do Google marca como opcional).
+        assert!(!youtube_refresh_form("id", "r", None)
+            .iter()
+            .any(|(k, _)| *k == "client_secret"));
+        assert!(youtube_refresh_form("id", "r", Some("s"))
+            .iter()
+            .any(|(k, _)| *k == "client_secret"));
+    }
+
+    #[test]
+    fn oficial_e_o_padrao_sem_escolha_explicita() {
+        // Decisão T2: quem nunca pediu BYOK entra pelo fluxo oficial nas duas plataformas.
+        let mut config = OauthConfig {
+            youtube_official_id: "oficial-yt".into(),
+            kick_official_id: "oficial-kick".into(),
+            kick_broker_ready: true,
+            ..Default::default()
+        };
+        resolve_youtube_mode(&mut config, None, None);
+        resolve_kick_mode(&mut config, None, None);
+        assert!(config.youtube_direct, "YouTube novo → PKCE oficial");
+        assert!(config.kick_brokered, "Kick nova → broker");
+        assert!(config.google_client_secret.is_empty());
+        assert!(config.kick_client_secret.is_empty());
+
+        // BYOK só entra por escolha explícita (credencial colada pelo usuário).
+        resolve_youtube_mode(&mut config, Some(("meu".into(), "meu-secret".into())), None);
+        assert!(!config.youtube_direct);
+        assert_eq!(config.google_client_id, "meu");
+    }
+
+    #[test]
+    fn kick_official_needs_the_broker() {
+        // A Kick oficial depende do broker (o Client Secret vive lá): Client ID sozinho não basta.
+        let mut config = OauthConfig {
+            kick_official_id: "oficial".into(),
+            ..Default::default()
+        };
+        resolve_kick_mode(&mut config, None, None);
+        assert!(!config.kick_brokered);
+
+        config.kick_broker_ready = true;
+        resolve_kick_mode(&mut config, None, None);
+        assert!(config.kick_brokered);
+
+        // BYOK não passa pelo broker.
+        resolve_kick_mode(
+            &mut config,
+            Some(("id".into(), "secret".into())),
+            Some("byok"),
+        );
+        assert!(!config.kick_brokered);
+        assert_eq!(config.kick_client_secret, "secret");
     }
 
     #[test]

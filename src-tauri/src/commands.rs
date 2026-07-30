@@ -1111,6 +1111,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     }
     emit(&app, &snap);
 
+    // Renova a sessão da Kick agora, em paralelo com o resto do start: é o único refresh que
+    // depende da nossa setup API, e vencer no meio da live derruba envio/moderação. Destacado —
+    // não entra no caminho crítico do BORA.
+    crate::auth::warm_kick_session(&app);
+
     // Limpeza de órfãos fora do event-loop (o PowerShell bloqueia).
     let _ = tauri::async_runtime::spawn_blocking(kill_orphan_sidecars).await;
 

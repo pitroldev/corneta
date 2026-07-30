@@ -70,9 +70,20 @@ export interface CornetaApi {
   authStatus(): Promise<{
     twitchLogin: string | null;
     youtube: boolean;
+    /** Existe algum caminho de login (oficial ou credenciais próprias). */
     youtubeConfigured: boolean;
+    /** O fluxo oficial está pronto — sem isso, trocar de modo deixaria sem login. */
+    youtubeOfficialReady: boolean;
+    /** Há credenciais próprias guardadas no cofre (dá pra voltar sem redigitar). */
+    youtubeOwnCreds: boolean;
+    youtubeUsingOwnCreds: boolean;
     kick: boolean;
     kickConfigured: boolean;
+    kickOfficialReady: boolean;
+    kickOwnCreds: boolean;
+    kickUsingOwnCreds: boolean;
+    /** Por que o bootstrap da setup API não respondeu, quando falhou. */
+    brokerError: string | null;
   }>;
   twitchLoginStart(): Promise<void>;
   twitchLogout(): Promise<void>;
@@ -88,8 +99,13 @@ export interface CornetaApi {
   /** BYOK: salva/limpa as credenciais do Google do próprio usuário (cofre). */
   setYoutubeOauth(clientId: string, clientSecret: string): Promise<void>;
   clearYoutubeOauth(): Promise<void>;
+  /** Troca de modo sem apagar nada — rejeita se o outro modo não estiver disponível. */
+  youtubeUseOfficial(): Promise<void>;
+  youtubeUseOwnCreds(): Promise<void>;
   setKickOauth(clientId: string, clientSecret: string): Promise<void>;
   clearKickOauth(): Promise<void>;
+  kickUseOfficial(): Promise<void>;
+  kickUseOwnCreds(): Promise<void>;
   chatModerate(
     sourceId: string,
     action: string,
@@ -383,6 +399,14 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("clear_youtube_oauth");
     },
+    async youtubeUseOfficial() {
+      const { invoke } = await core();
+      await invoke("youtube_use_official");
+    },
+    async youtubeUseOwnCreds() {
+      const { invoke } = await core();
+      await invoke("youtube_use_own_creds");
+    },
     async setKickOauth(clientId, clientSecret) {
       const { invoke } = await core();
       await invoke("set_kick_oauth", { clientId, clientSecret });
@@ -390,6 +414,14 @@ function tauriApi(): CornetaApi {
     async clearKickOauth() {
       const { invoke } = await core();
       await invoke("clear_kick_oauth");
+    },
+    async kickUseOfficial() {
+      const { invoke } = await core();
+      await invoke("kick_use_official");
+    },
+    async kickUseOwnCreds() {
+      const { invoke } = await core();
+      await invoke("kick_use_own_creds");
     },
     async chatModerate(sourceId, action, opts) {
       const { invoke } = await core();
@@ -1358,8 +1390,15 @@ function mockApi(): CornetaApi {
         twitchLogin: null,
         youtube: false,
         youtubeConfigured: false,
+        youtubeOfficialReady: false,
+        youtubeOwnCreds: false,
+        youtubeUsingOwnCreds: false,
         kick: false,
         kickConfigured: false,
+        kickOfficialReady: false,
+        kickOwnCreds: false,
+        kickUsingOwnCreds: false,
+        brokerError: null,
       };
     },
     async twitchLoginStart() {},
@@ -1373,8 +1412,12 @@ function mockApi(): CornetaApi {
     },
     async setYoutubeOauth() {},
     async clearYoutubeOauth() {},
+    async youtubeUseOfficial() {},
+    async youtubeUseOwnCreds() {},
     async setKickOauth() {},
     async clearKickOauth() {},
+    async kickUseOfficial() {},
+    async kickUseOwnCreds() {},
     async chatModerate() {},
     subscribeAuthFlow() {
       return () => {};

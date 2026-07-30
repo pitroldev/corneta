@@ -31,6 +31,19 @@ interface LoginState {
   message?: string;
 }
 
+/** Quais caminhos de login existem numa plataforma, e qual está em uso. */
+interface OauthModes {
+  officialReady: boolean;
+  ownCreds: boolean;
+  usingOwnCreds: boolean;
+}
+
+const NO_OAUTH_MODES: OauthModes = {
+  officialReady: false,
+  ownCreds: false,
+  usingOwnCreds: false,
+};
+
 // Última remoção de destino (para o "desfazer").
 let pendingRemoval: { target: Target; index: number } | null = null;
 
@@ -113,11 +126,20 @@ interface State {
   chatLogin: { twitch: LoginState; youtube: LoginState; kick: LoginState };
   /** YouTube tem Client ID oficial ou credenciais próprias configuradas. */
   youtubeOauthReady: boolean;
+  /** Modos disponíveis — a UI só oferece a troca que não deixa a plataforma sem login. */
+  youtubeOauthModes: OauthModes;
+  kickOauthModes: OauthModes;
+  /** Por que a setup API não respondeu, quando falhou. Null = nossa API respondeu. */
+  oauthBrokerError: string | null;
   setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
   clearYoutubeOauth: () => Promise<void>;
+  youtubeUseOfficial: () => Promise<void>;
+  youtubeUseOwnCreds: () => Promise<void>;
   kickOauthReady: boolean;
   setKickOauth: (clientId: string, clientSecret: string) => Promise<void>;
   clearKickOauth: () => Promise<void>;
+  kickUseOfficial: () => Promise<void>;
+  kickUseOwnCreds: () => Promise<void>;
   setupOauth: () => Promise<void>;
   bindAuthFlow: () => () => void;
   twitchLogin: () => Promise<void>;
@@ -541,6 +563,9 @@ export const useStore = create<State>((set, get) => {
     },
     youtubeOauthReady: false,
     kickOauthReady: false,
+    youtubeOauthModes: NO_OAUTH_MODES,
+    kickOauthModes: NO_OAUTH_MODES,
+    oauthBrokerError: null,
 
     bindChat() {
       return api.subscribeChat(
@@ -706,6 +731,17 @@ export const useStore = create<State>((set, get) => {
           },
           youtubeOauthReady: a.youtubeConfigured,
           kickOauthReady: a.kickConfigured,
+          youtubeOauthModes: {
+            officialReady: a.youtubeOfficialReady,
+            ownCreds: a.youtubeOwnCreds,
+            usingOwnCreds: a.youtubeUsingOwnCreds,
+          },
+          kickOauthModes: {
+            officialReady: a.kickOfficialReady,
+            ownCreds: a.kickOwnCreds,
+            usingOwnCreds: a.kickUsingOwnCreds,
+          },
+          oauthBrokerError: a.brokerError,
         });
       } catch {
         /* sem login ainda */
@@ -718,13 +754,21 @@ export const useStore = create<State>((set, get) => {
         youtubeOauthReady: true,
         chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
       }));
+      await get().setupOauth();
     },
+    // Só apaga as credenciais do cofre. Trocar de modo NÃO passa por aqui: a troca é
+    // `youtubeUseOfficial`, que mantém tudo salvo — apagar era o que fazia o login do YouTube
+    // desaparecer de vez quando o fluxo oficial não estava disponível pra assumir.
     async clearYoutubeOauth() {
       await api.clearYoutubeOauth();
-      set((s) => ({
-        youtubeOauthReady: false,
-        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
-      }));
+      await get().setupOauth();
+    },
+    async youtubeUseOfficial() {
+      await api.youtubeUseOfficial();
+      await get().setupOauth();
+    },
+    async youtubeUseOwnCreds() {
+      await api.youtubeUseOwnCreds();
       await get().setupOauth();
     },
     async setKickOauth(clientId, clientSecret) {
@@ -733,13 +777,18 @@ export const useStore = create<State>((set, get) => {
         kickOauthReady: true,
         chatLogin: { ...s.chatLogin, kick: { state: "out" } },
       }));
+      await get().setupOauth();
     },
     async clearKickOauth() {
       await api.clearKickOauth();
-      set((s) => ({
-        kickOauthReady: false,
-        chatLogin: { ...s.chatLogin, kick: { state: "out" } },
-      }));
+      await get().setupOauth();
+    },
+    async kickUseOfficial() {
+      await api.kickUseOfficial();
+      await get().setupOauth();
+    },
+    async kickUseOwnCreds() {
+      await api.kickUseOwnCreds();
       await get().setupOauth();
     },
 
