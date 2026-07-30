@@ -78,7 +78,28 @@ export function AboutScreen() {
         </div>
       </div>
 
-      {/* CTA principal: pitrol.dev */}
+      <button
+        onClick={() => openUrl("https://www.corneta.live")}
+        className="group mb-2 flex w-full items-center gap-4 rounded-xl bg-surface p-5 pop transition-transform hover:translate-x-1 hover:-translate-y-1"
+      >
+        <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-brass text-brass-ink">
+          <Mascot className="size-7" />
+        </span>
+        <span className="flex-1 text-left">
+          <span className="block font-display text-xl font-extrabold">
+            corneta.live
+          </span>
+          <span className="block text-sm text-ink-muted">
+            Site oficial, dúvidas e download.
+          </span>
+        </span>
+        <ArrowUpRight
+          className="size-6 text-ink-faint transition-colors group-hover:text-brass"
+          strokeWidth={2.4}
+        />
+      </button>
+
+      {/* CTA do autor */}
       <button
         onClick={() => openUrl("https://pitrol.dev")}
         className="group mb-4 flex w-full items-center gap-4 rounded-xl bg-surface p-5 pop transition-transform hover:translate-x-1 hover:-translate-y-1"

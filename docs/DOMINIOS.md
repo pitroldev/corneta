@@ -207,16 +207,24 @@ Ignorando preço, ele é a expressão mais forte do produto: não altera a marca
 funciona em inglês e transforma a URL em posicionamento. Para uma landing page simples, essa
 economia de explicação vale mais que a familiaridade adicional do `.com`.
 
-**Domínio defensivo: `usecorneta.com`.** Ele deve redirecionar com `301` para `corneta.live`,
+**Domínio defensivo: `usecorneta.com`.** Ele deve redirecionar com `301` para o canônico,
 capturando quem confia ou procura naturalmente um `.com`.
+
+> **Registrado em 30/07/2026 — o host canônico é `www.corneta.live`.** O apex `corneta.live`
+> redireciona com `301` para o `www`. A escolha do host importa mais do que parece: é ele que
+> vai em `NEXT_PUBLIC_SITE_URL`, no `canonical`, no sitemap, nos `@id` do JSON-LD, no
+> `VITE_SETUP_API_URL` do app e no cadastro da verificação do Google OAuth. Misturar `www` e
+> apex entre esses lugares cria conteúdo duplicado para o buscador e reprova a verificação por
+> "redireciona para domínio diferente do informado".
 
 Arquitetura sugerida:
 
 ```text
-corneta.live                 site público, páginas legais e domínio canônico
-corneta.live/api/v1          setup API (bootstrap + broker OAuth da Kick)
+www.corneta.live             site público, páginas legais e domínio canônico
+www.corneta.live/api/v1      setup API (bootstrap + broker OAuth da Kick)
+corneta.live                 redirecionamento 301 para o www
 usecorneta.com               redirecionamento 301
-corneta.live/download        releases e instaladores
+www.corneta.live/download    releases e instaladores
 docs.corneta.live            documentação de usuário
 developers.corneta.live      documentação técnica e contribuição
 status.corneta.live          status de serviços futuros

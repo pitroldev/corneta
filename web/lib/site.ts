@@ -14,7 +14,7 @@ if (!raw && isBuildServer) {
   throw new Error(
     "NEXT_PUBLIC_SITE_URL não definida. Sem ela, sitemap, canonical e dados " +
       "estruturados sairiam apontando para http://localhost:3000. Defina a URL " +
-      "canônica (ex.: https://corneta.live) nas variáveis de ambiente do deploy.",
+      "canônica (https://www.corneta.live) nas variáveis de ambiente do deploy.",
   );
 }
 
