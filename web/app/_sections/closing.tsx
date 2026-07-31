@@ -123,15 +123,34 @@ const tickerItems = [
   "Grátis e open source",
 ];
 
+/** Quantas vezes a lista se repete DENTRO de cada cópia.
+ *
+ *  Não é o que conserta o buraco (quem conserta é o `min-w-[100vw]` abaixo) — é o
+ *  que mantém o espaçamento apertado do desenho. Uma passada dos 4 itens mede
+ *  ~1080px; quatro passadas dão ~4300px, então em qualquer tela até 4K o conteúdo
+ *  já passa da viewport sozinho e o `justify-around` não tem folga pra distribuir. */
+const TICKER_PASSES = 4;
+
+/** Uma cópia da faixa, com largura mínima de uma tela.
+ *
+ *  O `min-w-[100vw]` é o conserto: com duas cópias e `translateX(-50%)`, no fim do
+ *  ciclo só UMA cópia continua cobrindo a tela. Cópia mais estreita que a viewport
+ *  = faixa vazia à direita — era o bug, e ele aparecia em TODA tela acima de
+ *  ~1080px (837px de tomate vazio num monitor de 1920).
+ *
+ *  Numa tela mais larga que as quatro passadas, o `justify-around` espalha os itens
+ *  em vez de abrir buraco: degrada o espaçamento, não a faixa. */
 function TickerRow() {
   return (
-    <span>
-      {tickerItems.map((item) => (
-        <span className={TICKER_ROW} key={item}>
-          <Mascot />
-          {item}
-        </span>
-      ))}
+    <span className="flex min-w-[100vw] justify-around">
+      {Array.from({ length: TICKER_PASSES }, (_, pass) =>
+        tickerItems.map((item) => (
+          <span className={TICKER_ROW} key={`${pass}-${item}`}>
+            <Mascot />
+            {item}
+          </span>
+        )),
+      )}
     </span>
   );
 }
