@@ -1628,6 +1628,60 @@ export const en: Dict = {
   "platforms.toast.removed": "{name} is out",
   "platforms.toast.undo": "Undo",
 
+  // ---- recording + replay ----
+  "recorder.toast.diskFull":
+    "No room to record — your stream is fine, it just isn't being saved.",
+  "recorder.toast.noDir":
+    "Couldn't find the recording folder. Your stream is fine, it just isn't being saved.",
+  "recorder.toast.resumed": "Recording dropped and came back — a little bit is missing.",
+  "recorder.toast.gaveUp": "I gave up recording after several tries.",
+  "recorder.toast.failed": "Couldn't record: {error}",
+  "recorder.toast.estimatedAnchor":
+    "Replay sync might be a few seconds off — you can nudge it in the report.",
+
+  "replay.back10": "Back 10s",
+  "replay.chat.empty": "Nobody had said anything yet.",
+  "replay.chat.gap": "Chat dropped around here — messages may be missing.",
+  "replay.chat.hideDeleted": "hide deleted",
+  "replay.chat.showDeleted": "show deleted",
+  "replay.chat.title": "Chat at that moment",
+  "replay.clip.cancel": "cancel clip",
+  "replay.clip.crossSegment":
+    "That range spans two recordings. Pick a stretch inside one of them.",
+  "replay.clip.cta": "Cut a clip (mark the start, then the end)",
+  "replay.clip.pending": "mark the end",
+  "replay.clip.saved": "Clip saved 📣",
+  "replay.delete.confirm": "Confirm?",
+  "replay.delete.cta": "Delete this stream's recording",
+  "replay.delete.done": "Recording deleted — the report is still here.",
+  "replay.folder": "Open the recording folder",
+  "replay.fwd10": "Forward 10s",
+  "replay.fullscreen": "Fullscreen",
+  "replay.marker.added": "Moment marked",
+  "replay.marker.cta": "Mark this moment",
+  "replay.marker.default": "Marked during replay",
+  "replay.missing": "This recording's file isn't on disk anymore.",
+  "replay.mute": "Mute",
+  "replay.offset.label": "Sync nudge",
+  "replay.offset.open": "video out of sync?",
+  "replay.offset.reset": "reset",
+  "replay.rate.aria": "Speed",
+  "replay.scrub.aria": "Replay timeline",
+  "replay.seek.cta": "See this moment in the video",
+  "replay.seek.notRecorded": "That moment wasn't recorded.",
+  "replay.shortcuts":
+    "Space plays/pauses · ← → jump 10s (Shift for 1min) · , and . step frame by frame",
+  "replay.title": "Stream replay",
+  "replay.unmute": "Unmute",
+  "replay.volume": "Volume",
+  "replay.warn.codec":
+    "This recording is in a format the player can't play. Open it from the folder.",
+  "replay.warn.estimated":
+    "Sync was estimated — if the video is off from the chart, use the nudge.",
+  "replay.warn.segments":
+    "This stream has {n} recording pieces (recording dropped and came back).",
+  "replay.warn.truncated": "Recording stopped before the stream ended.",
+
   // ---- reports ----
   "reports.alerts.bitsTotal": "bits total",
   "reports.alerts.kind.follow.one": "follow",
@@ -1856,6 +1910,8 @@ export const en: Dict = {
   "reports.row.clean": "clean",
   // title do ponto verde.
   "reports.row.clean.title": "Clean stream",
+  "reports.row.hasVideo": "RECORDED",
+  "reports.row.hasVideo.title": "This stream has a recording — you can watch it alongside the charts",
   "reports.row.onAir": "{dur} on air",
   // title do ícone de olho na lista.
   "reports.row.peakViewers.title": "Peak viewers",
@@ -2136,6 +2192,41 @@ export const en: Dict = {
   "settings.system.tray.title": "Minimize to the tray on close",
   // aria-label do Toggle.
   "settings.system.tray.toggle": "Minimize to the tray",
+  "settings.record.chat.hint":
+    "Saves who said what, so you can replay chat alongside the video. Stays on your computer — Corneta never gets a copy.",
+  "settings.record.chat.label": "Record chat",
+  "settings.record.desc":
+    "Keep the stream on your computer and replay it later with the charts running alongside, in the report.",
+  "settings.record.dir.default": "Corneta's default folder",
+  "settings.record.dir.error.missing": "I couldn't find that folder.",
+  "settings.record.dir.error.notDir": "That isn't a folder.",
+  "settings.record.dir.error.readonly": "I can't write to that folder.",
+  "settings.record.dir.free": "{size} GB free — about {hours} h of streaming",
+  "settings.record.dir.label": "Save to",
+  "settings.record.dir.pick": "Choose folder",
+  "settings.record.dir.reset": "use the default",
+  "settings.record.keep.hint":
+    "Past this, Corneta deletes the oldest recordings. The reports stay.",
+  "settings.record.keep.label": "Keep up to",
+  "settings.record.privacy":
+    "Everything stays on your computer: no recording is uploaded anywhere. If you record chat, those messages are your responsibility.",
+  "settings.record.test.busy": "Testing…",
+  "settings.record.test.cta": "Test recording",
+  "settings.record.test.fail": "The test didn't pass: {error}",
+  "settings.record.test.hint":
+    "Records 5 seconds and plays it back. Worth doing before your first stream.",
+  "settings.record.test.modal": "Recording test",
+  "settings.record.test.modal.body":
+    "If you can see and hear this, recording works on this machine: the folder accepts writes and the player plays the file.",
+  "settings.record.test.ok": "Recording works 📣",
+  "settings.record.title": "Record the stream",
+  "settings.record.video.hint":
+    "Saves what went out, without the weight (no re-encoding). Uses about {gb} GB per hour at your current bitrate.",
+  "settings.record.video.label": "Record video",
+  "settings.record.warn.longPath":
+    "That path is quite long — Windows may complain.",
+  "settings.record.warn.network":
+    "Network or removable drive: if it disappears mid-stream, recording stops (your stream doesn't).",
   "settings.tab.general": "General",
   // Nome de produto, inalterado.
   "settings.tab.obs": "OBS",

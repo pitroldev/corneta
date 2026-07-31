@@ -8,11 +8,14 @@ import type {
   AlertKind,
   ChatPlatform,
   PlatformId,
+  ReplayChatGap,
+  ReplayChatMessage,
   SessionAlertEvent,
   SessionData,
   SessionFollowerSample,
   SessionMarker,
   SessionMeta,
+  SessionRecording,
   SessionSample,
   SessionSummary,
   SessionViewerSample,
@@ -37,6 +40,11 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
   const viewerSamples: SessionViewerSample[] = [];
   const followerSamples: SessionFollowerSample[] = [];
   const alertEvents: SessionAlertEvent[] = [];
+  // Gravação: um segmento por vida do FFmpeg, indexado pelo número do segmento enquanto
+  // as linhas chegam (`recording` abre, `recSync` reancora, `recEnd` fecha).
+  const recs = new Map<number, SessionRecording>();
+  const clockJumps: { t: number; delta: number }[] = [];
+  let offsetMs = 0;
   let endedAt: number | undefined;
 
   for (const line of lines) {
@@ -100,6 +108,53 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
           t: ts,
           label: String(o.label ?? t("analysis.parse.marker.labelFallback")),
         });
+    } else if (o.kind === "recording") {
+      const ts = Number(o.t);
+      const seg = Number(o.seg) || 1;
+      if (!Number.isFinite(ts)) continue;
+      recs.set(seg, {
+        seg,
+        t: ts,
+        path: String(o.path ?? ""),
+        codec: String(o.codec ?? "h264"),
+        estimated: o.estimated === true,
+        // A âncora inicial JÁ é a primeira sincronia: sem ela, um segmento sem `recSync`
+        // (live curta) ficaria sem nenhuma referência.
+        syncs: [{ t: ts, out: 0 }],
+        endT: ts,
+        finalized: false,
+      });
+    } else if (o.kind === "recSync") {
+      const ts = Number(o.t);
+      const out = Number(o.out);
+      const r = recs.get(Number(o.seg) || 1);
+      if (r && Number.isFinite(ts) && Number.isFinite(out)) {
+        r.syncs.push({ t: ts, out });
+        if (ts > r.endT) r.endT = ts;
+      }
+    } else if (o.kind === "recEnd") {
+      const ts = Number(o.t);
+      // `recEnd` sem `seg` vem da recuperação de boot (sessão truncada por queda de
+      // energia): aplica no último segmento aberto, que é o que ficou pela metade.
+      const seg = o.seg == null ? Math.max(...recs.keys(), 1) : Number(o.seg) || 1;
+      const r = recs.get(seg);
+      if (r) {
+        if (Number.isFinite(ts) && ts > r.endT) r.endT = ts;
+        r.reason = o.reason == null ? undefined : String(o.reason);
+      }
+    } else if (o.kind === "recFinalized") {
+      const r = recs.get(Number(o.seg) || 1);
+      if (r) r.finalized = true;
+    } else if (o.kind === "clockJump") {
+      const ts = Number(o.t);
+      const delta = Number(o.delta);
+      if (Number.isFinite(ts) && Number.isFinite(delta))
+        clockJumps.push({ t: ts, delta });
+    } else if (o.kind === "offset") {
+      // Última linha vence: o NDJSON é append-only, então o ajuste manual é reescrito
+      // em vez de editado. Grampeado porque o arquivo pode ter sido mexido na mão.
+      const ms = Number(o.ms);
+      if (Number.isFinite(ms)) offsetMs = Math.max(-30_000, Math.min(30_000, ms));
     } else if (o.kind === "end") {
       const e = Number(o.endedAt);
       if (Number.isFinite(e)) endedAt = e;
@@ -115,6 +170,13 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
     0,
     Math.round(((endedAt ?? last) - meta.startedAt) / 1000),
   );
+  // Segmento que nunca fechou (o app morreu antes do `recEnd`) fica com `endT === t` e
+  // seria descartado como vazio. Fecha na última amostra: é o instante mais tardio que
+  // sabemos ter existido, e é melhor um replay que termina cedo do que replay nenhum.
+  for (const r of recs.values()) {
+    if (r.endT <= r.t) r.endT = Math.max(endedAt ?? last, r.t);
+  }
+
   return {
     meta,
     samples,
@@ -122,7 +184,53 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
     viewerSamples,
     followerSamples,
     alertEvents,
+    recordings: [...recs.values()].sort((a, b) => a.t - b.t),
+    clockJumps,
+    offsetMs,
   };
+}
+
+/** Converte o `<id>.chat.ndjson` em mensagens + buracos.
+ *
+ *  As deleções são aplicadas NA LEITURA: quem foi moderado sai do replay por padrão, em
+ *  vez de ficar guardado num campo que alguém esquece de filtrar depois. */
+export function parseChatSession(ndjson: string): {
+  messages: ReplayChatMessage[];
+  gaps: ReplayChatGap[];
+} {
+  const messages: ReplayChatMessage[] = [];
+  const gaps: ReplayChatGap[] = [];
+  const deleted = new Set<string>();
+  for (const line of ndjson.split("\n")) {
+    const raw = line.trim();
+    if (!raw) continue;
+    let o: RawLine;
+    try {
+      o = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const t = Number(o.t);
+    if (!Number.isFinite(t)) continue;
+    if (o.del != null) {
+      deleted.add(String(o.del));
+    } else if (o.gap != null) {
+      gaps.push({ t, from: Number(o.gap) || t });
+    } else if (o.m != null) {
+      messages.push({
+        t,
+        p: String(o.p ?? "twitch") as ReplayChatMessage["p"],
+        s: String(o.s ?? ""),
+        a: String(o.a ?? ""),
+        c: o.c == null ? undefined : String(o.c),
+        m: String(o.m),
+        i: o.i == null ? undefined : String(o.i),
+      });
+    }
+  }
+  for (const m of messages) if (m.i && deleted.has(m.i)) m.deleted = true;
+  messages.sort((a, b) => a.t - b.t);
+  return { messages, gaps };
 }
 
 // ---------------------------------------------------------------------------

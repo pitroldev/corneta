@@ -22,6 +22,7 @@ import type {
   EngineSnapshot,
   Leak,
   ObsCheck,
+  RecordDirCheck,
   SessionMeta,
   TargetStatus,
   Viewers,
@@ -61,8 +62,32 @@ export interface CornetaApi {
   /** `t` só serve à demo do navegador, que semeia sessões de exemplo com copy. */
   listSessions(t: I18n["t"]): Promise<SessionMeta[]>;
   readSession(id: string): Promise<string>;
+  /** NDJSON do chat gravado. String vazia = a sessão não gravou chat (o caso comum). */
+  readSessionChat(id: string): Promise<string>;
   deleteSession(id: string): Promise<void>;
   openSessionsDir(): Promise<void>;
+  // Gravação + replay
+  /** Valida a pasta candidata (existe, é pasta, ESCREVE de verdade) e devolve os avisos. */
+  recordCheckDir(dir: string): Promise<RecordDirCheck>;
+  /** Diálogo nativo de pasta. `null` = cancelou (não é erro). */
+  recordPickDir(): Promise<string | null>;
+  /** Grava 5s de barras e devolve o caminho — valida o caminho inteiro antes do BORA. */
+  recordTest(dir: string): Promise<string>;
+  /** Libera o arquivo no escopo do asset e devolve a URL que o `<video>` consome. */
+  recordVideoUrl(path: string): Promise<string>;
+  /** Ajuste manual de sincronia do replay, em ms (grampeado em ±30s no backend). */
+  setSessionOffset(id: string, ms: number): Promise<void>;
+  /** Apaga só os vídeos de uma sessão — relatório e chat ficam. */
+  deleteSessionRecordings(id: string): Promise<void>;
+  openRecordingFolder(): Promise<void>;
+  /** Marca um instante durante o replay (o `t` é o momento assistido, não o do clique). */
+  addSessionMarker(id: string, t: number, label: string): Promise<void>;
+  /** Corta um trecho da gravação (cópia de bitstream). `null` = cancelou o diálogo. */
+  exportClip(
+    path: string,
+    startMs: number,
+    endMs: number,
+  ): Promise<string | null>;
   /** Salva texto no arquivo que o usuário escolher. `false` = cancelou o diálogo. */
   saveTextFile(file: {
     name: string;
@@ -174,6 +199,11 @@ export interface CornetaApi {
   exportDiagnostics(): Promise<boolean>;
   registerShortcut(shortcut: string): Promise<void>;
   subscribeShortcut(cb: () => void): () => void;
+  /** Avisos do gravador (disco cheio, retomada, pasta sumida). O `kind` é ASCII de
+   *  protocolo — a tradução mora no dicionário. */
+  subscribeRecorder(
+    cb: (e: { kind: string; detail?: string | null }) => void,
+  ): () => void;
   obsCheck(): Promise<ObsCheck>;
   markMoment(label?: string): Promise<void>;
   exportConfig(): Promise<boolean>;
@@ -325,6 +355,10 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return invoke<boolean>("save_text_file", file);
     },
+    async readSessionChat(id) {
+      const { invoke } = await core();
+      return invoke<string>("read_session_chat", { id });
+    },
     async deleteSession(id) {
       const { invoke } = await core();
       await invoke("delete_session", { id });
@@ -332,6 +366,45 @@ function tauriApi(): CornetaApi {
     async openSessionsDir() {
       const { invoke } = await core();
       await invoke("open_sessions_dir");
+    },
+    async recordCheckDir(dir) {
+      const { invoke } = await core();
+      return invoke<RecordDirCheck>("record_check_dir", { dir });
+    },
+    async recordPickDir() {
+      const { invoke } = await core();
+      return (await invoke<string | null>("record_pick_dir")) ?? null;
+    },
+    async recordTest(dir) {
+      const { invoke } = await core();
+      return invoke<string>("record_test", { dir });
+    },
+    async recordVideoUrl(path) {
+      const { invoke, convertFileSrc } = await core();
+      // Duas etapas de propósito: o Rust confere que o arquivo é NOSSO e o libera no
+      // escopo; a URL é montada pelo próprio Tauri, que é quem sabe o escape do handler.
+      await invoke("record_allow_file", { path });
+      return convertFileSrc(path);
+    },
+    async setSessionOffset(id, ms) {
+      const { invoke } = await core();
+      await invoke("set_session_offset", { id, ms });
+    },
+    async deleteSessionRecordings(id) {
+      const { invoke } = await core();
+      await invoke("delete_session_recordings", { id });
+    },
+    async openRecordingFolder() {
+      const { invoke } = await core();
+      await invoke("open_recording_folder");
+    },
+    async addSessionMarker(id, t, label) {
+      const { invoke } = await core();
+      await invoke("add_session_marker", { id, t, label });
+    },
+    async exportClip(path, startMs, endMs) {
+      const { invoke } = await core();
+      return invoke<string | null>("export_clip", { path, startMs, endMs });
     },
     async chatStart() {
       const { invoke } = await core();
@@ -593,6 +666,20 @@ function tauriApi(): CornetaApi {
     async registerShortcut(shortcut) {
       const { invoke } = await core();
       await invoke("register_shortcut", { shortcut });
+    },
+    subscribeRecorder(cb) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<{ kind: string; detail?: string | null }>(
+          "recorder://status",
+          (e) => cb(e.payload),
+        ).then((u) => (cancelled ? u() : (unlisten = u))),
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+      };
     },
     subscribeShortcut(cb) {
       let cancelled = false;
@@ -1317,6 +1404,37 @@ function mockApi(): CornetaApi {
     async openSessionsDir() {
       // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
     },
+    // Gravação não existe na demo do navegador: não há FFmpeg, não há disco e não há
+    // protocolo de asset. Os stubs devolvem "nada gravado" em vez de lançar — assim a
+    // tela de relatório abre igual, só sem a aba de replay.
+    async readSessionChat() {
+      return "";
+    },
+    async recordCheckDir() {
+      return {
+        ok: false,
+        error: "missing",
+        lowSpace: false,
+        removableOrNetwork: false,
+        longPath: false,
+      };
+    },
+    async recordPickDir() {
+      return null;
+    },
+    async recordTest() {
+      throw new Error("sem gravação no navegador");
+    },
+    async recordVideoUrl() {
+      throw new Error("sem gravação no navegador");
+    },
+    async setSessionOffset() {},
+    async deleteSessionRecordings() {},
+    async openRecordingFolder() {},
+    async addSessionMarker() {},
+    async exportClip() {
+      return null;
+    },
     async chatStart(t) {
       // Frases da demo resolvidas UMA vez por conexão (o timer roda a cada 1,1 s).
       const chatMsgs = CHAT_MSG_KEYS.map((k) => t(k));
@@ -1543,6 +1661,9 @@ function mockApi(): CornetaApi {
     },
     async registerShortcut() {
       // no-op no navegador (atalho global é do SO).
+    },
+    subscribeRecorder() {
+      return () => {};
     },
     subscribeShortcut() {
       return () => {};

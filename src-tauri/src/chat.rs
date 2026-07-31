@@ -132,6 +132,23 @@ fn emit_chat(app: &AppHandle, msg: ChatMessage) {
             .entry(format!("{}:{}", msg.platform, msg.source))
             .or_insert(0) += 1;
     }
+    // Gravação do chat (opt-in): arquivo IRMÃO do relatório, com teto próprio. Se ele
+    // estourar, para de gravar texto e a contagem acima segue intacta — o relatório não
+    // perde nada por causa de uma raid.
+    if crate::session::chat_recording() {
+        if let Some(p) = session_path(app) {
+            crate::session::record_chat_msg(
+                &p,
+                msg.ts,
+                &msg.platform,
+                &msg.source,
+                &msg.author,
+                msg.color.as_deref(),
+                &msg.text,
+                msg.native_id.as_deref(),
+            );
+        }
+    }
     crate::overlay::push_chat(&app.state::<AppState>().overlay, &msg);
     let _ = app.emit("chat://message", msg);
 }
@@ -144,6 +161,15 @@ fn emit_chat_gen(app: &AppHandle, gen: u64, msg: ChatMessage) {
     }
 }
 fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
+    // Queda de uma fonte vira BURACO no chat gravado. Sem isso, o replay mostraria um
+    // silêncio de 3 minutos e quem revisa concluiria "ninguém falou" — quando na verdade
+    // a Corneta é que não estava ouvindo. Silêncio real e silêncio por desconexão são
+    // coisas diferentes pra quem está revisando a live.
+    if status == "disconnected" && crate::session::chat_recording() {
+        if let Some(p) = session_path(app) {
+            crate::session::record_chat_gap(&p, now_ms());
+        }
+    }
     let _ = app.emit(
         "chat://status",
         json!({ "platform": platform, "source": source, "status": status }),
@@ -165,6 +191,14 @@ fn chat_auth(app: &AppHandle, source_id: &str, login: &str, ok: bool) {
     );
 }
 fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
+    // A deleção também vai pro arquivo. Se alguém foi banido por assédio e a mensagem saiu
+    // do ar, o replay da Corneta não deveria ser o único lugar do mundo onde ela sobrevive
+    // pra sempre — o replay respeita a moderação e esconde por padrão.
+    if crate::session::chat_recording() {
+        if let Some(p) = session_path(app) {
+            crate::session::record_chat_delete(&p, native_id);
+        }
+    }
     let _ = app.emit(
         "chat://delete",
         json!({ "scope": "message", "platform": platform, "nativeId": native_id }),

@@ -277,6 +277,35 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Avisos do gravador. Ficam aqui, e não numa tela, porque o streamer pode estar em
+  // qualquer aba quando o disco enche — e porque nenhum deles é erro do MOTOR: a live
+  // segue no ar em todos os casos. É informação, não alarme.
+  useEffect(() => {
+    return api.subscribeRecorder(({ kind, detail }) => {
+      switch (kind) {
+        case "diskFull":
+          toast.error(t("recorder.toast.diskFull"));
+          break;
+        case "noDir":
+          toast.error(t("recorder.toast.noDir"));
+          break;
+        case "resumed":
+          toast.info(t("recorder.toast.resumed"));
+          break;
+        case "gaveUp":
+          toast.error(t("recorder.toast.gaveUp"));
+          break;
+        case "estimatedAnchor":
+          toast.info(t("recorder.toast.estimatedAnchor"));
+          break;
+        case "failed":
+          toast.error(t("recorder.toast.failed", { error: detail ?? "" }));
+          break;
+        default:
+      }
+    });
+  }, [t]);
+
   // Deep-link global: qualquer tela pede navegação pelo store (ex.: "Configurar chat" em Plataformas).
   const navRequest = useStore((s) => s.navRequest);
   const requestNavigate = useStore((s) => s.requestNavigate);

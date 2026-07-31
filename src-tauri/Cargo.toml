@@ -15,7 +15,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# protocol-asset: o `<video>` do replay lê a gravação do disco. O escopo nasce vazio e cada
+# arquivo é liberado em runtime (ver commands::record_video_url).
+tauri = { version = "2", features = ["tray-icon", "image-png", "protocol-asset"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
@@ -69,7 +71,9 @@ tauri-plugin-process = "2.0.0-rc.1"
 [target.'cfg(windows)'.dependencies]
 # Win32_Globalization: GetUserPreferredUILanguages (idioma de EXIBIÇÃO do Windows) para o
 # "auto" do i18n. É a mesma fonte que o navigator.languages do WebView2 lê.
-windows = { version = "0.58", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization"] }
+# Win32_Storage_FileSystem: GetDiskFreeSpaceExW — espaço livre do VOLUME da pasta de
+# gravação (não do disco do sistema). É o que sustenta a parada antes de o disco zerar.
+windows = { version = "0.58", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem"] }
 # Mesa: auto-concede câmera/mic no WebView2 (PermissionRequested). Resolve pra 0.38.2,
 # o mesmo já fixado pelo wry — sem binding nativo duplicado.
 webview2-com = "0.38"

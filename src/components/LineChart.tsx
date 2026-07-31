@@ -32,6 +32,8 @@ export function LineChart({
   formatX,
   refLine,
   className,
+  playhead,
+  onSeek,
 }: {
   series: ChartSeries[];
   /** Número de amostras (comprimento do eixo x). */
@@ -44,6 +46,11 @@ export function LineChart({
   formatX?: (i: number) => string;
   refLine?: ChartRefLine;
   className?: string;
+  /** Cursor do replay, em índice de amostra (fracionário: o vídeo anda entre amostras).
+   *  `null` = sem gravação ou instante fora dela. */
+  playhead?: number | null;
+  /** Clique no gráfico → salta o vídeo pra aquela amostra. Sem isso o gráfico é só leitura. */
+  onSeek?: (i: number) => void;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -81,9 +88,9 @@ export function LineChart({
   // O SVG escala via viewBox: mapeia o mouse de px da tela → coordenada do gráfico
   // pela matriz real do SVG (getScreenCTM), que já desconta o letterbox do
   // preserveAspectRatio — regra de três com o rect erraria perto das bordas.
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  const indexAtEvent = (e: React.MouseEvent<SVGSVGElement>): number | null => {
     const el = svgRef.current;
-    if (!el || n <= 1) return;
+    if (!el || n <= 1) return null;
     const ctm = el.getScreenCTM();
     let x: number;
     if (ctm) {
@@ -96,7 +103,18 @@ export function LineChart({
       x = ((e.clientX - rect.left) / rect.width) * W;
     }
     const i = Math.round(((x - padL) / innerW) * (n - 1));
-    setHover(Math.max(0, Math.min(n - 1, i)));
+    return Math.max(0, Math.min(n - 1, i));
+  };
+
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const i = indexAtEvent(e);
+    if (i != null) setHover(i);
+  };
+
+  const onClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!onSeek) return;
+    const i = indexAtEvent(e);
+    if (i != null) onSeek(i);
   };
 
   const renderTooltip = () => {
@@ -179,9 +197,10 @@ export function LineChart({
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         height={H}
-        className="overflow-visible"
+        className={cn("overflow-visible", onSeek && "cursor-pointer")}
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
+        onClick={onClick}
       >
         {ticks.map((tv, i) => (
           <g key={i}>
@@ -273,6 +292,30 @@ export function LineChart({
             vectorEffect="non-scaling-stroke"
           />
         ))}
+
+        {/* Cursor do replay. Desenhado DEPOIS das séries e ANTES do tooltip: tem que
+            ficar por cima da linha (é a informação que o olho procura enquanto o vídeo
+            corre) e por baixo do tooltip (que é o que o mouse pediu agora). */}
+        {playhead != null && n > 1 && (
+          <g pointerEvents="none">
+            <line
+              x1={xAt(playhead)}
+              y1={padT}
+              x2={xAt(playhead)}
+              y2={H - padB}
+              className="text-brass"
+              stroke="currentColor"
+              strokeWidth={2}
+              vectorEffect="non-scaling-stroke"
+            />
+            <circle
+              cx={xAt(playhead)}
+              cy={padT}
+              r={3.5}
+              className="fill-brass"
+            />
+          </g>
+        )}
 
         {renderTooltip()}
       </svg>

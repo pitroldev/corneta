@@ -15,6 +15,7 @@ mod keys;
 mod obs;
 mod overlay;
 mod permissions;
+mod recorder;
 mod session;
 mod splicer;
 mod studio;
@@ -201,8 +202,18 @@ pub fn run() {
             commands::set_force_brb,
             commands::list_sessions,
             commands::read_session,
+            commands::read_session_chat,
             commands::delete_session,
             commands::open_sessions_dir,
+            commands::record_check_dir,
+            commands::record_pick_dir,
+            commands::record_test,
+            commands::record_allow_file,
+            commands::set_session_offset,
+            commands::delete_session_recordings,
+            commands::open_recording_folder,
+            commands::add_session_marker,
+            commands::export_clip,
             commands::open_external,
             commands::chat_start,
             commands::chat_stop,
@@ -261,6 +272,18 @@ pub fn run() {
         ])
         .setup(|app| {
             session::recover_incomplete_sessions(app.handle());
+            // Varredura de gravações órfãs + poda por espaço. Roda no boot porque é aqui
+            // que dá pra recolher o que uma queda (ou uma versão anterior) deixou pra
+            // trás: sem isto, vídeo de sessão já podada ficaria ocupando dezenas de GB
+            // sem nada na interface explicando de onde veio.
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    let cfg = config::load(&handle);
+                    let dir = recorder::resolve_dir(&handle, &cfg.settings.record_video_dir);
+                    session::prune_videos(&handle, dir.as_deref(), cfg.settings.record_video_keep_gb);
+                });
+            }
             // Mesa: auto-concede câmera/mic no WebView2 (getUserMedia sem prompt/lock).
             if let Some(w) = app.get_webview_window("main") {
                 permissions::grant_av_permissions(&w);

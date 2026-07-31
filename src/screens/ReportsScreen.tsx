@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   Clock,
   Eye,
   MessageSquare,
+  Play,
   Copy,
   Scissors,
   Share2,
@@ -26,7 +27,19 @@ import { useStore } from "../lib/store";
 import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { cn, errMsg } from "../lib/utils";
-import type { SessionData, SessionMeta, SessionSummary } from "../lib/types";
+import type {
+  ReplayChatGap,
+  ReplayChatMessage,
+  SessionData,
+  SessionMeta,
+  SessionSummary,
+} from "../lib/types";
+import { fractionalIndexAt } from "../lib/replay";
+import {
+  ReplayPlayer,
+  type ReplayTick,
+  type SeekRequest,
+} from "../components/ReplayPlayer";
 import {
   analyze,
   bitrateSeries,
@@ -39,6 +52,7 @@ import {
   hasObs,
   chatRateSeriesFor,
   obsRenderSeries,
+  parseChatSession,
   parseSession,
   setCachedSummary,
   summarize,
@@ -352,6 +366,17 @@ function SessionRow({
           <span className="ml-1 text-xs text-ink-faint">
             {meta.platforms.map((p) => p.name).join(", ")}
           </span>
+          {/* Selo de gravação. Sem ele, o replay seria uma feature escondida: quem gravou
+              três lives não teria como saber QUAL delas dá pra assistir sem abrir uma a
+              uma. É a única pista na lista de que existe vídeo do outro lado. */}
+          {meta.hasVideo && (
+            <span
+              className="ml-1 flex items-center gap-1 rounded bg-brass/15 px-1.5 py-0.5 text-[10px] font-bold text-brass"
+              title={t("reports.row.hasVideo.title")}
+            >
+              <Play className="size-3" /> {t("reports.row.hasVideo")}
+            </span>
+          )}
         </div>
       </div>
       {/* Como foi a live, sem precisar abrir: pico · chat · veredito */}
@@ -619,6 +644,20 @@ function ReportDetail({
   // repartida nem sempre quer o chat repartido junto.
   const [splitViewers, setSplitViewers] = useState(false);
   const [splitChat, setSplitChat] = useState(false);
+  // O CURSOR. Um número em epoch ms, e tudo se pendura nele: o vídeo tocando move,
+  // clicar em qualquer coisa do relatório move, e os gráficos e o chat leem.
+  const [playheadT, setPlayheadT] = useState<number | null>(null);
+  const [seek, setSeek] = useState<SeekRequest | null>(null);
+  const [chatReplay, setChatReplay] = useState<{
+    messages: ReplayChatMessage[];
+    gaps: ReplayChatGap[];
+  }>({ messages: [], gaps: [] });
+  // Bump força a releitura da sessão (marcador novo, gravação apagada).
+  const [reload, setReload] = useState(0);
+
+  /** Único caminho de "leve o vídeo pra este instante". O nonce faz o segundo clique no
+   *  MESMO evento saltar de novo, em vez de parecer quebrado. */
+  const seekTo = (t: number) => setSeek({ epoch: t, nonce: Date.now() });
 
   useEffect(() => {
     let alive = true;
@@ -634,7 +673,22 @@ function ReportDetail({
     return () => {
       alive = false;
     };
-  }, [id, t]);
+  }, [id, t, reload]);
+
+  // Chat gravado (Fase 2). Lido em separado porque mora em arquivo irmão — e porque a
+  // maioria das sessões não tem, então não vale carregar junto com o relatório.
+  useEffect(() => {
+    let alive = true;
+    void api
+      .readSessionChat(id)
+      .then((raw) => {
+        if (alive && raw) setChatReplay(parseChatSession(raw));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
 
   // Resumo da live anterior: cache ou computa on-demand.
   useEffect(() => {
@@ -669,6 +723,26 @@ function ReportDetail({
     onDeleted();
   };
 
+  // O CUSTO DO CURSOR. Com o replay tocando, `playheadT` muda ~4×/s e re-renderiza esta
+  // tela inteira. Sem estes memos, cada quadro do vídeo refazia a análise completa da
+  // sessão (várias passadas por ~7.200 amostras, mais janelas, canais e destaques) — o
+  // relatório engasgava justamente enquanto o streamer assistia.
+  //
+  // Precisam ficar ACIMA dos returns de carregando/erro: hook não pode ser condicional.
+  const parsed = data === "loading" || !data ? null : data;
+  const analysis = useMemo(
+    () => (parsed ? analyze(parsed, t) : null),
+    [parsed, t],
+  );
+  const sampleTimes = useMemo(
+    () => parsed?.samples.map((s) => s.t) ?? [],
+    [parsed],
+  );
+  const viewerTimes = useMemo(
+    () => parsed?.viewerSamples.map((s) => s.t) ?? [],
+    [parsed],
+  );
+
   if (data === "loading") {
     return (
       <div className="mx-auto max-w-3xl">
@@ -696,8 +770,46 @@ function ReportDetail({
     );
   }
 
-  const a = analyze(data, t);
+  const a = analysis!;
   const n = data.samples.length;
+
+  // --- Replay: o cursor traduzido pra cada eixo ---
+  // Os gráficos são indexados por AMOSTRA, não por tempo, e a audiência tem eixo próprio
+  // (amostra a cada 30s). Traduzir aqui é o que deixa o cursor bater nos dois.
+  const playSample =
+    playheadT == null ? null : fractionalIndexAt(sampleTimes, playheadT);
+  const playViewer =
+    playheadT == null ? null : fractionalIndexAt(viewerTimes, playheadT);
+  const hasReplay = data.recordings.length > 0;
+  const seekSample = hasReplay
+    ? (i: number) => {
+        const ts = sampleTimes[Math.round(i)];
+        if (ts != null) seekTo(ts);
+      }
+    : undefined;
+  const seekViewer = hasReplay
+    ? (i: number) => {
+        const ts = viewerTimes[Math.round(i)];
+        if (ts != null) seekTo(ts);
+      }
+    : undefined;
+  // Marcas na régua do player: os mesmos eventos que já viram marcador nos gráficos.
+  const replayTicks: ReplayTick[] = hasReplay
+    ? [
+        ...a.events
+          .filter((e) => e.kind === "error" || e.kind === "reconnect")
+          .map((e) => ({
+            t: e.t,
+            color: e.kind === "error" ? "#ef4444" : "#f97316",
+            label: e.label,
+          })),
+        ...data.markers.map((m) => ({
+          t: m.t,
+          color: "#e0b040",
+          label: m.label,
+        })),
+      ]
+    : [];
 
   // Marcadores de evento (reconexão/erro) no eixo de tempo.
   const indexAt = (ms: number) => {
@@ -979,6 +1091,23 @@ function ReportDetail({
         </div>
       </Card>
 
+      {/* REPLAY — só existe se esta live foi gravada. Fica logo abaixo do veredito
+          porque é o caminho mais curto entre "a análise diz que travou às 23:40" e
+          "quero VER o que estava na tela às 23:40". */}
+      {hasReplay && (
+        <ReplayPlayer
+          data={data}
+          sessionId={id}
+          chat={chatReplay.messages}
+          gaps={chatReplay.gaps}
+          ticks={replayTicks}
+          seek={seek}
+          onPlayhead={setPlayheadT}
+          onMarkerAdded={() => setReload((r) => r + 1)}
+          onRecordingsDeleted={() => setReload((r) => r + 1)}
+        />
+      )}
+
       {/* Retenção (audiência ao vivo) */}
       {a.viewers.hasData && vN > 1 && (
         <Card className="mb-4">
@@ -994,6 +1123,8 @@ function ReportDetail({
             markers={raidMarkers}
             formatValue={(v) => fmt.num(Math.round(v))}
             formatX={relAtViewer}
+            playhead={playViewer}
+            onSeek={seekViewer}
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
             {/* Estes números são sempre da live inteira. Com o gráfico repartido
@@ -1041,7 +1172,12 @@ function ReportDetail({
           </h3>
           <div className="flex flex-col gap-1.5">
             {a.highlights.map((h, i) => (
-              <HighlightRow key={i} h={h} time={rel(h.t)} />
+              <HighlightRow
+                key={i}
+                h={h}
+                time={rel(h.t)}
+                onSeek={hasReplay ? () => seekTo(h.t) : undefined}
+              />
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
@@ -1065,6 +1201,8 @@ function ReportDetail({
             markers={chatMarkers}
             formatValue={(v) => Math.round(v).toString()}
             formatX={relAtSample}
+            playhead={playSample}
+            onSeek={seekSample}
           />
           <div className="mt-2 text-xs text-ink-muted">
             {splitChat && canSplitChat && (
@@ -1140,6 +1278,8 @@ function ReportDetail({
             markers={markers}
             formatValue={(v) => fmt.dec(v, 1)}
             formatX={relAtSample}
+            playhead={playSample}
+            onSeek={seekSample}
           />
           {markers.length > 0 && (
             <div className="mt-2 flex gap-3 text-[11px] font-semibold text-ink-faint">
@@ -1170,6 +1310,8 @@ function ReportDetail({
             formatValue={(v) => `${Math.round(v)}`}
             formatX={relAtSample}
             refLine={{ value: 92, label: t("reports.machine.dangerLine") }}
+            playhead={playSample}
+            onSeek={seekSample}
           />
         </Card>
       )}
@@ -1192,6 +1334,8 @@ function ReportDetail({
             markers={markers}
             formatValue={(v) => `${Math.round(v)}`}
             formatX={relAtSample}
+            playhead={playSample}
+            onSeek={seekSample}
           />
         </Card>
       )}
@@ -1242,7 +1386,12 @@ function ReportDetail({
           </h3>
           <div className="flex flex-col gap-2">
             {a.windows.map((w, i) => (
-              <WindowCard key={i} w={w} time={rel(w.tStart)} />
+              <WindowCard
+                key={i}
+                w={w}
+                time={rel(w.tStart)}
+                onSeek={hasReplay ? () => seekTo(w.tStart) : undefined}
+              />
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
@@ -1258,7 +1407,12 @@ function ReportDetail({
         </h3>
         <div className="flex flex-col gap-1">
           {a.events.map((e, i) => (
-            <EventRow key={i} e={e} time={rel(e.t)} />
+            <EventRow
+              key={i}
+              e={e}
+              time={rel(e.t)}
+              onSeek={hasReplay ? () => seekTo(e.t) : undefined}
+            />
           ))}
         </div>
       </Card>
@@ -1567,7 +1721,16 @@ function DeleteButton({ onDelete }: { onDelete: () => void }) {
 }
 
 // Tempo relativo primário (acha no VOD), hora do relógio secundária.
-function WindowCard({ w, time }: { w: ProblemWindow; time: string }) {
+function WindowCard({
+  w,
+  time,
+  onSeek,
+}: {
+  w: ProblemWindow;
+  time: string;
+  /** Definido só quando a live foi gravada: leva o vídeo pra este instante. */
+  onSeek?: () => void;
+}) {
   const { t, fmt } = useI18n();
   return (
     <div className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2">
@@ -1579,6 +1742,7 @@ function WindowCard({ w, time }: { w: ProblemWindow; time: string }) {
           ({fmt.time(w.tStart)} · {w.durationSec}s)
         </span>
         <span className="font-semibold">{w.cause}</span>
+        {onSeek && <SeekButton onSeek={onSeek} />}
         <button
           onClick={() => {
             void navigator.clipboard?.writeText(time);
@@ -1613,7 +1777,15 @@ const EVENT_DOT: Record<ReportEvent["kind"], string> = {
 };
 
 // Mesmo relógio dos destaques/trechos (relativo ao início); hora real à direita.
-function EventRow({ e, time }: { e: ReportEvent; time: string }) {
+function EventRow({
+  e,
+  time,
+  onSeek,
+}: {
+  e: ReportEvent;
+  time: string;
+  onSeek?: () => void;
+}) {
   const { fmt } = useI18n();
   return (
     <div className="flex items-center gap-2 text-sm">
@@ -1622,10 +1794,27 @@ function EventRow({ e, time }: { e: ReportEvent; time: string }) {
       </span>
       <span className={cn("size-2 shrink-0 rounded-full", EVENT_DOT[e.kind])} />
       <span className="flex-1 text-ink-muted">{e.label}</span>
+      {onSeek && <SeekButton onSeek={onSeek} />}
       <span className="text-[11px] tabular-nums text-ink-faint">
         {fmt.time(e.t)}
       </span>
     </div>
+  );
+}
+
+/** "Ver no vídeo": o botão que transforma um número do relatório num momento assistido.
+ *  Só aparece quando a live foi gravada. */
+function SeekButton({ onSeek }: { onSeek: () => void }) {
+  const t = useT();
+  return (
+    <button
+      onClick={onSeek}
+      className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-brass"
+      title={t("replay.seek.cta")}
+      aria-label={t("replay.seek.cta")}
+    >
+      <Play className="size-3.5" />
+    </button>
   );
 }
 
@@ -1649,7 +1838,15 @@ const HL_ICON: Record<Highlight["kind"], string> = {
   alert: "🎉",
 };
 
-function HighlightRow({ h, time }: { h: Highlight; time: string }) {
+function HighlightRow({
+  h,
+  time,
+  onSeek,
+}: {
+  h: Highlight;
+  time: string;
+  onSeek?: () => void;
+}) {
   const t = useT();
   return (
     <div className="flex items-center gap-2.5 rounded-md bg-surface-2 px-3 py-2">
@@ -1658,6 +1855,7 @@ function HighlightRow({ h, time }: { h: Highlight; time: string }) {
         {time}
       </span>
       <span className="flex-1 text-sm text-ink-muted">{h.reason}</span>
+      {onSeek && <SeekButton onSeek={onSeek} />}
       <button
         onClick={() => {
           void navigator.clipboard?.writeText(time);

@@ -13,14 +13,17 @@ import {
   Database,
   Download,
   FileText,
+  FolderOpen,
   Keyboard,
   MonitorCog,
   Palette,
   Plug,
+  Play,
   ScanEye,
   Server,
   Shield,
   Upload,
+  Video,
   X,
 } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
@@ -28,11 +31,13 @@ import * as RTabs from "@radix-ui/react-tabs";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
+import { lowestCommonDenominator } from "../lib/estimates";
 import { brbSlateGeneration, renderBrbSlatePng } from "../lib/brbSlate";
 import { toast } from "../lib/toast";
-import { cn } from "../lib/utils";
+import { cn, errMsg } from "../lib/utils";
 import { sanitizeHost } from "../lib/validation";
-import type { AppSettings, ObsCheck } from "../lib/types";
+import type { AppSettings, ObsCheck, RecordDirCheck } from "../lib/types";
+import { Modal } from "../components/Modal";
 import { Select } from "../components/Select";
 import {
   LOCALES,
@@ -422,6 +427,7 @@ export function SettingsScreen() {
 
         {/* ===================== Geral ===================== */}
         <RTabs.Content value="geral">
+          <RecordingSettings />
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">
               <Keyboard className="size-5 text-brass" />{" "}
@@ -1209,5 +1215,234 @@ function SettingRow({
       </div>
       {children}
     </div>
+  );
+}
+
+// ============================================================
+// Gravação da live (vídeo + chat) — ver docs/FEATURE-GRAVACAO-E-REPLAY.md §6.
+//
+// As duas chaves nascem DESLIGADAS e são independentes: uma custa disco, a outra guarda
+// dado pessoal de terceiros na máquina do streamer. Nenhuma das duas é decisão da Corneta.
+// ============================================================
+function RecordingSettings() {
+  const { t, fmt } = useI18n();
+  const config = useStore((s) => s.config!);
+  const settings = config.settings;
+  const setSettings = useStore((s) => s.setSettings);
+  const [check, setCheck] = useState<RecordDirCheck | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const dir = settings.recordVideoDir;
+
+  const validate = useCallback(async (path: string) => {
+    try {
+      setCheck(await api.recordCheckDir(path));
+    } catch {
+      setCheck(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (settings.recordVideo) void validate(dir);
+  }, [dir, settings.recordVideo, validate]);
+
+  // Custo em disco a partir do bitrate REAL desta configuração, não de um número redondo.
+  // "Gravar a live" sem "≈2,7 GB/h no seu bitrate" é uma pegadinha: o streamer só
+  // descobriria o preço quando o SSD enchesse.
+  const kbps =
+    lowestCommonDenominator(config).videoKbps ??
+    Math.max(
+      2500,
+      ...config.targets
+        .filter((x) => x.enabled)
+        .map((x) => x.encoding.preset?.videoBitrateKbps || 0),
+    );
+  const gbPerHour = ((kbps + 160) * 3600) / 8 / 1024 / 1024;
+
+  const runTest = async () => {
+    setTesting(true);
+    try {
+      const file = await api.recordTest(dir);
+      // Tocar de volta ali mesmo é o que fecha a prova de ponta a ponta: pasta, escrita,
+      // FFmpeg, remux, escopo do asset, CSP, codec e player, num clique só. Se o vídeo
+      // aparecer, TODO o caminho da gravação funciona nesta máquina.
+      setPreview(await api.recordVideoUrl(file));
+      toast.success(t("settings.record.test.ok"));
+    } catch (e) {
+      toast.error(t("settings.record.test.fail", { error: errMsg(e) }));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const pick = async () => {
+    const chosen = await api.recordPickDir();
+    if (!chosen) return; // cancelou — não é erro
+    const c = await api.recordCheckDir(chosen);
+    setCheck(c);
+    if (!c.ok) return; // pasta que não escreve não vira configuração
+    setSettings({ recordVideoDir: chosen });
+  };
+
+  const dirErrorKey =
+    check?.error === "notDir"
+      ? "settings.record.dir.error.notDir"
+      : check?.error === "readonly"
+        ? "settings.record.dir.error.readonly"
+        : "settings.record.dir.error.missing";
+
+  return (
+    <Card className="mb-4">
+      <h3 className="mb-1 flex items-center gap-2 text-lg">
+        <Video className="size-5 text-brass" /> {t("settings.record.title")}
+      </h3>
+      <p className="mb-3 text-xs text-ink-faint">{t("settings.record.desc")}</p>
+
+      <div className="divide-y divide-border-soft">
+        <SettingRow
+          title={t("settings.record.video.label")}
+          desc={t("settings.record.video.hint", { gb: fmt.dec(gbPerHour, 1) })}
+        >
+          <Toggle
+            checked={settings.recordVideo}
+            onChange={(v) => setSettings({ recordVideo: v })}
+            label={t("settings.record.video.label")}
+          />
+        </SettingRow>
+
+        {settings.recordVideo && (
+          <div className="py-3.5 pl-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold">
+                {t("settings.record.dir.label")}
+              </span>
+              <code className="max-w-sm truncate rounded bg-surface-2 px-2 py-1 text-xs">
+                {dir || t("settings.record.dir.default")}
+              </code>
+              <Button size="sm" variant="subtle" onClick={() => void pick()}>
+                <FolderOpen className="size-4" /> {t("settings.record.dir.pick")}
+              </Button>
+              {dir && (
+                <button
+                  onClick={() => setSettings({ recordVideoDir: "" })}
+                  className="text-xs font-semibold text-ink-faint hover:text-brass"
+                >
+                  {t("settings.record.dir.reset")}
+                </button>
+              )}
+            </div>
+
+            {check && (
+              <div className="mt-2 flex flex-col gap-1 text-xs">
+                {check.error && (
+                  <span className="font-semibold text-bad">
+                    {t(dirErrorKey)}
+                  </span>
+                )}
+                {check.freeBytes != null && (
+                  <span
+                    className={check.lowSpace ? "text-warn" : "text-ink-faint"}
+                  >
+                    {t("settings.record.dir.free", {
+                      size: fmt.dec(check.freeBytes / 1024 ** 3, 1),
+                      hours: fmt.dec(
+                        check.freeBytes / 1024 ** 3 / Math.max(gbPerHour, 0.1),
+                        1,
+                      ),
+                    })}
+                  </span>
+                )}
+                {check.removableOrNetwork && (
+                  <span className="text-warn">
+                    {t("settings.record.warn.network")}
+                  </span>
+                )}
+                {check.longPath && (
+                  <span className="text-warn">
+                    {t("settings.record.warn.longPath")}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold">
+                {t("settings.record.keep.label")}
+              </span>
+              <input
+                type="range"
+                min={5}
+                max={500}
+                step={5}
+                value={settings.recordVideoKeepGb}
+                onChange={(e) =>
+                  setSettings({ recordVideoKeepGb: Number(e.target.value) })
+                }
+                className="h-1 w-48 accent-brass"
+                aria-label={t("settings.record.keep.label")}
+              />
+              <span className="w-20 font-mono text-xs">
+                {fmt.num(settings.recordVideoKeepGb)} GB
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-ink-faint">
+              {t("settings.record.keep.hint")}
+            </p>
+
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="subtle"
+              disabled={testing}
+              onClick={() => void runTest()}
+            >
+              <Play className="size-4" />
+              {testing
+                ? t("settings.record.test.busy")
+                : t("settings.record.test.cta")}
+            </Button>
+            <p className="mt-1 text-[11px] text-ink-faint">
+              {t("settings.record.test.hint")}
+            </p>
+          </div>
+        )}
+
+        <SettingRow
+          title={t("settings.record.chat.label")}
+          desc={t("settings.record.chat.hint")}
+        >
+          <Toggle
+            checked={settings.recordChat}
+            onChange={(v) => setSettings({ recordChat: v })}
+            label={t("settings.record.chat.label")}
+          />
+        </SettingRow>
+      </div>
+
+      <p className="mt-3 rounded bg-surface-2 px-3 py-2 text-[11px] text-ink-muted">
+        {t("settings.record.privacy")}
+      </p>
+
+      {/* O resultado do teste num modal de verdade (e não num <video> jogado no body):
+          fecha no Esc, no clique fora e no X, como todo o resto do app. */}
+      {preview && (
+        <Modal
+          title={t("settings.record.test.modal")}
+          onClose={() => setPreview(null)}
+        >
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video
+            src={preview}
+            controls
+            autoPlay
+            className="w-full rounded-lg bg-black"
+          />
+          <p className="mt-2 text-xs text-ink-muted">
+            {t("settings.record.test.modal.body")}
+          </p>
+        </Modal>
+      )}
+    </Card>
   );
 }

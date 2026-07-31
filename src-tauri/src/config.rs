@@ -258,6 +258,34 @@ pub struct Settings {
     /// Nome original do arquivo custom do "JÁ VOLTO" (só exibição; o arquivo vira brb-slate.*).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brb_slate_file_name: Option<String>,
+    /// GRAVAÇÃO da live (vídeo do programa em disco, pro replay do relatório).
+    ///
+    /// Padrão DESLIGADO, e é uma decisão de produto, não de implementação: a 6000 kbps são
+    /// ~2,7 GB/hora. Ligar isso sem o streamer pedir encheria o SSD de alguém em duas
+    /// semanas. Ver docs/FEATURE-GRAVACAO-E-REPLAY.md §2.
+    #[serde(default)]
+    pub record_video: bool,
+    /// Pasta das gravações. VAZIO = pasta de sessões, resolvida na hora.
+    ///
+    /// Vazio em vez de um caminho concreto de propósito: este config viaja entre perfis e é
+    /// lido pelo Rust e pelo TS — um caminho gravado amarraria a configuração a uma máquina
+    /// e continuaria errado depois que o `app_data_dir` mudasse.
+    #[serde(default)]
+    pub record_video_dir: String,
+    /// Teto de disco das gravações, em GB. A poda de vídeo é por ESPAÇO (a de sessões é por
+    /// contagem): 50 relatórios são alguns MB, 50 vídeos são centenas de GB.
+    #[serde(default = "default_record_keep_gb")]
+    pub record_video_keep_gb: u64,
+    /// GRAVAÇÃO do chat (mensagens com autor e texto, pro replay).
+    ///
+    /// Chave SEPARADA da de vídeo porque os motivos de recusar cada uma são diferentes: uma
+    /// custa disco, a outra guarda dado pessoal de terceiros na máquina do streamer.
+    #[serde(default)]
+    pub record_chat: bool,
+}
+
+fn default_record_keep_gb() -> u64 {
+    20
 }
 
 fn default_true() -> bool {
@@ -403,6 +431,12 @@ impl Default for Settings {
             overlay_chat_hide_commands: false,
             overlay_chat_fade_secs: 0,
             brb_slate_file_name: None,
+            // As duas gravações nascem DESLIGADAS: uma custa disco, a outra guarda dado
+            // pessoal de terceiros. Nenhuma das duas é decisão da Corneta.
+            record_video: false,
+            record_video_dir: String::new(),
+            record_video_keep_gb: default_record_keep_gb(),
+            record_chat: false,
         }
     }
 }
@@ -598,6 +632,10 @@ impl AppConfig {
         if !matches!(s.theme.as_str(), "dark" | "light") {
             s.theme = default_theme();
         }
+        // Teto de gravação: 1 GB não cabe nem meia hora e o zero desligaria a retenção
+        // (deixando o disco crescer sem freio). 2 TB é o limite de sanidade.
+        s.record_video_keep_gb = s.record_video_keep_gb.clamp(1, 2048);
+        s.record_video_dir = s.record_video_dir.trim().chars().take(400).collect();
         Ok(self)
     }
 }

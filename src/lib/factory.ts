@@ -87,6 +87,11 @@ export function defaultConfig(): AppConfig {
       overlayChatPlatform: true,
       overlayChatHideCommands: false,
       overlayChatFadeSecs: 0,
+      // As duas gravações nascem desligadas — espelha o `Settings::default()` do Rust.
+      recordVideo: false,
+      recordVideoDir: "",
+      recordVideoKeepGb: 20,
+      recordChat: false,
     },
     profiles: [{ id: profId, name: "Padrão", mode: "hybrid", targets }],
     activeProfileId: profId,

@@ -283,6 +283,16 @@ export function PrivacyBodyPt() {
             locais.
           </li>
           <li>
+            <strong>Gravação da live</strong> — desligada por padrão. Se você
+            ligar, o aplicativo grava o vídeo que foi ao ar (e, numa opção
+            separada, as mensagens do chat com o nome de quem falou) em arquivos
+            na pasta que você escolher, no seu computador. Nada disso é enviado
+            para nós nem para lugar nenhum. As mensagens de terceiros que você
+            optar por gravar ficam sob a sua responsabilidade: você decide por
+            quanto tempo guardar e pode apagar a qualquer momento, pelo próprio
+            relatório ou pela pasta.
+          </li>
+          <li>
             <strong>Diagnóstico de suporte</strong> — se você pedir a exportação
             de logs, o aplicativo gera um arquivo com informações técnicas
             redigidas e é você quem decide se e para quem enviar.

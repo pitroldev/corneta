@@ -1164,6 +1164,61 @@ export const pt = {
   "platforms.toast.removed": "{name} saiu da corneta",
   "platforms.toast.undo": "Desfazer",
 
+  // ---- gravação + replay ----
+  "recorder.toast.diskFull":
+    "Sem espaço pra gravar — a live segue normal, só sem gravação.",
+  "recorder.toast.noDir":
+    "Não achei a pasta de gravação. A live segue normal, só sem gravar.",
+  "recorder.toast.resumed": "A gravação caiu e voltou — vai faltar um pedacinho.",
+  "recorder.toast.gaveUp": "Desisti de gravar depois de várias tentativas.",
+  "recorder.toast.failed": "Não consegui gravar: {error}",
+  "recorder.toast.estimatedAnchor":
+    "A sincronia do replay pode estar uns segundos fora — dá pra ajustar no relatório.",
+
+  "replay.back10": "10s pra trás",
+  "replay.chat.empty": "Ninguém tinha falado ainda.",
+  "replay.chat.gap": "O chat caiu por aqui — pode faltar mensagem.",
+  "replay.chat.hideDeleted": "esconder apagadas",
+  "replay.chat.showDeleted": "mostrar apagadas",
+  "replay.chat.title": "Chat naquele momento",
+  "replay.clip.cancel": "cancelar corte",
+  "replay.clip.crossSegment":
+    "Esse trecho atravessa duas gravações. Escolha um pedaço dentro da mesma.",
+  "replay.clip.cta": "Cortar um trecho (marque o início, depois o fim)",
+  "replay.clip.pending": "marque o fim",
+  "replay.clip.saved": "Trecho salvo 📣",
+  "replay.delete.confirm": "Confirmar?",
+  "replay.delete.cta": "Apagar a gravação desta live",
+  "replay.delete.done": "Gravação apagada — o relatório continua aqui.",
+  "replay.folder": "Abrir a pasta da gravação",
+  "replay.fwd10": "10s pra frente",
+  "replay.fullscreen": "Tela cheia",
+  "replay.marker.added": "Momento marcado",
+  "replay.marker.cta": "Marcar este momento",
+  "replay.marker.default": "Momento marcado no replay",
+  "replay.missing": "O arquivo desta gravação não está mais no disco.",
+  "replay.mute": "Silenciar",
+  "replay.offset.label": "Ajuste de sincronia",
+  "replay.offset.open": "vídeo fora de sincronia?",
+  "replay.offset.reset": "zerar",
+  "replay.rate.aria": "Velocidade",
+  "replay.scrub.aria": "Linha do tempo do replay",
+  "replay.seek.cta": "Ver este momento no vídeo",
+  "replay.seek.notRecorded": "Esse instante não foi gravado.",
+  "replay.shortcuts":
+    "Espaço toca/pausa · ← → pulam 10s (com Shift, 1min) · , e . andam quadro a quadro",
+  "replay.title": "Replay da live",
+  "replay.unmute": "Tirar do mudo",
+  "replay.volume": "Volume",
+  "replay.warn.codec":
+    "Essa gravação está num formato que o player não toca. Abra na pasta.",
+  "replay.warn.estimated":
+    "A sincronia foi estimada — se o vídeo estiver fora do gráfico, use o ajuste.",
+  "replay.warn.segments":
+    "Esta live tem {n} pedaços de gravação (a gravação caiu e voltou).",
+  "replay.warn.truncated":
+    "A gravação foi interrompida antes do fim da live.",
+
   // ---- reports ----
   "reports.alerts.bitsTotal": "bits no total",
   "reports.alerts.kind.follow.one": "follow",
@@ -1332,6 +1387,8 @@ export const pt = {
   "reports.row.chat.title": "Mensagens no chat",
   "reports.row.clean": "limpa",
   "reports.row.clean.title": "Transmissão limpa",
+  "reports.row.hasVideo": "GRAVADA",
+  "reports.row.hasVideo.title": "Esta live tem gravação — dá pra assistir junto com os gráficos",
   "reports.row.onAir": "{dur} no ar",
   "reports.row.peakViewers.title": "Pico de audiência",
   // Variantes .one/.other: quem monta é o tp(). Zero tem frase própria
@@ -1551,6 +1608,41 @@ export const pt = {
     "Fechar a janela esconde a Corneta na bandeja (a transmissão continua). Para sair de vez, use o menu da bandeja.",
   "settings.system.tray.title": "Minimizar para a bandeja ao fechar",
   "settings.system.tray.toggle": "Minimizar para a bandeja",
+  "settings.record.chat.hint":
+    "Guarda quem falou o quê, pra você rever o chat junto com o vídeo. Fica só no seu computador — a Corneta não recebe cópia.",
+  "settings.record.chat.label": "Gravar o chat",
+  "settings.record.desc":
+    "Guarde a live no seu computador e reveja depois com os gráficos correndo junto, no relatório.",
+  "settings.record.dir.default": "pasta padrão da Corneta",
+  "settings.record.dir.error.missing": "Não achei essa pasta.",
+  "settings.record.dir.error.notDir": "Isso não é uma pasta.",
+  "settings.record.dir.error.readonly": "Não consigo escrever nessa pasta.",
+  "settings.record.dir.free": "{size} GB livres — dá pra umas {hours} h de live",
+  "settings.record.dir.label": "Salvar em",
+  "settings.record.dir.pick": "Escolher pasta",
+  "settings.record.dir.reset": "usar a padrão",
+  "settings.record.keep.hint":
+    "Passou disso, a Corneta apaga as gravações mais antigas. Os relatórios ficam.",
+  "settings.record.keep.label": "Guardar até",
+  "settings.record.privacy":
+    "Tudo fica no seu computador: nada de gravação sobe pra lugar nenhum. Se gravar o chat, as mensagens ficam sob a sua responsabilidade.",
+  "settings.record.test.busy": "Testando…",
+  "settings.record.test.cta": "Testar a gravação",
+  "settings.record.test.fail": "O teste não passou: {error}",
+  "settings.record.test.hint":
+    "Grava 5 segundos e toca de volta. Vale fazer antes da primeira live.",
+  "settings.record.test.modal": "Teste de gravação",
+  "settings.record.test.modal.body":
+    "Se você está vendo e ouvindo isto, a gravação funciona nesta máquina: a pasta aceita escrita e o player toca o arquivo.",
+  "settings.record.test.ok": "Gravação funcionando 📣",
+  "settings.record.title": "Gravar a live",
+  "settings.record.video.hint":
+    "Guarda o que foi ao ar, sem pesar (não recodifica). Gasta uns {gb} GB por hora no seu bitrate atual.",
+  "settings.record.video.label": "Gravar o vídeo",
+  "settings.record.warn.longPath":
+    "Esse caminho é bem comprido — o Windows pode reclamar.",
+  "settings.record.warn.network":
+    "Pasta de rede ou unidade removível: se ela sumir no meio da live, a gravação para (a transmissão não).",
   "settings.tab.general": "Geral",
   "settings.tab.obs": "OBS",
   "settings.tab.safety": "Segurança ao vivo",

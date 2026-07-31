@@ -147,6 +147,17 @@ export interface AppSettings {
   brbSlateKind: "auto" | "image" | "video";
   /** Nome original do arquivo custom do "JÁ VOLTO" (só exibição — o arquivo vira brb-slate.*). */
   brbSlateFileName?: string;
+  /** Gravar o programa em disco (pro replay do relatório). Padrão DESLIGADO: a 6000 kbps
+   *  são ~2,7 GB/hora, e ligar sem o streamer pedir encheria o disco dele. */
+  recordVideo: boolean;
+  /** Pasta das gravações. VAZIO = pasta de sessões, resolvida na hora — um caminho
+   *  concreto aqui amarraria a config a uma máquina. */
+  recordVideoDir: string;
+  /** Teto de disco das gravações, em GB (a poda de vídeo é por espaço, não por contagem). */
+  recordVideoKeepGb: number;
+  /** Gravar as mensagens do chat. Chave separada da de vídeo: uma custa disco, a outra
+   *  guarda dado pessoal de terceiros. */
+  recordChat: boolean;
   /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
   autoBitrate: boolean;
   /** YouTube automático: cria a transmissão (broadcast) e injeta a chave no BORA — sem Studio. */
@@ -407,6 +418,10 @@ export interface SessionMeta {
   durationSec: number;
   mode: EncodingMode;
   platforms: SessionPlatform[];
+  /** Existe vídeo desta sessão no disco? Vem de existência de ARQUIVO, não do NDJSON:
+   *  quem apaga o MP4 na mão perde a aba de replay, não ganha um erro vermelho. */
+  hasVideo?: boolean;
+  hasChat?: boolean;
 }
 
 export interface SessionSampleTarget {
@@ -461,6 +476,38 @@ export interface SessionAlertEvent {
   amount?: number;
 }
 
+/** Resultado da validação da pasta de gravação. Só `error` impede gravar — o resto avisa
+ *  e deixa seguir, porque a máquina é do streamer. */
+export interface RecordDirCheck {
+  ok: boolean;
+  /** "missing" | "notDir" | "readonly" — chave de protocolo, o front traduz. */
+  error?: string;
+  freeBytes?: number;
+  lowSpace: boolean;
+  removableOrNetwork: boolean;
+  longPath: boolean;
+}
+
+/** Uma mensagem do chat gravado. Campos curtos porque são dezenas de milhares de linhas:
+ *  `t` epoch · `p` plataforma · `s` fonte · `a` autor · `c` cor · `m` texto · `i` id nativo. */
+export interface ReplayChatMessage {
+  t: number;
+  p: ChatPlatform;
+  s: string;
+  a: string;
+  c?: string;
+  m: string;
+  i?: string;
+  /** Removida pela moderação depois de dita — o replay esconde por padrão. */
+  deleted?: boolean;
+}
+
+/** Buraco no chat gravado (caiu e voltou). O replay mostra em vez de fingir continuidade. */
+export interface ReplayChatGap {
+  t: number;
+  from: number;
+}
+
 export interface SessionData {
   meta: SessionMeta;
   samples: SessionSample[];
@@ -468,6 +515,26 @@ export interface SessionData {
   viewerSamples: SessionViewerSample[];
   followerSamples: SessionFollowerSample[];
   alertEvents: SessionAlertEvent[];
+  /** Segmentos de vídeo gravados (uma sessão tem N: o gravador pode morrer e retomar). */
+  recordings: SessionRecording[];
+  /** Saltos do relógio do sistema durante a live (NTP, horário de verão). */
+  clockJumps: { t: number; delta: number }[];
+  /** Ajuste manual de sincronia do streamer, em ms. */
+  offsetMs: number;
+}
+
+export interface SessionRecording {
+  seg: number;
+  t: number;
+  path: string;
+  codec: string;
+  estimated: boolean;
+  syncs: { t: number; out: number }[];
+  endT: number;
+  /** Motivo do fim: "stopped" | "disk" | "died" | "giveup" | "truncated". */
+  reason?: string;
+  /** O remux de finalização rodou — o arquivo já navega bem. */
+  finalized: boolean;
 }
 
 /** Resumo de uma sessão pra lista/comparação (computado no front a partir de analyze(), cacheado). */

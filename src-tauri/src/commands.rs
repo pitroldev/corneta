@@ -8,6 +8,7 @@ use crate::engine_policy::{
 };
 use crate::i18n::Msg;
 use crate::keys;
+use crate::recorder;
 use crate::session;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -65,7 +66,7 @@ pub const START_CANCELLED: &str = "corneta:start-cancelled";
 
 /// Mata um sidecar (FFmpeg/MediaMTX) e seus netos órfãos — `taskkill /T /F` no Windows, onde
 /// `child.kill()` sozinho não leva a árvore junto. Fonte ÚNICA do encerramento de processo.
-fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) {
+pub(crate) fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) {
     let pid = child.pid();
     let _ = child.kill();
     #[cfg(windows)]
@@ -1168,6 +1169,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let slate_on = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
     chat::reset_msg_counts(); // a contagem de chat da sessão começa do zero
+    session::set_chat_recording(config.settings.record_chat);
                               // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
         .iter()
@@ -1335,6 +1337,58 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         "motor: compositor={compositor_on} guardião={guard} saídas-leem={}",
         if compositor_on { "_program" } else { "live" }
     );
+
+    // GRAVAÇÃO da live. Herda a MESMA fonte que os destinos leem (`out_source`) em vez de
+    // cravar `_program`: sem compositor esse path não existe, e um gravador apontado pra
+    // ele morreria calado justamente na configuração mais simples de todas.
+    //
+    // Tudo aqui é best-effort e sem `?`: nenhuma falha de gravação pode abortar o start.
+    if config.settings.record_video {
+        let sess = {
+            let eng = state.engine.lock().unwrap();
+            eng.session_path.clone()
+        };
+        match (
+            recorder::resolve_dir(&app, &config.settings.record_video_dir),
+            sess,
+        ) {
+            (Some(dir), Some(sp)) => {
+                // Poda ANTES de gravar: abrir espaço agora é o que evita bater no piso no
+                // meio da live. Sobra acima do teto = só arquivos que não são nossos.
+                let leftover =
+                    session::prune_videos(&app, Some(&dir), config.settings.record_video_keep_gb);
+                if leftover > 0 {
+                    log::warn!("gravação: {leftover} bytes acima do teto em arquivos não reconhecidos");
+                }
+                let free = recorder::free_bytes(&dir);
+                if free.is_some_and(|f| f < recorder::DISK_START_FLOOR) {
+                    log::warn!("gravação: pouco espaço em {} — não vou gravar", dir.display());
+                    let _ = app.emit(
+                        "recorder://status",
+                        serde_json::json!({ "kind": "diskFull", "detail": null }),
+                    );
+                } else {
+                    let id = sp
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    let (a, src, run) = (app.clone(), out_source.clone(), running.clone());
+                    tauri::async_runtime::spawn(recorder::run(a, src, dir, sp, id, run));
+                }
+            }
+            (None, _) => {
+                // Pasta configurada sumiu: avisa e segue SEM gravar. Recriar caminho no
+                // escuro (ou cair pra outra pasta) esconderia o problema do streamer.
+                log::warn!("gravação: pasta indisponível — a live segue sem gravar");
+                let _ = app.emit(
+                    "recorder://status",
+                    serde_json::json!({ "kind": "noDir", "detail": null }),
+                );
+            }
+            (_, None) => {}
+        }
+    }
     // Melhor encoder de HARDWARE real (sonda cacheada) — é o que o "Automático" dos destinos
     // em transcode usa, e o compositor também. Só sonda se alguém for precisar.
     let needs_hw = compositor_on
@@ -2099,6 +2153,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
         kill_child_tree(child);
     }
     // Fecha a gravação da sessão (relatório pós-live).
+    session::set_chat_recording(false);
     if let Some(path) = session_path {
         session::end_session(&path);
     }
@@ -2106,9 +2161,18 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
 
 // --------------------- Relatórios (pós-live) ----------------------
 
+/// Pasta de gravação configurada, já resolvida. `None` quando ela sumiu (unidade
+/// arrancada, pasta renomeada) — quem chama trata como "sem gravação", nunca recriando
+/// caminho no escuro.
+fn recording_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
+    let cfg = config::load(app);
+    recorder::resolve_dir(app, &cfg.settings.record_video_dir)
+}
+
 #[tauri::command]
 pub fn list_sessions(app: AppHandle) -> Vec<session::SessionMeta> {
-    session::list_sessions(&app)
+    let dir = recording_dir(&app);
+    session::list_sessions(&app, dir.as_deref())
 }
 
 #[tauri::command]
@@ -2116,9 +2180,211 @@ pub fn read_session(app: AppHandle, id: String) -> Result<String, String> {
     session::read_session(&app, &id).ok_or_else(|| Msg::SessionNotFound.now())
 }
 
+/// NDJSON do chat gravado. String vazia (não erro) quando a sessão não gravou chat: a
+/// ausência é o caso comum, e um erro aqui faria o relatório abrir com toast vermelho.
+#[tauri::command]
+pub fn read_session_chat(app: AppHandle, id: String) -> String {
+    session::read_chat(&app, &id).unwrap_or_default()
+}
+
 #[tauri::command]
 pub fn delete_session(app: AppHandle, id: String) -> Result<(), String> {
-    session::delete_session(&app, &id)
+    let dir = recording_dir(&app);
+    session::delete_session(&app, &id, dir.as_deref())
+}
+
+// --------------------- Gravação (vídeo + replay) ----------------------
+
+/// Valida uma pasta candidata: existe, é pasta, e ESCREVE de verdade (no Windows o
+/// atributo de permissão mente). Devolve também os avisos não-impeditivos.
+#[tauri::command]
+pub fn record_check_dir(app: AppHandle, dir: String) -> recorder::DirCheck {
+    let path = if dir.trim().is_empty() {
+        session::sessions_dir(&app).unwrap_or_default()
+    } else {
+        std::path::PathBuf::from(dir.trim())
+    };
+    recorder::check_dir(&path)
+}
+
+/// Diálogo nativo de pasta. `None` = o streamer cancelou (não é erro).
+#[tauri::command]
+pub async fn record_pick_dir(app: AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |p| {
+        let _ = tx.send(p);
+    });
+    rx.await
+        .ok()
+        .flatten()
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+/// Grava 5s de barras e devolve o caminho — o teste do §9.2 do doc.
+///
+/// Vale mais que qualquer outra mitigação: em um clique valida pasta, escrita, espaço,
+/// FFmpeg, remux, escopo do asset, CSP, codec e player. Converte quase toda falha de
+/// configuração numa descoberta ANTES do BORA, em vez de uma decepção depois da live.
+#[tauri::command]
+pub async fn record_test(app: AppHandle, dir: String) -> Result<String, String> {
+    let path = if dir.trim().is_empty() {
+        session::sessions_dir(&app).ok_or_else(|| Msg::SessionDirUnavailable.now())?
+    } else {
+        std::path::PathBuf::from(dir.trim())
+    };
+    let check = recorder::check_dir(&path);
+    if !check.ok {
+        return Err(Msg::RecordDirUnusable.now());
+    }
+    let file = recorder::test_record(&app, &path).await?;
+    allow_asset(&app, &file);
+    Ok(file)
+}
+
+/// Libera UM arquivo no escopo do protocolo de asset, pra que o `<video>` consiga lê-lo.
+///
+/// Arquivo a arquivo, e não a pasta inteira do streamer: o escopo fica do tamanho do que a
+/// tela está mostrando. Sem esta liberação o sintoma é dos piores de depurar — o vídeo
+/// grava perfeitamente e o player fica mudo, sem erro nenhum.
+///
+/// A URL em si NÃO sai daqui: quem monta é o `convertFileSrc` do próprio Tauri, no front.
+/// Montar `http://asset.localhost/...` na mão significaria reimplementar (e ter que manter
+/// igual) o escape que o handler do protocolo espera — errar um caractere daria exatamente
+/// o mesmo player mudo que esta função existe pra evitar.
+#[tauri::command]
+pub fn record_allow_file(app: AppHandle, path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+    // Só arquivos que a Corneta criou: o nome é a trava (mesma da poda).
+    let named = p
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| session::parse_video_name(n).is_some() || n == "corneta-teste.mp4");
+    if !named || !p.is_file() {
+        return Err(Msg::SessionNotFound.now());
+    }
+    allow_asset(&app, &path);
+    Ok(())
+}
+
+fn allow_asset(app: &AppHandle, path: &str) {
+    app.asset_protocol_scope().allow_file(path).ok();
+}
+
+/// Ajuste manual de sincronia (ms), gravado na própria sessão. É a válvula de escape que
+/// cobre a classe inteira de erro de sincronia: o que a automação errar, o streamer arrasta.
+#[tauri::command]
+pub fn set_session_offset(app: AppHandle, id: String, ms: i64) -> Result<(), String> {
+    if !session::valid_session_id(&id) {
+        return Err(Msg::SessionInvalidId.now());
+    }
+    let dir = session::sessions_dir(&app).ok_or_else(|| Msg::SessionDirUnavailable.now())?;
+    session::record_offset(&dir.join(format!("{id}.ndjson")), ms.clamp(-30_000, 30_000));
+    Ok(())
+}
+
+/// Apaga só os vídeos de uma sessão — o relatório e o chat ficam.
+#[tauri::command]
+pub fn delete_session_recordings(app: AppHandle, id: String) -> Result<(), String> {
+    let dir = recording_dir(&app);
+    session::delete_recordings(&app, &id, dir.as_deref())
+}
+
+/// Marca um instante durante o replay (depois da live). O `t` é o momento ASSISTIDO.
+#[tauri::command]
+pub fn add_session_marker(
+    app: AppHandle,
+    id: String,
+    t: u64,
+    label: String,
+) -> Result<(), String> {
+    if !session::valid_session_id(&id) {
+        return Err(Msg::SessionInvalidId.now());
+    }
+    let dir = session::sessions_dir(&app).ok_or_else(|| Msg::SessionDirUnavailable.now())?;
+    let clean: String = label.trim().chars().take(80).collect();
+    session::record_marker_at(&dir.join(format!("{id}.ndjson")), t, &clean);
+    Ok(())
+}
+
+/// Exporta um trecho da gravação. Cópia de bitstream: rápido e sem recodificar, então o
+/// clipe sai com a qualidade que foi ao ar. `None` = o streamer cancelou o diálogo.
+#[tauri::command]
+pub async fn export_clip(
+    app: AppHandle,
+    path: String,
+    start_ms: u64,
+    end_ms: u64,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let src = std::path::PathBuf::from(&path);
+    let named = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| session::parse_video_name(n).is_some());
+    if !named || !src.is_file() || end_ms <= start_ms {
+        return Err(Msg::SessionNotFound.now());
+    }
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("MP4", &["mp4"])
+        .set_file_name("corneta-clipe.mp4")
+        .save_file(move |p| {
+            let _ = tx.send(p);
+        });
+    let Some(dest) = rx.await.ok().flatten().and_then(|p| p.into_path().ok()) else {
+        return Ok(None);
+    };
+    let args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        // `-ss` ANTES do `-i` busca por keyframe (rápido); com `-c copy` o corte cai no
+        // keyframe mais próximo de qualquer jeito, então não há precisão a ganhar depois.
+        "-ss".into(),
+        format!("{:.3}", start_ms as f64 / 1000.0),
+        "-to".into(),
+        format!("{:.3}", end_ms as f64 / 1000.0),
+        "-i".into(),
+        src.to_string_lossy().to_string(),
+        "-c".into(),
+        "copy".into(),
+        "-movflags".into(),
+        "+faststart".into(),
+        "-y".into(),
+        dest.to_string_lossy().to_string(),
+    ];
+    let out = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| e.to_string())?
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    Ok(Some(dest.to_string_lossy().to_string()))
+}
+
+/// "Abrir pasta" do relatório: vai na pasta da GRAVAÇÃO, não na de sessões.
+#[tauri::command]
+pub fn open_recording_folder(app: AppHandle) -> Result<(), String> {
+    let dir = recording_dir(&app)
+        .or_else(|| session::sessions_dir(&app))
+        .ok_or_else(|| Msg::SessionDirUnavailable.now())?;
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    }
+    Ok(())
 }
 
 #[tauri::command]

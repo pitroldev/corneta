@@ -292,6 +292,16 @@ export function PrivacyBodyEn() {
             rate, alerts, marked moments — are written to local files.
           </li>
           <li>
+            <strong>Stream recording</strong> — off by default. If you turn it
+            on, the app saves the video that went out (and, as a separate
+            option, chat messages along with the name of whoever wrote them) as
+            files in the folder you pick, on your computer. None of it is sent
+            to us or anywhere else. Other people&rsquo;s messages that you
+            choose to record are your responsibility: you decide how long to
+            keep them, and you can delete them at any time from the report
+            itself or from the folder.
+          </li>
+          <li>
             <strong>Support diagnostics</strong> — if you ask for a log export,
             the app generates a file with redacted technical information, and
             you decide whether and to whom to send it.

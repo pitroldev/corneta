@@ -542,6 +542,9 @@ messages! {
     SessionDeleteFailed { e: &'a str } = "rust.session.deleteFailed" =>
         pt: "não foi possível apagar a sessão: {e}",
         en: "Couldn't delete the session: {e}";
+    RecordDirUnusable = "rust.record.dirUnusable" =>
+        pt: "não consigo gravar nessa pasta — confira se ela existe e se dá pra escrever nela",
+        en: "I can't record to that folder — check that it exists and is writable";
 
     // ---- open --------------------------------------------------------------
     OpenExternalRefused = "rust.open.externalRefused" =>
