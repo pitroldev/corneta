@@ -24,11 +24,13 @@ export function VerticalCrop() {
 
   return (
     <div className="relative">
-      <div className="vframe">
-        <span className="vframe-label">seu sinal do OBS · 1920×1080</span>
+      <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px]">
+        <span className="absolute top-[9px] left-[11px] text-[0.6rem] font-extrabold tracking-[0.1em] text-faint-raised uppercase">
+          seu sinal do OBS · 1920×1080
+        </span>
 
         <motion.div
-          className="vcrop"
+          className="absolute top-[6%] bottom-[6%] grid aspect-9/16 content-end justify-items-center border-[3px] border-brass bg-brass/15 pb-[7px] [&>span]:rounded-sm [&>span]:bg-brass [&>span]:px-1.5 [&>span]:py-0.5 [&>span]:text-[0.56rem] [&>span]:font-extrabold [&>span]:tracking-[0.06em] [&>span]:text-brass-ink"
           animate={active.at}
           initial={false}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -53,7 +55,7 @@ export function VerticalCrop() {
         ))}
       </div>
 
-      <p className="vhint">
+      <p className="mt-[13px] flex items-center justify-center gap-[9px] text-[0.76rem] font-[650] text-faint [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2] [&_b]:text-muted">
         <CropIcon />
         <span>
           Escolha um lado do quadro: é assim que você define{" "}

@@ -1,5 +1,6 @@
 import { PlatformGlyph } from "./decor";
 import { Switch } from "./switch";
+import { BenefitCopy, BenefitNote, Checklist, DemoLabel, Tag } from "./ui";
 import { CheckIcon, CropIcon, InfoIcon } from "./icons";
 
 // Mesa de qualidade: os três modos do app ("Na lata", "Esperto", "Caprichado")
@@ -152,51 +153,63 @@ export function QualityDesk() {
   );
 }
 
+const SUMMARY_CELL =
+  "border-t-2 border-brass/55 bg-surface-2 px-[11px] py-[9px] " +
+  "[&>span]:block [&>span]:text-[0.55rem] [&>span]:font-extrabold [&>span]:tracking-[0.08em] [&>span]:text-faint-raised [&>span]:uppercase " +
+  "[&>strong]:mt-0.5 [&>strong]:block [&>strong]:font-display [&>strong]:text-[1.02rem] [&>strong]:font-extrabold [&>strong]:tabular-nums";
+
 function ModePanel({ mode }: { mode: (typeof MODES)[number] }) {
   return (
     <div>
-      <p className="mode-lead">{mode.lead}</p>
+      <p className="mb-[18px] max-w-[54ch] text-base leading-[1.6] font-medium text-muted">
+        {mode.lead}
+      </p>
 
-      <div className="mode-board">
-        <div className="demo-label">
+      <div className="rounded-xl bg-surface p-5 shadow-pop-lg">
+        <DemoLabel>
           <span>4 plataformas ligadas</span>
           <span>estimativa do app</span>
-        </div>
+        </DemoLabel>
 
-        <div className="mode-rows">
+        <div className="flex flex-col gap-2">
           {mode.rows.map((row) => (
-            <div className="mode-row" key={row.id}>
+            <div
+              className="grid grid-cols-[34px_minmax(0,1fr)_auto] max-[760px]:grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-[11px] rounded-md bg-surface-2 px-[11px] py-[9px]"
+              key={row.id}
+            >
               <PlatformGlyph id={row.id} />
               <div>
-                <strong>{row.name}</strong>
-                <small>{row.detail}</small>
+                <strong className="block font-display text-[0.9rem] leading-[1.1] font-bold">
+                  {row.name}
+                </strong>
+                <small className="mt-0.5 block text-[0.66rem] font-[550] text-faint-raised">
+                  {row.detail}
+                </small>
               </div>
-              <span
-                className={`tag${row.tone === "copy" ? " tag-copy" : ""}${row.tone === "warn" ? " tag-warn" : ""}`}
-              >
-                {row.tag}
-              </span>
+              <Tag tone={row.tone}>{row.tag}</Tag>
             </div>
           ))}
         </div>
 
-        <div className="mode-summary">
-          <div>
+        <div className="mt-3.5 grid grid-cols-3 gap-2 max-[760px]:grid-cols-2 max-[760px]:[&>div:last-child]:col-span-2">
+          <div className={SUMMARY_CELL}>
             <span>upload somado</span>
             <strong>{mode.upload}</strong>
           </div>
-          <div>
+          <div className={SUMMARY_CELL}>
             <span>conversões</span>
             <strong>{mode.encodes}</strong>
           </div>
-          <div>
+          <div className={SUMMARY_CELL}>
             <span>carga estimada</span>
             <strong>{mode.load}</strong>
           </div>
         </div>
       </div>
 
-      <p className="mode-verdict">
+      {/* O ícone é absoluto pra o texto correr embaixo dele sem virar item de
+          flex — senão o parágrafo quebra numa coluna estreita. */}
+      <p className="relative mt-3.5 pl-[26px] text-[0.8rem] leading-[1.5] font-[550] text-muted [&>svg]:absolute [&>svg]:top-0.5 [&>svg]:left-0 [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:fill-current [&>svg]:text-brass">
         <InfoIcon />
         {mode.verdict}
       </p>
@@ -206,31 +219,28 @@ function ModePanel({ mode }: { mode: (typeof MODES)[number] }) {
 
 export function VerticalCopy() {
   return (
-    <div className="benefit-copy">
-      <span className="benefit-icon">
-        <CropIcon />
-      </span>
-      <div>
-        <h3>Sua live deitada virando vídeo em pé</h3>
-        <p>
-          TikTok e Instagram só aceitam vídeo em pé. Em vez de montar outra cena
-          e transmitir duas vezes, a Corneta recorta um 9:16 do que já tá no ar
-          — e você escolhe o enquadramento arrastando o quadro, vendo o
-          resultado.
-        </p>
-        <ul className="checklist">
-          <li>
-            <CheckIcon /> Recorte 9:16 com panorâmica e zoom
-          </li>
-          <li>
-            <CheckIcon /> Serve pra qualquer destino RTMP vertical
-          </li>
-        </ul>
-        <span className="benefit-note">
-          <InfoIcon /> TikTok e Instagram seguem experimentais: entrar neles
-          depende de liberação da própria plataforma.
-        </span>
-      </div>
-    </div>
+    <BenefitCopy
+      tone="dark"
+      icon={<CropIcon />}
+      title="Sua live deitada virando vídeo em pé"
+    >
+      <p>
+        TikTok e Instagram só aceitam vídeo em pé. Em vez de montar outra cena e
+        transmitir duas vezes, a Corneta recorta um 9:16 do que já tá no ar — e
+        você escolhe o enquadramento arrastando o quadro, vendo o resultado.
+      </p>
+      <Checklist>
+        <li>
+          <CheckIcon /> Recorte 9:16 com panorâmica e zoom
+        </li>
+        <li>
+          <CheckIcon /> Serve pra qualquer destino RTMP vertical
+        </li>
+      </Checklist>
+      <BenefitNote>
+        <InfoIcon /> TikTok e Instagram seguem experimentais: entrar neles
+        depende de liberação da própria plataforma.
+      </BenefitNote>
+    </BenefitCopy>
   );
 }

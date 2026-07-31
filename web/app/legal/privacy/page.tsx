@@ -5,7 +5,10 @@ import {
   Contact,
   LegalFoot,
   LegalHero,
+  LegalBody,
+  LegalLayout,
   LegalSection,
+  LegalTable,
   LegalTldr,
   LegalToc,
   Todo,
@@ -70,10 +73,10 @@ export default function PrivacyPage() {
         version="1.0"
       />
 
-      <div className="shell legal-layout">
+      <LegalLayout>
         <LegalToc sections={sections} />
 
-        <div className="legal-body">
+        <LegalBody>
           <LegalTldr
             points={[
               "A Corneta não tem telemetria, não cria conta e não exige cadastro para funcionar.",
@@ -203,7 +206,7 @@ export default function PrivacyPage() {
               aqui.
             </p>
 
-            <div className="legal-table">
+            <LegalTable>
               <table>
                 <thead>
                   <tr>
@@ -254,7 +257,7 @@ export default function PrivacyPage() {
                   </tr>
                 </tbody>
               </table>
-            </div>
+            </LegalTable>
 
             <h3>O que essa API não faz</h3>
             <ul>
@@ -331,8 +334,8 @@ export default function PrivacyPage() {
                 e chat como Browser Source. Ele não é exposto à internet.
               </li>
               <li>
-                <strong>Aceite destes documentos</strong> — a data e a versão dos
-                termos que você viu na tela de boas-vindas ficam guardadas
+                <strong>Aceite destes documentos</strong> — a data e a versão
+                dos termos que você viu na tela de boas-vindas ficam guardadas
                 localmente, só para o aplicativo saber quando precisa avisar de
                 novo. Esse registro não acompanha a exportação da configuração e
                 nunca é enviado para nós.
@@ -525,7 +528,7 @@ export default function PrivacyPage() {
           </LegalSection>
 
           <LegalSection id="retencao" n={11} title="Por quanto tempo guardamos">
-            <div className="legal-table">
+            <LegalTable>
               <table>
                 <thead>
                   <tr>
@@ -563,7 +566,7 @@ export default function PrivacyPage() {
                   </tr>
                 </tbody>
               </table>
-            </div>
+            </LegalTable>
           </LegalSection>
 
           <LegalSection id="seguranca" n={12} title="Segurança">
@@ -659,8 +662,8 @@ export default function PrivacyPage() {
           </LegalSection>
 
           <LegalFoot other="terms" />
-        </div>
-      </div>
+        </LegalBody>
+      </LegalLayout>
     </>
   );
 }

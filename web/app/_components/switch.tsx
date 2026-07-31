@@ -81,7 +81,7 @@ export function Switch({
               onClick={() => setActive(item.id)}
               onKeyDown={(e) => onKeyDown(e, i)}
               className={[
-                "relative cursor-pointer rounded-md px-3.75 py-2.5 text-left",
+                "relative cursor-pointer rounded-md px-3.75 py-2.5 text-left max-[760px]:px-3 max-[760px]:py-2",
                 "outline-offset-[3px] focus-visible:outline-[3px] focus-visible:outline-brass",
                 on
                   ? "text-brass-ink"
@@ -99,7 +99,7 @@ export function Switch({
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}
-              <span className="relative block font-display text-[1.05rem] font-bold leading-[1.1]">
+              <span className="relative block font-display text-[1.05rem] leading-[1.1] font-bold max-[760px]:text-[0.94rem]">
                 {item.title}
               </span>
               <span className="relative mt-0.5 block text-[0.66rem] font-extrabold uppercase tracking-[0.08em] opacity-75">

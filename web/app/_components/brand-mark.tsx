@@ -23,7 +23,7 @@ export function BrandMark({
             Corneta
           </span>
           {tag && (
-            <span className="mt-0.5 block text-[0.62rem] font-bold tracking-[0.22em] text-faint uppercase">
+            <span className="mt-0.5 block text-[0.62rem] font-bold tracking-[0.22em] text-faint uppercase max-[420px]:hidden">
               multi-stream
             </span>
           )}
