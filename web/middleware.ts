@@ -25,10 +25,10 @@ import {
 // a doença. A dupla hreflang + canonical por idioma é o que mantém as duas
 // versões indexadas certo.
 
-/** Só a home negocia idioma. `/legal` fica de fora porque existe apenas em
- *  português (é texto de CDC/LGPD), e `/api` nunca deve ser mexido. */
+/** A home negocia idioma; `/legal` só é reescrito pro segmento interno. `/api`
+ *  nunca é mexido. */
 export const config = {
-  matcher: ["/", "/pt-BR"],
+  matcher: ["/", "/pt-BR", "/legal/:path*", "/pt-BR/legal/:path*"],
 };
 
 export function middleware(req: NextRequest) {
@@ -37,10 +37,21 @@ export function middleware(req: NextRequest) {
   // `/pt-BR` é rota interna: ela existe porque o `[locale]` precisa de um
   // segmento, mas expor as duas (`/` e `/pt-BR`) com o mesmo conteúdo seria
   // conteúdo duplicado. Aqui a permanente é correta — a URL boa é `/`.
-  if (pathname === "/pt-BR") {
+  if (pathname === "/pt-BR" || pathname.startsWith("/pt-BR/legal")) {
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = pathname.slice("/pt-BR".length) || "/";
     return NextResponse.redirect(url, 308);
+  }
+
+  // Os documentos jurídicos NÃO negociam idioma: `/legal/...` é a versão em
+  // português e ponto. É a URL já publicada, linkada de dentro do app instalado
+  // e a que vincula juridicamente — mandar quem tem o navegador em inglês pra
+  // tradução seria trocar o texto que vale pelo que não vale, sem ele pedir.
+  // Quem quer a tradução clica no link que existe no topo de cada documento.
+  if (pathname.startsWith("/legal")) {
+    return NextResponse.rewrite(
+      new URL(`/${DEFAULT_LOCALE}${pathname}`, req.url),
+    );
   }
 
   const saved = req.cookies.get(LOCALE_COOKIE)?.value;

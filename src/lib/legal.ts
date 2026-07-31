@@ -19,10 +19,24 @@
 
 export const LEGAL_SITE = "https://www.corneta.live";
 
-export const LEGAL_URLS = {
-  terms: `${LEGAL_SITE}/legal/terms-of-use`,
-  privacy: `${LEGAL_SITE}/legal/privacy`,
+const LEGAL_PATHS = {
+  terms: "/legal/terms-of-use",
+  privacy: "/legal/privacy",
 } as const;
+
+/** URL do documento no idioma do app.
+ *
+ *  O português mora na raiz (é a URL publicada e a que vincula juridicamente);
+ *  o inglês leva o prefixo `/en`, como o resto do site. Quem está com o app em
+ *  inglês tem que cair na tradução — mandar pro texto em português seria pedir
+ *  que a pessoa aceite o que não consegue ler. */
+export function legalUrl(
+  locale: string,
+  doc: keyof typeof LEGAL_PATHS,
+): string {
+  const prefix = locale === "en" ? "/en" : "";
+  return `${LEGAL_SITE}${prefix}${LEGAL_PATHS[doc]}`;
+}
 
 /**
  * Versão dos termos que exige aceite.

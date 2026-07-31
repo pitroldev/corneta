@@ -1,8 +1,13 @@
+import type { I18n, MessageKey } from "./i18n";
 import type { PlatformId, PlatformPreset, VideoPreset } from "./types";
 
 // ============================================================
 // Catálogo de plataformas (valores de REFERÊNCIA — ver PLANEJAMENTO.md §8.5/§9).
 // Numa versão futura isto vira um JSON remoto versionado, validado pelo app.
+//
+// Aqui fica IDENTIDADE e NÚMERO: id, cor de marca, protocolo, URL de ingestão,
+// preset recomendado. A copy (observação didática, frase do picker) vive no
+// dicionário — o catálogo guarda só o ENDEREÇO dela, ver NOTE_KEYS/TAGLINE_KEYS.
 // ============================================================
 
 const p = (
@@ -29,7 +34,6 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://live.twitch.tv/app",
     recommended: p(1920, 1080, 60, 6000, 160),
-    note: "Sem ser parceiro, a Twitch aguenta uns 6000 kbps. Tem servidores em várias regiões — o mais perto de você costuma travar menos.",
     keyUrl: "https://dashboard.twitch.tv/settings/stream",
     liveUrl: "https://dashboard.twitch.tv/stream-manager",
   },
@@ -40,7 +44,6 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://a.rtmp.youtube.com/live2",
     recommended: p(1920, 1080, 60, 9000, 192),
-    note: "Aceita imagem pesada numa boa. Peça pro seu OBS mandar um keyframe (quadro que reinicia a imagem) a cada 2 s — no máximo 4 s.",
     keyUrl: "https://studio.youtube.com/channel/live/streaming",
     liveUrl: "https://studio.youtube.com/channel/live",
   },
@@ -51,7 +54,6 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmps",
     ingestUrl: "rtmps://live-api-s.facebook.com:443/rtmp",
     recommended: p(1280, 720, 30, 4000, 128),
-    note: "Só entra com conexão criptografada (RTMPS). O modo antigo sem proteção saiu de cena — aqui já vai do jeito certo.",
     keyUrl: "https://www.facebook.com/live/producer",
     liveUrl: "https://www.facebook.com/live/producer",
   },
@@ -62,7 +64,6 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmps",
     ingestUrl: "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
     recommended: p(1920, 1080, 60, 6000, 160),
-    note: "A chave sai do painel de criador da Kick. A URL já vem preenchida com o servidor padrão — se o seu painel mostrar outra, é só trocar aqui.",
     keyUrl: "https://kick.com/dashboard/settings/stream",
     liveUrl: "https://kick.com/dashboard/stream",
   },
@@ -73,7 +74,6 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://", // fornecido pelo painel (varia)
     recommended: p(720, 1280, 30, 3000, 128),
-    note: "Vídeo em pé (720×1280, formato de celular). Pra transmitir, a TikTok precisa liberar sua conta — e nem todo mundo consegue a chave sozinho.",
     // Raiz do LIVE Center — o path interno pode 404 pra quem não tem LIVE liberado.
     keyUrl: "https://livecenter.tiktok.com/",
     experimental: true,
@@ -85,7 +85,6 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(1280, 720, 30, 3000, 128),
-    note: "A URL e a chave saem do Media Studio do X (aba Producer) — o link aqui embaixo te leva lá.",
     keyUrl: "https://studio.x.com/producer",
     experimental: true,
   },
@@ -96,17 +95,18 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(720, 1280, 30, 2500, 128),
-    note: "O Instagram não recebe transmissão de fora oficialmente — use um serviço que gere uma URL RTMP pro seu perfil e cole a URL e a chave aqui. Ainda é experimental e pode falhar.",
     experimental: true,
   },
   custom: {
     id: "custom",
+    // DADO, não copy da tela: é o nome padrão que o destino recebe ao nascer
+    // (factory.ts) e que o streamer pode reescrever. Pra EXIBIR o rótulo da
+    // plataforma no idioma ativo use platformName() — ver core.platform.custom.name.
     name: "Personalizado",
     color: "#8b93a7",
     protocol: "rtmp",
     ingestUrl: "rtmp://",
     recommended: p(1920, 1080, 30, 4500, 160),
-    note: "Você informa o endereço RTMP ou RTMPS — serve para qualquer destino compatível fora da lista.",
   },
 };
 
@@ -121,18 +121,46 @@ export const PLATFORM_LIST: PlatformPreset[] = [
   PLATFORMS.custom,
 ];
 
-// Descrição curta e humana pro picker — o pré-requisito aparece ANTES do clique
-// (protocolo em caixa alta não diz nada pra quem não é técnico).
-export const PLATFORM_TAGLINES: Record<PlatformId, string> = {
-  twitch: "A live de sempre",
-  youtube: "Aguenta qualidade alta numa boa",
-  facebook: "Live pra página ou perfil",
-  kick: "No estilo da Twitch",
-  tiktok: "Vídeo em pé — precisa de conta liberada",
-  x: "A chave sai do Media Studio",
-  instagram: "Vídeo em pé — sem entrada oficial, pode falhar",
-  custom: "Qualquer servidor RTMP ou RTMPS",
+// Endereço da copy de cada plataforma no dicionário. É um Record fechado de
+// propósito: se um id novo entrar no catálogo, o TypeScript cobra a frase aqui.
+const NOTE_KEYS: Record<PlatformId, MessageKey> = {
+  twitch: "core.platform.twitch.note",
+  youtube: "core.platform.youtube.note",
+  facebook: "core.platform.facebook.note",
+  kick: "core.platform.kick.note",
+  tiktok: "core.platform.tiktok.note",
+  x: "core.platform.x.note",
+  instagram: "core.platform.instagram.note",
+  custom: "core.platform.custom.note",
 };
+
+const TAGLINE_KEYS: Record<PlatformId, MessageKey> = {
+  twitch: "core.platform.tagline.twitch",
+  youtube: "core.platform.tagline.youtube",
+  facebook: "core.platform.tagline.facebook",
+  kick: "core.platform.tagline.kick",
+  tiktok: "core.platform.tagline.tiktok",
+  x: "core.platform.tagline.x",
+  instagram: "core.platform.tagline.instagram",
+  custom: "core.platform.tagline.custom",
+};
+
+/** Observação didática exibida embaixo do card do destino, no idioma ativo. */
+export const platformNote = (id: PlatformId, t: I18n["t"]): string =>
+  t(NOTE_KEYS[id]);
+
+/** Descrição curta e humana pro picker — o pré-requisito aparece ANTES do clique
+ *  (protocolo em caixa alta não diz nada pra quem não é técnico). */
+export const platformTagline = (id: PlatformId, t: I18n["t"]): string =>
+  t(TAGLINE_KEYS[id]);
+
+/** Nome exibido da plataforma. Marca não se traduz (Twitch é Twitch em toda
+ *  língua); só o RTMP fora da lista é copy — e essa vem do dicionário.
+ *
+ *  `PLATFORMS[id].name` continua valendo como DADO (o padrão gravado no
+ *  destino); pra mostrar na tela, use esta função. */
+export const platformName = (id: PlatformId, t: I18n["t"]): string =>
+  id === "custom" ? t("core.platform.custom.name") : PLATFORMS[id].name;
 
 /** Iniciais para o "glifo" colorido da plataforma na UI. */
 export function platformInitials(id: PlatformId): string {

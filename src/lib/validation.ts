@@ -1,3 +1,4 @@
+import type { I18n, MessageKey } from "./i18n";
 import type { Target } from "./types";
 
 /** URL de ingestão aceita (RTMP/RTMPS) — exige host após o esquema. */
@@ -5,21 +6,49 @@ export const INGEST_URL_RE = /^rtmps?:\/\/\S+/i;
 /** Só o esquema, sem host (ex.: "rtmp://") — preset incompleto, tratar como vazio. */
 const BARE_SCHEME_RE = /^rtmps?:\/\/$/i;
 
+/** Problema de configuração de um destino, em CÓDIGO.
+ *
+ *  O filtro do "nome vazio é só aviso" comparava a frase em português — o que
+ *  significa que traduzir a frase travaria o BORA em silêncio. Agora a decisão
+ *  é por código; o texto é só a ponta que a tela mostra. */
+export type TargetIssue = "noName" | "noUrl" | "badUrl" | "noKey";
+
+const ISSUE_KEYS: Record<TargetIssue, MessageKey> = {
+  noName: "core.target.issue.noName",
+  noUrl: "core.target.issue.noUrl",
+  badUrl: "core.target.issue.badUrl",
+  noKey: "core.target.issue.noKey",
+};
+
 /** Problemas de configuração de um destino (lista vazia = ok). */
-export function targetIssues(t: Target): string[] {
-  const issues: string[] = [];
-  if (!t.name.trim()) issues.push("nome vazio");
-  const url = t.ingestUrl.trim();
-  if (!url || BARE_SCHEME_RE.test(url)) issues.push("URL não definida");
-  else if (!INGEST_URL_RE.test(url))
-    issues.push("URL inválida — use rtmp:// ou rtmps://");
-  if (t.enabled && !t.hasKey) issues.push("sem chave");
+export function targetIssueCodes(target: Target): TargetIssue[] {
+  const issues: TargetIssue[] = [];
+  if (!target.name.trim()) issues.push("noName");
+  const url = target.ingestUrl.trim();
+  if (!url || BARE_SCHEME_RE.test(url)) issues.push("noUrl");
+  else if (!INGEST_URL_RE.test(url)) issues.push("badUrl");
+  if (target.enabled && !target.hasKey) issues.push("noKey");
   return issues;
 }
 
 /** Problemas que IMPEDEM iniciar (chave/URL). Nome vazio é só aviso. */
-export function blockingIssues(t: Target): string[] {
-  return targetIssues(t).filter((i) => i !== "nome vazio");
+export function blockingIssueCodes(target: Target): TargetIssue[] {
+  return targetIssueCodes(target).filter((i) => i !== "noName");
+}
+
+/** Texto de um problema no idioma ativo (item de lista, por isso minúsculo). */
+export const issueText = (issue: TargetIssue, t: I18n["t"]): string =>
+  t(ISSUE_KEYS[issue]);
+
+/** Problemas de configuração já escritos pra tela. Só conta quantos? Use
+ *  `targetIssueCodes` e economize o `t`. */
+export function targetIssues(target: Target, t: I18n["t"]): string[] {
+  return targetIssueCodes(target).map((i) => issueText(i, t));
+}
+
+/** Problemas que impedem iniciar, já escritos pra tela. */
+export function blockingIssues(target: Target, t: I18n["t"]): string[] {
+  return blockingIssueCodes(target).map((i) => issueText(i, t));
 }
 
 /** True se a URL foi digitada e está num formato inválido (pra marcar o campo). */

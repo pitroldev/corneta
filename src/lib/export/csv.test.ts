@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { BOM, toCsv, historyCsv, seriesCsv } from "./csv";
 import { analyze, parseSession } from "../report";
+import { interpolate, type Vars } from "../i18n/locale";
+import { makeFmt } from "../i18n/format";
+import { pt, type MessageKey } from "../i18n/pt";
 import type { SessionMeta } from "../types";
+
+/** `parseSession`/`analyze` recebem a tradução por parâmetro — aqui entra o dicionário pt de verdade. */
+const t = (k: MessageKey, vars?: Vars) => interpolate(pt[k], vars);
+
+/** Os exportadores recebem o mesmo pacote `{locale, t, fmt}` que a tela usa. */
+const i18n = { locale: "pt-BR", t, fmt: makeFmt("pt-BR") } as const;
 
 const linhas = (csv: string) =>
   (csv.startsWith(BOM) ? csv.slice(BOM.length) : csv).trim().split("\r\n");
@@ -34,6 +43,17 @@ describe("toCsv", () => {
     // Número negativo NÃO é texto: continua número, sem apóstrofo.
     expect(linhas(toCsv([[-3]]))[0]).toBe("-3");
   });
+
+  it("em inglês vira vírgula + ponto decimal — o Excel de lá corta noutro caractere", () => {
+    expect(linhas(toCsv([["a", "b"], [1.5]], "en"))).toEqual(["a,b", "1.5"]);
+  });
+
+  it("o escape acompanha o separador do idioma", () => {
+    // Com `,` separando colunas, é a vírgula que precisa de aspas — e o `;` deixa
+    // de precisar. Trocar o separador sem trocar o escape parte a linha em duas.
+    expect(linhas(toCsv([["a,b", "c;d"]], "en"))[0]).toBe('"a,b",c;d');
+    expect(linhas(toCsv([["a,b", "c;d"]], "pt-BR"))[0]).toBe('a,b;"c;d"');
+  });
 });
 
 const meta = (over: Partial<SessionMeta> = {}): SessionMeta => ({
@@ -60,6 +80,7 @@ const sessao = (body: object[], m = meta()) =>
     ]
       .map((l) => JSON.stringify(l))
       .join("\n"),
+    t,
   )!;
 
 describe("historyCsv", () => {
@@ -78,7 +99,9 @@ describe("historyCsv", () => {
         items: [{ platform: "twitch", source: "Twitch", viewers: 300 }],
       },
     ]);
-    const out = linhas(historyCsv([{ meta: meta(), analysis: analyze(d) }]));
+    const out = linhas(
+      historyCsv([{ meta: meta(), analysis: analyze(d, t) }], i18n),
+    );
     expect(out).toHaveLength(2);
     expect(out[0].startsWith("data;inicio;duracao_min")).toBe(true);
     const c = out[1].split(";");
@@ -91,7 +114,7 @@ describe("historyCsv", () => {
 
   it("live sem audiência deixa a célula vazia em vez de fingir zero", () => {
     const out = linhas(
-      historyCsv([{ meta: meta(), analysis: analyze(sessao([])) }]),
+      historyCsv([{ meta: meta(), analysis: analyze(sessao([]), t) }], i18n),
     );
     const c = out[1].split(";");
     expect(c[5]).toBe(""); // pico
@@ -132,14 +155,14 @@ describe("seriesCsv", () => {
   ]);
 
   it("uma linha por amostra, com o tempo relativo ao início", () => {
-    const out = linhas(seriesCsv(d, analyze(d)));
+    const out = linhas(seriesCsv(d, analyze(d, t), i18n));
     expect(out).toHaveLength(3); // cabeçalho + 2 amostras
     expect(out[1].split(";")[0]).toBe("2");
     expect(out[2].split(";")[0]).toBe("4");
   });
 
   it("colunas por destino saem com o nome do destino", () => {
-    const head = linhas(seriesCsv(d, analyze(d)))[0];
+    const head = linhas(seriesCsv(d, analyze(d, t), i18n))[0];
     expect(head).toContain("bitrate_kbps_Twitch");
     expect(head).toContain("estado_Twitch");
     expect(head).toContain("chat_por_min_Twitch");
@@ -148,7 +171,7 @@ describe("seriesCsv", () => {
   it("audiência entra como último valor conhecido, e o nome da coluna avisa", () => {
     // A audiência é amostrada a cada ~30s, num eixo diferente do das amostras.
     // Antes da primeira leitura não há valor; depois dela, o degrau se mantém.
-    const out = linhas(seriesCsv(d, analyze(d)));
+    const out = linhas(seriesCsv(d, analyze(d, t), i18n));
     const head = out[0].split(";");
     const col = head.indexOf("assistindo_ultimo_conhecido_Twitch");
     expect(col).toBeGreaterThan(-1);

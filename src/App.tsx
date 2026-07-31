@@ -4,9 +4,10 @@ import { useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
-import { BRB_SLATE_GENERATION, renderBrbSlatePng } from "./lib/brbSlate";
+import { brbSlateGeneration, renderBrbSlatePng } from "./lib/brbSlate";
 import { runWhenIdle } from "./lib/idle";
 import { applyTheme } from "./lib/theme";
+import { useI18n, useT } from "./lib/i18n";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -70,11 +71,12 @@ function preloadScreen(screen: Screen) {
 }
 
 function ScreenLoading() {
+  const t = useT();
   return (
     <div className="mx-auto max-w-3xl py-8" role="status" aria-live="polite">
       <div className="mb-5 flex items-center gap-3 text-sm font-bold text-ink-muted">
         <span className="size-2 animate-pulse rounded-full bg-brass" />
-        Afinando esta tela…
+        {t("components.app.loading.screen")}
       </div>
       <div className="space-y-3" aria-hidden>
         <div className="h-8 w-2/5 animate-pulse rounded-sm bg-surface-3" />
@@ -86,6 +88,7 @@ function ScreenLoading() {
 }
 
 export default function App() {
+  const { t, locale } = useI18n();
   const loaded = useStore((s) => s.loaded);
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
@@ -107,14 +110,14 @@ export default function App() {
 
   // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
   const liveLabel = censored
-    ? "JÁ VOLTO no ar — um termo seu apareceu na tela"
+    ? t("components.app.live.aria.censored")
     : liveState === "live"
-      ? "No ar em todas as plataformas"
+      ? t("components.app.live.aria.live")
       : liveState === "starting"
-        ? "Aguardando o OBS conectar"
+        ? t("components.app.live.aria.starting")
         : liveState === "error"
-          ? "Erro na transmissão"
-          : "Fora do ar";
+          ? t("components.app.live.aria.error")
+          : t("components.app.live.aria.stopped");
   const [screen, setScreen] = useState<Screen>(() => {
     try {
       const stored = localStorage.getItem("corneta.screen") as Screen | null;
@@ -138,9 +141,9 @@ export default function App() {
   useEffect(() => preloadScreen(screen), [screen]);
 
   useEffect(() => {
-    void load();
+    void load(t);
     void setupOauth();
-    const unbind = bindEngine();
+    const unbind = bindEngine(t);
     const unbindConfigSync = bindConfigSync();
     const unbindChat = bindChat();
     const unbindChatRunning = bindChatRunning();
@@ -149,7 +152,7 @@ export default function App() {
     const unbindGuardian = bindGuardian();
     const unbindAlertStatus = bindAlertStatus();
     const unbindChatAuth = bindChatAuth();
-    const unbindAuthFlow = bindAuthFlow();
+    const unbindAuthFlow = bindAuthFlow(t);
     // C1: atalho global começar/parar (alterna conforme o estado atual).
     const unbindShortcut = api.subscribeShortcut(() => {
       const s = useStore.getState();
@@ -171,6 +174,7 @@ export default function App() {
       unbindShortcut();
     };
   }, [
+    t,
     load,
     setupOauth,
     bindEngine,
@@ -190,10 +194,10 @@ export default function App() {
   useEffect(() => {
     if (leaks.length > leakSeen.current) {
       const l = leaks[leaks.length - 1];
-      toast.error(`🛡️ "${l.snippet}" apareceu na tela — cortei pro JÁ VOLTO`);
+      toast.error(t("components.app.leak.toast", { snippet: l.snippet }));
     }
     leakSeen.current = leaks.length;
-  }, [leaks]);
+  }, [leaks, t]);
 
   // D1: aplica o tema (dark/light). Na troca pela mão, a corneta "sopra" o tema novo
   // (ondas de latão saindo do clique — ver lib/theme); no 1º load aplica direto.
@@ -206,21 +210,25 @@ export default function App() {
   // Gera o slate "JÁ VOLTO" e salva no disco — SÓ no modo "auto" (tela gerada). Se o usuário
   // escolheu uma imagem/vídeo custom (image/video), NÃO sobrescreve. Espera o config carregar
   // (`loaded`) pra não regerar por engano enquanto a kind ainda é desconhecida.
+  //
+  // Depende do `locale`: o cartão vai AO AR com texto, então trocar o idioma
+  // tem que redesenhar o PNG que está no disco (a generation carrega o idioma).
   useEffect(() => {
     if (!IS_TAURI || !loaded) return;
+    const generation = brbSlateGeneration(locale);
     if (brbSlateKind && brbSlateKind !== "auto") return;
     let cancelled = false;
     let cancelIdle = () => {};
     void api
-      .brbSlateNeedsRefresh(BRB_SLATE_GENERATION)
+      .brbSlateNeedsRefresh(generation)
       .then((needsRefresh) => {
         if (!needsRefresh || cancelled) return;
         cancelIdle = runWhenIdle(() => {
           if (cancelled) return;
-          void renderBrbSlatePng().then((b64) => {
+          void renderBrbSlatePng(t).then((b64) => {
             if (b64 && !cancelled)
               void api
-                .saveBrbSlate(b64, BRB_SLATE_GENERATION)
+                .saveBrbSlate(b64, generation)
                 .catch((error) =>
                   console.warn(
                     "Não foi possível atualizar o slate padrão",
@@ -237,7 +245,7 @@ export default function App() {
       cancelled = true;
       cancelIdle();
     };
-  }, [loaded, brbSlateKind]);
+  }, [loaded, brbSlateKind, locale, t]);
 
   // Cada tela começa no topo: o container de scroll é compartilhado, então um
   // scrollIntoView (ex.: "Fora do ar" → botão BORA) deixava as outras telas cortadas.
@@ -290,10 +298,13 @@ export default function App() {
     if (!liveShortcut) return;
     api.registerShortcut(liveShortcut).catch(() => {
       toast.error(
-        `Seu atalho ${liveShortcut.replace("CommandOrControl", "Ctrl")} já está em uso por outro programa — troque em Configurações → Atalho global.`,
+        t("components.app.shortcut.taken", {
+          // "CommandOrControl" é token do Tauri; na tela a pessoa lê "Ctrl".
+          shortcut: liveShortcut.replace("CommandOrControl", "Ctrl"),
+        }),
       );
     });
-  }, [loaded, liveShortcut]);
+  }, [loaded, liveShortcut, t]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -309,11 +320,10 @@ export default function App() {
             <span className="animate-pulse text-lg">🛑</span>
             <div className="min-w-0 flex-1">
               <div className="font-display text-sm font-extrabold leading-tight">
-                JÁ VOLTO no ar
+                {t("components.app.censored.title")}
               </div>
               <div className="truncate text-xs text-white/85">
-                Um termo seu apareceu na tela — a live volta sozinha quando ele
-                sumir.
+                {t("components.app.censored.body")}
               </div>
             </div>
           </div>
@@ -330,7 +340,7 @@ export default function App() {
                 <Mascot className="size-9" />
               </div>
               <span className="font-display text-sm font-bold text-ink-muted">
-                Abrindo sua bancada…
+                {t("components.app.loading.boot")}
               </span>
             </div>
           </div>

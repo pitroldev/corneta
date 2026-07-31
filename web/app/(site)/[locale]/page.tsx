@@ -119,14 +119,14 @@ export default async function Home({
 
         <Steps t={t} />
         <Local t={t} />
-        <Platforms t={t} destinations={destinations} />
+        <Platforms t={t} locale={locale} destinations={destinations} />
         <TinyThings t={t} items={tinyThings} />
         <Faq t={t} downloadUrl={downloadUrl} />
         <Ticker t={t} />
         <FinalCta t={t} />
       </main>
 
-      <SiteFooter t={t} downloadUrl={downloadUrl} />
+      <SiteFooter t={t} locale={locale} downloadUrl={downloadUrl} />
     </>
   );
 }

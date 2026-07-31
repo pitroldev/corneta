@@ -22,9 +22,16 @@ import {
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
-import { PLATFORM_LIST, PLATFORM_TAGLINES, PLATFORMS } from "../lib/platforms";
+import {
+  PLATFORM_LIST,
+  PLATFORMS,
+  platformName,
+  platformNote,
+  platformTagline,
+} from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { cn, openExternal, uid } from "../lib/utils";
+import { useI18n, useT, type I18n, type Locale } from "../lib/i18n";
 import type { ChatPlatform, PlatformId, Target } from "../lib/types";
 import {
   INGEST_URL_RE,
@@ -50,6 +57,7 @@ import { FirstLiveChecklist } from "../components/FirstLiveChecklist";
 import { Mascot } from "../components/decor";
 
 export function PlatformsScreen() {
+  const t = useT();
   const config = useStore((s) => s.config);
   const addTarget = useStore((s) => s.addTarget);
   const reorderTargets = useStore((s) => s.reorderTargets);
@@ -63,12 +71,12 @@ export function PlatformsScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker="Pra onde a corneta toca"
-        title="Plataformas"
-        subtitle="Escolha as plataformas, cole a chave de cada uma e eu toco seu vídeo do OBS em todas de uma vez."
+        kicker={t("platforms.title.kicker")}
+        title={t("platforms.title")}
+        subtitle={t("platforms.subtitle")}
         right={
           <Button variant="primary" onClick={() => setPicking(true)}>
-            <Plus className="size-4" strokeWidth={2.6} /> Adicionar
+            <Plus className="size-4" strokeWidth={2.6} /> {t("platforms.add")}
           </Button>
         }
       />
@@ -88,12 +96,12 @@ export function PlatformsScreen() {
             onReorder={reorderTargets}
             className="flex list-none flex-col gap-3"
           >
-            {config.targets.map((t) => (
+            {config.targets.map((tg) => (
               <TargetRow
-                key={t.id}
-                target={t}
-                onReframe={() => setReframeTarget(t)}
-                justAdded={t.id === justAddedId}
+                key={tg.id}
+                target={tg}
+                onReframe={() => setReframeTarget(tg)}
+                justAdded={tg.id === justAddedId}
                 onSpotlightDone={() => setJustAddedId(null)}
               />
             ))}
@@ -114,7 +122,9 @@ export function PlatformsScreen() {
             const newId = addTarget(id);
             if (newId) setJustAddedId(newId);
             setPicking(false);
-            toast.success(`${PLATFORMS[id].name} entrou na corneta 📣`);
+            toast.success(
+              t("platforms.toast.added", { platform: platformName(id, t) }),
+            );
           }}
           onClose={() => setPicking(false)}
         />
@@ -127,6 +137,7 @@ export function PlatformsScreen() {
 // vê todos de relance, troca num clique. Renomear é só pelo botão dedicado (clicar na
 // pílula ativa não faz nada — evitava renomeio acidental no mesmo gesto da troca).
 function ProfileBar() {
+  const t = useT();
   const config = useStore((s) => s.config)!;
   const loadProfile = useStore((s) => s.loadProfile);
   const addProfile = useStore((s) => s.addProfile);
@@ -144,9 +155,9 @@ function ProfileBar() {
       <div className="mb-2.5 flex items-center gap-1.5 px-0.5">
         <Layers className="size-3.5 text-ink-faint" />
         <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-          Perfil de transmissão
+          {t("platforms.profile.label")}
         </span>
-        <Hint text="Um perfil é um conjunto salvo de plataformas. Crie um pra cada situação (ex.: 'Solo Twitch+YT', 'Evento com TikTok') e troque num clique." />
+        <Hint text={t("platforms.profile.hint")} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -164,7 +175,7 @@ function ProfileBar() {
                   if (e.key === "Enter" || e.key === "Escape")
                     setEditing(false);
                 }}
-                aria-label="Nome do perfil"
+                aria-label={t("platforms.profile.nameAria")}
                 className="h-9 min-w-0 max-w-[14rem] rounded-md border-2 border-brass bg-surface px-2.5 font-display text-sm font-bold text-ink outline-none [field-sizing:content]"
               />
             );
@@ -177,7 +188,11 @@ function ProfileBar() {
               }}
               aria-pressed={on}
               title={
-                on ? "Perfil ativo" : `Trocar pra "${p.name || "Sem nome"}"`
+                on
+                  ? t("platforms.profile.active")
+                  : t("platforms.profile.switchTo", {
+                      name: p.name || t("platforms.profile.untitled"),
+                    })
               }
               className={cn(
                 "flex h-9 items-center gap-2 rounded-md px-3 font-display text-sm font-bold transition",
@@ -187,7 +202,7 @@ function ProfileBar() {
               )}
             >
               <span className="max-w-[14rem] truncate">
-                {p.name || "Sem nome"}
+                {p.name || t("platforms.profile.untitled")}
               </span>
               <span
                 className={cn(
@@ -196,7 +211,7 @@ function ProfileBar() {
                     ? "bg-brass-ink/15 text-brass-ink"
                     : "bg-surface-2 text-ink-faint",
                 )}
-                title={`${p.targets.length} plataforma${p.targets.length === 1 ? "" : "s"}`}
+                title={t("platforms.profile.count", { n: p.targets.length })}
               >
                 {p.targets.length}
               </span>
@@ -205,7 +220,8 @@ function ProfileBar() {
         })}
 
         <Button variant="subtle" size="sm" className="h-9" onClick={addProfile}>
-          <Plus className="size-4" strokeWidth={2.6} /> Novo perfil
+          <Plus className="size-4" strokeWidth={2.6} />{" "}
+          {t("platforms.profile.new")}
         </Button>
 
         <div className="ml-auto flex items-center gap-1">
@@ -215,9 +231,9 @@ function ProfileBar() {
               size="sm"
               className="h-9"
               onClick={() => setEditing(true)}
-              title="Renomear o perfil ativo"
+              title={t("platforms.profile.renameTitle")}
             >
-              <Pencil className="size-3.5" /> Renomear
+              <Pencil className="size-3.5" /> {t("platforms.profile.rename")}
             </Button>
           )}
           {many && (
@@ -234,10 +250,14 @@ function ProfileBar() {
                   setTimeout(() => setConfirmDel(false), 3000);
                 }
               }}
-              title={`Excluir o perfil "${active.name || "Sem nome"}"`}
+              title={t("platforms.profile.deleteTitle", {
+                name: active.name || t("platforms.profile.untitled"),
+              })}
             >
               <Trash2 className="size-3.5" />{" "}
-              {confirmDel ? "Excluir mesmo?" : "Excluir"}
+              {confirmDel
+                ? t("platforms.profile.deleteConfirm")
+                : t("platforms.profile.delete")}
             </Button>
           )}
         </div>
@@ -247,18 +267,18 @@ function ProfileBar() {
 }
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
+  const t = useT();
   return (
     <div className="rounded-xl bg-surface px-6 py-14 text-center pop">
       <div className="mx-auto mb-4 grid size-16 rotate-[-4deg] place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
         <Mascot className="size-9 animate-shout" />
       </div>
-      <h3 className="text-2xl">Cadê as plataformas?</h3>
+      <h3 className="text-2xl">{t("platforms.empty.title")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">
-        Sua corneta ainda não aponta pra lugar nenhum. Bora colocar a primeira
-        plataforma?
+        {t("platforms.empty.body")}
       </p>
       <Button variant="primary" size="lg" className="mt-5" onClick={onAdd}>
-        <Plus className="size-5" strokeWidth={2.6} /> Adicionar plataforma
+        <Plus className="size-5" strokeWidth={2.6} /> {t("platforms.empty.cta")}
       </Button>
     </div>
   );
@@ -266,39 +286,44 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 // Resumo "pronto pra live": o que está pronto e o que falta (chave/URL) num relance.
 function ReadinessSummary({ targets }: { targets: Target[] }) {
-  const enabled = targets.filter((t) => t.enabled);
-  const ready = enabled.filter((t) => blockingIssues(t).length === 0).length;
-  const semChave = enabled.filter((t) => !t.hasKey).length;
-  const semUrl = enabled.filter((t) => !hasValidUrl(t)).length;
+  const t = useT();
+  const enabled = targets.filter((x) => x.enabled);
+  const ready = enabled.filter((x) => blockingIssues(x, t).length === 0).length;
+  const semChave = enabled.filter((x) => !x.hasKey).length;
+  const semUrl = enabled.filter((x) => !hasValidUrl(x)).length;
   const off = targets.length - enabled.length;
   const allReady = enabled.length > 0 && ready === enabled.length;
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
       {allReady ? (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-ok/15 px-2.5 py-1 font-bold text-ok">
-          <Check className="size-3.5" strokeWidth={2.8} /> Tudo pronto pra live
+          <Check className="size-3.5" strokeWidth={2.8} />{" "}
+          {t("platforms.readiness.allReady")}
         </span>
       ) : (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1 font-bold text-ink-muted">
           <Check className="size-3.5 text-ok" strokeWidth={2.8} />
-          <span className="text-ink">{ready}</span> pronto
-          {ready === 1 ? "" : "s"}
+          <span className="text-ink">
+            {t("platforms.readiness.ready", { n: ready })}
+          </span>
         </span>
       )}
       {/* Chave ausente é pendência (warn), não erro — vermelho fica pra URL quebrada. */}
       {semChave > 0 && (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-warn/15 px-2.5 py-1 font-bold text-warn">
-          <KeyRound className="size-3.5" /> {semChave} sem chave
+          <KeyRound className="size-3.5" />{" "}
+          {t("platforms.readiness.noKey", { n: semChave })}
         </span>
       )}
       {semUrl > 0 && (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-bad/15 px-2.5 py-1 font-bold text-bad">
-          <AlertTriangle className="size-3.5" /> {semUrl} sem URL
+          <AlertTriangle className="size-3.5" />{" "}
+          {t("platforms.readiness.noUrl", { n: semUrl })}
         </span>
       )}
       {off > 0 && (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1 font-semibold text-ink-faint">
-          {off} desligado{off === 1 ? "" : "s"}
+          {t("platforms.readiness.off", { n: off })}
         </span>
       )}
     </div>
@@ -316,6 +341,7 @@ function TargetRow({
   justAdded?: boolean;
   onSpotlightDone?: () => void;
 }) {
+  const t = useT();
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const toggleTarget = useStore((s) => s.toggleTarget);
@@ -335,18 +361,23 @@ function TargetRow({
   // Selo de prontidão (independe de estar ligado): o erro deixa de aparecer só no Ao vivo.
   // Chave ausente é pendência convidativa (warn) — vermelho só pra URL quebrada/faltando.
   const readiness = !urlOk
-    ? { tone: "bad" as const, label: urlInvalid ? "URL inválida" : "Sem URL" }
+    ? {
+        tone: "bad" as const,
+        label: urlInvalid
+          ? t("platforms.target.badge.urlInvalid")
+          : t("platforms.target.badge.noUrl"),
+      }
     : !target.hasKey
-      ? { tone: "warn" as const, label: "Cole a chave" }
+      ? { tone: "warn" as const, label: t("platforms.target.badge.pasteKey") }
       : !target.name.trim()
-        ? { tone: "warn" as const, label: "Sem nome" }
-        : { tone: "ok" as const, label: "Pronto" };
+        ? { tone: "warn" as const, label: t("platforms.target.badge.noName") }
+        : { tone: "ok" as const, label: t("platforms.target.badge.ready") };
 
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
   // Bloqueios reais (chave/URL) — acendem o acento na borda e abrem o cartão por padrão.
   // Só chave faltando (URL ok) = warn; URL quebrada = vermelho.
-  const blocking = blockingIssues(target);
+  const blocking = blockingIssues(target, t);
   const keyOnlyPending = blocking.length > 0 && urlOk;
   const [open, setOpen] = useState(() => blocking.length > 0);
 
@@ -371,7 +402,7 @@ function TargetRow({
     setTesting(true);
     setTestResult(null);
     try {
-      setTestResult({ ok: true, msg: await api.testTarget(target.id) });
+      setTestResult({ ok: true, msg: await api.testTarget(target.id, t) });
     } catch (e) {
       setTestResult({ ok: false, msg: String(e) });
     } finally {
@@ -410,8 +441,8 @@ function TargetRow({
                   moveTarget(target.id, 1);
                 }
               }}
-              aria-label="Reordenar plataforma (setas ↑/↓)"
-              title="Arraste ou use ↑/↓"
+              aria-label={t("platforms.target.reorderAria")}
+              title={t("platforms.target.reorderTitle")}
               className="shrink-0 cursor-grab touch-none text-ink-faint active:cursor-grabbing"
             >
               <GripVertical className="size-5" />
@@ -424,7 +455,7 @@ function TargetRow({
                   onChange={(e) =>
                     updateTarget(target.id, { name: e.target.value })
                   }
-                  aria-label="Nome da plataforma"
+                  aria-label={t("platforms.target.nameAria")}
                   className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
                 />
                 {/* Protocolo é jargão — só interessa no Personalizado, e aí reflete
@@ -440,19 +471,21 @@ function TargetRow({
                 {preset.experimental && <ExperimentalBadge />}
               </div>
               <div className="mt-0.5 truncate text-xs text-ink-faint">
-                {urlOk ? target.ingestUrl : "URL não definida"}
+                {urlOk ? target.ingestUrl : t("platforms.target.urlUnset")}
               </div>
             </div>
             <Badge tone={readiness.tone}>{readiness.label}</Badge>
             <Toggle
               checked={target.enabled}
               onChange={() => toggleTarget(target.id)}
-              label="Ativar"
+              label={t("platforms.target.enableAria")}
             />
             <Collapsible.Trigger asChild>
               <button
                 aria-label={
-                  open ? "Recolher plataforma" : "Expandir plataforma"
+                  open
+                    ? t("platforms.target.collapseAria")
+                    : t("platforms.target.expandAria")
                 }
                 className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
               >
@@ -469,21 +502,22 @@ function TargetRow({
           <Collapsible.Content className="mt-4 flex flex-col gap-4">
             {/* A nota didática vem ANTES dos campos: é o que precisa ser lido
                 antes de preencher (liberação de conta, onde pegar a chave etc.). */}
-            {preset.note && (
-              <p className="text-xs text-ink-faint">{preset.note}</p>
-            )}
+            <p className="text-xs text-ink-faint">
+              {platformNote(target.platformId, t)}
+            </p>
 
             {showUrlField && (
               <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
                 <span>
-                  URL de ingestão
+                  {t("platforms.target.url.label")}
                   {!isCustom && (
                     <span className="font-normal text-ink-faint">
                       {" "}
-                      — o endereço pra onde seu vídeo vai;{" "}
                       {target.platformId === "kick"
-                        ? "essa já vem pronta, só troque se o painel da Kick mostrar outra"
-                        : `cole a que o painel da ${preset.name} te deu`}
+                        ? t("platforms.target.url.helpKick")
+                        : t("platforms.target.url.help", {
+                            platform: platformName(target.platformId, t),
+                          })}
                     </span>
                   )}
                 </span>
@@ -493,7 +527,7 @@ function TargetRow({
                       ? target.ingestUrl
                       : target.ingestUrl.replace(/^(rtmps?):\/\/$/i, "")
                   }
-                  placeholder="rtmp://servidor/app  (rtmp:// ou rtmps://)"
+                  placeholder={t("platforms.target.url.placeholder")}
                   onChange={(e) =>
                     updateTarget(target.id, { ingestUrl: e.target.value })
                   }
@@ -507,7 +541,7 @@ function TargetRow({
                 />
                 {urlInvalid && (
                   <span className="text-[11px] font-medium text-bad">
-                    URL inválida — use rtmp:// ou rtmps://
+                    {t("platforms.target.url.invalid")}
                   </span>
                 )}
               </label>
@@ -521,32 +555,35 @@ function TargetRow({
                 size="sm"
                 onClick={runTest}
                 disabled={testing}
-                title="Vê se o servidor da plataforma está respondendo — não confere a chave"
+                title={t("platforms.target.test.title")}
               >
                 <Wifi className="size-3.5" />{" "}
-                {testing ? "Testando…" : "Testar rede"}
+                {testing
+                  ? t("platforms.target.test.running")
+                  : t("platforms.target.test.cta")}
               </Button>
               {preset.keyUrl && (
                 <button
                   onClick={() => void openExternal(preset.keyUrl!)}
                   className="flex items-center gap-1 font-semibold text-brass hover:underline"
                 >
-                  Pegar minha chave <ExternalLink className="size-3" />
+                  {t("platforms.target.getKey")}{" "}
+                  <ExternalLink className="size-3" />
                 </button>
               )}
               {isPortrait && (
                 <button
                   onClick={onReframe}
                   className="flex items-center gap-1 font-semibold text-brass hover:underline"
-                  title="Recorta o 9:16 do seu vídeo pra esta saída vertical"
+                  title={t("platforms.target.reframeTitle")}
                 >
-                  <Crop className="size-3.5" /> Enquadrar vertical
+                  <Crop className="size-3.5" /> {t("platforms.target.reframe")}
                 </button>
               )}
               {testResult &&
                 (testResult.ok ? (
                   <span className="font-medium text-ink-muted">
-                    📡 {testResult.msg} · a chave só é confirmada ao vivo
+                    {t("platforms.target.test.ok", { msg: testResult.msg })}
                   </span>
                 ) : (
                   <span className="font-semibold text-bad">
@@ -560,13 +597,15 @@ function TargetRow({
                 onClick={() => {
                   const name = target.name;
                   removeTarget(target.id);
-                  toast.action(`${name} saiu da corneta`, "Desfazer", () =>
-                    undoRemoveTarget(),
+                  toast.action(
+                    t("platforms.toast.removed", { name }),
+                    t("platforms.toast.undo"),
+                    () => undoRemoveTarget(),
                   );
                 }}
-                aria-label="Remover"
+                aria-label={t("platforms.target.remove")}
               >
-                <Trash2 className="size-4" /> Remover
+                <Trash2 className="size-4" /> {t("platforms.target.remove")}
               </Button>
             </div>
           </Collapsible.Content>
@@ -578,7 +617,11 @@ function TargetRow({
 
 // Ponte plataforma→chat: guardar a chave NÃO configura o chat agregado (são
 // cadastros separados). Depois de salvar, oferece criar a fonte na tela de Chat.
-const CHAT_BRIDGE_LABEL: Record<ChatPlatform, string> = {
+//
+// O fragmento só existe por causa da preposição + gênero do português ("o chat
+// DA Twitch", "DO YouTube"). Em inglês a frase pede o nome cru ("Want Twitch
+// chat…"), então o mapa some e entra o nome do catálogo.
+const CHAT_BRIDGE_LABEL_PT: Record<ChatPlatform, string> = {
   twitch: "da Twitch",
   youtube: "do YouTube",
   kick: "da Kick",
@@ -588,7 +631,9 @@ function isChatPlatform(id: PlatformId): id is ChatPlatform {
   return id === "twitch" || id === "youtube" || id === "kick";
 }
 
-function offerChatBridge(platformId: PlatformId) {
+// Não é componente: recebe `t` e o idioma de quem chama (o app tem duas janelas,
+// então estado global de idioma viraria corrida entre elas).
+function offerChatBridge(platformId: PlatformId, t: I18n["t"], locale: Locale) {
   if (!isChatPlatform(platformId)) return;
   const sources = useStore.getState().config?.settings.chatSources ?? [];
   if (sources.some((s) => s.platform === platformId)) return;
@@ -601,9 +646,13 @@ function offerChatBridge(platformId: PlatformId) {
   } catch {
     /* storage indisponível: melhor arriscar oferecer de novo que nunca */
   }
+  const platformLabel =
+    locale === "pt-BR"
+      ? CHAT_BRIDGE_LABEL_PT[platformId]
+      : platformName(platformId, t);
   toast.action(
-    `Quer o chat ${CHAT_BRIDGE_LABEL[platformId]} aqui na Corneta também?`,
-    "Configurar",
+    t("platforms.chatBridge.ask", { platform: platformLabel }),
+    t("platforms.chatBridge.cta"),
     () => {
       const st = useStore.getState();
       const cur = st.config?.settings.chatSources ?? [];
@@ -635,6 +684,7 @@ function KeyField({
   target: Target;
   autoFocusKey?: boolean;
 }) {
+  const { t, locale } = useI18n();
   const setKey = useStore((s) => s.setKey);
   const clearKey = useStore((s) => s.clearKey);
   const [editing, setEditing] = useState(false);
@@ -648,30 +698,26 @@ function KeyField({
       const { key, strippedUrl } = sanitizeStreamKey(raw, target.ingestUrl);
       if (!key) {
         // Colou só a URL do servidor (ou nada): não tem chave pra guardar.
-        if (strippedUrl)
-          toast.error(
-            "Isso é o endereço do servidor, não a chave — cole a stream key que fica ao lado dela no painel 🔑",
-          );
+        if (strippedUrl) toast.error(t("platforms.key.pastedUrlOnly"));
         return;
       }
       await setKey(target.id, key);
       setValue("");
       setEditing(false);
-      if (strippedUrl)
-        toast.info("Isso parecia a URL completa — guardei só a chave 👍");
-      toast.success("Chave guardada no cofre 🔒");
-      offerChatBridge(target.platformId);
+      if (strippedUrl) toast.info(t("platforms.key.strippedUrl"));
+      toast.success(t("platforms.key.savedToast"));
+      offerChatBridge(target.platformId, t, locale);
     } catch (e) {
-      toast.error(`Falha ao guardar a chave: ${e}`);
+      toast.error(t("platforms.key.saveFailed", { err: String(e) }));
     }
   };
   // Colar já salva: um clique a menos no caminho mais quente do onboarding
   // (quem prefere digitar continua com o campo + Salvar).
   const paste = async () => {
     try {
-      const t = await navigator.clipboard.readText();
-      if (!t.trim()) return;
-      await save(t);
+      const clip = await navigator.clipboard.readText();
+      if (!clip.trim()) return;
+      await save(clip);
     } catch {
       /* área de transferência bloqueada */
     }
@@ -681,7 +727,9 @@ function KeyField({
     return (
       <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2">
         <Check className="size-4 text-ok" strokeWidth={2.6} />
-        <span className="text-sm font-semibold">Chave no cofre</span>
+        <span className="text-sm font-semibold">
+          {t("platforms.key.saved")}
+        </span>
         <span className="font-mono text-sm text-ink-faint">•••••••••••</span>
         <div className="ml-auto flex gap-1">
           <Button
@@ -692,7 +740,7 @@ function KeyField({
               setEditing(true);
             }}
           >
-            <Pencil className="size-3.5" /> Trocar
+            <Pencil className="size-3.5" /> {t("platforms.key.change")}
           </Button>
           <Button
             variant={confirmClear ? "danger" : "ghost"}
@@ -706,13 +754,17 @@ function KeyField({
               setConfirmClear(false);
               try {
                 await clearKey(target.id);
-                toast.info("Chave removida");
+                toast.info(t("platforms.key.removed"));
               } catch (e) {
-                toast.error(`Falha ao remover a chave: ${e}`);
+                toast.error(
+                  t("platforms.key.removeFailed", { err: String(e) }),
+                );
               }
             }}
           >
-            {confirmClear ? "Remover mesmo?" : "Remover"}
+            {confirmClear
+              ? t("platforms.key.removeConfirm")
+              : t("platforms.key.remove")}
           </Button>
         </div>
       </div>
@@ -727,7 +779,7 @@ function KeyField({
           type={reveal ? "text" : "password"}
           autoFocus={editing || autoFocusKey}
           className="pl-9 pr-9"
-          placeholder="Cole a chave de transmissão (stream key) que a plataforma te deu"
+          placeholder={t("platforms.key.placeholder")}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && value.trim() && void save()}
@@ -736,8 +788,10 @@ function KeyField({
           type="button"
           onClick={() => setReveal((v) => !v)}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
-          aria-label={reveal ? "Ocultar" : "Mostrar"}
-          title={reveal ? "Ocultar" : "Mostrar"}
+          aria-label={
+            reveal ? t("platforms.key.hide") : t("platforms.key.show")
+          }
+          title={reveal ? t("platforms.key.hide") : t("platforms.key.show")}
         >
           {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>
@@ -746,9 +800,9 @@ function KeyField({
         variant="subtle"
         size="sm"
         onClick={paste}
-        title="Cola da área de transferência e já guarda no cofre"
+        title={t("platforms.key.pasteSaveTitle")}
       >
-        <ClipboardPaste className="size-4" /> Colar e salvar
+        <ClipboardPaste className="size-4" /> {t("platforms.key.pasteSave")}
       </Button>
       <Button
         variant="primary"
@@ -756,7 +810,7 @@ function KeyField({
         disabled={!value.trim()}
         onClick={() => void save()}
       >
-        Salvar
+        {t("platforms.key.save")}
       </Button>
       {editing && (
         <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
@@ -774,19 +828,20 @@ function PlatformPicker({
   onPick: (id: PlatformId) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const targets = useStore((s) => s.config?.targets ?? []);
   const countOf = (id: PlatformId) =>
-    targets.filter((t) => t.platformId === id).length;
+    targets.filter((tg) => tg.platformId === id).length;
 
   return (
     <Modal
-      title="Quem entra na corneta?"
+      title={t("platforms.picker.title")}
       onClose={onClose}
       className="max-w-2xl rounded-xl bg-surface p-5 pop"
     >
       <div className="mb-4 flex items-center justify-between">
         <h3 id="picker-title" className="text-xl">
-          Quem entra na corneta?
+          {t("platforms.picker.title")}
         </h3>
         <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="size-4" />
@@ -797,14 +852,14 @@ function PlatformPicker({
           <button
             key={p.id}
             onClick={() => onPick(p.id)}
-            title={p.note}
+            title={platformNote(p.id, t)}
             className="flex items-center gap-3 rounded-md bg-surface-2 p-3 text-left transition hover:translate-x-0.5 hover:-translate-y-0.5 hover:bg-surface-3"
           >
             <PlatformGlyph id={p.id} size={38} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="truncate font-display font-bold">
-                  {p.name}
+                  {platformName(p.id, t)}
                 </span>
                 {p.experimental && (
                   <ExperimentalBadge className="shrink-0 scale-90" />
@@ -813,12 +868,14 @@ function PlatformPicker({
               {/* Descrição humana no lugar do protocolo: o pré-requisito
                   (conta liberada, vídeo em pé) aparece antes do clique. */}
               <div className="mt-0.5 text-[11px] font-medium text-ink-faint">
-                {PLATFORM_TAGLINES[p.id]}
+                {platformTagline(p.id, t)}
               </div>
             </div>
             {countOf(p.id) > 0 && (
               <Badge tone="neutral" className="shrink-0 self-start">
-                já tem{countOf(p.id) > 1 ? ` ×${countOf(p.id)}` : ""}
+                {countOf(p.id) > 1
+                  ? t("platforms.picker.alreadyCount", { n: countOf(p.id) })
+                  : t("platforms.picker.already")}
               </Badge>
             )}
           </button>

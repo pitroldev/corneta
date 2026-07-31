@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -71,37 +71,22 @@ import { anonymize } from "../lib/export/anonymize";
 import { historyCsv, seriesCsv, type HistoryRow } from "../lib/export/csv";
 import { reportHtml } from "../lib/export/html";
 import { reportJson } from "../lib/export/json";
+import {
+  fileStamp,
+  rich,
+  useI18n,
+  useT,
+  type Fmt,
+  type I18n,
+  type MessageKey,
+} from "../lib/i18n";
 
-function fmtDur(sec: number): string {
-  const total = Math.round(sec / 60);
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return h > 0 ? `${h}h${m.toString().padStart(2, "0")}` : `${m}min`;
-}
-// Com ano: "Live de 02/07" fica ambígua depois de um ano de uso.
-const fmtDate = (ms: number) =>
-  new Date(ms).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
-const fmtTime = (ms: number) =>
-  new Date(ms).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-// Data local em ISO pro nome de arquivo — não colide com o do ano anterior.
-const fmtDateFile = (ms: number) => {
-  const d = new Date(ms);
-  const p = (x: number) => x.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-};
-
-// Nomes dos modos como na tela Qualidade (nunca o enum interno).
-const MODE_LABEL: Record<string, string> = {
-  "per-platform": "Caprichado",
-  passthrough: "Na lata",
-  hybrid: "Esperto",
+// Nomes dos modos como na tela Qualidade (nunca o enum interno). A CHAVE do mapa
+// é o valor gravado no meta da sessão — só o rótulo é texto de tela.
+const MODE_KEY: Record<string, MessageKey> = {
+  "per-platform": "reports.mode.perPlatform",
+  passthrough: "reports.mode.passthrough",
+  hybrid: "reports.mode.hybrid",
 };
 
 const platColor = (pid: string) =>
@@ -138,6 +123,7 @@ function channelColors(channels: ChannelStats[]): Record<string, string> {
 }
 
 export function ReportsScreen() {
+  const t = useT();
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<Record<string, SessionSummary>>(
@@ -145,11 +131,14 @@ export function ReportsScreen() {
   );
 
   const markReportSeen = useStore((s) => s.markReportSeen);
-  const refresh = () => api.listSessions().then(setSessions);
+  // Estável entre renders: sem o `useCallback`, `refresh` nasce nova a cada
+  // render e não pode entrar nas dependências do efeito abaixo — que é
+  // justamente o que o lint cobra.
+  const refresh = useCallback(() => api.listSessions(t).then(setSessions), [t]);
   useEffect(() => {
     void refresh();
     markReportSeen(); // abriu Relatórios → some o selo "NOVO"
-  }, [markReportSeen]);
+  }, [markReportSeen, refresh]);
 
   // Resumos pros chips da lista: cache primeiro, o que faltar é computado em
   // background (uma sessão por vez, pra não ler todos os NDJSON de uma tacada).
@@ -169,9 +158,9 @@ export function ReportsScreen() {
         try {
           const raw = await api.readSession(id);
           if (!alive) return;
-          const d = parseSession(raw);
+          const d = parseSession(raw, t);
           if (!d) continue;
-          const sum = summarize(d, analyze(d));
+          const sum = summarize(d, analyze(d, t));
           // Sessão ainda no ar (sem registro "end") mostra os chips mas NÃO entra
           // no cache — senão o resumo de meia live ficaria congelado pra sempre.
           if (d.meta.endedAt != null) setCachedSummary(id, sum);
@@ -184,7 +173,7 @@ export function ReportsScreen() {
     return () => {
       alive = false;
     };
-  }, [sessions]);
+  }, [sessions, t]);
 
   if (selected) {
     // Lista vem ordenada da mais nova pra mais velha → a "última live" é a seguinte.
@@ -206,9 +195,9 @@ export function ReportsScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker="Depois da live"
-        title="Relatórios"
-        subtitle="O retrato de cada live: o que travou e o que prendeu a galera."
+        kicker={t("reports.list.kicker")}
+        title={t("reports.list.title")}
+        subtitle={t("reports.list.subtitle")}
         right={
           <div className="flex items-center gap-2">
             {sessions && sessions.length > 0 && (
@@ -219,7 +208,7 @@ export function ReportsScreen() {
               size="sm"
               onClick={() => void api.openSessionsDir()}
             >
-              <FolderOpen className="size-4" /> Abrir pasta
+              <FolderOpen className="size-4" /> {t("reports.list.openFolder")}
             </Button>
           </div>
         }
@@ -235,8 +224,8 @@ export function ReportsScreen() {
           ))}
         </div>
       ) : sessions.length === 0 ? (
-        <EmptyState title="Nenhuma live ainda">
-          Quando a live encerra, monto o relatório dela aqui.
+        <EmptyState title={t("reports.list.empty.title")}>
+          {t("reports.list.empty.body")}
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
@@ -261,6 +250,8 @@ export function ReportsScreen() {
  *  de cada vez porque o pico de memória vira o tamanho do MAIOR NDJSON em vez da
  *  soma de todos — 50 lives de 4h dariam dezenas de MB de uma vez. */
 function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const [busy, setBusy] = useState(false);
   const run = async () => {
     setBusy(true);
@@ -269,35 +260,40 @@ function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
       let ilegiveis = 0;
       for (const meta of sessions) {
         try {
-          const d = parseSession(await api.readSession(meta.id));
+          const d = parseSession(await api.readSession(meta.id), t);
           if (!d) {
             ilegiveis++;
             continue;
           }
           // O `meta` da lista tem o fim estimado pelo mtime; o do arquivo é o real.
-          rows.push({ meta: { ...meta, ...d.meta }, analysis: analyze(d) });
+          rows.push({ meta: { ...meta, ...d.meta }, analysis: analyze(d, t) });
         } catch {
           ilegiveis++;
         }
       }
       if (!rows.length) {
-        toast.error("Nenhuma live pôde ser lida.");
+        toast.error(t("reports.history.error.none"));
         return;
       }
       const ok = await api.saveTextFile({
-        name: `corneta-historico-${fmtDateFile(Date.now())}.csv`,
-        label: "Planilha (CSV)",
+        // A DATA continua ISO — ordena sozinha no explorador e não muda com o
+        // idioma. Só a palavra do nome segue o idioma.
+        name: `${t("reports.file.history")}-${fileStamp(Date.now())}.csv`,
+        label: t("reports.download.csv.label"),
         ext: "csv",
-        content: historyCsv(rows),
+        content: historyCsv(rows, i18n),
       });
       if (ok)
         toast.success(
           ilegiveis > 0
-            ? `${rows.length} live(s) exportadas — ${ilegiveis} ilegível(is) ficaram de fora`
-            : `${rows.length} live(s) na planilha`,
+            ? t("reports.history.ok.some", {
+                n: rows.length,
+                bad: ilegiveis,
+              })
+            : t("reports.history.ok.all", { n: rows.length }),
         );
     } catch (e) {
-      toast.error(`Falha ao exportar: ${errMsg(e)}`);
+      toast.error(t("reports.history.error.save", { err: errMsg(e) }));
     } finally {
       setBusy(false);
     }
@@ -309,7 +305,8 @@ function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
       disabled={busy}
       onClick={() => void run()}
     >
-      <Table2 className="size-4" /> {busy ? "Montando…" : "Histórico (CSV)"}
+      <Table2 className="size-4" />{" "}
+      {busy ? t("reports.history.busy") : t("reports.history.button")}
     </Button>
   );
 }
@@ -330,6 +327,7 @@ function SessionRow({
   summary?: SessionSummary;
   onOpen: () => void;
 }) {
+  const { t, tp, fmt } = useI18n();
   return (
     <button
       onClick={onOpen}
@@ -337,15 +335,15 @@ function SessionRow({
     >
       <div className="flex w-24 shrink-0 flex-col">
         <span className="font-display text-lg font-extrabold leading-none">
-          {fmtDate(meta.startedAt)}
+          {fmt.date(meta.startedAt)}
         </span>
         <span className="text-[11px] font-semibold text-ink-faint">
-          {fmtTime(meta.startedAt)}
+          {fmt.time(meta.startedAt)}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-1">
         <span className="text-sm font-bold">
-          {fmtDur(meta.durationSec)} no ar
+          {t("reports.row.onAir", { dur: fmt.dur(meta.durationSec) })}
         </span>
         <div className="flex items-center gap-1.5">
           {meta.platforms.map((p) => (
@@ -360,19 +358,23 @@ function SessionRow({
       {summary?.hasData && (
         <div className="hidden shrink-0 items-center gap-3 text-xs text-ink-muted sm:flex">
           {summary.peakViewers != null && (
-            <span className="flex items-center gap-1" title="Pico de audiência">
+            <span
+              className="flex items-center gap-1"
+              title={t("reports.row.peakViewers.title")}
+            >
               <Eye className="size-3.5" />
               <span className="tabular-nums">
-                {summary.peakViewers.toLocaleString("pt-BR")}
+                {fmt.num(summary.peakViewers)}
               </span>
             </span>
           )}
           {summary.chatTotal != null && (
-            <span className="flex items-center gap-1" title="Mensagens no chat">
+            <span
+              className="flex items-center gap-1"
+              title={t("reports.row.chat.title")}
+            >
               <MessageSquare className="size-3.5" />
-              <span className="tabular-nums">
-                {summary.chatTotal.toLocaleString("pt-BR")}
-              </span>
+              <span className="tabular-nums">{fmt.num(summary.chatTotal)}</span>
             </span>
           )}
           <span
@@ -380,11 +382,11 @@ function SessionRow({
               "flex items-center gap-1.5 font-semibold",
               TONE_TEXT[summary.verdictTone],
             )}
-            title={
+            title={t(
               summary.problemWindows === 0
-                ? "Transmissão limpa"
-                : "Trechos com problema — abra pra ver"
-            }
+                ? "reports.row.clean.title"
+                : "reports.row.problems.title",
+            )}
           >
             <span
               className={cn(
@@ -393,8 +395,8 @@ function SessionRow({
               )}
             />
             {summary.problemWindows === 0
-              ? "limpa"
-              : `${summary.problemWindows} perrengue${summary.problemWindows > 1 ? "s" : ""}`}
+              ? t("reports.row.clean")
+              : tp("reports.row.problems", summary.problemWindows)}
           </span>
         </div>
       )}
@@ -404,7 +406,13 @@ function SessionRow({
 }
 
 // Monta o pôster de recap a partir do relatório analisado.
-function buildRecap(data: SessionData, a: ReportAnalysis): RecapData {
+// Não é componente: `t`/`fmt` chegam de quem chama (RecapModal).
+function buildRecap(
+  data: SessionData,
+  a: ReportAnalysis,
+  t: I18n["t"],
+  fmt: Fmt,
+): RecapData {
   const platforms = data.meta.platforms.map((p) => ({
     name: p.name,
     color:
@@ -415,38 +423,56 @@ function buildRecap(data: SessionData, a: ReportAnalysis): RecapData {
   const big: RecapStat[] = [];
   if (a.viewers.hasData)
     big.push({
-      label: "pico de audiência",
-      value: a.viewers.peak.toLocaleString("pt-BR"),
+      label: t("reports.recap.stat.peakViewers"),
+      value: fmt.num(a.viewers.peak),
     });
   if (a.chat.hasData)
     big.push({
-      label: "mensagens",
-      value: a.chat.total.toLocaleString("pt-BR"),
+      label: t("reports.recap.stat.messages"),
+      value: fmt.num(a.chat.total),
     });
   const small: RecapStat[] = [];
   if (big.length > 0)
-    small.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
+    small.push({
+      label: t("reports.recap.stat.onAir"),
+      value: fmt.dur(data.meta.durationSec),
+    });
   if (a.viewers.hasData)
     small.push({
-      label: "média",
-      value: a.viewers.avg.toLocaleString("pt-BR"),
+      label: t("reports.recap.stat.avg"),
+      value: fmt.num(a.viewers.avg),
     });
   if (follows > 0)
     small.push({
-      label: "novos seguidores",
-      value: follows.toLocaleString("pt-BR"),
+      label: t("reports.recap.stat.newFollowers"),
+      value: fmt.num(follows),
     });
   if (a.alerts.subs > 0)
-    small.push({ label: "inscrições", value: String(a.alerts.subs) });
+    small.push({
+      label: t("reports.recap.stat.subs"),
+      value: String(a.alerts.subs),
+    });
   if (a.alerts.bits > 0)
-    small.push({ label: "bits", value: a.alerts.bits.toLocaleString("pt-BR") });
+    small.push({
+      label: t("reports.recap.stat.bits"),
+      value: fmt.num(a.alerts.bits),
+    });
   if (a.alerts.raids > 0)
-    small.push({ label: "raids", value: String(a.alerts.raids) });
+    small.push({
+      label: t("reports.recap.stat.raids"),
+      value: String(a.alerts.raids),
+    });
   // Sem audiência nem chat → promove tempo no ar (e inscrições) pros heróis.
   if (big.length === 0) {
-    big.push({ label: "tempo no ar", value: fmtDur(data.meta.durationSec) });
+    big.push({
+      label: t("reports.recap.stat.onAir"),
+      value: fmt.dur(data.meta.durationSec),
+    });
     if (a.alerts.subs > 0)
-      big.push({ label: "inscrições", value: String(a.alerts.subs) });
+      big.push({
+        label: t("reports.recap.stat.subs"),
+        value: String(a.alerts.subs),
+      });
   }
   const top = a.highlights[0]?.reason;
   const moment = top
@@ -458,14 +484,14 @@ function buildRecap(data: SessionData, a: ReportAnalysis): RecapData {
   const bigLabels = new Set(big.map((s) => s.label));
   return {
     brand: "CORNETA",
-    date: fmtDate(data.meta.startedAt),
-    title: `LIVE DE ${fmtDate(data.meta.startedAt)}`,
-    subtitle: `${fmtDur(data.meta.durationSec)} · ${data.meta.platforms.map((p) => p.name).join(" · ")}`,
+    date: fmt.date(data.meta.startedAt),
+    title: t("reports.recap.title", { date: fmt.date(data.meta.startedAt) }),
+    subtitle: `${fmt.dur(data.meta.durationSec)} · ${data.meta.platforms.map((p) => p.name).join(" · ")}`,
     big,
     small: small.filter((s) => !bigLabels.has(s.label)).slice(0, 4),
     moment,
     platforms,
-    footer: "transmitido com Corneta — multistream num app só",
+    footer: t("reports.recap.footer"),
   };
 }
 
@@ -478,6 +504,7 @@ function RecapModal({
   analysis: ReportAnalysis;
   onClose: () => void;
 }) {
+  const { t, fmt } = useI18n();
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     let alive = true;
@@ -494,17 +521,17 @@ function RecapModal({
       }
       const ctx = el.getContext("2d");
       if (!ctx) {
-        toast.error("Não consegui desenhar o recap nesta máquina.");
+        toast.error(t("reports.recap.error.canvas"));
         return;
       }
       try {
-        const r = buildRecap(data, analysis);
-        drawRecap(ctx, r);
+        const r = buildRecap(data, analysis, t, fmt);
+        drawRecap(ctx, r, t);
         void (document.fonts?.ready ?? Promise.resolve()).then(() => {
-          if (alive) drawRecap(ctx, r);
+          if (alive) drawRecap(ctx, r, t);
         });
       } catch (e) {
-        toast.error(`O recap falhou ao desenhar: ${errMsg(e)}`);
+        toast.error(t("reports.recap.error.draw", { err: errMsg(e) }));
       }
     };
     paint();
@@ -512,7 +539,7 @@ function RecapModal({
       alive = false;
       cancelAnimationFrame(raf);
     };
-  }, [data, analysis]);
+  }, [data, analysis, t, fmt]);
 
   const copy = async () => {
     const el = ref.current;
@@ -522,9 +549,9 @@ function RecapModal({
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
       ]);
-      toast.success("Imagem copiada — cola no WhatsApp/Discord/Twitter 📋");
+      toast.success(t("reports.recap.copied"));
     } catch {
-      toast.error("Não consegui copiar; use o Baixar PNG");
+      toast.error(t("reports.recap.error.copy"));
     }
   };
   const download = async () => {
@@ -534,7 +561,7 @@ function RecapModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `corneta-live-${fmtDateFile(data.meta.startedAt)}.png`;
+    a.download = `${t("reports.file.live")}-${fileStamp(data.meta.startedAt)}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -543,12 +570,12 @@ function RecapModal({
 
   return (
     <Modal
-      title="Recap da live"
+      title={t("reports.recap.modal.name")}
       onClose={onClose}
       className="max-w-lg rounded-xl bg-surface p-5 pop"
     >
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xl">Recap pra postar</h3>
+        <h3 className="text-xl">{t("reports.recap.modal.heading")}</h3>
         <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="size-4" />
         </Button>
@@ -561,10 +588,10 @@ function RecapModal({
       />
       <div className="flex gap-2">
         <Button variant="primary" className="flex-1" onClick={copy}>
-          <Copy className="size-4" /> Copiar imagem
+          <Copy className="size-4" /> {t("reports.recap.copy")}
         </Button>
         <Button variant="subtle" className="flex-1" onClick={download}>
-          <Download className="size-4" /> Baixar PNG
+          <Download className="size-4" /> {t("reports.recap.download")}
         </Button>
       </div>
     </Modal>
@@ -583,6 +610,7 @@ function ReportDetail({
   onBack: () => void;
   onDeleted: () => void;
 }) {
+  const { t, tp, fmt } = useI18n();
   const [data, setData] = useState<SessionData | null | "loading">("loading");
   const [showRecap, setShowRecap] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
@@ -596,17 +624,17 @@ function ReportDetail({
     let alive = true;
     void api.readSession(id).then((raw) => {
       if (!alive) return;
-      const d = parseSession(raw);
+      const d = parseSession(raw, t);
       setData(d);
       // Aproveita a leitura pra deixar o resumo desta live no cache — só de
       // sessão encerrada (a que ainda roda geraria um snapshot parcial eterno).
       if (d && d.meta.endedAt != null)
-        setCachedSummary(id, summarize(d, analyze(d)));
+        setCachedSummary(id, summarize(d, analyze(d, t)));
     });
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, t]);
 
   // Resumo da live anterior: cache ou computa on-demand.
   useEffect(() => {
@@ -622,9 +650,9 @@ function ReportDetail({
       .readSession(prevId)
       .then((raw) => {
         if (!alive) return;
-        const d = parseSession(raw);
+        const d = parseSession(raw, t);
         if (!d) return;
-        const sum = summarize(d, analyze(d));
+        const sum = summarize(d, analyze(d, t));
         if (d.meta.endedAt != null) setCachedSummary(prevId, sum);
         setPrevSummary(sum);
       })
@@ -632,12 +660,12 @@ function ReportDetail({
     return () => {
       alive = false;
     };
-  }, [prevId]);
+  }, [prevId, t]);
 
   const remove = async () => {
     await api.deleteSession(id);
     dropCachedSummary(id);
-    toast.info("Relatório excluído");
+    toast.info(t("reports.detail.deleted"));
     onDeleted();
   };
 
@@ -645,7 +673,7 @@ function ReportDetail({
     return (
       <div className="mx-auto max-w-3xl">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="size-4" /> Voltar
+          <ArrowLeft className="size-4" /> {t("reports.detail.back")}
         </Button>
         <div className="mt-4 flex flex-col gap-3">
           <div className="h-20 animate-pulse rounded-lg bg-surface-2" />
@@ -659,21 +687,21 @@ function ReportDetail({
     return (
       <div className="mx-auto max-w-3xl">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="size-4" /> Voltar
+          <ArrowLeft className="size-4" /> {t("reports.detail.back")}
         </Button>
         <Card className="mt-4 text-sm text-ink-muted">
-          Não consegui ler esta sessão.
+          {t("reports.detail.error.read")}
         </Card>
       </div>
     );
   }
 
-  const a = analyze(data);
+  const a = analyze(data, t);
   const n = data.samples.length;
 
   // Marcadores de evento (reconexão/erro) no eixo de tempo.
-  const indexAt = (t: number) => {
-    for (let i = 0; i < n; i++) if (data.samples[i].t >= t) return i;
+  const indexAt = (ms: number) => {
+    for (let i = 0; i < n; i++) if (data.samples[i].t >= ms) return i;
     return Math.max(0, n - 1);
   };
   const markers: ChartMarker[] = a.events
@@ -707,14 +735,14 @@ function ReportDetail({
 
   // Retenção (viewers) — timeline própria; marca raids (costumam dar pico).
   const vN = data.viewerSamples.length;
-  const viewerIndexAt = (t: number) => {
+  const viewerIndexAt = (ms: number) => {
     // As amostras já estão em ordem temporal; busca binária evita uma varredura completa
     // para cada raid/marcador em sessões longas.
     let lo = 0;
     let hi = vN;
     while (lo < hi) {
       const mid = lo + ((hi - lo) >> 1);
-      if (data.viewerSamples[mid].t < t) lo = mid + 1;
+      if (data.viewerSamples[mid].t < ms) lo = mid + 1;
       else hi = mid;
     }
     return Math.min(lo, Math.max(0, vN - 1));
@@ -739,7 +767,7 @@ function ReportDetail({
         }))
       : [
           {
-            label: "Assistindo",
+            label: t("reports.viewers.series"),
             color: "#56e39b",
             values: viewerSeries(data),
           },
@@ -753,7 +781,7 @@ function ReportDetail({
         }))
       : [
           {
-            label: "msgs/min",
+            label: t("reports.chat.series"),
             color: "#ffb323",
             values: chatRateSeries(data),
           },
@@ -762,9 +790,10 @@ function ReportDetail({
     .filter((h) => h.kind === "chat")
     .map((h) => ({ index: indexAt(h.t), color: "#ffb323" }));
 
-  // Tempo relativo ao início (pra achar/clipar no VOD).
-  const rel = (t: number) => {
-    const s = Math.max(0, Math.round((t - data.meta.startedAt) / 1000));
+  // Tempo relativo ao início (pra achar/clipar no VOD). `ms`, não `t`: `t` agora
+  // é a tradução.
+  const rel = (ms: number) => {
+    const s = Math.max(0, Math.round((ms - data.meta.startedAt) / 1000));
     const h = Math.floor(s / 3600);
     const mm = Math.floor((s % 3600) / 60)
       .toString()
@@ -785,9 +814,10 @@ function ReportDetail({
   ): { text: string; tone: "ok" | "bad" | "neutral" } | undefined => {
     if (prev == null || prev <= 0) return undefined;
     const pct = Math.round(((cur - prev) / prev) * 100);
-    if (pct === 0) return { text: "igual à última live", tone: "neutral" };
+    if (pct === 0) return { text: t("reports.delta.same"), tone: "neutral" };
     return {
-      text: `${pct > 0 ? "+" : ""}${pct}% vs última live`,
+      // O sinal viaja dentro de {pct}: a chave só tem o "%" e a comparação.
+      text: t("reports.delta.pct", { pct: `${pct > 0 ? "+" : ""}${pct}` }),
       tone: pct > 0 ? "ok" : "bad",
     };
   };
@@ -801,14 +831,14 @@ function ReportDetail({
   }[] = [];
   if (a.viewers.hasData) {
     heroStats.push({
-      label: "Pico de viewers",
-      value: a.viewers.peak.toLocaleString("pt-BR"),
+      label: t("reports.stat.peakViewers"),
+      value: fmt.num(a.viewers.peak),
       accent: true,
       sub: delta(a.viewers.peak, prevSummary?.peakViewers),
     });
     heroStats.push({
-      label: "Média",
-      value: a.viewers.avg.toLocaleString("pt-BR"),
+      label: t("reports.stat.avg"),
+      value: fmt.num(a.viewers.avg),
       sub: delta(a.viewers.avg, prevSummary?.avgViewers),
     });
   }
@@ -819,29 +849,37 @@ function ReportDetail({
   const seg = a.byChannel.followersGained;
   if (seg != null && seg !== 0)
     heroStats.push({
-      label: a.byChannel.followersNet
-        ? "Seguidores (líquido)"
-        : "Novos seguidores",
-      value: `${seg > 0 ? "+" : ""}${seg.toLocaleString("pt-BR")}`,
+      label: t(
+        a.byChannel.followersNet
+          ? "reports.stat.followersNet"
+          : "reports.stat.newFollowers",
+      ),
+      value: `${seg > 0 ? "+" : ""}${fmt.num(seg)}`,
     });
   if (a.alerts.subs > 0)
-    heroStats.push({ label: "Inscrições", value: String(a.alerts.subs) });
+    heroStats.push({
+      label: t("reports.stat.subs"),
+      value: String(a.alerts.subs),
+    });
   if (a.alerts.bits > 0)
     heroStats.push({
-      label: "Bits",
-      value: a.alerts.bits.toLocaleString("pt-BR"),
+      label: t("reports.stat.bits"),
+      value: fmt.num(a.alerts.bits),
     });
   if (a.alerts.raids > 0)
     heroStats.push({
-      label: "Raids",
+      label: t("reports.stat.raids"),
       value: `${a.alerts.raids} · +${a.alerts.raidViewers}`,
     });
   if (a.chat.hasData)
     heroStats.push({
-      label: "Mensagens",
-      value: a.chat.total.toLocaleString("pt-BR"),
+      label: t("reports.stat.messages"),
+      value: fmt.num(a.chat.total),
       sub: delta(a.chat.total, prevSummary?.chatTotal),
     });
+
+  // Modo desconhecido (sessão de uma versão futura) cai no valor cru do arquivo.
+  const modeKey = MODE_KEY[data.meta.mode];
 
   const tone =
     a.verdict.tone === "ok"
@@ -855,18 +893,18 @@ function ReportDetail({
     <div className="mx-auto max-w-3xl">
       <div className="mb-4 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="size-4" /> Voltar
+          <ArrowLeft className="size-4" /> {t("reports.detail.back")}
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="subtle" size="sm" onClick={() => setShowRecap(true)}>
-            <Share2 className="size-4" /> Recap
+            <Share2 className="size-4" /> {t("reports.detail.recap")}
           </Button>
           <Button
             variant="subtle"
             size="sm"
             onClick={() => setShowDownload(true)}
           >
-            <Download className="size-4" /> Baixar
+            <Download className="size-4" /> {t("reports.detail.download")}
           </Button>
           <DeleteButton onDelete={remove} />
         </div>
@@ -883,13 +921,15 @@ function ReportDetail({
       )}
 
       <div className="mb-1 font-display text-2xl font-extrabold">
-        Live de {fmtDate(data.meta.startedAt)}
+        {t("reports.detail.heading", { date: fmt.date(data.meta.startedAt) })}
       </div>
       <div className="mb-4 text-sm text-ink-muted">
-        {fmtDur(data.meta.durationSec)} · {fmtTime(data.meta.startedAt)}
-        {data.meta.endedAt ? `–${fmtTime(data.meta.endedAt)}` : ""} ·{" "}
-        {data.meta.platforms.map((p) => p.name).join(", ")} · modo{" "}
-        {MODE_LABEL[data.meta.mode] ?? data.meta.mode}
+        {fmt.dur(data.meta.durationSec)} · {fmt.time(data.meta.startedAt)}
+        {data.meta.endedAt ? `–${fmt.time(data.meta.endedAt)}` : ""} ·{" "}
+        {data.meta.platforms.map((p) => p.name).join(", ")} ·{" "}
+        {t("reports.detail.mode", {
+          mode: modeKey ? t(modeKey) : data.meta.mode,
+        })}
       </div>
 
       {/* Painel de engajamento */}
@@ -943,8 +983,7 @@ function ReportDetail({
       {a.viewers.hasData && vN > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Eye className="size-4" /> Audiência ao vivo (quanto da galera
-            ficou)
+            <Eye className="size-4" /> {t("reports.viewers.title")}
             {canSplitViewers && (
               <SplitToggle on={splitViewers} onChange={setSplitViewers} />
             )}
@@ -953,7 +992,7 @@ function ReportDetail({
             series={viewerChartSeries}
             n={vN}
             markers={raidMarkers}
-            formatValue={(v) => Math.round(v).toLocaleString("pt-BR")}
+            formatValue={(v) => fmt.num(Math.round(v))}
             formatX={relAtViewer}
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
@@ -962,26 +1001,27 @@ function ReportDetail({
                 "pico 521" ao lado de um eixo que vai só até 408 lê como bug. */}
             {splitViewers && canSplitViewers && (
               <span className="font-semibold text-ink-faint">
-                Somando os canais:
+                {t("reports.chart.allChannels")}
               </span>
             )}
             <span>
-              Pico{" "}
-              <strong className="text-ink">
-                {a.viewers.peak.toLocaleString("pt-BR")}
-              </strong>
+              {t("reports.viewers.peak")}{" "}
+              <strong className="text-ink">{fmt.num(a.viewers.peak)}</strong>
             </span>
             <span>
-              Média{" "}
-              <strong className="text-ink">
-                {a.viewers.avg.toLocaleString("pt-BR")}
-              </strong>
+              {t("reports.stat.avg")}{" "}
+              <strong className="text-ink">{fmt.num(a.viewers.avg)}</strong>
             </span>
             <span>
-              Começo {a.viewers.start} → fim {a.viewers.end}
+              {t("reports.viewers.startEnd", {
+                start: a.viewers.start,
+                end: a.viewers.end,
+              })}
             </span>
             {raidMarkers.length > 0 && (
-              <span className="text-[#7c9cff]">● raids</span>
+              <span className="text-[#7c9cff]">
+                {t("reports.viewers.raidsLegend")}
+              </span>
             )}
           </div>
         </Card>
@@ -996,8 +1036,8 @@ function ReportDetail({
       {a.highlights.length > 0 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Scissors className="size-4 text-brass" /> Momentos de destaque (pra
-            clipar)
+            <Scissors className="size-4 text-brass" />{" "}
+            {t("reports.highlights.title")}
           </h3>
           <div className="flex flex-col gap-1.5">
             {a.highlights.map((h, i) => (
@@ -1005,8 +1045,7 @@ function ReportDetail({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            ⏱️ Os tempos contam do início da live — ache o minuto na gravação
-            (VOD) pra cortar o clipe.
+            {t("reports.highlights.note")}
           </p>
         </Card>
       )}
@@ -1015,7 +1054,7 @@ function ReportDetail({
       {hasChat(data) && n > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <MessageSquare className="size-4" /> Atividade do chat (msgs/min)
+            <MessageSquare className="size-4" /> {t("reports.chat.title")}
             {canSplitChat && (
               <SplitToggle on={splitChat} onChange={setSplitChat} />
             )}
@@ -1030,16 +1069,18 @@ function ReportDetail({
           <div className="mt-2 text-xs text-ink-muted">
             {splitChat && canSplitChat && (
               <span className="font-semibold text-ink-faint">
-                Somando os canais:{" "}
+                {t("reports.chart.allChannels")}{" "}
               </span>
             )}
-            Total{" "}
-            <strong className="text-ink">
-              {a.chat.total.toLocaleString("pt-BR")}
-            </strong>{" "}
-            · pico <strong className="text-ink">{a.chat.peakPerMin}/min</strong>{" "}
-            · média {a.chat.avgPerMin}
-            /min
+            {/* Total e pico em destaque, média não: o olho bate nos dois números
+                que a pessoa vai comparar com a live passada. */}
+            {rich(t, "reports.chat.summary", {
+              total: (
+                <strong className="text-ink">{fmt.num(a.chat.total)}</strong>
+              ),
+              peak: <strong className="text-ink">{a.chat.peakPerMin}</strong>,
+              avg: a.chat.avgPerMin,
+            })}
           </div>
         </Card>
       )}
@@ -1048,32 +1089,40 @@ function ReportDetail({
       {a.alerts.hasData && (
         <Card className="mb-4">
           <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            Alertas da live
+            {t("reports.alerts.title")}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {ALERT_LABELS.map(([k, label, emoji]) =>
+            {ALERT_LABELS.map(([k, labelKey, emoji]) =>
               a.alerts.byKind[k] ? (
                 <span
                   key={k}
                   className="flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 text-sm"
                 >
                   <span>{emoji}</span> <strong>{a.alerts.byKind[k]}</strong>{" "}
-                  <span className="text-ink-muted">{label}</span>
+                  <span className="text-ink-muted">
+                    {tp(labelKey, a.alerts.byKind[k])}
+                  </span>
                 </span>
               ) : null,
             )}
             {a.alerts.bits > 0 && (
               <span className="flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 text-sm">
-                💎 <strong>{a.alerts.bits.toLocaleString("pt-BR")}</strong>{" "}
-                <span className="text-ink-muted">bits no total</span>
+                💎 <strong>{fmt.num(a.alerts.bits)}</strong>{" "}
+                <span className="text-ink-muted">
+                  {t("reports.alerts.bitsTotal")}
+                </span>
               </span>
             )}
           </div>
           {a.alerts.topRaid && a.alerts.topRaid.amount > 0 && (
             <div className="mt-2 text-xs text-ink-muted">
-              🚀 Maior raid:{" "}
-              <strong className="text-ink">{a.alerts.topRaid.user}</strong> (+
-              {Math.round(a.alerts.topRaid.amount)})
+              {/* {user} pode ser o "alguém" da exportação anônima. */}
+              {rich(t, "reports.alerts.topRaid", {
+                user: (
+                  <strong className="text-ink">{a.alerts.topRaid.user}</strong>
+                ),
+                n: Math.round(a.alerts.topRaid.amount),
+              })}
             </div>
           )}
         </Card>
@@ -1083,20 +1132,26 @@ function ReportDetail({
       {n > 1 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> Bitrate por plataforma (Mbps)
+            <Activity className="size-4" /> {t("reports.bitrate.title")}
           </h3>
           <LineChart
             series={bitrateSeriesData}
             n={n}
             markers={markers}
-            formatValue={(v) => v.toFixed(1).replace(".", ",")}
+            formatValue={(v) => fmt.dec(v, 1)}
             formatX={relAtSample}
           />
           {markers.length > 0 && (
             <div className="mt-2 flex gap-3 text-[11px] font-semibold text-ink-faint">
-              <span className="text-[#f97316]">● reconexão</span>
-              <span className="text-[#ef4444]">● erro</span>
-              <span className="text-[#a855f7]">● sem sinal do OBS</span>
+              <span className="text-[#f97316]">
+                {t("reports.marker.reconnect")}
+              </span>
+              <span className="text-[#ef4444]">
+                {t("reports.marker.error")}
+              </span>
+              <span className="text-[#a855f7]">
+                {t("reports.marker.noSignal")}
+              </span>
             </div>
           )}
         </Card>
@@ -1106,7 +1161,7 @@ function ReportDetail({
       {n > 1 && (cpu.some((v) => v != null) || hasGpu) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Cpu className="size-4" /> Carga da máquina (%)
+            <Cpu className="size-4" /> {t("reports.machine.title")}
           </h3>
           <LineChart
             series={machineSeries}
@@ -1114,7 +1169,7 @@ function ReportDetail({
             yMax={100}
             formatValue={(v) => `${Math.round(v)}`}
             formatX={relAtSample}
-            refLine={{ value: 92, label: "zona de perigo" }}
+            refLine={{ value: 92, label: t("reports.machine.dangerLine") }}
           />
         </Card>
       )}
@@ -1123,13 +1178,12 @@ function ReportDetail({
       {n > 1 && hasObs(data) && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <Activity className="size-4" /> OBS — atraso pra montar o quadro
-            (ms)
+            <Activity className="size-4" /> {t("reports.obs.title")}
           </h3>
           <LineChart
             series={[
               {
-                label: "Render lag",
+                label: t("reports.obs.series"),
                 color: "#a855f7",
                 values: obsRenderSeries(data),
               },
@@ -1145,31 +1199,34 @@ function ReportDetail({
       {/* Saúde do envio, por destino (o "Público por canal" cuida da audiência) */}
       <Card className="mb-4">
         <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-          Envio por plataforma
+          {t("reports.perTarget.title")}
         </h3>
         <div className="flex flex-col gap-2">
-          {a.perTarget.map((t) => (
+          {/* `tg`, não `t`: `t` é a tradução. */}
+          {a.perTarget.map((tg) => (
             <div
-              key={t.id}
+              key={tg.id}
               className="flex items-center gap-3 rounded-md bg-surface-2 px-3 py-2"
             >
-              <PlatformGlyph id={t.platformId} size={22} />
+              <PlatformGlyph id={tg.platformId} size={22} />
               <span className="min-w-24 flex-1 font-display font-bold">
-                {t.name}
+                {tg.name}
               </span>
               <span className="text-xs text-ink-muted">
-                ~{(t.avgBitrate / 1000).toFixed(1).replace(".", ",")} Mbps méd.
+                {t("reports.perTarget.avgBitrate", {
+                  mbps: fmt.dec(tg.avgBitrate / 1000, 1),
+                })}
               </span>
               <span className="text-xs text-ink-muted">
-                {t.maxDropped} quedas
+                {t("reports.perTarget.dropped", { n: tg.maxDropped })}
               </span>
               <span
                 className={cn(
                   "text-xs",
-                  t.reconnects > 0 ? "text-warn" : "text-ink-faint",
+                  tg.reconnects > 0 ? "text-warn" : "text-ink-faint",
                 )}
               >
-                {t.reconnects} reconex.
+                {t("reports.perTarget.reconnects", { n: tg.reconnects })}
               </span>
             </div>
           ))}
@@ -1180,8 +1237,8 @@ function ReportDetail({
       {a.windows.length > 0 && (
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-            <AlertTriangle className="size-4 text-warn" /> Trechos que deram
-            problema
+            <AlertTriangle className="size-4 text-warn" />{" "}
+            {t("reports.windows.title")}
           </h3>
           <div className="flex flex-col gap-2">
             {a.windows.map((w, i) => (
@@ -1189,7 +1246,7 @@ function ReportDetail({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            ⏱️ Os tempos contam do início da live, pra achar o trecho no VOD.
+            {t("reports.windows.note")}
           </p>
         </Card>
       )}
@@ -1197,7 +1254,7 @@ function ReportDetail({
       {/* Linha do tempo de eventos */}
       <Card>
         <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-          <Clock className="size-4" /> Eventos
+          <Clock className="size-4" /> {t("reports.events.title")}
         </h3>
         <div className="flex flex-col gap-1">
           {a.events.map((e, i) => (
@@ -1220,6 +1277,11 @@ function DownloadModal({
   data: SessionData;
   onClose: () => void;
 }) {
+  // O objeto inteiro, e não só `t`: o HTML exportado precisa de `fmt` e do
+  // `locale` (o lang= do <html>), e o parâmetro `fmt` daqui embaixo é o FORMATO
+  // do arquivo — nomes diferentes de propósito.
+  const i18n = useI18n();
+  const { t } = i18n;
   const [semNomes, setSemNomes] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -1229,34 +1291,35 @@ function DownloadModal({
       // Anonimiza ANTES de analisar: os nomes ficam costurados dentro de textos
       // prontos ("Raid de fulano"), e limpar depois viraria caça a substring.
       const d = semNomes ? anonymize(data) : data;
-      const a = analyze(d);
-      const base = `corneta-live-${fmtDateFile(d.meta.startedAt)}`;
+      const a = analyze(d, t);
+      // A DATA continua ISO: ordena sozinha no explorador e não segue o idioma.
+      const base = `${t("reports.file.live")}-${fileStamp(d.meta.startedAt)}`;
       const arquivo = {
         html: {
           name: `${base}.html`,
-          label: "Página (HTML)",
+          label: t("reports.download.html.label"),
           ext: "html",
-          content: reportHtml(d, a),
+          content: reportHtml(d, a, i18n),
         },
         csv: {
-          name: `${base}-serie.csv`,
-          label: "Planilha (CSV)",
+          name: `${base}${t("reports.file.seriesSuffix")}.csv`,
+          label: t("reports.download.csv.label"),
           ext: "csv",
-          content: seriesCsv(d, a),
+          content: seriesCsv(d, a, i18n),
         },
         json: {
           name: `${base}.json`,
-          label: "Dados (JSON)",
+          label: t("reports.download.json.label"),
           ext: "json",
           content: reportJson(d, a),
         },
       }[fmt];
       if (await api.saveTextFile(arquivo)) {
-        toast.success("Relatório salvo");
+        toast.success(t("reports.download.saved"));
         onClose();
       }
     } catch (e) {
-      toast.error(`Falha ao salvar: ${errMsg(e)}`);
+      toast.error(t("reports.download.error", { err: errMsg(e) }));
     } finally {
       setBusy(false);
     }
@@ -1266,31 +1329,31 @@ function DownloadModal({
     [
       "html",
       <FileText key="h" className="size-4" />,
-      "Página (HTML)",
-      "Abre em qualquer navegador, offline. Pra virar PDF: abra e use Imprimir → Salvar como PDF.",
+      t("reports.download.html.label"),
+      t("reports.download.html.desc"),
     ],
     [
       "csv",
       <Table2 key="c" className="size-4" />,
-      "Planilha (CSV)",
-      "A série da live amostra a amostra (~2s), pronta pro Excel.",
+      t("reports.download.csv.label"),
+      t("reports.download.csv.desc"),
     ],
     [
       "json",
       <Braces key="j" className="size-4" />,
-      "Dados (JSON)",
-      "O relatório já analisado, pra plugar em ferramenta própria.",
+      t("reports.download.json.label"),
+      t("reports.download.json.desc"),
     ],
   ];
 
   return (
     <Modal
-      title="Baixar relatório"
+      title={t("reports.download.modal.name")}
       onClose={onClose}
       className="max-w-md rounded-xl bg-surface p-5 pop"
     >
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xl">Baixar relatório</h3>
+        <h3 className="text-xl">{t("reports.download.modal.name")}</h3>
         <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="size-4" />
         </Button>
@@ -1324,14 +1387,13 @@ function DownloadModal({
         />
         <span>
           <span className="block text-sm font-bold">
-            Sem nomes de espectadores
+            {t("reports.download.anon.title")}
           </span>
           {/* Enquanto o relatório fica na máquina, os nomes são a memória da live.
               Mandado pra fora, viram dado pessoal de terceiro na mão de quem
               recebeu — e quem envia é que responde por isso. */}
           <span className="mt-0.5 block text-xs text-ink-muted">
-            Troca quem apareceu por “alguém”. Use ao mandar pra patrocinador ou
-            agência — os números continuam todos lá.
+            {t("reports.download.anon.desc")}
           </span>
         </span>
       </label>
@@ -1347,6 +1409,7 @@ function SplitToggle({
   on: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const t = useT();
   return (
     <div className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md bg-surface-2 p-0.5 normal-case">
       {[false, true].map((v) => (
@@ -1361,17 +1424,17 @@ function SplitToggle({
               : "text-ink-faint hover:text-ink",
           )}
         >
-          {v ? "Por canal" : "Total"}
+          {t(v ? "reports.split.byChannel" : "reports.split.total")}
         </button>
       ))}
     </div>
   );
 }
 
-const num = (v: number) => v.toLocaleString("pt-BR");
-
 /** Uma linha por canal: audiência (com a fatia da live), chat e alertas. */
 function ChannelRow({ c, color }: { c: ChannelStats; color: string }) {
+  const { t, fmt } = useI18n();
+  const num = fmt.num;
   const chips: string[] = [];
   if (c.followers.hasData && c.followers.gained !== 0)
     chips.push(
@@ -1393,13 +1456,13 @@ function ChannelRow({ c, color }: { c: ChannelStats; color: string }) {
         {c.viewers.hasData && (
           <>
             <span className="text-xs text-ink-muted">
-              pico{" "}
+              {t("reports.channel.peak")}{" "}
               <strong className="tabular-nums text-ink">
                 {num(c.viewers.peak)}
               </strong>
             </span>
             <span className="text-xs text-ink-muted">
-              méd{" "}
+              {t("reports.channel.avg")}{" "}
               <strong className="tabular-nums text-ink">
                 {num(c.viewers.avg)}
               </strong>
@@ -1436,7 +1499,7 @@ function ChannelRow({ c, color }: { c: ChannelStats; color: string }) {
             />
           </div>
           <span className="w-24 shrink-0 text-right text-[11px] font-semibold tabular-nums text-ink-faint">
-            {c.sharePct.toFixed(0)}% da audiência
+            {t("reports.channel.share", { pct: c.sharePct.toFixed(0) })}
           </span>
         </div>
       )}
@@ -1451,10 +1514,11 @@ function ChannelBreakdownCard({
   b: ChannelBreakdown;
   colors: Record<string, string>;
 }) {
+  const t = useT();
   return (
     <Card className="mb-4">
       <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-        <Users className="size-4" /> Público por canal
+        <Users className="size-4" /> {t("reports.channels.title")}
       </h3>
       <div className="flex flex-col gap-2">
         {b.channels.map((c) => (
@@ -1463,21 +1527,17 @@ function ChannelBreakdownCard({
       </div>
       {b.followersNet && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          💜 Seguidores vêm do contador da própria plataforma, então é o número
-          líquido: quem deixou de seguir durante a live subtrai. Pode não bater
-          com a contagem de alertas do Streamlabs/StreamElements.
+          {t("reports.channels.followersNote")}
         </p>
       )}
       {!b.hasChatByChannel && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          💬 Esta live é anterior à contagem de chat por canal — só o total dela
-          aparece. Nas próximas, o chat também vem repartido.
+          {t("reports.channels.oldChatNote")}
         </p>
       )}
       {b.unattributedAlerts > 0 && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          {b.unattributedAlerts} alerta(s) sem canal identificado (vindos de
-          Streamlabs/StreamElements, que não dizem de qual canal vieram).
+          {t("reports.channels.unattributed", { n: b.unattributedAlerts })}
         </p>
       )}
     </Card>
@@ -1485,6 +1545,7 @@ function ChannelBreakdownCard({
 }
 
 function DeleteButton({ onDelete }: { onDelete: () => void }) {
+  const t = useT();
   const [confirm, setConfirm] = useState(false);
   return (
     <Button
@@ -1499,13 +1560,15 @@ function DeleteButton({ onDelete }: { onDelete: () => void }) {
         onDelete();
       }}
     >
-      <Trash2 className="size-4" /> {confirm ? "Confirmar?" : "Excluir"}
+      <Trash2 className="size-4" />{" "}
+      {t(confirm ? "reports.detail.delete.confirm" : "reports.detail.delete")}
     </Button>
   );
 }
 
 // Tempo relativo primário (acha no VOD), hora do relógio secundária.
 function WindowCard({ w, time }: { w: ProblemWindow; time: string }) {
+  const { t, fmt } = useI18n();
   return (
     <div className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-2 text-sm">
@@ -1513,17 +1576,17 @@ function WindowCard({ w, time }: { w: ProblemWindow; time: string }) {
           {time}
         </span>
         <span className="text-xs text-ink-faint">
-          ({fmtTime(w.tStart)} · {w.durationSec}s)
+          ({fmt.time(w.tStart)} · {w.durationSec}s)
         </span>
         <span className="font-semibold">{w.cause}</span>
         <button
           onClick={() => {
             void navigator.clipboard?.writeText(time);
-            toast.success("Tempo copiado");
+            toast.success(t("reports.copyTime.done"));
           }}
           className="ml-auto rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-          title="Copiar tempo"
-          aria-label="Copiar tempo"
+          title={t("reports.copyTime")}
+          aria-label={t("reports.copyTime")}
         >
           <Copy className="size-3.5" />
         </button>
@@ -1551,6 +1614,7 @@ const EVENT_DOT: Record<ReportEvent["kind"], string> = {
 
 // Mesmo relógio dos destaques/trechos (relativo ao início); hora real à direita.
 function EventRow({ e, time }: { e: ReportEvent; time: string }) {
+  const { fmt } = useI18n();
   return (
     <div className="flex items-center gap-2 text-sm">
       <span className="w-16 shrink-0 text-xs font-semibold tabular-nums text-ink">
@@ -1559,20 +1623,23 @@ function EventRow({ e, time }: { e: ReportEvent; time: string }) {
       <span className={cn("size-2 shrink-0 rounded-full", EVENT_DOT[e.kind])} />
       <span className="flex-1 text-ink-muted">{e.label}</span>
       <span className="text-[11px] tabular-nums text-ink-faint">
-        {fmtTime(e.t)}
+        {fmt.time(e.t)}
       </span>
     </div>
   );
 }
 
+// [id do evento (enum das plataformas), chave do rótulo, emoji].
+// A 1ª posição é id de evento (vem do backend); a 2ª é a RAIZ da chave — o `tp`
+// completa com .one/.other, senão o chip diz "1 gifts".
 const ALERT_LABELS: [string, string, string][] = [
-  ["sub", "inscrições", "⭐"],
-  ["resub", "resubs", "🔁"],
-  ["subgift", "gifts", "🎁"],
-  ["member", "membros", "🏅"],
-  ["superchat", "super chats", "💬"],
-  ["raid", "raids", "🚀"],
-  ["follow", "follows", "💜"],
+  ["sub", "reports.alerts.kind.sub", "⭐"],
+  ["resub", "reports.alerts.kind.resub", "🔁"],
+  ["subgift", "reports.alerts.kind.subgift", "🎁"],
+  ["member", "reports.alerts.kind.member", "🏅"],
+  ["superchat", "reports.alerts.kind.superchat", "💬"],
+  ["raid", "reports.alerts.kind.raid", "🚀"],
+  ["follow", "reports.alerts.kind.follow", "💜"],
 ];
 
 const HL_ICON: Record<Highlight["kind"], string> = {
@@ -1583,6 +1650,7 @@ const HL_ICON: Record<Highlight["kind"], string> = {
 };
 
 function HighlightRow({ h, time }: { h: Highlight; time: string }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2.5 rounded-md bg-surface-2 px-3 py-2">
       <span className="text-lg leading-none">{HL_ICON[h.kind]}</span>
@@ -1593,11 +1661,11 @@ function HighlightRow({ h, time }: { h: Highlight; time: string }) {
       <button
         onClick={() => {
           void navigator.clipboard?.writeText(time);
-          toast.success("Tempo copiado");
+          toast.success(t("reports.copyTime.done"));
         }}
         className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-        title="Copiar tempo"
-        aria-label="Copiar tempo"
+        title={t("reports.copyTime")}
+        aria-label={t("reports.copyTime")}
       >
         <Copy className="size-3.5" />
       </button>

@@ -29,7 +29,6 @@ export const pt = {
   "replica.report.tag": "sessão de exemplo",
   "replica.crop.caption":
     "Escolha um lado do quadro: é assim que você define o que vai pro vertical.",
-  "replica.ui.note": "",
 
   // ---- benefits ----
   "benefits.chat.body":
@@ -317,6 +316,48 @@ export const pt = {
   "page-data.tiny.youtube.title": "YouTube automático",
 
   // ---- protection ----
+  // ---- Prévia do app no hero ----
+  // Réplica da tela "Ao vivo": os rótulos têm que bater com os da Sidebar do app
+  // (sidebar.nav.*), senão a LP promete uma tela que não existe.
+  "preview.badge": "PRÉVIA ILUSTRATIVA",
+  "preview.chat.compose": "Responde de uma vez…",
+  "preview.chat.compose.send": "enviar",
+  "preview.chat.msg.1.from": "gabizera",
+  "preview.chat.msg.1.text": "salve salve, chegando!",
+  "preview.chat.msg.2.from": "Marcos L.",
+  "preview.chat.msg.2.text": "áudio tá limpo hoje 👏",
+  "preview.chat.msg.3.from": "duduxx",
+  "preview.chat.msg.3.text": "bora cornetar!!",
+  "preview.chat.platforms": "3 plataformas",
+  "preview.chat.title": "Chat reunido",
+  "preview.cta": "BORA AO VIVO",
+  "preview.figure.alt":
+    "Prévia ilustrativa do app da Corneta na tela “Ao vivo”: o sinal do OBS sai para Twitch, YouTube e Kick, cada destino com sua própria qualidade e seu próprio interruptor, com o chat das três plataformas reunido ao lado.",
+  "preview.nav.chat.hint": "todo chat num lugar",
+  "preview.nav.chat.label": "Chat",
+  "preview.nav.encoding.hint": "capricho da imagem",
+  "preview.nav.encoding.label": "Qualidade",
+  "preview.nav.golive.hint": "bota tudo no ar",
+  "preview.nav.golive.label": "Ao vivo",
+  "preview.nav.platforms.hint": "onde sua live aparece",
+  "preview.nav.platforms.label": "Plataformas",
+  "preview.nav.reports.badge": "novo",
+  "preview.nav.reports.hint": "como foi a live",
+  "preview.nav.reports.label": "Relatórios",
+  "preview.panel.title": "painel da live",
+  "preview.settings": "Configurações",
+  "preview.stat.headroom": "folga",
+  "preview.stat.headroom.value": "tranquila",
+  "preview.stat.needed.value": "18,5 Mb/s",
+  "preview.stat.needed": "a live precisa",
+  "preview.stat.upload.value": "25 Mb/s",
+  "preview.stat.upload": "seu upload",
+  "preview.state.offAir": "Fora do ar",
+  // Rótulo da coluna de qualidade em cada destino ("Cópia" = passa o vídeo do OBS
+  // sem recodificar). Mesma palavra da tela Qualidade do app.
+  "preview.target.copy": "Cópia",
+  "preview.titlebar.tag": "multi-stream",
+
   "protection.alerts.chip.bits": "bits",
   "protection.alerts.chip.member": "membro",
   "protection.alerts.chip.subgift": "subgift",
@@ -339,6 +380,7 @@ export const pt = {
     "Quatro redes que você liga (ou não) nas Configurações. Cada uma tem um custo — e a Corneta conta ele antes, não no meio da live.",
   "protection.brb.art.aria": "Tela JÁ VOLTO que a Corneta coloca no ar",
   "protection.brb.art.brand": "CORNETA · MULTI-STREAM",
+  // Igual a `brb.slate.subtitle` do app — esta arte retrata o cartão real.
   "protection.brb.art.line": "já já tô de volta — segura a corneta 📣",
   "protection.brb.art.title": "JÁ VOLTO",
   "protection.brb.body":

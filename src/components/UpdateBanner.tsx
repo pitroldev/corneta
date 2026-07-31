@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Download, Loader2, RefreshCw, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
+import { useT } from "../lib/i18n";
 import { cn, errMsg } from "../lib/utils";
 import { Button } from "./ui";
 import {
@@ -19,6 +20,7 @@ import {
 // vira aviso e a atualização espera.
 
 export function UpdateBanner() {
+  const t = useT();
   const info = useUpdate((s) => s.info);
   const dismissed = useUpdate((s) => s.dismissed);
   const setInfo = useUpdate((s) => s.setInfo);
@@ -39,9 +41,9 @@ export function UpdateBanner() {
     try {
       await installUpdate(info, setProgress);
       // Só chega aqui se o relaunch não aconteceu.
-      toast.info("Instalei — feche e abra a Corneta pra terminar.");
+      toast.info(t("components.update.installed.toast"));
     } catch (e) {
-      toast.error(`Não consegui instalar: ${errMsg(e)}`);
+      toast.error(t("components.update.install.error", { error: errMsg(e) }));
       setInstalling(false);
       setProgress(null);
     }
@@ -54,31 +56,33 @@ export function UpdateBanner() {
       <Download className="size-4 shrink-0 text-brass" />
       <span className="flex-1">
         <strong className="font-display font-bold">
-          Saiu a Corneta {info.version}
+          {t("components.update.headline", { version: info.version })}
         </strong>
         {/* No ar, a frase diz o MOTIVO de o botão estar morto. "Atualize depois"
             sozinho parece capricho; "derrubaria a live" a pessoa entende na hora. */}
         <span className="ml-2 text-ink-muted">
           {live
-            ? "Você tá no ar — instalar agora derrubaria a live."
-            : "Instalo e abro de novo num instante."}
+            ? t("components.update.blocked.live")
+            : t("components.update.ready")}
         </span>
       </span>
 
       {installing ? (
         <span className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
           <Loader2 className="size-4 animate-spin" />
-          {pct == null ? "Baixando…" : `Baixando ${pct}%`}
+          {pct == null
+            ? t("components.update.downloading")
+            : t("components.update.downloading.pct", { pct })}
         </span>
       ) : (
         <Button
           variant="primary"
           size="sm"
           disabled={live}
-          title={live ? "Não dá pra reiniciar no meio da live" : undefined}
+          title={live ? t("components.update.cta.blocked.title") : undefined}
           onClick={() => void install()}
         >
-          Atualizar agora
+          {t("components.update.cta")}
         </Button>
       )}
 
@@ -86,8 +90,8 @@ export function UpdateBanner() {
         <button
           onClick={dismiss}
           className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-          title="Agora não"
-          aria-label="Fechar o aviso da atualização"
+          title={t("components.update.dismiss.title")}
+          aria-label={t("components.update.dismiss.aria")}
         >
           <X className="size-4" />
         </button>
@@ -99,6 +103,7 @@ export function UpdateBanner() {
 /** Botão "Procurar atualizações" da tela Sobre — o caminho manual, sem esperar o
  *  boot. Diz explicitamente quando NÃO há nada, senão o clique parece não fazer nada. */
 export function CheckUpdateButton({ version }: { version: string }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const setInfo = useUpdate((s) => s.setInfo);
 
@@ -109,13 +114,13 @@ export function CheckUpdateButton({ version }: { version: string }) {
       setInfo(info);
       if (info)
         toast.success(
-          `Saiu a Corneta ${info.version} — o aviso tá lá em cima.`,
+          t("components.update.check.found", { version: info.version }),
         );
       // Dizer a versão em que a pessoa está importa: sem isso o clique parece
       // não ter feito nada.
-      else toast.info(`Nada novo por aqui — você já tá na ${version}.`);
+      else toast.info(t("components.update.check.none", { version }));
     } catch (e) {
-      toast.error(`Não consegui checar agora: ${errMsg(e)}`);
+      toast.error(t("components.update.check.error", { error: errMsg(e) }));
     } finally {
       setBusy(false);
     }
@@ -131,7 +136,9 @@ export function CheckUpdateButton({ version }: { version: string }) {
       )}
     >
       <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
-      {busy ? "Olhando…" : "Ver se tem versão nova"}
+      {busy
+        ? t("components.update.check.busy")
+        : t("components.update.check.cta")}
     </button>
   );
 }

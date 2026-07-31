@@ -7,6 +7,7 @@ import { PLATFORMS } from "../lib/platforms";
 import { INGEST_URL_RE } from "../lib/validation";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
+import { useT, type MessageKey } from "../lib/i18n";
 import type { PlatformId } from "../lib/types";
 import { LegalAcceptNote } from "./legal";
 import { Modal } from "./Modal";
@@ -29,26 +30,28 @@ const PICKABLE = Object.values(PLATFORMS).filter(
 );
 const PICKER_STEP = 1;
 
-const STEPS = [
+// A lista guarda CHAVES, não texto: o passo é estrutura (ordem, arte, contagem)
+// e a frase vem do dicionário na hora de desenhar.
+const STEPS: { title: MessageKey; text: MessageKey }[] = [
   {
-    title: "Uma live, todo lugar",
-    text: "Você manda 1 stream do OBS e a Corneta espalha pra Twitch, YouTube, Kick e mais — tudo de uma vez.",
+    title: "components.onboarding.step1.title",
+    text: "components.onboarding.step1.text",
   },
   {
-    title: "Escolha as plataformas",
-    text: "Cada plataforma vira um destino com a sua própria chave de transmissão — é só colar a de cada uma.",
+    title: "components.onboarding.step2.title",
+    text: "components.onboarding.step2.text",
   },
   {
-    title: "Liga no OBS",
-    text: "Em Ao vivo, o botão “Configura pra mim” acerta o OBS sozinho — sem mexer em menu técnico.",
+    title: "components.onboarding.step3.title",
+    text: "components.onboarding.step3.text",
   },
   {
-    title: "Solta a corneta",
-    text: "Um clique e você entra no ar em todas. Acompanhe os números de cada plataforma.",
+    title: "components.onboarding.step4.title",
+    text: "components.onboarding.step4.text",
   },
   {
-    title: "Chat e relatórios",
-    text: "Todo o chat num lugar e, ao encerrar, um relatório do que travou.",
+    title: "components.onboarding.step5.title",
+    text: "components.onboarding.step5.text",
   },
 ];
 
@@ -68,6 +71,7 @@ function initialFlow(): Flow {
 }
 
 export function Onboarding({ onStart }: { onStart: () => void }) {
+  const t = useT();
   const [flow, setFlow] = useState<Flow>(initialFlow);
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
@@ -134,7 +138,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     if (start) onStart();
     // Só na primeira dispensa — quem reabriu via Sobre já sabe o caminho.
     else if (firstTime && replayNonce === 0)
-      toast.info("Sem pressa — o tour fica em Sobre → Rever o tour.");
+      toast.info(t("components.onboarding.dismissed.toast"));
   };
   const next = () => (last ? close(true) : setStep((s) => s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
@@ -154,14 +158,14 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     );
   return (
     <Modal
-      title="Opa! Bora cornetar?"
+      title={t("components.onboarding.title")}
       onClose={() => close(false)}
       className="max-w-md overflow-hidden rounded-xl bg-surface pop"
     >
       <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
       <button
         onClick={() => close(false)}
-        aria-label="Pular o tour"
+        aria-label={t("components.onboarding.skip.aria")}
         className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-md text-brass-ink/70 transition-colors hover:bg-brass-ink/10 hover:text-brass-ink"
       >
         <X className="size-5" />
@@ -171,10 +175,10 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
           <Mascot className="size-8 animate-shout" />
         </div>
         <h2 id="onb-title" className="text-3xl">
-          Opa! Bora cornetar?
+          {t("components.onboarding.title")}
         </h2>
         <p className="mt-1 text-sm font-semibold opacity-80">
-          Em {STEPS.length} passos você manda bem.
+          {t("components.onboarding.subtitle", { n: STEPS.length })}
         </p>
       </div>
 
@@ -189,11 +193,10 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
             {isPicker ? (
               <>
                 <div className="font-display text-lg font-extrabold">
-                  Onde você transmite?
+                  {t("components.onboarding.picker.title")}
                 </div>
                 <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
-                  Marque onde você faz live e a Corneta já deixa os destinos
-                  prontos — depois é só colar a chave de cada um.
+                  {t("components.onboarding.picker.text")}
                 </div>
                 <PlatformPicker selected={selected} onToggle={toggle} />
               </>
@@ -201,10 +204,10 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
               <>
                 <StepArt step={step} />
                 <div className="font-display text-lg font-extrabold">
-                  {cur.title}
+                  {t(cur.title)}
                 </div>
                 <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
-                  {cur.text}
+                  {t(cur.text)}
                 </div>
               </>
             )}
@@ -216,7 +219,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
             <button
               key={i}
               onClick={() => setStep(i)}
-              aria-label={`Passo ${i + 1}`}
+              aria-label={t("components.onboarding.dot.aria", { n: i + 1 })}
               className={cn(
                 "h-2 rounded-full transition-[width,background-color]",
                 i === step
@@ -233,18 +236,20 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
               onClick={back}
               className="flex items-center gap-1 text-sm font-semibold text-ink-faint hover:text-ink-muted"
             >
-              <ArrowLeft className="size-4" /> Voltar
+              <ArrowLeft className="size-4" /> {t("components.onboarding.back")}
             </button>
           ) : (
             <button
               onClick={() => close(false)}
               className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
             >
-              Pular
+              {t("components.onboarding.skip")}
             </button>
           )}
           <Button variant="primary" size="lg" onClick={next}>
-            {last ? "Bora começar" : "Próximo"}{" "}
+            {last
+              ? t("components.onboarding.start")
+              : t("components.onboarding.next")}{" "}
             <ArrowRight className="size-5" />
           </Button>
         </div>
@@ -263,6 +268,7 @@ function PlatformPicker({
   selected: Set<PlatformId>;
   onToggle: (id: PlatformId) => void;
 }) {
+  const t = useT();
   return (
     <>
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -302,8 +308,7 @@ function PlatformPicker({
         })}
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-ink-faint">
-        Dá pra mudar depois. TikTok, X e qualquer RTMP seu ficam na tela
-        Plataformas.
+        {t("components.onboarding.picker.note")}
       </p>
     </>
   );
@@ -315,9 +320,10 @@ function PlatformPicker({
  * veterano pelos cinco passos do tour de novo.
  */
 function LegalUpdate({ onClose }: { onClose: () => void }) {
+  const t = useT();
   return (
     <Modal
-      title="Os termos mudaram"
+      title={t("components.onboarding.legalUpdate.title")}
       onClose={onClose}
       className="max-w-md overflow-hidden rounded-xl bg-surface pop"
     >
@@ -326,21 +332,22 @@ function LegalUpdate({ onClose }: { onClose: () => void }) {
         <div className="mb-3 grid size-14 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
           <ScrollText className="size-8" />
         </div>
-        <h2 className="text-3xl">Os termos mudaram</h2>
+        <h2 className="text-3xl">
+          {t("components.onboarding.legalUpdate.title")}
+        </h2>
       </div>
 
       <div className="p-6">
         <p className="text-sm leading-relaxed text-ink-muted">
-          A gente atualizou os Termos de Uso e a Política de Privacidade. Dá uma
-          olhada no que mudou — seguir usando a Corneta significa aceitar a
-          versão nova.
+          {t("components.onboarding.legalUpdate.body")}
         </p>
 
         <LegalAcceptNote className="mt-4 border-t-2 border-border pt-3" />
 
         <div className="mt-5 flex justify-end">
           <Button variant="primary" size="lg" onClick={onClose}>
-            Entendi <ArrowRight className="size-5" />
+            {t("components.onboarding.legalUpdate.cta")}{" "}
+            <ArrowRight className="size-5" />
           </Button>
         </div>
       </div>
@@ -437,6 +444,7 @@ function ArtFanout() {
 }
 
 function ArtKeyVault() {
+  const t = useT();
   return (
     <svg viewBox="0 0 260 104" className="h-full w-full" aria-hidden>
       <rect
@@ -468,7 +476,7 @@ function ArtKeyVault() {
         fontWeight="700"
         fill="var(--color-ink-faint)"
       >
-        sua chave
+        {t("components.onboarding.art.key.label")}
       </text>
       <g
         stroke={TOMATE}
@@ -549,6 +557,7 @@ function ArtObsSetup() {
 }
 
 function ArtOnAir() {
+  const t = useT();
   const cols: [string, number][] = [
     ["T", 150],
     ["Y", 192],
@@ -575,7 +584,7 @@ function ArtOnAir() {
         fontWeight="800"
         fill="#fff"
       >
-        NO AR
+        {t("components.onboarding.art.onair.label")}
       </text>
       <path
         d="M20 80 H44 L52 66 L62 92 L72 72 L80 80 H120"

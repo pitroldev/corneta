@@ -6,6 +6,7 @@ use crate::engine_policy::{
     brb_slate_is_video, friendly_error, is_brb_slate_path, parse_ingest_hostport, parse_kv,
     parse_mediamtx_paths, quality_of, tray_tooltip,
 };
+use crate::i18n::Msg;
 use crate::keys;
 use crate::session;
 use crate::AppState;
@@ -53,6 +54,15 @@ fn quiet_command(program: &str) -> std::process::Command {
 const OBS_WS_HOST: &str = "127.0.0.1";
 const OBS_WS_PORT: u16 = 4455;
 
+/// Código devolvido quando o próprio usuário cancelou o início da live.
+///
+/// É CÓDIGO, não mensagem: o front compara este valor pra engolir o toast de
+/// erro (quem cancelou sabe o que fez). Enquanto isto era a frase
+/// "Início cancelado.", traduzir o backend quebrava a comparação em silêncio —
+/// e o cancelamento voltava a aparecer como falha. O texto que a pessoa lê vive
+/// no dicionário do front, com o resto da copy.
+pub const START_CANCELLED: &str = "corneta:start-cancelled";
+
 /// Mata um sidecar (FFmpeg/MediaMTX) e seus netos órfãos — `taskkill /T /F` no Windows, onde
 /// `child.kill()` sozinho não leva a árvore junto. Fonte ÚNICA do encerramento de processo.
 fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) {
@@ -93,7 +103,7 @@ pub fn save_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, Strin
     let mut config = config.validate_and_normalize()?;
     let disk_revision = config::load(&app).revision;
     if config.revision < disk_revision {
-        return Err("configuração mudou em outra janela; tente novamente".into());
+        return Err(Msg::ConfigSaveStaleRevision.now());
     }
     config.revision = disk_revision.saturating_add(1);
     config::save(&app, &config)?;
@@ -128,10 +138,10 @@ fn secret_namespace_exists(config: &AppConfig, namespace: &str) -> bool {
 pub fn set_key(app: AppHandle, target_id: String, key: String) -> Result<(), String> {
     config::validate_secret_namespace(&target_id)?;
     if !secret_namespace_exists(&config::load(&app), &target_id) {
-        return Err("namespace de segredo não pertence à configuração atual".into());
+        return Err(Msg::VaultNamespaceNotInConfig.now());
     }
     if key.len() > 8_192 {
-        return Err("segredo excede o limite de 8 KiB".into());
+        return Err(Msg::VaultSecretTooBig.now());
     }
     keys::set_key(&target_id, &key)
 }
@@ -140,7 +150,7 @@ pub fn set_key(app: AppHandle, target_id: String, key: String) -> Result<(), Str
 pub fn clear_key(app: AppHandle, target_id: String) -> Result<(), String> {
     config::validate_secret_namespace(&target_id)?;
     if !secret_namespace_exists(&config::load(&app), &target_id) {
-        return Err("namespace de segredo não pertence à configuração atual".into());
+        return Err(Msg::VaultNamespaceNotInConfig.now());
     }
     keys::clear_key(&target_id)
 }
@@ -463,7 +473,7 @@ pub async fn test_upload() -> Result<f64, String> {
 
         let bytes = c1.saturating_sub(c0);
         if bytes == 0 || secs <= 0.0 {
-            return Err("não foi possível medir o upload".to_string());
+            return Err(Msg::UploadMeasureFailed.now());
         }
         let mbps = (bytes as f64 * 8.0) / secs / 1_000_000.0;
         Ok((mbps * 10.0).round() / 10.0)
@@ -532,17 +542,20 @@ pub(crate) fn notify(app: &AppHandle, title: &str, body: &str) {
 /// Atualiza o ícone (só quando a qualidade muda) e o tooltip da bandeja.
 fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
     // Título da janela espelha o estado — na taskbar (ou minimizado) dá pra ver a live de pé.
+    // A memoização compara o texto JÁ RENDERIZADO: assim uma troca de idioma no meio da live
+    // (estado do motor idêntico, texto diferente) também dispara o set_title.
     let title = match snap.state.as_str() {
-        "live" => "Corneta — NO AR",
-        "starting" => "Corneta — aguardando o OBS",
-        "error" => "Corneta — erro na transmissão",
-        _ => "Corneta",
-    };
+        "live" => Msg::WindowTitleLive,
+        "starting" => Msg::WindowTitleStarting,
+        "error" => Msg::WindowTitleError,
+        _ => Msg::WindowTitleIdle,
+    }
+    .now();
     let title_changed = {
         let state = app.state::<AppState>();
         let mut eng = state.engine.lock().unwrap();
         if eng.win_title != title {
-            eng.win_title = title.to_string();
+            eng.win_title.clone_from(&title);
             true
         } else {
             false
@@ -550,7 +563,7 @@ fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
     };
     if title_changed {
         if let Some(w) = app.get_webview_window("main") {
-            let _ = w.set_title(title);
+            let _ = w.set_title(&title);
         }
     }
 
@@ -709,7 +722,7 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, Strin
             // Filtro ÚNICO: o botão da UI já diz "imagem ou vídeo" — dois filtros
             // separados escondiam metade dos arquivos até o usuário achar o seletor "Tipo".
             .add_filter(
-                "Imagem ou vídeo",
+                Msg::BrbFilePickerFilter.now(),
                 &[
                     "png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "mov", "mkv", "webm", "m4v",
                 ],
@@ -727,7 +740,7 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, Strin
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase())
         .filter(|e| !e.is_empty())
-        .ok_or("arquivo sem extensão — escolha uma imagem ou vídeo")?;
+        .ok_or_else(|| Msg::BrbFileNoExtension.now())?;
     let file_name = src
         .file_name()
         .and_then(|n| n.to_str())
@@ -738,7 +751,7 @@ pub async fn set_brb_slate(app: AppHandle) -> Result<Option<BrbSlateInfo>, Strin
     remove_brb_slate_files(&dir); // só um slate por vez
     let _ = std::fs::remove_file(dir.join(GENERATED_SLATE_MARKER));
     let dest = dir.join(format!("brb-slate.{ext}"));
-    std::fs::copy(&src, &dest).map_err(|e| format!("não consegui copiar o arquivo: {e}"))?;
+    std::fs::copy(&src, &dest).map_err(|e| Msg::BrbCopyFailed { e: &e.to_string() }.now())?;
     let kind = if brb_slate_is_video(&dest) {
         "video"
     } else {
@@ -804,7 +817,7 @@ pub fn clear_brb_slate(app: AppHandle) -> Result<(), String> {
 pub(crate) async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<u8>, String> {
     let cfg = get_config(app.clone());
     if !mediamtx_ingest_ready(&cfg) {
-        return Err("sem sinal — entre ao vivo no OBS pra capturar o frame".into());
+        return Err(Msg::FrameNoSignal.now());
     }
     let ingest = format!(
         "{}://{}:{}/{}/{}",
@@ -837,7 +850,7 @@ pub(crate) async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<
         .await
         .map_err(|e| e.to_string())?;
     if !output.status.success() {
-        return Err("não consegui capturar o frame (sinal instável?)".into());
+        return Err(Msg::FrameGrabFailed.now());
     }
     std::fs::read(&out).map_err(|e| e.to_string())
 }
@@ -878,7 +891,11 @@ fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
             drop(eng);
             emit(app, &out);
             if was != "reconnecting" {
-                notify(app, "Plataforma caiu", &format!("{name} — reconectando…"));
+                notify(
+                    app,
+                    &Msg::NotifyTargetDownTitle.now(),
+                    &Msg::NotifyTargetDownBody { name: &name }.now(),
+                );
             }
         }
     }
@@ -902,8 +919,7 @@ fn reaffirm_auth_error(app: &AppHandle, target_id: &str) {
         return;
     }
     st.state = "error".into();
-    st.message =
-        Some("Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into());
+    st.message = Some(Msg::TargetErrorKeyRejected.now());
     let out = snap.clone();
     drop(eng);
     emit(app, &out);
@@ -937,7 +953,7 @@ fn set_target_waiting(app: &AppHandle, target_id: &str) {
     }
     st.state = new_state.into();
     st.message = if mid_live {
-        Some("sua live está sem imagem — confira o OBS".into())
+        Some(Msg::TargetSignalLostMessage.now())
     } else {
         None
     };
@@ -951,8 +967,8 @@ fn set_target_waiting(app: &AppHandle, target_id: &str) {
             LAST_LOST_NOTIFY_MS.store(now, Ordering::Relaxed);
             notify(
                 app,
-                "O sinal do OBS caiu",
-                "Sua live está SEM IMAGEM — confira o OBS.",
+                &Msg::NotifySignalLostTitle.now(),
+                &Msg::NotifySignalLostBody.now(),
             );
         }
     }
@@ -1038,14 +1054,14 @@ fn yt_auto_fallback(app: &AppHandle, target_id: &str, err: &str) {
     log::warn!("YouTube auto-broadcast: {err}");
     notify(
         app,
-        "YouTube automático falhou",
-        "Vou usar sua configuração manual — confira se a live apareceu no seu canal.",
+        &Msg::NotifyYoutubeAutoFailedTitle.now(),
+        &Msg::NotifyYoutubeAutoFailedBody.now(),
     );
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     if let Some(snap) = eng.snapshot.as_mut() {
         if let Some(st) = snap.targets.get_mut(target_id) {
-            st.message = Some("YouTube automático falhou — usando sua config manual.".into());
+            st.message = Some(Msg::TargetYoutubeAutoFallback.now());
         }
         let out = snap.clone();
         drop(eng);
@@ -1081,7 +1097,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let my_gen = {
         let mut eng = state.engine.lock().unwrap();
         if eng.live {
-            return Err("já está no ar.".into());
+            return Err(Msg::EngineAlreadyLive.now());
         }
         eng.live = true;
         eng.start_gen = eng.start_gen.wrapping_add(1);
@@ -1097,7 +1113,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
     if enabled.is_empty() {
-        return Err("Nenhuma plataforma ativa.".into());
+        return Err(Msg::EngineNoPlatformEnabled.now());
     }
 
     // Feedback IMEDIATO: a UI sai do "Fora do ar" ANTES da limpeza de órfãos (PowerShell,
@@ -1137,7 +1153,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         .map_err(|e| {
             // Detalhe cru só no log — pra UI, uma frase que o streamer consegue agir em cima.
             log::error!("sidecar mediamtx indisponível (fetch-binaries?): {e}");
-            "Faltam arquivos internos da Corneta — reinstale o app.".to_string()
+            Msg::EngineMissingSidecar.now()
         })?
         .args([yml.to_string_lossy().to_string()])
         .spawn()
@@ -1176,7 +1192,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 let _ = std::fs::remove_file(p);
             }
             start_guard.armed = false;
-            return Err("Início cancelado.".into());
+            // CÓDIGO, não frase: o front compara este valor pra saber que foi o
+            // próprio usuário que cancelou e engolir o toast de erro. Texto
+            // traduzível aqui quebraria a comparação no primeiro idioma novo.
+            // O rótulo que a pessoa lê fica no dicionário do front.
+            return Err(START_CANCELLED.into());
         }
         eng.mediamtx = Some(mtx_child);
         eng.snapshot = Some(snap.clone());
@@ -1199,7 +1219,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             let title = {
                 let t = config.settings.stream_title.trim();
                 if t.is_empty() {
-                    "Ao vivo".to_string()
+                    Msg::YoutubeDefaultBroadcastTitle.now()
                 } else {
                     t.to_string()
                 }
@@ -1242,7 +1262,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     let raw = String::from_utf8_lossy(&b);
                     let line = raw.to_lowercase();
                     if line.contains("address already in use") {
-                        set_engine_error(&app_m, "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.");
+                        set_engine_error(&app_m, &Msg::EngineIngestPortInUse.now());
                     }
                     // Diagnóstico: ciclo de vida do publisher (OBS) + quedas. Sem o ruído dos grabs.
                     if line.contains("publish")
@@ -1262,10 +1282,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 // ficaria preso em "starting"/"aguardando OBS" pra sempre. No-op se já parou
                 // (ex.: fomos nós que matamos o MediaMTX no stop_engine).
                 CommandEvent::Terminated(_) => {
-                    set_engine_error(
-                        &app_m,
-                        "O servidor de ingestão (MediaMTX) caiu. Tente de novo.",
-                    );
+                    set_engine_error(&app_m, &Msg::EngineMediamtxDied.now());
                     break;
                 }
                 _ => {}
@@ -1338,7 +1355,11 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
             drop(eng);
             log::info!("motor: início cancelado após o setup — abortando antes dos supervisores");
             start_guard.armed = false;
-            return Err("Início cancelado.".into());
+            // CÓDIGO, não frase: o front compara este valor pra saber que foi o
+            // próprio usuário que cancelou e engolir o toast de erro. Texto
+            // traduzível aqui quebraria a comparação no primeiro idioma novo.
+            // O rótulo que a pessoa lê fica no dicionário do front.
+            return Err(START_CANCELLED.into());
         }
     }
     if compositor_on {
@@ -1508,10 +1529,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("sidecar ffmpeg indisponível: {e}");
-                        set_engine_error(
-                            &app_t,
-                            "Faltam arquivos internos da Corneta — reinstale o app.",
-                        );
+                        set_engine_error(&app_t, &Msg::EngineMissingSidecar.now());
                         break;
                     }
                 };
@@ -1576,8 +1594,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                                         drop_notified = true;
                                                         notify(
                                                             &app_t,
-                                                            "Internet apertou",
-                                                            &format!("{target_name}: baixei a qualidade por um tempo pra live não travar."),
+                                                            &Msg::NotifyBitrateDownTitle.now(),
+                                                            &Msg::NotifyBitrateDownBody { target_name: &target_name }.now(),
                                                         );
                                                     }
                                                     rebitrate = true;
@@ -1591,8 +1609,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                                         drop_notified = false;
                                                         notify(
                                                             &app_t,
-                                                            "Internet estabilizou",
-                                                            &format!("{target_name}: qualidade de volta ao normal."),
+                                                            &Msg::NotifyBitrateUpTitle.now(),
+                                                            &Msg::NotifyBitrateUpBody { target_name: &target_name }.now(),
                                                         );
                                                     }
                                                     rebitrate = true;
@@ -1747,7 +1765,7 @@ pub async fn set_target_paused(
         let mut eng = state.engine.lock().unwrap();
         match eng.paused.get(&target_id) {
             Some(flag) => flag.store(paused, Ordering::Relaxed),
-            None => return Err("destino não está ao vivo".into()),
+            None => return Err(Msg::TargetNotLive.now()),
         }
         if paused {
             eng.ffmpegs.remove(&target_id)
@@ -1793,7 +1811,7 @@ pub fn retry_target(app: AppHandle, target_id: String) -> Result<(), String> {
     let mut eng = state.engine.lock().unwrap();
     match eng.auth_error.get(&target_id) {
         Some(flag) => flag.store(false, Ordering::Relaxed),
-        None => return Err("essa plataforma não está nesta transmissão.".into()),
+        None => return Err(Msg::TargetNotInThisStream.now()),
     }
     // Estado otimista: sai do "Erro" pra "Conectando" já no clique.
     let out = eng.snapshot.as_mut().map(|snap| {
@@ -1818,12 +1836,10 @@ pub fn set_force_brb(app: AppHandle, on: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     if !eng.live {
-        return Err("a transmissão não está no ar.".into());
+        return Err(Msg::BrbStreamNotLive.now());
     }
     let Some(flag) = &eng.force_brb else {
-        return Err(
-            "o JÁ VOLTO não está armado nesta live — arme nas Configurações e recomece.".into(),
-        );
+        return Err(Msg::BrbNotArmed.now());
     };
     flag.store(on, Ordering::Relaxed);
     let out = eng.snapshot.as_mut().map(|snap| {
@@ -1961,10 +1977,18 @@ fn update_target_metrics(
     }
 
     if is_stats && was_starting {
-        notify(app, "Corneta no ar 📣", "Sua transmissão começou.");
+        notify(app, &Msg::NotifyLiveTitle.now(), &Msg::NotifyLiveBody.now());
     } else if let Some(msg) = err_msg {
         if prev_target != "error" {
-            notify(app, "Destino com erro", &format!("{name}: {msg}"));
+            notify(
+                app,
+                &Msg::NotifyTargetErrorTitle.now(),
+                &Msg::NotifyTargetErrorBody {
+                    name: &name,
+                    msg: &msg,
+                }
+                .now(),
+            );
         }
     }
 }
@@ -2089,7 +2113,7 @@ pub fn list_sessions(app: AppHandle) -> Vec<session::SessionMeta> {
 
 #[tauri::command]
 pub fn read_session(app: AppHandle, id: String) -> Result<String, String> {
-    session::read_session(&app, &id).ok_or_else(|| "sessão não encontrada".to_string())
+    session::read_session(&app, &id).ok_or_else(|| Msg::SessionNotFound.now())
 }
 
 #[tauri::command]
@@ -2099,7 +2123,7 @@ pub fn delete_session(app: AppHandle, id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_sessions_dir(app: AppHandle) -> Result<(), String> {
-    let dir = session::sessions_dir(&app).ok_or("pasta de sessões indisponível")?;
+    let dir = session::sessions_dir(&app).ok_or_else(|| Msg::SessionDirUnavailable.now())?;
     #[cfg(windows)]
     {
         let _ = std::process::Command::new("explorer").arg(&dir).spawn();
@@ -2116,11 +2140,11 @@ pub fn open_sessions_dir(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn open_external(app: AppHandle, url: String) -> Result<(), String> {
     if url.len() > 2_048 || !url.starts_with("https://") || url.chars().any(char::is_whitespace) {
-        return Err("URL externa recusada".into());
+        return Err(Msg::OpenExternalRefused.now());
     }
     app.opener()
         .open_url(url, None::<&str>)
-        .map_err(|e| format!("abrir URL: {e}"))
+        .map_err(|e| Msg::OpenExternalFailed { e: &e.to_string() }.now())
 }
 
 // ------------------------- Chat unificado -------------------------
@@ -2184,7 +2208,7 @@ pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
     tauri::WebviewWindowBuilder::new(&app, "chat", tauri::WebviewUrl::App("chat.html".into()))
-        .title("Corneta — Chat")
+        .title(Msg::WindowChatPopoutTitle.now())
         .inner_size(380.0, 600.0)
         .min_inner_size(300.0, 360.0)
         .resizable(true)
@@ -2214,14 +2238,12 @@ fn tcp_reach(ingest_url: &str) -> Result<String, String> {
     use std::net::ToSocketAddrs;
     let addr = format!("{host}:{port}")
         .to_socket_addrs()
-        .map_err(|_| format!("não resolvi {host}"))?
+        .map_err(|_| Msg::TestHostUnresolved { host: &host }.now())?
         .next()
-        .ok_or_else(|| format!("endereço não resolvido: {host}"))?;
+        .ok_or_else(|| Msg::TestAddressUnresolved { host: &host }.now())?;
     match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(5)) {
-        Ok(_) => Ok(format!("{host} respondeu")),
-        Err(_) => Err(format!(
-            "sem resposta de {host}:{port} — confira a URL/rede"
-        )),
+        Ok(_) => Ok(Msg::TestHostAnswered { host: &host }.now()),
+        Err(_) => Err(Msg::TestNoAnswer { host: &host, port }.now()),
     }
 }
 
@@ -2232,7 +2254,7 @@ pub async fn test_target(app: AppHandle, target_id: String) -> Result<String, St
         .targets
         .into_iter()
         .find(|t| t.id == target_id)
-        .ok_or("destino não encontrado")?;
+        .ok_or_else(|| Msg::TargetNotFound.now())?;
     let url = t.ingest_url;
     tauri::async_runtime::spawn_blocking(move || tcp_reach(&url))
         .await
@@ -2257,15 +2279,15 @@ pub async fn alert_test(app: AppHandle, source_id: String) -> Result<String, Str
         .alert_sources
         .into_iter()
         .find(|s| s.id == source_id)
-        .ok_or("fonte não encontrada")?;
+        .ok_or_else(|| Msg::AlertSourceNotFound.now())?;
     let token = crate::keys::get_key(&format!("alert_{}", src.id))
         .filter(|t| !t.trim().is_empty())
-        .ok_or("cole o token primeiro")?;
+        .ok_or_else(|| Msg::AlertSourcePasteTokenFirst.now())?;
     let kind = src.kind;
     tauri::async_runtime::spawn_blocking(move || crate::alerts::probe_alert(&kind, &token))
         .await
         .map_err(|e| format!("join: {e}"))?
-        .map(|_| "token válido".to_string())
+        .map(|_| Msg::AlertSourceTokenOk.now())
 }
 
 #[tauri::command]
@@ -2291,17 +2313,17 @@ pub fn export_diagnostics(app: AppHandle) -> Result<bool, String> {
     let mut cfg = config::load(&app);
     cfg.settings.obs_password.clear();
     cfg.settings.youtube_api_key.clear();
-    cfg.settings.guardian_watchlist = vec![format!(
-        "<{} termos omitidos>",
-        cfg.settings.guardian_watchlist.len()
-    )];
-    let mut report = format!(
-        "Corneta {}\nSO: {} {}\n\nCONFIG (segredos removidos)\n{}\n\nLOGS RECENTES\n",
-        app.package_info().version,
-        std::env::consts::OS,
-        std::env::consts::ARCH,
-        serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?
-    );
+    cfg.settings.guardian_watchlist = vec![Msg::DiagWatchlistOmitted {
+        n: cfg.settings.guardian_watchlist.len(),
+    }
+    .now()];
+    let mut report = Msg::DiagReportHeader {
+        version: &app.package_info().version.to_string(),
+        os: std::env::consts::OS,
+        arch: std::env::consts::ARCH,
+        config: &serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?,
+    }
+    .now();
     let redact_authorization =
         regex::Regex::new(r"(?i)(authorization\s*[:=]\s*)[^\r\n]+").map_err(|e| e.to_string())?;
     let redact = regex::Regex::new(
@@ -2333,7 +2355,7 @@ pub fn export_diagnostics(app: AppHandle) -> Result<bool, String> {
     let Some(path) = app
         .dialog()
         .file()
-        .add_filter("Diagnóstico da Corneta", &["txt"])
+        .add_filter(Msg::DiagFilePickerFilter.now(), &["txt"])
         .set_file_name("corneta-diagnostico.txt")
         .blocking_save_file()
     else {
@@ -2461,13 +2483,13 @@ pub fn overlay_test(state: State<'_, AppState>) {
     let demo = chat::Alert {
         id: "overlay-test".into(),
         platform: "twitch".into(),
-        source: "teste".into(),
+        source: Msg::OverlayDemoSource.now(),
         kind: "subgift".into(),
         user: "fulano_dtal".into(),
         amount: Some(5.0),
         currency: None,
         tier: None,
-        message: Some("bora cornetar! 📣".into()),
+        message: Some(Msg::OverlayDemoAlertMessage.now()),
         fragments: Vec::new(),
         ts: 0,
     };
@@ -2480,16 +2502,16 @@ pub fn overlay_chat_test(state: State<'_, AppState>) {
     let demo = chat::ChatMessage {
         id: "overlay-chat-test".into(),
         platform: "twitch".into(),
-        source: "teste".into(),
+        source: Msg::OverlayDemoSource.now(),
         author: "fulano_dtal".into(),
         author_id: None,
         native_id: None,
         color: Some("#ffb323".into()),
-        text: "salve, bora cornetar! Kappa".into(),
+        text: Msg::OverlayDemoChatText.now(),
         fragments: vec![
             chat::ChatFragment {
                 kind: "text".into(),
-                text: Some("salve, bora cornetar! ".into()),
+                text: Some(Msg::OverlayDemoChatTextFragment.now()),
                 url: None,
             },
             chat::ChatFragment {
@@ -2535,7 +2557,7 @@ pub fn open_privacy_settings(app: AppHandle, which: String) -> Result<(), String
     let uri = match which.as_str() {
         "camera" => "ms-settings:privacy-webcam",
         "microphone" => "ms-settings:privacy-microphone",
-        _ => return Err("configuração desconhecida".into()),
+        _ => return Err(Msg::PrivacySettingsUnknown.now()),
     };
     #[allow(deprecated)]
     app.shell().open(uri, None).map_err(|e| e.to_string())
@@ -2548,10 +2570,11 @@ pub fn mark_moment(app: AppHandle, label: Option<String>) -> Result<(), String> 
     let path = st.engine.lock().unwrap().session_path.clone();
     match path {
         Some(p) => {
-            session::record_marker(&p, label.as_deref().unwrap_or("Momento"));
+            let fallback = Msg::SessionDefaultMarkerLabel.now();
+            session::record_marker(&p, label.as_deref().unwrap_or(&fallback));
             Ok(())
         }
-        None => Err("não está gravando uma sessão".into()),
+        None => Err(Msg::SessionNotRecording.now()),
     }
 }
 
@@ -2600,7 +2623,7 @@ pub fn export_config(app: AppHandle) -> Result<bool, String> {
     match app
         .dialog()
         .file()
-        .add_filter("Config da Corneta", &["json"])
+        .add_filter(Msg::ConfigFilePickerFilter.now(), &["json"])
         .set_file_name("corneta-config.json")
         .blocking_save_file()
     {
@@ -2620,7 +2643,7 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     let Some(p) = app
         .dialog()
         .file()
-        .add_filter("Config da Corneta", &["json"])
+        .add_filter(Msg::ConfigFilePickerFilter.now(), &["json"])
         .blocking_pick_file()
     else {
         return Ok(false);
@@ -2628,11 +2651,11 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     let pb = p.into_path().map_err(|e| e.to_string())?;
     const MAX_IMPORT_BYTES: u64 = 2 * 1024 * 1024;
     if std::fs::metadata(&pb).map_err(|e| e.to_string())?.len() > MAX_IMPORT_BYTES {
-        return Err("config excede o limite de 2 MiB".into());
+        return Err(Msg::ConfigImportTooBig.now());
     }
     let content = std::fs::read_to_string(pb).map_err(|e| e.to_string())?;
-    let cfg: AppConfig =
-        serde_json::from_str(&content).map_err(|e| format!("config inválida: {e}"))?;
+    let cfg: AppConfig = serde_json::from_str(&content)
+        .map_err(|e| Msg::ConfigImportInvalidJson { e: &e.to_string() }.now())?;
     let mut cfg = cfg.validate_and_normalize()?;
     // Rede de segurança: guarda a config ATUAL ao lado do config.json antes de sobrescrever —
     // importar substitui perfis/plataformas/ajustes e não tinha caminho de volta.

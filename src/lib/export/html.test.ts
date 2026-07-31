@@ -3,6 +3,14 @@ import { reportHtml } from "./html";
 import { reportJson, REPORT_JSON_VERSION } from "./json";
 import { anonymize } from "./anonymize";
 import { analyze, parseSession } from "../report";
+import { interpolate, type Vars } from "../i18n/locale";
+import { pt, type MessageKey } from "../i18n/pt";
+import { makeFmt } from "../i18n/format";
+
+/** `parseSession`/`analyze` recebem a tradução por parâmetro — aqui entra o dicionário pt de verdade. */
+const t = (k: MessageKey, vars?: Vars) => interpolate(pt[k], vars);
+/** O HTML exportado precisa de locale e formatadores além do texto. */
+const i18n = { locale: "pt-BR" as const, t, fmt: makeFmt("pt-BR") };
 
 const start = new Date(2026, 6, 30, 20, 15).getTime();
 
@@ -63,11 +71,12 @@ const sessao = (extra: object[] = []) =>
     ]
       .map((l) => JSON.stringify(l))
       .join("\n"),
+    t,
   )!;
 
 describe("reportHtml", () => {
   const d = sessao();
-  const html = reportHtml(d, analyze(d));
+  const html = reportHtml(d, analyze(d, t), i18n);
 
   it("é um documento completo e autocontido", () => {
     expect(html.startsWith("<!doctype html>")).toBe(true);
@@ -93,7 +102,7 @@ describe("reportHtml", () => {
         label: "<img src=x onerror=alert(1)>",
       },
     ]);
-    const out = reportHtml(mau, analyze(mau));
+    const out = reportHtml(mau, analyze(mau, t), i18n);
     expect(out).not.toContain("<img src=x");
     expect(out).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
@@ -102,7 +111,7 @@ describe("reportHtml", () => {
 describe("reportJson", () => {
   it("carrega formato, versão e a análise pronta", () => {
     const d = sessao();
-    const j = JSON.parse(reportJson(d, analyze(d)));
+    const j = JSON.parse(reportJson(d, analyze(d, t)));
     expect(j.formato).toBe("corneta.relatorio");
     expect(j.versao).toBe(REPORT_JSON_VERSION);
     expect(j.audiencia.peak).toBe(300);
@@ -127,10 +136,10 @@ describe("anonymize", () => {
   ]);
 
   it("tira o nome de tudo que deriva do alerta, inclusive dos destaques", () => {
-    const cru = analyze(comRaid);
+    const cru = analyze(comRaid, t);
     expect(JSON.stringify(cru)).toContain("Gaules");
 
-    const limpo = analyze(anonymize(comRaid));
+    const limpo = analyze(anonymize(comRaid), t);
     expect(JSON.stringify(limpo)).not.toContain("Gaules");
     expect(limpo.highlights.some((h) => h.reason.includes("alguém"))).toBe(
       true,
@@ -138,8 +147,8 @@ describe("anonymize", () => {
   });
 
   it("não mexe nos números nem no nome dos canais do próprio streamer", () => {
-    const cru = analyze(comRaid);
-    const limpo = analyze(anonymize(comRaid));
+    const cru = analyze(comRaid, t);
+    const limpo = analyze(anonymize(comRaid), t);
     expect(limpo.alerts.raids).toBe(cru.alerts.raids);
     expect(limpo.alerts.raidViewers).toBe(cru.alerts.raidViewers);
     expect(limpo.viewers.peak).toBe(cru.viewers.peak);

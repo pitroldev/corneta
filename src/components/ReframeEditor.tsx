@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { bold, useI18n } from "../lib/i18n";
 import { Camera, Check, Crosshair, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
@@ -19,6 +20,7 @@ export function ReframeEditor({
   target: Target;
   onClose: () => void;
 }) {
+  const { t, fmt } = useI18n();
   const updateTarget = useStore((s) => s.updateTarget);
   const preset =
     target.encoding.preset ?? PLATFORMS[target.platformId].recommended;
@@ -100,7 +102,7 @@ export function ReframeEditor({
   const capture = async () => {
     setCapturing(true);
     try {
-      const b64 = await api.captureFrame();
+      const b64 = await api.captureFrame(t);
       setFrame(`data:image/jpeg;base64,${b64}`);
     } catch (e) {
       toast.error(`${e}`.replace("Error: ", ""));
@@ -113,7 +115,7 @@ export function ReframeEditor({
     updateTarget(target.id, {
       encoding: { ...target.encoding, reframe: { x, y, zoom } },
     });
-    toast.success("Enquadramento salvo");
+    toast.success(t("platforms.reframe.saved.toast"));
     onClose();
   };
 
@@ -140,30 +142,28 @@ export function ReframeEditor({
 
   return (
     <Modal
-      title="Enquadrar vertical"
+      title={t("platforms.reframe.title")}
       onClose={onClose}
       lockOutside={dirty}
       className="max-w-3xl rounded-xl bg-surface p-6 pop"
     >
       <div className="mb-1 flex items-center justify-between">
         <h3 id="reframe-title" className="flex items-center gap-2 text-xl">
-          <Crosshair className="size-5 text-brass" /> Enquadrar vertical ·{" "}
-          {target.name}
+          <Crosshair className="size-5 text-brass" />{" "}
+          {t("platforms.reframe.titleWithTarget", { target: target.name })}
         </h3>
         <button
           onClick={onClose}
           className="text-ink-faint hover:text-ink"
-          aria-label="Fechar"
+          aria-label={t("platforms.reframe.close")}
         >
           <X className="size-5" />
         </button>
       </div>
       <p className="mb-4 text-sm text-ink-muted">
-        Arraste o quadro pra escolher que parte do seu vídeo vai pro{" "}
-        <strong className="text-ink">
-          {preset.width}×{preset.height}
-        </strong>{" "}
-        (vertical).
+        {bold(t, "platforms.reframe.lede", {
+          size: `${preset.width}×${preset.height}`,
+        })}
       </p>
 
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -178,7 +178,7 @@ export function ReframeEditor({
             <ThirdsGrid />
             <button
               type="button"
-              aria-label="Recorte vertical — arraste ou use as setas (Shift = 10%)"
+              aria-label={t("platforms.reframe.crop.aria")}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -214,14 +214,14 @@ export function ReframeEditor({
             </button>
             {!frame && (
               <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-brass-ink/75 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brass">
-                prévia
+                {t("platforms.reframe.preview")}
               </span>
             )}
           </div>
 
           <div className="mt-3 flex items-center gap-3">
             <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-              Zoom
+              {t("platforms.reframe.zoom")}
             </span>
             <input
               type="range"
@@ -229,14 +229,14 @@ export function ReframeEditor({
               max={1}
               step={0.01}
               value={1.4 - zoom}
-              aria-label="Zoom"
+              aria-label={t("platforms.reframe.zoom")}
               onChange={(e) =>
                 setZoom(Number((1.4 - Number(e.target.value)).toFixed(2)))
               }
               className="flex-1 accent-brass"
             />
             <span className="w-9 text-right text-xs font-bold tabular-nums text-ink-muted">
-              {(1 / zoom).toFixed(1).replace(".", ",")}×
+              {fmt.dec(1 / zoom)}×
             </span>
             <Button
               variant="subtle"
@@ -247,7 +247,7 @@ export function ReframeEditor({
                 setZoom(1);
               }}
             >
-              Centralizar
+              {t("platforms.reframe.center")}
             </Button>
           </div>
         </div>
@@ -255,7 +255,7 @@ export function ReframeEditor({
         {/* Preview do resultado 9:16 */}
         <div className="flex flex-col items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-            Vai sair assim
+            {t("platforms.reframe.result")}
           </span>
           <div
             className="relative grid h-56 place-items-center overflow-hidden rounded-md border-2 border-border bg-surface-2 [aspect-ratio:9/16]"
@@ -278,24 +278,24 @@ export function ReframeEditor({
           onClick={capture}
           loading={capturing}
           disabled={capturing || !anyLive}
-          title={!anyLive ? "Disponível com o OBS ao vivo" : undefined}
+          title={!anyLive ? t("platforms.reframe.needLive") : undefined}
         >
           {!capturing && <Camera className="size-4" />}
-          Capturar frame do OBS
+          {t("platforms.reframe.capture")}
         </Button>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancelar
+            {t("platforms.reframe.cancel")}
           </Button>
           <Button variant="primary" size="sm" onClick={save}>
-            <Check className="size-4" /> Salvar
+            <Check className="size-4" /> {t("platforms.reframe.save")}
           </Button>
         </div>
       </div>
       <p className="mt-2 text-center text-xs text-ink-faint">
         {anyLive
-          ? "Capture um frame do OBS pra enquadrar exatamente."
-          : "💡 A captura de frame fica disponível com o OBS ao vivo. Sem frame, use a grade pra posicionar."}
+          ? t("platforms.reframe.hint.live")
+          : t("platforms.reframe.hint.offline")}
       </p>
     </Modal>
   );

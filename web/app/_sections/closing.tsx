@@ -1,7 +1,7 @@
-import type { T } from "@/lib/i18n";
+import type { Locale, T } from "@/lib/i18n";
 import Link from "next/link";
 import { faqsFor } from "@/lib/content";
-import { LEGAL_CNPJ, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
+import { LEGAL_CNPJ, LEGAL_OPERATOR, legalHref } from "@/lib/legal";
 import { BrandMark } from "../_components/brand-mark";
 import { Mascot, SoundWaves } from "../_components/decor";
 import { ArrowIcon, WindowsIcon } from "../_components/icons";
@@ -208,7 +208,15 @@ export function FinalCta({ t }: { t: T }) {
 const FOOTER_LINK =
   "inline-flex min-h-[30px] items-center rounded-sm bg-surface-2 px-[11px] py-1.5 text-[0.78rem] font-bold text-muted transition-colors duration-120 hover:bg-brass hover:text-brass-ink";
 
-export function SiteFooter({ t, downloadUrl }: { t: T; downloadUrl: string }) {
+export function SiteFooter({
+  t,
+  locale,
+  downloadUrl,
+}: {
+  t: T;
+  locale: Locale;
+  downloadUrl: string;
+}) {
   return (
     <footer className="border-t-2 border-border-soft bg-panel">
       <Shell className="flex min-h-26 items-center justify-between gap-7 py-5.5 max-[760px]:flex-col max-[760px]:items-start">
@@ -227,10 +235,10 @@ export function SiteFooter({ t, downloadUrl }: { t: T; downloadUrl: string }) {
           className="flex flex-wrap gap-x-2.5 gap-y-2"
           aria-label={t("closing.footer.nav.ariaLabel")}
         >
-          <Link className={FOOTER_LINK} href={LEGAL_ROUTES.privacy}>
+          <Link className={FOOTER_LINK} href={legalHref(locale, "privacy")}>
             {t("closing.footer.link.privacy")}
           </Link>
-          <Link className={FOOTER_LINK} href={LEGAL_ROUTES.terms}>
+          <Link className={FOOTER_LINK} href={legalHref(locale, "terms")}>
             {t("closing.footer.link.terms")}
           </Link>
           <a

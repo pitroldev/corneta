@@ -11,6 +11,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tungstenite::Message;
 
+use crate::i18n::Msg;
 use crate::AppState;
 
 #[derive(Serialize, Clone, Debug)]
@@ -516,7 +517,7 @@ fn run_twitch(
                                         source: source.to_string(),
                                         kind: "bits".into(),
                                         user: tag_val(twitch_tags(line), "display-name")
-                                            .unwrap_or_else(|| "alguém".into()),
+                                            .unwrap_or_else(|| Msg::ChatUnknownUser.now()),
                                         amount: Some(b),
                                         currency: None,
                                         tier: None,
@@ -627,12 +628,12 @@ pub fn send_message(
 ) -> Result<(), String> {
     let text = sanitize_outgoing(text);
     if text.is_empty() {
-        return Err("mensagem vazia".into());
+        return Err(Msg::ChatEmptyMessage.now());
     }
     let cfg = crate::config::load(app);
     let senders = {
         let st = app.state::<AppState>();
-        let guard = st.chat.lock().map_err(|_| "estado do chat".to_string())?;
+        let guard = st.chat.lock().map_err(|_| Msg::ChatStateLocked.now())?;
         guard.senders.clone()
     };
     let targets: Vec<String> = match sources {
@@ -687,7 +688,7 @@ pub fn send_message(
                                 id: next_id(),
                                 platform: "youtube".into(),
                                 source: label_of(&id),
-                                author: "você".into(),
+                                author: Msg::ChatSelfAuthor.now(),
                                 author_id: None,
                                 native_id: None,
                                 color: Some("#ffb323".into()),
@@ -714,7 +715,7 @@ pub fn send_message(
         }
     }
     if sent == 0 {
-        return Err(last_err.unwrap_or_else(|| "nenhum canal logado pra enviar".into()));
+        return Err(last_err.unwrap_or_else(|| Msg::ChatNoChannelSignedIn.now()));
     }
     Ok(())
 }
@@ -768,7 +769,7 @@ fn parse_usernotice(line: &str, source: &str, emotes: &HashMap<String, String>) 
     let msg_id = tag_val(tags, "msg-id")?;
     let user = tag_val(tags, "display-name")
         .or_else(|| tag_val(tags, "login"))
-        .unwrap_or_else(|| "alguém".into());
+        .unwrap_or_else(|| Msg::ChatUnknownUser.now());
     let tier = tag_val(tags, "msg-param-sub-plan").map(|p| match p.as_str() {
         "Prime" => "Prime".into(),
         "1000" => "T1".into(),
@@ -1340,12 +1341,16 @@ fn search_live_video_id(channel_id: &str, api_key: &str) -> Option<String> {
 pub fn check_youtube_key(key: &str) -> Result<String, String> {
     let key = key.trim();
     if key.is_empty() {
-        return Err("cole a API key primeiro".into());
+        return Err(Msg::YoutubeKeyPasteFirst.now());
     }
+    // `hl=pt` fixa o idioma da MENSAGEM DE ERRO que o Google devolve — e ela é
+    // repassada crua ao usuário logo abaixo (YoutubeKeyApiError). Com o app em
+    // inglês isso vira um recado em português. Trocar por locale ativo é mudança
+    // de lógica, então fica registrado como pendência.
     let url =
         format!("https://www.googleapis.com/youtube/v3/i18nLanguages?part=snippet&hl=pt&key={key}");
     match ureq::get(&url).timeout(Duration::from_secs(10)).call() {
-        Ok(_) => Ok("chave válida".into()),
+        Ok(_) => Ok(Msg::YoutubeKeyValid.now()),
         Err(ureq::Error::Status(code, r)) => {
             let body = r.into_string().unwrap_or_default();
             let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
@@ -1362,25 +1367,19 @@ pub fn check_youtube_key(key: &str) -> Result<String, String> {
                 .and_then(|x| x.as_str())
                 .unwrap_or("");
             Err(match reason {
-                "keyInvalid" | "badRequest" => "chave inválida — confira se copiou certo".into(),
-                "accessNotConfigured" => {
-                    "ative a YouTube Data API v3 no projeto dessa chave".into()
-                }
-                "ipRefererBlocked" | "forbidden" => {
-                    "essa chave tem restrição de app/IP — libere pra uso geral".into()
-                }
+                "keyInvalid" | "badRequest" => Msg::YoutubeKeyInvalid.now(),
+                "accessNotConfigured" => Msg::YoutubeKeyApiNotEnabled.now(),
+                "ipRefererBlocked" | "forbidden" => Msg::YoutubeKeyRestricted.now(),
                 // cota estourada = a chave EM SI é válida; não trata como erro de credencial.
                 "quotaExceeded" | "dailyLimitExceeded" | "rateLimitExceeded" => {
-                    return Ok("chave válida (mas a cota do dia está no limite)".into())
+                    return Ok(Msg::YoutubeKeyValidQuotaMaxed.now())
                 }
-                _ if status == "PERMISSION_DENIED" => {
-                    "ative a YouTube Data API v3 no projeto dessa chave".into()
-                }
-                _ if !msg.is_empty() => format!("YouTube {code}: {msg}"),
-                _ => format!("YouTube respondeu {code}"),
+                _ if status == "PERMISSION_DENIED" => Msg::YoutubeKeyApiNotEnabled.now(),
+                _ if !msg.is_empty() => Msg::YoutubeKeyApiError { code, msg }.now(),
+                _ => Msg::YoutubeKeyApiStatus { code }.now(),
             })
         }
-        Err(_) => Err("sem conexão com o YouTube (rede/proxy?)".into()),
+        Err(_) => Err(Msg::YoutubeKeyNoConnection.now()),
     }
 }
 
@@ -1426,8 +1425,8 @@ fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
 fn yt_author(item: &Value) -> String {
     item.pointer("/authorDetails/displayName")
         .and_then(|v| v.as_str())
-        .unwrap_or("alguém")
-        .to_string()
+        .map(String::from)
+        .unwrap_or_else(|| Msg::ChatUnknownUser.now())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1590,7 +1589,7 @@ fn yt_innertube_badges(renderer: &Value) -> Vec<ChatBadge> {
                     kind: "verified".into(),
                 }),
                 _ if r.and_then(|x| x.get("customThumbnail")).is_some() => out.push(ChatBadge {
-                    label: "MEMBRO".into(),
+                    label: Msg::ChatBadgeMember.now(),
                     kind: "subscriber".into(),
                 }),
                 _ => {}
@@ -1679,8 +1678,8 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u
         let author = r
             .pointer("/authorName/simpleText")
             .and_then(|v| v.as_str())
-            .unwrap_or("alguém")
-            .to_string();
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
         let amount_text = r
             .pointer("/purchaseAmountText/simpleText")
             .and_then(|v| v.as_str())
@@ -1710,8 +1709,8 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u
         let author = item
             .pointer("/liveChatMembershipItemRenderer/authorName/simpleText")
             .and_then(|v| v.as_str())
-            .unwrap_or("alguém")
-            .to_string();
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
         emit_alert(
             app,
             yt_alert(source, "member", author, None, None, None, None),
@@ -1723,8 +1722,8 @@ fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u
         let author = r
             .pointer("/header/liveChatSponsorshipsHeaderRenderer/authorName/simpleText")
             .and_then(|v| v.as_str())
-            .unwrap_or("alguém")
-            .to_string();
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
         emit_alert(
             app,
             yt_alert(source, "subgift", author, None, None, None, None),
@@ -2019,7 +2018,7 @@ fn youtube_dataapi(
                             }
                             if flag("isChatSponsor") {
                                 badges.push(ChatBadge {
-                                    label: "MEMBRO".into(),
+                                    label: Msg::ChatBadgeMember.now(),
                                     kind: "subscriber".into(),
                                 });
                             }
@@ -2228,8 +2227,8 @@ fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
         let user = d
             .get("username")
             .and_then(|x| x.as_str())
-            .unwrap_or("alguém")
-            .to_string();
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
         Some(mk(
             "sub",
             user,
@@ -2239,8 +2238,8 @@ fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
         let user = d
             .get("gifter_username")
             .and_then(|x| x.as_str())
-            .unwrap_or("alguém")
-            .to_string();
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
         let count = d
             .get("gifted_usernames")
             .and_then(|x| x.as_array())
@@ -2250,8 +2249,8 @@ fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
         let user = d
             .get("host_username")
             .and_then(|x| x.as_str())
-            .unwrap_or("alguém")
-            .to_string();
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
         Some(mk(
             "raid",
             user,

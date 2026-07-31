@@ -22,7 +22,15 @@ import {
   smartHybridAction,
 } from "../lib/estimates";
 import { toast } from "../lib/toast";
-import { cn, fmtBitrate, fmtResolution } from "../lib/utils";
+import {
+  bold,
+  rich,
+  useI18n,
+  useT,
+  type I18n,
+  type MessageKey,
+} from "../lib/i18n";
+import { cn, fmtResolution } from "../lib/utils";
 import {
   Badge,
   Button,
@@ -38,37 +46,38 @@ import { ObsQualityGuide } from "../components/ObsQualityGuide";
 const MIN_BR = 1000;
 const MAX_BR = 51000;
 
+// `id` é valor de enum (vai pra config e pro Rust) — só os *Key* são copy.
 const MODES: {
   id: EncodingMode;
-  title: string;
-  tag: string;
+  titleKey: MessageKey;
+  tagKey: MessageKey;
   tone: "brass" | "neutral";
   icon: typeof Cpu;
-  desc: string;
+  descKey: MessageKey;
 }[] = [
   {
     id: "passthrough",
-    title: "Na lata",
-    tag: "Mais leve",
+    titleKey: "encoding.mode.passthrough.title",
+    tagKey: "encoding.mode.passthrough.tag",
     tone: "neutral",
     icon: Layers,
-    desc: "A mesma imagem vai pra todas as plataformas, no mesmo padrão.",
+    descKey: "encoding.mode.passthrough.desc",
   },
   {
     id: "hybrid",
-    title: "Esperto",
-    tag: "Recomendado",
+    titleKey: "encoding.mode.hybrid.title",
+    tagKey: "encoding.mode.hybrid.tag",
     tone: "brass",
     icon: Wand2,
-    desc: "Ajusta cada plataforma só onde precisa. Decide sozinho.",
+    descKey: "encoding.mode.hybrid.desc",
   },
   {
     id: "per-platform",
-    title: "Caprichado",
-    tag: "Máx. qualidade",
+    titleKey: "encoding.mode.perPlatform.title",
+    tagKey: "encoding.mode.perPlatform.tag",
     tone: "neutral",
     icon: Sparkles,
-    desc: "Melhor imagem possível pra cada plataforma, mas é o mais pesado.",
+    descKey: "encoding.mode.perPlatform.desc",
   },
 ];
 
@@ -81,6 +90,7 @@ export function EncodingScreen() {
   const snapshot = useStore((s) => s.snapshot);
   const runUploadTest = useStore((s) => s.runUploadTest);
   const refreshEncoders = useStore((s) => s.refreshEncoders);
+  const { t, fmt } = useI18n();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [measuring, setMeasuring] = useState(false);
@@ -110,15 +120,15 @@ export function EncodingScreen() {
   // Plataforma vertical recebendo CÓPIA (vídeo deitado) — em QUALQUER modo, não só no
   // "Na lata": no Esperto um override "Copiar" causa o mesmo estrago, e o único aviso
   // ficava num texto de 11px dentro do acordeão fechado.
-  const verticalCopies = config.targets.filter((t) => {
-    const r = PLATFORMS[t.platformId].recommended;
+  const verticalCopies = config.targets.filter((x) => {
+    const r = PLATFORMS[x.platformId].recommended;
     return (
-      t.enabled &&
+      x.enabled &&
       r.height > r.width &&
-      effectiveAction(config.mode, t) === "copy"
+      effectiveAction(config.mode, x) === "copy"
     );
   });
-  const verticalNames = verticalCopies.map((t) => t.name);
+  const verticalNames = verticalCopies.map((x) => x.name);
 
   const activeFit = bandFit(activeEst.uploadKbps, uploadMbps);
   // Se o Esperto couber na banda (mesmo no limite), é a saída de 1 clique do card vermelho.
@@ -139,7 +149,7 @@ export function EncodingScreen() {
     try {
       await runUploadTest();
     } catch {
-      toast.error("Não consegui medir o upload — sem internet?");
+      toast.error(t("encoding.upload.measure.error"));
     } finally {
       setMeasuring(false);
     }
@@ -148,9 +158,9 @@ export function EncodingScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker="Como a corneta toca"
-        title="Qualidade"
-        subtitle="Quanto capricho na imagem — e quanto sua máquina vai suar."
+        kicker={t("encoding.header.kicker")}
+        title={t("encoding.header.title")}
+        subtitle={t("encoding.header.subtitle")}
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -178,7 +188,7 @@ export function EncodingScreen() {
               {/* Selo em linha própria: dividindo a linha com o título, ele quebrava
                   só no card de título longo e os três ficavam desalinhados. */}
               <Badge tone={m.tone} className="mb-2 self-start">
-                {m.tag}
+                {t(m.tagKey)}
               </Badge>
               <div className="flex items-center gap-2">
                 <span
@@ -192,20 +202,22 @@ export function EncodingScreen() {
                   <Icon className="size-4" strokeWidth={2.4} />
                 </span>
                 <span className="font-display text-lg font-bold">
-                  {m.title}
+                  {t(m.titleKey)}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                {m.desc}
+                {t(m.descKey)}
               </p>
               {/* mt-auto: métricas ancoradas no rodapé — descrições de tamanhos
                   diferentes não desalinham as barras entre os três cards. */}
               <div className="mt-auto space-y-2 pt-3">
                 <LoadBar load={est.load} />
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-ink-faint">Upload</span>
+                  <span className="font-semibold text-ink-faint">
+                    {t("encoding.card.upload.label")}
+                  </span>
                   <span className="font-display font-extrabold tabular-nums">
-                    {fmtBitrate(est.uploadKbps)}
+                    {fmt.bitrate(est.uploadKbps)}
                   </span>
                 </div>
                 {/* Slot SEMPRE presente: quando a medição chega, o texto preenche o
@@ -223,11 +235,11 @@ export function EncodingScreen() {
                   )}
                 >
                   {fit === "ok"
-                    ? "cabe folgado na sua banda"
+                    ? t("encoding.fit.ok")
                     : fit === "warn"
-                      ? "no limite da sua banda"
+                      ? t("encoding.fit.warn")
                       : fit === "bad"
-                        ? "acima da sua banda"
+                        ? t("encoding.fit.bad")
                         : " "}
                 </div>
               </div>
@@ -239,16 +251,11 @@ export function EncodingScreen() {
       {/* Linha fixa (não some após medir → sem pulo). Texto CURTO de propósito: se
           quebrasse em 2 linhas no estado não-medido, medir encolheria o parágrafo. */}
       <p className="mt-3 min-h-4 truncate text-xs text-ink-faint">
-        {uploadMbps == null ? (
-          <>Ainda não medi sua internet. </>
-        ) : (
-          <>
-            Sua internet sobe{" "}
-            <strong className="text-ink-muted">~{uploadMbps} Mbps</strong>.{" "}
-          </>
-        )}
+        {uploadMbps == null
+          ? t("encoding.upload.unmeasured")
+          : bold(t, "encoding.upload.measured", { mbps: fmt.dec(uploadMbps) })}
         {onAir ? (
-          <span>A medição fica pra depois da live.</span>
+          <span>{t("encoding.upload.onair")}</span>
         ) : (
           <button
             type="button"
@@ -257,10 +264,10 @@ export function EncodingScreen() {
             className="font-bold text-brass hover:underline disabled:opacity-60"
           >
             {measuring
-              ? "medindo…"
+              ? t("encoding.upload.measuring")
               : uploadMbps == null
-                ? "medir agora"
-                : "medir de novo"}
+                ? t("encoding.upload.measureNow")
+                : t("encoding.upload.measureAgain")}
           </button>
         )}
       </p>
@@ -270,11 +277,17 @@ export function EncodingScreen() {
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
           <div className="flex-1 text-sm text-ink-muted">
             <p>
-              {config.mode === "passthrough" ? "Na lata manda" : "Em cópia vai"}{" "}
-              o vídeo deitado pra{" "}
-              <strong className="text-ink">{verticalNames.join(" e ")}</strong>,
-              que só aceita{verticalNames.length > 1 ? "m" : ""} vídeo em pé — a
-              live vai sair torta ou nem entrar.
+              {bold(
+                t,
+                config.mode === "passthrough"
+                  ? "encoding.vertical.warn.passthrough"
+                  : "encoding.vertical.warn.copy",
+                {
+                  platforms: verticalNames.join(
+                    t("encoding.vertical.warn.join"),
+                  ),
+                },
+              )}
             </p>
             {config.mode === "passthrough" ? (
               <Button
@@ -283,8 +296,8 @@ export function EncodingScreen() {
                 className="mt-2"
                 onClick={() => setMode("hybrid")}
               >
-                <Wand2 className="size-3.5 text-brass" /> Usar o Esperto — ele
-                arruma isso sozinho
+                <Wand2 className="size-3.5 text-brass" />{" "}
+                {t("encoding.vertical.cta.hybrid")}
               </Button>
             ) : (
               <Button
@@ -292,15 +305,15 @@ export function EncodingScreen() {
                 size="sm"
                 className="mt-2"
                 onClick={() =>
-                  verticalCopies.forEach((t) =>
-                    updateTarget(t.id, {
-                      encoding: { ...t.encoding, hybridOverride: undefined },
+                  verticalCopies.forEach((x) =>
+                    updateTarget(x.id, {
+                      encoding: { ...x.encoding, hybridOverride: undefined },
                     }),
                   )
                 }
               >
-                <Wand2 className="size-3.5 text-brass" /> Voltar pro Auto —
-                ajusta em pé
+                <Wand2 className="size-3.5 text-brass" />{" "}
+                {t("encoding.vertical.cta.auto")}
               </Button>
             )}
           </div>
@@ -312,13 +325,10 @@ export function EncodingScreen() {
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
           <div className="flex-1 text-sm text-ink-muted">
             <p>
-              Este modo pede{" "}
-              <strong className="text-ink">
-                {fmtBitrate(activeEst.uploadKbps)}
-              </strong>{" "}
-              de upload, mas a sua internet mediu{" "}
-              <strong className="text-ink">{uploadMbps} Mbps</strong>. Vai
-              engasgar no meio da live.
+              {bold(t, "encoding.band.over.body", {
+                bitrate: fmt.bitrate(activeEst.uploadKbps),
+                mbps: fmt.dec(uploadMbps ?? 0),
+              })}
             </p>
             {hybridFits ? (
               <Button
@@ -328,30 +338,29 @@ export function EncodingScreen() {
                 onClick={() => setMode("hybrid")}
               >
                 <Wand2 className="size-3.5 text-brass" />{" "}
-                {hybridFit === "ok"
-                  ? "Usar o Esperto — cabe na sua banda"
-                  : "Usar o Esperto — fica no limite, mas passa"}
+                {t(
+                  hybridFit === "ok"
+                    ? "encoding.band.cta.hybridOk"
+                    : "encoding.band.cta.hybridWarn",
+                )}
               </Button>
             ) : config.mode === "passthrough" ? (
               // No Na lata a qualidade se define no OBS — mandar pro "ajuste fino"
               // (que aqui diz "não tem o que ajustar") era um beco sem saída.
               <p className="mt-1">
-                Baixe a{" "}
-                <strong className="text-ink">Taxa de bits no OBS</strong> (
-                <button
-                  onClick={() => setShowGuide(true)}
-                  className="font-bold text-brass hover:underline"
-                >
-                  ver o guia →
-                </button>
-                ) ou tire uma plataforma.
+                {rich(t, "encoding.band.fix.passthrough", {
+                  link: (
+                    <button
+                      onClick={() => setShowGuide(true)}
+                      className="font-bold text-brass hover:underline"
+                    >
+                      {t("encoding.band.fix.passthrough.link")}
+                    </button>
+                  ),
+                })}
               </p>
             ) : (
-              <p className="mt-1">
-                Baixe a qualidade no{" "}
-                <strong className="text-ink">ajuste fino</strong> aqui embaixo
-                ou tire uma plataforma.
-              </p>
+              <p className="mt-1">{bold(t, "encoding.band.fix.tuning")}</p>
             )}
           </div>
         </Card>
@@ -361,24 +370,12 @@ export function EncodingScreen() {
         <Card className="mt-4 flex gap-3 border-2 border-bad/40 bg-bad/10">
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
           <p className="text-sm text-ink-muted">
-            Este modo pede{" "}
-            <strong className="text-ink">
-              {activeEst.hwTranscodeCount} recodificações na placa de vídeo
-            </strong>{" "}
-            ao mesmo tempo, mas ela deve aguentar umas{" "}
-            <strong className="text-ink">{maxHw}</strong>. Pode falhar no meio
-            da live —{" "}
-            {config.mode === "hybrid" ? (
-              <>
-                volte algumas plataformas pra{" "}
-                <strong className="text-ink">Copiar</strong> no ajuste fino, ou
-                tire uma plataforma.
-              </>
-            ) : (
-              <>
-                use o <strong className="text-ink">Esperto</strong> ou tire uma
-                plataforma.
-              </>
+            {bold(
+              t,
+              config.mode === "hybrid"
+                ? "encoding.sessions.over.hybrid"
+                : "encoding.sessions.over.other",
+              { n: activeEst.hwTranscodeCount, max: maxHw },
             )}
           </p>
         </Card>
@@ -391,24 +388,21 @@ export function EncodingScreen() {
         <div className="flex-1 text-sm text-ink-muted">
           {lcd.videoKbps != null && lcd.capBy ? (
             <p>
-              Plataformas <strong className="text-ink">em cópia</strong>{" "}
-              precisam do OBS em{" "}
-              <strong className="text-ink">~{fmtBitrate(lcd.videoKbps)}</strong>{" "}
-              pra caber no <strong className="text-ink">{lcd.capBy}</strong>.
+              {bold(t, "encoding.obs.lcd", {
+                bitrate: fmt.bitrate(lcd.videoKbps),
+                platform: lcd.capBy,
+              })}
             </p>
           ) : (
-            <p>
-              Nenhuma plataforma <strong className="text-ink">em cópia</strong>{" "}
-              agora: quanto melhor o sinal do OBS, melhor a saída.
-            </p>
+            <p>{bold(t, "encoding.obs.noCopy")}</p>
           )}
           <p className="mt-1 text-xs text-ink-faint">
-            No OBS: Configurações → Saída → Taxa de bits.{" "}
+            {t("encoding.obs.path")}
             <button
               onClick={() => setShowGuide(true)}
               className="font-bold text-brass hover:underline"
             >
-              Ver o guia completo do OBS →
+              {t("encoding.obs.guideLink")}
             </button>
           </p>
         </div>
@@ -418,11 +412,11 @@ export function EncodingScreen() {
 
       <div className="mt-7">
         <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-          <Cpu className="size-4" /> O que recodifica nesta máquina
+          <Cpu className="size-4" /> {t("encoding.encoders.title")}
         </h3>
         {encoders.length === 0 ? (
           <Card className="bg-surface-2 text-sm text-ink-muted">
-            Vendo o que esta máquina tem…
+            {t("encoding.encoders.loading")}
           </Card>
         ) : (
           <>
@@ -443,8 +437,7 @@ export function EncodingScreen() {
             </div>
             {!anyHw && (
               <p className="mt-2 text-xs text-ink-faint">
-                Sem placa de vídeo por aqui — funciona no processador, só pesa
-                mais.
+                {t("encoding.encoders.noHw")}
               </p>
             )}
           </>
@@ -459,9 +452,9 @@ export function EncodingScreen() {
           aria-expanded={showAdvanced}
           className="mb-2 flex w-full items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint transition-colors hover:text-ink-muted"
         >
-          <Gauge className="size-4" /> Ajuste fino por plataforma
+          <Gauge className="size-4" /> {t("encoding.tuning.title")}
           <span className="font-medium normal-case tracking-normal text-ink-faint/70">
-            (avançado)
+            {t("encoding.tuning.advanced")}
           </span>
           <ChevronDown
             className={cn(
@@ -473,28 +466,25 @@ export function EncodingScreen() {
         {showAdvanced &&
           (config.mode === "passthrough" ? (
             <Card className="bg-surface-2 text-sm text-ink-muted">
-              No <strong className="text-ink">Na lata</strong> não tem o que
-              ajustar — a qualidade se define no OBS.{" "}
+              {bold(t, "encoding.tuning.passthrough.empty")}
               <button
                 onClick={() => setShowGuide(true)}
                 className="font-bold text-brass hover:underline"
               >
-                Ver o guia do OBS →
+                {t("encoding.tuning.passthrough.guideLink")}
               </button>
             </Card>
-          ) : config.targets.some((t) => t.enabled) ? (
+          ) : config.targets.some((x) => x.enabled) ? (
             <div className="flex flex-col gap-2">
               {config.targets
-                .filter((t) => t.enabled)
-                .map((t) => (
-                  <PerTargetRow key={t.id} targetId={t.id} />
+                .filter((x) => x.enabled)
+                .map((x) => (
+                  <PerTargetRow key={x.id} targetId={x.id} />
                 ))}
             </div>
           ) : (
             <Card className="bg-surface-2 text-sm text-ink-muted">
-              Nenhuma plataforma ativa. Ative uma em{" "}
-              <strong className="text-ink">Plataformas</strong> pra ajustar a
-              qualidade dela.
+              {t("encoding.tuning.noPlatforms")}
             </Card>
           ))}
       </div>
@@ -503,22 +493,24 @@ export function EncodingScreen() {
 }
 
 function LoadBar({ load }: { load: number }) {
+  const t = useT();
   const pct = Math.round(load * 100);
   const tone = load > 0.66 ? "bg-bad" : load > 0.33 ? "bg-warn" : "bg-ok";
-  const word =
+  const word = t(
     load >= 0.95
-      ? "no limite"
+      ? "encoding.load.word.max"
       : load > 0.66
-        ? "pega pesado"
+        ? "encoding.load.word.heavy"
         : load > 0.33
-          ? "esquenta"
-          : "tranquilo";
+          ? "encoding.load.word.warm"
+          : "encoding.load.word.easy",
+  );
   // Sem percentual: é heurística, não medição — número exato passaria falsa precisão.
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="font-semibold text-ink-faint">
-          Peso no PC (estimado)
+          {t("encoding.load.label")}
         </span>
         <span className="font-display font-bold text-ink-muted">{word}</span>
       </div>
@@ -533,22 +525,28 @@ function LoadBar({ load }: { load: number }) {
   );
 }
 
-/** Tradução do encoder pra linguagem de gente ("quem faz o trabalho"). */
-function friendlyEncoder(x: { kind: EncoderKind; label: string }): string {
+/** Tradução do encoder pra linguagem de gente ("quem faz o trabalho").
+ *  Não é componente: recebe o `t` de quem chama. */
+function friendlyEncoder(
+  t: I18n["t"],
+  x: { kind: EncoderKind; label: string },
+): string {
   return x.kind === "software"
-    ? "Processador (x264)"
-    : `Placa de vídeo (${x.label})`;
+    ? t("encoding.encoder.cpu")
+    : t("encoding.encoder.gpu", { label: x.label });
 }
 
 function PerTargetRow({ targetId }: { targetId: string }) {
   const config = useStore((s) => s.config)!;
   const updateTarget = useStore((s) => s.updateTarget);
   const encoders = useStore((s) => s.encoders);
-  const t = config.targets.find((x) => x.id === targetId)!;
-  const preset = PLATFORMS[t.platformId];
-  const enc = t.encoding;
+  const { t, fmt } = useI18n();
+  // `target` (e não `t`) porque `t` aqui é a tradução.
+  const target = config.targets.find((x) => x.id === targetId)!;
+  const preset = PLATFORMS[target.platformId];
+  const enc = target.encoding;
   const p = enc.preset ?? preset.recommended;
-  const action = effectiveAction(config.mode, t);
+  const action = effectiveAction(config.mode, target);
   const isVertical = p.height > p.width;
   const recVertical = preset.recommended.height > preset.recommended.width;
   const [reframing, setReframing] = useState(false);
@@ -566,15 +564,17 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   );
 
   const patchPreset = (patch: Partial<typeof p>) =>
-    updateTarget(t.id, { encoding: { ...enc, preset: { ...p, ...patch } } });
+    updateTarget(target.id, {
+      encoding: { ...enc, preset: { ...p, ...patch } },
+    });
 
   // Paradas do slider RELATIVAS ao recomendado da plataforma (cada uma tem o seu).
   const clampBr = (v: number) =>
     Math.min(MAX_BR, Math.max(MIN_BR, Math.round(v / 100) * 100));
-  const stops = [
-    { name: "Econômico", kbps: clampBr(recBr * 0.6) },
-    { name: "Padrão", kbps: recBr },
-    { name: "Bonitão", kbps: clampBr(recBr * 1.4) },
+  const stops: { nameKey: MessageKey; kbps: number }[] = [
+    { nameKey: "encoding.target.stop.eco", kbps: clampBr(recBr * 0.6) },
+    { nameKey: "encoding.target.stop.standard", kbps: recBr },
+    { nameKey: "encoding.target.stop.sharp", kbps: clampBr(recBr * 1.4) },
   ];
   const stopIdx = stops.findIndex((s) => s.kbps === p.videoBitrateKbps);
 
@@ -582,24 +582,31 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const autoEnc =
     encoders.find((x) => x.available && x.kind !== "software") ??
     encoders.find((x) => x.available);
-  const autoResolved = autoEnc ? friendlyEncoder(autoEnc) : undefined;
+  const autoResolved = autoEnc ? friendlyEncoder(t, autoEnc) : undefined;
 
   const encoderOptions: SelectOption<EncoderKind>[] = [
-    { value: "auto", label: "Automático" },
+    { value: "auto", label: t("encoding.target.encoder.auto") },
     ...encoders
       .filter((x) => x.available)
-      .map((x) => ({ value: x.kind, label: friendlyEncoder(x) })),
+      .map((x) => ({ value: x.kind, label: friendlyEncoder(t, x) })),
   ];
 
   // No híbrido: 3 opções com a decisão do automático resolvida no rótulo.
-  const autoAct = smartHybridAction(t.platformId);
-  const overrideOpts: { v: EncodingAction | undefined; label: string }[] = [
+  // `v` é valor de enum (vai pra config) — só o rótulo é copy.
+  const autoAct = smartHybridAction(target.platformId);
+  const overrideOpts: {
+    v: EncodingAction | undefined;
+    labelKey: MessageKey;
+  }[] = [
     {
       v: undefined,
-      label: `Auto (${autoAct === "transcode" ? "recodifica" : "copia"})`,
+      labelKey:
+        autoAct === "transcode"
+          ? "encoding.target.override.auto.transcode"
+          : "encoding.target.override.auto.copy",
     },
-    { v: "transcode", label: "Recodificar" },
-    { v: "copy", label: "Copiar" },
+    { v: "transcode", labelKey: "encoding.target.override.transcode" },
+    { v: "copy", labelKey: "encoding.target.override.copy" },
   ];
 
   // GEOMETRIA ESTÁVEL: cabeçalho fixo (identidade + segmented do híbrido) e um corpo com
@@ -611,16 +618,16 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       <Card className="bg-surface-2 py-3.5">
         {/* Cabeçalho: quem é + (no híbrido) o que fazer com ela */}
         <div className="flex flex-wrap items-center gap-3">
-          <PlatformGlyph id={t.platformId} size={36} />
+          <PlatformGlyph id={target.platformId} size={36} />
           <div className="min-w-0 flex-1">
             <div className="truncate font-display text-sm font-bold">
-              {t.name}
+              {target.name}
             </div>
             <div className="text-[11px] text-ink-faint">
               {/* Em cópia a resolução/fps são as do OBS — mostrar as do preset aqui
                   parecia promessa de "mando 1080p60" que a cópia não cumpre. */}
               {action === "copy"
-                ? "resolução e fps: os do OBS"
+                ? t("encoding.target.copy.resolution")
                 : fmtResolution(p.width, p.height, p.fps)}
             </div>
           </div>
@@ -632,11 +639,11 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 const sel = (enc.hybridOverride ?? undefined) === o.v;
                 return (
                   <button
-                    key={o.label}
+                    key={o.labelKey}
                     type="button"
                     aria-pressed={sel}
                     onClick={() =>
-                      updateTarget(t.id, {
+                      updateTarget(target.id, {
                         encoding: { ...enc, hybridOverride: o.v },
                       })
                     }
@@ -647,7 +654,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                         : "bg-surface text-ink-muted hover:bg-surface-3",
                     )}
                   >
-                    {o.label}
+                    {t(o.labelKey)}
                   </button>
                 );
               })}
@@ -664,16 +671,16 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                   simplesmente não acende nenhuma) + slot fixo pro número */}
               <div className="flex flex-col gap-1.5 text-[11px] font-semibold text-ink-faint">
                 <span className="flex items-center gap-1">
-                  Qualidade da imagem
-                  <Hint text="Imagem melhor pede mais upload. O Padrão é o recomendado da plataforma." />
+                  {t("encoding.target.quality.label")}
+                  <Hint text={t("encoding.target.quality.hint")} />
                 </span>
                 <div className="flex h-9 w-fit items-center overflow-hidden rounded-md border-2 border-border">
                   {stops.map((s, i) => (
                     <button
-                      key={s.name}
+                      key={s.nameKey}
                       type="button"
                       aria-pressed={stopIdx === i}
-                      title={fmtBitrate(s.kbps)}
+                      title={fmt.bitrate(s.kbps)}
                       onClick={() => patchPreset({ videoBitrateKbps: s.kbps })}
                       className={cn(
                         "h-full px-3 text-[11px] font-bold transition-colors",
@@ -682,7 +689,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                           : "bg-surface text-ink-muted hover:bg-surface-3",
                       )}
                     >
-                      {s.name}
+                      {t(s.nameKey)}
                     </button>
                   ))}
                 </div>
@@ -716,7 +723,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                           setBrDraft(null);
                         }}
                         aria-invalid={brInvalid || undefined}
-                        aria-label={`Bitrate de ${t.name} em kbps`}
+                        aria-label={t("encoding.target.bitrate.aria", {
+                          platform: target.name,
+                        })}
                         className={cn(
                           "h-8 w-24 rounded-md border-2 bg-surface px-2 text-sm tabular-nums outline-none focus:border-brass",
                           brInvalid
@@ -732,11 +741,14 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                         onClick={() => setShowBrNumber(false)}
                         className="font-semibold text-ink-faint hover:text-ink hover:underline"
                       >
-                        fechar
+                        {t("encoding.target.bitrate.close")}
                       </button>
                       {brInvalid ? (
                         <span className="font-medium text-bad">
-                          entre {MIN_BR} e {MAX_BR}
+                          {t("encoding.target.bitrate.range", {
+                            min: MIN_BR,
+                            max: MAX_BR,
+                          })}
                         </span>
                       ) : (
                         <button
@@ -746,21 +758,30 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                           }
                           className="font-bold text-brass hover:underline"
                         >
-                          usar recomendado ({recBr})
+                          {t("encoding.target.bitrate.useRecommended", {
+                            kbps: recBr,
+                          })}
                         </button>
                       )}
                     </>
                   ) : (
                     <span className="font-normal text-ink-faint">
-                      {stopIdx === -1 ? "personalizado" : stops[stopIdx].name} ·{" "}
-                      {fmtBitrate(p.videoBitrateKbps)} ·{" "}
-                      <button
-                        type="button"
-                        onClick={() => setShowBrNumber(true)}
-                        className="font-semibold text-brass hover:underline"
-                      >
-                        ajustar número
-                      </button>
+                      {rich(t, "encoding.target.quality.summary", {
+                        stop:
+                          stopIdx === -1
+                            ? t("encoding.target.quality.custom")
+                            : t(stops[stopIdx].nameKey),
+                        bitrate: fmt.bitrate(p.videoBitrateKbps),
+                        link: (
+                          <button
+                            type="button"
+                            onClick={() => setShowBrNumber(true)}
+                            className="font-semibold text-brass hover:underline"
+                          >
+                            {t("encoding.target.bitrate.edit")}
+                          </button>
+                        ),
+                      })}
                     </span>
                   )}
                 </div>
@@ -769,16 +790,20 @@ function PerTargetRow({ targetId }: { targetId: string }) {
               {/* Encoder: coluna fixa à direita, com o "usa X" sempre reservado */}
               <div className="flex flex-col gap-1.5 text-[11px] font-semibold text-ink-faint">
                 <span className="flex items-center gap-1">
-                  Quem recodifica
-                  <Hint text="A placa de vídeo poupa o processador. O processador entrega a melhor imagem, mas pesa mais no PC." />
+                  {t("encoding.target.encoder.label")}
+                  <Hint text={t("encoding.target.encoder.hint")} />
                 </span>
                 <Select
                   className="w-52"
-                  aria-label={`Quem recodifica em ${t.name}`}
+                  aria-label={t("encoding.target.encoder.aria", {
+                    platform: target.name,
+                  })}
                   value={enc.encoder}
                   options={encoderOptions}
                   onChange={(v) =>
-                    updateTarget(t.id, { encoding: { ...enc, encoder: v } })
+                    updateTarget(target.id, {
+                      encoding: { ...enc, encoder: v },
+                    })
                   }
                 />
                 {/* Coluna de largura FIXA (13rem no grid): o "usa X" some ao escolher um
@@ -788,12 +813,16 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                     className="min-w-0 flex-1 truncate font-normal text-ink-faint"
                     title={
                       enc.encoder === "auto" && autoResolved
-                        ? `usa ${autoResolved}`
+                        ? t("encoding.target.encoder.uses", {
+                            encoder: autoResolved,
+                          })
                         : undefined
                     }
                   >
                     {enc.encoder === "auto" && autoResolved
-                      ? `usa ${autoResolved}`
+                      ? t("encoding.target.encoder.uses", {
+                          encoder: autoResolved,
+                        })
                       : " "}
                   </span>
                   {isVertical && (
@@ -802,7 +831,8 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                       onClick={() => setReframing(true)}
                       className="flex shrink-0 items-center gap-1 font-bold text-brass hover:underline"
                     >
-                      <Crosshair className="size-3.5" /> Enquadrar 9:16
+                      <Crosshair className="size-3.5" />{" "}
+                      {t("encoding.target.reframe")}
                     </button>
                   )}
                 </div>
@@ -813,18 +843,19 @@ function PerTargetRow({ targetId }: { targetId: string }) {
             // com controles — nada de badge solitária flutuando à direita.
             <div className="flex min-h-22 flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
-                <Badge tone="neutral">em cópia</Badge>
+                <Badge tone="neutral">{t("encoding.target.copy.badge")}</Badge>
                 <span className="text-sm font-semibold text-ink">
-                  vai exatamente como sai do OBS
+                  {t("encoding.target.copy.headline")}
                 </span>
               </div>
               <p className="text-xs text-ink-muted">
-                A qualidade se define no OBS (bitrate, resolução, fps).
+                {t("encoding.target.copy.body")}
               </p>
               {recVertical && (
                 <p className="text-[11px] font-bold text-warn">
-                  ⚠ em cópia o vídeo vai deitado — {t.name} quer em pé (use
-                  “Recodificar”)
+                  {t("encoding.target.copy.verticalWarn", {
+                    platform: target.name,
+                  })}
                 </p>
               )}
             </div>
@@ -833,7 +864,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       </Card>
       <AnimatePresence>
         {reframing && (
-          <ReframeEditor target={t} onClose={() => setReframing(false)} />
+          <ReframeEditor target={target} onClose={() => setReframing(false)} />
         )}
       </AnimatePresence>
     </>

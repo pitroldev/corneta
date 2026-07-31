@@ -14,6 +14,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::i18n::{self, Locale, Msg};
 use crate::keys;
 use crate::AppState;
 
@@ -133,7 +134,7 @@ fn broker_error(code: u16, body: &Value, fallback: &str) -> String {
     if !message.is_empty() {
         message.to_string()
     } else if code == 0 {
-        "Serviço de login indisponível — confira sua conexão".into()
+        Msg::AuthBrokerDown.now()
     } else {
         fallback.into()
     }
@@ -220,21 +221,21 @@ fn refresh_broker_config(app: &AppHandle) -> Result<(), String> {
         .to_string();
     let Some(url) = setup_url(&current, "/api/v1/bootstrap") else {
         return Err(if base.is_empty() {
-            "serviço de login não configurado (VITE_SETUP_API_URL vazio)".into()
+            Msg::AuthSetupApiMissing.now()
         } else {
-            format!("o serviço de login precisa ser HTTPS ({base})")
+            Msg::AuthSetupApiNotHttps { base: &base }.now()
         });
     };
     let value = get_json(&url).map_err(|(code, _)| match code {
-        0 => format!("não consegui falar com o serviço de login em {base}"),
-        code => format!("o serviço de login em {base} respondeu {code}"),
+        0 => Msg::AuthSetupApiUnreachable { base: &base }.now(),
+        code => Msg::AuthSetupApiStatus { base: &base, code }.now(),
     })?;
     // Sem `providers` a URL aponta pra outro serviço (o caso comum é a porta 3000 já ocupada
     // por outro projeto). Melhor dizer isso do que agir como se o bootstrap tivesse funcionado.
     let providers = value
         .get("providers")
         .filter(|p| p.is_object())
-        .ok_or_else(|| format!("{base} respondeu, mas não é a setup API da Corneta"))?
+        .ok_or_else(|| Msg::AuthSetupApiWrongService { base: &base }.now())?
         .clone();
     let provider = |name: &str| providers.get(name).cloned().unwrap_or(Value::Null);
     let twitch = provider("twitch");
@@ -276,20 +277,18 @@ fn refresh_broker_config(app: &AppHandle) -> Result<(), String> {
 /// "não consegui iniciar o login" — mostra a causa real (o caso comum é cliente do tipo errado,
 /// que o Google recusa com `invalid_client`). Seguro: o pedido de device_code só manda o
 /// client_id (público) + escopo, então a resposta de erro não carrega segredo.
-fn google_oauth_err(code: u16, e: &Value) -> String {
+fn google_oauth_err(code: u16, e: &Value, l: Locale) -> String {
     let err = e.get("error").and_then(|x| x.as_str()).unwrap_or("");
     let desc = e
         .get("error_description")
         .and_then(|x| x.as_str())
         .unwrap_or("");
     match err {
-        "invalid_client" | "unauthorized_client" => {
-            "credenciais recusadas — o cliente OAuth precisa ser do tipo \"TVs e dispositivos de entrada limitada\" e no mesmo projeto do Client Secret".into()
-        }
-        _ if code == 0 => "sem conexão com o Google (rede/proxy?)".into(),
-        _ if !desc.is_empty() => format!("Google: {desc}"),
-        _ if !err.is_empty() => format!("Google: {err}"),
-        _ => format!("Google respondeu {code}"),
+        "invalid_client" | "unauthorized_client" => Msg::AuthGoogleWrongClientType.text(l),
+        _ if code == 0 => Msg::AuthGoogleNoConnection.text(l),
+        _ if !desc.is_empty() => Msg::AuthGoogleErrorPassthrough { desc }.text(l),
+        _ if !err.is_empty() => Msg::AuthGoogleErrorPassthrough { desc: err }.text(l),
+        _ => Msg::AuthGoogleStatus { code }.text(l),
     }
 }
 
@@ -434,7 +433,7 @@ pub fn set_youtube_oauth(
     let id = client_id.trim();
     let secret = client_secret.trim();
     if id.is_empty() || secret.is_empty() {
-        return Err("preencha o Client ID e o Client Secret".into());
+        return Err(Msg::AuthByokFillClientIdAndSecret.now());
     }
     keys::set_key("youtube_client_id", id)?;
     keys::set_key("youtube_client_secret", secret)?;
@@ -452,10 +451,8 @@ pub fn youtube_use_official(app: AppHandle) -> Result<(), String> {
     let broker = refresh_broker_config(&app);
     if oauth(&app).youtube_official_id.is_empty() {
         return Err(match broker {
-            Err(reason) => format!(
-                "Login oficial do YouTube indisponível: {reason}. Suas credenciais continuam salvas"
-            ),
-            Ok(()) => "O login oficial do YouTube ainda não está habilitado no servidor. Suas credenciais continuam salvas".into(),
+            Err(reason) => Msg::AuthYoutubeOfficialUnavailableReason { reason: &reason }.now(),
+            Ok(()) => Msg::AuthYoutubeOfficialNotEnabled.now(),
         });
     }
     keys::set_key("youtube_oauth_preference", "official")?;
@@ -468,7 +465,7 @@ pub fn youtube_use_official(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn youtube_use_own_creds(app: AppHandle) -> Result<(), String> {
     if own_creds("youtube_client_id", "youtube_client_secret").is_none() {
-        return Err("não achei credenciais próprias salvas — cole o Client ID e o Secret".into());
+        return Err(Msg::AuthByokNoSavedCreds.now());
     }
     keys::set_key("youtube_oauth_preference", "byok")?;
     forget_youtube_session();
@@ -512,7 +509,7 @@ pub fn set_kick_oauth(
     let id = client_id.trim();
     let secret = client_secret.trim();
     if id.is_empty() || secret.is_empty() || id.len() > 512 || secret.len() > 512 {
-        return Err("preencha credenciais válidas da Kick".into());
+        return Err(Msg::AuthKickFillValidCreds.now());
     }
     keys::set_key("kick_client_id", id)?;
     keys::set_key("kick_client_secret", secret)?;
@@ -530,10 +527,8 @@ pub fn kick_use_official(app: AppHandle) -> Result<(), String> {
     let cfg = oauth(&app);
     if cfg.kick_official_id.is_empty() || !cfg.kick_broker_ready {
         return Err(match broker {
-            Err(reason) => format!(
-                "Login oficial da Kick indisponível: {reason}. Suas credenciais continuam salvas"
-            ),
-            Ok(()) => "O login oficial da Kick ainda não está habilitado no servidor. Suas credenciais continuam salvas".into(),
+            Err(reason) => Msg::AuthKickOfficialUnavailableReason { reason: &reason }.now(),
+            Ok(()) => Msg::AuthKickOfficialNotEnabled.now(),
         });
     }
     keys::set_key("kick_oauth_preference", "official")?;
@@ -545,7 +540,7 @@ pub fn kick_use_official(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn kick_use_own_creds(app: AppHandle) -> Result<(), String> {
     if own_creds("kick_client_id", "kick_client_secret").is_none() {
-        return Err("não achei credenciais próprias salvas — cole o Client ID e o Secret".into());
+        return Err(Msg::AuthByokNoSavedCreds.now());
     }
     keys::set_key("kick_oauth_preference", "byok")?;
     forget_kick_session();
@@ -634,7 +629,7 @@ pub fn twitch_login_start(app: AppHandle) {
             "error",
             "",
             "",
-            "Falta VITE_TWITCH_CLIENT_ID no .env",
+            &Msg::AuthTwitchMissingClientId.now(),
         );
         return;
     }
@@ -648,14 +643,7 @@ pub fn twitch_login_start(app: AppHandle) {
         ) {
             Ok(v) => v,
             Err(_) => {
-                return auth_event(
-                    &app,
-                    "twitch",
-                    "error",
-                    "",
-                    "",
-                    "Não consegui iniciar o login",
-                )
+                return auth_event(&app, "twitch", "error", "", "", &Msg::AuthStartFailed.now())
             }
         };
         let device_code = dev
@@ -694,7 +682,7 @@ pub fn twitch_login_start(app: AppHandle) {
                 "error",
                 "",
                 "",
-                "Resposta inválida da Twitch",
+                &Msg::AuthTwitchBadResponse.now(),
             );
         }
         auth_code_event(&app, "twitch", &user_code, &verify, &verify_complete);
@@ -703,14 +691,7 @@ pub fn twitch_login_start(app: AppHandle) {
         loop {
             std::thread::sleep(Duration::from_secs(interval));
             if Instant::now() > deadline {
-                return auth_event(
-                    &app,
-                    "twitch",
-                    "error",
-                    "",
-                    "",
-                    "Código expirou — tente de novo",
-                );
+                return auth_event(&app, "twitch", "error", "", "", &Msg::AuthCodeExpired.now());
             }
             match post_form(
                 "https://id.twitch.tv/oauth2/token",
@@ -817,16 +798,14 @@ pub fn youtube_login_start(app: AppHandle) {
         if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
             let motivo = broker
                 .err()
-                .unwrap_or_else(|| "o servidor ainda não habilitou o YouTube oficial".to_string());
+                .unwrap_or_else(|| Msg::AuthYoutubeServerNotEnabled.now());
             return auth_event(
                 &app,
                 "youtube",
                 "error",
                 "",
                 "",
-                &format!(
-                    "Login oficial indisponível ({motivo}). Use credenciais próprias nas opções avançadas"
-                ),
+                &Msg::AuthOfficialUnavailable { reason: &motivo }.now(),
             );
         }
         let dev = match post_form(
@@ -844,7 +823,7 @@ pub fn youtube_login_start(app: AppHandle) {
                     "error",
                     "",
                     "",
-                    &google_oauth_err(code, &e),
+                    &google_oauth_err(code, &e, i18n::locale()),
                 )
             }
         };
@@ -886,7 +865,7 @@ pub fn youtube_login_start(app: AppHandle) {
                 "error",
                 "",
                 "",
-                "Resposta inválida do Google",
+                &Msg::AuthGoogleBadResponse.now(),
             );
         }
         auth_code_event(&app, "youtube", &user_code, &verify, &verify_complete);
@@ -901,7 +880,7 @@ pub fn youtube_login_start(app: AppHandle) {
                     "error",
                     "",
                     "",
-                    "Código expirou — tente de novo",
+                    &Msg::AuthCodeExpired.now(),
                 );
             }
             match post_form(
@@ -953,7 +932,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
             "error",
             "",
             "",
-            "Login oficial do YouTube não configurado",
+            &Msg::AuthYoutubeOfficialNotConfigured.now(),
         );
     }
 
@@ -968,7 +947,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
                 "error",
                 "",
                 "",
-                "Não consegui abrir o callback local do YouTube",
+                &Msg::AuthYoutubeCallbackOpenFailed.now(),
             )
         }
     };
@@ -981,7 +960,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
                 "error",
                 "",
                 "",
-                "Não consegui preparar o callback local do YouTube",
+                &Msg::AuthYoutubeCallbackPrepFailed.now(),
             )
         }
     };
@@ -992,7 +971,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
             "error",
             "",
             "",
-            "Não consegui preparar o callback local do YouTube",
+            &Msg::AuthYoutubeCallbackPrepFailed.now(),
         );
     }
 
@@ -1025,13 +1004,13 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
                 .and_then(|value| value.as_str())
                 .or_else(|| body.get("error").and_then(|value| value.as_str()));
             let message = if matches!(description, Some("invalid_client")) {
-                "O Client ID do Google precisa ser do tipo Aplicativo para computador".into()
+                Msg::AuthGoogleWrongDesktopClient.now()
             } else if status == 0 {
-                "Sem conexão com o Google (rede/proxy?)".into()
+                Msg::AuthGoogleNoConnection.now()
             } else if let Some(description) = description {
-                format!("Google: {description}")
+                Msg::AuthGoogleErrorPassthrough { desc: description }.now()
             } else {
-                format!("Google recusou o login ({status})")
+                Msg::AuthGoogleLoginRefused { status }.now()
             };
             return auth_event(app, "youtube", "error", "", "", &message);
         }
@@ -1051,7 +1030,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
             "error",
             "",
             "",
-            "O Google não retornou uma sessão renovável",
+            &Msg::AuthGoogleNoRefreshableSession.now(),
         );
     }
     if let Err(error) = keys::set_key("youtube_oauth", access) {
@@ -1147,8 +1126,8 @@ fn youtube_live_chat_id(token: &str) -> Option<String> {
 
 /// Manda uma mensagem no chat ao vivo do YouTube (liveChatMessages.insert).
 pub fn youtube_send(app: &AppHandle, text: &str) -> Result<(), String> {
-    let token = youtube_token(app).ok_or("YouTube não logado")?;
-    let chat_id = youtube_live_chat_id(&token).ok_or("Nenhuma live ativa no YouTube agora")?;
+    let token = youtube_token(app).ok_or_else(|| Msg::ChatYoutubeNotSignedIn.now())?;
+    let chat_id = youtube_live_chat_id(&token).ok_or_else(|| Msg::ChatYoutubeNoActiveLive.now())?;
     let body = json!({
         "snippet": {
             "liveChatId": chat_id,
@@ -1193,11 +1172,12 @@ fn google_json(
     };
     match res {
         Ok(r) => Ok(r.into_string().unwrap_or_default()),
-        Err(ureq::Error::Status(c, r)) => Err(format!(
-            "YouTube {c}: {}",
-            r.into_string().unwrap_or_default()
-        )),
-        Err(e) => Err(format!("YouTube: {e}")),
+        Err(ureq::Error::Status(c, r)) => Err(Msg::ChatYoutubeApiError {
+            c,
+            body: &r.into_string().unwrap_or_default(),
+        }
+        .now()),
+        Err(e) => Err(Msg::ChatYoutubeTransportError { e: &e.to_string() }.now()),
     }
 }
 
@@ -1250,14 +1230,14 @@ pub async fn chat_moderate(
             .chat_sources
             .iter()
             .find(|s| s.id == source_id)
-            .ok_or("fonte não encontrada")?;
+            .ok_or_else(|| Msg::AlertSourceNotFound.now())?;
         match src.platform.as_str() {
             "twitch" => twitch_moderate(
                 &app, &src.value, &action, native_id, author, author_id, seconds,
             ),
             "youtube" => youtube_moderate(&app, &action, native_id),
             "kick" => kick_moderate(&app, &action, native_id),
-            _ => Err("essa plataforma não tem moderação".into()),
+            _ => Err(Msg::ModeratePlatformUnsupported.now()),
         }
     })
     .await
@@ -1273,11 +1253,12 @@ fn twitch_moderate(
     author_id: Option<String>,
     seconds: Option<u64>,
 ) -> Result<(), String> {
-    let token = twitch_token(app).ok_or("entre na Twitch pra moderar")?;
+    let token = twitch_token(app).ok_or_else(|| Msg::ModerateTwitchSignInFirst.now())?;
     let client_id = oauth(app).twitch_client_id;
-    let info = twitch_validate(&token).ok_or("token da Twitch inválido")?;
+    let info = twitch_validate(&token).ok_or_else(|| Msg::AuthTwitchTokenInvalid.now())?;
     let chan = channel.trim().trim_start_matches('#').to_lowercase();
-    let broadcaster = helix_user_id(&token, &client_id, &chan).ok_or("canal não encontrado")?;
+    let broadcaster = helix_user_id(&token, &client_id, &chan)
+        .ok_or_else(|| Msg::ModerateTwitchChannelNotFound.now())?;
     let mod_id = info.user_id;
 
     let run = |method: &str, url: String, body: Option<Value>| -> Result<(), String> {
@@ -1296,17 +1277,18 @@ fn twitch_moderate(
         };
         match res {
             Ok(_) => Ok(()),
-            Err(ureq::Error::Status(c, r)) => Err(format!(
-                "Twitch {c}: {}",
-                r.into_string().unwrap_or_default()
-            )),
-            Err(e) => Err(format!("Twitch: {e}")),
+            Err(ureq::Error::Status(c, r)) => Err(Msg::AuthTwitchApiError {
+                c,
+                body: &r.into_string().unwrap_or_default(),
+            }
+            .now()),
+            Err(e) => Err(Msg::AuthTwitchTransportError { e: &e.to_string() }.now()),
         }
     };
 
     match action {
         "delete" => {
-            let mid = native_id.ok_or("sem id da mensagem")?;
+            let mid = native_id.ok_or_else(|| Msg::ModerateNoMessageId.now())?;
             run(
                 "DELETE",
                 format!(
@@ -1320,8 +1302,11 @@ fn twitch_moderate(
             let target = match author_id {
                 Some(id) if !id.trim().is_empty() => id,
                 _ => {
-                    let a = author.ok_or("sem usuário")?.to_lowercase();
-                    helix_user_id(&token, &client_id, &a).ok_or("usuário não encontrado")?
+                    let a = author
+                        .ok_or_else(|| Msg::ModerateNoUser.now())?
+                        .to_lowercase();
+                    helix_user_id(&token, &client_id, &a)
+                        .ok_or_else(|| Msg::ModerateUserNotFound.now())?
                 }
             };
             let data = if action == "timeout" {
@@ -1337,7 +1322,7 @@ fn twitch_moderate(
                 Some(data),
             )
         }
-        _ => Err("ação inválida".into()),
+        _ => Err(Msg::ModerateInvalidAction.now()),
     }
 }
 
@@ -1346,10 +1331,10 @@ fn youtube_moderate(
     action: &str,
     native_id: Option<String>,
 ) -> Result<(), String> {
-    let token = youtube_token(app).ok_or("entre no YouTube pra moderar")?;
+    let token = youtube_token(app).ok_or_else(|| Msg::ModerateYoutubeSignInFirst.now())?;
     match action {
         "delete" => {
-            let id = native_id.ok_or("sem id da mensagem")?;
+            let id = native_id.ok_or_else(|| Msg::ModerateNoMessageId.now())?;
             google_json(
                 "DELETE",
                 &format!("https://www.googleapis.com/youtube/v3/liveChat/messages?id={id}"),
@@ -1360,7 +1345,7 @@ fn youtube_moderate(
         }
         // banir/timeout no YouTube precisa do channelId do autor (liveChatBans), que o feed
         // não carrega hoje → fica como evolução. Apagar já cobre o essencial.
-        _ => Err("no YouTube, por enquanto só dá pra apagar a mensagem".into()),
+        _ => Err(Msg::ModerateYoutubeDeleteOnly.now()),
     }
 }
 
@@ -1436,16 +1421,14 @@ pub fn kick_login_start(app: AppHandle) {
         {
             let motivo = broker
                 .err()
-                .unwrap_or_else(|| "o servidor ainda não habilitou a Kick oficial".to_string());
+                .unwrap_or_else(|| Msg::AuthKickServerNotEnabled.now());
             return auth_event(
                 &app,
                 "kick",
                 "error",
                 "",
                 "",
-                &format!(
-                    "Login oficial indisponível ({motivo}). Use credenciais próprias nas opções avançadas"
-                ),
+                &Msg::AuthOfficialUnavailable { reason: &motivo }.now(),
             );
         }
         let verifier = rand_token();
@@ -1471,7 +1454,7 @@ pub fn kick_login_start(app: AppHandle) {
                 "error",
                 "",
                 "",
-                &format!("Porta {KICK_PORT} ocupada"),
+                &Msg::AuthKickPortBusy { port: KICK_PORT }.now(),
             );
         }
         let url = format!(
@@ -1508,7 +1491,7 @@ fn oauth_wait(
     let deadline = Instant::now() + Duration::from_secs(300);
     loop {
         if Instant::now() > deadline {
-            return Err(format!("Login do {provider} expirou (5 min)"));
+            return Err(Msg::AuthLoginExpired { provider }.now());
         }
         let mut idle = true;
         for listener in listeners {
@@ -1559,12 +1542,14 @@ fn oauth_wait(
             let state_ok = got_state == expected_state;
             let ok = err.is_empty() && !code.is_empty() && state_ok;
             let is_callback = !code.is_empty() || !err.is_empty();
+            // Esta página é servida no NAVEGADOR do usuário, numa thread sem `AppHandle` —
+            // é um dos casos que o locale global do `i18n` existe pra atender.
             let msg = if ok {
-                "Pronto! Pode fechar esta aba e voltar pra Corneta."
+                Msg::AuthCallbackPageOk.now()
             } else if is_callback {
-                "Algo deu errado. Volte pra Corneta e tente de novo."
+                Msg::AuthCallbackPageError.now()
             } else {
-                "Corneta — aguardando a conclusão do login…"
+                Msg::AuthCallbackPageWaiting.now()
             };
             let html = format!(
                 "<!doctype html><meta charset=utf-8><body style=\"font-family:sans-serif;text-align:center;padding-top:3rem\"><h2>{msg}</h2>"
@@ -1581,7 +1566,11 @@ fn oauth_wait(
             }
             // `error` só é definitivo se veio com o state correto (senão pode ser forjado).
             if state_ok && !err.is_empty() {
-                return Err(format!("Autorização negada no {provider} ({err})"));
+                return Err(Msg::AuthAuthorizationDenied {
+                    provider,
+                    err: &err,
+                }
+                .now());
             }
             // conexão espúria ou state errado/ausente → ignora e segue esperando o callback real.
         }
@@ -1600,7 +1589,7 @@ fn kick_exchange(
     let brokered = cfg.kick_brokered;
     let v = if brokered {
         let url = setup_url(cfg, "/api/v1/oauth/kick/exchange")
-            .ok_or("Serviço de login da Kick não configurado")?;
+            .ok_or_else(|| Msg::AuthKickBrokerNotConfigured.now())?;
         post_json(
             &url,
             &json!({
@@ -1609,9 +1598,7 @@ fn kick_exchange(
                 "redirectUri": redirect,
             }),
         )
-        .map_err(|(status, body)| {
-            broker_error(status, &body, "Não consegui concluir o login da Kick")
-        })?
+        .map_err(|(status, body)| broker_error(status, &body, &Msg::AuthKickLoginFailed.now()))?
     } else {
         post_form(
             "https://id.kick.com/oauth/token",
@@ -1624,7 +1611,7 @@ fn kick_exchange(
                 ("code", code),
             ],
         )
-        .map_err(|(status, _)| format!("Kick recusou o login ({status})"))?
+        .map_err(|(status, _)| Msg::AuthKickLoginRefused { status }.now())?
     };
     let access = v
         .get(if brokered {
@@ -1633,7 +1620,7 @@ fn kick_exchange(
             "access_token"
         })
         .and_then(|x| x.as_str())
-        .ok_or("Kick: token vazio")?;
+        .ok_or_else(|| Msg::AuthKickEmptyToken.now())?;
     keys::set_key("kick_oauth", access)?;
     let refresh = v
         .get(if brokered {
@@ -1645,7 +1632,7 @@ fn kick_exchange(
         .unwrap_or("");
     if refresh.is_empty() {
         let _ = keys::clear_key("kick_oauth");
-        return Err("Kick não retornou uma sessão renovável".into());
+        return Err(Msg::AuthKickNoRefreshableSession.now());
     }
     keys::set_key("kick_refresh", refresh)?;
     keys::set_key("kick_oauth_mode", if brokered { "broker" } else { "byok" })?;
@@ -1762,7 +1749,7 @@ fn kick_api(
     url: &str,
     body: Option<&Value>,
 ) -> Result<String, String> {
-    let mut token = keys::get_key("kick_oauth").ok_or("entre no Kick primeiro")?;
+    let mut token = keys::get_key("kick_oauth").ok_or_else(|| Msg::AuthKickSignInFirst.now())?;
     for attempt in 0..2 {
         let req = match method {
             "POST" => ureq::post(url),
@@ -1781,21 +1768,25 @@ fn kick_api(
         match res {
             Ok(r) => return Ok(r.into_string().unwrap_or_default()),
             Err(ureq::Error::Status(401, _)) if attempt == 0 => {
-                token = kick_refresh(app).ok_or("Kick: sessão expirou, entre de novo")?;
+                token = kick_refresh(app).ok_or_else(|| Msg::AuthKickSessionExpired.now())?;
             }
             Err(ureq::Error::Status(c, r)) => {
-                return Err(format!("Kick {c}: {}", r.into_string().unwrap_or_default()));
+                return Err(Msg::AuthKickApiError {
+                    c,
+                    body: &r.into_string().unwrap_or_default(),
+                }
+                .now());
             }
-            Err(e) => return Err(format!("Kick: {e}")),
+            Err(e) => return Err(Msg::AuthKickTransportError { e: &e.to_string() }.now()),
         }
     }
-    Err("Kick: falha após renovar a sessão".into())
+    Err(Msg::AuthKickStillFailingAfterRefresh.now())
 }
 
 fn kick_broadcaster_id(app: &AppHandle, slug: &str) -> Result<i64, String> {
     let slug = slug.trim().trim_start_matches('@').to_lowercase();
     if slug.is_empty() {
-        return Err("Kick: canal sem nome".into());
+        return Err(Msg::AuthKickChannelHasNoName.now());
     }
     if let Some(id) = KICK_IDS.lock().unwrap().get(&slug) {
         return Ok(*id);
@@ -1809,15 +1800,14 @@ fn kick_broadcaster_id(app: &AppHandle, slug: &str) -> Result<i64, String> {
         ),
         None,
     )?;
-    let v: Value =
-        serde_json::from_str(&body).map_err(|_| "Kick: resposta inválida".to_string())?;
+    let v: Value = serde_json::from_str(&body).map_err(|_| Msg::AuthKickBadResponse.now())?;
     let id = v
         .get("data")
         .and_then(|d| d.as_array())
         .and_then(|a| a.first())
         .and_then(|c| c.get("broadcaster_user_id"))
         .and_then(|x| x.as_i64())
-        .ok_or("Kick: canal não encontrado")?;
+        .ok_or_else(|| Msg::AuthKickChannelNotFound.now())?;
     let mut cache = KICK_IDS.lock().unwrap();
     if cache.len() >= KICK_ID_CACHE_CAP {
         cache.pop_first();
@@ -1855,7 +1845,7 @@ fn kick_whoami(app: &AppHandle) -> Option<String> {
 fn kick_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Result<(), String> {
     match action {
         "delete" => {
-            let id = native_id.ok_or("sem id da mensagem")?;
+            let id = native_id.ok_or_else(|| Msg::ModerateNoMessageId.now())?;
             kick_api(
                 app,
                 "DELETE",
@@ -1865,7 +1855,7 @@ fn kick_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Re
             .map(|_| ())
         }
         // banir/timeout precisa do user_id do autor (o feed Pusher só dá username) → evolução.
-        _ => Err("no Kick, por enquanto só dá pra apagar a mensagem".into()),
+        _ => Err(Msg::ModerateKickDeleteOnly.now()),
     }
 }
 
@@ -1893,7 +1883,7 @@ pub async fn set_stream_info(
     tauri::async_runtime::spawn_blocking(move || {
         let title = title.trim().to_string();
         if title.is_empty() {
-            return Err("digite um título".to_string());
+            return Err(Msg::StreamInfoEmptyTitle.now());
         }
         let category = category.unwrap_or_default().trim().to_string();
         let mut out = serde_json::Map::new();
@@ -1916,7 +1906,7 @@ pub async fn set_stream_info(
             );
         }
         if out.is_empty() {
-            return Err("entre em alguma plataforma primeiro (aba Conta)".to_string());
+            return Err(Msg::StreamInfoNoPlatformSignedIn.now());
         }
         Ok(Value::Object(out))
     })
@@ -1925,15 +1915,15 @@ pub async fn set_stream_info(
 }
 
 fn twitch_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<String>, String> {
-    let token = twitch_token(app).ok_or("entre na Twitch")?;
+    let token = twitch_token(app).ok_or_else(|| Msg::StreamInfoTwitchSignIn.now())?;
     let client_id = oauth(app).twitch_client_id;
-    let info = twitch_validate(&token).ok_or("token da Twitch inválido")?;
+    let info = twitch_validate(&token).ok_or_else(|| Msg::AuthTwitchTokenInvalid.now())?;
     let mut body = json!({ "title": title.chars().take(140).collect::<String>() });
     let mut warn = None;
     if !category.is_empty() {
         match twitch_game_id(&token, &client_id, category) {
             Some(gid) => body["game_id"] = json!(gid),
-            None => warn = Some(format!("categoria \"{category}\" não encontrada")),
+            None => warn = Some(Msg::StreamInfoCategoryNotFound { category }.now()),
         }
     }
     let url = format!(
@@ -1949,13 +1939,14 @@ fn twitch_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Optio
     {
         Ok(_) => Ok(warn),
         Err(ureq::Error::Status(401, _)) | Err(ureq::Error::Status(403, _)) => {
-            Err("re-entre na Twitch (faltou a permissão de editar a live)".into())
+            Err(Msg::StreamInfoTwitchMissingScope.now())
         }
-        Err(ureq::Error::Status(c, r)) => Err(format!(
-            "Twitch {c}: {}",
-            r.into_string().unwrap_or_default()
-        )),
-        Err(e) => Err(format!("Twitch: {e}")),
+        Err(ureq::Error::Status(c, r)) => Err(Msg::AuthTwitchApiError {
+            c,
+            body: &r.into_string().unwrap_or_default(),
+        }
+        .now()),
+        Err(e) => Err(Msg::AuthTwitchTransportError { e: &e.to_string() }.now()),
     }
 }
 
@@ -1979,9 +1970,9 @@ fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
 }
 
 fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, String> {
-    let token = youtube_token(app).ok_or("entre no YouTube")?;
-    let vid =
-        youtube_active_video_id(&token).ok_or("nenhuma transmissão ativa no YouTube agora")?;
+    let token = youtube_token(app).ok_or_else(|| Msg::StreamInfoYoutubeSignIn.now())?;
+    let vid = youtube_active_video_id(&token)
+        .ok_or_else(|| Msg::StreamInfoYoutubeNoActiveBroadcast.now())?;
     // GET do snippet atual (o update re-envia o snippet inteiro — omitir apaga description/tags).
     let body = google_json(
         "GET",
@@ -1989,15 +1980,14 @@ fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, Str
         &token,
         None,
     )?;
-    let v: Value =
-        serde_json::from_str(&body).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let v: Value = serde_json::from_str(&body).map_err(|_| Msg::AuthYoutubeBadResponse.now())?;
     let mut snippet = v
         .get("items")
         .and_then(|i| i.as_array())
         .and_then(|a| a.first())
         .and_then(|x| x.get("snippet"))
         .cloned()
-        .ok_or("YouTube: vídeo da live não encontrado")?;
+        .ok_or_else(|| Msg::StreamInfoYoutubeVideoNotFound.now())?;
     let cut = title.chars().count() > 100;
     snippet["title"] = json!(title.chars().take(100).collect::<String>());
     // categoryId é obrigatório no update; preserva o atual ou cai pra "24" (Entretenimento, neutro).
@@ -2018,7 +2008,7 @@ fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, Str
     )
     .map(|_| {
         if cut {
-            Some("título cortado em 100 (limite do YouTube)".into())
+            Some(Msg::StreamInfoYoutubeTitleTruncated.now())
         } else {
             None
         }
@@ -2050,7 +2040,7 @@ fn kick_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<
     if !category.is_empty() {
         match kick_category_id(app, category) {
             Some(cid) => body["category_id"] = json!(cid),
-            None => warn = Some(format!("categoria \"{category}\" não encontrada")),
+            None => warn = Some(Msg::StreamInfoCategoryNotFound { category }.now()),
         }
     }
     match kick_api(
@@ -2060,8 +2050,10 @@ fn kick_set_info(app: &AppHandle, title: &str, category: &str) -> Result<Option<
         Some(&body),
     ) {
         Ok(_) => Ok(warn),
+        // O prefixo "Kick {c}:" é idêntico nos dois idiomas (`rust.auth.kick.apiError`), então
+        // este `contains` continua valendo — mas depende disso.
         Err(e) if e.contains("Kick 401") || e.contains("Kick 403") => {
-            Err("re-entre no Kick (faltou a permissão channel:write)".into())
+            Err(Msg::StreamInfoKickMissingScope.now())
         }
         Err(e) => Err(e),
     }
@@ -2126,26 +2118,25 @@ fn youtube_reusable_stream(token: &str) -> Result<(String, String, String), Stri
         token,
         Some(&body),
     )?;
-    let v: Value =
-        serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let v: Value = serde_json::from_str(&resp).map_err(|_| Msg::AuthYoutubeBadResponse.now())?;
     let id = v
         .get("id")
         .and_then(|x| x.as_str())
-        .ok_or("YouTube: stream sem id")?
+        .ok_or_else(|| Msg::AuthYoutubeStreamNoId.now())?
         .to_string();
     let info = v
         .get("cdn")
         .and_then(|c| c.get("ingestionInfo"))
-        .ok_or("YouTube: sem ingestionInfo")?;
+        .ok_or_else(|| Msg::AuthYoutubeNoIngestionInfo.now())?;
     let addr = info
         .get("ingestionAddress")
         .and_then(|x| x.as_str())
-        .ok_or("YouTube: sem ingestionAddress")?
+        .ok_or_else(|| Msg::AuthYoutubeNoIngestionAddress.now())?
         .to_string();
     let key = info
         .get("streamName")
         .and_then(|x| x.as_str())
-        .ok_or("YouTube: sem streamName")?
+        .ok_or_else(|| Msg::AuthYoutubeNoStreamName.now())?
         .to_string();
     let _ = keys::set_key("youtube_stream_id", &id);
     let _ = keys::set_key("youtube_ingest_addr", &addr);
@@ -2168,7 +2159,7 @@ pub fn youtube_provision_broadcast(
 ) -> Result<(String, String), String> {
     // Encerra qualquer transmissão pendente de uma sessão anterior (app fechou/crashou no ar).
     youtube_complete_active(app);
-    let token = youtube_token(app).ok_or("entre no YouTube")?;
+    let token = youtube_token(app).ok_or_else(|| Msg::StreamInfoYoutubeSignIn.now())?;
     let start = rfc3339_utc(now_ms() / 1000 + 60); // ISO 8601 no futuro (obrigatório)
     let title: String = title.chars().take(100).collect();
     // autoStop=false: numa queda longa (sem o slate BRB), o autostop ENCERRARIA a live de vez e a
@@ -2188,12 +2179,11 @@ pub fn youtube_provision_broadcast(
         &token,
         Some(&body),
     )?;
-    let v: Value =
-        serde_json::from_str(&resp).map_err(|_| "YouTube: resposta inválida".to_string())?;
+    let v: Value = serde_json::from_str(&resp).map_err(|_| Msg::AuthYoutubeBadResponse.now())?;
     let broadcast_id = v
         .get("id")
         .and_then(|x| x.as_str())
-        .ok_or("YouTube: broadcast sem id")?
+        .ok_or_else(|| Msg::AuthYoutubeBroadcastNoId.now())?
         .to_string();
     // Grava o id JÁ — se o stream/bind falhar depois, ainda dá pra encerrar (sem broadcast órfão).
     let _ = keys::set_key("youtube_live_broadcast", &broadcast_id);
@@ -2297,11 +2287,14 @@ mod tests {
 
     #[test]
     fn google_oauth_err_classifies() {
+        // Locale explícito: o global é do processo e outro teste pode trocá-lo em paralelo.
+        let pt = Locale::PtBr;
         let e = serde_json::json!({ "error": "invalid_client" });
-        assert!(google_oauth_err(401, &e).contains("cliente OAuth"));
-        assert!(google_oauth_err(0, &serde_json::json!({})).contains("sem conexão"));
+        assert!(google_oauth_err(401, &e, pt).contains("cliente OAuth"));
+        assert!(google_oauth_err(401, &e, Locale::En).contains("OAuth client"));
+        assert!(google_oauth_err(0, &serde_json::json!({}), pt).contains("sem conexão"));
         let e2 = serde_json::json!({ "error_description": "bad scope" });
-        assert_eq!(google_oauth_err(400, &e2), "Google: bad scope");
+        assert_eq!(google_oauth_err(400, &e2, pt), "Google: bad scope");
     }
 
     #[test]

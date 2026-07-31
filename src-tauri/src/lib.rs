@@ -7,6 +7,10 @@ mod config;
 mod engine;
 mod engine_policy;
 mod guardian;
+// `pub` de propósito: o catálogo de mensagens é a fundação do i18n e precisa
+// ficar alcançável a partir da raiz do crate — senão as 220 variantes ainda não
+// fiadas viram um muro de `dead_code` que esconde aviso de verdade.
+pub mod i18n;
 mod keys;
 mod obs;
 mod overlay;

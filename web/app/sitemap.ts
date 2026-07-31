@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { CONTENT_UPDATED_ISO } from "@/lib/content";
-import { LEGAL_ROUTES, LEGAL_UPDATED_ISO } from "@/lib/legal";
-import { localePath } from "@/lib/i18n";
+import { LEGAL_UPDATED_ISO, legalHref } from "@/lib/legal";
+import { LOCALES, localePath } from "@/lib/i18n";
 import { siteUrl } from "@/lib/site";
 
 // Só páginas HTML indexáveis entram aqui. Ficam de fora, de propósito:
@@ -43,17 +43,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
       alternates: { languages },
     },
-    {
-      url: new URL(LEGAL_ROUTES.privacy, siteUrl).toString(),
-      lastModified: legal,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-    {
-      url: new URL(LEGAL_ROUTES.terms, siteUrl).toString(),
-      lastModified: legal,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
+    // Os quatro documentos: dois idiomas × dois textos. Cada um declara o par
+    // hreflang recíproco, igual à home — sem isso o Google trata a tradução
+    // como página órfã.
+    ...(["privacy", "terms"] as const).flatMap((doc) => {
+      const alternates = {
+        languages: {
+          "pt-BR": abs(legalHref("pt-BR", doc)),
+          en: abs(legalHref("en", doc)),
+          "x-default": abs(legalHref("pt-BR", doc)),
+        },
+      };
+      return LOCALES.map((locale) => ({
+        url: abs(legalHref(locale, doc)),
+        lastModified: legal,
+        changeFrequency: "yearly" as const,
+        priority: 0.3,
+        alternates,
+      }));
+    }),
   ];
 }

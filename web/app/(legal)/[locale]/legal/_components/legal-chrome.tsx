@@ -3,46 +3,59 @@ import { BrandMark } from "@/app/_components/brand-mark";
 import { Mascot } from "@/app/_components/decor";
 import { ArrowIcon, CheckIcon, InfoIcon } from "@/app/_components/icons";
 import { Shell } from "@/app/_components/ui";
+import type { Locale } from "@/lib/i18n";
 import {
   LEGAL_CNPJ,
   LEGAL_CONTACT,
   LEGAL_OPERATOR,
-  LEGAL_ROUTES,
   LEGAL_UPDATED_ISO,
-  LEGAL_UPDATED_LABEL,
+  legalHref,
 } from "@/lib/legal";
+import { legalUi } from "@/lib/legal-ui";
 
 /** Valor que o dono do site precisa preencher antes de publicar. */
-export function Todo({ children }: { children: string }) {
+export function Todo({
+  children,
+  locale,
+}: {
+  children: string;
+  locale: Locale;
+}) {
   return (
     <span
       className="rounded-sm bg-tomate-ink px-1.5 py-px text-[0.82em] font-extrabold tracking-[0.02em] whitespace-nowrap text-white"
       data-placeholder-legal="replace-me"
     >
-      [definir: {children}]
+      {legalUi(locale).todo(children)}
     </span>
   );
 }
 
 /** E-mail de contato ou a pendência visível, quando ainda não há um. */
-export function Contact() {
-  if (!LEGAL_CONTACT) return <Todo>e-mail de contato</Todo>;
+export function Contact({ locale }: { locale: Locale }) {
+  if (!LEGAL_CONTACT)
+    return <Todo locale={locale}>{legalUi(locale).contactPlaceholder}</Todo>;
   return <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>;
 }
 
-export function LegalHeader() {
+export function LegalHeader({ locale }: { locale: Locale }) {
+  const ui = legalUi(locale);
   return (
     <header className="border-b-2 border-paper-line bg-panel text-cream">
       <Shell className="flex min-h-17 items-center justify-between gap-7">
-        <Link className="shrink-0" href="/" aria-label="Corneta — início">
+        <Link
+          className="shrink-0"
+          href={locale === "en" ? "/en" : "/"}
+          aria-label={ui.brandHome}
+        >
           <BrandMark />
         </Link>
         <nav
           className="ml-auto flex items-center gap-6.5 text-[0.88rem] font-[650] text-muted [&_a:hover]:text-cream"
-          aria-label="Documentos"
+          aria-label={ui.documentsNav}
         >
-          <Link href={LEGAL_ROUTES.privacy}>Privacidade</Link>
-          <Link href={LEGAL_ROUTES.terms}>Termos de uso</Link>
+          <Link href={legalHref(locale, "privacy")}>{ui.privacy}</Link>
+          <Link href={legalHref(locale, "terms")}>{ui.terms}</Link>
         </nav>
       </Shell>
     </header>
@@ -50,16 +63,22 @@ export function LegalHeader() {
 }
 
 export function LegalHero({
+  locale,
   kicker,
   title,
   intro,
   version,
+  path,
 }: {
+  locale: Locale;
   kicker: string;
   title: string;
   intro: string;
   version: string;
+  /** Caminho SEM idioma deste documento, pro link do outro idioma. */
+  path: string;
 }) {
+  const ui = legalUi(locale);
   return (
     <Shell className="pt-[clamp(46px,5vw,74px)] pb-[clamp(30px,3.5vw,44px)]">
       <span className="mb-5 inline-flex items-center gap-2.5 text-[0.78rem] font-extrabold tracking-[0.1em] text-tomate-ink uppercase before:h-1 before:w-[26px] before:bg-brass before:content-['']">
@@ -71,29 +90,71 @@ export function LegalHero({
       <p className="mt-5 max-w-[62ch] text-[1.05rem] leading-[1.68] font-medium text-ink-muted">
         {intro}
       </p>
-      <div className="mt-6 flex flex-wrap gap-x-2.5 gap-y-2 [&>span]:inline-flex [&>span]:items-center [&>span]:gap-[7px] [&>span]:rounded-sm [&>span]:bg-paper-sunk [&>span]:px-2.5 [&>span]:py-1.5 [&>span]:text-[0.74rem] [&>span]:font-bold [&>span]:text-ink">
+      <div className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-2 [&>span]:inline-flex [&>span]:items-center [&>span]:gap-[7px] [&>span]:rounded-sm [&>span]:bg-paper-sunk [&>span]:px-2.5 [&>span]:py-1.5 [&>span]:text-[0.74rem] [&>span]:font-bold [&>span]:text-ink">
         <span>
-          Última atualização:{" "}
-          <time dateTime={LEGAL_UPDATED_ISO}>{LEGAL_UPDATED_LABEL}</time>
+          {ui.updatedAt}{" "}
+          <time dateTime={LEGAL_UPDATED_ISO}>{ui.updatedLabel}</time>
         </span>
-        <span>Versão {version}</span>
-        <span>Português do Brasil</span>
+        <span>
+          {ui.version} {version}
+        </span>
+        <span>{ui.languageChip}</span>
+        {/* Escrito no idioma de DESTINO: quem procura a outra versão lê a
+            própria língua, não a que está na tela. */}
+        <Link
+          className="inline-flex min-h-[30px] items-center rounded-sm bg-paper-sunk px-2.5 py-1.5 text-[0.74rem] font-bold text-tomate-ink underline decoration-2 underline-offset-[3px]"
+          href={ui.otherLanguageHref(path)}
+          hrefLang={locale === "en" ? "pt-BR" : "en"}
+        >
+          {ui.otherLanguage}
+        </Link>
       </div>
     </Shell>
   );
 }
 
+/** Faixa que diz qual versão vale juridicamente. Só aparece na tradução. */
+export function LegalBindingNotice({
+  locale,
+  path,
+}: {
+  locale: Locale;
+  path: string;
+}) {
+  const notice = legalUi(locale).binding;
+  if (!notice) return null;
+  return (
+    <aside className="mb-[clamp(22px,2.6vw,30px)] rounded-xl border-l-4 border-tomate bg-paper-sunk px-[clamp(18px,2.2vw,26px)] py-[clamp(16px,2vw,22px)]">
+      <strong className="block font-display text-[1.02rem] leading-[1.2] font-extrabold text-ink">
+        {notice.title}
+      </strong>
+      <p className="mt-2 max-w-[68ch] text-[0.92rem] leading-[1.6] font-medium text-ink-muted">
+        {notice.body}
+      </p>
+      <Link
+        className="mt-3 inline-flex min-h-[30px] items-center gap-1.5 text-[0.86rem] font-bold text-tomate-ink underline decoration-2 underline-offset-[3px]"
+        href={path}
+        hrefLang="pt-BR"
+      >
+        {notice.cta} →
+      </Link>
+    </aside>
+  );
+}
+
 export function LegalTldr({
+  locale,
   points,
   note,
 }: {
+  locale: Locale;
   points: string[];
   note: string;
 }) {
   return (
     <div className="rounded-xl bg-brass p-[clamp(22px,2.6vw,32px)] text-brass-ink shadow-pop-ink-lg">
       <span className="mb-3.5 inline-flex items-center gap-2 text-[0.72rem] font-extrabold tracking-[0.1em] uppercase [&>svg]:h-4 [&>svg]:w-4 [&>svg]:fill-current">
-        <Mascot /> Em uma corneta
+        <Mascot /> {legalUi(locale).tldrLabel}
       </span>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0 [&>li]:flex [&>li]:items-start [&>li]:gap-2.5 [&>li]:text-[0.95rem] [&>li]:leading-[1.5] [&>li]:font-[550] [&_svg]:mt-[3px] [&_svg]:h-[17px] [&_svg]:w-[17px] [&_svg]:shrink-0 [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round] [&_svg]:[stroke-width:3]">
         {points.map((point) => (
@@ -120,14 +181,17 @@ const TOC_LIST =
   "[&_a:hover]:text-tomate-ink";
 
 export function LegalToc({
+  locale,
   sections,
 }: {
+  locale: Locale;
   sections: { id: string; title: string }[];
 }) {
+  const ui = legalUi(locale);
   return (
-    <nav className="sticky top-23" aria-label="Sumário do documento">
+    <nav className="sticky top-23" aria-label={ui.tocLabel}>
       <strong className="mb-3.5 block text-[0.72rem] font-extrabold tracking-[0.1em] text-tomate-ink uppercase">
-        Neste documento
+        {ui.tocTitle}
       </strong>
       <ol className={TOC_LIST}>
         {sections.map((section) => (
@@ -227,34 +291,35 @@ export function Callout({ children }: { children: React.ReactNode }) {
 const PAIR_LINK =
   "inline-flex min-h-[30px] items-center rounded-sm bg-paper-sunk px-3 py-1.5 text-[0.8rem] font-bold text-ink hover:bg-brass";
 
-export function LegalFoot({ other }: { other: "privacy" | "terms" }) {
+export function LegalFoot({
+  locale,
+  other,
+}: {
+  locale: Locale;
+  other: "privacy" | "terms";
+}) {
+  const ui = legalUi(locale);
   return (
     <>
       <div className="mt-[clamp(34px,4vw,52px)] flex flex-wrap items-center justify-between gap-[18px] border-t-[3px] border-ink pt-[clamp(24px,3vw,34px)]">
         {/* A seta da LP aponta pra frente; aqui ela volta, então é espelhada. */}
         <Link
           className="inline-flex min-h-[30px] items-center gap-[9px] font-display text-[0.95rem] font-extrabold text-ink [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:-scale-x-100 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:transition-transform [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.4] hover:[&>svg]:-translate-x-1"
-          href="/"
+          href={locale === "en" ? "/en" : "/"}
         >
-          <ArrowIcon /> Voltar para a Corneta
+          <ArrowIcon /> {ui.back}
         </Link>
         <div className="flex flex-wrap gap-2.5">
-          {other === "terms" ? (
-            <Link className={PAIR_LINK} href={LEGAL_ROUTES.terms}>
-              Termos de uso
-            </Link>
-          ) : (
-            <Link className={PAIR_LINK} href={LEGAL_ROUTES.privacy}>
-              Política de privacidade
-            </Link>
-          )}
+          <Link className={PAIR_LINK} href={legalHref(locale, other)}>
+            {other === "terms" ? ui.terms : ui.privacy}
+          </Link>
           <a
             className={PAIR_LINK}
             href="https://github.com/pitroldev"
             rel="noreferrer noopener"
             target="_blank"
           >
-            Código-fonte
+            {ui.sourceCode}
           </a>
         </div>
       </div>

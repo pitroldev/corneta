@@ -28,14 +28,15 @@ import {
 } from "lucide-react";
 import { api, IS_TAURI, type OverlayInfo } from "../lib/api";
 import { useStore } from "../lib/store";
-import { sendStatusLine, srcLabel } from "../lib/chatSend";
+import { sendStatusLine, srcLabel, type Translate } from "../lib/chatSend";
+import { bold, useI18n, useT, type MessageKey } from "../lib/i18n";
 import { toast } from "../lib/toast";
 import { cn, errMsg, openExternal, uid } from "../lib/utils";
 import { normalizeChatChannel } from "../lib/chatChannel";
 import { sanitizeApiKey, sanitizeToken } from "../lib/validation";
 import * as RTabs from "@radix-ui/react-tabs";
 import { HAS_TWITCH_OAUTH } from "../lib/oauth";
-import { LEGAL_URLS } from "../lib/legal";
+import { legalUrl } from "../lib/legal";
 import { LegalLink } from "../components/legal";
 import type {
   AlertSource,
@@ -65,32 +66,41 @@ const PLATFORM_OPTS = [
   { value: "kick", label: "Kick" },
   { value: "youtube", label: "YouTube" },
 ];
-const VALUE_LABEL: Record<string, string> = {
-  twitch: "Canal",
-  kick: "Nome no link",
-  youtube: "Canal",
+const VALUE_LABEL: Record<string, MessageKey> = {
+  twitch: "chat.source.value.twitch",
+  kick: "chat.source.value.kick",
+  youtube: "chat.source.value.youtube",
 };
-const PLACEHOLDER: Record<string, string> = {
-  twitch: "ex.: pitrol",
-  kick: "ex.: xqc",
-  youtube: "ex.: @seucanal",
+const PLACEHOLDER: Record<string, MessageKey> = {
+  twitch: "chat.source.placeholder.twitch",
+  kick: "chat.source.placeholder.kick",
+  youtube: "chat.source.placeholder.youtube",
 };
-const HINT: Record<string, string> = {
-  twitch: "Só o nome do canal — o que vem depois de twitch.tv/.",
-  kick: "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
-  youtube: "Seu canal (@handle, URL ou ID).",
+const HINT: Record<string, MessageKey> = {
+  twitch: "chat.source.hint.twitch",
+  kick: "chat.source.hint.kick",
+  youtube: "chat.source.hint.youtube",
 };
 
 type ConfigTab = "canais" | "conta" | "alertas" | "overlays" | "exibicao";
-const CONFIG_TABS: { id: ConfigTab; label: string; icon: typeof Tv2 }[] = [
-  { id: "canais", label: "Canais", icon: Tv2 },
-  { id: "conta", label: "Conta", icon: LogIn },
-  { id: "alertas", label: "Alertas", icon: Bell },
-  { id: "overlays", label: "Overlays", icon: MonitorPlay },
-  { id: "exibicao", label: "Exibição", icon: Eye },
-];
+const CONFIG_TABS: { id: ConfigTab; labelKey: MessageKey; icon: typeof Tv2 }[] =
+  [
+    { id: "canais", labelKey: "chat.config.tab.channels", icon: Tv2 },
+    { id: "conta", labelKey: "chat.config.tab.account", icon: LogIn },
+    { id: "alertas", labelKey: "chat.config.tab.alerts", icon: Bell },
+    { id: "overlays", labelKey: "chat.config.tab.overlays", icon: MonitorPlay },
+    { id: "exibicao", labelKey: "chat.config.tab.display", icon: Eye },
+  ];
+
+/** Parte a frase traduzida no ponto marcado (um `{buraco}` ou um nome de produto)
+ *  pra encaixar um link no meio dela sem picar a chave em duas. */
+function splitAt(text: string, mark: string): [string, string] {
+  const i = text.indexOf(mark);
+  return i < 0 ? [text, ""] : [text.slice(0, i), text.slice(i + mark.length)];
+}
 
 export function ChatScreen() {
+  const { t, fmt, locale } = useI18n();
   const config = useStore((s) => s.config);
   const setSettings = useStore((s) => s.setSettings);
   const messages = useStore((s) => s.chatMessages);
@@ -276,12 +286,12 @@ export function ChatScreen() {
         : !!chatAuth[x.id]?.ok,
   );
   const doSend = async () => {
-    const t = draft.trim();
-    if (!t) return;
+    const text = draft.trim();
+    if (!text) return;
     setSending(true);
     try {
       await sendChat(
-        t,
+        text,
         sendTargets.map((x) => x.id),
       );
       setDraft("");
@@ -291,11 +301,12 @@ export function ChatScreen() {
       setSending(false);
     }
   };
-  const sendStatus = sendStatusLine(sendTargets, chatAuth, {
-    twitch: twitchReady,
-    youtube: youtubeReady,
-    kick: kickReady,
-  });
+  const sendStatus = sendStatusLine(
+    sendTargets,
+    chatAuth,
+    { twitch: twitchReady, youtube: youtubeReady, kick: kickReady },
+    t,
+  );
 
   // Troca de modo de OAuth (oficial ↔ credenciais próprias) e o "esquecer". Fecha as opções
   // avançadas quando dá certo e MOSTRA o motivo quando a Corneta recusa — a recusa (ex.: login
@@ -323,9 +334,9 @@ export function ChatScreen() {
     }
     setConnecting(true);
     try {
-      await connectChat();
+      await connectChat(t);
     } catch {
-      toast.error("Não consegui conectar o chat — confira os canais.");
+      toast.error(t("chat.error.connect"));
     } finally {
       setConnecting(false);
     }
@@ -338,7 +349,7 @@ export function ChatScreen() {
   const reconnect = async () => {
     setReconnecting(true);
     try {
-      await connectChat();
+      await connectChat(t);
     } catch (e) {
       toast.error(errMsg(e));
     } finally {
@@ -372,21 +383,28 @@ export function ChatScreen() {
       () =>
         toast.success(
           action === "delete"
-            ? "Mensagem apagada"
+            ? t("chat.mod.deleted")
             : action === "ban"
-              ? "Usuário banido"
-              : "Timeout aplicado",
+              ? t("chat.mod.banned")
+              : t("chat.mod.timeout"),
         ),
       (e) => toast.error(errMsg(e)),
     );
   };
 
+  // A frase da privacidade tem um LINK no meio: o dicionário guarda a frase
+  // inteira com {link}, e aqui ela é partida pra caber o componente.
+  const [privacyBefore, privacyAfter] = splitAt(
+    t("chat.account.privacy.text"),
+    "{link}",
+  );
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col">
       <SectionTitle
-        kicker="A galera junta"
-        title="Chat unificado"
-        subtitle="Twitch, Kick e YouTube no mesmo feed — até 2 Twitches."
+        kicker={t("chat.header.kicker")}
+        title={t("chat.header.title")}
+        subtitle={t("chat.header.subtitle")}
         right={
           <div className="flex items-center gap-2">
             {IS_TAURI && (
@@ -394,9 +412,10 @@ export function ChatScreen() {
                 variant="subtle"
                 size="sm"
                 onClick={() => void api.openChatWindow()}
-                title="Uma janelinha do chat que fica por cima de tudo."
+                title={t("chat.action.popout.title")}
               >
-                <PictureInPicture2 className="size-4" /> Janela flutuante
+                <PictureInPicture2 className="size-4" />{" "}
+                {t("chat.action.popout")}
               </Button>
             )}
             {connected ? (
@@ -405,7 +424,7 @@ export function ChatScreen() {
                 size="sm"
                 onClick={() => void disconnectChat()}
               >
-                <WifiOff className="size-4" /> Desconectar
+                <WifiOff className="size-4" /> {t("chat.action.disconnect")}
               </Button>
             ) : (
               <Button
@@ -415,11 +434,12 @@ export function ChatScreen() {
                 onClick={() => void doConnect()}
                 title={
                   IS_TAURI && !configured
-                    ? "Adicione um canal primeiro"
+                    ? t("chat.action.connect.needChannel")
                     : undefined
                 }
               >
-                {!connecting && <Wifi className="size-4" />} Conectar
+                {!connecting && <Wifi className="size-4" />}{" "}
+                {t("chat.action.connect")}
               </Button>
             )}
           </div>
@@ -432,19 +452,22 @@ export function ChatScreen() {
             {Object.keys(statuses).length === 0 ? (
               <span className="text-sm font-semibold text-ink-muted">
                 {connected
-                  ? "conectando…"
+                  ? t("chat.status.connecting")
                   : configured
                     ? (s.chatAutoConnect ?? true)
-                      ? "Tudo pronto — conecte, ou entre no ar que eu ligo sozinho"
-                      : "Tudo pronto — é só conectar"
-                    : "Adicione um canal pra ver o chat aqui"}
+                      ? t("chat.status.ready.auto")
+                      : t("chat.status.ready")
+                    : t("chat.status.empty")}
               </span>
             ) : (
               Object.entries(statuses).map(([source, st]) => (
                 <span
                   key={source}
                   className="flex items-center gap-1.5 text-sm"
-                  title={`${source}: ${statusExplain(st.platform, st.status)}`}
+                  title={t("chat.status.tooltip", {
+                    source,
+                    explain: statusExplain(t, st.platform, st.status),
+                  })}
                 >
                   <PlatformGlyph id={st.platform as ChatPlatform} size={16} />
                   <span
@@ -454,7 +477,7 @@ export function ChatScreen() {
                   <span className="text-ink-muted">{source}</span>
                   {st.status !== "connected" && (
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-                      {statusLabel(st.status)}
+                      {statusLabel(t, st.status)}
                     </span>
                   )}
                 </span>
@@ -466,9 +489,10 @@ export function ChatScreen() {
                 size="sm"
                 loading={reconnecting}
                 onClick={() => void reconnect()}
-                title="Religa as fontes que caíram."
+                title={t("chat.action.reconnect.title")}
               >
-                {!reconnecting && <RefreshCw className="size-3.5" />} Reconectar
+                {!reconnecting && <RefreshCw className="size-3.5" />}{" "}
+                {t("chat.action.reconnect")}
               </Button>
             )}
           </div>
@@ -481,15 +505,19 @@ export function ChatScreen() {
                 title={
                   viewers.items
                     .filter((i) => i.live)
-                    .map(
-                      (i) =>
-                        `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`,
+                    .map((i) =>
+                      t("chat.viewers.tooltip.row", {
+                        source: i.source,
+                        n: fmt.num(i.viewers ?? 0),
+                      }),
                     )
-                    .join("\n") + "\nClique pra esconder (volta na config)"
+                    .join("\n") +
+                  "\n" +
+                  t("chat.viewers.tooltip.hide")
                 }
               >
                 <Eye className="size-4 text-brass" />
-                {viewers.total.toLocaleString("pt-BR")} assistindo
+                {t("chat.viewers.count", { n: fmt.num(viewers.total) })}
               </button>
             )}
             <Button
@@ -497,7 +525,7 @@ export function ChatScreen() {
               size="sm"
               onClick={() => setShowConfig(true)}
             >
-              <Settings2 className="size-4" /> Configurar
+              <Settings2 className="size-4" /> {t("chat.action.configure")}
             </Button>
           </div>
         </div>
@@ -505,13 +533,13 @@ export function ChatScreen() {
 
       {showConfig && (
         <Modal
-          title="Configurar o chat"
+          title={t("chat.config.title")}
           onClose={() => setShowConfig(false)}
           className="max-w-2xl rounded-xl bg-surface p-5 pop"
         >
           <div className="mb-4 flex items-center justify-between">
             <h3 id="chatcfg-title" className="text-xl">
-              Configurar o chat
+              {t("chat.config.title")}
             </h3>
             <Button
               variant="ghost"
@@ -526,19 +554,20 @@ export function ChatScreen() {
             onValueChange={(v) => setConfigTab(v as ConfigTab)}
           >
             <RTabs.List className="mb-4 flex flex-wrap gap-2">
-              {CONFIG_TABS.map((t) => {
-                const Icon = t.icon;
+              {CONFIG_TABS.map((tab) => {
+                const Icon = tab.icon;
                 return (
                   <RTabs.Trigger
-                    key={t.id}
-                    value={t.id}
+                    key={tab.id}
+                    value={tab.id}
                     className={cn(
                       "inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 font-display text-sm font-bold transition",
                       "bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink",
                       "data-[state=active]:bg-brass data-[state=active]:text-brass-ink data-[state=active]:pop-brass",
                     )}
                   >
-                    <Icon className="size-4" strokeWidth={2.4} /> {t.label}
+                    <Icon className="size-4" strokeWidth={2.4} />{" "}
+                    {t(tab.labelKey)}
                   </RTabs.Trigger>
                 );
               })}
@@ -549,7 +578,7 @@ export function ChatScreen() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                    Canais
+                    {t("chat.channels.section")}
                   </span>
                   <Button
                     variant={adding ? "ghost" : "subtle"}
@@ -561,14 +590,14 @@ export function ChatScreen() {
                     ) : (
                       <Plus className="size-3.5" />
                     )}
-                    {adding ? "Cancelar" : "Adicionar canal"}
+                    {adding ? t("chat.common.cancel") : t("chat.channels.add")}
                   </Button>
                 </div>
 
                 {adding && (
                   <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-surface-2 p-2">
                     <span className="px-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-                      De qual?
+                      {t("chat.channels.which")}
                     </span>
                     {(["twitch", "kick", "youtube"] as const).map((p) => (
                       <button
@@ -592,11 +621,7 @@ export function ChatScreen() {
 
                 {sources.length === 0 ? (
                   <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-5 text-center text-sm text-ink-muted">
-                    Nenhum canal ainda. Adicione um da{" "}
-                    <strong className="text-ink">Twitch</strong>,{" "}
-                    <strong className="text-ink">Kick</strong> ou{" "}
-                    <strong className="text-ink">YouTube</strong> — pode repetir
-                    a mesma (ex.: 2 Twitches).
+                    {bold(t, "chat.channels.empty")}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -617,8 +642,8 @@ export function ChatScreen() {
                   <div className="mt-3 border-t border-border-soft pt-3">
                     <ToggleRow
                       icon={Wifi}
-                      label="Conectar o chat sozinho quando eu entrar no ar"
-                      hint="Sem clicar em Conectar toda live."
+                      label={t("chat.autoconnect.label")}
+                      hint={t("chat.autoconnect.hint")}
                       checked={s.chatAutoConnect ?? true}
                       onChange={(v) => setSettings({ chatAutoConnect: v })}
                     />
@@ -639,7 +664,7 @@ export function ChatScreen() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                    Fontes de alerta
+                    {t("chat.alertsrc.section")}
                   </span>
                   <Button
                     variant={addingAlert ? "ghost" : "subtle"}
@@ -651,20 +676,19 @@ export function ChatScreen() {
                     ) : (
                       <Plus className="size-3.5" />
                     )}
-                    {addingAlert ? "Cancelar" : "Adicionar fonte"}
+                    {addingAlert
+                      ? t("chat.common.cancel")
+                      : t("chat.alertsrc.add")}
                   </Button>
                 </div>
                 <p className="mb-2 text-[11px] text-ink-faint">
-                  Cole o token do{" "}
-                  <strong className="text-ink">Streamlabs</strong> ou{" "}
-                  <strong className="text-ink">StreamElements</strong> — as
-                  doações caem no feed de Alertas.
+                  {bold(t, "chat.alertsrc.lede")}
                 </p>
 
                 {addingAlert && (
                   <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-surface-2 p-2">
                     <span className="px-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-                      De qual?
+                      {t("chat.channels.which")}
                     </span>
                     {(["streamlabs", "streamelements"] as const).map((k) => (
                       <button
@@ -684,10 +708,7 @@ export function ChatScreen() {
 
                 {alertSources.length === 0 ? (
                   <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-4 text-center text-xs text-ink-muted">
-                    Nenhuma fonte de alerta. Adicione{" "}
-                    <strong className="text-ink">Streamlabs</strong> ou{" "}
-                    <strong className="text-ink">StreamElements</strong> pra ver
-                    doações.
+                    {bold(t, "chat.alertsrc.empty")}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -700,7 +721,7 @@ export function ChatScreen() {
                         }
                         onChange={(p) => updateAlertSource(src.id, p)}
                         onRemove={() => removeAlertSource(src.id)}
-                        onToken={(t) => setAlertToken(src.id, t)}
+                        onToken={(token) => setAlertToken(src.id, token)}
                       />
                     ))}
                   </div>
@@ -716,15 +737,11 @@ export function ChatScreen() {
             <RTabs.Content value="conta">
               {!IS_TAURI ? (
                 <p className="text-xs text-ink-muted">
-                  Disponível no app instalado.
+                  {t("chat.account.desktopOnly")}
                 </p>
               ) : !hasTwitchChannel && !hasYoutubeChannel && !hasKickChannel ? (
                 <p className="text-xs text-ink-muted">
-                  Adicione um canal da{" "}
-                  <strong className="text-ink">Twitch</strong>,{" "}
-                  <strong className="text-ink">YouTube</strong> ou{" "}
-                  <strong className="text-ink">Kick</strong> na aba Canais pra
-                  logar.
+                  {bold(t, "chat.account.needChannel")}
                 </p>
               ) : (
                 <>
@@ -732,11 +749,9 @@ export function ChatScreen() {
                       aparece. Dizer o motivo evita o streamer achar que o app está quebrado. */}
                   {oauthBrokerError && (
                     <p className="mb-2 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
-                      <strong className="text-ink">
-                        Login oficial da Corneta fora do ar:
-                      </strong>{" "}
-                      {oauthBrokerError}. Dá pra entrar com credenciais próprias
-                      nas opções avançadas.
+                      {t("chat.account.brokerError", {
+                        error: oauthBrokerError,
+                      })}
                     </p>
                   )}
                   {/* Divulgação NO MOMENTO da autorização. A Limited Use do Google exige
@@ -744,11 +759,11 @@ export function ChatScreen() {
                       a política publicada satisfaz o "antes", isto satisfaz o "durante", e
                       é o que o revisor vê no vídeo de verificação. */}
                   <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
-                    A Corneta usa sua conta só pro que está na{" "}
-                    <LegalLink href={LEGAL_URLS.privacy}>
-                      Política de Privacidade
+                    {privacyBefore}
+                    <LegalLink href={legalUrl(locale, "privacy")}>
+                      {t("chat.account.privacy.link")}
                     </LegalLink>
-                    . Dá pra desconectar quando quiser.
+                    {privacyAfter}
                   </p>
                   <div className="flex flex-col gap-2">
                     {hasTwitchChannel && (
@@ -779,8 +794,8 @@ export function ChatScreen() {
                             className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
                           >
                             {showYoutubeByok
-                              ? "ocultar opções avançadas"
-                              : "usar credenciais próprias"}
+                              ? t("chat.account.byok.hide")
+                              : t("chat.account.byok.show")}
                           </button>
                           {showYoutubeByok && (
                             <YoutubeCredsForm
@@ -791,19 +806,19 @@ export function ChatScreen() {
                               onUseOfficial={() =>
                                 void youtubeMode(
                                   youtubeUseOfficial(),
-                                  "Login oficial do YouTube de volta",
+                                  t("chat.account.youtube.official.toast"),
                                 )
                               }
                               onUseSaved={() =>
                                 void youtubeMode(
                                   youtubeUseOwnCreds(),
-                                  "Usando suas credenciais do YouTube 🔒",
+                                  t("chat.account.youtube.ownCreds.toast"),
                                 )
                               }
                               onForget={() =>
                                 void youtubeMode(
                                   clearYoutubeOauth(),
-                                  "Credenciais do YouTube esquecidas",
+                                  t("chat.account.youtube.forgot.toast"),
                                 )
                               }
                             />
@@ -818,7 +833,7 @@ export function ChatScreen() {
                           onUseSaved={() =>
                             void youtubeMode(
                               youtubeUseOwnCreds(),
-                              "Usando suas credenciais do YouTube 🔒",
+                              t("chat.account.youtube.ownCreds.toast"),
                             )
                           }
                         />
@@ -839,8 +854,8 @@ export function ChatScreen() {
                             className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
                           >
                             {showKickByok
-                              ? "ocultar opções avançadas"
-                              : "usar credenciais próprias"}
+                              ? t("chat.account.byok.hide")
+                              : t("chat.account.byok.show")}
                           </button>
                           {showKickByok && (
                             <KickCredsForm
@@ -851,19 +866,19 @@ export function ChatScreen() {
                               onUseOfficial={() =>
                                 void kickMode(
                                   kickUseOfficial(),
-                                  "Login oficial da Kick de volta",
+                                  t("chat.account.kick.official.toast"),
                                 )
                               }
                               onUseSaved={() =>
                                 void kickMode(
                                   kickUseOwnCreds(),
-                                  "Usando suas credenciais da Kick 🔒",
+                                  t("chat.account.kick.ownCreds.toast"),
                                 )
                               }
                               onForget={() =>
                                 void kickMode(
                                   clearKickOauth(),
-                                  "Credenciais da Kick esquecidas",
+                                  t("chat.account.kick.forgot.toast"),
                                 )
                               }
                             />
@@ -878,15 +893,14 @@ export function ChatScreen() {
                           onUseSaved={() =>
                             void kickMode(
                               kickUseOwnCreds(),
-                              "Usando suas credenciais da Kick 🔒",
+                              t("chat.account.kick.ownCreds.toast"),
                             )
                           }
                         />
                       ))}
                   </div>
                   <p className="mt-3 text-[11px] text-ink-faint">
-                    Entre pra <strong className="text-ink">enviar</strong> e{" "}
-                    <strong className="text-ink">moderar</strong>.
+                    {bold(t, "chat.account.footer")}
                   </p>
                 </>
               )}
@@ -896,55 +910,55 @@ export function ChatScreen() {
               {/* Exibição */}
               <div>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-faint">
-                  O que mostrar no feed
+                  {t("chat.display.section")}
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <ToggleRow
                     icon={Smile}
-                    label="Emotes"
-                    hint="figurinhas no lugar do :código:"
+                    label={t("chat.display.emotes")}
+                    hint={t("chat.display.emotes.hint")}
                     checked={view.emotes}
                     onChange={(v) => setSettings({ chatShowEmotes: v })}
                   />
                   <ToggleRow
                     icon={BadgeCheck}
-                    label="Badges"
-                    hint="selos de sub/mod/VIP"
+                    label={t("chat.display.badges")}
+                    hint={t("chat.display.badges.hint")}
                     checked={view.badges}
                     onChange={(v) => setSettings({ chatShowBadges: v })}
                   />
                   <ToggleRow
                     icon={Tv2}
-                    label="Plataforma"
-                    hint="de qual site veio"
+                    label={t("chat.display.platform")}
+                    hint={t("chat.display.platform.hint")}
                     checked={view.platform}
                     onChange={(v) => setSettings({ chatShowPlatform: v })}
                   />
                   <ToggleRow
                     icon={AtSign}
-                    label="Canal"
-                    hint="útil com 2+ do mesmo site"
+                    label={t("chat.display.source")}
+                    hint={t("chat.display.source.hint")}
                     checked={view.source}
                     onChange={(v) => setSettings({ chatShowSource: v })}
                   />
                   <ToggleRow
                     icon={Clock}
-                    label="Horário"
-                    hint="hora da mensagem"
+                    label={t("chat.display.timestamps")}
+                    hint={t("chat.display.timestamps.hint")}
                     checked={view.timestamps}
                     onChange={(v) => setSettings({ chatShowTimestamps: v })}
                   />
                   <ToggleRow
                     icon={Eye}
-                    label="Quem assiste"
-                    hint="contador de espectadores"
+                    label={t("chat.display.viewers")}
+                    hint={t("chat.display.viewers.hint")}
                     checked={s.chatShowViewers ?? true}
                     onChange={(v) => setSettings({ chatShowViewers: v })}
                   />
                 </div>
                 <div className="mt-3 flex items-center gap-3 border-t border-border-soft pt-3">
                   <span className="shrink-0 text-sm font-semibold text-ink-muted">
-                    Tamanho da fonte do chat
+                    {t("chat.display.chatFontSize")}
                   </span>
                   <Slider
                     className="ml-auto max-w-52 flex-1"
@@ -953,12 +967,12 @@ export function ChatScreen() {
                     max={44}
                     onChange={(v) => setSettings({ chatFontSize: v })}
                     suffix="px"
-                    aria-label="Tamanho da fonte do chat"
+                    aria-label={t("chat.display.chatFontSize")}
                   />
                 </div>
                 <div className="mt-3 flex items-center gap-3">
                   <span className="shrink-0 text-sm font-semibold text-ink-muted">
-                    Tamanho da fonte dos alertas
+                    {t("chat.display.alertFontSize")}
                   </span>
                   <Slider
                     className="ml-auto max-w-52 flex-1"
@@ -967,7 +981,7 @@ export function ChatScreen() {
                     max={44}
                     onChange={(v) => setSettings({ alertFontSize: v })}
                     suffix="px"
-                    aria-label="Tamanho da fonte dos alertas"
+                    aria-label={t("chat.display.alertFontSize")}
                   />
                 </div>
               </div>
@@ -997,10 +1011,12 @@ export function ChatScreen() {
             setAlertPulse(false);
             setSettings({ chatShowAlertsPanel: !showAlerts });
           }}
-          title={alertPulse ? "Chegou alerta novo!" : undefined}
+          title={alertPulse ? t("chat.alerts.newPulse") : undefined}
         >
-          <Bell className="size-4" /> Alertas
-          {alerts.length > 0 ? ` (${alerts.length})` : ""}
+          <Bell className="size-4" />{" "}
+          {alerts.length > 0
+            ? t("chat.alerts.button.count", { n: alerts.length })
+            : t("chat.alerts.button")}
         </Button>
         <Button
           variant={confirmClearChat ? "danger" : "ghost"}
@@ -1016,7 +1032,7 @@ export function ChatScreen() {
           }}
         >
           <Trash2 className="size-4" />{" "}
-          {confirmClearChat ? "Limpar mesmo?" : "Limpar"}
+          {confirmClearChat ? t("chat.clear.confirm") : t("chat.clear")}
         </Button>
       </div>
 
@@ -1032,9 +1048,7 @@ export function ChatScreen() {
             modLevel={modLevel}
             onModerate={onModerate}
             disconnectedHint={
-              configured
-                ? "Tudo pronto — é só clicar em Conectar."
-                : "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar."
+              configured ? t("chat.feed.hint.ready") : t("chat.feed.hint.setup")
             }
             emptyAction={
               configured ? (
@@ -1044,7 +1058,8 @@ export function ChatScreen() {
                   loading={connecting}
                   onClick={() => void doConnect()}
                 >
-                  {!connecting && <Wifi className="size-4" />} Conectar
+                  {!connecting && <Wifi className="size-4" />}{" "}
+                  {t("chat.action.connect")}
                 </Button>
               ) : (
                 <Button
@@ -1055,7 +1070,7 @@ export function ChatScreen() {
                     setShowConfig(true);
                   }}
                 >
-                  <Plus className="size-4" /> Adicionar canal
+                  <Plus className="size-4" /> {t("chat.channels.add")}
                 </Button>
               )
             }
@@ -1065,7 +1080,7 @@ export function ChatScreen() {
           <Card className="flex h-[54vh] w-72 shrink-0 flex-col overflow-hidden p-0">
             <div className="flex items-center justify-between border-b-2 border-border-soft px-3 py-2">
               <span className="flex items-center gap-1.5 font-display text-sm font-extrabold">
-                <Bell className="size-4 text-brass" /> Alertas
+                <Bell className="size-4 text-brass" /> {t("chat.alerts.button")}
               </span>
               <button
                 onClick={() => {
@@ -1084,12 +1099,14 @@ export function ChatScreen() {
                     : "text-ink-faint hover:text-bad",
                 )}
                 title={
-                  confirmClearAlerts ? "Clique pra confirmar" : "Limpar alertas"
+                  confirmClearAlerts
+                    ? t("chat.alerts.clear.confirmTitle")
+                    : t("chat.alerts.clear.title")
                 }
-                aria-label="Limpar alertas"
+                aria-label={t("chat.alerts.clear.title")}
               >
                 {confirmClearAlerts ? (
-                  "Limpar?"
+                  t("chat.alerts.clear.confirmLabel")
                 ) : (
                   <Trash2 className="size-3.5" />
                 )}
@@ -1112,7 +1129,7 @@ export function ChatScreen() {
                 className="w-40 shrink-0"
                 value={effectiveSendTo}
                 options={[
-                  { value: "all", label: "Todas" },
+                  { value: "all", label: t("chat.send.target.all") },
                   ...sendableSources.map((x) => ({
                     value: x.id,
                     label: srcLabel(x),
@@ -1130,7 +1147,7 @@ export function ChatScreen() {
                   void doSend();
                 }
               }}
-              placeholder="Manda no chat…"
+              placeholder={t("chat.send.placeholder")}
               className="flex-1"
             />
             <Button
@@ -1140,7 +1157,7 @@ export function ChatScreen() {
               onClick={doSend}
               title={!canSend ? sendStatus : undefined}
             >
-              {!sending && <Send className="size-4" />} Enviar
+              {!sending && <Send className="size-4" />} {t("chat.send.button")}
             </Button>
           </div>
           <div className="mt-1 px-0.5 text-[11px] text-ink-faint">
@@ -1158,12 +1175,9 @@ export function ChatScreen() {
           className="mt-3 flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-sm text-ink-muted ring-1 ring-border transition-colors hover:text-ink"
         >
           <LogIn className="size-4 shrink-0 text-brass" />
-          <span>
-            Entre na sua conta pra <strong className="text-ink">enviar</strong>{" "}
-            e <strong className="text-ink">moderar</strong>
-          </span>
+          <span>{bold(t, "chat.login.prompt")}</span>
           <span className="ml-auto shrink-0 text-xs font-bold text-brass">
-            Configurar →
+            {t("chat.login.prompt.cta")}
           </span>
         </button>
       )}
@@ -1197,25 +1211,27 @@ function FilterChip({
   );
 }
 
-const OVERLAY_POS_OPTS = [
-  { value: "top", label: "Em cima" },
-  { value: "bottom", label: "Embaixo" },
-  { value: "center", label: "No centro" },
-  { value: "top-left", label: "Canto sup. esquerdo" },
-  { value: "top-right", label: "Canto sup. direito" },
-  { value: "bottom-left", label: "Canto inf. esquerdo" },
-  { value: "bottom-right", label: "Canto inf. direito" },
+// Os `value` viajam crus na query string do overlay (?pos=, &scale=) — só o
+// rótulo é texto de tela.
+const overlayPosOpts = (t: Translate) => [
+  { value: "top", label: t("chat.overlay.pos.top") },
+  { value: "bottom", label: t("chat.overlay.pos.bottom") },
+  { value: "center", label: t("chat.overlay.pos.center") },
+  { value: "top-left", label: t("chat.overlay.pos.topLeft") },
+  { value: "top-right", label: t("chat.overlay.pos.topRight") },
+  { value: "bottom-left", label: t("chat.overlay.pos.bottomLeft") },
+  { value: "bottom-right", label: t("chat.overlay.pos.bottomRight") },
 ];
 
-const CHAT_POS_OPTS = [
-  { value: "bottom", label: "Embaixo (sobe)" },
-  { value: "top", label: "Em cima (desce)" },
+const chatPosOpts = (t: Translate) => [
+  { value: "bottom", label: t("chat.overlay.chatPos.bottom") },
+  { value: "top", label: t("chat.overlay.chatPos.top") },
 ];
 
-const SCALE_OPTS = [
-  { value: "sm", label: "Pequeno" },
-  { value: "md", label: "Médio" },
-  { value: "lg", label: "Grande" },
+const scaleOpts = (t: Translate) => [
+  { value: "sm", label: t("chat.overlay.scale.sm") },
+  { value: "md", label: t("chat.overlay.scale.md") },
+  { value: "lg", label: t("chat.overlay.scale.lg") },
 ];
 
 /** Linha de opção: rótulo à esquerda, controle à direita. */
@@ -1244,6 +1260,7 @@ function OverlayBlock({
   testMsg: string;
   children?: ReactNode;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -1257,7 +1274,11 @@ function OverlayBlock({
   const addToObs = () =>
     api
       .overlayObsAddSource(url)
-      .then(() => toast.success(`Overlay de ${title.toLowerCase()} no OBS 📺`))
+      .then(() =>
+        toast.success(
+          t("chat.overlay.added.toast", { block: title.toLowerCase() }),
+        ),
+      )
       .catch((e) => toast.error(errMsg(e)));
   const test = () =>
     onTest()
@@ -1278,15 +1299,15 @@ function OverlayBlock({
           ) : (
             <Copy className="size-3.5" />
           )}
-          {copied ? "Copiado" : "Copiar"}
+          {copied ? t("chat.common.copied") : t("chat.common.copy")}
         </Button>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         <Button variant="subtle" size="sm" onClick={() => void addToObs()}>
-          <Tv2 className="size-3.5" /> Adicionar no OBS
+          <Tv2 className="size-3.5" /> {t("chat.overlay.addToObs")}
         </Button>
         <Button variant="ghost" size="sm" onClick={() => void test()}>
-          <Bell className="size-3.5" /> Testar
+          <Bell className="size-3.5" /> {t("chat.common.test")}
         </Button>
       </div>
       {children && (
@@ -1295,9 +1316,7 @@ function OverlayBlock({
         </div>
       )}
       <p className="mt-1.5 text-[11px] text-ink-faint">
-        Mudou uma opção? Clique{" "}
-        <strong className="text-ink">Adicionar no OBS</strong> de novo (ou
-        atualize a URL da fonte lá).
+        {bold(t, "chat.overlay.reAddNote")}
       </p>
     </div>
   );
@@ -1311,6 +1330,7 @@ function OverlayCard({
   settings: AppSettings;
   setSettings: (patch: Partial<AppSettings>) => void;
 }) {
+  const t = useT();
   const enabled = settings.overlayEnabled ?? false;
   const [info, setInfo] = useState<OverlayInfo | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1372,59 +1392,56 @@ function OverlayCard({
         <div className="flex items-center gap-2">
           <MonitorPlay className="size-4 text-brass" />
           <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-            Overlays pro OBS
+            {t("chat.overlay.section")}
           </span>
         </div>
         <Toggle
           checked={enabled}
           onChange={(v) => void toggle(v)}
           disabled={busy}
-          label="Overlays pro OBS"
+          label={t("chat.overlay.section")}
         />
       </div>
       <p className="mb-2 text-[11px] text-ink-faint">
-        Servidor local que joga os <strong className="text-ink">alertas</strong>{" "}
-        e o <strong className="text-ink">chat</strong> (com emotes) no OBS.
-        Adicione a URL como <strong className="text-ink">Browser Source</strong>{" "}
-        — uma vez só.
+        {bold(t, "chat.overlay.lede")}
       </p>
 
       {enabled &&
         (!IS_TAURI ? (
-          <p className="text-xs text-ink-muted">Disponível no app instalado.</p>
+          <p className="text-xs text-ink-muted">
+            {t("chat.account.desktopOnly")}
+          </p>
         ) : !info ? (
           <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
-            {busy
-              ? "Ligando o overlay…"
-              : "Overlay ligado — reabra esta aba pra ver as URLs."}
+            {busy ? t("chat.overlay.starting") : t("chat.overlay.reopenTab")}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             <OverlayBlock
-              title="Alertas"
+              title={t("chat.overlay.block.alerts")}
               url={alertUrl}
               onTest={() => api.overlayTest()}
-              testMsg="Mandei um alerta de teste — olha no OBS 📣"
+              testMsg={t("chat.overlay.test.alerts")}
             >
-              <OptRow label="Posição">
+              <OptRow label={t("chat.overlay.opt.position")}>
                 <Select
                   className="w-40"
                   value={settings.overlayPosition || "top"}
-                  options={OVERLAY_POS_OPTS}
+                  options={overlayPosOpts(t)}
                   onChange={(v) => setSettings({ overlayPosition: v })}
-                  aria-label="Posição do overlay de alertas"
+                  aria-label={t("chat.overlay.aria.alertPosition")}
                 />
               </OptRow>
-              <OptRow label="Tamanho">
+              <OptRow label={t("chat.overlay.opt.size")}>
                 <Select
                   className="w-40"
                   value={settings.overlayScale || "md"}
-                  options={SCALE_OPTS}
+                  options={scaleOpts(t)}
                   onChange={(v) => setSettings({ overlayScale: v })}
-                  aria-label="Tamanho do overlay de alertas"
+                  aria-label={t("chat.overlay.aria.alertSize")}
                 />
               </OptRow>
-              <OptRow label="Tempo na tela">
+              <OptRow label={t("chat.overlay.opt.duration")}>
                 <Slider
                   className="w-40"
                   value={settings.overlayDurationSecs ?? 6}
@@ -1432,41 +1449,41 @@ function OverlayCard({
                   max={15}
                   suffix="s"
                   onChange={(v) => setSettings({ overlayDurationSecs: v })}
-                  aria-label="Tempo na tela"
+                  aria-label={t("chat.overlay.opt.duration")}
                 />
               </OptRow>
-              <OptRow label="Som ao aparecer">
+              <OptRow label={t("chat.overlay.opt.sound")}>
                 <Toggle
                   checked={settings.overlaySound ?? true}
                   onChange={(v) => setSettings({ overlaySound: v })}
-                  label="Som ao aparecer"
+                  label={t("chat.overlay.opt.sound")}
                 />
               </OptRow>
-              <OptRow label="Mostrar seguidores">
+              <OptRow label={t("chat.overlay.opt.follows")}>
                 <Toggle
                   checked={settings.overlayShowFollows ?? true}
                   onChange={(v) => setSettings({ overlayShowFollows: v })}
-                  label="Mostrar seguidores"
+                  label={t("chat.overlay.opt.follows")}
                 />
               </OptRow>
             </OverlayBlock>
 
             <OverlayBlock
-              title="Chat"
+              title={t("chat.overlay.block.chat")}
               url={chatUrl}
               onTest={() => api.overlayChatTest()}
-              testMsg="Mandei uma mensagem de teste — olha no OBS 💬"
+              testMsg={t("chat.overlay.test.chat")}
             >
-              <OptRow label="Posição">
+              <OptRow label={t("chat.overlay.opt.position")}>
                 <Select
                   className="w-40"
                   value={settings.overlayChatPosition || "bottom"}
-                  options={CHAT_POS_OPTS}
+                  options={chatPosOpts(t)}
                   onChange={(v) => setSettings({ overlayChatPosition: v })}
-                  aria-label="Posição do overlay de chat"
+                  aria-label={t("chat.overlay.aria.chatPosition")}
                 />
               </OptRow>
-              <OptRow label="Tamanho da fonte">
+              <OptRow label={t("chat.overlay.opt.fontSize")}>
                 <Slider
                   className="w-40"
                   value={settings.overlayChatSize ?? 22}
@@ -1474,20 +1491,20 @@ function OverlayCard({
                   max={40}
                   suffix="px"
                   onChange={(v) => setSettings({ overlayChatSize: v })}
-                  aria-label="Tamanho da fonte do chat"
+                  aria-label={t("chat.display.chatFontSize")}
                 />
               </OptRow>
-              <OptRow label="Máx. de mensagens">
+              <OptRow label={t("chat.overlay.opt.maxMessages")}>
                 <Slider
                   className="w-40"
                   value={settings.overlayChatMax ?? 12}
                   min={3}
                   max={30}
                   onChange={(v) => setSettings({ overlayChatMax: v })}
-                  aria-label="Máximo de mensagens"
+                  aria-label={t("chat.overlay.aria.maxMessages")}
                 />
               </OptRow>
-              <OptRow label="Sumir após (0 = nunca)">
+              <OptRow label={t("chat.overlay.opt.fade")}>
                 <Slider
                   className="w-40"
                   value={settings.overlayChatFadeSecs ?? 0}
@@ -1495,28 +1512,28 @@ function OverlayCard({
                   max={60}
                   suffix="s"
                   onChange={(v) => setSettings({ overlayChatFadeSecs: v })}
-                  aria-label="Sumir após"
+                  aria-label={t("chat.overlay.aria.fade")}
                 />
               </OptRow>
-              <OptRow label="Selos (mod/sub)">
+              <OptRow label={t("chat.overlay.opt.badges")}>
                 <Toggle
                   checked={settings.overlayChatBadges ?? true}
                   onChange={(v) => setSettings({ overlayChatBadges: v })}
-                  label="Selos"
+                  label={t("chat.overlay.aria.badges")}
                 />
               </OptRow>
-              <OptRow label="Ícone da plataforma">
+              <OptRow label={t("chat.overlay.opt.platformIcon")}>
                 <Toggle
                   checked={settings.overlayChatPlatform ?? true}
                   onChange={(v) => setSettings({ overlayChatPlatform: v })}
-                  label="Ícone da plataforma"
+                  label={t("chat.overlay.opt.platformIcon")}
                 />
               </OptRow>
-              <OptRow label="Esconder comandos (!)">
+              <OptRow label={t("chat.overlay.opt.hideCommands")}>
                 <Toggle
                   checked={settings.overlayChatHideCommands ?? false}
                   onChange={(v) => setSettings({ overlayChatHideCommands: v })}
-                  label="Esconder comandos"
+                  label={t("chat.overlay.aria.hideCommands")}
                 />
               </OptRow>
             </OverlayBlock>
@@ -1564,31 +1581,29 @@ const statusDot = (status: string) =>
         ? "bg-warn animate-pulse"
         : "bg-ink-faint";
 
-const statusLabel = (status: string) =>
+const statusLabel = (t: Translate, status: string) =>
   status === "connected"
-    ? "no ar"
+    ? t("chat.status.label.live")
     : status === "error"
-      ? "caiu"
+      ? t("chat.status.label.dropped")
       : status === "waiting"
-        ? "aguardando"
-        : "conectando";
+        ? t("chat.status.label.waiting")
+        : t("chat.status.label.connecting");
 
 // Tooltip com o PORQUÊ do status (o label sozinho parece travado/quebrado).
 // O supervisor do backend já re-tenta sozinho com backoff — a dica avisa isso.
-const statusExplain = (platform: string, status: string) => {
-  if (status === "connected") return "no ar";
+const statusExplain = (t: Translate, platform: string, status: string) => {
+  if (status === "connected") return t("chat.status.explain.live");
   if (status === "waiting")
     return platform === "youtube"
-      ? "esperando sua live do YouTube começar — conecto sozinho quando ela subir"
-      : "esperando a live começar — conecto sozinho quando ela subir";
+      ? t("chat.status.explain.waiting.youtube")
+      : t("chat.status.explain.waiting");
   if (status === "error") {
-    if (platform === "kick")
-      return "caiu — às vezes a Kick bloqueia a leitura; tô tentando de novo sozinho";
-    if (platform === "youtube")
-      return "caiu — confira o canal (@handle ou URL); tô tentando de novo sozinho";
-    return "caiu — confira o nome do canal; tô tentando de novo sozinho";
+    if (platform === "kick") return t("chat.status.explain.error.kick");
+    if (platform === "youtube") return t("chat.status.explain.error.youtube");
+    return t("chat.status.explain.error");
   }
-  return "conectando…";
+  return t("chat.status.explain.connecting");
 };
 
 function SourceCard({
@@ -1600,6 +1615,7 @@ function SourceCard({
   onChange: (patch: Partial<ChatSource>) => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(() => !src.value.trim());
   const [confirmRemove, setConfirmRemove] = useState(false);
   const inputCls =
@@ -1632,18 +1648,20 @@ function SourceCard({
               </span>
             ) : (
               <span className="shrink-0 text-xs font-semibold text-bad">
-                · sem canal
+                · {t("chat.source.noChannel")}
               </span>
             )}
           </div>
           <Toggle
             checked={src.enabled}
             onChange={(v) => onChange({ enabled: v })}
-            label="ligado"
+            label={t("chat.source.toggle")}
           />
           <Collapsible.Trigger asChild>
             <button
-              aria-label={open ? "Recolher canal" : "Expandir canal"}
+              aria-label={
+                open ? t("chat.source.collapse") : t("chat.source.expand")
+              }
               className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
             >
               <ChevronDown
@@ -1659,7 +1677,7 @@ function SourceCard({
         <Collapsible.Content className="flex flex-col gap-2 px-2.5 pb-2.5">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-              Plataforma
+              {t("chat.source.platformLabel")}
             </span>
             <Select
               className="w-36"
@@ -1676,10 +1694,10 @@ function SourceCard({
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_11rem]">
             <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-              {VALUE_LABEL[src.platform]}
+              {t(VALUE_LABEL[src.platform])}
               <input
                 value={src.value}
-                placeholder={PLACEHOLDER[src.platform]}
+                placeholder={t(PLACEHOLDER[src.platform])}
                 onChange={(e) => onChange({ value: e.target.value })}
                 onBlur={(e) => {
                   // Ao sair do campo, limpa o que colou (URL/@/ID/subpágina) pro formato certo.
@@ -1694,20 +1712,20 @@ function SourceCard({
             </label>
             <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
               <span>
-                Apelido{" "}
+                {t("chat.source.nickname")}{" "}
                 <span className="font-medium normal-case text-ink-faint/60">
-                  (opcional)
+                  {t("chat.source.nickname.optional")}
                 </span>
               </span>
               <input
                 value={src.name}
-                placeholder="ex.: Pitrol"
+                placeholder={t("chat.source.nickname.placeholder")}
                 onChange={(e) => onChange({ name: e.target.value })}
                 className={inputCls}
               />
             </label>
           </div>
-          <p className="text-[11px] text-ink-faint">{HINT[src.platform]}</p>
+          <p className="text-[11px] text-ink-faint">{t(HINT[src.platform])}</p>
           <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
             <Button
               variant={confirmRemove ? "danger" : "ghost"}
@@ -1722,7 +1740,9 @@ function SourceCard({
               }}
             >
               <Trash2 className="size-4" />
-              {confirmRemove ? "Remover mesmo?" : "Remover canal"}
+              {confirmRemove
+                ? t("chat.common.removeConfirm")
+                : t("chat.source.remove")}
             </Button>
           </div>
         </Collapsible.Content>
@@ -1731,26 +1751,29 @@ function SourceCard({
   );
 }
 
+// label e placeholder são nomes de produto e de campo dessas plataformas — só a
+// dica é texto de tela.
 const ALERT_META: Record<
   AlertSourceKind,
-  { label: string; placeholder: string; hint: string }
+  { label: string; placeholder: string; hintKey: MessageKey }
 > = {
   streamlabs: {
     label: "Streamlabs",
     placeholder: "Socket API Token",
-    hint: 'Streamlabs → Account Settings → API Settings → "Your Socket API Token". Pega doações, follows, subs e bits.',
+    hintKey: "chat.alertsrc.hint.streamlabs",
   },
   streamelements: {
     label: "StreamElements",
     placeholder: "JWT Token",
-    hint: 'StreamElements → seu perfil → Channels → "Show secrets" → JWT Token. ⚠️ Expira a cada ~2 semanas — é só colar de novo.',
+    hintKey: "chat.alertsrc.hint.streamelements",
   },
 };
 
-const ALERT_STATUS: Record<string, string> = {
-  connected: "no ar",
-  error: "erro",
-  disconnected: "caiu",
+// As chaves vêm do backend (alert://status) — só os rótulos são copy.
+const ALERT_STATUS: Record<string, MessageKey> = {
+  connected: "chat.alertsrc.status.live",
+  error: "chat.alertsrc.status.error",
+  disconnected: "chat.alertsrc.status.dropped",
 };
 
 // API key do YouTube: salva sozinha (onChange), mas ninguém saberia se presta — daí o
@@ -1762,6 +1785,7 @@ function YoutubeApiKeyField({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useT();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(
     null,
@@ -1773,7 +1797,7 @@ function YoutubeApiKeyField({
     setTesting(true);
     setResult(null);
     try {
-      setResult({ ok: true, msg: await api.youtubeKeyCheck(value.trim()) });
+      setResult({ ok: true, msg: await api.youtubeKeyCheck(value.trim(), t) });
     } catch (e) {
       setResult({ ok: false, msg: errMsg(e) });
     } finally {
@@ -1783,17 +1807,18 @@ function YoutubeApiKeyField({
   return (
     <label className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
       <span className="flex flex-wrap items-center gap-1.5">
-        <PlatformGlyph id="youtube" size={14} /> Chave da API do YouTube
-        <Tooltip content="Sem ela a Corneta já lê o chat. Com ela você ganha a contagem de “assistindo” do YouTube.">
+        <PlatformGlyph id="youtube" size={14} />{" "}
+        {t("chat.youtube.apikey.label")}
+        <Tooltip content={t("chat.youtube.apikey.tooltip")}>
           <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
-            · opcional (bom ter)
+            {t("chat.youtube.apikey.optional")}
           </span>
         </Tooltip>
       </span>
       <div className="flex items-center gap-2">
         <input
           value={value}
-          placeholder="cole sua API key (Data API v3)"
+          placeholder={t("chat.youtube.apikey.placeholder")}
           onChange={(e) => onChange(e.target.value)}
           onBlur={(e) => {
             const clean = sanitizeApiKey(e.target.value);
@@ -1808,7 +1833,10 @@ function YoutubeApiKeyField({
           disabled={!value.trim() || testing}
           onClick={verify}
         >
-          <Wifi className="size-3.5" /> {testing ? "Verificando…" : "Verificar"}
+          <Wifi className="size-3.5" />{" "}
+          {testing
+            ? t("chat.youtube.apikey.checking")
+            : t("chat.youtube.apikey.check")}
         </Button>
       </div>
       {result && (
@@ -1838,6 +1866,7 @@ function AlertSourceCard({
   onRemove: () => void;
   onToken: (token: string) => Promise<void>;
 }) {
+  const t = useT();
   const meta = ALERT_META[src.kind];
   const [open, setOpen] = useState(() => !src.hasToken);
   const [editing, setEditing] = useState(false);
@@ -1846,17 +1875,17 @@ function AlertSourceCard({
   const showInput = !src.hasToken || editing;
 
   const save = async () => {
-    const t = sanitizeToken(token);
-    if (!t) return;
-    await onToken(t);
+    const clean = sanitizeToken(token);
+    if (!clean) return;
+    await onToken(clean);
     setToken("");
     setEditing(false);
-    toast.success("Token guardado no cofre 🔒");
+    toast.success(t("chat.alertsrc.tokenStored.toast"));
   };
   const paste = async () => {
     try {
-      const t = await navigator.clipboard.readText();
-      if (t) setToken(sanitizeToken(t));
+      const pasted = await navigator.clipboard.readText();
+      if (pasted) setToken(sanitizeToken(pasted));
     } catch {
       /* área de transferência bloqueada */
     }
@@ -1873,7 +1902,7 @@ function AlertSourceCard({
     setTesting(true);
     setTestResult(null);
     try {
-      setTestResult({ ok: true, msg: await api.alertTest(src.id) });
+      setTestResult({ ok: true, msg: await api.alertTest(src.id, t) });
     } catch (e) {
       setTestResult({ ok: false, msg: errMsg(e) });
     } finally {
@@ -1900,22 +1929,29 @@ function AlertSourceCard({
             </span>
             {src.hasToken ? (
               <span className="truncate text-xs text-ink-muted">
-                · {status ? (ALERT_STATUS[status] ?? status) : "token salvo"}
+                ·{" "}
+                {status
+                  ? ALERT_STATUS[status]
+                    ? t(ALERT_STATUS[status])
+                    : status
+                  : t("chat.alertsrc.tokenSaved")}
               </span>
             ) : (
               <span className="shrink-0 text-xs font-semibold text-bad">
-                · sem token
+                · {t("chat.alertsrc.noToken")}
               </span>
             )}
           </div>
           <Toggle
             checked={src.enabled}
             onChange={(v) => onChange({ enabled: v })}
-            label="ligado"
+            label={t("chat.source.toggle")}
           />
           <Collapsible.Trigger asChild>
             <button
-              aria-label={open ? "Recolher fonte" : "Expandir fonte"}
+              aria-label={
+                open ? t("chat.alertsrc.collapse") : t("chat.alertsrc.expand")
+              }
               className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
             >
               <ChevronDown
@@ -1943,7 +1979,7 @@ function AlertSourceCard({
                 className="flex-1"
               />
               <Button variant="subtle" size="sm" onClick={paste}>
-                <ClipboardPaste className="size-4" /> Colar
+                <ClipboardPaste className="size-4" /> {t("chat.common.paste")}
               </Button>
               <Button
                 variant="primary"
@@ -1951,7 +1987,7 @@ function AlertSourceCard({
                 disabled={!token.trim()}
                 onClick={save}
               >
-                Salvar
+                {t("chat.common.save")}
               </Button>
               {editing && (
                 <Button
@@ -1966,7 +2002,9 @@ function AlertSourceCard({
           ) : (
             <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2">
               <Check className="size-4 text-ok" strokeWidth={2.6} />
-              <span className="text-sm font-semibold">Token no cofre</span>
+              <span className="text-sm font-semibold">
+                {t("chat.alertsrc.tokenStored.chip")}
+              </span>
               <div className="ml-auto flex gap-1">
                 <Button
                   variant="ghost"
@@ -1975,7 +2013,7 @@ function AlertSourceCard({
                   disabled={testing}
                 >
                   <Wifi className="size-3.5" />{" "}
-                  {testing ? "Testando…" : "Testar"}
+                  {testing ? t("chat.common.testing") : t("chat.common.test")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1985,7 +2023,7 @@ function AlertSourceCard({
                     setEditing(true);
                   }}
                 >
-                  <Pencil className="size-3.5" /> Trocar
+                  <Pencil className="size-3.5" /> {t("chat.alertsrc.replace")}
                 </Button>
               </div>
             </div>
@@ -2000,7 +2038,7 @@ function AlertSourceCard({
               {testResult.ok ? "✓" : "✕"} {testResult.msg}
             </span>
           )}
-          <p className="text-[11px] text-ink-faint">{meta.hint}</p>
+          <p className="text-[11px] text-ink-faint">{t(meta.hintKey)}</p>
           <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
             <Button
               variant={confirmRemove ? "danger" : "ghost"}
@@ -2015,7 +2053,9 @@ function AlertSourceCard({
               }}
             >
               <Trash2 className="size-4" />
-              {confirmRemove ? "Remover mesmo?" : "Remover fonte"}
+              {confirmRemove
+                ? t("chat.common.removeConfirm")
+                : t("chat.alertsrc.remove")}
             </Button>
           </div>
         </Collapsible.Content>
@@ -2049,6 +2089,7 @@ function ByokModeActions({
   onUseSaved?: () => void;
   onForget?: () => void;
 }) {
+  const t = useT();
   if (!modes) return null;
   const back = modes.ownCreds && !modes.usingOwnCreds;
   return (
@@ -2058,7 +2099,7 @@ function ByokModeActions({
           onClick={onUseOfficial}
           className="text-[11px] font-bold text-brass hover:underline"
         >
-          Voltar pro login oficial da Corneta
+          {t("chat.byok.useOfficial")}
         </button>
       )}
       {back && onUseSaved && (
@@ -2066,7 +2107,7 @@ function ByokModeActions({
           onClick={onUseSaved}
           className="text-[11px] font-bold text-brass hover:underline"
         >
-          Usar as credenciais que já salvei
+          {t("chat.byok.useSaved")}
         </button>
       )}
       {/* Esquecer é destrutivo: só aparece quando o oficial pode assumir no lugar. */}
@@ -2075,13 +2116,12 @@ function ByokModeActions({
           onClick={onForget}
           className="text-[11px] font-semibold text-ink-faint hover:text-danger hover:underline"
         >
-          esquecer minhas credenciais
+          {t("chat.byok.forget")}
         </button>
       )}
       {modes.usingOwnCreds && !modes.officialReady && (
         <span className="text-[11px] text-ink-faint">
-          (o oficial não respondeu na última checagem — suas credenciais ficam
-          salvas de qualquer jeito)
+          {t("chat.byok.officialDown")}
         </span>
       )}
     </div>
@@ -2101,6 +2141,7 @@ function YoutubeCredsForm({
   onUseSaved?: () => void;
   onForget?: () => void;
 }) {
+  const t = useT();
   const [id, setId] = useState("");
   const [secret, setSecret] = useState("");
   const [guide, setGuide] = useState(false);
@@ -2110,8 +2151,14 @@ function YoutubeCredsForm({
     onSave(sanitizeToken(id), sanitizeToken(secret));
     setId("");
     setSecret("");
-    toast.success("Credenciais do YouTube no cofre 🔒");
+    toast.success(t("chat.youtube.creds.saved.toast"));
   };
+  // O passo 1 tem um LINK no meio da frase; "Google Cloud Console" é nome de
+  // produto e sai igual nos dois idiomas, então dá pra cortar a frase nele.
+  const [step1Before, step1After] = splitAt(
+    t("chat.youtube.guide.step1"),
+    "Google Cloud Console",
+  );
   return (
     <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
       <div className="mb-2 flex items-center gap-2">
@@ -2121,7 +2168,9 @@ function YoutubeCredsForm({
           onClick={() => setGuide((v) => !v)}
           className="ml-auto text-xs font-bold text-brass hover:underline"
         >
-          {guide ? "ocultar guia" : "como conseguir?"}
+          {guide
+            ? t("chat.youtube.creds.guide.hide")
+            : t("chat.youtube.creds.guide.show")}
         </button>
       </div>
 
@@ -2136,7 +2185,7 @@ function YoutubeCredsForm({
         <>
           <ol className="mb-2.5 list-decimal space-y-2 rounded-md bg-surface px-5 py-3 text-[11px] leading-relaxed text-ink-muted marker:font-bold marker:text-brass">
             <li>
-              Abra o{" "}
+              {step1Before}
               <button
                 onClick={() =>
                   void openExternal(
@@ -2146,79 +2195,24 @@ function YoutubeCredsForm({
                 className="font-bold text-brass hover:underline"
               >
                 Google Cloud Console
-              </button>{" "}
-              e crie um projeto (dê qualquer nome, ex.: “Corneta”). Quando
-              terminar, confira lá no topo se o projeto novo é o que está
-              selecionado.
+              </button>
+              {step1After}
             </li>
-            <li>
-              No menu{" "}
-              <strong className="text-ink">
-                ☰ → APIs e serviços → Biblioteca
-              </strong>
-              , busque por{" "}
-              <strong className="text-ink">YouTube Data API v3</strong> e clique
-              em <strong className="text-ink">Ativar</strong>.
-            </li>
-            <li>
-              Ainda em <strong className="text-ink">APIs e serviços</strong>,
-              procure por{" "}
-              <strong className="text-ink">Tela de permissão OAuth</strong> (nas
-              versões novas isso aparece como{" "}
-              <strong className="text-ink">Público-alvo</strong> ou{" "}
-              <strong className="text-ink">Branding</strong>). Se pedir o{" "}
-              <strong className="text-ink">Tipo de usuário</strong>, escolha{" "}
-              <strong className="text-ink">Externo</strong> e siga.
-            </li>
-            <li>
-              Preencha os{" "}
-              <strong className="text-ink">campos obrigatórios</strong>:{" "}
-              <strong className="text-ink">Nome do app</strong> (o que quiser),{" "}
-              <strong className="text-ink">E-mail de suporte do usuário</strong>{" "}
-              (o seu e-mail) e, mais pra baixo,{" "}
-              <strong className="text-ink">
-                E-mail de contato do desenvolvedor
-              </strong>{" "}
-              (o seu e-mail de novo). Salve e continue.
-            </li>
-            <li>
-              Procure a seção{" "}
-              <strong className="text-ink">Usuários de teste</strong> (fica na
-              aba <strong className="text-ink">Público-alvo</strong> /
-              “Audience”) e{" "}
-              <strong className="text-ink">
-                adicione o e-mail da sua conta do YouTube
-              </strong>
-              . Sem isso o login nem funciona.
-            </li>
-            <li>
-              Em{" "}
-              <strong className="text-ink">
-                Credenciais → Criar credenciais → ID do cliente OAuth
-              </strong>
-              , escolha o tipo{" "}
-              <strong className="text-ink">
-                TVs e dispositivos de entrada limitada
-              </strong>{" "}
-              e crie.
-            </li>
-            <li>
-              Copie o <strong className="text-ink">Client ID</strong> e o{" "}
-              <strong className="text-ink">Client Secret</strong> e cole aqui
-              embaixo. ↓
-            </li>
+            {/* Os negritos são os rótulos que a pessoa vai caçar na tela do
+                Google — vêm marcados no dicionário porque em cada idioma o
+                rótulo é outro e cai em outro lugar da frase. */}
+            <li>{bold(t, "chat.youtube.guide.step2")}</li>
+            <li>{bold(t, "chat.youtube.guide.step3")}</li>
+            <li>{bold(t, "chat.youtube.guide.step4")}</li>
+            <li>{bold(t, "chat.youtube.guide.step5")}</li>
+            <li>{bold(t, "chat.youtube.guide.step6")}</li>
+            <li>{bold(t, "chat.youtube.guide.step7")}</li>
           </ol>
           <p className="mb-2.5 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
-            <strong className="text-ink">⚠️ Importante:</strong> enquanto o app
-            ficar em modo{" "}
-            <strong className="text-ink">“Teste” (Testing)</strong> — o normal,
-            sem passar pela verificação do Google — o login do YouTube{" "}
-            <strong className="text-ink">expira a cada ~7 dias</strong>. Quando
-            cair, é só voltar aqui e clicar em{" "}
-            <strong className="text-ink">Entrar</strong> de novo. Por isso o
-            passo de se colocar como{" "}
-            <strong className="text-ink">Usuário de teste</strong> é obrigatório
-            (publicar/verificar o app é opcional e bem mais burocrático).
+            <strong className="text-ink">
+              {t("chat.youtube.guide.warn.label")}
+            </strong>{" "}
+            {bold(t, "chat.youtube.guide.warn.text")}
           </p>
         </>
       )}
@@ -2243,7 +2237,7 @@ function YoutubeCredsForm({
             className="flex-1"
           />
           <Button variant="primary" size="sm" disabled={!can} onClick={save}>
-            Salvar
+            {t("chat.common.save")}
           </Button>
         </div>
       </div>
@@ -2264,6 +2258,7 @@ function KickCredsForm({
   onUseSaved?: () => void;
   onForget?: () => void;
 }) {
+  const t = useT();
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const canSave = clientId.trim() !== "" && clientSecret.trim() !== "";
@@ -2272,7 +2267,7 @@ function KickCredsForm({
     onSave(sanitizeToken(clientId), sanitizeToken(clientSecret));
     setClientId("");
     setClientSecret("");
-    toast.success("Credenciais da Kick no cofre 🔒");
+    toast.success(t("chat.kick.creds.saved.toast"));
   };
   return (
     <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
@@ -2285,12 +2280,11 @@ function KickCredsForm({
             void openExternal("https://kick.com/settings/developer")
           }
         >
-          abrir Developer
+          {t("chat.kick.creds.openDeveloper")}
         </button>
       </div>
       <p className="mb-2 text-[11px] text-ink-muted">
-        Use o redirect <strong>http://localhost:7395/callback</strong>. O
-        segredo fica somente no cofre do sistema.
+        {bold(t, "chat.kick.creds.redirect")}
       </p>
       <ByokModeActions
         modes={modes}
@@ -2323,7 +2317,7 @@ function KickCredsForm({
             disabled={!canSave}
             onClick={save}
           >
-            Salvar
+            {t("chat.common.save")}
           </Button>
         </div>
       </div>
@@ -2363,6 +2357,7 @@ function LoginRow({
   onLogin: () => void;
   onLogout: () => void;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const openPage = () => {
     const url = state.verifyUriComplete || state.verifyUri;
@@ -2385,7 +2380,10 @@ function LoginRow({
         <span className="font-display text-sm font-bold">{label}</span>
         {state.state === "connected" && (
           <span className="truncate text-xs font-semibold text-ok">
-            · logado{state.login ? ` como @${state.login}` : ""}
+            ·{" "}
+            {state.login
+              ? t("chat.loginrow.signedInAs", { login: state.login })
+              : t("chat.loginrow.signedIn")}
           </span>
         )}
         {state.state === "error" && (
@@ -2394,11 +2392,11 @@ function LoginRow({
         <div className="ml-auto shrink-0">
           {!enabled ? (
             <span className="text-[11px] text-ink-faint">
-              indisponível nesta versão
+              {t("chat.loginrow.unavailable")}
             </span>
           ) : state.state === "connected" ? (
             <Button variant="ghost" size="sm" onClick={onLogout}>
-              Sair
+              {t("chat.loginrow.signout")}
             </Button>
           ) : (
             <Button
@@ -2408,7 +2406,7 @@ function LoginRow({
               disabled={state.state === "code"}
               onClick={onLogin}
             >
-              <LogIn className="size-3.5" /> Entrar
+              <LogIn className="size-3.5" /> {t("chat.loginrow.signin")}
             </Button>
           )}
         </div>
@@ -2418,12 +2416,14 @@ function LoginRow({
           // Fallback BYOK do Google sem URL pré-preenchida: guiamos copiar → colar → autorizar.
           <div className="mt-2 rounded-md bg-brass/5 px-3 py-2.5 ring-1 ring-brass/25">
             <div className="mb-2 text-xs font-bold text-ink">
-              Falta 1 passo — autorizar no navegador:
+              {t("chat.loginrow.device.title")}
             </div>
             <div className="flex flex-col gap-2 text-xs text-ink-muted">
               <div className="flex flex-wrap items-center gap-2">
                 <StepNum n={1} />
-                <span className="shrink-0">Copie o código</span>
+                <span className="shrink-0">
+                  {t("chat.loginrow.device.step1")}
+                </span>
                 <span className="select-all rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
                   {state.userCode}
                 </span>
@@ -2437,34 +2437,38 @@ function LoginRow({
                   ) : (
                     <Copy className="size-3.5" />
                   )}
-                  {copied ? "Copiado" : "Copiar"}
+                  {copied ? t("chat.common.copied") : t("chat.common.copy")}
                 </Button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <StepNum n={2} />
-                <span className="shrink-0">Cole na página que abrimos</span>
+                <span className="shrink-0">
+                  {t("chat.loginrow.device.step2")}
+                </span>
                 <Button variant="subtle" size="sm" onClick={openPage}>
-                  <ExternalLink className="size-3.5" /> Abrir a página
+                  <ExternalLink className="size-3.5" />{" "}
+                  {t("chat.loginrow.device.openPage")}
                 </Button>
               </div>
               <div className="flex items-center gap-2">
                 <StepNum n={3} />
                 <span>
-                  Autorize e pronto — a Corneta entra sozinha.{" "}
-                  <span className="text-ink-faint">(aguardando…)</span>
+                  {t("chat.loginrow.device.step3")}{" "}
+                  <span className="text-ink-faint">
+                    {t("chat.loginrow.device.waitingParens")}
+                  </span>
                 </span>
               </div>
             </div>
             <p className="mt-2 text-[11px] text-ink-faint">
-              Já copiamos o código e abrimos a página do Google pra você — é só
-              colar e autorizar.
+              {t("chat.loginrow.device.note")}
             </p>
           </div>
         ) : (
           // Twitch, YouTube oficial ou Kick: abrir e autorizar. Mostra o código como referência
           // quando houver (a Twitch pede para conferi-lo).
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
-            <span>Abrimos a autorização no navegador — é só confirmar.</span>
+            <span>{t("chat.loginrow.browser.note")}</span>
             {state.userCode && (
               <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
                 {state.userCode}
@@ -2476,9 +2480,10 @@ function LoginRow({
               className="ml-auto"
               onClick={openPage}
             >
-              <ExternalLink className="size-3.5" /> Abrir de novo
+              <ExternalLink className="size-3.5" />{" "}
+              {t("chat.loginrow.browser.openAgain")}
             </Button>
-            <span className="text-ink-faint">aguardando…</span>
+            <span className="text-ink-faint">{t("chat.loginrow.waiting")}</span>
           </div>
         ))}
     </div>

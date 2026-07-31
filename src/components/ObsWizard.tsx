@@ -10,14 +10,21 @@ import {
 import { useStore } from "../lib/store";
 import { IS_TAURI } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
+import { bold, useT, type I18n } from "../lib/i18n";
 import { cn } from "../lib/utils";
 import { Modal } from "./Modal";
 import { Button, CopyField, Input } from "./ui";
 
 type Status = "idle" | "connecting" | "ok" | "error";
 
-/** Traduz o erro cru do obs-websocket pra um recado na voz da casa + checklist. */
-function obsErrorHelp(raw: string): { title: string; tips: string[] } {
+/** Traduz o erro cru do obs-websocket pra um recado na voz da casa + checklist.
+ *
+ *  Não é componente: recebe o `t` de quem chama. As palavras comparadas aqui
+ *  ("senha", "fechou"…) são o texto CRU do backend, não copy — não traduzir. */
+function obsErrorHelp(
+  t: I18n["t"],
+  raw: string,
+): { title: string; tips: string[] } {
   const e = raw.toLowerCase();
   if (
     e.includes("auth") ||
@@ -31,11 +38,11 @@ function obsErrorHelp(raw: string): { title: string; tips: string[] } {
     e.includes("close")
   ) {
     return {
-      title: "A senha do WebSocket não bateu.",
+      title: t("encoding.wizard.error.auth.title"),
       tips: [
-        "Pegue a senha certa no OBS: Ferramentas → Configurações do Servidor WebSocket → Mostrar Chave de Conexão.",
-        "Cole ela no passo 2 aqui em cima e tente de novo.",
-        "Se “Ativar Autenticação” estiver desmarcado no OBS, é porque não tem senha — deixe o campo vazio.",
+        t("encoding.wizard.error.auth.tip1"),
+        t("encoding.wizard.error.auth.tip2"),
+        t("encoding.wizard.error.auth.tip3"),
       ],
     };
   }
@@ -50,20 +57,20 @@ function obsErrorHelp(raw: string): { title: string; tips: string[] } {
     e.includes(" ws")
   ) {
     return {
-      title: "Não achei o OBS pra conectar.",
+      title: t("encoding.wizard.error.notfound.title"),
       tips: [
-        "O OBS está aberto aí no seu PC?",
-        "O WebSocket está ligado? Ferramentas → Configurações do Servidor WebSocket → Ativar Servidor WebSocket.",
-        "A porta continua a padrão, 4455?",
-        "Algum firewall pode estar barrando a conexão — libere o OBS pra mim.",
+        t("encoding.wizard.error.notfound.tip1"),
+        t("encoding.wizard.error.notfound.tip2"),
+        t("encoding.wizard.error.notfound.tip3"),
+        t("encoding.wizard.error.notfound.tip4"),
       ],
     };
   }
   return {
-    title: "Não consegui configurar o OBS sozinha.",
+    title: t("encoding.wizard.error.generic.title"),
     tips: [
-      "Confira se o OBS está aberto e com o WebSocket ligado (Ferramentas → Configurações do Servidor WebSocket).",
-      "Sem estresse: dá pra configurar na mão logo abaixo.",
+      t("encoding.wizard.error.generic.tip1"),
+      t("encoding.wizard.error.generic.tip2"),
     ],
   };
 }
@@ -72,11 +79,12 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   const settings = useStore((s) => s.config!.settings);
   const ingest = useStore((s) => s.config!.ingest);
   const setSettings = useStore((s) => s.setSettings);
+  const t = useT();
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
 
-  const help = error ? obsErrorHelp(error) : null;
+  const help = error ? obsErrorHelp(t, error) : null;
 
   const connect = async () => {
     setStatus("connecting");
@@ -99,7 +107,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Conectar ao OBS"
+      title={t("encoding.wizard.title")}
       onClose={onClose}
       className="max-w-lg rounded-xl bg-surface pop"
     >
@@ -110,41 +118,32 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <h2 id="obs-wizard-title" className="text-xl">
-              Conectar ao OBS
+              {t("encoding.wizard.title")}
             </h2>
             <p className="text-xs font-semibold opacity-80">
-              A Corneta configura o OBS sozinha.
+              {t("encoding.wizard.subtitle")}
             </p>
           </div>
         </div>
         <button
           onClick={onClose}
           className="text-brass-ink/70 hover:text-brass-ink"
-          aria-label="Fechar"
+          aria-label={t("encoding.close")}
         >
           <X className="size-5" />
         </button>
       </div>
 
       <div className="flex flex-col gap-4 p-5">
-        <Step n={1} title="Ative o WebSocket no OBS">
-          No OBS:{" "}
-          <strong className="text-ink">
-            Ferramentas → Configurações do Servidor WebSocket
-          </strong>{" "}
-          e marque{" "}
-          <strong className="text-ink">Ativar Servidor WebSocket</strong> (a
-          porta já vem 4455, pode deixar).
+        <Step n={1} title={t("encoding.wizard.step1.title")}>
+          {bold(t, "encoding.wizard.step1.body")}
         </Step>
 
-        <Step n={2} title="Senha (se tiver)">
-          Se <strong className="text-ink">Ativar Autenticação</strong> estiver
-          marcado, clique em{" "}
-          <strong className="text-ink">Mostrar Chave de Conexão</strong>, copie
-          e cole aqui. Sem senha? Deixe vazio.
+        <Step n={2} title={t("encoding.wizard.step2.title")}>
+          {bold(t, "encoding.wizard.step2.body")}
           <Input
             type="password"
-            placeholder="senha do WebSocket"
+            placeholder={t("encoding.wizard.step2.placeholder")}
             className="mt-2"
             value={settings.obsPassword}
             onChange={(e) => setSettings({ obsPassword: e.target.value })}
@@ -153,28 +152,18 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
 
         {/* O autoconfigure só grava servidor+chave no OBS — quem dá o play é o
               BORA (se autoStartObs) ou o próprio streamer. A copy segue a realidade. */}
-        <Step n={3} title="Conecte">
-          {settings.autoStartObs ? (
-            <>
-              Eu conecto e configuro o OBS pra apontar pra cá. Na hora do{" "}
-              <strong className="text-ink">BORA AO VIVO</strong>, eu mesma dou o
-              play no OBS.
-            </>
-          ) : (
-            <>
-              Eu conecto e configuro o OBS pra apontar pra cá. Depois, na hora
-              da live, é só dar{" "}
-              <strong className="text-ink">Iniciar transmissão</strong> no OBS.
-            </>
-          )}
+        <Step n={3} title={t("encoding.wizard.step3.title")}>
+          {settings.autoStartObs
+            ? bold(t, "encoding.wizard.step3.body.autostart")
+            : bold(t, "encoding.wizard.step3.body.manual")}
         </Step>
 
         {status === "ok" && (
           <div className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok">
             <Check className="size-4 shrink-0" strokeWidth={2.6} />{" "}
             {settings.autoStartObs
-              ? "Conectado! O OBS já aponta pra Corneta. Quando você der BORA AO VIVO, eu mando o OBS transmitir sozinho."
-              : "Conectado! O OBS já aponta pra Corneta. Na hora da live, é só clicar Iniciar transmissão no OBS."}
+              ? bold(t, "encoding.wizard.ok.autostart")
+              : bold(t, "encoding.wizard.ok.manual")}
           </div>
         )}
         {status === "error" && help && (
@@ -183,13 +172,13 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
               <AlertTriangle className="size-4 shrink-0" /> {help.title}
             </div>
             <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-ink-muted">
-              {help.tips.map((t, i) => (
-                <li key={i}>{t}</li>
+              {help.tips.map((tip, i) => (
+                <li key={i}>{tip}</li>
               ))}
             </ul>
             <details className="mt-2 text-xs text-ink-faint">
               <summary className="cursor-pointer select-none font-semibold">
-                Ver detalhe técnico
+                {t("encoding.wizard.error.details")}
               </summary>
               <p
                 data-selectable
@@ -209,7 +198,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-ink-muted hover:text-ink"
           >
             <Wrench className="size-4 text-brass" />
-            Prefiro configurar na mão
+            {t("encoding.wizard.manual.toggle")}
             <ChevronDown
               className={cn(
                 "ml-auto size-4 transition-transform",
@@ -220,35 +209,22 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           {manualOpen && (
             <div className="flex flex-col gap-2 border-t border-border-soft p-3">
               <p className="text-xs text-ink-faint">
-                Na mão também é rápido. No OBS:{" "}
-                <strong className="text-ink-muted">
-                  Configurações → Transmissão → Serviço “Personalizado”
-                </strong>{" "}
-                e cole estes dois campos:
+                {bold(t, "encoding.wizard.manual.lede")}
               </p>
-              <CopyField label="Servidor" value={obsIngestUrl(ingest)} />
-              <CopyField label="Chave de transmissão" value={ingest.key} mono />
+              <CopyField
+                label={t("encoding.wizard.manual.server")}
+                value={obsIngestUrl(ingest)}
+              />
+              <CopyField
+                label={t("encoding.wizard.manual.key")}
+                value={ingest.key}
+                mono
+              />
               <p className="text-xs text-ink-faint">
                 {/* Na mão, o WebSocket pode não estar de pé — promessa mais modesta. */}
-                {settings.autoStartObs ? (
-                  <>
-                    Com isso colado, na hora do{" "}
-                    <strong className="text-ink-muted">BORA AO VIVO</strong> eu
-                    tento dar o play no OBS pra você — se nada acontecer, dê{" "}
-                    <strong className="text-ink-muted">
-                      Iniciar transmissão
-                    </strong>{" "}
-                    nele.
-                  </>
-                ) : (
-                  <>
-                    Depois, na hora da live, é só dar{" "}
-                    <strong className="text-ink-muted">
-                      Iniciar transmissão
-                    </strong>{" "}
-                    no OBS.
-                  </>
-                )}
+                {settings.autoStartObs
+                  ? bold(t, "encoding.wizard.manual.note.autostart")
+                  : bold(t, "encoding.wizard.manual.note.manual")}
               </p>
             </div>
           )}
@@ -259,11 +235,12 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
           >
-            Fechar
+            {t("encoding.close")}
           </button>
           {status === "ok" ? (
             <Button variant="primary" onClick={onClose}>
-              Pronto <Check className="size-4" strokeWidth={2.6} />
+              {t("encoding.wizard.cta.done")}{" "}
+              <Check className="size-4" strokeWidth={2.6} />
             </Button>
           ) : (
             <Button
@@ -273,10 +250,10 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
               disabled={status === "connecting"}
             >
               {status === "connecting"
-                ? "Conectando…"
+                ? t("encoding.wizard.cta.connecting")
                 : status === "error"
-                  ? "Tentar de novo"
-                  : "Conectar e configurar"}
+                  ? t("encoding.wizard.cta.retry")
+                  : t("encoding.wizard.cta.connect")}
             </Button>
           )}
         </div>

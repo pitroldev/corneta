@@ -1,11 +1,6 @@
 import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "./content";
 import { DEFAULT_LOCALE, localePath, translator, type Locale } from "./i18n";
-import {
-  LEGAL_CNPJ,
-  LEGAL_CONTACT,
-  LEGAL_OPERATOR,
-  LEGAL_ROUTES,
-} from "./legal";
+import { LEGAL_CNPJ, LEGAL_CONTACT, LEGAL_OPERATOR, legalHref } from "./legal";
 import { siteUrl } from "./site";
 
 // Dados estruturados (schema.org / JSON-LD).
@@ -148,10 +143,17 @@ export function homeJsonLd(locale: Locale = DEFAULT_LOCALE) {
 }
 
 /** Trilha das páginas legais + identificação da página. */
-export function legalJsonLd(kind: "privacy" | "terms") {
+const LEGAL_NAME: Record<Locale, Record<"privacy" | "terms", string>> = {
+  "pt-BR": { privacy: "Política de privacidade", terms: "Termos de uso" },
+  en: { privacy: "Privacy policy", terms: "Terms of use" },
+};
+
+export function legalJsonLd(kind: "privacy" | "terms", locale: Locale) {
   const isPrivacy = kind === "privacy";
-  const path = isPrivacy ? LEGAL_ROUTES.privacy : LEGAL_ROUTES.terms;
-  const name = isPrivacy ? "Política de privacidade" : "Termos de uso";
+  // O `@id` e a URL carregam o idioma: dois documentos, duas páginas — declarar
+  // o mesmo `@id` pros dois faria o buscador tratar a tradução como duplicata.
+  const path = legalHref(locale, isPrivacy ? "privacy" : "terms");
+  const name = LEGAL_NAME[locale][kind];
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -160,7 +162,7 @@ export function legalJsonLd(kind: "privacy" | "terms") {
         "@id": abs(`${path}#pagina`),
         url: abs(path),
         name: `${name} — Corneta`,
-        inLanguage: "pt-BR",
+        inLanguage: locale,
         isPartOf: { "@id": abs("/#site") },
         publisher: { "@id": abs("/#empresa") },
         about: { "@id": abs("/#app") },
@@ -173,7 +175,7 @@ export function legalJsonLd(kind: "privacy" | "terms") {
             "@type": "ListItem",
             position: 1,
             name: "Corneta",
-            item: siteUrl.toString(),
+            item: abs(locale === "en" ? "/en" : "/"),
           },
           { "@type": "ListItem", position: 2, name },
         ],

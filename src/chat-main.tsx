@@ -4,6 +4,8 @@ import "@fontsource/baloo-2/latin-600.css";
 import "@fontsource/baloo-2/latin-700.css";
 import "@fontsource/baloo-2/latin-800.css";
 import { ChatPopout } from "./screens/ChatPopout";
+import { crashText } from "./components/ErrorBoundary";
+import { I18nFromConfig } from "./lib/i18n/provider";
 import "./index.css";
 
 // Entry DEDICADO da janela flutuante do chat. Não importa o App (motor, telas,
@@ -19,6 +21,7 @@ class ErrorBoundary extends React.Component<
   }
   render() {
     if (this.state.error) {
+      const text = crashText();
       return (
         <div
           style={{
@@ -30,10 +33,10 @@ class ErrorBoundary extends React.Component<
             overflow: "auto",
           }}
         >
-          <strong>O chat falhou ao carregar.</strong>
+          <strong>{text.chatTitle}</strong>
           <p style={{ color: "#ff8a6a" }}>{this.state.error.message}</p>
           <details style={{ marginTop: 8 }}>
-            <summary>Detalhes técnicos</summary>
+            <summary>{text.details}</summary>
             <pre
               style={{ whiteSpace: "pre-wrap", marginTop: 8, color: "#ff8a6a" }}
             >
@@ -50,7 +53,9 @@ class ErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ChatPopout />
+      <I18nFromConfig>
+        <ChatPopout />
+      </I18nFromConfig>
     </ErrorBoundary>
   </React.StrictMode>,
 );

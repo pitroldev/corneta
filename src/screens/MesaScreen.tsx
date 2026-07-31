@@ -19,6 +19,7 @@ import { useMesa } from "../lib/mesaStore";
 import { IS_TAURI } from "../lib/api";
 import type { MesaPeer } from "../lib/mesa";
 import { cn } from "../lib/utils";
+import { useT, type MessageKey } from "../lib/i18n";
 import {
   Badge,
   Button,
@@ -82,22 +83,24 @@ function VideoTile({
   );
 }
 
-const CONN_LABEL: Record<string, { text: string; down: boolean }> = {
-  new: { text: "ligando…", down: true },
-  connecting: { text: "ligando…", down: true },
-  connected: { text: "no ar", down: false },
-  disconnected: { text: "caiu", down: true },
-  failed: { text: "caiu", down: true },
-  closed: { text: "saiu", down: true },
+// As CHAVES são ids de estado do WebRTC — só o rótulo é texto, e ele sai do
+// dicionário na hora de renderizar.
+const CONN_LABEL: Record<string, { key: MessageKey; down: boolean }> = {
+  new: { key: "platforms.mesa.conn.connecting", down: true },
+  connecting: { key: "platforms.mesa.conn.connecting", down: true },
+  connected: { key: "platforms.mesa.conn.live", down: false },
+  disconnected: { key: "platforms.mesa.conn.dropped", down: true },
+  failed: { key: "platforms.mesa.conn.dropped", down: true },
+  closed: { key: "platforms.mesa.conn.left", down: true },
 };
 
-// MesaStatus em pt-BR (o badge do topo — senão vaza "connecting"/"offline" cru).
-const STATUS_LABEL: Record<string, string> = {
-  idle: "fora",
-  connecting: "conectando…",
-  online: "na mesa",
-  offline: "reconectando…",
-  error: "deu ruim",
+// MesaStatus traduzido (o badge do topo — senão vaza "connecting"/"offline" cru).
+const STATUS_LABEL: Record<string, MessageKey> = {
+  idle: "platforms.mesa.status.idle",
+  connecting: "platforms.mesa.status.connecting",
+  online: "platforms.mesa.status.online",
+  offline: "platforms.mesa.status.offline",
+  error: "platforms.mesa.status.error",
 };
 
 // ---- Ilustrações da Mesa: tudo em "tiles" de webcam (moldura + busto) ----
@@ -162,6 +165,7 @@ function Cam({
 
 // Criar: as câmeras da galera (tomate) convergem na SUA (latão, ao vivo) — você é o host.
 function HostHubArt() {
+  const t = useT();
   const guests: [number, number][] = [
     [16, 8],
     [16, 37],
@@ -198,7 +202,7 @@ function HostHubArt() {
         fill={BRASS}
         letterSpacing="1"
       >
-        VOCÊ
+        {t("platforms.mesa.art.you")}
       </text>
     </svg>
   );
@@ -206,6 +210,7 @@ function HostHubArt() {
 
 // Entrar: seu convite (ingresso MESA) entra numa Mesa já formada (cluster de câmeras).
 function GuestTicketArt() {
+  const t = useT();
   return (
     <svg viewBox="0 0 260 96" className="h-full w-full" aria-hidden>
       <g transform="rotate(-7 70 48)">
@@ -237,7 +242,7 @@ function GuestTicketArt() {
           fill={INK}
           letterSpacing="1.5"
         >
-          CONVITE
+          {t("platforms.mesa.art.invite")}
         </text>
         <text
           x="57"
@@ -315,6 +320,7 @@ function MeshArt() {
 }
 
 export function MesaScreen() {
+  const t = useT();
   const mesa = useMesa();
   const [name, setName] = useState(() => {
     try {
@@ -346,9 +352,9 @@ export function MesaScreen() {
   return (
     <div className="mx-auto max-w-5xl">
       <SectionTitle
-        kicker="Mesa · co-stream"
-        title="Chama a galera pra Mesa"
-        subtitle="Webcam de cada um direto P2P, em alta — sem call do Discord, sem mosaico borrado. E quem cai vira 'JÁ VOLTO' no lugar, sem quebrar a sua cena."
+        kicker={t("platforms.mesa.kicker")}
+        title={t("platforms.mesa.title")}
+        subtitle={t("platforms.mesa.subtitle")}
         right={
           mesa.active ? (
             <Badge
@@ -359,7 +365,9 @@ export function MesaScreen() {
               ) : (
                 <WifiOff className="size-3.5" />
               )}
-              {STATUS_LABEL[mesa.status] ?? mesa.status}
+              {STATUS_LABEL[mesa.status]
+                ? t(STATUS_LABEL[mesa.status])
+                : mesa.status}
             </Badge>
           ) : undefined
         }
@@ -368,8 +376,7 @@ export function MesaScreen() {
       {!IS_TAURI && (
         <Card className="mb-6 border-l-4 border-warn bg-warn/10">
           <div className="text-sm font-semibold text-ink">
-            Modo demonstração — a Mesa de verdade só roda no app instalado. Aqui
-            dá pra testar a câmera e ver a interface.
+            {t("platforms.mesa.demoNotice")}
           </div>
         </Card>
       )}
@@ -390,8 +397,8 @@ export function MesaScreen() {
             <VideoTile
               stream={mesa.localStream}
               muted
-              label="Você"
-              sub={mesa.micOn ? undefined : "mudo"}
+              label={t("platforms.mesa.you")}
+              sub={mesa.micOn ? undefined : t("platforms.mesa.muted")}
             />
             <div className="mt-3 flex gap-2">
               <Button
@@ -406,7 +413,9 @@ export function MesaScreen() {
                 ) : (
                   <VideoOff className="size-4" />
                 )}
-                {mesa.camOn ? "Câmera" : "Sem vídeo"}
+                {mesa.camOn
+                  ? t("platforms.mesa.cam.on")
+                  : t("platforms.mesa.cam.off")}
               </Button>
               <Button
                 variant={mesa.micOn ? "subtle" : "danger"}
@@ -420,7 +429,9 @@ export function MesaScreen() {
                 ) : (
                   <MicOff className="size-4" />
                 )}
-                {mesa.micOn ? "Mic" : "Mudo"}
+                {mesa.micOn
+                  ? t("platforms.mesa.mic.on")
+                  : t("platforms.mesa.mic.off")}
               </Button>
             </div>
           </div>
@@ -429,14 +440,14 @@ export function MesaScreen() {
             {!mesa.localStream ? (
               <Button
                 variant="primary"
-                onClick={() => void mesa.openLocal()}
+                onClick={() => void mesa.openLocal(t)}
                 className="self-start"
               >
-                <Camera className="size-4" /> Ligar minha câmera
+                <Camera className="size-4" /> {t("platforms.mesa.openCam")}
               </Button>
             ) : (
               <div className="text-sm font-semibold text-ok">
-                Câmera ligada ✓
+                {t("platforms.mesa.camOn")}
               </div>
             )}
 
@@ -451,14 +462,14 @@ export function MesaScreen() {
                     variant="outline"
                     onClick={() => void mesa.openPrivacy("camera")}
                   >
-                    Abrir privacidade (câmera)
+                    {t("platforms.mesa.privacy.camera")}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => void mesa.openPrivacy("microphone")}
                   >
-                    Abrir privacidade (microfone)
+                    {t("platforms.mesa.privacy.mic")}
                   </Button>
                 </div>
               </div>
@@ -469,26 +480,31 @@ export function MesaScreen() {
             {!mesa.active && (
               <div>
                 <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
-                  Seu nome na Mesa
+                  {t("platforms.mesa.nameLabel")}
                 </span>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="ex.: Pitrol"
+                  placeholder={t("platforms.mesa.namePlaceholder")}
                 />
               </div>
             )}
 
             <div>
               <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
-                Câmera
+                {t("platforms.mesa.cameraLabel")}
               </span>
               <Select
-                aria-label="Câmera"
+                aria-label={t("platforms.mesa.cameraLabel")}
                 value={mesa.cameraId || "default"}
-                onChange={(v) => void mesa.setCamera(v === "default" ? "" : v)}
+                onChange={(v) =>
+                  void mesa.setCamera(v === "default" ? "" : v, t)
+                }
                 options={[
-                  { value: "default", label: "Padrão" },
+                  {
+                    value: "default",
+                    label: t("platforms.mesa.deviceDefault"),
+                  },
                   ...mesa.devices.cameras
                     .filter(
                       (d) =>
@@ -498,21 +514,24 @@ export function MesaScreen() {
                     )
                     .map((d) => ({
                       value: d.deviceId,
-                      label: d.label || "Câmera",
+                      label: d.label || t("platforms.mesa.cameraLabel"),
                     })),
                 ]}
               />
             </div>
             <div>
               <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
-                Microfone
+                {t("platforms.mesa.micLabel")}
               </span>
               <Select
-                aria-label="Microfone"
+                aria-label={t("platforms.mesa.micLabel")}
                 value={mesa.micId || "default"}
-                onChange={(v) => void mesa.setMic(v === "default" ? "" : v)}
+                onChange={(v) => void mesa.setMic(v === "default" ? "" : v, t)}
                 options={[
-                  { value: "default", label: "Padrão" },
+                  {
+                    value: "default",
+                    label: t("platforms.mesa.deviceDefault"),
+                  },
                   ...mesa.devices.mics
                     .filter(
                       (d) =>
@@ -522,7 +541,7 @@ export function MesaScreen() {
                     )
                     .map((d) => ({
                       value: d.deviceId,
-                      label: d.label || "Microfone",
+                      label: d.label || t("platforms.mesa.micLabel"),
                     })),
                 ]}
               />
@@ -542,18 +561,19 @@ export function MesaScreen() {
               <div className="grid size-9 place-items-center rounded-md bg-brass text-brass-ink pop-brass">
                 <Plus className="size-5" strokeWidth={2.6} />
               </div>
-              <h3 className="text-xl">Criar uma Mesa</h3>
+              <h3 className="text-xl">{t("platforms.mesa.host.title")}</h3>
             </div>
             <p className="mb-4 text-sm text-ink-muted">
-              Você vira o host. A Corneta gera um <b>convite</b> — manda pra
-              galera, eles entram, e as câmeras chegam direto na sua máquina.
+              {t("platforms.mesa.host.body")}
             </p>
             <Button
               variant="primary"
               className="mt-auto"
-              onClick={() => void mesa.host(name || "Host")}
+              onClick={() =>
+                void mesa.host(name || t("platforms.mesa.hostDefaultName"), t)
+              }
             >
-              <Users className="size-4" /> Abrir a Mesa
+              <Users className="size-4" /> {t("platforms.mesa.host.cta")}
             </Button>
           </Card>
 
@@ -565,19 +585,17 @@ export function MesaScreen() {
               <div className="grid size-9 place-items-center rounded-md bg-surface-3 text-ink">
                 <LogIn className="size-5" strokeWidth={2.6} />
               </div>
-              <h3 className="text-xl">Entrar numa Mesa</h3>
+              <h3 className="text-xl">{t("platforms.mesa.join.title")}</h3>
             </div>
             <p className="mb-2 text-sm text-ink-muted">
-              Recebeu um convite? Cola aqui pra entrar na Mesa de outro
-              streamer.
+              {t("platforms.mesa.join.body")}
             </p>
             <p className="mb-4 text-xs text-ink-faint">
-              Por enquanto funciona na mesma rede (ou com o host acessível pela
-              internet) — relay tá vindo.
+              {t("platforms.mesa.join.note")}
             </p>
             <label className="mb-3 block">
               <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
-                Convite
+                {t("platforms.mesa.invite.label")}
               </span>
               <Input
                 value={joinCode}
@@ -591,10 +609,14 @@ export function MesaScreen() {
               className="mt-auto"
               disabled={!joinCode.trim()}
               onClick={() =>
-                void mesa.join(joinCode.trim(), name || "Convidado")
+                void mesa.join(
+                  joinCode.trim(),
+                  name || t("platforms.mesa.guestDefaultName"),
+                  t,
+                )
               }
             >
-              <LogIn className="size-4" /> Entrar
+              <LogIn className="size-4" /> {t("platforms.mesa.join.cta")}
             </Button>
           </Card>
         </div>
@@ -613,14 +635,14 @@ export function MesaScreen() {
                   variant="outline"
                   onClick={() => mesa.retry()}
                 >
-                  Tentar de novo
+                  {t("platforms.mesa.retry")}
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => void mesa.leave()}
                 >
-                  <Power className="size-4" /> Sair da Mesa
+                  <Power className="size-4" /> {t("platforms.mesa.leave")}
                 </Button>
               </div>
             </Card>
@@ -628,26 +650,33 @@ export function MesaScreen() {
 
           {mesa.mode === "host" && mesa.invite && (
             <Card accent>
-              <h3 className="mb-1 text-lg">Convite da Mesa</h3>
+              <h3 className="mb-1 text-lg">
+                {t("platforms.mesa.invite.title")}
+              </h3>
               <p className="mb-3 text-sm text-ink-muted">
-                Manda esse código pra galera entrar. Na mesma rede conecta na
-                hora; pela internet, o host precisa estar alcançável — relay tá
-                vindo.
+                {t("platforms.mesa.invite.body")}
               </p>
-              <CopyField label="Convite" value={mesa.invite} mono />
+              <CopyField
+                label={t("platforms.mesa.invite.label")}
+                value={mesa.invite}
+                mono
+              />
             </Card>
           )}
 
           {/* Grade de participantes */}
           <div>
             <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-              <Users className="size-4" /> Na Mesa ({participants.length + 1})
+              <Users className="size-4" />{" "}
+              {t("platforms.mesa.grid.count", { n: participants.length + 1 })}
             </div>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               <VideoTile
                 stream={mesa.localStream}
                 muted
-                label={`${name || "Você"} (você)`}
+                label={t("platforms.mesa.grid.self", {
+                  name: name || t("platforms.mesa.you"),
+                })}
               />
               {participants.map((p: MesaPeer) => {
                 const c = CONN_LABEL[p.connection] ?? CONN_LABEL.connecting;
@@ -655,8 +684,8 @@ export function MesaScreen() {
                   <VideoTile
                     key={p.id}
                     stream={p.stream}
-                    label={p.name || "convidado"}
-                    sub={c.text}
+                    label={p.name || t("platforms.mesa.guest")}
+                    sub={t(c.key)}
                     down={c.down}
                   />
                 );
@@ -664,7 +693,7 @@ export function MesaScreen() {
             </div>
             {participants.length === 0 && (
               <p className="mt-3 text-sm text-ink-faint">
-                Esperando a galera entrar com o convite…
+                {t("platforms.mesa.waiting")}
               </p>
             )}
           </div>
@@ -674,21 +703,21 @@ export function MesaScreen() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h3 className="mb-1 flex items-center gap-2 text-lg">
-                  <MonitorPlay className="size-5 text-brass" /> Levar a Mesa pro
-                  OBS
+                  <MonitorPlay className="size-5 text-brass" />{" "}
+                  {t("platforms.mesa.obs.title")}
                 </h3>
                 <p className="max-w-md text-sm text-ink-muted">
-                  Entra como Browser Source na sua cena atual, cada um num slot
-                  fixo. É só posicionar.
+                  {t("platforms.mesa.obs.body")}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-2">
                 {mesa.obsAdded ? (
                   <Button
                     variant="danger"
-                    onClick={() => void mesa.removeFromObs()}
+                    onClick={() => void mesa.removeFromObs(t)}
                   >
-                    <MonitorX className="size-4" /> Tirar do OBS
+                    <MonitorX className="size-4" />{" "}
+                    {t("platforms.mesa.obs.remove")}
                   </Button>
                 ) : (
                   <Button
@@ -696,21 +725,22 @@ export function MesaScreen() {
                     disabled={!online || !mesa.myId}
                     title={
                       !online || !mesa.myId
-                        ? "Conectando à Mesa… libero assim que conectar"
+                        ? t("platforms.mesa.obs.waitTitle")
                         : undefined
                     }
-                    onClick={() => void mesa.addToObs()}
+                    onClick={() => void mesa.addToObs(t)}
                   >
-                    <MonitorPlay className="size-4" /> Adicionar no OBS
+                    <MonitorPlay className="size-4" />{" "}
+                    {t("platforms.mesa.obs.add")}
                   </Button>
                 )}
                 <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
                   <Toggle
                     checked={mesa.hideSelf}
-                    onChange={mesa.setHideSelf}
-                    label="Esconder minha câmera na grade"
+                    onChange={(v) => mesa.setHideSelf(v, t)}
+                    label={t("platforms.mesa.hideSelfAria")}
                   />
-                  esconder minha câmera na grade
+                  {t("platforms.mesa.hideSelfLabel")}
                 </label>
               </div>
             </div>
@@ -718,7 +748,7 @@ export function MesaScreen() {
 
           <div>
             <Button variant="outline" onClick={() => void mesa.leave()}>
-              <Power className="size-4" /> Sair da Mesa
+              <Power className="size-4" /> {t("platforms.mesa.leave")}
             </Button>
           </div>
 
@@ -729,17 +759,19 @@ export function MesaScreen() {
               </div>
               <div className="min-w-0">
                 <h3 className="font-display text-lg font-extrabold">
-                  Mesa cheia pesa no upload
+                  {t("platforms.mesa.full.title")}
                 </h3>
                 <p className="mt-1 text-sm text-ink-muted">
-                  No P2P direto cada câmera sai pra todo mundo — a conta de
-                  conexões explode e seu upload vai no talo passando de ~5. Modo
-                  servidor (SFU) pra mesas grandes tá vindo.
+                  {t("platforms.mesa.full.body")}
                 </p>
                 <div className="mt-3 max-w-xs">
                   <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide">
-                    <span className="text-ink-faint">seu upload</span>
-                    <span className="text-bad">no talo</span>
+                    <span className="text-ink-faint">
+                      {t("platforms.mesa.full.uploadLabel")}
+                    </span>
+                    <span className="text-bad">
+                      {t("platforms.mesa.full.uploadValue")}
+                    </span>
                   </div>
                   <div className="flex gap-0.5">
                     {Array.from({ length: 12 }).map((_, i) => (

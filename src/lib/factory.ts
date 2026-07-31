@@ -55,6 +55,7 @@ export function defaultConfig(): AppConfig {
       chatShowTimestamps: false,
       chatShowViewers: true,
       theme: "dark",
+      language: "auto",
       chatFontSize: 14,
       alertFontSize: 14,
       chatBothLayout: "auto",

@@ -2,14 +2,15 @@ import { Check, Gauge, Route, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { PLATFORMS } from "../lib/platforms";
 import { effectiveAction, lowestCommonDenominator } from "../lib/estimates";
-import { fmtBitrate } from "../lib/utils";
+import { bold, useI18n, type I18n } from "../lib/i18n";
 import { Modal } from "./Modal";
 import { Badge, Button, PlatformGlyph } from "./ui";
 
-/** Rótulo humano do encoder (mesmo espírito da tela Qualidade). */
-function encoderLabel(kind: string, label: string): string {
-  if (kind === "software") return "Processador (x264)";
-  return `Placa de vídeo (${label})`;
+/** Rótulo humano do encoder (mesmo espírito da tela Qualidade).
+ *  Não é componente: recebe o `t` de quem chama. */
+function encoderLabel(t: I18n["t"], kind: string, label: string): string {
+  if (kind === "software") return t("encoding.encoder.cpu");
+  return t("encoding.encoder.gpu", { label });
 }
 
 /**
@@ -21,11 +22,12 @@ function encoderLabel(kind: string, label: string): string {
 export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const config = useStore((s) => s.config)!;
   const encoders = useStore((s) => s.encoders);
+  const { t, fmt } = useI18n();
 
-  const enabled = config.targets.filter((t) => t.enabled);
+  const enabled = config.targets.filter((x) => x.enabled);
   const guardArmed =
     config.settings.guardianEnabled &&
-    config.settings.guardianWatchlist.some((t) => t.trim().length >= 3);
+    config.settings.guardianWatchlist.some((w) => w.trim().length >= 3);
   // Só o GUARDIÃO faz a Corneta recodificar TUDO (o OBS vira contribuição local). O JÁ VOLTO
   // sozinho é o splicer: copia o sinal do OBS pras plataformas SEM recodificar — então, pro
   // bitrate, se comporta igual a "sem compositor" (a cópia por-plataforma manda no teto).
@@ -33,12 +35,12 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
 
   const copies = reencodesAll
     ? []
-    : enabled.filter((t) => effectiveAction(config.mode, t) === "copy");
-  const transcodes = enabled.filter((t) => !copies.includes(t));
+    : enabled.filter((x) => effectiveAction(config.mode, x) === "copy");
+  const transcodes = enabled.filter((x) => !copies.includes(x));
 
   const fps = Math.min(
     60,
-    Math.max(30, ...enabled.map((t) => t.encoding.preset?.fps ?? 30)),
+    Math.max(30, ...enabled.map((x) => x.encoding.preset?.fps ?? 30)),
   );
 
   // Resolução recomendada = a MAIOR saída que alguma plataforma realmente usa — mandar
@@ -49,8 +51,8 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const needsFullHd =
     guardArmed ||
     enabled.length === 0 ||
-    enabled.some((t) => {
-      const p = t.encoding.preset ?? PLATFORMS[t.platformId].recommended;
+    enabled.some((x) => {
+      const p = x.encoding.preset ?? PLATFORMS[x.platformId].recommended;
       return p.height > p.width || Math.min(p.width, p.height) > 720;
     });
   const srcRes = needsFullHd ? "1920×1080" : "1280×720";
@@ -74,22 +76,27 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const hw = encoders.find((e) => e.available && e.kind !== "software");
   const encAdvice =
     encoders.length === 0
-      ? "Verificando a placa de vídeo…"
+      ? t("encoding.guide.encoder.checking")
       : hw
-        ? encoderLabel(hw.kind, hw.label)
-        : "Processador — é o que essa máquina tem";
+        ? encoderLabel(t, hw.kind, hw.label)
+        : t("encoding.guide.encoder.cpuOnly");
 
   return (
     <Modal
-      title="Qualidade certa no OBS"
+      title={t("encoding.guide.title")}
       onClose={onClose}
       className="max-w-lg rounded-xl bg-surface p-5 pop"
     >
       <div className="mb-3 flex items-center justify-between">
         <h3 id="obs-guide-title" className="flex items-center gap-2 text-xl">
-          <Gauge className="size-5 text-brass" /> Qualidade certa no OBS
+          <Gauge className="size-5 text-brass" /> {t("encoding.guide.title")}
         </h3>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          aria-label={t("encoding.close")}
+        >
           <X className="size-4" />
         </Button>
       </div>
@@ -97,57 +104,56 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
       {/* 1. O caminho do vídeo — com a config REAL do usuário */}
       <div className="rounded-md bg-surface-2 p-3">
         <div className="mb-1.5 flex items-center gap-2 text-sm font-bold">
-          <Route className="size-4 text-brass" /> O caminho do seu vídeo hoje
+          <Route className="size-4 text-brass" />{" "}
+          {t("encoding.guide.path.title")}
         </div>
         <p className="text-xs leading-relaxed text-ink-muted">
-          O OBS encoda seu vídeo <strong className="text-ink">uma vez</strong>.
-          Daí:
+          {bold(t, "encoding.guide.path.lede")}
         </p>
         <div className="mt-2 flex flex-col gap-1.5 text-xs">
           {reencodesAll ? (
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge tone="brass">eu refaço</Badge>
+              <Badge tone="brass">{t("encoding.guide.badge.redo")}</Badge>
               <span className="text-ink-muted">
-                Guardião ligado — capricha no sinal do OBS.
+                {t("encoding.guide.guardian")}
               </span>
             </div>
           ) : (
             <>
               {copies.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone="neutral">em cópia</Badge>
-                  {copies.map((t) => (
+                  <Badge tone="neutral">
+                    {t("encoding.target.copy.badge")}
+                  </Badge>
+                  {copies.map((x) => (
                     <span
-                      key={t.id}
+                      key={x.id}
                       className="flex items-center gap-1 text-ink-muted"
                     >
-                      <PlatformGlyph id={t.platformId} size={14} /> {t.name}
+                      <PlatformGlyph id={x.platformId} size={14} /> {x.name}
                     </span>
                   ))}
                   <span className="text-ink-faint">
-                    — recebem{" "}
-                    <strong className="text-ink-muted">exatamente</strong> o que
-                    sai do OBS
+                    {bold(t, "encoding.guide.copy.suffix")}
                   </span>
                 </div>
               )}
               {transcodes.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone="brass">eu refaço</Badge>
-                  {transcodes.map((t) => (
+                  <Badge tone="brass">{t("encoding.guide.badge.redo")}</Badge>
+                  {transcodes.map((x) => (
                     <span
-                      key={t.id}
+                      key={x.id}
                       className="flex items-center gap-1 text-ink-muted"
                     >
-                      <PlatformGlyph id={t.platformId} size={14} /> {t.name}
+                      <PlatformGlyph id={x.platformId} size={14} /> {x.name}
                     </span>
                   ))}
                 </div>
               )}
               {enabled.length === 0 && (
                 <span className="text-ink-faint">
-                  (nenhuma plataforma ativa ainda — os números abaixo assumem
-                  1080p)
+                  {t("encoding.guide.noPlatforms")}
                 </span>
               )}
             </>
@@ -158,48 +164,46 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
       {/* 2. Os números — prontos pra copiar no OBS */}
       <div className="mt-3">
         <div className="mb-1.5 text-sm font-bold">
-          Configure assim: OBS → Configurações →{" "}
-          <strong className="text-brass">Saída</strong>
+          {bold(t, "encoding.guide.setup.title")}
         </div>
         <div className="divide-y divide-border-soft rounded-md bg-surface-2 px-3 text-sm">
-          <GuideRow k="Encoder" v={encAdvice} />
-          <GuideRow k="Controle de taxa" v="CBR" />
+          <GuideRow k={t("encoding.guide.row.encoder")} v={encAdvice} />
+          <GuideRow k={t("encoding.guide.row.rateControl")} v="CBR" />
           <GuideRow
-            k="Taxa de bits"
-            v={fmtBitrate(obsKbps)}
+            k={t("encoding.guide.row.bitrate")}
+            v={fmt.bitrate(obsKbps)}
             note={
               hasCopy
-                ? `acima disso a live trava no ${lcd.capBy}`
-                : "quanto melhor o sinal, melhor a saída"
+                ? t("encoding.guide.row.bitrate.noteCopy", {
+                    platform: lcd.capBy ?? "",
+                  })
+                : t("encoding.guide.row.bitrate.noteFree")
             }
           />
-          <GuideRow k="Intervalo de quadro-chave" v="2 s" />
+          <GuideRow k={t("encoding.guide.row.keyframe")} v="2 s" />
           <GuideRow
-            k="Vídeo (aba Vídeo)"
+            k={t("encoding.guide.row.video")}
             v={`${srcRes} · ${fps} FPS`}
             note={
               needsFullHd
-                ? "mesma resolução da saída — evita borrar a imagem"
-                : "suas plataformas saem em 720p — mandar mais que isso só pesa no PC, sem ganho"
+                ? t("encoding.guide.row.video.noteFullHd")
+                : t("encoding.guide.row.video.note720")
             }
           />
         </div>
         {/* Válvula de escape pra PC fraco: x264 em 1080p60 pena — fps custa quase linear. */}
         {!hw && (needsFullHd || fps >= 60) && (
           <p className="mt-2 text-[11px] font-semibold leading-relaxed text-warn">
-            Sem placa de vídeo, seu PC pode penar em{" "}
-            {needsFullHd ? "1080p" : "720p"}
-            {fps >= 60 ? "60" : "30"}: se a live engasgar ou o jogo travar,{" "}
-            {fps >= 60
-              ? "baixe o FPS pra 30 (aba Vídeo) — pesa quase metade"
-              : "baixe a saída pra 720p (aba Vídeo)"}{" "}
-            e, fora jogo muito rápido, ninguém nota.
+            {t(
+              fps >= 60
+                ? "encoding.guide.nohw.fps60"
+                : "encoding.guide.nohw.fps30",
+              { res: needsFullHd ? "1080p" : "720p" },
+            )}
           </p>
         )}
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-          No modo <strong className="text-ink-muted">Simples</strong> do OBS, só
-          bitrate e encoder aparecem — já resolve. Esses ajustes são na mão
-          mesmo.
+          {bold(t, "encoding.guide.simpleMode")}
         </p>
       </div>
 
@@ -211,8 +215,10 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
             strokeWidth={2.8}
           />
           <span>
-            <strong className="text-ink">Uma passada só.</strong> Refazer o
-            vídeo à toa perde qualidade de graça.
+            <strong className="text-ink">
+              {t("encoding.guide.why.onepass.strong")}
+            </strong>{" "}
+            {t("encoding.guide.why.onepass.text")}
           </span>
         </p>
         <p className="flex gap-2">
@@ -220,11 +226,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
             className="mt-0.5 size-3.5 shrink-0 text-ok"
             strokeWidth={2.8}
           />
-          <span>
-            <strong className="text-ink">CBR + quadro-chave 2 s</strong> é
-            exigência das plataformas — fora disso a live buferiza pros
-            espectadores.
-          </span>
+          <span>{bold(t, "encoding.guide.why.cbr")}</span>
         </p>
         <p className="flex gap-2">
           <Check
@@ -233,16 +235,17 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
           />
           <span>
             <strong className="text-ink">
-              Mudou as plataformas ou ligou o Guardião?
+              {t("encoding.guide.why.changed.strong")}
             </strong>{" "}
-            Volta aqui — os números acima acompanham a sua config.
+            {t("encoding.guide.why.changed.text")}
           </span>
         </p>
       </div>
 
       <div className="mt-4 flex justify-end">
         <Button variant="primary" onClick={onClose}>
-          Fechei o OBS certinho <Check className="size-4" strokeWidth={2.6} />
+          {t("encoding.guide.done")}{" "}
+          <Check className="size-4" strokeWidth={2.6} />
         </Button>
       </div>
     </Modal>

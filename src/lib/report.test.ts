@@ -8,6 +8,12 @@ import {
   timeAxis,
   viewerSeriesFor,
 } from "./report";
+import { interpolate, type Vars } from "./i18n/locale";
+import { pt, type MessageKey } from "./i18n/pt";
+
+/** `parseSession`/`analyze` recebem a tradução por parâmetro (não são componentes).
+ *  Aqui entra o dicionário pt de verdade — é objeto puro, sem React no caminho. */
+const t = (k: MessageKey, vars?: Vars) => interpolate(pt[k], vars);
 
 const nd = (lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
 
@@ -26,6 +32,7 @@ describe("parseSession", () => {
         { kind: "sample", t: 3000, cpu: 50, targets: [] },
         { kind: "end", endedAt: 5000 },
       ]),
+      t,
     )!;
     expect(d).not.toBeNull();
     expect(d.meta.id).toBe("s1");
@@ -47,6 +54,7 @@ describe("parseSession", () => {
         },
         { kind: "sample", t: 10000, targets: [] },
       ]),
+      t,
     )!;
     expect(d.meta.endedAt).toBeUndefined();
     expect(d.meta.durationSec).toBe(10);
@@ -59,10 +67,11 @@ describe("parseSession", () => {
         { kind: "sample", t: 1000, targets: [] },
         { kind: "sample", t: "nao-numero", targets: [] },
       ]) + "\nlixo que não é json\n",
+      t,
     )!;
     expect(d.samples).toHaveLength(1);
-    expect(parseSession("nada de meta aqui")).toBeNull();
-    expect(parseSession("")).toBeNull();
+    expect(parseSession("nada de meta aqui", t)).toBeNull();
+    expect(parseSession("", t)).toBeNull();
   });
 
   it("hasObs / hasChat refletem a presença dos dados", () => {
@@ -71,6 +80,7 @@ describe("parseSession", () => {
         { kind: "meta", id: "s4", startedAt: 0, platforms: [] },
         { kind: "sample", t: 1000, targets: [] },
       ]),
+      t,
     )!;
     expect(hasObs(semObs)).toBe(false);
     expect(hasChat(semObs)).toBe(false);
@@ -85,6 +95,7 @@ describe("parseSession", () => {
           targets: [],
         },
       ]),
+      t,
     )!;
     expect(hasObs(comObs)).toBe(true);
     expect(hasChat(comObs)).toBe(true);
@@ -103,6 +114,7 @@ const sessao = (body: object[]) =>
       ...body,
       { kind: "end", endedAt: 120000 },
     ]),
+    t,
   )!;
 
 const A = "twitch:Canal A";
@@ -158,7 +170,7 @@ describe("byChannel", () => {
   ]);
 
   it("junta audiência, chat e alertas de cada canal", () => {
-    const { channels, hasChatByChannel } = analyze(completa).byChannel;
+    const { channels, hasChatByChannel } = analyze(completa, t).byChannel;
     expect(hasChatByChannel).toBe(true);
     expect(channels.map((c) => c.key)).toEqual([A, B]); // maior audiência primeiro
 
@@ -172,13 +184,13 @@ describe("byChannel", () => {
   });
 
   it("a soma das médias por canal bate com a média total da live", () => {
-    const r = analyze(completa);
+    const r = analyze(completa, t);
     const soma = r.byChannel.channels.reduce((s, c) => s + c.viewers.avg, 0);
     expect(soma).toBe(r.viewers.avg); // 150 + 50 = 200
   });
 
   it("a fatia vem da audiência acumulada, não do pico", () => {
-    const [a, b] = analyze(completa).byChannel.channels;
+    const [a, b] = analyze(completa, t).byChannel.channels;
     // Pelos picos (200×50) daria 80/20 — mas os picos dos canais não são
     // simultâneos, então somá-los inventaria audiência que nunca existiu junta.
     expect(a.sharePct).toBe(75);
@@ -200,7 +212,7 @@ describe("byChannel", () => {
         { platform: "kick", source: "Canal C", viewers: null },
       ]),
     ]);
-    const c = analyze(d).byChannel.channels.find((x) =>
+    const c = analyze(d, t).byChannel.channels.find((x) =>
       x.key.startsWith("kick"),
     )!;
     expect(c.viewers).toMatchObject({ peak: 0, avg: 0, hasData: false });
@@ -215,7 +227,7 @@ describe("byChannel", () => {
         { platform: "youtube", source: "Canal B", viewers: 100 },
       ]),
     ]);
-    const { channels, hasChatByChannel } = analyze(d).byChannel;
+    const { channels, hasChatByChannel } = analyze(d, t).byChannel;
     expect(hasChatByChannel).toBe(false);
     expect(channels).toHaveLength(2);
     expect(channels.every((c) => c.chat.total === 0)).toBe(true);
@@ -238,6 +250,7 @@ describe("byChannel", () => {
         ]),
         alerta,
       ]),
+      t,
     ).byChannel;
     expect(umCanal.unattributedAlerts).toBe(0);
     expect(umCanal.channels[0].alerts.raids).toBe(1);
@@ -250,6 +263,7 @@ describe("byChannel", () => {
         ]),
         alerta,
       ]),
+      t,
     ).byChannel;
     expect(doisCanais.unattributedAlerts).toBe(1);
     expect(doisCanais.channels.every((c) => c.alerts.total === 0)).toBe(true);
@@ -261,7 +275,7 @@ describe("byChannel", () => {
       { kind: "followers", t: 1000, items: [{ ...seg, total: 12_480 }] },
       { kind: "followers", t: 60000, items: [{ ...seg, total: 12_509 }] },
     ]);
-    const b = analyze(d).byChannel;
+    const b = analyze(d, t).byChannel;
     expect(b.channels[0].followers).toEqual({
       gained: 29,
       total: 12_509,
@@ -277,16 +291,16 @@ describe("byChannel", () => {
       { kind: "followers", t: 1000, items: [{ ...seg, total: 900 }] },
       { kind: "followers", t: 60000, items: [{ ...seg, total: 897 }] },
     ]);
-    expect(analyze(d).byChannel.followersGained).toBe(-3);
+    expect(analyze(d, t).byChannel.followersGained).toBe(-3);
   });
 
   it("uma amostra só não vira ganho (não dá pra tirar diferença de um ponto)", () => {
     const d = sessao([
       { kind: "followers", t: 1000, items: [{ ...seg, total: 900 }] },
     ]);
-    const f = analyze(d).byChannel.channels[0].followers;
+    const f = analyze(d, t).byChannel.channels[0].followers;
     expect(f).toMatchObject({ from: null, hasData: false, total: 900 });
-    expect(analyze(d).byChannel.followersGained).toBeNull();
+    expect(analyze(d, t).byChannel.followersGained).toBeNull();
   });
 
   it("sem contador, cai nos alertas de follow do próprio canal", () => {
@@ -301,7 +315,7 @@ describe("byChannel", () => {
         user: "fulano",
       })),
     ]);
-    const b = analyze(d).byChannel;
+    const b = analyze(d, t).byChannel;
     expect(b.channels[0].followers).toMatchObject({
       gained: 3,
       from: "alerts",
@@ -320,7 +334,7 @@ describe("byChannel", () => {
       user: "fulano",
     });
     // Sem contador: os follows do agregador são a única fonte que existe.
-    const so = analyze(sessao([slFollow(1500), slFollow(1600)])).byChannel;
+    const so = analyze(sessao([slFollow(1500), slFollow(1600)]), t).byChannel;
     expect(so.followersGained).toBe(2);
     expect(so.followersNet).toBe(false);
 
@@ -333,6 +347,7 @@ describe("byChannel", () => {
         slFollow(1500),
         slFollow(1600),
       ]),
+      t,
     ).byChannel;
     expect(junto.followersGained).toBe(29);
     expect(junto.followersNet).toBe(true);
@@ -342,7 +357,7 @@ describe("byChannel", () => {
     const d = sessao([
       viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
     ]);
-    expect(analyze(d).byChannel.followersGained).toBeNull();
+    expect(analyze(d, t).byChannel.followersGained).toBeNull();
   });
 
   it("alerta de agregador não vira canal nem é chutado num", () => {
@@ -361,6 +376,7 @@ describe("byChannel", () => {
           amount: 20,
         },
       ]),
+      t,
     ).byChannel;
     expect(unattributedAlerts).toBe(1);
     expect(channels.map((c) => c.key)).toEqual([A]);

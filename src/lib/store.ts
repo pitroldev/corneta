@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { I18n } from "./i18n";
 import type {
   Alert,
   AppConfig,
@@ -53,6 +54,11 @@ let lastObsCheckAt = 0;
 // a mesma Promise em vez de abrir processos FFmpeg duplicados.
 let encoderLoadPromise: Promise<EncoderInfo[]> | null = null;
 
+// O store não é componente: não pode usar `useT()`. As ações que escrevem pra
+// tela (toast, nome de perfil, mensagem de erro) recebem `t` de quem as chama —
+// idioma global aqui viraria corrida entre a janela principal e o popout do chat.
+type T = I18n["t"];
+
 interface State {
   loaded: boolean;
   config: AppConfig | null;
@@ -60,8 +66,8 @@ interface State {
   encoders: EncoderInfo[];
   uploadMbps: number | null;
 
-  load: () => Promise<void>;
-  bindEngine: () => () => void;
+  load: (t: T) => Promise<void>;
+  bindEngine: (t: T) => () => void;
   /** Sincroniza a config quando OUTRA janela (ex.: popout do chat) a salva. */
   bindConfigSync: () => () => void;
 
@@ -108,7 +114,7 @@ interface State {
   bindChat: () => () => void;
   /** Espelha o estado "conectado" do chat entre janelas (é global no backend). */
   bindChatRunning: () => () => void;
-  connectChat: () => Promise<void>;
+  connectChat: (t: T) => Promise<void>;
   disconnectChat: () => Promise<void>;
 
   // Alertas externos (Streamlabs/StreamElements)
@@ -143,7 +149,7 @@ interface State {
   kickUseOfficial: () => Promise<void>;
   kickUseOwnCreds: () => Promise<void>;
   setupOauth: () => Promise<void>;
-  bindAuthFlow: () => () => void;
+  bindAuthFlow: (t: T) => () => void;
   twitchLogin: () => Promise<void>;
   twitchLogout: () => Promise<void>;
   youtubeLogin: () => Promise<void>;
@@ -260,7 +266,7 @@ export const useStore = create<State>((set, get) => {
     encoders: [],
     uploadMbps: null,
 
-    async load() {
+    async load(t) {
       // A configuração é tudo de que a primeira tela precisa. A sonda real dos encoders abre
       // processos FFmpeg e agora é lazy (Qualidade/Ao vivo/BORA), fora do caminho crítico do boot.
       const loaded = await api.getConfig();
@@ -271,7 +277,12 @@ export const useStore = create<State>((set, get) => {
         config = {
           ...config,
           profiles: [
-            { id, name: "Padrão", mode: config.mode, targets: config.targets },
+            {
+              id,
+              name: t("core.profile.default.name"),
+              mode: config.mode,
+              targets: config.targets,
+            },
           ],
           activeProfileId: id,
         };
@@ -299,7 +310,7 @@ export const useStore = create<State>((set, get) => {
       // Selo "NOVO" de relatório sobrevive ao fechar o app: se existe sessão mais nova
       // que a última visita a Relatórios, o selo volta aceso.
       try {
-        const sessions = await api.listSessions();
+        const sessions = await api.listSessions(t);
         const newest = sessions[0];
         const seenAt = Number(
           localStorage.getItem("corneta.lastSeenReportAt") || 0,
@@ -316,7 +327,7 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    bindEngine() {
+    bindEngine(t) {
       return api.subscribe((snapshot) => {
         const prev = get().snapshot.state;
         set({ snapshot });
@@ -329,10 +340,8 @@ export const useStore = create<State>((set, get) => {
             (st?.chatSources ?? []).some((x) => x.enabled && x.value.trim()) ||
             (st?.alertSources ?? []).some((x) => x.enabled && x.hasToken);
           if ((st?.chatAutoConnect ?? true) && hasSources && !s.chatConnected) {
-            s.connectChat().catch(() =>
-              toast.error(
-                "Não consegui ligar o chat sozinho — vá na tela Chat e clique em Conectar.",
-              ),
+            s.connectChat(t).catch(() =>
+              toast.error(t("core.chat.autoConnect.failed")),
             );
           }
         }
@@ -617,11 +626,11 @@ export const useStore = create<State>((set, get) => {
       );
     },
 
-    async connectChat() {
+    async connectChat(t) {
       // NÃO zera chatMessages: reconectar (ex.: pra ressuscitar uma fonte que caiu)
       // não pode apagar o histórico das outras. Limpar é só no botão "Limpar" (clearChat).
       set({ chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
-      await api.chatStart();
+      await api.chatStart(t);
       await api.alertsStart();
       set({ chatConnected: true });
     },
@@ -800,7 +809,7 @@ export const useStore = create<State>((set, get) => {
       await get().setupOauth();
     },
 
-    bindAuthFlow() {
+    bindAuthFlow(t) {
       return api.subscribeAuthFlow((who, a) => {
         set((s) => {
           const k = who as "twitch" | "youtube" | "kick";
@@ -815,7 +824,10 @@ export const useStore = create<State>((set, get) => {
           else if (a.state === "connected")
             next = { state: "connected", login: a.login || undefined };
           else if (a.state === "error")
-            next = { state: "error", message: a.login || "erro no login" };
+            next = {
+              state: "error",
+              message: a.login || t("core.auth.login.error.fallback"),
+            };
           else if (a.state === "loggedout") next = { state: "out" };
           return { chatLogin: { ...s.chatLogin, [k]: next } };
         });
@@ -840,7 +852,7 @@ export const useStore = create<State>((set, get) => {
           a.state === "connected" &&
           get().chatConnected
         ) {
-          void api.chatStart();
+          void api.chatStart(t);
         }
       });
     },

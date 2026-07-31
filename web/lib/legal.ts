@@ -33,9 +33,14 @@ export const LEGAL_VENUE = "Rio de Janeiro, RJ";
 export const LEGAL_HOST = "Vercel Inc.";
 
 /** Data da última revisão dos dois documentos. Sobe a cada correção, inclusive
- *  de vírgula — é informativa, e não vale como versão de aceite. */
+ *  de vírgula — é informativa, e não vale como versão de aceite.
+ *
+ *  A data por extenso tem uma forma por idioma: escrita à mão em vez de sair de
+ *  `Intl`, porque o valor tem que ser IDÊNTICO no HTML servido e no que o
+ *  navegador renderiza (o `<time dateTime>` ao lado é a versão de máquina). */
 export const LEGAL_UPDATED_ISO = "2026-07-30";
-export const LEGAL_UPDATED_LABEL = "30 de julho de 2026";
+export const LEGAL_UPDATED_LABEL_PT = "30 de julho de 2026";
+export const LEGAL_UPDATED_LABEL_EN = "July 30, 2026";
 
 /** Versão que exige aceite, espelhada em `src/lib/legal.ts` (o app é outro
  *  workspace e não importa daqui). Só sobe em mudança MATERIAL — passar a cobrar,
@@ -45,7 +50,22 @@ export const LEGAL_UPDATED_LABEL = "30 de julho de 2026";
  *  Mudou aqui, mude lá: são dois arquivos porque não há build compartilhado. */
 export const LEGAL_ACCEPT_VERSION = "2026-07-30";
 
+/** Caminhos SEM idioma. O português mora na raiz porque `/legal/privacy` é a
+ *  URL já publicada e linkada de dentro do app instalado — mudá-la quebraria o
+ *  botão de quem já baixou. O inglês ganha o prefixo, como o resto do site. */
 export const LEGAL_ROUTES = {
   privacy: "/legal/privacy",
   terms: "/legal/terms-of-use",
 } as const;
+
+/** Caminho do documento no idioma pedido (`localePath` aplicado às rotas
+ *  legais). Use SEMPRE isto pra linkar, nunca `LEGAL_ROUTES` cru: um link em
+ *  inglês apontando pro documento em português é a versão silenciosa do bug
+ *  que esta tradução veio resolver. */
+export function legalHref(
+  locale: string,
+  doc: keyof typeof LEGAL_ROUTES,
+): string {
+  const path = LEGAL_ROUTES[doc];
+  return locale === "en" ? `/en${path}` : path;
+}

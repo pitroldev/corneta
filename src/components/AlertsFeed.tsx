@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
 import { cn } from "../lib/utils";
+import { useI18n, type I18n, type MessageKey } from "../lib/i18n";
 import { PlatformGlyph } from "./ui";
 import type { Alert, AlertKind, PlatformId } from "../lib/types";
 
@@ -9,19 +10,28 @@ const ORIGIN: Record<string, string> = {
   streamelements: "StreamElements",
 };
 
+// A CHAVE é o enum do alerta (vem do backend) — só o verbo é texto de tela.
 const KIND_META: Record<
   AlertKind,
-  { emoji: string; verb: string; accent: string }
+  { emoji: string; verbKey: MessageKey; accent: string }
 > = {
-  follow: { emoji: "💜", verb: "seguiu", accent: "info" },
-  sub: { emoji: "⭐", verb: "se inscreveu", accent: "brass" },
-  resub: { emoji: "🔁", verb: "renovou a inscrição", accent: "brass" },
-  subgift: { emoji: "🎁", verb: "presenteou", accent: "tomate" },
-  bits: { emoji: "💎", verb: "mandou bits", accent: "brass" },
-  tip: { emoji: "💰", verb: "doou", accent: "ok" },
-  raid: { emoji: "🚀", verb: "trouxe um raid", accent: "info" },
-  member: { emoji: "🏅", verb: "virou membro", accent: "ok" },
-  superchat: { emoji: "💬", verb: "mandou um Super Chat", accent: "brass" },
+  follow: { emoji: "💜", verbKey: "chat.alerts.verb.follow", accent: "info" },
+  sub: { emoji: "⭐", verbKey: "chat.alerts.verb.sub", accent: "brass" },
+  resub: { emoji: "🔁", verbKey: "chat.alerts.verb.resub", accent: "brass" },
+  subgift: {
+    emoji: "🎁",
+    verbKey: "chat.alerts.verb.subgift",
+    accent: "tomate",
+  },
+  bits: { emoji: "💎", verbKey: "chat.alerts.verb.bits", accent: "brass" },
+  tip: { emoji: "💰", verbKey: "chat.alerts.verb.tip", accent: "ok" },
+  raid: { emoji: "🚀", verbKey: "chat.alerts.verb.raid", accent: "info" },
+  member: { emoji: "🏅", verbKey: "chat.alerts.verb.member", accent: "ok" },
+  superchat: {
+    emoji: "💬",
+    verbKey: "chat.alerts.verb.superchat",
+    accent: "brass",
+  },
 };
 
 const ACCENT: Record<string, { bar: string }> = {
@@ -31,12 +41,13 @@ const ACCENT: Record<string, { bar: string }> = {
   ok: { bar: "border-ok" },
 };
 
-/** Detalhe (valor/quantidade) por tipo de alerta. */
-function detail(a: Alert): string {
-  const months = (n: number) => `${n} ${n === 1 ? "mês" : "meses"}`;
+/** Detalhe (valor/quantidade) por tipo de alerta. `a.tier` vem da plataforma
+ *  ("Tier 1", "Prime") — é rótulo dela, não copy nossa, e passa cru. */
+function detail(a: Alert, i18n: Pick<I18n, "t" | "tp">): string {
+  const months = (n: number) => i18n.tp("chat.alerts.detail.months", n);
   switch (a.kind) {
     case "bits":
-      return a.amount ? `${a.amount} bits` : "";
+      return a.amount ? i18n.t("chat.alerts.detail.bits", { n: a.amount }) : "";
     case "resub":
       return [a.amount ? months(a.amount) : "", a.tier]
         .filter(Boolean)
@@ -44,9 +55,11 @@ function detail(a: Alert): string {
     case "sub":
       return a.tier ?? "";
     case "subgift":
-      return a.amount && a.amount > 1 ? `${a.amount} subs` : "1 sub";
+      return i18n.tp("chat.alerts.detail.subs", a.amount ?? 1);
     case "raid":
-      return a.amount ? `${a.amount} viewers` : "";
+      return a.amount
+        ? i18n.t("chat.alerts.detail.raidViewers", { n: a.amount })
+        : "";
     case "member":
       return [a.tier, a.amount && a.amount > 1 ? months(a.amount) : ""]
         .filter(Boolean)
@@ -66,9 +79,10 @@ const AlertRow = memo(function AlertRow({
   a: Alert;
   fontSize: number;
 }) {
+  const { t, tp } = useI18n();
   const meta = KIND_META[a.kind];
   const accent = ACCENT[meta.accent] ?? ACCENT.brass;
-  const d = detail(a);
+  const d = detail(a, { t, tp });
   return (
     <div
       style={{ fontSize }}
@@ -92,7 +106,7 @@ const AlertRow = memo(function AlertRow({
           <span className="truncate font-bold leading-tight">{a.user}</span>
         </div>
         <div className="text-ink-muted" style={{ fontSize: "0.85em" }}>
-          {meta.verb}
+          {t(meta.verbKey)}
           {d && <span className="font-bold text-ink"> · {d}</span>}
         </div>
         {(a.fragments?.length || a.message) && (
@@ -137,6 +151,7 @@ export function AlertsFeed({
   /** Tamanho base da fonte das linhas, em pixels (proporções escalam a partir daqui). */
   fontSize?: number;
 }) {
+  const { t } = useI18n();
   const list = useMemo(() => [...alerts].reverse(), [alerts]);
   return (
     <div className={cn("overflow-y-auto [scrollbar-gutter:stable]", className)}>
@@ -144,8 +159,7 @@ export function AlertsFeed({
         <div className="grid h-full place-items-center p-5 text-center text-sm text-ink-faint">
           <div>
             <div className="mb-1 text-2xl">🔔</div>
-            Inscrições, gifts, bits, raids e super chats de todas as plataformas
-            aparecem aqui.
+            {t("chat.alerts.empty")}
           </div>
         </div>
       ) : (

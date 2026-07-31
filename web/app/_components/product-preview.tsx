@@ -1,3 +1,4 @@
+import type { T } from "@/lib/i18n";
 import { Mascot, PlatformGlyph } from "./decor";
 import { cn } from "./ui";
 
@@ -5,46 +6,30 @@ import { cn } from "./ui";
 // chat reunido). Os números da navegação são os atalhos Alt+N do app; os valores
 // de banda e as mensagens são ilustrativos e estão marcados como prévia.
 
+// `id` é identificador de tela — o "está ativo?" e o selo "novo" olham pra ELE,
+// nunca pro rótulo. Comparar com o texto traduzido quebra no primeiro idioma novo.
 const nav = [
-  { n: "01", label: "Plataformas", hint: "onde sua live aparece", icon: "tv" },
-  { n: "02", label: "Qualidade", hint: "capricho da imagem", icon: "sliders" },
-  { n: "03", label: "Ao vivo", hint: "bota tudo no ar", icon: "radio" },
-  { n: "04", label: "Chat", hint: "todo chat num lugar", icon: "chat" },
-  { n: "05", label: "Relatórios", hint: "como foi a live", icon: "chart" },
+  { id: "platforms", n: "01", icon: "tv" },
+  { id: "encoding", n: "02", icon: "sliders" },
+  { id: "golive", n: "03", icon: "radio" },
+  { id: "chat", n: "04", icon: "chat" },
+  { id: "reports", n: "05", icon: "chart" },
 ] as const;
 
 // Modo "Esperto" com três destinos deitados: todos recebem a cópia do OBS no
 // menor bitrate da lista (6000). A soma bate com src/lib/estimates.ts.
 const targets = [
-  {
-    id: "twitch",
-    name: "Twitch",
-    detail: "1080p60 · 6000 kbps",
-    quality: "Cópia",
-  },
-  {
-    id: "youtube",
-    name: "YouTube",
-    detail: "1080p60 · 6000 kbps",
-    quality: "Cópia",
-  },
-  { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps", quality: "Cópia" },
+  { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps" },
+  { id: "youtube", name: "YouTube", detail: "1080p60 · 6000 kbps" },
+  { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps" },
 ] as const;
 
+// `n` é o índice da mensagem no dicionário (preview.chat.msg.N.*) — o texto e o
+// apelido de exemplo mudam com o idioma, o glifo da plataforma não.
 const chat = [
-  {
-    id: "twitch",
-    who: "Twitch",
-    from: "gabizera",
-    text: "salve salve, chegando!",
-  },
-  {
-    id: "youtube",
-    who: "YouTube",
-    from: "Marcos L.",
-    text: "áudio tá limpo hoje 👏",
-  },
-  { id: "kick", who: "Kick", from: "duduxx", text: "bora cornetar!!" },
+  { id: "twitch", who: "Twitch", n: 1 },
+  { id: "youtube", who: "YouTube", n: 2 },
+  { id: "kick", who: "Kick", n: 3 },
 ] as const;
 
 function NavIcon({ name }: { name: (typeof nav)[number]["icon"] }) {
@@ -105,15 +90,10 @@ const STAT =
   "[&>span]:block [&>span]:text-[0.55rem] [&>span]:font-extrabold [&>span]:tracking-[0.08em] [&>span]:text-faint-raised [&>span]:uppercase " +
   "[&>strong]:mt-0.5 [&>strong]:block [&>strong]:font-display [&>strong]:text-[1.06rem] [&>strong]:leading-[1.1] [&>strong]:font-extrabold [&>strong]:tabular-nums";
 
-export function ProductPreview() {
+export function ProductPreview({ t }: { t: T }) {
   return (
     <figure className="overflow-hidden rounded-xl border border-border-dry bg-surface shadow-[10px_10px_0_0_var(--night),0_30px_60px_rgb(0_0_0/42%)] max-[760px]:shadow-[5px_5px_0_0_var(--night),0_18px_34px_rgb(0_0_0/38%)]">
-      <figcaption className="sr-only">
-        Prévia ilustrativa do app da Corneta na tela “Ao vivo”: o sinal do OBS
-        sai para Twitch, YouTube e Kick, cada destino com sua própria qualidade
-        e seu próprio interruptor, com o chat das três plataformas reunido ao
-        lado.
-      </figcaption>
+      <figcaption className="sr-only">{t("preview.figure.alt")}</figcaption>
 
       <div className="flex min-h-10 items-center gap-2.5 border-b border-border-soft bg-panel pl-[13px]">
         <span className="flex items-center gap-2 [&>i]:grid [&>i]:size-[21px] [&>i]:place-items-center [&>i]:rounded-[5px] [&>i]:bg-brass [&>i]:text-brass-ink [&>i>svg]:h-3.5 [&>i>svg]:w-3.5">
@@ -124,11 +104,11 @@ export function ProductPreview() {
             Corneta
           </strong>
           <span className="text-[0.68rem] font-medium text-faint max-[420px]:hidden">
-            multi-stream
+            {t("preview.titlebar.tag")}
           </span>
         </span>
         <span className="ml-3.5 rounded-sm border border-border-dry px-[7px] py-[3px] text-[0.56rem] font-extrabold tracking-[0.1em] whitespace-nowrap text-muted">
-          PRÉVIA ILUSTRATIVA
+          {t("preview.badge")}
         </span>
         <span
           className={cn(
@@ -170,7 +150,7 @@ export function ProductPreview() {
                 Corneta
               </strong>
               <small className="mt-[3px] block text-[0.54rem] font-semibold tracking-[0.2em] text-faint uppercase">
-                multi-stream
+                {t("preview.titlebar.tag")}
               </small>
             </span>
           </span>
@@ -178,19 +158,19 @@ export function ProductPreview() {
           <div className="flex flex-col gap-1.5 max-[760px]:flex-row max-[760px]:gap-[7px]">
             {nav.map((item) => (
               <span
-                key={item.n}
-                className={cn(NAV_ITEM, item.label === "Ao vivo" && NAV_ACTIVE)}
+                key={item.id}
+                className={cn(NAV_ITEM, item.id === "golive" && NAV_ACTIVE)}
               >
                 <i>
                   <NavIcon name={item.icon} />
                 </i>
                 <span>
-                  <strong>{item.label}</strong>
-                  <small>{item.hint}</small>
+                  <strong>{t(`preview.nav.${item.id}.label`)}</strong>
+                  <small>{t(`preview.nav.${item.id}.hint`)}</small>
                 </span>
-                {item.label === "Relatórios" ? (
+                {item.id === "reports" ? (
                   <b className="ml-auto -rotate-3 rounded-sm bg-tomate px-[5px] py-0.5 text-[0.54rem] font-extrabold tracking-[0.06em] text-brass-ink uppercase">
-                    novo
+                    {t("preview.nav.reports.badge")}
                   </b>
                 ) : (
                   <b>{item.n}</b>
@@ -211,12 +191,12 @@ export function ProductPreview() {
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
               </svg>
-              Configurações
+              {t("preview.settings")}
               <b>06</b>
             </span>
             <span className="flex items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-[0.76rem] font-semibold text-muted [&>i]:size-[9px] [&>i]:rounded-full [&>i]:bg-faint">
               <i />
-              Fora do ar
+              {t("preview.state.offAir")}
             </span>
           </div>
         </div>
@@ -224,25 +204,25 @@ export function ProductPreview() {
         <div className="flex min-w-0 flex-col gap-3.5 p-[18px] max-[760px]:p-[15px]">
           <div>
             <span className="mb-[5px] block text-[0.6rem] font-extrabold tracking-[0.16em] text-brass uppercase">
-              painel da live
+              {t("preview.panel.title")}
             </span>
             <strong className="block font-display text-2xl leading-[1.05] font-extrabold tracking-[-0.02em]">
-              Ao vivo
+              {t("preview.nav.golive.label")}
             </strong>
           </div>
 
           <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-2 max-[760px]:[&>div:last-child]:col-span-2">
             <div className={STAT}>
-              <span>seu upload</span>
-              <strong>25 Mb/s</strong>
+              <span>{t("preview.stat.upload")}</span>
+              <strong>{t("preview.stat.upload.value")}</strong>
             </div>
             <div className={STAT}>
-              <span>a live precisa</span>
-              <strong>18,5 Mb/s</strong>
+              <span>{t("preview.stat.needed")}</span>
+              <strong>{t("preview.stat.needed.value")}</strong>
             </div>
             <div className={cn(STAT, "[&>strong]:text-ok")}>
-              <span>folga</span>
-              <strong>tranquila</strong>
+              <span>{t("preview.stat.headroom")}</span>
+              <strong>{t("preview.stat.headroom.value")}</strong>
             </div>
           </div>
 
@@ -262,7 +242,7 @@ export function ProductPreview() {
                   </small>
                 </div>
                 <span className="rounded-sm border border-border-dry px-[7px] py-1 text-[0.58rem] font-bold text-muted max-[760px]:hidden">
-                  {target.quality}
+                  {t("preview.target.copy")}
                 </span>
                 <span
                   className="flex h-[21px] w-[38px] items-center justify-end rounded-md bg-brass p-[3px]"
@@ -287,7 +267,7 @@ export function ProductPreview() {
               <circle cx="12" cy="12" r="2" />
               <path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2" />
             </svg>
-            BORA AO VIVO
+            {t("preview.cta")}
           </div>
         </div>
 
@@ -298,10 +278,10 @@ export function ProductPreview() {
           <div className="mb-4 flex items-start justify-between gap-2.5">
             <span>
               <strong className="block font-display text-[0.9rem] leading-none font-bold">
-                Chat reunido
+                {t("preview.chat.title")}
               </strong>
               <small className="mt-[3px] block text-[0.56rem] font-bold tracking-[0.08em] text-faint uppercase">
-                3 plataformas
+                {t("preview.chat.platforms")}
               </small>
             </span>
           </div>
@@ -315,10 +295,10 @@ export function ProductPreview() {
                 <PlatformGlyph id={message.id} />
                 <div>
                   <strong className="block text-[0.6rem] font-extrabold text-muted">
-                    {message.from} · {message.who}
+                    {t(`preview.chat.msg.${message.n}.from`)} · {message.who}
                   </strong>
                   <p className="mt-0.5 text-[0.72rem] leading-[1.4] font-[550]">
-                    {message.text}
+                    {t(`preview.chat.msg.${message.n}.text`)}
                   </p>
                 </div>
               </div>
@@ -326,8 +306,8 @@ export function ProductPreview() {
           </div>
 
           <div className="mt-3.5 flex min-h-[34px] items-center justify-between gap-2 rounded-md border border-border-dry px-2.5 text-[0.62rem] font-[550] text-faint">
-            Responde de uma vez…
-            <b className="text-brass">enviar</b>
+            {t("preview.chat.compose")}
+            <b className="text-brass">{t("preview.chat.compose.send")}</b>
           </div>
         </div>
       </div>

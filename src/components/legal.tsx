@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import { LEGAL_URLS } from "../lib/legal";
+import { Fragment, type ReactNode } from "react";
+import { legalUrl } from "../lib/legal";
+import { useI18n } from "../lib/i18n";
 import { cn, openExternal } from "../lib/utils";
 
 /** Link pra um documento legal. Abre no navegador — o app não embute o texto pra
@@ -33,6 +34,11 @@ export function LegalLink({
  * checkbox só adicionaria atrito sem ganho jurídico.
  */
 export function LegalAcceptNote({ className }: { className?: string }) {
+  const { t, locale } = useI18n();
+  // A frase inteira vem do dicionário com os dois buracos ainda no lugar (sem
+  // `vars`, `interpolate` devolve o template cru) e é partida neles. Montar a
+  // frase por pedaços de JSX prenderia a ordem das palavras ao português.
+  const parts = t("components.legal.accept").split(/(\{terms\}|\{privacy\})/);
   return (
     <p
       className={cn(
@@ -40,9 +46,19 @@ export function LegalAcceptNote({ className }: { className?: string }) {
         className,
       )}
     >
-      Ao continuar, você aceita os{" "}
-      <LegalLink href={LEGAL_URLS.terms}>Termos de Uso</LegalLink> e a{" "}
-      <LegalLink href={LEGAL_URLS.privacy}>Política de Privacidade</LegalLink>.
+      {parts.map((part, i) =>
+        part === "{terms}" ? (
+          <LegalLink key={i} href={legalUrl(locale, "terms")}>
+            {t("components.legal.link.terms")}
+          </LegalLink>
+        ) : part === "{privacy}" ? (
+          <LegalLink key={i} href={legalUrl(locale, "privacy")}>
+            {t("components.legal.link.privacy")}
+          </LegalLink>
+        ) : (
+          <Fragment key={i}>{part}</Fragment>
+        ),
+      )}
     </p>
   );
 }

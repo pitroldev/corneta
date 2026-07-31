@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 import { useToasts, type ToastKind } from "../lib/toast";
+import { useT } from "../lib/i18n";
 
 const ICON: Record<ToastKind, typeof Info> = {
   success: CheckCircle2,
@@ -19,48 +20,49 @@ const STRIPE: Record<ToastKind, string> = {
 };
 
 export function Toaster() {
+  const t = useT();
   const toasts = useToasts((s) => s.toasts);
   const dismiss = useToasts((s) => s.dismiss);
 
   return (
     <div
       role="region"
-      aria-label="Avisos"
+      aria-label={t("components.toaster.region.aria")}
       aria-live="polite"
       className="pointer-events-none fixed bottom-5 right-5 z-[100] flex w-80 flex-col gap-2"
     >
       <AnimatePresence>
-        {toasts.map((t) => {
-          const Icon = ICON[t.kind];
+        {toasts.map((item) => {
+          const Icon = ICON[item.kind];
           return (
             <motion.div
-              key={t.id}
+              key={item.id}
               layout
               initial={{ opacity: 0, x: 40, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className={`pointer-events-auto flex items-start gap-3 rounded-md border-l-4 bg-surface-2 pop p-3.5 ${STRIPE[t.kind]}`}
+              className={`pointer-events-auto flex items-start gap-3 rounded-md border-l-4 bg-surface-2 pop p-3.5 ${STRIPE[item.kind]}`}
             >
               <Icon
-                className={`mt-0.5 size-5 shrink-0 ${ACCENT[t.kind]}`}
+                className={`mt-0.5 size-5 shrink-0 ${ACCENT[item.kind]}`}
                 aria-hidden
               />
-              <p className="flex-1 text-sm text-ink">{t.message}</p>
-              {t.action && (
+              <p className="flex-1 text-sm text-ink">{item.message}</p>
+              {item.action && (
                 <button
                   onClick={() => {
-                    t.action?.onClick();
-                    dismiss(t.id);
+                    item.action?.onClick();
+                    dismiss(item.id);
                   }}
                   className="shrink-0 font-display text-xs font-extrabold uppercase text-brass hover:underline"
                 >
-                  {t.action.label}
+                  {item.action.label}
                 </button>
               )}
               <button
-                aria-label="Fechar aviso"
-                onClick={() => dismiss(t.id)}
+                aria-label={t("components.toaster.dismiss.aria")}
+                onClick={() => dismiss(item.id)}
                 className="text-ink-faint hover:text-ink"
               >
                 <X className="size-4" aria-hidden />

@@ -6,6 +6,7 @@
 // WebRTC roda no WebView (Chromium/WebView2) — nada de crate Rust. A sinalização é um
 // relay de texto servido pela Corneta do host; a mídia é direta entre os pares.
 // ============================================================
+import type { I18n } from "./i18n";
 
 export type MesaRole = "control" | "studio";
 
@@ -25,6 +26,9 @@ export interface MesaClientOpts {
   /** Chave da sala (id + segredo) — quem tem o convite tem acesso. */
   room: string;
   name: string;
+  /** Tradutor do idioma ativo: o cliente escreve erros que o convidado lê na tela.
+   *  Entra pelas opções (não é componente e não pode ter idioma global). */
+  t: I18n["t"];
   iceServers?: RTCIceServer[];
   onReady?: (myId: string) => void;
   onPeers: (peers: MesaPeer[]) => void;
@@ -249,9 +253,7 @@ export class MesaClient {
       ws = new WebSocket(this.opts.signalUrl);
     } catch (e) {
       console.warn("[mesa] sinalização inválida:", e);
-      this.opts.onError?.(
-        "O endereço do convite é inválido — pede um convite novo pro host.",
-      );
+      this.opts.onError?.(this.opts.t("core.mesa.error.badInviteAddress"));
       this.opts.onStatus("error");
       return;
     }
@@ -287,9 +289,11 @@ export class MesaClient {
         this.alive = false;
         this.opts.onStatus("error");
         this.opts.onError?.(
-          this.wasOnline
-            ? "A Mesa caiu ou o host saiu de vez."
-            : "Não consegui alcançar o host — vocês estão na mesma rede?",
+          this.opts.t(
+            this.wasOnline
+              ? "core.mesa.error.hostGone"
+              : "core.mesa.error.hostUnreachable",
+          ),
         );
         return;
       }
@@ -350,10 +354,13 @@ export class MesaClient {
           /* ignore */
         }
         this.opts.onStatus("error");
+        // O código do relay ("peer-taken") é protocolo e não se traduz — só a frase.
         this.opts.onError?.(
-          code === "peer-taken"
-            ? "Alguém já tá no seu lugar na sala — espera um instante e tenta de novo."
-            : "A Mesa recusou a entrada — confere o convite ou pede um novo pro host.",
+          this.opts.t(
+            code === "peer-taken"
+              ? "core.mesa.error.peerTaken"
+              : "core.mesa.error.joinRefused",
+          ),
         );
         break;
       }
@@ -461,7 +468,14 @@ export class MesaClient {
   private async onPeerSignal(fromId: string, data: SignalData): Promise<void> {
     if (!data) return;
     let rec = this.recs.get(fromId);
-    if (!rec) rec = this.connectTo(fromId, "control", "convidado") ?? undefined;
+    // "control" é papel do protocolo; o nome é rótulo de tela e vem do dicionário.
+    if (!rec)
+      rec =
+        this.connectTo(
+          fromId,
+          "control",
+          this.opts.t("core.mesa.peer.unknownName"),
+        ) ?? undefined;
     if (!rec) return;
     const pc = rec.pc;
     try {

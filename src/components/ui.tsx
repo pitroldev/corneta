@@ -11,6 +11,7 @@ import {
   siInstagram,
 } from "simple-icons";
 import { cn, readableOn } from "../lib/utils";
+import { useT } from "../lib/i18n";
 import { PLATFORMS } from "../lib/platforms";
 import type { PlatformId } from "../lib/types";
 import { Mascot } from "./decor";
@@ -156,16 +157,17 @@ export function Badge({
 // ---------------- Experimental (adesivo de feature beta) ----------------
 // Selo de gibi torto com frasco — sinaliza "ainda em teste, pode falhar/mudar".
 export function ExperimentalBadge({ className }: { className?: string }) {
+  const t = useT();
   return (
     <span
-      title="Feature experimental — ainda em teste, pode falhar ou mudar"
+      title={t("components.ui.experimental.title")}
       className={cn(
         "inline-flex shrink-0 -rotate-2 items-center gap-1 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white pop-sm",
         className,
       )}
     >
       <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden />{" "}
-      experimental
+      {t("components.ui.experimental.label")}
     </span>
   );
 }
@@ -321,11 +323,12 @@ export function Hint({
   text: string;
   className?: string;
 }) {
+  const t = useT();
   return (
     <Tooltip content={text} className={cn("align-middle", className)}>
       <button
         type="button"
-        aria-label="Ajuda"
+        aria-label={t("components.ui.hint.aria")}
         className="inline-flex cursor-help text-ink-faint transition-colors hover:text-ink"
       >
         <Info className="size-3.5" />
@@ -366,6 +369,7 @@ export function CopyField({
   mono?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -396,14 +400,20 @@ export function CopyField({
         variant="subtle"
         size="sm"
         onClick={copy}
-        aria-label={`Copiar${label ? ` ${label}` : ""}`}
+        // Duas chaves em vez de concatenar "Copiar" + rótulo: em outros idiomas
+        // a ordem das palavras muda, e a frase montada no código sairia torta.
+        aria-label={
+          label
+            ? t("components.ui.copy.aria", { label })
+            : t("components.ui.copy")
+        }
       >
         {copied ? (
           <Check className="size-4 text-ok" />
         ) : (
           <Copy className="size-4" />
         )}
-        {copied ? "Copiado" : "Copiar"}
+        {copied ? t("components.ui.copied") : t("components.ui.copy")}
       </Button>
     </div>
   );

@@ -9,6 +9,7 @@ use std::time::Duration;
 use tungstenite::Message;
 
 use crate::engine::ObsStats;
+use crate::i18n::Msg;
 
 type Socket = tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>;
 
@@ -29,7 +30,7 @@ fn read_json(socket: &mut Socket) -> Result<Value, String> {
     loop {
         match socket.read().map_err(|e| e.to_string())? {
             Message::Text(t) => return serde_json::from_str(&t).map_err(|e| e.to_string()),
-            Message::Close(_) => return Err("o OBS fechou a conexão".into()),
+            Message::Close(_) => return Err(Msg::ObsConnectionClosed.now()),
             _ => continue, // ping/pong/binário → ignora
         }
     }
@@ -41,15 +42,46 @@ fn send_json(socket: &mut Socket, v: &Value) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Erro de conexão que lembra se a causa foi SENHA.
+///
+/// Tipo próprio em vez de tupla pra o `?` continuar funcionando dos dois lados:
+/// as falhas comuns chegam como `String` e viram `auth: false`, e quem chama
+/// `connect_identify` em função que devolve `String` recebe só a mensagem.
+struct ConnErr {
+    auth: bool,
+    msg: String,
+}
+
+impl From<String> for ConnErr {
+    fn from(msg: String) -> Self {
+        Self { auth: false, msg }
+    }
+}
+
+impl From<ConnErr> for String {
+    fn from(e: ConnErr) -> Self {
+        e.msg
+    }
+}
+
+impl std::fmt::Display for ConnErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.msg)
+    }
+}
+
 /// Conecta no obs-websocket, faz Hello→Identify (com auth SHA256 se houver senha)
 /// e devolve o socket pronto para enviar requests.
-fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, String> {
+///
+/// Falha com `ConnErr`, que carrega a mensagem E se ela foi por senha.
+fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, ConnErr> {
     let url = format!("ws://{host}:{port}");
     let (mut socket, _resp) = tungstenite::connect(url.as_str()).map_err(|e| {
-        format!(
-            "não consegui conectar no obs-websocket ({url}): {e}. \
-             No OBS, ative em Ferramentas → Configurações do Servidor WebSocket."
-        )
+        Msg::ObsConnectFailed {
+            url: &url,
+            e: &e.to_string(),
+        }
+        .now()
     })?;
 
     if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
@@ -61,7 +93,10 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Str
     let mut identify = json!({ "op": 1, "d": { "rpcVersion": 1, "eventSubscriptions": 0 } });
     if let Some(auth) = hello.get("d").and_then(|d| d.get("authentication")) {
         if password.is_empty() {
-            return Err("O obs-websocket está com senha. Informe-a em Configurações → OBS.".into());
+            return Err(ConnErr {
+                auth: true,
+                msg: Msg::ObsPasswordRequired.now(),
+            });
         }
         let challenge = auth.get("challenge").and_then(|v| v.as_str()).unwrap_or("");
         let salt = auth.get("salt").and_then(|v| v.as_str()).unwrap_or("");
@@ -73,9 +108,13 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Str
     let identified = read_json(&mut socket)?;
     if identified.get("op").and_then(|v| v.as_i64()) != Some(2) {
         let _ = socket.close(None);
-        return Err(format!(
-            "falha ao identificar no OBS (senha errada?): {identified}"
-        ));
+        return Err(ConnErr {
+            auth: true,
+            msg: Msg::ObsIdentifyFailed {
+                identified: &identified.to_string(),
+            }
+            .now(),
+        });
     }
     Ok(socket)
 }
@@ -112,7 +151,10 @@ pub fn autoconfigure(
     if ok {
         Ok(())
     } else {
-        Err(format!("o OBS recusou a configuração: {response}"))
+        Err(Msg::ObsRefusedConfig {
+            response: &response.to_string(),
+        }
+        .now())
     }
 }
 
@@ -140,7 +182,11 @@ pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<
     if ok || code == already {
         Ok(())
     } else {
-        Err(format!("o OBS recusou {req_type}: {response}"))
+        Err(Msg::ObsRefusedRequest {
+            req_type,
+            response: &response.to_string(),
+        }
+        .now())
     }
 }
 
@@ -155,6 +201,14 @@ pub struct ObsCheck {
     pub fps: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// A conexão falhou por SENHA (faltando ou recusada)?
+    ///
+    /// Existe porque o front precisa distinguir "senha errada" de "OBS fechado"
+    /// pra dar o conselho certo. Ele fazia isso procurando as palavras "senha",
+    /// "identificar" e "autentic" na mensagem — o que parou de funcionar assim
+    /// que estas mensagens ganharam tradução. Estado é dado, não texto.
+    #[serde(default)]
+    pub auth_failed: bool,
 }
 
 /// Verifica se o OBS está acessível, apontando pra Corneta e em qual resolução/fps.
@@ -163,7 +217,8 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
         Ok(s) => s,
         Err(e) => {
             return ObsCheck {
-                error: Some(e),
+                auth_failed: e.auth,
+                error: Some(e.msg),
                 ..Default::default()
             };
         }
@@ -201,6 +256,7 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
         height: g("outputHeight") as u32,
         fps,
         error: None,
+        auth_failed: false,
     }
 }
 
@@ -280,9 +336,7 @@ pub fn add_or_update_browser_source(
     if let Some(kind) = &existing_kind {
         if kind != "browser_source" {
             let _ = socket.close(None);
-            return Err(format!(
-                "já existe uma fonte \"{input_name}\" no OBS (do tipo {kind}). Renomeie ou apague pra a Mesa usar esse nome."
-            ));
+            return Err(Msg::ObsSourceNameTaken { input_name, kind }.now());
         }
     }
 
@@ -292,7 +346,7 @@ pub fn add_or_update_browser_source(
         .get("currentProgramSceneName")
         .or_else(|| scene_resp.get("sceneName"))
         .and_then(|v| v.as_str())
-        .ok_or("não consegui descobrir a cena atual do OBS")?
+        .ok_or_else(|| Msg::ObsCurrentSceneUnknown.now())?
         .to_string();
 
     let resp = if existing_kind.is_some() {
@@ -318,7 +372,10 @@ pub fn add_or_update_browser_source(
             )?;
             if !req_ok(&added) {
                 let _ = socket.close(None);
-                return Err(format!("o OBS recusou pôr a Mesa na cena atual: {added}"));
+                return Err(Msg::ObsRefusedSceneItem {
+                    added: &added.to_string(),
+                }
+                .now());
             }
         }
         request_with(
@@ -346,7 +403,10 @@ pub fn add_or_update_browser_source(
     if req_ok(&resp) {
         Ok(())
     } else {
-        Err(format!("o OBS recusou a fonte da Mesa: {resp}"))
+        Err(Msg::ObsRefusedSource {
+            resp: &resp.to_string(),
+        }
+        .now())
     }
 }
 
@@ -368,7 +428,10 @@ pub fn remove_input(host: &str, port: u16, password: &str, input_name: &str) -> 
     if req_ok(&resp) || not_found {
         Ok(())
     } else {
-        Err(format!("o OBS recusou remover a fonte da Mesa: {resp}"))
+        Err(Msg::ObsRefusedRemoveSource {
+            resp: &resp.to_string(),
+        }
+        .now())
     }
 }
 

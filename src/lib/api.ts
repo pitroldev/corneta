@@ -3,7 +3,13 @@
 // - Dentro do Tauri: chama os commands em Rust e ouve eventos.
 // - No navegador (pnpm dev): usa um simulador local (mock) para que a UI
 //   seja totalmente navegável e demonstrável sem o backend.
+//
+// Alguns métodos recebem `t`: é o mock que precisa dele. As frases da demo
+// (chat de exemplo, "demo: alcançável", sessão semeada) são copy e seguem o
+// idioma — e como o módulo não é componente, o idioma entra por parâmetro, nunca
+// por estado global (duas janelas, uma corrida). No Tauri o parâmetro é ignorado.
 // ============================================================
+import type { I18n, MessageKey } from "./i18n";
 import type {
   Alert,
   AppConfig,
@@ -26,6 +32,13 @@ import { PLATFORMS } from "./platforms";
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/** Espelha `commands::START_CANCELLED` (Rust). É CÓDIGO, não frase: o backend
+ *  devolve isto quando a própria pessoa cancelou o início da live, e o front
+ *  engole o toast de erro. Enquanto era a frase "Início cancelado.", traduzir o
+ *  backend quebrava a comparação em silêncio — e o cancelamento voltava a
+ *  aparecer como falha. Mudou de um lado? Muda do outro. */
+export const START_CANCELLED = "corneta:start-cancelled";
+
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
   saveConfig(config: AppConfig): Promise<AppConfig>;
@@ -45,7 +58,8 @@ export interface CornetaApi {
   setForceBrb(on: boolean): Promise<void>;
   subscribe(cb: (s: EngineSnapshot) => void): () => void;
   // Relatórios pós-live
-  listSessions(): Promise<SessionMeta[]>;
+  /** `t` só serve à demo do navegador, que semeia sessões de exemplo com copy. */
+  listSessions(t: I18n["t"]): Promise<SessionMeta[]>;
   readSession(id: string): Promise<string>;
   deleteSession(id: string): Promise<void>;
   openSessionsDir(): Promise<void>;
@@ -57,7 +71,8 @@ export interface CornetaApi {
     content: string;
   }): Promise<boolean>;
   // Chat unificado
-  chatStart(): Promise<void>;
+  /** `t` só serve à demo do navegador, que inventa mensagens e alertas de exemplo. */
+  chatStart(t: I18n["t"]): Promise<void>;
   chatStop(): Promise<void>;
   /** Há sessão de chat no ar? (pro popout nascer com o estado da janela principal.) */
   chatRunning(): Promise<boolean>;
@@ -150,11 +165,11 @@ export interface CornetaApi {
   subscribeViewers(onViewers: (v: Viewers) => void): () => void;
   // UX
   obsSetStream(start: boolean): Promise<void>;
-  testTarget(targetId: string): Promise<string>;
+  testTarget(targetId: string, t: I18n["t"]): Promise<string>;
   /** Verifica a API key do YouTube (Data API v3). Resolve com msg de ok; rejeita com o motivo. */
-  youtubeKeyCheck(key: string): Promise<string>;
+  youtubeKeyCheck(key: string, t: I18n["t"]): Promise<string>;
   /** Testa o token de uma fonte de alerta. Resolve com msg de ok; rejeita com o motivo. */
-  alertTest(sourceId: string): Promise<string>;
+  alertTest(sourceId: string, t: I18n["t"]): Promise<string>;
   openLogsDir(): Promise<void>;
   exportDiagnostics(): Promise<boolean>;
   registerShortcut(shortcut: string): Promise<void>;
@@ -171,7 +186,7 @@ export interface CornetaApi {
   clearBrbSlate(): Promise<void>;
   /** Miniatura (JPEG base64, sem prefixo data:) da tela do "JÁ VOLTO" atual; "" se indisponível. */
   getBrbSlatePreview(): Promise<string>;
-  captureFrame(): Promise<string>;
+  captureFrame(t: I18n["t"]): Promise<string>;
   // Guardião anti-vazamento
   subscribeGuardian(
     onLeak: (l: Leak) => void,
@@ -757,6 +772,7 @@ function mockApi(): CornetaApi {
     startedAt: number,
     mins: number,
     plats: { id: string; name: string; platformId: string }[],
+    t: I18n["t"],
     opts?: { dropAtMin?: number; dropIdx?: number; highCpu?: boolean },
   ): string => {
     const meta = {
@@ -923,7 +939,7 @@ function mockApi(): CornetaApi {
         JSON.stringify({
           kind: "marker",
           t: startedAt + opts.dropAtMin * 60000,
-          label: "Twitch caiu",
+          label: t("core.mock.marker.twitchDropped"),
         }),
       );
     }
@@ -931,15 +947,15 @@ function mockApi(): CornetaApi {
     return lines.join("\n");
   };
 
-  const seedSessions = () => {
+  const seedSessions = (t: I18n["t"]) => {
     const m = loadSessions();
     if (Object.keys(m).length > 0) return;
     const tw = { id: "t1", name: "Twitch", platformId: "twitch" };
     const yt = { id: "y1", name: "YouTube", platformId: "youtube" };
     const a = Date.now() - 26 * 3600 * 1000;
     const b = Date.now() - 3 * 3600 * 1000;
-    m[String(a)] = genSession(a, 35, [tw, yt]); // sem incidentes
-    m[String(b)] = genSession(b, 48, [tw, yt], {
+    m[String(a)] = genSession(a, 35, [tw, yt], t); // sem incidentes
+    m[String(b)] = genSession(b, 48, [tw, yt], t, {
       dropAtMin: 23,
       dropIdx: 0,
       highCpu: true,
@@ -984,7 +1000,7 @@ function mockApi(): CornetaApi {
     "zedapeça",
     "miron_tv",
   ];
-  const randomAlert = (seq: number): Alert => {
+  const randomAlert = (seq: number, t: I18n["t"]): Alert => {
     const src = ALERT_SOURCES[Math.floor(Math.random() * ALERT_SOURCES.length)];
     const user = ALERT_USERS[Math.floor(Math.random() * ALERT_USERS.length)];
     const kinds: Alert["kind"][] = [
@@ -1014,7 +1030,7 @@ function mockApi(): CornetaApi {
           ...base,
           amount: 1 + Math.floor(Math.random() * 24),
           tier: "T1",
-          message: "valeu demais!",
+          message: t("core.mock.alert.resub.message"),
         };
       case "sub":
         return { ...base, tier: "T1" };
@@ -1025,7 +1041,8 @@ function mockApi(): CornetaApi {
       case "member":
         return {
           ...base,
-          tier: "Membro",
+          // Rótulo exibido no card (ao contrário do "T1", que é código de tier).
+          tier: t("core.mock.alert.tier.member"),
           amount: 1 + Math.floor(Math.random() * 12),
         };
       case "superchat":
@@ -1033,27 +1050,27 @@ function mockApi(): CornetaApi {
           ...base,
           amount: pick([5, 10, 50]),
           currency: "BRL",
-          message: "manda salve!",
+          message: t("core.mock.alert.superchat.message"),
         };
       default:
         return base;
     }
   };
-  const CHAT_MSGS = [
-    "salve salve!",
-    "kkkkk",
-    "qual a build?",
-    "primeiro 🎉",
-    "tá lagando aí?",
-    "som tá baixo",
-    "boa live!",
-    "manda um salve pro RJ",
-    "que jogo é esse?",
-    "📣📣📣",
-    "cornetou demais",
-    "GG",
-    "alguém mais travando?",
-    "joga de novo!",
+  const CHAT_MSG_KEYS: MessageKey[] = [
+    "core.mock.chat.msg.1",
+    "core.mock.chat.msg.2",
+    "core.mock.chat.msg.3",
+    "core.mock.chat.msg.4",
+    "core.mock.chat.msg.5",
+    "core.mock.chat.msg.6",
+    "core.mock.chat.msg.7",
+    "core.mock.chat.msg.8",
+    "core.mock.chat.msg.9",
+    "core.mock.chat.msg.10",
+    "core.mock.chat.msg.11",
+    "core.mock.chat.msg.12",
+    "core.mock.chat.msg.13",
+    "core.mock.chat.msg.14",
   ];
 
   const emit = () => listeners.forEach((l) => l(structuredClone(snapshot)));
@@ -1236,8 +1253,8 @@ function mockApi(): CornetaApi {
       cb(structuredClone(snapshot));
       return () => listeners.delete(cb);
     },
-    async listSessions() {
-      seedSessions();
+    async listSessions(t) {
+      seedSessions(t);
       const m = loadSessions();
       const out: SessionMeta[] = [];
       for (const [id, ndjson] of Object.entries(m)) {
@@ -1300,7 +1317,9 @@ function mockApi(): CornetaApi {
     async openSessionsDir() {
       // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
     },
-    async chatStart() {
+    async chatStart(t) {
+      // Frases da demo resolvidas UMA vez por conexão (o timer roda a cada 1,1 s).
+      const chatMsgs = CHAT_MSG_KEYS.map((k) => t(k));
       const SOURCES = [
         { platform: "twitch", name: "Pitrol" },
         { platform: "twitch", name: "Gaules" },
@@ -1351,12 +1370,12 @@ function mockApi(): CornetaApi {
         }
         // De vez em quando, dispara um alerta de exemplo.
         if (Math.random() < 0.12) {
-          const a = randomAlert(++alertSeq);
+          const a = randomAlert(++alertSeq, t);
           alertListeners.forEach((l) => l(a));
         }
         const src = SOURCES[Math.floor(Math.random() * SOURCES.length)];
         const platform = src.platform;
-        const text = CHAT_MSGS[Math.floor(Math.random() * CHAT_MSGS.length)];
+        const text = chatMsgs[Math.floor(Math.random() * chatMsgs.length)];
         const fragments: ChatFragment[] = [{ kind: "text", text: `${text} ` }];
         if (Math.random() < 0.4) {
           if (platform === "twitch")
@@ -1421,6 +1440,11 @@ function mockApi(): CornetaApi {
     },
     async chatSend(text) {
       // Demo: ecoa local pra UI funcionar no navegador.
+      //
+      // NÃO TRADUZIR "você" aqui sozinho: a ChatScreen compara `m.author === "você"`
+      // pra não deixar você moderar a própria mensagem. Os dois lados são um par —
+      // trocar um só destrava a moderação do próprio eco. Chave pronta no
+      // dicionário: core.mock.chat.self.
       chatMsgListeners.forEach((l) =>
         l({
           id: `me-${Date.now()}`,
@@ -1502,14 +1526,14 @@ function mockApi(): CornetaApi {
     async obsSetStream() {
       // no-op no navegador (sem OBS).
     },
-    async testTarget() {
-      return "demo: alcançável";
+    async testTarget(_targetId, t) {
+      return t("core.mock.target.test.ok");
     },
-    async youtubeKeyCheck() {
-      return "demo: chave válida";
+    async youtubeKeyCheck(_key, t) {
+      return t("core.mock.youtubeKey.ok");
     },
-    async alertTest() {
-      return "demo: token válido";
+    async alertTest(_sourceId, t) {
+      return t("core.mock.alertToken.ok");
     },
     async openLogsDir() {
       // no-op no navegador.
@@ -1558,8 +1582,8 @@ function mockApi(): CornetaApi {
     async getBrbSlatePreview() {
       return "";
     },
-    async captureFrame() {
-      throw new Error("captura de frame só no app instalado (e ao vivo)");
+    async captureFrame(t) {
+      throw new Error(t("core.mock.captureFrame.unavailable"));
     },
     subscribeGuardian() {
       return () => {};

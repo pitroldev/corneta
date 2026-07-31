@@ -1,4 +1,5 @@
 //! Modelo de configuração (espelha src/lib/types.ts) e persistência em disco.
+use crate::i18n::{self, Locale, Msg};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
@@ -19,9 +20,15 @@ fn valid_id(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
 }
 
-fn limited(label: &str, value: &str, max: usize) -> Result<(), String> {
+/// O rótulo entra como `Msg` (não como `&str`) porque a frase é MONTADA: o texto do
+/// rótulo é uma mensagem própria, renderizada no mesmo idioma da moldura.
+fn limited(l: Locale, label: Msg<'_>, value: &str, max: usize) -> Result<(), String> {
     if value.len() > max {
-        Err(format!("{label} excede o limite de {max} bytes"))
+        Err(Msg::ConfigLimitExceeded {
+            label: &label.text(l),
+            max,
+        }
+        .text(l))
     } else {
         Ok(())
     }
@@ -35,7 +42,7 @@ pub fn validate_secret_namespace(value: &str) -> Result<(), String> {
     if valid_id(id) && !value.starts_with("oauth_") {
         Ok(())
     } else {
-        Err("namespace de segredo inválido".into())
+        Err(Msg::ConfigInvalidSecretNamespace.now())
     }
 }
 
@@ -139,6 +146,11 @@ pub struct Settings {
     /// Tema da interface: "dark" | "light".
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Idioma da interface: "auto" | "pt-BR" | "en". Em "auto" segue o idioma
+    /// do Windows. O Rust também lê isto: as mensagens de erro que ele devolve
+    /// aparecem na tela, então precisam sair no idioma escolhido.
+    #[serde(default = "default_language")]
+    pub language: String,
     /// Tamanho da fonte do chat em pixels (slider). Aceita os antigos "sm/md/lg" salvos.
     #[serde(default = "default_font", deserialize_with = "de_font")]
     pub chat_font_size: u32,
@@ -287,6 +299,9 @@ fn default_live_shortcut() -> String {
 fn default_theme() -> String {
     "dark".to_string()
 }
+fn default_language() -> String {
+    "auto".to_string()
+}
 fn default_font() -> u32 {
     14
 }
@@ -355,6 +370,7 @@ impl Default for Settings {
             chat_show_timestamps: false,
             chat_show_viewers: true,
             theme: default_theme(),
+            language: default_language(),
             chat_font_size: default_font(),
             alert_font_size: default_font(),
             chat_both_layout: default_both_layout(),
@@ -451,39 +467,45 @@ impl Default for AppConfig {
 
 impl AppConfig {
     pub fn validate_and_normalize(mut self) -> Result<Self, String> {
+        // UMA leitura do idioma ativo pra função inteira: duas leituras poderiam divergir
+        // se o streamer trocasse o idioma no meio da validação.
+        let l = i18n::locale();
         if self.schema_version > CURRENT_SCHEMA_VERSION {
-            return Err(format!(
-                "config criada por uma versão mais nova (schema {})",
-                self.schema_version
-            ));
+            return Err(Msg::ConfigSchemaTooNew {
+                n: self.schema_version,
+            }
+            .text(l));
         }
         self.schema_version = CURRENT_SCHEMA_VERSION;
         if self.targets.len() > MAX_TARGETS || self.profiles.len() > MAX_PROFILES {
-            return Err("config excede o limite de destinos ou perfis".into());
+            return Err(Msg::ConfigTooManyTargetsOrProfiles.text(l));
         }
         if self.ingest.protocol != "rtmp" {
-            return Err("o ingest local deve usar RTMP".into());
+            return Err(Msg::ConfigIngestMustBeRtmp.text(l));
         }
         self.ingest.host = match self.ingest.host.trim().to_ascii_lowercase().as_str() {
             "127.0.0.1" | "localhost" => "127.0.0.1".into(),
-            _ => return Err("o ingest deve escutar somente em 127.0.0.1".into()),
+            _ => return Err(Msg::ConfigIngestMustBeLoopback.text(l)),
         };
         if !(1..=65_535).contains(&self.ingest.port) {
-            return Err("porta de ingest inválida".into());
+            return Err(Msg::ConfigInvalidIngestPort.text(l));
         }
         for (label, value) in [
-            ("app do ingest", &self.ingest.app),
-            ("chave do ingest", &self.ingest.key),
+            (Msg::ConfigLabelIngestApp, &self.ingest.app),
+            (Msg::ConfigLabelIngestKey, &self.ingest.key),
         ] {
             if !valid_id(value) {
-                return Err(format!("{label} inválido"));
+                return Err(Msg::ConfigInvalidValue {
+                    label: &label.text(l),
+                }
+                .text(l));
             }
         }
         if !matches!(
             self.mode.as_str(),
             "per-platform" | "passthrough" | "hybrid"
         ) {
-            return Err("modo de encoding inválido".into());
+            return Err(Msg::ConfigInvalidEncodingMode.text(l));
         }
 
         let allowed_platforms = [
@@ -498,11 +520,11 @@ impl AppConfig {
         ];
         for target in &mut self.targets {
             if !valid_id(&target.id) || !allowed_platforms.contains(&target.platform_id.as_str()) {
-                return Err("destino possui id ou plataforma inválida".into());
+                return Err(Msg::ConfigInvalidTarget.text(l));
             }
-            limited("nome do destino", &target.name, 120)?;
+            limited(l, Msg::ConfigLabelTargetName, &target.name, 120)?;
             if !matches!(target.protocol.as_str(), "rtmp" | "rtmps") {
-                return Err("protocolo de saída não suportado; use RTMP ou RTMPS".into());
+                return Err(Msg::ConfigUnsupportedProtocol.text(l));
             }
             let expected = format!("{}://", target.protocol);
             if !target.ingest_url.starts_with(&expected)
@@ -512,7 +534,7 @@ impl AppConfig {
                     .is_empty()
                 || target.ingest_url.chars().any(char::is_whitespace)
             {
-                return Err(format!("URL de ingest inválida em {}", target.name));
+                return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
             }
             if !matches!(target.encoding.action.as_str(), "copy" | "transcode")
                 || !matches!(
@@ -525,7 +547,7 @@ impl AppConfig {
                     .as_deref()
                     .is_some_and(|v| !matches!(v, "copy" | "transcode"))
             {
-                return Err(format!("encoding inválido em {}", target.name));
+                return Err(Msg::ConfigInvalidEncodingIn { name: &target.name }.text(l));
             }
             if let Some(p) = &mut target.encoding.preset {
                 if !(160..=7_680).contains(&p.width)
@@ -535,25 +557,25 @@ impl AppConfig {
                     || !(32..=1_536).contains(&p.audio_bitrate_kbps)
                     || !(1..=10).contains(&p.keyframe_sec)
                 {
-                    return Err(format!("preset fora dos limites em {}", target.name));
+                    return Err(Msg::ConfigPresetOutOfRange { name: &target.name }.text(l));
                 }
             }
             target.has_key = false;
         }
         for profile in &self.profiles {
             if !valid_id(&profile.id) || profile.targets.len() > MAX_TARGETS {
-                return Err("perfil possui id inválido ou destinos demais".into());
+                return Err(Msg::ConfigInvalidProfile.text(l));
             }
-            limited("nome do perfil", &profile.name, 120)?;
+            limited(l, Msg::ConfigLabelProfileName, &profile.name, 120)?;
             if !matches!(
                 profile.mode.as_str(),
                 "per-platform" | "passthrough" | "hybrid"
             ) {
-                return Err("perfil possui modo inválido".into());
+                return Err(Msg::ConfigInvalidProfileMode.text(l));
             }
         }
         if !self.active_profile_id.is_empty() && !valid_id(&self.active_profile_id) {
-            return Err("perfil ativo inválido".into());
+            return Err(Msg::ConfigInvalidActiveProfile.text(l));
         }
         let s = &mut self.settings;
         s.obs_password = s.obs_password.chars().take(512).collect();
@@ -566,7 +588,7 @@ impl AppConfig {
         s.chat_sources.truncate(32);
         s.alert_sources.truncate(16);
         if !(1..=65_535).contains(&s.overlay_port) {
-            return Err("porta do overlay inválida".into());
+            return Err(Msg::ConfigInvalidOverlayPort.text(l));
         }
         s.overlay_duration_secs = s.overlay_duration_secs.clamp(1, 60);
         s.overlay_chat_size = s.overlay_chat_size.clamp(8, 72);

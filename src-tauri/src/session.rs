@@ -13,6 +13,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::config::AppConfig;
 use crate::engine::EngineSnapshot;
+use crate::i18n::Msg;
 
 /// Quantas sessões manter no disco (as mais antigas são podadas).
 const KEEP: usize = 50;
@@ -339,11 +340,11 @@ pub fn read_session(app: &AppHandle, id: &str) -> Option<String> {
 }
 
 pub fn delete_session(app: &AppHandle, id: &str) -> Result<(), String> {
-    let path = session_path(app, id).ok_or_else(|| "id de sessão inválido".to_string())?;
+    let path = session_path(app, id).ok_or_else(|| Msg::SessionInvalidId.now())?;
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(format!("não foi possível apagar a sessão: {e}")),
+        Err(e) => Err(Msg::SessionDeleteFailed { e: &e.to_string() }.now()),
     }
 }
 

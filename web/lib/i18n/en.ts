@@ -27,8 +27,6 @@ export const en: Dict = {
   "replica.report.tag": "sample session",
   "replica.crop.caption":
     "Pick a side of the frame: that is how you decide what goes vertical.",
-  "replica.ui.note":
-    "Heads up: the app itself is in Portuguese for now — only this page speaks English.",
 
   // ---- benefits ----
   "benefits.chat.body":
@@ -50,8 +48,7 @@ export const en: Dict = {
   "benefits.chat.note":
     "You can pop it out into its own window on your second monitor",
   "benefits.chat.title": "All three chats in one column, emotes and all",
-  // O código usa a forma curta do botão ("o BORA", não "BORA AO VIVO"). Mantive o nome cru e coloquei a glosa aqui por ser a primeira ocorrência nesta sup
-  "benefits.heading.kicker": 'After you hit BORA ("GO LIVE")',
+  "benefits.heading.kicker": "After you hit GO LIVE",
   "benefits.heading.subtitle":
     "No alt-tab to find out who's still live and who's talking to you.",
   "benefits.heading.title": "One screen — even when it all goes sideways.",
@@ -191,9 +188,8 @@ export const en: Dict = {
   "content.faq.replaces_obs.answer":
     "No. You keep building scenes, camera and audio in the program you already use. Corneta picks up from there: it takes that signal, pushes it to the platforms, watches how each one is holding up, and keeps the stream's safety nets running.",
   "content.faq.replaces_obs.question": "Does Corneta replace OBS?",
-  // PT usa a forma curta "o BORA"; em inglês o nome curto não se lê como botão, então repeti o nome cheio. A glosa ("GO LIVE") está no passo 3 de STEPS, q
   "content.faq.streamlabs_xsplit.answer":
-    "It works. Corneta takes any program that streams over RTMP — just point it at the address the app shows you, same as you'd do with a platform. With OBS you get one extra shortcut: Corneta sets it up for you, and hits play when you press BORA AO VIVO.",
+    "It works. Corneta takes any program that streams over RTMP — just point it at the address the app shows you, same as you'd do with a platform. With OBS you get one extra shortcut: Corneta sets it up for you, and hits play when you press GO LIVE.",
   "content.faq.streamlabs_xsplit.question":
     "I use Streamlabs (or XSplit). Does it work?",
   "content.faq.upload.answer":
@@ -207,9 +203,8 @@ export const en: Dict = {
     "Alerts from the platforms and from Streamlabs/StreamElements in the same panel",
   "content.features.auto_bitrate":
     "Auto-bitrate when your internet starts choking, plus an optional audio normalizer",
-  // Primeira ocorrência de JÁ VOLTO nesta superfície — glosa aqui, nome cru depois. FEATURES vira featureList do schema, então a glosa também ajuda quem l
   "content.features.brb_screen":
-    'JÁ VOLTO ("BE RIGHT BACK") screen that holds the stream up when the program\'s signal drops',
+    "BE RIGHT BACK screen that holds the stream up when the program's signal drops",
   "content.features.independent_connections":
     "Each platform on its own connection: if one drops, the others stay on air",
   "content.features.keys_in_vault":
@@ -223,7 +218,7 @@ export const en: Dict = {
   "content.features.post_live_report":
     "Post-stream report that points at the likely cause of each stutter — encoding, internet or platform — with the minute to find it in the VOD",
   "content.features.privacy_guard":
-    "Privacy guard: reads what's going out on air and cuts to JÁ VOLTO if something private of yours shows up on screen",
+    "Privacy guard: reads what's going out on air and cuts to BE RIGHT BACK if something private of yours shows up on screen",
   "content.features.quality_modes":
     "Three quality modes — copy the signal, convert only what needs it, or convert everything",
   "content.features.report_per_channel":
@@ -263,8 +258,7 @@ export const en: Dict = {
   "content.steps.2.title": "Hook up your streaming program",
   "content.steps.3.text":
     "The panel shows each platform coming on air, one by one, and you go back to the game. If you want, Corneta tells OBS to start along with it.",
-  // Primeira ocorrência de BORA AO VIVO na ordem da página (Steps vem antes da FAQ), então a glosa fica aqui. Se o hero já glosar, tirar o parêntese daqui
-  "content.steps.3.title": 'Hit BORA AO VIVO ("GO LIVE")',
+  "content.steps.3.title": "Hit GO LIVE",
 
   // ---- hero ----
   "hero.cta.footnote":
@@ -348,12 +342,56 @@ export const en: Dict = {
   "page-data.tiny.tray.text":
     "Closing the window hides Corneta next to the clock — the stream stays up.",
   "page-data.tiny.tray.title": "Lives in the tray",
-  // O PT usa o apelido curto "BORA"; em inglês o nome cru sozinho não se lê como botão, então mantive "BORA AO VIVO" com a glosa. Se o hero já glosou, cor
   "page-data.tiny.youtube.text":
-    "With your account connected, Corneta creates the broadcast and drops the key into BORA AO VIVO. You never open YouTube Studio.",
+    "With your account connected, Corneta creates the broadcast and drops the key into GO LIVE. You never open YouTube Studio.",
   "page-data.tiny.youtube.title": "YouTube on autopilot",
 
   // ---- protection ----
+  // ---- Prévia do app no hero ----
+  // Réplica da tela "Ao vivo": os rótulos têm que bater com os da Sidebar do app
+  // (sidebar.nav.*), senão a LP promete uma tela que não existe.
+  "preview.badge": "ILLUSTRATIVE PREVIEW",
+  "preview.chat.compose": "Reply to everyone at once…",
+  "preview.chat.compose.send": "send",
+  // Handles de exemplo — mesmos nomes da seção de proteção, pra a página parecer
+  // um chat só.
+  "preview.chat.msg.1.from": "gabizera",
+  "preview.chat.msg.1.text": "yo yo, just got here!",
+  "preview.chat.msg.2.from": "Marcos L.",
+  "preview.chat.msg.2.text": "audio's clean today 👏",
+  "preview.chat.msg.3.from": "duduxx",
+  "preview.chat.msg.3.text": "let's gooo!!",
+  "preview.chat.platforms": "3 platforms",
+  "preview.chat.title": "Unified chat",
+  "preview.cta": "GO LIVE",
+  "preview.figure.alt":
+    "Illustrative preview of the Corneta app on the “Live” screen: the OBS signal goes out to Twitch, YouTube and Kick, each destination with its own quality and its own switch, with chat from all three platforms gathered beside it.",
+  // Têm que bater com a Sidebar do app (sidebar.nav.*).
+  "preview.nav.chat.hint": "every chat in one place",
+  "preview.nav.chat.label": "Chat",
+  "preview.nav.encoding.hint": "how good it looks",
+  "preview.nav.encoding.label": "Quality",
+  "preview.nav.golive.hint": "puts it all on air",
+  "preview.nav.golive.label": "Live",
+  "preview.nav.platforms.hint": "where your stream lands",
+  "preview.nav.platforms.label": "Platforms",
+  "preview.nav.reports.badge": "new",
+  "preview.nav.reports.hint": "how the stream went",
+  "preview.nav.reports.label": "Reports",
+  "preview.panel.title": "stream panel",
+  "preview.settings": "Settings",
+  "preview.stat.headroom": "headroom",
+  "preview.stat.headroom.value": "easy",
+  "preview.stat.needed.value": "18.5 Mb/s",
+  "preview.stat.needed": "the stream needs",
+  "preview.stat.upload.value": "25 Mb/s",
+  "preview.stat.upload": "your upload",
+  "preview.state.offAir": "Off air",
+  // "Cópia" = passa o vídeo do OBS sem recodificar. Mesma palavra da tela
+  // Qualidade do app (encoding.target.override.copy).
+  "preview.target.copy": "Copy",
+  "preview.titlebar.tag": "multi-stream",
+
   "protection.alerts.chip.bits": "bits",
   "protection.alerts.chip.member": "member",
   "protection.alerts.chip.subgift": "subgift",
@@ -364,8 +402,9 @@ export const en: Dict = {
   "protection.alerts.item.follow.title": "lucasrmk followed you",
   "protection.alerts.item.raid.meta":
     "Twitch · brought new people into the chat",
-  // o handle é PT legível ("canal do Zé"); virou um handle equivalente em inglês pra não soar como texto não traduzido
-  "protection.alerts.item.raid.title": "canal_do_ze raided you",
+  // O handle do pt lê como frase ("canal do Zé") — em inglês vira um handle de
+  // verdade, no mesmo formato dos outros exemplos desta tela.
+  "protection.alerts.item.raid.title": "zeke_tv raided you",
   "protection.alerts.item.sub.amount": "3 months",
   "protection.alerts.item.sub.meta":
     "Twitch · tier 1 · “been here since day one!”",
@@ -380,19 +419,21 @@ export const en: Dict = {
   "protection.body":
     "Four nets you turn on (or don't) in Settings. Each one costs you something — and Corneta tells you what it costs before you go live, not in the middle of it.",
   // aria-label: funcional, descreve o que a arte é
-  "protection.brb.art.aria": "The JÁ VOLTO screen Corneta puts on air",
+  "protection.brb.art.aria": "The BE RIGHT BACK screen Corneta puts on air",
   // nome do produto, inalterado
   "protection.brb.art.brand": "CORNETA · MULTI-STREAM",
-  // "segura a corneta" é "segura as pontas" com o nome do produto no lugar; em inglês some a expressão. "hold the horn" mantém a imagem do 📣 ao lado sem
-  "protection.brb.art.line": "back in a sec — hold tight 📣",
-  // nome próprio, fica em PT na arte que o app coloca no ar
-  "protection.brb.art.title": "JÁ VOLTO",
+  // "segura a corneta" é "segura as pontas" com o nome do produto no lugar; em
+  // inglês a expressão some e "hold the horn" mantém a imagem do 📣 ao lado.
+  // TEM QUE SER IGUAL a `brb.slate.subtitle` do app: esta arte é o retrato do
+  // cartão que vai ao ar de verdade, não uma ilustração livre.
+  "protection.brb.art.line": "back in a sec — hold the horn 📣",
+  // Igual a `brb.slate.title` do app — é o mesmo cartão.
+  "protection.brb.art.title": "BE RIGHT BACK",
   "protection.brb.body":
     "If OBS drops mid-stream, this screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns. It also works for a manual break: one click and you're out of the chair with the mic muted.",
   "protection.brb.note": "Use Corneta's slate or your own image or video",
-  // primeira ocorrência de JÁ VOLTO nesta superfície — glosa entre parênteses aqui, nome cru daqui pra frente
   "protection.brb.title":
-    "“JÁ VOLTO” (“BE RIGHT BACK”): the signal drops, the stream keeps going",
+    "“BE RIGHT BACK”: the signal drops, the stream keeps going",
   "protection.chat.body":
     "Read, reply and moderate without switching windows. Alerts from the platforms and from Streamlabs in the same panel. And an overlay you paste into OBS once and forget.",
   "protection.chat.demo.example": "example",
@@ -443,7 +484,7 @@ export const en: Dict = {
   "protection.guard.bitrate.switch": "on by default",
   "protection.guard.bitrate.title": "Auto-bitrate",
   "protection.guard.privacy.body":
-    "You list the words that can't leak — email, real name, address. If one of them shows up on screen, Corneta cuts to JÁ VOLTO before it goes on air.",
+    "You list the words that can't leak — email, real name, address. If one of them shows up on screen, Corneta cuts to BE RIGHT BACK before it goes on air.",
   "protection.guard.privacy.cost":
     "Costs 12s of delay on the whole stream (the chat too). Safety net, not a guarantee.",
   "protection.guard.privacy.switch": "experimental",
@@ -489,7 +530,7 @@ export const en: Dict = {
   "quality.journey.after.title":
     "Find out why it stuttered — and what to change.",
   "quality.journey.before.body":
-    "Hook up the platforms, measure your upload and get everything ready in a few clicks. Corneta sets OBS up for you — and hits play on it when you press BORA.",
+    "Hook up the platforms, measure your upload and get everything ready in a few clicks. Corneta sets OBS up for you — and hits play on it when you press GO LIVE.",
   "quality.journey.before.check.checklist": "First-stream checklist",
   "quality.journey.before.check.obs": "Guided OBS setup",
   "quality.journey.before.check.upload": "A real upload test",
@@ -500,7 +541,7 @@ export const en: Dict = {
   "quality.journey.before.sticker": "Before the stream",
   // Primeira ocorrência sempre visível do nome — glosa aqui. "frio na barriga" vira "that pit in your stomach": mesmo registro falado, mesmo medo.
   "quality.journey.before.title":
-    'Get to BORA AO VIVO ("GO LIVE") without that pit in your stomach.',
+    "Get to GO LIVE without that pit in your stomach.",
   "quality.journey.during.body":
     "Bitrate, fps, dropped frames and time on air for each platform, plus real CPU and GPU load. You can pause one without ending the others — and whichever one drops comes back on its own.",
   "quality.journey.during.sticker": "During the stream",
@@ -515,9 +556,8 @@ export const en: Dict = {
   // "Caprichado" carrega "capricho" — substantivo abstrato proibido em inglês. "All out" (ir com tudo) é curto, falado, e já avisa que pesa, que é justame
   "quality.mode.caprichado.title": "All out",
   "quality.mode.caprichado.upload": "24.6 Mb/s",
-  // "BORA" cru aqui: a glosa BORA AO VIVO ("GO LIVE") entra na jornada, que está sempre visível — este texto vive dentro de uma aba que pode nunca ser abe
   "quality.mode.caprichado.verdict":
-    "YouTube gets all 9000 kbps it can take and every platform gets the best picture it can show — but your upload and your GPU pay for it. You see that total before you hit BORA.",
+    "YouTube gets all 9000 kbps it can take and every platform gets the best picture it can show — but your upload and your GPU pay for it. You see that total before you hit GO LIVE.",
   "quality.mode.esperto.encodes": "1 (on the GPU)",
   "quality.mode.esperto.lead":
     "Only touches the platforms that need it. Figures it out on its own.",
@@ -557,8 +597,8 @@ export const en: Dict = {
   "steps.accounts.privacy.text":
     "Access tokens sit in Windows Credential Manager, on your machine — not on our servers, because there's no Corneta account and no database with your name in it. You can revoke access any time on the platform itself, and uninstalling the app wipes what it put there. The details are in the",
   "steps.accounts.title": "What Corneta asks for — and what it does with it.",
-  // Nome próprio, fica em PT. A glosa entra aqui só se esta for mesmo a primeira ocorrência na página; se o hero já glosou, usar o nome cru "BORA AO VIVO"
-  "steps.badge.golive": 'BORA AO VIVO ("GO LIVE")',
+  // Rótulo do botão, igual ao que o app mostra na tela.
+  "steps.badge.golive": "GO LIVE",
   "steps.kicker": "From your streaming app to everyone watching",
   "steps.lede": "No terminal, no Docker, no server address to memorize.",
   "steps.local.body":

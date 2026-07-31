@@ -10,6 +10,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, Ban, Clock, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
+import { useT } from "../lib/i18n";
 import { PlatformGlyph } from "./ui";
 
 export interface ChatView {
@@ -62,6 +63,7 @@ export function ChatFeed({
   /** Moderação: ação numa mensagem (apagar/timeout/ban). */
   onModerate?: (m: ChatMessage, action: string) => void;
 }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [paused, setPaused] = useState(false);
@@ -204,18 +206,18 @@ export function ChatFeed({
             <ChatFunnel />
             <div className="font-display text-lg font-bold">
               {allFilteredOut
-                ? "Filtro escondeu tudo"
+                ? t("chat.feed.empty.filtered.title")
                 : connected
-                  ? "Esperando mensagens…"
-                  : "Chat desconectado"}
+                  ? t("chat.feed.empty.waiting.title")
+                  : t("chat.feed.empty.disconnected.title")}
             </div>
             <div className="max-w-sm text-sm text-ink-muted">
               {allFilteredOut
-                ? "Você desligou todas as plataformas. Religa um chip ali em cima pra ver o chat de novo."
+                ? t("chat.feed.empty.filtered.body")
                 : connected
-                  ? "Assim que a galera mandar mensagem, aparece aqui."
+                  ? t("chat.feed.empty.waiting.body")
                   : (disconnectedHint ??
-                    "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar pra puxar o chat.")}
+                    t("chat.feed.empty.disconnected.body"))}
             </div>
             {!connected && !allFilteredOut && emptyAction}
           </div>
@@ -375,6 +377,7 @@ function ModButtons({
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
   onModerate?: (m: ChatMessage, action: string) => void;
 }) {
+  const t = useT();
   if (!onModerate || !modLevel) return null;
   const lvl = modLevel(m);
   if (lvl === "none") return null;
@@ -384,7 +387,7 @@ function ModButtons({
     <div className="absolute right-1.5 top-0.5 hidden items-center gap-0.5 rounded-md bg-surface ring-1 ring-border group-hover:flex">
       <button
         onClick={() => onModerate(m, "delete")}
-        title="Apagar"
+        title={t("chat.mod.action.delete")}
         className={cn(btn, "hover:text-bad")}
       >
         <Trash2 className="size-3.5" />
@@ -393,14 +396,14 @@ function ModButtons({
         <>
           <button
             onClick={() => onModerate(m, "timeout")}
-            title="Timeout 10 min"
+            title={t("chat.mod.action.timeout")}
             className={cn(btn, "hover:text-warn")}
           >
             <Clock className="size-3.5" />
           </button>
           <button
             onClick={() => onModerate(m, "ban")}
-            title="Banir"
+            title={t("chat.mod.action.ban")}
             className={cn(btn, "hover:text-bad")}
           >
             <Ban className="size-3.5" />

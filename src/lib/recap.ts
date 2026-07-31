@@ -1,5 +1,10 @@
 // Recap pós-live: desenha um pôster quadrado (1080×1080) compartilhável a partir do relatório.
 // Canvas 2D puro (sem dependência), no visual de pôster da Corneta. Copiar/baixar PNG.
+import type { I18n } from "./i18n";
+
+/** Tradução injetada: aqui não é componente, então quem desenha passa o `t` do
+ *  idioma ativo. O resto da copy do pôster chega pronta dentro de `RecapData`. */
+type Translate = I18n["t"];
 
 const C = {
   bg: "#100b07",
@@ -52,7 +57,11 @@ function fit(
   return size;
 }
 
-export function drawRecap(ctx: CanvasRenderingContext2D, r: RecapData): void {
+export function drawRecap(
+  ctx: CanvasRenderingContext2D,
+  r: RecapData,
+  t: Translate,
+): void {
   const W = RECAP_SIZE;
   const H = RECAP_SIZE;
   ctx.clearRect(0, 0, W, H);
@@ -152,7 +161,7 @@ export function drawRecap(ctx: CanvasRenderingContext2D, r: RecapData): void {
     ctx.fillRect(px, y, 8, bh);
     ctx.fillStyle = C.brass;
     ctx.font = `800 23px ${SANS}`;
-    ctx.fillText("★ MELHOR MOMENTO", px + 28, y + 42);
+    ctx.fillText(t("analysis.recap.bestMoment"), px + 28, y + 42);
     ctx.fillStyle = C.ink;
     const ms = fit(ctx, r.moment, pr - px - 56, 40, 700);
     ctx.font = `700 ${ms}px ${DISPLAY}`;

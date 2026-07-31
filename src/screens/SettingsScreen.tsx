@@ -28,11 +28,20 @@ import * as RTabs from "@radix-ui/react-tabs";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
-import { BRB_SLATE_GENERATION, renderBrbSlatePng } from "../lib/brbSlate";
+import { brbSlateGeneration, renderBrbSlatePng } from "../lib/brbSlate";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { sanitizeHost } from "../lib/validation";
-import type { ObsCheck } from "../lib/types";
+import type { AppSettings, ObsCheck } from "../lib/types";
+import { Select } from "../components/Select";
+import {
+  LOCALES,
+  LOCALE_LABEL,
+  rich,
+  useI18n,
+  useT,
+  type MessageKey,
+} from "../lib/i18n";
 import {
   Badge,
   Button,
@@ -45,14 +54,17 @@ import {
   Toggle,
 } from "../components/ui";
 
+// Os ids ("obs" | "seguranca" | "geral") são identificadores de deep-link
+// (store.settingsTab) — só o rótulo é texto de tela.
 type SettingsTab = "obs" | "seguranca" | "geral";
-const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
-  { id: "geral", label: "Geral", icon: MonitorCog },
-  { id: "seguranca", label: "Segurança ao vivo", icon: Shield },
-  { id: "obs", label: "OBS", icon: Plug },
+const TABS: { id: SettingsTab; labelKey: MessageKey; icon: typeof Plug }[] = [
+  { id: "geral", labelKey: "settings.tab.general", icon: MonitorCog },
+  { id: "seguranca", labelKey: "settings.tab.safety", icon: Shield },
+  { id: "obs", labelKey: "settings.tab.obs", icon: Plug },
 ];
 
 export function SettingsScreen() {
+  const t = useT();
   const config = useStore((s) => s.config);
   const setIngest = useStore((s) => s.setIngest);
   const setSettings = useStore((s) => s.setSettings);
@@ -82,7 +94,9 @@ export function SettingsScreen() {
   if (!config) {
     return (
       <div className="mx-auto max-w-3xl">
-        <EmptyState title="Carregando…">Já trago seus ajustes.</EmptyState>
+        <EmptyState title={t("settings.loading.title")}>
+          {t("settings.loading.body")}
+        </EmptyState>
       </div>
     );
   }
@@ -97,9 +111,10 @@ export function SettingsScreen() {
 
   const onExport = async () => {
     try {
-      if (await api.exportConfig()) toast.success("Config exportada");
+      if (await api.exportConfig())
+        toast.success(t("settings.toast.export.ok"));
     } catch (e) {
-      toast.error(`Falha ao exportar: ${e}`);
+      toast.error(t("settings.toast.export.error", { error: String(e) }));
     }
   };
   const onImport = async () => {
@@ -111,39 +126,40 @@ export function SettingsScreen() {
     setConfirmImport(false);
     try {
       if (await api.importConfig()) {
-        await load();
+        // O store não é componente e não tem `useT()` — quem chama passa o `t`.
+        await load(t);
         // O backend guarda a config antiga antes de sobrescrever — dá o caminho de volta.
-        toast.success("Config importada — a anterior ficou salva em backup.");
+        toast.success(t("settings.toast.import.ok"));
       }
     } catch (e) {
-      toast.error(`Falha ao importar: ${e}`);
+      toast.error(t("settings.toast.import.error", { error: String(e) }));
     }
   };
 
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker="Por baixo do capô"
-        title="Configurações"
-        subtitle="Como a Corneta conversa com o OBS e se comporta no ar."
+        kicker={t("settings.header.kicker")}
+        title={t("settings.header.title")}
+        subtitle={t("settings.header.subtitle")}
       />
 
       <RTabs.Root value={tab} onValueChange={(v) => setTab(v as SettingsTab)}>
         <RTabs.List className="mb-5 flex flex-wrap gap-2">
-          {TABS.map((t) => {
-            const Icon = t.icon;
+          {TABS.map((item) => {
+            const Icon = item.icon;
             return (
               <RTabs.Trigger
-                key={t.id}
-                value={t.id}
-                data-on-brass={tab === t.id ? "" : undefined}
+                key={item.id}
+                value={item.id}
+                data-on-brass={tab === item.id ? "" : undefined}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-md px-4 py-2 font-display text-sm font-bold transition",
                   "bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink",
                   "data-[state=active]:bg-brass data-[state=active]:text-brass-ink data-[state=active]:pop-brass",
                 )}
               >
-                <Icon className="size-4" strokeWidth={2.4} /> {t.label}
+                <Icon className="size-4" strokeWidth={2.4} /> {t(item.labelKey)}
               </RTabs.Trigger>
             );
           })}
@@ -153,32 +169,41 @@ export function SettingsScreen() {
         <RTabs.Content value="obs">
           <Card className="mb-4">
             <h3 className="flex items-center gap-2 text-lg">
-              <Server className="size-5 text-brass" /> Endpoint de ingestão
-              (OBS)
+              <Server className="size-5 text-brass" />{" "}
+              {t("settings.obs.ingest.title")}
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
-              Endereço local onde o OBS te entrega o vídeo. A
-              <strong className="text-ink-muted"> chave</strong> abaixo é só
-              entre OBS e Corneta — não é a chave da plataforma, que fica no
-              cofre.
+              {rich(t, "settings.obs.ingest.desc", {
+                key: (
+                  <strong className="text-ink-muted">
+                    {t("settings.obs.ingest.desc.key")}
+                  </strong>
+                ),
+              })}
             </p>
 
             {live && (
               <div className="mb-3 flex items-center gap-2 rounded-md bg-warn/15 px-3 py-2 text-xs font-semibold text-warn">
                 <AlertTriangle className="size-4 shrink-0" />
-                Você está no ar — travei a edição do endpoint pra não derrubar o
-                OBS no meio da live.
+                {t("settings.obs.ingest.liveLock")}
               </div>
             )}
 
             {/* A tarefa nº1 aqui é COPIAR, não editar — os campos crus ficam no "Avançado". */}
             <div className="rounded-md bg-surface-2 p-3">
               <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                Cole no OBS
+                {t("settings.obs.paste.label")}
               </span>
               <div className="mt-2 grid gap-2">
-                <CopyField label="Servidor" value={obsIngestUrl(ingest)} />
-                <CopyField label="Chave" value={ingest.key} mono />
+                <CopyField
+                  label={t("settings.obs.paste.field.server")}
+                  value={obsIngestUrl(ingest)}
+                />
+                <CopyField
+                  label={t("settings.obs.paste.field.key")}
+                  value={ingest.key}
+                  mono
+                />
               </div>
             </div>
 
@@ -188,16 +213,15 @@ export function SettingsScreen() {
               className="mt-4"
             >
               <Collapsible.Trigger className="group flex w-full items-center gap-2 text-left text-sm font-bold text-ink-muted transition-colors hover:text-ink">
-                Avançado — mudar o endereço local
+                {t("settings.obs.advanced.trigger")}
                 <ChevronDown className="size-4 shrink-0 text-ink-faint transition-transform group-data-[state=open]:rotate-180" />
               </Collapsible.Trigger>
               <Collapsible.Content className="mt-3">
                 <p className="mb-3 text-xs text-ink-faint">
-                  Só mexa aqui se a porta padrão (1935) já estiver em uso por
-                  outro programa. Mudou aqui, muda no OBS também.
+                  {t("settings.obs.advanced.desc")}
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="Host">
+                  <Field label={t("settings.obs.advanced.field.host")}>
                     <Input
                       value={ingest.host}
                       disabled={live}
@@ -210,7 +234,7 @@ export function SettingsScreen() {
                       }}
                     />
                   </Field>
-                  <Field label="Porta">
+                  <Field label={t("settings.obs.advanced.field.port")}>
                     <Input
                       type="number"
                       value={portShown}
@@ -230,18 +254,18 @@ export function SettingsScreen() {
                     />
                     {portInvalid && (
                       <span className="text-[11px] font-medium text-bad">
-                        A porta vai de 1 a 65535.
+                        {t("settings.obs.advanced.port.invalid")}
                       </span>
                     )}
                   </Field>
-                  <Field label="Aplicação (app)">
+                  <Field label={t("settings.obs.advanced.field.app")}>
                     <Input
                       value={ingest.app}
                       disabled={live}
                       onChange={(e) => setIngest({ app: e.target.value })}
                     />
                   </Field>
-                  <Field label="Chave local">
+                  <Field label={t("settings.obs.advanced.field.localKey")}>
                     <Input
                       value={ingest.key}
                       disabled={live}
@@ -255,26 +279,32 @@ export function SettingsScreen() {
 
           <Card className="mb-4">
             <h3 className="flex items-center gap-2 text-lg">
-              <Plug className="size-5 text-brass" /> OBS — auto-config
+              <Plug className="size-5 text-brass" />{" "}
+              {t("settings.obs.autoconfig.title")}
             </h3>
             <p className="mt-1 mb-4 text-xs text-ink-faint">
-              Pro botão{" "}
-              <strong className="text-ink-muted">“Configura pra mim”</strong>{" "}
-              (na tela Ao vivo) funcionar, ative no OBS:{" "}
-              <strong className="text-ink-muted">
-                Ferramentas → Configurações do Servidor WebSocket
-              </strong>
-              . Se tiver senha, cole aqui.
+              {rich(t, "settings.obs.autoconfig.desc", {
+                button: (
+                  <strong className="text-ink-muted">
+                    {t("settings.obs.autoconfig.desc.button")}
+                  </strong>
+                ),
+                path: (
+                  <strong className="text-ink-muted">
+                    {t("settings.obs.autoconfig.desc.path")}
+                  </strong>
+                ),
+              })}
             </p>
             <div className="divide-y divide-border-soft">
               <SettingRow
-                title="Senha do WebSocket"
-                desc="A senha aparece nessa mesma janela do OBS, no botão “Mostrar Chave de Conexão”. Se “Ativar Autenticação” estiver desmarcado lá, deixe vazio."
+                title={t("settings.obs.password.title")}
+                desc={t("settings.obs.password.desc")}
               >
                 <div className="flex flex-col items-end gap-2">
                   <Input
                     type="password"
-                    placeholder="(opcional)"
+                    placeholder={t("settings.obs.password.placeholder")}
                     className="w-48"
                     value={settings.obsPassword}
                     onChange={(e) =>
@@ -285,13 +315,13 @@ export function SettingsScreen() {
                 </div>
               </SettingRow>
               <SettingRow
-                title="Ligar o OBS junto"
-                desc="No BORA AO VIVO, a Corneta também manda o OBS começar a transmitir."
+                title={t("settings.obs.autostart.title")}
+                desc={t("settings.obs.autostart.desc")}
               >
                 <Toggle
                   checked={settings.autoStartObs}
                   onChange={(v) => setSettings({ autoStartObs: v })}
-                  label="Ligar o OBS junto"
+                  label={t("settings.obs.autostart.toggle")}
                 />
               </SettingRow>
             </div>
@@ -302,10 +332,11 @@ export function SettingsScreen() {
         <RTabs.Content value="seguranca">
           <Card accent>
             <h3 className="mb-1 flex items-center gap-2 text-lg">
-              <Shield className="size-5 text-brass" /> Segurança ao vivo
+              <Shield className="size-5 text-brass" />{" "}
+              {t("settings.safety.title")}
             </h3>
             <p className="mb-2 text-xs text-ink-faint">
-              As redes que seguram a sua live quando algo dá errado.
+              {t("settings.safety.desc")}
             </p>
             {/* Cada feature + seus parâmetros formam um GRUPO: o divisor fica entre grupos, e os
                 parâmetros só aparecem com a feature ligada, aninhados (colados) logo abaixo dela. */}
@@ -314,13 +345,13 @@ export function SettingsScreen() {
                 <SecurityFeature
                   preview={<BrbPreview />}
                   on={settings.brbEnabled}
-                  title="Proteção contra quedas (JÁ VOLTO)"
-                  desc="Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna."
+                  title={t("settings.safety.brb.title")}
+                  desc={t("settings.safety.brb.desc")}
                 >
                   <Toggle
                     checked={settings.brbEnabled}
                     onChange={(v) => setSettings({ brbEnabled: v })}
-                    label="Proteção contra quedas"
+                    label={t("settings.safety.brb.toggle")}
                   />
                 </SecurityFeature>
                 {settings.brbEnabled && (
@@ -334,13 +365,13 @@ export function SettingsScreen() {
                 <SecurityFeature
                   preview={<BitratePreview />}
                   on={settings.autoBitrate}
-                  title="Segurar a live quando a internet aperta (auto-bitrate)"
-                  desc="Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo por um tempo em vez de deixar a live travar ou cair — e volta ao normal sozinha."
+                  title={t("settings.safety.bitrate.title")}
+                  desc={t("settings.safety.bitrate.desc")}
                 >
                   <Toggle
                     checked={settings.autoBitrate}
                     onChange={(v) => setSettings({ autoBitrate: v })}
-                    label="Auto-bitrate"
+                    label={t("settings.safety.bitrate.toggle")}
                   />
                 </SecurityFeature>
               </div>
@@ -349,14 +380,14 @@ export function SettingsScreen() {
                 <SecurityFeature
                   preview={<GuardianPreview />}
                   on={settings.guardianEnabled}
-                  title="Guardião de privacidade"
+                  title={t("settings.safety.guardian.title")}
                   badge={<ExperimentalBadge />}
-                  desc="Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. Rede de segurança, não garantia. Custo: a live inteira sai com 12s de atraso (o chat também)."
+                  desc={t("settings.safety.guardian.desc")}
                 >
                   <Toggle
                     checked={settings.guardianEnabled}
                     onChange={(v) => setSettings({ guardianEnabled: v })}
-                    label="Guardião"
+                    label={t("settings.safety.guardian.toggle")}
                   />
                 </SecurityFeature>
                 {settings.guardianEnabled && (
@@ -370,13 +401,13 @@ export function SettingsScreen() {
                 <SecurityFeature
                   preview={<LoudnessPreview />}
                   on={settings.loudnessNormalize}
-                  title="Normalizador de áudio"
-                  desc="A Corneta acerta o volume do seu som antes de enviar — sem “tá baixo” nem estourando na troca de cena. Se você já normaliza no OBS, deixe desligado pra não brigar."
+                  title={t("settings.safety.loudness.title")}
+                  desc={t("settings.safety.loudness.desc")}
                 >
                   <Toggle
                     checked={settings.loudnessNormalize}
                     onChange={(v) => setSettings({ loudnessNormalize: v })}
-                    label="Normalizar"
+                    label={t("settings.safety.loudness.toggle")}
                   />
                 </SecurityFeature>
                 {settings.loudnessNormalize && (
@@ -393,11 +424,11 @@ export function SettingsScreen() {
         <RTabs.Content value="geral">
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">
-              <Keyboard className="size-5 text-brass" /> Atalho global
+              <Keyboard className="size-5 text-brass" />{" "}
+              {t("settings.hotkey.title")}
             </h3>
             <p className="mb-3 text-xs text-ink-faint">
-              Começa/para a transmissão de qualquer lugar — mesmo com a Corneta
-              minimizada na bandeja.
+              {t("settings.hotkey.desc")}
             </p>
             <div className="flex items-center gap-2">
               <ShortcutCapture
@@ -410,17 +441,13 @@ export function SettingsScreen() {
                   } catch {
                     // O backend desregistra o antigo antes de registrar — se o novo falhou
                     // (em uso por outro programa), reverte e re-registra o anterior.
-                    toast.error(
-                      "Esse atalho já está em uso por outro programa — mantive o anterior.",
-                    );
+                    toast.error(t("settings.hotkey.toast.inUse"));
                     setSettings({ liveShortcut: prev });
                     try {
                       await api.registerShortcut(prev);
                     } catch {
                       setSettings({ liveShortcut: "" });
-                      toast.error(
-                        "Não consegui restaurar o atalho anterior — defina um novo.",
-                      );
+                      toast.error(t("settings.hotkey.toast.restoreFailed"));
                     }
                   }
                 }}
@@ -434,7 +461,7 @@ export function SettingsScreen() {
                     void api.registerShortcut("");
                   }}
                 >
-                  <X className="size-4" /> Limpar
+                  <X className="size-4" /> {t("settings.hotkey.clear")}
                 </Button>
               )}
             </div>
@@ -442,27 +469,28 @@ export function SettingsScreen() {
 
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">
-              <MonitorCog className="size-5 text-brass" /> Sistema
+              <MonitorCog className="size-5 text-brass" />{" "}
+              {t("settings.system.title")}
             </h3>
             <div className="divide-y divide-border-soft">
               <SettingRow
-                title="Minimizar para a bandeja ao fechar"
-                desc="Fechar a janela esconde a Corneta na bandeja (a transmissão continua). Para sair de vez, use o menu da bandeja."
+                title={t("settings.system.tray.title")}
+                desc={t("settings.system.tray.desc")}
               >
                 <Toggle
                   checked={settings.minimizeToTray}
                   onChange={(v) => setSettings({ minimizeToTray: v })}
-                  label="Minimizar para a bandeja"
+                  label={t("settings.system.tray.toggle")}
                 />
               </SettingRow>
               <SettingRow
-                title="Abrir com o Windows"
-                desc="Inicia a Corneta automaticamente quando você liga o computador."
+                title={t("settings.system.autostart.title")}
+                desc={t("settings.system.autostart.desc")}
               >
                 <Toggle
                   checked={settings.autostart}
                   onChange={(v) => setSettings({ autostart: v })}
-                  label="Abrir com o Windows"
+                  label={t("settings.system.autostart.toggle")}
                 />
               </SettingRow>
             </div>
@@ -470,14 +498,37 @@ export function SettingsScreen() {
 
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">
-              <Palette className="size-5 text-brass" /> Aparência
+              <Palette className="size-5 text-brass" />{" "}
+              {t("settings.appearance.title")}
             </h3>
             <div className="divide-y divide-border-soft">
-              <SettingRow title="Tema claro">
+              <SettingRow title={t("settings.appearance.lightTheme.title")}>
                 <Toggle
                   checked={settings.theme === "light"}
                   onChange={(v) => setSettings({ theme: v ? "light" : "dark" })}
-                  label="Tema claro"
+                  label={t("settings.appearance.lightTheme.toggle")}
+                />
+              </SettingRow>
+
+              {/* O rótulo de cada idioma fica NO próprio idioma: quem abriu o
+                  app em inglês por engano procura "Português", não "Portuguese".
+                  Por isso os nomes não passam pelo `t`. */}
+              <SettingRow
+                title={t("settings.language.title")}
+                desc={t("settings.language.desc")}
+              >
+                <Select
+                  value={settings.language}
+                  onChange={(v) =>
+                    setSettings({ language: v as AppSettings["language"] })
+                  }
+                  options={[
+                    { value: "auto", label: t("settings.language.auto") },
+                    ...LOCALES.map((l) => ({
+                      value: l,
+                      label: LOCALE_LABEL[l],
+                    })),
+                  ]}
                 />
               </SettingRow>
             </div>
@@ -485,16 +536,18 @@ export function SettingsScreen() {
 
           <Card>
             <h3 className="mb-1 flex items-center gap-2 text-lg">
-              <Database className="size-5 text-brass" /> Dados &amp; diagnóstico
+              <Database className="size-5 text-brass" />{" "}
+              {t("settings.data.title")}
             </h3>
             <div className="divide-y divide-border-soft">
               <SettingRow
-                title="Backup da config"
-                desc="Salva seus ajustes num arquivo. As chaves ficam no cofre, não vão junto. Importar substitui a config atual."
+                title={t("settings.data.backup.title")}
+                desc={t("settings.data.backup.desc")}
               >
                 <div className="flex gap-2">
                   <Button variant="subtle" size="sm" onClick={onExport}>
-                    <Download className="size-4" /> Exportar
+                    <Download className="size-4" />{" "}
+                    {t("settings.data.backup.export")}
                   </Button>
                   <Button
                     variant={confirmImport ? "danger" : "subtle"}
@@ -502,13 +555,15 @@ export function SettingsScreen() {
                     onClick={onImport}
                   >
                     <Upload className="size-4" />{" "}
-                    {confirmImport ? "Substituir a config atual?" : "Importar"}
+                    {confirmImport
+                      ? t("settings.data.backup.import.confirm")
+                      : t("settings.data.backup.import")}
                   </Button>
                 </div>
               </SettingRow>
               <SettingRow
-                title="Logs"
-                desc="Exporte um diagnóstico redigido para o suporte ou abra os arquivos locais."
+                title={t("settings.data.logs.title")}
+                desc={t("settings.data.logs.desc")}
               >
                 <div className="flex gap-2">
                   <Button
@@ -516,15 +571,16 @@ export function SettingsScreen() {
                     size="sm"
                     onClick={() => void api.exportDiagnostics()}
                   >
-                    <Download className="size-4" aria-hidden /> Exportar
-                    diagnóstico
+                    <Download className="size-4" aria-hidden />{" "}
+                    {t("settings.data.logs.export")}
                   </Button>
                   <Button
                     variant="subtle"
                     size="sm"
                     onClick={() => void api.openLogsDir()}
                   >
-                    <FileText className="size-4" aria-hidden /> Abrir logs
+                    <FileText className="size-4" aria-hidden />{" "}
+                    {t("settings.data.logs.open")}
                   </Button>
                 </div>
               </SettingRow>
@@ -539,6 +595,7 @@ export function SettingsScreen() {
 /** Testa o obs-websocket ali mesmo. Quatro desfechos, não dois: não achei /
  *  senha recusada / conectado mas apontando pra outro lugar / conectado de verdade. */
 function ObsTestButton() {
+  const t = useT();
   const [obs, setObs] = useState<ObsCheck | "loading" | null>(null);
   const run = async () => {
     setObs("loading");
@@ -560,28 +617,37 @@ function ObsTestButton() {
   const verdict = (() => {
     if (!obs || obs === "loading") return null;
     if (!obs.reachable) {
-      const authFail = /senha|identificar|autentic/i.test(obs.error ?? "");
+      // O regex casa o motivo em pt-BR que o Rust manda no `error` — é leitura de
+      // texto do backend, não copy de tela: não traduzir junto (ver "pendencias").
+      // Campo do backend, não farejo de texto: o regex que morava aqui
+      // (`/senha|identificar|autentic/`) parou de casar no instante em que as
+      // mensagens do Rust ganharam inglês, e o conselho de senha sumia.
+      const authFail = obs.authFailed;
       return authFail
         ? {
             tone: "text-bad",
-            msg: "Senha recusada — confira a senha do WebSocket no OBS (botão “Mostrar Chave de Conexão”).",
+            msg: t("settings.obs.test.authFail"),
           }
         : {
             tone: "text-bad",
-            msg: "Não achei o OBS — ele está aberto? O WebSocket está ativado em Ferramentas → Configurações do Servidor WebSocket?",
+            msg: t("settings.obs.test.notFound"),
           };
     }
     if (!obs.pointingAtCorneta)
       return {
         tone: "text-warn",
-        msg: "Conectado, mas o OBS não está apontando pra Corneta — use “Configura pra mim” na tela Ao vivo.",
+        msg: t("settings.obs.test.wrongTarget"),
       };
     return {
       tone: "text-ok",
       msg:
         obs.width > 0
-          ? `Conectado · ${obs.width}×${obs.height} · ${obs.fps}fps`
-          : "Conectado",
+          ? t("settings.obs.test.okDetail", {
+              width: obs.width,
+              height: obs.height,
+              fps: obs.fps,
+            })
+          : t("settings.obs.test.ok"),
     };
   })();
 
@@ -595,7 +661,7 @@ function ObsTestButton() {
         disabled={obs === "loading"}
       >
         {obs !== "loading" && <Plug className="size-4" />}
-        Testar conexão
+        {t("settings.obs.test.button")}
       </Button>
       {verdict && (
         <span
@@ -618,43 +684,59 @@ function ObsTestButton() {
 
 /** Editor da watchlist do Guardião: contagem positiva + trim/dedup no blur. */
 function GuardianEditor() {
+  const { t, tp } = useI18n();
   const settings = useStore((s) => s.config!.settings);
   const setSettings = useStore((s) => s.setSettings);
   const watchCount = settings.guardianWatchlist.filter(
-    (t) => t.trim().length >= 3,
+    (term) => term.trim().length >= 3,
   ).length;
   // Termos de 1–2 letras são descartados pelo motor — avisar em vez de fingir proteção.
   const shortTerms = settings.guardianWatchlist
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0 && t.length < 3);
+    .map((term) => term.trim())
+    .filter((term) => term.length > 0 && term.length < 3);
 
   return (
     <div className="flex flex-col gap-3 py-3.5">
       <div className="rounded-md border-2 border-brass/40 bg-brass/[0.06] p-3 text-xs leading-relaxed text-ink-muted">
         <div className="mb-1 font-display text-sm font-extrabold text-ink">
-          🛡️ O preço da proteção
+          {t("settings.guardian.cost.title")}
         </div>
-        Quando um termo da sua lista aparece, a Corneta troca pra tela{" "}
-        <strong className="text-ink">“JÁ VOLTO”</strong> antes daquele instante
-        ir ao ar — nunca exposto, nem num clipe. Pra garantir isso:
+        {rich(t, "settings.guardian.cost.intro", {
+          // Nome próprio da tela: não traduz, mesma string nos dois idiomas.
+          jaVolto: (
+            <strong className="text-ink">
+              {t("golive.bar.protection.brb")}
+            </strong>
+          ),
+        })}
         <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
           <li>
-            A transmissão fica <strong className="text-ink">12s atrás</strong>{" "}
-            do tempo real.
+            {rich(t, "settings.guardian.cost.delay", {
+              delay: (
+                <strong className="text-ink">
+                  {t("settings.guardian.cost.delay.value")}
+                </strong>
+              ),
+            })}
           </li>
-          <li>O chat e a interação chegam até você com esse mesmo atraso.</li>
+          <li>{t("settings.guardian.cost.chat")}</li>
           <li>
-            Só vigia os termos que você listar —{" "}
-            <strong className="text-ink">não</strong> “qualquer segredo”.
+            {rich(t, "settings.guardian.cost.scope", {
+              no: (
+                <strong className="text-ink">
+                  {t("settings.guardian.cost.scope.no")}
+                </strong>
+              ),
+            })}
           </li>
-          <li>Texto muito pequeno ainda pode escapar.</li>
+          <li>{t("settings.guardian.cost.smallText")}</li>
         </ul>
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-sm font-semibold text-ink-muted">
-          Termos a vigiar{" "}
+          {t("settings.guardian.list.label")}{" "}
           <span className="font-normal text-ink-faint">
-            (um por linha — seu e-mail, nome real, endereço, @…)
+            {t("settings.guardian.list.hint")}
           </span>
         </span>
         <textarea
@@ -667,32 +749,37 @@ function GuardianEditor() {
               guardianWatchlist: Array.from(
                 new Set(
                   settings.guardianWatchlist
-                    .map((t) => t.trim())
+                    .map((term) => term.trim())
                     .filter(Boolean),
                 ),
               ),
             })
           }
           rows={4}
-          placeholder={"meu@email.com\nRua das Flores, 42\nMeu Nome Real"}
+          placeholder={t("settings.guardian.list.placeholder")}
           className="resize-y rounded-md border-2 border-border bg-surface px-2 py-1.5 text-sm font-medium text-ink outline-none focus:border-brass"
         />
+        {/* A frase inteira vem do dicionário, pelo tp(): o singular não é a
+            mesma costura em todo idioma, e "termo(s)" é remendo, não texto.
+            {terms} chega com as aspas já postas. */}
         {watchCount === 0 ? (
           <span className="text-xs font-semibold text-brass">
-            Sem termos (3+ letras), o guardião não faz nada — adicione ao menos
-            um.
+            {t("settings.guardian.list.empty")}
           </span>
         ) : shortTerms.length > 0 ? (
           <span className="text-xs font-semibold text-brass">
-            Vigiando {watchCount} termo{watchCount > 1 ? "s" : ""} —{" "}
             {shortTerms.length === 1
-              ? `1 ignorado por ser curto demais (mínimo 3 letras): "${shortTerms[0]}"`
-              : `${shortTerms.length} ignorados por serem curtos demais (mínimo 3 letras): ${shortTerms.map((t) => `"${t}"`).join(", ")}`}
-            .
+              ? tp("settings.guardian.list.watchingOneShort", watchCount, {
+                  terms: `"${shortTerms[0]}"`,
+                })
+              : tp("settings.guardian.list.watchingManyShort", watchCount, {
+                  short: shortTerms.length,
+                  terms: shortTerms.map((term) => `"${term}"`).join(", "),
+                })}
           </span>
         ) : (
           <span className="text-xs font-semibold text-ok">
-            Vigiando {watchCount} termo{watchCount > 1 ? "s" : ""}.
+            {tp("settings.guardian.list.watching", watchCount)}
           </span>
         )}
       </label>
@@ -709,6 +796,7 @@ function ShortcutCapture({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useT();
   const [capturing, setCapturing] = useState(false);
   const [hint, setHint] = useState(false);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -771,9 +859,9 @@ function ShortcutCapture({
     >
       {capturing
         ? hint
-          ? "precisa de Ctrl, Alt ou Shift junto"
-          : "pressione Ctrl, Alt ou Shift + tecla… (Esc cancela)"
-        : value || "definir atalho"}
+          ? t("settings.hotkey.capture.needsModifier")
+          : t("settings.hotkey.capture.prompt")
+        : value || t("settings.hotkey.capture.idle")}
     </button>
   );
 }
@@ -791,6 +879,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
  *  a kind vem da extensão). O arquivo é copiado pro backend (brb-slate.*) e entra no
  *  ar quando o sinal cai. Preview 16:9 pra conferir o que vai pro ar de verdade. */
 function BrbSlateChooser() {
+  const { t, locale } = useI18n();
   const kind = useStore((s) => s.config!.settings.brbSlateKind) ?? "auto";
   const fileName = useStore((s) => s.config!.settings.brbSlateFileName);
   const setSettings = useStore((s) => s.setSettings);
@@ -815,12 +904,14 @@ function BrbSlateChooser() {
       const r = await api.setBrbSlate();
       if (r) {
         setSettings({ brbSlateKind: r.kind, brbSlateFileName: r.fileName });
-        toast.success("Tela do JÁ VOLTO atualizada");
+        toast.success(t("settings.brb.slate.toast.updated"));
         await loadPreview();
       }
       // null = usuário cancelou o seletor → sem mudança.
     } catch (e) {
-      toast.error(`Não consegui usar esse arquivo: ${e}`);
+      toast.error(
+        t("settings.brb.slate.toast.fileError", { error: String(e) }),
+      );
     } finally {
       setBusy(false);
     }
@@ -831,24 +922,32 @@ function BrbSlateChooser() {
     setBusy(true);
     try {
       await api.clearBrbSlate();
-      const b64 = await renderBrbSlatePng();
-      if (b64) await api.saveBrbSlate(b64, BRB_SLATE_GENERATION);
+      const b64 = await renderBrbSlatePng(t);
+      if (b64) await api.saveBrbSlate(b64, brbSlateGeneration(locale));
       setSettings({ brbSlateKind: "auto", brbSlateFileName: undefined });
-      toast.success("Voltou pra tela padrão da Corneta");
+      toast.success(t("settings.brb.slate.toast.default"));
       await loadPreview();
     } catch (e) {
-      toast.error(`Falha ao voltar pro padrão: ${e}`);
+      toast.error(
+        t("settings.brb.slate.toast.defaultError", { error: String(e) }),
+      );
     } finally {
       setBusy(false);
     }
   };
 
+  // "image"/"video"/"auto" são os valores gravados na config e lidos pelo Rust —
+  // só a frase muda de idioma.
   const current =
     kind === "image"
-      ? `Usando: ${fileName ?? "imagem enviada"} (imagem)`
+      ? t("settings.brb.slate.using.image", {
+          file: fileName ?? t("settings.brb.slate.using.image.fallback"),
+        })
       : kind === "video"
-        ? `Usando: ${fileName ?? "vídeo enviado"} (vídeo, com som)`
-        : "Usando: tela padrão da Corneta";
+        ? t("settings.brb.slate.using.video", {
+            file: fileName ?? t("settings.brb.slate.using.video.fallback"),
+          })
+        : t("settings.brb.slate.using.default");
 
   const opt = (active: boolean) =>
     cn(
@@ -865,14 +964,14 @@ function BrbSlateChooser() {
         <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md ring-1 ring-border">
           <img
             src={`data:image/jpeg;base64,${preview}`}
-            alt="Prévia da tela do JÁ VOLTO"
+            alt={t("settings.brb.slate.preview.alt")}
             className="h-full w-full object-cover"
           />
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="text-sm font-semibold text-ink-muted">
-          Tela do “JÁ VOLTO”
+          {t("settings.brb.slate.label")}
         </span>
         <div className="flex gap-2">
           <button
@@ -880,19 +979,18 @@ function BrbSlateChooser() {
             disabled={busy}
             onClick={useDefault}
           >
-            Padrão (gerada)
+            {t("settings.brb.slate.default")}
           </button>
           <button
             className={opt(kind === "image" || kind === "video")}
             disabled={busy}
             onClick={pick}
           >
-            Usar arquivo meu (imagem ou vídeo)
+            {t("settings.brb.slate.custom")}
           </button>
         </div>
         <span className="text-xs font-semibold text-ink-faint">
-          {current} — entra no ar quando o sinal cai. Vídeo toca em loop e pode
-          ter som.
+          {t("settings.brb.slate.note", { current })}
         </span>
       </div>
     </div>
@@ -901,6 +999,7 @@ function BrbSlateChooser() {
 
 /** A tela "JÁ VOLTO" que vai pro ar quando o sinal do OBS cai. */
 function BrbPreview() {
+  const t = useT();
   return (
     <div className="absolute inset-0 grid place-items-center bg-[#14100a]">
       <div
@@ -912,7 +1011,7 @@ function BrbPreview() {
         }}
       />
       <div className="relative -rotate-3 bg-brass px-2 py-0.5 font-display text-[9px] font-extrabold leading-none text-brass-ink shadow-[2px_2px_0_#0b0805]">
-        JÁ VOLTO
+        {t("brb.slate.title")}
       </div>
     </div>
   );
@@ -983,17 +1082,19 @@ function LoudnessPreview() {
 
 /** Alvo de volume (LUFS) do normalizador: presets comuns. -14 é o padrão de Twitch/YouTube. */
 function LoudnessTarget() {
+  const t = useT();
   const target = useStore((s) => s.config!.settings.loudnessTargetLufs);
   const setSettings = useStore((s) => s.setSettings);
+  // -14/-16/-18 são os valores em LUFS gravados na config; só o rótulo é texto.
   const opts = [
-    { v: -14, label: "-14 · padrão (Twitch/YT)" },
-    { v: -16, label: "-16 · mais suave" },
-    { v: -18, label: "-18 · podcast/voz" },
+    { v: -14, label: t("settings.loudness.target.minus14") },
+    { v: -16, label: t("settings.loudness.target.minus16") },
+    { v: -18, label: t("settings.loudness.target.minus18") },
   ];
   return (
     <div className="flex flex-wrap items-center gap-2 py-3.5">
       <span className="text-xs font-semibold text-ink-faint">
-        Alvo de volume
+        {t("settings.loudness.target.label")}
       </span>
       {opts.map((o) => (
         <button
@@ -1047,6 +1148,7 @@ function SecurityFeature({
   badge?: ReactNode;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-4 py-4">
       <div
@@ -1061,7 +1163,7 @@ function SecurityFeature({
         {!on && (
           <div className="absolute inset-0 grid place-items-center bg-night/45">
             <span className="rounded-sm bg-surface-3/90 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-faint">
-              desligado
+              {t("settings.safety.state.off")}
             </span>
           </div>
         )}
@@ -1072,7 +1174,7 @@ function SecurityFeature({
           {badge}
           {on && (
             <Badge tone="brass" className="text-[10px]">
-              Armado
+              {t("settings.safety.state.armed")}
             </Badge>
           )}
         </div>

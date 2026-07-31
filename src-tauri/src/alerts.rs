@@ -19,6 +19,7 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
 use crate::chat::{emit_alert, Alert};
+use crate::i18n::Msg;
 use crate::AppState;
 
 #[derive(Default)]
@@ -202,8 +203,8 @@ fn parse_streamlabs(source: &str, data: &Value) -> Option<Alert> {
         .get("name")
         .and_then(|x| x.as_str())
         .or_else(|| m.get("from").and_then(|x| x.as_str()))
-        .unwrap_or("alguém")
-        .to_string();
+        .map(String::from)
+        .unwrap_or_else(|| Msg::ChatUnknownUser.now());
     let message = m
         .get("message")
         .and_then(|x| x.as_str())
@@ -265,8 +266,8 @@ fn parse_streamelements(source: &str, ev: &Value) -> Option<Alert> {
         .get("displayName")
         .and_then(|x| x.as_str())
         .or_else(|| d.get("username").and_then(|x| x.as_str()))
-        .unwrap_or("alguém")
-        .to_string();
+        .map(String::from)
+        .unwrap_or_else(|| Msg::ChatUnknownUser.now());
     let message = d
         .get("message")
         .and_then(|x| x.as_str())
@@ -350,6 +351,11 @@ where
                 "alerta ({source}): handshake recusado (HTTP {}) — token inválido/expirado",
                 resp.status().as_u16()
             );
+            // NÃO é copy: viaja no MESMO campo de `alert://status` que recebe
+            // "connected"/"disconnected"/"error" — é valor de enum, e um que o
+            // `statusLabel` do front nem conhece (cai no default e some da tela).
+            // Traduzir aqui só trocaria um valor errado por outro; o conserto é
+            // virar "error" ou ganhar um estado próprio. Ver pendências.
             alert_status(&app, source, "token inválido");
             return ConnResult::AuthFailed;
         }
@@ -474,7 +480,7 @@ pub fn probe_alert(kind: &str, token: &str) -> Result<(), String> {
                 json!({ "method": "jwt", "token": token })
             )),
         ),
-        _ => Err("fonte de alerta desconhecida".into()),
+        _ => Err(Msg::AlertsUnknownSourceKind.now()),
     }
 }
 
@@ -484,10 +490,16 @@ fn probe_socketio(url: &str, auth: Option<String>) -> Result<(), String> {
     let mut socket = match tungstenite::connect(url) {
         Ok((s, _)) => s,
         Err(tungstenite::Error::Http(resp)) if matches!(resp.status().as_u16(), 401 | 403) => {
-            return Err("token inválido ou expirado".into());
+            return Err(Msg::AlertsTokenInvalidOrExpired.now());
         }
-        Err(tungstenite::Error::Io(io)) => return Err(format!("sem conexão ({})", io.kind())),
-        Err(_) => return Err("não consegui conectar".into()),
+        Err(tungstenite::Error::Io(io)) => {
+            // `io.kind()` é valor cru (Display do ErrorKind) — entra sem traduzir.
+            return Err(Msg::AlertsNoConnection {
+                kind: &io.kind().to_string(),
+            }
+            .now());
+        }
+        Err(_) => return Err(Msg::AlertsConnectFailed.now()),
     };
     set_read_timeout(&mut socket, 400);
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -506,7 +518,7 @@ fn probe_socketio(url: &str, auth: Option<String>) -> Result<(), String> {
                             }
                             "unauthorized" => {
                                 let _ = socket.close(None);
-                                return Err("token inválido ou expirado".into());
+                                return Err(Msg::AlertsTokenInvalidOrExpired.now());
                             }
                             _ => {}
                         }
@@ -549,8 +561,8 @@ fn probe_socketio(url: &str, auth: Option<String>) -> Result<(), String> {
     }
     let _ = socket.close(None);
     if waits_auth && sent_auth {
-        Err("o StreamElements não confirmou a tempo — tente de novo".into())
+        Err(Msg::AlertsStreamElementsTimeout.now())
     } else {
-        Err("sem resposta a tempo — tente de novo".into())
+        Err(Msg::AlertsProbeTimeout.now())
     }
 }

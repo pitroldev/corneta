@@ -22,6 +22,11 @@ import {
   type ReportAnalysis,
 } from "../report";
 import type { SessionData } from "../types";
+import type { I18n, MessageKey } from "../i18n";
+
+/** Este módulo não é componente: não pode chamar hook. O idioma entra por
+ *  parâmetro — quem chama é a tela, que já tem o contexto. */
+export type ReportI18n = Pick<I18n, "locale" | "t" | "fmt">;
 
 const esc = (s: string): string =>
   s.replace(
@@ -36,32 +41,14 @@ const esc = (s: string): string =>
       })[c]!,
   );
 
-const num = (v: number) => v.toLocaleString("pt-BR");
 const platColor = (id: string) =>
   PLATFORMS[id as keyof typeof PLATFORMS]?.color ?? "#c98a00";
 
-const fmtDate = (ms: number) =>
-  new Date(ms).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
-const fmtTime = (ms: number) =>
-  new Date(ms).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-function fmtDur(sec: number): string {
-  const total = Math.round(sec / 60);
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`;
-}
-
-const MODE_LABEL: Record<string, string> = {
-  "per-platform": "Caprichado",
-  passthrough: "Na lata",
-  hybrid: "Esperto",
+// A CHAVE é enum do meta da sessão; só o rótulo é texto de tela.
+const MODE_KEY: Record<string, MessageKey> = {
+  "per-platform": "reports.mode.perPlatform",
+  passthrough: "reports.mode.passthrough",
+  hybrid: "reports.mode.hybrid",
 };
 
 // ---------------------------------------------------------------------------
@@ -205,10 +192,17 @@ footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-si
 
 // ---------------------------------------------------------------------------
 
-export function reportHtml(d: SessionData, a: ReportAnalysis): string {
+export function reportHtml(
+  d: SessionData,
+  a: ReportAnalysis,
+  i18n: ReportI18n,
+): string {
+  const { t, fmt, locale } = i18n;
+  const num = fmt.num;
   const start = d.meta.startedAt;
-  const rel = (t: number) => {
-    const s = Math.max(0, Math.round((t - start) / 1000));
+  // `ms`, não `t`: `t` agora é a tradução.
+  const rel = (ms: number) => {
+    const s = Math.max(0, Math.round((ms - start) / 1000));
     const h = Math.floor(s / 3600);
     const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
     const ss = String(s % 60).padStart(2, "0");
@@ -221,12 +215,15 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
   const eixoAudiencia = (i: number) =>
     rel(d.viewerSamples[Math.min(i, vN - 1)]?.t ?? start);
 
-  const title = `Live de ${fmtDate(start)}`;
+  const modeKey = MODE_KEY[d.meta.mode];
+  const title = t("reports.detail.heading", { date: fmt.date(start) });
   const sub = [
-    fmtDur(d.meta.durationSec),
-    `${fmtTime(start)}${d.meta.endedAt ? `–${fmtTime(d.meta.endedAt)}` : ""}`,
+    fmt.dur(d.meta.durationSec),
+    `${fmt.time(start)}${d.meta.endedAt ? `–${fmt.time(d.meta.endedAt)}` : ""}`,
     d.meta.platforms.map((p) => p.name).join(", "),
-    `modo ${MODE_LABEL[d.meta.mode] ?? d.meta.mode}`,
+    t("reports.detail.mode", {
+      mode: modeKey ? t(modeKey) : d.meta.mode,
+    }),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -234,21 +231,32 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
   // --- Números ---
   const stats: [string, string][] = [];
   if (a.viewers.hasData) {
-    stats.push(["Pico de viewers", num(a.viewers.peak)]);
-    stats.push(["Média", num(a.viewers.avg)]);
+    stats.push([t("reports.stat.peakViewers"), num(a.viewers.peak)]);
+    stats.push([t("reports.stat.avg"), num(a.viewers.avg)]);
   }
   const seg = a.byChannel.followersGained;
   if (seg != null && seg !== 0)
     stats.push([
-      a.byChannel.followersNet ? "Seguidores (líquido)" : "Novos seguidores",
+      t(
+        a.byChannel.followersNet
+          ? "reports.stat.followersNet"
+          : "reports.stat.newFollowers",
+      ),
       `${seg > 0 ? "+" : ""}${num(seg)}`,
     ]);
-  if (a.alerts.subs > 0) stats.push(["Inscrições", String(a.alerts.subs)]);
-  if (a.alerts.bits > 0) stats.push(["Bits", num(Math.round(a.alerts.bits))]);
+  if (a.alerts.subs > 0)
+    stats.push([t("reports.stat.subs"), String(a.alerts.subs)]);
+  if (a.alerts.bits > 0)
+    stats.push([t("reports.stat.bits"), num(Math.round(a.alerts.bits))]);
   if (a.alerts.raids > 0)
-    stats.push(["Raids", `${a.alerts.raids} · +${a.alerts.raidViewers}`]);
-  if (a.chat.hasData) stats.push(["Mensagens", num(a.chat.total)]);
-  if (a.maxCpu != null) stats.push(["CPU máx.", `${Math.round(a.maxCpu)}%`]);
+    stats.push([
+      t("reports.stat.raids"),
+      `${a.alerts.raids} · +${a.alerts.raidViewers}`,
+    ]);
+  if (a.chat.hasData)
+    stats.push([t("reports.stat.messages"), num(a.chat.total)]);
+  if (a.maxCpu != null)
+    stats.push([t("reports.stat.maxCpu"), `${Math.round(a.maxCpu)}%`]);
 
   const statsHtml = stats.length
     ? `<section class="stats">${stats
@@ -263,8 +271,8 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
   const canais = a.byChannel.channels;
   const canaisHtml =
     canais.length > 1
-      ? `<section><h2>Público por canal</h2><div class="card"><table>
-<thead><tr><th>Canal</th><th class="n">Pico</th><th class="n">Média</th><th class="n">Chat</th><th class="n">Seguidores</th><th>Fatia</th></tr></thead>
+      ? `<section><h2>${esc(t("reports.channels.title"))}</h2><div class="card"><table>
+<thead><tr><th>${esc(t("reports.html.table.channel"))}</th><th class="n">${esc(t("reports.viewers.peak"))}</th><th class="n">${esc(t("reports.stat.avg"))}</th><th class="n">${esc(t("reports.html.table.chat"))}</th><th class="n">${esc(t("reports.html.table.followers"))}</th><th>${esc(t("reports.html.table.share"))}</th></tr></thead>
 <tbody>${canais
           .map((c) => {
             const cor = platColor(c.platform);
@@ -286,7 +294,7 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
           })
           .join("")}</tbody></table>${
           a.byChannel.followersNet
-            ? `<p class="note">Seguidores vêm do contador da plataforma: é o número líquido (quem deixou de seguir subtrai).</p>`
+            ? `<p class="note">${esc(t("reports.html.followersNote"))}</p>`
             : ""
         }</div></section>`
       : "";
@@ -303,9 +311,15 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
             color: platColor(c.platform),
             values: viewerSeriesFor(d, c.key),
           }))
-        : [{ label: "Assistindo", color: "#1e7a4d", values: viewerSeries(d) }];
+        : [
+            {
+              label: t("reports.viewers.series"),
+              color: "#1e7a4d",
+              values: viewerSeries(d),
+            },
+          ];
     partes.push(
-      `<section><h2>Audiência ao vivo</h2><div class="card">${chart(
+      `<section><h2>${esc(t("reports.html.viewers.title"))}</h2><div class="card">${chart(
         series,
         vN,
         {
@@ -317,8 +331,14 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
 
   if (hasChat(d) && n > 1)
     partes.push(
-      `<section><h2>Atividade do chat (msgs/min)</h2><div class="card">${chart(
-        [{ label: "msgs/min", color: "#c98a00", values: chatRateSeries(d) }],
+      `<section><h2>${esc(t("reports.chat.title"))}</h2><div class="card">${chart(
+        [
+          {
+            label: t("reports.chat.series"),
+            color: "#c98a00",
+            values: chatRateSeries(d),
+          },
+        ],
         n,
         { xLabel: eixoAmostras },
       )}</div></section>`,
@@ -326,7 +346,7 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
 
   if (n > 1 && d.meta.platforms.length)
     partes.push(
-      `<section><h2>Bitrate por plataforma (Mbps)</h2><div class="card">${chart(
+      `<section><h2>${esc(t("reports.bitrate.title"))}</h2><div class="card">${chart(
         d.meta.platforms.map((p) => ({
           label: p.name,
           color: platColor(p.platformId),
@@ -335,14 +355,14 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
           ),
         })),
         n,
-        { xLabel: eixoAmostras, fmt: (v) => v.toFixed(1).replace(".", ",") },
+        { xLabel: eixoAmostras, fmt: (v) => fmt.dec(v, 1) },
       )}</div></section>`,
     );
 
   const gpu = gpuSeries(d);
   if (n > 1 && a.maxCpu != null)
     partes.push(
-      `<section><h2>Carga da máquina (%)</h2><div class="card">${chart(
+      `<section><h2>${esc(t("reports.machine.title"))}</h2><div class="card">${chart(
         [
           { label: "CPU", color: "#c0392b", values: cpuSeries(d) },
           ...(gpu.some((v) => v != null)
@@ -356,18 +376,18 @@ export function reportHtml(d: SessionData, a: ReportAnalysis): string {
 
   // --- Momentos, trechos, eventos ---
   const momentos = a.highlights.length
-    ? `<section><h2>Momentos de destaque</h2><div class="card"><ul class="tl">${a.highlights
+    ? `<section><h2>${esc(t("reports.html.highlights.title"))}</h2><div class="card"><ul class="tl">${a.highlights
         .map(
           (h) =>
             `<li><span class="t">${esc(rel(h.t))}</span><span class="lbl">${esc(h.reason)}</span></li>`,
         )
         .join(
           "",
-        )}</ul><p class="note">Os tempos contam do início da live — use pra achar o trecho na gravação.</p></div></section>`
+        )}</ul><p class="note">${esc(t("reports.html.highlights.note"))}</p></div></section>`
     : "";
 
   const trechos = a.windows.length
-    ? `<section><h2>Trechos que deram problema</h2>${a.windows
+    ? `<section><h2>${esc(t("reports.windows.title"))}</h2>${a.windows
         .map(
           (w) => `<div class="win"><span class="t">${esc(rel(w.tStart))}</span>
  · ${w.durationSec}s · <b>${esc(w.cause)}</b>
@@ -377,7 +397,7 @@ ${w.signals.length ? `<div class="sig">${esc(w.signals.join(" · "))}</div>` : "
         .join("")}</section>`
     : "";
 
-  const eventos = `<section><h2>Eventos</h2><div class="card"><ul class="tl">${a.events
+  const eventos = `<section><h2>${esc(t("reports.events.title"))}</h2><div class="card"><ul class="tl">${a.events
     .map(
       (e) =>
         `<li><span class="t">${esc(rel(e.t))}</span><span class="lbl">${esc(e.label)}</span></li>`,
@@ -387,16 +407,16 @@ ${w.signals.length ? `<div class="sig">${esc(w.signals.join(" · "))}</div>` : "
   const verdictClass = a.verdict.tone;
 
   return `<!doctype html>
-<html lang="pt-BR">
+<html lang="${esc(locale)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} — Corneta</title>
+<title>${esc(t("reports.html.docTitle", { title }))}</title>
 <style>${CSS}</style>
 </head>
 <body>
 <div class="wrap">
-<span class="tag">Corneta · relatório da live</span>
+<span class="tag">${esc(t("reports.html.tag"))}</span>
 <h1>${esc(title)}</h1>
 <p class="sub">${esc(sub)}</p>
 
@@ -412,7 +432,7 @@ ${momentos}
 ${trechos}
 ${eventos}
 
-<footer>Gerado pela Corneta em ${esc(fmtDate(Date.now()))} · multistream que roda no seu PC</footer>
+<footer>${esc(t("reports.html.footer", { date: fmt.date(Date.now()) }))}</footer>
 </div>
 </body>
 </html>`;

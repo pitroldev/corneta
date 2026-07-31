@@ -1,6 +1,11 @@
 import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "@/lib/content";
 import { translator } from "@/lib/i18n";
-import { LEGAL_CONTACT, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
+import {
+  LEGAL_CONTACT,
+  LEGAL_OPERATOR,
+  LEGAL_ROUTES,
+  legalHref,
+} from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
 
 // /llms.txt — convenção emergente (llmstxt.org) que entrega a um modelo um
@@ -62,8 +67,9 @@ ${FAQS.map((f) => `### ${f.question}\n\n${f.answer}`).join("\n\n")}
 ## Páginas
 
 - [Site e download](${abs("/")})
-- [Política de privacidade](${abs(LEGAL_ROUTES.privacy)})
-- [Termos de uso](${abs(LEGAL_ROUTES.terms)})
+- [Site em inglês](${abs("/en")})
+- [Política de privacidade](${abs(LEGAL_ROUTES.privacy)}) · [English](${abs(legalHref("en", "privacy"))})
+- [Termos de uso](${abs(LEGAL_ROUTES.terms)}) · [English](${abs(legalHref("en", "terms"))})
 - [Código-fonte](https://github.com/pitroldev)
 
 ## Quem responde

@@ -121,6 +121,8 @@ export interface AppSettings {
   chatShowViewers: boolean;
   /** Tema da interface. */
   theme: "dark" | "light";
+  /** Idioma da interface. "auto" segue o idioma do Windows. */
+  language: "auto" | "pt-BR" | "en";
   /** Tamanho da fonte do chat, em pixels. */
   chatFontSize: number;
   /** Tamanho da fonte dos alertas, em pixels (slider próprio, igual ao do chat). */
@@ -189,6 +191,10 @@ export interface AppSettings {
 
 export interface ObsCheck {
   reachable: boolean;
+  /** A conexão falhou por SENHA? Vem do Rust como DADO — o front precisa
+   *  distinguir senha errada de OBS fechado, e farejar palavra na mensagem
+   *  deixou de funcionar quando ela ganhou tradução. */
+  authFailed?: boolean;
   pointingAtCorneta: boolean;
   width: number;
   height: number;

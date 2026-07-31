@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronRight, Radio, X } from "lucide-react";
 import { useStore } from "../lib/store";
+import { useT } from "../lib/i18n";
 import { cn } from "../lib/utils";
 
 const FLAG = "corneta.firstlive";
@@ -31,6 +32,7 @@ export function FirstLiveChecklist({
 }: {
   onSetupObs?: () => void;
 }) {
+  const t = useT();
   const config = useStore((s) => s.config);
   const obs = useStore((s) => s.obs);
   const runObsCheck = useStore((s) => s.runObsCheck);
@@ -58,12 +60,12 @@ export function FirstLiveChecklist({
 
   const steps: { label: string; done: boolean; onClick: () => void }[] = [
     {
-      label: "Cole a chave de uma plataforma",
+      label: t("components.firstLive.step.key"),
       done: keyOk,
       onClick: () => requestNavigate("platforms"),
     },
     {
-      label: "Conecte o OBS",
+      label: t("components.firstLive.step.obs"),
       done: obsOk,
       onClick: () => {
         if (onSetupObs) onSetupObs();
@@ -71,7 +73,7 @@ export function FirstLiveChecklist({
       },
     },
     {
-      label: "BORA AO VIVO",
+      label: t("components.firstLive.step.golive"),
       done: false,
       onClick: () => requestNavigate("golive"),
     },
@@ -82,15 +84,15 @@ export function FirstLiveChecklist({
       <div className="flex items-center gap-2">
         <Radio className="size-4 text-brass" strokeWidth={2.6} />
         <span className="font-display text-sm font-extrabold">
-          Sua 1ª live em 3 passos
+          {t("components.firstLive.title")}
         </span>
         <button
           onClick={() => {
             setFlagDone();
             setHidden(true);
           }}
-          aria-label="Dispensar o guia"
-          title="Já sei me virar"
+          aria-label={t("components.firstLive.dismiss.aria")}
+          title={t("components.firstLive.dismiss.title")}
           className="ml-auto grid size-6 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
         >
           <X className="size-4" />

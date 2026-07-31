@@ -2,6 +2,8 @@
 // Relatório pós-live: parse do NDJSON + análise (eventos, janelas
 // problemáticas, veredito). Ver docs/RELATORIO-POS-LIVE.md.
 // ============================================================
+import type { I18n, MessageKey } from "./i18n";
+import { pluralSuffix } from "./i18n/locale";
 import type {
   AlertKind,
   ChatPlatform,
@@ -16,10 +18,15 @@ import type {
   SessionViewerSample,
 } from "./types";
 
+/** Tradução injetada. Este módulo é núcleo puro (nada de React aqui dentro), então
+ *  quem chama passa o `t` do idioma ativo — nunca um estado global, que viraria
+ *  corrida entre a janela principal e a do chat. */
+export type Translate = I18n["t"];
+
 type RawLine = { kind?: string; [k: string]: unknown };
 
 /** Converte o NDJSON cru numa sessão estruturada. */
-export function parseSession(ndjson: string): SessionData | null {
+export function parseSession(ndjson: string, t: Translate): SessionData | null {
   const lines = ndjson
     .split("\n")
     .map((l) => l.trim())
@@ -48,10 +55,10 @@ export function parseSession(ndjson: string): SessionData | null {
         platforms: (o.platforms ?? []) as SessionMeta["platforms"],
       };
     } else if (o.kind === "sample") {
-      const t = Number(o.t);
-      if (!Number.isFinite(t)) continue;
+      const ts = Number(o.t);
+      if (!Number.isFinite(ts)) continue;
       samples.push({
-        t,
+        t: ts,
         cpu: o.cpu == null ? undefined : Number(o.cpu),
         gpu: o.gpu == null ? undefined : Number(o.gpu),
         obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
@@ -61,35 +68,38 @@ export function parseSession(ndjson: string): SessionData | null {
         targets: (o.targets ?? []) as SessionSample["targets"],
       });
     } else if (o.kind === "viewers") {
-      const t = Number(o.t);
-      if (!Number.isFinite(t)) continue;
+      const ts = Number(o.t);
+      if (!Number.isFinite(ts)) continue;
       viewerSamples.push({
-        t,
+        t: ts,
         total: Number(o.total) || 0,
         items: (o.items ?? []) as SessionViewerSample["items"],
       });
     } else if (o.kind === "followers") {
-      const t = Number(o.t);
-      if (!Number.isFinite(t)) continue;
+      const ts = Number(o.t);
+      if (!Number.isFinite(ts)) continue;
       followerSamples.push({
-        t,
+        t: ts,
         items: (o.items ?? []) as SessionFollowerSample["items"],
       });
     } else if (o.kind === "alert") {
-      const t = Number(o.t);
-      if (!Number.isFinite(t)) continue;
+      const ts = Number(o.t);
+      if (!Number.isFinite(ts)) continue;
       alertEvents.push({
-        t,
+        t: ts,
         platform: o.platform as ChatPlatform,
         source: o.source == null ? undefined : String(o.source),
         kind: o.alertKind as AlertKind,
-        user: String(o.user ?? "alguém"),
+        user: String(o.user ?? t("analysis.parse.alert.userFallback")),
         amount: o.amount == null ? undefined : Number(o.amount),
       });
     } else if (o.kind === "marker") {
-      const t = Number(o.t);
-      if (Number.isFinite(t))
-        markers.push({ t, label: String(o.label ?? "Momento") });
+      const ts = Number(o.t);
+      if (Number.isFinite(ts))
+        markers.push({
+          t: ts,
+          label: String(o.label ?? t("analysis.parse.marker.labelFallback")),
+        });
     } else if (o.kind === "end") {
       const e = Number(o.endedAt);
       if (Number.isFinite(e)) endedAt = e;
@@ -421,6 +431,7 @@ function buildWindow(
   sliceCtxs: Array<Record<string, TargetCtx>>,
   totalTargets: number,
   typical: Record<string, number>,
+  t: Translate,
 ): ProblemWindow {
   const tStart = slice[0].t;
   const tEnd = slice[slice.length - 1].t;
@@ -440,27 +451,28 @@ function buildWindow(
       maxCongestion = Math.max(maxCongestion, s.obs.congestion);
       maxRenderMs = Math.max(maxRenderMs, s.obs.avgRenderMs);
     }
-    for (const t of s.targets) {
-      const ctx = sliceCtxs[i][t.id];
-      const typ = typical[t.id];
-      if (t.state === "signal-lost") {
+    // `tg` (não `t`): o `t` deste escopo é a tradução.
+    for (const tg of s.targets) {
+      const ctx = sliceCtxs[i][tg.id];
+      const typ = typical[tg.id];
+      if (tg.state === "signal-lost") {
         signalLost = true;
-        affected.add(t.name);
+        affected.add(tg.name);
       } else if (
-        (t.state === "reconnecting" || t.state === "error") &&
+        (tg.state === "reconnecting" || tg.state === "error") &&
         ctx?.everLive
       ) {
         reconnect = true;
-        affected.add(t.name);
+        affected.add(tg.name);
       }
       if (
-        t.state === "live" &&
+        tg.state === "live" &&
         ctx?.warm &&
         typ &&
-        t.bitrate < typ * BITRATE_DROP
+        tg.bitrate < typ * BITRATE_DROP
       ) {
         bitrateDrop = true;
-        affected.add(t.name);
+        affected.add(tg.name);
       }
     }
   });
@@ -472,44 +484,51 @@ function buildWindow(
   const singleTarget = affected.size === 1 && totalTargets > 1;
 
   const signals: string[] = [];
-  if (signalLost) signals.push("sem sinal do OBS");
-  if (reconnect) signals.push(`${[...affected].join(", ")} reconectou`);
-  if (bitrateDrop) signals.push("bitrate caiu");
-  if (cpuHigh) signals.push(`CPU ${Math.round(maxCpu)}%`);
-  if (gpuHigh) signals.push(`GPU ${Math.round(maxGpu)}%`);
-  if (renderLag) signals.push(`OBS render ${Math.round(maxRenderMs)}ms`);
+  if (signalLost) signals.push(t("analysis.signal.obsSignalLost"));
+  if (reconnect)
+    signals.push(
+      t("analysis.signal.reconnected", { targets: [...affected].join(", ") }),
+    );
+  if (bitrateDrop) signals.push(t("analysis.signal.bitrateDrop"));
+  if (cpuHigh)
+    signals.push(t("analysis.signal.cpu", { pct: Math.round(maxCpu) }));
+  if (gpuHigh)
+    signals.push(t("analysis.signal.gpu", { pct: Math.round(maxGpu) }));
+  if (renderLag)
+    signals.push(
+      t("analysis.signal.obsRender", { ms: Math.round(maxRenderMs) }),
+    );
   if (congested)
-    signals.push(`OBS congestionado ${Math.round(maxCongestion * 100)}%`);
+    signals.push(
+      t("analysis.signal.obsCongested", {
+        pct: Math.round(maxCongestion * 100),
+      }),
+    );
 
-  // Copy em português de streamer: o que houve + passo concreto, termo técnico entre parênteses.
-  let cause = "Causa indeterminada";
+  // Copy de streamer: o que houve + passo concreto, termo técnico entre parênteses.
+  let cause = t("analysis.cause.unknown");
   let causeKind: ProblemWindow["causeKind"] = "unknown";
-  let advice = "Veja os sinais deste trecho.";
+  let advice = t("analysis.advice.unknown");
   if (signalLost) {
-    cause = "O sinal do OBS caiu (sem vídeo chegando)";
+    cause = t("analysis.cause.signal");
     causeKind = "signal";
-    advice =
-      "Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta — nesse trecho a galera ficou sem imagem.";
+    advice = t("analysis.advice.signal");
   } else if (renderLag && !cpuHigh && !gpuHigh) {
-    cause = "Cena pesada no OBS (render lag)";
+    cause = t("analysis.cause.render");
     causeKind = "render";
-    advice =
-      "Alivie a cena no OBS — menos fontes, filtros e efeitos — ou baixe a resolução base lá.";
+    advice = t("analysis.advice.render");
   } else if (cpuHigh || gpuHigh) {
-    cause = "Seu PC não deu conta de gerar o vídeo (encoding)";
+    cause = t("analysis.cause.encoding");
     causeKind = "encoding";
-    advice =
-      "No OBS: Configurações → Saída → Encoder → escolha o da placa de vídeo (NVENC/QSV). Ou baixe o bitrate/resolução na tela Qualidade.";
+    advice = t("analysis.advice.encoding");
   } else if (congested || ((bitrateDrop || reconnect) && !singleTarget)) {
-    cause = "A internet não deu conta do upload";
+    cause = t("analysis.cause.network");
     causeKind = "network";
-    advice =
-      "Baixe o bitrate na tela Qualidade ou tire uma plataforma da live.";
+    advice = t("analysis.advice.network");
   } else if (singleTarget) {
-    cause = `Instabilidade em ${[...affected][0]}`;
+    cause = t("analysis.cause.platform", { target: [...affected][0] });
     causeKind = "platform";
-    advice =
-      "Provavelmente foi do lado da plataforma (o servidor dela, não você). Confira a chave e o status dela.";
+    advice = t("analysis.advice.platform");
   }
 
   return {
@@ -528,6 +547,7 @@ function problemWindows(
   data: SessionData,
   typical: Record<string, number>,
   ctxs: Array<Record<string, TargetCtx>>,
+  t: Translate,
 ): ProblemWindow[] {
   const { samples } = data;
   const flags = samples.map((s, i) => isBad(s, typical, ctxs[i]));
@@ -561,7 +581,7 @@ function problemWindows(
         .slice(a, b + 1)
         .some((s, i) =>
           s.targets.some(
-            (t) => isProblemState(t.state) && ctxs[a + i][t.id]?.everLive,
+            (tg) => isProblemState(tg.state) && ctxs[a + i][tg.id]?.everLive,
           ),
         );
       return hard || samples[b].t - samples[a].t >= SOFT_WINDOW_MIN_MS;
@@ -572,14 +592,15 @@ function problemWindows(
         ctxs.slice(a, b + 1),
         totalTargets,
         typical,
+        t,
       ),
     );
 }
 
-function deriveEvents(data: SessionData): ReportEvent[] {
+function deriveEvents(data: SessionData, t: Translate): ReportEvent[] {
   const { meta, samples } = data;
   const events: ReportEvent[] = [
-    { t: meta.startedAt, kind: "start", label: "Início da transmissão" },
+    { t: meta.startedAt, kind: "start", label: t("analysis.event.start") },
   ];
   const prev: Record<string, string> = {};
   // Recuperação só faz sentido depois de uma QUEDA anunciada — sem isso, o primeiro
@@ -588,52 +609,68 @@ function deriveEvents(data: SessionData): ReportEvent[] {
   let prevCpuHigh = false;
 
   for (const s of samples) {
-    for (const t of s.targets) {
+    // `tg` (não `t`): o `t` deste escopo é a tradução.
+    for (const tg of s.targets) {
       // prev inicia no PRÓPRIO estado (não "live"): a partida conectando/tentando
       // não é transição — era daqui que saía o "reconectou" fantasma de toda live.
-      const was = prev[t.id] ?? t.state;
-      if (isProblemState(t.state) && was === "live") {
-        droppedSince[t.id] = true;
+      const was = prev[tg.id] ?? tg.state;
+      if (isProblemState(tg.state) && was === "live") {
+        droppedSince[tg.id] = true;
         events.push({
           t: s.t,
           kind:
-            t.state === "error"
+            tg.state === "error"
               ? "error"
-              : t.state === "signal-lost"
+              : tg.state === "signal-lost"
                 ? "signal"
                 : "reconnect",
-          label: `${t.name} ${
-            t.state === "error"
-              ? "com erro"
-              : t.state === "signal-lost"
-                ? "ficou sem sinal do OBS"
-                : "reconectou"
-          }`,
+          label: t(
+            tg.state === "error"
+              ? "analysis.event.error"
+              : tg.state === "signal-lost"
+                ? "analysis.event.signalLost"
+                : "analysis.event.reconnect",
+            { target: tg.name },
+          ),
         });
       } else if (
-        t.state === "live" &&
+        tg.state === "live" &&
         isProblemState(was) &&
-        droppedSince[t.id]
+        droppedSince[tg.id]
       ) {
-        droppedSince[t.id] = false;
-        events.push({ t: s.t, kind: "recover", label: `${t.name} voltou` });
+        droppedSince[tg.id] = false;
+        events.push({
+          t: s.t,
+          kind: "recover",
+          label: t("analysis.event.recover", { target: tg.name }),
+        });
       }
-      prev[t.id] = t.state;
+      prev[tg.id] = tg.state;
     }
     const cpuHigh = s.cpu != null && s.cpu > CPU_HIGH;
     if (cpuHigh && !prevCpuHigh)
       events.push({
         t: s.t,
         kind: "cpu",
-        label: `CPU em ${Math.round(s.cpu as number)}%`,
+        label: t("analysis.event.cpuHigh", {
+          pct: Math.round(s.cpu as number),
+        }),
       });
     prevCpuHigh = cpuHigh;
   }
 
   if (meta.endedAt)
-    events.push({ t: meta.endedAt, kind: "end", label: "Fim da transmissão" });
+    events.push({
+      t: meta.endedAt,
+      kind: "end",
+      label: t("analysis.event.end"),
+    });
   for (const m of data.markers) {
-    events.push({ t: m.t, kind: "marker", label: `📍 ${m.label}` });
+    events.push({
+      t: m.t,
+      kind: "marker",
+      label: t("analysis.event.marker", { label: m.label }),
+    });
   }
   events.sort((a, b) => a.t - b.t);
   return events;
@@ -699,12 +736,15 @@ function aggregates(data: SessionData) {
   };
 }
 
-function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
+function buildVerdict(
+  windows: ProblemWindow[],
+  t: Translate,
+): ReportAnalysis["verdict"] {
   if (!windows.length)
     return {
       tone: "ok",
-      title: "Transmissão limpa",
-      detail: "Nenhum perrengue detectado nessa live.",
+      title: t("analysis.verdict.clean.title"),
+      detail: t("analysis.verdict.clean.detail"),
     };
   const count = (k: ProblemWindow["causeKind"]) =>
     windows.filter((w) => w.causeKind === k).length;
@@ -718,46 +758,79 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
   const totalBadSec = windows.reduce((a, w) => a + w.durationSec, 0);
   const brief = sig === 0 && totalBadSec <= 30;
   const briefNote = brief
-    ? ` Foi coisa rápida (${totalBadSec}s no total) — a galera provavelmente nem percebeu.`
+    ? t("analysis.verdict.brief", { sec: totalBadSec })
     : "";
+  // O substantivo entra por buraco em vez de virar "trecho(s)": remendo com
+  // parêntese é o tipo de coisa que só passa despercebida em português.
+  // `analyze` recebe só o `t`, então a variante sai da mesma regra do `tp`.
+  const stretch = (n: number) =>
+    t(`analysis.verdict.stretch.${pluralSuffix(n)}` as MessageKey);
+  const patch = (n: number) =>
+    t(`analysis.verdict.patch.${pluralSuffix(n)}` as MessageKey);
   if (sig)
     return {
       tone: "bad",
-      title: "O sinal do OBS caiu",
-      detail: `${sig} trecho(s) sem vídeo chegando do OBS — a galera ficou vendo tela parada. Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta.`,
+      title: t("analysis.verdict.signal.title"),
+      detail: t("analysis.verdict.signal.detail", {
+        n: sig,
+        stretch: stretch(sig),
+      }),
     };
   if (enc)
     return {
       tone: brief ? "warn" : "bad",
-      title: brief
-        ? "Engasgo rápido de encoding"
-        : "Seu PC não deu conta (encoding)",
-      detail: `${enc} trecho(s) com CPU/GPU no talo.${briefNote} No OBS: Configurações → Saída → troque o Encoder pro da placa de vídeo (NVENC/QSV) — ou baixe o bitrate/resolução na tela Qualidade.`,
+      title: t(
+        brief
+          ? "analysis.verdict.encoding.title.brief"
+          : "analysis.verdict.encoding.title",
+      ),
+      detail: t("analysis.verdict.encoding.detail", {
+        n: enc,
+        stretch: stretch(enc),
+        brief: briefNote,
+      }),
     };
   if (render)
     return {
       tone: "warn",
-      title: "Cena pesada no OBS",
-      detail: `${render} trecho(s) com o OBS penando pra montar o quadro (render lag) — alivie a cena (fontes/filtros/efeitos) ou baixe a resolução base no OBS.${briefNote}`,
+      title: t("analysis.verdict.render.title"),
+      detail: t("analysis.verdict.render.detail", {
+        n: render,
+        stretch: stretch(render),
+        brief: briefNote,
+      }),
     };
   if (net)
     return {
       tone: brief ? "warn" : "bad",
-      title: brief
-        ? "Engasgo rápido de internet"
-        : "A internet não deu conta (upload)",
-      detail: `${net} trecho(s) com bitrate caindo/reconexão sem o PC estar sobrecarregado.${briefNote} Se repetir, baixe o bitrate na tela Qualidade ou tire uma plataforma.`,
+      title: t(
+        brief
+          ? "analysis.verdict.network.title.brief"
+          : "analysis.verdict.network.title",
+      ),
+      detail: t("analysis.verdict.network.detail", {
+        n: net,
+        stretch: stretch(net),
+        brief: briefNote,
+      }),
     };
   if (plat)
     return {
       tone: "warn",
-      title: "Instabilidade de plataforma",
-      detail: `${plat} trecho(s) afetando uma plataforma só — provavelmente o problema foi do lado dela, não seu.${briefNote}`,
+      title: t("analysis.verdict.platform.title"),
+      detail: t("analysis.verdict.platform.detail", {
+        n: plat,
+        stretch: stretch(plat),
+        brief: briefNote,
+      }),
     };
   return {
     tone: "warn",
-    title: `${windows.length} trecho(s) com problema`,
-    detail: "Veja os detalhes de cada um abaixo.",
+    title: t("analysis.verdict.windows.title", {
+      n: windows.length,
+      patch: patch(windows.length),
+    }),
+    detail: t("analysis.verdict.windows.detail"),
   };
 }
 
@@ -1049,7 +1122,7 @@ function alertStats(d: SessionData): AlertStats {
 }
 
 /** Momentos de destaque (clipes sugeridos): picos de chat, alertas fortes e saltos de audiência. */
-function highlights(d: SessionData): Highlight[] {
+function highlights(d: SessionData, t: Translate): Highlight[] {
   const out: Highlight[] = [];
   const rate = chatRateSeries(d);
   const valid = rate.filter((x): x is number => x != null && x > 0);
@@ -1061,7 +1134,7 @@ function highlights(d: SessionData): Highlight[] {
         out.push({
           t: d.samples[i].t,
           kind: "chat",
-          reason: `Chat explodiu (${r}/min)`,
+          reason: t("analysis.highlight.chatSpike", { rate: r }),
           score: r,
         });
     });
@@ -1072,28 +1145,37 @@ function highlights(d: SessionData): Highlight[] {
       out.push({
         t: e.t,
         kind: "raid",
-        reason: `Raid de ${e.user} (+${Math.round(amt)})`,
+        reason: t("analysis.highlight.raid", {
+          user: e.user,
+          n: Math.round(amt),
+        }),
         score: 1000 + amt,
       });
     else if (e.kind === "subgift" && amt >= 5)
       out.push({
         t: e.t,
         kind: "alert",
-        reason: `${e.user} presenteou ${Math.round(amt)} subs`,
+        reason: t("analysis.highlight.subgift", {
+          user: e.user,
+          n: Math.round(amt),
+        }),
         score: 500 + amt,
       });
     else if (e.kind === "superchat" && amt >= 20)
       out.push({
         t: e.t,
         kind: "alert",
-        reason: `Super chat gordo de ${e.user}`,
+        reason: t("analysis.highlight.superchat", { user: e.user }),
         score: 400 + amt,
       });
     else if (e.kind === "bits" && amt >= 500)
       out.push({
         t: e.t,
         kind: "alert",
-        reason: `${e.user}: ${Math.round(amt)} bits`,
+        reason: t("analysis.highlight.bits", {
+          user: e.user,
+          n: Math.round(amt),
+        }),
         score: 300 + amt,
       });
   }
@@ -1104,7 +1186,7 @@ function highlights(d: SessionData): Highlight[] {
       out.push({
         t: vs[i].t,
         kind: "viewers",
-        reason: `+${delta} assistindo de uma vez`,
+        reason: t("analysis.highlight.viewerJump", { delta }),
         score: 150 + delta,
       });
   }
@@ -1115,20 +1197,20 @@ function highlights(d: SessionData): Highlight[] {
   return kept.sort((a, b) => a.t - b.t).slice(0, 10);
 }
 
-export function analyze(data: SessionData): ReportAnalysis {
+export function analyze(data: SessionData, t: Translate): ReportAnalysis {
   const ctxs = targetCtxs(data.samples);
   const typical = typicalBitrates(data.samples, ctxs);
-  const windows = problemWindows(data, typical, ctxs);
+  const windows = problemWindows(data, typical, ctxs, t);
   return {
-    events: deriveEvents(data),
+    events: deriveEvents(data, t),
     windows,
-    verdict: buildVerdict(windows),
+    verdict: buildVerdict(windows, t),
     ...aggregates(data),
     viewers: viewerStats(data),
     chat: chatStats(data),
     alerts: alertStats(data),
     byChannel: channelBreakdown(data),
-    highlights: highlights(data),
+    highlights: highlights(data, t),
   };
 }
 

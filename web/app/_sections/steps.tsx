@@ -1,7 +1,7 @@
-import type { T } from "@/lib/i18n";
+import type { Locale, T } from "@/lib/i18n";
 import Link from "next/link";
 import { accountScopesFor, stepsFor } from "@/lib/content";
-import { LEGAL_ROUTES } from "@/lib/legal";
+import { legalHref } from "@/lib/legal";
 import { Mascot, PlatformGlyph } from "../_components/decor";
 import { CheckIcon, LockIcon, RadioIcon } from "../_components/icons";
 import {
@@ -146,9 +146,11 @@ const ACCOUNT =
 
 export function Platforms({
   t,
+  locale,
   destinations,
 }: {
   t: T;
+  locale: Locale;
   destinations: readonly { id: string; name: string; note: string }[];
 }) {
   return (
@@ -227,7 +229,7 @@ export function Platforms({
               <LockIcon />
               <span>
                 {t("steps.accounts.privacy.text")}{" "}
-                <Link href={LEGAL_ROUTES.privacy}>
+                <Link href={legalHref(locale, "privacy")}>
                   {t("steps.accounts.privacy.link")}
                 </Link>
                 .

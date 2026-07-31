@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useI18n, type MessageKey } from "../lib/i18n";
 import { useStore } from "../lib/store";
 import { MESA_ENABLED } from "../lib/flags";
 import { Mascot } from "./decor";
@@ -26,41 +27,52 @@ export type Screen =
 
 // Relatórios entra na jornada numerada (é o passo que FECHA o ciclo da live) — no rodapé
 // apagado ninguém descobria que o app gera relatório.
-const NAV: { id: Screen; label: string; icon: typeof Radio; hint: string }[] = [
+// `id` é o identificador da tela (rota interna) — só as *Key* são texto de tela.
+const NAV: {
+  id: Screen;
+  labelKey: MessageKey;
+  icon: typeof Radio;
+  hintKey: MessageKey;
+}[] = [
   {
     id: "platforms",
-    label: "Plataformas",
+    labelKey: "sidebar.nav.platforms.label",
     icon: Tv2,
-    hint: "onde sua live aparece",
+    hintKey: "sidebar.nav.platforms.hint",
   },
   {
     id: "encoding",
-    label: "Qualidade",
+    labelKey: "sidebar.nav.encoding.label",
     icon: Sliders,
-    hint: "capricho da imagem",
+    hintKey: "sidebar.nav.encoding.hint",
   },
-  { id: "golive", label: "Ao vivo", icon: Radio, hint: "bota tudo no ar" },
+  {
+    id: "golive",
+    labelKey: "sidebar.nav.golive.label",
+    icon: Radio,
+    hintKey: "sidebar.nav.golive.hint",
+  },
   {
     id: "chat",
-    label: "Chat",
+    labelKey: "sidebar.nav.chat.label",
     icon: MessageSquare,
-    hint: "todo chat num lugar",
+    hintKey: "sidebar.nav.chat.hint",
   },
   ...(MESA_ENABLED
     ? [
         {
           id: "mesa" as Screen,
-          label: "Mesa",
+          labelKey: "sidebar.nav.mesa.label" as MessageKey,
           icon: Users,
-          hint: "co-stream com a galera",
+          hintKey: "sidebar.nav.mesa.hint" as MessageKey,
         },
       ]
     : []),
   {
     id: "reports",
-    label: "Relatórios",
+    labelKey: "sidebar.nav.reports.label",
     icon: BarChart3,
-    hint: "como foi a live",
+    hintKey: "sidebar.nav.reports.hint",
   },
 ];
 
@@ -77,6 +89,7 @@ export function Sidebar({
   onNavigate: (s: Screen) => void;
   onPreload?: (s: Screen) => void;
 }) {
+  const { t, fmt } = useI18n();
   const state = useStore((s) => s.snapshot.state);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const viewers = useStore((s) => s.viewers);
@@ -131,7 +144,7 @@ export function Sidebar({
               </span>
               <div className="flex flex-col">
                 <span className="font-display text-base font-bold leading-tight">
-                  {item.label}
+                  {t(item.labelKey)}
                 </span>
                 <span
                   className={cn(
@@ -139,12 +152,12 @@ export function Sidebar({
                     active ? "text-brass-ink/70" : "text-ink-faint",
                   )}
                 >
-                  {item.hint}
+                  {t(item.hintKey)}
                 </span>
               </div>
               {item.id === "reports" && unseenReport && !active ? (
                 <span className="ml-auto -rotate-3 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
-                  novo
+                  {t("sidebar.new")}
                 </span>
               ) : (
                 <span
@@ -176,7 +189,8 @@ export function Sidebar({
               : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted",
           )}
         >
-          <Settings className="size-4" strokeWidth={2.3} /> Configurações
+          <Settings className="size-4" strokeWidth={2.3} />{" "}
+          {t("sidebar.settings")}
           <span className="ml-auto font-display text-xs font-bold opacity-40">
             0{SETTINGS_N}
           </span>
@@ -194,7 +208,7 @@ export function Sidebar({
               : "text-ink-faint hover:bg-surface-2 hover:text-ink-muted",
           )}
         >
-          <Info className="size-4" strokeWidth={2.3} /> Sobre
+          <Info className="size-4" strokeWidth={2.3} /> {t("sidebar.about")}
           <span className="ml-auto text-[11px] font-bold text-brass">
             pitrol.dev
           </span>
@@ -203,34 +217,34 @@ export function Sidebar({
         {state === "live" ? (
           <button
             onClick={() => onNavigate("golive")}
-            title="Ver o painel ao vivo"
+            title={t("sidebar.live.title")}
             className="flex w-full -rotate-1 items-center gap-2 rounded-md bg-tomate px-3 py-2.5 text-left text-white pop transition-transform hover:scale-[1.02]"
           >
             <span className="size-2.5 rounded-full bg-white live-dot" />
             <span className="font-display text-sm font-extrabold uppercase tracking-wide">
-              No ar · cornetando
+              {t("sidebar.state.live")}
             </span>
           </button>
         ) : state === "starting" ? (
           <button
             onClick={() => onNavigate("golive")}
-            title="Ver o painel ao vivo"
+            title={t("sidebar.live.title")}
             className="flex w-full items-center gap-2 rounded-md bg-brass/15 px-3 py-2.5 text-left text-brass transition-transform hover:translate-x-0.5"
           >
             <span className="size-2.5 rounded-full bg-brass animate-pulse" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">
-              Aguardando o OBS
+              {t("sidebar.state.starting")}
             </span>
           </button>
         ) : state === "error" ? (
           <button
             onClick={() => onNavigate("golive")}
-            title="Ver o painel ao vivo"
+            title={t("sidebar.live.title")}
             className="flex w-full items-center gap-2 rounded-md bg-bad/15 px-3 py-2.5 text-left text-bad transition-transform hover:translate-x-0.5"
           >
             <span className="size-2.5 rounded-full bg-bad" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">
-              Erro
+              {t("sidebar.state.error")}
             </span>
           </button>
         ) : (
@@ -239,12 +253,12 @@ export function Sidebar({
               setGoLiveFocus(true);
               onNavigate("golive");
             }}
-            title="Ir pro Ao vivo e começar"
+            title={t("sidebar.start.title")}
             className="group flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2.5 text-left transition-transform hover:translate-x-0.5"
           >
             <span className="size-2.5 rounded-full bg-ink-faint" />
             <span className="text-sm font-semibold text-ink-muted group-hover:text-ink">
-              Fora do ar
+              {t("sidebar.state.stopped")}
             </span>
           </button>
         )}
@@ -254,17 +268,14 @@ export function Sidebar({
             className="flex items-center justify-center gap-1.5 pt-0.5 text-xs text-ink-faint"
             title={viewers.items
               .filter((i) => i.live)
-              .map(
-                (i) =>
-                  `${i.source}: ${(i.viewers ?? 0).toLocaleString("pt-BR")}`,
-              )
+              .map((i) => `${i.source}: ${fmt.num(i.viewers ?? 0)}`)
               .join("\n")}
           >
             <Eye className="size-3.5" />
             <span className="font-display font-extrabold text-ink-muted">
-              {viewers.total.toLocaleString("pt-BR")}
+              {fmt.num(viewers.total)}
             </span>
-            assistindo
+            {t("sidebar.viewers")}
           </div>
         )}
       </div>
