@@ -63,8 +63,33 @@ static MSG_ID: AtomicU64 = AtomicU64::new(1);
 fn next_id() -> String {
     MSG_ID.fetch_add(1, Ordering::Relaxed).to_string()
 }
-/// Mensagens de chat desde a última amostra (o motor lê+zera a cada ~2s → taxa de chat).
-pub static MSG_COUNT: AtomicU64 = AtomicU64::new(0);
+/// Mensagens de chat POR CANAL (`plataforma:fonte`) desde a última amostra — o motor
+/// drena a cada ~2s e isso vira a taxa de chat e a fatia de cada canal no relatório.
+///
+/// Era um `AtomicU64` com o total só. Virou mapa quando o relatório passou a segregar
+/// por canal; o lock não pesa no caminho quente: `emit_chat` já serializa o payload e
+/// atravessa o IPC a cada mensagem, o que custa ordens de grandeza mais que um insert
+/// num mapa de 2–3 chaves.
+static MSG_COUNTS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+
+fn msg_counts() -> &'static Mutex<HashMap<String, u64>> {
+    MSG_COUNTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Zera os contadores (início de sessão / restart do chat).
+pub fn reset_msg_counts() {
+    if let Ok(mut m) = msg_counts().lock() {
+        m.clear();
+    }
+}
+
+/// Lê e zera a janela que passou: `{ "twitch:meucanal": 7, "kick:meucanal": 2 }`.
+pub fn drain_msg_counts() -> HashMap<String, u64> {
+    msg_counts()
+        .lock()
+        .map(|mut m| std::mem::take(&mut *m))
+        .unwrap_or_default()
+}
 /// Geração do chat: incrementa a cada start_chat. Thread de um start ANTIGO (que ainda
 /// estava conectando durante um restart) compara a própria geração antes de registrar
 /// sender ou emitir status — senão o sender velho (Receiver morto) sobrescreve o novo.
@@ -101,7 +126,11 @@ fn frags_to_text(frags: &[ChatFragment]) -> String {
 }
 
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
-    MSG_COUNT.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut counts) = msg_counts().lock() {
+        *counts
+            .entry(format!("{}:{}", msg.platform, msg.source))
+            .or_insert(0) += 1;
+    }
     crate::overlay::push_chat(&app.state::<AppState>().overlay, &msg);
     let _ = app.emit("chat://message", msg);
 }
@@ -181,7 +210,14 @@ pub struct Alert {
 
 pub fn emit_alert(app: &AppHandle, alert: Alert) {
     if let Some(p) = session_path(app) {
-        crate::session::record_alert(&p, &alert.platform, &alert.kind, &alert.user, alert.amount);
+        crate::session::record_alert(
+            &p,
+            &alert.platform,
+            &alert.source,
+            &alert.kind,
+            &alert.user,
+            alert.amount,
+        );
     }
     // Espelha no overlay do OBS (se o servidor local estiver de pé). Vem ANTES do emit — que
     // consome `alert` por valor — pra empurrar por referência sem clonar. No-op sem overlay.
@@ -193,7 +229,7 @@ pub fn emit_alert(app: &AppHandle, alert: Alert) {
 
 /// (Re)inicia o chat com base nas fontes configuradas.
 pub fn start_chat(app: &AppHandle) {
-    MSG_COUNT.store(0, Ordering::Relaxed);
+    reset_msg_counts();
     // Nova geração ANTES de limpar as filas: qualquer thread antiga ainda conectando
     // vê a geração mudada e não registra sender/status por cima dos novos.
     let gen = CHAT_GEN.fetch_add(1, Ordering::SeqCst) + 1;

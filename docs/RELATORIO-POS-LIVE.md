@@ -5,6 +5,7 @@
 > travamento/lentidão** — para diagnosticar com calma depois, **sem mexer na transmissão ao vivo**.
 
 - **Status:** ✅ Implementado (Fases 1–4 + retenção + abrir pasta) · 2026-06-23
+  · **v2: métricas de público por canal** (§13) · 2026-07-30
 - **Relacionado:** [`PLANEJAMENTO.md`](./PLANEJAMENTO.md) (§8 métricas), [`PENDENCIAS.md`](./PENDENCIAS.md)
 
 ---
@@ -201,3 +202,41 @@ Ou seja, a Fase 1–3 reaproveita muita coisa; o maior ganho novo é **gravar a 
 - **Demo (navegador):** grava a sessão simulada (com obs) e semeia 2 exemplos (uma limpa, uma com incidente) pra navegar sem backend.
 
 **Pendente (Fase 5, niceties):** export HTML/JSON formatado e comparação entre sessões.
+
+## 13. Segregação por canal (v2) — 2026-07-30
+
+Pedido recorrente do beta: **ver as métricas de público separadas por canal**, não só somadas.
+As técnicas (bitrate, quedas, reconexões) já vinham por destino; as de público, não.
+
+**Canal ≠ destino.** Um *destino* é pra onde a Corneta empurra vídeo (`Target`: plataforma + chave);
+um *canal* é de onde vêm audiência, chat e alertas (`ChatSource`: plataforma + rótulo). São eixos
+diferentes, e **duas contas na mesma plataforma são dois canais** — foi justamente esse caso que o
+relatório não sabia contar. Por isso a chave é `plataforma:rótulo`, não a plataforma sozinha.
+
+**O que passou a ser gravado (`schemaVersion: 2`)**
+
+| Campo | Onde | Por quê |
+|---|---|---|
+| `sample.chatBy` | `{ "twitch:Meu canal": 7 }` | o `chat` era um total só; `chat::MSG_COUNT` (um `AtomicU64`) virou mapa por canal |
+| `alert.source` | rótulo do canal | o alerta só tinha `platform`, o que não distingue duas contas |
+
+`chatBy` é omitido em janela sem mensagem: numa live de 3h a maioria das amostras não tem nenhuma,
+e um `{}` por linha engordaria o NDJSON sem dizer nada além do `chat: 0`.
+
+**Compatibilidade com as ~50 sessões já gravadas.** A audiência por canal sempre esteve no
+`viewers.items` — relatórios antigos ganham a quebra na hora. O que falta neles degrada explícito:
+
+- sem `chatBy` → `hasChatByChannel: false`, e o card diz que aquela live é anterior à contagem;
+- alerta sem `source` → creditado ao canal **se a plataforma tiver exatamente um**; com dois, vai
+  pro balde de não-atribuídos. Chutar acertaria metade das vezes, o que é pior que não dizer;
+- alerta de agregador (Streamlabs/StreamElements) traz o agregador em `platform` e nunca é atribuível.
+
+**A fatia da audiência é acumulada, não de pico.** Somar os picos de cada canal inventa audiência
+que nunca existiu junta — os picos não são simultâneos. A fatia usa a soma de espectadores ao longo
+da live, com canal fora do ar valendo zero; assim a soma das médias por canal **bate** com a média
+total (há teste pra isso; na tela pode sobrar ±1 do arredondamento de cada linha) e as fatias
+fecham em 100%.
+
+**Na tela:** card "Público por canal" (pico · média · fatia · chat · alertas) e um "Total | Por
+canal" nos gráficos de audiência e de chat. O card antigo "Por plataforma" virou "Envio por
+plataforma", que é o que ele sempre foi.

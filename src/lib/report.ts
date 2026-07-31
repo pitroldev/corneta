@@ -54,6 +54,8 @@ export function parseSession(ndjson: string): SessionData | null {
         gpu: o.gpu == null ? undefined : Number(o.gpu),
         obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
         chat: o.chat == null ? undefined : Number(o.chat),
+        chatBy:
+          o.chatBy == null ? undefined : (o.chatBy as Record<string, number>),
         targets: (o.targets ?? []) as SessionSample["targets"],
       });
     } else if (o.kind === "viewers") {
@@ -70,6 +72,7 @@ export function parseSession(ndjson: string): SessionData | null {
       alertEvents.push({
         t,
         platform: o.platform as ChatPlatform,
+        source: o.source == null ? undefined : String(o.source),
         kind: o.alertKind as AlertKind,
         user: String(o.user ?? "alguém"),
         amount: o.amount == null ? undefined : Number(o.amount),
@@ -136,6 +139,34 @@ export function chatRateSeries(d: SessionData): (number | null)[] {
 export const hasChat = (d: SessionData): boolean =>
   d.samples.some((s) => (s.chat ?? 0) > 0);
 
+/** Audiência de UM canal ao longo do tempo (eixo = índice de `viewerSamples`). */
+export function viewerSeriesFor(
+  d: SessionData,
+  key: string,
+): (number | null)[] {
+  return d.viewerSamples.map(
+    (s) =>
+      s.items.find((i) => channelKey(i.platform, i.source) === key)?.viewers ??
+      null,
+  );
+}
+
+/** Taxa de chat (msgs/min) de UM canal. Só faz sentido com `hasChatByChannel`. */
+export function chatRateSeriesFor(
+  d: SessionData,
+  key: string,
+): (number | null)[] {
+  const s = d.samples;
+  return s.map((x, i) => {
+    // Sem o campo `chat` a amostra é anterior à contagem de chat: não é zero, é ausência.
+    if (x.chat == null) return null;
+    // Com `chat` mas sem `chatBy`, ninguém falou na janela — aí zero é a resposta certa.
+    const c = x.chatBy?.[key] ?? 0;
+    const dt = i > 0 ? (x.t - s[i - 1].t) / 1000 : 2;
+    return dt > 0 ? Math.round((c * 60) / dt) : 0;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Análise
 // ---------------------------------------------------------------------------
@@ -175,9 +206,37 @@ export interface ViewerStats {
   avg: number;
   start: number;
   end: number;
-  /** Audiência por plataforma no pico (último item de cada). */
-  byPlatform: { platform: ChatPlatform; source: string; peak: number }[];
   hasData: boolean;
+}
+
+/** Um canal do relatório: uma fonte de chat/audiência (`plataforma:rótulo`).
+ *  Duas contas na mesma plataforma são DOIS canais — é o caso que motivou a feature. */
+export interface ChannelStats {
+  key: string;
+  platform: ChatPlatform;
+  /** Rótulo que o usuário deu à fonte (ou o próprio @/slug, se não nomeou). */
+  source: string;
+  viewers: { peak: number; avg: number; last: number; hasData: boolean };
+  /** Fatia da audiência da live (0..100), ou null se a sessão não tem audiência. */
+  sharePct: number | null;
+  chat: { total: number; perMin: number; hasData: boolean };
+  alerts: {
+    total: number;
+    subs: number;
+    bits: number;
+    raids: number;
+    follows: number;
+    hasData: boolean;
+  };
+}
+
+export interface ChannelBreakdown {
+  channels: ChannelStats[];
+  /** A sessão gravou chat por canal? Sessão antiga só tem o total da live. */
+  hasChatByChannel: boolean;
+  /** Alertas que não dá pra creditar a um canal (agregador, ou sessão antiga com
+   *  duas fontes da mesma plataforma) — contados à parte em vez de chutados. */
+  unattributedAlerts: number;
 }
 
 export interface ChatStats {
@@ -225,6 +284,8 @@ export interface ReportAnalysis {
   viewers: ViewerStats;
   chat: ChatStats;
   alerts: AlertStats;
+  /** As mesmas métricas de público quebradas por canal. */
+  byChannel: ChannelBreakdown;
   highlights: Highlight[];
 }
 
@@ -670,39 +731,169 @@ function buildVerdict(windows: ProblemWindow[]): ReportAnalysis["verdict"] {
 
 function viewerStats(d: SessionData): ViewerStats {
   const vs = d.viewerSamples;
-  if (!vs.length)
-    return {
-      peak: 0,
-      avg: 0,
-      start: 0,
-      end: 0,
-      byPlatform: [],
-      hasData: false,
-    };
+  if (!vs.length) return { peak: 0, avg: 0, start: 0, end: 0, hasData: false };
   const totals = vs.map((v) => v.total);
-  const peakByKey: Record<
-    string,
-    { platform: ChatPlatform; source: string; peak: number }
-  > = {};
-  for (const v of vs)
-    for (const it of v.items) {
-      const k = `${it.platform}:${it.source}`;
-      const cur = peakByKey[k] ?? {
-        platform: it.platform,
-        source: it.source,
-        peak: 0,
-      };
-      cur.peak = Math.max(cur.peak, it.viewers ?? 0);
-      peakByKey[k] = cur;
-    }
   return {
     peak: maxOf(totals),
     avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
     start: totals[0],
     end: totals[totals.length - 1],
-    byPlatform: Object.values(peakByKey).sort((a, b) => b.peak - a.peak),
     hasData: true,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Por canal — a mesma live vista de cada plataforma/conta
+// ---------------------------------------------------------------------------
+
+/** Chave estável de um canal. `source` é o rótulo que o usuário deu à fonte. */
+export const channelKey = (platform: string, source: string) =>
+  `${platform}:${source}`;
+
+const CHAT_PLATFORMS = ["twitch", "youtube", "kick"] as const;
+const isChatPlatform = (p: string): p is ChatPlatform =>
+  (CHAT_PLATFORMS as readonly string[]).includes(p);
+
+interface ChannelAcc {
+  platform: ChatPlatform;
+  source: string;
+  viewerSum: number;
+  viewerPeak: number;
+  viewerLast: number;
+  viewerSeen: boolean;
+  chat: number;
+  alerts: {
+    total: number;
+    subs: number;
+    bits: number;
+    raids: number;
+    follows: number;
+  };
+}
+
+function newAcc(platform: ChatPlatform, source: string): ChannelAcc {
+  return {
+    platform,
+    source,
+    viewerSum: 0,
+    viewerPeak: 0,
+    viewerLast: 0,
+    viewerSeen: false,
+    chat: 0,
+    alerts: { total: 0, subs: 0, bits: 0, raids: 0, follows: 0 },
+  };
+}
+
+const SUB_KINDS: AlertKind[] = ["sub", "resub", "subgift", "member"];
+
+function channelBreakdown(d: SessionData): ChannelBreakdown {
+  const acc = new Map<string, ChannelAcc>();
+  const get = (platform: ChatPlatform, source: string) => {
+    const k = channelKey(platform, source);
+    let c = acc.get(k);
+    if (!c) acc.set(k, (c = newAcc(platform, source)));
+    return c;
+  };
+
+  // --- Audiência ---
+  for (const v of d.viewerSamples)
+    for (const it of v.items) {
+      const c = get(it.platform, it.source);
+      if (it.viewers == null) continue;
+      // Canal FORA do ar entra como zero na soma (não é ignorado): só assim a soma das
+      // médias dos canais bate com a média total e as fatias fecham em 100%.
+      c.viewerSum += it.viewers;
+      c.viewerPeak = Math.max(c.viewerPeak, it.viewers);
+      c.viewerLast = it.viewers;
+      c.viewerSeen = true;
+    }
+  const vN = d.viewerSamples.length;
+
+  // --- Chat ---
+  let hasChatByChannel = false;
+  for (const s of d.samples) {
+    if (!s.chatBy) continue;
+    hasChatByChannel = true;
+    for (const [k, n] of Object.entries(s.chatBy)) {
+      // A chave já vem como `plataforma:fonte`; um split ingênuo quebraria um rótulo
+      // que contenha ":" — daí o corte no PRIMEIRO separador só.
+      const i = k.indexOf(":");
+      if (i <= 0) continue;
+      const platform = k.slice(0, i);
+      if (!isChatPlatform(platform)) continue;
+      get(platform, k.slice(i + 1)).chat += n;
+    }
+  }
+
+  // --- Alertas ---
+  // Depois dos outros de propósito: o fallback de sessão antiga (alerta sem `source`)
+  // precisa saber quantos canais aquela plataforma tem.
+  const perPlatform = new Map<string, string[]>();
+  for (const c of acc.values()) {
+    const list = perPlatform.get(c.platform) ?? [];
+    list.push(c.source);
+    perPlatform.set(c.platform, list);
+  }
+  let unattributedAlerts = 0;
+  for (const e of d.alertEvents) {
+    // Alerta de agregador (Streamlabs/StreamElements) traz o nome do agregador em
+    // `platform` — não dá pra dizer de qual canal veio.
+    if (!isChatPlatform(e.platform)) {
+      unattributedAlerts++;
+      continue;
+    }
+    let source = e.source;
+    if (source == null) {
+      // Sessão gravada antes do `source`. Com um canal só na plataforma, a atribuição é
+      // certa; com dois, qualquer palpite estaria errado metade das vezes.
+      const known = perPlatform.get(e.platform) ?? [];
+      if (known.length !== 1) {
+        unattributedAlerts++;
+        continue;
+      }
+      source = known[0];
+    }
+    const a = get(e.platform, source).alerts;
+    a.total++;
+    if (SUB_KINDS.includes(e.kind)) a.subs++;
+    if (e.kind === "bits") a.bits += e.amount ?? 0;
+    if (e.kind === "raid") a.raids++;
+    if (e.kind === "follow") a.follows++;
+  }
+
+  const totalViewerSum = [...acc.values()].reduce((a, c) => a + c.viewerSum, 0);
+  const durMin = Math.max(1, d.meta.durationSec / 60);
+
+  const channels: ChannelStats[] = [...acc.entries()].map(([key, c]) => ({
+    key,
+    platform: c.platform,
+    source: c.source,
+    viewers: {
+      peak: c.viewerPeak,
+      avg: vN ? Math.round(c.viewerSum / vN) : 0,
+      last: c.viewerLast,
+      hasData: c.viewerSeen,
+    },
+    sharePct: totalViewerSum
+      ? Math.round((c.viewerSum / totalViewerSum) * 1000) / 10
+      : null,
+    chat: {
+      total: c.chat,
+      perMin: Math.round(c.chat / durMin),
+      hasData: hasChatByChannel,
+    },
+    alerts: { ...c.alerts, hasData: c.alerts.total > 0 },
+  }));
+
+  // Maior audiência primeiro; sem audiência, quem teve mais chat. O nome desempata pra
+  // ordem não dançar entre duas aberturas do mesmo relatório.
+  channels.sort(
+    (a, b) =>
+      b.viewers.avg - a.viewers.avg ||
+      b.chat.total - a.chat.total ||
+      a.source.localeCompare(b.source, "pt-BR"),
+  );
+  return { channels, hasChatByChannel, unattributedAlerts };
 }
 
 function chatStats(d: SessionData): ChatStats {
@@ -832,6 +1023,7 @@ export function analyze(data: SessionData): ReportAnalysis {
     viewers: viewerStats(data),
     chat: chatStats(data),
     alerts: alertStats(data),
+    byChannel: channelBreakdown(data),
     highlights: highlights(data),
   };
 }

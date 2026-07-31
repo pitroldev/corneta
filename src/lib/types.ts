@@ -419,6 +419,9 @@ export interface SessionSample {
   obs?: ObsStats;
   /** Mensagens de chat nesta janela (~2s) — vira taxa de chat / picos. */
   chat?: number;
+  /** As mesmas mensagens por canal (`plataforma:fonte`). Ausente em sessão antiga
+   *  (gravada antes da segregação) e em janela sem mensagem nenhuma. */
+  chatBy?: Record<string, number>;
   targets: SessionSampleTarget[];
 }
 
@@ -436,6 +439,9 @@ export interface SessionViewerSample {
 export interface SessionAlertEvent {
   t: number;
   platform: ChatPlatform;
+  /** Rótulo do canal de origem (mesmo namespace de `viewers`/`chatBy`).
+   *  Ausente em sessão antiga; em alerta de agregador, o `platform` é o agregador. */
+  source?: string;
   kind: AlertKind;
   user: string;
   amount?: number;

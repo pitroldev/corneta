@@ -213,7 +213,11 @@ fn apply_kick_mode(config: &mut OauthConfig) {
 /// "indisponível" mudo, que é o que fazia parecer bug de app quando era setup API errada).
 fn refresh_broker_config(app: &AppHandle) -> Result<(), String> {
     let current = oauth(app);
-    let base = current.setup_api_url.trim().trim_end_matches('/').to_string();
+    let base = current
+        .setup_api_url
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
     let Some(url) = setup_url(&current, "/api/v1/bootstrap") else {
         return Err(if base.is_empty() {
             "serviço de login não configurado (VITE_SETUP_API_URL vazio)".into()
@@ -811,9 +815,9 @@ pub fn youtube_login_start(app: AppHandle) {
             return youtube_direct_login(&app, &cfg);
         }
         if cfg.google_client_id.is_empty() || cfg.google_client_secret.is_empty() {
-            let motivo = broker.err().unwrap_or_else(|| {
-                "o servidor ainda não habilitou o YouTube oficial".to_string()
-            });
+            let motivo = broker
+                .err()
+                .unwrap_or_else(|| "o servidor ainda não habilitou o YouTube oficial".to_string());
             return auth_event(
                 &app,
                 "youtube",
@@ -2354,7 +2358,8 @@ mod tests {
         // Decisão Y1: o fluxo oficial é PKCE sem segredo nenhum. Se alguém "consertar" um
         // invalid_client acrescentando client_secret aqui, o oficial passa a exigir um segredo
         // distribuído no binário — este teste existe pra barrar isso.
-        let oficial = youtube_official_exchange_form("id", "code", "verifier", "http://127.0.0.1:1");
+        let oficial =
+            youtube_official_exchange_form("id", "code", "verifier", "http://127.0.0.1:1");
         assert!(!oficial.iter().any(|(k, _)| *k == "client_secret"));
         assert!(oficial
             .iter()

@@ -15,6 +15,7 @@ import {
   Scissors,
   Share2,
   Download,
+  Users,
   X,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -33,11 +34,15 @@ import {
   gpuSeries,
   hasChat,
   hasObs,
+  chatRateSeriesFor,
   obsRenderSeries,
   parseSession,
   setCachedSummary,
   summarize,
   viewerSeries,
+  viewerSeriesFor,
+  type ChannelBreakdown,
+  type ChannelStats,
   type Highlight,
   type ProblemWindow,
   type ReportAnalysis,
@@ -91,6 +96,39 @@ const MODE_LABEL: Record<string, string> = {
   passthrough: "Na lata",
   hybrid: "Esperto",
 };
+
+const platColor = (pid: string) =>
+  PLATFORMS[pid as keyof typeof PLATFORMS]?.color ?? "#ffb323";
+
+/** Clareia um `#rrggbb` em direção ao branco (k = 0..1). */
+function lighten(hex: string, k: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m || k <= 0) return hex;
+  const n = parseInt(m[1], 16);
+  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    .map((c) =>
+      Math.round(c + (255 - c) * Math.min(k, 0.75))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/** Cor de cada canal no gráfico e na barra de fatia.
+ *
+ *  Duas contas da MESMA plataforma têm a mesma cor de marca — e era exatamente esse o
+ *  caso que a segregação por canal veio resolver. Da segunda em diante o tom clareia,
+ *  senão as duas séries do gráfico viram uma linha só. */
+function channelColors(channels: ChannelStats[]): Record<string, string> {
+  const nth: Record<string, number> = {};
+  const out: Record<string, string> = {};
+  for (const c of channels) {
+    const i = nth[c.platform] ?? 0;
+    nth[c.platform] = i + 1;
+    out[c.key] = lighten(platColor(c.platform), i * 0.3);
+  }
+  return out;
+}
 
 export function ReportsScreen() {
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
@@ -475,6 +513,10 @@ function ReportDetail({
   const [data, setData] = useState<SessionData | null | "loading">("loading");
   const [showRecap, setShowRecap] = useState(false);
   const [prevSummary, setPrevSummary] = useState<SessionSummary | null>(null);
+  // Cada gráfico tem seu próprio "Total / Por canal": quem quer ver a audiência
+  // repartida nem sempre quer o chat repartido junto.
+  const [splitViewers, setSplitViewers] = useState(false);
+  const [splitChat, setSplitChat] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -554,8 +596,6 @@ function ReportDetail({
 
   const a = analyze(data);
   const n = data.samples.length;
-  const platColor = (pid: string) =>
-    PLATFORMS[pid as keyof typeof PLATFORMS]?.color ?? "#ffb323";
 
   // Marcadores de evento (reconexão/erro) no eixo de tempo.
   const indexAt = (t: number) => {
@@ -608,6 +648,42 @@ function ReportDetail({
   const raidMarkers: ChartMarker[] = data.alertEvents
     .filter((e) => e.kind === "raid")
     .map((e) => ({ index: viewerIndexAt(e.t), color: "#7c9cff" }));
+
+  // --- Séries por canal ---
+  // Com um canal só, repartir não diz nada que o total já não diga: o botão nem aparece.
+  const colors = channelColors(a.byChannel.channels);
+  const viewerChannels = a.byChannel.channels.filter((c) => c.viewers.hasData);
+  const chatChannels = a.byChannel.channels.filter((c) => c.chat.total > 0);
+  const canSplitViewers = viewerChannels.length > 1;
+  const canSplitChat = a.byChannel.hasChatByChannel && chatChannels.length > 1;
+  const viewerChartSeries =
+    splitViewers && canSplitViewers
+      ? viewerChannels.map((c) => ({
+          label: c.source,
+          color: colors[c.key],
+          values: viewerSeriesFor(data, c.key),
+        }))
+      : [
+          {
+            label: "Assistindo",
+            color: "#56e39b",
+            values: viewerSeries(data),
+          },
+        ];
+  const chatChartSeries =
+    splitChat && canSplitChat
+      ? chatChannels.map((c) => ({
+          label: c.source,
+          color: colors[c.key],
+          values: chatRateSeriesFor(data, c.key),
+        }))
+      : [
+          {
+            label: "msgs/min",
+            color: "#ffb323",
+            values: chatRateSeries(data),
+          },
+        ];
   const chatMarkers: ChartMarker[] = a.highlights
     .filter((h) => h.kind === "chat")
     .map((h) => ({ index: indexAt(h.t), color: "#ffb323" }));
@@ -773,21 +849,26 @@ function ReportDetail({
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
             <Eye className="size-4" /> Audiência ao vivo (quanto da galera
             ficou)
+            {canSplitViewers && (
+              <SplitToggle on={splitViewers} onChange={setSplitViewers} />
+            )}
           </h3>
           <LineChart
-            series={[
-              {
-                label: "Assistindo",
-                color: "#56e39b",
-                values: viewerSeries(data),
-              },
-            ]}
+            series={viewerChartSeries}
             n={vN}
             markers={raidMarkers}
             formatValue={(v) => Math.round(v).toLocaleString("pt-BR")}
             formatX={relAtViewer}
           />
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
+            {/* Estes números são sempre da live inteira. Com o gráfico repartido
+                eles passam a bater com nenhuma das linhas — sem esse aviso, o
+                "pico 521" ao lado de um eixo que vai só até 408 lê como bug. */}
+            {splitViewers && canSplitViewers && (
+              <span className="font-semibold text-ink-faint">
+                Somando os canais:
+              </span>
+            )}
             <span>
               Pico{" "}
               <strong className="text-ink">
@@ -807,22 +888,12 @@ function ReportDetail({
               <span className="text-[#7c9cff]">● raids</span>
             )}
           </div>
-          {a.viewers.byPlatform.length > 1 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {a.viewers.byPlatform.map((p) => (
-                <span
-                  key={`${p.platform}:${p.source}`}
-                  className="flex items-center gap-1.5 rounded bg-surface-2 px-2 py-1 text-xs text-ink-muted"
-                >
-                  <PlatformGlyph id={p.platform} size={14} /> {p.source}:{" "}
-                  <strong className="text-ink">
-                    {p.peak.toLocaleString("pt-BR")}
-                  </strong>
-                </span>
-              ))}
-            </div>
-          )}
         </Card>
+      )}
+
+      {/* Público por canal — pico/média, fatia da audiência, chat e alertas de cada um */}
+      {a.byChannel.channels.length > 1 && (
+        <ChannelBreakdownCard b={a.byChannel} colors={colors} />
       )}
 
       {/* Momentos de destaque (clipes sugeridos) */}
@@ -849,21 +920,23 @@ function ReportDetail({
         <Card className="mb-4">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
             <MessageSquare className="size-4" /> Atividade do chat (msgs/min)
+            {canSplitChat && (
+              <SplitToggle on={splitChat} onChange={setSplitChat} />
+            )}
           </h3>
           <LineChart
-            series={[
-              {
-                label: "msgs/min",
-                color: "#ffb323",
-                values: chatRateSeries(data),
-              },
-            ]}
+            series={chatChartSeries}
             n={n}
             markers={chatMarkers}
             formatValue={(v) => Math.round(v).toString()}
             formatX={relAtSample}
           />
           <div className="mt-2 text-xs text-ink-muted">
+            {splitChat && canSplitChat && (
+              <span className="font-semibold text-ink-faint">
+                Somando os canais:{" "}
+              </span>
+            )}
             Total{" "}
             <strong className="text-ink">
               {a.chat.total.toLocaleString("pt-BR")}
@@ -973,10 +1046,10 @@ function ReportDetail({
         </Card>
       )}
 
-      {/* Resumo por plataforma */}
+      {/* Saúde do envio, por destino (o "Público por canal" cuida da audiência) */}
       <Card className="mb-4">
         <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
-          Por plataforma
+          Envio por plataforma
         </h3>
         <div className="flex flex-col gap-2">
           {a.perTarget.map((t) => (
@@ -1037,6 +1110,139 @@ function ReportDetail({
         </div>
       </Card>
     </div>
+  );
+}
+
+/** "Total | Por canal" no cabeçalho de um gráfico. */
+function SplitToggle({
+  on,
+  onChange,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md bg-surface-2 p-0.5 normal-case">
+      {[false, true].map((v) => (
+        <button
+          key={String(v)}
+          onClick={() => onChange(v)}
+          aria-pressed={on === v}
+          className={cn(
+            "rounded px-2 py-1 text-[11px] font-bold transition-colors",
+            on === v
+              ? "bg-brass text-brass-ink"
+              : "text-ink-faint hover:text-ink",
+          )}
+        >
+          {v ? "Por canal" : "Total"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const num = (v: number) => v.toLocaleString("pt-BR");
+
+/** Uma linha por canal: audiência (com a fatia da live), chat e alertas. */
+function ChannelRow({ c, color }: { c: ChannelStats; color: string }) {
+  const chips: string[] = [];
+  if (c.alerts.subs > 0) chips.push(`⭐ ${c.alerts.subs}`);
+  if (c.alerts.bits > 0) chips.push(`💎 ${num(Math.round(c.alerts.bits))}`);
+  if (c.alerts.raids > 0) chips.push(`🚀 ${c.alerts.raids}`);
+  if (c.alerts.follows > 0) chips.push(`💜 ${c.alerts.follows}`);
+
+  return (
+    <div className="rounded-md bg-surface-2 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <PlatformGlyph id={c.platform} size={22} />
+        <span className="min-w-24 flex-1 truncate font-display font-bold">
+          {c.source}
+        </span>
+        {c.viewers.hasData && (
+          <>
+            <span className="text-xs text-ink-muted">
+              pico{" "}
+              <strong className="tabular-nums text-ink">
+                {num(c.viewers.peak)}
+              </strong>
+            </span>
+            <span className="text-xs text-ink-muted">
+              méd{" "}
+              <strong className="tabular-nums text-ink">
+                {num(c.viewers.avg)}
+              </strong>
+            </span>
+          </>
+        )}
+        {c.chat.hasData && c.chat.total > 0 && (
+          <span className="text-xs text-ink-muted">
+            💬{" "}
+            <strong className="tabular-nums text-ink">
+              {num(c.chat.total)}
+            </strong>
+          </span>
+        )}
+        {chips.length > 0 && (
+          <span className="text-xs tabular-nums text-ink-muted">
+            {chips.join(" · ")}
+          </span>
+        )}
+      </div>
+
+      {/* Fatia da audiência: soma de quem esteve assistindo neste canal ao longo da
+          live dividida pelo total. Comparar PICOS seria enganoso — os picos de cada
+          canal não acontecem no mesmo instante e somariam mais que a live inteira. */}
+      {c.sharePct != null && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.max(c.sharePct, 1.5)}%`,
+                background: color,
+              }}
+            />
+          </div>
+          <span className="w-24 shrink-0 text-right text-[11px] font-semibold tabular-nums text-ink-faint">
+            {c.sharePct.toFixed(0)}% da audiência
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChannelBreakdownCard({
+  b,
+  colors,
+}: {
+  b: ChannelBreakdown;
+  colors: Record<string, string>;
+}) {
+  return (
+    <Card className="mb-4">
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
+        <Users className="size-4" /> Público por canal
+      </h3>
+      <div className="flex flex-col gap-2">
+        {b.channels.map((c) => (
+          <ChannelRow key={c.key} c={c} color={colors[c.key]} />
+        ))}
+      </div>
+      {!b.hasChatByChannel && (
+        <p className="mt-2 text-[11px] text-ink-faint">
+          💬 Esta live é anterior à contagem de chat por canal — só o total dela
+          aparece. Nas próximas, o chat também vem repartido.
+        </p>
+      )}
+      {b.unattributedAlerts > 0 && (
+        <p className="mt-2 text-[11px] text-ink-faint">
+          {b.unattributedAlerts} alerta(s) sem canal identificado (vindos de
+          Streamlabs/StreamElements, que não dizem de qual canal vieram).
+        </p>
+      )}
+    </Card>
   );
 }
 

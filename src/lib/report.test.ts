@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { parseSession, timeAxis, hasObs, hasChat } from "./report";
+import {
+  analyze,
+  chatRateSeriesFor,
+  hasChat,
+  hasObs,
+  parseSession,
+  timeAxis,
+  viewerSeriesFor,
+} from "./report";
 
 const nd = (lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
 
@@ -80,5 +88,189 @@ describe("parseSession", () => {
     )!;
     expect(hasObs(comObs)).toBe(true);
     expect(hasChat(comObs)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Por canal
+// ---------------------------------------------------------------------------
+
+/** Sessão de 2 min (durMin = 2) com o que for passado no meio. */
+const sessao = (body: object[]) =>
+  parseSession(
+    nd([
+      { kind: "meta", id: "c", startedAt: 0, mode: "hybrid", platforms: [] },
+      ...body,
+      { kind: "end", endedAt: 120000 },
+    ]),
+  )!;
+
+const A = "twitch:Canal A";
+const B = "youtube:Canal B";
+
+const viewers = (t: number, items: object[]) => ({
+  kind: "viewers",
+  t,
+  total: items.reduce(
+    (acc: number, i) => acc + ((i as { viewers: number | null }).viewers ?? 0),
+    0,
+  ),
+  items,
+});
+
+describe("byChannel", () => {
+  const completa = sessao([
+    {
+      kind: "sample",
+      t: 1000,
+      chat: 3,
+      chatBy: { [A]: 2, [B]: 1 },
+      targets: [],
+    },
+    { kind: "sample", t: 3000, chat: 2, chatBy: { [A]: 2 }, targets: [] },
+    viewers(1000, [
+      { platform: "twitch", source: "Canal A", viewers: 100 },
+      { platform: "youtube", source: "Canal B", viewers: 50 },
+    ]),
+    viewers(2000, [
+      { platform: "twitch", source: "Canal A", viewers: 200 },
+      { platform: "youtube", source: "Canal B", viewers: 50 },
+    ]),
+    {
+      kind: "alert",
+      t: 1500,
+      platform: "twitch",
+      source: "Canal A",
+      alertKind: "sub",
+      user: "fulano",
+    },
+    {
+      kind: "alert",
+      t: 1600,
+      platform: "youtube",
+      source: "Canal B",
+      alertKind: "bits",
+      user: "ciclano",
+      amount: 300,
+    },
+  ]);
+
+  it("junta audiência, chat e alertas de cada canal", () => {
+    const { channels, hasChatByChannel } = analyze(completa).byChannel;
+    expect(hasChatByChannel).toBe(true);
+    expect(channels.map((c) => c.key)).toEqual([A, B]); // maior audiência primeiro
+
+    const [a, b] = channels;
+    expect(a.viewers).toMatchObject({ peak: 200, avg: 150, hasData: true });
+    expect(a.chat).toMatchObject({ total: 4, perMin: 2 });
+    expect(a.alerts.subs).toBe(1);
+    expect(b.viewers).toMatchObject({ peak: 50, avg: 50 });
+    expect(b.chat.total).toBe(1);
+    expect(b.alerts.bits).toBe(300);
+  });
+
+  it("a soma das médias por canal bate com a média total da live", () => {
+    const r = analyze(completa);
+    const soma = r.byChannel.channels.reduce((s, c) => s + c.viewers.avg, 0);
+    expect(soma).toBe(r.viewers.avg); // 150 + 50 = 200
+  });
+
+  it("a fatia vem da audiência acumulada, não do pico", () => {
+    const [a, b] = analyze(completa).byChannel.channels;
+    // Pelos picos (200×50) daria 80/20 — mas os picos dos canais não são
+    // simultâneos, então somá-los inventaria audiência que nunca existiu junta.
+    expect(a.sharePct).toBe(75);
+    expect(b.sharePct).toBe(25);
+  });
+
+  it("expõe a série de audiência e a de chat de um canal só", () => {
+    expect(viewerSeriesFor(completa, A)).toEqual([100, 200]);
+    expect(viewerSeriesFor(completa, "kick:Nao existe")).toEqual([null, null]);
+    // 2 msgs numa janela de 2s = 60/min; na segunda amostra o canal B ficou calado.
+    expect(chatRateSeriesFor(completa, A)).toEqual([60, 60]);
+    expect(chatRateSeriesFor(completa, B)).toEqual([30, 0]);
+  });
+
+  it("canal fora do ar entra na lista, mas sem inflar pico nem fatia", () => {
+    const d = sessao([
+      viewers(1000, [
+        { platform: "twitch", source: "Canal A", viewers: 100 },
+        { platform: "kick", source: "Canal C", viewers: null },
+      ]),
+    ]);
+    const c = analyze(d).byChannel.channels.find((x) =>
+      x.key.startsWith("kick"),
+    )!;
+    expect(c.viewers).toMatchObject({ peak: 0, avg: 0, hasData: false });
+    expect(c.sharePct).toBe(0);
+  });
+
+  it("sessão antiga (sem chatBy) mostra audiência por canal e avisa do chat", () => {
+    const d = sessao([
+      { kind: "sample", t: 1000, chat: 5, targets: [] },
+      viewers(1000, [
+        { platform: "twitch", source: "Canal A", viewers: 100 },
+        { platform: "youtube", source: "Canal B", viewers: 100 },
+      ]),
+    ]);
+    const { channels, hasChatByChannel } = analyze(d).byChannel;
+    expect(hasChatByChannel).toBe(false);
+    expect(channels).toHaveLength(2);
+    expect(channels.every((c) => c.chat.total === 0)).toBe(true);
+    expect(channels.every((c) => c.chat.hasData === false)).toBe(true);
+  });
+
+  it("alerta sem canal: credita quando a plataforma tem um só, senão deixa de fora", () => {
+    const alerta = {
+      kind: "alert",
+      t: 1500,
+      platform: "twitch",
+      alertKind: "raid",
+      user: "fulano",
+      amount: 30,
+    };
+    const umCanal = analyze(
+      sessao([
+        viewers(1000, [
+          { platform: "twitch", source: "Canal A", viewers: 100 },
+        ]),
+        alerta,
+      ]),
+    ).byChannel;
+    expect(umCanal.unattributedAlerts).toBe(0);
+    expect(umCanal.channels[0].alerts.raids).toBe(1);
+
+    const doisCanais = analyze(
+      sessao([
+        viewers(1000, [
+          { platform: "twitch", source: "Canal A", viewers: 100 },
+          { platform: "twitch", source: "Canal B", viewers: 90 },
+        ]),
+        alerta,
+      ]),
+    ).byChannel;
+    expect(doisCanais.unattributedAlerts).toBe(1);
+    expect(doisCanais.channels.every((c) => c.alerts.total === 0)).toBe(true);
+  });
+
+  it("alerta de agregador não vira canal nem é chutado num", () => {
+    const { channels, unattributedAlerts } = analyze(
+      sessao([
+        viewers(1000, [
+          { platform: "twitch", source: "Canal A", viewers: 100 },
+        ]),
+        {
+          kind: "alert",
+          t: 1500,
+          platform: "streamlabs",
+          source: "Minha conta",
+          alertKind: "tip",
+          user: "anônimo",
+          amount: 20,
+        },
+      ]),
+    ).byChannel;
+    expect(unattributedAlerts).toBe(1);
+    expect(channels.map((c) => c.key)).toEqual([A]);
   });
 });

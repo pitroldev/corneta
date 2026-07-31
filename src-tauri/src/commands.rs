@@ -1151,8 +1151,8 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // "JÁ VOLTO no ar" (slate ou censura) — o compositor liga/desliga; a UI mostra nos destinos.
     let slate_on = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
-    chat::MSG_COUNT.store(0, Ordering::Relaxed); // taxa de chat começa do zero na sessão
-                                                 // Uma flag de pausa por destino (controle ao vivo).
+    chat::reset_msg_counts(); // a contagem de chat da sessão começa do zero
+                              // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
         .iter()
         .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
@@ -2005,10 +2005,9 @@ fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
     let session = eng.session_path.clone();
     drop(eng);
     emit(app, &out);
-    // Grava a amostra desta janela (~2s) no NDJSON, com a taxa de chat (lê+zera o contador).
+    // Grava a amostra desta janela (~2s) no NDJSON, com o chat por canal (lê+zera).
     if let Some(path) = session {
-        let chat = chat::MSG_COUNT.swap(0, std::sync::atomic::Ordering::Relaxed);
-        session::record_sample(&path, &out, chat);
+        session::record_sample(&path, &out, &chat::drain_msg_counts());
     }
 }
 

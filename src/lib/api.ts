@@ -805,6 +805,18 @@ function mockApi(): CornetaApi {
       let chat = Math.round(5 + Math.sin(k / 11) * 2 + Math.random() * 4);
       if (nearRaid) chat += 18;
       if (Math.random() < 0.015) chat += 14;
+      // Reparte o chat entre os canais: a primeira plataforma fala mais que as outras,
+      // que é o formato que o relatório por canal precisa exercitar.
+      const chatBy: Record<string, number> = {};
+      let left = chat;
+      plats.forEach((p, i) => {
+        const share =
+          i === plats.length - 1
+            ? left
+            : Math.round(chat * (i === 0 ? 0.62 : 0.38 / (plats.length - 1)));
+        left -= share;
+        if (share > 0) chatBy[`${p.platformId}:${p.name}`] = share;
+      });
       lines.push(
         JSON.stringify({
           kind: "sample",
@@ -813,6 +825,7 @@ function mockApi(): CornetaApi {
           gpu: Math.round(gpu * 10) / 10,
           obs,
           chat,
+          ...(Object.keys(chatBy).length ? { chatBy } : {}),
           targets,
         }),
       );
@@ -834,6 +847,7 @@ function mockApi(): CornetaApi {
         kind: "alert",
         t: at(raidAtMin),
         platform: plats[0].platformId,
+        source: plats[0].name,
         alertKind: "raid",
         user: "Gaules",
         amount: raidViewers,
@@ -847,6 +861,7 @@ function mockApi(): CornetaApi {
             kind: "alert",
             t: at(mm),
             platform: plats[idx % plats.length].platformId,
+            source: plats[idx % plats.length].name,
             alertKind: kd,
             user: [
               "ana_live",
@@ -864,6 +879,7 @@ function mockApi(): CornetaApi {
         kind: "alert",
         t: at(Math.min(mins * 0.55, 16)),
         platform: plats[0].platformId,
+        source: plats[0].name,
         alertKind: "subgift",
         user: "Patrocinador",
         amount: 10,
@@ -874,6 +890,7 @@ function mockApi(): CornetaApi {
         kind: "alert",
         t: at(Math.min(mins * 0.28, 8)),
         platform: plats[0].platformId,
+        source: plats[0].name,
         alertKind: "bits",
         user: "fa_numero_1",
         amount: 1000,

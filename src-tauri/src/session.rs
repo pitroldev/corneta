@@ -87,9 +87,10 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
         .filter(|t| t.enabled)
         .map(|t| json!({ "id": t.id, "name": t.name, "platformId": t.platform_id }))
         .collect();
+    // v2: amostra ganhou `chatBy` (chat por canal) e o alerta ganhou `source`.
     let meta = json!({
         "kind": "meta",
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "id": id.to_string(),
         "startedAt": id,
         "mode": config.mode,
@@ -113,8 +114,12 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
     Some(path)
 }
 
-/// Grava uma amostra (estado dos destinos + CPU/GPU + nº de mensagens de chat na janela).
-pub fn record_sample(path: &Path, snap: &EngineSnapshot, chat_count: u64) {
+/// Grava uma amostra (estado dos destinos + CPU/GPU + mensagens de chat na janela).
+///
+/// `chat_by_channel` vem de `chat::drain_msg_counts` (`plataforma:fonte` → nº de mensagens).
+/// O campo `chat` continua sendo o TOTAL — relatórios gravados antes da segregação por
+/// canal só têm ele, e a análise precisa seguir lendo os dois formatos.
+pub fn record_sample(path: &Path, snap: &EngineSnapshot, chat_by_channel: &HashMap<String, u64>) {
     let targets: Vec<Value> = snap
         .targets
         .values()
@@ -129,15 +134,21 @@ pub fn record_sample(path: &Path, snap: &EngineSnapshot, chat_count: u64) {
             })
         })
         .collect();
-    let sample = json!({
+    let mut sample = json!({
         "kind": "sample",
         "t": now_ms(),
         "cpu": snap.cpu,
         "gpu": snap.gpu,
         "obs": snap.obs,
-        "chat": chat_count,
+        "chat": chat_by_channel.values().sum::<u64>(),
         "targets": targets,
     });
+    // `chatBy` só entra quando alguém falou na janela: a maioria das amostras de uma
+    // live de 3h não tem mensagem nenhuma, e um `{}` por linha engordaria o NDJSON
+    // sem dizer nada além do que o `chat: 0` já diz.
+    if !chat_by_channel.is_empty() {
+        sample["chatBy"] = json!(chat_by_channel);
+    }
     append_line(path, &sample);
 }
 
@@ -150,12 +161,25 @@ pub fn record_viewers(path: &Path, total: u64, items: &[Value]) {
 }
 
 /// Grava um alerta (sub/raid/bits…) na sessão — pra timeline e momentos de destaque.
-pub fn record_alert(path: &Path, platform: &str, kind: &str, user: &str, amount: Option<f64>) {
+///
+/// `source` é o rótulo do canal (mesmo namespace do `viewers`/`chatBy`), o que permite
+/// somar os alertas por canal. Em alerta de agregador (Streamlabs/StreamElements) o
+/// `platform` é o nome do agregador, não uma plataforma de chat — a análise trata esses
+/// como não-atribuíveis em vez de chutar um canal.
+pub fn record_alert(
+    path: &Path,
+    platform: &str,
+    source: &str,
+    kind: &str,
+    user: &str,
+    amount: Option<f64>,
+) {
     append_line(
         path,
         &json!({
             "kind": "alert", "t": now_ms(),
-            "platform": platform, "alertKind": kind, "user": user, "amount": amount,
+            "platform": platform, "source": source,
+            "alertKind": kind, "user": user, "amount": amount,
         }),
     );
 }
