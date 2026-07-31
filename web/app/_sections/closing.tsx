@@ -1,5 +1,6 @@
+import type { T } from "@/lib/i18n";
 import Link from "next/link";
-import { FAQS } from "@/lib/content";
+import { faqsFor } from "@/lib/content";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
 import { BrandMark } from "../_components/brand-mark";
 import { Mascot, SoundWaves } from "../_components/decor";
@@ -23,16 +24,18 @@ const TINY =
   "[&_p]:mt-[3px] [&_p]:text-[0.8rem] [&_p]:leading-[1.45] [&_p]:font-medium [&_p]:text-muted";
 
 export function TinyThings({
+  t,
   items,
 }: {
+  t: T;
   items: { icon: React.ReactNode; title: string; text: string }[];
 }) {
   return (
     <Section>
       <Shell>
         <SectionHeading
-          kicker="As miudezas"
-          title="Coisa pequena que você só nota na terceira live."
+          kicker={t("closing.tiny.kicker")}
+          title={t("closing.tiny.title")}
         />
 
         {/* A grade tem 1px de vão sobre o breu: os cartões encostam e a linha
@@ -67,7 +70,7 @@ const FAQ_LIST =
   "[&_details[open]_summary>i]:after:rotate-0 " +
   "[&_details>p]:mt-[-2px] [&_details>p]:mb-6 [&_details>p]:max-w-[68ch] [&_details>p]:pr-11 max-[760px]:[&_details>p]:pr-0 [&_details>p]:leading-[1.68] [&_details>p]:font-medium [&_details>p]:text-ink-muted";
 
-export function Faq({ downloadUrl }: { downloadUrl: string }) {
+export function Faq({ t, downloadUrl }: { t: T; downloadUrl: string }) {
   return (
     <Section id="duvidas" tone="paper-raised">
       <Shell>
@@ -79,10 +82,10 @@ export function Faq({ downloadUrl }: { downloadUrl: string }) {
           <SectionHeading
             tight
             tone="paper"
-            kicker="Antes de baixar"
-            title="O que todo mundo pergunta antes de instalar."
+            kicker={t("closing.faq.kicker")}
+            title={t("closing.faq.title")}
           >
-            <p>Inclusive as que não pegam bem pra gente responder.</p>
+            <p>{t("closing.faq.subtitle")}</p>
             <a
               className={cn(
                 downloadButton,
@@ -92,12 +95,12 @@ export function Faq({ downloadUrl }: { downloadUrl: string }) {
               data-placeholder-link="replace-me"
             >
               <WindowsIcon />
-              <span>Baixar grátis</span>
+              <span>{t("closing.faq.cta")}</span>
             </a>
           </SectionHeading>
 
           <div className={FAQ_LIST}>
-            {FAQS.map((faq, index) => (
+            {faqsFor(t).map((faq, index) => (
               <details key={faq.question} open={index === 0}>
                 <summary>
                   <span>{faq.question}</span>
@@ -116,12 +119,13 @@ export function Faq({ downloadUrl }: { downloadUrl: string }) {
 const TICKER_ROW =
   "inline-flex items-center gap-5.5 pr-5.5 whitespace-nowrap [&_svg]:h-[17px] [&_svg]:w-[17px] [&_svg]:fill-current";
 
-const tickerItems = [
-  "Bora cornetar",
-  "Uma live · várias comunidades",
-  "Multistream que roda no seu PC",
-  "Grátis e open source",
-];
+// Chaves, não texto: a lista é de módulo e `t` só existe dentro do componente.
+const TICKER_KEYS = [
+  "closing.ticker.item1",
+  "closing.ticker.item2",
+  "closing.ticker.item3",
+  "closing.ticker.item4",
+] as const;
 
 /** Quantas vezes a lista se repete DENTRO de cada cópia.
  *
@@ -140,14 +144,14 @@ const TICKER_PASSES = 4;
  *
  *  Numa tela mais larga que as quatro passadas, o `justify-around` espalha os itens
  *  em vez de abrir buraco: degrada o espaçamento, não a faixa. */
-function TickerRow() {
+function TickerRow({ t }: { t: T }) {
   return (
     <span className="flex min-w-[100vw] justify-around">
       {Array.from({ length: TICKER_PASSES }, (_, pass) =>
-        tickerItems.map((item) => (
-          <span className={TICKER_ROW} key={`${pass}-${item}`}>
+        TICKER_KEYS.map((key) => (
+          <span className={TICKER_ROW} key={`${pass}-${key}`}>
             <Mascot />
-            {item}
+            {t(key)}
           </span>
         )),
       )}
@@ -157,21 +161,21 @@ function TickerRow() {
 
 /** Duas cópias da faixa: a animação desliza uma largura inteira e a segunda
  *  entra sem emenda. */
-export function Ticker() {
+export function Ticker({ t }: { t: T }) {
   return (
     <div
       className="overflow-hidden border-y-[3px] border-night bg-tomate text-brass-ink select-none"
       aria-hidden="true"
     >
       <div className="flex w-max animate-[marquee_34s_linear_infinite] items-center py-[11px] font-display text-[0.95rem] font-extrabold tracking-[0.06em] uppercase">
-        <TickerRow />
-        <TickerRow />
+        <TickerRow t={t} />
+        <TickerRow t={t} />
       </div>
     </div>
   );
 }
 
-export function FinalCta() {
+export function FinalCta({ t }: { t: T }) {
   return (
     <section className="relative isolate overflow-hidden py-[clamp(70px,8vw,110px)]">
       <SoundWaves className="pointer-events-none absolute -right-[190px] -bottom-[220px] -z-10 w-[640px] text-brass opacity-14" />
@@ -188,12 +192,12 @@ export function FinalCta() {
               <Mascot />
             </span>
             <h2 className="max-w-[24ch] text-[clamp(2.35rem,4.2vw,3.9rem)] leading-[0.98] tracking-[-0.03em] max-md:text-[clamp(2.1rem,10.5vw,3rem)]">
-              Sua próxima live já podia estar em três lugares.
+              {t("closing.cta.title")}
             </h2>
           </div>
           <div className="flex flex-col items-start gap-4 [&>a]:w-[min(400px,100%)] [&>p]:text-[0.78rem] [&>p]:font-[650] [&>p]:text-faint">
-            <DownloadButton />
-            <p>Windows 10/11 · sem cadastro · sem assinatura</p>
+            <DownloadButton t={t} />
+            <p>{t("closing.cta.note")}</p>
           </div>
         </TwoCol>
       </Shell>
@@ -204,13 +208,13 @@ export function FinalCta() {
 const FOOTER_LINK =
   "inline-flex min-h-[30px] items-center rounded-sm bg-surface-2 px-[11px] py-1.5 text-[0.78rem] font-bold text-muted transition-colors duration-120 hover:bg-brass hover:text-brass-ink";
 
-export function SiteFooter({ downloadUrl }: { downloadUrl: string }) {
+export function SiteFooter({ t, downloadUrl }: { t: T; downloadUrl: string }) {
   return (
     <footer className="border-t-2 border-border-soft bg-panel">
       <Shell className="flex min-h-26 items-center justify-between gap-7 py-5.5 max-[760px]:flex-col max-[760px]:items-start">
         <div className="flex flex-col gap-3 [&_p]:max-w-[40ch] [&_p]:text-[0.82rem] [&_p]:font-[550] [&_p]:text-faint">
           <BrandMark />
-          <p>Multistream que roda no seu PC — não na nuvem de ninguém.</p>
+          <p>{t("closing.footer.tagline")}</p>
           <p>
             {LEGAL_OPERATOR} · CNPJ {LEGAL_CNPJ}
           </p>
@@ -221,13 +225,13 @@ export function SiteFooter({ downloadUrl }: { downloadUrl: string }) {
             ambíguo pra quem revisa sem ler português. */}
         <nav
           className="flex flex-wrap gap-x-2.5 gap-y-2"
-          aria-label="Links do rodapé"
+          aria-label={t("closing.footer.nav.ariaLabel")}
         >
           <Link className={FOOTER_LINK} href={LEGAL_ROUTES.privacy}>
-            Política de privacidade
+            {t("closing.footer.link.privacy")}
           </Link>
           <Link className={FOOTER_LINK} href={LEGAL_ROUTES.terms}>
-            Termos de uso
+            {t("closing.footer.link.terms")}
           </Link>
           <a
             className={FOOTER_LINK}
@@ -235,7 +239,7 @@ export function SiteFooter({ downloadUrl }: { downloadUrl: string }) {
             rel="noreferrer noopener"
             target="_blank"
           >
-            Código-fonte
+            {t("closing.footer.link.source")}
           </a>
         </nav>
 
@@ -244,7 +248,7 @@ export function SiteFooter({ downloadUrl }: { downloadUrl: string }) {
           href={downloadUrl}
           data-placeholder-link="replace-me"
         >
-          Baixar para Windows <ArrowIcon />
+          {t("closing.footer.download")} <ArrowIcon />
         </a>
       </Shell>
     </footer>

@@ -1,3 +1,4 @@
+import type { T } from "@/lib/i18n";
 import { PlatformGlyph } from "./decor";
 import { EyeIcon } from "./icons";
 import { Chip, cn, DemoLabel, State } from "./ui";
@@ -40,12 +41,12 @@ function Meter({
   );
 }
 
-export function LiveRoom() {
+export function LiveRoom({ t }: { t: T }) {
   return (
     <div className={PANEL}>
       <DemoLabel>
-        <span>painel ao vivo · 01:42:08</span>
-        <span>números ilustrativos</span>
+        <span>{t("replica.live.label")}</span>
+        <span>{t("replica.live.tag")}</span>
       </DemoLabel>
 
       <div className={ROW}>
@@ -115,12 +116,12 @@ const GRID =
 const LINE =
   "fill-none stroke-brass [stroke-width:2.5] [stroke-linecap:round] [stroke-linejoin:round] [vector-effect:non-scaling-stroke]";
 
-export function ReportChart() {
+export function ReportChart({ t }: { t: T }) {
   return (
     <div className={PANEL}>
       <DemoLabel>
-        <span>relatório da live · 3h12</span>
-        <span>sessão de exemplo</span>
+        <span>{t("replica.report.label")}</span>
+        <span>{t("replica.report.tag")}</span>
       </DemoLabel>
 
       <svg

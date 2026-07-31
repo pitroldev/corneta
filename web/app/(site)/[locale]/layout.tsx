@@ -1,0 +1,134 @@
+import type { Metadata, Viewport } from "next";
+import { notFound } from "next/navigation";
+import { LEGAL_AUTHOR, LEGAL_OPERATOR } from "@/lib/legal";
+import { siteUrl } from "@/lib/site";
+import {
+  isLocale,
+  LOCALES,
+  OG_LOCALE,
+  localePath,
+  translator,
+  type Locale,
+} from "@/lib/i18n";
+import { fontVars } from "../../fonts";
+import "../../globals.css";
+
+// Layout raiz do SITE. Existe um segundo, em (legal)/legal — é o que permite
+// `<html lang>` mudar por idioma sem arrastar as páginas jurídicas junto, que
+// são pt-BR e ponto.
+
+/** As duas versões são geradas no build; qualquer outro segmento é 404 em vez de
+ *  virar uma página vazia com `locale` inventado. */
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return LOCALES.map((locale) => ({ locale }));
+}
+
+/** As keywords vivem numeradas no dicionário porque cada uma é um termo de busca
+ *  próprio — traduzir a lista inteira como uma frase daria termo que ninguém
+ *  digita. Listadas à mão pra o TypeScript conferir que todas existem. */
+const KEYWORD_KEYS = [
+  "chrome.meta.keywords.1",
+  "chrome.meta.keywords.2",
+  "chrome.meta.keywords.3",
+  "chrome.meta.keywords.4",
+  "chrome.meta.keywords.5",
+  "chrome.meta.keywords.6",
+  "chrome.meta.keywords.7",
+  "chrome.meta.keywords.8",
+  "chrome.meta.keywords.9",
+  "chrome.meta.keywords.10",
+  "chrome.meta.keywords.11",
+] as const;
+
+/** Alternates completos: cada idioma aponta pro outro E pra si mesmo, que é o
+ *  par recíproco que o Google exige pra aceitar o hreflang. O `x-default` é o
+ *  português porque `/` é a URL canônica do site. */
+function alternatesFor(locale: Locale) {
+  return {
+    canonical: localePath(locale),
+    languages: {
+      "pt-BR": localePath("pt-BR"),
+      en: localePath("en"),
+      "x-default": localePath("pt-BR"),
+    },
+  };
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!isLocale(locale)) notFound();
+  const t = translator(locale);
+
+  return {
+    metadataBase: siteUrl,
+    title: {
+      default: t("chrome.meta.title.default"),
+      // O template não é copy: é a moldura "%s | Corneta" das páginas internas.
+      template: "%s | Corneta",
+    },
+    description: t("chrome.meta.description"),
+    applicationName: "Corneta",
+    category: "technology",
+    creator: LEGAL_OPERATOR,
+    publisher: LEGAL_OPERATOR,
+    authors: [{ name: LEGAL_AUTHOR, url: "https://github.com/pitroldev" }],
+    keywords: KEYWORD_KEYS.map(t),
+    alternates: alternatesFor(locale),
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-snippet": -1,
+        "max-image-preview": "large",
+        "max-video-preview": -1,
+      },
+    },
+    openGraph: {
+      type: "website",
+      locale: OG_LOCALE[locale],
+      alternateLocale: LOCALES.filter((l) => l !== locale).map(
+        (l) => OG_LOCALE[l],
+      ),
+      url: localePath(locale),
+      siteName: "Corneta",
+      title: t("chrome.og.title"),
+      description: t("chrome.og.description"),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: t("chrome.og.title"),
+      description: t("chrome.twitter.description"),
+    },
+  };
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#100b07",
+  colorScheme: "dark",
+};
+
+export default async function SiteLayout({
+  children,
+  params,
+}: Readonly<{
+  children: React.ReactNode;
+  params: Promise<{ locale: string }>;
+}>) {
+  const { locale } = await params;
+  if (!isLocale(locale)) notFound();
+  return (
+    <html lang={locale} className={fontVars}>
+      <body>{children}</body>
+    </html>
+  );
+}

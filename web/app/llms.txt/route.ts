@@ -1,4 +1,5 @@
-import { FAQS, FEATURES, ONE_LINER, STEPS } from "@/lib/content";
+import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "@/lib/content";
+import { translator } from "@/lib/i18n";
 import { LEGAL_CONTACT, LEGAL_OPERATOR, LEGAL_ROUTES } from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
 
@@ -14,7 +15,15 @@ export const dynamic = "force-static";
 
 const abs = (path: string) => new URL(path, siteUrl).toString();
 
+// Em pt-BR: o /llms.txt vive na raiz, que é a URL canônica em português.
+// Uma versão inglesa exigiria /en/llms.txt — vale quando/se o inglês virar
+// tráfego relevante.
 function body() {
+  const t = translator("pt-BR");
+  const ONE_LINER = oneLinerFor(t);
+  const FEATURES = featuresFor(t);
+  const FAQS = faqsFor(t);
+  const STEPS = stepsFor(t);
   return `# Corneta
 
 > ${ONE_LINER}

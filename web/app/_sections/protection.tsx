@@ -1,3 +1,4 @@
+import type { T } from "@/lib/i18n";
 import { ChatHub } from "../_components/chat-hub";
 import {
   GaugeIcon,
@@ -18,7 +19,7 @@ import {
   TwoCol,
 } from "../_components/ui";
 
-export function ChatSection() {
+export function ChatSection({ t }: { t: T }) {
   return (
     <Section id="chat">
       <Shell>
@@ -29,17 +30,13 @@ export function ChatSection() {
         >
           <SectionHeading
             tight
-            kicker="A galera junta"
-            title="Ninguém fica falando sozinho numa aba que você não abriu."
+            kicker={t("protection.chat.kicker")}
+            title={t("protection.chat.title")}
           >
-            <p>
-              Ler, responder e moderar sem trocar de janela. Os alertas das
-              plataformas e do Streamlabs no mesmo painel. E um overlay que você
-              cola no OBS uma vez e esquece.
-            </p>
+            <p>{t("protection.chat.body")}</p>
           </SectionHeading>
 
-          <ChatHub />
+          <ChatHub t={t} />
         </TwoCol>
       </Shell>
     </Section>
@@ -80,51 +77,43 @@ const GUARD_COST =
 const GUARD_SWITCH =
   "mt-[15px] flex items-center gap-[9px] text-[0.7rem] font-extrabold tracking-[0.06em] text-muted uppercase";
 
-export function Protection() {
+export function Protection({ t }: { t: T }) {
   return (
     <Section id="protecao" tone="paper">
       <Shell>
         <SectionHeading
           tone="paper"
-          kicker="Rede de proteção"
-          title="Sua live não devia acabar porque o OBS travou."
+          kicker={t("protection.kicker")}
+          title={t("protection.title")}
         >
-          <p>
-            Quatro redes que você liga (ou não) nas Configurações. Cada uma tem
-            um custo — e a Corneta conta ele antes, não no meio da live.
-          </p>
+          <p>{t("protection.body")}</p>
         </SectionHeading>
 
         <div className="mt-[clamp(52px,6vw,84px)] flex flex-col gap-[clamp(30px,4vw,56px)]">
           <BenefitRow>
             <BenefitCopy
               icon={<ShieldIcon />}
-              title="“JÁ VOLTO”: o sinal cai, a live continua"
+              title={t("protection.brb.title")}
             >
-              <p>
-                Se o OBS cair no meio da transmissão, esta tela entra no ar sem
-                derrubar as plataformas — pro espectador a live nem pisca, e
-                volta sozinha quando o sinal retorna. Também serve pra pausa
-                manual: um clique e você sai da cadeira com o microfone mudo.
-              </p>
+              <p>{t("protection.brb.body")}</p>
               <BenefitNote>
-                <InfoIcon /> Use o slate da Corneta ou a sua imagem ou vídeo
+                <InfoIcon /> {t("protection.brb.note")}
               </BenefitNote>
             </BenefitCopy>
 
             {/* Mesma arte que o app coloca no ar. */}
             <div
               className="grid min-h-[218px] place-content-center justify-items-center rounded-lg bg-[#14100a] bg-[image:var(--halftone-dark)] bg-[length:22px_22px] px-5 py-6.5 text-center text-cream shadow-pop-ink-lg"
-              aria-label="Tela JÁ VOLTO que a Corneta coloca no ar"
+              aria-label={t("protection.brb.art.aria")}
             >
               <small className="font-display text-[0.74rem] font-bold tracking-[0.14em] text-brass">
-                CORNETA · MULTI-STREAM
+                {t("protection.brb.art.brand")}
               </small>
               <strong className="mt-3.5 rotate-[-1.7deg] bg-brass px-[0.16em] pt-[0.02em] pb-[0.08em] font-display text-[clamp(2.1rem,4vw,2.9rem)] leading-none font-extrabold text-brass-ink shadow-[6px_6px_0_0_var(--night)]">
-                JÁ VOLTO
+                {t("protection.brb.art.title")}
               </strong>
               <p className="mt-5.5 text-[0.82rem] font-medium text-muted">
-                já já tô de volta — segura a corneta 📣
+                {t("protection.brb.art.line")}
               </p>
             </div>
           </BenefitRow>
@@ -136,20 +125,15 @@ export function Protection() {
               <i>
                 <GaugeIcon />
               </i>
-              <h3>Auto-bitrate</h3>
+              <h3>{t("protection.guard.bitrate.title")}</h3>
             </div>
-            <p>
-              Se a sua internet engasgar, a Corneta baixa a qualidade do vídeo
-              por um tempo em vez de deixar a live travar ou cair — e volta ao
-              normal sozinha.
-            </p>
+            <p>{t("protection.guard.bitrate.body")}</p>
             <span className={GUARD_COST}>
-              <InfoIcon /> Age nas plataformas que estão convertendo; quem vai
-              na cópia sai do jeito que o OBS mandou.
+              <InfoIcon /> {t("protection.guard.bitrate.cost")}
             </span>
             <span className={GUARD_SWITCH}>
               <Toggle />
-              ligado por padrão
+              {t("protection.guard.bitrate.switch")}
             </span>
           </div>
 
@@ -158,19 +142,16 @@ export function Protection() {
               <i>
                 <LockIcon />
               </i>
-              <h3>Guardião de privacidade</h3>
+              <h3>{t("protection.guard.privacy.title")}</h3>
             </div>
-            <p>
-              Você lista os termos que não podem vazar — e-mail, nome real,
-              endereço. Se um deles aparece na tela, a Corneta corta pro “JÁ
-              VOLTO” antes de ir ao ar.
-            </p>
+            <p>{t("protection.guard.privacy.body")}</p>
             <span className={GUARD_COST}>
-              <InfoIcon /> Custa 12s de atraso na live inteira (o chat também).
-              Rede de segurança, não garantia.
+              <InfoIcon /> {t("protection.guard.privacy.cost")}
             </span>
             <span className={GUARD_SWITCH}>
-              <Sticker tone="tomate">experimental</Sticker>
+              <Sticker tone="tomate">
+                {t("protection.guard.privacy.switch")}
+              </Sticker>
             </span>
           </div>
 
@@ -179,20 +160,15 @@ export function Protection() {
               <i>
                 <VolumeIcon />
               </i>
-              <h3>Normalizador de áudio</h3>
+              <h3>{t("protection.guard.audio.title")}</h3>
             </div>
-            <p>
-              A Corneta acerta o volume do seu som antes de enviar — sem “tá
-              baixo” do chat nem estouro na troca de cena, no mesmo encode que
-              já estava rodando.
-            </p>
+            <p>{t("protection.guard.audio.body")}</p>
             <span className={GUARD_COST}>
-              <InfoIcon /> Se você já normaliza no OBS, deixe desligado pra não
-              brigar com ele.
+              <InfoIcon /> {t("protection.guard.audio.cost")}
             </span>
             <span className={GUARD_SWITCH}>
               <Toggle off />
-              opcional
+              {t("protection.guard.audio.switch")}
             </span>
           </div>
         </div>

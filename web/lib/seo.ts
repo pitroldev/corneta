@@ -1,4 +1,5 @@
-import { FAQS, FEATURES, ONE_LINER, STEPS } from "./content";
+import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "./content";
+import { DEFAULT_LOCALE, localePath, translator, type Locale } from "./i18n";
 import {
   LEGAL_CNPJ,
   LEGAL_CONTACT,
@@ -45,30 +46,34 @@ const website = {
   "@id": abs("/#site"),
   url: siteUrl.toString(),
   name: "Corneta",
-  inLanguage: "pt-BR",
+  // O site é bilíngue: declarar só português mentiria sobre a versão inglesa.
+  // Quem é por-idioma são os nós de FAQ/HowTo/app, não a entidade "site".
+  inLanguage: ["pt-BR", "en"],
   publisher: { "@id": abs("/#empresa") },
 };
 
-function softwareApplication() {
+/** O app é UM só, então o `@id` não muda por idioma — o que muda é a prosa que
+ *  o buscador cita (descrição, lista de recursos, requisitos). */
+function softwareApplication(locale: Locale) {
   const download = realDownloadUrl();
+  const t = translator(locale);
   return {
     "@type": "SoftwareApplication",
     "@id": abs("/#app"),
     name: "Corneta",
     alternateName: "Corneta multistream",
     applicationCategory: "MultimediaApplication",
-    applicationSubCategory: "Software de transmissão ao vivo (multistream)",
+    applicationSubCategory: t("seo.app.subcategory"),
     operatingSystem: "Windows 10, Windows 11",
-    description: ONE_LINER,
-    url: siteUrl.toString(),
+    description: oneLinerFor(t),
+    url: abs(localePath(locale)),
     image: abs("/opengraph-image"),
     screenshot: abs("/opengraph-image"),
-    inLanguage: "pt-BR",
+    inLanguage: locale,
     isAccessibleForFree: true,
     license: "https://spdx.org/licenses/MIT.html",
-    softwareRequirements:
-      "OBS Studio ou qualquer programa de transmissão compatível com RTMP",
-    featureList: FEATURES,
+    softwareRequirements: t("seo.app.requirements"),
+    featureList: featuresFor(t),
     publisher: { "@id": abs("/#empresa") },
     author: { "@id": abs("/#empresa") },
     offers: {
@@ -83,47 +88,62 @@ function softwareApplication() {
   };
 }
 
-const faqPage = {
-  "@type": "FAQPage",
-  "@id": abs("/#faq"),
-  inLanguage: "pt-BR",
-  isPartOf: { "@id": abs("/#site") },
-  mainEntity: FAQS.map((faq) => ({
-    "@type": "Question",
-    name: faq.question,
-    acceptedAnswer: { "@type": "Answer", text: faq.answer },
-  })),
+const faqPageFor = (locale: Locale) => {
+  const t = translator(locale);
+  return {
+    "@type": "FAQPage",
+    // O @id inclui o idioma: dois FAQs diferentes no mesmo @id seria o mesmo nó
+    // declarado duas vezes com conteúdo distinto.
+    "@id": abs(`${localePath(locale)}#faq`),
+    inLanguage: locale,
+    isPartOf: { "@id": abs("/#site") },
+    mainEntity: faqsFor(t).map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+    })),
+  };
 };
 
-const howTo = {
-  "@type": "HowTo",
-  "@id": abs("/#como-funciona"),
-  name: "Como transmitir para várias plataformas ao mesmo tempo com a Corneta",
-  description:
-    "Três passos para levar uma única live do seu programa de transmissão para Twitch, YouTube, Kick e outros destinos ao mesmo tempo.",
-  inLanguage: "pt-BR",
-  totalTime: "PT10M",
-  tool: [
-    {
-      "@type": "HowToTool",
-      name: "OBS Studio, Streamlabs, XSplit ou outro programa RTMP",
-    },
-    { "@type": "HowToTool", name: "PC com Windows 10 ou 11" },
-  ],
-  step: STEPS.map((step, i) => ({
-    "@type": "HowToStep",
-    position: i + 1,
-    name: step.title,
-    text: step.text,
-    url: abs(`/#como-funciona`),
-  })),
+const howToFor = (locale: Locale) => {
+  const t = translator(locale);
+  const home = localePath(locale);
+  return {
+    "@type": "HowTo",
+    "@id": abs(`${home}#como-funciona`),
+    name: t("seo.howto.name"),
+    description: t("seo.howto.description"),
+    inLanguage: locale,
+    totalTime: "PT10M",
+    tool: [
+      { "@type": "HowToTool", name: t("seo.howto.tool.software") },
+      { "@type": "HowToTool", name: t("seo.howto.tool.pc") },
+    ],
+    step: stepsFor(t).map((step, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      name: step.title,
+      text: step.text,
+      url: abs(`${home}#como-funciona`),
+    })),
+  };
 };
 
-/** Grafo único da home: uma tag `<script>` só, tudo referenciado por @id. */
-export function homeJsonLd() {
+/** Grafo único da home: uma tag `<script>` só, tudo referenciado por @id.
+ *
+ *  O que muda por idioma: FAQ, HowTo e a descrição do app — o texto que o
+ *  buscador cita. O que NÃO muda: `organization` e os `@id` de empresa/site.
+ *  A empresa é uma só; declarar duas quebraria a identidade da entidade. */
+export function homeJsonLd(locale: Locale = DEFAULT_LOCALE) {
   return {
     "@context": "https://schema.org",
-    "@graph": [organization, website, softwareApplication(), faqPage, howTo],
+    "@graph": [
+      organization,
+      website,
+      softwareApplication(locale),
+      faqPageFor(locale),
+      howToFor(locale),
+    ],
   };
 }
 

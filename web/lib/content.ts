@@ -4,6 +4,11 @@
 // saem daqui juntas, então é impossível o texto visível e o que o buscador lê
 // divergirem — que é o jeito clássico de tomar penalidade por conteúdo
 // inconsistente.
+//
+// Desde a tradução, tudo aqui é FUNÇÃO DO IDIOMA. O texto mora no dicionário
+// (lib/i18n/pt.ts e en.ts); estas funções só dizem qual chave entra em que
+// ordem — que é a parte que não muda de língua.
+import type { MessageKey, T } from "./i18n";
 
 /** Última revisão do conteúdo da home — alimenta o `lastModified` do sitemap.
  *  Atualize quando a copy mudar de verdade: data que mexe a cada build vira
@@ -13,102 +18,57 @@ export const CONTENT_UPDATED_ISO = "2026-07-31";
 export type Faq = { question: string; answer: string };
 
 /** Perguntas na ordem em que travam o download, não na ordem do produto. */
-export const FAQS: Faq[] = [
-  {
-    question:
-      "Posso transmitir na Twitch e no YouTube ao mesmo tempo? Não dá ban?",
-    answer:
-      "Quem decide isso é cada plataforma, não a Corneta — e essas regras mudaram nos últimos anos: hoje várias permitem, com condições que dependem do seu tipo de conta ou de contrato assinado. A Corneta não muda esse combinado, ela só manda o sinal pra onde você mandar. Antes da primeira live simultânea, dá uma lida nos termos de quem você já tem compromisso. São cinco minutos que evitam dor de cabeça.",
-  },
-  {
-    question: "Uso Streamlabs (ou XSplit). Funciona?",
-    answer:
-      "Funciona. A Corneta aceita qualquer programa que transmita por RTMP — é só apontar ele pro endereço que o app mostra, igual você faria com uma plataforma. No OBS tem um atalho a mais: a Corneta configura sozinha e ainda dá play nele quando você aperta o BORA.",
-  },
-  {
-    question: "A Corneta substitui o OBS?",
-    answer:
-      "Não. Você continua montando cenas, câmera e áudio no seu programa de sempre. A Corneta entra depois: pega esse sinal e cuida das plataformas, do acompanhamento e das proteções da transmissão.",
-  },
+const FAQ_IDS = [
+  "multistream_ban",
+  "streamlabs_xsplit",
+  "replaces_obs",
   // A objeção mais forte que existe hoje: há plugin grátis de multistream que
   // roda dentro do próprio OBS. Responder de frente — e admitir quando ele
   // basta — converte melhor do que fingir que não existe.
-  {
-    question: "Já uso um plugin de multistream no OBS. Por que trocar?",
-    answer:
-      "Se você só quer mandar o mesmo vídeo pra mais de um lugar, o plugin resolve — e a gente prefere te falar isso agora do que depois do download. A Corneta entra quando a live é mais que o envio: ela segura a transmissão quando o seu programa cai (o plugin cai junto, porque mora dentro dele), reúne o chat e os alertas de todas as plataformas num lugar só, avisa se um dado seu aparecer na tela e, no fim, monta um relatório que cruza a sua máquina, o seu OBS e cada plataforma pra dizer por que engasgou.",
-  },
-  {
-    question: "É grátis mesmo? Vai virar assinatura depois?",
-    answer:
-      "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC — multistream, chat, alertas, relatórios e proteções — é open source com licença MIT e vai continuar assim. Se um dia existir algo pago, será um serviço opcional na nuvem, e você vai saber antes de instalar qualquer coisa.",
-  },
-  {
-    question: "Vai travar meu jogo? Preciso de placa de vídeo boa?",
-    answer:
-      "Depende do modo. Copiando o sinal do seu programa, o custo é quase zero — dá pra usar em máquina modesta. Melhorando a imagem pra cada plataforma, o trabalho vai pra placa de vídeo (as NVIDIA, Intel e AMD das últimas gerações dão conta) ou, sem ela, pro processador, que pesa mais. A Corneta estima essa carga e quantas conversões sua placa aguenta antes de você entrar ao vivo.",
-  },
-  {
-    question: "Vou precisar de muita internet?",
-    answer:
-      "Cada plataforma come um pedaço do seu upload. Antes da live, a Corneta mede sua conexão, soma tudo e ajuda você a escolher uma configuração que caiba com folga.",
-  },
-  {
-    question: "Dá pra mandar vídeo em pé pro TikTok?",
-    answer:
-      "A Corneta recorta um 9:16 do seu vídeo deitado e você escolhe o enquadramento, com prévia do resultado. TikTok e Instagram seguem experimentais porque a entrada depende de liberação da própria plataforma; o mesmo recorte serve pra qualquer destino RTMP vertical.",
-  },
-  {
-    question: "Tem overlay pra usar no OBS?",
-    answer:
-      "Tem. Um servidor dentro da sua máquina serve os alertas e o chat (com emotes) numa URL que você adiciona como Browser Source — uma vez só. Posição, tamanho, duração, som e limite de mensagens são ajustáveis, e tem botão de alerta de teste pra você conferir na hora.",
-  },
-  {
-    question: "Quais plataformas aparecem no app?",
-    answer:
-      "Twitch, YouTube, Kick, Facebook e qualquer servidor RTMP que você quiser somar. TikTok, Instagram e X aparecem como experimentais porque dependem de liberação e de fluxos das próprias plataformas.",
-  },
-  {
-    question: "Funciona em macOS ou Linux?",
-    answer:
-      "Hoje o download é só pra Windows. A arquitetura já considera outros sistemas, mas não tem data pra anunciar. Se o seu caso é macOS ou Linux, a resposta é: por enquanto, não.",
-  },
-];
+  "obs_plugin",
+  "free",
+  "performance",
+  "upload",
+  "vertical_tiktok",
+  "overlay",
+  "platforms",
+  "macos_linux",
+] as const;
+
+export const faqsFor = (t: T): Faq[] =>
+  FAQ_IDS.map((id) => ({
+    question: t(`content.faq.${id}.question` as MessageKey),
+    answer: t(`content.faq.${id}.answer` as MessageKey),
+  }));
 
 export type Step = { title: string; text: string };
 
-export const STEPS: Step[] = [
-  {
-    title: "Escolha onde quer aparecer",
-    text: "A Corneta abre a página certa de cada plataforma pra você copiar a chave, e guarda ela no cofre do Windows — nunca num arquivo de configuração.",
-  },
-  {
-    title: "Ligue o seu programa de live",
-    text: "No OBS, a Corneta configura sozinha. Em qualquer outro (Streamlabs, XSplit), é colar um endereço e uma chave — uma vez só, e nunca mais.",
-  },
-  {
-    title: "Aperte BORA AO VIVO",
-    text: "O painel mostra cada plataforma entrando no ar, uma por uma, e você volta pro jogo. Se quiser, a Corneta manda o OBS começar junto.",
-  },
-];
+export const stepsFor = (t: T): Step[] =>
+  ([1, 2, 3] as const).map((n) => ({
+    title: t(`content.steps.${n}.title` as MessageKey),
+    text: t(`content.steps.${n}.text` as MessageKey),
+  }));
 
 /** Uma frase por recurso — vira `featureList` do schema e resposta citável. */
-export const FEATURES = [
-  "Multistream de um sinal só para Twitch, YouTube, Kick, Facebook e qualquer servidor RTMP",
-  "Cada plataforma com conexão independente: se uma cai, as outras continuam no ar",
-  "Três modos de qualidade — copiar o sinal, converter só o que precisa ou converter tudo",
-  "Estimativa de upload somado e de carga na placa antes de entrar ao vivo",
-  "Recorte vertical 9:16 com enquadramento manual para TikTok e Instagram",
-  "Chat unificado de Twitch, Kick e YouTube com emotes, envio e moderação",
-  "Alertas das plataformas e do Streamlabs/StreamElements no mesmo painel",
-  "Overlay de alertas e chat para OBS servido localmente como Browser Source",
-  "Tela “JÁ VOLTO” que segura a transmissão quando o sinal do programa cai",
-  "Guardião de privacidade: lê o que está indo ao ar e corta para o “JÁ VOLTO” se um dado seu aparecer na tela",
-  "Auto-bitrate quando a internet aperta e normalizador de áudio opcional",
-  "Relatório pós-live que aponta a causa provável de cada engasgo — encoding, internet ou plataforma — com o minuto para achar na gravação",
-  "Audiência, chat e alertas do relatório separados por canal, com exportação em HTML, CSV e JSON",
-  "Chaves de transmissão guardadas no cofre de credenciais do Windows",
-];
+const FEATURE_IDS = [
+  "multistream",
+  "independent_connections",
+  "quality_modes",
+  "load_estimate",
+  "vertical_crop",
+  "unified_chat",
+  "alerts",
+  "overlay",
+  "brb_screen",
+  "privacy_guard",
+  "auto_bitrate",
+  "post_live_report",
+  "report_per_channel",
+  "keys_in_vault",
+] as const;
+
+export const featuresFor = (t: T): string[] =>
+  FEATURE_IDS.map((id) => t(`content.features.${id}` as MessageKey));
 
 /** O que cada login oficial pede e por quê.
  *
@@ -116,37 +76,20 @@ export const FEATURES = [
  *  verificação de marca do Google exige que a home explique o uso dos dados do
  *  usuário. Os escopos são os mesmos do código (src-tauri/src/auth.rs) — se
  *  mudarem lá, mudam aqui. */
-export const ACCOUNT_SCOPES = [
-  {
-    platform: "youtube" as const,
-    title: "Conta do YouTube (Google)",
-    permission: "Gerenciar sua conta do YouTube",
-    why: "Criar a transmissão ao vivo e pegar a chave sozinha, dar a ela o título que você escreveu no app, encerrar no fim, ler e enviar mensagens no chat ao vivo e mostrar quantas pessoas estão assistindo.",
-    never:
-      "A Corneta não envia vídeo gravado pro seu canal, não mexe nos vídeos que já estão lá, não lê seu histórico e não usa esses dados para anúncio ou treinamento de modelo.",
-  },
-  {
-    platform: "twitch" as const,
-    title: "Conta da Twitch",
-    permission: "Ler e enviar no chat, moderar e gerenciar a transmissão",
-    why: "Mostrar o chat no app, responder por lá, apagar mensagem ou dar timeout quando você mandar, e acompanhar o estado da sua live.",
-    never:
-      "Nada é postado no seu canal sem você pedir, e a Corneta não segue, não inscreve nem altera nada da sua conta.",
-  },
-  {
-    platform: "kick" as const,
-    title: "Conta da Kick",
-    permission: "Ler o canal, enviar no chat e moderar",
-    why: "As mesmas coisas do chat unificado: ler, responder e moderar sem sair do app.",
-    never:
-      "É o único login que passa pelo nosso servidor, porque a Kick exige um segredo de servidor na troca — e mesmo assim o token não é armazenado em lugar nenhum.",
-  },
-];
+const SCOPE_IDS = ["youtube", "twitch", "kick"] as const;
+
+export const accountScopesFor = (t: T) =>
+  SCOPE_IDS.map((platform) => ({
+    platform,
+    title: t(`content.scopes.${platform}.title` as MessageKey),
+    permission: t(`content.scopes.${platform}.permission` as MessageKey),
+    why: t(`content.scopes.${platform}.why` as MessageKey),
+    never: t(`content.scopes.${platform}.never` as MessageKey),
+  }));
 
 /** Frase única e citável: é o que motor generativo tende a extrair.
  *
  *  Carrega o diferencial, não só o mecanismo: o multistream sozinho descreve
  *  também a concorrência, e uma frase que serve pro concorrente não posiciona
  *  ninguém. */
-export const ONE_LINER =
-  "A Corneta é um aplicativo gratuito e de código aberto para Windows que recebe um único sinal de vídeo do OBS (ou de qualquer programa que transmita por RTMP) e o retransmite ao mesmo tempo para Twitch, YouTube, Kick, Facebook e outros destinos, com cada plataforma em conexão independente. Além do envio, ela cuida da live inteira: reúne chat e alertas de todas as plataformas, mantém a transmissão de pé quando o sinal do programa cai e gera um relatório pós-live que cruza máquina, OBS e plataformas para apontar a causa provável de cada instabilidade — tudo processado no computador do streamer.";
+export const oneLinerFor = (t: T): string => t("content.one_liner");

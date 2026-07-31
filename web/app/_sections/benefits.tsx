@@ -1,3 +1,4 @@
+import type { T } from "@/lib/i18n";
 import { Mascot, ObsMark, PlatformGlyph } from "../_components/decor";
 import { ChatIcon, RadioIcon } from "../_components/icons";
 import {
@@ -26,7 +27,7 @@ const CHAT_LINE =
   "[&_p]:mt-0.5 [&_p]:text-[0.84rem] [&_p]:font-semibold";
 
 /** O leque de rotas: uma entrada, três saídas. */
-function RouteFan() {
+function RouteFan({ t }: { t: T }) {
   return (
     <div className="grid grid-cols-[62px_34px_1fr] items-center max-[760px]:grid-cols-[54px_26px_1fr]">
       {/* "OBS" não tem letra com descendente, mas a caixa de linha da Baloo 2
@@ -63,21 +64,21 @@ function RouteFan() {
           <PlatformGlyph id="twitch" />
           Twitch
           <State>
-            <i /> no ar
+            <i /> {t("benefits.routes.demo.twitch.state")}
           </State>
         </div>
         <div className={`${ROUTE_ROW} bg-surface-2`}>
           <PlatformGlyph id="youtube" />
           YouTube
           <State>
-            <i /> no ar
+            <i /> {t("benefits.routes.demo.youtube.state")}
           </State>
         </div>
         <div className={`${ROUTE_ROW} bg-surface-3`}>
           <PlatformGlyph id="kick" />
           Kick
           <State tone="warn">
-            <i /> reconectando
+            <i /> {t("benefits.routes.demo.kick.state")}
           </State>
         </div>
       </div>
@@ -85,46 +86,39 @@ function RouteFan() {
   );
 }
 
-export function Benefits() {
+export function Benefits({ t }: { t: T }) {
   return (
     <Section id="por-que" tone="paper">
       <Shell>
         <SectionHeading
           tone="paper"
           centered
-          kicker="Depois que você aperta o BORA"
-          title="Uma tela só — inclusive na hora que dá ruim."
+          kicker={t("benefits.heading.kicker")}
+          title={t("benefits.heading.title")}
         >
           {/* Não cita plataforma: a linha de baixo já usa a Kick como exemplo,
               e repetir a mesma piada em três linhas mata as duas. */}
-          <p>
-            Sem alt-tab pra saber quem ainda tá no ar e quem tá falando com
-            você.
-          </p>
+          <p>{t("benefits.heading.subtitle")}</p>
         </SectionHeading>
 
         <div className="mt-[clamp(52px,6vw,84px)] flex flex-col gap-[clamp(30px,4vw,56px)]">
           <BenefitRow>
             <BenefitCopy
               icon={<RadioIcon />}
-              title="Se a Kick cair, a Twitch nem fica sabendo"
+              title={t("benefits.routes.title")}
             >
-              <p>
-                Cada plataforma tem a sua própria conexão. Uma reconectando não
-                encosta nas outras — e isso aparece no painel, com nome e
-                horário, em vez de você descobrir pelo chat.
-              </p>
+              <p>{t("benefits.routes.body")}</p>
               <BenefitNote>
-                <Mascot /> Dá pra pausar uma sem derrubar o resto
+                <Mascot /> {t("benefits.routes.note")}
               </BenefitNote>
             </BenefitCopy>
 
             <DemoPanel>
               <DemoLabel>
-                <span>suas plataformas</span>
-                <span>exemplo</span>
+                <span>{t("benefits.routes.demo.label")}</span>
+                <span>{t("benefits.chat.demo.tag")}</span>
               </DemoLabel>
-              <RouteFan />
+              <RouteFan t={t} />
             </DemoPanel>
           </BenefitRow>
 
@@ -132,48 +126,46 @@ export function Benefits() {
             <BenefitCopy
               tone="brass"
               icon={<ChatIcon />}
-              title="O chat das três na mesma coluna, com emote e tudo"
+              title={t("benefits.chat.title")}
             >
-              <p>
-                Twitch, YouTube e Kick descem juntas, na ordem em que
-                aconteceram, e você responde de lá mesmo. O alerta de sub entra
-                no meio, junto com a mensagem que veio depois.
-              </p>
+              <p>{t("benefits.chat.body")}</p>
               <BenefitNote>
-                <Mascot /> Dá pra soltar numa janelinha, no segundo monitor
+                <Mascot /> {t("benefits.chat.note")}
               </BenefitNote>
             </BenefitCopy>
 
             <DemoPanel>
               <DemoLabel>
-                <span>chat reunido</span>
-                <span>exemplo</span>
+                <span>{t("benefits.chat.demo.label")}</span>
+                <span>{t("benefits.routes.demo.tag")}</span>
               </DemoLabel>
               <div className="flex flex-col gap-2.5">
                 <div className={CHAT_LINE}>
                   <PlatformGlyph id="twitch" />
                   <div>
-                    <strong>gabizera · Twitch</strong>
-                    <p>salve salve, chegando!</p>
+                    <strong>{t("benefits.chat.demo.line1.author")}</strong>
+                    <p>{t("benefits.chat.demo.line1.message")}</p>
                   </div>
                 </div>
                 <div className={CHAT_LINE}>
                   <PlatformGlyph id="youtube" />
                   <div>
-                    <strong>Marcos L. · YouTube</strong>
-                    <p>áudio tá limpo hoje 👏</p>
+                    <strong>{t("benefits.chat.demo.line2.author")}</strong>
+                    <p>{t("benefits.chat.demo.line2.message")}</p>
                   </div>
                 </div>
                 <div className={CHAT_LINE}>
                   <PlatformGlyph id="kick" />
                   <div>
-                    <strong>duduxx · Kick</strong>
-                    <p>bora cornetar!!</p>
+                    <strong>{t("benefits.chat.demo.line3.author")}</strong>
+                    <p>{t("benefits.chat.demo.line3.message")}</p>
                   </div>
                 </div>
                 <div className="flex min-h-[38px] items-center justify-between gap-2.5 rounded-md border-2 border-border-dry px-[11px] text-[0.74rem] font-semibold text-faint-raised">
-                  Responde de uma vez…
-                  <b className="text-brass">enviar</b>
+                  {t("benefits.chat.demo.input.placeholder")}
+                  <b className="text-brass">
+                    {t("benefits.chat.demo.input.send")}
+                  </b>
                 </div>
               </div>
             </DemoPanel>

@@ -1,5 +1,6 @@
+import type { T } from "@/lib/i18n";
 import Link from "next/link";
-import { ACCOUNT_SCOPES, STEPS } from "@/lib/content";
+import { accountScopesFor, stepsFor } from "@/lib/content";
 import { LEGAL_ROUTES } from "@/lib/legal";
 import { Mascot, PlatformGlyph } from "../_components/decor";
 import { CheckIcon, LockIcon, RadioIcon } from "../_components/icons";
@@ -13,7 +14,7 @@ import {
   TwoCol,
 } from "../_components/ui";
 
-// Três passos, o argumento do "roda no seu PC", os destinos e as permissões de
+// Três steps, o argumento do "roda no seu PC", os destinos e as permissões de
 // conta. São as seções de meio de página, todas de leitura corrida.
 
 // Os filetes de 3px em tinta escura são o que dá o ar de tabela impressa; a
@@ -27,7 +28,8 @@ const STEPS_LIST =
   "[&_em]:mt-3 [&_em]:inline-flex [&_em]:rotate-[-1.5deg] [&_em]:items-center [&_em]:gap-[7px] [&_em]:rounded-sm [&_em]:bg-tomate [&_em]:px-[9px] [&_em]:py-[5px] [&_em]:font-display [&_em]:text-[0.86rem] [&_em]:font-extrabold [&_em]:text-brass-ink [&_em]:not-italic [&_em]:shadow-[3px_3px_0_0_var(--ink)] " +
   "[&_em>svg]:h-[15px] [&_em>svg]:w-[15px] [&_em>svg]:fill-current";
 
-export function Steps() {
+export function Steps({ t }: { t: T }) {
+  const steps = stepsFor(t);
   return (
     <Section id="como-funciona" tone="paper-raised">
       <Shell>
@@ -39,24 +41,22 @@ export function Steps() {
           <SectionHeading
             tight
             tone="paper"
-            kicker="Do seu programa pro público"
-            title="Você entra ao vivo em três passos."
+            kicker={t("steps.kicker")}
+            title={t("steps.title")}
           >
-            <p>
-              Sem terminal, sem Docker, sem endereço de servidor pra decorar.
-            </p>
+            <p>{t("steps.lede")}</p>
           </SectionHeading>
 
           <ol className={STEPS_LIST}>
-            {STEPS.map((step, i) => (
+            {steps.map((step, i) => (
               <li key={step.title}>
                 <b>{i + 1}</b>
                 <div>
                   <h3>{step.title}</h3>
                   <p>{step.text}</p>
-                  {i === STEPS.length - 1 && (
+                  {i === steps.length - 1 && (
                     <em>
-                      <RadioIcon /> BORA AO VIVO
+                      <RadioIcon /> {t("steps.badge.golive")}
                     </em>
                   )}
                 </div>
@@ -69,7 +69,7 @@ export function Steps() {
   );
 }
 
-export function Local() {
+export function Local({ t }: { t: T }) {
   return (
     <Section>
       <Shell>
@@ -80,42 +80,37 @@ export function Local() {
         >
           <div>
             <SectionHeading
-              kicker="Roda no seu PC, de verdade"
-              title="Não tem mensalidade porque não tem servidor nosso no meio."
+              kicker={t("steps.local.kicker")}
+              title={t("steps.local.title")}
             >
-              <p className="max-w-[60ch]!">
-                O trabalho pesado acontece na máquina que já tá transmitindo.
-                Ajustes, chaves e relatórios ficam com você — e até o overlay do
-                OBS é um servidor que só responde dentro do seu computador.
-              </p>
+              <p className="max-w-[60ch]!">{t("steps.local.body")}</p>
             </SectionHeading>
 
             <Checklist row className="mt-6.5">
               <li>
-                <CheckIcon /> Grátis, sem cadastro
+                <CheckIcon /> {t("steps.local.check.free")}
               </li>
               <li>
-                <CheckIcon /> Código aberto com licença MIT
+                <CheckIcon /> {t("steps.local.check.license")}
               </li>
               <li>
-                <CheckIcon /> Chaves no cofre do Windows
+                <CheckIcon /> {t("steps.local.check.keys")}
               </li>
               <li>
-                <CheckIcon /> Sem marca-d&apos;água
+                <CheckIcon /> {t("steps.local.check.watermark")}
               </li>
             </Checklist>
 
             <Proof>
               <LockIcon />
               <span>
-                Código aberto: dá pra abrir o repositório e ver exatamente o que
-                o app faz com a sua chave.{" "}
+                {t("steps.local.proof.text")}{" "}
                 <a
                   href="https://github.com/pitroldev"
                   rel="noreferrer noopener"
                   target="_blank"
                 >
-                  Ver o código
+                  {t("steps.local.proof.link")}
                 </a>
               </span>
             </Proof>
@@ -123,14 +118,10 @@ export function Local() {
 
           <HonestNote>
             <span>
-              <Mascot /> A conta honesta
+              <Mascot /> {t("steps.local.honest.label")}
             </span>
-            <h3>Cada plataforma come um pedaço do seu upload.</h3>
-            <p>
-              E melhorar a imagem pra cada uma pesa na placa ou no processador.
-              A Corneta mede sua conexão, soma tudo e te mostra a conta antes da
-              live — não no meio dela.
-            </p>
+            <h3>{t("steps.local.honest.title")}</h3>
+            <p>{t("steps.local.honest.body")}</p>
           </HonestNote>
         </TwoCol>
       </Shell>
@@ -154,8 +145,10 @@ const ACCOUNT =
   "[&_p+p]:mt-3 [&_b]:font-[750] [&_b]:text-cream";
 
 export function Platforms({
+  t,
   destinations,
 }: {
+  t: T;
   destinations: readonly { id: string; name: string; note: string }[];
 }) {
   return (
@@ -168,14 +161,10 @@ export function Platforms({
           <SectionHeading
             tight
             tone="paper"
-            kicker="Do seu canal pra todo lugar"
-            title="As quatro grandes prontas, e o resto por sua conta."
+            kicker={t("steps.platforms.kicker")}
+            title={t("steps.platforms.title")}
           >
-            <p>
-              As quatro grandes já vêm prontas, com o endereço de cada uma
-              preenchido. Some quantas quiser — inclusive qualquer servidor RTMP
-              que não esteja nesta lista.
-            </p>
+            <p>{t("steps.platforms.lede")}</p>
           </SectionHeading>
 
           <div className="rounded-xl bg-surface bg-[image:var(--halftone-dark)] bg-[length:20px_20px] p-5.5 text-cream shadow-pop-ink-lg max-[980px]:max-w-[720px]">
@@ -192,15 +181,10 @@ export function Platforms({
             </div>
 
             <p className={DEST_NOTE}>
-              <strong>TikTok, Instagram e X são experimentais.</strong> A
-              entrada depende de liberação e de fluxos das próprias plataformas,
-              então podem simplesmente não funcionar para a sua conta.
+              <strong>{t("steps.platforms.note.experimental.strong")}</strong>{" "}
+              {t("steps.platforms.note.experimental.text")}
             </p>
-            <p className={DEST_NOTE}>
-              Até aqui, a Twitch é a plataforma com transmissão real documentada
-              de ponta a ponta. As outras estão implementadas no app e seguem em
-              validação pública.
-            </p>
+            <p className={DEST_NOTE}>{t("steps.platforms.note.validation")}</p>
           </div>
         </TwoCol>
 
@@ -208,20 +192,15 @@ export function Platforms({
           <div id="contas">
             <SectionHeading
               tone="paper"
-              kicker="Entrar com a sua conta"
-              title="O que a Corneta pede — e o que ela faz com isso."
+              kicker={t("steps.accounts.kicker")}
+              title={t("steps.accounts.title")}
               className="mt-[clamp(56px,7vw,96px)] max-w-[720px]! border-t-2 border-paper-line pt-[clamp(40px,5vw,64px)]"
             >
-              <p>
-                Dá pra usar só colando a chave de transmissão. Mas se você
-                conectar a conta, o app faz o trabalho chato sozinho: cria a
-                live, pega a chave e traz o chat. Aqui está exatamente o que
-                cada permissão serve.
-              </p>
+              <p>{t("steps.accounts.lede")}</p>
             </SectionHeading>
 
             <div className="mt-[clamp(32px,4vw,48px)] grid grid-cols-3 gap-[clamp(14px,2vw,20px)] max-[980px]:grid-cols-1">
-              {ACCOUNT_SCOPES.map((account) => (
+              {accountScopesFor(t).map((account) => (
                 <article className={ACCOUNT} key={account.platform}>
                   <div className="mb-4 grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 [&_.glyph]:h-10 [&_.glyph]:w-10">
                     <PlatformGlyph id={account.platform} />
@@ -235,10 +214,10 @@ export function Platforms({
                     </div>
                   </div>
                   <p>
-                    <b>Pra quê:</b> {account.why}
+                    <b>{t("steps.accounts.label.why")}</b> {account.why}
                   </p>
                   <p className="mt-auto! border-t-2 border-border-soft pt-3.5 text-[0.8rem]! text-faint-raised!">
-                    <b>O que não acontece:</b> {account.never}
+                    <b>{t("steps.accounts.label.never")}</b> {account.never}
                   </p>
                 </article>
               ))}
@@ -247,12 +226,10 @@ export function Platforms({
             <p className="mt-[clamp(22px,2.5vw,30px)] flex max-w-[90ch] items-start gap-3 text-[0.9rem] leading-[1.6] font-medium text-ink-muted [&>svg]:mt-px [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomate-ink [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2] [&_a]:font-[750] [&_a]:text-tomate-ink [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-[3px]">
               <LockIcon />
               <span>
-                Os tokens de acesso ficam no cofre de credenciais do Windows, na
-                sua máquina — não em servidor nosso, porque não existe conta
-                Corneta nem banco de dados de usuário. Dá pra revogar o acesso a
-                qualquer momento na própria plataforma, e desinstalar o app
-                apaga o que ficou no cofre. Os detalhes estão na{" "}
-                <Link href={LEGAL_ROUTES.privacy}>política de privacidade</Link>
+                {t("steps.accounts.privacy.text")}{" "}
+                <Link href={LEGAL_ROUTES.privacy}>
+                  {t("steps.accounts.privacy.link")}
+                </Link>
                 .
               </span>
             </p>

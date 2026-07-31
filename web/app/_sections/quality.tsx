@@ -1,3 +1,4 @@
+import type { T } from "@/lib/i18n";
 import { CheckIcon } from "../_components/icons";
 import { VerticalCrop } from "../_components/crop-picker";
 import { LiveRoom, ReportChart } from "../_components/live-room";
@@ -15,7 +16,7 @@ import {
 // Duas seções que andam juntas: a mesa de qualidade (o que cada modo faz) e a
 // jornada da live (antes, durante, depois).
 
-export function Quality() {
+export function Quality({ t }: { t: T }) {
   return (
     <Section id="qualidade">
       <Shell>
@@ -26,26 +27,21 @@ export function Quality() {
         >
           <SectionHeading
             tight
-            kicker="Quanto capricho na imagem"
-            title="A mesma imagem pra todas, ou uma sob medida pra cada."
+            kicker={t("quality.heading.kicker")}
+            title={t("quality.heading.title")}
           >
-            <p>
-              Sua live pode sair caprichada em toda plataforma sem fritar o PC —
-              mas isso é uma escolha, e ela custa internet e placa de vídeo.
-              Você vê essa conta antes de entrar no ar, não no meio dela. Veja o
-              que muda em cada modo:
-            </p>
+            <p>{t("quality.heading.body")}</p>
           </SectionHeading>
 
-          <QualityDesk />
+          <QualityDesk t={t} />
         </TwoCol>
 
         <TwoCol
           cols="minmax(0,1fr) minmax(340px,0.9fr)"
           className="mt-[clamp(46px,5vw,72px)] gap-[clamp(28px,4vw,52px)] border-t-2 border-border-dry pt-[clamp(40px,5vw,64px)]"
         >
-          <VerticalCopy />
-          <VerticalCrop />
+          <VerticalCopy t={t} />
+          <VerticalCrop caption={t("replica.crop.caption")} />
         </TwoCol>
       </Shell>
     </Section>
@@ -63,44 +59,42 @@ const COLS_3 =
 const COLS_2 =
   "[grid-template-columns:minmax(260px,0.85fr)_minmax(360px,1.15fr)]";
 
-export function Journey() {
+export function Journey({ t }: { t: T }) {
   return (
     <Section tone="paper-raised">
       <Shell>
         <SectionHeading
           tone="paper"
-          kicker="Do setup ao relatório"
-          title="Antes, durante e depois — sem trocar de bancada."
+          kicker={t("quality.journey.kicker")}
+          title={t("quality.journey.title")}
         />
 
         <div className="mt-[clamp(46px,5vw,68px)] flex flex-col border-t-2 border-paper-line">
           <article className={`${ROW} ${COLS_3}`}>
             <div>
-              <Sticker className="mb-4">Antes da live</Sticker>
-              <h3>Chega no BORA sem aquele frio na barriga.</h3>
+              <Sticker className="mb-4">
+                {t("quality.journey.before.sticker")}
+              </Sticker>
+              <h3>{t("quality.journey.before.title")}</h3>
             </div>
             <div>
-              <p className="mt-0!">
-                Ligue as plataformas, meça seu upload e deixe tudo pronto com
-                poucos cliques. No OBS, a Corneta configura sozinha — e ainda dá
-                play nele quando você aperta o BORA.
-              </p>
+              <p className="mt-0!">{t("quality.journey.before.body")}</p>
               {/* Sobre papel o visto verde do tema escuro perde contraste;
                   `ok-ink` é o mesmo verde um passo mais fundo. */}
               <Checklist className="[&>li]:text-ink [&_svg]:stroke-ok-ink">
                 <li>
-                  <CheckIcon /> Teste de upload de verdade
+                  <CheckIcon /> {t("quality.journey.before.check.upload")}
                 </li>
                 <li>
-                  <CheckIcon /> Configuração guiada do OBS
+                  <CheckIcon /> {t("quality.journey.before.check.obs")}
                 </li>
                 <li>
-                  <CheckIcon /> Checklist da primeira live
+                  <CheckIcon /> {t("quality.journey.before.check.checklist")}
                 </li>
               </Checklist>
             </div>
             <StatPanel>
-              <span>seu upload · exemplo</span>
+              <span>{t("quality.journey.before.stat.label")}</span>
               <div
                 className="my-3 mb-2.5 flex h-[46px] items-end gap-[5px] [&>i]:block [&>i]:w-[16%] [&>i]:rounded-t-sm [&>i]:bg-brass [&>i]:opacity-72"
                 aria-hidden="true"
@@ -111,42 +105,35 @@ export function Journey() {
                 <i className="h-[84%]" />
                 <i className="h-full bg-ok! opacity-100!" />
               </div>
-              <strong>25 Mb/s</strong>
-              <small>dá pra três plataformas com folga</small>
+              <strong>{t("quality.journey.before.stat.value")}</strong>
+              <small>{t("quality.journey.before.stat.caption")}</small>
             </StatPanel>
           </article>
 
           <article className={`${ROW} ${COLS_2}`}>
             <div>
               <Sticker tone="tomate" className="mb-4">
-                Durante a live
+                {t("quality.journey.during.sticker")}
               </Sticker>
-              <h3>Uma olhada de canto de olho e volta pro jogo.</h3>
-              <p>
-                Bitrate, fps, quadros perdidos e tempo no ar de cada plataforma,
-                mais CPU e placa de verdade. Dá pra pausar uma sem encerrar as
-                outras — e quem cai volta sozinha.
-              </p>
+              <h3>{t("quality.journey.during.title")}</h3>
+              <p>{t("quality.journey.during.body")}</p>
             </div>
-            <LiveRoom />
+            <LiveRoom t={t} />
           </article>
 
           <article className={`${ROW} ${COLS_2}`}>
             <div>
-              <Sticker className="mb-4">Depois da live</Sticker>
+              <Sticker className="mb-4">
+                {t("quality.journey.after.sticker")}
+              </Sticker>
               {/* "Junta os dados" é o que qualquer painel de analytics faz. O
                   que só um app que é dono da máquina, do OBS e do envio
                   consegue é CRUZAR os três e dizer a causa. É esse o verbo
                   que a copy precisa carregar. */}
-              <h3>Descubra por que engasgou — e o que mexer.</h3>
-              <p>
-                Não é um punhado de número solto: a Corneta cruza o que a sua
-                máquina, o seu OBS e cada plataforma fizeram e aponta a causa
-                provável de cada engasgo — com o minuto pra achar na gravação e
-                o que mudar pra não repetir.
-              </p>
+              <h3>{t("quality.journey.after.title")}</h3>
+              <p>{t("quality.journey.after.body")}</p>
             </div>
-            <ReportChart />
+            <ReportChart t={t} />
           </article>
         </div>
       </Shell>

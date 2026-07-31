@@ -18,7 +18,7 @@ const SPOTS = [
   { id: "dir", label: "Enquadrar à direita", at: { left: "96%", x: "-100%" } },
 ] as const;
 
-export function VerticalCrop() {
+export function VerticalCrop({ caption }: { caption: string }) {
   const [spot, setSpot] = useState<(typeof SPOTS)[number]["id"]>("meio");
   const active = SPOTS.find((s) => s.id === spot)!;
 
@@ -57,10 +57,7 @@ export function VerticalCrop() {
 
       <p className="mt-[13px] flex items-center justify-center gap-[9px] text-[0.76rem] font-[650] text-faint [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2] [&_b]:text-muted">
         <CropIcon />
-        <span>
-          Escolha um lado do quadro: é assim que você define{" "}
-          <b>o que vai pro vertical</b>.
-        </span>
+        <span>{caption}</span>
       </p>
     </div>
   );

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { BrandMark } from "../../_components/brand-mark";
-import { Mascot } from "../../_components/decor";
-import { ArrowIcon, CheckIcon, InfoIcon } from "../../_components/icons";
-import { Shell } from "../../_components/ui";
+import { BrandMark } from "@/app/_components/brand-mark";
+import { Mascot } from "@/app/_components/decor";
+import { ArrowIcon, CheckIcon, InfoIcon } from "@/app/_components/icons";
+import { Shell } from "@/app/_components/ui";
 import {
   LEGAL_CNPJ,
   LEGAL_CONTACT,
