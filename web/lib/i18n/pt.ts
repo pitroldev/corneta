@@ -390,6 +390,10 @@ export const pt = {
   "preview.chat.msg.2.text": "áudio tá limpo hoje 👏",
   "preview.chat.msg.3.from": "duduxx",
   "preview.chat.msg.3.text": "bora cornetar!!",
+  "preview.chat.msg.4.from": "PedroHD",
+  "preview.chat.msg.4.text": "esse setup tá liso demais",
+  "preview.chat.msg.5.from": "nanda",
+  "preview.chat.msg.5.text": "chegando agora, perdi muita coisa?",
   "preview.chat.platforms": "3 plataformas",
   "preview.chat.title": "Chat reunido",
   "preview.cta": "BORA AO VIVO",
@@ -419,6 +423,8 @@ export const pt = {
   // sem recodificar). Mesma palavra da tela Qualidade do app.
   "preview.target.copy": "Cópia",
   "preview.titlebar.tag": "multi-stream",
+  "preview.verdict":
+    "Três plataformas e nenhuma recodificação: o vídeo sai do OBS e chega igual nas três.",
 
   "protection.alerts.chip.bits": "bits",
   "protection.alerts.chip.member": "membro",

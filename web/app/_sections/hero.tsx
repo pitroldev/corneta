@@ -181,7 +181,7 @@ export function Hero({ t }: { t: T }) {
           <ProductPreview t={t} />
         </div>
 
-        <div className="mt-[clamp(30px,3.5vw,44px)] flex flex-col items-center gap-3.5 pb-[clamp(46px,5vw,70px)] text-center max-[760px]:mt-[34px] [&_a]:min-h-[70px] [&_a]:w-[min(440px,100%)] [&_a]:text-[1.24rem] max-[760px]:[&_a]:min-h-[62px] max-[760px]:[&_a]:w-full max-[760px]:[&_a]:text-[1.06rem] [&>p]:text-[0.84rem] [&>p]:font-semibold [&>p]:text-faint">
+        <div className="mt-[clamp(48px,5vw,76px)] flex flex-col items-center gap-3.5 pb-[clamp(46px,5vw,70px)] text-center max-[760px]:mt-[44px] [&_a]:min-h-[70px] [&_a]:w-[min(440px,100%)] [&_a]:text-[1.24rem] max-[760px]:[&_a]:min-h-[62px] max-[760px]:[&_a]:w-full max-[760px]:[&_a]:text-[1.06rem] [&>p]:text-[0.84rem] [&>p]:font-semibold [&>p]:text-faint">
           <DownloadButton t={t} />
           <p>{t("hero.cta.footnote")}</p>
         </div>

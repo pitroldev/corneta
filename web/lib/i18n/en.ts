@@ -423,6 +423,10 @@ export const en: Dict = {
   "preview.chat.msg.2.text": "audio's clean today 👏",
   "preview.chat.msg.3.from": "duduxx",
   "preview.chat.msg.3.text": "let's gooo!!",
+  "preview.chat.msg.4.from": "PedroHD",
+  "preview.chat.msg.4.text": "this setup is smooth",
+  "preview.chat.msg.5.from": "nanda",
+  "preview.chat.msg.5.text": "just got here, did i miss much?",
   "preview.chat.platforms": "3 platforms",
   "preview.chat.title": "Unified chat",
   "preview.cta": "GO LIVE",
@@ -453,6 +457,8 @@ export const en: Dict = {
   // Qualidade do app (encoding.target.override.copy).
   "preview.target.copy": "Copy",
   "preview.titlebar.tag": "multi-stream",
+  "preview.verdict":
+    "Three platforms and zero re-encoding: the video leaves OBS and arrives the same on all three.",
 
   "protection.alerts.chip.bits": "bits",
   "protection.alerts.chip.member": "member",

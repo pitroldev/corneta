@@ -26,10 +26,15 @@ const targets = [
 
 // `n` é o índice da mensagem no dicionário (preview.chat.msg.N.*) — o texto e o
 // apelido de exemplo mudam com o idioma, o glifo da plataforma não.
+// Cinco falas, não três: "chat reunido" com uma mensagem por plataforma parece
+// legenda de legenda, e a coluna ficava com metade da altura vazia. Duas delas
+// repetem a plataforma de propósito — chat de verdade não reveza educadamente.
 const chat = [
   { id: "twitch", who: "Twitch", n: 1 },
   { id: "youtube", who: "YouTube", n: 2 },
   { id: "kick", who: "Kick", n: 3 },
+  { id: "twitch", who: "Twitch", n: 4 },
+  { id: "youtube", who: "YouTube", n: 5 },
 ] as const;
 
 function NavIcon({ name }: { name: (typeof nav)[number]["icon"] }) {
@@ -254,6 +259,24 @@ export function ProductPreview({ t }: { t: T }) {
             ))}
           </div>
 
+          {/* O veredito da conta.
+              As três linhas acima são IDÊNTICAS de propósito — no modo Esperto as
+              três cabem na cópia, então nenhuma recodifica. Sem esta linha isso lê
+              como repetição de layout; com ela, vira o argumento (a CPU não entra
+              na conta). Também é o que preenche o vão que sobrava entre a última
+              plataforma e o BORA. */}
+          <p
+            className={cn(
+              "flex items-center gap-2 border-t border-border-soft pt-3 text-[0.72rem] leading-[1.4] font-[550] text-muted",
+              "[&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:stroke-ok [&>svg]:[stroke-width:3] [&>svg]:fill-none [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round]",
+            )}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 12.5l5.2 5.2L20 7" />
+            </svg>
+            {t("preview.verdict")}
+          </p>
+
           {/* ≥18.66px em peso 800 = "texto grande" no WCAG, então o branco sobre
               tomate (3.1:1) passa AA — é o mesmo botão do app. */}
           <div
@@ -290,7 +313,7 @@ export function ProductPreview({ t }: { t: T }) {
             {chat.map((message) => (
               <div
                 className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 [&_.glyph]:h-6 [&_.glyph]:w-6"
-                key={message.id}
+                key={message.n}
               >
                 <PlatformGlyph id={message.id} />
                 <div>
