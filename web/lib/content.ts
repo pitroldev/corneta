@@ -30,6 +30,14 @@ export const FAQS: Faq[] = [
     answer:
       "Não. Você continua montando cenas, câmera e áudio no seu programa de sempre. A Corneta entra depois: pega esse sinal e cuida das plataformas, do acompanhamento e das proteções da transmissão.",
   },
+  // A objeção mais forte que existe hoje: há plugin grátis de multistream que
+  // roda dentro do próprio OBS. Responder de frente — e admitir quando ele
+  // basta — converte melhor do que fingir que não existe.
+  {
+    question: "Já uso um plugin de multistream no OBS. Por que trocar?",
+    answer:
+      "Se você só quer mandar o mesmo vídeo pra mais de um lugar, o plugin resolve — e a gente prefere te falar isso agora do que depois do download. A Corneta entra quando a live é mais que o envio: ela segura a transmissão quando o seu programa cai (o plugin cai junto, porque mora dentro dele), reúne o chat e os alertas de todas as plataformas num lugar só, avisa se um dado seu aparecer na tela e, no fim, monta um relatório que cruza a sua máquina, o seu OBS e cada plataforma pra dizer por que engasgou.",
+  },
   {
     question: "É grátis mesmo? Vai virar assinatura depois?",
     answer:
@@ -95,8 +103,10 @@ export const FEATURES = [
   "Alertas das plataformas e do Streamlabs/StreamElements no mesmo painel",
   "Overlay de alertas e chat para OBS servido localmente como Browser Source",
   "Tela “JÁ VOLTO” que segura a transmissão quando o sinal do programa cai",
+  "Guardião de privacidade: lê o que está indo ao ar e corta para o “JÁ VOLTO” se um dado seu aparecer na tela",
   "Auto-bitrate quando a internet aperta e normalizador de áudio opcional",
-  "Relatório pós-live com audiência, chat, alertas e trechos com problema",
+  "Relatório pós-live que aponta a causa provável de cada engasgo — encoding, internet ou plataforma — com o minuto para achar na gravação",
+  "Audiência, chat e alertas do relatório separados por canal, com exportação em HTML, CSV e JSON",
   "Chaves de transmissão guardadas no cofre de credenciais do Windows",
 ];
 
@@ -133,6 +143,10 @@ export const ACCOUNT_SCOPES = [
   },
 ];
 
-/** Frase única e citável: é o que motor generativo tende a extrair. */
+/** Frase única e citável: é o que motor generativo tende a extrair.
+ *
+ *  Carrega o diferencial, não só o mecanismo: o multistream sozinho descreve
+ *  também a concorrência, e uma frase que serve pro concorrente não posiciona
+ *  ninguém. */
 export const ONE_LINER =
-  "A Corneta é um aplicativo gratuito e de código aberto para Windows que recebe um único sinal de vídeo do OBS (ou de qualquer programa que transmita por RTMP) e o retransmite ao mesmo tempo para Twitch, YouTube, Kick, Facebook e outros destinos, com cada plataforma em conexão independente, chat e alertas reunidos e processamento inteiramente no computador do streamer.";
+  "A Corneta é um aplicativo gratuito e de código aberto para Windows que recebe um único sinal de vídeo do OBS (ou de qualquer programa que transmita por RTMP) e o retransmite ao mesmo tempo para Twitch, YouTube, Kick, Facebook e outros destinos, com cada plataforma em conexão independente. Além do envio, ela cuida da live inteira: reúne chat e alertas de todas as plataformas, mantém a transmissão de pé quando o sinal do programa cai e gera um relatório pós-live que cruza máquina, OBS e plataformas para apontar a causa provável de cada instabilidade — tudo processado no computador do streamer.";

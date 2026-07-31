@@ -134,11 +134,16 @@ export function Journey() {
           <article className={`${ROW} ${COLS_2}`}>
             <div>
               <Sticker className="mb-4">Depois da live</Sticker>
-              <h3>Entenda o que aconteceu e melhore a próxima.</h3>
+              {/* "Junta os dados" é o que qualquer painel de analytics faz. O
+                  que só um app que é dono da máquina, do OBS e do envio
+                  consegue é CRUZAR os três e dizer a causa. É esse o verbo
+                  que a copy precisa carregar. */}
+              <h3>Descubra por que engasgou — e o que mexer.</h3>
               <p>
-                O relatório fica no seu PC e junta audiência, movimento do chat,
-                alertas, momentos marcados e os trechos em que o sinal sofreu —
-                com um veredito honesto no fim.
+                Não é um punhado de número solto: a Corneta cruza o que a sua
+                máquina, o seu OBS e cada plataforma fizeram e aponta a causa
+                provável de cada engasgo — com o minuto pra achar na gravação e
+                o que mudar pra não repetir.
               </p>
             </div>
             <ReportChart />
