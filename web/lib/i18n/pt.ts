@@ -316,6 +316,68 @@ export const pt = {
   "page-data.tiny.youtube.title": "YouTube automático",
 
   // ---- protection ----
+// ---- depois da live: relatório + replay ----
+  "after.kicker": "Depois da live",
+  "after.badge": "novo",
+  "after.title": "Clica no engasgo e vê o que tava na tela.",
+  "after.body":
+    "A Corneta grava o que foi ao ar e guarda, no mesmo relógio, o bitrate de cada plataforma, a CPU, o chat e os alertas. Quando a live acaba, o relatório aponta o minuto — e o vídeo pula pra lá.",
+  "after.proof":
+    "O relatório existe mesmo sem gravar vídeo: desde a primeira live ele já cruza a sua máquina, o seu OBS e cada plataforma pra dizer o que engasgou e quando.",
+  "after.cost":
+    "Gravar ocupa disco: mais ou menos 2,7 GB por hora no bitrate padrão. Por isso nasce desligada — você liga, escolhe a pasta, e a Corneta apaga as gravações mais antigas quando passa do teto que você marcou.",
+  "after.more.channels": "audiência, chat e alertas separados por canal",
+  "after.more.export": "exporta em HTML, CSV e JSON",
+  "after.more.compare": "compara com a sua live anterior",
+  "after.more.clip": "corta um trecho direto da gravação",
+
+  "after.scope.axis": "a live inteira · 3h12",
+  "after.scope.series.platforms": "as plataformas receberam",
+  "after.scope.series.obs": "o OBS mandou",
+  "after.scope.chat": "chat naquele momento",
+  "after.scope.chart.aria":
+    "Gráfico de exemplo da live: a linha de latão é o que as plataformas receberam, a linha tracejada é o que o OBS mandou. Três momentos marcados: pico de chat, queda da Twitch e a hora em que o OBS fechou.",
+
+  "after.frame.live": "no ar",
+  "after.frame.reconnect": "reconectando",
+  "after.frame.note": "o quadro que foi ao ar naquele segundo",
+
+  "after.moment.chat.tab": "pico de chat",
+  "after.moment.chat.title": "Momento: o chat explodiu aos 42 minutos",
+  "after.moment.chat.finding": "Chat 5× acima da média aos 42min.",
+  "after.moment.chat.reading":
+    "O relatório marca sozinho como momento de destaque — é o corte que você ia procurar na mão depois.",
+  "after.moment.chat.chat.1": "AEEEE",
+  "after.moment.chat.chat.2": "clipa isso pfvr",
+  "after.moment.chat.chat.3": "melhor jogada do mês",
+  "after.moment.chat.chat.4": "voltei só pra ver de novo",
+  "after.moment.chat.chat.5": "MANO",
+  "after.moment.chat.chat.6": "pausa e olha o chat kkkk",
+  "after.moment.chat.chat.7": "isso foi limpo demais",
+
+  "after.moment.queda.tab": "Twitch caiu 8s",
+  "after.moment.queda.title": "Momento: a Twitch caiu por 8 segundos",
+  "after.moment.queda.finding":
+    "A CPU estava em 98% no mesmo minuto em que a Twitch caiu.",
+  "after.moment.queda.reading":
+    "Provável gargalo de encoding, não a sua internet — e a YouTube e a Kick nem ficaram sabendo.",
+  "after.moment.queda.chat.1": "travou aí?",
+  "after.moment.queda.chat.2": "voltou",
+  "after.moment.queda.chat.3": "aqui tá liso",
+  "after.moment.queda.chat.4": "na twitch congelou uns 5s",
+  "after.moment.queda.chat.5": "no youtube nem piscou",
+
+  "after.moment.brb.tab": "o OBS fechou",
+  "after.moment.brb.title": "Momento: o OBS fechou e o JÁ VOLTO entrou",
+  "after.moment.brb.finding": "A linha de latão não desce.",
+  "after.moment.brb.reading":
+    "O OBS fechou às 2h35, o JÁ VOLTO entrou no ar e nenhuma plataforma perdeu a conexão — ninguém precisou voltar pra sua live.",
+  "after.moment.brb.chat.1": "cadê ele",
+  "after.moment.brb.chat.2": "voltou!!",
+  "after.moment.brb.chat.3": "nem saí da aba",
+  "after.moment.brb.chat.4": "achei que tinha caído",
+  "after.moment.brb.chat.5": "continuou tocando aqui",
+
   // ---- Prévia do app no hero ----
   // Réplica da tela "Ao vivo": os rótulos têm que bater com os da Sidebar do app
   // (sidebar.nav.*), senão a LP promete uma tela que não existe.

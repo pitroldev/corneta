@@ -17,6 +17,7 @@ import {
   SiteHeader,
   SkipLink,
 } from "@/app/_sections/hero";
+import { AfterLive } from "@/app/_sections/afterlive";
 import { Benefits } from "@/app/_sections/benefits";
 import { Journey, Quality } from "@/app/_sections/quality";
 import { ChatSection, Protection } from "@/app/_sections/protection";
@@ -116,6 +117,7 @@ export default async function Home({
 
         <ChatSection t={t} />
         <Protection t={t} />
+        <AfterLive t={t} />
 
         <Steps t={t} />
         <Local t={t} />

@@ -350,6 +350,68 @@ export const en: Dict = {
   // ---- Prévia do app no hero ----
   // Réplica da tela "Ao vivo": os rótulos têm que bater com os da Sidebar do app
   // (sidebar.nav.*), senão a LP promete uma tela que não existe.
+// ---- after the stream: report + replay ----
+  "after.kicker": "After the stream",
+  "after.badge": "new",
+  "after.title": "Click the glitch and see what was on screen.",
+  "after.body":
+    "Corneta records what went out and keeps it on the same clock as every platform's bitrate, your CPU, the chat and the alerts. When the stream ends, the report points at the minute — and the video jumps there.",
+  "after.proof":
+    "The report works even without recording video: from your first stream it already cross-references your machine, your OBS and every platform to say what choked and when.",
+  "after.cost":
+    "Recording takes disk: roughly 2.7 GB per hour at the default bitrate. That's why it ships off — you turn it on, pick the folder, and Corneta deletes the oldest recordings once you pass the cap you set.",
+  "after.more.channels": "audience, chat and alerts split per channel",
+  "after.more.export": "exports to HTML, CSV and JSON",
+  "after.more.compare": "compares against your previous stream",
+  "after.more.clip": "cuts a clip straight from the recording",
+
+  "after.scope.axis": "the whole stream · 3h12",
+  "after.scope.series.platforms": "what the platforms got",
+  "after.scope.series.obs": "what OBS sent",
+  "after.scope.chat": "chat at that moment",
+  "after.scope.chart.aria":
+    "Example chart of a stream: the brass line is what the platforms received, the dashed line is what OBS sent. Three moments are marked: a chat spike, a Twitch drop, and the moment OBS closed.",
+
+  "after.frame.live": "on air",
+  "after.frame.reconnect": "reconnecting",
+  "after.frame.note": "the frame that went out that second",
+
+  "after.moment.chat.tab": "chat spike",
+  "after.moment.chat.title": "Moment: chat blew up at 42 minutes",
+  "after.moment.chat.finding": "Chat 5× above average at 42min.",
+  "after.moment.chat.reading":
+    "The report flags it as a highlight on its own — it's the clip you'd have gone hunting for by hand.",
+  "after.moment.chat.chat.1": "LETS GOOO",
+  "after.moment.chat.chat.2": "clip that please",
+  "after.moment.chat.chat.3": "best play of the month",
+  "after.moment.chat.chat.4": "came back just to see it again",
+  "after.moment.chat.chat.5": "BRO",
+  "after.moment.chat.chat.6": "pause and read the chat lol",
+  "after.moment.chat.chat.7": "that was way too clean",
+
+  "after.moment.queda.tab": "Twitch dropped 8s",
+  "after.moment.queda.title": "Moment: Twitch dropped for 8 seconds",
+  "after.moment.queda.finding":
+    "CPU was at 98% the same minute Twitch dropped.",
+  "after.moment.queda.reading":
+    "Likely an encoding bottleneck, not your internet — and YouTube and Kick never noticed.",
+  "after.moment.queda.chat.1": "did it freeze?",
+  "after.moment.queda.chat.2": "back now",
+  "after.moment.queda.chat.3": "smooth over here",
+  "after.moment.queda.chat.4": "froze for like 5s on twitch",
+  "after.moment.queda.chat.5": "youtube didn't even blink",
+
+  "after.moment.brb.tab": "OBS closed",
+  "after.moment.brb.title": "Moment: OBS closed and BE RIGHT BACK took over",
+  "after.moment.brb.finding": "The brass line never dips.",
+  "after.moment.brb.reading":
+    "OBS closed at 2h35, BE RIGHT BACK went on air and no platform lost its connection — nobody had to come back to your stream.",
+  "after.moment.brb.chat.1": "where'd he go",
+  "after.moment.brb.chat.2": "he's back!!",
+  "after.moment.brb.chat.3": "never even left the tab",
+  "after.moment.brb.chat.4": "thought he crashed",
+  "after.moment.brb.chat.5": "kept playing over here",
+
   "preview.badge": "ILLUSTRATIVE PREVIEW",
   "preview.chat.compose": "Reply to everyone at once…",
   "preview.chat.compose.send": "send",
