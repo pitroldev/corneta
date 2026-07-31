@@ -260,7 +260,7 @@ export const pt = {
   "hero.nav.quality": "Qualidade",
   "hero.nav.why": "Por que",
   "hero.pitch":
-    "Você transmite como sempre. A Corneta joga esse sinal na Twitch, no YouTube, na Kick e onde mais você quiser — cada uma com a sua própria conexão. Se o OBS fechar, ela segura a live no ar. O chat das três chega numa janela só. E no fim ela diz em que minuto engasgou.",
+    "No OBS você não mexe em nada — a Corneta se configura sozinha nele. Daí em diante cada plataforma ganha a sua própria conexão, todas aparecem lado a lado na mesma tela, e o chat delas chega numa janela só. E ela não some quando você aperta o BORA: fica mostrando o que acontece em cada uma, até o relatório do dia seguinte.",
   "hero.skiplink.label": "Pular para o conteúdo",
   "hero.sticker": "Corneta · multistream no seu PC",
   "hero.title.line1": "Uma live.",

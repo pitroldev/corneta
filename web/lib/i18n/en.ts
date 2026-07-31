@@ -286,7 +286,7 @@ export const en: Dict = {
   "hero.nav.why": "Why Corneta",
   // "joga esse sinal" virou "pushes that signal out to" — é como streamer fala em inglês ("push to Twitch"). "junta o chat de todas" virou "pulls every ch
   "hero.pitch":
-    "You stream like you always do. Corneta pushes that signal out to Twitch, YouTube, Kick and wherever else you want — each one on its own connection. If OBS closes, it holds the stream up. Every chat lands in one window. And when it's over, it tells you which minute choked.",
+    "In OBS you don't touch a thing — Corneta sets itself up in there. From then on each platform gets its own connection, they all sit side by side on one screen, and their chats land in a single window. And it doesn't disappear when you hit GO LIVE: it keeps showing you what is happening on each one, right up to the next day's report.",
   "hero.skiplink.label": "Skip to content",
   "hero.sticker": "Corneta · multistream on your PC",
   "hero.title.line1": "One stream.",
