@@ -338,7 +338,8 @@ function buildRecap(data: SessionData, a: ReportAnalysis): RecapData {
     color:
       PLATFORMS[p.platformId as keyof typeof PLATFORMS]?.color ?? "#ffb323",
   }));
-  const follows = a.alerts.byKind.follow ?? 0;
+  // Mesmo número do painel do topo (contador da plataforma, ou alertas de follow).
+  const follows = a.byChannel.followersGained ?? 0;
   const big: RecapStat[] = [];
   if (a.viewers.hasData)
     big.push({
@@ -738,6 +739,18 @@ function ReportDetail({
       sub: delta(a.viewers.avg, prevSummary?.avgViewers),
     });
   }
+  // Seguidores vêm antes das inscrições porque são muito mais frequentes. O número
+  // sai do contador da plataforma quando existe (Twitch/Kick) e dos eventos de follow
+  // do Streamlabs/StreamElements quando não — a análise já resolve qual vale, aqui só
+  // muda o rótulo, porque medido é LÍQUIDO e por alerta é bruto.
+  const seg = a.byChannel.followersGained;
+  if (seg != null && seg !== 0)
+    heroStats.push({
+      label: a.byChannel.followersNet
+        ? "Seguidores (líquido)"
+        : "Novos seguidores",
+      value: `${seg > 0 ? "+" : ""}${seg.toLocaleString("pt-BR")}`,
+    });
   if (a.alerts.subs > 0)
     heroStats.push({ label: "Inscrições", value: String(a.alerts.subs) });
   if (a.alerts.bits > 0)
@@ -1147,10 +1160,15 @@ const num = (v: number) => v.toLocaleString("pt-BR");
 /** Uma linha por canal: audiência (com a fatia da live), chat e alertas. */
 function ChannelRow({ c, color }: { c: ChannelStats; color: string }) {
   const chips: string[] = [];
+  if (c.followers.hasData && c.followers.gained !== 0)
+    chips.push(
+      `💜 ${c.followers.gained > 0 ? "+" : ""}${num(c.followers.gained)}`,
+    );
   if (c.alerts.subs > 0) chips.push(`⭐ ${c.alerts.subs}`);
   if (c.alerts.bits > 0) chips.push(`💎 ${num(Math.round(c.alerts.bits))}`);
   if (c.alerts.raids > 0) chips.push(`🚀 ${c.alerts.raids}`);
-  if (c.alerts.follows > 0) chips.push(`💜 ${c.alerts.follows}`);
+  // Sem chip próprio pros alertas de follow: o 💜 acima já os usa como fonte quando
+  // não há contador da plataforma. Dois chips seriam a mesma gente contada duas vezes.
 
   return (
     <div className="rounded-md bg-surface-2 px-3 py-2">
@@ -1230,6 +1248,13 @@ function ChannelBreakdownCard({
           <ChannelRow key={c.key} c={c} color={colors[c.key]} />
         ))}
       </div>
+      {b.followersNet && (
+        <p className="mt-2 text-[11px] text-ink-faint">
+          💜 Seguidores vêm do contador da própria plataforma, então é o número
+          líquido: quem deixou de seguir durante a live subtrai. Pode não bater
+          com a contagem de alertas do Streamlabs/StreamElements.
+        </p>
+      )}
       {!b.hasChatByChannel && (
         <p className="mt-2 text-[11px] text-ink-faint">
           💬 Esta live é anterior à contagem de chat por canal — só o total dela

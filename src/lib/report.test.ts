@@ -107,6 +107,8 @@ const sessao = (body: object[]) =>
 
 const A = "twitch:Canal A";
 const B = "youtube:Canal B";
+/** Identificação do canal A num registro de seguidores. */
+const seg = { platform: "twitch", source: "Canal A" };
 
 const viewers = (t: number, items: object[]) => ({
   kind: "viewers",
@@ -251,6 +253,96 @@ describe("byChannel", () => {
     ).byChannel;
     expect(doisCanais.unattributedAlerts).toBe(1);
     expect(doisCanais.channels.every((c) => c.alerts.total === 0)).toBe(true);
+  });
+
+  it("ganho de seguidores é a diferença do contador, ponta a ponta", () => {
+    const d = sessao([
+      viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
+      { kind: "followers", t: 1000, items: [{ ...seg, total: 12_480 }] },
+      { kind: "followers", t: 60000, items: [{ ...seg, total: 12_509 }] },
+    ]);
+    const b = analyze(d).byChannel;
+    expect(b.channels[0].followers).toEqual({
+      gained: 29,
+      total: 12_509,
+      from: "counter",
+      hasData: true,
+    });
+    expect(b.followersGained).toBe(29);
+    expect(b.followersNet).toBe(true);
+  });
+
+  it("contador que cai vira ganho negativo — a live perdeu seguidor", () => {
+    const d = sessao([
+      { kind: "followers", t: 1000, items: [{ ...seg, total: 900 }] },
+      { kind: "followers", t: 60000, items: [{ ...seg, total: 897 }] },
+    ]);
+    expect(analyze(d).byChannel.followersGained).toBe(-3);
+  });
+
+  it("uma amostra só não vira ganho (não dá pra tirar diferença de um ponto)", () => {
+    const d = sessao([
+      { kind: "followers", t: 1000, items: [{ ...seg, total: 900 }] },
+    ]);
+    const f = analyze(d).byChannel.channels[0].followers;
+    expect(f).toMatchObject({ from: null, hasData: false, total: 900 });
+    expect(analyze(d).byChannel.followersGained).toBeNull();
+  });
+
+  it("sem contador, cai nos alertas de follow do próprio canal", () => {
+    const d = sessao([
+      viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
+      ...[1500, 1600, 1700].map((t) => ({
+        kind: "alert",
+        t,
+        platform: "twitch",
+        source: "Canal A",
+        alertKind: "follow",
+        user: "fulano",
+      })),
+    ]);
+    const b = analyze(d).byChannel;
+    expect(b.channels[0].followers).toMatchObject({
+      gained: 3,
+      from: "alerts",
+    });
+    expect(b.followersNet).toBe(false);
+    expect(b.followersGained).toBe(3);
+  });
+
+  it("Streamlabs sozinho conta; com contador junto, não conta duas vezes", () => {
+    const slFollow = (t: number) => ({
+      kind: "alert",
+      t,
+      platform: "streamlabs",
+      source: "Minha conta",
+      alertKind: "follow",
+      user: "fulano",
+    });
+    // Sem contador: os follows do agregador são a única fonte que existe.
+    const so = analyze(sessao([slFollow(1500), slFollow(1600)])).byChannel;
+    expect(so.followersGained).toBe(2);
+    expect(so.followersNet).toBe(false);
+
+    // Com contador da Twitch medindo AS MESMAS pessoas, o agregador é descartado —
+    // somar daria 31 seguidores numa live que ganhou 29.
+    const junto = analyze(
+      sessao([
+        { kind: "followers", t: 1000, items: [{ ...seg, total: 12_480 }] },
+        { kind: "followers", t: 60000, items: [{ ...seg, total: 12_509 }] },
+        slFollow(1500),
+        slFollow(1600),
+      ]),
+    ).byChannel;
+    expect(junto.followersGained).toBe(29);
+    expect(junto.followersNet).toBe(true);
+  });
+
+  it("sessão sem nenhuma fonte de seguidores não inventa zero", () => {
+    const d = sessao([
+      viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
+    ]);
+    expect(analyze(d).byChannel.followersGained).toBeNull();
   });
 
   it("alerta de agregador não vira canal nem é chutado num", () => {

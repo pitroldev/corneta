@@ -8,6 +8,7 @@ import type {
   PlatformId,
   SessionAlertEvent,
   SessionData,
+  SessionFollowerSample,
   SessionMarker,
   SessionMeta,
   SessionSample,
@@ -27,6 +28,7 @@ export function parseSession(ndjson: string): SessionData | null {
   const samples: SessionSample[] = [];
   const markers: SessionMarker[] = [];
   const viewerSamples: SessionViewerSample[] = [];
+  const followerSamples: SessionFollowerSample[] = [];
   const alertEvents: SessionAlertEvent[] = [];
   let endedAt: number | undefined;
 
@@ -66,6 +68,13 @@ export function parseSession(ndjson: string): SessionData | null {
         total: Number(o.total) || 0,
         items: (o.items ?? []) as SessionViewerSample["items"],
       });
+    } else if (o.kind === "followers") {
+      const t = Number(o.t);
+      if (!Number.isFinite(t)) continue;
+      followerSamples.push({
+        t,
+        items: (o.items ?? []) as SessionFollowerSample["items"],
+      });
     } else if (o.kind === "alert") {
       const t = Number(o.t);
       if (!Number.isFinite(t)) continue;
@@ -96,7 +105,14 @@ export function parseSession(ndjson: string): SessionData | null {
     0,
     Math.round(((endedAt ?? last) - meta.startedAt) / 1000),
   );
-  return { meta, samples, markers, viewerSamples, alertEvents };
+  return {
+    meta,
+    samples,
+    markers,
+    viewerSamples,
+    followerSamples,
+    alertEvents,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +235,17 @@ export interface ChannelStats {
   viewers: { peak: number; avg: number; last: number; hasData: boolean };
   /** Fatia da audiência da live (0..100), ou null se a sessão não tem audiência. */
   sharePct: number | null;
+  followers: {
+    /** Seguidores ganhos na live. Pelo contador é LÍQUIDO: quem deixou de seguir
+     *  subtrai, e o número pode ser negativo (a Twitch também faz limpeza de bots). */
+    gained: number;
+    /** Total do canal ao fim da live — só existe medido pelo contador. */
+    total: number | null;
+    /** `counter` = diferença do contador da plataforma (líquido, autoritativo).
+     *  `alerts` = soma de eventos de follow (bruto). */
+    from: "counter" | "alerts" | null;
+    hasData: boolean;
+  };
   chat: { total: number; perMin: number; hasData: boolean };
   alerts: {
     total: number;
@@ -237,6 +264,11 @@ export interface ChannelBreakdown {
   /** Alertas que não dá pra creditar a um canal (agregador, ou sessão antiga com
    *  duas fontes da mesma plataforma) — contados à parte em vez de chutados. */
   unattributedAlerts: number;
+  /** Seguidores ganhos na live inteira. `null` = nenhuma fonte soube dizer. */
+  followersGained: number | null;
+  /** Algum canal foi medido pelo contador da plataforma — então o número é LÍQUIDO
+   *  e a UI precisa dizer isso, senão não bate com o que o streamer contou de alertas. */
+  followersNet: boolean;
 }
 
 export interface ChatStats {
@@ -762,6 +794,12 @@ interface ChannelAcc {
   viewerLast: number;
   viewerSeen: boolean;
   chat: number;
+  /** Primeiro e último total de seguidores visto — a diferença é o ganho da live.
+   *  `followCount` existe porque UM ponto não é uma diferença: primeiro e último
+   *  seriam o mesmo valor e o ganho sairia como zero medido, que é mentira. */
+  followFirst: number | null;
+  followLast: number | null;
+  followCount: number;
   alerts: {
     total: number;
     subs: number;
@@ -780,6 +818,9 @@ function newAcc(platform: ChatPlatform, source: string): ChannelAcc {
     viewerLast: 0,
     viewerSeen: false,
     chat: 0,
+    followFirst: null,
+    followLast: null,
+    followCount: 0,
     alerts: { total: 0, subs: 0, bits: 0, raids: 0, follows: 0 },
   };
 }
@@ -808,6 +849,16 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
       c.viewerSeen = true;
     }
   const vN = d.viewerSamples.length;
+
+  // --- Seguidores (contador da plataforma) ---
+  for (const f of d.followerSamples)
+    for (const it of f.items) {
+      const c = get(it.platform, it.source);
+      if (!Number.isFinite(it.total)) continue;
+      if (c.followFirst == null) c.followFirst = it.total;
+      c.followLast = it.total;
+      c.followCount++;
+    }
 
   // --- Chat ---
   let hasChatByChannel = false;
@@ -882,6 +933,7 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
       perMin: Math.round(c.chat / durMin),
       hasData: hasChatByChannel,
     },
+    followers: channelFollowers(c),
     alerts: { ...c.alerts, hasData: c.alerts.total > 0 },
   }));
 
@@ -893,7 +945,59 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
       b.chat.total - a.chat.total ||
       a.source.localeCompare(b.source, "pt-BR"),
   );
-  return { channels, hasChatByChannel, unattributedAlerts };
+  return {
+    channels,
+    hasChatByChannel,
+    unattributedAlerts,
+    ...followersRollup(channels, d.alertEvents),
+  };
+}
+
+/** Seguidores de UM canal: o contador da plataforma ganha dos alertas quando existe. */
+function channelFollowers(c: ChannelAcc): ChannelStats["followers"] {
+  // Uma amostra só (live curta demais, ou o contador só respondeu no fim) não permite
+  // diferença nenhuma — o total é conhecido, o ganho não.
+  if (c.followCount >= 2 && c.followFirst != null && c.followLast != null)
+    return {
+      gained: c.followLast - c.followFirst,
+      total: c.followLast,
+      from: "counter",
+      hasData: true,
+    };
+  if (c.alerts.follows > 0)
+    return {
+      gained: c.alerts.follows,
+      total: c.followLast,
+      from: "alerts",
+      hasData: true,
+    };
+  return { gained: 0, total: c.followLast, from: null, hasData: false };
+}
+
+/** Total da live, sem contar o mesmo seguidor duas vezes.
+ *
+ *  O conflito é real: quem tem Streamlabs ligado na Twitch recebe o evento de follow
+ *  E tem o contador da Twitch medindo a mesma pessoa. Somar os dois dobraria o número.
+ *  A regra é: quando ALGUM canal foi medido por contador, os follows de agregador
+ *  (que não pertencem a canal nenhum) são descartados como duplicata — o contador da
+ *  plataforma é a fonte mais confiável que existe pra isso. */
+function followersRollup(
+  channels: ChannelStats[],
+  alerts: SessionAlertEvent[],
+): Pick<ChannelBreakdown, "followersGained" | "followersNet"> {
+  const withData = channels.filter((c) => c.followers.hasData);
+  const net = withData.some((c) => c.followers.from === "counter");
+  const orphanFollows = net
+    ? 0
+    : alerts.filter((e) => e.kind === "follow" && !isChatPlatform(e.platform))
+        .length;
+  if (!withData.length && !orphanFollows)
+    return { followersGained: null, followersNet: false };
+  return {
+    followersGained:
+      withData.reduce((s, c) => s + c.followers.gained, 0) + orphanFollows,
+    followersNet: net,
+  };
 }
 
 function chatStats(d: SessionData): ChatStats {

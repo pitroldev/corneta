@@ -838,6 +838,17 @@ function mockApi(): CornetaApi {
         });
         const total = items.reduce((acc, x) => acc + (x.viewers ?? 0), 0);
         lines.push(JSON.stringify({ kind: "viewers", t, total, items }));
+        // Contador de seguidores: só Twitch e Kick expõem (o YouTube arredonda), e o
+        // total é absoluto — o relatório tira o ganho da diferença ponta a ponta.
+        const seg = plats
+          .filter((p) => p.platformId === "twitch" || p.platformId === "kick")
+          .map((p) => ({
+            platform: p.platformId,
+            source: p.name,
+            total: 12480 + Math.round(minNow * 1.7),
+          }));
+        if (seg.length)
+          lines.push(JSON.stringify({ kind: "followers", t, items: seg }));
       }
     }
     // Alertas de exemplo: raid (pico), subs/membros espalhados, gift bomb e bits.

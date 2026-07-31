@@ -2306,27 +2306,54 @@ fn kick_fragments(content: &str) -> Vec<ChatFragment> {
 
 // ----------------------- Viewers (contagem unificada) -----------------------
 
-/// Viewers da Twitch via GQL público (sem login) — `null` se offline.
-fn twitch_viewers(channel: &str) -> Option<u64> {
+/// Contadores públicos de um canal, colhidos numa consulta só.
+///
+/// Seguidores e audiência andam juntos de propósito: nas duas plataformas que expõem
+/// os dois números, eles vêm na MESMA resposta. Buscar separado dobraria as requisições
+/// pra não ganhar nada.
+#[derive(Default, Clone, Copy)]
+struct ChannelCounts {
+    /// Assistindo agora — `None` se offline (ou se a plataforma não respondeu).
+    viewers: Option<u64>,
+    /// Total de seguidores do canal. `None` = plataforma não expõe (YouTube) ou falhou.
+    followers: Option<u64>,
+}
+
+/// Viewers + seguidores da Twitch via GQL público (sem login, sem escopo) — o mesmo
+/// endpoint anônimo que a contagem de audiência já usava, agora pedindo os dois campos.
+fn twitch_counts(channel: &str) -> ChannelCounts {
     let ch = channel.trim().trim_start_matches('#').to_lowercase();
     if ch.is_empty() {
-        return None;
+        return ChannelCounts::default();
     }
     let body = json!({
-        "query": format!("query {{ user(login: \"{ch}\") {{ stream {{ viewersCount }} }} }}")
+        "query": format!(
+            "query {{ user(login: \"{ch}\") {{ followers {{ totalCount }} stream {{ viewersCount }} }} }}"
+        )
     })
     .to_string();
-    let resp = ureq::post("https://gql.twitch.tv/gql")
+    let Some(resp) = ureq::post("https://gql.twitch.tv/gql")
         .set("Client-Id", "kimne78kx3ncx6brgo4mv6wki5h1ko")
         .set("Content-Type", "application/json")
         .timeout(Duration::from_secs(6))
         .send_string(&body)
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&resp).ok()?;
-    v.pointer("/data/user/stream/viewersCount")
-        .and_then(|x| x.as_u64())
+        .ok()
+        .and_then(|r| r.into_string().ok())
+    else {
+        return ChannelCounts::default();
+    };
+    let Ok(v) = serde_json::from_str::<Value>(&resp) else {
+        return ChannelCounts::default();
+    };
+    ChannelCounts {
+        // `stream` é null fora do ar; `followers` responde do mesmo jeito nos dois casos.
+        viewers: v
+            .pointer("/data/user/stream/viewersCount")
+            .and_then(|x| x.as_u64()),
+        followers: v
+            .pointer("/data/user/followers/totalCount")
+            .and_then(|x| x.as_u64()),
+    }
 }
 
 /// `concurrentViewers` de um vídeo já conhecido (chamada barata da Data API).
@@ -2372,24 +2399,43 @@ fn youtube_viewers(
     n
 }
 
-/// Viewers do Kick (`livestream.viewer_count`) — `null` se offline.
-fn kick_viewers(slug: &str) -> Option<u64> {
+/// Viewers (`livestream.viewer_count`) + seguidores (`followers_count`) do Kick.
+///
+/// Os dois saem da mesma resposta que a contagem de audiência já baixava — o corpo
+/// inteiro vinha sendo descartado depois de ler um campo só.
+///
+/// `followers_count` é campo de API NÃO documentada (o mesmo pé em que a contagem de
+/// audiência do Kick já estava). Se o nome mudar, `followers` vira `None` e a métrica
+/// simplesmente não aparece — nada quebra, e o `debug!` abaixo diz o porquê.
+fn kick_counts(slug: &str) -> ChannelCounts {
     let slug = slug.trim().trim_start_matches('@').to_lowercase();
     if slug.is_empty() {
-        return None;
+        return ChannelCounts::default();
     }
     let url = format!("https://kick.com/api/v2/channels/{slug}");
-    let body = ureq::get(&url)
+    let Some(body) = ureq::get(&url)
         .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
         .set("Accept", "application/json")
         .timeout(Duration::from_secs(6))
         .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/livestream/viewer_count")
-        .and_then(|x| x.as_u64())
+        .ok()
+        .and_then(|r| r.into_string().ok())
+    else {
+        return ChannelCounts::default();
+    };
+    let Ok(v) = serde_json::from_str::<Value>(&body) else {
+        return ChannelCounts::default();
+    };
+    let followers = v.get("followers_count").and_then(|x| x.as_u64());
+    if followers.is_none() {
+        log::debug!("kick ({slug}): sem followers_count na resposta do canal");
+    }
+    ChannelCounts {
+        viewers: v
+            .pointer("/livestream/viewer_count")
+            .and_then(|x| x.as_u64()),
+        followers,
+    }
 }
 
 /// Poll periódico das fontes → emite `viewers://update` com o total + por fonte.
@@ -2402,6 +2448,10 @@ fn run_viewers(
     let mut yt_cache: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     while running.load(Ordering::Relaxed) {
         let mut items = vec![];
+        // Seguidores viajam num registro PRÓPRIO da sessão, não dentro de `items`: o
+        // `viewers://update` é consumido pela UI ao vivo, e o total de seguidores só
+        // interessa ao relatório. Enfiar lá dentro sujaria um payload quente.
+        let mut followers = vec![];
         let mut total: u64 = 0;
         let mut any_live = false;
         for src in &sources {
@@ -2413,15 +2463,30 @@ fn run_viewers(
             } else {
                 src.name.clone()
             };
-            let count = match src.platform.as_str() {
-                "twitch" => twitch_viewers(&src.value),
-                "youtube" => youtube_viewers(&api_key, &src.value, &mut yt_cache),
-                "kick" => kick_viewers(&src.value),
-                _ => None,
+            let counts = match src.platform.as_str() {
+                "twitch" => twitch_counts(&src.value),
+                // O YouTube expõe `subscriberCount`, mas ARREDONDADO pra 3 algarismos
+                // significativos: um canal de 40 mil que ganha 30 inscritos na live
+                // continua marcando o mesmo número. Melhor não ter a métrica do que
+                // ter uma que fica zerada sem explicação.
+                "youtube" => ChannelCounts {
+                    viewers: youtube_viewers(&api_key, &src.value, &mut yt_cache),
+                    followers: None,
+                },
+                "kick" => kick_counts(&src.value),
+                _ => ChannelCounts::default(),
             };
+            let count = counts.viewers;
             if let Some(v) = count {
                 total += v;
                 any_live = true;
+            }
+            if let Some(f) = counts.followers {
+                followers.push(json!({
+                    "platform": src.platform,
+                    "source": label,
+                    "total": f,
+                }));
             }
             items.push(json!({
                 "platform": src.platform,
@@ -2432,6 +2497,7 @@ fn run_viewers(
         }
         if let Some(p) = session_path(&app) {
             crate::session::record_viewers(&p, total, &items);
+            crate::session::record_followers(&p, &followers);
         }
         let _ = app.emit(
             "viewers://update",

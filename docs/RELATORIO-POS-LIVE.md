@@ -5,7 +5,7 @@
 > travamento/lentidão** — para diagnosticar com calma depois, **sem mexer na transmissão ao vivo**.
 
 - **Status:** ✅ Implementado (Fases 1–4 + retenção + abrir pasta) · 2026-06-23
-  · **v2: métricas de público por canal** (§13) · 2026-07-30
+  · **v2: métricas de público por canal** (§13) e **seguidores ganhos** (§14) · 2026-07-30
 - **Relacionado:** [`PLANEJAMENTO.md`](./PLANEJAMENTO.md) (§8 métricas), [`PENDENCIAS.md`](./PENDENCIAS.md)
 
 ---
@@ -240,3 +240,41 @@ fecham em 100%.
 **Na tela:** card "Público por canal" (pico · média · fatia · chat · alertas) e um "Total | Por
 canal" nos gráficos de audiência e de chat. O card antigo "Por plataforma" virou "Envio por
 plataforma", que é o que ele sempre foi.
+
+## 14. Seguidores ganhos na live — 2026-07-30
+
+Outro pedido do beta. Antes disso, follow só chegava por **Streamlabs/StreamElements**: nenhum
+conector nativo entrega o evento (o IRC da Twitch não tem follow há anos, o chat do YouTube só
+avisa *membro* — que é o pago — e o canal Pusher do Kick que a Corneta assina não traz follower).
+
+**A descoberta que barateou tudo:** os dois contadores saem **na mesma requisição que a contagem
+de audiência já fazia**. Nenhuma chamada nova, nenhum escopo novo, ninguém precisa relogar.
+
+| plataforma | de onde | custo |
+|---|---|---|
+| **Twitch** | `followers.totalCount` no GQL público anônimo (o mesmo `viewersCount` já usava) | zero |
+| **Kick** | `followers_count` no `/api/v2/channels/{slug}` (o corpo já vinha e era descartado) | zero |
+| **YouTube** | ⛔ não implementado — ver abaixo | — |
+
+> **YouTube fica de fora de propósito.** `channels.list` traz `subscriberCount`, mas arredondado
+> pra 3 algarismos significativos: um canal de 40 mil que ganha 30 inscritos numa live marca o
+> mesmo número. O `subscribersGained` exato só existe na YouTube Analytics API, que atrasa 1–2
+> dias e não serve pra relatório de live. Métrica que fica zerada sem explicação é pior que
+> métrica ausente.
+
+**O registro guarda o total ABSOLUTO** (`{"kind":"followers","t":…,"items":[{platform,source,total}]}`),
+não o delta — o ganho é a diferença ponta a ponta. Guardar delta deixaria o número refém do
+instante em que a amostragem começou. Com **uma amostra só** não há ganho nenhum a declarar
+(primeiro e último seriam o mesmo ponto e sairia um "zero medido" que é mentira).
+
+**Contador ganha de alerta, e nunca somam.** Quem tem Streamlabs na Twitch recebe o evento *e*
+tem o contador medindo a mesma pessoa; somar dobraria. A regra: quando algum canal foi medido por
+contador, os follows de agregador são descartados como duplicata. Por canal, o contador vence e o
+alerta é o fallback.
+
+**O número medido é LÍQUIDO** — quem deixou de seguir subtrai, e a Twitch ainda faz limpeza de
+bot, então ele pode ser negativo. A UI diz isso explicitamente, senão não bate com a contagem de
+alertas que o streamer viu passar na tela.
+
+O contador só roda junto com o poll de audiência, que depende do chat conectado — sem chat
+conectado, a live não tem nem audiência nem seguidores no relatório.

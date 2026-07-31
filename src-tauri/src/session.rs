@@ -160,6 +160,21 @@ pub fn record_viewers(path: &Path, total: u64, items: &[Value]) {
     );
 }
 
+/// Grava o total de seguidores de cada canal — o relatório tira daí o ganho da live
+/// (último menos primeiro). É o total ABSOLUTO de propósito: guardar o delta aqui
+/// deixaria o número refém do instante em que a amostragem começou.
+///
+/// Sem nenhum canal que exponha o contador, não escreve linha nenhuma.
+pub fn record_followers(path: &Path, items: &[Value]) {
+    if items.is_empty() {
+        return;
+    }
+    append_line(
+        path,
+        &json!({ "kind": "followers", "t": now_ms(), "items": items }),
+    );
+}
+
 /// Grava um alerta (sub/raid/bits…) na sessão — pra timeline e momentos de destaque.
 ///
 /// `source` é o rótulo do canal (mesmo namespace do `viewers`/`chatBy`), o que permite

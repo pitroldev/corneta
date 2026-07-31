@@ -436,6 +436,14 @@ export interface SessionViewerSample {
   items: { platform: ChatPlatform; source: string; viewers: number | null }[];
 }
 
+/** Total ABSOLUTO de seguidores de cada canal num instante — o ganho da live é a
+ *  diferença entre a primeira e a última amostra. Só existe pra plataforma que
+ *  expõe o contador (hoje Twitch e Kick). */
+export interface SessionFollowerSample {
+  t: number;
+  items: { platform: ChatPlatform; source: string; total: number }[];
+}
+
 export interface SessionAlertEvent {
   t: number;
   platform: ChatPlatform;
@@ -452,6 +460,7 @@ export interface SessionData {
   samples: SessionSample[];
   markers: SessionMarker[];
   viewerSamples: SessionViewerSample[];
+  followerSamples: SessionFollowerSample[];
   alertEvents: SessionAlertEvent[];
 }
 
