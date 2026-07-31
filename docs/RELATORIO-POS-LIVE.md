@@ -5,7 +5,7 @@
 > travamento/lentidão** — para diagnosticar com calma depois, **sem mexer na transmissão ao vivo**.
 
 - **Status:** ✅ Implementado (Fases 1–4 + retenção + abrir pasta) · 2026-06-23
-  · **v2: métricas de público por canal** (§13) e **seguidores ganhos** (§14) · 2026-07-30
+  · **v2: público por canal** (§13), **seguidores ganhos** (§14) e **exportação** (§15) · 2026-07-30
 - **Relacionado:** [`PLANEJAMENTO.md`](./PLANEJAMENTO.md) (§8 métricas), [`PENDENCIAS.md`](./PENDENCIAS.md)
 
 ---
@@ -201,7 +201,8 @@ Ou seja, a Fase 1–3 reaproveita muita coisa; o maior ganho novo é **gravar a 
 - **OBS (Fase 4):** `obs.rs::poll_stats` coleta render lag + congestionamento na sessão; aparece no gráfico "OBS — render lag" e na classificação de causa (cena pesada × rede).
 - **Demo (navegador):** grava a sessão simulada (com obs) e semeia 2 exemplos (uma limpa, uma com incidente) pra navegar sem backend.
 
-**Pendente (Fase 5, niceties):** export HTML/JSON formatado e comparação entre sessões.
+**Fase 5 concluída:** export em HTML/CSV/JSON (§15) — a comparação entre sessões saiu pelo CSV do
+histórico, sem precisar de tela nova.
 
 ## 13. Segregação por canal (v2) — 2026-07-30
 
@@ -278,3 +279,49 @@ alertas que o streamer viu passar na tela.
 
 O contador só roda junto com o poll de audiência, que depende do chat conectado — sem chat
 conectado, a live não tem nem audiência nem seguidores no relatório.
+
+## 15. Baixar o relatório — 2026-07-30
+
+Fecha a Fase 5 ("Exportar HTML/JSON" + "comparar sessões"). Streamers pediram "formatos
+diversos"; a leitura foi que não são formatos, são **três trabalhos**: postar (o Recap em PNG já
+resolvia), mandar pra alguém, e jogar numa planilha.
+
+| formato | onde | pra quê |
+|---|---|---|
+| **HTML** autocontido | detalhe da live | abre offline em qualquer navegador; vira PDF pelo Imprimir |
+| **CSV — histórico** | lista de relatórios | **uma linha por LIVE**: a evolução entre lives |
+| **CSV — série** | detalhe da live | uma linha por amostra (~2s), pra plotar |
+| **JSON** | detalhe da live | a análise pronta, pra ferramenta própria |
+
+> **PDF nativo foi recusado.** jsPDF/pdf-lib custam ~50–90 KB gzip e o chunk `index` já está em
+> ~98,7 KiB contra um budget de 110. "Imprimir → Salvar como PDF" entrega o mesmo resultado com
+> um `@media print` de 5 linhas. XLSX seria o CSV com uma dependência pesada; Markdown, ninguém pediu.
+
+**O CSV que importa é o do histórico.** Planilha serve pra comparar lives, e ninguém plota 7.200
+amostras no Excel. Ele lê e analisa as sessões **uma por vez**: o resumo cacheado tem 5 campos e a
+planilha quer 15, e carregar 50 NDJSON juntos daria dezenas de MB de pico.
+
+**Armadilhas de CSV que viraram teste:** BOM de UTF-8 (sem ele o Excel pt-BR lê como ANSI e
+"audiência" vira "audiÃªncia"), separador `;` com decimal vírgula (com `,` a planilha cai numa
+coluna só), e **escudo de fórmula**: célula começando com `=`/`+`/`-`/`@` é executada ao abrir, e
+nome de canal vem da config do usuário. Número negativo não passa pelo escudo — continua número.
+
+**Eixos diferentes no CSV de série.** Audiência é amostrada a ~30s e a máquina a ~2s. Em vez de
+ficar de fora, ela entra como `assistindo_ultimo_conhecido_<canal>` — o nome da coluna diz que é
+degrau, não medição instantânea.
+
+**HTML autocontido de verdade:** zero script, zero link, zero imagem, nenhuma URL — tem teste
+verificando. Os gráficos saem inline em SVG pela mesma `buildPath` da tela (extraída pra
+`lib/chartPath.ts` justamente pra os dois desenhos não divergirem). Fundo **claro**, ao contrário
+do app: o navegador descarta cor de fundo ao imprimir, e um relatório escuro sairia com texto
+claro no papel branco.
+
+**"Sem nomes" (opcional).** O relatório traz nome de espectador ("Raid de Gaules", destaques).
+Na máquina é a memória da live; enviado a um patrocinador, é dado pessoal de terceiro saindo da
+mão de quem coletou. A opção troca por "alguém" e age **antes** de `analyze` — a análise costura o
+nome dentro de textos prontos, e limpar depois viraria caça a substring. Nome de canal e de
+destino ficam: são do próprio streamer.
+
+**Encanamento:** `save_text_file` (comando genérico, ~15 linhas) reusa o diálogo nativo que o
+`export_config` já usava. Sem plugin novo, sem permissão nova. No navegador (demo) cai no download
+do browser. Os exportadores são funções puras em `src/lib/export/`, testadas.

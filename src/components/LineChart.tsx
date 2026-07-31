@@ -3,14 +3,7 @@
 // rótulos de tempo no eixo X, linha de referência e tooltip no hover.
 import { useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils";
-
-const MAX_POINTS = 600;
-
-function sampleIndices(len: number) {
-  if (len <= MAX_POINTS) return Array.from({ length: len }, (_, i) => i);
-  const step = len / MAX_POINTS;
-  return Array.from({ length: MAX_POINTS }, (_, k) => Math.floor(k * step));
-}
+import { buildPath, peakOf, type PathGeometry } from "../lib/chartPath";
 
 export interface ChartSeries {
   label: string;
@@ -64,51 +57,19 @@ export function LineChart({
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
-  const yMax = useMemo(() => {
-    if (yMaxProp !== undefined) return yMaxProp;
-    let peak = 1;
-    for (const s of series)
-      for (const v of s.values) if (v != null && v > peak) peak = v;
-    return peak * 1.1;
-  }, [series, yMaxProp]);
+  const yMax = useMemo(() => yMaxProp ?? peakOf(series), [series, yMaxProp]);
   const xAt = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - Math.min(v, yMax) / yMax) * innerH;
   const fmt = formatValue ?? ((v: number) => `${Math.round(v)}`);
 
   // Hover muda dezenas de vezes por segundo. A geometria das séries não muda junto, então os
   // paths (e a varredura de até milhares de amostras) ficam memorizados entre esses renders.
-  const paths = useMemo(
-    () =>
-      series.map((s) => {
-        const vals = s.values;
-        const pointIndices = sampleIndices(vals.length);
-        let d = "";
-        let pen = false;
-        let prev = -1;
-        for (const i of pointIndices) {
-          if (pen && prev >= 0) {
-            for (let k = prev + 1; k < i; k++) {
-              if (vals[k] == null) {
-                pen = false;
-                break;
-              }
-            }
-          }
-          const v = vals[i];
-          if (v == null) {
-            pen = false;
-          } else {
-            const x = padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
-            const y = padT + (1 - Math.min(v, yMax) / yMax) * innerH;
-            d += `${pen ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)} `;
-            pen = true;
-          }
-          prev = i;
-        }
-        return d.trim();
-      }),
-    [innerH, innerW, n, series, yMax],
-  );
+  // A geometria é montada AQUI dentro: como objeto novo a cada render, na lista de
+  // dependências ela invalidaria o memo justamente a cada hover.
+  const paths = useMemo(() => {
+    const geo: PathGeometry = { n, yMax, padL, padT, innerW, innerH };
+    return series.map((s) => buildPath(s.values, geo));
+  }, [innerH, innerW, n, series, yMax]);
 
   const ticks = [1, 0.5, 0].map((f) => yMax * f);
   // 4 rótulos de tempo (início · 1/3 · 2/3 · fim), sem repetir índice em séries curtas.

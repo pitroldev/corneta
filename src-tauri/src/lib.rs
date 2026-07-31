@@ -231,6 +231,7 @@ pub fn run() {
             commands::mark_moment,
             commands::export_config,
             commands::import_config,
+            commands::save_text_file,
             commands::save_brb_slate,
             commands::brb_slate_needs_refresh,
             commands::set_brb_slate,

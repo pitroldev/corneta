@@ -15,6 +15,9 @@ import {
   Scissors,
   Share2,
   Download,
+  FileText,
+  Table2,
+  Braces,
   Users,
   X,
 } from "lucide-react";
@@ -64,6 +67,10 @@ import {
   type RecapData,
   type RecapStat,
 } from "../lib/recap";
+import { anonymize } from "../lib/export/anonymize";
+import { historyCsv, seriesCsv, type HistoryRow } from "../lib/export/csv";
+import { reportHtml } from "../lib/export/html";
+import { reportJson } from "../lib/export/json";
 
 function fmtDur(sec: number): string {
   const total = Math.round(sec / 60);
@@ -203,13 +210,18 @@ export function ReportsScreen() {
         title="Relatórios"
         subtitle="O retrato de cada live: o que travou e o que prendeu a galera."
         right={
-          <Button
-            variant="subtle"
-            size="sm"
-            onClick={() => void api.openSessionsDir()}
-          >
-            <FolderOpen className="size-4" /> Abrir pasta
-          </Button>
+          <div className="flex items-center gap-2">
+            {sessions && sessions.length > 0 && (
+              <HistoryCsvButton sessions={sessions} />
+            )}
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => void api.openSessionsDir()}
+            >
+              <FolderOpen className="size-4" /> Abrir pasta
+            </Button>
+          </div>
         }
       />
 
@@ -239,6 +251,66 @@ export function ReportsScreen() {
         </div>
       )}
     </div>
+  );
+}
+
+/** CSV do histórico: uma linha por live, pra acompanhar a evolução em planilha.
+ *
+ *  Lê e analisa cada sessão na hora, uma por vez. O resumo cacheado não serve: ele
+ *  guarda 5 campos e a planilha quer 15 (seguidores, bits, raids, veredito…). Uma
+ *  de cada vez porque o pico de memória vira o tamanho do MAIOR NDJSON em vez da
+ *  soma de todos — 50 lives de 4h dariam dezenas de MB de uma vez. */
+function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const rows: HistoryRow[] = [];
+      let ilegiveis = 0;
+      for (const meta of sessions) {
+        try {
+          const d = parseSession(await api.readSession(meta.id));
+          if (!d) {
+            ilegiveis++;
+            continue;
+          }
+          // O `meta` da lista tem o fim estimado pelo mtime; o do arquivo é o real.
+          rows.push({ meta: { ...meta, ...d.meta }, analysis: analyze(d) });
+        } catch {
+          ilegiveis++;
+        }
+      }
+      if (!rows.length) {
+        toast.error("Nenhuma live pôde ser lida.");
+        return;
+      }
+      const ok = await api.saveTextFile({
+        name: `corneta-historico-${fmtDateFile(Date.now())}.csv`,
+        label: "Planilha (CSV)",
+        ext: "csv",
+        content: historyCsv(rows),
+      });
+      if (ok)
+        toast.success(
+          ilegiveis > 0
+            ? `${rows.length} live(s) exportadas — ${ilegiveis} ilegível(is) ficaram de fora`
+            : `${rows.length} live(s) na planilha`,
+        );
+    } catch (e) {
+      toast.error(`Falha ao exportar: ${errMsg(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button
+      variant="subtle"
+      size="sm"
+      disabled={busy}
+      onClick={() => void run()}
+    >
+      <Table2 className="size-4" /> {busy ? "Montando…" : "Histórico (CSV)"}
+    </Button>
   );
 }
 
@@ -513,6 +585,7 @@ function ReportDetail({
 }) {
   const [data, setData] = useState<SessionData | null | "loading">("loading");
   const [showRecap, setShowRecap] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
   const [prevSummary, setPrevSummary] = useState<SessionSummary | null>(null);
   // Cada gráfico tem seu próprio "Total / Por canal": quem quer ver a audiência
   // repartida nem sempre quer o chat repartido junto.
@@ -788,6 +861,13 @@ function ReportDetail({
           <Button variant="subtle" size="sm" onClick={() => setShowRecap(true)}>
             <Share2 className="size-4" /> Recap
           </Button>
+          <Button
+            variant="subtle"
+            size="sm"
+            onClick={() => setShowDownload(true)}
+          >
+            <Download className="size-4" /> Baixar
+          </Button>
           <DeleteButton onDelete={remove} />
         </div>
       </div>
@@ -797,6 +877,9 @@ function ReportDetail({
           analysis={a}
           onClose={() => setShowRecap(false)}
         />
+      )}
+      {showDownload && (
+        <DownloadModal data={data} onClose={() => setShowDownload(false)} />
       )}
 
       <div className="mb-1 font-display text-2xl font-extrabold">
@@ -1123,6 +1206,136 @@ function ReportDetail({
         </div>
       </Card>
     </div>
+  );
+}
+
+/** Escolha de formato + a opção de tirar nomes, num lugar só.
+ *
+ *  Um botão por formato encheria o cabeçalho, e a caixa "sem nomes" não teria onde
+ *  morar — ela vale pros três, porque o que muda é o dado, não o formato. */
+function DownloadModal({
+  data,
+  onClose,
+}: {
+  data: SessionData;
+  onClose: () => void;
+}) {
+  const [semNomes, setSemNomes] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const baixar = async (fmt: "html" | "csv" | "json") => {
+    setBusy(true);
+    try {
+      // Anonimiza ANTES de analisar: os nomes ficam costurados dentro de textos
+      // prontos ("Raid de fulano"), e limpar depois viraria caça a substring.
+      const d = semNomes ? anonymize(data) : data;
+      const a = analyze(d);
+      const base = `corneta-live-${fmtDateFile(d.meta.startedAt)}`;
+      const arquivo = {
+        html: {
+          name: `${base}.html`,
+          label: "Página (HTML)",
+          ext: "html",
+          content: reportHtml(d, a),
+        },
+        csv: {
+          name: `${base}-serie.csv`,
+          label: "Planilha (CSV)",
+          ext: "csv",
+          content: seriesCsv(d, a),
+        },
+        json: {
+          name: `${base}.json`,
+          label: "Dados (JSON)",
+          ext: "json",
+          content: reportJson(d, a),
+        },
+      }[fmt];
+      if (await api.saveTextFile(arquivo)) {
+        toast.success("Relatório salvo");
+        onClose();
+      }
+    } catch (e) {
+      toast.error(`Falha ao salvar: ${errMsg(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const OPCOES: ["html" | "csv" | "json", React.ReactNode, string, string][] = [
+    [
+      "html",
+      <FileText key="h" className="size-4" />,
+      "Página (HTML)",
+      "Abre em qualquer navegador, offline. Pra virar PDF: abra e use Imprimir → Salvar como PDF.",
+    ],
+    [
+      "csv",
+      <Table2 key="c" className="size-4" />,
+      "Planilha (CSV)",
+      "A série da live amostra a amostra (~2s), pronta pro Excel.",
+    ],
+    [
+      "json",
+      <Braces key="j" className="size-4" />,
+      "Dados (JSON)",
+      "O relatório já analisado, pra plugar em ferramenta própria.",
+    ],
+  ];
+
+  return (
+    <Modal
+      title="Baixar relatório"
+      onClose={onClose}
+      className="max-w-md rounded-xl bg-surface p-5 pop"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-xl">Baixar relatório</h3>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          <X className="size-4" />
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {OPCOES.map(([fmt, icon, titulo, desc]) => (
+          <button
+            key={fmt}
+            disabled={busy}
+            onClick={() => void baixar(fmt)}
+            className="flex items-start gap-3 rounded-lg border-2 border-border bg-surface-2 px-3 py-2.5 text-left transition-colors hover:border-brass disabled:opacity-50"
+          >
+            <span className="mt-0.5 text-brass">{icon}</span>
+            <span className="flex-1">
+              <span className="block font-display font-bold">{titulo}</span>
+              <span className="mt-0.5 block text-xs text-ink-muted">
+                {desc}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg bg-surface-2 px-3 py-2.5">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-brass"
+          checked={semNomes}
+          onChange={(e) => setSemNomes(e.target.checked)}
+        />
+        <span>
+          <span className="block text-sm font-bold">
+            Sem nomes de espectadores
+          </span>
+          {/* Enquanto o relatório fica na máquina, os nomes são a memória da live.
+              Mandado pra fora, viram dado pessoal de terceiro na mão de quem
+              recebeu — e quem envia é que responde por isso. */}
+          <span className="mt-0.5 block text-xs text-ink-muted">
+            Troca quem apareceu por “alguém”. Use ao mandar pra patrocinador ou
+            agência — os números continuam todos lá.
+          </span>
+        </span>
+      </label>
+    </Modal>
   );
 }
 

@@ -2555,6 +2555,40 @@ pub fn mark_moment(app: AppHandle, label: Option<String>) -> Result<(), String> 
     }
 }
 
+/// Salva um texto no arquivo que o usuário escolher. Devolve `false` se ele cancelou.
+///
+/// Genérico de propósito: quem monta o conteúdo é o frontend (os exportadores de
+/// relatório em HTML/CSV/JSON são funções puras testadas lá). Aqui só existe o
+/// diálogo nativo e a escrita — o caminho vem do próprio diálogo, então é o usuário
+/// que escolhe onde, não o app.
+///
+/// O conteúdo é gravado como UTF-8 tal e qual: quando o exportador precisa de BOM
+/// (CSV pro Excel em português), ele já manda o `\u{FEFF}` na string.
+#[tauri::command]
+pub fn save_text_file(
+    app: AppHandle,
+    name: String,
+    label: String,
+    ext: String,
+    content: String,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    match app
+        .dialog()
+        .file()
+        .add_filter(&label, &[ext.as_str()])
+        .set_file_name(&name)
+        .blocking_save_file()
+    {
+        Some(p) => {
+            let pb = p.into_path().map_err(|e| e.to_string())?;
+            std::fs::write(pb, content).map_err(|e| e.to_string())?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
 /// Exporta a config (perfis/ajustes — sem chaves) num arquivo escolhido pelo usuário.
 #[tauri::command]
 pub fn export_config(app: AppHandle) -> Result<bool, String> {

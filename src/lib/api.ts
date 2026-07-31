@@ -49,6 +49,13 @@ export interface CornetaApi {
   readSession(id: string): Promise<string>;
   deleteSession(id: string): Promise<void>;
   openSessionsDir(): Promise<void>;
+  /** Salva texto no arquivo que o usuário escolher. `false` = cancelou o diálogo. */
+  saveTextFile(file: {
+    name: string;
+    label: string;
+    ext: string;
+    content: string;
+  }): Promise<boolean>;
   // Chat unificado
   chatStart(): Promise<void>;
   chatStop(): Promise<void>;
@@ -298,6 +305,10 @@ function tauriApi(): CornetaApi {
     async readSession(id) {
       const { invoke } = await core();
       return invoke<string>("read_session", { id });
+    },
+    async saveTextFile(file) {
+      const { invoke } = await core();
+      return invoke<boolean>("save_text_file", file);
     },
     async deleteSession(id) {
       const { invoke } = await core();
@@ -1265,6 +1276,21 @@ function mockApi(): CornetaApi {
     },
     async readSession(id) {
       return loadSessions()[id] ?? "";
+    },
+    // No navegador não existe diálogo nativo: cai no download do próprio browser,
+    // que escolhe a pasta de Downloads. Sempre "salvou" — não há como cancelar.
+    async saveTextFile({ name, content }) {
+      const url = URL.createObjectURL(
+        new Blob([content], { type: "text/plain;charset=utf-8" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      return true;
     },
     async deleteSession(id) {
       const m = loadSessions();
