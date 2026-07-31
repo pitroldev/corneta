@@ -260,7 +260,7 @@ export const pt = {
   "hero.nav.quality": "Qualidade",
   "hero.nav.why": "Por que",
   "hero.pitch":
-    "Você transmite como sempre. A Corneta joga esse sinal na Twitch, no YouTube, na Kick e onde mais você quiser — cada uma com a sua própria conexão. E não larga do osso: segura a live se o sinal cair, junta o chat de todas e, no fim, te conta como foi.",
+    "Você transmite como sempre. A Corneta joga esse sinal na Twitch, no YouTube, na Kick e onde mais você quiser — cada uma com a sua própria conexão. Se o OBS fechar, ela segura a live no ar. O chat das três chega numa janela só. E no fim ela diz em que minuto engasgou.",
   "hero.skiplink.label": "Pular para o conteúdo",
   "hero.sticker": "Corneta · multistream no seu PC",
   "hero.title.line1": "Uma live.",
@@ -306,7 +306,7 @@ export const pt = {
     "Já sobe junto com o PC, pronta pra live, se você quiser.",
   "page-data.tiny.startup.title": "Abre com o Windows",
   "page-data.tiny.theme.text":
-    "O mesmo pôster no breu ou no papel — e a troca acontece com um sopro de corneta.",
+    "A Corneta no escuro ou no claro — e a troca acontece com um sopro de corneta.",
   "page-data.tiny.theme.title": "Tema claro e escuro",
   "page-data.tiny.tray.text":
     "Fechar a janela esconde a Corneta perto do relógio — a transmissão continua de pé.",
@@ -321,7 +321,7 @@ export const pt = {
   "after.badge": "novo",
   "after.title": "Clica no engasgo e vê o que tava na tela.",
   "after.body":
-    "A Corneta grava o que foi ao ar e guarda, no mesmo relógio, o bitrate de cada plataforma, a CPU, o chat e os alertas. Quando a live acaba, o relatório aponta o minuto — e o vídeo pula pra lá.",
+    "A Corneta grava o que foi ao ar. E marca tudo pelo mesmo horário: o bitrate de cada plataforma, a CPU, o chat e os alertas. Quando a live acaba, o relatório aponta o minuto — e o vídeo pula pra lá.",
   "after.proof":
     "O relatório existe mesmo sem gravar vídeo: desde a primeira live ele já cruza a sua máquina, o seu OBS e cada plataforma pra dizer o que engasgou e quando.",
   "after.cost":
@@ -336,7 +336,7 @@ export const pt = {
   "after.scope.series.obs": "o OBS mandou",
   "after.scope.chat": "chat naquele momento",
   "after.scope.chart.aria":
-    "Gráfico de exemplo da live: a linha de latão é o que as plataformas receberam, a linha tracejada é o que o OBS mandou. Três momentos marcados: pico de chat, queda da Twitch e a hora em que o OBS fechou.",
+    "Gráfico de exemplo da live, em duas faixas: em cima, o que as plataformas receberam; embaixo, o que o OBS mandou. Três momentos marcados: o pico de chat aos 42 minutos, a queda da Twitch à 1h58 e a hora em que o OBS fechou, às 2h35 — quando a faixa de baixo zera e a de cima não.",
 
   "after.frame.live": "no ar",
   "after.frame.reconnect": "reconectando",
@@ -369,9 +369,9 @@ export const pt = {
 
   "after.moment.brb.tab": "o OBS fechou",
   "after.moment.brb.title": "Momento: o OBS fechou e o JÁ VOLTO entrou",
-  "after.moment.brb.finding": "A linha de latão não desce.",
+  "after.moment.brb.finding": "As três plataformas continuaram recebendo vídeo.",
   "after.moment.brb.reading":
-    "O OBS fechou às 2h35, o JÁ VOLTO entrou no ar e nenhuma plataforma perdeu a conexão — ninguém precisou voltar pra sua live.",
+    "O OBS fechou às 2h35 e o JÁ VOLTO entrou no lugar. Quem estava assistindo viu a tela de espera e continuou lá.",
   "after.moment.brb.chat.1": "cadê ele",
   "after.moment.brb.chat.2": "voltou!!",
   "after.moment.brb.chat.3": "nem saí da aba",
@@ -447,7 +447,7 @@ export const pt = {
   "protection.brb.art.title": "JÁ VOLTO",
   "protection.brb.body":
     "Se o OBS cair no meio da transmissão, esta tela entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna. Também serve pra pausa manual: um clique e você sai da cadeira com o microfone mudo.",
-  "protection.brb.note": "Use o slate da Corneta ou a sua imagem ou vídeo",
+  "protection.brb.note": "Use a tela JÁ VOLTO da Corneta ou a sua imagem ou vídeo",
   "protection.brb.title": "“JÁ VOLTO”: o sinal cai, a live continua",
   "protection.chat.body":
     "Ler, responder e moderar sem trocar de janela. Os alertas das plataformas e do Streamlabs no mesmo painel. E um overlay que você cola no OBS uma vez e esquece.",

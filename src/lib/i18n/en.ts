@@ -1148,7 +1148,7 @@ export const en: Dict = {
   "golive.brb.now": "BE RIGHT BACK now",
   // title do botão. 'aviso' → 'slate', termo já usado na LP (protection.brb.note).
   "golive.brb.title.back":
-    "Takes the slate off air and brings your content back",
+    "Takes BE RIGHT BACK off air and brings your content back",
   "golive.brb.title.on":
     "Puts the “BE RIGHT BACK” screen on air (with your mic muted)",
   "golive.brb.toast.back": "You're back! Your content's on air again 📣",
@@ -1260,7 +1260,7 @@ export const en: Dict = {
   // Mesmo termo da LP.
   "golive.security.bitrate.label": "Auto-bitrate",
   "golive.security.brb.desc":
-    "if OBS drops the signal, the slate goes on air and your stream never blinks",
+    "if OBS drops the signal, BE RIGHT BACK goes on air and your stream never blinks",
   "golive.security.brb.label": "BE RIGHT BACK",
   "golive.security.disabled": "off",
   // Termo já fixado na LP (protection.guard.privacy.title). A imagem do 'guardião' (pessoa) se perde, mas divergir da LP seria pior.

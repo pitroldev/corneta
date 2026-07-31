@@ -100,10 +100,11 @@ OBS. Kick. Cofre do Windows. O minuto do VOD. Perto do relógio. O Studio do You
 
 ---
 
-## 4. Os três vícios
+## 4. Os cinco vícios
 
-São os defeitos que aparecem quando a escrita entra no piloto automático — e os três dão o mesmo
-cheiro de texto gerado por máquina.
+São os defeitos que aparecem quando a escrita entra no piloto automático. Os três primeiros dão o
+mesmo cheiro de texto gerado por máquina; os dois últimos são piores, porque passam despercebidos
+justamente por parecerem certos — um soa como a nossa voz, o outro é específico demais.
 
 ### 4.1 A antítese simétrica
 
@@ -138,6 +139,44 @@ item mata um medo distinto.
 que existe na tela. Se o substantivo principal da frase for um desses, a frase ainda não foi
 escrita.
 
+### 4.4 A gíria que faz cara de voz
+
+O vício mais difícil de pegar, porque ele se **esconde dentro da virtude**: o tom é casual e
+brasileiro, então uma expressão feita passa no teste do "isso soa como a gente?" sem dizer nada.
+*Não larga do osso · dar conta do recado · tirar de letra · cair como uma luva.*
+
+| ❌ não | ✅ sim |
+|---|---|
+| "E não larga do osso: segura a live, junta o chat e, no fim, te conta como foi." | "Se o OBS fechar, ela segura a live no ar. O chat das três chega numa janela só. E no fim ela diz em que minuto engasgou." |
+| "A Corneta dá conta do recado." | "A Corneta reconecta o destino sozinha, sem derrubar os outros." |
+
+**O teste que resolve: traduza pro inglês.** A LP e o app são bilíngues, e frase feita não
+atravessa — ela vira *outra* figura de linguagem, porque não havia fato pra carregar. Aconteceu
+exatamente assim: `"não larga do osso"` virou `"it doesn't look away"`, uma imagem completamente
+diferente, e ninguém notou porque as duas eram igualmente vazias. Frase com conteúdo chega do
+outro lado com o **mesmo** conteúdo, mesmo que com outras palavras.
+
+> Isto não proíbe falar como gente — `"bora cornetar"`, `"tá liso"` e `"segura a corneta"`
+> continuam. A diferença é que essas são **nossas** e dizem algo; a expressão feita é de todo
+> mundo e não diz nada.
+
+### 4.5 O nome interno na cara do streamer
+
+Palavra que só existe no nosso código ou no nosso design system, escrita como se o streamer
+soubesse dela. É o vício que a regra 4.3 **não** pega: `"a linha de latão"` é concretíssima — só
+que num vocabulário que quem lê não tem.
+
+| ❌ não | ✅ sim | de onde vazou |
+|---|---|---|
+| "A linha de latão não desce." | "As três plataformas continuaram recebendo vídeo." | `latão` é o nome da cor no `DESIGN.md` |
+| "O compositor segue publicando." | "A live continua no ar mesmo com o OBS fechado." | `compositor` é um módulo do Rust |
+| "O slate entrou." | "A tela JÁ VOLTO entrou no ar." | `slate` é o nome no código; na tela está escrito JÁ VOLTO |
+
+**O teste: essa palavra aparece em algum lugar da tela do streamer?** Se ela só existe no
+`DESIGN.md`, no nome de um arquivo ou numa conversa nossa, ela não é copy. Lista curta do que
+nunca sai daqui: *latão, tomate, breu, papel* (cores), *compositor, splicer, bomba, programa,
+slate* (código), *NDJSON, schemaVersion, sessão* (dados).
+
 ---
 
 ## 5. Regra que ninguém lembra e vale por dez
@@ -153,6 +192,20 @@ Aconteceu duas vezes na mesma revisão:
 
 Nos dois casos o defeito não era escrita ruim: era abstração **desperdiçando uma demonstração que
 a página já tinha**.
+
+### A outra beirada da mesma regra
+
+Apostar na demonstração é dizer o que ela **significa** — não descrever como ela é. Descrever o
+desenho parece obedecer a regra (o texto está falando da imagem!) e é o erro oposto: obriga o
+leitor a decorar a legenda antes de entender a frase.
+
+| ❌ descreve o desenho | ✅ diz o que aconteceu |
+|---|---|
+| "A linha de latão não desce." | "As três plataformas continuaram recebendo vídeo." |
+| "A barra amarela some no minuto 118." | "A Twitch ficou 8s fora à 1h58." |
+
+Regra prática: se a frase deixa de fazer sentido quando alguém troca a cor do gráfico, ela está
+falando do desenho.
 
 ---
 
@@ -188,8 +241,12 @@ Antes de dar a frase por pronta:
 3. **Tem exatamente três itens?** Confira se os três são coisas diferentes ou o mesmo item três
    vezes.
 4. **Qual é o substantivo principal?** Se ele não existe na tela, troque por um que exista.
-5. **Tem imagem ao lado?** O texto aposta no que ela mostra?
-6. **Leia em voz alta.** Se você não falaria assim no Discord, não escreva assim no app.
+5. **Toda palavra aparece na tela do streamer?** Nome de cor, de módulo ou de arquivo não é copy.
+6. **Tem expressão feita?** Traduza pro inglês de cabeça. Se ela vira outra figura de linguagem
+   em vez do mesmo fato, ela não tinha fato nenhum.
+7. **Tem imagem ao lado?** O texto aposta no que ela mostra — e diz o que ela significa, não como
+   ela é desenhada?
+8. **Leia em voz alta.** Se você não falaria assim no Discord, não escreva assim no app.
 
 ---
 

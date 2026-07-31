@@ -83,4 +83,22 @@ describe("dicionários pt/en", () => {
       .map(([key]) => key);
     expect(leaked).toEqual([]);
   });
+  // Vício 4.5 do docs/TOM-DE-VOZ.md: nome interno na cara do streamer.
+  //
+  // Palavra que só existe no nosso código ou no nosso design system, escrita
+  // como se quem lê soubesse dela. É o vício que a regra do "substantivo
+  // abstrato" NÃO pega — "a linha de latão" é concretíssima, só que num
+  // vocabulário que o streamer não tem.
+  //
+  // Este teste existe porque a varredura manual achou cinco casos já no ar, e
+  // três deles eram tradução regredindo pro nome do código ("slate") enquanto o
+  // português dizia certo ("a tela JÁ VOLTO"). Doc não pega isso; teste pega.
+  it("não deixam nome interno vazar pra copy", () => {
+    const INTERNO =
+      /\b(lat[ãa]o|breu|compositor|splicer|bomba|slate|ndjson|schemaVersion|halftone)\b/i;
+    const vazou = [...entries(pt), ...entries(en)]
+      .filter(([, text]) => INTERNO.test(text))
+      .map(([key]) => key);
+    expect(vazou).toEqual([]);
+  });
 });

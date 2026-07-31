@@ -286,7 +286,7 @@ export const en: Dict = {
   "hero.nav.why": "Why Corneta",
   // "joga esse sinal" virou "pushes that signal out to" — é como streamer fala em inglês ("push to Twitch"). "junta o chat de todas" virou "pulls every ch
   "hero.pitch":
-    "You stream like you always do. Corneta pushes that signal out to Twitch, YouTube, Kick and wherever else you want — each one on its own connection. And it doesn't look away: it keeps the stream alive if your connection drops, pulls every chat into one window and, when it's over, tells you how it went.",
+    "You stream like you always do. Corneta pushes that signal out to Twitch, YouTube, Kick and wherever else you want — each one on its own connection. If OBS closes, it holds the stream up. Every chat lands in one window. And when it's over, it tells you which minute choked.",
   "hero.skiplink.label": "Skip to content",
   "hero.sticker": "Corneta · multistream on your PC",
   "hero.title.line1": "One stream.",
@@ -337,7 +337,7 @@ export const en: Dict = {
   "page-data.tiny.startup.title": "Starts with Windows",
   // "sopro de corneta" ecoa o nome do produto; em inglês "horn blast" guarda o som da animação mas perde o eco com "Corneta". Listado em intraduzíveis.
   "page-data.tiny.theme.text":
-    "The same poster in the dark or on paper — and flipping it blows the horn.",
+    "Corneta in dark or light — and flipping it blows the horn.",
   "page-data.tiny.theme.title": "Light and dark theme",
   "page-data.tiny.tray.text":
     "Closing the window hides Corneta next to the clock — the stream stays up.",
@@ -355,7 +355,7 @@ export const en: Dict = {
   "after.badge": "new",
   "after.title": "Click the glitch and see what was on screen.",
   "after.body":
-    "Corneta records what went out and keeps it on the same clock as every platform's bitrate, your CPU, the chat and the alerts. When the stream ends, the report points at the minute — and the video jumps there.",
+    "Corneta records what went out. And stamps everything with the same clock: each platform's bitrate, your CPU, the chat and the alerts. When the stream ends, the report points at the minute — and the video jumps there.",
   "after.proof":
     "The report works even without recording video: from your first stream it already cross-references your machine, your OBS and every platform to say what choked and when.",
   "after.cost":
@@ -370,7 +370,7 @@ export const en: Dict = {
   "after.scope.series.obs": "what OBS sent",
   "after.scope.chat": "chat at that moment",
   "after.scope.chart.aria":
-    "Example chart of a stream: the brass line is what the platforms received, the dashed line is what OBS sent. Three moments are marked: a chat spike, a Twitch drop, and the moment OBS closed.",
+    "Example chart of a stream, in two lanes: on top, what the platforms received; below, what OBS sent. Three moments are marked: the chat spike at 42 minutes, the Twitch drop at 1h58, and the moment OBS closed at 2h35 — when the bottom lane hits zero and the top one doesn't.",
 
   "after.frame.live": "on air",
   "after.frame.reconnect": "reconnecting",
@@ -403,9 +403,9 @@ export const en: Dict = {
 
   "after.moment.brb.tab": "OBS closed",
   "after.moment.brb.title": "Moment: OBS closed and BE RIGHT BACK took over",
-  "after.moment.brb.finding": "The brass line never dips.",
+  "after.moment.brb.finding": "All three platforms kept receiving video.",
   "after.moment.brb.reading":
-    "OBS closed at 2h35, BE RIGHT BACK went on air and no platform lost its connection — nobody had to come back to your stream.",
+    "OBS closed at 2h35 and BE RIGHT BACK took its place. Anyone watching saw the holding screen and stayed put.",
   "after.moment.brb.chat.1": "where'd he go",
   "after.moment.brb.chat.2": "he's back!!",
   "after.moment.brb.chat.3": "never even left the tab",
@@ -493,7 +493,7 @@ export const en: Dict = {
   "protection.brb.art.title": "BE RIGHT BACK",
   "protection.brb.body":
     "If OBS drops mid-stream, this screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns. It also works for a manual break: one click and you're out of the chair with the mic muted.",
-  "protection.brb.note": "Use Corneta's slate or your own image or video",
+  "protection.brb.note": "Use Corneta's BE RIGHT BACK screen or your own image or video",
   "protection.brb.title":
     "“BE RIGHT BACK”: the signal drops, the stream keeps going",
   "protection.chat.body":
