@@ -97,7 +97,7 @@ export function SiteHeader() {
           </a>
         </nav>
 
-        <DownloadButton compact label="Baixar no Windows" />
+        <DownloadButton compact label="Baixar grátis" />
       </Shell>
     </header>
   );
@@ -120,7 +120,7 @@ export function Hero() {
           <div>
             <Sticker className="animate-[copy-in_500ms_cubic-bezier(0.16,1,0.3,1)_both] mb-6.5">
               <Mascot />
-              Multistream no seu PC · Windows
+              Corneta · multistream no seu PC
             </Sticker>
             <h1 className="animate-[copy-in_620ms_70ms_cubic-bezier(0.16,1,0.3,1)_both] text-[clamp(2.95rem,4.9vw,4.45rem)] leading-[0.95] tracking-[-0.035em] max-[760px]:text-[clamp(2.55rem,11.4vw,3.4rem)] max-[420px]:text-[clamp(2.35rem,11vw,3rem)] [&>span]:block">
               <span>Uma live.</span>
@@ -161,7 +161,7 @@ export function Hero() {
 
         <div className="mt-[clamp(30px,3.5vw,44px)] flex flex-col items-center gap-3.5 pb-[clamp(46px,5vw,70px)] text-center max-[760px]:mt-[34px] [&_a]:min-h-[70px] [&_a]:w-[min(440px,100%)] [&_a]:text-[1.24rem] max-[760px]:[&_a]:min-h-[62px] max-[760px]:[&_a]:w-full max-[760px]:[&_a]:text-[1.06rem] [&>p]:text-[0.84rem] [&>p]:font-semibold [&>p]:text-faint">
           <DownloadButton />
-          <p>Windows 10/11 · sem cadastro · sem assinatura</p>
+          <p>Corneta para Windows 10/11 · sem cadastro · sem assinatura</p>
         </div>
       </Shell>
     </section>

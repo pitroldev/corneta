@@ -146,75 +146,81 @@
   --shadow-pop-cream: var(--pop-cream);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* Tudo aqui vai em @layer base de propósito.
+   CSS SEM camada vence CSS EM camada, sempre — então estas regras de elemento
+   estavam ganhando de todo utilitário do Tailwind. Foi assim que `a { color:
+   inherit }` apagou o `text-brass-ink` do skip link e dos botões de download,
+   deixando creme sobre latão (1.63:1) e creme sobre tomate (2.82:1). */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-html {
-  scroll-behavior: smooth;
-  background: var(--breu);
-}
+  html {
+    scroll-behavior: smooth;
+    background: var(--breu);
+  }
 
-body {
-  margin: 0;
-  overflow-x: clip;
-  color: var(--ink-on-dark);
-  background-color: var(--breu);
-  background-image: var(--halftone-dark);
-  background-size: 20px 20px;
-  font-family: var(--font-inter), "Segoe UI", system-ui, sans-serif;
-  font-size: 16px;
-  font-weight: 450;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
+  body {
+    margin: 0;
+    overflow-x: clip;
+    color: var(--ink-on-dark);
+    background-color: var(--breu);
+    background-image: var(--halftone-dark);
+    background-size: 20px 20px;
+    font-family: var(--font-inter), "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 450;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-h1,
-h2,
-h3 {
-  margin: 0;
-  font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+    font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
 
-p {
-  margin: 0;
-}
+  p {
+    margin: 0;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button,
-a,
-summary {
-  -webkit-tap-highlight-color: transparent;
-}
+  button,
+  a,
+  summary {
+    -webkit-tap-highlight-color: transparent;
+  }
 
-svg {
-  display: block;
-}
+  svg {
+    display: block;
+  }
 
-::selection {
-  color: var(--brass-ink);
-  background: var(--brass);
-}
+  ::selection {
+    color: var(--brass-ink);
+    background: var(--brass);
+  }
 
-/* Foco on-brand: traço seco de latão, nada de glow. */
-:focus-visible {
-  outline: 3px solid var(--brass);
-  outline-offset: 3px;
-  border-radius: 2px;
-}
+  /* Foco on-brand: traço seco de latão, nada de glow. */
+  :focus-visible {
+    outline: 3px solid var(--brass);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
 
-[data-on-brass]:focus-visible {
-  outline-color: var(--brass-ink);
+  [data-on-brass]:focus-visible {
+    outline-color: var(--brass-ink);
+  }
 }
-
 /* ============================================================
    Peças recorrentes do mundo: adesivo, bloco de latão, faixa
    ============================================================ */

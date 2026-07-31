@@ -92,7 +92,7 @@ export function Faq({ downloadUrl }: { downloadUrl: string }) {
               data-placeholder-link="replace-me"
             >
               <WindowsIcon />
-              <span>Baixar grátis para Windows</span>
+              <span>Baixar grátis</span>
             </a>
           </SectionHeading>
 
@@ -169,7 +169,8 @@ export function FinalCta() {
               <Mascot />
             </span>
             <h2 className="max-w-[24ch] text-[clamp(2.35rem,4.2vw,3.9rem)] leading-[0.98] tracking-[-0.03em] max-md:text-[clamp(2.1rem,10.5vw,3rem)]">
-              Baixe, ligue no seu programa de live e chegue mais longe.
+              Baixe a Corneta, ligue no seu programa de live e chegue mais
+              longe.
             </h2>
           </div>
           <div className="flex flex-col items-start gap-4 [&>a]:w-[min(400px,100%)] [&>p]:text-[0.78rem] [&>p]:font-[650] [&>p]:text-faint">

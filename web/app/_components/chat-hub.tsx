@@ -49,7 +49,11 @@ const MSG =
   "[&>div>p]:mt-[3px] [&>div>p]:text-[0.8rem] [&>div>p]:leading-[1.4] [&>div>p]:font-[550]";
 const MSG_HEAD =
   "flex items-center gap-1.5 [&>strong]:text-[0.74rem] [&>strong]:font-extrabold";
-const MSG_TIME = "ml-auto text-[0.56rem] font-bold tabular-nums text-faint";
+// text-faint sobre superfície elevada dá 4.44:1 e não passa AA. O token
+// faint-raised existe exatamente pra esse caso — é o mesmo creme apagado, um
+// passo mais claro.
+const MSG_TIME =
+  "ml-auto text-[0.56rem] font-bold tabular-nums text-faint-raised";
 const BADGE =
   "rounded-sm px-[5px] py-px text-[0.5rem] font-extrabold tracking-[0.04em] uppercase";
 
@@ -114,7 +118,7 @@ function ChatPanel() {
               <strong>bot_spam_xyz</strong>
               <span className={MSG_TIME}>21:43</span>
             </div>
-            <p className="text-faint line-through">
+            <p className="text-faint-raised line-through">
               mensagem removida pela moderação
             </p>
           </div>

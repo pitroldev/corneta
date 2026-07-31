@@ -29,9 +29,17 @@ const CHAT_LINE =
 function RouteFan() {
   return (
     <div className="grid grid-cols-[62px_34px_1fr] items-center max-[760px]:grid-cols-[54px_26px_1fr]">
-      <span className="grid size-[62px] max-[760px]:size-[54px] max-[760px]:text-[0.92rem] place-items-center gap-0.5 rounded-md bg-brass font-display text-[1.05rem] font-extrabold text-brass-ink shadow-pop-sm [&>svg]:h-[22px] [&>svg]:w-[22px] [&>svg]:fill-current">
+      {/* "OBS" não tem letra com descendente, mas a caixa de linha da Baloo 2
+          reserva o espaço dela assim mesmo — quase 7px vazios abaixo da tinta.
+          O grid centraliza CAIXAS, não tinta, então essa sobra empurrava o
+          conjunto pra cima e o logo encostava na borda de topo. `leading-none`
+          tira boa parte do fantasma. O que sobra é a assimetria da própria
+          fonte, e aí não tem cálculo: o `pt` é correção ÓPTICA medida na tela —
+          sem ele restavam 5,6px de tinta em cima contra 10,7px embaixo, e
+          padding no topo empurra o conteúdo centralizado metade disso. */}
+      <span className="grid size-[62px] place-items-center gap-1 rounded-md bg-brass pt-[5px] font-display text-[1.05rem] font-extrabold text-brass-ink shadow-pop-sm max-[760px]:size-[54px] max-[760px]:text-[0.92rem] [&>svg]:h-5 [&>svg]:w-5 [&>svg]:fill-current">
         <ObsMark />
-        OBS
+        <span className="leading-none">OBS</span>
       </span>
 
       {/* Em porcentagem da altura: com 3 linhas de 42px e 8px de respiro, os

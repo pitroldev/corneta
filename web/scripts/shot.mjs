@@ -35,6 +35,9 @@ const flag = (name, fallback) => {
 const selector = flag("sel", null);
 const width = Number(flag("w", 1280));
 const path = flag("path", "/");
+// Amplia a captura sem mexer no layout: útil pra julgar alinhamento óptico de
+// peça pequena, onde um PNG 1:1 de 62px não deixa ver nada.
+const scale = Number(flag("scale", 1));
 
 const chrome = spawn(
   CHROME,
@@ -136,6 +139,16 @@ await cdp.send("Runtime.evaluate", {
     document.head.appendChild(s);
   `,
 });
+
+if (scale !== 1) {
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width,
+    height: 900,
+    deviceScaleFactor: scale,
+    mobile: false,
+  });
+  await sleep(300);
+}
 
 let clip;
 if (selector) {

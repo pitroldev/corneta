@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { twMerge } from "tailwind-merge";
 
 // Primitivas compartilhadas da LP, em utilitário do Tailwind.
 //
@@ -9,9 +10,18 @@ import type { ReactNode } from "react";
 //
 // Mesmo vocabulário do app: bloco sólido, canto seco, sombra dura sem blur.
 
-/** Junta classes ignorando vazios. O site não tem clsx e não precisa. */
+/**
+ * Junta classes RESOLVENDO conflito, não só concatenando.
+ *
+ * Isso não é conveniência: concatenar é errado. Se `min-h-16` e `min-h-11`
+ * chegam juntos, quem vence é o que o Tailwind emitiu por último na FOLHA — não
+ * o último da string. Foi assim que o `compact` do botão de download sumiu e a
+ * navbar ficou com um botão de 64px de altura, e o mesmo aconteceu com a cor do
+ * item ativo da navegação na réplica do app. O `twMerge` desempata pela ordem
+ * em que as classes aparecem aqui, que é a que a gente escreve esperando.
+ */
 export function cn(...parts: (string | false | null | undefined)[]) {
-  return parts.filter(Boolean).join(" ");
+  return twMerge(parts.filter(Boolean).join(" "));
 }
 
 /** Caixa central de toda seção — a largura de leitura da LP. */

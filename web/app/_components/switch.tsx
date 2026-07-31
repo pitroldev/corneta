@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 
 // Abas do "chat unificado" e da "mesa de qualidade".
 //
@@ -11,9 +11,10 @@ import { AnimatePresence, motion } from "framer-motion";
 // globals.css, e o componente ficava amarrado a IDs globais — dois switches na
 // mesma página só não colidiam porque os nomes foram escolhidos à mão.
 //
-// O que se ganha além de sumir com o CSS: a faixa de latão agora DESLIZA entre
-// as abas (layoutId), em vez de piscar de uma pra outra, e o painel entra com
-// transição em vez de trocar de `display`.
+// A animação aqui é deliberadamente contida: transição de cor na aba e fade no
+// painel, nada que mexa em layout. Uma versão anterior deslizava a faixa de
+// latão entre as abas com `layoutId` — bonito, mas com dois defeitos reais que
+// os comentários abaixo detalham.
 //
 // O que se perde, e é honesto registrar: isto é um client component. Antes as
 // abas respondiam sem JavaScript nenhum, inclusive antes da hidratação.
@@ -81,28 +82,23 @@ export function Switch({
               onClick={() => setActive(item.id)}
               onKeyDown={(e) => onKeyDown(e, i)}
               className={[
-                "relative cursor-pointer rounded-md px-3.75 py-2.5 text-left max-[760px]:px-3 max-[760px]:py-2",
+                "cursor-pointer rounded-md px-3.75 py-2.5 text-left max-[760px]:px-3 max-[760px]:py-2",
+                "transition-[background-color,color,box-shadow] duration-150 ease-out",
                 "outline-offset-[3px] focus-visible:outline-[3px] focus-visible:outline-brass",
                 on
-                  ? "text-brass-ink"
+                  ? "bg-brass text-brass-ink shadow-pop-brass"
                   : "bg-surface-2 text-muted hover:bg-surface-3 hover:text-cream",
               ].join(" ")}
             >
-              {/* A faixa desliza entre as abas. Ela vem ANTES do texto no DOM e
-                  os dois são posicionados, então o texto pinta por cima sem
-                  precisar de z-index negativo — que jogaria o latão pra trás do
-                  fundo da página e deixaria tinta escura sobre escuro. */}
-              {on && (
-                <motion.span
-                  layoutId={`${group}-active`}
-                  className="absolute inset-0 rounded-md bg-brass shadow-pop-brass"
-                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                />
-              )}
-              <span className="relative block font-display text-[1.05rem] leading-[1.1] font-bold max-[760px]:text-[0.94rem]">
+              {/* O latão é fundo do PRÓPRIO botão, não uma faixa que desliza por
+                  cima com layoutId. A faixa era mais bonita, mas durante o voo
+                  de ~250ms o texto da aba recém-ativa (tinta escura) ficava sem
+                  latão embaixo — 1.18:1, ilegível, num piscar a cada clique.
+                  Fundo direto com transição de cor não tem esse buraco. */}
+              <span className="block font-display text-[1.05rem] leading-[1.1] font-bold max-[760px]:text-[0.94rem]">
                 {item.title}
               </span>
-              <span className="relative mt-0.5 block text-[0.66rem] font-extrabold uppercase tracking-[0.08em] opacity-75">
+              <span className="mt-0.5 block text-[0.66rem] font-extrabold tracking-[0.08em] uppercase opacity-75">
                 {item.hint}
               </span>
             </button>
@@ -110,20 +106,23 @@ export function Switch({
         })}
       </div>
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={current.id}
-          role="tabpanel"
-          id={`${group}-panel-${current.id}`}
-          aria-labelledby={`${group}-tab-${current.id}`}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-        >
-          {current.panel}
-        </motion.div>
-      </AnimatePresence>
+      {/* SEM AnimatePresence de propósito.
+          Com `mode="wait"` o painel antigo desmontava, o container colapsava
+          pra zero e só então o novo montava — tudo abaixo da seção pulava pra
+          cima e voltava a cada troca de aba. Trocando o painel direto, a
+          mudança de altura acontece uma vez só, e a entrada é só opacidade:
+          nada de `y`, que somava um solavanco por cima do salto. */}
+      <motion.div
+        key={current.id}
+        role="tabpanel"
+        id={`${group}-panel-${current.id}`}
+        aria-labelledby={`${group}-tab-${current.id}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.14, ease: "easeOut" }}
+      >
+        {current.panel}
+      </motion.div>
     </div>
   );
 }
