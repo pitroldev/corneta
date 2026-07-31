@@ -229,9 +229,45 @@ detectam e atualizam sozinhos no próximo `check()`.
 
 ## Checklist
 
-- [ ] `pnpm tauri add updater` + `pnpm tauri add process`
-- [ ] Chave do updater gerada e guardada com segurança (pública no config, privada nos secrets)
-- [ ] `createUpdaterArtifacts: true` + `plugins.updater` no `tauri.conf.json`
-- [ ] `check()/downloadAndInstall()/relaunch()` no app
-- [ ] `.github/workflows/release.yml` com os secrets configurados
+- [x] `pnpm tauri add updater` + `pnpm tauri add process`
+- [x] Chave do updater gerada e guardada com segurança (pública no config, privada nos secrets)
+- [x] `createUpdaterArtifacts: true` + `plugins.updater` no `tauri.conf.json`
+- [x] `check()/downloadAndInstall()/relaunch()` no app
+- [x] `.github/workflows/release.yml` com os secrets configurados
 - [ ] Primeira release de teste publicada e atualização validada de uma versão pra outra
+
+---
+
+## Estado da implementação (2026-07-30)
+
+**Pronto no código:**
+
+- `tauri-plugin-updater` + `tauri-plugin-process` no Cargo, registrados no `lib.rs`.
+- `plugins.updater` no `tauri.conf.json`: endpoint no `releases/latest/download/latest.json`,
+  chave pública embutida, `installMode: "passive"` (mostra a barra de progresso do NSIS sem pedir
+  clique). `bundle.createUpdaterArtifacts: true` — **sem isso o build não emite os `.sig`** e a
+  atualização falha em silêncio.
+- Permissões `updater:default` e `process:allow-restart` na capability da janela principal.
+- `src/lib/updater.ts` (checagem + instalação + store) e `src/components/UpdateBanner.tsx`
+  (faixa no topo + botão "Procurar atualizações" na tela Sobre).
+- `.github/workflows/release.yml`: dispara na tag `v*`, baixa os sidecars com verificação de
+  SHA-256, builda, assina e publica como **rascunho**.
+
+**A regra de produto que moldou o código:** instalar reinicia o app, e o processo é dono do
+MediaMTX e de um FFmpeg por destino. Reiniciar no ar **derruba a transmissão**. Por isso o botão
+"Atualizar agora" fica desabilitado enquanto o motor não está `stopped`, e a faixa troca o texto
+pra "Você está no ar — atualize quando encerrar a live". O plugin sozinho não sabe disso.
+
+**Falta você fazer (uma vez):**
+
+1. A chave privada está em `~/.tauri/corneta-updater.key` (fora do repositório, senha vazia).
+2. Crie dois secrets no GitHub (**Settings → Secrets and variables → Actions**):
+   - `TAURI_SIGNING_PRIVATE_KEY` = o conteúdo do arquivo `corneta-updater.key`
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = vazio
+3. Guarde uma cópia da chave privada em lugar seguro e **apague o arquivo local** se preferir.
+   Perder essa chave significa que nenhuma versão futura consegue atualizar quem já instalou —
+   todo mundo teria que baixar e instalar na mão de novo.
+4. Publique uma release de teste e valide a atualização N-1 → N numa máquina.
+
+> A chave **pública** correspondente já está no `tauri.conf.json` e é pública por natureza —
+> ela só serve pra verificar assinatura, não pra criar uma.

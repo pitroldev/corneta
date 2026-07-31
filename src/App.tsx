@@ -23,6 +23,7 @@ const SCREENS: Screen[] = [
   "about",
 ];
 import { TitleBar } from "./components/TitleBar";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { LiveBar } from "./components/LiveBar";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
@@ -317,6 +318,8 @@ export default function App() {
             </div>
           </div>
         )}
+
+        <UpdateBanner />
 
         {!censored && <LiveBar onOpen={() => navigate("golive")} />}
 

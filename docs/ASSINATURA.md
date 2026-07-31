@@ -182,9 +182,42 @@ Para Azure (A/B), em vez disso passe `AZURE_CLIENT_ID/SECRET/TENANT_ID` como sec
 
 ---
 
+---
+
+## Decisão do v1 (2026-07-30): **lançar SEM assinar**
+
+Não há verba pra certificado agora. Isso é uma decisão consciente, não um esquecimento —
+e tem consequência concreta: **todo mundo que baixar vai ver o SmartScreen** ("O Windows protegeu
+o seu PC"), com o botão de executar escondido atrás de "Mais informações".
+
+**O que NÃO adianta fazer:**
+
+- **Certificado autoassinado.** O SmartScreen não avalia se a assinatura é válida, e sim se o
+  binário/publicador tem **reputação**. Autoassinado dá o mesmo alerta, com trabalho a mais.
+- **Esperar reputação chegar sozinha.** Reputação se acumula por volume de downloads. Um app novo
+  e sem assinatura praticamente não acumula — o relógio só começa a andar de verdade com cert.
+
+**O que dá pra fazer de graça e reduz a perda:**
+
+1. **Explicar o alerta ANTES de ele aparecer.** Uma seção curta na página de download, com o
+   print exato da tela e a seta em "Mais informações → Executar assim mesmo". Quem é avisado
+   antes não interpreta como vírus; quem é pego de surpresa fecha a janela.
+2. **Publicar o SHA-256** de cada instalador na release. Quem desconfia consegue conferir.
+3. **Link do VirusTotal** do `.exe` na própria release. É o argumento mais forte que existe sem
+   certificado, porque não é você falando.
+4. **Distribuir pelo GitHub Releases**, não por um link qualquer. `github.com/pitroldev/corneta`
+   com o código aberto ao lado do binário vale muito como sinal de confiança.
+
+**Quando reavaliar:** assim que houver receita. O caminho mais barato hoje é o Azure Trusted
+Signing (ordem de ~US$ 10/mês, confirmar preço e requisitos de validação na hora), bem abaixo do
+OV tradicional. Até lá, o item 7 do [`PENDENCIAS.md`](./PENDENCIAS.md) fica ⛔ **por decisão**.
+
+---
+
 ## Checklist
 
-- [ ] Decidir a estratégia (sem assinar no beta → Trusted Signing / OV depois)
+- [x] Decidir a estratégia — **v1 sai sem assinar** (ver a seção acima)
+- [ ] Página de download com o aviso do SmartScreen explicado + SHA-256 + VirusTotal
 - [ ] Configurar `bundle.windows` (thumbprint **ou** signCommand) no `tauri.conf.json`
 - [ ] `pnpm tauri build` assinando localmente OK
 - [ ] Secrets no GitHub (pfx base64 **ou** credenciais Azure)

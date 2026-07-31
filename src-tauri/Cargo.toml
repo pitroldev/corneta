@@ -62,6 +62,8 @@ keyring = { version = "3", features = ["windows-native"] }
 # que o Tauri já traz; só compila axum/axum-core/matchit/tokio-tungstenite a mais.
 axum = { version = "=0.8.4", default-features = false, features = ["http1", "tokio", "ws"] }
 tokio = { version = "1", features = ["net", "sync", "macros", "time"] }
+tauri-plugin-updater = "2.0.0-rc.4"
+tauri-plugin-process = "2.0.0-rc.1"
 
 # OCR local do guardião anti-vazamento via Windows.Media.Ocr (nativo, sem binário extra).
 [target.'cfg(windows)'.dependencies]

@@ -1,0 +1,64 @@
+# Publica uma release: builda o instalador NSIS, assina os artefatos com a chave do
+# updater e sobe tudo (incluindo o `latest.json`) num release do GitHub.
+#
+# O `latest.json` é o que o app lê — o endpoint em `tauri.conf.json` aponta pro
+# `releases/latest/download/latest.json`. Sem este workflow, o updater não tem o que ler.
+#
+# Como disparar: crie a tag da versão e empurre.
+#   git tag v0.5.3 && git push origin v0.5.3
+# A tag precisa BATER com a `version` do `tauri.conf.json` (o `pnpm bump` cuida disso).
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Permite um ensaio manual sem criar tag (sai como rascunho, igual).
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # Os sidecars não são versionados: o script baixa e CONFERE o SHA-256 antes de
+      # copiar pra src-tauri/binaries. Sem isso o bundle sai sem ffmpeg/mediamtx.
+      - name: Baixar sidecars (ffmpeg + mediamtx)
+        shell: pwsh
+        run: pwsh -File scripts/fetch-binaries.ps1
+
+      - name: Build + assinatura do updater
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Chave PRIVADA do updater. Só existe como secret do repositório — nunca
+          # no git, nunca no log. A pública correspondente está no tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Corneta ${{ github.ref_name }}"
+          releaseBody: "Baixe o `.exe` abaixo. Quem já tem a Corneta instalada recebe o aviso de atualização dentro do app."
+          # Rascunho de propósito: o instalador é NÃO ASSINADO (SmartScreen), então
+          # vale conferir numa máquina antes de publicar pra todo mundo.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true

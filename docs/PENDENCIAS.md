@@ -24,12 +24,12 @@
 
 | # | Item | Status | Quem | Critério de pronto |
 |---|---|---|---|---|
-| 1 | **Teste ao vivo end-to-end** (OBS → Corneta → plataforma) | ✅ | 🧑 | **Twitch confirmado** (2026-06-23)! Falta validar **multi-plataforma simultâneo** |
+| 1 | **Teste ao vivo end-to-end** (OBS → Corneta → plataforma) | ✅ | 🧑 | Twitch (2026-06-23) e **multi-plataforma simultâneo com streamers reais** (2026-07-30) |
 | 2 | **Caminho de ingestão** (OBS→MediaMTX→fan-out) | ✅ | 🤖 | Validado de ponta a ponta com vídeo+áudio reais |
 | 3 | **Reconexão / resiliência** | ✅ | 🤖 | MediaMTX como ingestão + **respawn do FFmpeg**: OBS pode cair e voltar |
-| 4 | **Saída RTMPS** (Facebook/Kick) confirmada | 🔬 | 🧑 | Twitch (RTMP) ✅; falta confirmar uma plataforma **RTMPS** |
+| 4 | **Saída RTMPS** (Facebook/Kick) confirmada | ✅ | 🧑 | **Kick confirmado** (2026-07-30) |
 
-> O item 1 destrava tudo. Os 2–4 dependem do que ele revelar.
+> P0 fechado: o caminho crítico está validado ao vivo, com gente de verdade transmitindo.
 
 ---
 
@@ -37,10 +37,10 @@
 
 | # | Item | Status | Quem | Critério de pronto |
 |---|---|---|---|---|
-| 5 | **Gerar instalador** (`pnpm tauri build` → NSIS) | 🟡 | 🤖+🧑 | **Gerado:** `Corneta_0.1.0_x64-setup.exe` (não assinado). Falta você validar instalar+abrir |
-| 6 | **Auto-update via GitHub** | ⛔ | 🤖+🧑 | Conforme [`ATUALIZACAO-AUTOMATICA.md`](./ATUALIZACAO-AUTOMATICA.md); update de v→v validado |
-| 7 | **Assinatura de código (Windows)** | ⛔ | 🧑 | Conforme [`ASSINATURA.md`](./ASSINATURA.md); instala sem alerta (ou OV com reputação) |
-| 8 | **Licença** (MIT/Apache-2.0) + `LICENSE` no repo | ⛔ | 🧑 | Arquivo de licença escolhido e commitado |
+| 5 | **Gerar instalador** (`pnpm tauri build` → NSIS) | ✅ | 🤖+🧑 | Gerado e **validado em máquina limpa** (2026-07-30) |
+| 6 | **Auto-update via GitHub** | 🟡 | 🤖+🧑 | Plugin, UI e workflow de release prontos (2026-07-30). Falta o **secret no GitHub** e um teste real N-1 → N |
+| 7 | **Assinatura de código (Windows)** | ⛔ | 🧑 | **Adiado — sem verba.** Lança com SmartScreen; ver [`ASSINATURA.md`](./ASSINATURA.md) e a mitigação abaixo |
+| 8 | **Licença** (MIT/Apache-2.0) + `LICENSE` no repo | ✅ | 🧑 | MIT, `LICENSE` na raiz |
 | 9 | **Metadados do app** | ✅ | 🤖 | publisher/copyright/category/homepage/descrições no `tauri.conf` |
 | 10 | **Log em arquivo** (`tauri-plugin-log`) | ✅ | 🤖 | Grava no app log dir + stdout; logs do motor (start/stop/respawn/erros) |
 

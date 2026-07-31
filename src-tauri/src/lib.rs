@@ -167,6 +167,11 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        // Auto-update via GitHub Releases. Quem decide a hora de instalar é o frontend
+        // (`src/lib/updater.ts`): a instalação REINICIA o app, e reiniciar no meio de
+        // uma live derrubaria a transmissão.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
             chat: Mutex::new(chat::ChatRuntime::default()),

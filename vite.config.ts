@@ -29,6 +29,13 @@ export default defineConfig(async () => ({
 
   // Variáveis de ambiente do Tauri ficam disponíveis no front com este prefixo.
   envPrefix: ["VITE_", "TAURI_ENV_"],
+
+  test: {
+    // `.claude/worktrees` guarda CÓPIAS inteiras do repositório (worktrees de
+    // sessão). Sem excluir, o Vitest roda a suíte duas vezes — e a segunda é uma
+    // versão ANTIGA do código, que pode passar ou quebrar por conta própria.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**"],
+  },
   build: {
     // Alvo do WebView2 (Windows) / WKWebView; ES2021 é seguro.
     target: "es2021",

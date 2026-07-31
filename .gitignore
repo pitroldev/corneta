@@ -15,6 +15,9 @@ src-tauri/gen/
 src-tauri/binaries/*
 !src-tauri/binaries/.gitkeep
 
+# Worktrees de sessão do Claude Code (cópias inteiras do repo — nunca versionar)
+.claude/worktrees/
+
 # Logs
 *.log
 npm-debug.log*

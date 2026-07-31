@@ -12,6 +12,7 @@ import { LEGAL_URLS } from "../lib/legal";
 import { LegalLink } from "../components/legal";
 import { Mascot, SoundWaves } from "../components/decor";
 import { SectionTitle } from "../components/ui";
+import { CheckUpdateButton } from "../components/UpdateBanner";
 
 function useAppVersion(): string {
   const [version, setVersion] = useState(__APP_VERSION__);
@@ -181,8 +182,10 @@ export function AboutScreen() {
         <LegalLink href={LEGAL_URLS.privacy}>Política de Privacidade</LegalLink>
       </p>
 
-      <p className="mt-3 text-center text-[11px] font-semibold text-ink-faint">
-        Corneta v{appVersion} · multi-stream
+      <p className="mt-3 flex items-center justify-center gap-3 text-[11px] font-semibold text-ink-faint">
+        <span>Corneta v{appVersion} · multi-stream</span>
+        <span aria-hidden>·</span>
+        <CheckUpdateButton version={appVersion} />
       </p>
     </div>
   );
