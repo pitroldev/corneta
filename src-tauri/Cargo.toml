@@ -55,14 +55,14 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 # (5-15s e crescendo) ao vivo. CPU também dispensa bundlar a DirectML.dll.
 # `ort` FIXO no rc.10 (rc.11+ quebra o oar-ocr).
 oar-ocr = "0.2"
-ort = "=2.0.0-rc.10"
+ort = "=2.0.0-rc.13"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
 keyring = { version = "3", features = ["windows-native"] }
 # Mesa (co-stream P2P): servidor local HTTP (página de estúdio pro OBS) + relay de
 # sinalização WebRTC. axum =0.8.4 (MSRV ok p/ rust 1.77) reusa o stack hyper1/http1/tower
 # que o Tauri já traz; só compila axum/axum-core/matchit/tokio-tungstenite a mais.
-axum = { version = "=0.8.4", default-features = false, features = ["http1", "tokio", "ws"] }
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
 tokio = { version = "1", features = ["net", "sync", "macros", "time"] }
 tauri-plugin-updater = "2.0.0-rc.4"
 tauri-plugin-process = "2.0.0-rc.1"
