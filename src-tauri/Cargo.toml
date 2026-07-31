@@ -1,6 +1,6 @@
 [package]
 name = "corneta"
-version = "0.5.2"
+version = "0.6.0"
 description = "Corneta — transmita para todas as plataformas ao mesmo tempo."
 authors = ["Pitrol"]
 edition = "2021"
@@ -16,7 +16,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # protocol-asset: o `<video>` do replay lê a gravação do disco. O escopo nasce vazio e cada
-# arquivo é liberado em runtime (ver commands::record_video_url).
+# arquivo é liberado em runtime (ver commands::record_allow_file).
 tauri = { version = "2", features = ["tray-icon", "image-png", "protocol-asset"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
