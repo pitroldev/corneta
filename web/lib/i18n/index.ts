@@ -42,3 +42,24 @@ export function fill(text: string, vars: Record<string, string>): string {
     name in vars ? vars[name] : whole,
   );
 }
+
+/**
+ * Separador de milhar do idioma.
+ *
+ *  NÃO é chave de dicionário: o valor do português é um ESPAÇO, e o
+ *  `dict.test.ts` reprova — com razão — frase que fica vazia depois do `trim()`.
+ *  Isto aqui é regra de formatação, não frase.
+ */
+export function thousandsSep(locale: Locale): string {
+  return locale === "en" ? "," : " ";
+}
+
+/**
+ * Agrupa o milhar no estilo que a LP já usa à mão ("1 284", "3 412").
+ *
+ *  Não é `Intl.NumberFormat`: em pt-BR ele devolveria "1.284", e aí o número que
+ *  se MOVE nos painéis divergiria do número escrito ao lado, na mesma tela.
+ */
+export function group(n: number, sep: string): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+}

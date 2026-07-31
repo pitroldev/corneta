@@ -1,0 +1,532 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { PlatformGlyph } from "./decor";
+import { CoinIcon, HeartIcon, RaidIcon, StarIcon } from "./icons";
+import { cn } from "./ui";
+import { useCalm, useHeartbeat } from "./use-motion";
+
+// ============================================================
+// "A galera junta" — as três peças que ESTÃO acontecendo
+// ============================================================
+// A versão anterior era uma lista parada com uma mensagem já riscada: o
+// RESULTADO da moderação, sem o ato. E a única coisa que se movia era um risco
+// que corria uma vez, quando o painel entrava na tela.
+//
+// O que a seção promete é um chat de três plataformas caindo num lugar só e
+// você moderando dali. Então:
+//
+//  • o feed RECEBE mensagem o tempo todo, das três plataformas;
+//  • chegar perto de uma mensagem revela apagar / timeout / responder no lugar
+//    do horário — a troca que o app faz;
+//  • apagar apaga DE VERDADE: o risco corre, o texto vira lápide e some. É a
+//    frase do dicionário ("a mensagem vira lápide em vez de sumir sem
+//    explicação") acontecendo em vez de sendo prometida;
+//  • responder joga o @ no campo de baixo, que é pra onde a resposta iria.
+//
+// Nada disso é decoração: cada gesto é uma função que a tela de Chat do app tem.
+//
+// Com `prefers-reduced-motion` o laço para (o feed congela onde está) e TODAS
+// as ações continuam funcionando. Some o movimento, não a ferramenta.
+
+type PlatId = "twitch" | "youtube" | "kick";
+
+export interface ChatMsg {
+  name: string;
+  text: string;
+  platform: PlatId;
+  badge?: string;
+  /** `mod` é verde, `member` é latão — as mesmas cores dos selos do app. */
+  badgeTone?: "mod" | "member";
+}
+
+export interface ChatFeedCopy {
+  label: string;
+  example: string;
+  pool: ChatMsg[];
+  actionDelete: string;
+  actionTimeout: string;
+  actionReply: string;
+  removed: string;
+  timedOut: string;
+  input: string;
+  sendAll: string;
+  hint: string;
+}
+
+/** Uma linha de mensagem: glifo de 26px + corpo. */
+// `shrink-0` não é detalhe: a caixa tem altura fixa e guarda mais falas do que
+// cabe. Sem ele o flex ESPREME todas pra caber, e o chat vira um acordeão em vez
+// de rolar.
+const MSG =
+  "group relative grid shrink-0 grid-cols-[26px_minmax(0,1fr)] gap-[9px] rounded-md bg-surface px-2.5 py-[9px] " +
+  "[&_.glyph]:h-[26px] [&_.glyph]:w-[26px]";
+const MSG_HEAD =
+  "flex items-center gap-1.5 [&>strong]:text-[0.74rem] [&>strong]:font-extrabold";
+// `text-faint` sobre superfície elevada dá 4.44:1 e não passa AA. O token
+// `faint-raised` existe exatamente pra esse caso.
+const MSG_TIME =
+  "ml-auto text-[0.56rem] font-bold tabular-nums text-faint-raised transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0";
+const BADGE =
+  "rounded-sm px-[5px] py-px text-[0.5rem] font-extrabold tracking-[0.04em] uppercase";
+const ACTION =
+  "cursor-pointer rounded-sm border border-border-dry bg-surface-2 px-[7px] py-[3px] text-[0.56rem] font-extrabold tracking-[0.04em] text-muted uppercase " +
+  "outline-offset-2 transition-colors duration-120 hover:border-brass hover:text-cream focus-visible:outline-2 focus-visible:outline-brass " +
+  "[@media(pointer:coarse)]:px-2.5 [@media(pointer:coarse)]:py-1.5";
+
+/** Ritmo do feed. Rápido o bastante pra parecer chat de live, devagar o
+ *  bastante pra dar tempo de ler antes da próxima subir. */
+const ARRIVAL_MS = 2600;
+/** Quantas falas o estado guarda.
+ *
+ *  A CAIXA é que decide quantas aparecem (altura fixa + `justify-end`): as mais
+ *  velhas sobem e são cortadas na borda, como em qualquer chat. Guardar mais do
+ *  que cabe é de propósito — assim a fala que sai por cima some CLIPADA, sem
+ *  animação de saída. Se ela saísse do array, o `AnimatePresence` daria a ela a
+ *  mesma despedida da mensagem apagada, e as duas coisas leriam igual: uma é
+ *  chat rolando, a outra é moderação. */
+const KEEP = 10;
+/** Quanto tempo a lápide fica antes de a linha sair de vez. */
+const TOMB_MS = 1400;
+
+type Status = "live" | "gone" | "muted";
+interface Line {
+  key: number;
+  idx: number;
+  status: Status;
+}
+
+/** Horário da fala: 21:42 andando ~7 s por mensagem. */
+const at = (key: number) => {
+  const s = 21 * 3600 + 42 * 60 + key * 7;
+  return `${String(Math.floor(s / 3600) % 24).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`;
+};
+
+export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
+  const calm = useCalm();
+  const box = useRef<HTMLDivElement>(null);
+  const [lines, setLines] = useState<Line[]>(() =>
+    Array.from({ length: 5 }, (_, i) => ({ key: i, idx: i, status: "live" })),
+  );
+  const [draft, setDraft] = useState("");
+
+  useHeartbeat(box, ARRIVAL_MS, !calm, () =>
+    setLines((cur) => {
+      const key = (cur[cur.length - 1]?.key ?? -1) + 1;
+      const next = [...cur, { key, idx: key % copy.pool.length, status: "live" as Status }];
+      return next.length > KEEP ? next.slice(next.length - KEEP) : next;
+    }),
+  );
+
+  const setStatus = (key: number, status: Status) =>
+    setLines((cur) => cur.map((l) => (l.key === key ? { ...l, status } : l)));
+
+  const remove = (key: number) => {
+    setStatus(key, "gone");
+    // O `setTimeout` mora no HANDLER, não num efeito: mexer em estado de forma
+    // síncrona dentro de efeito dispara render em cascata e o lint pega.
+    setTimeout(() => setLines((cur) => cur.filter((l) => l.key !== key)), TOMB_MS);
+  };
+
+  const shown = lines;
+
+  return (
+    <div ref={box}>
+      <div className="mb-[15px] flex items-center justify-between gap-2.5 text-[0.64rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
+        <span>{copy.label}</span>
+        <span>{copy.example}</span>
+      </div>
+
+      {/* Altura fixa e ancorada embaixo: as falas se acumulam de baixo pra cima
+          e a mais velha é cortada na borda, como num chat de verdade. Sem isso
+          a seção inteira pularia a cada mensagem. A máscara é o que apaga o
+          topo — opacidade por item briga com a animação de entrada. */}
+      <div className="flex h-[292px] flex-col justify-end gap-[7px] overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_34px)] max-[760px]:h-[248px]">
+        <AnimatePresence initial={false}>
+          {shown.map((line, i) => {
+            const msg = copy.pool[line.idx];
+            const dead = line.status === "gone";
+            const muted = line.status === "muted";
+            return (
+              <motion.div
+                key={line.key}
+                // `layout` fecha o buraco com suavidade quando a fala apagada
+                // sai da lista; sem ele as de baixo pulam 44px de uma vez.
+                layout={!calm}
+                initial={calm ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -14, transition: { duration: 0.2 } }}
+                transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
+                className={cn(MSG, (dead || muted) && "opacity-80")}
+              >
+                <PlatformGlyph id={msg.platform} />
+                <div className="min-w-0">
+                  <div className={MSG_HEAD}>
+                    <strong>{msg.name}</strong>
+                    {msg.badge && (
+                      <span
+                        className={cn(
+                          BADGE,
+                          msg.badgeTone === "member"
+                            ? "bg-brass text-brass-ink"
+                            : "bg-ok text-night",
+                        )}
+                      >
+                        {msg.badge}
+                      </span>
+                    )}
+                    {(dead || muted) && (
+                      <span className={cn(BADGE, "bg-surface-3 text-faint-raised")}>
+                        {dead ? copy.removed : copy.timedOut}
+                      </span>
+                    )}
+                    <span className={MSG_TIME}>{at(line.key)}</span>
+                  </div>
+
+                  <p
+                    className={cn(
+                      "relative mt-[3px] w-fit text-[0.8rem] leading-[1.4] font-[550] transition-colors duration-400",
+                      dead || muted ? "text-faint-raised" : "text-cream",
+                    )}
+                  >
+                    {msg.text}
+                    {/* O risco CORRE da esquerda pra direita em vez de aparecer
+                        pronto: é a diferença entre ver a moderação acontecer e
+                        ver que ela já aconteceu.
+
+                        Ele fica SEMPRE montado, em `scaleX: 0`, e o estado é que
+                        anima. Montar só quando morre parecia mais limpo e não
+                        funcionava: `<AnimatePresence initial={false}>` não vale
+                        só pros filhos diretos — ele propaga "não anime a
+                        entrada" pro subárvore inteira, então o `initial` deste
+                        risco era ignorado e a linha nascia pronta. Animar por
+                        MUDANÇA DE ESTADO não depende de montagem nenhuma. */}
+                    <motion.i
+                      aria-hidden="true"
+                      className="absolute top-1/2 left-0 block h-px w-full origin-left bg-current"
+                      initial={false}
+                      animate={{ scaleX: dead ? 1 : 0 }}
+                      transition={{
+                        duration: calm ? 0 : 0.42,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                    />
+                  </p>
+                </div>
+
+                {/* As ações ocupam o lugar do horário, que apaga junto: mesma
+                    troca que a linha de chat do app faz. `pointer-events-none`
+                    enquanto invisível pra não haver alvo fantasma. */}
+                <div
+                  className={cn(
+                    "absolute top-[7px] right-2.5 flex gap-1 rounded-sm opacity-0 transition-opacity duration-150",
+                    "pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100",
+                    "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+                    // Em ponteiro grosso não existe hover: as ações ficam na
+                    // fala mais nova, que é a que se modera na prática.
+                    i === shown.length - 1
+                      ? "[@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100"
+                      : "[@media(pointer:coarse)]:opacity-0",
+                  )}
+                >
+                  <button
+                    type="button"
+                    className={ACTION}
+                    onClick={() => remove(line.key)}
+                    disabled={dead}
+                  >
+                    {copy.actionDelete}
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(ACTION, "max-[520px]:hidden")}
+                    onClick={() => setStatus(line.key, "muted")}
+                    disabled={dead || muted}
+                  >
+                    {copy.actionTimeout}
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(ACTION, "max-[520px]:hidden")}
+                    onClick={() => setDraft(`@${msg.name} `)}
+                  >
+                    {copy.actionReply}
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+
+      {/* O campo é um campo de verdade: "responder" tem pra onde escrever. */}
+      <label className="mt-[7px] flex min-h-[38px] items-center gap-2.5 rounded-md border-2 border-border-dry px-[11px] focus-within:border-brass">
+        <span className="sr-only">{copy.input}</span>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={copy.input}
+          className="min-w-0 flex-1 bg-transparent py-2 text-[0.74rem] font-semibold text-cream outline-none placeholder:text-faint-raised"
+        />
+        <b className="text-[0.74rem] font-extrabold whitespace-nowrap text-brass">
+          {copy.sendAll}
+        </b>
+      </label>
+
+      <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
+        {copy.hint}
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// Alertas — o painel que RECEBE
+// ============================================================
+// Um feed de alertas parado é uma lista de exemplos; o que o app faz é receber.
+// Aqui eles chegam sozinhos, pelo topo, e o botão de teste é o mesmo que existe
+// nas Configurações (a nota do painel já promete: "tem botão de alerta de teste
+// pra você conferir sem esperar ninguém").
+
+export type AlertKind = "follow" | "sub" | "raid" | "superchat" | "bits" | "member";
+
+export interface AlertItem {
+  kind: AlertKind;
+  title: string;
+  meta: string;
+  amount?: string;
+}
+
+export interface AlertsFeedCopy {
+  label: string;
+  example: string;
+  pool: AlertItem[];
+  test: string;
+}
+
+const ICON: Record<AlertKind, React.ReactNode> = {
+  follow: <HeartIcon />,
+  sub: <StarIcon />,
+  raid: <RaidIcon />,
+  superchat: <CoinIcon />,
+  bits: <CoinIcon />,
+  member: <StarIcon />,
+};
+const KIND_TONE: Record<AlertKind, string> = {
+  follow: "bg-ok text-night",
+  sub: "bg-brass text-brass-ink",
+  raid: "bg-tomate text-white",
+  superchat: "bg-brass text-brass-ink",
+  bits: "bg-ok text-night",
+  member: "bg-tomate text-white",
+};
+
+const ALERT_MS = 3400;
+const ALERTS_KEEP = 4;
+
+export function AlertsFeed({ copy }: { copy: AlertsFeedCopy }) {
+  const calm = useCalm();
+  const box = useRef<HTMLDivElement>(null);
+  const [keys, setKeys] = useState<number[]>([3, 2, 1, 0]);
+
+  const push = () =>
+    setKeys((cur) => [(cur[0] ?? -1) + 1, ...cur].slice(0, ALERTS_KEEP));
+
+  useHeartbeat(box, ALERT_MS, !calm, push);
+
+  return (
+    <div ref={box}>
+      <div className="mb-[15px] flex items-center justify-between gap-2.5 text-[0.64rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
+        <span>{copy.label}</span>
+        <span>{copy.example}</span>
+      </div>
+
+      {/* Altura fixa pelo mesmo motivo do chat: sem ela o painel cresce e
+          encolhe embaixo do dedo de quem está lendo. */}
+      <div className="flex h-[268px] flex-col gap-[7px] overflow-hidden max-[760px]:h-[248px]">
+        <AnimatePresence initial={false}>
+          {keys.map((key) => {
+            const item = copy.pool[key % copy.pool.length];
+            return (
+              <motion.div
+                key={key}
+                layout={!calm}
+                initial={calm ? false : { opacity: 0, y: -12, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.18 } }}
+                transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
+                className={
+                  "grid shrink-0 grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md bg-surface px-[11px] py-2.5 " +
+                  "[&>div>strong]:block [&>div>strong]:text-[0.8rem] [&>div>strong]:font-extrabold " +
+                  "[&>div>small]:mt-0.5 [&>div>small]:block [&>div>small]:text-[0.68rem] [&>div>small]:font-[550] [&>div>small]:text-muted"
+                }
+              >
+                <span
+                  className={cn(
+                    "grid size-[30px] place-items-center rounded-sm text-[0.62rem] font-extrabold [&>svg]:h-4 [&>svg]:w-4 [&>svg]:fill-current",
+                    KIND_TONE[item.kind],
+                  )}
+                >
+                  {ICON[item.kind]}
+                </span>
+                <div className="min-w-0">
+                  <strong>{item.title}</strong>
+                  <small>{item.meta}</small>
+                </div>
+                {item.amount && (
+                  <span className="font-display text-[0.94rem] font-extrabold tabular-nums">
+                    {item.amount}
+                  </span>
+                )}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+
+      <button
+        type="button"
+        onClick={push}
+        className={cn(
+          "mt-3 flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 rounded-md border-2 border-border-dry",
+          "text-[0.68rem] font-extrabold tracking-[0.06em] text-brass uppercase",
+          "outline-offset-2 transition-colors duration-150 hover:border-brass hover:bg-surface-2 focus-visible:outline-[3px] focus-visible:outline-brass",
+        )}
+      >
+        {copy.test}
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// Overlay — o alerta ENTRANDO na cena do OBS
+// ============================================================
+// A cena não precisa de vida artificial: ela é uma cena parada mesmo. O que se
+// move é o que o overlay faz — o alerta aparece, fica, sai. E os dois campos de
+// URL copiam de verdade, porque é literalmente a única coisa que se faz com
+// eles.
+
+export interface OverlayCopy {
+  label: string;
+  example: string;
+  scene: string;
+  alert: string;
+  camera: string;
+  chat: string[];
+  copy: string;
+  copied: string;
+  urls: string[];
+}
+
+/** O alerta fica 3,6 s no ar e some por 2,4 s — a mesma ordem de grandeza da
+ *  duração que o app deixa configurar. */
+const ALERT_ON = 3600;
+const ALERT_OFF = 2400;
+
+export function OverlayScene({ copy }: { copy: OverlayCopy }) {
+  const calm = useCalm();
+  const box = useRef<HTMLDivElement>(null);
+  const [on, setOn] = useState(true);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // Um só temporizador com dois tempos: o batimento dispara no ritmo do estado
+  // atual, então "ligado" dura mais que "desligado" sem precisar de dois hooks.
+  useHeartbeat(box, on ? ALERT_ON : ALERT_OFF, !calm, () => setOn((v) => !v));
+
+  const copyUrl = (url: string) => {
+    navigator.clipboard
+      ?.writeText(url)
+      .then(() => {
+        setCopied(url);
+        setTimeout(() => setCopied((cur) => (cur === url ? null : cur)), 1800);
+      })
+      // Sem área de transferência (contexto inseguro, permissão negada) o botão
+      // não mente dizendo "copiado!".
+      .catch(() => {});
+  };
+
+  return (
+    <div ref={box}>
+      <div className="mb-[15px] flex items-center justify-between gap-2.5 text-[0.64rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
+        <span>{copy.label}</span>
+        <span>{copy.example}</span>
+      </div>
+
+      <div className="relative grid aspect-video content-start overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px] p-3">
+        <small className="text-[0.6rem] font-extrabold tracking-[0.1em] text-faint-raised uppercase">
+          {copy.scene}
+        </small>
+
+        {/* O espaço do alerta fica reservado: sem a altura fixa a cena inteira
+            se reorganiza duas vezes a cada ciclo. */}
+        <div className="mt-3.5 flex h-[42px] items-center justify-center">
+          <AnimatePresence>
+            {on && (
+              <motion.div
+                initial={calm ? false : { opacity: 0, y: -14, scale: 0.9, rotate: -6 }}
+                animate={{ opacity: 1, y: 0, scale: 1, rotate: -1.4 }}
+                exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.22 } }}
+                transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                className="flex w-max max-w-full items-center gap-[9px] rounded-md bg-brass px-[13px] py-[9px] font-display text-[0.9rem] font-extrabold text-brass-ink shadow-pop [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:fill-current"
+              >
+                <StarIcon />
+                {copy.alert}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* A moldura da câmera dá escala à cena e explica por que o meio fica
+            livre: ali é o seu conteúdo. */}
+        <span
+          className="absolute right-3 bottom-3 grid aspect-4/3 w-[27%] content-end justify-end rounded-md border-2 border-dashed border-border-dry px-[9px] py-[7px] text-[0.58rem] font-extrabold tracking-[0.08em] text-faint-raised uppercase"
+          aria-hidden="true"
+        >
+          {copy.camera}
+        </span>
+
+        <div
+          className="absolute bottom-3 left-3 flex flex-col gap-[5px] [&>span]:flex [&>span]:w-max [&>span]:max-w-full [&>span]:items-center [&>span]:gap-1.5 [&>span]:rounded-sm [&>span]:bg-night/[0.78] [&>span]:px-2 [&>span]:py-[5px] [&>span]:text-[0.66rem] [&>span]:font-[650] [&_i]:h-[7px] [&_i]:w-[7px] [&_i]:shrink-0 [&_i]:rounded-full"
+          aria-hidden="true"
+        >
+          {copy.chat.map((line, i) => (
+            <span key={line}>
+              <i
+                style={{
+                  background: ["var(--twitch)", "var(--youtube)", "var(--kick)"][i],
+                }}
+              />{" "}
+              {line}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {copy.urls.map((url) => (
+        <button
+          key={url}
+          type="button"
+          onClick={() => copyUrl(url)}
+          className={cn(
+            "mt-2 flex min-h-[38px] w-full cursor-pointer items-center justify-between gap-2.5 rounded-md border-2 border-border-dry px-[11px] text-left",
+            "outline-offset-2 transition-colors duration-150 hover:border-brass focus-visible:outline-[3px] focus-visible:outline-brass",
+          )}
+        >
+          <code className="truncate text-[0.72rem] font-semibold text-muted">
+            {url}
+          </code>
+          <span
+            className={cn(
+              "text-[0.62rem] font-extrabold tracking-[0.06em] uppercase",
+              copied === url ? "text-ok" : "text-brass",
+            )}
+          >
+            {copied === url ? copy.copied : copy.copy}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}

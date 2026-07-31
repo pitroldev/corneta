@@ -1,4 +1,4 @@
-import type { T } from "@/lib/i18n";
+import { thousandsSep, type Locale, type T } from "@/lib/i18n";
 import { Mascot } from "./decor";
 import { cn } from "./ui";
 import { LiveChat, LivePanel, type LiveWindowCopy } from "./live-window";
@@ -36,7 +36,7 @@ const chat = [
 
 /** Copy do miolo vivo, resolvida no SERVIDOR: função não atravessa a fronteira
  *  servidor→cliente do Next, então o componente animado recebe texto pronto. */
-const liveCopy = (t: T): LiveWindowCopy => ({
+const liveCopy = (t: T, locale: Locale): LiveWindowCopy => ({
   kicker: t("preview.panel.title"),
   title: t("preview.nav.golive.label"),
   stateLive: t("preview.state.live"),
@@ -45,6 +45,8 @@ const liveCopy = (t: T): LiveWindowCopy => ({
   statDrops: t("preview.stat.drops"),
   verdict: t("preview.verdict"),
   stop: t("preview.stop"),
+  metrics: t("preview.target.metrics"),
+  sep: thousandsSep(locale),
   chatTitle: t("preview.chat.title"),
   chatPlatforms: t("preview.chat.platforms"),
   compose: t("preview.chat.compose"),
@@ -110,7 +112,7 @@ const NAV_ACTIVE = cn(
   "[&>i]:bg-brass-ink/15 [&_small]:text-brass-ink/85 [&>b]:opacity-60",
 );
 
-export function ProductPreview({ t }: { t: T }) {
+export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
   return (
     <figure className="overflow-hidden rounded-xl border border-border-dry bg-surface shadow-[10px_10px_0_0_var(--night),0_30px_60px_rgb(0_0_0/42%)] max-[760px]:shadow-[5px_5px_0_0_var(--night),0_18px_34px_rgb(0_0_0/38%)]">
       <figcaption className="sr-only">{t("preview.figure.alt")}</figcaption>
@@ -224,8 +226,8 @@ export function ProductPreview({ t }: { t: T }) {
           </div>
         </div>
 
-        <LivePanel copy={liveCopy(t)} />
-        <LiveChat copy={liveCopy(t)} />
+        <LivePanel copy={liveCopy(t, locale)} />
+        <LiveChat copy={liveCopy(t, locale)} />
       </div>
     </figure>
   );

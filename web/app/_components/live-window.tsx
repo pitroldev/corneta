@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { fill, group } from "@/lib/i18n";
 import { useCalm, useHeartbeat } from "./use-motion";
 import { PlatformGlyph } from "./decor";
 import { cn } from "./ui";
@@ -37,6 +38,14 @@ export interface LiveWindowCopy {
   statDrops: string;
   verdict: string;
   stop: string;
+  /** "{kbps} kbps · 60 fps · {drops} quedas" — esta linha estava CRAVADA em
+   *  português dentro do JSX, junto com um `toLocaleString("pt-BR")`. A página
+   *  em inglês mostrava "6.000 kbps · 60 fps · 0 quedas" no primeiro viewport.
+   *  O teste de paridade não pegava: a frase nunca entrou em dicionário nenhum. */
+  metrics: string;
+  /** Separador de milhar do idioma — o número muda a cada segundo, então ele
+   *  não pode sair de uma frase pronta. */
+  sep: string;
   /** Chat */
   chatTitle: string;
   chatPlatforms: string;
@@ -129,7 +138,10 @@ export function LivePanel({ copy }: { copy: LiveWindowCopy }) {
                 {target.name}
               </strong>
               <small className="mt-0.5 block text-[0.62rem] font-[550] text-faint-raised tabular-nums">
-                {rates[i].toLocaleString("pt-BR")} kbps · 60 fps · 0 quedas
+                {fill(copy.metrics, {
+                  kbps: group(rates[i], copy.sep),
+                  drops: "0",
+                })}
               </small>
             </div>
             <span className="flex items-center gap-2.5">

@@ -1,61 +1,100 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useId, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { PlatformGlyph } from "./decor";
 import { EyeIcon } from "./icons";
 import { Chip, cn, DemoLabel, State } from "./ui";
 import { useCalm, useHeartbeat } from "./use-motion";
-import { fill } from "@/lib/i18n";
+import { fill, group } from "@/lib/i18n";
 
-// Sala de guerra: o que o painel Ao vivo mostra por destino enquanto você
-// transmite — bitrate, fps, quadros perdidos e tempo no ar, mais CPU/GPU reais.
-// Estados e nomes de métrica saem de TargetStatus/EngineSnapshot (src/lib/types.ts).
+// Sala de guerra e relatório: os dois painéis da jornada da live.
 //
 // ------------------------------------------------------------
-// MOVIMENTO: cada painel faz o VERBO do seu momento
+// POR QUE ISTO FOI REESCRITO
 // ------------------------------------------------------------
-// A jornada tem três passos — antes, durante, depois — e cada painel se move
-// como aquele instante se move. O de "durante" está no meio de uma reconexão,
-// então o contador de segundos fora ANDA: parado, ele era um screenshot de um
-// problema; andando, é um problema acontecendo. O de "depois" desenha a curva,
-// porque é isso que um relatório faz quando abre.
+// A versão anterior animava a ENTRADA: as barrinhas subiam do zero e a curva se
+// desenhava quando a seção aparecia, uma vez só. Dois problemas, e o segundo é
+// grave:
 //
-// Nenhum dos dois inventa um efeito novo: os dois usam o mesmo vocabulário do
-// herói e do replay (batimento que para fora da tela, traço que se desenha).
+//  1. Rolando a página normalmente, não havia nada acontecendo. Uma entrada de
+//     um segundo que roda uma vez por visita não é um painel vivo — é um GIF
+//     que já terminou. E estes dois painéis vendem justamente o que a Corneta
+//     faz ENQUANTO a live acontece.
+//
+//  2. A curva `pathLength` + `vector-effect: non-scaling-stroke` +
+//     `preserveAspectRatio="none"` desenhava ERRADO. O framer implementa
+//     `pathLength` como `stroke-dasharray`, medida em unidades do usuário; o
+//     `non-scaling-stroke` manda o traço ser calculado em pixels de tela; e o
+//     `preserveAspectRatio="none"` estica X e Y por fatores diferentes. Os três
+//     juntos fazem o tracejado ser calculado numa escala e desenhado noutra: a
+//     linha aparecia cortada no meio, ou não aparecia. Foi o "sumiram ou
+//     ficaram cortadas" que apareceu na revisão.
+//
+// A regra que fica: `pathLength` NÃO combina com viewBox esticado. Onde o
+// desenho estica, o movimento tem que ser posição/opacidade/clipe — nunca
+// tracejado.
 //
 // ------------------------------------------------------------
-// A COPY ESTAVA CRAVADA EM PORTUGUÊS
+// A TESE NOVA: os dois painéis ESTÃO RODANDO
 // ------------------------------------------------------------
-// Até esta revisão, as duas peças escreviam "reconectando · tentativa 2 · 12 s
-// fora", "pausado por você" e "1 284 assistindo" direto no JSX — então a página
-// em inglês mostrava português no meio da seção que vende a jornada inteira. O
-// teste de paridade dos dicionários não pegava porque as frases nunca chegaram
-// a entrar em dicionário nenhum. Agora chegam resolvidas, como nas outras peças
-// animadas: função `t` não atravessa a fronteira servidor→cliente.
+// Sala de guerra: os números oscilam, a Kick cai e volta sozinha num ciclo, e
+// as barras de CPU/placa respondem. E o painel ACEITA COMANDO: clicar num
+// destino liga ou pausa ele — e a conta de máquina sobe junto, que é a relação
+// que o app mostra de verdade (mais destino convertendo, mais CPU).
+//
+// Relatório: o gráfico TOCA. Um cursor caminha pela live inteira e a leitura
+// embaixo acompanha minuto a minuto; passar o mouse (ou arrastar o dedo) toma o
+// controle e vira busca livre. É o mesmo laço da tela de Relatórios do app.
+//
+// Com `prefers-reduced-motion` nenhum laço roda — os painéis ficam no estado
+// inicial e o CLIQUE continua funcionando. Movimento é o que some; função, não.
+//
+// A copy chega RESOLVIDA (função não atravessa a fronteira servidor→cliente) e
+// os números entram por `fill`, então o texto em volta continua no dicionário.
 
 /** `text-cream` explícito: estes painéis aparecem sobre seções de PAPEL, onde a
  *  tinta herdada é escura — sem isso o nome da plataforma some no fundo escuro. */
 const PANEL = "rounded-lg bg-surface p-[18px] text-cream shadow-pop-ink-lg";
 
 const ROW =
-  "grid grid-cols-[30px_minmax(0,1fr)_auto] max-[760px]:grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md bg-surface-2 px-2.5 py-[9px] not-first:mt-[7px] " +
+  "grid w-full grid-cols-[30px_minmax(0,1fr)_auto] max-[760px]:grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md bg-surface-2 px-2.5 py-[9px] text-left not-first:mt-[7px] " +
   "[&_.glyph]:h-[30px] [&_.glyph]:w-[30px] " +
   "[&>div>strong]:block [&>div>strong]:font-display [&>div>strong]:text-[0.84rem] [&>div>strong]:font-bold " +
   "[&>div>small]:mt-0.5 [&>div>small]:block [&>div>small]:text-[0.62rem] [&>div>small]:font-[550] [&>div>small]:tabular-nums [&>div>small]:text-faint-raised";
 
+type PlatId = "twitch" | "youtube" | "kick" | "tiktok";
+
+const ROWS: { id: PlatId; name: string; target: number }[] = [
+  { id: "twitch", name: "Twitch", target: 6000 },
+  { id: "youtube", name: "YouTube", target: 6000 },
+  { id: "kick", name: "Kick", target: 6000 },
+  { id: "tiktok", name: "TikTok", target: 4500 },
+];
+
+/** A Kick cai e volta sozinha: 10s fora, 16s no ar. O ciclo é o argumento do
+ *  painel — não adianta mostrar uma queda congelada, porque o que a Corneta faz
+ *  é a RECUPERAÇÃO, e recuperação só existe no tempo. */
+const KICK_CYCLE = 26;
+const KICK_DOWN = 10;
+
+/** Oscilação determinística em volta do alvo — mesma função da janela do herói.
+ *  Sem `Math.random`: valor diferente no servidor e no cliente vira erro de
+ *  hidratação. */
+const wobble = (target: number, tick: number, seed: number) =>
+  target +
+  Math.round(
+    Math.sin((tick + seed * 2.1) * 1.7) * 26 + Math.sin(tick * 0.7 + seed) * 12,
+  );
+
 export interface LiveRoomCopy {
   label: string;
   tag: string;
-  /** Já resolvida por linha: FUNÇÃO não atravessa a fronteira servidor→cliente
-   *  do Next. Foi exatamente o tropeço que a primeira versão desta refatoração
-   *  cometeu, e o build reclamou na hora. */
-  metricsTwitch: string;
-  metricsYoutube: string;
+  /** Template com os buracos do bitrate e das quedas — só os números são do
+   *  cliente; o texto em volta continua saindo do dicionário. */
+  metrics: string;
   onAir: string;
-  /** Template com o buraco do contador ainda por preencher: só o número é do
-   *  cliente, e o texto em volta continua saindo do dicionário. */
-  reconnectingTemplate: string;
+  reconnecting: string;
   back: string;
   paused: string;
   pausedState: string;
@@ -63,20 +102,29 @@ export interface LiveRoomCopy {
   gpu: string;
   /** "{n} assistindo" */
   watching: string;
+  hint: string;
+  /** Separador de milhar do idioma. Vem resolvido de fora porque o componente
+   *  não conhece o locale — e não precisa conhecer. */
+  sep: string;
 }
 
 export interface ReportChartCopy {
   label: string;
   tag: string;
   chartAria: string;
+  scrub: string;
+  hint: string;
+  watching: string;
   peak: string;
   average: string;
   messages: string;
   raid: string;
   drop: string;
+  sep: string;
 }
 
-/** Medidor de carga: rótulo, barrinha e número. */
+/** Medidor de carga: rótulo, barrinha e número. A barra é `scaleX`, não
+ *  `width` — largura reflui a linha inteira a cada segundo. */
 function Meter({
   label,
   pct,
@@ -92,40 +140,53 @@ function Meter({
     <span className="flex items-center gap-[7px] text-[0.66rem] font-extrabold tracking-[0.04em] whitespace-nowrap text-muted uppercase">
       {label}
       <i className="block h-[7px] w-14 overflow-hidden bg-surface-3">
-        {/* A barra sobe do zero quando o painel aparece: é uma medida sendo
-            feita, não um valor que sempre esteve ali. */}
         <motion.b
-          className={cn("block h-full origin-left", ok ? "bg-ok" : "bg-brass")}
-          style={{ width: `${pct}%` }}
-          initial={calm ? false : { scaleX: 0 }}
-          whileInView={calm ? undefined : { scaleX: 1 }}
-          viewport={{ once: true, amount: 0.8 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className={cn(
+            "block h-full w-full origin-left",
+            ok ? "bg-ok" : "bg-brass",
+          )}
+          initial={false}
+          animate={{ scaleX: pct / 100 }}
+          transition={
+            calm ? { duration: 0 } : { type: "spring", stiffness: 130, damping: 21 }
+          }
         />
       </i>
-      {pct}%
+      <span className="w-[3.4ch] text-right tabular-nums">{pct}%</span>
     </span>
   );
 }
 
 export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
-  // Dois "calmas" com papéis diferentes: o do LAÇO pode nascer parado (é o certo
-  // — não anima antes de saber), o da ENTRADA não pode, senão ela não acontece.
-  // DOIS "calmas", com papéis diferentes — e confundir os dois já custou uma
-  // animação que nunca acontecia:
-  //  • o do LAÇO (`useCalm`) pode nascer parado, e deve: o servidor não sabe a
-  //    preferência, e começar animando pra depois parar é o pior dos mundos;
-  //  • o da ENTRADA (`useReducedMotion`) não pode, porque o framer aplica
-  //    `initial` só na montagem. Se ele nascer "calmo", o elemento monta já no
-  //    estado final e a entrada nunca roda.
   const calm = useCalm();
-  const calmOnMount = useReducedMotion() ?? false;
   const box = useRef<HTMLDivElement>(null);
-  const [secs, setSecs] = useState(12);
-  // O contador de "segundos fora" anda enquanto o painel está na tela. Volta pro
-  // 12 depois de um tempo: a Kick reconecta, e deixar o número subir pra sempre
-  // contaria uma história pior do que a verdadeira.
-  useHeartbeat(box, 1000, !calm, () => setSecs((s) => (s >= 27 ? 12 : s + 1)));
+  const [tick, setTick] = useState(0);
+  /** O que a PESSOA desligou. A TikTok começa pausada — é o estado que o painel
+   *  sempre mostrou; a diferença é que agora dá pra ligar. */
+  const [off, setOff] = useState<Partial<Record<PlatId, boolean>>>({
+    tiktok: true,
+  });
+
+  useHeartbeat(box, 1000, !calm, () => setTick((n) => n + 1));
+
+  const kickPhase = tick % KICK_CYCLE;
+  const kickDown = kickPhase < KICK_DOWN;
+  // A Kick já caiu uma vez antes do painel abrir: começa em 1, não em 0.
+  const kickDrops = Math.floor(tick / KICK_CYCLE) + 1;
+
+  const active = ROWS.filter((r) => !off[r.id]).length;
+  // A conta de máquina responde ao que está ligado. Não é enfeite: é a relação
+  // que a tela de Qualidade do app mostra, e é o que justifica o painel ter
+  // CPU e placa em vez de só bitrate.
+  const cpu = 6 + active * 4 + Math.round(Math.sin(tick * 0.9) * 2);
+  const gpu = 11 + Math.round(active * 6.7) + Math.round(Math.sin(tick * 0.6 + 1) * 2);
+  const viewers = Math.round(
+    (1284 + Math.round(Math.sin(tick * 0.33) * 46 + Math.sin(tick * 0.11) * 28)) *
+      (active / 3),
+  );
+
+  const toggle = (id: PlatId) =>
+    setOff((cur) => ({ ...cur, [id]: !cur[id] }));
 
   return (
     <div ref={box} className={PANEL}>
@@ -134,160 +195,325 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
         <span>{copy.tag}</span>
       </DemoLabel>
 
-      <div className={ROW}>
-        <PlatformGlyph id="twitch" />
-        <div>
-          <strong>Twitch</strong>
-          <small>{copy.metricsTwitch}</small>
-        </div>
-        <State>
-          <i /> {copy.onAir}
-        </State>
-      </div>
+      {ROWS.map((row, i) => {
+        const isOff = off[row.id];
+        const down = !isOff && row.id === "kick" && kickDown;
+        const kbps = wobble(row.target, tick, i);
+        const state = isOff ? "off" : down ? "down" : "live";
 
-      <div className={ROW}>
-        <PlatformGlyph id="youtube" />
-        <div>
-          <strong>YouTube</strong>
-          <small>{copy.metricsYoutube}</small>
-        </div>
-        <State>
-          <i /> {copy.onAir}
-        </State>
-      </div>
-
-      <div className={ROW}>
-        <PlatformGlyph id="kick" />
-        <div>
-          <strong>Kick</strong>
-          <small>{fill(copy.reconnectingTemplate, { s: String(secs) })}</small>
-        </div>
-        <State tone="warn">
-          {/* O ponto pulsa só nesta linha: é a única que está tentando algo. */}
-          <i
+        return (
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => toggle(row.id)}
+            aria-pressed={!isOff}
             className={cn(
-              !calm && "animate-[soft-pulse_1.2s_ease-in-out_infinite]",
+              ROW,
+              "cursor-pointer outline-offset-2 transition-colors duration-150",
+              "hover:bg-surface-3 focus-visible:outline-[3px] focus-visible:outline-brass",
+              isOff && "opacity-70",
             )}
-          />{" "}
-          {copy.back}
-        </State>
-      </div>
-
-      <div className={ROW}>
-        <PlatformGlyph id="tiktok" />
-        <div>
-          <strong>TikTok</strong>
-          <small>{copy.paused}</small>
-        </div>
-        <State tone="quiet">
-          <i /> {copy.pausedState}
-        </State>
-      </div>
+          >
+            <PlatformGlyph id={row.id} />
+            <div>
+              <strong>{row.name}</strong>
+              <small>
+                {isOff
+                  ? copy.paused
+                  : down
+                    ? fill(copy.reconnecting, { s: String(12 + kickPhase) })
+                    : fill(copy.metrics, {
+                        kbps: group(kbps, copy.sep),
+                        drops: String(row.id === "kick" ? kickDrops : 0),
+                      })}
+              </small>
+            </div>
+            {/* A `key` é o ESTADO: quando a Kick volta, a pastilha remonta e
+                entra com um pulinho. É o instante que o painel existe pra
+                mostrar, e sem a remontagem ele passaria como troca de cor. */}
+            <motion.span
+              key={state}
+              initial={calm ? false : { scale: 0.72, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <State tone={down ? "warn" : isOff ? "quiet" : "ok"}>
+                {/* Só a linha que está TENTANDO alguma coisa pulsa. */}
+                <i
+                  className={cn(
+                    down && !calm && "animate-[soft-pulse_1.2s_ease-in-out_infinite]",
+                  )}
+                />{" "}
+                {down ? copy.back : isOff ? copy.pausedState : copy.onAir}
+              </State>
+            </motion.span>
+          </button>
+        );
+      })}
 
       <div className="mt-[13px] flex flex-wrap gap-x-4 gap-y-2 border-t-2 border-border-soft pt-[13px]">
-        <Meter label={copy.cpu} pct={18} calm={calmOnMount} />
-        <Meter label={copy.gpu} pct={31} ok calm={calmOnMount} />
-        <span className="flex items-center gap-[7px] text-[0.66rem] font-extrabold tracking-[0.04em] whitespace-nowrap text-muted uppercase [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2]">
+        <Meter label={copy.cpu} pct={cpu} calm={calm} />
+        <Meter label={copy.gpu} pct={gpu} ok calm={calm} />
+        <span className="flex items-center gap-[7px] text-[0.66rem] font-extrabold tracking-[0.04em] whitespace-nowrap text-muted uppercase tabular-nums [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2]">
           <EyeIcon />
-          {copy.watching}
+          {fill(copy.watching, { n: group(viewers, copy.sep) })}
         </span>
       </div>
+
+      {/* O convite. Sem ele o painel parece uma figura, e ninguém descobre que
+          as linhas respondem — affordance que não se anuncia não existe. */}
+      <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
+        {copy.hint}
+      </p>
     </div>
   );
 }
 
-// Relatório pós-live: a curva de audiência com os marcadores do que aconteceu.
-// A análise real (src/screens/ReportsScreen.tsx) usa viewerSamples, alertEvents,
-// taxa de chat e janelas com problema; aqui é uma sessão de exemplo.
-const CURVE =
-  "M0,74 L18,70 L36,66 L54,58 L72,55 L90,49 L108,52 L126,44 L144,40 L162,34 L180,22 L198,18 L216,20 L234,26 L252,24 L270,30 L288,36 L306,33 L324,42 L342,48 L360,60";
+// ============================================================
+// Relatório pós-live — a curva de audiência TOCANDO
+// ============================================================
+// A análise real (src/screens/ReportsScreen.tsx) cruza viewerSamples,
+// alertEvents, taxa de chat e janelas com problema; aqui é uma sessão de
+// exemplo. O que NÃO é exemplo é o gesto: no app o relatório tem um cursor que
+// atravessa todos os gráficos junto, e é ele que está aqui.
 
-// `vector-effect` mantém a espessura do traço quando o SVG estica sem proporção.
+/** Audiência a cada 9,6 min de uma live de 3h12. O pico (índice 10) é o raid
+ *  das 22:30 e o índice 14 é o trecho com queda de sinal — os dois marcadores
+ *  que a legenda embaixo nomeia. */
+const SAMPLES = [
+  362, 430, 495, 560, 610, 680, 650, 740, 800, 880, 1284, 1160, 1130, 1040,
+  1090, 980, 900, 940, 830, 760, 610,
+];
+const PEAK = 1284;
+const LAST = SAMPLES.length - 1;
+const W = 360;
+const H = 96;
+/** Minuto zero da live e duração — o eixo em números, pra leitura do cursor. */
+const START_MIN = 21 * 60;
+const SPAN_MIN = 192;
+
+const xAt = (i: number) => (i / LAST) * W;
+const yOf = (v: number) => 90 - (v / PEAK) * 72;
+const CURVE = SAMPLES.map(
+  (v, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)},${yOf(v).toFixed(1)}`,
+).join(" ");
+
+/** Audiência em qualquer ponto do eixo (0..1), interpolando entre amostras. */
+function viewersAt(p: number) {
+  const x = Math.max(0, Math.min(LAST, p * LAST));
+  const i = Math.min(LAST - 1, Math.floor(x));
+  return SAMPLES[i] + (SAMPLES[i + 1] - SAMPLES[i]) * (x - i);
+}
+
+/** Relógio de parede naquele ponto — a live vira madrugada, então dá a volta. */
+function clockAt(p: number) {
+  const total = Math.round(START_MIN + p * SPAN_MIN) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** Os dois instantes marcados na curva, em fração do eixo. */
+const RAID = 10 / LAST;
+const DROP = 14 / LAST;
+/** Quão perto o cursor precisa chegar pra "acender" um marcador. */
+const NEAR = 0.035;
+
 const GRID =
   "stroke-border-dry [stroke-width:1] [vector-effect:non-scaling-stroke]";
-const LINE =
-  "fill-none stroke-brass [stroke-width:2.5] [stroke-linecap:round] [stroke-linejoin:round] [vector-effect:non-scaling-stroke]";
 
 export function ReportChart({ copy }: { copy: ReportChartCopy }) {
-  // `useReducedMotion` do framer, não o `useCalm` daqui — ver a nota no
-  // LiveRoom. A primeira versão usava o `useCalm` e a curva nascia pronta: a
-  // entrada existia no código e nunca acontecia na tela.
-  const calm = useReducedMotion() ?? false;
-  const draw = calm
-    ? {}
-    : {
-        initial: { pathLength: 0 },
-        whileInView: { pathLength: 1 },
-        viewport: { once: true, amount: 0.7 },
-        transition: { duration: 1.1, ease: [0.16, 1, 0.3, 1] as const },
-      };
+  const calm = useCalm();
+  const box = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const clip = useId().replace(/:/g, "");
+  const [pos, setPos] = useState(0);
+  /** `true` enquanto a pessoa está com o cursor (ou o dedo, ou o foco) em cima.
+   *  O passeio automático para: ninguém consegue ler um ponto que foge. */
+  const [held, setHeld] = useState(false);
+
+  useHeartbeat(box, 90, !calm && !held, () =>
+    setPos((p) => (p >= 1 ? 0 : Math.min(1, p + 0.0055))),
+  );
+
+  /** Posição do ponteiro → fração do eixo. */
+  const seek = (clientX: number) => {
+    const el = track.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos(Math.max(0, Math.min(1, (clientX - r.left) / r.width)));
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const step =
+      e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
+    if (!step) return;
+    e.preventDefault();
+    setPos((p) => Math.max(0, Math.min(1, p + step / LAST)));
+  };
+
+  const v = Math.round(viewersAt(pos));
+  const readout = `${clockAt(pos)} · ${fill(copy.watching, { n: group(v, copy.sep) })}`;
+  const nearRaid = Math.abs(pos - RAID) < NEAR;
+  const nearDrop = Math.abs(pos - DROP) < NEAR;
 
   return (
-    <div className={PANEL}>
+    <div ref={box} className={PANEL}>
       <DemoLabel>
         <span>{copy.label}</span>
         <span>{copy.tag}</span>
       </DemoLabel>
 
-      <svg
-        className="my-1.5 block h-auto w-full overflow-visible"
-        viewBox="0 0 360 96"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={copy.chartAria}
+      {/* O quadro do gráfico é o próprio controle: cursor em cima já busca, sem
+          exigir clique. `touch-action: pan-y` deixa a página rolar no celular e
+          reserva só o arrasto horizontal pra busca. */}
+      <div
+        ref={track}
+        role="slider"
+        tabIndex={0}
+        aria-label={copy.scrub}
+        aria-valuemin={0}
+        aria-valuemax={SPAN_MIN}
+        aria-valuenow={Math.round(pos * SPAN_MIN)}
+        aria-valuetext={readout}
+        onKeyDown={onKeyDown}
+        onFocus={() => setHeld(true)}
+        onBlur={() => setHeld(false)}
+        onPointerEnter={() => setHeld(true)}
+        onPointerLeave={() => setHeld(false)}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setHeld(true);
+          seek(e.clientX);
+        }}
+        onPointerMove={(e) => seek(e.clientX)}
+        onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
+        className="relative my-1.5 cursor-ew-resize touch-pan-y rounded-sm outline-offset-4 focus-visible:outline-[3px] focus-visible:outline-brass"
       >
-        <line className={GRID} x1="0" y1="24" x2="360" y2="24" />
-        <line className={GRID} x1="0" y1="56" x2="360" y2="56" />
-        {/* A área preenche depois que a linha passa: primeiro o traço, depois o
-            corpo — a ordem em que alguém desenharia à mão. */}
-        <motion.path
-          className="fill-brass/15"
-          d={`${CURVE} L360,96 L0,96 Z`}
-          initial={calm ? false : { opacity: 0 }}
-          whileInView={calm ? undefined : { opacity: 1 }}
-          viewport={{ once: true, amount: 0.7 }}
-          transition={{ duration: 0.5, delay: 0.75 }}
-        />
-        <motion.path className={LINE} d={CURVE} {...draw} />
-        {/* As bolinhas usam a cor da legenda correspondente: latão = raid,
-            âmbar = trecho com queda. Entram quando o traço já passou por elas. */}
-        <motion.circle
-          className="fill-brass stroke-surface [stroke-width:2]"
-          cx="180"
-          cy="22"
-          r="4.5"
-          initial={calm ? false : { scale: 0 }}
-          whileInView={calm ? undefined : { scale: 1 }}
-          viewport={{ once: true, amount: 0.7 }}
-          transition={{ duration: 0.3, delay: 0.62, ease: [0.16, 1, 0.3, 1] }}
-          style={{ transformOrigin: "180px 22px" }}
-        />
-        <motion.circle
-          className="fill-warn stroke-surface [stroke-width:2]"
-          cx="252"
-          cy="24"
-          r="4.5"
-          initial={calm ? false : { scale: 0 }}
-          whileInView={calm ? undefined : { scale: 1 }}
-          viewport={{ once: true, amount: 0.7 }}
-          transition={{ duration: 0.3, delay: 0.82, ease: [0.16, 1, 0.3, 1] }}
-          style={{ transformOrigin: "252px 24px" }}
-        />
-      </svg>
+        <svg
+          className="block h-auto w-full"
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={copy.chartAria}
+        >
+          <defs>
+            {/* O trecho JÁ TOCADO é um recorte que cresce com o cursor. Recorte
+                e não tracejado: o quadro estica em X e Y por fatores
+                diferentes, e o retângulo do recorte estica junto com a curva —
+                que é exatamente o que o `stroke-dasharray` não faz. */}
+            <clipPath id={clip}>
+              <rect x="0" y="0" width={Math.max(0.001, pos * W)} height={H} />
+            </clipPath>
+          </defs>
 
-      <div className="flex justify-between text-[0.6rem] font-bold tabular-nums text-faint-raised">
-        <span>21:00</span>
-        <span>22:30</span>
-        <span>00:12</span>
+          <line className={GRID} x1="0" y1="24" x2={W} y2="24" />
+          <line className={GRID} x1="0" y1="56" x2={W} y2="56" />
+
+          <path className="fill-brass/10" d={`${CURVE} L${W},${H} L0,${H} Z`} />
+          <path
+            className="fill-brass/25"
+            d={`${CURVE} L${W},${H} L0,${H} Z`}
+            clipPath={`url(#${clip})`}
+          />
+
+          {/* A curva inteira fica sempre visível, apagada; o que o cursor já
+              passou acende. Assim o gráfico nunca some — e o progresso é lido
+              sem precisar de um segundo elemento. */}
+          <path
+            className="fill-none stroke-brass/40 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.5] [vector-effect:non-scaling-stroke]"
+            d={CURVE}
+          />
+          <path
+            className="fill-none stroke-brass [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.5] [vector-effect:non-scaling-stroke]"
+            d={CURVE}
+            clipPath={`url(#${clip})`}
+          />
+        </svg>
+
+        {/* Marcas, cursor e ponto moram em HTML sobre o SVG: dentro dele o
+            `preserveAspectRatio="none"` viraria a bolinha numa elipse. */}
+        <Marker at={RAID} tone="brass" near={nearRaid} calm={calm} />
+        <Marker at={DROP} tone="warn" near={nearDrop} calm={calm} />
+
+        <span
+          className="pointer-events-none absolute inset-y-0 w-px bg-cream/70"
+          style={{ left: `${pos * 100}%` }}
+          aria-hidden="true"
+        >
+          <i
+            className="absolute -top-1 -left-[3.5px] size-[7px] rounded-full bg-cream"
+          />
+        </span>
+        <span
+          className="pointer-events-none absolute z-2 -ml-[6px] -mt-[6px] size-3 rounded-full border-2 border-surface bg-cream"
+          style={{ left: `${pos * 100}%`, top: `${(yOf(viewersAt(pos)) / H) * 100}%` }}
+          aria-hidden="true"
+        />
+      </div>
+
+      {/* A leitura do cursor. Fica numa linha própria e não flutuando sobre a
+          curva: pastilha que persegue o ponteiro tapa justamente o pedaço do
+          gráfico que a pessoa está tentando ver. */}
+      <div className="flex items-center justify-between gap-2 text-[0.6rem] font-bold tabular-nums text-faint-raised">
+        <span>{clockAt(0)}</span>
+        <strong className="rounded-sm bg-surface-2 px-2 py-1 text-[0.66rem] font-extrabold text-cream">
+          {readout}
+        </strong>
+        <span>{clockAt(1)}</span>
       </div>
 
       <div className="mt-[13px] flex flex-wrap gap-[7px] [&>span]:text-[0.62rem]">
         <Chip tone="ok">{copy.peak}</Chip>
         <Chip quiet>{copy.average}</Chip>
         <Chip quiet>{copy.messages}</Chip>
-        <Chip>{copy.raid}</Chip>
-        <Chip tone="warn">{copy.drop}</Chip>
+        {/* As duas pastilhas de evento acendem quando o cursor chega nelas: é a
+            legenda dizendo "é ISTO que você está olhando agora". */}
+        <motion.span
+          animate={{ scale: nearRaid ? 1.07 : 1 }}
+          transition={{ duration: calm ? 0 : 0.2 }}
+          className="origin-left"
+        >
+          <Chip className={cn(!nearRaid && "opacity-55")}>{copy.raid}</Chip>
+        </motion.span>
+        <motion.span
+          animate={{ scale: nearDrop ? 1.07 : 1 }}
+          transition={{ duration: calm ? 0 : 0.2 }}
+          className="origin-left"
+        >
+          <Chip tone="warn" className={cn(!nearDrop && "opacity-55")}>
+            {copy.drop}
+          </Chip>
+        </motion.span>
       </div>
+
+      <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
+        {copy.hint}
+      </p>
     </div>
+  );
+}
+
+/** Marcador de evento na curva: fica apagado até o cursor chegar perto. */
+function Marker({
+  at,
+  tone,
+  near,
+  calm,
+}: {
+  at: number;
+  tone: "brass" | "warn";
+  near: boolean;
+  calm: boolean;
+}) {
+  return (
+    <motion.span
+      aria-hidden="true"
+      className={cn(
+        "pointer-events-none absolute -mt-[5px] -ml-[5px] size-2.5 rounded-full border-2 border-surface",
+        tone === "warn" ? "bg-warn" : "bg-brass",
+      )}
+      style={{ left: `${at * 100}%`, top: `${(yOf(viewersAt(at)) / H) * 100}%` }}
+      animate={{ scale: near ? 1.55 : 1 }}
+      transition={{ duration: calm ? 0 : 0.24, ease: [0.16, 1, 0.3, 1] }}
+    />
   );
 }

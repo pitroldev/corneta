@@ -122,7 +122,7 @@ const TRUST =
   "inline-flex items-center gap-[7px] rounded-sm bg-surface-2 px-[11px] py-[7px] text-[0.78rem] font-bold shadow-pop-sm " +
   "max-[760px]:text-[0.74rem] [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:stroke-ok [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:3]";
 
-export function Hero({ t }: { t: T }) {
+export function Hero({ t, locale }: { t: T; locale: Locale }) {
   return (
     <section
       id="topo"
@@ -181,7 +181,7 @@ export function Hero({ t }: { t: T }) {
         </div>
 
         <div className="relative z-2 animate-[stage-in_720ms_210ms_cubic-bezier(0.16,1,0.3,1)_both]">
-          <ProductPreview t={t} />
+          <ProductPreview t={t} locale={locale} />
         </div>
 
         <div className="mt-[clamp(48px,5vw,76px)] flex flex-col items-center gap-3.5 pb-[clamp(46px,5vw,70px)] text-center max-[760px]:mt-[44px] [&_a]:min-h-[70px] [&_a]:w-[min(440px,100%)] [&_a]:text-[1.24rem] max-[760px]:[&_a]:min-h-[62px] max-[760px]:[&_a]:w-full max-[760px]:[&_a]:text-[1.06rem] [&>p]:text-[0.84rem] [&>p]:font-semibold [&>p]:text-faint">

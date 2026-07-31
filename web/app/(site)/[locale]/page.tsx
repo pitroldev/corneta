@@ -107,13 +107,13 @@ export default async function Home({
       <SiteHeader t={t} locale={locale} />
 
       <main id="conteudo">
-        <Hero t={t} />
+        <Hero t={t} locale={locale} />
         <MechanismStrip t={t} />
 
         <Benefits t={t} />
 
         <Quality t={t} />
-        <Journey t={t} />
+        <Journey t={t} locale={locale} />
 
         <ChatSection t={t} />
         <Protection t={t} />

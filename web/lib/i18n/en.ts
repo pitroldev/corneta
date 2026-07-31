@@ -302,19 +302,22 @@ export const en: Dict = {
   "journey.live.back": "coming back",
   "journey.live.cpu": "CPU",
   "journey.live.gpu": "GPU",
+  "journey.live.hint": "click a destination to start or pause it",
   "journey.live.metrics": "{kbps} kbps · 60 fps · {drops} drops · 1h42",
   "journey.live.onAir": "on air",
-  "journey.live.paused": "paused by you · 720×1280",
+  "journey.live.paused": "paused by you",
   "journey.live.pausedState": "paused",
   "journey.live.reconnecting": "reconnecting · try 2 · {s}s down",
-  "journey.live.watching": "1,284 watching",
   "journey.report.average": "avg 870",
   "journey.report.chartAria":
     "Audience curve from an example stream, with a spike at the raid and a stretch where the signal dropped.",
   "journey.report.drop": "1 rough stretch",
+  "journey.report.hint": "drag across the curve to read any minute",
   "journey.report.messages": "3,412 messages",
   "journey.report.peak": "peak 1,284",
   "journey.report.raid": "raid at 22:30",
+  "journey.report.scrub": "stream timeline",
+  "journey.watching": "{n} watching",
   "page-data.destinations.custom.name": "Custom RTMP",
   "page-data.destinations.custom.note": "Any RTMP or RTMPS server",
   "page-data.destinations.facebook.name": "Facebook",
@@ -385,6 +388,11 @@ export const en: Dict = {
   "after.scope.series.platforms": "what the platforms got",
   "after.scope.series.obs": "what OBS sent",
   "after.scope.chat": "chat at that moment",
+  "after.scope.hint":
+    "drag the timeline — the video, the chat and the chart all follow",
+  "after.scope.pause": "pause the replay",
+  "after.scope.play": "play the replay",
+  "after.scope.scrub": "recording timeline",
   "after.scope.chart.aria":
     "Example chart of a stream, in two lanes: on top, what the platforms received; below, what OBS sent. Three moments are marked: the chat spike at 42 minutes, the Twitch drop at 1h58, and the moment OBS closed at 2h35 — when the bottom lane hits zero and the top one doesn't.",
 
@@ -473,6 +481,7 @@ export const en: Dict = {
   // "Cópia" = passa o vídeo do OBS sem recodificar. Mesma palavra da tela
   // Qualidade do app (encoding.target.override.copy).
   "preview.target.copy": "Copy",
+  "preview.target.metrics": "{kbps} kbps · 60 fps · {drops} drops",
   "preview.state.live": "on air",
   "preview.stat.uptime": "On air",
   "preview.stat.sending": "Going out",
@@ -494,8 +503,14 @@ export const en: Dict = {
   "protection.alerts.chip.tip": "tip",
   "protection.alerts.demo.example": "example",
   "protection.alerts.demo.label": "live alerts",
+  "protection.alerts.item.bits.amount": "500",
+  "protection.alerts.item.bits.meta": "Twitch · bits",
+  "protection.alerts.item.bits.title": "ronaldo cheered",
   "protection.alerts.item.follow.meta": "Twitch · just now",
   "protection.alerts.item.follow.title": "lucasrmk followed you",
+  "protection.alerts.item.member.amount": "3 months",
+  "protection.alerts.item.member.meta": "YouTube · member",
+  "protection.alerts.item.member.title": "ju.costa became a member",
   "protection.alerts.item.raid.meta":
     "Twitch · brought new people into the chat",
   // O handle do pt lê como frase ("canal do Zé") — em inglês vira um handle de
@@ -512,6 +527,7 @@ export const en: Dict = {
   "protection.alerts.item.superchat.title": "Superchat from Marcos L.",
   "protection.alerts.note":
     "Follows, subs, resubs, subgifts, bits, raids, members and superchats come straight from the platforms. Donations and goals come in through Streamlabs or StreamElements, with the token kept in Windows Credential Manager. The panel sits next to the chat — or in its own little window, on top of the game.",
+  "protection.alerts.test": "fire a test alert",
   "protection.body":
     "Four nets you turn on (or don't) in Settings. Each one costs you something — and Corneta tells you what it costs before you go live, not in the middle of it.",
   // aria-label: funcional, descreve o que a arte é
@@ -532,14 +548,16 @@ export const en: Dict = {
     "“BE RIGHT BACK”: the signal drops, the stream keeps going",
   "protection.chat.body":
     "Read, reply and moderate without switching windows. Alerts from the platforms and from Streamlabs in the same panel. And an overlay you paste into OBS once and forget.",
+  "protection.chat.action.delete": "delete",
+  "protection.chat.action.reply": "reply",
+  "protection.chat.action.timeout": "timeout",
   "protection.chat.demo.example": "example",
   "protection.chat.demo.label": "chat in one feed · 3 platforms",
+  "protection.chat.hint":
+    "get close to a message: delete, timeout and reply show up right there",
   "protection.chat.input.placeholder": "Say something…",
   "protection.chat.input.sendAll": "send to all platforms",
   "protection.chat.kicker": "Everyone in one feed",
-  "protection.chat.msg.1.action.delete": "delete",
-  "protection.chat.msg.1.action.reply": "reply",
-  "protection.chat.msg.1.action.timeout": "timeout",
   "protection.chat.msg.1.badge": "mod",
   // handle de exemplo, fica como está
   "protection.chat.msg.1.name": "gabizera",
@@ -554,7 +572,18 @@ export const en: Dict = {
   "protection.chat.msg.3.text": "let's gooo!!",
   // handle de exemplo, fica como está
   "protection.chat.msg.4.name": "bot_spam_xyz",
-  "protection.chat.msg.4.text": "message removed by a mod",
+  "protection.chat.msg.4.text": "free followers on the site in my bio 🔥🔥",
+  // handles de exemplo, ficam como estão
+  "protection.chat.msg.5.name": "nanda",
+  "protection.chat.msg.5.text": "just got here, did I miss much?",
+  "protection.chat.msg.6.name": "PedroHD",
+  "protection.chat.msg.6.text": "this setup is way too clean",
+  "protection.chat.msg.7.name": "carol_hd",
+  "protection.chat.msg.7.text": "was that doorbell yours or was it in the stream lol",
+  "protection.chat.msg.8.name": "vitinho",
+  "protection.chat.msg.8.text": "first time here, already followed",
+  "protection.chat.removed": "deleted by you",
+  "protection.chat.timedOut": "10 min timeout",
   "protection.chat.note":
     "Twitch, Kick and YouTube in the same feed — up to two Twitch channels at once. BTTV, FFZ and 7TV emotes, badges, timestamps and one field to send from. Delete and time out right in the feed: the message turns into a tombstone instead of vanishing with no explanation and leaving you in the dark.",
   "protection.chat.tabs.alerts.hint": "who showed up and chipped in",
@@ -599,6 +628,7 @@ export const en: Dict = {
     "A local server puts the alerts and the chat (emotes and all) on a URL you add as a Browser Source — once, and Corneta can even create the source in OBS for you. Position, size, duration, sound, how many messages stay on screen and hiding commands (“!”) are all adjustable. There's a test alert button so you can check it without waiting for anyone.",
   "protection.overlay.scene": "scene · your usual stream",
   // aparece nos dois campos de URL
+  "protection.overlay.url.copied": "copied!",
   "protection.overlay.url.copy": "copy",
   "protection.title": "Your stream shouldn't end because OBS froze.",
 

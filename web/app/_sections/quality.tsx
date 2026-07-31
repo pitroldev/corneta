@@ -1,4 +1,4 @@
-import { fill, type T } from "@/lib/i18n";
+import { thousandsSep, type Locale, type T } from "@/lib/i18n";
 import { CheckIcon } from "../_components/icons";
 import { VerticalCrop } from "../_components/crop-picker";
 import {
@@ -69,38 +69,41 @@ const COLS_3 =
 const COLS_2 =
   "[grid-template-columns:minmax(260px,0.85fr)_minmax(360px,1.15fr)]";
 
-/** Copy dos dois painéis da jornada, resolvida no SERVIDOR — função  não
- *  atravessa a fronteira pro componente animado. */
-const liveRoomCopy = (t: T): LiveRoomCopy => ({
+/** Copy dos dois painéis da jornada, resolvida no SERVIDOR — função não
+ *  atravessa a fronteira pro componente animado. Os templates chegam com os
+ *  buracos intactos: quem preenche é o cliente, a cada segundo. */
+const liveRoomCopy = (t: T, locale: Locale): LiveRoomCopy => ({
   label: t("replica.live.label"),
   tag: t("replica.live.tag"),
-  metricsTwitch: fill(t("journey.live.metrics"), { kbps: "5 998", drops: "0" }),
-  metricsYoutube: fill(t("journey.live.metrics"), {
-    kbps: "6 002",
-    drops: "0",
-  }),
+  metrics: t("journey.live.metrics"),
   onAir: t("journey.live.onAir"),
-  reconnectingTemplate: t("journey.live.reconnecting"),
+  reconnecting: t("journey.live.reconnecting"),
   back: t("journey.live.back"),
   paused: t("journey.live.paused"),
   pausedState: t("journey.live.pausedState"),
   cpu: t("journey.live.cpu"),
   gpu: t("journey.live.gpu"),
-  watching: t("journey.live.watching"),
+  watching: t("journey.watching"),
+  hint: t("journey.live.hint"),
+  sep: thousandsSep(locale),
 });
 
-const reportCopy = (t: T): ReportChartCopy => ({
+const reportCopy = (t: T, locale: Locale): ReportChartCopy => ({
   label: t("replica.report.label"),
   tag: t("replica.report.tag"),
   chartAria: t("journey.report.chartAria"),
+  scrub: t("journey.report.scrub"),
+  hint: t("journey.report.hint"),
+  watching: t("journey.watching"),
   peak: t("journey.report.peak"),
   average: t("journey.report.average"),
   messages: t("journey.report.messages"),
   raid: t("journey.report.raid"),
   drop: t("journey.report.drop"),
+  sep: thousandsSep(locale),
 });
 
-export function Journey({ t }: { t: T }) {
+export function Journey({ t, locale }: { t: T; locale: Locale }) {
   return (
     <Section tone="paper-raised">
       <Shell>
@@ -159,7 +162,7 @@ export function Journey({ t }: { t: T }) {
               <h3>{t("quality.journey.during.title")}</h3>
               <p>{t("quality.journey.during.body")}</p>
             </div>
-            <LiveRoom copy={liveRoomCopy(t)} />
+            <LiveRoom copy={liveRoomCopy(t, locale)} />
           </article>
 
           <article className={`${ROW} ${COLS_2}`}>
@@ -174,7 +177,7 @@ export function Journey({ t }: { t: T }) {
               <h3>{t("quality.journey.after.title")}</h3>
               <p>{t("quality.journey.after.body")}</p>
             </div>
-            <ReportChart copy={reportCopy(t)} />
+            <ReportChart copy={reportCopy(t, locale)} />
           </article>
         </div>
       </Shell>

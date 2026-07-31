@@ -56,6 +56,10 @@ const replayCopy = (t: T): ReplayCopy => ({
   frameReconnect: t("after.frame.reconnect"),
   frameNote: t("after.frame.note"),
   preview: t("preview.badge"),
+  play: t("after.scope.play"),
+  pause: t("after.scope.pause"),
+  scrub: t("after.scope.scrub"),
+  hint: t("after.scope.hint"),
   // O slate reusa a copy da seção de proteção: é a MESMA tela indo ao ar, e duas
   // chaves para o mesmo texto acabariam divergindo na primeira revisão.
   slateBrand: t("protection.brb.art.brand"),
