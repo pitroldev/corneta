@@ -23,8 +23,11 @@ export const metadata: Metadata = {
     default: "Corneta — multistream: uma live, várias comunidades",
     template: "%s | Corneta",
   },
+  // O TÍTULO fica com "multistream" porque é o que a pessoa digita na busca.
+  // A DESCRIÇÃO é onde entra o diferencial — descrição que serve igual pro
+  // concorrente não faz ninguém clicar no seu resultado.
   description:
-    "Transmita para Twitch, YouTube, Kick e mais ao mesmo tempo, direto do seu PC: cada plataforma independente, chat reunido e nada de mensalidade. Grátis para Windows.",
+    "Multistream no seu PC para Twitch, YouTube, Kick e mais — com chat reunido, a live de pé quando o sinal cai e um relatório que explica o que travou. Grátis.",
   applicationName: "Corneta",
   category: "technology",
   creator: LEGAL_OPERATOR,
@@ -62,13 +65,13 @@ export const metadata: Metadata = {
     siteName: "Corneta",
     title: "Corneta — uma live, várias comunidades",
     description:
-      "Multistream que roda no seu PC: cada plataforma independente, chat reunido e download grátis para Windows.",
+      "Multistream que roda no seu PC: cada plataforma independente, chat reunido e um relatório que explica o que travou na sua live. Grátis para Windows.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Corneta — uma live, várias comunidades",
     description:
-      "Uma live sua em várias plataformas ao mesmo tempo, com tudo no seu controle.",
+      "Uma live em várias plataformas ao mesmo tempo — e um app que segura a transmissão e te conta depois o que aconteceu.",
   },
 };
 

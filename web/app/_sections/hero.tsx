@@ -123,20 +123,31 @@ export function Hero() {
               Corneta · multistream no seu PC
             </Sticker>
             <h1 className="animate-[copy-in_620ms_70ms_cubic-bezier(0.16,1,0.3,1)_both] text-[clamp(2.95rem,4.9vw,4.45rem)] leading-[0.95] tracking-[-0.035em] max-[760px]:text-[clamp(2.55rem,11.4vw,3.4rem)] max-[420px]:text-[clamp(2.35rem,11vw,3rem)] [&>span]:block">
+              {/* As duas primeiras linhas ficam: são o que a pessoa procura e
+                  o que ela reconhece. A terceira é a que muda o argumento —
+                  mandar pra vários lugares tem plugin grátis dentro do OBS; o
+                  que ninguém mais faz é cuidar da live inteira e te contar
+                  depois o que aconteceu. "Tudo no seu controle" era promessa
+                  que todo concorrente também faz. */}
               <span>Uma live.</span>
               <span>
                 <Slab>Várias comunidades.</Slab>
               </span>
-              <span>Tudo no seu controle.</span>
+              <span>Nada passa batido.</span>
             </h1>
           </div>
 
           <div className="animate-[copy-in_620ms_150ms_cubic-bezier(0.16,1,0.3,1)_both] pb-1.5">
+            {/* Dois tempos de propósito: o primeiro explica o mecanismo (sem
+                ele ninguém entende o produto), o segundo é o diferencial. O
+                texto antigo parava no mecanismo — que é justamente a parte
+                que a concorrência também entrega. */}
             <p className="max-w-[46ch] text-[clamp(1.04rem,1.5vw,1.2rem)] leading-[1.62] font-medium text-muted">
-              Você transmite como sempre. A <strong>Corneta</strong> pega esse
-              sinal e joga nas plataformas que você escolher — Twitch, YouTube,
-              Kick e mais, cada uma com a sua própria conexão, tudo rodando no
-              seu PC.
+              Você transmite como sempre. A <strong>Corneta</strong> joga esse
+              sinal na Twitch, no YouTube, na Kick e onde mais você quiser —
+              cada uma com a sua própria conexão. E não larga do osso: segura a
+              live se o sinal cair, junta o chat de todas e, no fim, te conta
+              como foi.
             </p>
             <div
               className="mt-6.5 flex flex-wrap gap-2.5"
@@ -193,7 +204,7 @@ export function MechanismStrip() {
         <i className={ARROW} aria-hidden="true" />
         <div>
           <strong>Tudo no seu PC</strong>
-          <span>suas chaves, seus ajustes, seus relatórios</span>
+          <span>suas chaves, seus ajustes e o relatório de cada live</span>
         </div>
       </Shell>
     </section>
