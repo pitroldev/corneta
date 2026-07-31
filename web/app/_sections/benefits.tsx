@@ -92,12 +92,14 @@ export function Benefits() {
         <SectionHeading
           tone="paper"
           centered
-          kicker="Feita pra rotina de quem faz live"
-          title="Você cuida do conteúdo. A Corneta cuida do caminho."
+          kicker="Depois que você aperta o BORA"
+          title="Uma tela só — inclusive na hora que dá ruim."
         >
+          {/* Não cita plataforma: a linha de baixo já usa a Kick como exemplo,
+              e repetir a mesma piada em três linhas mata as duas. */}
           <p>
-            Menos janela pra vigiar, menos susto no meio da live e mais tempo
-            pra falar com quem tá assistindo.
+            Sem alt-tab pra saber quem ainda tá no ar e quem tá falando com
+            você.
           </p>
         </SectionHeading>
 
@@ -105,15 +107,15 @@ export function Benefits() {
           <BenefitRow>
             <BenefitCopy
               icon={<RadioIcon />}
-              title="Chegue em mais lugares sem perder o controle"
+              title="Se a Kick cair, a Twitch nem fica sabendo"
             >
               <p>
-                Você liga as plataformas que quiser e acompanha uma por uma. Se
-                alguma precisar reconectar, as outras seguem no ar — e você vê
-                isso acontecendo, sem ficar adivinhando.
+                Cada plataforma tem a sua própria conexão. Uma reconectando não
+                encosta nas outras — e isso aparece no painel, com nome e
+                horário, em vez de você descobrir pelo chat.
               </p>
               <BenefitNote>
-                <Mascot /> Cada plataforma tem seu próprio interruptor
+                <Mascot /> Dá pra pausar uma sem derrubar o resto
               </BenefitNote>
             </BenefitCopy>
 
@@ -130,15 +132,15 @@ export function Benefits() {
             <BenefitCopy
               tone="brass"
               icon={<ChatIcon />}
-              title="Converse com todo mundo sem malabarismo"
+              title="O chat das três na mesma coluna, com emote e tudo"
             >
               <p>
-                Chat, alertas e audiência aparecem juntos. Você acompanha a
-                galera sem pular entre janela e janela — e responde de um lugar
-                só.
+                Twitch, YouTube e Kick descem juntas, na ordem em que
+                aconteceram, e você responde de lá mesmo. O alerta de sub entra
+                no meio, junto com a mensagem que veio depois.
               </p>
               <BenefitNote>
-                <Mascot /> Twitch, YouTube e Kick na mesma coluna
+                <Mascot /> Dá pra soltar numa janelinha, no segundo monitor
               </BenefitNote>
             </BenefitCopy>
 

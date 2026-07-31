@@ -81,7 +81,7 @@ export function Local() {
           <div>
             <SectionHeading
               kicker="Roda no seu PC, de verdade"
-              title="Sem mensalidade de serviço de retransmissão. Sem mandar suas chaves pra nuvem de ninguém."
+              title="Não tem mensalidade porque não tem servidor nosso no meio."
             >
               <p className="max-w-[60ch]!">
                 O trabalho pesado acontece na máquina que já tá transmitindo.
@@ -169,7 +169,7 @@ export function Platforms({
             tight
             tone="paper"
             kicker="Do seu canal pra todo lugar"
-            title="Leve sua live pras plataformas que fazem sentido pra você."
+            title="As quatro grandes prontas, e o resto por sua conta."
           >
             <p>
               As quatro grandes já vêm prontas, com o endereço de cada uma

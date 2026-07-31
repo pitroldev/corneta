@@ -27,7 +27,7 @@ export function Quality() {
           <SectionHeading
             tight
             kicker="Quanto capricho na imagem"
-            title="Uma imagem pra todas ou uma pra cada. Sem adivinhar o preço."
+            title="A mesma imagem pra todas, ou uma sob medida pra cada."
           >
             <p>
               Sua live pode sair caprichada em toda plataforma sem fritar o PC —
@@ -69,15 +69,15 @@ export function Journey() {
       <Shell>
         <SectionHeading
           tone="paper"
-          kicker="Um app para a live inteira"
-          title="Antes, durante e depois. Sem trocar de bancada."
+          kicker="Do setup ao relatório"
+          title="Antes, durante e depois — sem trocar de bancada."
         />
 
         <div className="mt-[clamp(46px,5vw,68px)] flex flex-col border-t-2 border-paper-line">
           <article className={`${ROW} ${COLS_3}`}>
             <div>
               <Sticker className="mb-4">Antes da live</Sticker>
-              <h3>Prepare sem medo de esquecer alguma coisa.</h3>
+              <h3>Chega no BORA sem aquele frio na barriga.</h3>
             </div>
             <div>
               <p className="mt-0!">
@@ -121,7 +121,7 @@ export function Journey() {
               <Sticker tone="tomate" className="mb-4">
                 Durante a live
               </Sticker>
-              <h3>Veja o que importa sem sair do seu conteúdo.</h3>
+              <h3>Uma olhada de canto de olho e volta pro jogo.</h3>
               <p>
                 Bitrate, fps, quadros perdidos e tempo no ar de cada plataforma,
                 mais CPU e placa de verdade. Dá pra pausar uma sem encerrar as

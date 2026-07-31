@@ -39,9 +39,9 @@ export function UpdateBanner() {
     try {
       await installUpdate(info, setProgress);
       // Só chega aqui se o relaunch não aconteceu.
-      toast.info("Atualização instalada — reinicie a Corneta pra concluir.");
+      toast.info("Instalei — feche e abra a Corneta pra terminar.");
     } catch (e) {
-      toast.error(`Não consegui atualizar: ${errMsg(e)}`);
+      toast.error(`Não consegui instalar: ${errMsg(e)}`);
       setInstalling(false);
       setProgress(null);
     }
@@ -54,12 +54,14 @@ export function UpdateBanner() {
       <Download className="size-4 shrink-0 text-brass" />
       <span className="flex-1">
         <strong className="font-display font-bold">
-          Corneta {info.version} disponível
+          Saiu a Corneta {info.version}
         </strong>
+        {/* No ar, a frase diz o MOTIVO de o botão estar morto. "Atualize depois"
+            sozinho parece capricho; "derrubaria a live" a pessoa entende na hora. */}
         <span className="ml-2 text-ink-muted">
           {live
-            ? "Você está no ar — atualize quando encerrar a live."
-            : "Instala e reinicia em alguns segundos."}
+            ? "Você tá no ar — instalar agora derrubaria a live."
+            : "Instalo e abro de novo num instante."}
         </span>
       </span>
 
@@ -73,9 +75,7 @@ export function UpdateBanner() {
           variant="primary"
           size="sm"
           disabled={live}
-          title={
-            live ? "Não dá pra reiniciar durante a transmissão" : undefined
-          }
+          title={live ? "Não dá pra reiniciar no meio da live" : undefined}
           onClick={() => void install()}
         >
           Atualizar agora
@@ -87,7 +87,7 @@ export function UpdateBanner() {
           onClick={dismiss}
           className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
           title="Agora não"
-          aria-label="Dispensar aviso de atualização"
+          aria-label="Fechar o aviso da atualização"
         >
           <X className="size-4" />
         </button>
@@ -109,11 +109,13 @@ export function CheckUpdateButton({ version }: { version: string }) {
       setInfo(info);
       if (info)
         toast.success(
-          `Corneta ${info.version} disponível — o aviso apareceu no topo.`,
+          `Saiu a Corneta ${info.version} — o aviso tá lá em cima.`,
         );
-      else toast.info(`Você já está na versão mais recente (${version}).`);
+      // Dizer a versão em que a pessoa está importa: sem isso o clique parece
+      // não ter feito nada.
+      else toast.info(`Nada novo por aqui — você já tá na ${version}.`);
     } catch (e) {
-      toast.error(`Não consegui verificar: ${errMsg(e)}`);
+      toast.error(`Não consegui checar agora: ${errMsg(e)}`);
     } finally {
       setBusy(false);
     }
@@ -129,7 +131,7 @@ export function CheckUpdateButton({ version }: { version: string }) {
       )}
     >
       <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
-      {busy ? "Verificando…" : "Procurar atualizações"}
+      {busy ? "Olhando…" : "Ver se tem versão nova"}
     </button>
   );
 }

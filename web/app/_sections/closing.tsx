@@ -32,7 +32,7 @@ export function TinyThings({
       <Shell>
         <SectionHeading
           kicker="As miudezas"
-          title="O resto do cuidado, que só aparece quando você usa."
+          title="Coisa pequena que você só nota na terceira live."
         />
 
         {/* A grade tem 1px de vão sobre o breu: os cartões encostam e a linha
@@ -80,9 +80,9 @@ export function Faq({ downloadUrl }: { downloadUrl: string }) {
             tight
             tone="paper"
             kicker="Antes de baixar"
-            title="Dúvidas que vale resolver agora."
+            title="O que todo mundo pergunta antes de instalar."
           >
-            <p>Sem letrinha miúda aparecendo depois que você instalou.</p>
+            <p>Inclusive as que não pegam bem pra gente responder.</p>
             <a
               className={cn(
                 downloadButton,
@@ -169,8 +169,7 @@ export function FinalCta() {
               <Mascot />
             </span>
             <h2 className="max-w-[24ch] text-[clamp(2.35rem,4.2vw,3.9rem)] leading-[0.98] tracking-[-0.03em] max-md:text-[clamp(2.1rem,10.5vw,3rem)]">
-              Baixe a Corneta, ligue no seu programa de live e chegue mais
-              longe.
+              Sua próxima live já podia estar em três lugares.
             </h2>
           </div>
           <div className="flex flex-col items-start gap-4 [&>a]:w-[min(400px,100%)] [&>p]:text-[0.78rem] [&>p]:font-[650] [&>p]:text-faint">
@@ -192,7 +191,7 @@ export function SiteFooter({ downloadUrl }: { downloadUrl: string }) {
       <Shell className="flex min-h-26 items-center justify-between gap-7 py-5.5 max-[760px]:flex-col max-[760px]:items-start">
         <div className="flex flex-col gap-3 [&_p]:max-w-[40ch] [&_p]:text-[0.82rem] [&_p]:font-[550] [&_p]:text-faint">
           <BrandMark />
-          <p>Multistream local para quem quer criar, não manter servidor.</p>
+          <p>Multistream que roda no seu PC — não na nuvem de ninguém.</p>
           <p>
             {LEGAL_OPERATOR} · CNPJ {LEGAL_CNPJ}
           </p>

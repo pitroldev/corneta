@@ -8,7 +8,7 @@
 /** Última revisão do conteúdo da home — alimenta o `lastModified` do sitemap.
  *  Atualize quando a copy mudar de verdade: data que mexe a cada build vira
  *  ruído e o buscador aprende a ignorar. */
-export const CONTENT_UPDATED_ISO = "2026-07-30";
+export const CONTENT_UPDATED_ISO = "2026-07-31";
 
 export type Faq = { question: string; answer: string };
 
@@ -71,7 +71,7 @@ export const FAQS: Faq[] = [
   {
     question: "Funciona em macOS ou Linux?",
     answer:
-      "Hoje o download é só pra Windows. A arquitetura já considera outros sistemas, mas ainda não tem data pública pra esses builds — e a gente prefere avisar isso agora do que depois do download.",
+      "Hoje o download é só pra Windows. A arquitetura já considera outros sistemas, mas não tem data pra anunciar. Se o seu caso é macOS ou Linux, a resposta é: por enquanto, não.",
   },
 ];
 
@@ -88,7 +88,7 @@ export const STEPS: Step[] = [
   },
   {
     title: "Aperte BORA AO VIVO",
-    text: "Acompanhe cada plataforma e siga cuidando do conteúdo. Se quiser, a Corneta manda o OBS começar a transmitir junto.",
+    text: "O painel mostra cada plataforma entrando no ar, uma por uma, e você volta pro jogo. Se quiser, a Corneta manda o OBS começar junto.",
   },
 ];
 

@@ -1,5 +1,10 @@
 import { FAQS, FEATURES, ONE_LINER, STEPS } from "./content";
-import { LEGAL_CNPJ, LEGAL_CONTACT, LEGAL_OPERATOR, LEGAL_ROUTES } from "./legal";
+import {
+  LEGAL_CNPJ,
+  LEGAL_CONTACT,
+  LEGAL_OPERATOR,
+  LEGAL_ROUTES,
+} from "./legal";
 import { siteUrl } from "./site";
 
 // Dados estruturados (schema.org / JSON-LD).
@@ -99,7 +104,10 @@ const howTo = {
   inLanguage: "pt-BR",
   totalTime: "PT10M",
   tool: [
-    { "@type": "HowToTool", name: "OBS Studio, Streamlabs, XSplit ou outro programa RTMP" },
+    {
+      "@type": "HowToTool",
+      name: "OBS Studio, Streamlabs, XSplit ou outro programa RTMP",
+    },
     { "@type": "HowToTool", name: "PC com Windows 10 ou 11" },
   ],
   step: STEPS.map((step, i) => ({
@@ -115,13 +123,7 @@ const howTo = {
 export function homeJsonLd() {
   return {
     "@context": "https://schema.org",
-    "@graph": [
-      organization,
-      website,
-      softwareApplication(),
-      faqPage,
-      howTo,
-    ],
+    "@graph": [organization, website, softwareApplication(), faqPage, howTo],
   };
 }
 

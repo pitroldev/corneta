@@ -30,7 +30,7 @@ export function ChatSection() {
           <SectionHeading
             tight
             kicker="A galera junta"
-            title="O chat de todas, os alertas de todas — e um overlay pronto."
+            title="Ninguém fica falando sozinho numa aba que você não abriu."
           >
             <p>
               Ler, responder e moderar sem trocar de janela. Os alertas das
@@ -87,7 +87,7 @@ export function Protection() {
         <SectionHeading
           tone="paper"
           kicker="Rede de proteção"
-          title="Quando algo dá errado, a live não precisa morrer."
+          title="Sua live não devia acabar porque o OBS travou."
         >
           <p>
             Quatro redes que você liga (ou não) nas Configurações. Cada uma tem
