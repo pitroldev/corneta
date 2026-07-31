@@ -173,7 +173,14 @@ export function TwoCol({
   return (
     <div
       className={cn(
-        "grid max-[980px]:grid-cols-1",
+        // O `!` NÃO é preguiça: as colunas chegam por `style` inline (são um
+        // valor de runtime), e estilo inline vence qualquer classe. Sem o
+        // important, este colapso era código morto — o grid seguia com duas
+        // colunas em TODA largura, e os `minmax(440px,…)` das oito seções que
+        // usam este componente travavam a página em ~500px no celular. Como o
+        // `body` tem `overflow-x: clip`, não aparecia barra de rolagem: o
+        // conteúdo simplesmente era cortado e ficava inalcançável.
+        "grid max-[980px]:grid-cols-1!",
         align === "start"
           ? "items-start"
           : align === "stretch"

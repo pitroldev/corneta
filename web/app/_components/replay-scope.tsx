@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { useCalm, useHeartbeat } from "./use-motion";
 import { PlatformGlyph } from "./decor";
 import { InfoIcon } from "./icons";
 import { cn } from "./ui";
@@ -156,8 +157,39 @@ export interface ReplayCopy {
   moments: Record<MomentId, MomentCopy>;
 }
 
+/** Quanto tempo o passeio automático fica em cada momento. Longo de propósito:
+ *  cada parada tem um veredito de duas linhas pra ler, e trocar antes disso
+ *  seria arrancar o texto da mão de quem está lendo. */
+const TOUR_MS = 5600;
+
 export function ReplayScope({ copy }: { copy: ReplayCopy }) {
-  const [id, setId] = useState<MomentId>("queda");
+  const [id, setId] = useState<MomentId>("chat");
+  // `false` assim que a pessoa toca em qualquer momento: escolha manual não
+  // pode ser atropelada cinco segundos depois pelo passeio.
+  const [auto, setAuto] = useState(true);
+  const [hover, setHover] = useState(false);
+  const calm = useCalm();
+  const box = useRef<HTMLDivElement>(null);
+
+  // O RELATÓRIO TOCANDO — a tese de movimento desta peça.
+  //
+  // O herói é dado em tempo real; aqui é PLAYBACK. O cursor caminha sozinho
+  // pelos três momentos, e o quadro, o chat e o veredito trocam junto. É o laço
+  // do produto acontecendo sem exigir um clique — e clicar continua funcionando,
+  // só que aí o passeio se aposenta.
+  useHeartbeat(
+    box,
+    TOUR_MS,
+    auto && !calm,
+    () => {
+      setId((cur) => {
+        const i = MOMENTS.findIndex((m) => m.id === cur);
+        return MOMENTS[(i + 1) % MOMENTS.length].id;
+      });
+    },
+    hover,
+  );
+
   const reduce = useReducedMotion();
   const active = MOMENTS.find((m) => m.id === id)!;
   // Mola curta: o cursor tem que parecer que ENCOSTOU no ponto, não deslizar até ele.
@@ -165,12 +197,32 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     ? { duration: 0 }
     : ({ type: "spring", stiffness: 320, damping: 32 } as const);
 
+  /** Todo caminho de escolha passa por aqui — e todo caminho aposenta o passeio. */
+  const pick = (next: MomentId) => {
+    setId(next);
+    setAuto(false);
+  };
+
   return (
-    <div className="rounded-xl bg-panel p-[clamp(14px,2vw,20px)] shadow-pop-lg">
+    <div
+      ref={box}
+      // Passar o mouse ou dar foco PAUSA (não mata): quem está lendo o veredito
+      // não pode ver o texto trocar embaixo do olho. Sair retoma.
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocusCapture={() => setHover(true)}
+      onBlurCapture={() => setHover(false)}
+      className="rounded-xl bg-panel p-[clamp(14px,2vw,20px)] shadow-pop-lg"
+    >
       {/* --- quadro + chat --- */}
       <div className="grid gap-3 [grid-template-columns:minmax(0,1.34fr)_minmax(0,1fr)] max-[820px]:grid-cols-1">
-        <Frame moment={active} copy={copy} />
-        <ChatColumn moment={active} copy={copy} />
+        <Frame
+          key={active.id}
+          moment={active}
+          copy={copy}
+          calm={reduce ?? false}
+        />
+        <ChatColumn moment={active} copy={copy} calm={reduce ?? false} />
       </div>
 
       {/* --- a linha do tempo: o eixo que as duas metades compartilham --- */}
@@ -203,8 +255,17 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             tone="brass"
             label={copy.seriesPlatforms}
             floor={false}
+            calm={reduce ?? false}
+            delay={0}
           />
-          <Lane d={LINE_OBS} tone="muted" label={copy.seriesObs} floor />
+          <Lane
+            d={LINE_OBS}
+            tone="muted"
+            label={copy.seriesObs}
+            floor
+            calm={reduce ?? false}
+            delay={0.18}
+          />
 
           {/* Marcas dos momentos que não estão selecionados. A ativa some: quem
               ocupa aquele lugar passa a ser o cursor. */}
@@ -243,7 +304,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             <button
               key={m.id}
               type="button"
-              onClick={() => setId(m.id)}
+              onClick={() => pick(m.id)}
               aria-pressed={m.id === id}
               style={{ left: `${pctAt(m.min)}%` }}
               className={cn(
@@ -255,7 +316,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
                   : i === MOMENTS.length - 1
                     ? "-translate-x-full"
                     : "-translate-x-1/2",
+                // Alvo de toque: 21px de altura reprova em qualquer régua. Em ponteiro
+                // grosso (dedo) a caixa cresce; no mouse fica compacta, que é o que
+                // mantém o rótulo colado na marca do eixo.
                 "rounded-sm px-2 py-1 text-[0.64rem] leading-[1.25] font-extrabold tracking-[0.02em] whitespace-nowrap uppercase",
+                "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2.5",
                 "outline-offset-2 transition-colors duration-150 focus-visible:outline-[3px] focus-visible:outline-brass",
                 m.id === id
                   ? "bg-brass text-brass-ink shadow-pop-brass"
@@ -275,7 +340,13 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           passo do mecanismo no herói. */}
       <p className="mt-3 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[0.84rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-current [&>svg]:text-brass">
         <InfoIcon />
-        <span>
+        {/* Troca com transição, não piscando: o veredito é a frase que o
+            relatório escreve, e ela aparecendo suave lê como conclusão sendo
+            calculada. Corte seco leria como bug. */}
+        <span
+          key={id}
+          className={cn(!reduce && "animate-[chat-in_320ms_ease-out_both]")}
+        >
           <b className="font-extrabold text-cream">
             {copy.moments[id].finding}
           </b>{" "}
@@ -297,11 +368,17 @@ function Lane({
   tone,
   label,
   floor,
+  calm,
+  delay,
 }: {
   d: string;
   tone: "brass" | "muted";
   label: string;
   floor: boolean;
+  calm: boolean;
+  /** A faixa de baixo entra logo depois da de cima: o olho lê primeiro o que as
+   *  plataformas receberam e SÓ ENTÃO vê a do OBS zerar. A ordem é o argumento. */
+  delay: number;
 }) {
   return (
     <div className="relative">
@@ -324,7 +401,11 @@ function Lane({
           strokeWidth={1}
           strokeDasharray={floor ? undefined : "3 4"}
         />
-        <path
+        {/* A curva se DESENHA quando a seção entra na tela, uma vez só.
+            É o momento autoral desta peça: um relatório traçando o que
+            aconteceu, da esquerda pra direita, como quem lê a live. Uma vez —
+            entrada repetida a cada rolagem vira tique de página. */}
+        <motion.path
           d={d}
           fill="none"
           stroke={tone === "brass" ? "var(--brass)" : "var(--color-muted)"}
@@ -334,6 +415,10 @@ function Lane({
           // `preserveAspectRatio: none` estica o traço junto com o quadro; sem
           // isto a linha engorda na horizontal e some na vertical.
           vectorEffect="non-scaling-stroke"
+          initial={calm ? false : { pathLength: 0, opacity: 0.35 }}
+          whileInView={calm ? undefined : { pathLength: 1, opacity: 1 }}
+          viewport={{ once: true, amount: 0.6 }}
+          transition={{ duration: 1.05, delay, ease: [0.16, 1, 0.3, 1] }}
         />
       </svg>
     </div>
@@ -347,13 +432,28 @@ function Lane({
  * usa, com o ESTADO do instante escrito nela. No momento do JÁ VOLTO ela vira a
  * arte que o app coloca no ar de verdade — a única "cena" honesta que existe.
  */
-function Frame({ moment, copy }: { moment: Moment; copy: ReplayCopy }) {
+function Frame({
+  moment,
+  copy,
+  calm,
+}: {
+  moment: Moment;
+  copy: ReplayCopy;
+  calm: boolean;
+}) {
   const clock = `${String(Math.floor(moment.min / 60)).padStart(2, "0")}:${String(
     moment.min % 60,
   ).padStart(2, "0")}:12`;
 
   return (
-    <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px]">
+    <div
+      className={cn(
+        "relative aspect-video overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px]",
+        // Remonta a cada momento (a  vem de fora) e entra suave: é o vídeo
+        // saltando pro instante, não um slide trocando.
+        !calm && "animate-[chat-in_360ms_cubic-bezier(0.16,1,0.3,1)_both]",
+      )}
+    >
       {moment.frame === "slate" ? (
         // A arte real do slate, a mesma da seção de proteção.
         <div className="grid h-full place-content-center justify-items-center bg-[#14100a] px-4 pb-9 text-center">
@@ -419,7 +519,15 @@ function Frame({ moment, copy }: { moment: Moment; copy: ReplayCopy }) {
 }
 
 /** As mensagens daquele instante. É o chat gravado voltando a rolar. */
-function ChatColumn({ moment, copy }: { moment: Moment; copy: ReplayCopy }) {
+function ChatColumn({
+  moment,
+  copy,
+  calm,
+}: {
+  moment: Moment;
+  copy: ReplayCopy;
+  calm: boolean;
+}) {
   const lines = copy.moments[moment.id].lines;
   return (
     <div className="flex flex-col rounded-lg bg-surface p-[13px]">
@@ -427,10 +535,19 @@ function ChatColumn({ moment, copy }: { moment: Moment; copy: ReplayCopy }) {
         {copy.chat}
       </span>
       <div className="flex flex-col gap-[7px]">
+        {/* A `key` carrega o momento: as falas REMONTAM na troca, e a entrada
+            escalonada faz o chat daquele instante CHEGAR em vez de aparecer
+            trocado de uma vez. É a mesma animação do chat do herói — as duas
+            peças falam a mesma língua de movimento. */}
         {moment.who.map((line, i) => (
           <p
-            key={line.name}
-            className="grid grid-cols-[18px_minmax(0,1fr)] items-start gap-2 text-[0.76rem] leading-[1.35] [&_.glyph]:h-[18px] [&_.glyph]:w-[18px]"
+            key={`${moment.id}-${line.name}`}
+            style={calm ? undefined : { animationDelay: `${i * 55}ms` }}
+            className={cn(
+              "grid grid-cols-[18px_minmax(0,1fr)] items-start gap-2 text-[0.76rem] leading-[1.35] [&_.glyph]:h-[18px] [&_.glyph]:w-[18px]",
+              !calm &&
+                "animate-[chat-in_380ms_cubic-bezier(0.16,1,0.3,1)_both]",
+            )}
           >
             <PlatformGlyph id={line.platform} />
             <span>

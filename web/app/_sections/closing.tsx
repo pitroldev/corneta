@@ -206,7 +206,10 @@ export function FinalCta({ t }: { t: T }) {
 }
 
 const FOOTER_LINK =
-  "inline-flex min-h-[30px] items-center rounded-sm bg-surface-2 px-[11px] py-1.5 text-[0.78rem] font-bold text-muted transition-colors duration-120 hover:bg-brass hover:text-brass-ink";
+  // 30px reprova em régua de toque; no dedo a caixa vai a 40. Links legais são
+  // exatamente os que alguém procura no celular, com pressa.
+  "inline-flex min-h-[30px] items-center rounded-sm bg-surface-2 px-[11px] py-1.5 text-[0.78rem] font-bold text-muted transition-colors duration-120 hover:bg-brass hover:text-brass-ink " +
+  "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:px-3.5";
 
 export function SiteFooter({
   t,
@@ -252,7 +255,7 @@ export function SiteFooter({
         </nav>
 
         <a
-          className="inline-flex min-h-[30px] items-center gap-2 font-display text-[0.92rem] font-extrabold text-brass [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:transition-transform [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.4] hover:[&>svg]:translate-x-1"
+          className="inline-flex min-h-[30px] items-center gap-2 font-display text-[0.92rem] font-extrabold text-brass [@media(pointer:coarse)]:min-h-11 [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:transition-transform [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.4] hover:[&>svg]:translate-x-1"
           href={downloadUrl}
           data-placeholder-link="replace-me"
         >

@@ -21,6 +21,10 @@ import {
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
+/** Código curto pro celular. Não é tradução: é o mesmo rótulo abreviado, e por
+ *  isso mora aqui e não no dicionário. */
+const LOCALE_SHORT: Record<Locale, string> = { "pt-BR": "PT", en: "EN" };
+
 /** Fora do componente de propósito: escrever em `document.cookie` é efeito no
  *  mundo, e o React Compiler recusa mutação de valor externo dentro do corpo do
  *  componente — com razão, porque ali ela rodaria em cada render. */
@@ -45,13 +49,23 @@ export function LocaleSwitch({ current }: { current: Locale }) {
             aria-current={active ? "true" : undefined}
             onClick={() => remember(locale)}
             className={
-              "rounded-[3px] px-2 py-1 text-[0.72rem] font-bold transition-colors " +
+              // No celular o par "Português | English" ocupava ~150px e, junto
+              // com o botão de baixar, empurrava o header pra 429px — cortado
+              // pelo `overflow-x: clip` do body, sem barra de rolagem pra
+              // denunciar. Abaixo de 640px sobra o código do idioma, que é o
+              // padrão que todo mundo já lê.
+              "grid min-h-9 place-items-center rounded-[3px] px-2 text-[0.72rem] font-bold transition-colors " +
+              "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10 " +
+              "max-[420px]:min-w-9 " +
               (active
                 ? "bg-brass text-brass-ink"
                 : "text-muted hover:bg-surface-3 hover:text-cream")
             }
           >
-            {LOCALE_LABEL[locale]}
+            <span className="max-[640px]:hidden">{LOCALE_LABEL[locale]}</span>
+            <span className="hidden max-[640px]:inline">
+              {LOCALE_SHORT[locale]}
+            </span>
           </a>
         );
       })}

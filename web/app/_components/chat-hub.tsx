@@ -1,5 +1,6 @@
 import type { T } from "@/lib/i18n";
 import { PlatformGlyph } from "./decor";
+import { Moderated } from "./moderated";
 import { Switch } from "./switch";
 import { Board, Chip, DemoLabel, HubNote } from "./ui";
 import {
@@ -123,9 +124,9 @@ function ChatPanel({ t }: { t: T }) {
               <strong>{t("protection.chat.msg.4.name")}</strong>
               <span className={MSG_TIME}>21:43</span>
             </div>
-            <p className="text-faint-raised line-through">
-              {t("protection.chat.msg.4.text")}
-            </p>
+            {/* Apagada ENQUANTO você olha — ver o risco atravessar a frase é o
+                que transforma o botão "apagar" acima de enfeite em ação. */}
+            <Moderated>{t("protection.chat.msg.4.text")}</Moderated>
           </div>
         </div>
 

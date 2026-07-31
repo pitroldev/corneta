@@ -26,3 +26,19 @@ export function translator(locale: Locale): T {
   const dict = getDict(locale);
   return (key) => dict[key];
 }
+
+/**
+ * Preenche os buracos `{assim}` de uma frase já traduzida.
+ *
+ *  NÃO é ICU e não quer ser: a LP tem meia dúzia de frases com variável, e o
+ *  `dict.test.ts` já garante que os dois idiomas usam os MESMOS buracos. Um
+ *  formatador de verdade aqui seria peso sem freguês.
+ *
+ *  Buraco sem valor fica como está, visível — some é pior, porque a frase sai
+ *  gramaticalmente inteira e factualmente errada.
+ */
+export function fill(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    name in vars ? vars[name] : whole,
+  );
+}

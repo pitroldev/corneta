@@ -73,13 +73,16 @@ const NAV_LINK =
 export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
   return (
     <header className="sticky top-0 z-60 border-b border-border-soft bg-night/95 backdrop-blur-[8px]">
-      <Shell className="flex min-h-17 items-center justify-between gap-7">
+      {/* O vão de 28px é generoso quando cabe a navegação inteira; em tela de
+          320px ele é o que faltava pro botão de baixar (a ação da página) não
+          ser cortado pelo `overflow-x: clip` do body. */}
+      <Shell className="flex min-h-17 items-center justify-between gap-7 max-[420px]:gap-2.5">
         <a
           className="shrink-0"
           href="#topo"
           aria-label={t("hero.header.brand.aria")}
         >
-          <BrandMark />
+          <BrandMark tight />
         </a>
 
         <nav

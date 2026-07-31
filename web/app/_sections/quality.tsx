@@ -1,7 +1,12 @@
-import type { T } from "@/lib/i18n";
+import { fill, type T } from "@/lib/i18n";
 import { CheckIcon } from "../_components/icons";
 import { VerticalCrop } from "../_components/crop-picker";
-import { LiveRoom, ReportChart } from "../_components/live-room";
+import {
+  LiveRoom,
+  ReportChart,
+  type LiveRoomCopy,
+  type ReportChartCopy,
+} from "../_components/live-room";
 import { QualityDesk, VerticalCopy } from "../_components/quality-desk";
 import {
   Checklist,
@@ -51,13 +56,49 @@ export function Quality({ t }: { t: T }) {
 // A jornada pousa em PAPEL, então os filetes usam a linha de papel e o texto de
 // apoio usa a tinta escura — por isso `tone` aparece nas duas pontas.
 const ROW =
-  "grid items-center gap-[clamp(26px,3.5vw,46px)] border-b-2 border-paper-line py-[clamp(30px,4vw,46px)] max-[760px]:grid-cols-1! max-[760px]:gap-6 " +
+  // Colapsa em 860, não em 760: as três colunas somam 710px de mínimo mais os
+  // vãos, e a casca em 768px oferece 728. Entre 760 e ~810 a linha estourava
+  // 16px — cortados pelo `overflow-x: clip` do body, então sem barra de
+  // rolagem pra denunciar. É a largura do CONTEÚDO que manda no ponto de
+  // quebra, não o número redondo do tablet.
+  "grid items-center gap-[clamp(26px,3.5vw,46px)] border-b-2 border-paper-line py-[clamp(30px,4vw,46px)] max-[860px]:grid-cols-1! max-[860px]:gap-6 " +
   "[&_h3]:text-[clamp(1.6rem,2.4vw,2.3rem)] [&_h3]:tracking-[-0.02em] " +
   "[&_p]:mt-3.5 [&_p]:max-w-[46ch] [&_p]:leading-[1.62] [&_p]:font-medium [&_p]:text-ink-muted";
 const COLS_3 =
   "[grid-template-columns:minmax(210px,0.8fr)_minmax(260px,0.95fr)_minmax(240px,0.8fr)]";
 const COLS_2 =
   "[grid-template-columns:minmax(260px,0.85fr)_minmax(360px,1.15fr)]";
+
+/** Copy dos dois painéis da jornada, resolvida no SERVIDOR — função  não
+ *  atravessa a fronteira pro componente animado. */
+const liveRoomCopy = (t: T): LiveRoomCopy => ({
+  label: t("replica.live.label"),
+  tag: t("replica.live.tag"),
+  metricsTwitch: fill(t("journey.live.metrics"), { kbps: "5 998", drops: "0" }),
+  metricsYoutube: fill(t("journey.live.metrics"), {
+    kbps: "6 002",
+    drops: "0",
+  }),
+  onAir: t("journey.live.onAir"),
+  reconnectingTemplate: t("journey.live.reconnecting"),
+  back: t("journey.live.back"),
+  paused: t("journey.live.paused"),
+  pausedState: t("journey.live.pausedState"),
+  cpu: t("journey.live.cpu"),
+  gpu: t("journey.live.gpu"),
+  watching: t("journey.live.watching"),
+});
+
+const reportCopy = (t: T): ReportChartCopy => ({
+  label: t("replica.report.label"),
+  tag: t("replica.report.tag"),
+  chartAria: t("journey.report.chartAria"),
+  peak: t("journey.report.peak"),
+  average: t("journey.report.average"),
+  messages: t("journey.report.messages"),
+  raid: t("journey.report.raid"),
+  drop: t("journey.report.drop"),
+});
 
 export function Journey({ t }: { t: T }) {
   return (
@@ -118,7 +159,7 @@ export function Journey({ t }: { t: T }) {
               <h3>{t("quality.journey.during.title")}</h3>
               <p>{t("quality.journey.during.body")}</p>
             </div>
-            <LiveRoom t={t} />
+            <LiveRoom copy={liveRoomCopy(t)} />
           </article>
 
           <article className={`${ROW} ${COLS_2}`}>
@@ -133,7 +174,7 @@ export function Journey({ t }: { t: T }) {
               <h3>{t("quality.journey.after.title")}</h3>
               <p>{t("quality.journey.after.body")}</p>
             </div>
-            <ReportChart t={t} />
+            <ReportChart copy={reportCopy(t)} />
           </article>
         </div>
       </Shell>

@@ -1,6 +1,7 @@
 import type { T } from "@/lib/i18n";
-import { Mascot, PlatformGlyph } from "./decor";
+import { Mascot } from "./decor";
 import { cn } from "./ui";
+import { LiveChat, LivePanel, type LiveWindowCopy } from "./live-window";
 
 // Réplica da tela "Ao vivo" do app (titlebar + sidebar numerada + destinos +
 // chat reunido). Os números da navegação são os atalhos Alt+N do app; os valores
@@ -16,26 +17,45 @@ const nav = [
   { id: "reports", n: "05", icon: "chart" },
 ] as const;
 
-// Modo "Esperto" com três destinos deitados: todos recebem a cópia do OBS no
-// menor bitrate da lista (6000). A soma bate com src/lib/estimates.ts.
-const targets = [
-  { id: "twitch", name: "Twitch", detail: "1080p60 · 6000 kbps" },
-  { id: "youtube", name: "YouTube", detail: "1080p60 · 6000 kbps" },
-  { id: "kick", name: "Kick", detail: "1080p60 · 6000 kbps" },
-] as const;
-
 // `n` é o índice da mensagem no dicionário (preview.chat.msg.N.*) — o texto e o
 // apelido de exemplo mudam com o idioma, o glifo da plataforma não.
-// Cinco falas, não três: "chat reunido" com uma mensagem por plataforma parece
-// legenda de legenda, e a coluna ficava com metade da altura vazia. Duas delas
-// repetem a plataforma de propósito — chat de verdade não reveza educadamente.
+//
+// Oito falas, não três: a coluna mostra cinco e vai rodando, então a lista
+// precisa ser maior que a janela pra o chat não repetir a cada volta. Duas
+// plataformas se repetem de propósito — chat de verdade não reveza educadamente.
 const chat = [
-  { id: "twitch", who: "Twitch", n: 1 },
-  { id: "youtube", who: "YouTube", n: 2 },
-  { id: "kick", who: "Kick", n: 3 },
-  { id: "twitch", who: "Twitch", n: 4 },
-  { id: "youtube", who: "YouTube", n: 5 },
+  { platform: "twitch", who: "Twitch", n: 1 },
+  { platform: "youtube", who: "YouTube", n: 2 },
+  { platform: "kick", who: "Kick", n: 3 },
+  { platform: "twitch", who: "Twitch", n: 4 },
+  { platform: "youtube", who: "YouTube", n: 5 },
+  { platform: "kick", who: "Kick", n: 6 },
+  { platform: "twitch", who: "Twitch", n: 7 },
+  { platform: "youtube", who: "YouTube", n: 8 },
 ] as const;
+
+/** Copy do miolo vivo, resolvida no SERVIDOR: função não atravessa a fronteira
+ *  servidor→cliente do Next, então o componente animado recebe texto pronto. */
+const liveCopy = (t: T): LiveWindowCopy => ({
+  kicker: t("preview.panel.title"),
+  title: t("preview.nav.golive.label"),
+  stateLive: t("preview.state.live"),
+  statUptime: t("preview.stat.uptime"),
+  statSending: t("preview.stat.sending"),
+  statDrops: t("preview.stat.drops"),
+  verdict: t("preview.verdict"),
+  stop: t("preview.stop"),
+  chatTitle: t("preview.chat.title"),
+  chatPlatforms: t("preview.chat.platforms"),
+  compose: t("preview.chat.compose"),
+  send: t("preview.chat.compose.send"),
+  messages: chat.map((m) => ({
+    platform: m.platform,
+    who: m.who,
+    from: t(`preview.chat.msg.${m.n}.from`),
+    text: t(`preview.chat.msg.${m.n}.text`),
+  })),
+});
 
 function NavIcon({ name }: { name: (typeof nav)[number]["icon"] }) {
   switch (name) {
@@ -89,11 +109,6 @@ const NAV_ACTIVE = cn(
   "bg-brass text-brass-ink shadow-pop-brass",
   "[&>i]:bg-brass-ink/15 [&_small]:text-brass-ink/85 [&>b]:opacity-60",
 );
-
-const STAT =
-  "border-t-2 border-brass/55 bg-surface-2 px-[11px] py-2 " +
-  "[&>span]:block [&>span]:text-[0.55rem] [&>span]:font-extrabold [&>span]:tracking-[0.08em] [&>span]:text-faint-raised [&>span]:uppercase " +
-  "[&>strong]:mt-0.5 [&>strong]:block [&>strong]:font-display [&>strong]:text-[1.06rem] [&>strong]:leading-[1.1] [&>strong]:font-extrabold [&>strong]:tabular-nums";
 
 export function ProductPreview({ t }: { t: T }) {
   return (
@@ -199,140 +214,18 @@ export function ProductPreview({ t }: { t: T }) {
               {t("preview.settings")}
               <b>06</b>
             </span>
-            <span className="flex items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-[0.76rem] font-semibold text-muted [&>i]:size-[9px] [&>i]:rounded-full [&>i]:bg-faint">
+            {/* O rodapé da barra lateral é o estado GLOBAL do app. Com o painel
+                no ar ele tinha que virar junto: "Fora do ar" ao lado de um
+                painel transmitindo é contradição, não detalhe. */}
+            <span className="flex items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-[0.76rem] font-semibold text-ok [&>i]:size-[9px] [&>i]:rounded-full [&>i]:bg-ok">
               <i />
-              {t("preview.state.offAir")}
+              {t("preview.state.onAir")}
             </span>
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3.5 p-[18px] max-[760px]:p-[15px]">
-          <div>
-            <span className="mb-[5px] block text-[0.6rem] font-extrabold tracking-[0.16em] text-brass uppercase">
-              {t("preview.panel.title")}
-            </span>
-            <strong className="block font-display text-2xl leading-[1.05] font-extrabold tracking-[-0.02em]">
-              {t("preview.nav.golive.label")}
-            </strong>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-2 max-[760px]:[&>div:last-child]:col-span-2">
-            <div className={STAT}>
-              <span>{t("preview.stat.upload")}</span>
-              <strong>{t("preview.stat.upload.value")}</strong>
-            </div>
-            <div className={STAT}>
-              <span>{t("preview.stat.needed")}</span>
-              <strong>{t("preview.stat.needed.value")}</strong>
-            </div>
-            <div className={cn(STAT, "[&>strong]:text-ok")}>
-              <span>{t("preview.stat.headroom")}</span>
-              <strong>{t("preview.stat.headroom.value")}</strong>
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col gap-2">
-            {targets.map((target) => (
-              <div
-                className="grid grid-cols-[38px_minmax(0,1fr)_auto_auto] items-center gap-[11px] rounded-md bg-surface-2 px-[11px] py-[9px] max-[760px]:grid-cols-[34px_minmax(0,1fr)_auto] [&_.glyph]:h-[38px] [&_.glyph]:w-[38px]"
-                key={target.id}
-              >
-                <PlatformGlyph id={target.id} />
-                <div>
-                  <strong className="block font-display text-[0.92rem] leading-[1.1] font-bold">
-                    {target.name}
-                  </strong>
-                  <small className="mt-0.5 block text-[0.62rem] font-[550] text-faint-raised">
-                    {target.detail}
-                  </small>
-                </div>
-                <span className="rounded-sm border border-border-dry px-[7px] py-1 text-[0.58rem] font-bold text-muted max-[760px]:hidden">
-                  {t("preview.target.copy")}
-                </span>
-                <span
-                  className="flex h-[21px] w-[38px] items-center justify-end rounded-md bg-brass p-[3px]"
-                  aria-hidden="true"
-                >
-                  <i className="size-3.5 rounded-sm bg-brass-ink" />
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* O veredito da conta.
-              As três linhas acima são IDÊNTICAS de propósito — no modo Esperto as
-              três cabem na cópia, então nenhuma recodifica. Sem esta linha isso lê
-              como repetição de layout; com ela, vira o argumento (a CPU não entra
-              na conta). Também é o que preenche o vão que sobrava entre a última
-              plataforma e o BORA. */}
-          <p
-            className={cn(
-              "flex items-center gap-2 border-t border-border-soft pt-3 text-[0.72rem] leading-[1.4] font-[550] text-muted",
-              "[&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:stroke-ok [&>svg]:[stroke-width:3] [&>svg]:fill-none [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round]",
-            )}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 12.5l5.2 5.2L20 7" />
-            </svg>
-            {t("preview.verdict")}
-          </p>
-
-          {/* ≥18.66px em peso 800 = "texto grande" no WCAG, então o branco sobre
-              tomate (3.1:1) passa AA — é o mesmo botão do app. */}
-          <div
-            className={cn(
-              "flex min-h-[50px] items-center justify-center gap-2.5 rounded-md bg-tomate text-white shadow-pop",
-              "font-display text-[1.18rem] font-extrabold tracking-[0.01em]",
-              "[&>svg]:h-[21px] [&>svg]:w-[21px] [&>svg]:[stroke-width:2.5] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round]",
-            )}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="2" />
-              <path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2" />
-            </svg>
-            {t("preview.cta")}
-          </div>
-        </div>
-
-        <div
-          className="flex min-w-0 flex-col border-l border-border-soft bg-panel px-[15px] py-[18px] max-[1180px]:hidden"
-          aria-hidden="true"
-        >
-          <div className="mb-4 flex items-start justify-between gap-2.5">
-            <span>
-              <strong className="block font-display text-[0.9rem] leading-none font-bold">
-                {t("preview.chat.title")}
-              </strong>
-              <small className="mt-[3px] block text-[0.56rem] font-bold tracking-[0.08em] text-faint uppercase">
-                {t("preview.chat.platforms")}
-              </small>
-            </span>
-          </div>
-
-          <div className="flex flex-1 flex-col gap-[13px]">
-            {chat.map((message) => (
-              <div
-                className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 [&_.glyph]:h-6 [&_.glyph]:w-6"
-                key={message.n}
-              >
-                <PlatformGlyph id={message.id} />
-                <div>
-                  <strong className="block text-[0.6rem] font-extrabold text-muted">
-                    {t(`preview.chat.msg.${message.n}.from`)} · {message.who}
-                  </strong>
-                  <p className="mt-0.5 text-[0.72rem] leading-[1.4] font-[550]">
-                    {t(`preview.chat.msg.${message.n}.text`)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-3.5 flex min-h-[34px] items-center justify-between gap-2 rounded-md border border-border-dry px-2.5 text-[0.62rem] font-[550] text-faint">
-            {t("preview.chat.compose")}
-            <b className="text-brass">{t("preview.chat.compose.send")}</b>
-          </div>
-        </div>
+        <LivePanel copy={liveCopy(t)} />
+        <LiveChat copy={liveCopy(t)} />
       </div>
     </figure>
   );

@@ -445,6 +445,44 @@
   }
 }
 
+/* Fala nova chegando no chat reunido da réplica. Curta e sem bounce: mensagem
+   que quica lê como notificação de brinquedo, não como chat rolando. */
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A janela "liga": cada região pinta na ordem de leitura do app. É o momento
+   autoral da página — o resto do movimento é dado em tempo real, não entrada. */
+@keyframes boot-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Pulso discreto do ponto de estado — o AO VIVO tem o seu (live-pulse, com
+   halo); este é o da linha que está TENTANDO algo: só a opacidade respira. */
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 @keyframes live-pulse {
   0% {
     box-shadow: 0 0 0 0 rgb(255 71 51 / 65%);

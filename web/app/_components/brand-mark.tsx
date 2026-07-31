@@ -4,6 +4,12 @@ type BrandMarkProps = {
   className?: string;
   showName?: boolean;
   tag?: boolean;
+  /** Some com o nome abaixo de 400px, deixando só o símbolo.
+   *
+   *  É opt-in porque só o header fixo tem esse aperto: ali a marca divide 288px
+   *  com o troca-idioma e o botão de baixar, e o botão é a ação da página. No
+   *  rodapé e na página legal sobra espaço, e o nome fica. */
+  tight?: boolean;
 };
 
 /** Marca da Corneta: bloco de latão torto + nome, igual à sidebar do app. */
@@ -11,6 +17,7 @@ export function BrandMark({
   className = "",
   showName = true,
   tag = true,
+  tight = false,
 }: BrandMarkProps) {
   return (
     <span className={`flex items-center gap-2.5 ${className}`.trim()}>
@@ -18,7 +25,7 @@ export function BrandMark({
         <Mascot />
       </span>
       {showName && (
-        <span>
+        <span className={tight ? "max-[400px]:hidden" : undefined}>
           <span className="block font-display text-[1.32rem] leading-none font-extrabold tracking-[-0.02em]">
             Corneta
           </span>
