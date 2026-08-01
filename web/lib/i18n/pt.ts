@@ -101,7 +101,7 @@ export const pt = {
   "chrome.meta.keywords.8": "chat unificado streamer",
   "chrome.meta.keywords.9": "overlay de alertas OBS",
   "chrome.meta.title.default":
-    "Corneta — multistream: uma live, várias comunidades",
+    "Corneta — multistream: uma live, três plataformas",
   "chrome.notfound.body":
     "A transmissão principal continua firme. Volte para o início e tente\n    outro caminho.",
   "chrome.notfound.cta": "Voltar ao início",
@@ -111,10 +111,10 @@ export const pt = {
   "chrome.og.description":
     "Multistream que roda no seu PC: cada plataforma independente, chat reunido e um relatório que explica o que travou na sua live. Grátis para Windows.",
   "chrome.og.locale": "pt_BR",
-  "chrome.og.title": "Corneta — uma live, várias comunidades",
+  "chrome.og.title": "Corneta — uma live, três plataformas, um só chat",
   "chrome.twitter.description":
     "Uma live em várias plataformas ao mesmo tempo — e um app que segura a transmissão e te conta depois o que aconteceu.",
-  "chrome.twitter.title": "Corneta — uma live, várias comunidades",
+  "chrome.twitter.title": "Corneta — uma live, três plataformas, um só chat",
 
   // ---- closing ----
   "closing.cta.note": "Windows 10/11 · sem cadastro · sem assinatura",
@@ -131,7 +131,7 @@ export const pt = {
   "closing.footer.tagline":
     "Multistream que roda no seu PC — não na nuvem de ninguém.",
   "closing.ticker.item1": "Bora cornetar",
-  "closing.ticker.item2": "Uma live · várias comunidades",
+  "closing.ticker.item2": "Uma live · três plataformas · um só chat",
   "closing.ticker.item3": "Multistream que roda no seu PC",
   "closing.ticker.item4": "Grátis e open source",
   "closing.tiny.kicker": "As miudezas",
@@ -270,8 +270,8 @@ export const pt = {
   "hero.skiplink.label": "Pular para o conteúdo",
   "hero.sticker": "Corneta · multistream no seu PC",
   "hero.title.line1": "Uma live.",
-  "hero.title.line2": "Várias comunidades.",
-  "hero.title.line3": "Nada passa batido.",
+  "hero.title.line2": "Três plataformas.",
+  "hero.title.line3": "Um só chat.",
   "hero.trust.aria": "Informações principais",
   "hero.trust.free": "Grátis",
   "hero.trust.opensource": "Open source (MIT)",
@@ -341,7 +341,7 @@ export const pt = {
   "page-data.tiny.youtube.title": "YouTube automático",
 
   // ---- protection ----
-// ---- depois da live: relatório + replay ----
+  // ---- depois da live: relatório + replay ----
   "after.kicker": "Depois da live",
   "after.badge": "novo",
   "after.title": "Clica no engasgo e vê o que tava na tela.",
@@ -360,7 +360,8 @@ export const pt = {
   "after.scope.series.platforms": "as plataformas receberam",
   "after.scope.series.obs": "o OBS mandou",
   "after.scope.chat": "chat naquele momento",
-  "after.scope.hint": "arrasta a linha do tempo — o vídeo, o chat e o gráfico vão junto",
+  "after.scope.hint":
+    "arrasta a linha do tempo — o vídeo, o chat e o gráfico vão junto",
   "after.scope.pause": "pausar o replay",
   "after.scope.play": "tocar o replay",
   "after.scope.scrub": "linha do tempo da gravação",
@@ -398,7 +399,8 @@ export const pt = {
 
   "after.moment.brb.tab": "o OBS fechou",
   "after.moment.brb.title": "Momento: o OBS fechou e o JÁ VOLTO entrou",
-  "after.moment.brb.finding": "As três plataformas continuaram recebendo vídeo.",
+  "after.moment.brb.finding":
+    "As três plataformas continuaram recebendo vídeo.",
   "after.moment.brb.reading":
     "O OBS fechou às 2h35 e o JÁ VOLTO entrou no lugar. Quem estava assistindo viu a tela de espera e continuou lá.",
   "after.moment.brb.chat.1": "cadê ele",
@@ -502,7 +504,8 @@ export const pt = {
   "protection.brb.art.title": "JÁ VOLTO",
   "protection.brb.body":
     "Se o OBS cair no meio da transmissão, esta tela entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna. Também serve pra pausa manual: um clique e você sai da cadeira com o microfone mudo.",
-  "protection.brb.note": "Use a tela JÁ VOLTO da Corneta ou a sua imagem ou vídeo",
+  "protection.brb.note":
+    "Use a tela JÁ VOLTO da Corneta ou a sua imagem ou vídeo",
   "protection.brb.title": "“JÁ VOLTO”: o sinal cai, a live continua",
   "protection.chat.body":
     "Ler, responder e moderar sem trocar de janela. Os alertas das plataformas e do Streamlabs no mesmo painel. E um overlay que você cola no OBS uma vez e esquece.",

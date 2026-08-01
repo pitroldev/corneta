@@ -135,13 +135,8 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
               <Mascot />
               {t("hero.sticker")}
             </Sticker>
+
             <h1 className="animate-[copy-in_620ms_70ms_cubic-bezier(0.16,1,0.3,1)_both] text-[clamp(2.95rem,4.9vw,4.45rem)] leading-[0.95] tracking-[-0.035em] max-[760px]:text-[clamp(2.55rem,11.4vw,3.4rem)] max-[420px]:text-[clamp(2.35rem,11vw,3rem)] [&>span]:block">
-              {/* As duas primeiras linhas ficam: são o que a pessoa procura e
-                  o que ela reconhece. A terceira é a que muda o argumento —
-                  mandar pra vários lugares tem plugin grátis dentro do OBS; o
-                  que ninguém mais faz é cuidar da live inteira e te contar
-                  depois o que aconteceu. "Tudo no seu controle" era promessa
-                  que todo concorrente também faz. */}
               <span>{t("hero.title.line1")}</span>
               <span>
                 <Slab>{t("hero.title.line2")}</Slab>

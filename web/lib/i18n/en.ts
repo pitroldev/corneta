@@ -112,7 +112,7 @@ export const en: Dict = {
   "chrome.meta.keywords.9": "OBS alert overlay",
   // 51 caracteres, dentro do limite de ~60. Mantive "multistream" no começo porque é o termo de busca, igual ao comentário do código. "live" como substant
   "chrome.meta.title.default":
-    "Corneta — multistream: one stream, many communities",
+    "Corneta — multistream: one stream, three platforms",
   // A quebra de linha no pt é do JSX, não do texto.
   "chrome.notfound.body":
     "The main stream is still up. Head back home and try another way.",
@@ -126,10 +126,10 @@ export const en: Dict = {
     "Multistream that runs on your PC: each platform on its own connection, chat in one place, and a report on what choked during your stream. Free for Windows.",
   // Não é copy, mas precisa virar junto com o texto, senão o Open Graph anuncia português.
   "chrome.og.locale": "en_US",
-  "chrome.og.title": "Corneta — one stream, many communities",
+  "chrome.og.title": "Corneta — one stream, three platforms, one chat",
   "chrome.twitter.description":
     "One stream, several platforms at once — and an app that keeps it up when the signal drops, then tells you what happened.",
-  "chrome.twitter.title": "Corneta — one stream, many communities",
+  "chrome.twitter.title": "Corneta — one stream, three platforms, one chat",
 
   // ---- closing ----
   "closing.cta.note": "Windows 10/11 · no sign-up · no subscription",
@@ -151,7 +151,7 @@ export const en: Dict = {
     "Multistream that runs on your PC — not in somebody else's cloud.",
   // "Cornetar" carrega o nome do produto (corneta = horn) e o sentido de "soltar o berro / cornetar". "Sound the horn" salva a corneta e o imperativo curt
   "closing.ticker.item1": "Sound the horn",
-  "closing.ticker.item2": "One stream · all your communities",
+  "closing.ticker.item2": "One stream · three platforms · one chat",
   "closing.ticker.item3": "Multistream that runs on your PC",
   "closing.ticker.item4": "Free and open source",
   "closing.tiny.kicker": "The small stuff",
@@ -292,9 +292,8 @@ export const en: Dict = {
   "hero.skiplink.label": "Skip to content",
   "hero.sticker": "Corneta · multistream on your PC",
   "hero.title.line1": "One stream.",
-  "hero.title.line2": "All your communities.",
-  // É a linha que carrega o argumento (a Corneta cuida da live inteira e te conta depois). "Nothing slips past you" mantém a promessa de que ninguém perde
-  "hero.title.line3": "Nothing slips past you.",
+  "hero.title.line2": "Three platforms.",
+  "hero.title.line3": "One chat.",
   "hero.trust.aria": "Key facts",
   "hero.trust.free": "Free",
   "hero.trust.opensource": "Open source (MIT)",
@@ -371,7 +370,7 @@ export const en: Dict = {
   // ---- Prévia do app no hero ----
   // Réplica da tela "Ao vivo": os rótulos têm que bater com os da Sidebar do app
   // (sidebar.nav.*), senão a LP promete uma tela que não existe.
-// ---- after the stream: report + replay ----
+  // ---- after the stream: report + replay ----
   "after.kicker": "After the stream",
   "after.badge": "new",
   "after.title": "Click the glitch and see what was on screen.",
@@ -545,7 +544,8 @@ export const en: Dict = {
   "protection.brb.art.title": "BE RIGHT BACK",
   "protection.brb.body":
     "If OBS drops mid-stream, this screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns. It also works for a manual break: one click and you're out of the chair with the mic muted.",
-  "protection.brb.note": "Use Corneta's BE RIGHT BACK screen or your own image or video",
+  "protection.brb.note":
+    "Use Corneta's BE RIGHT BACK screen or your own image or video",
   "protection.brb.title":
     "“BE RIGHT BACK”: the signal drops, the stream keeps going",
   "protection.chat.body":
@@ -583,7 +583,8 @@ export const en: Dict = {
   "protection.chat.msg.6.name": "PedroHD",
   "protection.chat.msg.6.text": "this setup is way too clean",
   "protection.chat.msg.7.name": "carol_hd",
-  "protection.chat.msg.7.text": "was that doorbell yours or was it in the stream lol",
+  "protection.chat.msg.7.text":
+    "was that doorbell yours or was it in the stream lol",
   "protection.chat.msg.8.name": "vitinho",
   "protection.chat.msg.8.text": "first time here, already followed",
   "protection.chat.removed": "deleted by you",
