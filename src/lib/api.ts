@@ -1412,8 +1412,8 @@ function mockApi(): CornetaApi {
     },
     async recordCheckDir() {
       return {
-        ok: false,
-        error: "missing",
+        ok: true,
+        freeBytes: 231 * 1024 ** 3,
         lowSpace: false,
         removableOrNetwork: false,
         longPath: false,

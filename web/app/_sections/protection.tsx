@@ -140,6 +140,26 @@ export function Protection({ t }: { t: T }) {
           <div className={GUARD}>
             <div className={GUARD_HEAD}>
               <i>
+                <VolumeIcon />
+              </i>
+              <h3>{t("protection.guard.audio.title")}</h3>
+            </div>
+            <p>{t("protection.guard.audio.body")}</p>
+            <span className={GUARD_COST}>
+              <InfoIcon /> {t("protection.guard.audio.cost")}
+            </span>
+            <span className={GUARD_SWITCH}>
+              <Toggle off />
+              {t("protection.guard.audio.switch")}
+            </span>
+          </div>
+
+          {/* O guardião fecha a fileira porque é o único EXPERIMENTAL dela — a
+              mesma ordem que a aba de Segurança do app usa. No meio, ele
+              emprestava a hesitação dele às duas redes que já estão prontas. */}
+          <div className={GUARD}>
+            <div className={GUARD_HEAD}>
+              <i>
                 <LockIcon />
               </i>
               <h3>{t("protection.guard.privacy.title")}</h3>
@@ -152,23 +172,6 @@ export function Protection({ t }: { t: T }) {
               <Sticker tone="tomate">
                 {t("protection.guard.privacy.switch")}
               </Sticker>
-            </span>
-          </div>
-
-          <div className={GUARD}>
-            <div className={GUARD_HEAD}>
-              <i>
-                <VolumeIcon />
-              </i>
-              <h3>{t("protection.guard.audio.title")}</h3>
-            </div>
-            <p>{t("protection.guard.audio.body")}</p>
-            <span className={GUARD_COST}>
-              <InfoIcon /> {t("protection.guard.audio.cost")}
-            </span>
-            <span className={GUARD_SWITCH}>
-              <Toggle off />
-              {t("protection.guard.audio.switch")}
             </span>
           </div>
         </div>

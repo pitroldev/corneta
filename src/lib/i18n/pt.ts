@@ -1619,11 +1619,16 @@ export const pt = {
   "settings.record.dir.error.readonly": "Não consigo escrever nessa pasta.",
   "settings.record.dir.free": "{size} GB livres — dá pra umas {hours} h de live",
   "settings.record.dir.label": "Salvar em",
+  "settings.record.dir.open": "Abrir pasta",
   "settings.record.dir.pick": "Escolher pasta",
   "settings.record.dir.reset": "usar a padrão",
+  "settings.record.group.space": "Espaço em disco",
   "settings.record.keep.hint":
     "Passou disso, a Corneta apaga as gravações mais antigas. Os relatórios ficam.",
+  "settings.record.keep.hours": "≈{hours} h de live",
   "settings.record.keep.label": "Guardar até",
+  "settings.record.keep.over":
+    "O limite passa do espaço livre — o disco enche antes de a Corneta apagar.",
   "settings.record.privacy":
     "Tudo fica no seu computador: nada de gravação sobe pra lugar nenhum. Se gravar o chat, as mensagens ficam sob a sua responsabilidade.",
   "settings.record.test.busy": "Testando…",

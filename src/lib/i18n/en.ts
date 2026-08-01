@@ -2203,11 +2203,16 @@ export const en: Dict = {
   "settings.record.dir.error.readonly": "I can't write to that folder.",
   "settings.record.dir.free": "{size} GB free — about {hours} h of streaming",
   "settings.record.dir.label": "Save to",
+  "settings.record.dir.open": "Open folder",
   "settings.record.dir.pick": "Choose folder",
   "settings.record.dir.reset": "use the default",
+  "settings.record.group.space": "Disk space",
   "settings.record.keep.hint":
     "Past this, Corneta deletes the oldest recordings. The reports stay.",
+  "settings.record.keep.hours": "≈{hours} h of streaming",
   "settings.record.keep.label": "Keep up to",
+  "settings.record.keep.over":
+    "The limit is bigger than the free space — the disk fills up before Corneta deletes anything.",
   "settings.record.privacy":
     "Everything stays on your computer: no recording is uploaded anywhere. If you record chat, those messages are your responsibility.",
   "settings.record.test.busy": "Testing…",

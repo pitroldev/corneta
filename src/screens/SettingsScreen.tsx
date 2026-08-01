@@ -14,6 +14,8 @@ import {
   Download,
   FileText,
   FolderOpen,
+  FolderSearch,
+  HardDrive,
   Keyboard,
   MonitorCog,
   Palette,
@@ -383,6 +385,30 @@ export function SettingsScreen() {
 
               <div>
                 <SecurityFeature
+                  preview={<LoudnessPreview />}
+                  on={settings.loudnessNormalize}
+                  title={t("settings.safety.loudness.title")}
+                  desc={t("settings.safety.loudness.desc")}
+                >
+                  <Toggle
+                    checked={settings.loudnessNormalize}
+                    onChange={(v) => setSettings({ loudnessNormalize: v })}
+                    label={t("settings.safety.loudness.toggle")}
+                  />
+                </SecurityFeature>
+                {settings.loudnessNormalize && (
+                  <SubSettings>
+                    <LoudnessTarget />
+                  </SubSettings>
+                )}
+              </div>
+
+              {/* O guardião fecha a lista porque é o único EXPERIMENTAL daqui.
+                  No meio, ele emprestava a hesitação dele às redes que estão
+                  prontas — e a ordem de uma lista de proteções é uma
+                  recomendação, queira ela ou não. */}
+              <div>
+                <SecurityFeature
                   preview={<GuardianPreview />}
                   on={settings.guardianEnabled}
                   title={t("settings.safety.guardian.title")}
@@ -398,26 +424,6 @@ export function SettingsScreen() {
                 {settings.guardianEnabled && (
                   <SubSettings>
                     <GuardianEditor />
-                  </SubSettings>
-                )}
-              </div>
-
-              <div>
-                <SecurityFeature
-                  preview={<LoudnessPreview />}
-                  on={settings.loudnessNormalize}
-                  title={t("settings.safety.loudness.title")}
-                  desc={t("settings.safety.loudness.desc")}
-                >
-                  <Toggle
-                    checked={settings.loudnessNormalize}
-                    onChange={(v) => setSettings({ loudnessNormalize: v })}
-                    label={t("settings.safety.loudness.toggle")}
-                  />
-                </SecurityFeature>
-                {settings.loudnessNormalize && (
-                  <SubSettings>
-                    <LoudnessTarget />
                   </SubSettings>
                 )}
               </div>
@@ -1224,6 +1230,23 @@ function SettingRow({
 // As duas chaves nascem DESLIGADAS e são independentes: uma custa disco, a outra guarda
 // dado pessoal de terceiros na máquina do streamer. Nenhuma das duas é decisão da Corneta.
 // ============================================================
+/** Título de um bloco dentro dos ajustes de gravação. Existe pra que "onde
+ *  salvar" e "espaço em disco" sejam ASSUNTOS, e não mais duas linhas na pilha. */
+function RecordGroup({
+  icon,
+  children,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs font-extrabold tracking-wide text-ink-faint uppercase [&>svg]:text-brass">
+      {icon}
+      {children}
+    </div>
+  );
+}
+
 function RecordingSettings() {
   const { t, fmt } = useI18n();
   const config = useStore((s) => s.config!);
@@ -1292,6 +1315,24 @@ function RecordingSettings() {
         ? "settings.record.dir.error.readonly"
         : "settings.record.dir.error.missing";
 
+  // Abrir a pasta é o gesto que faltava: até aqui dava pra ESCOLHER onde salvar e
+  // nunca pra ir lá ver. O comando resolve a pasta padrão sozinho, então funciona
+  // igual quando o caminho está vazio — que é justamente quando o streamer não
+  // sabe onde as gravações foram parar.
+  const openDir = async () => {
+    try {
+      await api.openRecordingFolder();
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+
+  const freeGb = check?.freeBytes != null ? check.freeBytes / 1024 ** 3 : null;
+  const keepGb = settings.recordVideoKeepGb;
+  // O limite passar do espaço livre é uma armadilha silenciosa: a faxina só age
+  // DEPOIS de encher, então o disco acaba primeiro.
+  const keepOverFree = freeGb != null && keepGb > freeGb;
+
   return (
     <Card className="mb-4">
       <h3 className="mb-1 flex items-center gap-2 text-lg">
@@ -1311,100 +1352,162 @@ function RecordingSettings() {
           />
         </SettingRow>
 
+        {/* Os ajustes do vídeo em BLOCOS, não numa pilha. Antes eram pasta,
+            avisos, limite e teste soltos no mesmo nível, todos com o mesmo peso
+            — e "onde salvar" acabava com a mesma importância visual que uma nota
+            de rodapé. Cada assunto agora tem caixa e título próprios. */}
         {settings.recordVideo && (
-          <div className="py-3.5 pl-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold">
+          <div className="flex flex-col gap-3 py-3.5">
+            <section className="rounded-md bg-surface-2 p-3">
+              <RecordGroup icon={<FolderOpen className="size-4" />}>
                 {t("settings.record.dir.label")}
-              </span>
-              <code className="max-w-sm truncate rounded bg-surface-2 px-2 py-1 text-xs">
-                {dir || t("settings.record.dir.default")}
-              </code>
-              <Button size="sm" variant="subtle" onClick={() => void pick()}>
-                <FolderOpen className="size-4" /> {t("settings.record.dir.pick")}
-              </Button>
-              {dir && (
-                <button
-                  onClick={() => setSettings({ recordVideoDir: "" })}
-                  className="text-xs font-semibold text-ink-faint hover:text-brass"
-                >
-                  {t("settings.record.dir.reset")}
-                </button>
-              )}
-            </div>
+              </RecordGroup>
 
-            {check && (
-              <div className="mt-2 flex flex-col gap-1 text-xs">
-                {check.error && (
-                  <span className="font-semibold text-bad">
-                    {t(dirErrorKey)}
-                  </span>
-                )}
-                {check.freeBytes != null && (
-                  <span
-                    className={check.lowSpace ? "text-warn" : "text-ink-faint"}
+              {/* O caminho INTEIRO, quebrando se precisar. Ele estava num chip de
+                  384px com `truncate`, que cortava justo o fim — a parte que diz
+                  em qual pasta a gravação cai. */}
+              <p className="mt-2 rounded bg-surface px-2.5 py-2 font-mono text-xs break-all text-ink-muted">
+                {dir || t("settings.record.dir.default")}
+              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => void openDir()}>
+                  <FolderOpen className="size-4" />{" "}
+                  {t("settings.record.dir.open")}
+                </Button>
+                <Button size="sm" variant="subtle" onClick={() => void pick()}>
+                  <FolderSearch className="size-4" />{" "}
+                  {t("settings.record.dir.pick")}
+                </Button>
+                {dir && (
+                  <button
+                    onClick={() => setSettings({ recordVideoDir: "" })}
+                    className="text-xs font-semibold text-ink-faint hover:text-brass"
                   >
-                    {t("settings.record.dir.free", {
-                      size: fmt.dec(check.freeBytes / 1024 ** 3, 1),
-                      hours: fmt.dec(
-                        check.freeBytes / 1024 ** 3 / Math.max(gbPerHour, 0.1),
-                        1,
-                      ),
-                    })}
-                  </span>
-                )}
-                {check.removableOrNetwork && (
-                  <span className="text-warn">
-                    {t("settings.record.warn.network")}
-                  </span>
-                )}
-                {check.longPath && (
-                  <span className="text-warn">
-                    {t("settings.record.warn.longPath")}
-                  </span>
+                    {t("settings.record.dir.reset")}
+                  </button>
                 )}
               </div>
-            )}
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold">
-                {t("settings.record.keep.label")}
-              </span>
-              <input
-                type="range"
-                min={5}
-                max={500}
-                step={5}
-                value={settings.recordVideoKeepGb}
-                onChange={(e) =>
-                  setSettings({ recordVideoKeepGb: Number(e.target.value) })
-                }
-                className="h-1 w-48 accent-brass"
-                aria-label={t("settings.record.keep.label")}
-              />
-              <span className="w-20 font-mono text-xs">
-                {fmt.num(settings.recordVideoKeepGb)} GB
-              </span>
+              {check && (check.error || check.removableOrNetwork || check.longPath) && (
+                <div className="mt-2 flex flex-col gap-1 text-xs">
+                  {check.error && (
+                    <span className="font-semibold text-bad">
+                      {t(dirErrorKey)}
+                    </span>
+                  )}
+                  {check.removableOrNetwork && (
+                    <span className="text-warn">
+                      {t("settings.record.warn.network")}
+                    </span>
+                  )}
+                  {check.longPath && (
+                    <span className="text-warn">
+                      {t("settings.record.warn.longPath")}
+                    </span>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-md bg-surface-2 p-3">
+              <RecordGroup icon={<HardDrive className="size-4" />}>
+                {t("settings.record.group.space")}
+              </RecordGroup>
+
+              {/* A barra dá ao limite a referência que ele nunca teve: "20 GB" é
+                  um número abstrato até você ver quanto isso é do disco que
+                  sobrou. Vermelha quando o limite passa do livre — aí a faxina
+                  nunca chega a agir, porque o disco enche antes. */}
+              {freeGb != null && (
+                <>
+                  <div
+                    className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3"
+                    role="img"
+                    aria-label={t("settings.record.dir.free", {
+                      size: fmt.dec(freeGb, 1),
+                      hours: fmt.dec(freeGb / Math.max(gbPerHour, 0.1), 1),
+                    })}
+                  >
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-[width] duration-200",
+                        keepOverFree ? "bg-bad" : "bg-brass",
+                      )}
+                      style={{
+                        width: `${Math.min(100, (keepGb / Math.max(freeGb, 0.1)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <p
+                    className={cn(
+                      "mt-1.5 text-xs",
+                      check?.lowSpace ? "text-warn" : "text-ink-faint",
+                    )}
+                  >
+                    {t("settings.record.dir.free", {
+                      size: fmt.dec(freeGb, 1),
+                      hours: fmt.dec(freeGb / Math.max(gbPerHour, 0.1), 1),
+                    })}
+                  </p>
+                </>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                <span className="text-sm font-semibold">
+                  {t("settings.record.keep.label")}
+                </span>
+                <input
+                  type="range"
+                  min={5}
+                  max={500}
+                  step={5}
+                  value={keepGb}
+                  onChange={(e) =>
+                    setSettings({ recordVideoKeepGb: Number(e.target.value) })
+                  }
+                  className="h-1 min-w-40 flex-1 accent-brass"
+                  aria-label={t("settings.record.keep.label")}
+                />
+                {/* GB é a unidade do disco; hora é a unidade de quem transmite.
+                    O limite só quer dizer alguma coisa nas duas. */}
+                <span className="font-mono text-xs whitespace-nowrap">
+                  {fmt.num(keepGb)} GB
+                  <span className="ml-1.5 text-ink-faint">
+                    {t("settings.record.keep.hours", {
+                      hours: fmt.dec(keepGb / Math.max(gbPerHour, 0.1), 1),
+                    })}
+                  </span>
+                </span>
+              </div>
+              <p
+                className={cn(
+                  "mt-1.5 text-[11px]",
+                  keepOverFree ? "font-semibold text-warn" : "text-ink-faint",
+                )}
+              >
+                {keepOverFree
+                  ? t("settings.record.keep.over")
+                  : t("settings.record.keep.hint")}
+              </p>
+            </section>
+
+            <div>
+              <Button
+                size="sm"
+                variant="subtle"
+                loading={testing}
+                onClick={() => void runTest()}
+              >
+                {!testing && <Play className="size-4" />}
+                {testing
+                  ? t("settings.record.test.busy")
+                  : t("settings.record.test.cta")}
+              </Button>
+              <p className="mt-1 text-[11px] text-ink-faint">
+                {t("settings.record.test.hint")}
+              </p>
             </div>
-            <p className="mt-1 text-[11px] text-ink-faint">
-              {t("settings.record.keep.hint")}
-            </p>
-
-            <Button
-              className="mt-3"
-              size="sm"
-              variant="subtle"
-              disabled={testing}
-              onClick={() => void runTest()}
-            >
-              <Play className="size-4" />
-              {testing
-                ? t("settings.record.test.busy")
-                : t("settings.record.test.cta")}
-            </Button>
-            <p className="mt-1 text-[11px] text-ink-faint">
-              {t("settings.record.test.hint")}
-            </p>
           </div>
         )}
 
