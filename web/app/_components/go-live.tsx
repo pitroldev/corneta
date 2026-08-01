@@ -190,7 +190,7 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
         </button>
       )}
 
-      <p className="mt-2 text-center text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
+      <p className="mt-2 text-center text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised mx-auto">
         {phase === "live"
           ? fill(copy.onAir, { n: String(lit.length) })
           : copy.pick}
