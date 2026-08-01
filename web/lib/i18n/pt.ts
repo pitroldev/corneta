@@ -254,6 +254,13 @@ export const pt = {
   "hero.nav.aria": "Navegação principal",
   "hero.nav.chat": "Chat e alertas",
   "hero.nav.faq": "Dúvidas",
+  // Sem buraco de propósito: são DOIS idiomas, então "o outro" é sempre o mesmo
+  // dentro de cada dicionário. Com `{language}` a frase saía "Ver em English" —
+  // português com o endônimo inglês no meio. (O nome próprio continua sendo o
+  // que APARECE no menu do celular; só a frase é traduzida.)
+  "hero.nav.lang": "Ver em inglês",
+  "hero.nav.menu.close": "Fechar menu",
+  "hero.nav.menu.open": "Abrir menu",
   "hero.nav.platforms": "Plataformas",
   "hero.nav.protection": "Proteção",
   "hero.nav.quality": "Qualidade",

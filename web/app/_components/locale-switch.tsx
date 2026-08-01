@@ -8,17 +8,34 @@ import {
   type Locale,
 } from "@/lib/i18n";
 import { GlobeIcon } from "./icons";
+import { cn } from "./ui";
 
-// Troca de idioma.
+// ============================================================
+// Troca de idioma: UM controle, não dois.
+// ============================================================
+// Era um par `PT | EN` com o ativo aceso, plantado entre a navegação e o botão
+// de baixar. Três problemas, e o terceiro é o que pesa:
 //
-// A ARMADILHA que este componente existe pra evitar: quem está em `/en` e clica
-// "Português" vai pra `/`, onde o middleware lê `Accept-Language: en` e devolve
-// pra `/en`. Sem cookie, a pessoa fica presa no inglês pra sempre, achando que
-// o botão está quebrado.
+//  1. Ocupava 105px de barra permanente — mais que qualquer link de seção — pra
+//     uma decisão que se toma no máximo uma vez por visita;
+//  2. Sendo dois blocos clicáveis lado a lado, lia como mais um grupo de
+//     navegação, e a barra passava a ter TRÊS grupos disputando o mesmo peso;
+//  3. Encostava no "Baixar grátis", que é a única ação de conversão da página.
+//     Chrome de preferência não divide vizinhança com a ação principal.
 //
-// Por isso o cookie é gravado ANTES da navegação. É também por isso que ele é
-// um `<a>` de verdade e não um `<button>`: link entre as duas versões é sinal de
-// descoberta que o buscador segue, e o `hrefLang` diz pra onde cada um leva.
+// Com dois idiomas, o controle mínimo correto é um botão que leva ao OUTRO. O
+// código visível é o destino, e o nome acessível diz a frase inteira ("Ver em
+// inglês") — que é o que resolve o "estou em qual?" sem gastar largura.
+//
+// A ARMADILHA que este componente continua existindo pra evitar: quem está em
+// `/en` e clica "Português" vai pra `/`, onde o middleware lê
+// `Accept-Language: en` e devolve pra `/en`. Sem cookie, a pessoa fica presa no
+// inglês pra sempre, achando que o botão está quebrado. Por isso o cookie é
+// gravado ANTES da navegação, e por isso continua sendo um `<a>` de verdade.
+//
+// O SEO não depende mais destes links: o `<head>` já emite
+// `alternates.languages` (app/(site)/[locale]/layout.tsx), que é o sinal que o
+// buscador segue. O `hrefLang` aqui fica porque é barato e correto.
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -33,49 +50,38 @@ function remember(locale: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
 }
 
-export function LocaleSwitch({ current }: { current: Locale }) {
+export function LocaleSwitch({
+  current,
+  label,
+  /** No menu do celular ele deita e ganha o nome por extenso — lá sobra largura
+   *  e falta contexto, o oposto da barra. */
+  full = false,
+}: {
+  current: Locale;
+  /** "Ver em {idioma}" já resolvido pro idioma de DESTINO. */
+  label: string;
+  full?: boolean;
+}) {
+  const other = LOCALES.find((l) => l !== current) ?? current;
+
   return (
-    <nav
-      className="flex items-center gap-1 rounded-sm bg-surface-2 py-0.5 pr-0.5 pl-2"
-      aria-label={current === "en" ? "Language" : "Idioma"}
+    <a
+      href={localePath(other)}
+      hrefLang={other}
+      lang={other}
+      onClick={() => remember(other)}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-2 rounded-md text-[0.76rem] font-extrabold tracking-[0.04em] text-muted",
+        "outline-offset-2 transition-colors duration-150 hover:bg-surface-2 hover:text-cream focus-visible:outline-[3px] focus-visible:outline-brass",
+        "[&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:1.9]",
+        full ? "min-h-11 px-3 text-[0.88rem]" : "min-h-9 px-2.5",
+        "[@media(pointer:coarse)]:min-h-11",
+      )}
     >
-      {/* O globo é o rótulo do grupo em desenho: sem ele, "PT EN" soltos no
-          header são duas siglas sem assunto. Decorativo pro leitor de tela — o
-          assunto, pra ele, é o `aria-label` do <nav>. */}
-      <span className="grid shrink-0 place-items-center text-faint-raised [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:1.9]">
-        <GlobeIcon />
-      </span>
-      {LOCALES.map((locale) => {
-        const active = locale === current;
-        return (
-          <a
-            key={locale}
-            href={localePath(locale)}
-            hrefLang={locale}
-            lang={locale}
-            aria-current={active ? "true" : undefined}
-            onClick={() => remember(locale)}
-            className={
-              // Sempre o código curto, em toda largura. O par "Português |
-              // English" ocupava ~150px e, junto com o botão de baixar,
-              // empurrava o header pra 429px no celular — cortado pelo
-              // `overflow-x: clip` do body, sem barra de rolagem pra denunciar.
-              // Com o globo ao lado, a sigla não precisa do nome por extenso.
-              "grid min-h-9 min-w-9 place-items-center rounded-[3px] px-1.5 text-[0.72rem] font-extrabold tracking-[0.04em] transition-colors " +
-              "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10 " +
-              (active
-                ? "bg-brass text-brass-ink"
-                : "text-muted hover:bg-surface-3 hover:text-cream")
-            }
-          >
-            {LOCALE_SHORT[locale]}
-            {/* O nome por extenso continua no nome acessível, DEPOIS da sigla:
-                assim a etiqueta visível ("PT") é começo do que o leitor de tela
-                anuncia, que é o que a regra de "rótulo no nome" pede. */}
-            <span className="sr-only"> — {LOCALE_LABEL[locale]}</span>
-          </a>
-        );
-      })}
-    </nav>
+      <GlobeIcon />
+      {full ? LOCALE_LABEL[other] : LOCALE_SHORT[other]}
+    </a>
   );
 }

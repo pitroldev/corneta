@@ -1,5 +1,6 @@
 import type { T, Locale } from "@/lib/i18n";
 import { LocaleSwitch } from "../_components/locale-switch";
+import { SiteNav } from "../_components/site-nav";
 import { CheckIcon, DownloadIcon, WindowsIcon } from "../_components/icons";
 import { Mascot, SoundWaves } from "../_components/decor";
 import { BrandMark } from "../_components/brand-mark";
@@ -62,17 +63,23 @@ export function SkipLink({ t }: { t: T }) {
   );
 }
 
-// O sublinhado cresce da esquerda no hover e recolhe pela direita ao sair — o
-// `transform-origin` inverte entre os dois estados, que é o truque que faz o
-// traço parecer "voltar" em vez de piscar.
-const NAV_LINK =
-  "relative py-2 hover:text-cream " +
-  "after:absolute after:inset-x-0 after:bottom-0.5 after:h-[3px] after:origin-right after:scale-x-0 after:bg-brass after:transition-transform after:duration-140 after:content-[''] " +
-  "hover:after:origin-left hover:after:scale-x-100";
+/** As seções que a barra alcança. Os ids são as âncoras E as chaves do
+ *  observador que marca a seção atual — uma lista só, pra não divergirem. */
+const NAV_IDS = [
+  ["por-que", "hero.nav.why"],
+  ["qualidade", "hero.nav.quality"],
+  ["chat", "hero.nav.chat"],
+  ["protecao", "hero.nav.protection"],
+  ["plataformas", "hero.nav.platforms"],
+  ["duvidas", "hero.nav.faq"],
+] as const;
 
 export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
+  const langLabel = t("hero.nav.lang");
+
   return (
-    <header className="sticky top-0 z-60 border-b border-border-soft bg-night/95 backdrop-blur-[8px]">
+    // `relative` porque a folha do menu se pendura no rodapé do cabeçalho.
+    <header className="sticky top-0 z-60 relative border-b border-border-soft bg-night/95 backdrop-blur-[8px]">
       {/* O vão de 28px é generoso quando cabe a navegação inteira; em tela de
           320px ele é o que faltava pro botão de baixar (a ação da página) não
           ser cortado pelo `overflow-x: clip` do body. */}
@@ -85,32 +92,25 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
           <BrandMark tight />
         </a>
 
-        <nav
-          className="ml-auto flex items-center gap-6.5 text-[0.88rem] font-[650] text-muted max-[980px]:hidden"
-          aria-label={t("hero.nav.aria")}
+        <SiteNav
+          copy={{
+            aria: t("hero.nav.aria"),
+            open: t("hero.nav.menu.open"),
+            close: t("hero.nav.menu.close"),
+            items: NAV_IDS.map(([id, key]) => ({ id, label: t(key) })),
+          }}
         >
-          <a className={NAV_LINK} href="#por-que">
-            {t("hero.nav.why")}
-          </a>
-          <a className={NAV_LINK} href="#qualidade">
-            {t("hero.nav.quality")}
-          </a>
-          <a className={NAV_LINK} href="#chat">
-            {t("hero.nav.chat")}
-          </a>
-          <a className={NAV_LINK} href="#protecao">
-            {t("hero.nav.protection")}
-          </a>
-          <a className={NAV_LINK} href="#plataformas">
-            {t("hero.nav.platforms")}
-          </a>
-          <a className={NAV_LINK} href="#duvidas">
-            {t("hero.nav.faq")}
-          </a>
-        </nav>
+          {/* Dentro da folha o idioma aparece por extenso: lá sobra largura e
+              falta contexto — o oposto da barra. */}
+          <LocaleSwitch current={locale} label={langLabel} full />
+        </SiteNav>
 
-        <div className="flex items-center gap-3">
-          <LocaleSwitch current={locale} />
+        <div className="flex items-center gap-2.5 max-[980px]:gap-2">
+          {/* Na barra ele é o controle mínimo, e some no celular porque já está
+              na folha do menu — repetido, viraria de novo o vizinho do CTA. */}
+          <span className="max-[980px]:hidden">
+            <LocaleSwitch current={locale} label={langLabel} />
+          </span>
           <DownloadButton t={t} compact label={t("hero.header.download")} />
         </div>
       </Shell>

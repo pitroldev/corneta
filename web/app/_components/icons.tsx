@@ -15,6 +15,7 @@ import {
   Layers,
   Loader2,
   Lock,
+  Menu,
   MessageSquare,
   Minimize2,
   Minus,
@@ -106,6 +107,7 @@ export const LayersIcon = wrap(Layers);
 export const LoaderIcon = wrap(Loader2);
 export const LockIcon = wrap(Lock);
 export const MaximizeIcon = wrap(Square);
+export const MenuIcon = wrap(Menu);
 export const MinimizeIcon = wrap(Minus);
 export const MonitorIcon = wrap(MonitorPlay);
 export const PauseIcon = wrap(Pause);
