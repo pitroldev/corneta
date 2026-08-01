@@ -61,8 +61,7 @@
           "English"
         ],
         "headerImage": "installer/header.bmp",
-        "sidebarImage": "installer/sidebar.bmp",
-        "installerHooks": "installer/theme.nsh"
+        "sidebarImage": "installer/sidebar.bmp"
       }
     }
   },
