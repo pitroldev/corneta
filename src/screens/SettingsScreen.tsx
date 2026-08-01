@@ -1216,7 +1216,7 @@ function SettingRow({
           {badge}
         </div>
         {desc && (
-          <div className="mt-0.5 max-w-md text-sm text-ink-muted">{desc}</div>
+          <div className="mt-0.5 max-w-xl text-sm text-ink-muted">{desc}</div>
         )}
       </div>
       {children}
@@ -1389,25 +1389,26 @@ function RecordingSettings() {
                 )}
               </div>
 
-              {check && (check.error || check.removableOrNetwork || check.longPath) && (
-                <div className="mt-2 flex flex-col gap-1 text-xs">
-                  {check.error && (
-                    <span className="font-semibold text-bad">
-                      {t(dirErrorKey)}
-                    </span>
-                  )}
-                  {check.removableOrNetwork && (
-                    <span className="text-warn">
-                      {t("settings.record.warn.network")}
-                    </span>
-                  )}
-                  {check.longPath && (
-                    <span className="text-warn">
-                      {t("settings.record.warn.longPath")}
-                    </span>
-                  )}
-                </div>
-              )}
+              {check &&
+                (check.error || check.removableOrNetwork || check.longPath) && (
+                  <div className="mt-2 flex flex-col gap-1 text-xs">
+                    {check.error && (
+                      <span className="font-semibold text-bad">
+                        {t(dirErrorKey)}
+                      </span>
+                    )}
+                    {check.removableOrNetwork && (
+                      <span className="text-warn">
+                        {t("settings.record.warn.network")}
+                      </span>
+                    )}
+                    {check.longPath && (
+                      <span className="text-warn">
+                        {t("settings.record.warn.longPath")}
+                      </span>
+                    )}
+                  </div>
+                )}
             </section>
 
             <section className="rounded-md bg-surface-2 p-3">
