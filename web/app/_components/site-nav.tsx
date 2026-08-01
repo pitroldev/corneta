@@ -8,21 +8,37 @@ import { cn } from "./ui";
 // ============================================================
 // A navegação do site.
 // ============================================================
-// O que ela era: seis links que SUMIAM inteiros abaixo de 980px. Numa página com
-// doze seções e três metros de rolagem, o celular — que é onde a maior parte das
-// visitas acontece — ficava sem nenhuma forma de pular pra um assunto. Não era
-// uma navegação apertada; era uma navegação ausente.
+// Antes: seis links que sumiam inteiros abaixo de 980px, sem nenhuma noção de
+// lugar. Isso foi resolvido — o menu do celular e a marcação da seção atual (por
+// observador de interseção) vieram daí e continuam aqui.
 //
-// E não havia noção de LUGAR: rolando, nada dizia em que trecho você estava.
+// O QUE ESTA REVISÃO CONSERTOU, tudo medido na tela:
 //
-// O que ela é agora:
-//  • no desktop, os mesmos links — mas o da seção em que você está fica marcado,
-//    por um observador de interseção. A barra vira bússola, não só atalho;
-//  • abaixo de 980px, um botão de menu abre uma folha com os links em alvos de
-//    dedo, mais a troca de idioma. Fecha no Esc, no clique fora e ao escolher;
-//  • o idioma saiu do meio da barra (ver locale-switch.tsx).
+//  1. A barra era torta. Entre o fim da marca e o primeiro link havia 278px de
+//     nada, porque a navegação vinha com `ml-auto` e ia toda pro canto direito.
+//     O resultado é que os seis links, a troca de idioma e o botão de baixar
+//     disputavam o mesmo pedaço, com metade da barra vazia do outro lado.
+//     Agora a navegação ocupa o MEIO e o vazio se divide nos dois lados.
 //
-// A copy chega RESOLVIDA: função não atravessa a fronteira servidor→cliente.
+//  2. O idioma agrupava com o botão errado. Ele ficava a 10px do "Baixar
+//     grátis" e a 28px do último link — ou seja, aos olhos ele fazia parte da
+//     ação de conversão, que é justamente o vizinho que um controle de
+//     preferência não pode ter. Agora ele entra no grupo da navegação, separado
+//     por um traço, e o CTA fica sozinho na direita.
+//
+//  3. Havia uma faixa morta de ~120px de largura. O ponto de virada pro menu
+//     estava em 980px, mas o conteúdo da barra precisa de ~1030px pra caber.
+//     Entre 980 e 1100 a barra ficava montada e espremida: "Por que", "Chat e
+//     alertas" e o próprio "Baixar grátis" quebravam em DUAS LINHAS. O ponto de
+//     virada subiu pra 1100px, que é onde a barra realmente cabe.
+//
+// O 1100 aparece literal em quatro lugares (aqui e no cabeçalho) porque o
+// Tailwind só gera classe escrita por extenso — classe montada por variável não
+// existe no CSS final. Mexeu num, mexe nos quatro.
+//
+// A copy chega RESOLVIDA: função não atravessa a fronteira servidor→cliente —
+// e é por isso que a troca de idioma entra como dois `ReactNode` prontos, um
+// pra barra e outro pra folha, em vez de um render prop.
 
 export interface NavItem {
   /** Id da seção, sem `#`. É a âncora E a chave do observador. */
@@ -83,11 +99,14 @@ function useCurrentSection(ids: string[]) {
 
 export function SiteNav({
   copy,
-  children,
+  localeBar,
+  localeSheet,
 }: {
   copy: SiteNavCopy;
-  /** A troca de idioma, que no celular mora DENTRO da folha. */
-  children: React.ReactNode;
+  /** Troca de idioma compacta, ao lado dos links. */
+  localeBar: React.ReactNode;
+  /** A mesma troca em alvo de dedo, no rodapé da folha do celular. */
+  localeSheet: React.ReactNode;
 }) {
   const reduce = useReducedMotion() ?? false;
   const [open, setOpen] = useState(false);
@@ -114,34 +133,42 @@ export function SiteNav({
 
   return (
     <div ref={box} className="contents">
-      {/* --- desktop: os links, com o atual marcado --- */}
-      <nav
-        className="ml-auto flex items-center gap-6.5 text-[0.88rem] font-[650] text-muted max-[980px]:hidden"
-        aria-label={copy.aria}
-      >
-        {copy.items.map((item) => {
-          const on = current === item.id;
-          return (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              aria-current={on ? "location" : undefined}
-              className={cn(
-                LINK,
-                "hover:text-cream",
-                // A seção atual fica com o traço aceso e a tinta cheia. É o
-                // mesmo sublinhado do hover, então não há vocabulário novo — só
-                // um estado a mais para ele.
-                on && "text-cream after:origin-left after:scale-x-100",
-              )}
-            >
-              {item.label}
-            </a>
-          );
-        })}
-      </nav>
+      <div className="flex flex-1 items-center justify-center gap-5 max-[1100px]:hidden">
+        <nav
+          className="flex items-center gap-6.5 text-[0.88rem] font-[650] whitespace-nowrap text-muted"
+          aria-label={copy.aria}
+        >
+          {copy.items.map((item) => {
+            const on = current === item.id;
+            return (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                aria-current={on ? "location" : undefined}
+                className={cn(
+                  LINK,
+                  "hover:text-cream",
+                  // A seção atual fica com o traço aceso e a tinta cheia. É o
+                  // mesmo sublinhado do hover, então não há vocabulário novo — só
+                  // um estado a mais para ele.
+                  on && "text-cream after:origin-left after:scale-x-100",
+                )}
+              >
+                {item.label}
+              </a>
+            );
+          })}
+        </nav>
 
-      {/* --- celular: o botão do menu --- */}
+        {/* O traço faz o trabalho que a distância sozinha não faz: sem ele,
+            "English" ao lado de "Dúvidas" lê como um sétimo link de seção. */}
+        <span aria-hidden="true" className="h-5 w-px shrink-0 bg-border-soft" />
+        {localeBar}
+      </div>
+
+      {/* --- celular: o botão do menu ---
+           `ml-auto` continua porque abaixo de 1100 o bloco do meio some do
+           fluxo, e sem ele o botão ficaria solto no vão entre marca e CTA. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -149,7 +176,7 @@ export function SiteNav({
         aria-controls="menu-do-site"
         aria-label={open ? copy.close : copy.open}
         className={cn(
-          "ml-auto hidden size-11 shrink-0 cursor-pointer place-items-center rounded-md text-muted max-[980px]:grid",
+          "ml-auto hidden size-11 shrink-0 cursor-pointer place-items-center rounded-md text-muted max-[1100px]:grid",
           "outline-offset-2 transition-colors duration-150 hover:bg-surface-2 hover:text-cream focus-visible:outline-[3px] focus-visible:outline-brass",
           "[&>svg]:h-[22px] [&>svg]:w-[22px]",
           open && "bg-surface-2 text-cream",
@@ -167,7 +194,7 @@ export function SiteNav({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.14 } }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-x-0 top-full hidden border-b border-border-soft bg-night shadow-pop-lg max-[980px]:block"
+            className="absolute inset-x-0 top-full hidden border-b border-border-soft bg-night shadow-pop-lg max-[1100px]:block"
           >
             <nav
               aria-label={copy.aria}
@@ -191,7 +218,7 @@ export function SiteNav({
               ))}
 
               <div className="mt-2 flex items-center justify-between gap-3 border-t border-border-soft pt-3 pb-1">
-                {children}
+                {localeSheet}
               </div>
             </nav>
           </motion.div>

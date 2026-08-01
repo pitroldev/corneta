@@ -80,10 +80,15 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
   return (
     // `relative` porque a folha do menu se pendura no rodapé do cabeçalho.
     <header className="sticky top-0 z-60 relative border-b border-border-soft bg-night/95 backdrop-blur-[8px]">
-      {/* O vão de 28px é generoso quando cabe a navegação inteira; em tela de
+      {/* Três zonas: marca à esquerda, navegação ocupando o meio, e o botão de
+          baixar sozinho à direita. O `justify-between` saiu porque quem faz a
+          distribuição agora é o `flex-1` do bloco do meio — com ele, o vazio
+          que sobra fica dos DOIS lados dos links em vez de todo à esquerda.
+
+          O vão de 28px é generoso quando cabe a navegação inteira; em tela de
           320px ele é o que faltava pro botão de baixar (a ação da página) não
           ser cortado pelo `overflow-x: clip` do body. */}
-      <Shell className="flex min-h-17 items-center justify-between gap-7 max-[420px]:gap-2.5">
+      <Shell className="flex min-h-17 items-center gap-7 max-[420px]:gap-2.5">
         <a
           className="shrink-0"
           href="#topo"
@@ -99,20 +104,13 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
             close: t("hero.nav.menu.close"),
             items: NAV_IDS.map(([id, key]) => ({ id, label: t(key) })),
           }}
-        >
-          {/* Dentro da folha o idioma aparece por extenso: lá sobra largura e
-              falta contexto — o oposto da barra. */}
-          <LocaleSwitch current={locale} label={langLabel} full />
-        </SiteNav>
+          localeBar={<LocaleSwitch current={locale} label={langLabel} />}
+          localeSheet={<LocaleSwitch current={locale} label={langLabel} full />}
+        />
 
-        <div className="flex items-center gap-2.5 max-[980px]:gap-2">
-          {/* Na barra ele é o controle mínimo, e some no celular porque já está
-              na folha do menu — repetido, viraria de novo o vizinho do CTA. */}
-          <span className="max-[980px]:hidden">
-            <LocaleSwitch current={locale} label={langLabel} />
-          </span>
-          <DownloadButton t={t} compact label={t("hero.header.download")} />
-        </div>
+        {/* Sozinho na direita de propósito: é a única ação de conversão da
+            página, e agora nenhum controle de preferência encosta nele. */}
+        <DownloadButton t={t} compact label={t("hero.header.download")} />
       </Shell>
     </header>
   );

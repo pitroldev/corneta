@@ -23,9 +23,17 @@ import { cn } from "./ui";
 //  3. Encostava no "Baixar grátis", que é a única ação de conversão da página.
 //     Chrome de preferência não divide vizinhança com a ação principal.
 //
-// Com dois idiomas, o controle mínimo correto é um botão que leva ao OUTRO. O
-// código visível é o destino, e o nome acessível diz a frase inteira ("Ver em
-// inglês") — que é o que resolve o "estou em qual?" sem gastar largura.
+// Com dois idiomas, o controle mínimo correto é um botão que leva ao OUTRO.
+//
+// O QUE MUDOU: o rótulo era o código de duas letras (`EN`), e código de duas
+// letras não diz se é onde você ESTÁ ou pra onde você VAI — as duas convenções
+// existem por aí, e o `aria-label` que desfaz a dúvida só chega em quem passa o
+// mouse ou usa leitor de tela. No celular não existe nem hover.
+//
+// Agora o rótulo é o idioma de destino escrito por extenso, no próprio idioma
+// dele: "English" numa página em português não tem segunda leitura possível.
+// De quebra, some a incoerência de a barra dizer `EN` e a folha do menu dizer
+// "English" pro mesmo controle.
 //
 // A ARMADILHA que este componente continua existindo pra evitar: quem está em
 // `/en` e clica "Português" vai pra `/`, onde o middleware lê
@@ -39,10 +47,6 @@ import { cn } from "./ui";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-/** Código curto do idioma. Não é tradução: é o rótulo abreviado, o mesmo nos
- *  dois idiomas, e por isso mora aqui e não no dicionário. */
-const LOCALE_SHORT: Record<Locale, string> = { "pt-BR": "PT", en: "EN" };
-
 /** Fora do componente de propósito: escrever em `document.cookie` é efeito no
  *  mundo, e o React Compiler recusa mutação de valor externo dentro do corpo do
  *  componente — com razão, porque ali ela rodaria em cada render. */
@@ -53,8 +57,7 @@ function remember(locale: Locale) {
 export function LocaleSwitch({
   current,
   label,
-  /** No menu do celular ele deita e ganha o nome por extenso — lá sobra largura
-   *  e falta contexto, o oposto da barra. */
+  /** Na folha do celular ele vira alvo de dedo: mesma frase, caixa maior. */
   full = false,
 }: {
   current: Locale;
@@ -73,15 +76,15 @@ export function LocaleSwitch({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex shrink-0 items-center gap-2 rounded-md text-[0.76rem] font-extrabold tracking-[0.04em] text-muted",
+        "inline-flex shrink-0 items-center gap-2 rounded-md font-[650] whitespace-nowrap text-muted",
         "outline-offset-2 transition-colors duration-150 hover:bg-surface-2 hover:text-cream focus-visible:outline-[3px] focus-visible:outline-brass",
         "[&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:1.9]",
-        full ? "min-h-11 px-3 text-[0.88rem]" : "min-h-9 px-2.5",
+        full ? "min-h-11 px-3 text-[0.95rem]" : "min-h-9 px-2 text-[0.84rem]",
         "[@media(pointer:coarse)]:min-h-11",
       )}
     >
       <GlobeIcon />
-      {full ? LOCALE_LABEL[other] : LOCALE_SHORT[other]}
+      {LOCALE_LABEL[other]}
     </a>
   );
 }
