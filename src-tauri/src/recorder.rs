@@ -193,13 +193,7 @@ pub fn free_bytes(dir: &Path) -> Option<u64> {
         .collect();
     let mut free: u64 = 0;
     unsafe {
-        GetDiskFreeSpaceExW(
-            PCWSTR(wide.as_ptr()),
-            Some(&mut free),
-            None,
-            None,
-        )
-        .ok()?;
+        GetDiskFreeSpaceExW(PCWSTR(wide.as_ptr()), Some(&mut free), None, None).ok()?;
     }
     Some(free)
 }
@@ -537,7 +531,10 @@ mod tests {
         // o parser lê `out_time=`. Se algum dia alguém "otimizar" pra ler o outro campo,
         // este teste é quem pega o fator 1000.
         assert_eq!(parse_out_time_ms("out_time=00:00:01.000000"), Some(1_000));
-        assert_eq!(parse_out_time_ms("out_time=01:02:03.500000"), Some(3_723_500));
+        assert_eq!(
+            parse_out_time_ms("out_time=01:02:03.500000"),
+            Some(3_723_500)
+        );
         assert_eq!(parse_out_time_ms("out_time=00:00:00.000000"), Some(0));
     }
 
@@ -573,9 +570,18 @@ mod tests {
         let a = record_args("rtmp://x/live/obs_program", Path::new("D:/a.mp4"));
         let joined = a.join(" ");
         assert!(joined.contains("-c copy"), "gravar não pode re-encodar");
-        assert!(joined.contains("frag_keyframe"), "precisa sobreviver a queda");
-        assert!(joined.contains("-progress pipe:1"), "sem isso não há âncora");
-        assert!(!joined.contains("faststart"), "faststart é do remux, não da gravação");
+        assert!(
+            joined.contains("frag_keyframe"),
+            "precisa sobreviver a queda"
+        );
+        assert!(
+            joined.contains("-progress pipe:1"),
+            "sem isso não há âncora"
+        );
+        assert!(
+            !joined.contains("faststart"),
+            "faststart é do remux, não da gravação"
+        );
     }
 
     #[test]

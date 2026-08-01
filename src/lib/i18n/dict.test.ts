@@ -73,11 +73,15 @@ describe("dicionários pt/en", () => {
     // "Corneta" é o nome do produto e atravessa os dois idiomas. Fora ele, uma
     // frase em inglês não tem por que carregar acento nem os nomes de botão em
     // português: o app em inglês diz GO LIVE, BE RIGHT BACK e Table.
+    //
+    // TOPÔNIMO também atravessa: em inglês se escreve "São Paulo" com o til, e
+    // tirá-lo pra passar num teste sobre TRADUÇÃO seria consertar a régua errada.
     const ACENTO = /[áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ]/;
     const TERMOS = ["JÁ VOLTO", "BORA AO VIVO", "BORA", "Mesa"];
+    const ATRAVESSAM = /Corneta|São Paulo/g;
     const leaked = entries(en)
       .filter(([, text]) => {
-        const limpo = text.replace(/Corneta/g, "");
+        const limpo = text.replace(ATRAVESSAM, "");
         return ACENTO.test(limpo) || TERMOS.some((x) => limpo.includes(x));
       })
       .map(([key]) => key);

@@ -214,14 +214,35 @@ falando do desenho.
 | item | regra |
 |---|---|
 | Pessoa | `você`, nunca `usuário` (exceto texto jurídico) |
-| Plataforma | sempre **plataforma** — nunca "serviço", "canal de destino" ou "rede" |
+| Plataforma | sempre **plataforma** — nunca "serviço", "site", "canal de destino" ou "rede" |
+| Gênero da plataforma | **a** Twitch, **a** Kick, **o** YouTube — o feminino segue "a plataforma" |
 | Contração | `pra` em interface; `para` só em texto legal |
 | Travessão | marca a virada da frase — não é vírgula enfeitada |
 | Ponto final | frase de apoio leva; título grande de pôster pode dispensar |
 | Emoji | raro e funcional (🛡️ no vazamento, 📣 no slate, 💜 em seguidores). Nunca decorativo |
 | Reticência | só em estado de espera (`Baixando…`, `Olhando…`) |
 | CAPS | só em `BORA AO VIVO` e `JÁ VOLTO` — são nomes, não ênfase |
-| Número | escreva o número (`12s`, `25 Mb/s`, `três lugares`), não "alguns" nem "vários" |
+| Número | escreva o número (`12s`, `25 Mb/s`, `três lugares`), não "alguns" nem "vários" — **se ele existir** (ver abaixo) |
+
+### A precisão inventada
+
+A regra do número tem um contra-veneno, e ele custou duas frases numa revisão só:
+
+| ❌ específico e falso | ✅ o que dava pra afirmar |
+|---|---|
+| "Tem servidor em São Paulo, no Rio e em Porto Alegre" | "O servidor dela mais perto daqui fica em São Paulo" |
+| "se em 10 segundos nada mudar aqui" | "se esta tela não mudar" |
+
+Nos dois casos a frase original era vaga ("servidores em várias regiões", "alguns segundos") e a
+correção trocou a vagueza por um número que **não existe**: a Twitch tem um ingest na América do Sul,
+e o fluxo do BORA não tem timer de 10s. Ninguém checou porque texto específico *soa* verificado.
+
+> **A regra completa:** escreva o número quando ele estiver no código, na API ou na tela. Quando não
+> estiver, não invente — troque o advérbio por uma coisa **observável** ("se esta tela não mudar"),
+> que é específico sem afirmar o que você não sabe.
+
+O teste: **onde eu confiro esse número?** Se a resposta não for um arquivo, uma requisição ou um
+print, ele não entra.
 
 **Rótulo de botão** é verbo do que vai acontecer: `Atualizar agora`, `Copiar imagem`, `Abrir pasta`.
 Nunca `OK`, `Confirmar` ou `Enviar` sozinho.

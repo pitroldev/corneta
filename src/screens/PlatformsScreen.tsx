@@ -394,7 +394,7 @@ function TargetRow({
     ok: boolean;
     msg: string;
   } | null>(null);
-  // Resultado do "Testar rede" envelhece: zera ao trocar chave/URL/enabled.
+  // Resultado do "Testar o servidor" envelhece: zera ao trocar chave/URL/enabled.
   useEffect(() => {
     setTestResult(null);
   }, [target.hasKey, target.ingestUrl, target.enabled]);

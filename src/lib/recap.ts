@@ -101,9 +101,12 @@ export function drawRecap(
   // Título + subtítulo
   ctx.textAlign = "left";
   ctx.fillStyle = C.ink;
-  const ts = fit(ctx, r.title, pr - px, 78, 800);
+  // A caixa alta do headline é decisão de desenho, não do texto: o dicionário
+  // guarda "Live de {date}" e quem grita é o pôster (§6 do TOM-DE-VOZ).
+  const title = r.title.toUpperCase();
+  const ts = fit(ctx, title, pr - px, 78, 800);
   ctx.font = `800 ${ts}px ${DISPLAY}`;
-  ctx.fillText(r.title, px, 244);
+  ctx.fillText(title, px, 244);
   ctx.fillStyle = C.inkMuted;
   const ss = fit(ctx, r.subtitle, pr - px, 30, 600, SANS);
   ctx.font = `600 ${ss}px ${SANS}`;
@@ -161,7 +164,7 @@ export function drawRecap(
     ctx.fillRect(px, y, 8, bh);
     ctx.fillStyle = C.brass;
     ctx.font = `800 23px ${SANS}`;
-    ctx.fillText(t("analysis.recap.bestMoment"), px + 28, y + 42);
+    ctx.fillText(t("analysis.recap.bestMoment").toUpperCase(), px + 28, y + 42);
     ctx.fillStyle = C.ink;
     const ms = fit(ctx, r.moment, pr - px - 56, 40, 700);
     ctx.font = `700 ${ms}px ${DISPLAY}`;

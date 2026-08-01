@@ -542,7 +542,9 @@ pub fn list_sessions(app: &AppHandle, video_dir: Option<&Path>) -> Vec<SessionMe
         .filter_map(|p| {
             let mut m = read_meta(&p)?;
             m.has_video = recorded.iter().any(|id| id == &m.id);
-            m.has_chat = fs::metadata(chat_path(&p)).map(|x| x.len() > 0).unwrap_or(false);
+            m.has_chat = fs::metadata(chat_path(&p))
+                .map(|x| x.len() > 0)
+                .unwrap_or(false);
             Some(m)
         })
         .collect();
@@ -731,7 +733,9 @@ pub fn prune_videos(app: &AppHandle, configured: Option<&Path>, keep_gb: u64) ->
     let mut all: Vec<(PathBuf, u64, String)> = Vec::new();
     for dir in video_dirs(app, configured) {
         for (path, len) in video_files(&dir) {
-            let Some(id) = video_id_of(&path) else { continue };
+            let Some(id) = video_id_of(&path) else {
+                continue;
+            };
             all.push((path, len, id));
         }
     }

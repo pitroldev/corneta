@@ -1158,7 +1158,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         })?
         .args([yml.to_string_lossy().to_string()])
         .spawn()
-        .map_err(|e| format!("falha ao iniciar o MediaMTX: {e}"))?;
+        // Mesmo tratamento do sidecar ausente três linhas acima: o erro cru do SO (e o
+        // nome do sidecar) ficam no log; pra tela vai uma frase que dá pra agir em cima.
+        .map_err(|e| {
+            log::error!("mediamtx não subiu: {e}");
+            Msg::EngineMediamtxNoStart.now()
+        })?;
 
     let running = Arc::new(AtomicBool::new(true));
     // Sinal de ingestão: true quando o OBS está publicando no MediaMTX.
@@ -1170,7 +1175,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     let session_path = session::start_session(&app, &config);
     chat::reset_msg_counts(); // a contagem de chat da sessão começa do zero
     session::set_chat_recording(config.settings.record_chat);
-                              // Uma flag de pausa por destino (controle ao vivo).
+    // Uma flag de pausa por destino (controle ao vivo).
     let pause_flags: HashMap<String, Arc<AtomicBool>> = enabled
         .iter()
         .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
@@ -1358,11 +1363,16 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 let leftover =
                     session::prune_videos(&app, Some(&dir), config.settings.record_video_keep_gb);
                 if leftover > 0 {
-                    log::warn!("gravação: {leftover} bytes acima do teto em arquivos não reconhecidos");
+                    log::warn!(
+                        "gravação: {leftover} bytes acima do teto em arquivos não reconhecidos"
+                    );
                 }
                 let free = recorder::free_bytes(&dir);
                 if free.is_some_and(|f| f < recorder::DISK_START_FLOOR) {
-                    log::warn!("gravação: pouco espaço em {} — não vou gravar", dir.display());
+                    log::warn!(
+                        "gravação: pouco espaço em {} — não vou gravar",
+                        dir.display()
+                    );
                     let _ = app.emit(
                         "recorder://status",
                         serde_json::json!({ "kind": "diskFull", "detail": null }),
@@ -2293,12 +2303,7 @@ pub fn delete_session_recordings(app: AppHandle, id: String) -> Result<(), Strin
 
 /// Marca um instante durante o replay (depois da live). O `t` é o momento ASSISTIDO.
 #[tauri::command]
-pub fn add_session_marker(
-    app: AppHandle,
-    id: String,
-    t: u64,
-    label: String,
-) -> Result<(), String> {
+pub fn add_session_marker(app: AppHandle, id: String, t: u64, label: String) -> Result<(), String> {
     if !session::valid_session_id(&id) {
         return Err(Msg::SessionInvalidId.now());
     }

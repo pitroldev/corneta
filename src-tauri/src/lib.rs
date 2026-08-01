@@ -281,7 +281,11 @@ pub fn run() {
                 std::thread::spawn(move || {
                     let cfg = config::load(&handle);
                     let dir = recorder::resolve_dir(&handle, &cfg.settings.record_video_dir);
-                    session::prune_videos(&handle, dir.as_deref(), cfg.settings.record_video_keep_gb);
+                    session::prune_videos(
+                        &handle,
+                        dir.as_deref(),
+                        cfg.settings.record_video_keep_gb,
+                    );
                 });
             }
             // Mesa: auto-concede câmera/mic no WebView2 (getUserMedia sem prompt/lock).

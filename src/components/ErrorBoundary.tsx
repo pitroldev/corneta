@@ -15,20 +15,20 @@ const CRASH: Record<Locale, Record<string, string>> = {
   "pt-BR": {
     title: "Essa tela deu pau",
     titleApp: "A Corneta tropeçou",
-    body: "Algo quebrou ao desenhar aqui. As outras telas seguem funcionando — troque de tela ou tente de novo. (Se aparecer sempre, me manda o texto abaixo.)",
+    body: "Não consegui desenhar esta tela. As outras seguem funcionando — troca de tela ou tenta de novo. (Se acontecer sempre, me manda o texto aqui embaixo.)",
     details: "Detalhes técnicos",
     copy: "Copiar erro",
     retry: "Tentar de novo",
-    chatTitle: "O chat falhou ao carregar.",
+    chatTitle: "Não consegui carregar o chat — fecha e abre esta janela.",
   },
   en: {
     title: "This screen broke",
     titleApp: "Corneta tripped",
-    body: "Something went wrong drawing this. The other screens still work — switch screens or try again. (If it keeps happening, send me the text below.)",
+    body: "Couldn't draw this screen. The others still work — switch screens or try again. (If it keeps happening, send me the text right below.)",
     details: "Technical details",
     copy: "Copy the error",
     retry: "Try again",
-    chatTitle: "The chat didn't load.",
+    chatTitle: "Couldn't load the chat — close and reopen this window.",
   },
 };
 
@@ -78,7 +78,6 @@ export class ErrorBoundary extends Component<
       return (
         <div className="grid min-h-[60vh] place-items-center p-8">
           <div className="max-w-md text-center">
-            <div className="mb-2 text-4xl">😵</div>
             <h3 className="font-display text-2xl font-extrabold">
               {this.props.app ? text.titleApp : text.title}
             </h3>

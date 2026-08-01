@@ -310,8 +310,8 @@ messages! {
         pt: "{label} excede o limite de {max} bytes",
         en: "{label} is over the {max}-byte limit";
     ConfigInvalidValue { label: &'a str } = "rust.config.invalidValue" =>
-        pt: "{label} inválido",
-        en: "{label} isn't valid";
+        pt: "não consegui usar {label} — vale de 1 a 80 caracteres, só letra, número, traço (-) e sublinhado (_)",
+        en: "Couldn't use {label} — 1 to 80 characters, letters, numbers, hyphen (-) and underscore (_) only";
     ConfigLabelIngestApp = "rust.config.label.ingestApp" =>
         pt: "app do ingest",
         en: "the ingest app";
@@ -325,7 +325,7 @@ messages! {
         pt: "nome do perfil",
         en: "the profile name";
     ConfigInvalidSecretNamespace = "rust.config.invalidSecretNamespace" =>
-        pt: "namespace de segredo inválido",
+        pt: "esse lugar do cofre não é válido",
         en: "that secret slot isn't valid";
     ConfigSchemaTooNew { n: u32 } = "rust.config.schemaTooNew" =>
         pt: "config criada por uma versão mais nova (schema {n})",
@@ -375,7 +375,7 @@ messages! {
 
     // ---- vault -------------------------------------------------------------
     VaultNamespaceNotInConfig = "rust.vault.namespaceNotInConfig" =>
-        pt: "namespace de segredo não pertence à configuração atual",
+        pt: "esse lugar do cofre não está na sua configuração atual",
         en: "that secret slot isn't in your current setup";
     VaultSecretTooBig = "rust.vault.secretTooBig" =>
         pt: "segredo excede o limite de 8 KiB",
@@ -383,7 +383,7 @@ messages! {
 
     // ---- upload ------------------------------------------------------------
     UploadMeasureFailed = "rust.upload.measureFailed" =>
-        pt: "não foi possível medir o upload",
+        pt: "Não consegui medir o upload — sem internet?",
         en: "Couldn't measure your upload — no internet?";
 
     // ---- window ------------------------------------------------------------
@@ -438,9 +438,10 @@ messages! {
     NotifySignalLostTitle = "rust.notify.signalLost.title" =>
         pt: "O sinal do OBS caiu",
         en: "OBS dropped the signal";
+    // CAPS só em BORA AO VIVO e JÁ VOLTO — são nomes, não ênfase (TOM-DE-VOZ.md §6).
     NotifySignalLostBody = "rust.notify.signalLost.body" =>
-        pt: "Sua live está SEM IMAGEM — confira o OBS.",
-        en: "Your stream has NO PICTURE — check OBS.";
+        pt: "Sua live está sem imagem — confira o OBS.",
+        en: "Your stream has no picture — check OBS.";
     NotifyYoutubeAutoFailedTitle = "rust.notify.youtubeAutoFailed.title" =>
         pt: "YouTube automático falhou",
         en: "YouTube autopilot failed";
@@ -474,7 +475,7 @@ messages! {
 
     // ---- target ------------------------------------------------------------
     TargetErrorKeyRejected = "rust.target.error.keyRejected" =>
-        pt: "Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.",
+        pt: "Chave recusada — cole a chave nova em Plataformas e clique em Tentar de novo.",
         en: "The platform turned down your stream key — paste the new one in Platforms and hit Try again.";
     TargetSignalLostMessage = "rust.target.signalLost.message" =>
         pt: "sua live está sem imagem — confira o OBS",
@@ -511,12 +512,15 @@ messages! {
     EngineMissingSidecar = "rust.engine.missingSidecar" =>
         pt: "Faltam arquivos internos da Corneta — reinstale o app.",
         en: "Corneta's own files are missing — reinstall the app.";
+    EngineMediamtxNoStart = "rust.engine.mediamtxNoStart" =>
+        pt: "Não consegui subir o servidor de ingestão — reinicie a Corneta e tente de novo.",
+        en: "Couldn't start the ingest server — restart Corneta and try again.";
     EngineIngestPortInUse = "rust.engine.ingestPortInUse" =>
         pt: "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.",
         en: "Something else is already on port 1935. Close whatever's using it.";
     EngineMediamtxDied = "rust.engine.mediamtxDied" =>
-        pt: "O servidor de ingestão (MediaMTX) caiu. Tente de novo.",
-        en: "The ingest server (MediaMTX) crashed. Try again.";
+        pt: "O servidor de ingestão caiu — tenta de novo.",
+        en: "The ingest server crashed — try again.";
 
     // ---- youtube -----------------------------------------------------------
     YoutubeDefaultBroadcastTitle = "rust.youtube.defaultBroadcastTitle" =>
@@ -525,42 +529,44 @@ messages! {
 
     // ---- session -----------------------------------------------------------
     SessionNotFound = "rust.session.notFound" =>
-        pt: "sessão não encontrada",
-        en: "session not found";
+        pt: "não achei o relatório dessa live",
+        en: "couldn't find that stream's report";
     SessionDirUnavailable = "rust.session.dirUnavailable" =>
-        pt: "pasta de sessões indisponível",
-        en: "couldn't reach the sessions folder";
+        pt: "não consegui chegar na pasta dos relatórios",
+        en: "couldn't reach the reports folder";
     SessionDefaultMarkerLabel = "rust.session.defaultMarkerLabel" =>
         pt: "Momento",
         en: "Moment";
     SessionNotRecording = "rust.session.notRecording" =>
-        pt: "não está gravando uma sessão",
+        pt: "não estou gravando nenhuma live agora",
         en: "I'm not recording a stream right now";
     SessionInvalidId = "rust.session.invalidId" =>
-        pt: "id de sessão inválido",
-        en: "that session id isn't valid";
+        pt: "essa live não tem um id válido",
+        en: "that stream id isn't valid";
     SessionDeleteFailed { e: &'a str } = "rust.session.deleteFailed" =>
-        pt: "não foi possível apagar a sessão: {e}",
-        en: "Couldn't delete the session: {e}";
+        pt: "não consegui apagar o relatório dessa live: {e}",
+        en: "Couldn't delete that stream's report: {e}";
     RecordDirUnusable = "rust.record.dirUnusable" =>
         pt: "não consigo gravar nessa pasta — confira se ela existe e se dá pra escrever nela",
         en: "I can't record to that folder — check that it exists and is writable";
 
     // ---- open --------------------------------------------------------------
     OpenExternalRefused = "rust.open.externalRefused" =>
-        pt: "URL externa recusada",
+        pt: "Não vou abrir esse link — só abro endereço que começa com https://",
         en: "I won't open that link — it has to be a plain https:// address";
     OpenExternalFailed { e: &'a str } = "rust.open.externalFailed" =>
-        pt: "abrir URL: {e}",
-        en: "Couldn't open the link: {e}";
+        pt: "não consegui abrir o link — abre no navegador na mão: {e}",
+        en: "Couldn't open the link — open it in your browser by hand: {e}";
 
     // ---- test --------------------------------------------------------------
+    // "resolver" é vocabulário de DNS: "não resolvi twitch.tv" não diz nada pra
+    // quem só colou uma URL no teste de conexão.
     TestHostUnresolved { host: &'a str } = "rust.test.hostUnresolved" =>
-        pt: "não resolvi {host}",
-        en: "Couldn't resolve {host}";
+        pt: "não achei {host} — confira o endereço",
+        en: "Couldn't find {host} — check the address";
     TestAddressUnresolved { host: &'a str } = "rust.test.addressUnresolved" =>
-        pt: "endereço não resolvido: {host}",
-        en: "Couldn't find an address for {host}";
+        pt: "não consegui achar o endereço de {host} — confira a URL",
+        en: "Couldn't find an address for {host} — check the URL";
     TestHostAnswered { host: &'a str } = "rust.test.hostAnswered" =>
         pt: "{host} respondeu",
         en: "{host} answered";
@@ -638,8 +644,8 @@ messages! {
         pt: "aguardando sinal",
         en: "waiting for signal";
     TrayTargetBrb = "rust.tray.target.brb" =>
-        pt: "JÁ VOLTO (slate no ar)",
-        en: "BE RIGHT BACK (slate on air)";
+        pt: "JÁ VOLTO no ar",
+        en: "BE RIGHT BACK on air";
     TrayTargetConnecting = "rust.tray.target.connecting" =>
         pt: "conectando",
         en: "connecting";
@@ -652,10 +658,10 @@ messages! {
         pt: "não consegui conectar no obs-websocket ({url}): {e}. No OBS, ative em Ferramentas → Configurações do Servidor WebSocket.",
         en: "Couldn't connect to obs-websocket ({url}): {e}. In OBS, turn it on under Tools → WebSocket Server Settings.";
     ObsPasswordRequired = "rust.obs.passwordRequired" =>
-        pt: "O obs-websocket está com senha. Informe-a em Configurações → OBS.",
-        en: "obs-websocket has a password. Put it in Settings → OBS.";
+        pt: "O obs-websocket tá com senha — cola ela em Configurações → OBS.",
+        en: "obs-websocket has a password — put it in Settings → OBS.";
     ObsIdentifyFailed { identified: &'a str } = "rust.obs.identifyFailed" =>
-        pt: "falha ao identificar no OBS (senha errada?): {identified}",
+        pt: "não consegui entrar no OBS (senha errada?): {identified}",
         en: "Couldn't sign in to OBS (wrong password?): {identified}";
     ObsRefusedConfig { response: &'a str } = "rust.obs.refusedConfig" =>
         pt: "o OBS recusou a configuração: {response}",
@@ -686,9 +692,12 @@ messages! {
     ChatEmptyMessage = "rust.chat.emptyMessage" =>
         pt: "mensagem vazia",
         en: "nothing to send";
+    // Nasce de um `Mutex::lock()` envenenado: outra thread entrou em pânico segurando
+    // a trava, e o processo não se recupera sozinho. Por isso a saída é reabrir, não
+    // "tenta de novo" — tentar de novo daria o mesmo erro pra sempre.
     ChatStateLocked = "rust.chat.stateLocked" =>
-        pt: "estado do chat",
-        en: "Couldn't reach the chat right now";
+        pt: "Não consegui enviar a mensagem — feche e abra a Corneta.",
+        en: "Couldn't send your message — close and reopen Corneta.";
     ChatSelfAuthor = "rust.chat.selfAuthor" =>
         pt: "você",
         en: "you";
@@ -699,8 +708,8 @@ messages! {
         pt: "MEMBRO",
         en: "MEMBER";
     ChatYoutubeNotSignedIn = "rust.chat.youtube.notSignedIn" =>
-        pt: "YouTube não logado",
-        en: "you're not signed in to YouTube";
+        pt: "entre no YouTube pra mandar mensagem",
+        en: "sign in to YouTube to send messages";
     ChatYoutubeNoActiveLive = "rust.chat.youtube.noActiveLive" =>
         pt: "Nenhuma live ativa no YouTube agora",
         en: "No live stream running on YouTube right now";
@@ -762,8 +771,8 @@ messages! {
 
     // ---- auth --------------------------------------------------------------
     AuthBrokerDown = "rust.auth.brokerDown" =>
-        pt: "Serviço de login indisponível — confira sua conexão",
-        en: "Login service is down — check your connection";
+        pt: "Não consegui falar com o serviço de login — sem internet?",
+        en: "Couldn't reach the login service — no internet?";
     AuthSetupApiMissing = "rust.auth.setupApiMissing" =>
         pt: "serviço de login não configurado (VITE_SETUP_API_URL vazio)",
         en: "login service isn't set up (VITE_SETUP_API_URL is empty)";
@@ -836,12 +845,14 @@ messages! {
     AuthYoutubeOfficialNotConfigured = "rust.auth.youtube.officialNotConfigured" =>
         pt: "Login oficial do YouTube não configurado",
         en: "The official YouTube login isn't set up";
+    // "callback" não aparece em lugar nenhum da tela — o que falhou de verdade é o
+    // bind de uma porta local, e "porta" o app já usa com o streamer.
     AuthYoutubeCallbackOpenFailed = "rust.auth.youtube.callbackOpenFailed" =>
-        pt: "Não consegui abrir o callback local do YouTube",
-        en: "Couldn't open the local YouTube callback";
+        pt: "Não consegui abrir a porta local pro login do YouTube",
+        en: "Couldn't open the local port for the YouTube login";
     AuthYoutubeCallbackPrepFailed = "rust.auth.youtube.callbackPrepFailed" =>
-        pt: "Não consegui preparar o callback local do YouTube",
-        en: "Couldn't set up the local YouTube callback";
+        pt: "Não consegui preparar a porta local pro login do YouTube",
+        en: "Couldn't set up the local port for the YouTube login";
     AuthGoogleWrongDesktopClient = "rust.auth.google.wrongDesktopClient" =>
         pt: "O Client ID do Google precisa ser do tipo Aplicativo para computador",
         en: "That Google Client ID has to be the Desktop app type";
@@ -870,8 +881,8 @@ messages! {
         pt: "Pronto! Pode fechar esta aba e voltar pra Corneta.",
         en: "Done! You can close this tab and head back to Corneta.";
     AuthCallbackPageError = "rust.auth.callbackPage.error" =>
-        pt: "Algo deu errado. Volte pra Corneta e tente de novo.",
-        en: "Something went wrong. Head back to Corneta and try again.";
+        pt: "Não consegui concluir o login. Volte pra Corneta e tente de novo.",
+        en: "Couldn't finish the login. Head back to Corneta and try again.";
     AuthCallbackPageWaiting = "rust.auth.callbackPage.waiting" =>
         pt: "Corneta — aguardando a conclusão do login…",
         en: "Corneta — waiting for the login to finish…";
@@ -879,7 +890,7 @@ messages! {
         pt: "Login do {provider} expirou (5 min)",
         en: "The {provider} login expired (5 min)";
     AuthAuthorizationDenied { provider: &'a str, err: &'a str } = "rust.auth.authorizationDenied" =>
-        pt: "Autorização negada no {provider} ({err})",
+        pt: "{provider} não me deixou entrar ({err}) — tente de novo",
         en: "{provider} didn't let me in ({err}) — try again";
     AuthKickBrokerNotConfigured = "rust.auth.kick.brokerNotConfigured" =>
         pt: "Serviço de login da Kick não configurado",
@@ -897,7 +908,7 @@ messages! {
         pt: "Kick não retornou uma sessão renovável",
         en: "Kick didn't send back a session I can renew";
     AuthKickSignInFirst = "rust.auth.kick.signInFirst" =>
-        pt: "entre no Kick primeiro",
+        pt: "entre na Kick primeiro",
         en: "sign in to Kick first";
     AuthKickSessionExpired = "rust.auth.kick.sessionExpired" =>
         pt: "Kick: sessão expirou, entre de novo",
@@ -941,7 +952,7 @@ messages! {
 
     // ---- moderate ----------------------------------------------------------
     ModeratePlatformUnsupported = "rust.moderate.platformUnsupported" =>
-        pt: "essa plataforma não tem moderação",
+        pt: "ainda não sei moderar nessa plataforma",
         en: "I can't moderate on that platform yet";
     ModerateTwitchSignInFirst = "rust.moderate.twitch.signInFirst" =>
         pt: "entre na Twitch pra moderar",
@@ -953,11 +964,11 @@ messages! {
         pt: "sem id da mensagem",
         en: "no message id";
     ModerateNoUser = "rust.moderate.noUser" =>
-        pt: "sem usuário",
+        pt: "sem o nome de quem mandou",
         en: "no username";
     ModerateUserNotFound = "rust.moderate.userNotFound" =>
-        pt: "usuário não encontrado",
-        en: "user not found";
+        pt: "não achei essa pessoa na Twitch",
+        en: "couldn't find that person on Twitch";
     ModerateInvalidAction = "rust.moderate.invalidAction" =>
         pt: "ação inválida",
         en: "I don't know that action";
@@ -968,7 +979,7 @@ messages! {
         pt: "no YouTube, por enquanto só dá pra apagar a mensagem",
         en: "on YouTube, deleting the message is all I can do for now";
     ModerateKickDeleteOnly = "rust.moderate.kick.deleteOnly" =>
-        pt: "no Kick, por enquanto só dá pra apagar a mensagem",
+        pt: "na Kick, por enquanto só dá pra apagar a mensagem",
         en: "on Kick, deleting the message is all I can do for now";
 
     // ---- streamInfo --------------------------------------------------------
@@ -985,7 +996,7 @@ messages! {
         pt: "categoria \"{category}\" não encontrada",
         en: "couldn't find the category \"{category}\"";
     StreamInfoTwitchMissingScope = "rust.streamInfo.twitch.missingScope" =>
-        pt: "re-entre na Twitch (faltou a permissão de editar a live)",
+        pt: "entre de novo na Twitch (faltou a permissão de editar a live)",
         en: "sign in to Twitch again (the permission to edit the stream is missing)";
     StreamInfoYoutubeSignIn = "rust.streamInfo.youtube.signIn" =>
         pt: "entre no YouTube",
@@ -1000,7 +1011,7 @@ messages! {
         pt: "título cortado em 100 (limite do YouTube)",
         en: "title cut at 100 characters (YouTube's limit)";
     StreamInfoKickMissingScope = "rust.streamInfo.kick.missingScope" =>
-        pt: "re-entre no Kick (faltou a permissão channel:write)",
+        pt: "entre de novo na Kick (faltou a permissão channel:write)",
         en: "sign in to Kick again (the channel:write permission is missing)";
 }
 

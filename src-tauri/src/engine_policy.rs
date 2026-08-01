@@ -63,7 +63,7 @@ pub(crate) fn tray_tooltip(snap: &EngineSnapshot) -> String {
             "signal-lost" => ("✕", "sem sinal do OBS".to_string()),
             "paused" => ("⏸", "pausado".to_string()),
             "waiting" => ("◌", "aguardando sinal".to_string()),
-            "brb" => ("◷", "JÁ VOLTO (slate no ar)".to_string()),
+            "brb" => ("◷", "JÁ VOLTO no ar".to_string()),
             _ => ("…", "conectando".to_string()),
         };
         lines.push(format!("{mark} {} · {detail}", st.name));
@@ -93,7 +93,7 @@ pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
     {
         (
             "error",
-            "Chave recusada — cole a chave nova em Plataformas e toque em Tentar de novo.".into(),
+            "Chave recusada — cole a chave nova em Plataformas e clique em Tentar de novo.".into(),
         )
     } else if low.contains("connection refused")
         || low.contains("cannot open")
@@ -281,7 +281,7 @@ mod tests {
         let t = tray_tooltip(&s);
         assert!(t.starts_with("Corneta · no ar (2)"));
         assert!(t.contains("✓ YouTube · 9.0 Mbps"));
-        assert!(t.contains("◷ Twitch · JÁ VOLTO (slate no ar)"));
+        assert!(t.contains("◷ Twitch · JÁ VOLTO no ar"));
         assert_eq!(tray_tooltip(&snap("stopped", vec![])), "Corneta");
     }
 
