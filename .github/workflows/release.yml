@@ -46,7 +46,7 @@ jobs:
         run: pwsh -File scripts/fetch-binaries.ps1
 
       - name: Build + assinatura do updater
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Chave PRIVADA do updater. Só existe como secret do repositório — nunca
