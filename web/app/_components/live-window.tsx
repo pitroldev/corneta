@@ -241,7 +241,7 @@ export function LiveChat({ copy }: { copy: LiveWindowCopy }) {
 
   const n = copy.messages.length;
   // Janela deslizante sobre a lista: sempre cinco, sempre em ordem de chegada.
-  const shown = Array.from({ length: 5 }, (_, i) => {
+  const shown = Array.from({ length: 6 }, (_, i) => {
     const idx = (head + i) % n;
     return { ...copy.messages[idx], key: `${head + i}` };
   });
