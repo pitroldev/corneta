@@ -254,3 +254,15 @@ export function InfoIcon() {
     </svg>
   );
 }
+
+/** Globo do seletor de idioma. Traçado, não preenchido: no header ele fica ao
+ *  lado de texto, e sólido nesse tamanho vira uma bolinha sem paralelos. */
+export function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.6 2.6 2.6 15.4 0 18-2.6-2.6-2.6-15.4 0-18Z" />
+    </svg>
+  );
+}

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { PlatformGlyph } from "./decor";
+import { Mascot, PlatformGlyph } from "./decor";
 import { CoinIcon, HeartIcon, RaidIcon, StarIcon } from "./icons";
 import { cn } from "./ui";
 import { useCalm, useHeartbeat } from "./use-motion";
@@ -53,6 +53,9 @@ export interface ChatFeedCopy {
   input: string;
   sendAll: string;
   hint: string;
+  /** Como a SUA fala aparece no feed depois de enviada. */
+  me: string;
+  mineBadge: string;
 }
 
 /** Uma linha de mensagem: glifo de 26px + corpo. */
@@ -95,6 +98,8 @@ interface Line {
   key: number;
   idx: number;
   status: Status;
+  /** Preenchido quando a fala é SUA — o texto vem do campo, não do dicionário. */
+  mine?: string;
 }
 
 /** Horário da fala: 21:42 andando ~7 s por mensagem. */
@@ -114,7 +119,10 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
   useHeartbeat(box, ARRIVAL_MS, !calm, () =>
     setLines((cur) => {
       const key = (cur[cur.length - 1]?.key ?? -1) + 1;
-      const next = [...cur, { key, idx: key % copy.pool.length, status: "live" as Status }];
+      const next = [
+        ...cur,
+        { key, idx: key % copy.pool.length, status: "live" as Status },
+      ];
       return next.length > KEEP ? next.slice(next.length - KEEP) : next;
     }),
   );
@@ -122,11 +130,33 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
   const setStatus = (key: number, status: Status) =>
     setLines((cur) => cur.map((l) => (l.key === key ? { ...l, status } : l)));
 
+  /** O campo de baixo manda de verdade: a sua fala entra no feed com o megafone
+   *  no lugar do glifo de plataforma, porque ela saiu pras TRÊS de uma vez — que
+   *  é exatamente o que o botão promete. Sem isso, o "enviar pra todas" era um
+   *  rótulo bonito num campo que não fazia nada. */
+  const send = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text) return;
+    setLines((cur) => {
+      const key = (cur[cur.length - 1]?.key ?? -1) + 1;
+      const next = [
+        ...cur,
+        { key, idx: 0, status: "live" as Status, mine: text },
+      ];
+      return next.length > KEEP ? next.slice(next.length - KEEP) : next;
+    });
+    setDraft("");
+  };
+
   const remove = (key: number) => {
     setStatus(key, "gone");
     // O `setTimeout` mora no HANDLER, não num efeito: mexer em estado de forma
     // síncrona dentro de efeito dispara render em cascata e o lint pega.
-    setTimeout(() => setLines((cur) => cur.filter((l) => l.key !== key)), TOMB_MS);
+    setTimeout(
+      () => setLines((cur) => cur.filter((l) => l.key !== key)),
+      TOMB_MS,
+    );
   };
 
   const shown = lines;
@@ -160,24 +190,41 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                 transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
                 className={cn(MSG, (dead || muted) && "opacity-80")}
               >
-                <PlatformGlyph id={msg.platform} />
+                {/* Fala sua: o megafone da marca no lugar do glifo de
+                    plataforma. Não é enfeite — é a única linha do feed que saiu
+                    pelas três de uma vez, e o desenho diz isso sem legenda. */}
+                {line.mine ? (
+                  <span className="grid size-[26px] place-items-center rounded-sm bg-brass text-brass-ink shadow-pop-sm [&>svg]:h-[62%] [&>svg]:w-[62%]">
+                    <Mascot />
+                  </span>
+                ) : (
+                  <PlatformGlyph id={msg.platform} />
+                )}
                 <div className="min-w-0">
                   <div className={MSG_HEAD}>
-                    <strong>{msg.name}</strong>
-                    {msg.badge && (
-                      <span
-                        className={cn(
-                          BADGE,
-                          msg.badgeTone === "member"
-                            ? "bg-brass text-brass-ink"
-                            : "bg-ok text-night",
-                        )}
-                      >
-                        {msg.badge}
+                    <strong>{line.mine ? copy.me : msg.name}</strong>
+                    {line.mine ? (
+                      <span className={cn(BADGE, "bg-brass text-brass-ink")}>
+                        {copy.mineBadge}
                       </span>
+                    ) : (
+                      msg.badge && (
+                        <span
+                          className={cn(
+                            BADGE,
+                            msg.badgeTone === "member"
+                              ? "bg-brass text-brass-ink"
+                              : "bg-ok text-night",
+                          )}
+                        >
+                          {msg.badge}
+                        </span>
+                      )
                     )}
                     {(dead || muted) && (
-                      <span className={cn(BADGE, "bg-surface-3 text-faint-raised")}>
+                      <span
+                        className={cn(BADGE, "bg-surface-3 text-faint-raised")}
+                      >
                         {dead ? copy.removed : copy.timedOut}
                       </span>
                     )}
@@ -190,7 +237,7 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                       dead || muted ? "text-faint-raised" : "text-cream",
                     )}
                   >
-                    {msg.text}
+                    {line.mine ?? msg.text}
                     {/* O risco CORRE da esquerda pra direita em vez de aparecer
                         pronto: é a diferença entre ver a moderação acontecer e
                         ver que ela já aconteceu.
@@ -217,62 +264,83 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
 
                 {/* As ações ocupam o lugar do horário, que apaga junto: mesma
                     troca que a linha de chat do app faz. `pointer-events-none`
-                    enquanto invisível pra não haver alvo fantasma. */}
-                <div
-                  className={cn(
-                    "absolute top-[7px] right-2.5 flex gap-1 rounded-sm opacity-0 transition-opacity duration-150",
-                    "pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100",
-                    "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-                    // Em ponteiro grosso não existe hover: as ações ficam na
-                    // fala mais nova, que é a que se modera na prática.
-                    i === shown.length - 1
-                      ? "[@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100"
-                      : "[@media(pointer:coarse)]:opacity-0",
-                  )}
-                >
-                  <button
-                    type="button"
-                    className={ACTION}
-                    onClick={() => remove(line.key)}
-                    disabled={dead}
+                    enquanto invisível pra não haver alvo fantasma.
+
+                    Na SUA fala elas não aparecem: dar timeout em si mesmo e
+                    responder a si mesmo são botões sem sentido, e "apagar" ali
+                    contaria outra história (a de moderar o público). */}
+                {!line.mine && (
+                  <div
+                    className={cn(
+                      "absolute top-[7px] right-2.5 flex gap-1 rounded-sm opacity-0 transition-opacity duration-150",
+                      "pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100",
+                      "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+                      // Em ponteiro grosso não existe hover: as ações ficam na
+                      // fala mais nova, que é a que se modera na prática.
+                      i === shown.length - 1
+                        ? "[@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100"
+                        : "[@media(pointer:coarse)]:opacity-0",
+                    )}
                   >
-                    {copy.actionDelete}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(ACTION, "max-[520px]:hidden")}
-                    onClick={() => setStatus(line.key, "muted")}
-                    disabled={dead || muted}
-                  >
-                    {copy.actionTimeout}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(ACTION, "max-[520px]:hidden")}
-                    onClick={() => setDraft(`@${msg.name} `)}
-                  >
-                    {copy.actionReply}
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      className={ACTION}
+                      onClick={() => remove(line.key)}
+                      disabled={dead}
+                    >
+                      {copy.actionDelete}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(ACTION, "max-[520px]:hidden")}
+                      onClick={() => setStatus(line.key, "muted")}
+                      disabled={dead || muted}
+                    >
+                      {copy.actionTimeout}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(ACTION, "max-[520px]:hidden")}
+                      onClick={() => setDraft(`@${msg.name} `)}
+                    >
+                      {copy.actionReply}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             );
           })}
         </AnimatePresence>
       </div>
 
-      {/* O campo é um campo de verdade: "responder" tem pra onde escrever. */}
-      <label className="mt-[7px] flex min-h-[38px] items-center gap-2.5 rounded-md border-2 border-border-dry px-[11px] focus-within:border-brass">
-        <span className="sr-only">{copy.input}</span>
+      {/* Formulário de verdade: Enter envia (é o gesto de todo chat) e o botão
+          também. "Responder" tem pra onde escrever, e o que se escreve SAI. */}
+      <form
+        onSubmit={send}
+        className="mt-[7px] flex min-h-[38px] items-center gap-1.5 rounded-md border-2 border-border-dry pl-[11px] focus-within:border-brass"
+      >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={copy.input}
+          aria-label={copy.input}
           className="min-w-0 flex-1 bg-transparent py-2 text-[0.74rem] font-semibold text-cream outline-none placeholder:text-faint-raised"
         />
-        <b className="text-[0.74rem] font-extrabold whitespace-nowrap text-brass">
+        <button
+          type="submit"
+          disabled={!draft.trim()}
+          className={cn(
+            "my-0.5 mr-0.5 cursor-pointer rounded-sm px-2.5 py-1.5 text-[0.74rem] font-extrabold whitespace-nowrap text-brass",
+            "outline-offset-2 transition-colors duration-150 hover:bg-brass hover:text-brass-ink focus-visible:outline-2 focus-visible:outline-brass",
+            // Vazio, o botão fica visivelmente inerte em vez de parecer quebrado
+            // quando o clique não faz nada.
+            "disabled:cursor-default disabled:text-faint-raised disabled:hover:bg-transparent disabled:hover:text-faint-raised",
+            "[@media(pointer:coarse)]:min-h-9",
+          )}
+        >
           {copy.sendAll}
-        </b>
-      </label>
+        </button>
+      </form>
 
       <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
         {copy.hint}
@@ -289,7 +357,8 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
 // nas Configurações (a nota do painel já promete: "tem botão de alerta de teste
 // pra você conferir sem esperar ninguém").
 
-export type AlertKind = "follow" | "sub" | "raid" | "superchat" | "bits" | "member";
+export type AlertKind =
+  "follow" | "sub" | "raid" | "superchat" | "bits" | "member";
 
 export interface AlertItem {
   kind: AlertKind;
@@ -465,9 +534,15 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
           <AnimatePresence>
             {on && (
               <motion.div
-                initial={calm ? false : { opacity: 0, y: -14, scale: 0.9, rotate: -6 }}
+                initial={
+                  calm ? false : { opacity: 0, y: -14, scale: 0.9, rotate: -6 }
+                }
                 animate={{ opacity: 1, y: 0, scale: 1, rotate: -1.4 }}
-                exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.22 } }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.94,
+                  transition: { duration: 0.22 },
+                }}
                 transition={{ type: "spring", stiffness: 260, damping: 18 }}
                 className="flex w-max max-w-full items-center gap-[9px] rounded-md bg-brass px-[13px] py-[9px] font-display text-[0.9rem] font-extrabold text-brass-ink shadow-pop [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:fill-current"
               >
@@ -495,7 +570,11 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
             <span key={line}>
               <i
                 style={{
-                  background: ["var(--twitch)", "var(--youtube)", "var(--kick)"][i],
+                  background: [
+                    "var(--twitch)",
+                    "var(--youtube)",
+                    "var(--kick)",
+                  ][i],
                 }}
               />{" "}
               {line}

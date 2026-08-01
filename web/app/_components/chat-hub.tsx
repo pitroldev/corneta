@@ -54,6 +54,8 @@ const chatCopy = (t: T): ChatFeedCopy => ({
   input: t("protection.chat.input.placeholder"),
   sendAll: t("protection.chat.input.sendAll"),
   hint: t("protection.chat.hint"),
+  me: t("protection.chat.me"),
+  mineBadge: t("protection.chat.mine.badge"),
 });
 
 /** Os seis alertas que o feed cicla. `amount` só onde o alerta tem número —

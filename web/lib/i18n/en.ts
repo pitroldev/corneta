@@ -558,6 +558,8 @@ export const en: Dict = {
   "protection.chat.input.placeholder": "Say something…",
   "protection.chat.input.sendAll": "send to all platforms",
   "protection.chat.kicker": "Everyone in one feed",
+  "protection.chat.me": "you",
+  "protection.chat.mine.badge": "3 platforms",
   "protection.chat.msg.1.badge": "mod",
   // handle de exemplo, fica como está
   "protection.chat.msg.1.name": "gabizera",

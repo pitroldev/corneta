@@ -510,6 +510,8 @@ export const pt = {
   "protection.chat.input.placeholder": "Manda no chat…",
   "protection.chat.input.sendAll": "enviar pra todas",
   "protection.chat.kicker": "A galera junta",
+  "protection.chat.me": "você",
+  "protection.chat.mine.badge": "3 plataformas",
   "protection.chat.msg.1.badge": "mod",
   "protection.chat.msg.1.name": "gabizera",
   "protection.chat.msg.1.text": "salve salve, chegando!",

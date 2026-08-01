@@ -167,7 +167,7 @@ export function Ticker({ t }: { t: T }) {
       className="overflow-hidden border-y-[3px] border-night bg-tomate text-brass-ink select-none"
       aria-hidden="true"
     >
-      <div className="flex w-max animate-[marquee_34s_linear_infinite] items-center py-[11px] font-display text-[0.95rem] font-extrabold tracking-[0.06em] uppercase">
+      <div className="flex w-max animate-[marquee_52s_linear_infinite] items-center py-[11px] font-display text-[0.95rem] font-extrabold tracking-[0.06em] uppercase">
         <TickerRow t={t} />
         <TickerRow t={t} />
       </div>
