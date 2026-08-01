@@ -164,9 +164,6 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
                 <CheckIcon /> {t("hero.trust.free")}
               </span>
               <span className={TRUST}>
-                <CheckIcon /> {t("hero.trust.watermark")}
-              </span>
-              <span className={TRUST}>
                 <CheckIcon /> {t("hero.trust.opensource")}
               </span>
             </div>

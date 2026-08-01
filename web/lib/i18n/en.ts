@@ -97,7 +97,7 @@ export const en: Dict = {
   "chrome.manifest.lang": "en-US",
   // 157 caracteres. Os três itens depois do travessão são coisas diferentes e concretas (chat / queda de sinal / relatório), não sinônimos — regra de três
   "chrome.meta.description":
-    "Multistream from your PC to Twitch, YouTube, Kick and more — chat in one place, your stream still up when the signal drops, and a report on what choked. Free.",
+    "Multistream from your PC to Twitch, YouTube, Kick and more — chat in one place, your stream still up when the signal drops, and a report with the numbers for each one. Free.",
   "chrome.meta.keywords.1": "multistream",
   "chrome.meta.keywords.10": "Kick",
   "chrome.meta.keywords.11": "open source",
@@ -123,12 +123,12 @@ export const en: Dict = {
   "chrome.notfound.title.line2": "went off the air.",
   // "cada plataforma independente" ficaria vago em inglês ("independent" não diz o quê); "on its own connection" nomeia a coisa que existe.
   "chrome.og.description":
-    "Multistream that runs on your PC: each platform on its own connection, chat in one place, and a report on what choked during your stream. Free for Windows.",
+    "Multistream that runs on your PC: each platform on its own connection, chat in one place, and a report with the audience for each channel. Free for Windows.",
   // Não é copy, mas precisa virar junto com o texto, senão o Open Graph anuncia português.
   "chrome.og.locale": "en_US",
   "chrome.og.title": "Corneta — one stream, three platforms, one chat",
   "chrome.twitter.description":
-    "One stream, several platforms at once — and an app that keeps it up when the signal drops, then tells you what happened.",
+    "One stream, several platforms at once — and an app that keeps it up when the signal drops, then keeps the numbers for each one.",
   "chrome.twitter.title": "Corneta — one stream, three platforms, one chat",
 
   // ---- closing ----
@@ -215,7 +215,7 @@ export const en: Dict = {
   "content.features.overlay":
     "Alert and chat overlay for OBS, served from your own machine as a Browser Source",
   "content.features.post_live_report":
-    "Post-stream report that points at the likely cause of each stutter — encoding, internet or platform — with the minute to find it in the VOD",
+    "Post-stream report with audience, chat, alerts and followers per channel, comparison with your previous stream and export to HTML, CSV and JSON",
   "content.features.privacy_guard":
     "Privacy guard: reads what's going out on air and cuts to BE RIGHT BACK if something private of yours shows up on screen",
   "content.features.quality_modes":
@@ -286,18 +286,16 @@ export const en: Dict = {
   "hero.nav.protection": "Protection",
   "hero.nav.quality": "Quality",
   "hero.nav.why": "Why Corneta",
-  // "joga esse sinal" virou "pushes that signal out to" — é como streamer fala em inglês ("push to Twitch"). "junta o chat de todas" virou "pulls every ch
   "hero.pitch":
-    "In OBS you don't touch a thing — Corneta sets itself up in there. From then on each platform gets its own connection, they all sit side by side on one screen, and their chats land in a single window. And it doesn't disappear when you hit GO LIVE: it keeps showing you what is happening on each one, right up to the next day's report.",
+    "You don't touch OBS — Corneta sets itself up in there. It takes your stream to each platform and stays open beside it, showing all three. When it ends, the stream is saved — with the best moment already marked.",
   "hero.skiplink.label": "Skip to content",
   "hero.sticker": "Corneta · multistream on your PC",
   "hero.title.line1": "One stream.",
   "hero.title.line2": "Three platforms.",
   "hero.title.line3": "One chat.",
   "hero.trust.aria": "Key facts",
-  "hero.trust.free": "Free",
-  "hero.trust.opensource": "Open source (MIT)",
-  "hero.trust.watermark": "No watermark",
+  "hero.trust.free": "Free forever",
+  "hero.trust.opensource": "Open source",
 
   // ---- page-data ----
   "journey.live.back": "coming back",
@@ -373,11 +371,11 @@ export const en: Dict = {
   // ---- after the stream: report + replay ----
   "after.kicker": "After the stream",
   "after.badge": "new",
-  "after.title": "Click the glitch and see what was on screen.",
+  "after.title": "The clip you would have hunted for, already marked.",
   "after.body":
-    "Corneta records what went out. And stamps everything with the same clock: each platform's bitrate, your CPU, the chat and the alerts. When the stream ends, the report points at the minute — and the video jumps there.",
+    "Corneta records what went out and stamps everything with the same clock: audience, chat, alerts and what each platform received. Click a moment in the report and the video jumps there.",
   "after.proof":
-    "The report works even without recording video: from your first stream it already cross-references your machine, your OBS and every platform to say what choked and when.",
+    "The report works even without recording video: from your first stream you already get audience, chat and alerts split by channel — plus the comparison with your last stream.",
   "after.cost":
     "Recording takes disk: roughly 2.7 GB per hour at the default bitrate. That's why it ships off — you turn it on, pick the folder, and Corneta deletes the oldest recordings once you pass the cap you set.",
   "after.more.channels": "audience, chat and alerts split per channel",
@@ -656,10 +654,10 @@ export const en: Dict = {
     "The same picture for every platform, or one sized for each.",
   // "gravação" vira "the VOD": é o nome que o streamer usa em inglês e é coisa que existe na tela.
   "quality.journey.after.body":
-    "It's not a pile of loose numbers: Corneta cross-checks what your machine, your OBS and each platform did, then points at the likely cause of every stutter — with the minute to jump to in the VOD and what to change so it doesn't happen again.",
+    "Audience, chat and alerts for every channel, side by side with what your machine and your OBS were doing at the same time. Compare it with your last stream, export it to a spreadsheet — and, when one of them stuttered, see what to change.",
   "quality.journey.after.sticker": "After the stream",
   "quality.journey.after.title":
-    "Find out why it stuttered — and what to change.",
+    "See how each platform did.",
   "quality.journey.before.body":
     "Hook up the platforms, measure your upload and get everything ready in a few clicks. Corneta sets OBS up for you — and hits play on it when you press GO LIVE.",
   "quality.journey.before.check.checklist": "First-stream checklist",
@@ -739,8 +737,7 @@ export const en: Dict = {
     "The heavy lifting happens on the machine that's already streaming. Settings, keys and reports stay with you — and even the OBS overlay is a server that only answers inside your own computer.",
   "steps.local.check.free": "Free, no sign-up",
   "steps.local.check.keys": "Keys in Windows Credential Manager",
-  "steps.local.check.license": "Open source, MIT license",
-  "steps.local.check.watermark": "No watermark",
+  "steps.local.check.license": "Open source",
   // "a conta" (o valor somado) vira "the math" pra casar com o rótulo "The honest math" logo acima.
   "steps.local.honest.body":
     "And bumping the quality for each one hits your graphics card or your CPU. Corneta measures your connection, adds it all up and shows you the math before you go live — not halfway through it.",

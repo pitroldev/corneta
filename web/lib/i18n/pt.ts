@@ -88,7 +88,7 @@ export const pt = {
     "Multistream local para streamers, com saídas independentes e controle no seu PC.",
   "chrome.manifest.lang": "pt-BR",
   "chrome.meta.description":
-    "Multistream no seu PC para Twitch, YouTube, Kick e mais — com chat reunido, a live de pé quando o sinal cai e um relatório que explica o que travou. Grátis.",
+    "Multistream no seu PC para Twitch, YouTube, Kick e mais — com chat reunido, a live de pé quando o sinal cai e um relatório com os números de cada uma. Grátis.",
   "chrome.meta.keywords.1": "multistream",
   "chrome.meta.keywords.10": "Kick",
   "chrome.meta.keywords.11": "open source",
@@ -109,11 +109,11 @@ export const pt = {
   "chrome.notfound.title.line1": "Essa página",
   "chrome.notfound.title.line2": "saiu do ar.",
   "chrome.og.description":
-    "Multistream que roda no seu PC: cada plataforma independente, chat reunido e um relatório que explica o que travou na sua live. Grátis para Windows.",
+    "Multistream que roda no seu PC: cada plataforma independente, chat reunido e um relatório com a audiência de cada canal. Grátis para Windows.",
   "chrome.og.locale": "pt_BR",
   "chrome.og.title": "Corneta — uma live, três plataformas, um só chat",
   "chrome.twitter.description":
-    "Uma live em várias plataformas ao mesmo tempo — e um app que segura a transmissão e te conta depois o que aconteceu.",
+    "Uma live em várias plataformas ao mesmo tempo — e um app que segura a transmissão e guarda os números de cada uma.",
   "chrome.twitter.title": "Corneta — uma live, três plataformas, um só chat",
 
   // ---- closing ----
@@ -139,7 +139,7 @@ export const pt = {
 
   // ---- content ----
   "content.faq.free.answer":
-    "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC — multistream, chat, alertas, relatórios e proteções — é open source com licença MIT e vai continuar assim. Se um dia existir algo pago, será um serviço opcional na nuvem, e você vai saber antes de instalar qualquer coisa.",
+    "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC — multistream, chat, alertas, relatórios e proteções — é de código aberto e vai continuar assim. Se um dia existir algo pago, será um serviço opcional na nuvem, e você vai saber antes de instalar qualquer coisa.",
   "content.faq.free.question": "É grátis mesmo? Vai virar assinatura depois?",
   "content.faq.macos_linux.answer":
     "Hoje o download é só pra Windows. A arquitetura já considera outros sistemas, mas não tem data pra anunciar. Se o seu caso é macOS ou Linux, a resposta é: por enquanto, não.",
@@ -149,7 +149,7 @@ export const pt = {
   "content.faq.multistream_ban.question":
     "Posso transmitir na Twitch e no YouTube ao mesmo tempo? Não dá ban?",
   "content.faq.obs_plugin.answer":
-    "Se você só quer mandar o mesmo vídeo pra mais de um lugar, o plugin resolve — e a gente prefere te falar isso agora do que depois do download. A Corneta entra quando a live é mais que o envio: ela segura a transmissão quando o seu programa cai (o plugin cai junto, porque mora dentro dele), reúne o chat e os alertas de todas as plataformas num lugar só, avisa se um dado seu aparecer na tela e, no fim, monta um relatório que cruza a sua máquina, o seu OBS e cada plataforma pra dizer por que engasgou.",
+    "Se você só quer mandar o mesmo vídeo pra mais de um lugar, o plugin resolve — e a gente prefere te falar isso agora do que depois do download. A Corneta entra quando a live é mais que o envio: ela segura a transmissão quando o seu programa cai (o plugin cai junto, porque mora dentro dele), reúne o chat e os alertas de todas as plataformas num lugar só, avisa se um dado seu aparecer na tela e, no fim, grava a live e monta um relatório com os números de cada plataforma.",
   "content.faq.obs_plugin.question":
     "Já uso um plugin de multistream no OBS. Por que trocar?",
   "content.faq.overlay.answer":
@@ -193,7 +193,7 @@ export const pt = {
   "content.features.overlay":
     "Overlay de alertas e chat para OBS servido localmente como Browser Source",
   "content.features.post_live_report":
-    "Relatório pós-live que aponta a causa provável de cada engasgo — encoding, internet ou plataforma — com o minuto para achar na gravação",
+    "Relatório pós-live com audiência, chat, alertas e seguidores por canal, comparação com a live anterior e exportação em HTML, CSV e JSON",
   "content.features.privacy_guard":
     "Guardião de privacidade: lê o que está indo ao ar e corta para o “JÁ VOLTO” se um dado seu aparecer na tela",
   "content.features.quality_modes":
@@ -266,16 +266,15 @@ export const pt = {
   "hero.nav.quality": "Qualidade",
   "hero.nav.why": "Por que",
   "hero.pitch":
-    "No OBS você não mexe em nada — a Corneta se configura sozinha nele. Daí em diante cada plataforma ganha a sua própria conexão, todas aparecem lado a lado na mesma tela, e o chat delas chega numa janela só. E ela não some quando você aperta o BORA: fica mostrando o que acontece em cada uma, até o relatório do dia seguinte.",
+    "No OBS você não mexe em nada — a Corneta se configura sozinha lá. Leva a sua live pra cada plataforma e fica aberta do lado, mostrando as três. No fim, a live fica gravada e o melhor momento já vem marcado.",
   "hero.skiplink.label": "Pular para o conteúdo",
   "hero.sticker": "Corneta · multistream no seu PC",
   "hero.title.line1": "Uma live.",
   "hero.title.line2": "Três plataformas.",
   "hero.title.line3": "Um só chat.",
   "hero.trust.aria": "Informações principais",
-  "hero.trust.free": "Grátis",
-  "hero.trust.opensource": "Open source (MIT)",
-  "hero.trust.watermark": "Sem marca-d'água",
+  "hero.trust.free": "Grátis pra sempre",
+  "hero.trust.opensource": "Código aberto",
 
   // ---- page-data ----
   "journey.live.back": "voltando",
@@ -344,11 +343,11 @@ export const pt = {
   // ---- depois da live: relatório + replay ----
   "after.kicker": "Depois da live",
   "after.badge": "novo",
-  "after.title": "Clica no engasgo e vê o que tava na tela.",
+  "after.title": "O corte que você ia caçar na mão, já marcado.",
   "after.body":
-    "A Corneta grava o que foi ao ar. E marca tudo pelo mesmo horário: o bitrate de cada plataforma, a CPU, o chat e os alertas. Quando a live acaba, o relatório aponta o minuto — e o vídeo pula pra lá.",
+    "A Corneta grava o que foi ao ar e marca tudo pelo mesmo horário: audiência, chat, alertas e o que cada plataforma recebeu. Clica num momento do relatório e o vídeo pula pra lá.",
   "after.proof":
-    "O relatório existe mesmo sem gravar vídeo: desde a primeira live ele já cruza a sua máquina, o seu OBS e cada plataforma pra dizer o que engasgou e quando.",
+    "O relatório existe mesmo sem gravar vídeo: desde a primeira live você já tem audiência, chat e alertas separados por canal — e a comparação com a live passada.",
   "after.cost":
     "Gravar ocupa disco: mais ou menos 2,7 GB por hora no bitrate padrão. Por isso nasce desligada — você liga, escolhe a pasta, e a Corneta apaga as gravações mais antigas quando passa do teto que você marcou.",
   "after.more.channels": "audiência, chat e alertas separados por canal",
@@ -601,9 +600,9 @@ export const pt = {
   "quality.heading.title":
     "A mesma imagem pra todas, ou uma sob medida pra cada.",
   "quality.journey.after.body":
-    "Não é um punhado de número solto: a Corneta cruza o que a sua máquina, o seu OBS e cada plataforma fizeram e aponta a causa provável de cada engasgo — com o minuto pra achar na gravação e o que mudar pra não repetir.",
+    "Audiência, chat e alertas de cada canal, lado a lado com o que a sua máquina e o seu OBS fizeram na mesma hora. Dá pra comparar com a live passada, exportar pra planilha — e, quando alguma engasgou, ver o que mudar.",
   "quality.journey.after.sticker": "Depois da live",
-  "quality.journey.after.title": "Descubra por que engasgou — e o que mexer.",
+  "quality.journey.after.title": "Veja como cada plataforma se saiu.",
   "quality.journey.before.body":
     "Ligue as plataformas, meça seu upload e deixe tudo pronto com poucos cliques. No OBS, a Corneta configura sozinha — e ainda dá play nele quando você aperta o BORA.",
   "quality.journey.before.check.checklist": "Checklist da primeira live",
@@ -676,8 +675,7 @@ export const pt = {
     "O trabalho pesado acontece na máquina que já tá transmitindo. Ajustes, chaves e relatórios ficam com você — e até o overlay do OBS é um servidor que só responde dentro do seu computador.",
   "steps.local.check.free": "Grátis, sem cadastro",
   "steps.local.check.keys": "Chaves no cofre do Windows",
-  "steps.local.check.license": "Código aberto com licença MIT",
-  "steps.local.check.watermark": "Sem marca-d'água",
+  "steps.local.check.license": "Código aberto",
   "steps.local.honest.body":
     "E melhorar a imagem pra cada uma pesa na placa ou no processador. A Corneta mede sua conexão, soma tudo e te mostra a conta antes da live — não no meio dela.",
   "steps.local.honest.label": "A conta honesta",

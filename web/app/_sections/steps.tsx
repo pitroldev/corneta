@@ -108,9 +108,6 @@ export function Local({ t }: { t: T }) {
               <li>
                 <CheckIcon /> {t("steps.local.check.keys")}
               </li>
-              <li>
-                <CheckIcon /> {t("steps.local.check.watermark")}
-              </li>
             </Checklist>
 
             <Proof>
