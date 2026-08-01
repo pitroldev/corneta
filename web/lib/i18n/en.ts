@@ -54,12 +54,11 @@ export const en: Dict = {
   "benefits.heading.title": "One screen — even when it all goes sideways.",
   "benefits.routes.body":
     "Every platform gets its own connection. When one is reconnecting, the rest keep going — and you see it on the panel, which platform and what time, instead of finding out from chat.",
-  "benefits.routes.demo.kick.state": "reconnecting",
+  "benefits.routes.demo.hint":
+    "click a destination to drop it — and watch what happens to the others",
   // Rótulo em caixa baixa no código (o CAPS, se houver, vem do CSS). Mantive minúsculo.
   "benefits.routes.demo.label": "your platforms",
   "benefits.routes.demo.tag": "example",
-  "benefits.routes.demo.twitch.state": "live",
-  "benefits.routes.demo.youtube.state": "live",
   "benefits.routes.note":
     "You can pause one platform and leave the rest running",
   "benefits.routes.title": "If Kick drops, Twitch never finds out",
@@ -727,6 +726,9 @@ export const en: Dict = {
   "steps.accounts.title": "What Corneta asks for — and what it does with it.",
   // Rótulo do botão, igual ao que o app mostra na tela.
   "steps.badge.golive": "GO LIVE",
+  "steps.golive.connecting": "connecting",
+  "steps.golive.onAir": "on air · {n} platforms",
+  "steps.golive.pick": "click a destination to add or drop it",
   "steps.kicker": "From your streaming app to everyone watching",
   "steps.lede": "No terminal, no Docker, no server address to memorize.",
   "steps.local.body":

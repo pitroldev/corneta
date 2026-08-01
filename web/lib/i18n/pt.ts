@@ -51,11 +51,10 @@ export const pt = {
   "benefits.heading.title": "Uma tela só — inclusive na hora que dá ruim.",
   "benefits.routes.body":
     "Cada plataforma tem a sua própria conexão. Uma reconectando não encosta nas outras — e isso aparece no painel, com nome e horário, em vez de você descobrir pelo chat.",
-  "benefits.routes.demo.kick.state": "reconectando",
+  "benefits.routes.demo.hint":
+    "clica num destino pra derrubar — e olha o que acontece com os outros",
   "benefits.routes.demo.label": "suas plataformas",
   "benefits.routes.demo.tag": "exemplo",
-  "benefits.routes.demo.twitch.state": "no ar",
-  "benefits.routes.demo.youtube.state": "no ar",
   "benefits.routes.note": "Dá pra pausar uma sem derrubar o resto",
   "benefits.routes.title": "Se a Kick cair, a Twitch nem fica sabendo",
 
@@ -657,6 +656,9 @@ export const pt = {
     "Os tokens de acesso ficam no cofre de credenciais do Windows, na sua máquina — não em servidor nosso, porque não existe conta Corneta nem banco de dados de usuário. Dá pra revogar o acesso a qualquer momento na própria plataforma, e desinstalar o app apaga o que ficou no cofre. Os detalhes estão na",
   "steps.accounts.title": "O que a Corneta pede — e o que ela faz com isso.",
   "steps.badge.golive": "BORA AO VIVO",
+  "steps.golive.connecting": "conectando",
+  "steps.golive.onAir": "no ar · {n} plataformas",
+  "steps.golive.pick": "clica num destino pra tirar ou pôr no ar",
   "steps.kicker": "Do seu programa pro público",
   "steps.lede":
     "Sem terminal, sem Docker, sem endereço de servidor pra decorar.",

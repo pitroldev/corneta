@@ -3,7 +3,8 @@ import Link from "next/link";
 import { accountScopesFor, stepsFor } from "@/lib/content";
 import { legalHref } from "@/lib/legal";
 import { Mascot, PlatformGlyph } from "../_components/decor";
-import { CheckIcon, LockIcon, RadioIcon } from "../_components/icons";
+import { CheckIcon, LockIcon } from "../_components/icons";
+import { GoLive } from "../_components/go-live";
 import {
   Checklist,
   HonestNote,
@@ -54,10 +55,21 @@ export function Steps({ t }: { t: T }) {
                 <div>
                   <h3>{step.title}</h3>
                   <p>{step.text}</p>
+                  {/* O passo 3 não descreve mais o BORA: ele DÁ o BORA. A copy
+                      ao lado promete "cada plataforma entrando no ar, uma por
+                      uma" — agora é isso que acontece quando se aperta. */}
                   {i === steps.length - 1 && (
-                    <em>
-                      <RadioIcon /> {t("steps.badge.golive")}
-                    </em>
+                    <GoLive
+                      copy={{
+                        golive: t("steps.badge.golive"),
+                        stop: t("preview.stop"),
+                        live: t("preview.state.live"),
+                        off: t("preview.state.offAir"),
+                        connecting: t("steps.golive.connecting"),
+                        onAir: t("steps.golive.onAir"),
+                        pick: t("steps.golive.pick"),
+                      }}
+                    />
                   )}
                 </div>
               </li>
