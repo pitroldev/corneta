@@ -1,11 +1,20 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import {
+  motion,
+  useAnimationFrame,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import { PlatformGlyph } from "./decor";
 import { EyeIcon } from "./icons";
 import { Chip, cn, DemoLabel, State } from "./ui";
-import { useCalm, useHeartbeat } from "./use-motion";
+import { useCalm, useHeartbeat, useOnScreen } from "./use-motion";
 import { fill, group } from "@/lib/i18n";
 
 // Sala de guerra e relatório: os dois painéis da jornada da live.
@@ -320,40 +329,107 @@ const NEAR = 0.035;
 const GRID =
   "stroke-border-dry [stroke-width:1] [vector-effect:non-scaling-stroke]";
 
+/** Quanto tempo o cursor leva pra atravessar a live inteira, tocando sozinho. */
+const SWEEP_MS = 18000;
+
 export function ReportChart({ copy }: { copy: ReportChartCopy }) {
-  const calm = useCalm();
+  // Aqui é o `useReducedMotion` do framer, não o `useCalm`: este componente
+  // precisa saber a preferência JÁ NO PRIMEIRO EFEITO (pra decidir onde o cursor
+  // descansa), e o `useCalm` nasce dizendo "calmo" pra todo mundo.
+  const reduce = useReducedMotion() ?? false;
   const box = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const clip = useId().replace(/:/g, "");
-  const [pos, setPos] = useState(0);
+  const onScreen = useOnScreen(box);
   /** `true` enquanto a pessoa está com o cursor (ou o dedo, ou o foco) em cima.
    *  O passeio automático para: ninguém consegue ler um ponto que foge. */
   const [held, setHeld] = useState(false);
 
-  useHeartbeat(box, 90, !calm && !held, () =>
-    setPos((p) => (p >= 1 ? 0 : Math.min(1, p + 0.0055))),
+  // ------------------------------------------------------------
+  // A POSIÇÃO NÃO É ESTADO DO REACT
+  // ------------------------------------------------------------
+  // A primeira versão empurrava `setPos` num `setInterval` de 90 ms. Isso não é
+  // "uma animação leve": é uma animação de ONZE QUADROS POR SEGUNDO — e foi
+  // exatamente assim que ela apareceu na tela, engasgada.
+  //
+  // Um `MotionValue` mora FORA do ciclo de render: o `useAnimationFrame` empurra
+  // o valor a cada quadro e o framer escreve direto no estilo de quem depende
+  // dele. Nenhum render do React por quadro, 60 fps.
+  //
+  // O que continua em estado do React é só o que muda em SALTOS — as pastilhas
+  // que acendem e o valor que o leitor de tela anuncia. Isso muda um punhado de
+  // vezes por passagem, não sessenta por segundo.
+  const pos = useMotionValue(0);
+
+  useAnimationFrame((_, delta) => {
+    if (!onScreen || held || reduce) return;
+    // `delta` volta gigante quando a aba estava no fundo; sem o teto o cursor
+    // daria um salto de meia live no primeiro quadro de volta.
+    const next = pos.get() + Math.min(delta, 64) / SWEEP_MS;
+    pos.set(next >= 1 ? 0 : next);
+  });
+
+  // Com movimento reduzido o cursor não anda — então ele descansa no FIM, com o
+  // relatório inteiro lido. Parado no começo, o gráfico apareceria todo apagado
+  // pra quem pediu menos movimento, que é o contrário de acessível.
+  useEffect(() => {
+    if (reduce) pos.set(1);
+  }, [reduce, pos]);
+
+  const left = useTransform(pos, (p) => `${p * 100}%`);
+  const dotTop = useTransform(pos, (p) => `${(yOf(viewersAt(p)) / H) * 100}%`);
+  /** O véu sobre o trecho que o cursor ainda não leu. É `scaleX` num elemento
+   *  ancorado à direita — transformação pura, que o compositor resolve sem
+   *  refazer layout. A versão anterior fazia isso com um recorte de SVG cujo
+   *  `width` só mudava quando o React re-renderizava. */
+  const veil = useTransform(pos, (p) => 1 - p);
+  const readout = useTransform(
+    pos,
+    (p) =>
+      `${clockAt(p)} · ${fill(copy.watching, {
+        n: group(Math.round(viewersAt(p)), copy.sep),
+      })}`,
   );
 
-  /** Posição do ponteiro → fração do eixo. */
+  const [mark, setMark] = useState({ min: 0, raid: false, drop: false });
+  useMotionValueEvent(pos, "change", (p) => {
+    const raid = Math.abs(p - RAID) < NEAR;
+    const drop = Math.abs(p - DROP) < NEAR;
+    const min = Math.round(p * SPAN_MIN);
+    // Devolver o MESMO objeto é o que corta o render: o React compara por
+    // identidade e não reconcilia nada.
+    setMark((cur) =>
+      cur.raid === raid && cur.drop === drop && Math.abs(cur.min - min) < 4
+        ? cur
+        : { min, raid, drop },
+    );
+  });
+
+  /** Posição do ponteiro → fração do eixo. Escreve direto no `MotionValue`:
+   *  arrastar não passa pelo React em quadro nenhum. */
   const seek = (clientX: number) => {
     const el = track.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos(Math.max(0, Math.min(1, (clientX - r.left) / r.width)));
+    pos.set(Math.max(0, Math.min(1, (clientX - r.left) / r.width)));
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const step =
-      e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
+      e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowLeft"
+          ? -1
+          : e.key === "Home"
+            ? -99
+            : e.key === "End"
+              ? 99
+              : 0;
     if (!step) return;
     e.preventDefault();
-    setPos((p) => Math.max(0, Math.min(1, p + step / LAST)));
+    pos.set(Math.max(0, Math.min(1, pos.get() + step / LAST)));
   };
 
-  const v = Math.round(viewersAt(pos));
-  const readout = `${clockAt(pos)} · ${fill(copy.watching, { n: group(v, copy.sep) })}`;
-  const nearRaid = Math.abs(pos - RAID) < NEAR;
-  const nearDrop = Math.abs(pos - DROP) < NEAR;
+  const ariaP = mark.min / SPAN_MIN;
 
   return (
     <div ref={box} className={PANEL}>
@@ -372,8 +448,10 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         aria-label={copy.scrub}
         aria-valuemin={0}
         aria-valuemax={SPAN_MIN}
-        aria-valuenow={Math.round(pos * SPAN_MIN)}
-        aria-valuetext={readout}
+        aria-valuenow={mark.min}
+        aria-valuetext={`${clockAt(ariaP)} · ${fill(copy.watching, {
+          n: group(Math.round(viewersAt(ariaP)), copy.sep),
+        })}`}
         onKeyDown={onKeyDown}
         onFocus={() => setHeld(true)}
         onBlur={() => setHeld(false)}
@@ -395,69 +473,53 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
           role="img"
           aria-label={copy.chartAria}
         >
-          <defs>
-            {/* O trecho JÁ TOCADO é um recorte que cresce com o cursor. Recorte
-                e não tracejado: o quadro estica em X e Y por fatores
-                diferentes, e o retângulo do recorte estica junto com a curva —
-                que é exatamente o que o `stroke-dasharray` não faz. */}
-            <clipPath id={clip}>
-              <rect x="0" y="0" width={Math.max(0.001, pos * W)} height={H} />
-            </clipPath>
-          </defs>
-
           <line className={GRID} x1="0" y1="24" x2={W} y2="24" />
           <line className={GRID} x1="0" y1="56" x2={W} y2="56" />
-
-          <path className="fill-brass/10" d={`${CURVE} L${W},${H} L0,${H} Z`} />
-          <path
-            className="fill-brass/25"
-            d={`${CURVE} L${W},${H} L0,${H} Z`}
-            clipPath={`url(#${clip})`}
-          />
-
-          {/* A curva inteira fica sempre visível, apagada; o que o cursor já
-              passou acende. Assim o gráfico nunca some — e o progresso é lido
-              sem precisar de um segundo elemento. */}
-          <path
-            className="fill-none stroke-brass/40 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.5] [vector-effect:non-scaling-stroke]"
-            d={CURVE}
-          />
+          <path className="fill-brass/20" d={`${CURVE} L${W},${H} L0,${H} Z`} />
           <path
             className="fill-none stroke-brass [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.5] [vector-effect:non-scaling-stroke]"
             d={CURVE}
-            clipPath={`url(#${clip})`}
           />
         </svg>
 
+        {/* O véu entra ANTES das marcas: elas ficam por cima e continuam
+            legíveis do outro lado do cursor — é delas que a legenda fala. */}
+        <motion.span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 origin-right bg-surface/65"
+          style={{ scaleX: veil }}
+        />
+
         {/* Marcas, cursor e ponto moram em HTML sobre o SVG: dentro dele o
             `preserveAspectRatio="none"` viraria a bolinha numa elipse. */}
-        <Marker at={RAID} tone="brass" near={nearRaid} calm={calm} />
-        <Marker at={DROP} tone="warn" near={nearDrop} calm={calm} />
+        <Marker at={RAID} tone="brass" pos={pos} reduce={reduce} />
+        <Marker at={DROP} tone="warn" pos={pos} reduce={reduce} />
 
-        <span
+        <motion.span
           className="pointer-events-none absolute inset-y-0 w-px bg-cream/70"
-          style={{ left: `${pos * 100}%` }}
+          style={{ left }}
           aria-hidden="true"
         >
-          <i
-            className="absolute -top-1 -left-[3.5px] size-[7px] rounded-full bg-cream"
-          />
-        </span>
-        <span
-          className="pointer-events-none absolute z-2 -ml-[6px] -mt-[6px] size-3 rounded-full border-2 border-surface bg-cream"
-          style={{ left: `${pos * 100}%`, top: `${(yOf(viewersAt(pos)) / H) * 100}%` }}
+          <i className="absolute -top-1 -left-[3.5px] size-[7px] rounded-full bg-cream" />
+        </motion.span>
+        <motion.span
+          className="pointer-events-none absolute z-2 -mt-[6px] -ml-[6px] size-3 rounded-full border-2 border-surface bg-cream"
+          style={{ left, top: dotTop }}
           aria-hidden="true"
         />
       </div>
 
       {/* A leitura do cursor. Fica numa linha própria e não flutuando sobre a
           curva: pastilha que persegue o ponteiro tapa justamente o pedaço do
-          gráfico que a pessoa está tentando ver. */}
+          gráfico que a pessoa está tentando ver.
+
+          O texto é o próprio `MotionValue` renderizado como filho — o framer
+          escreve o conteúdo direto no nó, sem passar pelo React. */}
       <div className="flex items-center justify-between gap-2 text-[0.6rem] font-bold tabular-nums text-faint-raised">
         <span>{clockAt(0)}</span>
-        <strong className="rounded-sm bg-surface-2 px-2 py-1 text-[0.66rem] font-extrabold text-cream">
+        <motion.strong className="rounded-sm bg-surface-2 px-2 py-1 text-[0.66rem] font-extrabold text-cream">
           {readout}
-        </strong>
+        </motion.strong>
         <span>{clockAt(1)}</span>
       </div>
 
@@ -468,18 +530,18 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         {/* As duas pastilhas de evento acendem quando o cursor chega nelas: é a
             legenda dizendo "é ISTO que você está olhando agora". */}
         <motion.span
-          animate={{ scale: nearRaid ? 1.07 : 1 }}
-          transition={{ duration: calm ? 0 : 0.2 }}
+          animate={{ scale: mark.raid ? 1.07 : 1 }}
+          transition={{ duration: reduce ? 0 : 0.2 }}
           className="origin-left"
         >
-          <Chip className={cn(!nearRaid && "opacity-55")}>{copy.raid}</Chip>
+          <Chip className={cn(!mark.raid && "opacity-55")}>{copy.raid}</Chip>
         </motion.span>
         <motion.span
-          animate={{ scale: nearDrop ? 1.07 : 1 }}
-          transition={{ duration: calm ? 0 : 0.2 }}
+          animate={{ scale: mark.drop ? 1.07 : 1 }}
+          transition={{ duration: reduce ? 0 : 0.2 }}
           className="origin-left"
         >
-          <Chip tone="warn" className={cn(!nearDrop && "opacity-55")}>
+          <Chip tone="warn" className={cn(!mark.drop && "opacity-55")}>
             {copy.drop}
           </Chip>
         </motion.span>
@@ -492,28 +554,40 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
   );
 }
 
-/** Marcador de evento na curva: fica apagado até o cursor chegar perto. */
+/** Marcador de evento na curva: cresce quando o cursor chega perto.
+ *
+ *  A mola pendura no `MotionValue` do cursor, então o "acender" também acontece
+ *  fora do render — este componente não re-renderiza nenhuma vez por causa
+ *  disso. */
 function Marker({
   at,
   tone,
-  near,
-  calm,
+  pos,
+  reduce,
 }: {
   at: number;
   tone: "brass" | "warn";
-  near: boolean;
-  calm: boolean;
+  pos: MotionValue<number>;
+  reduce: boolean;
 }) {
+  // O `: number` não é enfeite: sem ele o TS infere a união `1 | 1.55` e a mola
+  // não aceita um `MotionValue` de literais.
+  const target = useTransform(pos, (p): number =>
+    Math.abs(p - at) < NEAR ? 1.55 : 1,
+  );
+  const scale = useSpring(target, { stiffness: 320, damping: 26 });
   return (
     <motion.span
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute -mt-[5px] -ml-[5px] size-2.5 rounded-full border-2 border-surface",
+        "pointer-events-none absolute z-2 -mt-[5px] -ml-[5px] size-2.5 rounded-full border-2 border-surface",
         tone === "warn" ? "bg-warn" : "bg-brass",
       )}
-      style={{ left: `${at * 100}%`, top: `${(yOf(viewersAt(at)) / H) * 100}%` }}
-      animate={{ scale: near ? 1.55 : 1 }}
-      transition={{ duration: calm ? 0 : 0.24, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        left: `${at * 100}%`,
+        top: `${(yOf(viewersAt(at)) / H) * 100}%`,
+        scale: reduce ? target : scale,
+      }}
     />
   );
 }

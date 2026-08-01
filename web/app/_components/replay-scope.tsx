@@ -1,8 +1,17 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { useCalm, useHeartbeat } from "./use-motion";
+import {
+  motion,
+  useAnimationFrame,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
+import { useOnScreen } from "./use-motion";
 import { PlatformGlyph } from "./decor";
 import { InfoIcon } from "./icons";
 import { cn } from "./ui";
@@ -15,21 +24,31 @@ import { cn } from "./ui";
 // até o "BORA"; aqui a live já acabou e o streamer está procurando o que travou.
 //
 // ------------------------------------------------------------
-// POR QUE FOI REESCRITA
+// COMO O TEMPO ANDA AQUI
 // ------------------------------------------------------------
-// A versão anterior TROCAVA de momento a cada 5,6 s: três slides girando. Isso
-// não é um replay, é um carrossel — e o gesto que a seção vende (arrastar o
-// tempo e ver tudo andar junto) não existia em lugar nenhum.
+// O cursor CAMINHA. O relógio anda, o quadro muda de estado no minuto certo, o
+// chat volta a rolar na hora em que foi digitado e os dois gráficos têm um ponto
+// correndo em cima da curva. É um player: tem play, tem pausa e tem barra pra
+// arrastar.
 //
-// Agora o cursor CAMINHA. O relógio anda, o quadro muda de estado no minuto
-// certo, o chat volta a rolar na hora em que foi digitado e os dois gráficos
-// têm um ponto correndo em cima da curva. É um player: tem play, tem pausa e
-// tem barra pra arrastar.
+// O passeio não percorre as 3h12 num fôlego — ele TOCA as três janelas que
+// interessam e passa rápido pelo meio, que é o que qualquer resumo de gravação
+// faz. Cada janela contém a virada dela: você vê a Twitch cair, e vê o OBS zerar
+// enquanto as plataformas continuam recebendo.
 //
-// O passeio não percorre as 3h12 inteiras num fôlego — ele TOCA as três janelas
-// que interessam e passa rápido pelo meio, que é o que qualquer resumo de
-// gravação faz. Cada janela contém a virada dela: você vê a Twitch cair, e vê o
-// OBS zerar enquanto as plataformas continuam recebendo.
+// ------------------------------------------------------------
+// POSIÇÃO NÃO É ESTADO DO REACT — E ISSO NÃO É OTIMIZAÇÃO PREMATURA
+// ------------------------------------------------------------
+// A primeira versão desta peça tocava com um `setInterval` de 100 ms chamando
+// `setState`. Dez quadros por segundo: engasgado a olho nu, e cada tique
+// re-renderizava o painel inteiro (quadro, chat, veredito, dois gráficos) só pra
+// mover um cursor dois pixels.
+//
+// Agora o minuto atual é um `MotionValue` empurrado pelo `useAnimationFrame`: o
+// framer escreve direto no estilo do cursor e dos pontos, sem passar pelo React.
+// O React só entra pro que muda em SALTOS — o estado do quadro, as falas que
+// já foram ditas, qual momento está ativo — e isso é sincronizado por um limiar
+// de minutos, não por quadro.
 //
 // ------------------------------------------------------------
 // O QUE SUMIU DE PROPÓSITO
@@ -219,118 +238,176 @@ export interface ReplayCopy {
  *  A janela é longa de propósito: o veredito embaixo tem duas linhas pra ler. */
 const PLAY_MS = 6200;
 const SEEK_MS = 1100;
-const TICK_MS = 100;
+/** De quantos em quantos minutos o conteúdo discreto (quadro, chat, veredito)
+ *  se atualiza. Na velocidade do passeio isso dá ~4 renders por segundo — o
+ *  cursor continua a 60 fps porque ele não depende disto. */
+const SYNC_MIN = 0.35;
 
 const easeInOut = (k: number) =>
   k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 
-interface Tour {
-  /** Índice do momento que está tocando (ou pro qual o cursor está indo). */
-  i: number;
-  kind: "play" | "seek";
-  /** Milissegundos dentro da fase atual. */
-  el: number;
-  /** De onde o pulo saiu — só usado na fase "seek". */
-  from: number;
-  /** Minuto em que o cursor está. É a única fonte da verdade da peça inteira:
-   *  quadro, chat, veredito e pontos das curvas saem todos daqui. */
-  pos: number;
-}
-
 const nearest = (min: number) => {
   let best = 0;
   for (let i = 1; i < MOMENTS.length; i++) {
-    if (Math.abs(MOMENTS[i].min - min) < Math.abs(MOMENTS[best].min - min)) best = i;
+    if (Math.abs(MOMENTS[i].min - min) < Math.abs(MOMENTS[best].min - min))
+      best = i;
   }
   return best;
 };
 
+/** Onde o cursor começa: no meio da primeira janela, com o chat já rolando. */
+const START = MOMENTS[0].from + (MOMENTS[0].to - MOMENTS[0].from) * 0.42;
+
 export function ReplayScope({ copy }: { copy: ReplayCopy }) {
-  const calm = useCalm();
+  const reduce = useReducedMotion() ?? false;
   const box = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
+  const onScreen = useOnScreen(box);
   const [playing, setPlaying] = useState(true);
   const [hover, setHover] = useState(false);
-  const [tour, setTour] = useState<Tour>(() => ({
+
+  /** O minuto em que o cursor está. Fonte da verdade da peça inteira. */
+  const pos = useMotionValue(START);
+  /** A máquina do passeio mora num ref: mexer nela não pode custar um render. */
+  const tour = useRef({
     i: 0,
-    kind: "play",
+    kind: "play" as "play" | "seek",
     el: PLAY_MS * 0.42,
-    from: MOMENTS[0].from,
-    pos: MOMENTS[0].from + (MOMENTS[0].to - MOMENTS[0].from) * 0.42,
-  }));
+    from: START,
+  });
 
   // O passeio para quando: pediram menos movimento, apertaram pausa, o mouse
-  // está em cima (ninguém lê um veredito que troca sozinho), ou a peça saiu da
-  // tela / a aba foi pro fundo — isso último é o próprio `useHeartbeat`.
-  useHeartbeat(box, TICK_MS, playing && !calm, () =>
-    setTour((p) => {
-      const el = p.el + TICK_MS;
-      const m = MOMENTS[p.i];
-      if (p.kind === "seek") {
-        if (el >= SEEK_MS) return { ...p, kind: "play", el: 0, pos: m.from };
-        const k = easeInOut(el / SEEK_MS);
-        return { ...p, el, pos: p.from + (m.from - p.from) * k };
-      }
-      if (el >= PLAY_MS) {
-        const i = (p.i + 1) % MOMENTS.length;
-        return { i, kind: "seek", el: 0, from: p.pos, pos: p.pos };
-      }
-      return { ...p, el, pos: m.from + (m.to - m.from) * (el / PLAY_MS) };
-    }),
-    hover,
-  );
+  // está em cima (ninguém lê um veredito que troca sozinho) ou a peça saiu da
+  // tela / a aba foi pro fundo.
+  useAnimationFrame((_, delta) => {
+    if (!playing || hover || reduce || !onScreen) return;
+    const t = tour.current;
+    const m = MOMENTS[t.i];
+    // Teto no `delta`: voltando de uma aba no fundo ele vem gigante, e o cursor
+    // pularia a janela inteira num quadro só.
+    t.el += Math.min(delta, 64);
 
-  const pos = tour.pos;
-  const active = MOMENTS[nearest(pos)];
-  const state = frameAt(pos);
+    if (t.kind === "seek") {
+      if (t.el >= SEEK_MS) {
+        t.kind = "play";
+        t.el = 0;
+        pos.set(m.from);
+        return;
+      }
+      pos.set(t.from + (m.from - t.from) * easeInOut(t.el / SEEK_MS));
+      return;
+    }
+    if (t.el >= PLAY_MS) {
+      t.from = pos.get();
+      t.i = (t.i + 1) % MOMENTS.length;
+      t.kind = "seek";
+      t.el = 0;
+      return;
+    }
+    pos.set(m.from + (m.to - m.from) * (t.el / PLAY_MS));
+  });
 
-  /** Toda busca manual passa por aqui — e toda busca manual segura o passeio.
-   *  Quem pegou a linha do tempo na mão não pode ver ela fugir do dedo. */
+  /** O conteúdo que muda em saltos. Sincroniza por limiar de minutos: o quadro
+   *  não precisa ser recalculado sessenta vezes por segundo pra virar de estado
+   *  três vezes na live inteira. */
+  const [at, setAt] = useState(START);
+  useMotionValueEvent(pos, "change", (p) => {
+    setAt((cur) => (Math.abs(cur - p) < SYNC_MIN ? cur : p));
+  });
+
+  // Com movimento reduzido o cursor simplesmente não anda — e não precisa de
+  // efeito nenhum pra "arrumar" a posição: `START` já cai dentro da primeira
+  // janela, a meio caminho do minuto que o primeiro momento aponta. O veredito e
+  // o chat daquele trecho aparecem parados, que é o combinado.
+  const active = MOMENTS[nearest(at)];
+  const state = frameAt(at);
+
+  /** Todo caminho manual escreve nos DOIS: no valor contínuo (o cursor segue o
+   *  dedo no mesmo quadro) e no discreto (o quadro e o chat viram na hora, sem
+   *  esperar o limiar). */
+  const jump = (min: number, keepPlaying = false) => {
+    const t = tour.current;
+    t.i = nearest(min);
+    t.kind = "play";
+    t.el =
+      ((min - MOMENTS[t.i].from) /
+        (MOMENTS[t.i].to - MOMENTS[t.i].from)) *
+      PLAY_MS;
+    t.from = min;
+    pos.set(min);
+    setAt(min);
+    if (!keepPlaying) setPlaying(false);
+  };
+
   const seek = (clientX: number) => {
     const el = track.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const min = Math.max(0, Math.min(SPAN_MIN, ((clientX - r.left) / r.width) * SPAN_MIN));
-    setPlaying(false);
-    setTour((p) => ({ ...p, kind: "play", el: 0, from: min, pos: min }));
+    jump(
+      Math.max(
+        0,
+        Math.min(SPAN_MIN, ((clientX - r.left) / r.width) * SPAN_MIN),
+      ),
+    );
   };
 
   /** Play: retoma de onde o cursor parou. Se ele estiver no meio do nada, pula
    *  pra janela mais próxima em vez de tocar 40 minutos de linha reta. */
   const toggle = () => {
     if (playing) return setPlaying(false);
-    const i = nearest(pos);
+    const p = pos.get();
+    const i = nearest(p);
     const m = MOMENTS[i];
-    setTour(
-      pos < m.from || pos > m.to
-        ? { i, kind: "seek", el: 0, from: pos, pos }
-        : { i, kind: "play", el: ((pos - m.from) / (m.to - m.from)) * PLAY_MS, from: pos, pos },
-    );
+    const t = tour.current;
+    t.i = i;
+    t.from = p;
+    if (p < m.from || p > m.to) {
+      t.kind = "seek";
+      t.el = 0;
+    } else {
+      t.kind = "play";
+      t.el = ((p - m.from) / (m.to - m.from)) * PLAY_MS;
+    }
     setPlaying(true);
   };
 
   /** Botão de momento = botão de capítulo: pula pra lá e CONTINUA tocando. */
   const chapter = (i: number) => {
-    setTour((p) => ({ i, kind: "seek", el: 0, from: p.pos, pos: p.pos }));
+    const t = tour.current;
+    t.i = i;
+    t.kind = "seek";
+    t.el = 0;
+    t.from = pos.get();
     setPlaying(true);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const step =
-      e.key === "ArrowRight" ? 2 : e.key === "ArrowLeft" ? -2 : e.key === "Home" ? -SPAN_MIN : e.key === "End" ? SPAN_MIN : 0;
+      e.key === "ArrowRight"
+        ? 2
+        : e.key === "ArrowLeft"
+          ? -2
+          : e.key === "Home"
+            ? -SPAN_MIN
+            : e.key === "End"
+              ? SPAN_MIN
+              : 0;
     if (!step) return;
     e.preventDefault();
-    setPlaying(false);
-    setTour((p) => {
-      const min = Math.max(0, Math.min(SPAN_MIN, p.pos + step));
-      return { ...p, kind: "play", el: 0, from: min, pos: min };
-    });
+    jump(Math.max(0, Math.min(SPAN_MIN, pos.get() + step)));
   };
+
+  const cursor = useTransform(pos, (p) => `${pctAt(p)}%`);
+  const played = useTransform(pos, (p) => p / SPAN_MIN);
+  const clock = useTransform(pos, elapsed);
 
   // Com movimento reduzido o tempo não anda, então prender o chat ao relógio
   // esconderia quase todas as falas. Aí ele mostra o momento inteiro.
-  const lines = (calm ? EVENTS.filter((e) => e.moment === active.id) : EVENTS.filter((e) => e.at <= pos))
-    .slice(-5);
+  const lines = (
+    reduce
+      ? EVENTS.filter((e) => e.moment === active.id)
+      : EVENTS.filter((e) => e.at <= at)
+  ).slice(-5);
 
   return (
     <div
@@ -345,8 +422,8 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     >
       {/* --- quadro + chat --- */}
       <div className="grid gap-3 [grid-template-columns:minmax(0,1.34fr)_minmax(0,1fr)] max-[820px]:grid-cols-1">
-        <Frame state={state} pos={pos} copy={copy} calm={calm} />
-        <ChatColumn lines={lines} copy={copy} calm={calm} />
+        <Frame state={state} pos={pos} copy={copy} reduce={reduce} />
+        <ChatColumn lines={lines} copy={copy} reduce={reduce} />
       </div>
 
       {/* --- a linha do tempo: o eixo que as duas metades compartilham --- */}
@@ -363,7 +440,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
                 <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" className="h-4 w-4 translate-x-px" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 translate-x-px"
+                aria-hidden="true"
+              >
                 <path d="M8 5l11 7-11 7z" fill="currentColor" />
               </svg>
             )}
@@ -371,9 +452,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           <span className="text-[0.62rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
             {copy.axis}
           </span>
-          <span className="ml-auto font-display text-[0.8rem] font-extrabold text-cream tabular-nums">
-            {elapsed(pos)}
-          </span>
+          {/* O relógio é o `MotionValue` renderizado como filho: o framer
+              escreve o texto direto no nó, sem re-render do React. */}
+          <motion.span className="ml-auto font-display text-[0.8rem] font-extrabold text-cream tabular-nums">
+            {clock}
+          </motion.span>
         </div>
 
         {/* O desenho é decorativo pro leitor de tela: a leitura vem do texto do
@@ -386,8 +469,8 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           aria-label={copy.scrub}
           aria-valuemin={0}
           aria-valuemax={SPAN_MIN}
-          aria-valuenow={Math.round(pos)}
-          aria-valuetext={`${elapsed(pos)} — ${copy.moments[active.id].tab}`}
+          aria-valuenow={Math.round(at)}
+          aria-valuetext={`${elapsed(at)} — ${copy.moments[active.id].tab}`}
           onKeyDown={onKeyDown}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -408,10 +491,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
               width: `${pctAt(OBS_OUT[1]) - pctAt(OBS_OUT[0])}%`,
             }}
           />
-          {/* O trecho já tocado, como em qualquer player. */}
-          <span
-            className="pointer-events-none absolute inset-y-0 left-0 bg-cream/5"
-            style={{ width: `${pctAt(pos)}%` }}
+          {/* O trecho já tocado, como em qualquer player. `scaleX` num elemento
+              de largura fixa: transformação pura, sem refazer layout por quadro. */}
+          <motion.span
+            className="pointer-events-none absolute inset-y-0 left-0 w-full origin-left bg-cream/5"
+            style={{ scaleX: played }}
           />
 
           <Lane
@@ -420,7 +504,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             label={copy.seriesPlatforms}
             floor={false}
             pos={pos}
-            calm={calm}
+            reduce={reduce}
           />
           <Lane
             pts={OBS}
@@ -428,7 +512,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             label={copy.seriesObs}
             floor
             pos={pos}
-            calm={calm}
+            reduce={reduce}
           />
 
           {/* Marcas dos momentos que não estão selecionados. A ativa some: quem
@@ -438,7 +522,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
               key={m.id}
               className={cn(
                 "pointer-events-none absolute inset-y-0 w-0.5 transition-opacity duration-200",
-                m.tone === "warn" ? "bg-warn" : m.tone === "ok" ? "bg-ok" : "bg-brass",
+                m.tone === "warn"
+                  ? "bg-warn"
+                  : m.tone === "ok"
+                    ? "bg-ok"
+                    : "bg-brass",
                 m.id === active.id ? "opacity-0" : "opacity-45",
               )}
               style={{ left: `${pctAt(m.min)}%` }}
@@ -446,14 +534,13 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           ))}
 
           {/* O cursor: linha cheia + ponto no topo, igual ao do app. Sem mola:
-              ele não persegue um alvo, ele É o tempo — a suavidade vem do
-              passo de 100 ms, não de uma física por cima. */}
-          <span
+              ele não persegue um alvo, ele É o tempo. */}
+          <motion.span
             className="pointer-events-none absolute inset-y-0 w-0.5 bg-cream"
-            style={{ left: `${pctAt(pos)}%` }}
+            style={{ left: cursor }}
           >
             <i className="absolute -top-0.5 -left-[3px] size-2 rounded-full bg-cream" />
-          </span>
+          </motion.span>
         </div>
 
         {/* Os momentos são botões de verdade — teclado, foco, aria-pressed — e
@@ -502,7 +589,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             calculada. Corte seco leria como bug. */}
         <motion.span
           key={active.id}
-          initial={calm ? false : { opacity: 0, y: 6 }}
+          initial={reduce ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
         >
@@ -533,16 +620,24 @@ function Lane({
   label,
   floor,
   pos,
-  calm,
+  reduce,
 }: {
   pts: [number, number][];
   tone: "brass" | "muted";
   label: string;
   floor: boolean;
-  pos: number;
-  calm: boolean;
+  pos: MotionValue<number>;
+  reduce: boolean;
 }) {
-  const y = yAt(pts, pos);
+  const left = useTransform(pos, (p) => `${pctAt(p)}%`);
+  const top = useTransform(pos, (p) => `${(yAt(pts, p) / LANE_H) * 100}%`);
+  // O ponto incha quando a curva encosta no chão. É o único instante da peça em
+  // que uma das duas séries diz algo que a outra não diz.
+  const target = useTransform(pos, (p): number =>
+    yAt(pts, p) > LANE_H - 12 ? 1.35 : 1,
+  );
+  const scale = useSpring(target, { stiffness: 320, damping: 26 });
+
   return (
     <div className="relative">
       {/* O rótulo ganha o fundo da faixa atrás: sem isso a curva passa por baixo
@@ -586,9 +681,7 @@ function Lane({
           "pointer-events-none absolute z-2 -mt-[5px] -ml-[5px] block size-2.5 rounded-full border-2 border-surface",
           tone === "brass" ? "bg-brass" : "bg-muted",
         )}
-        style={{ left: `${pctAt(pos)}%`, top: `${(y / LANE_H) * 100}%` }}
-        animate={{ scale: y > LANE_H - 12 ? 1.35 : 1 }}
-        transition={{ duration: calm ? 0 : 0.25 }}
+        style={{ left, top, scale: reduce ? target : scale }}
       />
     </div>
   );
@@ -605,18 +698,19 @@ function Frame({
   state,
   pos,
   copy,
-  calm,
+  reduce,
 }: {
   state: FrameState;
-  pos: number;
+  pos: MotionValue<number>;
   copy: ReplayCopy;
-  calm: boolean;
+  reduce: boolean;
 }) {
   const dests: { platform: PlatId; live: boolean }[] = [
     { platform: "twitch", live: state !== "reconnect" },
     { platform: "youtube", live: true },
     { platform: "kick", live: true },
   ];
+  const clock = useTransform(pos, wallClock);
 
   return (
     <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px]">
@@ -624,7 +718,7 @@ function Frame({
           que está no ar muda — e é aí que a troca tem significado. */}
       <motion.div
         key={state}
-        initial={calm ? false : { opacity: 0, scale: 1.015 }}
+        initial={reduce ? false : { opacity: 0, scale: 1.015 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="grid h-full place-content-center justify-items-center px-4 pb-9 text-center"
@@ -647,7 +741,7 @@ function Frame({
               viewBox="0 0 24 24"
               className="size-11 text-warn"
               aria-hidden="true"
-              animate={calm ? undefined : { rotate: 360 }}
+              animate={reduce ? undefined : { rotate: 360 }}
               transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
             >
               <circle
@@ -673,9 +767,9 @@ function Frame({
           </>
         ) : (
           <>
-            <strong className="font-display text-[clamp(1.4rem,3vw,2.1rem)] leading-none font-extrabold text-cream tabular-nums">
-              {wallClock(pos)}
-            </strong>
+            <motion.strong className="font-display text-[clamp(1.4rem,3vw,2.1rem)] leading-none font-extrabold text-cream tabular-nums">
+              {clock}
+            </motion.strong>
             <span className="mt-2 text-[0.72rem] font-[550] text-faint-raised">
               {copy.frameNote}
             </span>
@@ -704,7 +798,9 @@ function Frame({
               className={cn(
                 "h-[6px] w-[6px] rounded-full",
                 d.live ? "bg-ok" : "bg-warn",
-                !d.live && !calm && "animate-[soft-pulse_1.2s_ease-in-out_infinite]",
+                !d.live &&
+                  !reduce &&
+                  "animate-[soft-pulse_1.2s_ease-in-out_infinite]",
               )}
             />
             <span className={d.live ? "text-ok" : "text-warn"}>
@@ -722,11 +818,11 @@ function Frame({
 function ChatColumn({
   lines,
   copy,
-  calm,
+  reduce,
 }: {
   lines: typeof EVENTS;
   copy: ReplayCopy;
-  calm: boolean;
+  reduce: boolean;
 }) {
   return (
     <div className="flex flex-col rounded-lg bg-surface p-[13px]">
@@ -739,7 +835,7 @@ function ChatColumn({
         {lines.map((line) => (
           <motion.p
             key={`${line.moment}-${line.k}`}
-            initial={calm ? false : { opacity: 0, y: 9 }}
+            initial={reduce ? false : { opacity: 0, y: 9 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
             className="grid grid-cols-[18px_minmax(0,1fr)] items-start gap-2 text-[0.76rem] leading-[1.35] [&_.glyph]:h-[18px] [&_.glyph]:w-[18px]"

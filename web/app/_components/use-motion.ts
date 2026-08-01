@@ -27,8 +27,45 @@ export function useCalm() {
 }
 
 /**
+ * `true` enquanto o elemento está VISÍVEL na tela e a aba em primeiro plano.
+ *
+ * É o mesmo portão do `useHeartbeat`, exposto como valor — quem anima quadro a
+ * quadro (`useAnimationFrame`) não pode ligar e desligar um efeito, só sair cedo
+ * do laço. Um painel fora da tela não gasta bateria de ninguém.
+ */
+export function useOnScreen(
+  ref: React.RefObject<HTMLElement | null>,
+  amount = 0.15,
+) {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let visible = false;
+    const sync = () => setOn(visible && !document.hidden);
+    const io = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      sync();
+    }, { threshold: amount });
+    io.observe(el);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, [ref, amount]);
+  return on;
+}
+
+/**
  * Roda `fn` a cada `ms` — mas só enquanto o elemento está VISÍVEL na tela e a
  * aba está em primeiro plano.
+ *
+ * Para conteúdo que muda em SALTOS (uma fala nova, um segundo no relógio, um
+ * alerta chegando). Movimento CONTÍNUO não passa por aqui: um intervalo de
+ * 100 ms empurrando estado do React é uma animação de 10 fps, e foi exatamente
+ * assim que as duas linhas do tempo nasceram engasgadas. Para isso existe o
+ * `useAnimationFrame` do framer com `MotionValue` — ver os dois gráficos.
  *
  * Um laço decorativo não pode gastar bateria de quem deixou a página aberta
  * numa segunda janela, e a peça do relatório fica fora da tela na maior parte
