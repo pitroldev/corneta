@@ -1,19 +1,21 @@
 import {
   ApiError,
+  apiJson,
   clientAddress,
   errorResponse,
-  json,
   providerForm,
   readJson,
   requiredString,
 } from "@/lib/server/http";
 import { getOAuthConfig } from "@/lib/server/oauth-config";
 import { rateLimit } from "@/lib/server/rate-limit";
+import { createApiTelemetryContext } from "@/lib/server/telemetry-reporter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const telemetry = createApiTelemetryContext(request, "kick_refresh", "kick");
   try {
     rateLimit(`kick:refresh:${clientAddress(request)}`, 60, 60_000);
     const config = getOAuthConfig();
@@ -55,12 +57,15 @@ export async function POST(request: Request) {
         "A Kick não retornou o token esperado.",
       );
     }
-    return json({
-      accessToken,
-      refreshToken: provider.refresh_token ?? null,
-      expiresIn: Number(provider.expires_in) || null,
-    });
+    return apiJson(
+      {
+        accessToken,
+        refreshToken: provider.refresh_token ?? null,
+        expiresIn: Number(provider.expires_in) || null,
+      },
+      telemetry,
+    );
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, telemetry);
   }
 }

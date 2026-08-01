@@ -31,7 +31,7 @@ export const config = {
   matcher: ["/", "/pt-BR", "/legal/:path*", "/pt-BR/legal/:path*"],
 };
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // `/pt-BR` é rota interna: ela existe porque o `[locale]` precisa de um

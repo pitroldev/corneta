@@ -348,7 +348,7 @@ where
         Err(tungstenite::Error::Http(resp)) if matches!(resp.status().as_u16(), 401 | 403) => {
             // Token revogado/expirado: erro permanente — UI mostra e o backoff vai pro teto.
             log::warn!(
-                "alerta ({source}): handshake recusado (HTTP {}) — token inválido/expirado",
+                "alerta: handshake recusado (HTTP {}) — token inválido/expirado",
                 resp.status().as_u16()
             );
             // NÃO é copy: viaja no MESMO campo de `alert://status` que recebe
@@ -366,7 +366,7 @@ where
                 tungstenite::Error::Http(r) => format!("HTTP {}", r.status().as_u16()),
                 _ => "handshake".into(),
             };
-            log::warn!("alerta ({source}): falha ao conectar ({desc})");
+            log::warn!("alerta: falha ao conectar ({desc})");
             alert_status(&app, source, "error");
             return ConnResult::Failed;
         }
@@ -388,7 +388,7 @@ where
         // Rede caiu em silêncio (sem FIN/RST): read() só dá WouldBlock e o ping some no
         // buffer TCP sem erro — servidor mudo além do prazo → cai pro caminho de reconexão.
         if last_pong.elapsed() > ping_every + ping_grace {
-            log::warn!("alerta ({source}): servidor sem responder — reconectando");
+            log::warn!("alerta: servidor sem responder — reconectando");
             break;
         }
         match socket.read() {
@@ -409,7 +409,7 @@ where
                         connected = true;
                     }
                     if let Some(a) = &auth {
-                        let _ = socket.send(Message::Text(a.clone()));
+                        let _ = socket.send(Message::Text(a.clone().into()));
                     }
                 } else if let Some(open) = t.strip_prefix('0') {
                     // OPEN: lê pingInterval/pingTimeout e dispara o connect do namespace padrão.
@@ -527,7 +527,7 @@ fn probe_socketio(url: &str, auth: Option<String>) -> Result<(), String> {
                     match &auth {
                         // StreamElements: conectou — agora autentica e aguarda a resposta.
                         Some(a) if !sent_auth => {
-                            let _ = socket.send(Message::Text(a.clone()));
+                            let _ = socket.send(Message::Text(a.clone().into()));
                             sent_auth = true;
                         }
                         // Streamlabs: conectar já valida (o token estava na URL).

@@ -29,6 +29,14 @@ import type {
 } from "./types";
 import { defaultConfig } from "./factory";
 import { PLATFORMS } from "./platforms";
+import {
+  EMPTY_TELEMETRY_STATUS,
+  TELEMETRY_NOTICE_VERSION,
+  createTelemetryId,
+  normalizeTelemetryStatus,
+  type TelemetryChoice,
+  type TelemetryStatus,
+} from "./telemetry-schema";
 
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -50,8 +58,8 @@ export interface CornetaApi {
   detectEncoders(): Promise<EncoderInfo[]>;
   testUpload(): Promise<number>; // Mbps
   setAutostart(enabled: boolean): Promise<void>;
-  start(): Promise<void>;
-  stop(): Promise<void>;
+  start(operationId?: string): Promise<void>;
+  stop(operationId?: string): Promise<void>;
   setTargetPaused(targetId: string, paused: boolean): Promise<void>;
   /** Destino parqueado em erro (ex.: chave recusada): relê a chave do cofre e tenta de novo. */
   retryTarget(targetId: string): Promise<void>;
@@ -197,6 +205,15 @@ export interface CornetaApi {
   alertTest(sourceId: string, t: I18n["t"]): Promise<string>;
   openLogsDir(): Promise<void>;
   exportDiagnostics(): Promise<boolean>;
+  /** Consentimento mora em telemetry.json, separado da AppConfig/exportação. */
+  telemetryStatus(): Promise<TelemetryStatus>;
+  telemetrySetConsent(input: {
+    usage: TelemetryChoice;
+    crashReports: TelemetryChoice;
+    noticeVersion: string;
+  }): Promise<TelemetryStatus>;
+  /** Troca o UUID depois de um pedido de exclusão; exige as duas finalidades desligadas. */
+  telemetryRegenerateId(): Promise<TelemetryStatus>;
   registerShortcut(shortcut: string): Promise<void>;
   subscribeShortcut(cb: () => void): () => void;
   /** Avisos do gravador (disco cheio, retomada, pasta sumida). O `kind` é ASCII de
@@ -309,13 +326,13 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("set_autostart", { enabled });
     },
-    async start() {
+    async start(operationId) {
       const { invoke } = await core();
-      await invoke("start_engine");
+      await invoke("start_engine", { operationId: operationId ?? null });
     },
-    async stop() {
+    async stop(operationId) {
       const { invoke } = await core();
-      await invoke("stop_engine");
+      await invoke("stop_engine", { operationId: operationId ?? null });
     },
     async setTargetPaused(targetId, paused) {
       const { invoke } = await core();
@@ -663,6 +680,20 @@ function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return invoke<boolean>("export_diagnostics");
     },
+    async telemetryStatus() {
+      const { invoke } = await core();
+      return invoke<TelemetryStatus>("telemetry_status");
+    },
+    async telemetrySetConsent(input) {
+      const { invoke } = await core();
+      // O command Rust recebe um argumento nomeado `input`; Tauri não agrupa
+      // automaticamente os campos do objeto interno.
+      return invoke<TelemetryStatus>("telemetry_set_consent", { input });
+    },
+    async telemetryRegenerateId() {
+      const { invoke } = await core();
+      return invoke<TelemetryStatus>("telemetry_regenerate_id");
+    },
     async registerShortcut(shortcut) {
       const { invoke } = await core();
       await invoke("register_shortcut", { shortcut });
@@ -809,6 +840,7 @@ function tauriApi(): CornetaApi {
 function mockApi(): CornetaApi {
   const CONFIG_KEY = "corneta.config";
   const VAULT_KEY = "corneta.vault";
+  const TELEMETRY_KEY = "corneta.telemetry.v1";
 
   const loadVault = (): Record<string, string> => {
     try {
@@ -819,6 +851,20 @@ function mockApi(): CornetaApi {
   };
   const saveVault = (v: Record<string, string>) =>
     localStorage.setItem(VAULT_KEY, JSON.stringify(v));
+
+  const loadTelemetry = (): TelemetryStatus => {
+    try {
+      return normalizeTelemetryStatus(
+        JSON.parse(localStorage.getItem(TELEMETRY_KEY) || "null"),
+      );
+    } catch {
+      return EMPTY_TELEMETRY_STATUS;
+    }
+  };
+  const saveTelemetry = (value: TelemetryStatus): TelemetryStatus => {
+    localStorage.setItem(TELEMETRY_KEY, JSON.stringify(value));
+    return value;
+  };
 
   const loadConfig = (): AppConfig => {
     try {
@@ -1259,7 +1305,7 @@ function mockApi(): CornetaApi {
     async setAutostart() {
       // no-op no navegador (sem SO pra registrar autostart)
     },
-    async start() {
+    async start(_operationId) {
       const cfg = loadConfig();
       pausedTargets.clear();
       const targets: Record<string, TargetStatus> = {};
@@ -1298,7 +1344,7 @@ function mockApi(): CornetaApi {
       if (timer) clearInterval(timer);
       timer = setInterval(tick, 1000);
     },
-    async stop() {
+    async stop(_operationId) {
       if (timer) clearInterval(timer);
       timer = null;
       if (rec) {
@@ -1658,6 +1704,33 @@ function mockApi(): CornetaApi {
     },
     async exportDiagnostics() {
       return true;
+    },
+    async telemetryStatus() {
+      return loadTelemetry();
+    },
+    async telemetrySetConsent(input) {
+      const previous = loadTelemetry();
+      const needsId =
+        input.usage === "enabled" || input.crashReports === "enabled";
+      return saveTelemetry({
+        schemaVersion: 1,
+        noticeVersion: TELEMETRY_NOTICE_VERSION,
+        usage: input.usage,
+        crashReports: input.crashReports,
+        installationId:
+          previous.installationId ?? (needsId ? createTelemetryId() : null),
+        decidedAt: new Date().toISOString(),
+      });
+    },
+    async telemetryRegenerateId() {
+      const previous = loadTelemetry();
+      if (previous.usage === "enabled" || previous.crashReports === "enabled")
+        throw new Error("telemetry_disable_before_regenerate");
+      return saveTelemetry({
+        ...previous,
+        installationId: null,
+        decidedAt: new Date().toISOString(),
+      });
     },
     async registerShortcut() {
       // no-op no navegador (atalho global é do SO).

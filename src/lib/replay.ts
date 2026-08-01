@@ -195,7 +195,10 @@ export function pointAtGlobal(
 }
 
 /** Posição global → epoch. É o caminho de volta: o vídeo tocando move o cursor dos gráficos. */
-export function epochAtGlobal(idx: ReplayIndex, globalMs: number): number | null {
+export function epochAtGlobal(
+  idx: ReplayIndex,
+  globalMs: number,
+): number | null {
   const p = pointAtGlobal(idx, globalMs);
   if (!p) return null;
   const seg = idx.segments[p.index];

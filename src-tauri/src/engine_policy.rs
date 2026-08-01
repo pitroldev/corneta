@@ -215,6 +215,8 @@ mod tests {
         EngineSnapshot {
             state: state.into(),
             started_at: None,
+            operation_id: None,
+            error_id: None,
             targets: map,
             message: None,
             cpu: None,

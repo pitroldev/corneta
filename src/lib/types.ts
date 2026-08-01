@@ -386,6 +386,10 @@ export interface EngineSnapshot {
   startedAt: number | null;
   targets: Record<string, TargetStatus>;
   message?: string;
+  /** UUID da operação de live corrente, compartilhado entre UI e motor nativo. */
+  operationId?: string;
+  /** UUID opaco da falha nativa, quando o backend capturou um evento correlato. */
+  errorId?: string;
   /** Uso real de CPU/GPU (%) enquanto transmite. */
   cpu?: number;
   gpu?: number;

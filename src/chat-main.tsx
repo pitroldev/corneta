@@ -5,7 +5,10 @@ import "@fontsource/baloo-2/latin-700.css";
 import "@fontsource/baloo-2/latin-800.css";
 import { ChatPopout } from "./screens/ChatPopout";
 import { crashText } from "./components/ErrorBoundary";
+import { api } from "./lib/api";
 import { I18nFromConfig } from "./lib/i18n/provider";
+import { captureException, initializeTelemetry } from "./lib/telemetry";
+import { redactTelemetryText } from "./lib/telemetry-schema";
 import "./index.css";
 
 // Entry DEDICADO da janela flutuante do chat. Não importa o App (motor, telas,
@@ -13,11 +16,22 @@ import "./index.css";
 // tela em vez de ficar em branco.
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { error: Error | null }
+  { error: Error | null; errorId: string | null }
 > {
-  state = { error: null as Error | null };
+  state = { error: null as Error | null, errorId: null as string | null };
   static getDerivedStateFromError(error: Error) {
     return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    const errorId = captureException(error, {
+      handled: false,
+      severity: "error",
+      error_code: "chat_render_failed",
+      stage: "chat_render",
+      screen_id: "chat_popout",
+      component_stack: info.componentStack ?? undefined,
+    });
+    if (errorId) this.setState({ errorId });
   }
   render() {
     if (this.state.error) {
@@ -34,13 +48,23 @@ class ErrorBoundary extends React.Component<
           }}
         >
           <strong>{text.chatTitle}</strong>
-          <p style={{ color: "#ff8a6a" }}>{this.state.error.message}</p>
+          <p style={{ color: "#ff8a6a" }}>
+            {redactTelemetryText(this.state.error.message || "UI error", 500)}
+          </p>
+          {this.state.errorId && (
+            <p style={{ color: "#c6b69b" }}>
+              {text.errorId}: {this.state.errorId}
+            </p>
+          )}
           <details style={{ marginTop: 8 }}>
             <summary>{text.details}</summary>
             <pre
               style={{ whiteSpace: "pre-wrap", marginTop: 8, color: "#ff8a6a" }}
             >
-              {String(this.state.error.stack || this.state.error)}
+              {redactTelemetryText(
+                String(this.state.error.stack || this.state.error),
+                4_000,
+              )}
             </pre>
           </details>
         </div>
@@ -50,12 +74,16 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <I18nFromConfig>
-        <ChatPopout />
-      </I18nFromConfig>
-    </ErrorBoundary>
-  </React.StrictMode>,
-);
+function render() {
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <I18nFromConfig>
+          <ChatPopout />
+        </I18nFromConfig>
+      </ErrorBoundary>
+    </React.StrictMode>,
+  );
+}
+
+void initializeTelemetry(api).finally(render);

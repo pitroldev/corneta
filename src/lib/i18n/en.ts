@@ -628,6 +628,30 @@ export const en: Dict = {
   "components.onboarding.subtitle": "{n} steps, from OBS to the report.",
   // Aparece 2x no mesmo componente (prop title do Modal, que vira o Dialog.Title sr-only, e o <h2> visível) — uma chave só pros dois. "Sound the horn" é a
   "components.onboarding.title": "Hey! Ready to sound the horn?",
+  "components.telemetry.crashes.body":
+    "Sends exceptions, the failure stage and error code, with redacted messages and stacks.",
+  "components.telemetry.crashes.title": "Send crash reports",
+  "components.telemetry.notice.allowed":
+    "May be sent: version, screen/stage, outcome, enumerated platform, system categories, and random correlation IDs.",
+  "components.telemetry.notice.details":
+    "What may be sent — and what never leaves",
+  "components.telemetry.notice.error":
+    "Couldn't save your choice. Nothing new was sent.",
+  "components.telemetry.notice.forbidden":
+    "Never included in an event: stream keys, tokens, chat, title/category, OCR, images, audio, video, local paths, hostname, IP as a property, or raw logs.",
+  "components.telemetry.notice.later": "Decide later",
+  "components.telemetry.notice.none": "Continue without sending",
+  "components.telemetry.notice.privacy":
+    "This is pseudonymized technical data, processed by PostHog for up to 90 days.",
+  "components.telemetry.notice.privacyLink": "Read the privacy policy",
+  "components.telemetry.notice.save": "Save my choices",
+  "components.telemetry.notice.saved": "Your data choice was saved.",
+  "components.telemetry.notice.subtitle":
+    "Nothing starts checked. You can change your mind in Settings.",
+  "components.telemetry.notice.title": "What can Corneta tell us?",
+  "components.telemetry.usage.body":
+    "Sends completed stages, version, system categories, and operation outcomes — never stream content.",
+  "components.telemetry.usage.title": "Send usage data",
   "components.toaster.dismiss.aria": "Close notice",
   // aria-label da região aria-live dos toasts. Evitei "Alerts" de propósito: "Alertas" já é o nome da feature de follow/sub/bits no app, e o leitor de tel
   "components.toaster.region.aria": "Notices",
@@ -1209,8 +1233,10 @@ export const en: Dict = {
     "No platforms turned on. Head to {plataformas}, switch at least one on and paste its key.",
   // Fallback quando snapshot.message vem vazio; a mensagem real vem do backend.
   "golive.error.body": "The stream stopped. Check the logs or try again.",
+  "golive.error.errorId": "Error ID",
   // Abre a pasta de logs.
   "golive.error.logs": "See the logs",
+  "golive.error.operationId": "Operation ID",
   "golive.error.retry": "Try again",
   "golive.error.title": "Couldn't keep the stream going",
   // Kicker da tela. 'Bora cornetar' é nosso e carrega a corneta (instrumento e marca); 'Sound the horn' é a forma que a LP já usa em inglês e atravessa com o mesmo fato.
@@ -2001,15 +2027,42 @@ export const en: Dict = {
   "settings.data.backup.import.confirm": "Replace your current settings?",
   // Mesmo termo da LP (page-data.tiny.backup.title).
   "settings.data.backup.title": "Settings backup",
-  // "redigido" aqui é redacted, não "escrito": o export_diagnostics no Rust apaga senha do OBS, chave da API do YouTube, tokens e a watchlist antes de sal
+  // O diagnóstico compartilhável é estruturado e allowlisted; logs ficam num fluxo local separado.
   "settings.data.logs.desc":
-    "Export a diagnostic file for support — keys, passwords and tokens stripped out — or open the log files on your PC.",
+    "Export a structured technical summary for support — without logs, names, paths or credentials — or open logs separately on this PC.",
   // No JSX o texto quebra em duas linhas, mas é um rótulo só.
   "settings.data.logs.export": "Export diagnostics",
+  "settings.data.logs.export.error": "Couldn't export diagnostics.",
   "settings.data.logs.open": "Open logs",
   "settings.data.logs.title": "Logs",
   // No JSX o & está escrito como &amp;.
   "settings.data.title": "Data & diagnostics",
+  "settings.telemetry.buildDisabled":
+    "Collection is disabled in this build; your choice stays saved for a configured version.",
+  "settings.telemetry.crashes.desc":
+    "Redacted exceptions and technical failures, without attaching logs.",
+  "settings.telemetry.deletion.cta": "How to request deletion",
+  "settings.telemetry.deletion.desc":
+    "With both options off, copy the ID above and use the channel listed in the policy to delete data already sent.",
+  "settings.telemetry.explainer":
+    "Corneta only sends pseudonymized technical data allowed by its catalog. PostHog processes collection, with an initial 90-day retention. Turning a switch off stops new events immediately.",
+  "settings.telemetry.id": "Telemetry ID",
+  "settings.telemetry.id.pending":
+    "The ID is only created after you turn on at least one option.",
+  "settings.telemetry.loading": "Reading your telemetry choices…",
+  "settings.telemetry.privacy": "Privacy policy and collected data",
+  "settings.telemetry.regenerate.confirm": "Change the ID now?",
+  "settings.telemetry.regenerate.cta": "Use another ID",
+  "settings.telemetry.regenerate.error": "Couldn't change the ID.",
+  "settings.telemetry.regenerate.ok":
+    "Previous ID unlinked. A new one will be created if you enable telemetry again.",
+  "settings.telemetry.saveError":
+    "Couldn't save that. Your previous choice still applies.",
+  "settings.telemetry.saved": "Telemetry preference updated.",
+  "settings.telemetry.unavailable":
+    "The local telemetry service isn't available in this build. No data was sent.",
+  "settings.telemetry.usage.desc":
+    "Stages and outcomes in categories, without text or stream content.",
   "settings.guardian.cost.chat":
     "Chat and alerts reach you with that same delay.",
   // "12s atrás" / "12s behind" está em <strong>.

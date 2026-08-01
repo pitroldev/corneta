@@ -78,7 +78,7 @@ async function endpoint() {
   throw new Error("Chrome não abriu uma aba depurável");
 }
 
-// WebSocket nativo do Node 22 — sem dependência.
+// WebSocket nativo do Node 24 — sem dependência.
 function connect(url) {
   const ws = new WebSocket(url);
   let seq = 0;

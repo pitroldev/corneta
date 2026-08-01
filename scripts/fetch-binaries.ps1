@@ -14,7 +14,14 @@ param(
   # Atalho de conveniência p/ dev: copia o ffmpeg encontrado no PATH em vez de
   # baixar a versão fixada. ATENÇÃO: esse binário NÃO passa por verificação de
   # hash — nunca use para gerar o instalador.
-  [switch]$AllowSystemFfmpeg
+  [switch]$AllowSystemFfmpeg,
+
+  # CI de integração: expõe ffmpeg.exe e ffprobe.exe vindos do MESMO arquivo
+  # verificado. O sidecar distribuído continua sendo copiado para binaries/.
+  [string]$ToolDirectory,
+
+  # Permite validar o script sem sobrescrever os sidecars do workspace.
+  [string]$BinaryDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,23 +31,31 @@ $ErrorActionPreference = 'Stop'
 # Para atualizar uma versão: troque a URL e o hash JUNTOS, e recalcule com
 #   Get-FileHash <zip> -Algorithm SHA256
 #
-# FFmpeg n7.1.5 win64 GPL (build estático) — BtbN/FFmpeg-Builds, release
-# versionado "autobuild-2026-06-30-13-34" (NUNCA usar a tag rolante "latest").
-# Hash calculado em 2026-07-01 via Get-FileHash sobre o download do release
-# oficial (o BtbN não publica arquivo de checksums).
-$ffmpegVersion = 'n7.1.5 (BtbN autobuild-2026-06-30-13-34)'
-$ffmpegUrl     = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n7.1.5-1-g7d0e842004-win64-gpl-7.1.zip'
-$ffmpegSha256  = '405B190F746DB40539EB453967F72C0E69D8BF260B10CEFF36E0C2149A9AD22F'
+# FFmpeg n8.1.2 win64 GPL (build estático) — BtbN/FFmpeg-Builds, release
+# versionado "autobuild-2026-08-01-13-21" (NUNCA usar a tag rolante "latest").
+# Hash conferido em 2026-08-01 contra o digest SHA-256 publicado pelo GitHub
+# nos metadados do asset oficial dessa release.
+$ffmpegVersion = 'n8.1.2 (BtbN autobuild-2026-08-01-13-21)'
+$ffmpegUrl     = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-01-13-21/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-gpl-8.1.zip'
+$ffmpegSha256  = 'DA6B04AEAEAB2A061BE5356C7A945F4D80C7CECC3F976F17DD83B23827D96330'
 
-# MediaMTX v1.19.2 windows_amd64 — bluenviron/mediamtx.
-# Hash conferido em 2026-07-01 contra o checksums.sha256 publicado no release:
-#   https://github.com/bluenviron/mediamtx/releases/download/v1.19.2/checksums.sha256
-$mtxVersion = 'v1.19.2'
-$mtxUrl     = 'https://github.com/bluenviron/mediamtx/releases/download/v1.19.2/mediamtx_v1.19.2_windows_amd64.zip'
-$mtxSha256  = '53028B551AFCC8D9DDBD56EB8406D5B31E395E5505D52E28347F211696BE9345'
+# MediaMTX v1.19.3 windows_amd64 — bluenviron/mediamtx.
+# Hash conferido em 2026-08-01 contra o checksums.sha256 publicado no release:
+#   https://github.com/bluenviron/mediamtx/releases/download/v1.19.3/checksums.sha256
+$mtxVersion = 'v1.19.3'
+$mtxUrl     = 'https://github.com/bluenviron/mediamtx/releases/download/v1.19.3/mediamtx_v1.19.3_windows_amd64.zip'
+$mtxSha256  = '5D82148D1032A6A190D9909A2997D9989457AAADF49AF87DD02CD4512D31BEBE'
 # -----------------------------------------------------------------------------
 
-$binDir = Join-Path $PSScriptRoot '..\src-tauri\binaries'
+if ($AllowSystemFfmpeg -and $ToolDirectory) {
+  throw '-ToolDirectory exige o arquivo FFmpeg verificado; não combine com -AllowSystemFfmpeg.'
+}
+
+$binDir = if ($BinaryDirectory) {
+  [System.IO.Path]::GetFullPath($BinaryDirectory)
+} else {
+  Join-Path $PSScriptRoot '..\src-tauri\binaries'
+}
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 $tmp = Join-Path $env:TEMP "corneta-bins"
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
@@ -80,6 +95,7 @@ function Get-VerifiedFile {
 
 # ---------------- FFmpeg ----------------
 $ffmpegOut = Join-Path $binDir "ffmpeg-$triple.exe"
+$verifiedFfprobe = $null
 $sys = if ($AllowSystemFfmpeg) { Get-Command ffmpeg -ErrorAction SilentlyContinue } else { $null }
 if ($sys) {
   Write-Warning "-AllowSystemFfmpeg: copiando o ffmpeg do PATH SEM verificação de hash. Use só em dev; nunca para o instalador!"
@@ -94,9 +110,22 @@ if ($sys) {
   if (Test-Path $ffDir) { Remove-Item $ffDir -Recurse -Force }
   Expand-Archive $zip -DestinationPath $ffDir -Force
   $exe = Get-ChildItem $ffDir -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1
+  $ffprobe = Get-ChildItem $ffDir -Recurse -Filter 'ffprobe.exe' | Select-Object -First 1
+  if (-not $exe -or -not $ffprobe) {
+    throw 'O arquivo FFmpeg verificado não contém exatamente as ferramentas esperadas.'
+  }
   Copy-Item $exe.FullName $ffmpegOut -Force
+  $verifiedFfprobe = $ffprobe.FullName
 }
 Write-Host "  -> $ffmpegOut"
+
+if ($ToolDirectory) {
+  $resolvedToolDirectory = [System.IO.Path]::GetFullPath($ToolDirectory)
+  New-Item -ItemType Directory -Force -Path $resolvedToolDirectory | Out-Null
+  Copy-Item $ffmpegOut (Join-Path $resolvedToolDirectory 'ffmpeg.exe') -Force
+  Copy-Item $verifiedFfprobe (Join-Path $resolvedToolDirectory 'ffprobe.exe') -Force
+  Write-Host "  -> ferramentas de teste verificadas em $resolvedToolDirectory"
+}
 
 # ---------------- MediaMTX ----------------
 $mtxOut = Join-Path $binDir "mediamtx-$triple.exe"

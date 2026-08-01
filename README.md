@@ -27,6 +27,10 @@ bloqueada pelos gates manuais de assinatura, conformidade GPL e matriz real de p
 
 ## Rodando
 
+Toolchains fixados e validados: **Node.js 24.18.1 LTS**, **pnpm 11.18.0** e
+**Rust 1.97.1**. `.node-version`, `packageManager`, `engines`, `rust-toolchain.toml` e os
+workflows mantêm essas versões alinhadas.
+
 ### Web: site público + setup API (Next.js)
 
 Tudo da Corneta que roda fora do PC do streamer fica em `web/`: a página pública, as páginas
@@ -54,7 +58,8 @@ pnpm dev          # abre http://localhost:1420
 
 ### 2. App completo (Tauri)
 
-Pré-requisitos: **Rust** (rustup), **VS Build Tools com C++/MSVC** e **WebView2** (Win 11 já traz).
+Pré-requisitos: **Rust 1.97.1** (rustup), **VS Build Tools com C++/MSVC** e **WebView2**
+(Win 11 já traz).
 
 ```bash
 pwsh -File scripts/fetch-binaries.ps1   # baixa ffmpeg + mediamtx para src-tauri/binaries
@@ -116,8 +121,14 @@ legacy/              setup antigo (nginx-rtmp + docker)
 - [`docs/ATUALIZACAO-AUTOMATICA.md`](./docs/ATUALIZACAO-AUTOMATICA.md) — auto-update via GitHub Releases.
 - [`docs/ASSINATURA.md`](./docs/ASSINATURA.md) — assinatura de código (Windows) + chave do updater.
 - [`docs/GATES-DE-RELEASE.md`](./docs/GATES-DE-RELEASE.md) — gates automatizados e matriz manual obrigatória.
+- [`docs/PLANO-TELEMETRIA-E-DIAGNOSTICO-POSTHOG.md`](./docs/PLANO-TELEMETRIA-E-DIAGNOSTICO-POSTHOG.md)
+  — contrato de dados, consentimento e arquitetura da observabilidade.
+- [`docs/RUNBOOK-POSTHOG.md`](./docs/RUNBOOK-POSTHOG.md) — provisionamento, dashboards, alertas,
+  suporte, exclusão e rollback da telemetria.
+- [`docs/ATUALIZACAO-DEPENDENCIAS-2026-08-01.md`](./docs/ATUALIZACAO-DEPENDENCIAS-2026-08-01.md)
+  — versões, pins compatíveis, hashes e validação da atualização integral.
 - [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) — licenças e obrigações dos sidecars.
 
 ## Licença
 
-A definir (sugestão: MIT/Apache-2.0). FFmpeg/MediaMTX são processos externos (não linkados).
+MIT, conforme o arquivo [`LICENSE`](./LICENSE). FFmpeg/MediaMTX são processos externos (não linkados).

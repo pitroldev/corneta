@@ -40,6 +40,19 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::engine::{self, ProgramSpec};
 use crate::guardian;
+use crate::telemetry::AppError;
+use crate::AppState;
+
+fn capture_compositor_error(app: &AppHandle, code: &str, retryable: bool) {
+    let state = app.state::<AppState>();
+    let operation_id = state.engine.lock().unwrap().operation_id.clone();
+    state.telemetry.capture_error(
+        AppError::new(code, "compositor", retryable, None),
+        operation_id.as_deref(),
+        true,
+        "error",
+    );
+}
 
 /// Quanto tempo congelar o último quadro antes de cortar pro slate (ponte pra engasgos).
 const HOLD_MS: u64 = 500;
@@ -374,6 +387,7 @@ pub async fn run(
     let _ = tauri::async_runtime::spawn_blocking(move || {
         let Some(ffmpeg) = ffmpeg_path() else {
             log::error!("compositor: sidecar ffmpeg não encontrado");
+            capture_compositor_error(&app, "compositor_ffmpeg_missing", false);
             return;
         };
         let cfg = crate::config::load(&app);
@@ -444,9 +458,13 @@ pub async fn run(
                 GenExit::Stop => break,
                 GenExit::EncoderDied => {
                     log::warn!("compositor: encoder do programa caiu — resubindo");
+                    capture_compositor_error(&app, "compositor_encoder_died", true);
                     std::thread::sleep(Duration::from_millis(500));
                 }
-                GenExit::SetupFailed => std::thread::sleep(Duration::from_secs(2)),
+                GenExit::SetupFailed => {
+                    capture_compositor_error(&app, "compositor_setup_failed", true);
+                    std::thread::sleep(Duration::from_secs(2));
+                }
             }
         }
         if censoring {
@@ -769,7 +787,7 @@ fn generation(
         if let Slate::Video { path, has_audio } = &opts.slate {
             if want_slate_media
                 && slate_vsrc.is_none()
-                && !last_slate_spawn.is_some_and(|t| t.elapsed() < Duration::from_secs(2))
+                && last_slate_spawn.is_none_or(|t| t.elapsed() >= Duration::from_secs(2))
             {
                 last_slate_spawn = Some(Instant::now());
                 slate_vsrc = spawn_frame_source(

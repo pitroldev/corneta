@@ -41,7 +41,7 @@ A crate **`ort`** (pykeio) roda modelos ONNX em Rust com vários *execution prov
 sem CUDA**. Rodando os modelos **PP-OCR (PaddleOCR convertidos pra ONNX)** dá um OCR rápido e preciso,
 com **detecção (boxes) + reconhecimento** — então a **tarja por região** continua funcionando.
 
-Crates Rust prontas que já fazem esse pipeline: **`oar-ocr`** (PP-OCRv5, suporte a GPU), **`paddle-ocr-rs`**,
+Crates Rust prontas que já fazem esse pipeline: **`oar-ocr`** (PP-OCR, suporte a GPU), **`paddle-ocr-rs`**,
 e o **RapidOCR** (referência: PP-OCR em ONNX, sem dependência do PaddlePaddle, ~50–80 MB).
 
 - **Prós:** **qualquer GPU** (DirectML), sem CUDA; libera CPU; mais preciso (fontes pequenas/de jogo);
@@ -157,6 +157,6 @@ perfeito — o backend GPU encaixa sem mexer no resto (regras/tarja/delay).
 
 ## Fontes
 - [`ort` — ONNX Runtime em Rust (EPs: directml, cuda, tensorrt, openvino, rocm…)](https://github.com/pykeio/ort)
-- [`oar-ocr` — OCR em Rust com `ort` + PP-OCRv5 (suporte a GPU)](https://github.com/greatv/oar-ocr) · [`paddle-ocr-rs`](https://crates.io/crates/paddle-ocr-rs)
+- [`oar-ocr` — OCR em Rust com `ort` + PP-OCR (suporte a GPU)](https://github.com/greatv/oar-ocr) · [`paddle-ocr-rs`](https://crates.io/crates/paddle-ocr-rs)
 - [RapidOCR — PP-OCR em ONNX Runtime (sem PaddlePaddle, ~50–80 MB)](https://github.com/RapidAI/RapidOCR)
 - [ONNX Runtime — DirectML execution provider](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html)

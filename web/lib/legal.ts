@@ -38,9 +38,9 @@ export const LEGAL_HOST = "Vercel Inc.";
  *  A data por extenso tem uma forma por idioma: escrita à mão em vez de sair de
  *  `Intl`, porque o valor tem que ser IDÊNTICO no HTML servido e no que o
  *  navegador renderiza (o `<time dateTime>` ao lado é a versão de máquina). */
-export const LEGAL_UPDATED_ISO = "2026-07-30";
-export const LEGAL_UPDATED_LABEL_PT = "30 de julho de 2026";
-export const LEGAL_UPDATED_LABEL_EN = "July 30, 2026";
+export const LEGAL_UPDATED_ISO = "2026-08-01";
+export const LEGAL_UPDATED_LABEL_PT = "1º de agosto de 2026";
+export const LEGAL_UPDATED_LABEL_EN = "August 1, 2026";
 
 /** Versão que exige aceite, espelhada em `src/lib/legal.ts` (o app é outro
  *  workspace e não importa daqui). Só sobe em mudança MATERIAL — passar a cobrar,
@@ -48,7 +48,7 @@ export const LEGAL_UPDATED_LABEL_EN = "July 30, 2026";
  *  guardado em cada instalação e faz o app avisar de novo quem já usava.
  *
  *  Mudou aqui, mude lá: são dois arquivos porque não há build compartilhado. */
-export const LEGAL_ACCEPT_VERSION = "2026-07-30";
+export const LEGAL_ACCEPT_VERSION = "2026-08-01";
 
 /** Caminhos SEM idioma. O português mora na raiz porque `/legal/privacy` é a
  *  URL já publicada e linkada de dentro do app instalado — mudá-la quebraria o

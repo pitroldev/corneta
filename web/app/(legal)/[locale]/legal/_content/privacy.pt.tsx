@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TelemetryPreference } from "@/app/_components/telemetry-preference";
 import {
   Callout,
   Contact,
@@ -22,7 +23,7 @@ const L = "pt-BR" as const;
 
 export const privacyHeroPt = {
   kicker: "Política de privacidade",
-  title: "Seus dados ficam onde você já está: no seu PC.",
+  title: "O conteúdo da sua live fica onde você está: no seu PC.",
   intro:
     "A Corneta é um app de desktop que roda na sua máquina. Esta política explica, em detalhe e sem enrolação, o que acontece com dados no site, na API de login e dentro do aplicativo — incluindo o que a gente deliberadamente não coleta.",
 };
@@ -43,17 +44,17 @@ export const privacySectionsPt = [
   { id: "direitos", title: "Seus direitos" },
   { id: "espectadores", title: "Dados dos seus espectadores" },
   { id: "criancas", title: "Crianças e adolescentes" },
-  { id: "cookies", title: "Cookies" },
+  { id: "cookies", title: "Cookies e preferências locais" },
   { id: "mudancas", title: "Mudanças nesta política" },
 ];
 
 export const privacyTldrPt = {
   points: [
-    "A Corneta não tem telemetria, não cria conta e não exige cadastro para funcionar.",
+    "A Corneta não cria conta nem exige cadastro. No aplicativo, dados de uso e relatórios de falha só são enviados se você ativar cada finalidade separadamente.",
     "Chaves de transmissão e tokens ficam no cofre de credenciais do seu sistema operacional, nunca nos nossos servidores.",
     "Configurações, chat, alertas e relatórios da live ficam em arquivos no seu computador.",
     "Só o login da Kick passa pelos nossos servidores — de passagem, sem ser armazenado. Twitch e YouTube falam direto com o seu app.",
-    "Este site não usa cookies, analytics, pixel de rastreamento nem formulário.",
+    "Este site mede apenas rota, idioma, cliques de download e erros técnicos, sem cookies de analytics, replay, texto da página ou ligação com o aplicativo; você pode desativar essas métricas abaixo.",
   ],
   note: "Este resumo é uma cortesia de leitura e não substitui o texto completo abaixo.",
 };
@@ -127,19 +128,37 @@ export function PrivacyBodyPt() {
           porque eles nunca chegam até nós.
         </p>
         <Callout>
-          O aplicativo não possui telemetria, coleta de uso, relatório
-          automático de erros ou identificador de instalação. Você pode conferir
-          isso no código-fonte: o projeto é aberto.
+          A telemetria do aplicativo é opcional e vem desligada. Dados de uso e
+          relatórios de falha têm controles independentes, sem opção
+          pré-marcada. Um UUID aleatório de instalação só é criado quando pelo
+          menos uma finalidade é ativada. Você pode conferir isso no
+          código-fonte: o projeto é aberto.
         </Callout>
       </LegalSection>
 
       <LegalSection id="site" n={4} title="Dados no site">
         <p>
-          As páginas deste site são estáticas. Não há formulário de cadastro,
-          newsletter, chat de atendimento, cookies, pixel de rastreamento nem
-          ferramenta de analytics. As fontes tipográficas são servidas pelo
-          próprio site, então a sua visita não gera requisição a serviços de
-          fontes de terceiros.
+          As páginas deste site não têm formulário de cadastro, newsletter, chat
+          de atendimento, pixel de publicidade ou perfil de usuário. As fontes
+          tipográficas são servidas pelo próprio site, então a sua visita não
+          gera requisição a serviços de fontes de terceiros.
+        </p>
+        <p>
+          Usamos o PostHog em modo sem cookies para medir somente a rota e o
+          idioma visitados, qual botão de download foi acionado e falhas
+          técnicas redigidas, com ambiente e versão do build. Não coletamos
+          query string, fragmento da URL, texto visível, campos digitados,
+          reprodução de sessão, heatmap, autocapture ou desempenho de rede. O
+          navegador não recebe identificador persistente de analytics, não
+          criamos perfil e não ligamos a visita ao UUID opcional da instalação
+          do aplicativo.
+        </p>
+        <p>
+          A conexão revela o IP ao provedor durante o transporte, como toda
+          requisição de internet, mas o projeto é configurado para descartá-lo
+          na ingestão e não usar geolocalização. Respeitamos Do Not Track e
+          Global Privacy Control. Você também pode interromper novas métricas a
+          qualquer momento no controle da seção 16.
         </p>
         <p>
           Como em qualquer site, o servidor que o entrega registra dados
@@ -235,9 +254,15 @@ export function PrivacyBodyPt() {
           </li>
           <li>
             <strong>Não registra o conteúdo das requisições.</strong> Quando
-            ocorre uma falha inesperada, o servidor registra apenas um
-            identificador aleatório do pedido, para investigação — sem tokens,
-            sem corpo da requisição.
+            ocorre uma falha, o servidor pode enviar ao PostHog somente o
+            identificador aleatório do pedido, rota e provedor em categorias,
+            código do erro, classe da resposta e duração em faixa. Uma falha
+            inesperada inclui tipo e stack redigida. Corpo, resposta da
+            plataforma, query string, tokens e cabeçalhos de autenticação não
+            entram nesse evento. O UUID de telemetria e o identificador da
+            operação só acompanham o pedido quando o aplicativo tiver o
+            consentimento correspondente; caso contrário, a correlação é efêmera
+            e limitada ao pedido.
           </li>
         </ul>
 
@@ -258,7 +283,9 @@ export function PrivacyBodyPt() {
       <LegalSection id="app" n={6} title="Dados no seu computador">
         <p>
           O aplicativo guarda, na sua máquina, o que ele precisa para trabalhar.
-          Nada disso é enviado para nós.
+          O conteúdo descrito abaixo não é enviado para nós. Somente dados
+          técnicos expressamente listados mais adiante podem ser enviados se
+          você der consentimento.
         </p>
         <ul>
           <li>
@@ -293,9 +320,34 @@ export function PrivacyBodyPt() {
             relatório ou pela pasta.
           </li>
           <li>
-            <strong>Diagnóstico de suporte</strong> — se você pedir a exportação
-            de logs, o aplicativo gera um arquivo com informações técnicas
-            redigidas e é você quem decide se e para quem enviar.
+            <strong>Diagnóstico de suporte</strong> — se você pedir a
+            exportação, o aplicativo gera um arquivo apenas com resumo técnico
+            estruturado e eventos operacionais permitidos. Ele não incorpora
+            logs crus, nomes de canal ou destino, títulos, caminhos, URLs ou
+            credenciais. Os logs podem ser abertos separadamente no seu
+            computador; é você quem decide se e para quem enviar o diagnóstico.
+          </li>
+          <li>
+            <strong>Telemetria opcional</strong> — “dados de uso” pode enviar
+            versão, idioma, família do sistema, arquitetura e GPU em categorias,
+            etapas e resultado das operações, plataformas em enum, quantidade de
+            destinos e durações em faixas. “Relatórios de falha” pode enviar
+            código e etapa do erro, tipo, stack redigida e identificadores
+            aleatórios de erro/operação, além de um marcador mínimo de abertura
+            com versão e se a saída anterior foi limpa, necessário para medir
+            estabilidade sem ativar métricas de uso. São dois consentimentos
+            independentes, desligados por padrão. Mesmo com eles ativos, nunca
+            enviamos vídeo, áudio, chat, alertas, título da live, canal, chave,
+            token, URL RTMP, hostname, caminho local completo, log cru ou
+            configuração.
+          </li>
+          <li>
+            <strong>Preferência e UUID de telemetria</strong> — ficam em um
+            arquivo local próprio, que não acompanha exportação ou importação de
+            configuração. O UUID nasce somente ao ativar pelo menos uma
+            finalidade. Desligar as duas interrompe os envios, limpa a
+            persistência do SDK e permite copiar o ID para solicitar a exclusão
+            do que já foi enviado; depois disso, você pode gerar um ID novo.
           </li>
           <li>
             <strong>Overlay para o OBS</strong> — quando ligado, o aplicativo
@@ -313,8 +365,10 @@ export function PrivacyBodyPt() {
         </ul>
         <p>
           Desinstalar o aplicativo, apagar o arquivo de configuração e remover
-          as credenciais do cofre do sistema elimina esses dados. Como eles
-          estão sob a sua guarda, essa exclusão não depende de nós.
+          as credenciais do cofre do sistema elimina os dados locais. Eventos de
+          telemetria enviados antes disso seguem o prazo da seção 11; para pedir
+          a exclusão antecipada, use o UUID mostrado nas Configurações e o canal
+          da seção 13.
         </p>
       </LegalSection>
 
@@ -331,9 +385,18 @@ export function PrivacyBodyPt() {
           </li>
           <li>
             <strong>Legítimo interesse</strong> (art. 7º, IX) — registros
-            técnicos de acesso e o limite por IP existem para manter o site e a
-            API disponíveis e seguros, no mínimo necessário para essa
-            finalidade.
+            técnicos de acesso, o limite por IP, o diagnóstico de falhas da API
+            e as métricas cookieless estritamente agregadas do site existem para
+            manter o serviço disponível, seguro e compreensível, no mínimo
+            necessário. O site oferece opt-out direto e respeita os sinais de
+            privacidade do navegador.
+          </li>
+          <li>
+            <strong>Consentimento</strong> (art. 7º, I) — dados de uso e
+            relatórios automáticos de falha do aplicativo só são enviados para
+            as finalidades que você ativar. Você pode revogar cada uma a
+            qualquer momento nas Configurações, sem afetar o funcionamento da
+            Corneta.
           </li>
           <li>
             <strong>Cumprimento de obrigação legal ou regulatória</strong> (art.
@@ -461,8 +524,12 @@ export function PrivacyBodyPt() {
           </li>
         </ul>
         <p>
-          Do nosso lado, o único operador envolvido é o provedor de hospedagem
-          do site e da API, já indicado acima.
+          Do nosso lado, atuam como operadores o provedor de hospedagem do site
+          e da API, já indicado acima, e a <strong>PostHog Inc.</strong>. O
+          PostHog recebe somente os eventos técnicos e exceções redigidas
+          descritos nesta política, para métricas de produto, operação e
+          diagnóstico; não recebe o conteúdo da sua transmissão e não é usado
+          para publicidade.
         </p>
       </LegalSection>
 
@@ -479,9 +546,10 @@ export function PrivacyBodyPt() {
             <Todo locale={L}>provedor de hospedagem</Todo>
           )}
           , empresa sediada nos Estados Unidos, que pode processar as
-          requisições em servidores fora do Brasil. As plataformas de
-          transmissão, os agregadores de alertas e os serviços de emote citados
-          acima também operam no exterior.
+          requisições em servidores fora do Brasil. A telemetria é processada
+          pelo <strong>PostHog Cloud US, na Virgínia, Estados Unidos</strong>.
+          As plataformas de transmissão, os agregadores de alertas e os serviços
+          de emote citados acima também operam no exterior.
         </p>
         <p>
           Ao usar esses recursos, os dados necessários para a comunicação
@@ -522,6 +590,31 @@ export function PrivacyBodyPt() {
                 </td>
               </tr>
               <tr>
+                <td>
+                  Eventos técnicos e exceções redigidas do site, aplicativo e
+                  API
+                </td>
+                <td>
+                  Até 90 dias no PostHog. O IP é descartado na ingestão e não é
+                  usado como dimensão.
+                </td>
+              </tr>
+              <tr>
+                <td>Consentimentos e UUID de telemetria do aplicativo</td>
+                <td>
+                  No seu computador enquanto alguma finalidade estiver ativa ou
+                  até você apagar/regenerar o identificador.
+                </td>
+              </tr>
+              <tr>
+                <td>Preferências do site</td>
+                <td>
+                  A escolha de idioma fica em cookie funcional por até um ano; o
+                  opt-out de métricas fica no armazenamento local até você
+                  reativar as métricas ou limpar os dados do navegador.
+                </td>
+              </tr>
+              <tr>
                 <td>Suas configurações, chaves e relatórios</td>
                 <td>
                   Pelo tempo que você quiser: estão no seu computador, sob a sua
@@ -540,7 +633,10 @@ export function PrivacyBodyPt() {
           arquivos de texto; as respostas da API não são armazenadas em cache; o
           tamanho das requisições é limitado; os endereços de retorno do login
           são validados contra uma lista fixa; e há limite de tentativas por IP.
-          O overlay para o OBS responde apenas no endereço local.
+          O overlay para o OBS responde apenas no endereço local. Antes de cada
+          evento de telemetria, uma lista fechada de propriedades e um redator
+          removem segredos, texto livre, parâmetros de URL e caminhos locais; um
+          evento fora do esquema é descartado.
         </p>
         <p>
           Nenhum sistema é infalível. Se identificarmos um incidente de
@@ -566,8 +662,11 @@ export function PrivacyBodyPt() {
           Para exercer qualquer um deles, escreva para <Contact locale={L} />.
           Vamos responder no prazo legal. Como não mantemos cadastro, a maior
           parte dos dados que dizem respeito a você já está sob o seu controle
-          direto — e vamos explicar isso caso o seu pedido se refira a algo que
-          não temos.
+          direto. Se você ativou a telemetria do aplicativo, inclua o UUID
+          copiável em Configurações para localizarmos e excluirmos os eventos. A
+          telemetria cookieless do site não cria identificador persistente que
+          permita isolar uma visita anterior; o controle abaixo impede novos
+          envios neste navegador.
         </p>
       </LegalSection>
 
@@ -600,12 +699,23 @@ export function PrivacyBodyPt() {
         </p>
       </LegalSection>
 
-      <LegalSection id="cookies" n={16} title="Cookies">
+      <LegalSection id="cookies" n={16} title="Cookies e preferências locais">
         <p>
-          Este site não usa cookies, armazenamento local, fingerprinting ou
-          qualquer outro mecanismo de rastreamento. Como não há cookie a
-          consentir, também não há banner de consentimento.
+          O PostHog funciona em modo cookieless: não grava cookie ou
+          identificador persistente de analytics, não faz fingerprinting e não
+          cria perfil de pessoa. Existe um cookie funcional,
+          <code> corneta.locale</code>, que guarda por até um ano o idioma que
+          você escolheu.
         </p>
+        <p>
+          Se você desativar as métricas, o navegador grava apenas o valor
+          “disabled” na chave <code>corneta:site-telemetry:v1</code> do
+          armazenamento local. Essa preferência não é enviada ao PostHog. Do Not
+          Track e Global Privacy Control também mantêm a captura desligada. Como
+          não há cookie de publicidade ou analytics, disponibilizamos o controle
+          direto abaixo em vez de um banner de cookies.
+        </p>
+        <TelemetryPreference locale={L} />
       </LegalSection>
 
       <LegalSection id="mudancas" n={17} title="Mudanças nesta política">

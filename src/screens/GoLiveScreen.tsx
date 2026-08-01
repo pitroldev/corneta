@@ -30,6 +30,7 @@ import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { cn, errMsg, fmtUptime, openExternal } from "../lib/utils";
 import type { EngineState, ObsCheck, TargetState } from "../lib/types";
+import { isUuid } from "../lib/telemetry-schema";
 import type { Screen } from "../components/Sidebar";
 import { blockingIssues } from "../lib/validation";
 import { rich, useI18n, useT } from "../lib/i18n";
@@ -72,6 +73,7 @@ export function GoLiveScreen({
   const goLiveFocus = useStore((s) => s.goLiveFocus);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const setSettingsTab = useStore((s) => s.setSettingsTab);
+  const lastOperationId = useStore((s) => s.lastOperationId);
   const openSecurity = () => {
     setSettingsTab("seguranca");
     onNavigate?.("settings");
@@ -367,6 +369,22 @@ export function GoLiveScreen({
               <FileText className="size-4" /> {t("golive.error.logs")}
             </Button>
           </div>
+          {lastOperationId && (
+            <CopyField
+              className="mt-3"
+              label={t("golive.error.operationId")}
+              value={lastOperationId}
+              mono
+            />
+          )}
+          {isUuid(snapshot.errorId) && (
+            <CopyField
+              className="mt-2"
+              label={t("golive.error.errorId")}
+              value={snapshot.errorId}
+              mono
+            />
+          )}
         </Card>
       )}
 

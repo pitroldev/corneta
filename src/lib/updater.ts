@@ -7,6 +7,8 @@
 // ============================================================
 import { create } from "zustand";
 import type { Update } from "@tauri-apps/plugin-updater";
+import { addStep, capture } from "./telemetry";
+import { normalizeErrorCode } from "./telemetry-schema";
 
 /** Espera antes da checagem automática do boot. O primeiro minuto de app é o mais
  *  disputado (motor, chat, OBS, ícones) — a atualização não tem pressa nenhuma. */
@@ -74,18 +76,35 @@ export async function installUpdate(
   info: UpdateInfo,
   onProgress?: (fraction: number | null) => void,
 ): Promise<void> {
+  addStep("update_install_requested", { stage: "update_install" });
   let total = 0;
   let baixado = 0;
-  await info.handle.downloadAndInstall((ev) => {
-    if (ev.event === "Started") {
-      total = ev.data.contentLength ?? 0;
-      onProgress?.(total > 0 ? 0 : null);
-    } else if (ev.event === "Progress") {
-      baixado += ev.data.chunkLength;
-      onProgress?.(total > 0 ? Math.min(1, baixado / total) : null);
-    } else if (ev.event === "Finished") {
-      onProgress?.(1);
-    }
+  try {
+    await info.handle.downloadAndInstall((ev) => {
+      if (ev.event === "Started") {
+        total = ev.data.contentLength ?? 0;
+        onProgress?.(total > 0 ? 0 : null);
+      } else if (ev.event === "Progress") {
+        baixado += ev.data.chunkLength;
+        onProgress?.(total > 0 ? Math.min(1, baixado / total) : null);
+      } else if (ev.event === "Finished") {
+        onProgress?.(1);
+      }
+    });
+  } catch (error) {
+    capture("update_completed", {
+      from_version: __APP_VERSION__,
+      to_version: info.version,
+      outcome: "failed",
+      error_code: normalizeErrorCode(error, "update_install_failed"),
+    });
+    throw error;
+  }
+  capture("update_completed", {
+    from_version: __APP_VERSION__,
+    to_version: info.version,
+    outcome: "installed",
+    error_code: "none",
   });
   const { relaunch } = await import("@tauri-apps/plugin-process");
   await relaunch();

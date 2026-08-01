@@ -255,6 +255,10 @@ Hoje migrações estão dispersas entre defaults Serde e lógica do store, sem `
 
 ### P1.8 Cobrir integração, não só funções puras
 
+> **Estado em 2026-08-01:** parcialmente resolvido. O CI agora baixa o mesmo FFmpeg fixado e
+> conferido por SHA-256 que acompanha a aplicação e executa os testes de integração de mídia com
+> ele. Os cenários Tauri/OBS e as demais costuras listadas abaixo continuam sendo trabalho de QA.
+
 A cobertura unitária existente é valiosa, especialmente em engine, policy, guardião e relatórios. As maiores lacunas estão nas costuras.
 
 Adicionar:
@@ -268,6 +272,13 @@ Adicionar:
 - smoke E2E Tauri/OBS numa máquina Windows dedicada.
 
 ### P1.9 Atualizar dependências em dois trilhos
+
+> **Resolvido em 2026-08-01:** os workspaces npm/pnpm, o grafo Rust/Tauri, Actions, toolchains e
+> binários externos foram atualizados em conjunto, com lockfiles regenerados, hashes fixos,
+> auditorias e a suíte completa. React 19, Vite 8, Framer Motion 12, Tailwind Merge 3 e Lucide 1
+> já estão ativos. TypeScript ficou em 6.0.3 enquanto `typescript-eslint` exigir `<6.1`, ESLint em
+> 9.39.5 enquanto os plugins usados não aceitarem 10 e `@types/node` na linha 24 do Node LTS.
+> A automação semanal passa a acompanhar npm, Cargo e GitHub Actions.
 
 `pnpm outdated` mostrou patches/minors simples e majors relevantes (React 19, Vite 8, Framer Motion 12, Tailwind Merge 3, Lucide 1.x, TypeScript 7).
 

@@ -37,6 +37,19 @@ use tauri::{AppHandle, Manager};
 
 use crate::compositor::{CompositorOpts, Slate};
 use crate::engine;
+use crate::telemetry::AppError;
+use crate::AppState;
+
+fn capture_splicer_error(app: &AppHandle, code: &str) {
+    let state = app.state::<AppState>();
+    let operation_id = state.engine.lock().unwrap().operation_id.clone();
+    state.telemetry.capture_error(
+        AppError::new(code, "compositor", true, None),
+        operation_id.as_deref(),
+        true,
+        "warning",
+    );
+}
 
 // ----------------------------- constantes -----------------------------
 
@@ -1054,11 +1067,18 @@ pub async fn run(
     let outcome = tauri::async_runtime::spawn_blocking(move || {
         setup_and_pump(&app_c, &run_c, &sig_c, &slate_c, opts)
     })
-    .await
-    .unwrap_or(SetupOutcome::Done);
+    .await;
+    let outcome = match outcome {
+        Ok(outcome) => outcome,
+        Err(_) => {
+            capture_splicer_error(&app, "splicer_task_failed");
+            SetupOutcome::Done
+        }
+    };
     // Fallback SÓ é alcançável na fase de setup (antes do 1º publish) — aqui é seguro delegar.
     if let SetupOutcome::Fallback(opts) = outcome {
         log::warn!("splicer: não estabeleceu — caindo pro compositor (comportamento de hoje)");
+        capture_splicer_error(&app, "splicer_setup_fallback");
         crate::compositor::run(app, running, has_signal, slate_on, opts).await;
     }
     // slate_on já foi zerado no teardown do pump (ou pelo compositor no ramo de fallback).
@@ -1339,7 +1359,7 @@ fn setup_and_pump(
             while clock.out_dts < target && emitted < SLATE_CATCHUP_CAP && !slate.is_empty() {
                 // Vídeo deu a volta (voltou ao IDR do índice 0) → reinicia a trilha junto, pra
                 // A/V não derivarem (os dois loops têm períodos quase iguais, mas não idênticos).
-                if slate_i != 0 && slate_i % slate.len() == 0 {
+                if slate_i != 0 && slate_i.is_multiple_of(slate.len()) {
                     slate_a_i = 0;
                 }
                 let frame = &slate[slate_i % slate.len()];

@@ -14,8 +14,10 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::http_client as ureq;
 use crate::i18n::{self, Locale, Msg};
 use crate::keys;
+use crate::telemetry::TelemetryCorrelation;
 use crate::AppState;
 
 const TWITCH_SCOPES: &str =
@@ -78,11 +80,50 @@ fn post_form(url: &str, form: &[(&str, &str)]) -> Result<Value, (u16, Value)> {
     }
 }
 
-/// POST JSON para a setup API. Respostas de erro são desserializadas, mas nunca logadas aqui:
-/// elas podem estar correlacionadas a uma troca de token.
-fn post_json(url: &str, body: &Value) -> Result<Value, (u16, Value)> {
+fn build_setup_correlation_headers(
+    correlation: Option<TelemetryCorrelation>,
+    operation_id: Option<String>,
+) -> Vec<(&'static str, String)> {
+    let Some(correlation) = correlation else {
+        // O operation ID também é dado de correlação: nunca viaja sozinho.
+        return Vec::new();
+    };
+    let mut headers = Vec::with_capacity(3);
+    headers.push(("X-Corneta-Telemetry-Id", correlation.installation_id));
+    headers.push((
+        "X-Corneta-Telemetry-Purposes",
+        correlation.purposes.to_string(),
+    ));
+    if let Some(id) = operation_id.filter(|id| uuid::Uuid::parse_str(id).is_ok()) {
+        headers.push(("X-Corneta-Operation-Id", id));
+    }
+    headers
+}
+
+fn setup_correlation_headers(app: &AppHandle) -> Vec<(&'static str, String)> {
+    let state = app.state::<AppState>();
+    let correlation = state.telemetry.correlation();
+    let operation_id = correlation
+        .as_ref()
+        .and_then(|_| state.engine.lock().unwrap().operation_id.clone());
+    build_setup_correlation_headers(correlation, operation_id)
+}
+
+fn with_setup_correlation(app: &AppHandle, mut request: ureq::Request) -> ureq::Request {
+    // Esta função só é chamada pelos dois helpers `*_setup_json` abaixo. As
+    // requisições diretas a Twitch/Google/Kick continuam usando post_form/ureq
+    // e jamais recebem estes cabeçalhos.
+    for (name, value) in setup_correlation_headers(app) {
+        request = request.set(name, &value);
+    }
+    request
+}
+
+/// POST JSON exclusivamente para a setup API Corneta. Respostas de erro são
+/// desserializadas, mas nunca logadas aqui: podem estar correlacionadas a tokens.
+fn post_setup_json(app: &AppHandle, url: &str, body: &Value) -> Result<Value, (u16, Value)> {
     let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap_or(Value::Null);
-    match ureq::post(url)
+    match with_setup_correlation(app, ureq::post(url))
         .set("Accept", "application/json")
         .set("Content-Type", "application/json")
         .timeout(Duration::from_secs(12))
@@ -96,9 +137,9 @@ fn post_json(url: &str, body: &Value) -> Result<Value, (u16, Value)> {
     }
 }
 
-fn get_json(url: &str) -> Result<Value, (u16, Value)> {
+fn get_setup_json(app: &AppHandle, url: &str) -> Result<Value, (u16, Value)> {
     let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap_or(Value::Null);
-    match ureq::get(url)
+    match with_setup_correlation(app, ureq::get(url))
         .set("Accept", "application/json")
         .timeout(Duration::from_secs(8))
         .call()
@@ -125,18 +166,46 @@ fn setup_url(cfg: &OauthConfig, path: &str) -> Option<String> {
     Some(format!("{base}{path}"))
 }
 
-fn broker_error(code: u16, body: &Value, fallback: &str) -> String {
+fn broker_request_id(body: &Value) -> Option<String> {
+    body.get("error")
+        .and_then(|error| error.get("requestId"))
+        .or_else(|| body.get("requestId"))
+        .and_then(Value::as_str)
+        .filter(|id| uuid::Uuid::parse_str(id).is_ok())
+        .map(str::to_string)
+}
+
+fn record_broker_failure(app: &AppHandle, body: &Value, code: &str) -> Option<String> {
+    let request_id = broker_request_id(body)?;
+    let state = app.state::<AppState>();
+    let operation_id = state.engine.lock().unwrap().operation_id.clone();
+    state.telemetry.record_diagnostic(
+        code,
+        "oauth",
+        operation_id.as_deref(),
+        None,
+        Some(&request_id),
+    );
+    Some(request_id)
+}
+
+fn broker_error(app: &AppHandle, code: u16, body: &Value, fallback: &str) -> String {
     let message = body
         .get("error")
         .and_then(|e| e.get("message"))
         .and_then(|m| m.as_str())
         .unwrap_or("");
-    if !message.is_empty() {
+    let base = if !message.is_empty() {
         message.to_string()
     } else if code == 0 {
         Msg::AuthBrokerDown.now()
     } else {
         fallback.into()
+    };
+    if let Some(request_id) = record_broker_failure(app, body, "oauth_broker_failed") {
+        format!("{base} (request_id: {request_id})")
+    } else {
+        base
     }
 }
 
@@ -226,9 +295,16 @@ fn refresh_broker_config(app: &AppHandle) -> Result<(), String> {
             Msg::AuthSetupApiNotHttps { base: &base }.now()
         });
     };
-    let value = get_json(&url).map_err(|(code, _)| match code {
-        0 => Msg::AuthSetupApiUnreachable { base: &base }.now(),
-        code => Msg::AuthSetupApiStatus { base: &base, code }.now(),
+    let value = get_setup_json(app, &url).map_err(|(code, body)| {
+        let message = match code {
+            0 => Msg::AuthSetupApiUnreachable { base: &base }.now(),
+            code => Msg::AuthSetupApiStatus { base: &base, code }.now(),
+        };
+        if let Some(request_id) = record_broker_failure(app, &body, "setup_bootstrap_failed") {
+            format!("{message} (request_id: {request_id})")
+        } else {
+            message
+        }
     })?;
     // Sem `providers` a URL aponta pra outro serviço (o caso comum é a porta 3000 já ocupada
     // por outro projeto). Melhor dizer isso do que agir como se o bootstrap tivesse funcionado.
@@ -1361,7 +1437,7 @@ const KICK_ID_CACHE_CAP: usize = 64;
 /// state anti-CSRF (RFC 7636 exige aleatoriedade real, não time/pid).
 fn rand_token() -> String {
     let mut bytes = [0u8; 32];
-    getrandom::getrandom(&mut bytes).expect("OS RNG indisponível");
+    getrandom::fill(&mut bytes).expect("OS RNG indisponível");
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
@@ -1468,7 +1544,7 @@ pub fn kick_login_start(app: AppHandle) {
         // o front abre o navegador (auth://kick "code" → openExternal). Sem user_code (não é device).
         auth_code_event(&app, "kick", "", &url, &url);
         match oauth_wait(&listeners, &state, "Kick") {
-            Ok(code) => match kick_exchange(&cfg, &code, &verifier, &redirect) {
+            Ok(code) => match kick_exchange(&app, &cfg, &code, &verifier, &redirect) {
                 Ok(()) => {
                     let login = kick_whoami(&app).unwrap_or_default();
                     auth_event(&app, "kick", "connected", "", "", &login);
@@ -1581,6 +1657,7 @@ fn oauth_wait(
 }
 
 fn kick_exchange(
+    app: &AppHandle,
     cfg: &OauthConfig,
     code: &str,
     verifier: &str,
@@ -1590,7 +1667,8 @@ fn kick_exchange(
     let v = if brokered {
         let url = setup_url(cfg, "/api/v1/oauth/kick/exchange")
             .ok_or_else(|| Msg::AuthKickBrokerNotConfigured.now())?;
-        post_json(
+        post_setup_json(
+            app,
             &url,
             &json!({
                 "code": code,
@@ -1598,7 +1676,9 @@ fn kick_exchange(
                 "redirectUri": redirect,
             }),
         )
-        .map_err(|(status, body)| broker_error(status, &body, &Msg::AuthKickLoginFailed.now()))?
+        .map_err(|(status, body)| {
+            broker_error(app, status, &body, &Msg::AuthKickLoginFailed.now())
+        })?
     } else {
         post_form(
             "https://id.kick.com/oauth/token",
@@ -1664,7 +1744,7 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
     let brokered = keys::get_key("kick_oauth_mode").as_deref() == Some("broker");
     let result = if brokered {
         let url = setup_url(&cfg, "/api/v1/oauth/kick/refresh")?;
-        post_json(&url, &json!({ "refreshToken": atual.as_str() }))
+        post_setup_json(app, &url, &json!({ "refreshToken": atual.as_str() }))
     } else {
         post_form(
             "https://id.kick.com/oauth/token",
@@ -1679,6 +1759,7 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
     let v = match result {
         Ok(v) => v,
         Err((code, e)) => {
+            let _ = record_broker_failure(app, &e, "oauth_refresh_failed");
             // refresh morto (revogado/expirado) → desloga de vez pra UI refletir. Erro de rede
             // (status 0) ou 5xx → mantém a sessão pra tentar de novo.
             let broker_dead = e
@@ -2429,6 +2510,87 @@ mod tests {
         assert_eq!(
             result_json(Err("x".into())),
             serde_json::json!({ "ok": false, "error": "x" })
+        );
+    }
+
+    #[test]
+    fn setup_correlation_headers_are_paired_with_consent_purposes() {
+        let operation_id = uuid::Uuid::new_v4().to_string();
+        assert!(build_setup_correlation_headers(None, Some(operation_id.clone())).is_empty());
+
+        for purpose in ["usage", "crash_reports", "usage,crash_reports"] {
+            let installation_id = uuid::Uuid::new_v4().to_string();
+            let headers = build_setup_correlation_headers(
+                Some(TelemetryCorrelation {
+                    installation_id: installation_id.clone(),
+                    purposes: purpose,
+                }),
+                Some(operation_id.clone()),
+            );
+            assert_eq!(headers.len(), 3);
+            assert_eq!(
+                headers
+                    .iter()
+                    .find(|(name, _)| *name == "X-Corneta-Telemetry-Id")
+                    .map(|(_, value)| value.as_str()),
+                Some(installation_id.as_str())
+            );
+            assert_eq!(
+                headers
+                    .iter()
+                    .find(|(name, _)| *name == "X-Corneta-Telemetry-Purposes")
+                    .map(|(_, value)| value.as_str()),
+                Some(purpose)
+            );
+            assert_eq!(
+                headers
+                    .iter()
+                    .find(|(name, _)| *name == "X-Corneta-Operation-Id")
+                    .map(|(_, value)| value.as_str()),
+                Some(operation_id.as_str())
+            );
+        }
+
+        let headers = build_setup_correlation_headers(
+            Some(TelemetryCorrelation {
+                installation_id: uuid::Uuid::new_v4().to_string(),
+                purposes: "usage",
+            }),
+            Some("not-a-uuid".into()),
+        );
+        assert_eq!(headers.len(), 2);
+        assert!(headers
+            .iter()
+            .all(|(name, _)| *name != "X-Corneta-Operation-Id"));
+    }
+
+    #[test]
+    fn broker_request_id_accepts_only_uuid_from_known_fields() {
+        let nested = serde_json::json!({
+            "error": { "requestId": "018f9f2a-04b4-7a5b-9c8d-123456789abc" }
+        });
+        assert_eq!(
+            broker_request_id(&nested).as_deref(),
+            Some("018f9f2a-04b4-7a5b-9c8d-123456789abc")
+        );
+
+        let top = serde_json::json!({
+            "requestId": "4f9cf1d4-79c9-44c8-afd9-0ec39bd4dd24"
+        });
+        assert_eq!(
+            broker_request_id(&top).as_deref(),
+            Some("4f9cf1d4-79c9-44c8-afd9-0ec39bd4dd24")
+        );
+        assert_eq!(
+            broker_request_id(&serde_json::json!({ "requestId": "not-a-uuid" })),
+            None
+        );
+        assert_eq!(
+            broker_request_id(&serde_json::json!({
+                "error": { "request_id": "4f9cf1d4-79c9-44c8-afd9-0ec39bd4dd24" }
+            })),
+            None,
+            "campos arbitrários não entram no contrato do broker"
         );
     }
 }

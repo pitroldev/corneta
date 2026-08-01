@@ -15,25 +15,7 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./*"],
-      // O app (src/) usa React 18 e o site usa React 19, então a RAIZ do
-      // monorepo tem @types/react 18 e o site tem o 19.
-      //
-      // O vazamento não era pelo `react` — esse já resolvia certo. Era pelo
-      // `react/jsx-runtime`, que TODO .tsx importa implicitamente por causa do
-      // `"jsx": "react-jsx"`, e que subia até a raiz e pegava o 18. Resultado:
-      // os elementos JSX criados aqui eram tipados pelo React 18 enquanto as
-      // libs tipavam `children` com o ReactNode do 19 — as duas metades não
-      // conversavam, e qualquer children dinâmico num motion.* falhava no tsc.
-      //
-      // Fixar aqui é escopado ao site; um override de workspace estragaria os
-      // tipos do app, que é React 18 de verdade.
-      "react": ["./node_modules/@types/react"],
-      "react-dom": ["./node_modules/@types/react-dom"],
-      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime"],
-      "react/jsx-dev-runtime": [
-        "./node_modules/@types/react/jsx-dev-runtime"
-      ]
+      "@/*": ["./*"]
     }
   },
   "include": [

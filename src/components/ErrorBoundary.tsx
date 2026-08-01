@@ -1,6 +1,8 @@
 import { Component, type ReactNode } from "react";
 import { useStore } from "../lib/store";
 import { resolveLocale, type Locale } from "../lib/i18n/locale";
+import { captureException } from "../lib/telemetry";
+import { redactTelemetryText, type ScreenId } from "../lib/telemetry-schema";
 
 // Esta é a ÚNICA tela do app que não pode depender do dicionário.
 //
@@ -19,6 +21,7 @@ const CRASH: Record<Locale, Record<string, string>> = {
     details: "Detalhes técnicos",
     copy: "Copiar erro",
     retry: "Tentar de novo",
+    errorId: "ID do erro",
     chatTitle: "Não consegui carregar o chat — fecha e abre esta janela.",
   },
   en: {
@@ -28,6 +31,7 @@ const CRASH: Record<Locale, Record<string, string>> = {
     details: "Technical details",
     copy: "Copy the error",
     retry: "Try again",
+    errorId: "Error ID",
     chatTitle: "Couldn't load the chat — close and reopen this window.",
   },
 };
@@ -49,32 +53,59 @@ export function crashText(): Record<string, string> {
  *  `app`: é o boundary de fora, o que pega o app INTEIRO caindo — o título
  *  muda porque "essa tela deu pau" mentiria quando não sobrou tela nenhuma. */
 export class ErrorBoundary extends Component<
-  { children: ReactNode; app?: boolean },
-  { error: Error | null }
+  { children: ReactNode; app?: boolean; screenId?: ScreenId },
+  { error: Error | null; errorId: string | null }
 > {
-  state = { error: null as Error | null };
+  state = { error: null as Error | null, errorId: null as string | null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     // Fica no console pra diagnóstico (e some ao trocar de tela / "tentar de novo").
     console.error("[Corneta] erro de render:", error);
+    const errorId = captureException(error, {
+      handled: false,
+      severity: this.props.app ? "fatal" : "error",
+      error_code: this.props.app ? "app_render_failed" : "screen_render_failed",
+      stage: this.props.app ? "app_render" : "screen_render",
+      screen_id: this.props.screenId,
+      component_stack: info.componentStack ?? undefined,
+    });
+    if (errorId) this.setState({ errorId });
   }
 
-  reset = () => this.setState({ error: null });
+  reset = () => this.setState({ error: null, errorId: null });
   copy = () => {
     const error = this.state.error;
     if (error)
       void navigator.clipboard.writeText(
-        String(error.stack || error.message || error),
+        [
+          this.state.errorId
+            ? `${crashText().errorId}: ${this.state.errorId}`
+            : "",
+          redactTelemetryText(
+            String(error.stack || error.message || error),
+            4_000,
+          ),
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
       );
   };
 
   render() {
     if (this.state.error) {
       const text = crashText();
+      const safeMessage = redactTelemetryText(
+        this.state.error.message || "UI error",
+        500,
+      );
+      const safeDetails = redactTelemetryText(
+        String(this.state.error.stack || this.state.error),
+        4_000,
+      );
       return (
         <div className="grid min-h-[60vh] place-items-center p-8">
           <div className="max-w-md text-center">
@@ -83,14 +114,22 @@ export class ErrorBoundary extends Component<
             </h3>
             <p className="mt-1 text-sm text-ink-muted">{text.body}</p>
             <p className="mt-3 rounded-md bg-surface-2 p-2.5 text-left text-xs text-bad">
-              {this.state.error.message}
+              {safeMessage}
             </p>
+            {this.state.errorId && (
+              <p
+                className="mt-2 font-mono text-[11px] text-ink-faint"
+                data-selectable
+              >
+                {text.errorId}: {this.state.errorId}
+              </p>
+            )}
             <details className="mt-2 text-left text-xs text-ink-muted">
               <summary className="cursor-pointer font-bold">
                 {text.details}
               </summary>
               <pre className="mt-2 max-h-40 overscroll-contain overflow-auto rounded-md bg-surface-2 p-2.5 text-[11px] leading-relaxed text-bad">
-                {String(this.state.error.stack || this.state.error)}
+                {safeDetails}
               </pre>
             </details>
             <div className="mt-3 flex justify-center gap-2">

@@ -38,8 +38,15 @@ import { brbSlateGeneration, renderBrbSlatePng } from "../lib/brbSlate";
 import { toast } from "../lib/toast";
 import { cn, errMsg } from "../lib/utils";
 import { sanitizeHost } from "../lib/validation";
+import { addStep, capture } from "../lib/telemetry";
+import {
+  fpsBucket,
+  normalizeErrorCode,
+  resolutionBucket,
+} from "../lib/telemetry-schema";
 import type { AppSettings, ObsCheck, RecordDirCheck } from "../lib/types";
 import { Modal } from "../components/Modal";
+import { TelemetrySettingsPanel } from "../components/TelemetryConsent";
 import { Select } from "../components/Select";
 import {
   LOCALES,
@@ -140,6 +147,14 @@ export function SettingsScreen() {
       }
     } catch (e) {
       toast.error(t("settings.toast.import.error", { error: String(e) }));
+    }
+  };
+  const onExportDiagnostics = async () => {
+    addStep("diagnostics_export_requested");
+    try {
+      await api.exportDiagnostics();
+    } catch {
+      toast.error(t("settings.data.logs.export.error"));
     }
   };
 
@@ -551,6 +566,7 @@ export function SettingsScreen() {
               <Database className="size-5 text-brass" />{" "}
               {t("settings.data.title")}
             </h3>
+            <TelemetrySettingsPanel />
             <div className="divide-y divide-border-soft">
               <SettingRow
                 title={t("settings.data.backup.title")}
@@ -581,7 +597,7 @@ export function SettingsScreen() {
                   <Button
                     variant="subtle"
                     size="sm"
-                    onClick={() => void api.exportDiagnostics()}
+                    onClick={() => void onExportDiagnostics()}
                   >
                     <Download className="size-4" aria-hidden />{" "}
                     {t("settings.data.logs.export")}
@@ -611,8 +627,26 @@ function ObsTestButton() {
   const [obs, setObs] = useState<ObsCheck | "loading" | null>(null);
   const run = async () => {
     setObs("loading");
+    addStep("obs_check_started", { stage: "obs_check" });
     try {
-      setObs(await api.obsCheck());
+      const result = await api.obsCheck();
+      setObs(result);
+      capture("obs_check_completed", {
+        outcome: !result.reachable
+          ? "not_reachable"
+          : result.pointingAtCorneta
+            ? "ok"
+            : "wrong_destination",
+        error_code: result.reachable
+          ? result.pointingAtCorneta
+            ? "none"
+            : "wrong_destination"
+          : result.authFailed
+            ? "auth_failed"
+            : normalizeErrorCode(result.error, "obs_unavailable"),
+        resolution_bucket: resolutionBucket(result.width, result.height),
+        fps_bucket: fpsBucket(result.fps),
+      });
     } catch (e) {
       setObs({
         reachable: false,
@@ -621,6 +655,12 @@ function ObsTestButton() {
         height: 0,
         fps: 0,
         error: String(e),
+      });
+      capture("obs_check_completed", {
+        outcome: "error",
+        error_code: normalizeErrorCode(e, "obs_check_failed"),
+        resolution_bucket: "unknown",
+        fps_bucket: "unknown",
       });
     }
   };

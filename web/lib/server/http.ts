@@ -1,6 +1,12 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { after } from "next/server";
+import type { ApiErrorCode } from "../telemetry-schema";
+import { reportApiFailure } from "./posthog";
+import {
+  sanitizedErrorLog,
+  type ApiTelemetryContext,
+} from "./telemetry-reporter";
 
 export const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, max-age=0",
@@ -11,7 +17,7 @@ export const NO_STORE_HEADERS = {
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    public readonly code: string,
+    public readonly code: ApiErrorCode,
     message: string,
     public readonly retryable = false,
   ) {
@@ -20,38 +26,93 @@ export class ApiError extends Error {
 }
 
 export function json(data: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  for (const [name, value] of Object.entries(NO_STORE_HEADERS)) {
+    headers.set(name, value);
+  }
   return Response.json(data, {
     ...init,
-    headers: { ...NO_STORE_HEADERS, ...init.headers },
+    headers,
   });
 }
 
-export function errorResponse(error: unknown) {
-  const requestId = randomUUID();
+export function apiJson(
+  data: unknown,
+  context: ApiTelemetryContext,
+  init: ResponseInit = {},
+) {
+  const headers = new Headers(init.headers);
+  headers.set("X-Request-Id", context.requestId);
+  return json(data, { ...init, headers });
+}
+
+function scheduleFailureReport(
+  error: unknown,
+  context: ApiTelemetryContext,
+  status: number,
+  retryable: boolean,
+  errorCode: ApiErrorCode,
+) {
+  const failure = {
+    context,
+    status,
+    retryable,
+    errorCode,
+    ...(error instanceof ApiError ? {} : { unexpectedError: error }),
+  };
+  try {
+    after(async () => {
+      try {
+        await reportApiFailure(failure);
+      } catch {
+        // A resposta já foi produzida; falha do provedor é sempre descartável.
+      }
+    });
+  } catch {
+    // Fora de um request do Next (por exemplo, num teste), telemetria é no-op.
+  }
+}
+
+export function errorResponse(error: unknown, context: ApiTelemetryContext) {
   if (error instanceof ApiError) {
-    return json(
+    scheduleFailureReport(
+      error,
+      context,
+      error.status,
+      error.retryable,
+      error.code,
+    );
+    return apiJson(
       {
         error: {
           code: error.code,
           message: error.message,
           retryable: error.retryable,
-          requestId,
+          requestId: context.requestId,
         },
       },
+      context,
       { status: error.status },
     );
   }
 
-  console.error("OAuth broker request failed", { requestId });
-  return json(
+  console.error("API request failed", {
+    requestId: context.requestId,
+    routeId: context.routeId,
+    provider: context.provider,
+    error: sanitizedErrorLog(error),
+  });
+  scheduleFailureReport(error, context, 500, true, "INTERNAL_ERROR");
+  return apiJson(
     {
       error: {
         code: "INTERNAL_ERROR",
         message: "Não foi possível concluir a operação.",
         retryable: true,
-        requestId,
+        requestId: context.requestId,
       },
     },
+    context,
     { status: 500 },
   );
 }

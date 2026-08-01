@@ -6,14 +6,15 @@ use crate::engine_policy::{
     brb_slate_is_video, friendly_error, is_brb_slate_path, parse_ingest_hostport, parse_kv,
     parse_mediamtx_paths, quality_of, tray_tooltip,
 };
+use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
 use crate::recorder;
 use crate::session;
+use crate::telemetry::{self, AppError};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Read, Seek};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandEvent;
@@ -26,14 +27,31 @@ fn now_ms() -> u128 {
         .unwrap_or(0)
 }
 
-fn read_file_tail(path: &std::path::Path, max_bytes: u64) -> std::io::Result<Vec<u8>> {
-    let mut file = std::fs::File::open(path)?;
-    let len = file.metadata()?.len();
-    let start = len.saturating_sub(max_bytes);
-    file.seek(std::io::SeekFrom::Start(start))?;
-    let mut bytes = Vec::with_capacity((len - start) as usize);
-    file.read_to_end(&mut bytes)?;
-    Ok(bytes)
+fn build_diagnostic_report(
+    version: &str,
+    os: &str,
+    arch: &str,
+    config: &AppConfig,
+    telemetry_summary: &serde_json::Value,
+) -> Result<String, String> {
+    // O arquivo compartilhável nasce exclusivamente de estruturas allowlisted.
+    // Logs são texto livre e ficam fora deste caminho; a inspeção local continua
+    // disponível pelo comando separado `open_logs_dir`.
+    let safe_config = telemetry::diagnostic_config_summary(config);
+    let config = serde_json::to_string_pretty(&safe_config).map_err(|error| error.to_string())?;
+    let mut report = Msg::DiagReportHeader {
+        version,
+        os,
+        arch,
+        config: &config,
+    }
+    .now();
+    report.push_str("\n--- telemetry-and-operations.json ---\n");
+    report.push_str(
+        &serde_json::to_string_pretty(telemetry_summary).map_err(|error| error.to_string())?,
+    );
+    report.push('\n');
+    Ok(report)
 }
 
 /// `std::process::Command` que NÃO pisca uma janela de console no Windows. Os sidecars
@@ -63,6 +81,117 @@ const OBS_WS_PORT: u16 = 4455;
 /// e o cancelamento voltava a aparecer como falha. O texto que a pessoa lê vive
 /// no dicionário do front, com o resto da copy.
 pub const START_CANCELLED: &str = "corneta:start-cancelled";
+
+fn current_operation_id(app: &AppHandle) -> Option<String> {
+    app.state::<AppState>()
+        .engine
+        .lock()
+        .unwrap()
+        .operation_id
+        .clone()
+}
+
+#[track_caller]
+fn capture_native_error(
+    app: &AppHandle,
+    code: &str,
+    stage: &str,
+    retryable: bool,
+    source: Option<String>,
+) -> String {
+    let operation_id = current_operation_id(app);
+    app.state::<AppState>().telemetry.capture_error(
+        AppError::new(code, stage, retryable, source),
+        operation_id.as_deref(),
+        true,
+        "error",
+    )
+}
+
+/// Captura uma causa terminal do motor e memoriza o issue para que o wrapper de
+/// BORA devolva exatamente o mesmo ID, sem abrir uma exceção genérica duplicada.
+#[track_caller]
+fn capture_engine_error(
+    app: &AppHandle,
+    code: &str,
+    stage: &str,
+    retryable: bool,
+    source: Option<String>,
+) -> String {
+    let operation_id = current_operation_id(app);
+    let error_id = app.state::<AppState>().telemetry.capture_error(
+        AppError::new(code, stage, retryable, source),
+        operation_id.as_deref(),
+        true,
+        "error",
+    );
+    let state = app.state::<AppState>();
+    let mut engine = state.engine.lock().unwrap();
+    engine.telemetry_last_error_id = Some(error_id.clone());
+    engine.telemetry_last_error_operation_id = operation_id;
+    error_id
+}
+
+fn telemetry_platform(value: &str) -> &'static str {
+    match value {
+        "twitch" => "twitch",
+        "youtube" => "youtube",
+        "facebook" => "facebook",
+        "kick" => "kick",
+        "tiktok" => "tiktok",
+        "x" => "x",
+        "instagram" => "instagram",
+        _ => "custom",
+    }
+}
+
+fn telemetry_encoder_kind(config: &AppConfig) -> String {
+    if config.mode == "passthrough" {
+        return "copy".into();
+    }
+    let mut encoders: std::collections::HashSet<&str> = config
+        .targets
+        .iter()
+        .filter(|target| target.enabled)
+        .map(|target| match target.encoding.encoder.as_str() {
+            "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software" => {
+                target.encoding.encoder.as_str()
+            }
+            _ => "unknown",
+        })
+        .collect();
+    if encoders.len() == 1 {
+        encoders.drain().next().unwrap_or("unknown").into()
+    } else {
+        "mixed".into()
+    }
+}
+
+fn capture_target_transition(
+    app: &AppHandle,
+    target_id: &str,
+    from: &str,
+    to: &str,
+    error_code: Option<&str>,
+) {
+    let (operation_id, platform) = {
+        let state = app.state::<AppState>();
+        let engine = state.engine.lock().unwrap();
+        (
+            engine.operation_id.clone(),
+            engine.target_platforms.get(target_id).cloned(),
+        )
+    };
+    if let Some(platform) = platform {
+        app.state::<AppState>().telemetry.capture_target_transition(
+            operation_id.as_deref(),
+            &platform,
+            from,
+            to,
+            error_code,
+        );
+    }
+}
 
 /// Mata um sidecar (FFmpeg/MediaMTX) e seus netos órfãos — `taskkill /T /F` no Windows, onde
 /// `child.kill()` sozinho não leva a árvore junto. Fonte ÚNICA do encerramento de processo.
@@ -868,9 +997,11 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
 /// "Tentar de novo" ser aceito), preservando a mensagem no snapshot ("error"). Antes, o motor
 /// só trocava o snapshot pra "error" e deixava `live=true`/supervisores rodando — todo retry
 /// batia em "já está no ar." e o usuário ficava preso até fechar pela bandeja.
-fn set_engine_error(app: &AppHandle, msg: &str) {
+fn set_engine_error(app: &AppHandle, code: &str, stage: &str, msg: &str) {
     log::error!("motor: {msg}");
-    stop_engine_internal(app, Some(msg.to_string()));
+    let error_id = capture_engine_error(app, code, stage, true, Some(msg.to_string()));
+    log::error!("motor: error_id={error_id}");
+    stop_engine_internal(app, Some(msg.to_string()), "error");
 }
 
 /// Marca um destino específico como "reconectando" (entre tentativas do seu FFmpeg).
@@ -889,8 +1020,12 @@ fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
             // sob o pill "Reconectando", contando uma história que já passou.
             st.message = None;
             let out = snap.clone();
+            if was != "reconnecting" {
+                eng.telemetry_reconnect_count = eng.telemetry_reconnect_count.saturating_add(1);
+            }
             drop(eng);
             emit(app, &out);
+            capture_target_transition(app, target_id, &was, "reconnecting", None);
             if was != "reconnecting" {
                 notify(
                     app,
@@ -919,11 +1054,19 @@ fn reaffirm_auth_error(app: &AppHandle, target_id: &str) {
     if st.state == "error" {
         return;
     }
+    let previous = st.state.clone();
     st.state = "error".into();
     st.message = Some(Msg::TargetErrorKeyRejected.now());
     let out = snap.clone();
     drop(eng);
     emit(app, &out);
+    capture_target_transition(
+        app,
+        target_id,
+        &previous,
+        "auth-error",
+        Some("target_auth_error"),
+    );
 }
 
 /// Sem fonte pra ler: distingue "esperando a 1ª conexão" (waiting, azul calmo) do "sinal
@@ -952,6 +1095,7 @@ fn set_target_waiting(app: &AppHandle, target_id: &str) {
     if st.state == new_state {
         return;
     }
+    let previous = st.state.clone();
     st.state = new_state.into();
     st.message = if mid_live {
         Some(Msg::TargetSignalLostMessage.now())
@@ -961,6 +1105,7 @@ fn set_target_waiting(app: &AppHandle, target_id: &str) {
     let out = snap.clone();
     drop(eng);
     emit(app, &out);
+    capture_target_transition(app, target_id, &previous, new_state, None);
     if new_state == "signal-lost" {
         let now = now_ms() as u64;
         let last = LAST_LOST_NOTIFY_MS.load(Ordering::Relaxed);
@@ -1053,6 +1198,14 @@ async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
 /// sem live nenhuma enquanto a Corneta parece "no ar".
 fn yt_auto_fallback(app: &AppHandle, target_id: &str, err: &str) {
     log::warn!("YouTube auto-broadcast: {err}");
+    let error_id = capture_native_error(
+        app,
+        "youtube_auto_provision_failed",
+        "oauth",
+        true,
+        Some(err.to_string()),
+    );
+    log::warn!("YouTube auto-broadcast: error_id={error_id}");
     notify(
         app,
         &Msg::NotifyYoutubeAutoFailedTitle.now(),
@@ -1087,7 +1240,91 @@ impl Drop for StartGuard<'_> {
 }
 
 #[tauri::command]
-pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn start_engine(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    operation_id: Option<String>,
+) -> Result<(), String> {
+    let operation_id = telemetry::normalize_or_new_id(operation_id);
+
+    let result = start_engine_inner(app.clone(), state, operation_id.clone()).await;
+    if let Err(error) = &result {
+        let cancelled = error == START_CANCELLED;
+        let mut properties = serde_json::Map::new();
+        properties.insert(
+            "operation_id".into(),
+            serde_json::Value::String(operation_id.clone()),
+        );
+        properties.insert(
+            "stage".into(),
+            serde_json::Value::String(if cancelled { "shutdown" } else { "native" }.into()),
+        );
+        properties.insert(
+            "error_code".into(),
+            serde_json::Value::String(
+                if cancelled {
+                    "start_cancelled"
+                } else {
+                    "engine_start_failed"
+                }
+                .into(),
+            ),
+        );
+        properties.insert("cancelled".into(), serde_json::Value::Bool(cancelled));
+        properties.insert("retryable".into(), serde_json::Value::Bool(true));
+        let _ = app
+            .state::<AppState>()
+            .telemetry
+            .capture("live_start_failed", properties);
+    }
+    match result {
+        Err(error) if error != START_CANCELLED => {
+            // Alguns ramos críticos já registraram uma exceção específica. Os
+            // demais recebem um erro genérico aqui; em ambos os casos o mesmo
+            // ID pesquisável volta ao frontend sem duplicar o issue no PostHog.
+            let existing_error_id = {
+                let state = app.state::<AppState>();
+                let engine = state.engine.lock().unwrap();
+                (engine.telemetry_last_error_operation_id.as_deref() == Some(operation_id.as_str()))
+                    .then(|| engine.telemetry_last_error_id.clone())
+                    .flatten()
+            };
+            let error_id = existing_error_id.unwrap_or_else(|| {
+                app.state::<AppState>().telemetry.capture_error(
+                    AppError::new("engine_start_failed", "native", true, Some(error.clone())),
+                    Some(&operation_id),
+                    true,
+                    "error",
+                )
+            });
+            // StartGuard já fez a limpeza idempotente. Publica então um estado
+            // terminal estruturado para a UI oferecer cópia dos dois IDs, sem
+            // ressuscitar sidecars nem a trava de sessão.
+            let snapshot = {
+                let state = app.state::<AppState>();
+                let mut engine = state.engine.lock().unwrap();
+                let mut snapshot = EngineSnapshot::stopped();
+                snapshot.state = "error".into();
+                snapshot.message = Some(error.clone());
+                snapshot.operation_id = Some(operation_id.clone());
+                snapshot.error_id = Some(error_id.clone());
+                engine.snapshot = Some(snapshot.clone());
+                snapshot
+            };
+            emit(&app, &snapshot);
+            Err(format!(
+                "{error}\n(error_id: {error_id}; operation_id: {operation_id})"
+            ))
+        }
+        other => other,
+    }
+}
+
+async fn start_engine_inner(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    operation_id: String,
+) -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
@@ -1102,6 +1339,10 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         }
         eng.live = true;
         eng.start_gen = eng.start_gen.wrapping_add(1);
+        eng.operation_id = Some(operation_id.clone());
+        eng.telemetry_reconnect_count = 0;
+        eng.telemetry_last_error_id = None;
+        eng.telemetry_last_error_operation_id = None;
         eng.start_gen
     };
     // Daqui pra frente qualquer saída por erro solta a trava e limpa parciais (Drop). Só o
@@ -1113,6 +1354,19 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
 
     let config = get_config(app.clone());
     let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
+    {
+        let mut eng = state.engine.lock().unwrap();
+        eng.target_platforms = enabled
+            .iter()
+            .map(|target| {
+                (
+                    target.id.clone(),
+                    telemetry_platform(&target.platform_id).to_string(),
+                )
+            })
+            .collect();
+        eng.telemetry_encoder_kind = telemetry_encoder_kind(&config);
+    }
     if enabled.is_empty() {
         return Err(Msg::EngineNoPlatformEnabled.now());
     }
@@ -1120,11 +1374,13 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
     // Feedback IMEDIATO: a UI sai do "Fora do ar" ANTES da limpeza de órfãos (PowerShell,
     // 1-3s no Windows) — sem isto o clique no BORA parecia não ter pego.
     let started = now_ms();
-    let snap = EngineSnapshot::starting(&config, started);
+    let mut snap = EngineSnapshot::starting(&config, started);
+    snap.operation_id = Some(operation_id.clone());
     {
         let mut eng = state.engine.lock().unwrap();
         eng.snapshot = Some(snap.clone());
         eng.started_ms = started;
+        eng.telemetry_start_requested_ms = started;
     }
     emit(&app, &snap);
 
@@ -1144,9 +1400,25 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         }
     }
     // 1) Gera o mediamtx.yml e sobe o MediaMTX (servidor de ingestão do OBS).
-    let yml = mediamtx_config_path(&app)?;
-    std::fs::write(&yml, engine::mediamtx_config(&config))
-        .map_err(|e| format!("config mediamtx: {e}"))?;
+    let yml = mediamtx_config_path(&app).inspect_err(|error| {
+        capture_engine_error(
+            &app,
+            "mediamtx_config_path_failed",
+            "config",
+            true,
+            Some(error.clone()),
+        );
+    })?;
+    std::fs::write(&yml, engine::mediamtx_config(&config)).map_err(|error| {
+        capture_engine_error(
+            &app,
+            "mediamtx_config_write_failed",
+            "config",
+            true,
+            Some(error.to_string()),
+        );
+        format!("config mediamtx: {error}")
+    })?;
 
     let (mut mtx_rx, mtx_child) = app
         .shell()
@@ -1154,6 +1426,13 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         .map_err(|e| {
             // Detalhe cru só no log — pra UI, uma frase que o streamer consegue agir em cima.
             log::error!("sidecar mediamtx indisponível (fetch-binaries?): {e}");
+            capture_engine_error(
+                &app,
+                "mediamtx_sidecar_missing",
+                "mediamtx",
+                false,
+                Some(e.to_string()),
+            );
             Msg::EngineMissingSidecar.now()
         })?
         .args([yml.to_string_lossy().to_string()])
@@ -1162,6 +1441,13 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
         // nome do sidecar) ficam no log; pra tela vai uma frase que dá pra agir em cima.
         .map_err(|e| {
             log::error!("mediamtx não subiu: {e}");
+            capture_engine_error(
+                &app,
+                "mediamtx_spawn_failed",
+                "mediamtx",
+                true,
+                Some(e.to_string()),
+            );
             Msg::EngineMediamtxNoStart.now()
         })?;
 
@@ -1269,7 +1555,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     let raw = String::from_utf8_lossy(&b);
                     let line = raw.to_lowercase();
                     if line.contains("address already in use") {
-                        set_engine_error(&app_m, &Msg::EngineIngestPortInUse.now());
+                        set_engine_error(
+                            &app_m,
+                            "ingest_port_in_use",
+                            "mediamtx",
+                            &Msg::EngineIngestPortInUse.now(),
+                        );
                     }
                     // Diagnóstico: ciclo de vida do publisher (OBS) + quedas. Sem o ruído dos grabs.
                     if line.contains("publish")
@@ -1289,7 +1580,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                 // ficaria preso em "starting"/"aguardando OBS" pra sempre. No-op se já parou
                 // (ex.: fomos nós que matamos o MediaMTX no stop_engine).
                 CommandEvent::Terminated(_) => {
-                    set_engine_error(&app_m, &Msg::EngineMediamtxDied.now());
+                    set_engine_error(
+                        &app_m,
+                        "mediamtx_died",
+                        "mediamtx",
+                        &Msg::EngineMediamtxDied.now(),
+                    );
                     break;
                 }
                 _ => {}
@@ -1593,7 +1889,12 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("sidecar ffmpeg indisponível: {e}");
-                        set_engine_error(&app_t, &Msg::EngineMissingSidecar.now());
+                        set_engine_error(
+                            &app_t,
+                            "ffmpeg_spawn_failed",
+                            "encoder",
+                            &Msg::EngineMissingSidecar.now(),
+                        );
                         break;
                     }
                 };
@@ -1651,7 +1952,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                         if let Some(speed) = parse_kv(&line, "speed=") {
                                             match abr.on_speed(speed) {
                                                 engine::BitrateAction::Down(kbps) => {
-                                                    log::info!("auto-bitrate: {target_name} baixando pra {kbps} kbps");
+                                                    log::info!("auto-bitrate: destino baixando pra {kbps} kbps");
                                                     // Uma notificação por sequência de aperto (degraus
                                                     // seguintes ficam só no log — sem spam).
                                                     if !drop_notified {
@@ -1666,7 +1967,7 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
                                                     break;
                                                 }
                                                 engine::BitrateAction::Up(kbps) => {
-                                                    log::info!("auto-bitrate: {target_name} subindo pra {kbps} kbps");
+                                                    log::info!("auto-bitrate: destino subindo pra {kbps} kbps");
                                                     // Recuperou TUDO: fecha o ciclo avisando (senão fica
                                                     // a impressão de que a qualidade caiu pra sempre).
                                                     if kbps >= base_kbps && drop_notified {
@@ -1799,7 +2100,22 @@ pub async fn start_engine(app: AppHandle, state: State<'_, AppState>) -> Result<
 // sensível). spawn_blocking tira do event-loop; o snapshot "stopped" é emitido no começo do
 // kill_engine, então a UI responde na hora mesmo com o taskkill ainda rolando.
 #[tauri::command]
-pub async fn stop_engine(app: AppHandle) -> Result<(), String> {
+pub async fn stop_engine(app: AppHandle, operation_id: Option<String>) -> Result<(), String> {
+    if operation_id
+        .as_deref()
+        .is_some_and(|value| uuid::Uuid::parse_str(value).is_err())
+    {
+        return Err("operationId inválido".into());
+    }
+    if let Some(operation_id) = operation_id {
+        let state = app.state::<AppState>();
+        let mut engine = state.engine.lock().unwrap();
+        // O ID criado no start é a fonte de verdade; o argumento mantém
+        // correlação em chamadas legadas/recuperadas nas quais ele não exista.
+        if engine.operation_id.is_none() {
+            engine.operation_id = Some(operation_id);
+        }
+    }
     let app2 = app.clone();
     tauri::async_runtime::spawn_blocking(move || kill_engine(&app2))
         .await
@@ -2035,9 +2351,57 @@ fn update_target_metrics(
     if should_emit {
         eng.last_emit_ms = now;
     }
+    let live_started_context = if is_stats && was_starting {
+        Some((
+            eng.operation_id.clone(),
+            eng.telemetry_encoder_kind.clone(),
+            eng.telemetry_start_requested_ms,
+        ))
+    } else {
+        None
+    };
     drop(eng);
     if let Some(out) = out {
         emit(app, &out);
+    }
+
+    if new_state != prev_target {
+        capture_target_transition(
+            app,
+            target_id,
+            &prev_target,
+            &new_state,
+            if new_state == "error" {
+                Some("target_auth_error")
+            } else {
+                None
+            },
+        );
+    }
+
+    if let Some((Some(operation_id), encoder_kind, requested_ms)) = live_started_context {
+        let mut properties = serde_json::Map::new();
+        properties.insert(
+            "operation_id".into(),
+            serde_json::Value::String(operation_id),
+        );
+        properties.insert(
+            "duration_bucket".into(),
+            serde_json::Value::String(
+                telemetry::duration_bucket(std::time::Duration::from_millis(
+                    now_ms().saturating_sub(requested_ms).min(u64::MAX as u128) as u64,
+                ))
+                .into(),
+            ),
+        );
+        properties.insert(
+            "encoder_kind".into(),
+            serde_json::Value::String(encoder_kind),
+        );
+        let _ = app
+            .state::<AppState>()
+            .telemetry
+            .capture("live_start_completed", properties);
     }
 
     if is_stats && was_starting {
@@ -2112,17 +2476,22 @@ fn update_obs_stats(app: &AppHandle, stats: engine::ObsStats) {
 
 /// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado (§14.2).
 pub fn kill_engine(app: &AppHandle) {
-    stop_engine_internal(app, None);
+    stop_engine_internal(app, None, "user");
+}
+
+/// Encerramento provocado pela saída do aplicativo, distinto do botão Cortar.
+pub fn kill_engine_for_shutdown(app: &AppHandle) {
+    stop_engine_internal(app, None, "app_exit");
 }
 
 /// Núcleo de encerramento do motor. `error=None` → parada normal (snapshot "stopped");
 /// `error=Some(msg)` → erro fatal (snapshot "error" com a mensagem, mas mesma limpeza).
 /// IDEMPOTENTE: se a sessão já não está no ar, é no-op (o primeiro a encerrar vence — evita que
 /// um erro duplicado clobbere o estado, ou que o taskkill rode duas vezes).
-fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
+fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
     use std::sync::atomic::Ordering;
     let state = app.state::<AppState>();
-    let (children, session_path, out) = {
+    let (children, session_path, out, telemetry_end, target_transitions) = {
         let mut eng = state.engine.lock().unwrap();
         if !eng.live {
             return;
@@ -2135,29 +2504,108 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>) {
         // Sinaliza os supervisores a pararem ANTES de drenar (sob o MESMO lock que eles usam pra
         // inserir): fecha a janela em que um FFmpeg recém-spawnado escaparia da drenagem.
         eng.running.store(false, Ordering::Relaxed);
-        let out = match &error {
+        let was_live = eng
+            .snapshot
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.state == "live");
+        let operation_id = eng.operation_id.clone();
+        let last_error_id = eng.telemetry_last_error_id.clone();
+        let duration = now_ms().saturating_sub(eng.started_ms);
+        let reconnect_count = eng.telemetry_reconnect_count;
+        let target_transitions: Vec<_> = eng
+            .snapshot
+            .as_ref()
+            .map(|snapshot| {
+                snapshot
+                    .targets
+                    .iter()
+                    .filter_map(|(target_id, target)| {
+                        eng.target_platforms
+                            .get(target_id)
+                            .cloned()
+                            .map(|platform| (platform, target.state.clone()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut out = match &error {
             Some(msg) => {
                 let mut s = EngineSnapshot::stopped();
                 s.state = "error".into();
                 s.message = Some(msg.clone());
+                s.error_id = last_error_id;
                 s
             }
             None => EngineSnapshot::stopped(),
         };
+        out.operation_id = operation_id.clone();
         eng.snapshot = Some(out.clone());
         eng.paused.clear();
         eng.auth_error.clear();
         eng.force_brb = None;
+        eng.target_platforms.clear();
+        eng.operation_id = None;
         let session_path = eng.session_path.take();
         let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
             eng.ffmpegs.drain().map(|(_, c)| c).collect();
         if let Some(m) = eng.mediamtx.take() {
             children.push(m);
         }
-        (children, session_path, out)
+        (
+            children,
+            session_path,
+            out,
+            (was_live, operation_id, duration, reconnect_count),
+            target_transitions,
+        )
     };
     // Emite o estado final JÁ (a UI responde na hora), ANTES do taskkill pesado.
     emit(app, &out);
+
+    let (was_live, operation_id, duration_ms, reconnect_count) = telemetry_end;
+    for (platform, previous) in target_transitions {
+        state.telemetry.capture_target_transition(
+            operation_id.as_deref(),
+            &platform,
+            &previous,
+            "stopped",
+            None,
+        );
+    }
+    if was_live {
+        if let Some(operation_id) = operation_id {
+            let mut properties = serde_json::Map::new();
+            properties.insert(
+                "operation_id".into(),
+                serde_json::Value::String(operation_id),
+            );
+            properties.insert(
+                "reason".into(),
+                serde_json::Value::String(
+                    if error.is_some() {
+                        "engine_error"
+                    } else {
+                        reason
+                    }
+                    .into(),
+                ),
+            );
+            properties.insert(
+                "duration_bucket".into(),
+                serde_json::Value::String(
+                    telemetry::duration_bucket(std::time::Duration::from_millis(
+                        duration_ms.min(u64::MAX as u128) as u64,
+                    ))
+                    .into(),
+                ),
+            );
+            properties.insert(
+                "reconnect_count_bucket".into(),
+                serde_json::Value::String(telemetry::reconnect_bucket(reconnect_count).into()),
+            );
+            let _ = state.telemetry.capture("live_ended", properties);
+        }
+    }
 
     for child in children {
         kill_child_tree(child);
@@ -2495,12 +2943,39 @@ pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
 /// Liga/desliga a transmissão no OBS junto com o BORA AO VIVO (melhor-esforço).
 #[tauri::command]
 pub async fn obs_set_stream(app: AppHandle, start: bool) -> Result<(), String> {
-    let password = get_config(app).settings.obs_password;
-    tauri::async_runtime::spawn_blocking(move || {
+    let password = get_config(app.clone()).settings.obs_password;
+    let result = tauri::async_runtime::spawn_blocking(move || {
         crate::obs::set_stream(OBS_WS_HOST, OBS_WS_PORT, &password, start)
     })
-    .await
-    .map_err(|e| format!("join: {e}"))?
+    .await;
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => {
+            capture_native_error(
+                &app,
+                if start {
+                    "obs_start_failed"
+                } else {
+                    "obs_stop_failed"
+                },
+                "obs",
+                true,
+                Some(error.clone()),
+            );
+            Err(error)
+        }
+        Err(error) => {
+            let error = format!("join: {error}");
+            capture_native_error(
+                &app,
+                "obs_stream_task_failed",
+                "obs",
+                true,
+                Some(error.clone()),
+            );
+            Err(error)
+        }
+    }
 }
 
 /// Testa o ALCANCE do servidor de ingestão (TCP). Não valida a chave — só uma live real valida.
@@ -2576,53 +3051,41 @@ pub fn open_logs_dir(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Exporta um relatório de suporte limitado e redigido. Não inclui tokens do keyring,
-/// watchlist do Guardião, senha do OBS nem API key do YouTube.
+/// Exporta um relatório de suporte estritamente estruturado. Não inclui logs crus,
+/// tokens do keyring, watchlist, nomes, títulos, paths, URLs nem credenciais.
 #[tauri::command]
-pub fn export_diagnostics(app: AppHandle) -> Result<bool, String> {
+pub fn export_diagnostics(
+    app: AppHandle,
+    include_telemetry_id: Option<bool>,
+) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
-    let mut cfg = config::load(&app);
-    cfg.settings.obs_password.clear();
-    cfg.settings.youtube_api_key.clear();
-    cfg.settings.guardian_watchlist = vec![Msg::DiagWatchlistOmitted {
-        n: cfg.settings.guardian_watchlist.len(),
-    }
-    .now()];
-    let mut report = Msg::DiagReportHeader {
-        version: &app.package_info().version.to_string(),
-        os: std::env::consts::OS,
-        arch: std::env::consts::ARCH,
-        config: &serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?,
-    }
-    .now();
-    let redact_authorization =
-        regex::Regex::new(r"(?i)(authorization\s*[:=]\s*)[^\r\n]+").map_err(|e| e.to_string())?;
-    let redact = regex::Regex::new(
-        r"(?i)(access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|password|stream[_ -]?key)(\s*[:=]\s*)([^\s,;]+)",
-    )
-    .map_err(|e| e.to_string())?;
-    if let Ok(dir) = app.path().app_log_dir() {
-        let mut files: Vec<_> = std::fs::read_dir(dir)
-            .into_iter()
-            .flatten()
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.is_file())
-            .collect();
-        files.sort();
-        for path in files.into_iter().rev().take(3) {
-            let Ok(bytes) = read_file_tail(&path, 512 * 1024) else {
-                continue;
-            };
-            let text = String::from_utf8_lossy(&bytes);
-            let safe = redact_authorization.replace_all(&text, "$1<redacted>");
-            let safe = redact.replace_all(&safe, "$1$2<redacted>");
-            report.push_str(&format!(
-                "\n--- {} ---\n{safe}",
-                path.file_name().and_then(|n| n.to_str()).unwrap_or("log")
-            ));
-        }
-    }
+    let cfg = config::load(&app);
+    let telemetry_state = &app.state::<AppState>().telemetry;
+    let status = telemetry_state.status();
+    let telemetry_id = if include_telemetry_id.unwrap_or(false) {
+        status.installation_id.clone()
+    } else {
+        status
+            .installation_id
+            .as_ref()
+            .map(|_| "<omitted; include only with explicit consent>".into())
+    };
+    let telemetry_summary = serde_json::json!({
+        "schemaVersion": status.schema_version,
+        "noticeVersion": status.notice_version,
+        "usage": status.usage,
+        "crashReports": status.crash_reports,
+        "installationId": telemetry_id,
+        "buildSha": option_env!("CORNETA_BUILD_SHA").unwrap_or("dev"),
+        "structuredEvents": telemetry_state.diagnostic_events(),
+    });
+    let report = build_diagnostic_report(
+        &app.package_info().version.to_string(),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        &cfg,
+        &telemetry_summary,
+    )?;
     let Some(path) = app
         .dialog()
         .file()
@@ -2630,10 +3093,31 @@ pub fn export_diagnostics(app: AppHandle) -> Result<bool, String> {
         .set_file_name("corneta-diagnostico.txt")
         .blocking_save_file()
     else {
+        let mut properties = serde_json::Map::new();
+        properties.insert(
+            "outcome".into(),
+            serde_json::Value::String("cancelled".into()),
+        );
+        let _ = telemetry_state.capture("diagnostics_exported", properties);
         return Ok(false);
     };
     let path = path.into_path().map_err(|e| e.to_string())?;
-    std::fs::write(path, report).map_err(|e| e.to_string())?;
+    if let Err(error) = std::fs::write(path, report) {
+        let mut properties = serde_json::Map::new();
+        properties.insert("outcome".into(), serde_json::Value::String("failed".into()));
+        let _ = telemetry_state.capture("diagnostics_exported", properties);
+        capture_native_error(
+            &app,
+            "diagnostics_write_failed",
+            "diagnostics",
+            true,
+            Some(error.to_string()),
+        );
+        return Err(error.to_string());
+    }
+    let mut properties = serde_json::Map::new();
+    properties.insert("outcome".into(), serde_json::Value::String("saved".into()));
+    let _ = telemetry_state.capture("diagnostics_exported", properties);
     Ok(true)
 }
 
@@ -2653,17 +3137,32 @@ pub fn register_shortcut(app: AppHandle, shortcut: String) -> Result<(), String>
 /// Check-up do OBS (acessível? apontando pra Corneta? resolução/fps).
 #[tauri::command]
 pub async fn obs_check(app: AppHandle) -> Result<crate::obs::ObsCheck, String> {
-    let cfg = get_config(app);
+    let cfg = get_config(app.clone());
     let server = format!(
         "{}://{}:{}/{}",
         cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
     );
     let password = cfg.settings.obs_password;
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         crate::obs::check(OBS_WS_HOST, OBS_WS_PORT, &password, &server)
     })
-    .await
-    .map_err(|e| format!("join: {e}"))
+    .await;
+    let check = match result {
+        Ok(check) => check,
+        Err(error) => {
+            let error = format!("join: {error}");
+            capture_native_error(
+                &app,
+                "obs_check_task_failed",
+                "obs",
+                true,
+                Some(error.clone()),
+            );
+            return Err(error);
+        }
+    };
+
+    Ok(check)
 }
 
 // ------------------------------- Mesa (co-stream P2P) -------------------------------
@@ -2972,5 +3471,65 @@ mod encoder_cache_tests {
             "app|ffmpeg|gpu|driver",
             101 + ENCODER_CACHE_TTL_SEC,
         ));
+    }
+}
+
+#[cfg(test)]
+mod diagnostic_export_tests {
+    use super::build_diagnostic_report;
+    use crate::config::{ChatSource, Target, TargetEncoding};
+
+    #[test]
+    fn exported_diagnostic_omits_channel_destination_and_video_identifiers() {
+        let channel = "canalSentinela19";
+        let source = "fonteSentinela27";
+        let destination = "destinoSentinela31";
+        let video_id = "videoSentinela43";
+        let mut config = crate::config::AppConfig::default();
+        config.settings.stream_title = channel.into();
+        config.settings.chat_sources.push(ChatSource {
+            id: source.into(),
+            platform: "youtube".into(),
+            value: video_id.into(),
+            name: channel.into(),
+            enabled: true,
+            has_send_token: false,
+        });
+        config.targets.push(Target {
+            id: destination.into(),
+            platform_id: "custom".into(),
+            name: destination.into(),
+            enabled: true,
+            protocol: "rtmp".into(),
+            ingest_url: format!("rtmp://example.invalid/live/{channel}"),
+            has_key: false,
+            encoding: TargetEncoding {
+                action: "copy".into(),
+                preset: None,
+                encoder: "auto".into(),
+                hybrid_override: None,
+                reframe: None,
+            },
+        });
+        let report = build_diagnostic_report(
+            "0.0.0-test",
+            "test-os",
+            "test-arch",
+            &config,
+            &serde_json::json!({
+                "schemaVersion": 1,
+                "structuredEvents": [],
+            }),
+        )
+        .unwrap();
+
+        for forbidden in [channel, source, destination, video_id] {
+            assert!(
+                !report.contains(forbidden),
+                "identificador livre vazou no diagnóstico: {forbidden}\n{report}"
+            );
+        }
+        assert!(report.contains("telemetry-and-operations.json"));
+        assert!(!report.contains("local-log-"));
     }
 }

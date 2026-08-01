@@ -473,6 +473,30 @@ export const pt = {
   "components.onboarding.step5.title": "Chat e relatórios",
   "components.onboarding.subtitle": "Em {n} passos, do OBS até o relatório.",
   "components.onboarding.title": "Opa! Bora cornetar?",
+  "components.telemetry.crashes.body":
+    "Envia exceções, a etapa e o código da falha, com mensagens e stacks redigidas.",
+  "components.telemetry.crashes.title": "Enviar relatórios de falha",
+  "components.telemetry.notice.allowed":
+    "Pode sair: versão, tela/etapa, resultado, plataforma em enum, categorias do sistema e IDs aleatórios de correlação.",
+  "components.telemetry.notice.details":
+    "O que pode — e o que nunca pode — ser enviado",
+  "components.telemetry.notice.error":
+    "Não consegui salvar sua escolha. Nada novo foi enviado.",
+  "components.telemetry.notice.forbidden":
+    "Nunca entra no evento: chave de live, token, chat, título/categoria, OCR, imagem, áudio, vídeo, caminho local, hostname, IP como propriedade ou log cru.",
+  "components.telemetry.notice.later": "Decidir depois",
+  "components.telemetry.notice.none": "Continuar sem enviar",
+  "components.telemetry.notice.privacy":
+    "São dados técnicos pseudonimizados, tratados pelo PostHog por até 90 dias.",
+  "components.telemetry.notice.privacyLink": "Leia a política de privacidade",
+  "components.telemetry.notice.save": "Salvar minhas escolhas",
+  "components.telemetry.notice.saved": "Sua escolha de dados foi salva.",
+  "components.telemetry.notice.subtitle":
+    "Nada é marcado de saída. Você pode mudar de ideia nas Configurações.",
+  "components.telemetry.notice.title": "O que a Corneta pode contar?",
+  "components.telemetry.usage.body":
+    "Envia etapas concluídas, versão, categorias do sistema e resultado das operações — nunca conteúdo da live.",
+  "components.telemetry.usage.title": "Enviar dados de uso",
   "components.toaster.dismiss.aria": "Fechar aviso",
   "components.toaster.region.aria": "Avisos",
   "components.ui.copied": "Copiado",
@@ -864,7 +888,9 @@ export const pt = {
   "golive.empty.noPlatforms":
     "Nenhuma plataforma ativa. Vá em {plataformas}, ative pelo menos uma e cole a chave.",
   "golive.error.body": "A transmissão parou. Vê os logs ou tenta de novo.",
+  "golive.error.errorId": "ID do erro",
   "golive.error.logs": "Ver logs",
+  "golive.error.operationId": "ID da operação",
   "golive.error.retry": "Tentar de novo",
   "golive.error.title": "Não consegui deixar sua live no ar",
   "golive.header.kicker": "Bora cornetar",
@@ -1467,11 +1493,38 @@ export const pt = {
   "settings.data.backup.import.confirm": "Substituir a config atual?",
   "settings.data.backup.title": "Backup da config",
   "settings.data.logs.desc":
-    "Exporte um diagnóstico pro suporte — eu tiro chave, senha e token antes — ou abra a pasta dos logs aqui no PC.",
+    "Exporte um resumo técnico estruturado pro suporte — sem logs, nomes, caminhos ou credenciais — ou abra os logs separadamente aqui no PC.",
   "settings.data.logs.export": "Exportar diagnóstico",
+  "settings.data.logs.export.error": "Não consegui exportar o diagnóstico.",
   "settings.data.logs.open": "Abrir logs",
   "settings.data.logs.title": "Logs",
   "settings.data.title": "Dados & diagnóstico",
+  "settings.telemetry.buildDisabled":
+    "A coleta está desativada neste build; sua escolha fica guardada para uma versão configurada.",
+  "settings.telemetry.crashes.desc":
+    "Exceções e falhas técnicas redigidas, sem anexar logs.",
+  "settings.telemetry.deletion.cta": "Como pedir exclusão",
+  "settings.telemetry.deletion.desc":
+    "Com as duas opções desligadas, copie o ID acima e siga o canal indicado na política para excluir o que já foi enviado.",
+  "settings.telemetry.explainer":
+    "A Corneta envia só dados técnicos pseudonimizados permitidos pelo catálogo. O PostHog opera a coleta, com retenção inicial de 90 dias. Desligar interrompe novos eventos na hora.",
+  "settings.telemetry.id": "ID de telemetria",
+  "settings.telemetry.id.pending":
+    "O ID só é criado quando você liga pelo menos uma opção.",
+  "settings.telemetry.loading": "Lendo suas escolhas de telemetria…",
+  "settings.telemetry.privacy": "Política de privacidade e dados coletados",
+  "settings.telemetry.regenerate.confirm": "Trocar o ID agora?",
+  "settings.telemetry.regenerate.cta": "Usar outro ID",
+  "settings.telemetry.regenerate.error": "Não consegui trocar o ID.",
+  "settings.telemetry.regenerate.ok":
+    "ID anterior desvinculado. Um novo será criado se você reativar a telemetria.",
+  "settings.telemetry.saveError":
+    "Não consegui salvar. A escolha anterior continua valendo.",
+  "settings.telemetry.saved": "Preferência de telemetria atualizada.",
+  "settings.telemetry.unavailable":
+    "O serviço local de telemetria não está disponível neste build. Nenhum dado foi enviado.",
+  "settings.telemetry.usage.desc":
+    "Etapas e resultados em categorias, sem texto ou conteúdo da live.",
   "settings.guardian.cost.chat":
     "O chat e a interação chegam até você com esse mesmo atraso.",
   // Os {buracos} destas três viram negrito: são o preço da proteção, e é o que a

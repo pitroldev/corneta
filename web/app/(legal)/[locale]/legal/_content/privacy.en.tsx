@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TelemetryPreference } from "@/app/_components/telemetry-preference";
 import {
   Callout,
   Contact,
@@ -27,7 +28,7 @@ const L = "en" as const;
 
 export const privacyHeroEn = {
   kicker: "Privacy policy",
-  title: "Your data stays where you already are: on your PC.",
+  title: "Your stream content stays where you are: on your PC.",
   intro:
     "Corneta is a desktop app that runs on your machine. This policy explains, in detail and without the runaround, what happens to data on the website, in the sign-in API and inside the app — including what we deliberately don’t collect.",
 };
@@ -48,17 +49,17 @@ export const privacySectionsEn = [
   { id: "direitos", title: "Your rights" },
   { id: "espectadores", title: "Your viewers’ data" },
   { id: "criancas", title: "Children and teenagers" },
-  { id: "cookies", title: "Cookies" },
+  { id: "cookies", title: "Cookies and local preferences" },
   { id: "mudancas", title: "Changes to this policy" },
 ];
 
 export const privacyTldrEn = {
   points: [
-    "Corneta has no telemetry, creates no account and needs no sign-up to work.",
+    "Corneta creates no account and needs no sign-up. In the app, usage data and crash reports are sent only if you enable each purpose separately.",
     "Stream keys and tokens live in your operating system’s credential vault, never on our servers.",
     "Settings, chat, alerts and stream reports live in files on your computer.",
     "Only the Kick sign-in passes through our servers — in transit, never stored. Twitch and YouTube talk straight to your app.",
-    "This website uses no cookies, no analytics, no tracking pixel and no forms.",
+    "This website measures only route, language, download clicks and technical errors, with no analytics cookies, replay, page text or link to the app; you can turn these metrics off below.",
   ],
   note: "This summary is a reading courtesy and does not replace the full text below.",
 };
@@ -140,18 +141,35 @@ export function PrivacyBodyEn() {
           us.
         </p>
         <Callout>
-          The app has no telemetry, no usage collection, no automatic crash
-          reporting and no install identifier. You can check that in the source:
-          the project is open.
+          App telemetry is optional and starts off. Usage data and crash reports
+          have independent controls, with neither option preselected. A random
+          installation UUID is created only when at least one purpose is
+          enabled. You can check that in the source: the project is open.
         </Callout>
       </LegalSection>
 
       <LegalSection id="site" n={4} title="Data on the website">
         <p>
-          This site’s pages are static. There’s no sign-up form, no newsletter,
-          no support chat, no cookies, no tracking pixel and no analytics tool.
-          The fonts are served by the site itself, so your visit generates no
-          request to third-party font services.
+          This site has no sign-up form, newsletter, support chat, advertising
+          pixel or user profile. Its fonts are served by the site itself, so
+          your visit generates no request to third-party font services.
+        </p>
+        <p>
+          We use PostHog in cookieless mode to measure only the route and
+          language visited, which download button was used and redacted
+          technical failures, together with the environment and build version.
+          We do not collect query strings, URL fragments, visible text, typed
+          fields, session replay, heatmaps, autocapture or network performance.
+          The browser receives no persistent analytics identifier, we create no
+          person profile and we do not connect the visit to the app’s optional
+          installation UUID.
+        </p>
+        <p>
+          The connection reveals the IP address to the provider in transit, as
+          every internet request does, but the project is configured to discard
+          it at ingestion and not use geolocation. We honour Do Not Track and
+          Global Privacy Control. You can also stop new metrics at any time
+          through the control in section 16.
         </p>
         <p>
           As with any website, the server that delivers it records technical
@@ -247,8 +265,14 @@ export function PrivacyBodyEn() {
           </li>
           <li>
             <strong>It doesn’t log request contents.</strong> When an unexpected
-            failure happens, the server records only a random request
-            identifier, for investigation — no tokens, no request body.
+            failure happens, the server may send PostHog only a random request
+            identifier, categorised route and provider, error code, response
+            class and a duration bucket. An unexpected failure includes a
+            redacted type and stack. Request bodies, platform responses, query
+            strings, tokens and authentication headers never enter that event.
+            The telemetry UUID and operation identifier accompany a request only
+            when the app has the corresponding consent; otherwise, correlation
+            is ephemeral and limited to that request.
           </li>
         </ul>
 
@@ -269,7 +293,8 @@ export function PrivacyBodyEn() {
       <LegalSection id="app" n={6} title="Data on your computer">
         <p>
           The app keeps, on your machine, what it needs to do its job. None of
-          it is sent to us.
+          the content described below is sent to us. Only the technical data
+          expressly listed further down may be sent if you consent.
         </p>
         <ul>
           <li>
@@ -302,9 +327,33 @@ export function PrivacyBodyEn() {
             itself or from the folder.
           </li>
           <li>
-            <strong>Support diagnostics</strong> — if you ask for a log export,
-            the app generates a file with redacted technical information, and
-            you decide whether and to whom to send it.
+            <strong>Support diagnostics</strong> — if you request an export, the
+            app generates a file containing only a structured technical summary
+            and allowlisted operational events. It does not include raw logs,
+            channel or destination names, titles, paths, URLs or credentials.
+            Logs can be opened separately on your computer; you decide whether
+            and to whom to send the diagnostic file.
+          </li>
+          <li>
+            <strong>Optional telemetry</strong> — “usage data” may send the
+            version, language, categorised system family, architecture and GPU,
+            operation stages and outcomes, enumerated platforms, destination
+            count and bucketed durations. “Crash reports” may send the error
+            code and stage, type, redacted stack and random error/operation
+            identifiers, plus a minimal startup marker with the version and
+            whether the previous exit was clean, needed to measure stability
+            without enabling usage metrics. These are two independent consents
+            and both start off. Even when active, we never send video, audio,
+            chat, alerts, stream title, channel, keys, tokens, RTMP URL,
+            hostname, full local path, raw logs or configuration.
+          </li>
+          <li>
+            <strong>Telemetry preference and UUID</strong> — these live in a
+            separate local file that does not travel with configuration exports
+            or imports. The UUID is created only after you enable at least one
+            purpose. Turning both off stops sending, clears SDK persistence and
+            lets you copy the ID to request deletion of what was already sent;
+            afterwards, you can generate a new ID.
           </li>
           <li>
             <strong>The OBS overlay</strong> — when on, the app starts a server
@@ -321,8 +370,10 @@ export function PrivacyBodyEn() {
         </ul>
         <p>
           Uninstalling the app, deleting the config file and removing the
-          credentials from the system vault erases this data. Since it’s under
-          your care, that deletion doesn’t depend on us.
+          credentials from the system vault erases local data. Telemetry events
+          sent before then follow the period in section 11; to request earlier
+          deletion, use the UUID shown in Settings and the channel in section
+          13.
         </p>
       </LegalSection>
 
@@ -339,8 +390,17 @@ export function PrivacyBodyEn() {
           </li>
           <li>
             <strong>Legitimate interest</strong> (art. 7º, IX) — technical
-            access records and the per-IP limit exist to keep the site and the
-            API available and secure, at the minimum needed for that purpose.
+            access records, the per-IP limit, API failure diagnostics and
+            strictly aggregate cookieless site metrics exist to keep the service
+            available, secure and understandable, at the minimum needed for
+            those purposes. The site offers a direct opt-out and honours browser
+            privacy signals.
+          </li>
+          <li>
+            <strong>Consent</strong> (art. 7º, I) — app usage data and automatic
+            crash reports are sent only for the purposes you enable. You can
+            withdraw each one at any time in Settings without affecting how
+            Corneta works.
           </li>
           <li>
             <strong>Compliance with a legal or regulatory obligation</strong>{" "}
@@ -466,8 +526,11 @@ export function PrivacyBodyEn() {
           </li>
         </ul>
         <p>
-          On our side, the only processor involved is the hosting provider for
-          the site and the API, named above.
+          On our side, the processors are the hosting provider for the site and
+          API, named above, and <strong>PostHog Inc.</strong>. PostHog receives
+          only the technical events and redacted exceptions described in this
+          policy, for product metrics, operations and diagnosis; it does not
+          receive your stream content and is not used for advertising.
         </p>
       </LegalSection>
 
@@ -480,8 +543,10 @@ export function PrivacyBodyEn() {
             <Todo locale={L}>hosting provider</Todo>
           )}
           , a company based in the United States, which may process requests on
-          servers outside Brazil. The streaming platforms, the alert aggregators
-          and the emote services named above also operate abroad.
+          servers outside Brazil. Telemetry is processed by{" "}
+          <strong>PostHog Cloud US, in Virginia, United States</strong>. The
+          streaming platforms, alert aggregators and emote services named above
+          also operate abroad.
         </p>
         <p>
           When you use those features, the data needed for the communication
@@ -521,6 +586,31 @@ export function PrivacyBodyEn() {
                 </td>
               </tr>
               <tr>
+                <td>
+                  Technical events and redacted exceptions from the site, app
+                  and API
+                </td>
+                <td>
+                  Up to 90 days in PostHog. The IP address is discarded at
+                  ingestion and is not used as a dimension.
+                </td>
+              </tr>
+              <tr>
+                <td>App telemetry consents and UUID</td>
+                <td>
+                  On your computer while a purpose remains active, or until you
+                  erase/regenerate the identifier.
+                </td>
+              </tr>
+              <tr>
+                <td>Website preferences</td>
+                <td>
+                  The language choice stays in a functional cookie for up to one
+                  year; the metrics opt-out stays in local storage until you
+                  re-enable metrics or clear browser data.
+                </td>
+              </tr>
+              <tr>
                 <td>Your settings, keys and reports</td>
                 <td>
                   For as long as you want: they’re on your computer, under your
@@ -539,7 +629,9 @@ export function PrivacyBodyEn() {
           text files; API responses are not cached; request size is capped;
           sign-in return addresses are validated against a fixed list; and
           there’s a per-IP attempt limit. The OBS overlay answers only on the
-          local address.
+          local address. Before every telemetry event, a closed property list
+          and a redactor remove secrets, free text, URL parameters and local
+          paths; an event outside the schema is dropped.
         </p>
         <p>
           No system is infallible. If we identify a security incident with
@@ -563,9 +655,12 @@ export function PrivacyBodyEn() {
         </p>
         <p>
           To exercise any of them, write to <Contact locale={L} />. We’ll answer
-          within the statutory deadline. Since we keep no user records, most of
-          the data concerning you is already under your direct control — and
-          we’ll explain that if your request refers to something we don’t have.
+          within the statutory deadline. Since we keep no account, most data
+          concerning you is already under your direct control. If you enabled
+          app telemetry, include the UUID you can copy from Settings so we can
+          locate and delete the events. Cookieless site telemetry creates no
+          persistent identifier with which to isolate a past visit; the control
+          below prevents new sends in this browser.
         </p>
       </LegalSection>
 
@@ -593,12 +688,23 @@ export function PrivacyBodyEn() {
         </p>
       </LegalSection>
 
-      <LegalSection id="cookies" n={16} title="Cookies">
+      <LegalSection id="cookies" n={16} title="Cookies and local preferences">
         <p>
-          This website uses no cookies, no local storage, no fingerprinting and
-          no other tracking mechanism. Since there’s no cookie to consent to,
-          there’s no consent banner either.
+          PostHog runs in cookieless mode: it writes no analytics cookie or
+          persistent analytics identifier, performs no fingerprinting and
+          creates no person profile. One functional cookie,
+          <code> corneta.locale</code>, stores your language choice for up to
+          one year.
         </p>
+        <p>
+          If you turn metrics off, the browser stores only the value “disabled”
+          under the <code>corneta:site-telemetry:v1</code> local-storage key.
+          That preference is not sent to PostHog. Do Not Track and Global
+          Privacy Control also keep capture off. Because there is no advertising
+          or analytics cookie, we provide the direct control below instead of a
+          cookie banner.
+        </p>
+        <TelemetryPreference locale={L} />
       </LegalSection>
 
       <LegalSection id="mudancas" n={17} title="Changes to this policy">

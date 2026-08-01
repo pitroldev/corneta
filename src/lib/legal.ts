@@ -47,7 +47,7 @@ export function legalUrl(
  * o aceite guardado e faz o app avisar de novo quem já tinha aceitado a versão
  * anterior (ver o fluxo "reaccept" em components/Onboarding.tsx).
  */
-export const LEGAL_ACCEPT_VERSION = "2026-07-30";
+export const LEGAL_ACCEPT_VERSION = "2026-08-01";
 
 const KEY = "corneta.legal.accepted";
 

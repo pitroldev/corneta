@@ -2,7 +2,7 @@
 // Idioma do app: catálogo, resolução do "automático" e interpolação.
 //
 // Núcleo puro e testado. A LP tem um módulo parecido em web/lib/i18n/locale.ts
-// — são pacotes diferentes (React 18 aqui, 19 lá) e uma função de 30 linhas
+// — são workspaces independentes e uma função de 30 linhas
 // duplicada custa menos que um pacote compartilhado no meio do caminho.
 // ============================================================
 

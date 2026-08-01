@@ -1,4 +1,5 @@
 import type { T, Locale } from "@/lib/i18n";
+import type { SiteCtaId } from "@/lib/telemetry-schema";
 import { LocaleSwitch } from "../_components/locale-switch";
 import { SiteNav } from "../_components/site-nav";
 import { CheckIcon, DownloadIcon, WindowsIcon } from "../_components/icons";
@@ -23,10 +24,12 @@ const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#baixar";
 
 export function DownloadButton({
   t,
+  ctaId,
   compact = false,
   label,
 }: {
   t: T;
+  ctaId: SiteCtaId;
   compact?: boolean;
   label?: string;
 }) {
@@ -39,6 +42,7 @@ export function DownloadButton({
       )}
       href={downloadUrl}
       data-placeholder-link="replace-me"
+      data-telemetry-cta={ctaId}
       aria-label={t("hero.download.aria")}
     >
       <WindowsIcon />
@@ -110,7 +114,12 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
 
         {/* Sozinho na direita de propósito: é a única ação de conversão da
             página, e agora nenhum controle de preferência encosta nele. */}
-        <DownloadButton t={t} compact label={t("hero.header.download")} />
+        <DownloadButton
+          t={t}
+          ctaId="header_download"
+          compact
+          label={t("hero.header.download")}
+        />
       </Shell>
     </header>
   );
@@ -175,7 +184,7 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
         </div>
 
         <div className="mt-[clamp(48px,5vw,76px)] flex flex-col items-center gap-3.5 pb-[clamp(46px,5vw,70px)] text-center max-[760px]:mt-[44px] [&_a]:min-h-[70px] [&_a]:w-[min(440px,100%)] [&_a]:text-[1.24rem] max-[760px]:[&_a]:min-h-[62px] max-[760px]:[&_a]:w-full max-[760px]:[&_a]:text-[1.06rem] [&>p]:text-[0.84rem] [&>p]:font-semibold [&>p]:text-faint">
-          <DownloadButton t={t} />
+          <DownloadButton t={t} ctaId="hero_download" />
           <p>{t("hero.cta.footnote")}</p>
         </div>
       </Shell>

@@ -93,6 +93,7 @@ export function Faq({ t, downloadUrl }: { t: T; downloadUrl: string }) {
               )}
               href={downloadUrl}
               data-placeholder-link="replace-me"
+              data-telemetry-cta="faq_download"
             >
               <WindowsIcon />
               <span>{t("closing.faq.cta")}</span>
@@ -196,7 +197,7 @@ export function FinalCta({ t }: { t: T }) {
             </h2>
           </div>
           <div className="flex flex-col items-start gap-4 [&>a]:w-[min(400px,100%)] [&>p]:text-[0.78rem] [&>p]:font-[650] [&>p]:text-faint">
-            <DownloadButton t={t} />
+            <DownloadButton t={t} ctaId="final_download" />
             <p>{t("closing.cta.note")}</p>
           </div>
         </TwoCol>
@@ -258,6 +259,7 @@ export function SiteFooter({
           className="inline-flex min-h-[30px] items-center gap-2 font-display text-[0.92rem] font-extrabold text-brass [@media(pointer:coarse)]:min-h-11 [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:transition-transform [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.4] hover:[&>svg]:translate-x-1"
           href={downloadUrl}
           data-placeholder-link="replace-me"
+          data-telemetry-cta="footer_download"
         >
           {t("closing.footer.download")} <ArrowIcon />
         </a>

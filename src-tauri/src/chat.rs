@@ -11,6 +11,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tungstenite::Message;
 
+use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::AppState;
 
@@ -415,8 +416,8 @@ fn run_twitch(
     // TLS (wss://:443): a Twitch deixou de servir o IRC em texto puro na porta 80.
     let mut socket = match tungstenite::connect("wss://irc-ws.chat.twitch.tv:443") {
         Ok((s, _)) => s,
-        Err(e) => {
-            log::warn!("twitch chat ({source}): {e}");
+        Err(_) => {
+            log::warn!("twitch chat: conexão falhou");
             chat_status_gen(&app, gen, "twitch", source, "error");
             return false;
         }
@@ -435,17 +436,16 @@ fn run_twitch(
     ));
     // Autenticada (PASS/NICK com o login do token) pra poder ENVIAR; senão, anônima.
     if let Some((login, raw)) = &creds {
-        let _ = socket.send(Message::Text(format!("PASS oauth:{raw}")));
-        let _ = socket.send(Message::Text(format!("NICK {login}")));
+        let _ = socket.send(Message::Text(format!("PASS oauth:{raw}").into()));
+        let _ = socket.send(Message::Text(format!("NICK {login}").into()));
     } else {
         let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
-        let _ = socket.send(Message::Text(format!(
-            "NICK justinfan{}",
-            now_ms() % 100000
-        )));
+        let _ = socket.send(Message::Text(
+            format!("NICK justinfan{}", now_ms() % 100000).into(),
+        ));
     }
-    let _ = socket.send(Message::Text(format!("JOIN #{ch}")));
-    log::info!("twitch chat: conectado em #{ch}");
+    let _ = socket.send(Message::Text(format!("JOIN #{ch}").into()));
+    log::info!("twitch chat: conectado");
     chat_status_gen(&app, gen, "twitch", source, "connected");
 
     // Fila de envio: registra um sender pra esta fonte e avisa "logado como X".
@@ -497,7 +497,7 @@ fn run_twitch(
                     continue;
                 }
                 if socket
-                    .send(Message::Text(format!("PRIVMSG #{ch} :{clean}")))
+                    .send(Message::Text(format!("PRIVMSG #{ch} :{clean}").into()))
                     .is_ok()
                 {
                     sends.push(Instant::now());
@@ -1776,7 +1776,7 @@ fn youtube_innertube(
     let Some((key, version, mut cont)) = innertube_bootstrap(video_id) else {
         return false;
     };
-    log::info!("youtube chat: InnerTube conectado ({source}) — vídeo {video_id}");
+    log::info!("youtube chat: InnerTube conectado");
     chat_status_gen(app, gen, "youtube", source, "connected");
     let mut first = true;
     let mut errors = 0u32;
@@ -1870,7 +1870,7 @@ fn youtube_dataapi(
             return false;
         }
     };
-    log::info!("youtube chat: Data API conectado ({source})");
+    log::info!("youtube chat: Data API conectado");
     chat_status_gen(&app, gen, "youtube", source, "connected");
 
     let mut page_token: Option<String> = None;
@@ -2121,7 +2121,7 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, 
     let (chatroom_id, channel_id) = match get_kick_ids(&slug) {
         Some(ids) => ids,
         None => {
-            log::warn!("kick chat ({source}): chatroom não resolvido (Cloudflare?)");
+            log::warn!("kick chat: chatroom não resolvido (Cloudflare?)");
             chat_status_gen(&app, gen, "kick", source, "error");
             return false;
         }
@@ -2129,8 +2129,8 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, 
     let url = "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=corneta&version=1.0&flash=false";
     let mut socket = match tungstenite::connect(url) {
         Ok((s, _)) => s,
-        Err(e) => {
-            log::warn!("kick chat ({source}): pusher {e}");
+        Err(_) => {
+            log::warn!("kick chat: conexão pusher falhou");
             chat_status_gen(&app, gen, "kick", source, "error");
             return false;
         }
@@ -2140,14 +2140,19 @@ fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, 
     }
     let _ = socket.send(Message::Text(format!(
         "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroom_id}.v2\"}}}}"
-    )));
+    )
+    .into()));
     // Canal de eventos (subs/gifts/host) — separado do chatroom.
     if channel_id != 0 {
         let _ = socket.send(Message::Text(format!(
             "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"channel.{channel_id}\"}}}}"
-        )));
+        )
+        .into()));
     }
-    log::info!("kick chat: conectado em {slug} (chatroom {chatroom_id})");
+    log::info!(
+        "kick chat: conectado; canal de eventos={}",
+        if channel_id == 0 { "ausente" } else { "ativo" }
+    );
     chat_status_gen(&app, gen, "kick", source, "connected");
 
     while running.load(Ordering::Relaxed) {
@@ -2461,7 +2466,7 @@ fn kick_counts(slug: &str) -> ChannelCounts {
     };
     let followers = v.get("followers_count").and_then(|x| x.as_u64());
     if followers.is_none() {
-        log::debug!("kick ({slug}): sem followers_count na resposta do canal");
+        log::debug!("kick: sem followers_count na resposta do canal");
     }
     ChannelCounts {
         viewers: v

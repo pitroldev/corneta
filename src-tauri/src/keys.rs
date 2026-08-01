@@ -19,7 +19,7 @@ pub fn get_key(target_id: &str) -> Option<String> {
 }
 
 pub fn clear_key(target_id: &str) -> Result<(), String> {
-    // delete_credential é a API do keyring v3; ignorar erro de "não existe".
+    // Ignorar erro de "não existe": limpar uma credencial ausente é idempotente.
     let _ = entry(target_id)?.delete_credential();
     Ok(())
 }

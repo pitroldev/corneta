@@ -52,7 +52,10 @@ describe("replay — índice", () => {
 
   it("ordena pela âncora, não pelo número do segmento", () => {
     // Numa retomada com relógio bagunçado o número pode mentir; o instante não.
-    const idx = buildReplayIndex([seg(2, T0 + 60_000, 10_000), seg(1, T0, 10_000)]);
+    const idx = buildReplayIndex([
+      seg(2, T0 + 60_000, 10_000),
+      seg(1, T0, 10_000),
+    ]);
     expect(idx.segments.map((s) => s.path)).toEqual(["S1.mp4", "S2.mp4"]);
   });
 
@@ -67,7 +70,10 @@ describe("replay — índice", () => {
 });
 
 describe("replay — epoch ↔ global", () => {
-  const idx = buildReplayIndex([seg(1, T0, 60_000), seg(2, T0 + 90_000, 30_000)]);
+  const idx = buildReplayIndex([
+    seg(1, T0, 60_000),
+    seg(2, T0 + 90_000, 30_000),
+  ]);
 
   it("mapeia um instante dentro do primeiro segmento", () => {
     expect(globalAtEpoch(idx, T0 + 10_000)).toBe(10_000);
@@ -158,13 +164,17 @@ describe("replay — deriva e âncoras", () => {
   });
 
   it("acusa âncora estimada e codec que o webview não toca", () => {
-    expect(hasEstimatedAnchor(buildReplayIndex([seg(1, T0, 1_000)]))).toBe(false);
+    expect(hasEstimatedAnchor(buildReplayIndex([seg(1, T0, 1_000)]))).toBe(
+      false,
+    );
     expect(
       hasEstimatedAnchor(
         buildReplayIndex([seg(1, T0, 1_000, { estimated: true })]),
       ),
     ).toBe(true);
-    expect(hasUnplayableCodec(buildReplayIndex([seg(1, T0, 1_000)]))).toBe(false);
+    expect(hasUnplayableCodec(buildReplayIndex([seg(1, T0, 1_000)]))).toBe(
+      false,
+    );
     expect(
       hasUnplayableCodec(
         buildReplayIndex([seg(1, T0, 1_000, { codec: "hevc" })]),

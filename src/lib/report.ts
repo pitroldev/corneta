@@ -136,7 +136,8 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
       const ts = Number(o.t);
       // `recEnd` sem `seg` vem da recuperação de boot (sessão truncada por queda de
       // energia): aplica no último segmento aberto, que é o que ficou pela metade.
-      const seg = o.seg == null ? Math.max(...recs.keys(), 1) : Number(o.seg) || 1;
+      const seg =
+        o.seg == null ? Math.max(...recs.keys(), 1) : Number(o.seg) || 1;
       const r = recs.get(seg);
       if (r) {
         if (Number.isFinite(ts) && ts > r.endT) r.endT = ts;
@@ -154,7 +155,8 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
       // Última linha vence: o NDJSON é append-only, então o ajuste manual é reescrito
       // em vez de editado. Grampeado porque o arquivo pode ter sido mexido na mão.
       const ms = Number(o.ms);
-      if (Number.isFinite(ms)) offsetMs = Math.max(-30_000, Math.min(30_000, ms));
+      if (Number.isFinite(ms))
+        offsetMs = Math.max(-30_000, Math.min(30_000, ms));
     } else if (o.kind === "end") {
       const e = Number(o.endedAt);
       if (Number.isFinite(e)) endedAt = e;

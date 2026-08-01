@@ -16,11 +16,20 @@ import type {
   Target,
   Viewers,
 } from "./types";
-import { api } from "./api";
+import { api, IS_TAURI, START_CANCELLED } from "./api";
 import { toast } from "./toast";
 import { OAUTH } from "./oauth";
 import * as cfgOps from "./configOps";
 import { openExternal, uid } from "./utils";
+import { addStep, capture } from "./telemetry";
+import {
+  createTelemetryId,
+  fpsBucket,
+  isUuid,
+  normalizeErrorCode,
+  resolutionBucket,
+  type SafePlatform,
+} from "./telemetry-schema";
 
 interface LoginState {
   state: string; // out | code | connected | error
@@ -65,6 +74,8 @@ interface State {
   snapshot: EngineSnapshot;
   encoders: EncoderInfo[];
   uploadMbps: number | null;
+  /** Última operação longa; fica visível após falha para copiar ao suporte. */
+  lastOperationId: string | null;
 
   load: (t: T) => Promise<void>;
   bindEngine: (t: T) => () => void;
@@ -235,6 +246,7 @@ export const useStore = create<State>((set, get) => {
   let saveChain: Promise<void> = Promise.resolve();
   let saveRevision = 0;
   let pendingSaves = 0;
+  let liveOperation: { id: string } | null = null;
   const flushSave = () => saveChain;
   const persist = (config: AppConfig) => {
     const profiles = config.profiles.map((p) =>
@@ -265,6 +277,7 @@ export const useStore = create<State>((set, get) => {
     snapshot: EMPTY_SNAPSHOT,
     encoders: [],
     uploadMbps: null,
+    lastOperationId: null,
 
     async load(t) {
       // A configuração é tudo de que a primeira tela precisa. A sonda real dos encoders abre
@@ -329,8 +342,22 @@ export const useStore = create<State>((set, get) => {
 
     bindEngine(t) {
       return api.subscribe((snapshot) => {
-        const prev = get().snapshot.state;
-        set({ snapshot });
+        const previousSnapshot = get().snapshot;
+        const prev = previousSnapshot.state;
+        const operationId = isUuid(snapshot.operationId)
+          ? snapshot.operationId
+          : liveOperation?.id;
+        set({
+          snapshot,
+          ...(isUuid(operationId) ? { lastOperationId: operationId } : {}),
+        });
+        if (prev !== "live" && snapshot.state === "live" && operationId)
+          addStep("live_became_active", { operation_id: operationId });
+        if (
+          liveOperation &&
+          (snapshot.state === "error" || snapshot.state === "stopped")
+        )
+          liveOperation = null;
         // Entrou no ar → liga o chat sozinho (se tem fonte configurada e a opção está on).
         // O streamer médio esquece o clique manual em outra tela — e conclui que "o chat não funciona".
         if (prev !== "live" && snapshot.state === "live") {
@@ -512,6 +539,23 @@ export const useStore = create<State>((set, get) => {
         const r = await api.obsCheck();
         lastObsCheckAt = Date.now();
         set({ obs: r });
+        if (force)
+          capture("obs_check_completed", {
+            outcome: !r.reachable
+              ? "not_reachable"
+              : r.pointingAtCorneta
+                ? "ok"
+                : "wrong_destination",
+            error_code: r.reachable
+              ? r.pointingAtCorneta
+                ? "none"
+                : "wrong_destination"
+              : r.authFailed
+                ? "auth_failed"
+                : normalizeErrorCode(r.error, "obs_unavailable"),
+            resolution_bucket: resolutionBucket(r.width, r.height),
+            fps_bucket: fpsBucket(r.fps),
+          });
       } catch (e) {
         lastObsCheckAt = Date.now();
         set({
@@ -524,6 +568,13 @@ export const useStore = create<State>((set, get) => {
             error: String(e),
           },
         });
+        if (force)
+          capture("obs_check_completed", {
+            outcome: "error",
+            error_code: normalizeErrorCode(e, "obs_check_failed"),
+            resolution_bucket: "unknown",
+            fps_bucket: "unknown",
+          });
       }
     },
 
@@ -533,13 +584,62 @@ export const useStore = create<State>((set, get) => {
     },
 
     async start() {
-      await flushSave();
-      set({
-        leaks: [],
-        censored: false,
-        viewers: { total: 0, anyLive: false, items: [] },
+      const config = get().config;
+      const operation = {
+        id: createTelemetryId(),
+      };
+      liveOperation = operation;
+      set({ lastOperationId: operation.id });
+      const enabledTargets = (config?.targets ?? []).filter(
+        (target) => target.enabled,
+      );
+      const requestProperties = {
+        operation_id: operation.id,
+        mode: config?.mode ?? "per-platform",
+        target_count: enabledTargets.length,
+        platforms: [
+          ...new Set(enabledTargets.map((target) => target.platformId)),
+        ].sort() as SafePlatform[],
+        brb_enabled: config?.settings.brbEnabled ?? false,
+        guardian_enabled: config?.settings.guardianEnabled ?? false,
+        record_video_enabled: config?.settings.recordVideo ?? false,
+      } as const;
+      addStep("live_start_requested", {
+        operation_id: operation.id,
+        stage: "engine_start",
       });
-      await api.start();
+      let requestCaptured = false;
+      try {
+        await flushSave();
+        set({
+          leaks: [],
+          censored: false,
+          viewers: { total: 0, anyLive: false, items: [] },
+        });
+        // A UI é dona do request porque conhece a intenção e captura exatamente
+        // antes do invoke; do recebimento em diante, outcomes pertencem ao Rust.
+        capture("live_start_requested", requestProperties);
+        requestCaptured = true;
+        await api.start(operation.id);
+      } catch (error) {
+        const rustSawOperation =
+          IS_TAURI &&
+          (error === START_CANCELLED ||
+            get().snapshot.operationId === operation.id ||
+            String(error).includes(`operation_id: ${operation.id}`));
+        if (!rustSawOperation) {
+          if (!requestCaptured)
+            capture("live_start_requested", requestProperties);
+          capture("live_start_failed", {
+            operation_id: operation.id,
+            stage: "ui_pre_command",
+            error_code: normalizeErrorCode(error, "engine_start_failed"),
+            cancelled: normalizeErrorCode(error) === "start_cancelled",
+          });
+        }
+        if (liveOperation?.id === operation.id) liveOperation = null;
+        throw error;
+      }
       // A1: liga o OBS junto (melhor-esforço) — e CONTA pra tela o que aconteceu,
       // pra o toast não mentir "no ar" quando o OBS nem recebeu o play.
       if (get().config?.settings.autoStartObs) {
@@ -557,6 +657,16 @@ export const useStore = create<State>((set, get) => {
       await flushSave();
       // Só marca relatório novo se chegou a ficar AO VIVO (cancelar no "starting" não gera live).
       const wasLive = get().snapshot.state === "live";
+      const operationId =
+        liveOperation?.id ??
+        (isUuid(get().snapshot.operationId)
+          ? get().snapshot.operationId
+          : undefined);
+      if (operationId)
+        addStep("live_stop_requested", {
+          operation_id: operationId,
+          stage: "engine_stop",
+        });
       if (get().config?.settings.autoStartObs) {
         try {
           await api.obsSetStream(false);
@@ -564,7 +674,8 @@ export const useStore = create<State>((set, get) => {
           /* ignore */
         }
       }
-      await api.stop();
+      await api.stop(operationId);
+      if (liveOperation?.id === operationId) liveOperation = null;
       if (wasLive) set({ unseenReport: true });
     },
 

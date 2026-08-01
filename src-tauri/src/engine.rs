@@ -586,6 +586,12 @@ pub struct TargetStatus {
 pub struct EngineSnapshot {
     pub state: String, // stopped | starting | live | error
     pub started_at: Option<u128>,
+    /// Correlação opaca desta tentativa/live; seguro para detalhes copiáveis.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_id: Option<String>,
+    /// Presente apenas em falha nativa já registrada/redigida.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_id: Option<String>,
     pub targets: HashMap<String, TargetStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -618,6 +624,8 @@ impl EngineSnapshot {
         EngineSnapshot {
             state: "stopped".into(),
             started_at: None,
+            operation_id: None,
+            error_id: None,
             targets: HashMap::new(),
             message: None,
             cpu: None,
@@ -656,6 +664,8 @@ impl EngineSnapshot {
         EngineSnapshot {
             state: "live".into(),
             started_at: Some(started_at),
+            operation_id: None,
+            error_id: None,
             targets,
             message: None,
             cpu: None,
@@ -804,6 +814,25 @@ pub struct EngineRuntime {
     pub start_gen: u64,
     /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
     pub last_emit_ms: u128,
+    /// UUID opaco criado no clique de BORA e propagado por todo o ciclo da live.
+    /// Nunca deriva do ID/nome de destino.
+    pub operation_id: Option<String>,
+    /// Mapa interno target_id -> plataforma enumerada. O target_id não sai em
+    /// telemetria; serve apenas para traduzir transições ao catálogo seguro.
+    pub target_platforms: std::collections::HashMap<String, String>,
+    /// Encoder consolidado para o evento único de entrada ao vivo.
+    pub telemetry_encoder_kind: String,
+    /// Reconexões consolidadas fora do hot path, emitidas apenas no fim.
+    pub telemetry_reconnect_count: u32,
+    /// Instante do clique de início (Unix ms), separado de `started_ms`, que é
+    /// resetado quando o primeiro pacote realmente entra ao vivo.
+    pub telemetry_start_requested_ms: u128,
+    /// Último ID capturado durante o setup, para que o erro retornado ao
+    /// frontend possa referenciar o issue sem duplicar a exceção.
+    pub telemetry_last_error_id: Option<String>,
+    /// Operação à qual `telemetry_last_error_id` pertence. Impede que um erro
+    /// antigo (por exemplo, um check do OBS) seja anexado a um novo BORA.
+    pub telemetry_last_error_operation_id: Option<String>,
 }
 
 #[cfg(test)]

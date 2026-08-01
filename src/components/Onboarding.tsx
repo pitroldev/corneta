@@ -8,6 +8,12 @@ import { INGEST_URL_RE } from "../lib/validation";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
 import { useT, type MessageKey } from "../lib/i18n";
+import {
+  addStep,
+  captureOnboarding,
+  TELEMETRY_DECISION_READY_EVENT,
+} from "../lib/telemetry";
+import { durationBucket } from "../lib/telemetry-schema";
 import type { PlatformId } from "../lib/types";
 import { LegalAcceptNote } from "./legal";
 import { Modal } from "./Modal";
@@ -75,6 +81,20 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const [flow, setFlow] = useState<Flow>(initialFlow);
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
+  const tourStartedAt = useRef(Date.now());
+  const tourRun = useRef(0);
+  const capturedRun = useRef(-1);
+
+  useEffect(() => {
+    if (flow !== "tour" || capturedRun.current === tourRun.current) return;
+    capturedRun.current = tourRun.current;
+    captureOnboarding({
+      event: "onboarding_started",
+      properties: {
+        entry_point: tourRun.current === 0 ? "first_run" : "replay",
+      },
+    });
+  }, [flow]);
 
   // O seletor só aparece com a config intocada. Quem já colou uma chave (ou
   // voltou pelo "Rever o tour") vê o passo 2 explicativo de sempre, e nada na
@@ -112,6 +132,8 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const replayNonce = useStore((s) => s.tourNonce);
   useEffect(() => {
     if (replayNonce > 0) {
+      tourRun.current += 1;
+      tourStartedAt.current = Date.now();
       setStep(0);
       setFlow("tour");
     }
@@ -135,12 +157,35 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     if (pristine)
       setPlatforms(PICKABLE.filter((p) => selected.has(p.id)).map((p) => p.id));
     setFlow(null);
+    window.dispatchEvent(new Event(TELEMETRY_DECISION_READY_EVENT));
     if (start) onStart();
     // Só na primeira dispensa — quem reabriu via Sobre já sabe o caminho.
     else if (firstTime && replayNonce === 0)
       toast.info(t("components.onboarding.dismissed.toast"));
   };
-  const next = () => (last ? close(true) : setStep((s) => s + 1));
+  const next = () => {
+    const stepId = [
+      "welcome",
+      "platforms",
+      "obs",
+      "golive",
+      "chat_reports",
+    ] as const;
+    captureOnboarding({
+      event: "onboarding_step_completed",
+      properties: { step_id: stepId[step] },
+    });
+    addStep("onboarding_advanced");
+    if (last) {
+      captureOnboarding({
+        event: "onboarding_completed",
+        properties: {
+          duration_bucket: durationBucket(Date.now() - tourStartedAt.current),
+        },
+      });
+      close(true);
+    } else setStep((s) => s + 1);
+  };
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const cur = STEPS[step];
@@ -153,6 +198,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
         onClose={() => {
           recordAcceptance();
           setFlow(null);
+          window.dispatchEvent(new Event(TELEMETRY_DECISION_READY_EVENT));
         }}
       />
     );

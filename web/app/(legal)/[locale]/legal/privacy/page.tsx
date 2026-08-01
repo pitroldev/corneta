@@ -31,7 +31,7 @@ const META = {
   "pt-BR": {
     title: "Política de privacidade",
     description:
-      "O que a Corneta trata, o que fica só no seu computador e o que passa pelos nossos servidores. Sem telemetria, sem conta, sem cookies.",
+      "O que fica no seu computador, a telemetria opcional do aplicativo e as métricas cookieless do site, com opt-out e sem conta.",
     ogTitle: "Política de privacidade — Corneta",
     ogDescription:
       "O que a Corneta trata, o que fica só no seu computador e o que passa pelos nossos servidores.",
@@ -39,7 +39,7 @@ const META = {
   en: {
     title: "Privacy policy",
     description:
-      "What Corneta processes, what stays on your computer only, and what passes through our servers. No telemetry, no account, no cookies.",
+      "What stays on your computer, optional app telemetry, and cookieless website metrics with an opt-out and no account.",
     ogTitle: "Privacy policy — Corneta",
     ogDescription:
       "What Corneta processes, what stays on your computer only, and what passes through our servers.",
@@ -99,7 +99,7 @@ export default async function PrivacyPage({
         kicker={hero.kicker}
         title={hero.title}
         intro={hero.intro}
-        version="1.0"
+        version="2.0"
         path={PATH}
       />
 

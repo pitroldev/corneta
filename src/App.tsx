@@ -8,6 +8,12 @@ import { brbSlateGeneration, renderBrbSlatePng } from "./lib/brbSlate";
 import { runWhenIdle } from "./lib/idle";
 import { applyTheme } from "./lib/theme";
 import { useI18n, useT } from "./lib/i18n";
+import {
+  addStep,
+  capture,
+  flushTelemetry,
+  setTelemetryLocale,
+} from "./lib/telemetry";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -28,6 +34,7 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { LiveBar } from "./components/LiveBar";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
+import { TelemetryConsentNotice } from "./components/TelemetryConsent";
 import { Mascot, SoundWaves } from "./components/decor";
 import { PlatformsScreen } from "./screens/PlatformsScreen";
 const loadEncodingScreen = () =>
@@ -107,6 +114,17 @@ export default function App() {
   const liveState = useStore((s) => s.snapshot.state);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const brbSlateKind = useStore((s) => s.config?.settings.brbSlateKind);
+  const appStarted = useRef(false);
+
+  useEffect(() => {
+    setTelemetryLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
+    if (!loaded || appStarted.current) return;
+    appStarted.current = true;
+    addStep("app_ready");
+  }, [loaded]);
 
   // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
   const liveLabel = censored
@@ -139,6 +157,20 @@ export default function App() {
 
   // A última tela lembrada baixa em paralelo ao config; hover/foco cuida das próximas.
   useEffect(() => preloadScreen(screen), [screen]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    capture("screen_viewed", { screen_id: screen });
+    addStep("screen_opened", { screen_id: screen });
+  }, [loaded, screen]);
+
+  useEffect(() => {
+    const onClose = () => {
+      void flushTelemetry(150);
+    };
+    window.addEventListener("beforeunload", onClose);
+    return () => window.removeEventListener("beforeunload", onClose);
+  }, []);
 
   useEffect(() => {
     void load(t);
@@ -395,7 +427,7 @@ export default function App() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.11, ease: "easeOut" }}
                 >
-                  <ErrorBoundary>
+                  <ErrorBoundary screenId={screen}>
                     <Suspense fallback={<ScreenLoading />}>
                       {screen === "platforms" && <PlatformsScreen />}
                       {screen === "encoding" && <EncodingScreen />}
@@ -417,6 +449,7 @@ export default function App() {
 
         <Toaster />
         <Onboarding onStart={() => navigate("platforms")} />
+        <TelemetryConsentNotice />
       </div>
     </MotionConfig>
   );

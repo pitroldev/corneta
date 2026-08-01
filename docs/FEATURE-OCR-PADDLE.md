@@ -1,52 +1,47 @@
-# OCR PaddleOCR (oar-ocr) — mais preciso + na CPU (libera a GPU)
+# OCR PaddleOCR (oar-ocr) — preciso e executado na CPU
 
-## Por quê
-O Windows.Media.Ocr usa a GPU (somava com o NVENC do compositor) e erra texto
-pequeno/estilizado. PaddleOCR (PP-OCRv5) é mais preciso e roda rápido na CPU →
-libera a GPU.
+## Decisão
 
-## VALIDADO ✅ (scratchpad/ocrtest)
-Crate `oar-ocr` 0.2.2 (PaddleOCR PP-OCRv5 via ONNX Runtime). Numa imagem com e-mail
-+ chave:
-- pipeline pronto em ~190ms; **predict ~60-100ms na CPU** (dá ~10×/s).
-- "Email:joao@teste.com" conf 0.97, "token sk-ABC…" conf 0.98 — texto exato + boxes.
+A Corneta usa `oar-ocr` **0.8.1** com ONNX Runtime `ort`
+**`=2.0.0-rc.12`**. O pin de `ort` é intencional: a RC 13 removeu
+`CPUExecutionProvider`, API ainda usada pelo `oar-ocr` 0.8.1. Essa versão do OCR exige Rust
+1.95; o projeto, o CI e os artefatos oficiais usam Rust **1.97.1**.
 
-### Detalhe crítico de build
-`oar-ocr 0.2.2` só compila com **`ort = "=2.0.0-rc.10"`** fixo (rc.11+ tornou
-`Session.inputs` privado → não compila). Pinar o ort resolve.
+O PaddleOCR roda na CPU para não disputar GPU com NVDEC/NVENC durante a live. O
+`Windows.Media.Ocr` permanece como fallback local e é usado imediatamente na primeira sessão
+enquanto os modelos são baixados em background.
 
-### API
-```rust
-use oar_ocr::prelude::*;
-let ocr = OAROCRBuilder::new(det.to_string(), rec.to_string(), dict.to_string()).build()?;
-let results = ocr.predict(&[rgb_image])?;          // &[RgbImage]
-for region in &results[0].text_regions {
-    if let Some(text) = &region.text {              // Option<String>
-        let bb = &region.bounding_box;              // BoundingBox { points: [Point{x,y}; 4] }
-        // region.confidence: Option<f32>
-    }
-}
-```
+## Implementação atual
 
-### Modelos (GitHub Releases oar-ocr v0.3.0, ~21MB)
-- pp-ocrv5_mobile_det.onnx (4.8MB)
-- pp-ocrv5_mobile_rec.onnx (16.5MB)
-- ppocrv5_dict.txt (74KB)
-`https://github.com/GreatV/oar-ocr/releases/download/v0.3.0/<arquivo>`
+- `OAROCRBuilder` recebe os caminhos de detecção, reconhecimento e dicionário.
+- `OrtSessionConfig` força o execution provider de CPU e limita as threads.
+- A imagem em tons de cinza é redimensionada, convertida para RGB e passada a `predict`.
+- O pipeline é criado uma única vez dentro da thread que o utiliza.
+- Falha de download, integridade, criação da sessão ou inferência degrada para o motor nativo;
+  ela não impede o início da live.
 
-GPU opcional: feature `directml` (Windows). Mas a CPU já é rápida E libera a GPU → CPU.
+## Modelos fixados
 
-## Plano de integração
-1. **Cargo:** `oar-ocr = "0.2"` + `ort = "=2.0.0-rc.10"`.
-2. **Modelos:** baixar na 1ª vez (censura ligada) pra `app_config_dir/ocr-models/`
-   via `ureq` se faltar; OU empacotar como resource. Também o **ONNX Runtime DLL**
-   (o `ort` baixa pro lado do exe em dev; em produção, empacotar).
-3. **guardian.rs:** `paddle_scan_gray(ocr, gray, w, h, watchlist) -> (Vec<Leak>,
-   Vec<Region>)`: cinza → RgbImage (g→g,g,g) → predict → monta `full` + `Word`s e
-   reusa `scan`. Box: bounding-rect dos 4 pontos → frações. Pra tarja mais justa,
-   dividir a linha em palavras com box proporcional ao range de chars.
-4. **compositor.rs:** a thread de OCR constrói o pipeline UMA vez (com fallback pro
-   Windows OCR se baixar/abrir falhar) e usa `paddle_scan_gray` no lugar do
-   `ocr_scan_gray`.
+Os assets PP-OCRv6 Tiny vêm do release oficial `oar-ocr` **v0.7.0**:
 
-Mantém o Windows OCR como fallback → o app nunca quebra se o Paddle falhar.
+| Arquivo                  |     Bytes | SHA-256                                                            |
+| ------------------------ | --------: | ------------------------------------------------------------------ |
+| `pp-ocrv6_tiny_det.onnx` | 1.780.590 | `193bab7a04fca699a6c82e6abb5b81bdb28177f0abd4062552b04908dafb19f8` |
+| `pp-ocrv6_tiny_rec.onnx` | 4.462.639 | `9ef676d6ed3c88256a2d92c640c44f25b0c40947e111b14b8be8f594091563e6` |
+| `ppocrv6_tiny_dict.txt`  |    27.156 | `c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd` |
+
+Base de download:
+`https://github.com/GreatV/oar-ocr/releases/download/v0.7.0/<arquivo>`.
+
+Cada arquivo é baixado em streaming com limite de tamanho, validado por tamanho e SHA-256 e
+gravado primeiro como `.part`; somente então a troca para o nome definitivo é feita. O cache em
+`app_config_dir/ocr-models/` é revalidado antes do uso.
+
+## Validação histórica
+
+O protótipo inicial mediu aproximadamente 60–100 ms por inferência na CPU em uma imagem de
+teste com texto pequeno e confirmou texto e regiões. Os números são referência histórica, não
+um SLA: resolução, CPU, quantidade de linhas e modelos atuais alteram o tempo real.
+
+O comportamento vigente e seus testes ficam em `src-tauri/src/guardian/ocr.rs`; este documento
+deve ser atualizado junto de qualquer mudança de `oar-ocr`, `ort` ou dos três assets fixados.

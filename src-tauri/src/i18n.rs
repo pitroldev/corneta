@@ -176,7 +176,7 @@ pub fn system_locale() -> Locale {
     unsafe {
         let mut count: u32 = 0;
         let mut len: u32 = 0;
-        if GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &mut count, PWSTR::null(), &mut len)
+        if GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &mut count, Some(PWSTR::null()), &mut len)
             .is_err()
             || len == 0
         {
@@ -186,7 +186,7 @@ pub fn system_locale() -> Locale {
         if GetUserPreferredUILanguages(
             MUI_LANGUAGE_NAME,
             &mut count,
-            PWSTR(buf.as_mut_ptr()),
+            Some(PWSTR(buf.as_mut_ptr())),
             &mut len,
         )
         .is_err()
@@ -590,8 +590,8 @@ messages! {
         pt: "<{n} termos omitidos>",
         en: "<{n} term(s) left out>";
     DiagReportHeader { version: &'a str, os: &'a str, arch: &'a str, config: &'a str } = "rust.diag.reportHeader" =>
-        pt: "Corneta {version}\nSO: {os} {arch}\n\nCONFIG (segredos removidos)\n{config}\n\nLOGS RECENTES\n",
-        en: "Corneta {version}\nOS: {os} {arch}\n\nCONFIG (secrets stripped)\n{config}\n\nRECENT LOGS\n";
+        pt: "Corneta {version}\nSO: {os} {arch}\n\nRESUMO DA CONFIGURAÇÃO (somente campos técnicos permitidos)\n{config}\n",
+        en: "Corneta {version}\nOS: {os} {arch}\n\nCONFIGURATION SUMMARY (allowlisted technical fields only)\n{config}\n";
     DiagFilePickerFilter = "rust.diag.filePicker.filter" =>
         pt: "Diagnóstico da Corneta",
         en: "Corneta diagnostics";

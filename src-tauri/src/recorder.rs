@@ -31,7 +31,19 @@ use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
 use crate::session;
+use crate::telemetry::AppError;
 use crate::AppState;
+
+fn capture_recording_error(app: &AppHandle, code: &str, retryable: bool) {
+    let state = app.state::<AppState>();
+    let operation_id = state.engine.lock().unwrap().operation_id.clone();
+    state.telemetry.capture_error(
+        AppError::new(code, "recording", retryable, None),
+        operation_id.as_deref(),
+        true,
+        "warning",
+    );
+}
 
 /// Chave do gravador no mapa de filhos do motor. Estar lá é o que faz TODOS os caminhos de
 /// encerramento que já existem (`kill_engine`, `taskkill /T /F`) levarem o gravador junto.
@@ -305,6 +317,7 @@ pub async fn run(
         if let Some(free) = free_bytes(&dir) {
             if free < DISK_START_FLOOR {
                 log::warn!("gravação: espaço insuficiente ({free} bytes) — não vou começar");
+                capture_recording_error(&app, "recording_disk_low", true);
                 session::record_rec_end(&session_path, seg, REASON_DISK);
                 toast(&app, "diskFull", None);
                 return;
@@ -319,6 +332,7 @@ pub async fn run(
             Ok(v) => v,
             Err(e) => {
                 log::error!("gravação: sidecar ffmpeg indisponível: {e}");
+                capture_recording_error(&app, "recording_ffmpeg_spawn_failed", true);
                 session::record_rec_end(&session_path, seg, REASON_GIVEUP);
                 toast(&app, "failed", Some(e.to_string()));
                 return;
@@ -450,6 +464,7 @@ pub async fn run(
         restarts += 1;
         if restarts > MAX_RESTARTS {
             log::error!("gravação: {MAX_RESTARTS} retomadas sem sucesso — desistindo");
+            capture_recording_error(&app, "recording_gave_up", false);
             session::record_rec_end(&session_path, seg, REASON_GIVEUP);
             toast(&app, "gaveUp", None);
             break;

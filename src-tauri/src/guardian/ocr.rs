@@ -1,6 +1,6 @@
 //! Adaptadores da porta [`Ocr`]: transformam pixels em TEXTO (a watchlist é casada no domínio).
 //! Dois motores locais (sem nuvem — privacidade):
-//! - **PaddleOCR** (PP-OCRv5 via ONNX Runtime na CPU) — mais preciso; a GPU fica pro codec.
+//! - **PaddleOCR** (PP-OCRv6 Tiny via ONNX Runtime na CPU) — preciso; a GPU fica pro codec.
 //! - **Windows.Media.Ocr** — nativo, leve, sem baixar modelo (fallback / 1ª sessão).
 //!
 //! Antes do OCR a gente ENCOLHE o quadro (1280w) e limita a detecção (640) — corta custo sem
@@ -8,6 +8,7 @@
 //! menos vezes (o diff no pipeline pula quadros iguais).
 
 use super::Ocr;
+use crate::http_client as ureq;
 use image::{DynamicImage, GrayImage};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -39,7 +40,7 @@ fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {
 // ----------------------------- PaddleOCR (CPU) -----------------------------
 
 pub(super) struct PaddleOcr {
-    inner: oar_ocr::pipeline::OAROCR,
+    inner: oar_ocr::oarocr::OAROCR,
 }
 
 impl Ocr for PaddleOcr {
@@ -52,7 +53,7 @@ impl Ocr for PaddleOcr {
             return String::new();
         };
         let rgb = DynamicImage::ImageLuma8(small).into_rgb8();
-        let results = match self.inner.predict(&[rgb]) {
+        let results = match self.inner.predict(vec![rgb]) {
             Ok(r) => r,
             Err(_) => return String::new(),
         };
@@ -74,19 +75,19 @@ impl Ocr for PaddleOcr {
 
 const MODELS: [(&str, u64, &str); 3] = [
     (
-        "pp-ocrv5_mobile_det.onnx",
-        4_826_518,
-        "1eb7b4f7ab657ebd1c66d5f79bca7497f29768a2e3c15e52daecbba1a8e4a039",
+        "pp-ocrv6_tiny_det.onnx",
+        1_780_590,
+        "193bab7a04fca699a6c82e6abb5b81bdb28177f0abd4062552b04908dafb19f8",
     ),
     (
-        "pp-ocrv5_mobile_rec.onnx",
-        16_562_373,
-        "243a0f06d826761323e9045e9b113ab2c191c3aa50565585e628300b8eda0224",
+        "pp-ocrv6_tiny_rec.onnx",
+        4_462_639,
+        "9ef676d6ed3c88256a2d92c640c44f25b0c40947e111b14b8be8f594091563e6",
     ),
     (
-        "ppocrv5_dict.txt",
-        74_012,
-        "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b",
+        "ppocrv6_tiny_dict.txt",
+        27_156,
+        "c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd",
     ),
 ];
 
@@ -109,7 +110,12 @@ fn verify_model(path: &std::path::Path, size: u64, expected_sha256: &str) -> boo
         }
         hasher.update(&buffer[..read]);
     }
-    format!("{:x}", hasher.finalize()) == expected_sha256
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>()
+        == expected_sha256
 }
 
 fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
@@ -117,7 +123,7 @@ fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
     Some(app.path().app_config_dir().ok()?.join("ocr-models"))
 }
 
-/// Os 3 modelos PP-OCRv5 já estão baixados? (Paddle agora vs Windows OCR + baixar no fundo).
+/// Os 3 modelos PP-OCRv6 Tiny já estão baixados? (Paddle agora vs Windows OCR + baixar no fundo).
 fn models_cached(app: &AppHandle) -> bool {
     match models_dir(app) {
         Some(dir) => MODELS
@@ -127,7 +133,7 @@ fn models_cached(app: &AppHandle) -> bool {
     }
 }
 
-/// Garante os 3 modelos PP-OCRv5 (baixa do GitHub Releases na 1ª vez). (det, rec, dict).
+/// Garante os 3 modelos PP-OCRv6 Tiny (baixa do GitHub Releases na 1ª vez). (det, rec, dict).
 static DL_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Com timeout por arquivo — uma rede ruim falha rápido (cai pro Windows OCR) em vez de pendurar.
@@ -138,13 +144,13 @@ fn ensure_paddle_models(
     let _guard = DL_GUARD.lock().ok()?;
     let dir = models_dir(app)?;
     std::fs::create_dir_all(&dir).ok()?;
-    let base = "https://github.com/GreatV/oar-ocr/releases/download/v0.3.0";
+    let base = "https://github.com/GreatV/oar-ocr/releases/download/v0.7.0";
     let mut paths = Vec::new();
     for (n, size, expected_sha256) in MODELS {
         let p = dir.join(n);
         if !cache_already_verified && !verify_model(&p, size, expected_sha256) {
             log::info!("OCR: baixando modelo {n}…");
-            let resp = ureq::get(&format!("{base}/{n}"))
+            let resp = ureq::get(format!("{base}/{n}"))
                 .timeout(Duration::from_secs(60))
                 .call()
                 .ok()?;
@@ -168,7 +174,12 @@ fn ensure_paddle_models(
             }
             output.flush().ok()?;
             drop(output);
-            if total != size || format!("{:x}", hasher.finalize()) != expected_sha256 {
+            let actual_sha256 = hasher
+                .finalize()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            if total != size || actual_sha256 != expected_sha256 {
                 let _ = std::fs::remove_file(&tmp);
                 log::error!("OCR: integridade inválida em {n}; download descartado");
                 return None;
@@ -189,6 +200,7 @@ fn ensure_paddle_models(
 /// degradando pra 5-15s ao vivo. Intra-threads limitado (sobra core pro encoder/compositor).
 fn build_paddle(app: &AppHandle, cache_already_verified: bool) -> Option<PaddleOcr> {
     use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
+    use oar_ocr::domain::tasks::TextDetectionConfig;
     let (det, rec, dict) = ensure_paddle_models(app, cache_already_verified)?;
     let cores = std::thread::available_parallelism()
         .map(|n| n.get())
@@ -198,16 +210,15 @@ fn build_paddle(app: &AppHandle, cache_already_verified: bool) -> Option<PaddleO
         .with_execution_providers(vec![OrtExecutionProvider::CPU])
         .with_intra_threads(intra)
         .with_inter_threads(1);
-    let inner = oar_ocr::pipeline::OAROCRBuilder::new(
-        det.to_string_lossy().to_string(),
-        rec.to_string_lossy().to_string(),
-        dict.to_string_lossy().to_string(),
-    )
-    .global_ort_session(ort_cfg)
-    .text_det_limit_side_len(DET_LIMIT)
-    .text_recognition_batch_size(8)
-    .build()
-    .ok()?;
+    let inner = oar_ocr::oarocr::OAROCRBuilder::new(det, rec, dict)
+        .ort_session(ort_cfg)
+        .text_detection_config(TextDetectionConfig {
+            limit_side_len: Some(DET_LIMIT),
+            ..Default::default()
+        })
+        .region_batch_size(8)
+        .build()
+        .ok()?;
     Some(PaddleOcr { inner })
 }
 
@@ -250,14 +261,14 @@ fn ocr_text_jpeg(bytes: &[u8]) -> Option<String> {
     let stream = InMemoryRandomAccessStream::new().ok()?;
     let writer = DataWriter::CreateDataWriter(&stream).ok()?;
     writer.WriteBytes(bytes).ok()?;
-    writer.StoreAsync().ok()?.get().ok()?;
-    let _ = writer.FlushAsync().ok()?.get();
+    writer.StoreAsync().ok()?.join().ok()?;
+    let _ = writer.FlushAsync().ok()?.join();
     let _ = writer.DetachStream();
     stream.Seek(0).ok()?;
-    let decoder = BitmapDecoder::CreateAsync(&stream).ok()?.get().ok()?;
-    let bitmap = decoder.GetSoftwareBitmapAsync().ok()?.get().ok()?;
+    let decoder = BitmapDecoder::CreateAsync(&stream).ok()?.join().ok()?;
+    let bitmap = decoder.GetSoftwareBitmapAsync().ok()?.join().ok()?;
     let engine = OcrEngine::TryCreateFromUserProfileLanguages().ok()?;
-    let result = engine.RecognizeAsync(&bitmap).ok()?.get().ok()?;
+    let result = engine.RecognizeAsync(&bitmap).ok()?.join().ok()?;
     Some(result.Text().ok()?.to_string())
 }
 

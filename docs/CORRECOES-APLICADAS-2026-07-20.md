@@ -32,8 +32,8 @@ hardware reais. Eles estão documentados em `GATES-DE-RELEASE.md` e bloqueiam pu
   futuras. Saves são imediatos, serializados e protegidos contra escrita obsoleta entre webviews.
 - Sessões usam writer bufferizado, flush periódico/final, limite de 32 MiB, schema no NDJSON e
   recuperação no boot quando o processo anterior terminou sem evento `end`.
-- Logs rotacionam em cinco arquivos de 5 MiB. A exportação de diagnóstico remove senha do OBS,
-  API key, watchlist, tokens, secrets, stream keys e headers Authorization.
+- Logs rotacionam em cinco arquivos de 5 MiB e permanecem locais. A exportação de diagnóstico não
+  inclui caudas de log: contém apenas resumo técnico e eventos estruturados allowlisted.
 - Stack traces ficam recolhidos em “Detalhes técnicos”; o erro pode ser copiado sob demanda.
 - Entrada/config importada é salva atomicamente e sincronizada com as demais janelas.
 

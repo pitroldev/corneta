@@ -7,6 +7,7 @@ mod config;
 mod engine;
 mod engine_policy;
 mod guardian;
+mod http_client;
 // `pub` de propósito: o catálogo de mensagens é a fundação do i18n e precisa
 // ficar alcançável a partir da raiz do crate — senão as 220 variantes ainda não
 // fiadas viram um muro de `dead_code` que esconde aviso de verdade.
@@ -19,6 +20,7 @@ mod recorder;
 mod session;
 mod splicer;
 mod studio;
+mod telemetry;
 
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
@@ -33,6 +35,7 @@ pub struct AppState {
     pub oauth: Mutex<auth::OauthConfig>,
     pub studio: Mutex<studio::StudioServer>,
     pub overlay: Mutex<overlay::OverlayServer>,
+    pub telemetry: telemetry::TelemetryRuntime,
 }
 
 fn show_main(app: &tauri::AppHandle) {
@@ -67,10 +70,16 @@ fn confirm_end_live(app: &tauri::AppHandle, msg: &str) -> bool {
 
 /// Sequência única de encerramento (Mesa + broadcast do YouTube + motor).
 fn shutdown_engine(app: &tauri::AppHandle) {
+    // Memoriza o estado ANTES de derrubar o motor; o evento/marker e o flush
+    // acontecem apenas no RunEvent::ExitRequested (fechar uma janela nem sempre
+    // encerra um app que também possui tray icon).
+    app.state::<AppState>()
+        .telemetry
+        .note_exit_live(engine_live(app));
     studio::stop(&app.state::<AppState>().studio);
     overlay::stop(&app.state::<AppState>().overlay);
     auth::youtube_complete_active(app); // encerra o broadcast do YouTube
-    commands::kill_engine(app);
+    commands::kill_engine_for_shutdown(app);
 }
 
 /// Feedback da ida pra bandeja: na primeira vez avisa que o app NÃO fechou (o botão se
@@ -129,6 +138,7 @@ fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let startup_started = std::time::Instant::now();
     tauri::Builder::default()
         // single-instance DEVE ser o primeiro plugin (§14.2): evita duas Cornetas
         // disputando a porta de ingestão / subindo motores duplicados.
@@ -184,6 +194,7 @@ pub fn run() {
             oauth: Mutex::new(auth::OauthConfig::default()),
             studio: Mutex::new(studio::StudioServer::default()),
             overlay: Mutex::new(overlay::OverlayServer::default()),
+            telemetry: telemetry::TelemetryRuntime::default(),
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
@@ -269,8 +280,18 @@ pub fn run() {
             commands::overlay_chat_test,
             commands::overlay_obs_add_source,
             commands::open_privacy_settings,
+            telemetry::telemetry_status,
+            telemetry::telemetry_set_consent,
+            telemetry::telemetry_regenerate_id,
+            telemetry::telemetry_capture,
+            telemetry::telemetry_capture_exception,
         ])
-        .setup(|app| {
+        .setup(move |app| {
+            let previous_exit = telemetry::mark_boot_started(app.handle());
+            let telemetry_state = &app.state::<AppState>().telemetry;
+            telemetry_state.initialize(app.handle());
+            telemetry::install_panic_hook(app.handle().clone());
+            telemetry_state.capture_app_started(&previous_exit, startup_started.elapsed());
             session::recover_incomplete_sessions(app.handle());
             // Varredura de gravações órfãs + poda por espaço. Roda no boot porque é aqui
             // que dá pra recolher o que uma queda (ou uma versão anterior) deixou pra
@@ -382,6 +403,13 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("erro ao iniciar a Corneta");
+        .build(tauri::generate_context!())
+        .expect("erro ao iniciar a Corneta")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                let telemetry = &app.state::<AppState>().telemetry;
+                telemetry.record_clean_exit(app, engine_live(app));
+                telemetry.shutdown();
+            }
+        });
 }

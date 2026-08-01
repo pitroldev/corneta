@@ -4,7 +4,11 @@ version = "0.6.0"
 description = "Corneta — transmita para todas as plataformas ao mesmo tempo."
 authors = ["Pitrol"]
 edition = "2021"
-rust-version = "1.77"
+license = "MIT"
+publish = false
+# OAR-OCR 0.8 exige Rust 1.95. Usamos a versão estável fixada no CI para que
+# `rust-version` seja validado pelo mesmo compilador usado nos artefatos oficiais.
+rust-version = "1.97.1"
 
 [lib]
 # O nome do lib é referenciado por main.rs como `corneta_lib::run()`.
@@ -12,60 +16,73 @@ name = "corneta_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 # protocol-asset: o `<video>` do replay lê a gravação do disco. O escopo nasce vazio e cada
 # arquivo é liberado em runtime (ver commands::record_allow_file).
-tauri = { version = "2", features = ["tray-icon", "image-png", "protocol-asset"] }
-tauri-plugin-shell = "2"
-tauri-plugin-opener = "2"
-tauri-plugin-single-instance = "2"
-tauri-plugin-autostart = "2"
-tauri-plugin-log = "2"
+tauri = { version = "2.11.5", features = ["tray-icon", "image-png", "protocol-asset"] }
+tauri-plugin-shell = "2.3.5"
+tauri-plugin-opener = "2.5.4"
+tauri-plugin-single-instance = "2.4.3"
+tauri-plugin-autostart = "2.5.1"
+tauri-plugin-log = "2.9.0"
 # Atalhos globais, notificações nativas e memória de tamanho/posição da janela.
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-notification = "2"
-tauri-plugin-window-state = "2"
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-window-state = "2.4.1"
 # Diálogos nativos (confirmar saída, importar/exportar config).
-tauri-plugin-dialog = "2"
-log = "0.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+tauri-plugin-dialog = "2.7.2"
+log = "0.4.33"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+# Telemetria nativa: captura é fire-and-forget numa fila de background. Sem a
+# feature async-client, a criação/flush do cliente não depende do runtime Tokio;
+# a entrega de eventos continua acontecendo no worker do próprio SDK.
+posthog-rs = { version = "=0.21.0", default-features = false, features = ["error-tracking"] }
+uuid = { version = "1.24.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 # Cliente HTTP leve (bloqueante) para o teste de upload — rodado em spawn_blocking.
-ureq = "2"
+ureq3 = { package = "ureq", version = "3.3.0" }
 # Uso de CPU ao vivo (GPU via nvidia-smi). Só o módulo "system".
-sysinfo = { version = "0.32", default-features = false, features = ["system"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 # WebSocket para obs-websocket v5 (ws://) e chat da Twitch/Kick (Kick/Pusher é wss:// → TLS).
-tungstenite = { version = "0.23", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
-sha2 = "0.10"
-base64 = "0.22"
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+sha2 = "0.11.0"
+base64 = "0.23.0"
 # Quadros crus são imutáveis depois de decodificados. `Bytes` permite compartilhar o
 # mesmo backing buffer entre delay, freeze e encoder sem copiar ~3 MiB por frame.
-bytes = "1"
+bytes = "1.12.1"
 # Aleatoriedade do SO (PKCE verifier/state do login do Kick). Já está no lock (transitivo).
-getrandom = "0.2"
+getrandom = "0.4.3"
 # Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
-regex = "1"
+regex = "1.13.1"
 # Guardião: encolhe o quadro antes do OCR (resize), diff de quadros e renderiza o slate "JÁ VOLTO"
 # (PNG) → yuv420p pro compositor.
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
-# OCR PaddleOCR (PP-OCRv5 via ONNX Runtime) na CPU. Decode/encode ficam na GPU (NVDEC/NVENC);
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
+# OCR PaddleOCR (PP-OCRv6 Tiny via ONNX Runtime) na CPU. Decode/encode ficam na GPU (NVDEC/NVENC);
 # OCR na CPU LIVRE (~300ms, previsível). Na GPU (DirectML) disputava o codec e degradava
 # (5-15s e crescendo) ao vivo. CPU também dispensa bundlar a DirectML.dll.
-# `ort` FIXO no rc.10 (rc.11+ quebra o oar-ocr).
-oar-ocr = "0.2"
-ort = "=2.0.0-rc.10"
+# OAR-OCR 0.8.1 ainda chama a API de execution providers da RC 12; a RC 13
+# removeu `CPUExecutionProvider`. O pin é o máximo compatível até o upstream adaptar.
+oar-ocr = "0.8.1"
+ort = "=2.0.0-rc.12"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
-keyring = { version = "3", features = ["windows-native"] }
+keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 # Mesa (co-stream P2P): servidor local HTTP (página de estúdio pro OBS) + relay de
-# sinalização WebRTC. axum =0.8.4 (MSRV ok p/ rust 1.77) reusa o stack hyper1/http1/tower
+# sinalização WebRTC. axum 0.8 reusa o stack hyper1/http1/tower
 # que o Tauri já traz; só compila axum/axum-core/matchit/tokio-tungstenite a mais.
-axum = { version = "=0.8.4", default-features = false, features = ["http1", "tokio", "ws"] }
-tokio = { version = "1", features = ["net", "sync", "macros", "time"] }
-tauri-plugin-updater = "2.0.0-rc.4"
-tauri-plugin-process = "2.0.0-rc.1"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
+tokio = { version = "1.53.1", features = ["net", "sync", "macros", "time"] }
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"
+
+# Hotfix transitivo de segurança: notify-rust 4.18 ainda fixa
+# tauri-winrt-notification 0.7 (quick-xml vulnerável). Este commit imutável é o PR
+# oficial do mantenedor que sobe para 0.8.1; remover o patch assim que houver release.
+[patch.crates-io]
+notify-rust = { git = "https://github.com/hoodie/notify-rust", rev = "a733009b2c52c6605443b287ae5348a6c4879a3e" }
 
 # OCR local do guardião anti-vazamento via Windows.Media.Ocr (nativo, sem binário extra).
 [target.'cfg(windows)'.dependencies]
@@ -73,10 +90,12 @@ tauri-plugin-process = "2.0.0-rc.1"
 # "auto" do i18n. É a mesma fonte que o navigator.languages do WebView2 lê.
 # Win32_Storage_FileSystem: GetDiskFreeSpaceExW — espaço livre do VOLUME da pasta de
 # gravação (não do disco do sistema). É o que sustenta a parada antes de o disco zerar.
-windows = { version = "0.58", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem"] }
+windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem"] }
 # Mesa: auto-concede câmera/mic no WebView2 (PermissionRequested). Resolve pra 0.38.2,
 # o mesmo já fixado pelo wry — sem binding nativo duplicado.
-webview2-com = "0.38"
+# O WebView retornado pelo Wry/Tauri usa os bindings 0.38; misturar 0.39 cria
+# interfaces COM de versões distintas de windows-core. Atualizar junto do Wry.
+webview2-com = "=0.38.2"
 
 [profile.release]
 panic = "abort"

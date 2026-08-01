@@ -1,41 +1,90 @@
-# Publica uma release: builda o instalador NSIS, assina os artefatos com a chave do
-# updater e sobe tudo (incluindo o `latest.json`) num release do GitHub.
-#
-# O `latest.json` é o que o app lê — o endpoint em `tauri.conf.json` aponta pro
-# `releases/latest/download/latest.json`. Sem este workflow, o updater não tem o que ler.
+# Publica uma release: gera o frontend e seus source maps, builda o instalador NSIS,
+# assina o artefato do updater, escaneia exatamente esse resultado e só então cria o
+# draft no GitHub com o `latest.json`.
 #
 # Como disparar: crie a tag da versão e empurre.
-#   git tag v0.5.3 && git push origin v0.5.3
-# A tag precisa BATER com a `version` do `tauri.conf.json` (o `pnpm bump` cuida disso).
+#   git tag v0.6.0 && git push origin v0.6.0
+# A tag precisa ser exatamente `v` + `version` de `src-tauri/tauri.conf.json`.
 name: Release
 
 on:
   push:
     tags:
       - "v*"
-  # Permite um ensaio manual sem criar tag (sai como rascunho, igual).
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag existente a ensaiar/publicar (ex.: v0.6.0)"
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
+  quality:
+    uses: ./.github/workflows/ci.yml
+    with:
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+    permissions:
+      contents: read
 
-      - uses: pnpm/action-setup@v4
+  release:
+    needs: quality
+    runs-on: windows-2025
+    permissions:
+      contents: write
+    # Configure este Environment com reviewer obrigatório. Ele é também o gate humano que
+    # confirma DPA, política publicada e inspeção do payload antes de uma release com coleta.
+    environment: production-telemetry
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          version: 11.7.0
-      - uses: actions/setup-node@v4
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
-          node-version: 22
+          version: 11.18.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
+
+      - name: Validar tag e fixar identidade da release
+        shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          QUALITY_SHA: ${{ needs.quality.outputs.validated_sha }}
+        run: |
+          $config = Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json
+          $expectedTag = "v$($config.version)"
+          if ($env:REQUESTED_TAG -cne $expectedTag) {
+            throw "Tag inválida: esperado '$expectedTag', recebido '$env:REQUESTED_TAG'."
+          }
+
+          $sha = (git rev-parse HEAD).Trim()
+          if ($sha -notmatch '^[a-f0-9]{40}$') {
+            throw "Não foi possível determinar o SHA completo da release."
+          }
+          if ($env:QUALITY_SHA -notmatch '^[a-f0-9]{40}$' -or $sha -cne $env:QUALITY_SHA) {
+            throw 'O commit da tag diverge do SHA aprovado pelo workflow de qualidade.'
+          }
+          $tagCommit = (git rev-parse --verify "refs/tags/$expectedTag^{commit}").Trim()
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $sha) {
+            throw "HEAD não corresponde à tag exata $expectedTag."
+          }
+
+          "RELEASE_TAG=$expectedTag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VITE_BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CORNETA_BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "NEXT_PUBLIC_BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - run: pnpm install --frozen-lockfile
 
@@ -45,20 +94,166 @@ jobs:
         shell: pwsh
         run: pwsh -File scripts/fetch-binaries.ps1
 
-      - name: Build + assinatura do updater
-        uses: tauri-apps/tauri-action@v0
+      - name: Gate de privacidade e configuração da telemetria
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Chave PRIVADA do updater. Só existe como secret do repositório — nunca
-          # no git, nunca no log. A pública correspondente está no tauri.conf.json.
+          VITE_POSTHOG_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
+          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          POSTHOG_DESKTOP_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ vars.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
+          POSTHOG_PROJECT_TOKEN: ${{ vars.POSTHOG_PROJECT_TOKEN }}
+          VITE_TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          TELEMETRY_POLICY_PUBLISHED_VERSION: ${{ vars.TELEMETRY_POLICY_PUBLISHED_VERSION }}
+          TELEMETRY_DEPLOYMENT_METADATA_URL: https://www.corneta.live/api/v1/health
+        run: pnpm telemetry:release:check
+
+      # O instalador npm do CLI pode variar entre plataformas. A release usa o
+      # binário oficial versionado e só o executa depois de conferir o SHA-256.
+      - name: Preparar PostHog CLI verificado
+        if: vars.TELEMETRY_DISABLED != '1'
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/fetch-posthog-cli.ps1 -EnvironmentFile $env:GITHUB_ENV
+
+      # Este é o único step que recebe a Personal API Key. O plugin do Vite envia os mapas e
+      # `deleteAfterUpload` os remove antes de o instalador ser criado.
+      - name: Build do frontend + upload de source maps
+        if: vars.TELEMETRY_DISABLED != '1'
+        shell: pwsh
+        env:
+          VITE_POSTHOG_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
+          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_ID: ${{ vars.POSTHOG_PROJECT_ID }}
+          VITE_SETUP_API_URL: https://www.corneta.live
+          VITE_TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          REQUIRE_POSTHOG_SOURCE_MAPS: "1"
+        run: |
+          if ($env:VITE_TELEMETRY_DISABLED -ne '0' -or $env:TELEMETRY_DISABLED -ne '0') {
+            throw 'Os kill switches Vite/Rust precisam ser 0 no build com telemetria.'
+          }
+          if ($env:POSTHOG_API_KEY -notmatch '^phx_[A-Za-z0-9_-]{20,}$') {
+            throw 'POSTHOG_API_KEY deve ser uma Personal API Key phx_ dedicada a source maps.'
+          }
+          if ($env:POSTHOG_PROJECT_ID -notmatch '^\d+$') {
+            throw 'POSTHOG_PROJECT_ID deve ser numérico.'
+          }
+
+          try {
+            $project = Invoke-RestMethod `
+              -Method Get `
+              -Uri "https://us.posthog.com/api/projects/$($env:POSTHOG_PROJECT_ID)/" `
+              -Headers @{
+                Authorization = "Bearer $($env:POSTHOG_API_KEY)"
+                Accept = 'application/json'
+              } `
+              -TimeoutSec 8 `
+              -MaximumRedirection 0 `
+              -ErrorAction Stop
+            if ([string]$project.id -cne $env:POSTHOG_PROJECT_ID -or [string]$project.api_token -cne $env:VITE_POSTHOG_TOKEN) {
+              throw 'mismatch'
+            }
+          } catch {
+            throw 'Não foi possível validar com segurança o projeto PostHog de source maps.'
+          }
+          pnpm build
+
+      # No modo emergencial o frontend é produzido sem expor credenciais de source maps ao job.
+      - name: Build do frontend com telemetria desligada
+        if: vars.TELEMETRY_DISABLED == '1'
+        shell: pwsh
+        env:
+          VITE_POSTHOG_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
+          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          VITE_SETUP_API_URL: https://www.corneta.live
+          VITE_TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          REQUIRE_POSTHOG_SOURCE_MAPS: "0"
+        run: |
+          if ($env:VITE_TELEMETRY_DISABLED -ne '1' -or $env:TELEMETRY_DISABLED -ne '1') {
+            throw 'Os kill switches Vite/Rust precisam ser 1 no build emergencial.'
+          }
+          pnpm build
+
+      # O frontend acima é preservado: o override impede um segundo Vite build. Este comando gera
+      # o EXE, o NSIS e o `.exe.sig`; nenhum artefato é enviado por este step.
+      - name: Build Tauri + assinatura do updater
+        shell: pwsh
+        env:
+          VITE_POSTHOG_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
+          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          POSTHOG_DESKTOP_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          VITE_SETUP_API_URL: https://www.corneta.live
+          VITE_TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
+          TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Corneta ${{ github.ref_name }}"
-          releaseBody: "Baixe o `.exe` abaixo. Quem já tem a Corneta instalada recebe o aviso de atualização dentro do app."
-          # Rascunho de propósito: o instalador é NÃO ASSINADO (SmartScreen), então
-          # vale conferir numa máquina antes de publicar pra todo mundo.
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
+        run: pnpm tauri build --config '{"build":{"beforeBuildCommand":"pnpm --version"}}'
+
+      - name: Gerar latest.json do updater
+        id: updater
+        shell: pwsh
+        run: pnpm updater:manifest
+
+      # Este gate inspeciona o dist, o binário, a árvore bundle e o conteúdo que o 7-Zip consegue
+      # extrair do MESMO NSIS assinado acima. Nada foi enviado ao GitHub até este ponto.
+      - name: Verificar artefatos antes de qualquer upload de release
+        shell: pwsh
+        run: pnpm artifacts:check
+
+      - name: Criar/atualizar draft e enviar artefatos aprovados
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALLER_PATH: ${{ steps.updater.outputs.installer_path }}
+          SIGNATURE_PATH: ${{ steps.updater.outputs.signature_path }}
+          MANIFEST_PATH: ${{ steps.updater.outputs.manifest_path }}
+        run: |
+          $expectedAssets = @(
+            [System.IO.Path]::GetFileName($env:INSTALLER_PATH),
+            [System.IO.Path]::GetFileName($env:SIGNATURE_PATH),
+            [System.IO.Path]::GetFileName($env:MANIFEST_PATH)
+          )
+          if (($expectedAssets | Select-Object -Unique).Count -ne 3) {
+            throw 'Os três artefatos aprovados precisam ter nomes distintos.'
+          }
+
+          $releaseJson = gh release view $env:RELEASE_TAG --json isDraft,assets 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG `
+              --verify-tag `
+              --draft `
+              --title "Corneta $env:RELEASE_TAG" `
+              --notes 'Baixe o .exe abaixo. Quem já tem a Corneta instalada recebe o aviso de atualização dentro do app.'
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Não foi possível criar o draft da release; nenhum asset será enviado.'
+            }
+          } else {
+            try {
+              $release = $releaseJson | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+              throw 'Não foi possível validar o draft existente.'
+            }
+            if ($release.isDraft -ne $true) {
+              throw "A release $env:RELEASE_TAG já existe e não é draft; upload automático bloqueado."
+            }
+            $unexpectedAssets = @(
+              $release.assets |
+                ForEach-Object { [string]$_.name } |
+                Where-Object { $_ -cnotin $expectedAssets }
+            )
+            if ($unexpectedAssets.Count -gt 0) {
+              throw 'O draft existente contém assets fora dos três nomes aprovados; revise/remova-os manualmente antes de repetir.'
+            }
+          }
+
+          gh release upload $env:RELEASE_TAG `
+            $env:INSTALLER_PATH `
+            $env:SIGNATURE_PATH `
+            $env:MANIFEST_PATH `
+            --clobber

@@ -1,9 +1,24 @@
 packages:
   - web
 
-# Autoriza build-scripts de dependências confiáveis (pnpm 11).
-# esbuild precisa do seu postinstall para preparar o binário usado pelo Vite.
+# Autoriza somente os build-scripts nativos necessários e revisados (pnpm 11).
 allowBuilds:
-  esbuild: true
+  # O postinstall nativo é deliberadamente bloqueado: a release baixa o CLI
+  # versionado e verifica seu SHA-256 em scripts/fetch-posthog-cli.ps1.
+  "@posthog/cli": false
+  # Só imprime a mensagem de apoio do projeto; não é necessário para o runtime.
+  core-js: false
   sharp: true
   unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  # Versão fixada e revisada neste rollout; necessária ao suporte do Next.js 16.
+  - posthog-node@5.47.3
+
+# Patches de segurança transitivos. Remover cada override assim que o pacote pai
+# declarar uma faixa que já resolva para a versão corrigida.
+overrides:
+  "sharp": "0.35.3"
+  "postcss": "8.5.25"
+  "brace-expansion@^1.0.0": "1.1.18"
+  "brace-expansion@^5.0.0": "5.0.9"

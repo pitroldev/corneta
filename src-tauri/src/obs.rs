@@ -38,7 +38,7 @@ fn read_json(socket: &mut Socket) -> Result<Value, String> {
 
 fn send_json(socket: &mut Socket, v: &Value) -> Result<(), String> {
     socket
-        .send(Message::Text(v.to_string()))
+        .send(Message::Text(v.to_string().into()))
         .map_err(|e| e.to_string())
 }
 

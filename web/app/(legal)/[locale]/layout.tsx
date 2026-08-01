@@ -1,7 +1,8 @@
-import type { Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, LOCALES } from "@/lib/i18n";
 import { legalUi } from "@/lib/legal-ui";
+import { siteUrl } from "@/lib/site";
 import { fontVars } from "../../fonts";
 import { LegalHeader } from "./legal/_components/legal-chrome";
 import "../../globals.css";
@@ -21,6 +22,10 @@ export const dynamicParams = false;
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }));
 }
+
+export const metadata: Metadata = {
+  metadataBase: siteUrl,
+};
 
 export const viewport: Viewport = {
   width: "device-width",
