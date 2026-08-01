@@ -116,7 +116,7 @@ export function AfterLive({ t }: { t: T }) {
 
         {/* A Regra do Custo Visível: a gravação é o recurso mais caro em disco
             do app, e vender isso sem o preço seria o oposto do tom da marca. */}
-        <p className="mt-6 flex max-w-[64ch] items-start gap-2.5 border-t-2 border-border-dry pt-5 text-[0.84rem] leading-[1.55] font-[550] text-faint-raised [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-current [&>svg]:text-brass">
+        <p className="mt-6 flex max-w-[64ch] items-start gap-2.5 border-t-2 border-border-dry pt-5 text-[0.84rem] leading-[1.55] font-[550] text-faint-raised [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
           <InfoIcon />
           <span>{t("after.cost")}</span>
         </p>

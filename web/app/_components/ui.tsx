@@ -405,7 +405,7 @@ export function State({
 /** Nota de rodapé dos painéis de demonstração, com o ícone alinhado ao topo. */
 export function HubNote({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-3.5 flex items-start gap-[9px] text-[0.8rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-current [&>svg]:text-brass">
+    <p className="mt-3.5 flex items-start gap-[9px] text-[0.8rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
       {children}
     </p>
   );

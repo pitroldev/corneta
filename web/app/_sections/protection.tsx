@@ -73,7 +73,7 @@ const GUARD_HEAD =
   "[&_svg]:h-[21px] [&_svg]:w-[21px] [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round] [&_svg]:[stroke-width:2.2]";
 const GUARD_COST =
   "relative mt-auto pt-[15px] pl-[23px] text-[0.74rem] leading-[1.4] font-bold text-faint-raised " +
-  "[&>svg]:absolute [&>svg]:top-4 [&>svg]:left-0 [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:fill-current";
+  "[&>svg]:absolute [&>svg]:top-4 [&>svg]:left-0 [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:fill-none [&>svg]:stroke-current";
 const GUARD_SWITCH =
   "mt-[15px] flex items-center gap-[9px] text-[0.7rem] font-extrabold tracking-[0.06em] text-muted uppercase";
 

@@ -26,7 +26,7 @@ const STEPS_LIST =
   "[&_h3]:text-[clamp(1.42rem,2.2vw,1.9rem)] [&_h3]:leading-[1.1] " +
   "[&_p]:mt-1.5 [&_p]:max-w-[54ch] [&_p]:leading-[1.6] [&_p]:font-medium [&_p]:text-ink-muted " +
   "[&_em]:mt-3 [&_em]:inline-flex [&_em]:rotate-[-1.5deg] [&_em]:items-center [&_em]:gap-[7px] [&_em]:rounded-sm [&_em]:bg-tomate [&_em]:px-[9px] [&_em]:py-[5px] [&_em]:font-display [&_em]:text-[0.86rem] [&_em]:font-extrabold [&_em]:text-brass-ink [&_em]:not-italic [&_em]:shadow-[3px_3px_0_0_var(--ink)] " +
-  "[&_em>svg]:h-[15px] [&_em>svg]:w-[15px] [&_em>svg]:fill-current";
+  "[&_em>svg]:h-[15px] [&_em>svg]:w-[15px] [&_em>svg]:fill-none [&_em>svg]:stroke-current";
 
 export function Steps({ t }: { t: T }) {
   const steps = stepsFor(t);

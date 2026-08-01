@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { fill, group } from "@/lib/i18n";
 import { useCalm, useHeartbeat } from "./use-motion";
 import { PlatformGlyph } from "./decor";
+import { CheckIcon } from "./icons";
 import { cn } from "./ui";
 
 // ============================================================
@@ -161,9 +162,7 @@ export function LivePanel({ copy }: { copy: LiveWindowCopy }) {
           "[&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:stroke-ok [&>svg]:[stroke-width:3] [&>svg]:fill-none [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round]",
         )}
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 12.5l5.2 5.2L20 7" />
-        </svg>
+        <CheckIcon />
         {copy.verdict}
       </p>
 

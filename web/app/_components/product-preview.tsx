@@ -1,5 +1,16 @@
 import { thousandsSep, type Locale, type T } from "@/lib/i18n";
 import { Mascot } from "./decor";
+import {
+  ChatIcon,
+  CloseIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+  MonitorIcon,
+  RadioIcon,
+  ReportIcon,
+  SettingsIcon,
+  SlidersIcon,
+} from "./icons";
 import { cn } from "./ui";
 import { LiveChat, LivePanel, type LiveWindowCopy } from "./live-window";
 
@@ -59,44 +70,20 @@ const liveCopy = (t: T, locale: Locale): LiveWindowCopy => ({
   })),
 });
 
+/** Os ícones da navegação são os MESMOS do app — que também usa lucide. Antes
+ *  eram traçados desenhados aqui "parecidos com" os de lá; parecido não é igual,
+ *  e a réplica só vale enquanto for fiel. */
+const NAV_ICON = {
+  tv: MonitorIcon,
+  sliders: SlidersIcon,
+  radio: RadioIcon,
+  chat: ChatIcon,
+  chart: ReportIcon,
+} as const;
+
 function NavIcon({ name }: { name: (typeof nav)[number]["icon"] }) {
-  switch (name) {
-    case "tv":
-      return (
-        <svg viewBox="0 0 24 24">
-          <rect x="2" y="4" width="20" height="14" rx="2" />
-          <path d="M8 21h8" />
-        </svg>
-      );
-    case "sliders":
-      return (
-        <svg viewBox="0 0 24 24">
-          <path d="M4 6h16M4 12h16M4 18h16" />
-          <circle cx="9" cy="6" r="2.2" />
-          <circle cx="15" cy="12" r="2.2" />
-          <circle cx="7" cy="18" r="2.2" />
-        </svg>
-      );
-    case "radio":
-      return (
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="2" />
-          <path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2" />
-        </svg>
-      );
-    case "chat":
-      return (
-        <svg viewBox="0 0 24 24">
-          <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-        </svg>
-      );
-    case "chart":
-      return (
-        <svg viewBox="0 0 24 24">
-          <path d="M3 3v18h18M8 17v-4M13 17V7M18 17v-7" />
-        </svg>
-      );
-  }
+  const Icon = NAV_ICON[name];
+  return <Icon />;
 }
 
 const NAV_ITEM = cn(
@@ -140,20 +127,15 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
           )}
           aria-hidden="true"
         >
+          {/* Minimizar, maximizar, fechar — os controles de janela do Windows. */}
           <i>
-            <svg viewBox="0 0 24 24">
-              <path d="M5 12h14" />
-            </svg>
+            <MinimizeIcon />
           </i>
           <i>
-            <svg viewBox="0 0 24 24">
-              <rect x="5" y="5" width="14" height="14" rx="1.5" />
-            </svg>
+            <MaximizeIcon />
           </i>
           <i>
-            <svg viewBox="0 0 24 24">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
+            <CloseIcon />
           </i>
         </span>
       </div>
@@ -209,10 +191,7 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
                 "[&>b]:ml-auto [&>b]:font-display [&>b]:text-[0.66rem] [&>b]:font-extrabold [&>b]:opacity-50",
               )}
             >
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
-              </svg>
+              <SettingsIcon />
               {t("preview.settings")}
               <b>06</b>
             </span>

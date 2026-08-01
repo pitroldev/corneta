@@ -281,7 +281,7 @@ export function LegalSection({
 
 export function Callout({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-5 flex items-start gap-3 border-l-4 border-brass bg-paper-sunk px-[18px] py-4 text-[0.94rem] leading-[1.6] font-[550] text-ink [&>svg]:mt-0.5 [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:fill-current [&>svg]:text-tomate-ink">
+    <p className="mt-5 flex items-start gap-3 border-l-4 border-brass bg-paper-sunk px-[18px] py-4 text-[0.94rem] leading-[1.6] font-[550] text-ink [&>svg]:mt-0.5 [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomate-ink">
       <InfoIcon />
       <span>{children}</span>
     </p>

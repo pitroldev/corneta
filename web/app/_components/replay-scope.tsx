@@ -13,7 +13,7 @@ import {
 } from "framer-motion";
 import { useOnScreen } from "./use-motion";
 import { PlatformGlyph } from "./decor";
-import { InfoIcon } from "./icons";
+import { InfoIcon, LoaderIcon, PauseIcon, PlayIcon } from "./icons";
 import { cn } from "./ui";
 
 // ============================================================
@@ -433,21 +433,9 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             type="button"
             onClick={toggle}
             aria-label={playing ? copy.pause : copy.play}
-            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-sm bg-brass text-brass-ink shadow-pop-brass outline-offset-2 transition-colors duration-150 hover:bg-brass-strong focus-visible:outline-[3px] focus-visible:outline-brass [@media(pointer:coarse)]:size-11"
+            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-sm bg-brass text-brass-ink shadow-pop-brass outline-offset-2 transition-colors duration-150 hover:bg-brass-strong focus-visible:outline-[3px] focus-visible:outline-brass [@media(pointer:coarse)]:size-11 [&>svg]:h-4 [&>svg]:w-4 [&>svg]:fill-current"
           >
-            {playing ? (
-              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-                <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" />
-              </svg>
-            ) : (
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4 translate-x-px"
-                aria-hidden="true"
-              >
-                <path d="M8 5l11 7-11 7z" fill="currentColor" />
-              </svg>
-            )}
+            {playing ? <PauseIcon /> : <PlayIcon />}
           </button>
           <span className="text-[0.62rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
             {copy.axis}
@@ -582,7 +570,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
       </div>
 
       {/* --- o veredito: a frase que o relatório escreve sozinho --- */}
-      <p className="mt-3 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[0.84rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-current [&>svg]:text-brass">
+      <p className="mt-3 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[0.84rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
         <InfoIcon />
         {/* Troca com transição, não piscando: o veredito é a frase que o
             relatório escreve, e ela aparecendo suave lê como conclusão sendo
@@ -736,31 +724,15 @@ function Frame({
         ) : state === "reconnect" ? (
           <>
             {/* O arco girando é o mesmo sinal que o app dá enquanto tenta: é uma
-                tentativa em curso, não um erro parado. */}
-            <motion.svg
-              viewBox="0 0 24 24"
-              className="size-11 text-warn"
-              aria-hidden="true"
+                tentativa em curso, não um erro parado. Gira o INVÓLUCRO, não o
+                ícone: assim quem desenha o arco continua sendo o lucide. */}
+            <motion.span
+              className="grid place-items-center text-warn [&>svg]:h-11 [&>svg]:w-11 [&>svg]:[stroke-width:2.4]"
               animate={reduce ? undefined : { rotate: 360 }}
               transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
             >
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                fill="none"
-                stroke="currentColor"
-                strokeOpacity="0.25"
-                strokeWidth="2.6"
-              />
-              <path
-                d="M12 3a9 9 0 0 1 9 9"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-              />
-            </motion.svg>
+              <LoaderIcon />
+            </motion.span>
             <strong className="mt-3 font-display text-[clamp(1.1rem,2.4vw,1.5rem)] leading-none font-extrabold text-warn">
               {copy.frameReconnect}
             </strong>

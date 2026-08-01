@@ -433,7 +433,7 @@ export function AlertsFeed({ copy }: { copy: AlertsFeedCopy }) {
               >
                 <span
                   className={cn(
-                    "grid size-[30px] place-items-center rounded-sm text-[0.62rem] font-extrabold [&>svg]:h-4 [&>svg]:w-4 [&>svg]:fill-current",
+                    "grid size-[30px] place-items-center rounded-sm text-[0.62rem] font-extrabold [&>svg]:h-4 [&>svg]:w-4 [&>svg]:fill-none [&>svg]:stroke-current",
                     KIND_TONE[item.kind],
                   )}
                 >
@@ -544,7 +544,7 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
                   transition: { duration: 0.22 },
                 }}
                 transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                className="flex w-max max-w-full items-center gap-[9px] rounded-md bg-brass px-[13px] py-[9px] font-display text-[0.9rem] font-extrabold text-brass-ink shadow-pop [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:fill-current"
+                className="flex w-max max-w-full items-center gap-[9px] rounded-md bg-brass px-[13px] py-[9px] font-display text-[0.9rem] font-extrabold text-brass-ink shadow-pop [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:fill-none [&>svg]:stroke-current"
               >
                 <StarIcon />
                 {copy.alert}

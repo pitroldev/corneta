@@ -216,7 +216,7 @@ function ModePanel({
 
       {/* O ícone é absoluto pra o texto correr embaixo dele sem virar item de
           flex — senão o parágrafo quebra numa coluna estreita. */}
-      <p className="relative mt-3.5 pl-[26px] text-[0.8rem] leading-[1.5] font-[550] text-muted [&>svg]:absolute [&>svg]:top-0.5 [&>svg]:left-0 [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:fill-current [&>svg]:text-brass">
+      <p className="relative mt-3.5 pl-[26px] text-[0.8rem] leading-[1.5] font-[550] text-muted [&>svg]:absolute [&>svg]:top-0.5 [&>svg]:left-0 [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
         <InfoIcon />
         {mode.verdict}
       </p>
