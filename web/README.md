@@ -28,6 +28,8 @@ Copie `.env.example` para `.env.local` quando necessário:
 - `NEXT_PUBLIC_PRIMARY_CTA_URL`: URL pública do instalador/release. Enquanto a URL real não
   estiver disponível, a página usa `https://example.com/corneta-download` como placeholder
   explícito;
+- `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION`: tokens públicos fornecidos pelo
+  Search Console e Bing Webmaster Tools. A metadata omite as tags quando eles estão vazios;
 - `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` e `NEXT_PUBLIC_POSTHOG_HOST`: Project API Key de
   ingestão (`phc_*`) e host HTTPS usados no navegador;
 - `POSTHOG_PROJECT_TOKEN` e `POSTHOG_HOST`: equivalentes server-only para a Setup API. Se
@@ -91,3 +93,21 @@ para a empresa exigiria uma cessão de direitos — não é edição de texto.
 
 Uma mudança material de telemetria exige atualizar as versões PT/EN da política, a data de
 revisão e `LEGAL_ACCEPT_VERSION`, espelhado no workspace desktop.
+
+## Conteúdo editorial e buscadores
+
+Os hubs públicos usam caminhos sempre em inglês: `/help`, `/guides`, `/en/help` e
+`/en/guides`. O texto continua localizado. Artigos vivem em `content/`, passam pelo gate
+`pnpm content:check` e só entram em sitemap, hreflang e llms.txt quando estão publicados.
+
+Para concluir a verificação externa depois do deploy:
+
+1. defina `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION` no ambiente de produção;
+2. implante o mesmo host de `NEXT_PUBLIC_SITE_URL`;
+3. confirme as tags no HTML renderizado;
+4. valide a propriedade de domínio nos dois consoles;
+5. envie `https://www.corneta.live/sitemap.xml`.
+
+As quatro primeiras etapas dependem das contas externas e não podem ser concluídas apenas pelo
+repositório. Não use upload de arquivo de verificação: as tags geradas por metadata permanecem
+válidas em todas as páginas públicas.

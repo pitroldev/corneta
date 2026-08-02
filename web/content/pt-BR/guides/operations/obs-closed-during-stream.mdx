@@ -1,0 +1,79 @@
+---
+contentId: guide_obs_closed_during_stream
+title: "O que acontece com a live quando o OBS fecha?"
+description: "Veja quando a tela JÁ VOLTO mantém os destinos conectados e quais falhas ainda encerram a transmissão."
+summary: "Com a proteção armada, a Corneta troca o sinal perdido pela tela JÁ VOLTO e mantém os destinos conectados até o OBS retornar. Se o PC, a internet ou a própria Corneta parar, essa proteção não funciona."
+locale: pt-BR
+collection: guides
+kind: guide
+category: operations
+slug: obs-closed-during-stream
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: o que acontece se o OBS fechar durante a live
+related:
+  - help_brb_screen
+  - help_stream_statuses
+  - help_obs_not_found
+sources:
+  - title: Corneta continuity compositor
+    kind: internal
+    repoPath: src-tauri/src/compositor.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta copy-mode continuity
+    kind: internal
+    repoPath: src-tauri/src/splicer.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/operations/corneta-live-safety-settings.webp
+    originalPath: assets/originals/operations/corneta-live-safety-settings.png
+    baseName: corneta-live-safety-settings
+    alt: "Configurações de Segurança ao vivo com JÁ VOLTO e auto-bitrate armados."
+    caption: "A proteção precisa estar armada antes da live; ligar no meio não reconstrói uma saída que já caiu."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Com JÁ VOLTO armado
+
+Depois que o primeiro sinal real chegou, a Corneta consegue substituir a falta de vídeo pela tela **JÁ VOLTO**. Os destinos continuam conectados e voltam ao conteúdo quando o sinal retorna.
+
+<ContentImage baseName="corneta-live-safety-settings" />
+
+Isso cobre OBS fechado, reinício do OBS e interrupção do RTMP local. Também existe o botão **JÁ VOLTO agora**, que coloca a tela manualmente e corta o áudio enquanto você faz uma pausa.
+
+## Sem a proteção
+
+Se o sinal some no meio da live e JÁ VOLTO não estava armado, a Corneta avisa que perdeu a entrada. As plataformas podem encerrar a transmissão quando deixam de receber mídia.
+
+## O que a proteção não cobre
+
+- queda total da internet;
+- PC desligado ou travado;
+- Corneta encerrada;
+- falta de energia;
+- bloqueio ou encerramento feito pela plataforma.
+
+É uma rede de segurança dentro do mesmo PC, não um relay na nuvem. Para cobrir falha total da máquina seria necessário outro encoder em outro lugar.
+
+Teste antes com uma live não listada: entre no ar, feche o OBS, confirme **JÁ VOLTO no ar** e abra o OBS de novo. O procedimento completo está em [como usar e personalizar a tela JÁ VOLTO](/help/streaming-software/brb-screen).

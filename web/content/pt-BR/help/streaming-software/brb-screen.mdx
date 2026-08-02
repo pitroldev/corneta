@@ -1,0 +1,79 @@
+---
+contentId: help_brb_screen
+title: "Como usar e personalizar a tela JÁ VOLTO"
+description: "Arme a proteção contra queda do sinal, escolha a tela padrão ou um arquivo próprio e teste antes da live."
+summary: "Ative Proteção contra quedas em Configurações → Segurança ao vivo. A tela JÁ VOLTO entra quando o sinal some depois de a live começar e também pode ser acionada manualmente."
+locale: pt-BR
+collection: help
+kind: help
+category: streaming-software
+slug: brb-screen
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: configurar tela já volto Corneta
+related:
+  - guide_obs_closed_during_stream
+  - help_stream_statuses
+  - help_auto_bitrate
+sources:
+  - title: Corneta JÁ VOLTO settings
+    kind: internal
+    repoPath: src/screens/SettingsScreen.tsx
+    reviewedAt: 2026-08-01
+  - title: Corneta continuity compositor
+    kind: internal
+    repoPath: src-tauri/src/compositor.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/operations/corneta-live-safety-settings.webp
+    originalPath: assets/originals/operations/corneta-live-safety-settings.png
+    baseName: corneta-live-safety-settings
+    alt: "Configurações de Segurança ao vivo com Proteção contra quedas e seletor da tela JÁ VOLTO."
+    caption: "O selo ARMADO confirma que a proteção estará disponível quando a próxima live começar."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Arme antes da live
+
+1. Abra **Configurações**.
+2. Entre em **Segurança ao vivo**.
+3. Ative **Proteção contra quedas (JÁ VOLTO)**.
+4. Confirme o selo **ARMADO**.
+5. Escolha **Padrão (gerada)** ou **Usar arquivo meu (imagem ou vídeo)**.
+
+<ContentImage baseName="corneta-live-safety-settings" />
+
+Com arquivo próprio, a Corneta copia a mídia escolhida para a configuração local. Vídeo roda em loop e pode ter som. Confira a prévia antes do BORA.
+
+## Teste o retorno
+
+Faça uma live não listada, espere o sinal entrar e feche o software de transmissão. O destino deve mudar para **JÁ VOLTO no ar** sem desconectar. Abra o software novamente e confirme a volta do conteúdo.
+
+## Sintomas comuns
+
+| Sintoma | Causa provável | Correção |
+| --- | --- | --- |
+| live começa em JÁ VOLTO | ainda não chegou primeiro sinal real | inicie a transmissão no software |
+| tela não entra após queda | proteção não estava armada | encerre, arme e faça novo teste |
+| arquivo próprio não abre | formato ou arquivo inacessível | volte à tela padrão e escolha outro arquivo |
+| conteúdo volta sem áudio | áudio ainda não chegou ou pausa manual ativa | confira o software e clique em **Voltei!** |
+
+JÁ VOLTO não cobre internet, energia ou PC inteiro. Não compartilhe arquivo com dados pessoais e não use segredo como parte da arte.

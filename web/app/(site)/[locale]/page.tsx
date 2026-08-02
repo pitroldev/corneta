@@ -22,6 +22,7 @@ import { Benefits } from "@/app/_sections/benefits";
 import { Journey, Quality } from "@/app/_sections/quality";
 import { ChatSection, Protection } from "@/app/_sections/protection";
 import { Local, Platforms, Steps } from "@/app/_sections/steps";
+import { KnowledgeEntryPoints } from "@/app/_sections/knowledge";
 import {
   Faq,
   FinalCta,
@@ -34,7 +35,7 @@ import {
 // Os dados que atravessam mais de uma seção ficam aqui.
 
 // Placeholder: substitua pela URL real do instalador ou da release.
-const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#baixar";
+const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#download";
 
 const DEST_IDS = [
   "twitch",
@@ -106,7 +107,7 @@ export default async function Home({
       <SkipLink t={t} />
       <SiteHeader t={t} locale={locale} />
 
-      <main id="conteudo">
+      <main id="conteudo" tabIndex={-1}>
         <Hero t={t} locale={locale} />
         <MechanismStrip t={t} />
 
@@ -123,6 +124,7 @@ export default async function Home({
         <Local t={t} />
         <Platforms t={t} locale={locale} destinations={destinations} />
         <TinyThings t={t} items={tinyThings} />
+        <KnowledgeEntryPoints t={t} locale={locale} />
         <Faq t={t} downloadUrl={downloadUrl} />
         <Ticker t={t} />
         <FinalCta t={t} />

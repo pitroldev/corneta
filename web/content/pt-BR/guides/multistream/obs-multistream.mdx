@@ -1,0 +1,159 @@
+---
+contentId: guide_obs_multistream
+title: "Como fazer multistream no OBS Studio: guia completo"
+description: "Entenda as formas de enviar uma live do OBS Studio para várias plataformas e escolha entre distribuição local, plugin ou nuvem."
+summary: "O OBS manda um sinal. A partir daí, você escolhe quem distribui: um app local, um plugin ou um relay na nuvem. Upload e controle decidem o melhor caminho."
+locale: pt-BR
+collection: guides
+kind: guide
+category: multistream
+slug: obs-multistream
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: como fazer multistream no OBS Studio
+related:
+  - help_first_stream
+  - guide_twitch_youtube_simultaneously
+  - guide_multistream_upload_speed
+  - guide_local_vs_cloud
+sources:
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+  - title: OBS Studio stream connection troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela Plataformas da Corneta com Twitch e YouTube configurados como destinos independentes e prontos."
+    caption: "Na Corneta, cada destino tem seu próprio estado sem esconder o caminho do sinal."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade da Corneta comparando cópia, ajuste automático e recodificação por plataforma."
+    caption: "Os modos deixam visível a troca entre carga na máquina, qualidade e upload."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
+    originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
+    baseName: corneta-obs-connection-details
+    alt: "Tela Ao vivo da Corneta mostrando o servidor e a chave local usados para receber o sinal do OBS."
+    caption: "O OBS publica em um endereço local; a Corneta assume a distribuição a partir dali."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/getting-started/corneta-first-live-checklist.webp
+    originalPath: assets/originals/getting-started/corneta-first-live-checklist.png
+    baseName: corneta-first-live-checklist
+    alt: "Tela Ao vivo da Corneta com OBS configurado, banda de upload e check-up pré-live em estado aprovado."
+    caption: "O check-up confirma o caminho completo antes de abrir os destinos."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## O que é multistream no OBS Studio?
+
+O OBS monta cenas, junta áudio e vídeo e entrega um sinal. Multistream é mandar
+esse sinal para dois ou mais destinos, como Twitch, YouTube e Kick.
+
+A diferença está em quem faz a distribuição. No modo local, cada destino usa uma
+parte do seu upload. Com um relay na nuvem, seu PC envia uma saída e o serviço
+replica o sinal lá fora.
+
+## Três jeitos de distribuir a live
+
+### Aplicativo local
+
+O OBS envia o sinal para um aplicativo no mesmo computador. Ele copia ou adapta
+a transmissão para cada plataforma. É assim que a Corneta trabalha: um destino
+pode cair, pausar ou reconectar sem puxar os outros junto.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+### Plugin do OBS
+
+Um plugin coloca novas saídas dentro do OBS. É o caminho mais curto para quem só
+quer distribuir o sinal, mas controle por destino e diagnóstico dependem do
+plugin escolhido.
+
+### Relay na nuvem
+
+O OBS manda uma única saída para um serviço externo, que replica a live. Faz
+sentido quando seu upload não aguenta a soma dos destinos ou quando você prefere
+tirar essa carga do PC.
+
+## Como escolher sem adivinhar?
+
+Faça quatro contas:
+
+1. some o bitrate de todas as saídas locais;
+2. deixe margem para oscilações da conexão;
+3. confirme se haverá cópia do sinal ou recodificação por destino;
+4. decida se você precisa pausar, reconectar e diagnosticar cada plataforma de
+   forma independente.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+Se a conta não fecha, não brigue com o roteador. Reduza a qualidade ou use um
+relay na nuvem. Se o PC não aguenta recodificar, copie um sinal compatível ou
+baixe resolução e FPS.
+
+## Onde a Corneta entra
+
+A Corneta fica entre o OBS e as plataformas. O OBS continua cuidando da produção;
+a Corneta distribui, acompanha e reconecta cada destino.
+
+<ContentImage baseName="corneta-obs-connection-details" />
+
+Quer colocar isso no ar? Siga o passo a passo da
+[primeira live](/help/getting-started/first-stream).
+
+<ContentImage baseName="corneta-first-live-checklist" />
+
+## O combinado antes do BORA AO VIVO
+
+- cada destino local come uma parte do upload;
+- recodificar usa CPU ou GPU;
+- cada plataforma manda nas próprias regras e limites;
+- a Corneta roda primeiro no Windows e o OBS continua produzindo a live;
+- com pouco upload, um relay na nuvem pode ser a escolha certa.

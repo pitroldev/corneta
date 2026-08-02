@@ -1,0 +1,116 @@
+---
+contentId: guide_restream_alternative
+title: "Alternativa ao Restream: quando um aplicativo local é melhor — e quando não é"
+description: "Compare Corneta e Restream por upload, custo, controle, privacidade e carga no PC antes de decidir entre multistream local e na nuvem."
+summary: "A Corneta faz mais sentido quando seu upload aguenta todas as saídas e você quer controle local sem mensalidade. O Restream leva vantagem quando sua conexão só sustenta uma saída ou quando você prefere que a distribuição aconteça na nuvem."
+locale: pt-BR
+collection: guides
+kind: comparison
+category: comparisons
+slug: restream-alternative
+status: published
+publishedAt: 2026-08-01
+intent: commercial
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11 com OBS Studio 32.2.1
+  - name: Restream
+    version: serviço web em 2026-08-01
+    environment: fluxo público até o login; saída não executada sem conta
+reviewIntervalDays: 60
+experimental: false
+primaryQuery: alternativa ao Restream
+related:
+  - guide_local_vs_cloud
+  - guide_multistream_tools
+  - guide_multistream_upload_speed
+sources:
+  - title: Restream free plan
+    kind: official
+    url: https://support.restream.io/en/articles/9127747-can-i-use-restream-for-free-yes
+    reviewedAt: 2026-08-01
+  - title: Restream with streaming software
+    kind: official
+    url: https://support.restream.io/en/articles/9241076-why-use-streaming-software-with-restream
+    reviewedAt: 2026-08-01
+  - title: Restream pricing
+    kind: official
+    url: https://restream.io/pricing
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela da Corneta com Twitch, YouTube e Kick configuradas como destinos locais independentes."
+    caption: "Na Corneta, as conexões saem do seu PC e cada destino continua sob controle separado."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A diferença que decide quase tudo
+
+O Restream recebe **uma** transmissão e replica na nuvem. A Corneta recebe o sinal do OBS localmente e abre **uma conexão por destino**. Isso muda upload, dependências e controle.
+
+| Se você precisa de…                                  | Melhor ponto de partida |
+| ---------------------------------------------------- | ----------------------- |
+| economizar upload em casa                            | Restream                |
+| evitar assinatura para distribuir localmente         | Corneta                 |
+| pausar ou reconectar um destino sem tocar nos outros | Corneta                 |
+| transmitir sem instalar outro aplicativo local       | Restream                |
+| manter stream keys no computador                     | Corneta                 |
+| usar estúdio no navegador e convidados remotos       | Restream                |
+
+Não escolha pela lista de plataformas. Escolha pelo gargalo real do seu setup.
+
+## O teste e seu limite
+
+Em 1º de agosto de 2026, repetimos no Windows 11 o fluxo local com Corneta 0.6.0 e OBS 32.2.1: configurar destinos, estimar banda, iniciar o relay e controlar cada saída. No Restream, verificamos o onboarding público, o plano gratuito e a documentação atual; não criamos uma conta nem transmitimos por ela.
+
+Por isso, este artigo compara arquitetura, requisitos e recursos documentados. Ele não mede latência ou estabilidade do Restream e não finge que mediu.
+
+## Quando a Corneta encaixa melhor
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+- sua conexão sustenta a soma dos bitrates com margem;
+- você já usa Windows e OBS;
+- quer testar, pausar e reconectar cada destino separadamente;
+- prefere guardar as chaves no cofre local do sistema;
+- quer juntar chat, alertas, métricas e relatório no mesmo aplicativo;
+- não precisa de um estúdio de convidados no navegador.
+
+A desvantagem é física: três saídas de 6 Mbps consomem perto de 18 Mbps de vídeo, além de áudio e margem. A Corneta não inventa banda.
+
+## Quando o Restream é a escolha mais simples
+
+- seu upload só segura uma boa saída;
+- seu PC já trabalha no limite com jogo e OBS;
+- você quer operar pelo navegador;
+- recursos de estúdio remoto pesam mais que controle local;
+- o plano escolhido cobre todos os destinos e integrações necessários.
+
+O plano gratuito informado pelo Restream permite duas plataformas e inclui marca do serviço. Mais destinos e alguns recursos dependem do plano vigente; confira o preço no dia da contratação.
+
+<Callout label="Nuvem também entra no caminho" tone="limit">
+  O relay reduz o upload que sai da sua casa, mas adiciona conta, serviço e rota
+  externa. Se a conexão até a nuvem cair, todas as réplicas perdem o sinal.
+</Callout>
+
+## A decisão em 30 segundos
+
+Faça o [teste de upload](/help/quality/test-upload) com a cena real. Se a soma das saídas couber com folga, teste a Corneta. Se não couber, um relay na nuvem é a decisão técnica correta — mesmo que a alternativa local seja gratuita.

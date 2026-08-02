@@ -1,0 +1,116 @@
+---
+contentId: guide_multistream_upload_speed
+title: "Quanto upload é necessário para fazer multistream?"
+description: "Some o bitrate de cada saída, aplique uma margem de estabilidade e teste o upload com a carga real da sua live."
+summary: "No multistream local, some o bitrate de vídeo e áudio de todas as saídas. Como ponto de partida, procure uma conexão estável entre 1,5 e 2 vezes esse total."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: multistream-upload-speed
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: quanto upload precisa para multistream
+related:
+  - help_quality_modes
+  - guide_local_vs_cloud
+  - guide_twitch_youtube_simultaneously
+sources:
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-08-01
+  - title: OBS Stream Connection Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: Corneta upload estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade mostrando a estimativa de upload do perfil atual na Corneta."
+    caption: "A estimativa usa os bitrates dos destinos ligados no perfil atual."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A conta que interessa
+
+Some o bitrate de **vídeo e áudio** de cada saída local. Depois deixe margem
+para Wi-Fi, outras pessoas na rede e variações do provedor. O YouTube recomenda
+mirar entre 1,5 e 2 vezes o bitrate combinado em simulstream.
+
+Se a Twitch usa 6 Mb/s e o YouTube usa 4 Mb/s, a soma é 10 Mb/s. A referência de
+upload estável fica entre 15 e 20 Mb/s. Isso não é promessa do seu provedor:
+serve para decidir se vale testar essa configuração.
+
+<UploadCalculator />
+
+## O que entra na soma
+
+Cada destino que sai direto do seu PC entra na conta. Se três plataformas
+recebem 6 Mb/s cada, você não está usando 6 Mb/s: está tentando sustentar perto
+de 18 Mb/s, mais áudio, protocolo e oscilações.
+
+Um relay na nuvem muda a conta local. Seu PC manda uma saída para o relay e ele
+replica do lado de lá. Você gasta menos upload em casa, mas passa a depender
+daquele serviço e dos limites do plano.
+
+## Mbps do plano não é Mbps estável
+
+O número contratado é teto, não garantia de estabilidade a cada segundo. Faça o
+teste na mesma rede, no mesmo horário e com o cabo ou Wi-Fi que você usa na
+live.
+
+O OBS explica que quadros perdidos aparecem quando a conexão com o servidor não
+consegue manter o bitrate definido. Um teste rápido pode dar um número alto e
+mesmo assim esconder perda, jitter ou queda curta.
+
+## Teste com a live de verdade
+
+1. Feche backup, sincronização e download em outros aparelhos.
+2. Abra jogo, câmera, microfone, alertas e a cena mais pesada.
+3. Na Corneta, use **Banda de upload → Medir agora** fora da transmissão.
+4. Faça uma live não listada ou de teste com todos os destinos.
+5. Observe bitrate e quadros perdidos por alguns minutos, principalmente nas
+   cenas com movimento.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+## Se a conta não fechar
+
+Reduza primeiro o bitrate do destino menos exigente. Depois avalie FPS e
+resolução. Trocar de **Caprichado** para **Esperto** alivia recodificação, mas não
+reduz automaticamente a soma do upload se os bitrates continuam iguais.
+
+Se a conexão só sustenta uma boa saída, use um relay na nuvem. Brigar com um
+upload que já está no limite costuma virar quadros perdidos no pior momento.
+
+<Callout label="Não use download na conta" tone="warning">
+  Live sai do seu PC. O número relevante é upload estável, não download nem o
+  maior pico que apareceu no teste.
+</Callout>
+
+Veja a diferença completa em [multistream local ou na
+nuvem](/guides/multistream/local-vs-cloud).

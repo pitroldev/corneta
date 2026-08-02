@@ -4,13 +4,14 @@
 // O fallback de localhost existe pro `pnpm web:dev` funcionar sem configurar
 // nada. Em produção ele é um desastre silencioso — o sitemap inteiro sai
 // apontando pra `http://localhost:3000` e ninguém descobre até o tráfego não
-// chegar. Por isso o build QUEBRA quando roda em CI/Vercel sem a variável, em
+// chegar. Por isso todo build de produção QUEBRA sem a variável, em
 // vez de publicar um site que se declara hospedado na sua máquina.
 
 const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-const isBuildServer = Boolean(process.env.VERCEL || process.env.CI);
+const canonicalProductionOrigin = "https://www.corneta.live";
+const requiresCanonicalUrl = process.env.NODE_ENV === "production";
 
-if (!raw && isBuildServer) {
+if (!raw && requiresCanonicalUrl) {
   throw new Error(
     "NEXT_PUBLIC_SITE_URL não definida. Sem ela, sitemap, canonical e dados " +
       "estruturados sairiam apontando para http://localhost:3000. Defina a URL " +
@@ -18,11 +19,36 @@ if (!raw && isBuildServer) {
   );
 }
 
-if (!raw && process.env.NODE_ENV === "production") {
-  console.warn(
-    "[corneta] NEXT_PUBLIC_SITE_URL ausente: build de produção usando " +
-      "http://localhost:3000 como URL canônica. Não publique assim.",
+let configuredSiteUrl: URL;
+try {
+  configuredSiteUrl = new URL(raw || "http://localhost:3000");
+} catch {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL inválida. Informe somente a origem do site, por " +
+      "exemplo https://www.corneta.live.",
   );
 }
 
-export const siteUrl = new URL(raw || "http://localhost:3000");
+if (
+  configuredSiteUrl.username ||
+  configuredSiteUrl.password ||
+  configuredSiteUrl.pathname !== "/" ||
+  configuredSiteUrl.search ||
+  configuredSiteUrl.hash
+) {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL deve conter somente protocolo e host, sem " +
+      "credenciais, caminho, query ou fragmento.",
+  );
+}
+
+if (
+  requiresCanonicalUrl &&
+  configuredSiteUrl.origin !== canonicalProductionOrigin
+) {
+  throw new Error(
+    `NEXT_PUBLIC_SITE_URL de produção deve ser ${canonicalProductionOrigin}.`,
+  );
+}
+
+export const siteUrl = configuredSiteUrl;

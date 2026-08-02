@@ -1,0 +1,118 @@
+---
+contentId: guide_multistream_low_end_pc
+title: "Multistream em PC fraco: o que reduzir primeiro"
+description: "Reduza carga de GPU, encoder, cenas, resolução e FPS na ordem certa sem adivinhar requisitos mínimos para multistream."
+summary: "Primeiro limite o FPS do jogo e copie o sinal compatível em vez de recodificar. Se ainda houver atraso, simplifique cenas, reduza saídas recodificadas e passe de 60 para 30 FPS antes de mexer na resolução base do OBS."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: multistream-low-end-pc
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: multistream em PC fraco
+related:
+  - guide_why_stream_lags
+  - guide_live_stream_encoders
+  - guide_resolution_and_fps
+sources:
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: OBS Hardware Encoding
+    kind: official
+    url: https://obsproject.com/kb/hardware-encoding
+    reviewedAt: 2026-08-01
+  - title: Corneta workload estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade da Corneta comparando os modos Na lata, Esperto e Caprichado e os encoders disponíveis."
+    caption: "A quantidade de recodificações pesa mais que o nome do modo: confira a estimativa antes da live."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/quality/corneta-upload-test-result.webp
+    originalPath: assets/originals/quality/corneta-upload-test-result.png
+    baseName: corneta-upload-test-result
+    alt: "Resultado do teste de upload da Corneta comparado ao consumo estimado de cada modo."
+    caption: "PC e internet são gargalos diferentes; confira os dois antes de sacrificar imagem."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Reduza nesta ordem
+
+1. limite o FPS do jogo;
+2. use encoder de hardware disponível;
+3. copie destinos que aceitam o sinal do OBS;
+4. reduza Browser Sources, filtros e cenas pesadas;
+5. corte recodificações desnecessárias;
+6. passe as saídas pesadas de 60 para 30 FPS;
+7. reduza a resolução de saída;
+8. mexa na resolução base do OBS só por último.
+
+Essa ordem preserva o que o público percebe e ataca primeiro o trabalho duplicado.
+
+## Comece pela carga invisível
+
+Jogo sem limite de FPS tenta ocupar toda a GPU. O OBS ainda precisa de espaço para compor a cena e codificar. Limite o jogo à taxa do monitor ou a um valor estável e confira se **atraso de renderização** cai.
+
+Depois desligue temporariamente filtros, fontes de navegador e animações. Se o contador melhora, reative uma por vez. Um overlay bonito não compensa uma live pulando quadro.
+
+## Copiar custa bem menos que recodificar
+
+<ContentImage baseName="corneta-quality-modes" />
+
+Se Twitch, YouTube e Kick podem receber o mesmo 1080p60 a 6 Mbps, **Na lata** evita novos encodes. Se apenas um destino precisa de 720p30 ou 9:16, **Esperto** recodifica só ele. **Caprichado** é o último modo a testar num PC limitado.
+
+Não existe requisito mínimo universal. Uma GTX antiga com cena simples pode ir melhor que uma placa nova ocupada por jogo sem limite, navegador, filtros e gravação.
+
+## FPS antes de resolução
+
+Passar de 60 para 30 FPS corta pela metade a quantidade de quadros que precisam ser renderizados e codificados. Para conversa, podcast, arte ou jogo lento, isso costuma doer menos que transformar textos finos de 1080p em 720p.
+
+Em jogo rápido, faça o contrário apenas se o movimento for a prioridade e os textos continuarem legíveis em resolução menor.
+
+## Não confunda PC fraco com upload curto
+
+<ContentImage baseName="corneta-upload-test-result" />
+
+- atraso de renderização aponta para GPU/cena;
+- atraso de codificação aponta para encoder/CPU/GPU;
+- quadros perdidos por rede apontam para conexão;
+- uma plataforma ruim com as outras estáveis aponta para destino ou rota.
+
+Baixar resolução não resolve uma rota instável. E contratar mais internet não libera uma GPU saturada.
+
+Faça uma gravação ou live privada de dez minutos com a cena mais pesada. O perfil certo é o último que mantém OBS, jogo e todas as saídas estáveis — não o maior número disponível.

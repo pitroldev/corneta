@@ -2,6 +2,10 @@ import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "./content";
 import { DEFAULT_LOCALE, localePath, translator, type Locale } from "./i18n";
 import { LEGAL_CNPJ, LEGAL_CONTACT, LEGAL_OPERATOR, legalHref } from "./legal";
 import { siteUrl } from "./site";
+import type {
+  EditorialPerson,
+  PublishedEditorialDocument,
+} from "./editorial/types";
 
 // Dados estruturados (schema.org / JSON-LD).
 //
@@ -180,6 +184,136 @@ export function legalJsonLd(kind: "privacy" | "terms", locale: Locale) {
           { "@type": "ListItem", position: 2, name },
         ],
       },
+    ],
+  };
+}
+
+type EditorialBreadcrumb = {
+  name: string;
+  path: string;
+};
+
+function breadcrumbList(path: string, items: readonly EditorialBreadcrumb[]) {
+  return {
+    "@type": "BreadcrumbList",
+    "@id": abs(`${path}#trilha`),
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: abs(item.path),
+    })),
+  };
+}
+
+/** Hub ou categoria editorial. Só deve ser emitido em páginas com itens
+ * publicados; páginas vazias usam noindex e não precisam fingir uma coleção. */
+export function editorialCollectionJsonLd({
+  locale,
+  path,
+  name,
+  description,
+  breadcrumbs,
+  documents,
+}: {
+  locale: Locale;
+  path: string;
+  name: string;
+  description: string;
+  breadcrumbs: readonly EditorialBreadcrumb[];
+  documents: readonly PublishedEditorialDocument[];
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      organization,
+      website,
+      {
+        "@type": "CollectionPage",
+        "@id": abs(`${path}#pagina`),
+        url: abs(path),
+        name,
+        description,
+        inLanguage: locale,
+        isPartOf: { "@id": abs("/#site") },
+        publisher: { "@id": abs("/#empresa") },
+        mainEntity: {
+          "@type": "ItemList",
+          itemListElement: documents.map((document, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            name: document.frontmatter.title,
+            url: abs(document.href),
+          })),
+        },
+      },
+      breadcrumbList(path, breadcrumbs),
+    ],
+  };
+}
+
+/** Marcação factual do conteúdo: datas e autoria vêm exclusivamente do
+ * frontmatter validado, e a imagem é o asset editorial realmente publicado. */
+export function editorialArticleJsonLd({
+  document,
+  breadcrumbs,
+  categoryName,
+  author,
+  reviewer,
+}: {
+  document: PublishedEditorialDocument;
+  breadcrumbs: readonly EditorialBreadcrumb[];
+  categoryName: string;
+  author: EditorialPerson;
+  reviewer: EditorialPerson;
+}) {
+  const { frontmatter, href } = document;
+  const externalCitations = frontmatter.sources.flatMap((source) =>
+    source.url ? [source.url] : [],
+  );
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      organization,
+      website,
+      {
+        "@type": frontmatter.kind === "comparison" ? "Article" : "TechArticle",
+        "@id": abs(`${href}#artigo`),
+        url: abs(href),
+        mainEntityOfPage: { "@id": abs(`${href}#pagina`) },
+        headline: frontmatter.title,
+        description: frontmatter.description,
+        articleSection: categoryName,
+        inLanguage: frontmatter.locale,
+        datePublished: frontmatter.publishedAt,
+        dateModified: frontmatter.updatedAt,
+        author: {
+          "@type": author.type === "person" ? "Person" : "Organization",
+          name: author.name,
+          ...(author.url ? { url: author.url } : {}),
+        },
+        publisher: { "@id": abs("/#empresa") },
+        isAccessibleForFree: true,
+        ...(externalCitations.length > 0
+          ? { citation: externalCitations }
+          : {}),
+      },
+      {
+        "@type": "WebPage",
+        "@id": abs(`${href}#pagina`),
+        url: abs(href),
+        name: frontmatter.title,
+        inLanguage: frontmatter.locale,
+        isPartOf: { "@id": abs("/#site") },
+        breadcrumb: { "@id": abs(`${href}#trilha`) },
+        reviewedBy: {
+          "@type": reviewer.type === "person" ? "Person" : "Organization",
+          name: reviewer.name,
+          ...(reviewer.url ? { url: reviewer.url } : {}),
+        },
+      },
+      breadcrumbList(href, breadcrumbs),
     ],
   };
 }

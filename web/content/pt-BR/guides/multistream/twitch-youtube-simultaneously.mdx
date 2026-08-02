@@ -1,0 +1,136 @@
+---
+contentId: guide_twitch_youtube_simultaneously
+title: "Como transmitir na Twitch e no YouTube ao mesmo tempo"
+description: "Configure Twitch e YouTube como saídas independentes do OBS, calcule o upload e confira as regras atuais de simulcast."
+summary: "Você pode mandar a mesma live para Twitch e YouTube ao mesmo tempo. Prepare as duas contas, some os bitrates e use um destino separado para cada stream key."
+locale: pt-BR
+collection: guides
+kind: guide
+category: multistream
+slug: twitch-youtube-simultaneously
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: como transmitir na Twitch e YouTube ao mesmo tempo
+related:
+  - guide_obs_multistream
+  - guide_multistream_upload_speed
+  - help_manage_platform
+sources:
+  - title: Twitch Simulcasting Guidelines FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/simulcasting-guidelines
+    reviewedAt: 2026-08-01
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Twitch e YouTube configurados como destinos independentes na tela Plataformas."
+    caption: "As duas plataformas recebem o mesmo conteúdo, mas cada saída mantém chave, estado e reconexão próprios."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Modos de qualidade da Corneta com estimativa de upload para os destinos configurados."
+    caption: "A tela mostra quanto as duas saídas pedem e quando haverá recodificação."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Pode fazer?
+
+Pode. A Twitch permite simulcast para quem não tem acordo individual de
+exclusividade, e o YouTube tem orientação própria para transmitir em várias
+plataformas. A Twitch exige que a experiência dela não seja pior que nas outras
+e proíbe usar a transmissão na Twitch para mandar a audiência assistir à live
+concorrente.
+
+Se você assinou um acordo individual, ele manda mais que um guia público. Leia o
+documento ou fale com o suporte da plataforma antes da live.
+
+## Prepare as duas contas
+
+No YouTube, o canal precisa estar verificado e com live ativada. A primeira
+ativação pode levar pelo menos 24 horas segundo o próprio YouTube, então não
+deixe isso para a hora do **BORA AO VIVO**.
+
+Na Twitch, pegue a stream key atual no painel. Não coloque nenhuma das duas
+chaves no OBS: o OBS vai mandar um sinal local para a Corneta.
+
+## Configure Twitch e YouTube
+
+1. Na Corneta, abra **Plataformas → Adicionar plataforma**.
+2. Adicione a Twitch, cole a stream key e use **Testar o servidor**.
+3. Adicione o YouTube. Se a conta estiver conectada, a Corneta pode criar a
+   transmissão no **BORA AO VIVO**; caso contrário, informe os dados do evento.
+4. Confirme se os dois destinos aparecem como **Pronto**.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+## Confira upload e qualidade
+
+Na distribuição local, o upload pedido é a soma das duas saídas. Um destino em 6
+Mb/s e outro em 4 Mb/s pedem 10 Mb/s só de bitrate; ainda falta margem para a
+conexão oscilar. O YouTube recomenda testar com 1,5 a 2 vezes a soma como
+referência de estabilidade.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+Se o mesmo sinal serve para as duas, **Na lata** evita uma segunda
+recodificação. Se apenas um destino precisa mudar, **Esperto** adapta só ele.
+
+## Faça um ensaio que valha
+
+Teste com o jogo aberto, câmera, áudio, alertas e uma cena com movimento. Abra as
+duas páginas de exibição em outro aparelho e confirme vídeo e som. Speedtest
+sozinho não reproduz o trabalho da live.
+
+## Durante a transmissão
+
+- mantenha qualidade equivalente na Twitch;
+- não coloque QR code, banner ou comando de chat mandando a audiência da Twitch
+  para a live concorrente;
+- acompanhe bitrate e reconexões por destino;
+- se uma plataforma cair, tente reconectar só ela antes de encerrar tudo.
+
+<Callout label="Quando a nuvem é mais sensata" tone="limit">
+  Se o upload não aguenta as duas saídas locais, um relay na nuvem recebe um
+  único sinal e replica de lá. A troca é colocar um serviço externo no meio.
+</Callout>
+
+Use a [calculadora de upload](/guides/quality/multistream-upload-speed) antes de
+escolher os bitrates.

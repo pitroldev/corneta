@@ -1,0 +1,108 @@
+---
+contentId: help_automatic_obs_setup
+title: "Como conectar e configurar o OBS automaticamente"
+description: "Ative o WebSocket do OBS, use Configura pra mim e confirme se o OBS está apontando para a Corneta antes da live."
+summary: "Ative o servidor WebSocket no OBS e clique em Configura pra mim na tela Ao vivo. A Corneta conecta, troca o serviço do OBS pelo endereço local e confirma quando os dois estão prontos."
+locale: pt-BR
+collection: help
+kind: help
+category: streaming-software
+slug: automatic-obs-setup
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: WebSocket v5
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: como configurar o OBS automaticamente na Corneta
+related:
+  - help_first_stream
+  - help_streaming_keys_and_urls
+sources:
+  - title: Corneta OBS wizard and live screen
+    kind: internal
+    repoPath: src/components/ObsWizard.tsx
+    reviewedAt: 2026-08-01
+  - title: Corneta OBS interface labels
+    kind: internal
+    repoPath: src/lib/i18n/pt.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
+    originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
+    baseName: corneta-obs-connection-details
+    alt: "Painel Liga no OBS com servidor local, chave local e o estado da conexão."
+    caption: "Quando aparecer configurado, o OBS já está apontando para a Corneta."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## O resultado esperado
+
+No fim deste passo, a tela **Ao vivo** mostra o OBS como configurado e apontando
+pra Corneta. Isso ainda não coloca vídeo no ar: só prepara o caminho pra Corneta
+mandar o OBS transmitir quando você der **BORA AO VIVO**.
+
+## Antes de clicar
+
+- abra o OBS Studio antes da Corneta;
+- use o OBS Studio 28 ou mais recente, que já traz o WebSocket;
+- feche outro app que possa estar mudando as configurações de transmissão;
+- se o WebSocket pedir senha, tenha essa senha em mãos.
+
+## Configure em três passos
+
+1. No OBS, abra **Ferramentas → Configurações do Servidor WebSocket**.
+2. Marque **Ativar Servidor WebSocket**. A porta padrão é `4455`; só mude se
+   você já usa outra configuração.
+3. Na Corneta, abra **Ao vivo → Liga no OBS** e clique em **Configura pra mim**.
+
+Se **Ativar Autenticação** estiver ligado no OBS, clique em **Mostrar Chave de
+Conexão** e cole a senha pedida pela Corneta. Essa é a senha do WebSocket, não a
+stream key de uma plataforma.
+
+<ContentImage baseName="corneta-obs-connection-details" />
+
+Quando o estado virar **configurado**, a Corneta já trocou o serviço do OBS para
+**Personalizado** e colocou o servidor e a chave locais nos campos certos.
+
+## Se não conectar
+
+| O que apareceu                        | Causa provável                                                    | Como confirmar                                   | O que fazer                                         |
+| ------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------- |
+| Não achei o OBS                       | OBS fechado ou WebSocket desligado                                | Abra a janela do OBS e volte ao menu Ferramentas | Ligue o servidor WebSocket e tente de novo          |
+| Senha recusada                        | Senha diferente da mostrada pelo OBS                              | Use Mostrar Chave de Conexão                     | Copie a senha atual e substitua na Corneta          |
+| Conectado, mas não aponta pra Corneta | O controle funciona, mas o serviço de transmissão não foi trocado | Abra Configurações → Transmissão no OBS          | Clique em Configura pra mim novamente               |
+| Porta ocupada                         | Outro processo usa a porta local da transmissão                   | A Corneta mostra a falha antes de iniciar        | Feche o processo ou altere a porta em Configurações |
+
+## Plano B: configurar na mão
+
+Abra **Liga no OBS**, escolha **Prefiro configurar na mão** e copie os campos
+**Servidor** e **Chave de transmissão**. No OBS, vá em **Configurações →
+Transmissão**, escolha **Serviço: Personalizado** e cole os dois.
+
+Sem WebSocket, a Corneta não consegue dar play no OBS sozinha. Depois do **BORA
+AO VIVO**, clique em **Iniciar transmissão** no OBS.
+
+<Callout label="Não mande a senha do WebSocket" tone="warning">
+  Se ainda não funcionar, informe a mensagem exata e a porta usada. Não envie
+  senha, stream key, token nem print com credencial.
+</Callout>
+
+Pronto por aqui? Continue pela [primeira live](/help/getting-started/first-stream).

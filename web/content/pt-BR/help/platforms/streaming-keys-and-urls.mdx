@@ -1,0 +1,114 @@
+---
+contentId: help_streaming_keys_and_urls
+title: "Stream key, URL de ingestão e chave do OBS: qual é qual?"
+description: "Entenda onde usar a stream key, a URL RTMP ou RTMPS da plataforma e a chave local que liga o OBS à Corneta."
+summary: "A URL de ingestão é o endereço do servidor da plataforma. A stream key é a senha do seu canal. A chave mostrada em Liga no OBS só conecta o OBS à Corneta no seu PC."
+locale: pt-BR
+collection: help
+kind: help
+category: platforms
+slug: streaming-keys-and-urls
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: diferença entre stream key URL de ingestão e chave do OBS
+related:
+  - help_manage_platform
+  - help_automatic_obs_setup
+sources:
+  - title: Corneta target validation
+    kind: internal
+    repoPath: src/lib/validation.ts
+    reviewedAt: 2026-08-01
+  - title: Twitch Stream Key FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/twitch-stream-key-faq
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
+    originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
+    baseName: corneta-platform-key-setup
+    alt: "Campos de URL de ingestão e stream key dentro de um destino da Corneta."
+    caption: "A URL e a chave da plataforma ficam no destino; a chave é guardada no cofre do Windows."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
+    originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
+    baseName: corneta-obs-connection-details
+    alt: "Painel Liga no OBS com o servidor e a chave usados apenas na conexão local."
+    caption: "Esses dois campos vão para Serviço Personalizado no OBS; nenhum deles é a stream key da Twitch."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A diferença em uma tabela
+
+| Campo              | O que é                                      | Onde você pega                                          | Onde cola                              |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------- | -------------------------------------- |
+| URL de ingestão    | Endereço do servidor que recebe a live       | Painel ou documentação da plataforma                    | No destino da Corneta                  |
+| Stream key         | Senha que aponta a live para o seu canal     | Painel da Twitch, YouTube, Kick ou outra plataforma     | No destino da Corneta                  |
+| Chave local do OBS | Identificador da ligação entre OBS e Corneta | Tela Ao vivo → Liga no OBS                              | OBS → Configurações → Transmissão      |
+| Senha do WebSocket | Senha para a Corneta controlar o OBS         | OBS → Ferramentas → Configurações do Servidor WebSocket | Assistente ou Configurações da Corneta |
+
+## URL de ingestão
+
+Ela começa com `rtmp://` ou `rtmps://`. É um endereço de transmissão, não uma
+página que abre no navegador. Algumas plataformas já têm um servidor padrão na
+Corneta; em **Personalizado**, você informa o endereço completo.
+
+## Stream key
+
+Ela funciona como senha do canal. Quem tiver essa chave pode tentar transmitir
+na sua conta. Se ela apareceu num print ou chat, revogue no painel da plataforma
+e gere outra — apagar a mensagem não desfaz o vazamento.
+
+<ContentImage baseName="corneta-platform-key-setup" />
+
+Se você colar uma URL completa no campo da chave, a Corneta tenta separar o
+endereço e guardar só a chave. Mesmo assim, confira os dois campos antes de
+testar.
+
+## A chave local mostrada em Liga no OBS
+
+Essa chave só vale no seu computador. Ela faz o OBS publicar no servidor local
+da Corneta, normalmente pelo endereço `127.0.0.1`. Depois a Corneta abre uma
+saída diferente para cada plataforma.
+
+<ContentImage baseName="corneta-obs-connection-details" />
+
+## A senha do WebSocket
+
+WebSocket não carrega o vídeo. Ele deixa a Corneta verificar, configurar, dar
+play e parar o OBS. Se você configurar tudo na mão, a live funciona sem essa
+senha, mas a Corneta não controla o OBS por você.
+
+<Callout label="O que nunca mandar pro suporte" tone="important">
+  Não envie stream key, senha do WebSocket, token, URL com credencial ou print
+  em que um desses campos esteja visível. A mensagem de erro e o nome da etapa
+  bastam para começar o diagnóstico.
+</Callout>
+
+Agora que os campos estão separados, [adicione e teste a
+plataforma](/help/platforms/manage-platform).

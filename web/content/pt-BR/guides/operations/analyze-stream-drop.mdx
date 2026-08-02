@@ -1,0 +1,73 @@
+---
+contentId: guide_analyze_stream_drop
+title: "Como descobrir em que minuto a live engasgou"
+description: "Use a linha do tempo do relatório para cruzar bitrate, quadros perdidos, CPU, GPU e estado de cada plataforma."
+summary: "Abra o relatório pós-live, localize a janela marcada como problema e compare os gráficos no mesmo minuto. Depois confirme se a falha atingiu a entrada inteira ou apenas uma plataforma."
+locale: pt-BR
+collection: guides
+kind: guide
+category: operations
+slug: analyze-stream-drop
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: descobrir minuto que a live travou
+related:
+  - help_post_live_report
+  - help_stream_metrics
+  - guide_dropped_frames
+sources:
+  - title: Corneta report analysis
+    kind: internal
+    repoPath: src/lib/report.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/reports-and-data/corneta-post-live-report.webp
+    originalPath: assets/originals/reports-and-data/corneta-post-live-report.png
+    baseName: corneta-post-live-report
+    alt: "Relatório da Corneta com resumo, diagnóstico de encoding e gráfico de audiência."
+    caption: "O relatório aponta a janela provável; os gráficos mostram o que mudou naquele mesmo trecho."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Comece pelo horário relatado
+
+Se alguém disse “travou perto de 1h58”, anote esse ponto antes de abrir o relatório. Sem referência, procure os trechos em que o diagnóstico marcou rede, renderização ou encoding.
+
+<ContentImage baseName="corneta-post-live-report" />
+
+## Cruze os gráficos no mesmo minuto
+
+| O que mudou junto | Leitura provável |
+| --- | --- |
+| bitrate caiu em todos os destinos | entrada ou upload local |
+| só uma plataforma reconectou | chave, ingest ou rota daquela saída |
+| CPU/GPU subiu e encoding atrasou | máquina sem folga |
+| render skipped subiu no OBS | cena ou jogo ocupou a GPU |
+| audiência caiu sem métrica técnica | conteúdo, atraso do player ou dado incompleto |
+
+Correlação não prova causa. Um pico de CPU no mesmo minuto é pista; o relatório chama de causa provável porque não vê roteador, servidor da plataforma nem o player de cada pessoa.
+
+## Marque durante a próxima live
+
+Use **Marcar momento** quando perceber engasgo, troca de cena pesada ou queda de plataforma. O marcador aparece na linha do tempo e reduz a busca depois.
+
+Se precisar mandar o caso, exporte o relatório ou um [diagnóstico seguro](/help/reports-and-data/export-safe-diagnostic). Nunca mande stream key nem a pasta inteira de logs.
+

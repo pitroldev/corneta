@@ -1020,7 +1020,7 @@ function mockApi(): CornetaApi {
         platform: plats[0].platformId,
         source: plats[0].name,
         alertKind: "raid",
-        user: "Gaules",
+        user: "raid_demo",
         amount: raidViewers,
       }),
     );
@@ -1035,11 +1035,11 @@ function mockApi(): CornetaApi {
             source: plats[idx % plats.length].name,
             alertKind: kd,
             user: [
-              "ana_live",
-              "brabo_do_rio",
-              "zedapeça",
-              "kraderson",
-              "luluzinha",
+              "viewer_demo_01",
+              "viewer_demo_02",
+              "viewer_demo_03",
+              "viewer_demo_04",
+              "viewer_demo_05",
             ][idx],
             amount: kd === "resub" ? 2 + idx : 1,
           }),
@@ -1121,17 +1121,17 @@ function mockApi(): CornetaApi {
   let chatSeq = 0;
   const recentIds: { nativeId: string; platform: string }[] = [];
   const ALERT_SOURCES = [
-    { platform: "twitch" as const, source: "Pitrol" },
-    { platform: "kick" as const, source: "XQC" },
-    { platform: "youtube" as const, source: "Live" },
+    { platform: "twitch" as const, source: "Twitch Demo" },
+    { platform: "kick" as const, source: "Kick Demo" },
+    { platform: "youtube" as const, source: "YouTube Demo" },
   ];
   const ALERT_USERS = [
-    "brabo_do_rio",
-    "ana_live",
-    "kraderson",
-    "Maria Silva",
-    "zedapeça",
-    "miron_tv",
+    "viewer_demo_01",
+    "viewer_demo_02",
+    "viewer_demo_03",
+    "viewer_demo_04",
+    "viewer_demo_05",
+    "viewer_demo_06",
   ];
   const randomAlert = (seq: number, t: I18n["t"]): Alert => {
     const src = ALERT_SOURCES[Math.floor(Math.random() * ALERT_SOURCES.length)];
@@ -1485,10 +1485,10 @@ function mockApi(): CornetaApi {
       // Frases da demo resolvidas UMA vez por conexão (o timer roda a cada 1,1 s).
       const chatMsgs = CHAT_MSG_KEYS.map((k) => t(k));
       const SOURCES = [
-        { platform: "twitch", name: "Pitrol" },
-        { platform: "twitch", name: "Gaules" },
-        { platform: "kick", name: "XQC" },
-        { platform: "youtube", name: "Live" },
+        { platform: "twitch", name: "Twitch Demo A" },
+        { platform: "twitch", name: "Twitch Demo B" },
+        { platform: "kick", name: "Kick Demo" },
+        { platform: "youtube", name: "YouTube Demo" },
       ] as const;
       SOURCES.forEach((src) =>
         chatStatusListeners.forEach((l) =>
@@ -1497,10 +1497,10 @@ function mockApi(): CornetaApi {
       );
       // Viewers simulados (oscilam ao redor de uma base por canal).
       const VBASE: Record<string, number> = {
-        Pitrol: 820,
-        Gaules: 4200,
-        XQC: 1500,
-        Live: 300,
+        "Twitch Demo A": 820,
+        "Twitch Demo B": 4200,
+        "Kick Demo": 1500,
+        "YouTube Demo": 300,
       };
       const emitViewers = () => {
         const items = SOURCES.map((s) => {
@@ -1519,9 +1519,24 @@ function mockApi(): CornetaApi {
       viewerTimer = setInterval(emitViewers, 4000);
       if (chatTimer) clearInterval(chatTimer);
       const AUTHORS = {
-        twitch: ["Pitrol", "brabo_do_rio", "ana_live", "zedapeça"],
-        kick: ["kraderson", "miron_tv", "biel_kick", "luluzinha"],
-        youtube: ["Maria Silva", "joao_yt", "gamer123", "fulano_de_tal"],
+        twitch: [
+          "viewer_twitch_01",
+          "viewer_twitch_02",
+          "viewer_twitch_03",
+          "viewer_twitch_04",
+        ],
+        kick: [
+          "viewer_kick_01",
+          "viewer_kick_02",
+          "viewer_kick_03",
+          "viewer_kick_04",
+        ],
+        youtube: [
+          "viewer_youtube_01",
+          "viewer_youtube_02",
+          "viewer_youtube_03",
+          "viewer_youtube_04",
+        ],
       };
       const COLORS = ["#ff5a36", "#7c9cff", "#34d399", "#f5a524", "#e879f9"];
       chatTimer = setInterval(() => {

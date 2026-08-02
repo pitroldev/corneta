@@ -7,6 +7,8 @@ import {
   legalHref,
 } from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
+import { listPublishedEditorial } from "@/lib/editorial/server";
+import { editorialCollectionHref } from "@/lib/editorial/urls";
 
 // /llms.txt — convenção emergente (llmstxt.org) que entrega a um modelo um
 // resumo curado do site em markdown, em vez de deixá-lo adivinhar a partir do
@@ -23,12 +25,30 @@ const abs = (path: string) => new URL(path, siteUrl).toString();
 // Em pt-BR: o /llms.txt vive na raiz, que é a URL canônica em português.
 // Uma versão inglesa exigiria /en/llms.txt — vale quando/se o inglês virar
 // tráfego relevante.
-function body() {
+async function body() {
   const t = translator("pt-BR");
   const ONE_LINER = oneLinerFor(t);
   const FEATURES = featuresFor(t);
   const FAQS = faqsFor(t);
   const STEPS = stepsFor(t);
+  const editorial = await listPublishedEditorial({ locale: "pt-BR" });
+  const publishedCollections = new Set(
+    editorial.map((document) => document.frontmatter.collection),
+  );
+  const editorialPages = [
+    ...(publishedCollections.has("help")
+      ? [
+          `- [Central de ajuda](${abs(editorialCollectionHref("pt-BR", "help"))})`,
+        ]
+      : []),
+    ...(publishedCollections.has("guides")
+      ? [`- [Guias](${abs(editorialCollectionHref("pt-BR", "guides"))})`]
+      : []),
+    ...editorial.map(
+      (document) =>
+        `- [${document.frontmatter.title}](${abs(document.href)}) — ${document.frontmatter.summary}`,
+    ),
+  ];
   return `# Corneta
 
 > ${ONE_LINER}
@@ -70,7 +90,7 @@ ${FAQS.map((f) => `### ${f.question}\n\n${f.answer}`).join("\n\n")}
 - [Site em inglês](${abs("/en")})
 - [Política de privacidade](${abs(LEGAL_ROUTES.privacy)}) · [English](${abs(legalHref("en", "privacy"))})
 - [Termos de uso](${abs(LEGAL_ROUTES.terms)}) · [English](${abs(legalHref("en", "terms"))})
-- [Código-fonte](https://github.com/pitroldev)
+${editorialPages.length > 0 ? `${editorialPages.join("\n")}\n` : ""}- [Código-fonte](https://github.com/pitroldev)
 
 ## Quem responde
 
@@ -78,8 +98,8 @@ ${LEGAL_OPERATOR} — contato: ${LEGAL_CONTACT}
 `;
 }
 
-export function GET() {
-  return new Response(body(), {
+export async function GET() {
+  return new Response(await body(), {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "public, max-age=3600",

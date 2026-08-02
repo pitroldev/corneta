@@ -1,0 +1,182 @@
+---
+contentId: help_first_stream
+title: "Sua primeira live: do zero ao BORA AO VIVO"
+description: "Conecte o OBS Studio, prepare uma plataforma e confira o upload necessário para iniciar sua primeira live com a Corneta."
+summary: "Conecte o OBS, deixe pelo menos um destino pronto e confira o upload. Depois é só mandar o sinal para a Corneta e partir para o BORA AO VIVO."
+locale: pt-BR
+collection: help
+kind: help
+category: getting-started
+slug: first-stream
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: como fazer a primeira live com Corneta
+related:
+  - guide_obs_multistream
+  - help_automatic_obs_setup
+  - help_manage_platform
+  - help_quality_modes
+sources:
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
+    originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
+    baseName: corneta-obs-connection-details
+    alt: "Tela Ao vivo da Corneta com o painel Liga no OBS aberto, mostrando servidor local, chave local e botões para copiar."
+    caption: "O servidor e a chave desta tela ligam o OBS à Corneta; não são credenciais de nenhuma plataforma."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
+    originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
+    baseName: corneta-platform-key-setup
+    alt: "Destino Twitch aberto na tela Plataformas da Corneta, com a chave protegida no cofre e o botão Testar o servidor."
+    caption: "Abra o destino para trocar a chave ou testar o servidor antes da live."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela Plataformas da Corneta com os destinos Twitch e YouTube marcados como prontos para a live."
+    caption: "Antes de seguir, confira se cada destino habilitado aparece como pronto."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade da Corneta comparando os modos Na lata, Esperto e Caprichado, com estimativas de carga e upload."
+    caption: "Compare custo na máquina e upload antes de escolher como cada destino recebe o sinal."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/getting-started/corneta-first-live-checklist.webp
+    originalPath: assets/originals/getting-started/corneta-first-live-checklist.png
+    baseName: corneta-first-live-checklist
+    alt: "Tela Ao vivo da Corneta com OBS configurado, medição de upload e itens do check-up pré-live aprovados."
+    caption: "A tela Ao vivo reúne o que precisa estar em ordem antes do BORA AO VIVO."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## O caminho até o BORA AO VIVO
+
+O OBS manda um único sinal para a Corneta. Ela cuida do resto e acompanha cada
+plataforma separadamente. Se um destino tropeçar, os outros continuam no ar.
+
+Faça nessa ordem: conecte o OBS, deixe pelo menos um destino pronto, confira o
+upload e só então envie o sinal. Assim você resolve qualquer problema antes de a
+live começar de verdade.
+
+## Antes de começar
+
+- Corneta e OBS Studio instalados no Windows;
+- stream key de pelo menos uma plataforma;
+- upload suficiente para os destinos escolhidos;
+- nenhum outro app disputando a transmissão ou o encoder.
+
+A stream key é uma senha. Não coloque em chat, print ou pedido de suporte.
+
+## Conecte a Corneta ao OBS
+
+Abra o OBS e depois a Corneta. Use a configuração automática quando ela estiver
+disponível. Se o OBS pedir confirmação ou a senha do WebSocket estiver
+diferente, acerte isso antes de seguir.
+
+Quando o OBS aparecer como conectado, o controle está pronto. O vídeo ainda não
+chegou — essa é a próxima etapa.
+
+<ContentImage baseName="corneta-obs-connection-details" />
+
+## Adicione e teste uma plataforma
+
+Escolha a plataforma, informe os dados pedidos e faça o teste antes da live. Se
+a Corneta avisar que a chave está inválida, corrija agora. Ao vivo não é hora de
+descobrir senha errada.
+
+<ContentImage baseName="corneta-platform-key-setup" />
+
+Destino pronto e sem erro de autenticação? Pode seguir.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+## Confira upload e modo de qualidade
+
+Como a distribuição acontece no seu PC, cada destino usa uma parte do upload. A
+conta começa pela soma dos bitrates e ainda precisa de folga para a internet
+oscilar.
+
+Copiar o sinal pesa menos na máquina. Mudar resolução ou bitrate para cada
+plataforma exige recodificação e pode usar CPU ou GPU.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+Se a estimativa ultrapassar a capacidade estável da conexão, reduza a qualidade
+ou considere um relay na nuvem. O [guia de multistream no OBS Studio](/guides/multistream/obs-multistream)
+explica essa escolha.
+
+<ContentImage baseName="corneta-first-live-checklist" />
+
+## Envie o sinal do OBS
+
+No OBS, escolha o serviço personalizado e use o endereço local mostrado pela
+Corneta. A chave desse destino local não é a stream key da Twitch, do YouTube ou
+da Kick.
+
+Confira cena, câmera e áudio. Tudo certo? Inicie a transmissão no OBS.
+
+Quando o sinal chegar, a Corneta sai da espera e conecta os destinos habilitados.
+
+## Confira antes de chamar a galera
+
+Veja se há movimento, áudio e bitrate em cada destino. Abra as plataformas em
+outra janela ou no celular e confirme que o canal certo está ao vivo. Uma tela
+funcionando não prova que todas estão.
+
+## Deu ruim?
+
+Anote a mensagem exata, em qual etapa parou e se o problema pegou todos os
+destinos ou apenas um. Esse trio vale mais do que “não funcionou”.
+
+Se for pedir ajuda, nunca envie stream key, token, senha ou URL com credencial.

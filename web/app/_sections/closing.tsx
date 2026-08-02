@@ -1,10 +1,10 @@
-import type { Locale, T } from "@/lib/i18n";
+import { localePath, type Locale, type T } from "@/lib/i18n";
 import Link from "next/link";
 import { faqsFor } from "@/lib/content";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, legalHref } from "@/lib/legal";
 import { BrandMark } from "../_components/brand-mark";
 import { Mascot, SoundWaves } from "../_components/decor";
-import { ArrowIcon, WindowsIcon } from "../_components/icons";
+import { WindowsIcon } from "../_components/icons";
 import {
   cn,
   downloadButton,
@@ -178,7 +178,10 @@ export function Ticker({ t }: { t: T }) {
 
 export function FinalCta({ t }: { t: T }) {
   return (
-    <section className="relative isolate overflow-hidden py-[clamp(70px,8vw,110px)]">
+    <section
+      id="download"
+      className="relative isolate overflow-hidden py-[clamp(70px,8vw,110px)]"
+    >
       <SoundWaves className="pointer-events-none absolute -right-[190px] -bottom-[220px] -z-10 w-[640px] text-brass opacity-14" />
       <Shell>
         <TwoCol
@@ -207,10 +210,11 @@ export function FinalCta({ t }: { t: T }) {
 }
 
 const FOOTER_LINK =
-  // 30px reprova em régua de toque; no dedo a caixa vai a 40. Links legais são
-  // exatamente os que alguém procura no celular, com pressa.
-  "inline-flex min-h-[30px] items-center rounded-sm bg-surface-2 px-[11px] py-1.5 text-[0.78rem] font-bold text-muted transition-colors duration-120 hover:bg-brass hover:text-brass-ink " +
-  "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:px-3.5";
+  "inline-flex min-h-9 items-center rounded-sm text-[0.84rem] font-[650] text-muted underline-offset-4 transition-colors duration-120 " +
+  "hover:text-brass hover:underline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-brass [@media(pointer:coarse)]:min-h-11";
+
+const FOOTER_GROUP_TITLE =
+  "mb-3 font-display text-[0.92rem] font-extrabold text-cream";
 
 export function SiteFooter({
   t,
@@ -223,46 +227,102 @@ export function SiteFooter({
 }) {
   return (
     <footer className="border-t-2 border-border-soft bg-panel">
-      <Shell className="flex min-h-26 items-center justify-between gap-7 py-5.5 max-[760px]:flex-col max-[760px]:items-start">
-        <div className="flex flex-col gap-3 [&_p]:max-w-[40ch] [&_p]:text-[0.82rem] [&_p]:font-[550] [&_p]:text-faint">
-          <BrandMark />
-          <p>{t("closing.footer.tagline")}</p>
-          <p>
-            {LEGAL_OPERATOR} · CNPJ {LEGAL_CNPJ}
-          </p>
+      <Shell>
+        <div className="grid grid-cols-[minmax(240px,0.9fr)_minmax(420px,1.1fr)] gap-x-[clamp(48px,8vw,112px)] gap-y-10 py-10 max-[760px]:grid-cols-1 max-[560px]:py-8">
+          <div className="flex flex-col items-start gap-4">
+            <BrandMark />
+            <p className="max-w-[36ch] text-[0.84rem] leading-[1.6] font-[550] text-faint-raised">
+              {t("closing.footer.tagline")}
+            </p>
+          </div>
+
+          <nav
+            className="grid grid-cols-3 gap-x-8 gap-y-8 max-[560px]:grid-cols-2"
+            aria-label={t("closing.footer.nav.ariaLabel")}
+          >
+            <div>
+              <h2 className={FOOTER_GROUP_TITLE}>
+                {t("closing.footer.group.product")}
+              </h2>
+              <ul className="flex flex-col items-start gap-1" role="list">
+                <li>
+                  <a
+                    className={FOOTER_LINK}
+                    href={downloadUrl}
+                    data-placeholder-link="replace-me"
+                    data-telemetry-cta="footer_download"
+                  >
+                    {t("closing.footer.download")}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    className={FOOTER_LINK}
+                    href="https://github.com/pitroldev"
+                    rel="noreferrer noopener"
+                    target="_blank"
+                  >
+                    {t("closing.footer.link.source")}
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className={FOOTER_GROUP_TITLE}>
+                {t("closing.footer.group.content")}
+              </h2>
+              <ul className="flex flex-col items-start gap-1" role="list">
+                <li>
+                  <Link
+                    className={FOOTER_LINK}
+                    href={localePath(locale, "/guides")}
+                    data-telemetry-cta="footer_guides"
+                  >
+                    {t("closing.footer.link.guides")}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    className={FOOTER_LINK}
+                    href={localePath(locale, "/help")}
+                    data-telemetry-cta="footer_help"
+                  >
+                    {t("closing.footer.link.help")}
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className={FOOTER_GROUP_TITLE}>
+                {t("closing.footer.group.legal")}
+              </h2>
+              <ul className="flex flex-col items-start gap-1" role="list">
+                <li>
+                  <Link
+                    className={FOOTER_LINK}
+                    href={legalHref(locale, "privacy")}
+                  >
+                    {t("closing.footer.link.privacy")}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    className={FOOTER_LINK}
+                    href={legalHref(locale, "terms")}
+                  >
+                    {t("closing.footer.link.terms")}
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </nav>
         </div>
 
-        {/* Rótulo por extenso de propósito: a verificação do Google procura um
-            link de "política de privacidade" na home, e "Privacidade" sozinho é
-            ambíguo pra quem revisa sem ler português. */}
-        <nav
-          className="flex flex-wrap gap-x-2.5 gap-y-2"
-          aria-label={t("closing.footer.nav.ariaLabel")}
-        >
-          <Link className={FOOTER_LINK} href={legalHref(locale, "privacy")}>
-            {t("closing.footer.link.privacy")}
-          </Link>
-          <Link className={FOOTER_LINK} href={legalHref(locale, "terms")}>
-            {t("closing.footer.link.terms")}
-          </Link>
-          <a
-            className={FOOTER_LINK}
-            href="https://github.com/pitroldev"
-            rel="noreferrer noopener"
-            target="_blank"
-          >
-            {t("closing.footer.link.source")}
-          </a>
-        </nav>
-
-        <a
-          className="inline-flex min-h-[30px] items-center gap-2 font-display text-[0.92rem] font-extrabold text-brass [@media(pointer:coarse)]:min-h-11 [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:transition-transform [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.4] hover:[&>svg]:translate-x-1"
-          href={downloadUrl}
-          data-placeholder-link="replace-me"
-          data-telemetry-cta="footer_download"
-        >
-          {t("closing.footer.download")} <ArrowIcon />
-        </a>
+        <div className="border-t border-border-soft py-4 text-[0.75rem] leading-relaxed font-[550] text-faint-raised">
+          {LEGAL_OPERATOR} · CNPJ {LEGAL_CNPJ}
+        </div>
       </Shell>
     </footer>
   );

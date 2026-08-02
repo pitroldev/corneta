@@ -1,0 +1,89 @@
+---
+contentId: help_stream_metrics
+title: "Como interpretar bitrate, FPS, quadros perdidos, CPU e GPU"
+description: "Leia as métricas da tela Ao vivo sem confundir sintoma, causa e capacidade da máquina."
+summary: "Bitrate e FPS mostram o que saiu; quadros perdidos mostram onde algo não acompanhou; CPU e GPU ajudam a confirmar pressão na máquina. Leia as métricas no mesmo intervalo."
+locale: pt-BR
+collection: help
+kind: help
+category: quality
+slug: stream-metrics
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: interpretar bitrate FPS quadros perdidos CPU GPU live
+related:
+  - guide_dropped_frames
+  - guide_analyze_stream_drop
+  - help_post_live_report
+sources:
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: Corneta runtime metrics
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade mostrando upload estimado e encoders detectados."
+    caption: "Antes do BORA, a estimativa mostra a carga planejada; durante a live, as métricas mostram o que aconteceu."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Leia em conjunto
+
+| Métrica | O que responde | O que não prova sozinha |
+| --- | --- | --- |
+| bitrate | quantos dados saem por segundo | qualidade percebida ou estabilidade futura |
+| FPS | quantos quadros chegam na saída | se o jogo está rodando no mesmo FPS |
+| quadros perdidos | parte do fluxo não acompanhou | a causa sem separar rede, render e encoder |
+| CPU | pressão geral de processamento | qual processo é o culpado |
+| GPU | pressão geral da placa | se faltou renderização ou sessão de encoder |
+
+<ContentImage baseName="corneta-quality-modes" />
+
+## Um diagnóstico rápido
+
+1. Marque o minuto do sintoma.
+2. Veja se a queda atingiu todos os destinos.
+3. Abra **Exibir → Estatísticas** no OBS.
+4. Compare rede, renderização e codificação no mesmo intervalo.
+5. Mude uma coisa e repita a mesma cena.
+
+CPU alta com live lisa não é erro. GPU abaixo de 100% também não garante folga para compor uma cena no prazo. O que importa é a mudança junto do sintoma.
+
+## Se ainda estiver confuso
+
+| Sintoma | Confirme | Próximo passo |
+| --- | --- | --- |
+| bitrate cai em todas | quadros perdidos de rede | teste upload e cabo |
+| FPS cai com render skipped | jogo ou cena usa GPU | limite FPS e simplifique fontes |
+| output skipped aumenta | encoder atrasou | reduza FPS, resolução ou transcodes |
+| só um destino reconecta | estado das outras plataformas | revise aquele ingest |
+
+Exporte o relatório ou diagnóstico, nunca credenciais e logs crus.
+

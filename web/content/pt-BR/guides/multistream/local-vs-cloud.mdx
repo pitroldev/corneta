@@ -1,0 +1,113 @@
+---
+contentId: guide_local_vs_cloud
+title: "Multistream local ou na nuvem: qual faz sentido para você?"
+description: "Compare upload, carga no PC, custo, controle por destino e privacidade antes de escolher multistream local ou relay na nuvem."
+summary: "Multistream local dá controle direto e mantém as chaves no seu PC, mas soma o upload das saídas. Um relay na nuvem usa uma saída local e replica fora, com outra dependência no caminho."
+locale: pt-BR
+collection: guides
+kind: comparison
+category: multistream
+slug: local-vs-cloud
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: multistream local ou na nuvem
+related:
+  - guide_multistream_upload_speed
+  - guide_obs_multistream
+  - help_quality_modes
+sources:
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Destinos da Corneta configurados separadamente para distribuição local."
+    caption: "No caminho local, cada plataforma pode pausar ou reconectar sem puxar as outras."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A resposta curta
+
+Escolha **local** quando seu upload aguenta a soma, você quer controlar cada
+plataforma separadamente e prefere manter chaves e relatórios no PC. Escolha um
+**relay na nuvem** quando a conexão só sustenta uma boa saída ou quando tirar a
+carga de distribuição da máquina vale a dependência externa.
+
+Não existe vencedor sem olhar a sua conexão. O mesmo streamer pode usar local em
+casa e relay num evento com upload apertado.
+
+## O que muda no caminho
+
+No modo local, o OBS entrega um sinal para o aplicativo e ele abre uma conexão
+por plataforma. A conta de upload cresce com cada saída.
+
+No relay, o OBS ou aplicativo envia um sinal para a nuvem. O relay abre as outras
+saídas, então o upload do seu PC fica perto de uma transmissão.
+
+## Comparação direta
+
+| Ponto                  | Local                                       | Relay na nuvem                                             |
+| ---------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| Upload em casa         | Soma dos bitrates locais                    | Uma saída principal                                        |
+| Carga de recodificação | Pode usar CPU ou GPU do PC                  | Pode acontecer no serviço, conforme o plano                |
+| Chaves                 | Ficam no computador                         | Precisam ser entregues ao serviço                          |
+| Controle por destino   | Depende do app local; na Corneta é separado | Depende do painel e do plano                               |
+| Falha no intermediário | PC e conexão local                          | Serviço, conta e rota até o relay também entram no caminho |
+| Custo recorrente       | O núcleo da Corneta é gratuito              | Varia por serviço e plano                                  |
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+## Quando o local encaixa melhor
+
+- seu upload estável fica acima da soma com margem;
+- o PC aguenta copiar ou recodificar as saídas escolhidas;
+- você quer pausar, testar e reconectar um destino por vez;
+- não quer entregar stream keys a um relay;
+- Windows e OBS já fazem parte do seu setup.
+
+## Quando a nuvem evita dor de cabeça
+
+- o upload só sustenta uma saída de boa qualidade;
+- a máquina já fica no limite com jogo e OBS;
+- você precisa transmitir de uma rede temporária ou imprevisível;
+- o plano do relay entrega os destinos e ajustes que você precisa;
+- você aceita guardar as chaves nesse serviço.
+
+## O meio-termo
+
+Nem toda adaptação exige recodificar tudo. Na Corneta, **Esperto** copia os
+destinos compatíveis e recodifica só os que precisam mudar. Isso reduz carga da
+máquina, mas cada saída continua consumindo upload.
+
+<Callout label="Relay não conserta a internet até ele" tone="limit">
+  Você ainda precisa manter uma saída estável do PC até a nuvem. Se essa
+  primeira perna cai, todos os destinos do relay ficam sem sinal.
+</Callout>
+
+Faça a conta com seus bitrates no [guia de upload para
+multistream](/guides/quality/multistream-upload-speed).

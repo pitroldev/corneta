@@ -1,0 +1,83 @@
+---
+contentId: guide_copy_vs_transcode
+title: "Copiar ou recodificar a live? Como escolher por plataforma"
+description: "Decida quando reaproveitar o sinal de entrada e quando criar outra resolução, bitrate ou enquadramento para um destino."
+summary: "Copie quando o mesmo H.264, resolução, FPS e bitrate servem para todas as plataformas. Recodifique apenas o destino que exige outro limite ou formato."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: copy-vs-transcode
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: copiar ou recodificar live multistream
+related:
+  - help_quality_modes
+  - guide_live_stream_encoders
+  - guide_twitch_youtube_kick_bitrate
+sources:
+  - title: Corneta encoding modes
+    kind: internal
+    repoPath: src-tauri/src/config.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta engine pipeline
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade comparando os modos Na lata, Esperto e Caprichado."
+    caption: "Na lata copia tudo; Esperto recodifica só o necessário; Caprichado prepara cada destino."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Copiar preserva o que chegou
+
+Na cópia, a Corneta não recria os quadros. Ela encaminha o vídeo e o áudio recebidos para os destinos compatíveis. Isso reduz CPU, GPU e atraso, mas não muda resolução, FPS, bitrate ou enquadramento.
+
+## Recodificar cria outra saída
+
+Recodificação decodifica o sinal e produz outro arquivo ao vivo. É o caminho quando:
+
+- uma plataforma aceita menos bitrate;
+- um destino precisa de resolução ou FPS diferente;
+- a live vertical exige recorte 9:16;
+- o codec recebido não cabe na plataforma;
+- o normalizador de áudio precisa atuar naquele fluxo.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+## A decisão em três perguntas
+
+1. Todas aceitam exatamente o sinal que entrou? Use **Na lata**.
+2. Só uma ou duas precisam de ajuste? Use **Esperto**.
+3. Você quer um preset independente por plataforma e a máquina aguenta? Use **Caprichado**.
+
+Não escolha Caprichado só porque o nome parece melhor. Se três saídas já aceitam o mesmo 1080p60, recodificar três vezes pode gastar GPU sem entregar diferença visível.
+
+<Callout label="Cópia não corrige sinal ruim" tone="limit">
+  Se o software de transmissão já manda imagem borrada, áudio estourado ou keyframe errado, Na lata replica o problema. Corrija a origem ou recodifique com um objetivo claro.
+</Callout>
+
+Veja os nomes e a estimativa na Ajuda: [qual modo de qualidade escolher](/help/quality/quality-modes).
+

@@ -1,0 +1,86 @@
+---
+contentId: help_post_live_report
+title: "Como ler e exportar o relatório pós-live"
+description: "Entenda resumo, diagnóstico, audiência, chat e linha do tempo e baixe os dados da live em formatos seguros."
+summary: "Abra Relatórios e escolha uma live. Comece pelo diagnóstico, confirme o minuto nos gráficos e baixe o formato adequado; a causa mostrada é uma hipótese baseada nas métricas disponíveis."
+locale: pt-BR
+collection: help
+kind: help
+category: reports-and-data
+slug: post-live-report
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: relatório pós live Corneta
+related:
+  - guide_analyze_stream_drop
+  - help_stream_metrics
+  - help_export_safe_diagnostic
+sources:
+  - title: Corneta report renderer and exports
+    kind: internal
+    repoPath: src/screens/ReportsScreen.tsx
+    reviewedAt: 2026-08-01
+  - title: Corneta report analysis
+    kind: internal
+    repoPath: src/lib/report.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/reports-and-data/corneta-post-live-report.webp
+    originalPath: assets/originals/reports-and-data/corneta-post-live-report.png
+    baseName: corneta-post-live-report
+    alt: "Relatório pós-live com pico de viewers, mensagens, seguidores, diagnóstico e gráfico."
+    caption: "O resumo mostra o tamanho da live; o diagnóstico e a linha do tempo explicam onde investigar."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Abra a live certa
+
+1. Entre em **Relatórios**.
+2. Escolha a data e o horário.
+3. Confira plataformas, duração e modo de qualidade.
+4. Leia o aviso de diagnóstico antes dos gráficos.
+
+<ContentImage baseName="corneta-post-live-report" />
+
+Pico e média de audiência, mensagens e alertas só aparecem quando aquela fonte entregou dados. Ausência não vira zero inventado.
+
+## Leia o diagnóstico como hipótese
+
+A Corneta cruza CPU, GPU, estatísticas do OBS e estado dos destinos. Ela pode dizer “engasgo rápido de encoding” porque os contadores mudaram juntos; não enxerga roteador, computador de quem assistiu ou toda falha da plataforma.
+
+## Baixe o formato certo
+
+- **HTML**: relatório legível para abrir ou anexar.
+- **CSV**: tabela para comparar lives.
+- **JSON**: dados estruturados para análise técnica.
+- **Recap**: imagem pronta para compartilhar, depois de revisar.
+
+## Se os números parecem errados
+
+| Sintoma | Verifique | Explicação provável |
+| --- | --- | --- |
+| audiência ausente | conexão das contas | fonte não forneceu amostras |
+| seguidores diferentes do painel | período e atribuição | eventos externos podem não ter canal seguro |
+| gráfico termina cedo | horário de encerramento | sessão ou app foi interrompido |
+| causa não bate com o que você viu | minuto e outras métricas | correlação incompleta |
+
+Antes de compartilhar, confira nomes de canal, mensagens e qualquer dado pessoal. Para suporte técnico, prefira o [diagnóstico seguro](/help/reports-and-data/export-safe-diagnostic).
+

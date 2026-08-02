@@ -1,0 +1,79 @@
+---
+contentId: help_auto_bitrate
+title: "O que o auto-bitrate faz — e quando ele não atua"
+description: "Veja quais destinos podem baixar bitrate automaticamente, quando a qualidade volta e por que saídas em cópia não mudam."
+summary: "O auto-bitrate reduz temporariamente a taxa de destinos que a Corneta está recodificando quando a banda aperta. Saídas em cópia continuam iguais porque o bitrate vem do software de transmissão."
+locale: pt-BR
+collection: help
+kind: help
+category: quality
+slug: auto-bitrate
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: auto bitrate Corneta como funciona
+related:
+  - help_quality_modes
+  - guide_copy_vs_transcode
+  - help_test_upload
+sources:
+  - title: Corneta auto-bitrate controller
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta auto-bitrate setting
+    kind: internal
+    repoPath: src-tauri/src/config.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/operations/corneta-live-safety-settings.webp
+    originalPath: assets/originals/operations/corneta-live-safety-settings.png
+    baseName: corneta-live-safety-settings
+    alt: "Configurações de Segurança ao vivo com auto-bitrate armado."
+    caption: "O auto-bitrate nasce ligado e aparece como ARMADO; ele só consegue alterar destinos em recodificação."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Ative e confira o escopo
+
+1. Abra **Configurações → Segurança ao vivo**.
+2. Ative **Segurar a live quando a internet aperta (auto-bitrate)**.
+3. Confirme **ARMADO**.
+4. Em **Qualidade**, veja quais plataformas serão recodificadas.
+
+<ContentImage baseName="corneta-live-safety-settings" />
+
+Quando o envio aperta, a Corneta desce o bitrate de uma saída recodificada e tenta subir de novo depois que a conexão firma. Ela prefere degradar imagem por um tempo a deixar aquele destino cair.
+
+## Quando não atua
+
+- destino em **Na lata** ou em cópia dentro do **Esperto**;
+- falta total de internet;
+- problema de renderização no OBS;
+- encoder sobrecarregado;
+- chave ou URL inválida;
+- plataforma fora do ar.
+
+Na cópia, os pacotes já chegam prontos. Para reduzir essa saída, baixe o bitrate no software de transmissão ou mude o destino para recodificação.
+
+## Como confirmar
+
+Se um destino reconecta mesmo com auto-bitrate, confira se ele estava em recodificação e se outras saídas também perderam rede. Exporte horário e estado pelo diagnóstico; nunca mande chave ou URL com credencial.
+

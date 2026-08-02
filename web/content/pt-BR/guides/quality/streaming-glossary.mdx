@@ -1,0 +1,147 @@
+---
+contentId: guide_streaming_glossary
+title: "RTMP, ingest, keyframe, bitrate e transcode: glossário de live"
+description: "Entenda os termos que aparecem no OBS, na Corneta e nos painéis de Twitch, YouTube e Kick sem decorar siglas soltas."
+summary: "RTMP é o protocolo que carrega a live até um servidor de ingestão; a stream key identifica seu canal. Bitrate mede dados por segundo, keyframe reinicia uma imagem completa e transcode cria outra versão do vídeo."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: streaming-glossary
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: glossário de live RTMP ingest keyframe bitrate transcode
+related:
+  - guide_protect_stream_key
+  - guide_copy_vs_transcode
+  - guide_resolution_and_fps
+sources:
+  - title: YouTube live encoder settings
+    kind: official
+    url: https://support.google.com/youtube/answer/2853702?hl=en
+    reviewedAt: 2026-08-01
+  - title: YouTube stream settings and keys
+    kind: official
+    url: https://support.google.com/youtube/answer/9854503?hl=en
+    reviewedAt: 2026-08-01
+  - title: Enhanced RTMP specification
+    kind: primary
+    url: https://github.com/veovera/enhanced-rtmp/blob/main/docs/enhanced/enhanced-rtmp-v2.md
+    reviewedAt: 2026-08-01
+  - title: Corneta platform catalog
+    kind: internal
+    repoPath: src/lib/platforms.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
+    originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
+    baseName: corneta-platform-key-setup
+    alt: "Configuração de uma plataforma na Corneta com URL de ingestão, campo de stream key e teste do servidor."
+    caption: "URL de ingestão e stream key trabalham juntas, mas não são a mesma coisa."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## O caminho de uma live
+
+O OBS **codifica** áudio e vídeo, envia pelo **RTMP ou RTMPS** para um servidor de **ingestão**, e a plataforma distribui versões para quem assiste. No multistream local, a Corneta recebe um sinal e abre esse caminho para cada destino.
+
+<ContentImage baseName="corneta-platform-key-setup" />
+
+## Termos de conexão
+
+### RTMP
+
+Protocolo muito usado para levar áudio, vídeo e dados do encoder até a plataforma. Ele descreve o transporte; não é a qualidade da imagem.
+
+### RTMPS
+
+RTMP protegido por TLS. Criptografa o trecho entre seu encoder e o servidor. Sempre prefira quando a plataforma oferecer.
+
+### Ingest ou ingestão
+
+Servidor que recebe sua live. A **URL de ingestão** informa o endereço; a **stream key** informa qual canal deve receber o sinal.
+
+### Stream key
+
+Segredo que autoriza a transmissão. Trate como senha: não mostre em print, vídeo, log ou diagnóstico.
+
+## Termos de imagem
+
+### Resolução
+
+Quantidade de pixels do quadro, como 1280×720 ou 1920×1080. Mais pixels só viram mais detalhe quando bitrate e encoder acompanham.
+
+### FPS
+
+Quadros por segundo. 60 FPS deixam movimento mais fluido, mas dobram o volume de quadros em relação a 30 FPS.
+
+### Bitrate
+
+Quantidade de dados enviada por segundo. Em live, costuma aparecer em kbps ou Mbps. Somar bitrates de saída ajuda a estimar upload; não mede sozinho a qualidade final.
+
+### Keyframe
+
+Quadro completo usado como ponto de referência. Entre eles, o encoder descreve mudanças. Twitch, YouTube e Kick normalmente trabalham com intervalo de 2 segundos.
+
+### CBR
+
+Controle que tenta manter bitrate constante. É o padrão recomendado pelas principais plataformas para ingestão ao vivo.
+
+## Termos de processamento
+
+### Encoder
+
+Transforma quadros e áudio em um fluxo comprimido. Pode usar CPU, como x264, ou hardware dedicado, como NVENC, QSV e AMF.
+
+### Codec
+
+Regra de compressão usada pelo encoder, como H.264, HEVC ou AV1. Encoder é quem executa; codec é o formato do trabalho.
+
+### Copy ou passthrough
+
+Copia o fluxo já codificado sem recriar o vídeo. Economiza CPU e GPU, mas preserva resolução, FPS, bitrate e orientação recebidos.
+
+### Transcode
+
+Decodifica e codifica outra versão. Permite mudar resolução, FPS, bitrate ou enquadramento, mas custa processamento e pode perder qualidade.
+
+### Relay
+
+Intermediário que recebe um fluxo e encaminha para outro lugar. Pode ser local, como a Corneta, ou na nuvem, como serviços de restream.
+
+## Termos de diagnóstico
+
+### Dropped frames
+
+Quadros que não chegaram ao destino por problema de rede. No OBS, não confunda com quadros ignorados por renderização ou codificação.
+
+### Render lag
+
+O OBS não conseguiu montar os quadros a tempo, geralmente por falta de recurso de GPU ou cena pesada.
+
+### Encoding lag
+
+O encoder não terminou os quadros no prazo. Pode indicar CPU, GPU, preset ou sessões demais.
+
+Quando um contador piorar, use a árvore de [dropped frames, renderização e codificação](/guides/quality/dropped-frames) antes de trocar tudo ao mesmo tempo.

@@ -1,0 +1,101 @@
+---
+contentId: help_export_safe_diagnostic
+title: "Como exportar um diagnóstico seguro para o suporte"
+description: "Gere o arquivo de diagnóstico da Corneta, confira o que ele inclui e compartilhe sem mandar stream keys, chat ou logs crus."
+summary: "Abra Configurações → Dados & diagnóstico e use Exportar diagnóstico. O arquivo leva versões, configuração resumida e eventos técnicos; chaves, chat, caminhos e logs crus ficam fora."
+locale: pt-BR
+collection: help
+kind: help
+category: reports-and-data
+slug: export-safe-diagnostic
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: exportar diagnóstico seguro Corneta
+related:
+  - guide_why_stream_lags
+  - help_first_stream
+sources:
+  - title: Corneta diagnostic export command
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta telemetry and diagnostics runbook
+    kind: internal
+    repoPath: docs/RUNBOOK-POSTHOG.md
+    reviewedAt: 2026-08-01
+images: []
+---
+
+## Exporte o arquivo
+
+1. Abra **Configurações**.
+2. Entre na aba **Dados & diagnóstico**.
+3. Clique em **Exportar diagnóstico**.
+4. Escolha onde salvar `corneta-diagnostico.txt`.
+5. Abra o arquivo e confira o conteúdo antes de anexar ao chamado.
+
+Cancelar a janela de salvamento não cria arquivo nem envia nada. A Corneta
+também não anexa diagnóstico automaticamente.
+
+## O que entra
+
+O arquivo é montado a partir de campos fechados:
+
+- versão da Corneta, sistema e arquitetura;
+- resumo da configuração sem nomes nem credenciais;
+- estado das preferências de telemetria;
+- versão do schema e SHA do build;
+- eventos técnicos estruturados, com código e etapa da falha;
+- ID de instalação somente quando houver consentimento explícito.
+
+O ID ajuda a cruzar um evento técnico no PostHog. Ele não é necessário em cada
+pedido. Se você não autorizou a inclusão, o arquivo marca o campo como omitido.
+
+## O que fica fora
+
+- stream keys, tokens e senha do WebSocket;
+- nomes de canal, título da live e mensagens de chat;
+- imagem, áudio, vídeo e texto lido da tela;
+- caminhos locais, nome do computador e IP como propriedade;
+- watchlist do Guardião;
+- logs crus.
+
+Os logs continuam locais e têm um comando separado para abrir a pasta. Não mande
+a pasta inteira sem uma pessoa do suporte explicar qual arquivo precisa e por
+quê.
+
+## O que escrever junto
+
+O diagnóstico não adivinha o que você viu. Inclua três linhas no chamado:
+
+1. o que você tentou fazer;
+2. a mensagem exata que apareceu;
+3. se a falha atingiu todos os destinos ou apenas um.
+
+Se houver **ID do erro** ou **ID da operação** na tela Ao vivo, copie como texto.
+Não precisa mandar print do painel inteiro.
+
+## Se você abriu o arquivo e viu algo estranho
+
+Não compartilhe. Guarde uma cópia local, feche o chamado sem anexo e informe que
+o diagnóstico parece conter um dado inesperado. Diga o nome do campo, não o
+valor.
+
+<Callout label="Blur não protege segredo" tone="important">
+  Se for mandar um print por conta própria, corte o campo antes da captura. Não
+  confie em blur sobre stream key, token ou senha.
+</Callout>
+
+Pra separar a causa antes de abrir o chamado, use o guia [por que minha live
+trava](/guides/quality/why-stream-lags).

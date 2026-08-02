@@ -3,6 +3,7 @@ import {
   SITE_TELEMETRY_CHANGE_EVENT,
   SITE_TELEMETRY_PREFERENCE_KEY,
   createBrowserTelemetry,
+  editorialContentIdFromDocument,
   subscribeToSiteTelemetryPreference,
 } from "./telemetry";
 
@@ -27,6 +28,22 @@ function fakeSdk() {
 }
 
 const UUID = "318f95fc-6f70-4cf5-a625-e250e43b1234";
+
+describe("editorial content id", () => {
+  it("aceita apenas o identificador opaco da metadata", () => {
+    const root = (content: string) =>
+      ({
+        querySelector: () => ({ content }),
+      }) as unknown as Pick<Document, "querySelector">;
+
+    expect(editorialContentIdFromDocument(root("guide_upload_speed"))).toBe(
+      "guide_upload_speed",
+    );
+    expect(
+      editorialContentIdFromDocument(root("/guides/quality?email=a@b.com")),
+    ).toBeUndefined();
+  });
+});
 
 describe("browser telemetry facade", () => {
   it("não carrega o SDK sem configuração ou após opt-out", async () => {
@@ -140,6 +157,73 @@ describe("browser telemetry facade", () => {
     expect(JSON.stringify(sdk.capture.mock.calls)).not.toContain(
       "must-not-leak",
     );
+  });
+
+  it("captura content_id validado e deduplica por artigo sem enviar a URL", async () => {
+    const sdk = fakeSdk();
+    const telemetry = createBrowserTelemetry({
+      token: "phc_project123",
+      host: "https://us.i.posthog.com",
+      environment: "test",
+      loadSdk: async () => sdk,
+      storage: () => fakeStorage(),
+    });
+
+    await telemetry.capturePageView(
+      "/guides/multistream/obs-multistream?private=query#title",
+      "guide_multistream_obs",
+    );
+    await telemetry.capturePageView(
+      "/guides/multistream/obs-multistream?another=secret",
+      "guide_multistream_obs",
+    );
+    await telemetry.capturePageView(
+      "/guides/multistream/twitch-youtube-simultaneously",
+      "guide_multistream_twitch_youtube",
+    );
+    await telemetry.capturePageView(
+      "/guides/multistream/leak",
+      "guide_multistream/leak?token=secret",
+    );
+    await telemetry.captureCta(
+      "content_related",
+      "/guides/multistream/obs-multistream?token=must-not-leak",
+      "guide_multistream_obs",
+    );
+
+    expect(sdk.capture).toHaveBeenCalledTimes(3);
+    expect(sdk.capture).toHaveBeenNthCalledWith(
+      1,
+      "site_page_viewed",
+      expect.objectContaining({
+        route_id: "guide_article",
+        locale: "pt-BR",
+        content_id: "guide_multistream_obs",
+      }),
+    );
+    expect(sdk.capture).toHaveBeenNthCalledWith(
+      2,
+      "site_page_viewed",
+      expect.objectContaining({
+        route_id: "guide_article",
+        content_id: "guide_multistream_twitch_youtube",
+      }),
+    );
+    expect(sdk.capture).toHaveBeenNthCalledWith(
+      3,
+      "site_cta_clicked",
+      expect.objectContaining({
+        route_id: "guide_article",
+        cta_id: "content_related",
+        content_id: "guide_multistream_obs",
+      }),
+      { transport: "sendBeacon", send_instantly: true },
+    );
+    const serialized = JSON.stringify(sdk.capture.mock.calls);
+    expect(serialized).not.toContain("private=query");
+    expect(serialized).not.toContain("another=secret");
+    expect(serialized).not.toContain("must-not-leak");
+    expect(serialized).not.toContain("guide_multistream/leak");
   });
 
   it("redige exceções e interrompe a captura imediatamente ao desativar", async () => {

@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { LEGAL_AUTHOR, LEGAL_OPERATOR } from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
 import {
+  SOCIAL_IMAGE_ALT,
+  SOCIAL_IMAGE_PATH,
+  SOCIAL_IMAGE_SIZE,
+} from "@/lib/social-image";
+import {
   isLocale,
   LOCALES,
   OG_LOCALE,
@@ -42,6 +47,19 @@ const KEYWORD_KEYS = [
   "chrome.meta.keywords.11",
 ] as const;
 
+const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, siteUrl).toString();
+
+function searchVerification(): Metadata["verification"] | undefined {
+  const google = process.env.GOOGLE_SITE_VERIFICATION?.trim();
+  const bing = process.env.BING_SITE_VERIFICATION?.trim();
+  if (!google && !bing) return undefined;
+
+  return {
+    ...(google ? { google } : {}),
+    ...(bing ? { other: { "msvalidate.01": bing } } : {}),
+  };
+}
+
 /** Alternates completos: cada idioma aponta pro outro E pra si mesmo, que é o
  *  par recíproco que o Google exige pra aceitar o hreflang. O `x-default` é o
  *  português porque `/` é a URL canônica do site. */
@@ -79,6 +97,7 @@ export async function generateMetadata({
     publisher: LEGAL_OPERATOR,
     authors: [{ name: LEGAL_AUTHOR, url: "https://github.com/pitroldev" }],
     keywords: KEYWORD_KEYS.map(t),
+    verification: searchVerification(),
     alternates: alternatesFor(locale),
     robots: {
       index: true,
@@ -101,11 +120,19 @@ export async function generateMetadata({
       siteName: "Corneta",
       title: t("chrome.og.title"),
       description: t("chrome.og.description"),
+      images: [
+        {
+          url: socialImageUrl,
+          ...SOCIAL_IMAGE_SIZE,
+          alt: SOCIAL_IMAGE_ALT,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: t("chrome.og.title"),
       description: t("chrome.twitter.description"),
+      images: [socialImageUrl],
     },
   };
 }

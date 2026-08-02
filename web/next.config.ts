@@ -17,6 +17,30 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR?.trim() || ".next",
   poweredByHeader: false,
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        source: "/help/obs/:path*",
+        destination: "/help/streaming-software/:path*",
+        permanent: true,
+      },
+      {
+        source: "/guides/obs/why-stream-lags",
+        destination: "/guides/quality/why-stream-lags",
+        permanent: true,
+      },
+      {
+        source: "/guides/obs/dropped-frames",
+        destination: "/guides/quality/dropped-frames",
+        permanent: true,
+      },
+      {
+        source: "/guides/obs",
+        destination: "/guides/quality",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

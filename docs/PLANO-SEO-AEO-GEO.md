@@ -150,12 +150,16 @@ desenvolvimento com H2 em forma de pergunta.
 
 Candidatas, em ordem de intenção de busca:
 
-- [ ] `/multistream-twitch-youtube` — a busca de maior volume
-- [ ] `/alternativa-ao-restream` — intenção comercial alta, e existe demanda comprovada (a
+> **Convenção permanente de URL:** todos os segmentos e slugs ficam em inglês,
+> inclusive nas páginas em português. O idioma muda o conteúdo e, no caso do
+> inglês, acrescenta o prefixo /en; não traduz o restante do caminho.
+
+- [x] `/guides/multistream/twitch-youtube-simultaneously` — intenção central de multistream
+- [x] `/guides/comparisons/restream-alternative` — intenção comercial alta, e existe demanda comprovada (a
       concorrência tem roundups inteiros sobre isso)
-- [ ] `/obs-multistream-gratis` — pega quem já procura plugin
-- [ ] `/por-que-minha-live-trava` — cauda longa, dor real, e leva direto ao nosso diferencial
-- [ ] `/como-multistream-kick` — nicho menos disputado
+- [x] `/guides/multistream/obs-multistream` — pega quem já procura plugin
+- [x] `/guides/quality/why-stream-lags` — cauda longa, dor real, e leva direto ao nosso diferencial
+- [ ] `/guides/multistream/kick-multistream` — nicho menos disputado
 - [ ] Uma página de **changelog/releases** — frescor é o que o Perplexity premia, e ela se
       atualiza sozinha a cada versão
 

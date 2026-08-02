@@ -1,0 +1,81 @@
+---
+contentId: help_obs_not_found
+title: "A Corneta não encontra o OBS: WebSocket, senha, porta e firewall"
+description: "Corrija conexão recusada, senha errada e porta diferente quando a configuração automática não encontra o OBS."
+summary: "Abra Ferramentas → Configurações do Servidor WebSocket no OBS, deixe o servidor ativo e copie a mesma senha para a Corneta. A porta padrão é 4455, mas a configuração precisa bater dos dois lados."
+locale: pt-BR
+collection: help
+kind: troubleshooting
+category: troubleshooting
+slug: obs-not-found
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: Corneta não encontra OBS WebSocket
+related:
+  - help_automatic_obs_setup
+  - help_stream_statuses
+  - guide_obs_closed_during_stream
+sources:
+  - title: OBS Remote Control Guide
+    kind: official
+    url: https://obsproject.com/kb/remote-control-guide
+    reviewedAt: 2026-08-01
+  - title: Corneta OBS WebSocket client
+    kind: internal
+    repoPath: src-tauri/src/obs.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
+    originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
+    baseName: corneta-obs-connection-details
+    alt: "Tela da Corneta com a conexão do OBS configurada e os dados locais de entrada."
+    caption: "WebSocket controla o OBS; endereço RTMP local recebe o vídeo. Os dois caminhos são diferentes."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Primeiro teste
+
+No OBS 28 ou mais recente, abra **Ferramentas → Configurações do Servidor WebSocket**. O WebSocket já vem integrado; não instale plugin separado sem necessidade.
+
+1. Ative o servidor WebSocket.
+2. Confira a porta; o padrão é `4455`.
+3. Mantenha autenticação ligada.
+4. Copie a senha para **Configurações → OBS** na Corneta.
+5. Clique em **Testar conexão** ou volte a **Liga no OBS**.
+
+<ContentImage baseName="corneta-obs-connection-details" />
+
+## Pelo sintoma
+
+| Mensagem | Causa provável | Correção |
+| --- | --- | --- |
+| conexão recusada | servidor desligado ou porta errada | ative e iguale a porta |
+| senha necessária | autenticação ligada sem senha na Corneta | cole a senha correta |
+| autenticação falhou | senha diferente | gere ou copie novamente |
+| timeout | firewall ou processo travado | libere na rede privada e reinicie o OBS |
+| conectado, mas Aguardando sinal | WebSocket está bem; RTMP não chegou | inicie a transmissão no OBS |
+
+Não desligue a senha só para “ver se vai” numa rede compartilhada. A documentação do OBS recomenda proteger o WebSocket.
+
+Se continuar, anote a mensagem e as versões. Nunca mande a senha do WebSocket.

@@ -2,6 +2,7 @@ import type { PostHogConfig } from "posthog-js/dist/module.no-external";
 
 import {
   SITE_CTA_IDS,
+  normalizeContentId,
   normalizePostHogHost,
   redactPostHogMessage,
   redactedException,
@@ -173,13 +174,12 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
     }
   };
 
-  const capturePageView = async (pathOrUrl: string) => {
+  const capturePageView = async (pathOrUrl: string, contentId?: string) => {
     const route = siteRoute(pathOrUrl);
-    const pageKey = `${route.routeId}:${route.locale}`;
+    const safeContentId = normalizeContentId(contentId);
+    if (contentId !== undefined && !safeContentId) return;
+    const pageKey = `${route.routeId}:${route.locale}:${safeContentId ?? ""}`;
     if (lastPage === pageKey || isOptedOut()) return;
-    const client = await ensureSdk();
-    if (!client || isOptedOut()) return;
-    lastPage = pageKey;
     const safe = sanitizeTelemetryProperties("site_page_viewed", {
       ...telemetryBaseProperties(
         "marketing_site",
@@ -188,8 +188,12 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
       ),
       route_id: route.routeId,
       locale: route.locale,
+      ...(safeContentId ? { content_id: safeContentId } : {}),
     });
     if (!safe) return;
+    const client = await ensureSdk();
+    if (!client || isOptedOut() || lastPage === pageKey) return;
+    lastPage = pageKey;
     try {
       client.capture("site_page_viewed", safe);
     } catch {
@@ -197,8 +201,14 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
     }
   };
 
-  const captureCta = (ctaId: SiteCtaId, pathOrUrl: string) => {
+  const captureCta = (
+    ctaId: SiteCtaId,
+    pathOrUrl: string,
+    contentId?: string,
+  ) => {
     const route = siteRoute(pathOrUrl);
+    const safeContentId = normalizeContentId(contentId);
+    if (contentId !== undefined && !safeContentId) return Promise.resolve();
     return capture(
       "site_cta_clicked",
       {
@@ -210,6 +220,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
         route_id: route.routeId,
         locale: route.locale,
         cta_id: ctaId,
+        ...(safeContentId ? { content_id: safeContentId } : {}),
       },
       true,
     );
@@ -331,8 +342,18 @@ export function initializeSiteTelemetry() {
   return browserTelemetry.initialize();
 }
 
-export function captureSitePageView(pathOrUrl: string) {
-  return browserTelemetry.capturePageView(pathOrUrl);
+export function captureSitePageView(pathOrUrl: string, contentId?: string) {
+  return browserTelemetry.capturePageView(pathOrUrl, contentId);
+}
+
+/** Lê somente o identificador opaco publicado pela metadata do artigo. */
+export function editorialContentIdFromDocument(
+  root: Pick<Document, "querySelector"> = document,
+) {
+  const value = root
+    .querySelector<HTMLMetaElement>('meta[name="corneta:content-id"]')
+    ?.content.trim();
+  return normalizeContentId(value);
 }
 
 export function captureSiteException(
@@ -369,7 +390,10 @@ export async function setSiteTelemetryEnabled(enabled: boolean) {
       detail: { enabled: active },
     }),
   );
-  if (active) void browserTelemetry.capturePageView(window.location.pathname);
+  if (active) {
+    const contentId = editorialContentIdFromDocument();
+    void browserTelemetry.capturePageView(window.location.pathname, contentId);
+  }
   return active;
 }
 
@@ -393,10 +417,15 @@ export function installSiteTelemetryListeners() {
     if (!(target instanceof Element)) return;
     const cta = target.closest<HTMLElement>("[data-telemetry-cta]");
     const ctaId = cta?.dataset.telemetryCta;
-    if (!ctaId || !CTA_IDS.has(ctaId)) return;
+    if (!cta || !ctaId || !CTA_IDS.has(ctaId)) return;
+    const contentId =
+      cta.dataset.telemetryContentId ??
+      cta.closest<HTMLElement>("[data-telemetry-content-id]")?.dataset
+        .telemetryContentId;
     void browserTelemetry.captureCta(
       ctaId as SiteCtaId,
       window.location.pathname,
+      contentId,
     );
   };
 

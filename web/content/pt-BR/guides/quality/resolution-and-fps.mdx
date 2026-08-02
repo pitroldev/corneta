@@ -1,0 +1,104 @@
+---
+contentId: guide_resolution_and_fps
+title: "720p30, 720p60 ou 1080p60: como escolher"
+description: "Escolha resolução e FPS pelo tipo de conteúdo, bitrate disponível, capacidade do encoder e menor denominador comum do multistream."
+summary: "Use 720p30 para estabilidade e conteúdo de pouco movimento, 720p60 para movimento com banda limitada e 1080p60 quando texto, detalhe, upload e encoder aguentam. A melhor configuração é a que fica estável na cena mais pesada."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: resolution-and-fps
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: 720p30 720p60 ou 1080p60
+related:
+  - guide_twitch_youtube_kick_bitrate
+  - guide_multistream_low_end_pc
+  - guide_horizontal_vertical_live
+sources:
+  - title: Twitch Broadcasting Guidelines
+    kind: official
+    url: https://help.twitch.tv/s/article/broadcasting-guidelines?language=en_US
+    reviewedAt: 2026-08-01
+  - title: YouTube live encoder settings
+    kind: official
+    url: https://support.google.com/youtube/answer/2853702?hl=en
+    reviewedAt: 2026-08-01
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade da Corneta com estimativas de upload, recodificações e encoders por modo."
+    caption: "Resolução e FPS só fazem sentido junto do bitrate e da quantidade de encodes que a máquina vai abrir."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Escolha pelo que se move
+
+| Perfil  | Faz sentido para                             | Troca principal                            |
+| ------- | -------------------------------------------- | ------------------------------------------ |
+| 720p30  | conversa, podcast, desenho e setup limitado  | mais estabilidade, menos detalhe e fluidez |
+| 720p60  | jogo rápido com bitrate ou encoder apertado  | movimento fluido, texto menos nítido       |
+| 1080p30 | câmera, tutorial e texto com pouco movimento | mais detalhe, movimento menos fluido       |
+| 1080p60 | jogo rápido, texto fino e setup com folga    | maior carga e necessidade de bitrate       |
+
+Não escolha 1080p60 porque o monitor é Full HD. A saída precisa sobreviver ao pior minuto da live.
+
+## O bitrate muda o resultado
+
+Na Twitch, a referência oficial usa 3.000 kbps para 720p30, 4.500 para 720p60 e 6.000 para 1080p60. No YouTube, as recomendações H.264 são mais altas: 4, 6 e 12 Mbps nesses mesmos perfis.
+
+Com bitrate curto, mais pixels podem piorar a imagem: o encoder divide a mesma quantidade de dados entre mais detalhes e mais quadros. Blocos em movimento são um sinal para reduzir resolução, FPS ou complexidade da cena.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+## No multistream, há três caminhos
+
+1. **Menor denominador comum:** configure o OBS num perfil aceito por todos e copie o sinal.
+2. **Uma exceção:** copie para destinos compatíveis e recodifique só o diferente.
+3. **Tudo separado:** recodifique cada plataforma quando qualidade por destino vale a carga.
+
+Comece pelo primeiro. Só abra uma nova sessão de encoder quando o benefício for visível.
+
+## Teste sem enganar a si mesmo
+
+- use a cena mais pesada;
+- mova câmera e jogo como numa live real;
+- deixe o teste rodar por dez minutos;
+- confira renderização, codificação e rede separadamente;
+- assista no celular e em uma conexão comum;
+- teste todas as plataformas ao mesmo tempo.
+
+Uma gravação local lisa não prova que três saídas de rede vão ficar estáveis. Um speed test alto também não prova que a GPU aguenta recodificar.
+
+<Callout label="Vertical muda a geometria" tone="limit">
+  720×1280 não é um 720p horizontal girado. O destino 9:16 precisa de recorte,
+  composição e leitura próprios.
+</Callout>
+
+Se o perfil escolhido excede a banda, calcule a soma no [guia de bitrate e upload](/guides/quality/multistream-upload-speed).

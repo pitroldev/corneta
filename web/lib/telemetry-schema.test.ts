@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   durationBucket,
+  normalizeContentId,
   normalizeErrorType,
   normalizePostHogHost,
   redactedException,
@@ -154,6 +155,67 @@ describe("telemetry catalog", () => {
     ).toBeNull();
   });
 
+  it("aceita somente content_id editorial opaco e limitado", () => {
+    expect(normalizeContentId("guide_multistream_obs")).toBe(
+      "guide_multistream_obs",
+    );
+    expect(normalizeContentId("help_obs_first_live_2")).toBe(
+      "help_obs_first_live_2",
+    );
+
+    for (const unsafe of [
+      "G01",
+      "guide_Uppercase",
+      "guide_multistream/obs-multistream",
+      "guide_title?email=person@example.com",
+      "Como configurar o OBS",
+      `guide_${"a".repeat(64)}`,
+      "content_unscoped",
+    ]) {
+      expect(normalizeContentId(unsafe)).toBeUndefined();
+      expect(
+        sanitizeTelemetryProperties("site_page_viewed", {
+          surface: "marketing_site",
+          route_id: "guide_article",
+          locale: "pt-BR",
+          content_id: unsafe,
+        }),
+      ).toBeNull();
+    }
+
+    expect(
+      sanitizeTelemetryProperties("site_cta_clicked", {
+        surface: "marketing_site",
+        route_id: "guide_article",
+        locale: "pt-BR",
+        cta_id: "content_related",
+        content_id: "guide_multistream_obs",
+      }),
+    ).toMatchObject({
+      route_id: "guide_article",
+      cta_id: "content_related",
+      content_id: "guide_multistream_obs",
+    });
+
+    for (const ctaId of [
+      "home_guides",
+      "home_help",
+      "nav_guides",
+      "nav_help",
+      "footer_guides",
+      "footer_help",
+    ]) {
+      expect(
+        sanitizeTelemetryProperties("site_cta_clicked", {
+          surface: "marketing_site",
+          route_id: "home",
+          locale: "pt-BR",
+          cta_id: ctaId,
+        }),
+      ).toMatchObject({ cta_id: ctaId });
+    }
+  });
+
   it("reconstrói um envelope mínimo e remove campos top-level livres", () => {
     const timestamp = new Date("2026-08-01T12:00:00.000Z");
     const safe = redactPostHogMessage({
@@ -287,6 +349,51 @@ describe("telemetry normalization", () => {
       routeId: "privacy",
       locale: "en",
     });
+  });
+
+  it("classifica hubs, categorias, artigos e changelog sem expor o caminho", () => {
+    const fixtures = [
+      ["/help", "help_index", "pt-BR"],
+      ["/help/obs", "help_category", "pt-BR"],
+      [
+        "/help/obs/first-live?stream_key=must-not-leak#private",
+        "help_article",
+        "pt-BR",
+      ],
+      ["/guides", "guides_index", "pt-BR"],
+      ["/guides/quality", "guides_category", "pt-BR"],
+      ["/guides/quality/bitrate", "guide_article", "pt-BR"],
+      ["/en/help", "help_index", "en"],
+      ["/search?q=obs", "search", "pt-BR"],
+      ["/en/search?q=upload", "search", "en"],
+      ["/en/help/platforms", "help_category", "en"],
+      ["/en/help/platforms/kick", "help_article", "en"],
+      ["/en/guides/multistream/local", "guide_article", "en"],
+      ["/pt-BR/guides/obs/dropped-frames", "guide_article", "pt-BR"],
+      ["/changelog", "changelog", "pt-BR"],
+      ["/en/changelog", "changelog", "en"],
+    ] as const;
+
+    for (const [url, routeId, locale] of fixtures) {
+      expect(siteRoute(url)).toEqual({ routeId, locale });
+    }
+
+    const safe = sanitizeTelemetryProperties("site_page_viewed", {
+      surface: "marketing_site",
+      route_id: siteRoute("/guides/quality/bitrate?title=segredo&email=a@b.com")
+        .routeId,
+      locale: "pt-BR",
+      content_id: "guide_quality_bitrate",
+    });
+    expect(safe).toEqual(
+      expect.objectContaining({
+        route_id: "guide_article",
+        content_id: "guide_quality_bitrate",
+      }),
+    );
+    expect(JSON.stringify(safe)).not.toContain("/guides/");
+    expect(JSON.stringify(safe)).not.toContain("segredo");
+    expect(JSON.stringify(safe)).not.toContain("a@b.com");
   });
 
   it("usa buckets determinísticos", () => {

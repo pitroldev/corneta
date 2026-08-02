@@ -141,8 +141,13 @@ export const en: Dict = {
   "closing.faq.subtitle": "Including the ones that don't make us look good.",
   "closing.faq.title": "What everybody asks before installing.",
   "closing.footer.download": "Download for Windows",
+  "closing.footer.group.content": "Content",
+  "closing.footer.group.legal": "Legal",
+  "closing.footer.group.product": "Product",
   // Manter por extenso: a verificação do Google procura exatamente a expressão "Privacy policy" na home.
   "closing.footer.link.privacy": "Privacy policy",
+  "closing.footer.link.guides": "Guides",
+  "closing.footer.link.help": "Help",
   "closing.footer.link.source": "Source code",
   "closing.footer.link.terms": "Terms of use",
   // aria-label funcional (§6): descreve o que é, sem piada.
@@ -277,15 +282,27 @@ export const en: Dict = {
     "your keys, your settings and the report from every stream",
   "hero.mechanism.step3.title": "All on your PC",
   "hero.nav.aria": "Main navigation",
-  "hero.nav.chat": "Chat and alerts",
-  "hero.nav.faq": "FAQ",
-  "hero.nav.lang": "View in Portuguese",
-  "hero.nav.menu.close": "Close menu",
-  "hero.nav.menu.open": "Open menu",
+  "hero.nav.guides": "Guides",
+  "hero.nav.help": "Help",
   "hero.nav.platforms": "Platforms",
-  "hero.nav.protection": "Protection",
-  "hero.nav.quality": "Quality",
   "hero.nav.why": "Why Corneta",
+  "hero.nav.lang": "View in Portuguese",
+
+  // ---- knowledge ----
+  "knowledge.kicker": "Learn at your pace",
+  "knowledge.title": "From first setup to stream troubleshooting.",
+  "knowledge.description":
+    "Practical guides for building your broadcast and direct answers when something does not go as planned.",
+  "knowledge.guides.eyebrow": "Step-by-step guides",
+  "knowledge.guides.title": "Get your next stream live.",
+  "knowledge.guides.description":
+    "Setup, platforms, quality, and best practices explained from start to finish.",
+  "knowledge.guides.action": "Explore guides",
+  "knowledge.help.eyebrow": "Help center",
+  "knowledge.help.title": "Find out what went wrong.",
+  "knowledge.help.description":
+    "Short solutions, objective checks, and safe paths back to broadcasting.",
+  "knowledge.help.action": "Open help",
   "hero.pitch":
     "You don't touch OBS — Corneta sets itself up in there. It takes your stream to each platform and stays open beside it, showing all three. When it ends, the stream is saved — with the best moment already marked.",
   "hero.skiplink.label": "Skip to content",
@@ -656,8 +673,7 @@ export const en: Dict = {
   "quality.journey.after.body":
     "Audience, chat and alerts for every channel, side by side with what your machine and your OBS were doing at the same time. Compare it with your last stream, export it to a spreadsheet — and, when one of them stuttered, see what to change.",
   "quality.journey.after.sticker": "After the stream",
-  "quality.journey.after.title":
-    "See how each platform did.",
+  "quality.journey.after.title": "See how each platform did.",
   "quality.journey.before.body":
     "Hook up the platforms, measure your upload and get everything ready in a few clicks. Corneta sets OBS up for you — and hits play on it when you press GO LIVE.",
   "quality.journey.before.check.checklist": "First-stream checklist",

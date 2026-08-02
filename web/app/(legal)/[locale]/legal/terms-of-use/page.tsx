@@ -24,8 +24,15 @@ import {
 import { isLocale, type Locale } from "@/lib/i18n";
 import { LEGAL_ROUTES, legalHref } from "@/lib/legal";
 import { jsonLdScript, legalJsonLd } from "@/lib/seo";
+import { siteUrl } from "@/lib/site";
+import {
+  SOCIAL_IMAGE_ALT,
+  SOCIAL_IMAGE_PATH,
+  SOCIAL_IMAGE_SIZE,
+} from "@/lib/social-image";
 
 const PATH = LEGAL_ROUTES.terms;
+const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, siteUrl).toString();
 
 const META = {
   "pt-BR": {
@@ -55,6 +62,7 @@ export async function generateMetadata({
   if (!isLocale(locale)) return {};
   const meta = META[locale];
   return {
+    metadataBase: siteUrl,
     title: meta.title,
     description: meta.description,
     // Par recíproco completo: cada idioma aponta pro outro E pra si mesmo, que é
@@ -73,6 +81,19 @@ export async function generateMetadata({
       description: meta.ogDescription,
       url: legalHref(locale, "terms"),
       locale: locale === "en" ? "en_US" : "pt_BR",
+      images: [
+        {
+          url: socialImageUrl,
+          ...SOCIAL_IMAGE_SIZE,
+          alt: SOCIAL_IMAGE_ALT,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: meta.ogTitle,
+      description: meta.ogDescription,
+      images: [socialImageUrl],
     },
   };
 }

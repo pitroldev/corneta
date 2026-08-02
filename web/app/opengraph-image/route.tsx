@@ -1,9 +1,7 @@
 import { ImageResponse } from "next/og";
+import { SOCIAL_IMAGE_SIZE } from "@/lib/social-image";
 
-export const alt =
-  "Corneta — uma live, várias comunidades, tudo no seu controle";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+export const dynamic = "force-static";
 
 const destinations = [
   { name: "Twitch", color: "#9146FF", ink: "#ffffff" },
@@ -11,7 +9,7 @@ const destinations = [
   { name: "Kick", color: "#53FC18", ink: "#100b07" },
 ];
 
-export default function OpenGraphImage() {
+export function GET() {
   return new ImageResponse(
     <div
       style={{
@@ -193,6 +191,6 @@ export default function OpenGraphImage() {
         </div>
       </div>
     </div>,
-    size,
+    SOCIAL_IMAGE_SIZE,
   );
 }

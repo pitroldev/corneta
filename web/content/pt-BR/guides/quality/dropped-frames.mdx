@@ -1,0 +1,83 @@
+---
+contentId: guide_dropped_frames
+title: "Dropped frames no OBS: rede, renderização ou codificação?"
+description: "Leia os três contadores do OBS e descubra se a live perdeu quadros na internet, na GPU ou no encoder."
+summary: "“Dropped frames” costuma apontar para rede, mas o OBS também mede atraso de renderização e de codificação. Abra Estatísticas e corrija o contador que realmente subiu."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: dropped-frames
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: dropped frames OBS
+related:
+  - guide_why_stream_lags
+  - guide_one_platform_disconnected
+  - help_stream_metrics
+sources:
+  - title: OBS Stream Connection Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade com estimativa de upload e encoders disponíveis."
+    caption: "Depois de identificar a causa, reduza só o custo que está apertado: upload, renderização ou recodificação."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Abra o contador certo
+
+No OBS, abra **Exibir → Estatísticas** durante a mesma cena que costuma travar. Não tire conclusão olhando só CPU ou o FPS do jogo.
+
+| O que subiu | Gargalo provável | Primeiro teste |
+| --- | --- | --- |
+| Quadros perdidos pela rede | upload, Wi-Fi, rota ou ingest | cabo, sem VPN e outro ingest oficial |
+| Quadros perdidos por atraso de renderização | GPU sem tempo para montar a cena | limite o FPS do jogo |
+| Quadros ignorados por atraso de codificação | encoder sem entregar a tempo | reduza FPS, resolução ou preset |
+
+## Rede
+
+Perda de rede acontece depois que o quadro já foi produzido. Feche backup e sincronização, teste por cabo e compare outro servidor oficial. Se só uma saída da Corneta reconecta, investigue aquela plataforma antes de mexer no OBS inteiro.
+
+## Renderização
+
+O OBS usa GPU para montar cena mesmo quando o vídeo é codificado por CPU. Jogo com FPS destravado, Browser Sources pesadas e filtros podem ocupar o tempo que faltou. Limite o jogo e desative uma fonte por vez.
+
+## Codificação
+
+Aqui o quadro foi montado, mas o encoder atrasou. Hardware encoder costuma aliviar CPU; reduzir de 60 para 30 FPS corta pela metade o número de quadros a codificar. No multistream, diminuir recodificações também conta.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+Repita o teste na mesma cena por alguns minutos. Se o contador estabilizou, a mudança atacou a causa. Se outro contador subiu, você apenas deslocou o gargalo.
+
+Pra árvore completa, volte a [por que minha live trava](/guides/quality/why-stream-lags).

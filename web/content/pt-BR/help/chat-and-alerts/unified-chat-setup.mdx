@@ -1,0 +1,81 @@
+---
+contentId: help_unified_chat_setup
+title: "Como configurar o chat unificado de Twitch, YouTube e Kick"
+description: "Adicione canais, conecte o feed e confira plataforma, emotes, selos e audiência na tela Chat."
+summary: "Abra Chat → Configurar → Canais, adicione Twitch, YouTube e Kick e clique em Conectar. Ler chat não exige que a Corneta publique as mensagens no vídeo."
+locale: pt-BR
+collection: help
+kind: help
+category: chat-and-alerts
+slug: unified-chat-setup
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: configurar chat unificado Twitch YouTube Kick
+related:
+  - guide_unified_chat_rules
+  - help_obs_overlay
+  - help_platform_reconnecting
+sources:
+  - title: Corneta chat connectors
+    kind: internal
+    repoPath: src-tauri/src/chat.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta chat interface
+    kind: internal
+    repoPath: src/screens/ChatScreen.tsx
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/chat-and-alerts/corneta-unified-chat.webp
+    originalPath: assets/originals/chat-and-alerts/corneta-unified-chat.png
+    baseName: corneta-unified-chat
+    alt: "Tela Chat conectada a Twitch, YouTube e Kick com mensagens no mesmo feed."
+    caption: "Cor, ícone e nome mantêm a origem visível mesmo com as três plataformas no mesmo painel."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Adicione os canais
+
+1. Abra **Chat**.
+2. Clique em **Configurar**.
+3. Entre na aba **Canais**.
+4. Clique em **Adicionar** e escolha a plataforma.
+5. Preencha o identificador pedido e deixe o canal ativado.
+6. Feche a configuração e clique em **Conectar**.
+
+O estado esperado é um ponto verde junto de cada canal. Com **Conectar sozinho** ativo, a Corneta liga o chat quando você entra no ar.
+
+<ContentImage baseName="corneta-unified-chat" />
+
+## O que funciona sem login
+
+Leitura, emotes, selos e horário dependem do conector e do que a plataforma entrega publicamente. Para enviar mensagem e moderar, entre na conta pela aba **Conta**; as ações disponíveis mudam entre Twitch, YouTube e Kick.
+
+## Se um canal não conecta
+
+| Sintoma | Como confirmar | Correção |
+| --- | --- | --- |
+| Twitch sem mensagens | confira nome do canal | remova `@` e use o nome exato |
+| YouTube esperando live | veja se a live já começou | aguarde ou informe o vídeo correto |
+| Kick reconectando | abra o canal no navegador | confira nome e tente de novo |
+| feed vazio com pontos verdes | mande mensagem de teste | confira filtros em **Exibição** |
+
+Não cole token ou credencial de OAuth em chamado. O painel é privado por padrão; [overlay público é uma decisão separada](/guides/operations/unified-chat-rules).
+

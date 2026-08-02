@@ -1,0 +1,115 @@
+---
+contentId: guide_horizontal_vertical_live
+title: "Como transmitir em horizontal e vertical ao mesmo tempo"
+description: "Configure uma saída 16:9 e outra 9:16, escolha o enquadramento e calcule o custo extra de recodificação antes da live."
+summary: "Para transmitir nos dois formatos, mantenha o sinal principal em 16:9 e recodifique o destino vertical com um recorte 9:16. Copiar a imagem horizontal para uma plataforma vertical costuma produzir barras, corte errado ou rejeição."
+locale: pt-BR
+collection: guides
+kind: guide
+category: multistream
+slug: horizontal-and-vertical-live
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: transmitir horizontal e vertical ao mesmo tempo
+related:
+  - guide_resolution_and_fps
+  - guide_copy_vs_transcode
+  - help_quality_modes
+sources:
+  - title: Twitch Dual Format Streaming
+    kind: official
+    url: https://help.twitch.tv/s/article/dual-format-vertical-video
+    reviewedAt: 2026-08-01
+  - title: YouTube live streaming formats
+    kind: official
+    url: https://support.google.com/youtube/answer/2474026
+    reviewedAt: 2026-08-01
+  - title: Corneta reframe editor
+    kind: internal
+    repoPath: src/components/ReframeEditor.tsx
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-vertical-target-settings.webp
+    originalPath: assets/originals/multistream/corneta-vertical-target-settings.png
+    baseName: corneta-vertical-target-settings
+    alt: "Destino TikTok vertical na tela Plataformas da Corneta, com URL de ingestão e ação Enquadrar vertical."
+    caption: "Um destino vertical pede recodificação e um enquadramento próprio; ele não deve receber uma cópia cega do 16:9."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/multistream/corneta-vertical-reframe-editor.webp
+    originalPath: assets/originals/multistream/corneta-vertical-reframe-editor.png
+    baseName: corneta-vertical-reframe-editor
+    alt: "Editor de enquadramento vertical da Corneta com área 9 por 16, controle de zoom e prévia do resultado."
+    caption: "O editor mostra exatamente qual faixa do quadro horizontal será enviada em 720×1280."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Monte duas saídas, não duas lives improvisadas
+
+Use o OBS em 16:9 como fonte principal. Na Corneta, mantenha Twitch, Kick ou YouTube horizontal em cópia quando o sinal já estiver compatível e configure o destino vertical para recodificar em 9:16.
+
+<ContentImage baseName="corneta-vertical-target-settings" />
+
+O destino vertical consome uma sessão de encoder e mais upload. O formato não nasce de girar a imagem: ele nasce de escolher o que continua dentro do quadro estreito.
+
+## Escolha o enquadramento
+
+1. Adicione o destino vertical em **Plataformas**.
+2. Informe a URL e a chave entregues pelo painel da plataforma.
+3. Abra **Enquadrar vertical**.
+4. Posicione a faixa 9:16 sobre rosto, câmera, placar ou ação principal.
+5. Ajuste o zoom sem cortar textos essenciais.
+6. Salve e confira o resultado com movimento real.
+
+<ContentImage baseName="corneta-vertical-reframe-editor" />
+
+O editor é manual. A Corneta não promete auto-reframe nem segue uma pessoa sozinha. Se o foco muda muito durante a live, prepare uma composição que continue legível no centro ou use uma ferramenta com canvas vertical independente.
+
+## O que cabe no centro
+
+Um recorte 9:16 de um quadro 16:9 joga fora boa parte das laterais. Antes de transmitir:
+
+- mova webcam e legendas importantes para a zona central;
+- evite placares colados nos cantos;
+- não use texto pequeno pensado só para 1080p horizontal;
+- teste menus, mapa e HUD do jogo;
+- confira o overlay em um celular, não apenas no monitor.
+
+## Quanto custa na máquina
+
+Uma saída vertical precisa escalar e recodificar. Se o OBS já usa o encoder da GPU, confirme quantas sessões simultâneas o driver suporta. Comece em 720×1280 a 30 FPS e só suba depois de uma live de teste estável.
+
+<Callout label="Dual Format da Twitch é outro fluxo" tone="note">
+  A Twitch oferece Dual Format por Enhanced Broadcasting em contas elegíveis e
+  usa um fluxo próprio com múltiplos encodes. Não confunda esse recurso com
+  mandar uma saída RTMP vertical independente para outra plataforma.
+</Callout>
+
+Se a prévia engasgar, siga a ordem do guia de [multistream em PC fraco](/guides/quality/multistream-low-end-pc).

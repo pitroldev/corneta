@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "baseName": "corneta-first-live-checklist",
+      "originalPath": "assets/originals/getting-started/corneta-first-live-checklist.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/getting-started/corneta-first-live-checklist.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 45758
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-platform-destinations",
+      "originalPath": "assets/originals/multistream/corneta-platform-destinations.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/multistream/corneta-platform-destinations.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 41176
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-platform-key-setup",
+      "originalPath": "assets/originals/getting-started/corneta-platform-key-setup.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/getting-started/corneta-platform-key-setup.webp",
+          "width": 1080,
+          "height": 900,
+          "bytes": 50654
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-obs-connection-details",
+      "originalPath": "assets/originals/getting-started/corneta-obs-connection-details.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/getting-started/corneta-obs-connection-details.webp",
+          "width": 1080,
+          "height": 900,
+          "bytes": 54540
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-quality-modes",
+      "originalPath": "assets/originals/quality/corneta-quality-modes.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/quality/corneta-quality-modes.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 54716
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-live-safety-settings",
+      "originalPath": "assets/originals/operations/corneta-live-safety-settings.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/operations/corneta-live-safety-settings.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 66954
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-upload-test-result",
+      "originalPath": "assets/originals/quality/corneta-upload-test-result.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/quality/corneta-upload-test-result.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 58024
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-unified-chat",
+      "originalPath": "assets/originals/chat-and-alerts/corneta-unified-chat.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/chat-and-alerts/corneta-unified-chat.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 37708
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-post-live-report",
+      "originalPath": "assets/originals/reports-and-data/corneta-post-live-report.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/reports-and-data/corneta-post-live-report.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 51440
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-vertical-target-settings",
+      "originalPath": "assets/originals/multistream/corneta-vertical-target-settings.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/multistream/corneta-vertical-target-settings.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 59552
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    },
+    {
+      "baseName": "corneta-vertical-reframe-editor",
+      "originalPath": "assets/originals/multistream/corneta-vertical-reframe-editor.png",
+      "derivatives": [
+        {
+          "src": "/images/editorial/multistream/corneta-vertical-reframe-editor.webp",
+          "width": 1080,
+          "height": 800,
+          "bytes": 26378
+        }
+      ],
+      "kind": "screenshot",
+      "source": "corneta",
+      "rights": "owned",
+      "language": "pt-BR",
+      "capturedAt": "2026-08-01",
+      "productVersion": "0.6.0"
+    }
+  ]
+}

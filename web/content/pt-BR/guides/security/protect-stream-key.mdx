@@ -1,0 +1,88 @@
+---
+contentId: guide_protect_stream_key
+title: "Stream key é senha? RTMP, RTMPS e como proteger suas contas"
+description: "Entenda por que a stream key autoriza uma live, quando usar RTMPS e o que fazer depois de expor uma chave."
+summary: "Trate a stream key como senha: quem tem a chave pode transmitir no seu canal. Prefira RTMPS, guarde credenciais no cofre do sistema e resete a chave assim que houver suspeita de exposição."
+locale: pt-BR
+collection: guides
+kind: guide
+category: security
+slug: protect-stream-key
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: stream key é senha
+related:
+  - help_streaming_keys_and_urls
+  - help_export_safe_diagnostic
+  - guide_simulcasting_rules
+sources:
+  - title: Twitch Stream Key FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/twitch-stream-key-faq?language=en_US
+    reviewedAt: 2026-08-01
+  - title: YouTube Manage live stream settings
+    kind: official
+    url: https://support.google.com/youtube/answer/9854503?hl=en
+    reviewedAt: 2026-08-01
+  - title: YouTube Encrypt your stream using RTMPS
+    kind: official
+    url: https://support.google.com/youtube/answer/10349430?hl=en
+    reviewedAt: 2026-08-01
+  - title: Corneta native key vault
+    kind: internal
+    repoPath: src-tauri/src/keys.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
+    originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
+    baseName: corneta-platform-key-setup
+    alt: "Card de plataforma da Corneta com URL e campo de chave preenchidos com dados fictícios."
+    caption: "URL localiza o servidor; a chave autoriza o canal. A Corneta guarda a chave no cofre do Windows."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A chave autoriza a transmissão
+
+Stream key não é sua senha de login, mas merece o mesmo cuidado. A Twitch define a chave como a autorização que identifica seu canal no ingest. No YouTube, ela liga o encoder à transmissão escolhida.
+
+<ContentImage baseName="corneta-platform-key-setup" />
+
+Quem pega essa chave pode tentar mandar vídeo para seu canal sem conhecer sua senha. Por isso ela não entra em print, log colado, backup de configuração ou chamado de suporte.
+
+## RTMP e RTMPS
+
+RTMP transporta o sinal até o ingest. RTMPS adiciona TLS nesse caminho. O YouTube recomenda RTMPS porque o envio fica criptografado até a infraestrutura da plataforma. Quando o painel oferece os dois, prefira `rtmps://`.
+
+RTMPS não conserta uma chave já vazada. Ele protege o transporte; não impede alguém que copiou a credencial de usá-la.
+
+## Se a chave apareceu na tela
+
+1. Encerre a transmissão suspeita.
+2. Resete a chave no painel da plataforma.
+3. Atualize a chave na Corneta.
+4. Revise VOD, clipe, print e gravação local onde ela apareceu.
+5. Troque a senha da conta se houver sinal de invasão e ative 2FA.
+
+<Callout label="Blur não é revogação" tone="important">
+  Se uma chave real apareceu num arquivo, trate como exposta mesmo que você aplique blur depois. Resete primeiro; edite a imagem depois.
+</Callout>
+
+Pra saber qual campo copiar sem misturar os endereços, veja [stream key, URL de ingestão e chave do OBS](/help/platforms/streaming-keys-and-urls).

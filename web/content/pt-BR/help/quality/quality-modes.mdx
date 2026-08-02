@@ -1,0 +1,110 @@
+---
+contentId: help_quality_modes
+title: "Na lata, Esperto ou Caprichado: qual modo escolher?"
+description: "Compare os três modos de qualidade da Corneta pelo custo de upload, pela carga de recodificação e pela compatibilidade."
+summary: "Use Na lata quando o sinal do OBS já serve para todas as plataformas. Esperto adapta só o que não encaixa. Caprichado recodifica cada destino e exige mais da máquina."
+locale: pt-BR
+collection: help
+kind: help
+category: quality
+slug: quality-modes
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: Na lata Esperto ou Caprichado Corneta
+related:
+  - guide_multistream_upload_speed
+  - help_first_stream
+  - guide_why_stream_lags
+sources:
+  - title: Corneta encoding screen
+    kind: internal
+    repoPath: src/screens/EncodingScreen.tsx
+    reviewedAt: 2026-08-01
+  - title: Corneta platform estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade comparando Na lata, Esperto e Caprichado com estimativas de upload e carga."
+    caption: "A estimativa muda com os destinos, bitrates e ajustes do perfil atual."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A escolha curta
+
+- **Na lata:** quando o OBS já entrega uma resolução, FPS e bitrate que todas as
+  plataformas aceitam.
+- **Esperto:** quando alguns destinos aceitam o sinal e outros precisam de
+  ajuste.
+- **Caprichado:** quando cada plataforma precisa receber um preset próprio e sua
+  GPU ou CPU aguenta as recodificações.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+## Na lata
+
+A Corneta copia o sinal comprimido do OBS para todos os destinos. Não abre uma
+nova recodificação por plataforma, então costuma ser o modo mais leve.
+
+O limite aparece cedo: todas recebem o mesmo vídeo. Se a configuração boa para o
+YouTube ultrapassa o que outro destino aceita, ajuste o OBS pelo menor limite ou
+troque de modo.
+
+## Esperto
+
+A Corneta copia o sinal onde ele já cabe e recodifica só os destinos
+incompatíveis. É a primeira tentativa quando você quer manter o sinal original
+em uma plataforma sem abrir encoder novo para todas.
+
+Confira a estimativa de sessões. O resultado depende da placa, do encoder
+disponível e do que cada destino pede naquele perfil.
+
+## Caprichado
+
+Cada destino recebe uma recodificação própria. Isso permite ajustar bitrate,
+resolução e FPS por plataforma, mas aumenta a carga de CPU ou GPU. Em placas com
+limite de sessões simultâneas, a conta pode não fechar.
+
+## Como decidir no seu PC
+
+1. Comece em **Na lata** se as plataformas aceitam a saída do OBS.
+2. Troque para **Esperto** quando só um destino precisa mudar.
+3. Use **Caprichado** quando o ajuste por plataforma compensa a carga extra.
+4. Faça uma live de teste com jogo, câmera, alertas e movimento reais.
+5. Veja CPU, GPU, FPS e quadros perdidos durante o trecho mais pesado.
+
+| Sintoma                        | Teste rápido                        | Próxima mudança                        |
+| ------------------------------ | ----------------------------------- | -------------------------------------- |
+| Encoder sobrecarregado         | Troque Caprichado por Esperto       | Reduza o número de recodificações      |
+| GPU no limite com o jogo       | Limite o FPS do jogo                | Deixe tempo de GPU para OBS e encoder  |
+| Upload no limite               | Some os bitrates de todas as saídas | Reduza bitrate ou use relay na nuvem   |
+| Uma plataforma rejeita o sinal | Compare o preset dela               | Recodifique só esse destino no Esperto |
+
+<Callout label="A estimativa não substitui uma live de teste" tone="limit">
+  Encoder disponível não quer dizer jogo estável. Teste a cena mais pesada e
+  deixe a tela de métricas aberta antes de chamar a galera.
+</Callout>
+
+Faça a conta no [guia de upload para
+multistream](/guides/quality/multistream-upload-speed).

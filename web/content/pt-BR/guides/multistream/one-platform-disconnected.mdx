@@ -1,0 +1,82 @@
+---
+contentId: guide_one_platform_disconnected
+title: "Uma plataforma caiu no multistream: o que verificar sem encerrar as outras"
+description: "Isole chave, ingest, regra e rota da plataforma que caiu sem interromper os destinos que continuam no ar."
+summary: "Se apenas uma plataforma reconecta, não pare a live inteira. Pause aquele destino, confira chave e servidor, teste o status da plataforma e retome quando a causa estiver isolada."
+locale: pt-BR
+collection: guides
+kind: guide
+category: multistream
+slug: one-platform-disconnected
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: uma plataforma caiu no multistream
+related:
+  - help_platform_reconnecting
+  - guide_dropped_frames
+  - help_export_safe_diagnostic
+sources:
+  - title: Corneta independent target engine
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta target controls
+    kind: internal
+    repoPath: src/screens/GoLiveScreen.tsx
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela Plataformas com destinos Twitch, YouTube e Kick configurados separadamente."
+    caption: "Cada card tem chave, servidor e estado próprios; uma correção não precisa mexer nas outras saídas."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Primeiro: confirme que é isolado
+
+Na tela **Ao vivo**, veja se Twitch, YouTube ou Kick continuam em **NO AR** enquanto uma aparece como **RECONECTANDO** ou **ERRO**. Se todas caíram juntas, pule para rede local ou sinal de entrada.
+
+## Não encerre as outras
+
+1. Pause apenas o destino ruim.
+2. Abra **Plataformas** e use **Testar o servidor** naquele card.
+3. Confira se a chave foi trocada no painel da plataforma.
+4. Compare a URL de ingestão com a documentação oficial atual.
+5. Veja o painel de status da plataforma.
+6. Retome o destino e acompanhe o bitrate por alguns minutos.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+## Como ler o resultado
+
+| Resultado | Causa provável | Próxima ação |
+| --- | --- | --- |
+| Servidor não responde | rota, DNS, firewall ou indisponibilidade | tente o ingest oficial alternativo |
+| Conecta e cai em seguida | chave, codec ou limite da plataforma | revise credenciais e preset |
+| Bitrate oscila só ali | rota até aquele ingest | troque o servidor do destino |
+| Todas começam a perder juntas | upload local saturado | reduza soma dos bitrates |
+
+<Callout label="Não cole chave em chamado" tone="important">
+  Se a plataforma mandou resetar a stream key, atualize o cofre da Corneta. Não envie a chave por print, chat ou diagnóstico.
+</Callout>
+
+O passo a passo operacional está em [uma plataforma vive reconectando](/help/troubleshooting/platform-reconnecting).

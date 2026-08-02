@@ -124,7 +124,12 @@ export const pt = {
   "closing.faq.subtitle": "Inclusive as que não pegam bem pra gente responder.",
   "closing.faq.title": "O que todo mundo pergunta antes de instalar.",
   "closing.footer.download": "Baixar para Windows",
+  "closing.footer.group.content": "Conteúdo",
+  "closing.footer.group.legal": "Legal",
+  "closing.footer.group.product": "Produto",
   "closing.footer.link.privacy": "Política de privacidade",
+  "closing.footer.link.guides": "Guias",
+  "closing.footer.link.help": "Ajuda",
   "closing.footer.link.source": "Código-fonte",
   "closing.footer.link.terms": "Termos de uso",
   "closing.footer.nav.ariaLabel": "Links do rodapé",
@@ -252,19 +257,31 @@ export const pt = {
     "suas chaves, seus ajustes e o relatório de cada live",
   "hero.mechanism.step3.title": "Tudo no seu PC",
   "hero.nav.aria": "Navegação principal",
-  "hero.nav.chat": "Chat e alertas",
-  "hero.nav.faq": "Dúvidas",
+  "hero.nav.guides": "Guias",
+  "hero.nav.help": "Ajuda",
+  "hero.nav.platforms": "Plataformas",
+  "hero.nav.why": "Por que",
   // Sem buraco de propósito: são DOIS idiomas, então "o outro" é sempre o mesmo
   // dentro de cada dicionário. Com `{language}` a frase saía "Ver em English" —
   // português com o endônimo inglês no meio. (O nome próprio continua sendo o
   // que APARECE no menu do celular; só a frase é traduzida.)
   "hero.nav.lang": "Ver em inglês",
-  "hero.nav.menu.close": "Fechar menu",
-  "hero.nav.menu.open": "Abrir menu",
-  "hero.nav.platforms": "Plataformas",
-  "hero.nav.protection": "Proteção",
-  "hero.nav.quality": "Qualidade",
-  "hero.nav.why": "Por que",
+
+  // ---- knowledge ----
+  "knowledge.kicker": "Aprenda no seu ritmo",
+  "knowledge.title": "Da primeira configuração ao diagnóstico da live.",
+  "knowledge.description":
+    "Guias práticos para montar a transmissão e respostas diretas quando alguma coisa não sair como esperado.",
+  "knowledge.guides.eyebrow": "Guias passo a passo",
+  "knowledge.guides.title": "Coloque sua próxima live no ar.",
+  "knowledge.guides.description":
+    "Configuração, plataformas, qualidade e boas práticas explicadas do começo ao fim.",
+  "knowledge.guides.action": "Explorar guias",
+  "knowledge.help.eyebrow": "Central de ajuda",
+  "knowledge.help.title": "Descubra o que deu errado.",
+  "knowledge.help.description":
+    "Soluções curtas, verificações objetivas e caminhos seguros para voltar a transmitir.",
+  "knowledge.help.action": "Abrir a ajuda",
   "hero.pitch":
     "No OBS você não mexe em nada — a Corneta se configura sozinha lá. Leva a sua live pra cada plataforma e fica aberta do lado, mostrando as três. No fim, a live fica gravada e o melhor momento já vem marcado.",
   "hero.skiplink.label": "Pular para o conteúdo",

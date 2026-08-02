@@ -1,0 +1,140 @@
+---
+contentId: guide_why_stream_lags
+title: "Por que minha live trava? Separe internet, GPU e encoder"
+description: "Use as métricas do OBS e da Corneta para separar quadros perdidos por rede, atraso de renderização e sobrecarga de codificação."
+summary: "Live travando pode ser rede, renderização ou encoder. Veja qual contador subiu antes de baixar qualidade ou reiniciar tudo — cada causa pede uma correção diferente."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: why-stream-lags
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: por que minha live trava OBS
+related:
+  - guide_multistream_upload_speed
+  - help_quality_modes
+  - help_export_safe_diagnostic
+sources:
+  - title: OBS Stream Connection Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: Corneta metrics reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-first-live-checklist.webp
+    originalPath: assets/originals/getting-started/corneta-first-live-checklist.png
+    baseName: corneta-first-live-checklist
+    alt: "Tela Ao vivo mostrando upload, encoder e check-up antes de iniciar a transmissão."
+    caption: "O check-up pega falta de banda e encoder indisponível antes de a falha aparecer na live."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade mostrando carga estimada de recodificação e upload."
+    caption: "Antes da live, veja se o perfil pede mais sessões ou upload do que a máquina aguenta."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Primeiro: qual contador subiu?
+
+Abra **Exibir → Estatísticas** no OBS e as métricas da tela **Ao vivo** na
+Corneta. Não mude bitrate, encoder, servidor e cena ao mesmo tempo. Anote o
+sintoma e mexa em uma coisa por teste.
+
+| Métrica que piorou                          | Onde costuma estar o problema                 |
+| ------------------------------------------- | --------------------------------------------- |
+| Quadros perdidos por rede                   | Caminho entre seu PC e o servidor de ingestão |
+| Quadros perdidos por renderização           | GPU sem tempo para montar a cena              |
+| Quadros ignorados por atraso de codificação | Encoder, CPU ou GPU sem entregar a tempo      |
+| Só uma plataforma reconectando              | Chave, servidor ou rota daquele destino       |
+
+## Se for rede
+
+O OBS trata quadros perdidos e desconexões intermitentes como problema no caminho
+até o servidor de ingestão. Teste cabo no lugar do Wi-Fi, feche VPN e apps de
+upload, escolha outro servidor oficial e reduza o bitrate de forma controlada.
+
+Se todas as plataformas caem juntas, olhe primeiro para a conexão local. Se só
+uma cai, não derrube as outras: teste a chave, o ingest e o status daquela
+plataforma.
+
+## Se for renderização
+
+O OBS precisa de tempo de GPU para montar cada cena, mesmo quando o encoder é
+outro chip. Jogo com FPS destravado pode ocupar a GPU inteira e deixar o OBS sem
+espaço.
+
+Limite o FPS do jogo, reduza a qualidade gráfica e desative temporariamente
+Browser Sources ou filtros pesados. Se a perda de renderização parar, você achou
+o lado certo da falha.
+
+## Se for codificação
+
+Mensagem de encoder sobrecarregado ou quadros ignorados por codificação aponta
+para CPU, GPU ou sessões de encoder. Reduza FPS ou resolução, use um encoder de
+hardware disponível e diminua o número de destinos recodificados.
+
+Trocar **Caprichado** por **Esperto** pode resolver quando só uma plataforma
+precisa de ajuste. **Na lata** é ainda mais leve se todas aceitam o sinal do OBS.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+## Antes da próxima live
+
+Rode o teste de upload e confira o encoder no check-up. Depois repita a cena que
+travou — menu parado quase nunca reproduz uma falha que acontece no meio da
+partida.
+
+<ContentImage baseName="corneta-first-live-checklist" />
+
+## O que anotar se continuar
+
+- horário aproximado e minuto da live;
+- se afetou todas as plataformas ou uma só;
+- contador que subiu no OBS;
+- modo de qualidade e número de recodificações;
+- mensagem exata e ID do erro, quando houver.
+
+<Callout label="Speedtest normal não inocenta a rede" tone="limit">
+  Um pico bom não mostra perda curta, rota ruim até o ingest ou upload
+  disputado. Compare o teste com os quadros perdidos durante uma cena real.
+</Callout>
+
+Se precisar compartilhar o caso, [exporte um diagnóstico
+seguro](/help/reports-and-data/export-safe-diagnostic).

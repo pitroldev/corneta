@@ -1,0 +1,92 @@
+---
+contentId: guide_twitch_youtube_kick_bitrate
+title: "Qual bitrate usar na Twitch, YouTube e Kick?"
+description: "Compare bitrate, resolução, FPS e limites oficiais de Twitch, YouTube e Kick antes de montar seu perfil de multistream."
+summary: "Não existe um bitrate perfeito para as três plataformas. Em H.264, 1080p60 pede 6 Mbps na Twitch, 12 Mbps recomendados no YouTube e até 8 Mbps na Kick; use o menor perfil comum ou recodifique só os destinos que precisam."
+locale: pt-BR
+collection: guides
+kind: guide
+category: quality
+slug: twitch-youtube-kick-bitrate
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: qual bitrate usar na Twitch YouTube e Kick
+related:
+  - guide_multistream_upload_speed
+  - guide_live_stream_encoders
+  - help_quality_modes
+sources:
+  - title: Twitch Broadcasting Guidelines
+    kind: official
+    url: https://help.twitch.tv/s/article/broadcasting-guidelines?language=en_US
+    reviewedAt: 2026-08-01
+  - title: YouTube live encoder settings, bitrates and resolutions
+    kind: official
+    url: https://support.google.com/youtube/answer/2853702?hl=en
+    reviewedAt: 2026-08-01
+  - title: How to stream on KICK.com
+    kind: official
+    url: https://help.kick.com/en/articles/7066931-how-to-stream-on-kick-com
+    reviewedAt: 2026-08-01
+  - title: Corneta quality modes
+    kind: internal
+    repoPath: src/screens/EncodingScreen.tsx
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-upload-test-result.webp
+    originalPath: assets/originals/quality/corneta-upload-test-result.png
+    baseName: corneta-upload-test-result
+    alt: "Tela Qualidade depois do teste, mostrando 53 Mbps disponíveis e a banda exigida por cada modo."
+    caption: "A conta só fecha quando a banda disponível fica acima da soma mostrada para o modo escolhido."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## A matriz que interessa
+
+Valores revisados em 1º de agosto de 2026 para vídeo H.264. Eles são ponto de partida, não ordem para ocupar toda a banda disponível.
+
+| Saída | Twitch | YouTube | Kick |
+| --- | ---: | ---: | ---: |
+| 720p30 | 3.000 kbps | 4.000 kbps recomendados | 2.500–4.500 kbps |
+| 720p60 | 4.500 kbps | 6.000 kbps recomendados | 3.500–5.000 kbps |
+| 1080p30 | 4.500 kbps | 10.000 kbps recomendados | 4.500–6.000 kbps |
+| 1080p60 | 6.000 kbps | 12.000 kbps recomendados | 6.000–8.000 kbps |
+
+As três aceitam CBR e keyframe a cada 2s. A Kick limita H.264 a 8.000 kbps, 1080p e 60 FPS. O YouTube aceita mais bitrate e cria versões menores para quem assiste. Na Twitch, 6.000 kbps continua sendo a referência oficial para 1080p60.
+
+## Um sinal só ou um por plataforma?
+
+Se o OBS mandar 1080p60 a 6.000 kbps, **Na lata** é o caminho mais leve: as três recebem o mesmo sinal. O YouTube fica abaixo da recomendação de 12 Mbps, mas a live continua dentro de uma configuração válida.
+
+Se você quer aproveitar mais qualidade no YouTube sem estourar Twitch e Kick, use **Esperto** ou **Caprichado**. A Corneta recodifica os destinos diferentes e mostra quanto upload e quantas sessões de encoder serão usados.
+
+<ContentImage baseName="corneta-upload-test-result" />
+
+## Faça a conta antes do BORA
+
+Some vídeo e áudio de cada saída recodificada. Depois compare com um teste feito enquanto a cena tem movimento. Como margem prática, o próprio YouTube recomenda upload entre 1,5× e 2× a soma dos bitrates no simulcast.
+
+<Callout label="Mais bitrate não conserta cena pesada" tone="limit">
+  Se o OBS perde quadros de renderização ou codificação, subir bitrate só aumenta a pressão na rede. Primeiro descubra qual contador piorou.
+</Callout>
+
+Pra escolher o modo sem decorar essa tabela, veja [Na lata, Esperto ou Caprichado](/help/quality/quality-modes).
+

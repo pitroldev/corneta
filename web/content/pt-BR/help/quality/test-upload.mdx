@@ -1,0 +1,75 @@
+---
+contentId: help_test_upload
+title: "Como testar o upload antes da live"
+description: "Meça a banda disponível na Corneta e compare com o upload exigido pelo modo e pelas plataformas escolhidas."
+summary: "Abra Qualidade e clique em medir agora. A Corneta compara o resultado com a soma estimada das saídas; teste com a cena e a rede no estado em que serão usados."
+locale: pt-BR
+collection: help
+kind: help
+category: quality
+slug: test-upload
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: testar upload Corneta antes da live
+related:
+  - guide_multistream_upload_speed
+  - guide_twitch_youtube_kick_bitrate
+  - help_quality_modes
+sources:
+  - title: Corneta upload test
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/quality/corneta-upload-test-result.webp
+    originalPath: assets/originals/quality/corneta-upload-test-result.png
+    baseName: corneta-upload-test-result
+    alt: "Tela Qualidade mostrando 53 Mbps medidos e a banda necessária em cada modo."
+    caption: "O resultado aparece ao lado da soma exigida; a folga muda quando você troca modo ou plataforma."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Antes de medir
+
+Aplica-se à Corneta 0.6.0 no Windows 11. Conecte o PC como será usado na live, feche upload de backup e deixe outras pessoas da rede usando normalmente. Um teste feito numa rede vazia pode prometer uma folga que desaparece à noite.
+
+## Faça o teste
+
+1. Abra **Qualidade**.
+2. Escolha **Na lata**, **Esperto** ou **Caprichado**.
+3. Clique em **medir agora**.
+4. Espere o valor aparecer em **Sua internet sobe**.
+5. Compare com o upload mostrado em cada modo.
+
+<ContentImage baseName="corneta-upload-test-result" />
+
+O estado esperado é **cabe folgado na sua banda**. Se a margem estiver curta, reduza bitrate, use menos recodificações ou teste por cabo.
+
+## Se o resultado não bate com a live
+
+| Sintoma | Causa provável | Como confirmar | Correção |
+| --- | --- | --- | --- |
+| teste alto, live perde rede | rota ou variação curta | veja quadros perdidos no OBS | cabo, outro ingest, bitrate menor |
+| resultado muda muito | Wi-Fi ou rede disputada | repita em horários diferentes | estabilize a conexão |
+| só uma plataforma cai | rota daquele destino | compare estados na tela Ao vivo | teste outro ingest |
+| teste não termina | firewall ou falta de internet | tente outra conexão | libere a Corneta e repita |
+
+Se continuar, anote horário, modo e valor medido. Não compartilhe chave, IP, nome do PC ou logs crus.

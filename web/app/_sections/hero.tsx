@@ -1,4 +1,4 @@
-import type { T, Locale } from "@/lib/i18n";
+import { localePath, type T, type Locale } from "@/lib/i18n";
 import type { SiteCtaId } from "@/lib/telemetry-schema";
 import { LocaleSwitch } from "../_components/locale-switch";
 import { SiteNav } from "../_components/site-nav";
@@ -20,7 +20,7 @@ import {
 // arquivo que cabe na cabeça.
 
 // Placeholder: substitua pela URL real do instalador ou da release.
-const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#baixar";
+const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#download";
 
 export function DownloadButton({
   t,
@@ -67,17 +67,6 @@ export function SkipLink({ t }: { t: T }) {
   );
 }
 
-/** As seções que a barra alcança. Os ids são as âncoras E as chaves do
- *  observador que marca a seção atual — uma lista só, pra não divergirem. */
-const NAV_IDS = [
-  ["por-que", "hero.nav.why"],
-  ["qualidade", "hero.nav.quality"],
-  ["chat", "hero.nav.chat"],
-  ["protecao", "hero.nav.protection"],
-  ["plataformas", "hero.nav.platforms"],
-  ["duvidas", "hero.nav.faq"],
-] as const;
-
 export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
   const langLabel = t("hero.nav.lang");
 
@@ -92,7 +81,7 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
           O vão de 28px é generoso quando cabe a navegação inteira; em tela de
           320px ele é o que faltava pro botão de baixar (a ação da página) não
           ser cortado pelo `overflow-x: clip` do body. */}
-      <Shell className="flex min-h-17 items-center gap-7 max-[420px]:gap-2.5">
+      <Shell className="flex min-h-17 items-center gap-7 max-[980px]:gap-4 max-[420px]:gap-2.5">
         <a
           className="shrink-0"
           href="#topo"
@@ -104,22 +93,40 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
         <SiteNav
           copy={{
             aria: t("hero.nav.aria"),
-            open: t("hero.nav.menu.open"),
-            close: t("hero.nav.menu.close"),
-            items: NAV_IDS.map(([id, key]) => ({ id, label: t(key) })),
+            items: [
+              {
+                href: "#por-que",
+                label: t("hero.nav.why"),
+              },
+              {
+                href: "#plataformas",
+                label: t("hero.nav.platforms"),
+              },
+              {
+                href: localePath(locale, "/guides"),
+                label: t("hero.nav.guides"),
+                ctaId: "nav_guides",
+              },
+              {
+                href: localePath(locale, "/help"),
+                label: t("hero.nav.help"),
+                ctaId: "nav_help",
+              },
+            ],
           }}
-          localeBar={<LocaleSwitch current={locale} label={langLabel} />}
-          localeSheet={<LocaleSwitch current={locale} label={langLabel} full />}
+          locale={<LocaleSwitch current={locale} label={langLabel} />}
         />
 
         {/* Sozinho na direita de propósito: é a única ação de conversão da
             página, e agora nenhum controle de preferência encosta nele. */}
-        <DownloadButton
-          t={t}
-          ctaId="header_download"
-          compact
-          label={t("hero.header.download")}
-        />
+        <div className="ml-auto shrink-0">
+          <DownloadButton
+            t={t}
+            ctaId="header_download"
+            compact
+            label={t("hero.header.download")}
+          />
+        </div>
       </Shell>
     </header>
   );

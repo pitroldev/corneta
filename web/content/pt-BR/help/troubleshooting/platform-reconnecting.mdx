@@ -1,0 +1,81 @@
+---
+contentId: help_platform_reconnecting
+title: "Uma plataforma vive reconectando, mas as outras estão normais"
+description: "Teste chave, servidor, preset e rota do destino afetado sem derrubar as plataformas que continuam no ar."
+summary: "Pause só a plataforma que reconecta, teste o servidor no card dela e confira chave, ingest e limites. Se as outras seguem NO AR, não reinicie a transmissão inteira."
+locale: pt-BR
+collection: help
+kind: troubleshooting
+category: troubleshooting
+slug: platform-reconnecting
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: plataforma reconectando Corneta multistream
+related:
+  - guide_one_platform_disconnected
+  - help_stream_statuses
+  - help_export_safe_diagnostic
+sources:
+  - title: Corneta independent target reconnect
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-08-01
+  - title: KICK OBS or Streamlabs not connecting
+    kind: official
+    url: https://help.kick.com/en/articles/14994318-obs-or-streamlabs-not-connecting-to-kick
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela Plataformas com cards independentes para Twitch, YouTube e Kick."
+    caption: "Faça o teste e a correção no card afetado; as outras chaves e saídas não precisam mudar."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Isole o destino
+
+1. Na tela **Ao vivo**, confirme que as outras plataformas estão **NO AR**.
+2. Clique em **Pausar** no destino que reconecta.
+3. Abra **Plataformas**.
+4. No card afetado, clique em **Testar o servidor**.
+5. Confira a chave e a URL no painel oficial.
+6. Revise bitrate, codec, resolução e FPS em **Qualidade**.
+7. Volte a **Ao vivo** e clique em **Retomar**.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+## Escolha o ramo
+
+| Confirmação | Causa provável | Correção |
+| --- | --- | --- |
+| teste do servidor falha | rota, DNS, firewall ou ingest | use endereço oficial alternativo |
+| autentica e cai | chave ou regra da plataforma | resete a chave e revise o preset |
+| bitrate passa do limite | configuração incompatível | reduza apenas aquele destino |
+| painel oficial mostra incidente | plataforma indisponível | mantenha pausado e espere |
+| todas começam a cair | upload local | reduza a soma e teste a rede |
+
+O conector tenta voltar sozinho, mas tentativa repetida não corrige credencial inválida. Se a chave foi resetada, troque também na Corneta.
+
+## Se não resolveu
+
+Anote plataforma, horário, estado anterior, mensagem e se o teste do servidor passou. Exporte o diagnóstico seguro. Nunca envie stream key, token ou URL que carregue credencial.
+

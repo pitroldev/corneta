@@ -8,6 +8,9 @@ allowBuilds:
   "@posthog/cli": false
   # Só imprime a mensagem de apoio do projeto; não é necessário para o runtime.
   core-js: false
+  # Necessário ao runner TypeScript usado pelo gate editorial e já transitivo
+  # de Vite/Vitest; o script instala apenas o binário da plataforma.
+  esbuild: true
   sharp: true
   unrs-resolver: true
 

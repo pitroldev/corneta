@@ -4,7 +4,7 @@ import {
   isLocale,
   LOCALE_COOKIE,
   negotiateLocale,
-} from "@/lib/i18n";
+} from "./lib/i18n";
 
 // Idioma automático — e por que ele é tão contido.
 //
@@ -25,11 +25,33 @@ import {
 // a doença. A dupla hreflang + canonical por idioma é o que mantém as duas
 // versões indexadas certo.
 
-/** A home negocia idioma; `/legal` só é reescrito pro segmento interno. `/api`
- *  nunca é mexido. */
+/** A home negocia idioma; as URLs públicas em português só são reescritas para
+ *  o segmento interno. `/api` e as rotas inglesas nunca são mexidos. */
 export const config = {
-  matcher: ["/", "/pt-BR", "/legal/:path*", "/pt-BR/legal/:path*"],
+  matcher: [
+    "/",
+    "/pt-BR",
+    "/legal/:path*",
+    "/help/:path*",
+    "/guides/:path*",
+    "/search/:path*",
+    "/pt-BR/legal/:path*",
+    "/pt-BR/help/:path*",
+    "/pt-BR/guides/:path*",
+    "/pt-BR/search/:path*",
+  ],
 };
+
+const PUBLIC_PT_COLLECTIONS = [
+  "/legal",
+  "/help",
+  "/guides",
+  "/search",
+] as const;
+
+function belongsToCollection(pathname: string, collection: string) {
+  return pathname === collection || pathname.startsWith(`${collection}/`);
+}
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -37,22 +59,34 @@ export function proxy(req: NextRequest) {
   // `/pt-BR` é rota interna: ela existe porque o `[locale]` precisa de um
   // segmento, mas expor as duas (`/` e `/pt-BR`) com o mesmo conteúdo seria
   // conteúdo duplicado. Aqui a permanente é correta — a URL boa é `/`.
-  if (pathname === "/pt-BR" || pathname.startsWith("/pt-BR/legal")) {
+  const internalPtPath = pathname.slice(`/${DEFAULT_LOCALE}`.length) || "/";
+  if (
+    pathname === `/${DEFAULT_LOCALE}` ||
+    PUBLIC_PT_COLLECTIONS.some((collection) =>
+      belongsToCollection(internalPtPath, collection),
+    )
+  ) {
     const url = req.nextUrl.clone();
-    url.pathname = pathname.slice("/pt-BR".length) || "/";
+    url.pathname = internalPtPath;
     return NextResponse.redirect(url, 308);
   }
 
-  // Os documentos jurídicos NÃO negociam idioma: `/legal/...` é a versão em
-  // português e ponto. É a URL já publicada, linkada de dentro do app instalado
-  // e a que vincula juridicamente — mandar quem tem o navegador em inglês pra
-  // tradução seria trocar o texto que vale pelo que não vale, sem ele pedir.
-  // Quem quer a tradução clica no link que existe no topo de cada documento.
-  if (pathname.startsWith("/legal")) {
-    return NextResponse.rewrite(
-      new URL(`/${DEFAULT_LOCALE}${pathname}`, req.url),
-    );
+  // Conteúdo em português usa URL pública sem prefixo. O rewrite é apenas uma
+  // adaptação para o `[locale]` interno e não negocia idioma. Isso preserva tanto
+  // os documentos jurídicos publicados quanto URLs estáveis de Ajuda e Guias.
+  if (
+    PUBLIC_PT_COLLECTIONS.some((collection) =>
+      belongsToCollection(pathname, collection),
+    )
+  ) {
+    const url = req.nextUrl.clone();
+    url.pathname = `/${DEFAULT_LOCALE}${pathname}`;
+    return NextResponse.rewrite(url);
   }
+
+  // A negociação automática pertence exclusivamente à raiz. Esta guarda
+  // também mantém rotas inglesas diretas se a função for chamada fora do matcher.
+  if (pathname !== "/") return NextResponse.next();
 
   const saved = req.cookies.get(LOCALE_COOKIE)?.value;
   const chosen =

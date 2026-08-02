@@ -261,7 +261,7 @@ sozinha". É busca de quem está com o problema na mão, que é a intenção mai
 | **Repositório, agregadores, vídeo** | ser citada | consenso entre fontes |
 
 A ponte entre elas é sempre a mesma: **captura no termo commodity, conversão no diferencial.** A
-página `/por-que-minha-live-trava` do [`PLANO-SEO-AEO-GEO.md`](./PLANO-SEO-AEO-GEO.md) §P3 é
+página `/guides/quality/why-stream-lags` do [`PLANO-SEO-AEO-GEO.md`](./PLANO-SEO-AEO-GEO.md) §P3 é
 literalmente isso — entra pela dor buscada e sai na coluna 3, que é onde não temos concorrente.
 
 ### As duas regras que saem daqui

@@ -1,0 +1,78 @@
+---
+contentId: guide_unified_chat_rules
+title: "Chat unificado no multistream: painel privado ou overlay público?"
+description: "Entenda quando reunir chats só para você e quando mostrar mensagens de várias plataformas dentro da transmissão."
+summary: "Reunir Twitch, YouTube e Kick num painel privado simplifica a operação. Colocar esse feed no vídeo muda o contexto: a mensagem passa a ser exibida também para pessoas de outras plataformas."
+locale: pt-BR
+collection: guides
+kind: guide
+category: operations
+slug: unified-chat-rules
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: chat unificado multistream overlay
+related:
+  - help_unified_chat_setup
+  - help_obs_overlay
+  - guide_simulcasting_rules
+sources:
+  - title: Twitch Simulcasting Guidelines FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/simulcasting-guidelines?language=en_US
+    reviewedAt: 2026-08-01
+  - title: Corneta chat behavior
+    kind: internal
+    repoPath: src/screens/ChatScreen.tsx
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/chat-and-alerts/corneta-unified-chat.webp
+    originalPath: assets/originals/chat-and-alerts/corneta-unified-chat.png
+    baseName: corneta-unified-chat
+    alt: "Chat da Corneta conectado a Twitch, YouTube e Kick, com plataforma e autor em cada mensagem."
+    caption: "No painel privado, cada mensagem mantém a plataforma de origem e só você vê o feed completo."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## O painel privado é o padrão seguro
+
+Use o chat unificado para ler, responder e moderar sem trocar de janela. A plataforma aparece em cada mensagem; quando você responde, a Corneta envia para a origem escolhida, não para todas.
+
+<ContentImage baseName="corneta-unified-chat" />
+
+Na Twitch, a documentação de simulcast permite ferramentas que juntam atividade para uso pessoal. Isso encaixa no painel e na janela flutuante que ficam só no seu monitor.
+
+## O overlay é outra decisão
+
+Quando o feed vira **Browser Source**, uma mensagem escrita em uma plataforma aparece dentro do vídeo transmitido para as outras. Antes de ligar:
+
+- mantenha o ícone da plataforma visível;
+- esconda comandos iniciados por `!`;
+- defina um limite de mensagens e um tempo de saída;
+- teste moderação e nomes longos;
+- avise sua comunidade quando esse contexto importar.
+
+Não use o overlay como forma de mandar a audiência de uma live para outra. Na Twitch, promover ativamente a transmissão simultânea em outro lugar entra nas restrições de simulcast.
+
+## Moderação não atravessa sozinha
+
+Apagar uma mensagem na Twitch não garante remoção do YouTube ou da Kick. A ação vale no canal e na plataforma que aceitam aquela operação. O painel reduz o alt-tab; ele não transforma três sistemas de moderação em um só.
+
+Pra colocar o feed no OBS com essas opções visíveis, siga [como adicionar o overlay da Corneta](/help/chat-and-alerts/obs-browser-source-overlay).

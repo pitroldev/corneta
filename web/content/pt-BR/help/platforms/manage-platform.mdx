@@ -1,0 +1,118 @@
+---
+contentId: help_manage_platform
+title: "Como adicionar, testar, pausar e remover uma plataforma"
+description: "Gerencie cada destino da Corneta sem derrubar as outras plataformas: adicione, teste, pause, retome ou remova."
+summary: "Adicione a plataforma, guarde a stream key no cofre e use Testar o servidor antes da live. Ao vivo, Pausar e Retomar mexem só naquele destino."
+locale: pt-BR
+collection: help
+kind: help
+category: platforms
+slug: manage-platform
+status: published
+publishedAt: 2026-08-01
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: como adicionar plataforma na Corneta
+related:
+  - help_streaming_keys_and_urls
+  - help_quality_modes
+  - help_first_stream
+sources:
+  - title: Corneta platforms screen
+    kind: internal
+    repoPath: src/screens/PlatformsScreen.tsx
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
+    originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
+    baseName: corneta-platform-key-setup
+    alt: "Destino Twitch aberto na tela Plataformas, com chave no cofre e botão Testar o servidor."
+    caption: "O teste pega chave ou servidor errado antes de você entrar no ar."
+    width: 1080
+    height: 900
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela Plataformas com Twitch e YouTube independentes e prontas para a live."
+    caption: "Cada destino tem seu próprio estado. Pausar um não manda os outros embora."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Adicione uma plataforma
+
+1. Abra **Plataformas**.
+2. Clique em **Adicionar plataforma**.
+3. Escolha Twitch, YouTube, Kick ou **Personalizado**.
+4. Cole a stream key e clique em **Colar e salvar**.
+5. Se o endereço não veio preenchido, cole a **URL de ingestão** mostrada pelo
+   painel da plataforma.
+
+A Corneta guarda a stream key no cofre do Windows. O arquivo de configuração não
+leva essa chave junto.
+
+## Teste antes da live
+
+Abra o destino e clique em **Testar o servidor**. Esse teste verifica se a
+Corneta consegue chegar ao endereço e usar a chave informada sem abrir uma live
+completa.
+
+<ContentImage baseName="corneta-platform-key-setup" />
+
+Se o teste passar, o card fica **Pronto**. Se você trocar a chave, a URL ou
+desligar o destino, o resultado anterior deixa de valer — teste de novo.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+## Pause ou retome durante a live
+
+Na tela **Ao vivo**, use **Pausar** no destino que precisa sair. A Twitch pode
+continuar no ar enquanto a Kick fica pausada, por exemplo. Use **Retomar** para
+abrir aquela saída novamente.
+
+Pausar não apaga chave nem configuração. Remover faz outra coisa: tira o destino
+do perfil ativo.
+
+## Remova uma plataforma
+
+Na tela **Plataformas**, abra o destino, clique em **Remover** e confirme em
+**Remover mesmo?**. Faça isso fora da live. Se você só não vai usar a plataforma
+hoje, desligue o destino em vez de remover.
+
+## Se o card não ficar pronto
+
+| Sinal          | O que costuma ser                              | Próxima ação                                  |
+| -------------- | ---------------------------------------------- | --------------------------------------------- |
+| Cole a chave   | Não há stream key guardada                     | Pegue uma chave nova no painel da plataforma  |
+| Sem URL        | O destino não tem servidor de ingestão         | Cole uma URL `rtmp://` ou `rtmps://` válida   |
+| URL inválida   | Foi colada uma página web no campo de ingestão | Copie o servidor RTMP/RTMPS, não o dashboard  |
+| Teste recusado | Chave expirada ou servidor errado              | Gere outra chave e confira o endereço oficial |
+
+<Callout label="Uma plataforma manda nas próprias regras" tone="limit">
+  O teste confirma a conexão, não libera sua conta para fazer live. O YouTube,
+  por exemplo, pode exigir ativação antecipada da primeira transmissão.
+</Callout>
+
+Se os nomes dos campos ainda estão embolados, veja [stream key, URL de ingestão
+e chave do OBS](/help/platforms/streaming-keys-and-urls).

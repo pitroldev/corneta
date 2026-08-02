@@ -20,11 +20,19 @@ const AI_AGENTS = [
   "CCBot",
 ];
 
+const publicRule = (userAgent: string) => ({
+  userAgent,
+  allow: "/",
+  // Não é barreira de segurança: apenas evita gastar crawl em endpoints JSON
+  // que não são resultados de busca. As rotas continuam protegidas no código.
+  disallow: ["/api/"],
+});
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      { userAgent: "*", allow: "/" },
-      ...AI_AGENTS.map((userAgent) => ({ userAgent, allow: "/" })),
+      publicRule("*"),
+      ...AI_AGENTS.map(publicRule),
     ],
     sitemap: new URL("/sitemap.xml", siteUrl).toString(),
     host: siteUrl.host,

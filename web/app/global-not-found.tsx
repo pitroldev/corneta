@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { siteUrl } from "../lib/site";
 import { BrandMark } from "./_components/brand-mark";
 import { SoundWaves } from "./_components/decor";
 import { fontVars } from "./fonts";
@@ -17,6 +18,7 @@ import "./globals.css";
 // de uma URL quebrada, e a raiz do site é a versão portuguesa.
 
 export const metadata: Metadata = {
+  metadataBase: siteUrl,
   title: "Página não encontrada | Corneta",
   robots: { index: false, follow: true },
 };

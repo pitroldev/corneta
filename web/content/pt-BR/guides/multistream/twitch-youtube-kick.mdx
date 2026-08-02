@@ -1,0 +1,149 @@
+---
+contentId: guide_twitch_youtube_kick
+title: "Como transmitir na Twitch, YouTube e Kick ao mesmo tempo"
+description: "Prepare três destinos independentes, confira upload e encoder e siga as regras atuais de Twitch, YouTube e Kick."
+summary: "Configure uma stream key por plataforma, some os três bitrates e teste a cena mais pesada. Na Kick, parceiros precisam ativar o Multistreaming e o pagamento muda durante esse período."
+locale: pt-BR
+collection: guides
+kind: guide
+category: multistream
+slug: twitch-youtube-kick
+status: published
+publishedAt: 2026-08-01
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-08-01
+productVersion: 0.6.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: como transmitir na Twitch YouTube e Kick ao mesmo tempo
+related:
+  - guide_twitch_youtube_simultaneously
+  - guide_multistream_upload_speed
+  - help_manage_platform
+sources:
+  - title: Twitch Simulcasting Guidelines FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/simulcasting-guidelines
+    reviewedAt: 2026-08-01
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-08-01
+  - title: Multistreaming no KICK Partner Program
+    kind: official
+    url: https://help.kick.com/pt-BR/articles/11091744-multistreaming-no-kick-partner-program
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-08-01
+images:
+  - src: /images/editorial/multistream/corneta-platform-destinations.webp
+    originalPath: assets/originals/multistream/corneta-platform-destinations.png
+    baseName: corneta-platform-destinations
+    alt: "Tela Plataformas da Corneta com destinos independentes preparados para a live."
+    caption: "Abra cada card e teste a chave antes de ligar as três saídas."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+  - src: /images/editorial/quality/corneta-quality-modes.webp
+    originalPath: assets/originals/quality/corneta-quality-modes.png
+    baseName: corneta-quality-modes
+    alt: "Tela Qualidade com modos e estimativa de carga para várias plataformas."
+    caption: "Três destinos podem significar três bitrates e até três recodificações. Confira antes de entrar no ar."
+    width: 1080
+    height: 800
+    kind: screenshot
+    source: corneta
+    rights: owned
+    language: pt-BR
+    capturedAt: 2026-08-01
+    productVersion: 0.6.0
+---
+
+## Antes da configuração: confira as contas
+
+A Twitch permite simulcast, salvo acordo individual de exclusividade. A
+experiência na Twitch não pode ser pior e você não pode usar a live dela para
+empurrar a audiência para outra transmissão concorrente.
+
+O YouTube precisa estar verificado e com live ativada. A primeira ativação pode
+levar pelo menos 24 horas.
+
+Se você participa do **KICK Partner Program**, a Kick orienta ativar o toggle
+**Multistreaming** depois de começar a live ou usar `/multi on`. Durante esse
+período, o pagamento do programa é reduzido em 50%. Essa regra é específica do
+programa e pode mudar; confira seu painel antes de entrar no ar.
+
+## Adicione os três destinos
+
+1. Abra **Plataformas** na Corneta.
+2. Adicione a Twitch, cole a stream key e clique em **Testar o servidor**.
+3. Faça o mesmo com o YouTube.
+4. Adicione a Kick e confirme a URL que aparece no painel dela.
+5. Deixe os três cards em **Pronto**.
+
+<ContentImage baseName="corneta-platform-destinations" />
+
+Não reutilize chave entre plataformas. Cada uma identifica uma conta e pode
+expirar ou ser revogada sem mexer nas outras.
+
+## Faça a conta do upload
+
+Some o bitrate de vídeo e áudio das três saídas. Se cada uma usa 6 Mb/s, o piso
+já fica perto de 18 Mb/s antes da margem. O YouTube sugere mirar em 1,5 a 2 vezes
+o bitrate combinado para simulstream estável.
+
+Se a conta não fecha, reduza bitrates ou use um relay. Tirar margem para “caber”
+costuma aparecer como quadros perdidos quando a cena se mexe.
+
+## Veja quantas recodificações vão abrir
+
+**Na lata** copia o mesmo sinal para as três e pesa menos na máquina, desde que
+as três aceitem a saída do OBS. **Esperto** adapta só os destinos incompatíveis.
+**Caprichado** recodifica cada um e pode abrir três sessões de encoder.
+
+<ContentImage baseName="corneta-quality-modes" />
+
+Faça um teste com jogo, câmera e alertas. Se GPU, CPU ou encoder encostarem no
+limite, reduza a carga antes de cortar qualidade às cegas.
+
+## Na hora do BORA AO VIVO
+
+1. Confirme o toggle de Multistreaming na Kick se a sua conta faz parte do
+   Partner Program.
+2. Dê **BORA AO VIVO** e espere os três estados saírem de **Conectando**.
+3. Abra cada canal em outro aparelho e confira imagem e áudio.
+4. Se um destino reconectar, mantenha os outros no ar e trate só a saída com
+   problema.
+
+## Checklist que evita o susto mais comum
+
+- nenhuma chave aparece em print ou compartilhamento de tela;
+- Twitch recebe qualidade equivalente;
+- não há CTA na Twitch mandando a pessoa para outra live concorrente;
+- YouTube já estava liberado antes do horário;
+- a regra atual da sua conta Kick foi conferida;
+- upload e sessões de encoder têm folga.
+
+<Callout label="As plataformas podem mudar a regra" tone="limit">
+  Este guia foi conferido em 1º de agosto de 2026. Acordos individuais e o
+  painel da sua conta prevalecem sobre qualquer resumo público.
+</Callout>
+
+Quer testar a conta primeiro? Abra a [calculadora de
+upload](/guides/quality/multistream-upload-speed).

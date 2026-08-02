@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "people": [
+    {
+      "name": "Petro Cardoso",
+      "role": "Criador e mantenedor da Corneta",
+      "type": "person",
+      "url": "https://github.com/pitroldev"
+    }
+  ]
+}
