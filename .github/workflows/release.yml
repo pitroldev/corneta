@@ -41,6 +41,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -87,6 +88,28 @@ jobs:
           "BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Revisar ajuda afetada pela release
+        shell: pwsh
+        run: |
+          $config = Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json
+          $previousTag = @(
+            git tag --merged $env:RELEASE_SHA --sort=-version:refname --list 'v*' |
+              Where-Object { $_ -cne $env:RELEASE_TAG }
+          ) | Select-Object -First 1
+
+          if (-not $previousTag) {
+            Write-Host 'Primeira release versionada: não há base editorial anterior.'
+            exit 0
+          }
+
+          pnpm --dir web content:revision:check -- `
+            --base $previousTag `
+            --head $env:RELEASE_SHA `
+            --product-version $config.version
+          if ($LASTEXITCODE -ne 0) {
+            throw 'A ajuda afetada pela release precisa ser revisada.'
+          }
 
       # Os sidecars não são versionados: o script baixa e CONFERE o SHA-256 antes de
       # copiar pra src-tauri/binaries. Sem isso o bundle sai sem ffmpeg/mediamtx.

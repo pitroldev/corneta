@@ -518,14 +518,24 @@ HTML para acessibilidade e indexação.
 
 ### Fase 4 — manutenção contínua
 
-- Revisar consultas e páginas na Search Console a cada 28 dias.
-- Atualizar páginas de regras, bitrate e integrações no máximo a cada 90 dias.
-- Revisar Ajuda em toda release que altere o fluxo descrito.
-- Revisar conceitos evergreen a cada 180 dias.
-- Revisar comparativos a cada 60–90 dias ou retirá-los do ar se não puderem ser
-  mantidos.
-- Registrar mudanças substanciais em updatedAt; nunca atualizar a data apenas
-  para aparentar frescor.
+**Status no repositório em 2 de agosto de 2026:** a manutenção contínua está
+implementada. O que depende de acesso às contas de produção continua indicado
+como ação externa.
+
+- [x] Gerar uma fila semanal por `reviewedAt` e `reviewIntervalDays`, com aviso
+  28 dias antes e falha no CI para conteúdo vencido.
+- [x] Manter regras, bitrate e integrações em intervalos de no máximo 90 dias e
+  conceitos evergreen em 180 dias.
+- [x] Limitar comparativos a 60–90 dias no contrato de conteúdo.
+- [x] Cruzar mudanças de produto com `sources[].repoPath` em PRs e releases,
+  exigindo nova revisão da Ajuda afetada.
+- [x] Separar revisão factual (`reviewedAt`) de mudança substancial
+  (`updatedAt`) e bloquear datas de frescor artificiais.
+- [x] Criar uma issue recorrente a cada 28 dias com o relatório e a lista de
+  verificação de Search Console e Bing.
+- [x] Documentar a rotina em `docs/RUNBOOK-MANUTENCAO-EDITORIAL.md`.
+- [ ] Validar as propriedades de produção no Google Search Console e no Bing
+  Webmaster Tools e enviar `/sitemap.xml` (ação externa após o deploy).
 
 Cadência mínima recomendada: **duas publicações ou revisões substanciais por
 mês**. Se isso não for sustentável, reduzir o backlog ativo em vez de produzir
@@ -715,6 +725,7 @@ author: nome-real
 reviewedBy: nome-real
 publishedAt:
 updatedAt:
+reviewedAt:
 productVersion:
 testedWith:
 reviewIntervalDays: 90
@@ -728,7 +739,8 @@ images: []
 Validações de build:
 
 - contentId e slug únicos;
-- datas válidas e updatedAt não anterior a publishedAt;
+- datas válidas, `updatedAt` não anterior a `publishedAt` e `reviewedAt` não
+  anterior a `updatedAt`;
 - artigo publicado sem placeholder;
 - autor e revisor existentes;
 - imagem e alt obrigatórios quando houver passos visuais;
@@ -935,10 +947,11 @@ artigo.
 
 ## 17. Próxima ação recomendada
 
-Começar pela Fase 0 e produzir briefs de G01, A02, A03 e G03 em paralelo. Eles
-formam o menor conjunto que já entrega descoberta, primeiro uso e uma resposta
-honesta sobre o principal limite do multistream local: upload.
+Publicar o site, validar `https://www.corneta.live` no Google Search Console e
+no Bing Webmaster Tools e enviar `/sitemap.xml`. Depois de 28 dias completos,
+encerrar a primeira issue de manutenção com a linha de base de cliques,
+impressões, CTR e posição e com pelo menos duas ações substanciais escolhidas.
 
-Antes de publicar G02, G06, G07, G11 ou G12, revisar novamente as regras das
-plataformas. Antes de publicar G10 ou G25, executar e documentar testes práticos
-das alternativas.
+Enquanto não houver dados suficientes, o backlog não deve crescer por intuição.
+As próximas revisões vêm da fila automática, das mudanças de produto detectadas
+nas releases e das dúvidas reais recebidas no suporte.

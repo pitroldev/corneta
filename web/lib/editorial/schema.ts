@@ -273,6 +273,7 @@ const draftEditorialFrontmatterSchema = z
     reviewedBy: z.string().trim().min(2).max(100).optional(),
     publishedAt: isoDateSchema.optional(),
     updatedAt: isoDateSchema.optional(),
+    reviewedAt: isoDateSchema.optional(),
     productVersion: z.string().trim().min(1).max(80).optional(),
     testedWith: z.array(testedVersionSchema).default([]),
     reviewIntervalDays: z.number().int().min(1).max(730).optional(),
@@ -298,6 +299,7 @@ export const publishedEditorialFrontmatterSchema = z
     reviewedBy: z.string().trim().min(2).max(100),
     publishedAt: isoDateSchema,
     updatedAt: isoDateSchema,
+    reviewedAt: isoDateSchema,
     productVersion: z.string().trim().min(1).max(80),
     testedWith: z.array(testedVersionSchema).min(1),
     reviewIntervalDays: z.number().int().min(1).max(730),
@@ -356,6 +358,19 @@ export const editorialFrontmatterSchema = z
     }
 
     if (
+      frontmatter.kind === "comparison" &&
+      frontmatter.reviewIntervalDays &&
+      (frontmatter.reviewIntervalDays < 60 ||
+        frontmatter.reviewIntervalDays > 90)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "comparativos precisam usar um intervalo de 60 a 90 dias",
+        path: ["reviewIntervalDays"],
+      });
+    }
+
+    if (
       frontmatter.publishedAt &&
       frontmatter.updatedAt &&
       frontmatter.updatedAt < frontmatter.publishedAt
@@ -367,12 +382,32 @@ export const editorialFrontmatterSchema = z
       });
     }
 
+    if (
+      frontmatter.updatedAt &&
+      frontmatter.reviewedAt &&
+      frontmatter.reviewedAt < frontmatter.updatedAt
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "reviewedAt não pode ser anterior a updatedAt",
+        path: ["reviewedAt"],
+      });
+    }
+
     if (frontmatter.status === "published") {
       frontmatter.sources.forEach((source, index) => {
         if (!source.reviewedAt) {
           context.addIssue({
             code: "custom",
             message: "fonte de conteúdo publicado precisa de reviewedAt",
+            path: ["sources", index, "reviewedAt"],
+          });
+        }
+        if (source.reviewedAt && source.reviewedAt > frontmatter.reviewedAt) {
+          context.addIssue({
+            code: "custom",
+            message:
+              "a revisão da fonte não pode ser posterior à revisão do artigo",
             path: ["sources", index, "reviewedAt"],
           });
         }

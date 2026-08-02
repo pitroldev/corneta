@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start",
     "content:check": "tsx scripts/check-editorial-content.ts",
+    "content:maintenance": "tsx scripts/check-editorial-maintenance.ts",
+    "content:maintenance:check": "tsx scripts/check-editorial-maintenance.ts --fail-on-overdue",
+    "content:revision:check": "tsx scripts/check-editorial-revisions.ts",
     "content:image": "tsx scripts/optimize-editorial-image.ts",
     "prebuild": "pnpm content:check",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm lint && pnpm typecheck && pnpm build"
+    "check": "pnpm content:maintenance:check && pnpm lint && pnpm typecheck && pnpm build"
   },
   "dependencies": {
     "framer-motion": "^12.43.0",

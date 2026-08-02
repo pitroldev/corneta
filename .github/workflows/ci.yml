@@ -61,6 +61,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
@@ -70,6 +71,12 @@ jobs:
           node-version: 24.18.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verificar revisões dos artigos alterados
+        if: github.event_name == 'pull_request'
+        run: >-
+          pnpm --dir web content:revision:check --
+          --base "${{ github.event.pull_request.base.sha }}"
+          --head "${{ needs.resolve.outputs.sha }}"
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test

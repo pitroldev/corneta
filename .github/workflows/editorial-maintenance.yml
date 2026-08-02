@@ -1,0 +1,106 @@
+name: Editorial maintenance
+
+on:
+  schedule:
+    - cron: "17 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Gerar fila de revisão
+        working-directory: web
+        run: >-
+          pnpm content:maintenance --
+          --warning-days 28
+          --format github
+          --output ../editorial-maintenance.md
+
+      - name: Publicar resumo e manter tarefa recorrente
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $report = Get-Content -Raw editorial-maintenance.md
+          $report | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+          gh label create editorial-maintenance `
+            --color FFB62E `
+            --description 'Revisão recorrente de conteúdo e desempenho orgânico' `
+            --force
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Não foi possível preparar a label de manutenção editorial.'
+          }
+
+          $now = [DateTimeOffset]::UtcNow
+          $checklist = @(
+            $report.TrimEnd(),
+            '',
+            '## Revisão dos últimos 28 dias',
+            '',
+            '- [ ] Comparar consultas, páginas, CTR e posição no Google Search Console.',
+            '- [ ] Conferir cobertura, sitemap e alertas no Bing Webmaster Tools.',
+            '- [ ] Separar buscas de marca e sem marca; procurar canibalização e páginas em queda.',
+            '- [ ] Registrar no mínimo duas publicações ou revisões substanciais para o ciclo.',
+            '- [ ] Atualizar `reviewedAt` após validar fatos e fluxos; alterar `updatedAt` apenas se o conteúdo mudou.',
+            '- [ ] Registrar decisões e resultados antes de encerrar esta tarefa.',
+            '',
+            'Runbook: `docs/RUNBOOK-MANUTENCAO-EDITORIAL.md`.'
+          ) -join "`n"
+          $checklist | Set-Content -Path editorial-maintenance-issue.md -Encoding utf8
+
+          $openIssues = @(
+            gh issue list `
+              --state open `
+              --label editorial-maintenance `
+              --limit 1 `
+              --json number | ConvertFrom-Json
+          )
+          if ($openIssues.Count -gt 0) {
+            gh issue edit $openIssues[0].number --body-file editorial-maintenance-issue.md
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Não foi possível atualizar a tarefa editorial aberta.'
+            }
+            exit 0
+          }
+
+          $closedIssues = @(
+            gh issue list `
+              --state closed `
+              --label editorial-maintenance `
+              --limit 1 `
+              --json number,closedAt | ConvertFrom-Json
+          )
+          if (
+            $closedIssues.Count -gt 0 -and
+            $closedIssues[0].closedAt -and
+            ([DateTimeOffset]::Parse($closedIssues[0].closedAt) -gt $now.AddDays(-28))
+          ) {
+            Write-Host 'O último ciclo foi encerrado há menos de 28 dias.'
+            exit 0
+          }
+
+          gh issue create `
+            --title "Manutenção editorial — $($now.ToString('yyyy-MM'))" `
+            --label editorial-maintenance `
+            --body-file editorial-maintenance-issue.md
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Não foi possível criar a tarefa mensal de manutenção editorial.'
+          }
