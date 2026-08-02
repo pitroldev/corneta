@@ -13,6 +13,7 @@ import {
 } from "./telemetry";
 import {
   REMOTE_DESKTOP_ERROR_MESSAGE,
+  TELEMETRY_NOTICE_VERSION,
   type TelemetryStatus,
 } from "./telemetry-schema";
 
@@ -48,15 +49,17 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
 function status(
   usage: TelemetryStatus["usage"],
   crashReports: TelemetryStatus["crashReports"],
-  noticeVersion = "2026-08-01",
+  noticeVersion: string = TELEMETRY_NOTICE_VERSION,
 ): TelemetryStatus {
   return {
     schemaVersion: 1,
     noticeVersion,
     usage,
     crashReports,
+    // Espelha o backend: o UUID existe sempre que ALGUMA finalidade está ativa —
+    // e `unset` é ativa, porque a base legal é legítimo interesse.
     installationId:
-      usage === "enabled" || crashReports === "enabled"
+      usage !== "disabled" || crashReports !== "disabled"
         ? INSTALLATION_ID
         : null,
     decidedAt: "2026-08-01T12:00:00.000Z",
@@ -168,11 +171,25 @@ describe("telemetry facade", () => {
     );
   });
 
-  it("does not honor enabled consent from an older notice", async () => {
+  // Com legítimo interesse, um aviso mais novo é INFORMAÇÃO e não permissão:
+  // reapresentar o texto reabre a conversa, mas não interrompe um tratamento que
+  // continua legítimo. Quem interrompe é a oposição — coberta no teste seguinte.
+  it("segue enviando quando só o texto do aviso ficou velho", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(
       backend(status("enabled", "enabled", "2026-07-01")),
+    );
+    capture("screen_viewed", { screen_id: "settings" });
+    await flushTelemetry();
+    expect(harness.captures).toHaveLength(1);
+  });
+
+  it("oposição desliga mesmo com o aviso velho — e não é religada por ele", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(
+      backend(status("disabled", "disabled", "2026-07-01")),
     );
     capture("screen_viewed", { screen_id: "settings" });
     captureException(new Error("boom"), {
@@ -185,6 +202,17 @@ describe("telemetry facade", () => {
     expect(harness.loader).not.toHaveBeenCalled();
     expect(harness.captures).toHaveLength(0);
     expect(harness.exceptions).toHaveLength(0);
+  });
+
+  // O caso que a mudança pra opt-out cria: instalação nova, ninguém tocou em
+  // nada. Tem que enviar — é isso que "ligado por padrão" significa.
+  it("envia na instalação nova, sem ninguém ter mexido nos interruptores", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("unset", "unset")));
+    capture("screen_viewed", { screen_id: "settings" });
+    await flushTelemetry();
+    expect(harness.captures).toHaveLength(1);
   });
 
   it("loads conditionally and captures only catalogued properties", async () => {
@@ -201,12 +229,7 @@ describe("telemetry facade", () => {
     });
   });
 
-  it("keeps first-run onboarding local and replays it only after usage opt-in", async () => {
-    const harness = sdkHarness();
-    configure(harness.loader);
-    const native = backend(status("unset", "unset"));
-    await initializeTelemetry(native);
-
+  const onboardingTrio = () => {
     captureOnboarding({
       event: "onboarding_started",
       properties: { entry_point: "first_run" },
@@ -219,17 +242,38 @@ describe("telemetry facade", () => {
       event: "onboarding_completed",
       properties: { duration_bucket: "10_30s" },
     });
-    await flushTelemetry();
-    expect(harness.loader).not.toHaveBeenCalled();
-    expect(harness.captures).toHaveLength(0);
+  };
 
-    await setTelemetryConsent({ usage: "enabled", crashReports: "disabled" });
+  // O buffer nasceu pra segurar o funil até um opt-in que agora não existe: com
+  // legítimo interesse a finalidade já está ativa no primeiro run, então o funil
+  // sai na hora em vez de esperar.
+  it("manda o funil do primeiro run direto, sem esperar decisão", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("unset", "unset")));
+    onboardingTrio();
     await flushTelemetry();
     expect(harness.captures.map(({ event }) => event)).toEqual([
       "onboarding_started",
       "onboarding_step_completed",
       "onboarding_completed",
     ]);
+  });
+
+  // E o caminho que o buffer ainda protege: quem se opôs não tem funil nenhum
+  // enviado, nem no ato nem depois.
+  it("não guarda nem envia o funil de quem se opôs", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("disabled", "disabled")));
+    onboardingTrio();
+    await flushTelemetry();
+    expect(harness.loader).not.toHaveBeenCalled();
+    expect(harness.captures).toHaveLength(0);
+
+    await setTelemetryConsent({ usage: "enabled", crashReports: "disabled" });
+    await flushTelemetry();
+    expect(harness.captures).toHaveLength(0);
   });
 
   it("discards deferred onboarding instead of replaying it later", async () => {

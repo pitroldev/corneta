@@ -9,7 +9,6 @@ import {
 import { acceptedCurrent, legalUrl } from "../lib/legal";
 import { useI18n } from "../lib/i18n";
 import {
-  discardBufferedOnboardingTelemetry,
   regenerateTelemetryId,
   setTelemetryConsent,
   TELEMETRY_DECISION_READY_EVENT,
@@ -18,6 +17,7 @@ import {
 import {
   needsTelemetryDecision,
   telemetryConsentDraft,
+  telemetryPurposeActive,
 } from "../lib/telemetry-schema";
 import { openExternal } from "../lib/utils";
 import { toast } from "../lib/toast";
@@ -54,10 +54,7 @@ export function TelemetryConsentNotice() {
   )
     return null;
 
-  const defer = () => {
-    discardBufferedOnboardingTelemetry();
-    setDeferred(true);
-  };
+  const defer = () => setDeferred(true);
 
   const save = async (withoutSending = false) => {
     try {
@@ -130,27 +127,20 @@ export function TelemetryConsentNotice() {
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Button
             variant="outline"
+            onClick={() => void save(true)}
+            disabled={telemetry.saving}
+          >
+            {t("components.telemetry.notice.none")}
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => void save(false)}
             disabled={telemetry.saving}
             loading={telemetry.saving}
           >
             {t("components.telemetry.notice.save")}
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => void save(true)}
-            disabled={telemetry.saving}
-          >
-            {t("components.telemetry.notice.none")}
-          </Button>
         </div>
-        <button
-          type="button"
-          className="mt-3 w-full text-center text-xs font-semibold text-ink-faint hover:text-ink-muted"
-          onClick={defer}
-        >
-          {t("components.telemetry.notice.later")}
-        </button>
       </div>
     </Modal>
   );
@@ -206,7 +196,10 @@ export function TelemetrySettingsPanel() {
       crashReports: telemetry.status.crashReports,
     };
     choices[which] = enabled ? "enabled" : "disabled";
-    if (choices[other] === "unset") choices[other] = "disabled";
+    // Mexer num interruptor não pode desligar o OUTRO. Antes o `unset` virava
+    // `disabled` porque `unset` significava "não autorizado"; agora ele significa
+    // "ativo e não contestado", então a materialização certa é `enabled`.
+    if (choices[other] === "unset") choices[other] = "enabled";
     try {
       await setTelemetryConsent(choices);
       toast.success(t("settings.telemetry.saved"));
@@ -243,7 +236,7 @@ export function TelemetrySettingsPanel() {
           body={t("settings.telemetry.usage.desc")}
         >
           <Toggle
-            checked={telemetry.status.usage === "enabled"}
+            checked={telemetryPurposeActive(telemetry.status.usage)}
             onChange={(enabled) => void change("usage", enabled)}
             disabled={telemetry.saving}
             label={t("components.telemetry.usage.title")}
@@ -255,7 +248,7 @@ export function TelemetrySettingsPanel() {
           body={t("settings.telemetry.crashes.desc")}
         >
           <Toggle
-            checked={telemetry.status.crashReports === "enabled"}
+            checked={telemetryPurposeActive(telemetry.status.crashReports)}
             onChange={(enabled) => void change("crashReports", enabled)}
             disabled={telemetry.saving}
             label={t("components.telemetry.crashes.title")}

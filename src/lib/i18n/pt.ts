@@ -484,16 +484,15 @@ export const pt = {
     "Não consegui salvar sua escolha. Nada novo foi enviado.",
   "components.telemetry.notice.forbidden":
     "Nunca entra no evento: chave de live, token, chat, título/categoria, OCR, imagem, áudio, vídeo, caminho local, hostname, IP como propriedade ou log cru.",
-  "components.telemetry.notice.later": "Decidir depois",
-  "components.telemetry.notice.none": "Continuar sem enviar",
+  "components.telemetry.notice.none": "Desligar as duas",
   "components.telemetry.notice.privacy":
     "São dados técnicos pseudonimizados, tratados pelo PostHog por até 90 dias.",
   "components.telemetry.notice.privacyLink": "Leia a política de privacidade",
   "components.telemetry.notice.save": "Salvar minhas escolhas",
-  "components.telemetry.notice.saved": "Sua escolha de dados foi salva.",
+  "components.telemetry.notice.saved": "Salvei sua escolha.",
   "components.telemetry.notice.subtitle":
-    "Nada é marcado de saída. Você pode mudar de ideia nas Configurações.",
-  "components.telemetry.notice.title": "O que a Corneta pode contar?",
+    "Vem ligado pra eu achar bug antes de você. Desliga aqui ou depois, em Configurações.",
+  "components.telemetry.notice.title": "Já estou mandando dados técnicos",
   "components.telemetry.usage.body":
     "Envia etapas concluídas, versão, categorias do sistema e resultado das operações — nunca conteúdo da live.",
   "components.telemetry.usage.title": "Enviar dados de uso",
@@ -1507,7 +1506,7 @@ export const pt = {
   "settings.telemetry.deletion.desc":
     "Com as duas opções desligadas, copie o ID acima e siga o canal indicado na política para excluir o que já foi enviado.",
   "settings.telemetry.explainer":
-    "A Corneta envia só dados técnicos pseudonimizados permitidos pelo catálogo. O PostHog opera a coleta, com retenção inicial de 90 dias. Desligar interrompe novos eventos na hora.",
+    "As duas vêm ligadas, por legítimo interesse — existem pra eu achar e consertar problema. Sai só dado técnico pseudonimizado do catálogo; o PostHog opera a coleta, com retenção inicial de 90 dias. Desligar aqui é o seu direito de oposição e vale na hora.",
   "settings.telemetry.id": "ID de telemetria",
   "settings.telemetry.id.pending":
     "O ID só é criado quando você liga pelo menos uma opção.",

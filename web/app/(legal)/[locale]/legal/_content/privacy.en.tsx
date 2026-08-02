@@ -141,10 +141,13 @@ export function PrivacyBodyEn() {
           us.
         </p>
         <Callout>
-          App telemetry is optional and starts off. Usage data and crash reports
-          have independent controls, with neither option preselected. A random
-          installation UUID is created only when at least one purpose is
-          enabled. You can check that in the source: the project is open.
+          App telemetry <strong>starts on</strong> and runs under legitimate
+          interest (art. 7º, IX): usage data and crash reports exist to find and
+          fix problems. You can <strong>turn each one off at any time</strong> in
+          Settings — that is your right to object (art. 18, §2), it takes effect
+          immediately, and it changes nothing about how Corneta works. A random
+          installation UUID is created on first use and erased once you turn both
+          off. You can check that in the source: the project is open.
         </Callout>
       </LegalSection>
 
@@ -397,10 +400,14 @@ export function PrivacyBodyEn() {
             privacy signals.
           </li>
           <li>
-            <strong>Consent</strong> (art. 7º, I) — app usage data and automatic
-            crash reports are sent only for the purposes you enable. You can
-            withdraw each one at any time in Settings without affecting how
-            Corneta works.
+            <strong>Legitimate interest</strong> (art. 7º, IX) — app usage data
+            and automatic crash reports start on and exist to find defects,
+            measure stability, and prioritise fixes. Processing is kept to the
+            minimum necessary (art. 10, §1): a closed list of technical
+            properties, no stream content, no geolocation, and no identified
+            profile. You can object to each purpose at any time in Settings
+            (art. 18, §2), with immediate effect and without affecting how
+            Corneta works. The balancing test is published in the repository.
           </li>
           <li>
             <strong>Compliance with a legal or regulatory obligation</strong>{" "}

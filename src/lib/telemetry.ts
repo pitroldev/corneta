@@ -10,6 +10,7 @@ import {
   isTelemetryStage,
   isUuid,
   needsTelemetryDecision,
+  telemetryPurposeActive,
   normalizeTelemetryExceptionName,
   normalizeTelemetryStatus,
   sanitizeExceptionProperties,
@@ -238,10 +239,13 @@ export function useTelemetry(): TelemetrySnapshot {
   );
 }
 
+// Os portões não olham a versão do aviso, e isso é deliberado: com legítimo
+// interesse, texto novo é INFORMAÇÃO e não pedido de permissão. Quem gate é a
+// oposição (`disabled`), que atravessa qualquer versão. Ver
+// `telemetryPurposeActive` e docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md.
 function canCaptureUsage(): boolean {
   return (
-    snapshot.status.noticeVersion === TELEMETRY_NOTICE_VERSION &&
-    snapshot.status.usage === "enabled" &&
+    telemetryPurposeActive(snapshot.status.usage) &&
     isUuid(snapshot.status.installationId) &&
     snapshot.configured
   );
@@ -249,22 +253,21 @@ function canCaptureUsage(): boolean {
 
 function canCaptureCrashes(): boolean {
   return (
-    snapshot.status.noticeVersion === TELEMETRY_NOTICE_VERSION &&
-    snapshot.status.crashReports === "enabled" &&
+    telemetryPurposeActive(snapshot.status.crashReports) &&
     isUuid(snapshot.status.installationId) &&
     snapshot.configured
   );
 }
 
 function anyEnabledChoice(status = snapshot.status): boolean {
-  return status.usage === "enabled" || status.crashReports === "enabled";
+  return (
+    telemetryPurposeActive(status.usage) ||
+    telemetryPurposeActive(status.crashReports)
+  );
 }
 
 function anyCurrentConsent(status = snapshot.status): boolean {
-  return (
-    status.noticeVersion === TELEMETRY_NOTICE_VERSION &&
-    anyEnabledChoice(status)
-  );
+  return anyEnabledChoice(status);
 }
 
 function onlyProperty(
@@ -331,9 +334,8 @@ function replayBufferedOnboarding(): void {
 }
 
 function resolveBufferedOnboarding(status: TelemetryStatus): void {
-  if (status.noticeVersion !== TELEMETRY_NOTICE_VERSION) return;
-  if (status.usage === "enabled") replayBufferedOnboarding();
-  else if (status.usage === "disabled") discardBufferedOnboardingTelemetry();
+  if (telemetryPurposeActive(status.usage)) replayBufferedOnboarding();
+  else discardBufferedOnboardingTelemetry();
 }
 
 async function defaultSdkLoader(): Promise<PostHogSdk> {
@@ -577,9 +579,13 @@ export async function setTelemetryConsent(input: {
     throw new Error("telemetry_backend_unavailable");
 
   const previous = snapshot.status;
+  // Oposição é sair de ATIVA (que inclui `unset`) pra `disabled` — com opt-out,
+  // comparar contra "enabled" deixaria de invalidar o SDK de quem nunca tinha
+  // mexido nos interruptores e acabou de desligar.
   const revoked =
-    (previous.usage === "enabled" && input.usage !== "enabled") ||
-    (previous.crashReports === "enabled" && input.crashReports !== "enabled");
+    (telemetryPurposeActive(previous.usage) && input.usage === "disabled") ||
+    (telemetryPurposeActive(previous.crashReports) &&
+      input.crashReports === "disabled");
   if (revoked) invalidateSdk();
   const refusingBoth =
     input.usage === "disabled" && input.crashReports === "disabled";

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-const EXPECTED_NOTICE_VERSION = "2026-08-01";
+const EXPECTED_NOTICE_VERSION = "2026-08-02";
 const EXPECTED_HOST = "https://us.i.posthog.com";
 const EXPECTED_METADATA_URL = "https://www.corneta.live/api/v1/health";
 const PROJECT_TOKEN_RE = /^phc_[A-Za-z0-9_-]{8,}$/;

@@ -26,7 +26,8 @@ use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
 pub const TELEMETRY_SCHEMA_VERSION: u32 = 1;
-pub const NOTICE_VERSION: &str = "2026-08-01";
+/// Gêmeo do `TELEMETRY_NOTICE_VERSION` do TS — os dois sobem juntos.
+pub const NOTICE_VERSION: &str = "2026-08-02";
 const TELEMETRY_FILE: &str = "telemetry.json";
 const EXIT_MARKER_FILE: &str = "telemetry-exit.json";
 const MAX_TELEMETRY_FILE_BYTES: u64 = 64 * 1024;
@@ -66,6 +67,20 @@ impl Consent {
     fn enabled(self) -> bool {
         self == Self::Enabled
     }
+
+    /// A finalidade está valendo?
+    ///
+    /// `Unset` conta como ATIVA: a base legal destas duas finalidades é o
+    /// legítimo interesse (LGPD art. 7º, IX), não o consentimento — o
+    /// tratamento começa informado e para quando a pessoa se opõe. Ver
+    /// `docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`.
+    ///
+    /// `Disabled` é a OPOSIÇÃO registrada (art. 18, §2) e vence sempre, inclusive
+    /// quando o texto do aviso muda de versão. Reapresentar o aviso não pode
+    /// religar quem já disse não.
+    fn active(self) -> bool {
+        self != Self::Disabled
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -103,21 +118,38 @@ impl Default for TelemetryStatus {
 }
 
 impl TelemetryStatus {
+    /// Estado de quem se opôs às duas finalidades.
+    ///
+    /// É para onde vai um arquivo ILEGÍVEL — e a distinção importa desde que
+    /// `Unset` passou a significar "ativa": arquivo ausente é instalação nova
+    /// (e aí o padrão ligado vale), mas arquivo corrompido é um estado que já
+    /// existiu e não dá mais pra ler. Cair no `default()` religaria justamente
+    /// quem tinha desligado, que é o pior erro possível aqui.
+    fn opposed() -> Self {
+        Self {
+            usage: Consent::Disabled,
+            crash_reports: Consent::Disabled,
+            ..Self::default()
+        }
+    }
+
     fn normalize(mut self) -> Self {
         // Um schema futuro/desconhecido ou um notice malformado não pode ser
-        // reinterpretado como consentimento atual. Falha fechada e deixa a UI
-        // pedir uma nova decisão explícita.
+        // reinterpretado como autorização. Falha FECHADA e deixa a UI pedir
+        // uma decisão nova.
         if self.schema_version != TELEMETRY_SCHEMA_VERSION
             || !valid_notice_version(&self.notice_version)
         {
-            return Self::default();
+            return Self::opposed();
         }
         self.installation_id = self
             .installation_id
             .filter(|value| Uuid::parse_str(value).is_ok());
-        if !self.usage.enabled() && !self.crash_reports.enabled() && self.decided_at.is_none() {
-            // Mantém `null` no primeiro boot. Disabled continua sendo uma decisão
-            // explícita e recebe decidedAt pelo comando set_consent.
+        // Sem NENHUMA finalidade ativa não existe o que correlacionar, então o UUID
+        // é apagado — vale tanto pra quem se opôs às duas quanto pro caso, hoje raro,
+        // de as duas nascerem desligadas. Com pelo menos uma ativa o identificador é
+        // criado no primeiro boot: é o que o legítimo interesse pressupõe.
+        if !self.usage.active() && !self.crash_reports.active() {
             self.installation_id = None;
         }
         self
@@ -132,12 +164,18 @@ pub struct TelemetryConsentInput {
     pub notice_version: String,
 }
 
+/// Portões efetivos das duas finalidades.
+///
+/// Não dependem da versão do aviso, e isso é deliberado: com legítimo interesse,
+/// um texto novo é INFORMAÇÃO, não um pedido de permissão — reapresentar o aviso
+/// reabre a conversa sem interromper um tratamento que continua legítimo. Quem
+/// gate é a oposição (`Disabled`), que atravessa qualquer versão.
+///
+/// Consequência a lembrar: finalidade NOVA não pode entrar como `Unset`, senão
+/// nasceria ligada sem ninguém ter sido informado dela. Ao adicionar uma, grave
+/// `Disabled` nas instalações existentes e só ligue depois do aviso novo.
 fn effective_gates(status: &TelemetryStatus) -> (bool, bool) {
-    let current = status.notice_version == NOTICE_VERSION;
-    (
-        current && status.usage.enabled(),
-        current && status.crash_reports.enabled(),
-    )
+    (status.usage.active(), status.crash_reports.active())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -317,10 +355,20 @@ impl TelemetryRuntime {
             return;
         }
         let path = config_dir.join(TELEMETRY_FILE);
-        let status = load_status_file(&path);
-        // Consentimento de uma versão antiga permanece visível para a UI pedir
-        // nova decisão, mas não é autorização efetiva para o aviso atual.
+        let mut status = load_status_file(&path);
         let (usage_enabled, crash_enabled) = effective_gates(&status);
+        // Com opt-out o identificador nasce no PRIMEIRO BOOT, não na primeira
+        // decisão: sem ele os eventos não têm a quem se referir e a instalação
+        // ficaria muda até alguém abrir Configurações. Só é criado se alguma
+        // finalidade está de fato ativa — quem se opôs às duas segue sem UUID.
+        if (usage_enabled || crash_enabled) && status.installation_id.is_none() {
+            status.installation_id = Some(new_id());
+            if let Err(error) = save_status_file(&path, &status) {
+                // Sem persistir, o próximo boot geraria outro UUID e a mesma
+                // máquina viraria duas instalações na contagem.
+                log::warn!("telemetria: não consegui gravar o id de instalação: {error}");
+            }
+        }
         self.usage_enabled.store(usage_enabled, Ordering::Release);
         self.crash_enabled.store(crash_enabled, Ordering::Release);
         self.sync_epoch_installation_id(status.installation_id.clone());
@@ -1015,7 +1063,7 @@ fn load_status_file(path: &Path) -> TelemetryStatus {
     if metadata.len() > MAX_TELEMETRY_FILE_BYTES {
         log::warn!("telemetria: telemetry.json excede 64 KiB; usando padrão");
         preserve_corrupt(path);
-        return TelemetryStatus::default();
+        return TelemetryStatus::opposed();
     }
     match std::fs::read_to_string(path)
         .ok()
@@ -1025,7 +1073,7 @@ fn load_status_file(path: &Path) -> TelemetryStatus {
         None => {
             log::warn!("telemetria: telemetry.json inválido; preservando cópia");
             preserve_corrupt(path);
-            TelemetryStatus::default()
+            TelemetryStatus::opposed()
         }
     }
 }
@@ -2366,16 +2414,35 @@ mod tests {
         }
     }
 
+    /// Com legítimo interesse, aviso velho é INFORMAÇÃO desatualizada, não
+    /// autorização vencida: o texto novo é reapresentado, mas o tratamento não
+    /// para. O que atravessa qualquer versão é a OPOSIÇÃO.
     #[test]
-    fn old_notice_is_preserved_but_never_enables_a_gate() {
-        let status = TelemetryStatus {
+    fn aviso_velho_nao_para_o_envio_mas_a_oposicao_para() {
+        let seguindo = TelemetryStatus {
             notice_version: "2025-01-01".into(),
             usage: Consent::Enabled,
             crash_reports: Consent::Enabled,
             installation_id: Some(new_id()),
             ..TelemetryStatus::default()
         };
-        assert_eq!(effective_gates(&status), (false, false));
+        assert_eq!(effective_gates(&seguindo), (true, true));
+
+        let opposto = TelemetryStatus {
+            notice_version: "2025-01-01".into(),
+            usage: Consent::Disabled,
+            crash_reports: Consent::Disabled,
+            ..TelemetryStatus::default()
+        };
+        assert_eq!(effective_gates(&opposto), (false, false));
+    }
+
+    /// Instalação nova (sem arquivo) nasce LIGADA; arquivo ilegível não pode ser
+    /// confundido com ela, senão a corrupção religaria quem tinha desligado.
+    #[test]
+    fn instalacao_nova_liga_e_arquivo_ilegivel_nao() {
+        assert_eq!(effective_gates(&TelemetryStatus::default()), (true, true));
+        assert_eq!(effective_gates(&TelemetryStatus::opposed()), (false, false));
     }
 
     #[test]
@@ -2397,8 +2464,10 @@ mod tests {
             },
         ] {
             let normalized = status.normalize();
-            assert_eq!(normalized.usage, Consent::Unset);
-            assert_eq!(normalized.crash_reports, Consent::Unset);
+            // `Disabled`, não `Unset`: desde que `Unset` virou "ativa", devolver
+            // o padrão aqui religaria a telemetria de quem tinha desligado.
+            assert_eq!(normalized.usage, Consent::Disabled);
+            assert_eq!(normalized.crash_reports, Consent::Disabled);
             assert!(normalized.installation_id.is_none());
             assert_eq!(effective_gates(&normalized), (false, false));
         }
@@ -2580,6 +2649,38 @@ mod tests {
         assert_eq!(
             normalize_error_code("mensagem com segredo"),
             "unknown_error"
+        );
+    }
+
+    /// O que o `build.rs` assou tem que ser utilizável — meio-configurado é pior
+    /// que desligado, porque some em silêncio (os avisos daqui são `debug!`, e o
+    /// app roda em `Info`).
+    ///
+    /// Não exige configuração: sem `.env` — que é o caso do CI — os dois lados
+    /// ficam `None` e o teste passa. O que ele proíbe é o estado intermediário,
+    /// que é como um `.env` com token torto se manifestaria.
+    #[test]
+    fn configuracao_assada_no_build_e_coerente() {
+        let token = option_env!("POSTHOG_DESKTOP_TOKEN").map(str::trim);
+        let host = option_env!("POSTHOG_HOST").map(str::trim);
+        if let Some(token) = token.filter(|t| !t.is_empty()) {
+            assert!(
+                valid_posthog_token(token),
+                "POSTHOG_DESKTOP_TOKEN assado não é um project token phc_ público"
+            );
+        }
+        if let Some(host) = host.filter(|h| !h.is_empty()) {
+            assert!(
+                valid_posthog_host(host.trim_end_matches('/'), cfg!(debug_assertions)),
+                "POSTHOG_HOST assado não é um origin aceito"
+            );
+        }
+        let tem_token = posthog_token().is_some();
+        let tem_host = posthog_host().is_some();
+        assert_eq!(
+            tem_token, tem_host,
+            "token e host precisam estar os DOIS presentes ou os dois ausentes — \
+             com só um deles o cliente cai em no-op sem dizer por quê"
         );
     }
 

@@ -128,11 +128,14 @@ export function PrivacyBodyPt() {
           porque eles nunca chegam até nós.
         </p>
         <Callout>
-          A telemetria do aplicativo é opcional e vem desligada. Dados de uso e
-          relatórios de falha têm controles independentes, sem opção
-          pré-marcada. Um UUID aleatório de instalação só é criado quando pelo
-          menos uma finalidade é ativada. Você pode conferir isso no
-          código-fonte: o projeto é aberto.
+          A telemetria do aplicativo <strong>vem ligada</strong> e roda por
+          legítimo interesse (art. 7º, IX): dados de uso e relatórios de falha
+          existem para encontrar e corrigir problemas. Você pode{" "}
+          <strong>desligar cada uma a qualquer momento</strong> em Configurações
+          — é o seu direito de oposição (art. 18, §2), vale na hora e não afeta
+          nada no funcionamento da Corneta. Um UUID aleatório de instalação é
+          criado no primeiro uso e apagado quando você desliga as duas. Você
+          pode conferir isso no código-fonte: o projeto é aberto.
         </Callout>
       </LegalSection>
 
@@ -392,11 +395,15 @@ export function PrivacyBodyPt() {
             privacidade do navegador.
           </li>
           <li>
-            <strong>Consentimento</strong> (art. 7º, I) — dados de uso e
-            relatórios automáticos de falha do aplicativo só são enviados para
-            as finalidades que você ativar. Você pode revogar cada uma a
-            qualquer momento nas Configurações, sem afetar o funcionamento da
-            Corneta.
+            <strong>Legítimo interesse</strong> (art. 7º, IX) — os dados de uso
+            e os relatórios automáticos de falha do aplicativo vêm ligados e
+            servem para encontrar defeito, medir estabilidade e priorizar
+            correção. O tratamento é reduzido ao mínimo necessário (art. 10,
+            §1): uma lista fechada de propriedades técnicas, sem conteúdo da sua
+            live, sem geolocalização e sem perfil identificado. Você pode se
+            opor a cada finalidade a qualquer momento nas Configurações (art.
+            18, §2), com efeito imediato e sem afetar o funcionamento da
+            Corneta. O teste de balanceamento está publicado no repositório.
           </li>
           <li>
             <strong>Cumprimento de obrigação legal ou regulatória</strong> (art.

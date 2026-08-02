@@ -7,7 +7,8 @@
  */
 
 export const TELEMETRY_SCHEMA_VERSION = 1;
-export const TELEMETRY_NOTICE_VERSION = "2026-08-01";
+// Gêmeo do `NOTICE_VERSION` em src-tauri/src/telemetry.rs — os dois sobem juntos.
+export const TELEMETRY_NOTICE_VERSION = "2026-08-02";
 
 export type TelemetryChoice = "unset" | "enabled" | "disabled";
 
@@ -81,7 +82,21 @@ export function normalizeTelemetryStatus(value: unknown): TelemetryStatus {
   };
 }
 
-/** O aviso atual nunca herda escolhas de uma versão materialmente diferente. */
+/** A finalidade está valendo?
+ *
+ *  `unset` conta como ATIVA. A base legal das duas é o legítimo interesse (LGPD
+ *  art. 7º, IX), não o consentimento: o tratamento começa informado e para quando
+ *  a pessoa se opõe. `disabled` é a oposição registrada (art. 18, §2) e vence
+ *  sempre — inclusive quando o texto do aviso muda de versão, porque reapresentar
+ *  o aviso não pode religar quem já disse não.
+ *
+ *  Gêmeo do `Consent::active` em `src-tauri/src/telemetry.rs`.
+ *  Ver `docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`. */
+export const telemetryPurposeActive = (choice: TelemetryChoice): boolean =>
+  choice !== "disabled";
+
+/** Mostrar o aviso? Diferente de "pode enviar": o aviso reaparece quando o texto
+ *  muda de versão, mas o envio segue pela oposição, não pela versão. */
 export function needsTelemetryDecision(status: TelemetryStatus): boolean {
   return (
     status.noticeVersion !== TELEMETRY_NOTICE_VERSION ||
@@ -90,16 +105,15 @@ export function needsTelemetryDecision(status: TelemetryStatus): boolean {
   );
 }
 
+/** Estado dos interruptores quando o aviso abre — espelha o que JÁ está valendo,
+ *  senão a tela mostraria desligado enquanto o app envia. */
 export function telemetryConsentDraft(status: TelemetryStatus): {
   usage: boolean;
   crashReports: boolean;
 } {
-  if (needsTelemetryDecision(status)) {
-    return { usage: false, crashReports: false };
-  }
   return {
-    usage: status.usage === "enabled",
-    crashReports: status.crashReports === "enabled",
+    usage: telemetryPurposeActive(status.usage),
+    crashReports: telemetryPurposeActive(status.crashReports),
   };
 }
 

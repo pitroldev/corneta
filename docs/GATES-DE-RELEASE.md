@@ -53,11 +53,14 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
 - Credenciais reais devem vir de contas de teste sem dados pessoais. Nunca anexar `.env`,
   chaves, tokens, logs crus ou certificados ao issue/artefato.
 - O Environment GitHub `production-telemetry` tem reviewer obrigatório; DPA/MFA, descarte de IP,
-  retenção de 90 dias e política PT/EN versão `2026-08-01` precisam estar ativos antes da
+  retenção de 90 dias e política PT/EN versão `2026-08-02` precisam estar ativos antes da
   aprovação.
-- Em uma instalação limpa, confirmar zero request ao PostHog com ambos os consentimentos
-  desligados. Depois testar separadamente uso e relatórios de erro, inspecionar payloads e validar
-  uma stack React simbolicada conforme o [`RUNBOOK-POSTHOG.md`](./RUNBOOK-POSTHOG.md).
+- Em uma instalação limpa, confirmar zero request ao PostHog com as duas finalidades
+  **desligadas** — elas agora vêm LIGADAS por legítimo interesse, então o teste é desligar e
+  conferir que parou, e não instalar e conferir que está mudo. Depois religar uma de cada vez,
+  inspecionar payloads e validar uma stack React simbolicada conforme o
+  [`RUNBOOK-POSTHOG.md`](./RUNBOOK-POSTHOG.md). Ver o teste de balanceamento em
+  [`LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`](./LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md).
 
 Registre data, versão, máquina, GPU/driver, cenário e resultado em cada execução. Falha em um
 item bloqueia publicação; não deve ser convertida em “risco aceito” sem uma decisão explícita.

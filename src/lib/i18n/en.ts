@@ -639,16 +639,15 @@ export const en: Dict = {
     "Couldn't save your choice. Nothing new was sent.",
   "components.telemetry.notice.forbidden":
     "Never included in an event: stream keys, tokens, chat, title/category, OCR, images, audio, video, local paths, hostname, IP as a property, or raw logs.",
-  "components.telemetry.notice.later": "Decide later",
-  "components.telemetry.notice.none": "Continue without sending",
+  "components.telemetry.notice.none": "Turn both off",
   "components.telemetry.notice.privacy":
     "This is pseudonymized technical data, processed by PostHog for up to 90 days.",
   "components.telemetry.notice.privacyLink": "Read the privacy policy",
   "components.telemetry.notice.save": "Save my choices",
-  "components.telemetry.notice.saved": "Your data choice was saved.",
+  "components.telemetry.notice.saved": "Saved your choice.",
   "components.telemetry.notice.subtitle":
-    "Nothing starts checked. You can change your mind in Settings.",
-  "components.telemetry.notice.title": "What can Corneta tell us?",
+    "It starts on so I can catch bugs before you do. Turn it off here or later, in Settings.",
+  "components.telemetry.notice.title": "I'm already sending technical data",
   "components.telemetry.usage.body":
     "Sends completed stages, version, system categories, and operation outcomes — never stream content.",
   "components.telemetry.usage.title": "Send usage data",
@@ -2045,7 +2044,7 @@ export const en: Dict = {
   "settings.telemetry.deletion.desc":
     "With both options off, copy the ID above and use the channel listed in the policy to delete data already sent.",
   "settings.telemetry.explainer":
-    "Corneta only sends pseudonymized technical data allowed by its catalog. PostHog processes collection, with an initial 90-day retention. Turning a switch off stops new events immediately.",
+    "Both start on, under legitimate interest — they exist so I can find and fix problems. Only pseudonymized technical data from the catalog goes out; PostHog processes collection, with an initial 90-day retention. Turning a switch off is your right to object and takes effect immediately.",
   "settings.telemetry.id": "Telemetry ID",
   "settings.telemetry.id.pending":
     "The ID is only created after you turn on at least one option.",

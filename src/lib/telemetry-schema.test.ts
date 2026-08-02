@@ -7,6 +7,7 @@ import {
   durationBucket,
   fpsBucket,
   needsTelemetryDecision,
+  telemetryPurposeActive,
   normalizeTelemetryExceptionName,
   normalizeTelemetryStatus,
   redactTelemetryText,
@@ -29,26 +30,76 @@ const context: TelemetryContext = {
 };
 
 describe("telemetry schema", () => {
-  it("starts a materially new notice with both choices unchecked", () => {
-    const oldEnabled: Parameters<typeof telemetryConsentDraft>[0] = {
+  // As duas finalidades rodam por LEGÍTIMO INTERESSE (LGPD art. 7º, IX), então
+  // `unset` é ativa e o aviso abre com os interruptores LIGADOS — mostrar
+  // desligado seria a tela mentindo sobre o que o app já está fazendo.
+  it("mostra o aviso com o que já está valendo, não com tudo desligado", () => {
+    const base: Parameters<typeof telemetryConsentDraft>[0] = {
+      schemaVersion: TELEMETRY_SCHEMA_VERSION,
+      noticeVersion: TELEMETRY_NOTICE_VERSION,
+      usage: "unset",
+      crashReports: "unset",
+      installationId: "00000000-0000-4000-8000-000000000001",
+      decidedAt: null,
+    };
+    expect(needsTelemetryDecision(base)).toBe(true); // nunca respondeu → aviso abre
+    expect(telemetryConsentDraft(base)).toEqual({
+      usage: true,
+      crashReports: true,
+    });
+  });
+
+  // O caminho crítico do opt-out: com o padrão LIGADO, a transparência é a única
+  // coisa que segura a base legal de pé. Se o aviso não abrisse numa instalação
+  // nova, o app estaria coletando sem nunca ter informado — e é isso que o
+  // legítimo interesse (art. 9º c/c art. 10, §2) não perdoa.
+  //
+  // O estado abaixo é exatamente o que o backend grava no primeiro boot,
+  // conferido em disco: usage/crashReports `unset`, `decidedAt` nulo.
+  it("o aviso ABRE na instalação nova, que é o que sustenta a base legal", () => {
+    expect(
+      needsTelemetryDecision({
+        schemaVersion: TELEMETRY_SCHEMA_VERSION,
+        noticeVersion: TELEMETRY_NOTICE_VERSION,
+        usage: "unset",
+        crashReports: "unset",
+        installationId: "00000000-0000-4000-8000-000000000001",
+        decidedAt: null,
+      }),
+    ).toBe(true);
+  });
+
+  // …e para de abrir depois que a pessoa respondeu, senão vira pop-up eterno.
+  it("o aviso PARA de abrir depois de respondido", () => {
+    expect(
+      needsTelemetryDecision({
+        schemaVersion: TELEMETRY_SCHEMA_VERSION,
+        noticeVersion: TELEMETRY_NOTICE_VERSION,
+        usage: "enabled",
+        crashReports: "disabled",
+        installationId: "00000000-0000-4000-8000-000000000001",
+        decidedAt: "2026-08-02T12:00:00.000Z",
+      }),
+    ).toBe(false);
+  });
+
+  // O que não pode acontecer NUNCA: trocar o texto do aviso religar quem se opôs.
+  it("oposição atravessa a troca de versão do aviso", () => {
+    const opposto: Parameters<typeof telemetryConsentDraft>[0] = {
       schemaVersion: TELEMETRY_SCHEMA_VERSION,
       noticeVersion: "2026-07-01",
-      usage: "enabled",
-      crashReports: "enabled",
-      installationId: "00000000-0000-4000-8000-000000000001",
+      usage: "disabled",
+      crashReports: "disabled",
+      installationId: null,
       decidedAt: "2026-07-01T12:00:00.000Z",
     };
-    expect(needsTelemetryDecision(oldEnabled)).toBe(true);
-    expect(telemetryConsentDraft(oldEnabled)).toEqual({
+    expect(needsTelemetryDecision(opposto)).toBe(true); // reapresenta o texto novo
+    expect(telemetryConsentDraft(opposto)).toEqual({
       usage: false,
-      crashReports: false,
+      crashReports: false, // …mas continua desligado
     });
-    expect(
-      telemetryConsentDraft({
-        ...oldEnabled,
-        noticeVersion: TELEMETRY_NOTICE_VERSION,
-      }),
-    ).toEqual({ usage: true, crashReports: true });
+    expect(telemetryPurposeActive(opposto.usage)).toBe(false);
+    expect(telemetryPurposeActive(opposto.crashReports)).toBe(false);
   });
 
   it("fails closed for malformed consent", () => {
@@ -86,7 +137,7 @@ describe("telemetry schema", () => {
     expect(
       normalizeTelemetryStatus({
         schemaVersion: 2,
-        noticeVersion: "2026-08-01",
+        noticeVersion: TELEMETRY_NOTICE_VERSION,
         usage: "enabled",
         crashReports: "enabled",
         installationId: "00000000-0000-4000-8000-000000000001",

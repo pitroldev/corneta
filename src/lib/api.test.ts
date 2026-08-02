@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TELEMETRY_NOTICE_VERSION } from "./telemetry-schema";
 
 const { invoke } = vi.hoisted(() => ({
   invoke: vi.fn(async () => ({
     schemaVersion: 1,
-    noticeVersion: "2026-08-01",
+    // Literal de propósito: `vi.hoisted` roda ANTES dos imports do módulo, então
+    // a constante ainda não existe aqui. É só o retorno falso do backend — o que
+    // importa pro teste é o `noticeVersion` que o app ENVIA, logo abaixo.
+    noticeVersion: "2026-08-02",
     usage: "enabled",
     crashReports: "disabled",
     installationId: "00000000-0000-4000-8000-000000000001",
@@ -27,7 +31,7 @@ describe("Tauri telemetry IPC", () => {
     const input = {
       usage: "enabled" as const,
       crashReports: "disabled" as const,
-      noticeVersion: "2026-08-01",
+      noticeVersion: TELEMETRY_NOTICE_VERSION,
     };
 
     await api.telemetrySetConsent(input);
