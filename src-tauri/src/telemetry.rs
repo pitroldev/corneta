@@ -245,6 +245,25 @@ impl fmt::Display for AppError {
     }
 }
 
+/// `arquivo:linha` que vai pro `top_app_frame` e pro fingerprint.
+///
+/// O frame explícito vence o do `#[track_caller]`. Quem precisa disso é o panic
+/// hook: lá o "caller" é o próprio hook, e sem o override todo panic nativo do
+/// app cai no mesmo fingerprint — crashes diferentes viram uma issue só.
+///
+/// Só o NOME do arquivo atravessa; o caminho completo entregaria a estrutura de
+/// diretórios de quem compilou.
+fn top_app_frame_from(frame: Option<&str>, caller: &std::panic::Location<'_>) -> String {
+    if let Some(frame) = frame.map(str::trim).filter(|value| !value.is_empty()) {
+        return frame.to_string();
+    }
+    let file = Path::new(caller.file())
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("native");
+    format!("{file}:{}", caller.line())
+}
+
 impl std::error::Error for AppError {}
 
 #[derive(Default)]
@@ -673,6 +692,18 @@ impl TelemetryRuntime {
         handled: bool,
         severity: &str,
     ) -> String {
+        self.capture_error_at(error, operation_id, handled, severity, None)
+    }
+
+    #[track_caller]
+    pub fn capture_error_at(
+        &self,
+        error: AppError,
+        operation_id: Option<&str>,
+        handled: bool,
+        severity: &str,
+        frame: Option<&str>,
+    ) -> String {
         let operation_id = valid_id(operation_id);
         let dedupe_key = format!(
             "{}:{}:{}",
@@ -697,12 +728,7 @@ impl TelemetryRuntime {
         let Some(client) = self.client() else {
             return error_id;
         };
-        let caller = std::panic::Location::caller();
-        let caller_file = Path::new(caller.file())
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("native");
-        let top_app_frame = format!("{caller_file}:{}", caller.line());
+        let top_app_frame = top_app_frame_from(frame, std::panic::Location::caller());
         let fingerprint = format!("desktop_native:{}:{top_app_frame}", error.code);
         let mut options = CaptureExceptionOptions::new()
             .distinct_id(identity.installation_id)
@@ -2019,9 +2045,10 @@ pub fn install_panic_hook(app: AppHandle) {
                 format!("{file}:{}", location.line())
             });
             let error = AppError::new("native_panic", "native", false, None);
-            let error_id = telemetry.capture_error(error, None, false, "fatal");
-            if let Some(frame) = safe_frame {
-                telemetry.record_diagnostic("native_panic", "native", None, Some(&error_id), None);
+
+            let error_id =
+                telemetry.capture_error_at(error, None, false, "fatal", safe_frame.as_deref());
+            if let Some(frame) = &safe_frame {
                 log::error!("panic nativo em {frame}; error_id={error_id}");
             }
             telemetry.flush_after_panic_bounded();
@@ -2682,6 +2709,30 @@ mod tests {
             "token e host precisam estar os DOIS presentes ou os dois ausentes — \
              com só um deles o cliente cai em no-op sem dizer por quê"
         );
+    }
+
+    /// Regressão do PRIMEIRO crash reportado por um beta: o panic hook chamava
+    /// `capture_error`, o `#[track_caller]` resolvia o frame como a linha do
+    /// próprio hook, e o relatório chegou com
+    /// `desktop_native:native_panic:telemetry.rs:2022`. Sem o arquivo:linha de
+    /// verdade, todo panic do app é a mesma issue e nenhum é diagnosticável.
+    #[test]
+    fn frame_explicito_vence_o_do_track_caller() {
+        let aqui = std::panic::Location::caller();
+        assert_eq!(
+            top_app_frame_from(Some("chat.rs:1234"), aqui),
+            "chat.rs:1234"
+        );
+        // Vazio e só-espaço não são frame: caem no caller em vez de virar ":0".
+        for vazio in [Some(""), Some("   "), None] {
+            let resolvido = top_app_frame_from(vazio, aqui);
+            assert!(
+                resolvido.starts_with("telemetry.rs:"),
+                "esperava o arquivo do caller, veio {resolvido}"
+            );
+        }
+        // O caminho completo do disco de quem compilou nunca atravessa.
+        assert!(!top_app_frame_from(None, aqui).contains(['/', '\\']));
     }
 
     #[test]

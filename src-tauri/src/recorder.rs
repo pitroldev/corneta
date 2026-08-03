@@ -34,6 +34,11 @@ use crate::session;
 use crate::telemetry::AppError;
 use crate::AppState;
 
+/// `#[track_caller]` OBRIGATÓRIO: sem ele o `Location::caller()` lá dentro resolve
+/// para ESTE wrapper, e todo erro de gravação chega com
+/// `top_app_frame = recorder.rs:<linha daqui>` — foi o que aconteceu com o primeiro
+/// `recording_gave_up` reportado por um beta, que apontou pro helper em vez do laço.
+#[track_caller]
 fn capture_recording_error(app: &AppHandle, code: &str, retryable: bool) {
     let state = app.state::<AppState>();
     let operation_id = state.engine.lock().unwrap().operation_id.clone();

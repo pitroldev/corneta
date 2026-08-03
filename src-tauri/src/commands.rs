@@ -997,7 +997,18 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
 /// "Tentar de novo" ser aceito), preservando a mensagem no snapshot ("error"). Antes, o motor
 /// só trocava o snapshot pra "error" e deixava `live=true`/supervisores rodando — todo retry
 /// batia em "já está no ar." e o usuário ficava preso até fechar pela bandeja.
+/// `#[track_caller]` porque o `capture_engine_error` também é: sem os DOIS, o frame
+/// resolve pra linha daqui e todo erro fatal do motor divide o mesmo fingerprint.
+#[track_caller]
 fn set_engine_error(app: &AppHandle, code: &str, stage: &str, msg: &str) {
+    // Motor já parado = este "erro" é eco do nosso próprio encerramento. Sem esta
+    // guarda, terminar a live normalmente reportava `mediamtx_died` toda vez: o
+    // `stop_engine_internal` abaixo já ignora (`if !eng.live { return }`), mas a
+    // telemetria disparava ANTES dele e virava erro fantasma no painel.
+    if !app.state::<AppState>().engine.lock().unwrap().live {
+        log::debug!("motor: {code} depois do encerramento — ignorando");
+        return;
+    }
     log::error!("motor: {msg}");
     let error_id = capture_engine_error(app, code, stage, true, Some(msg.to_string()));
     log::error!("motor: error_id={error_id}");
