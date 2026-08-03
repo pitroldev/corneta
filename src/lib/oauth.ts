@@ -4,10 +4,15 @@ export const OAUTH = {
   twitchClientId: import.meta.env.VITE_TWITCH_CLIENT_ID ?? "",
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "",
   kickClientId: import.meta.env.VITE_KICK_CLIENT_ID ?? "",
-  // Porta 7390 = `pnpm lp:dev`. Fixa de propósito: a 3000 é disputada com qualquer outro projeto
+  // Porta 7390 = `pnpm web:dev`. Fixa de propósito: a 3000 é disputada com qualquer outro projeto
   // Node da máquina, e apontar pra API errada fazia o bootstrap falhar calado.
+  //
+  // `||` e não `??`: o `.env.example` traz `VITE_SETUP_API_URL=` VAZIO, e string
+  // vazia não é nullish — com `??` o fallback de dev nunca disparava pra quem
+  // copiou o exemplo, e o login oficial sumia sem dizer por quê. Vazio aqui
+  // significa "não configurado", igual a ausente.
   setupApiUrl:
-    import.meta.env.VITE_SETUP_API_URL ??
+    import.meta.env.VITE_SETUP_API_URL?.trim() ||
     (import.meta.env.DEV ? "http://localhost:7390" : ""),
 };
 
