@@ -596,7 +596,7 @@ impl AppConfig {
             }
             target.has_key = false;
         }
-        for profile in &self.profiles {
+        for profile in &mut self.profiles {
             if !valid_id(&profile.id) || profile.targets.len() > MAX_TARGETS {
                 return Err(Msg::ConfigInvalidProfile.text(l));
             }
@@ -606,6 +606,9 @@ impl AppConfig {
                 "per-platform" | "passthrough" | "hybrid"
             ) {
                 return Err(Msg::ConfigInvalidProfileMode.text(l));
+            }
+            for target in &mut profile.targets {
+                target.has_key = false;
             }
         }
         if !self.active_profile_id.is_empty() && !valid_id(&self.active_profile_id) {
@@ -621,6 +624,12 @@ impl AppConfig {
         }
         s.chat_sources.truncate(32);
         s.alert_sources.truncate(16);
+        for source in &mut s.chat_sources {
+            source.has_send_token = false;
+        }
+        for source in &mut s.alert_sources {
+            source.has_token = false;
+        }
         if !(1..=65_535).contains(&s.overlay_port) {
             return Err(Msg::ConfigInvalidOverlayPort.text(l));
         }

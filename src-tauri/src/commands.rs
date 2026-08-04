@@ -215,17 +215,38 @@ pub(crate) fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) 
 #[tauri::command]
 pub fn get_config(app: AppHandle) -> AppConfig {
     let mut cfg = config::load(&app);
-    // A verdade sobre "tem chave?" vem do cofre, não do arquivo.
-    for t in cfg.targets.iter_mut() {
-        t.has_key = keys::has_key(&t.id);
-    }
-    for a in cfg.settings.alert_sources.iter_mut() {
-        a.has_token = keys::has_key(&format!("alert_{}", a.id));
-    }
-    for c in cfg.settings.chat_sources.iter_mut() {
-        c.has_send_token = keys::has_key(&format!("chat_send_{}", c.id));
-    }
+    refresh_secret_presence(&mut cfg);
     cfg
+}
+
+/// Recompõe os indicadores efêmeros de credenciais a partir do cofre.
+///
+/// `validate_and_normalize` zera `has_key` antes de persistir a configuração para que o
+/// arquivo nunca seja a fonte da verdade sobre credenciais. Toda configuração que volta para
+/// uma webview (retorno de comando ou evento) precisa passar por aqui depois da gravação;
+/// caso contrário, qualquer ajuste comum — como ligar/desligar um destino — faz todas as
+/// chaves parecerem removidas até a próxima abertura do app.
+fn refresh_secret_presence(config: &mut AppConfig) {
+    refresh_secret_presence_with(config, keys::has_key);
+}
+
+fn refresh_secret_presence_with(config: &mut AppConfig, mut has_secret: impl FnMut(&str) -> bool) {
+    for target in &mut config.targets {
+        target.has_key = has_secret(&target.id);
+    }
+    // Perfis inativos também precisam chegar hidratados: ao trocar de perfil, seus destinos
+    // viram o working set sem uma nova leitura do backend.
+    for profile in &mut config.profiles {
+        for target in &mut profile.targets {
+            target.has_key = has_secret(&target.id);
+        }
+    }
+    for source in &mut config.settings.alert_sources {
+        source.has_token = has_secret(&format!("alert_{}", source.id));
+    }
+    for source in &mut config.settings.chat_sources {
+        source.has_send_token = has_secret(&format!("chat_send_{}", source.id));
+    }
 }
 
 #[tauri::command]
@@ -237,6 +258,9 @@ pub fn save_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, Strin
     }
     config.revision = disk_revision.saturating_add(1);
     config::save(&app, &config)?;
+    // O arquivo continua com os indicadores zerados; somente a cópia devolvida às webviews
+    // recebe a presença real das credenciais guardadas no cofre.
+    refresh_secret_presence(&mut config);
     // Sincroniza as OUTRAS janelas (o popout do chat é outro webview, com store zustand próprio):
     // sem isto, cada janela persistia sua cópia inteira do AppConfig e revertia em disco as
     // mudanças da outra. Cada janela reassina `config://changed` e atualiza a base SEM re-persistir.
@@ -3448,8 +3472,91 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     }
     cfg.revision = config::load(&app).revision.saturating_add(1);
     config::save(&app, &cfg)?;
+    refresh_secret_presence(&mut cfg);
     let _ = app.emit("config://changed", &cfg);
     Ok(true)
+}
+
+#[cfg(test)]
+mod secret_presence_tests {
+    use super::refresh_secret_presence_with;
+    use crate::config::{AlertSource, AppConfig, ChatSource, Profile, Target, TargetEncoding};
+    use std::collections::HashSet;
+
+    fn target(id: &str, has_key: bool) -> Target {
+        Target {
+            id: id.into(),
+            platform_id: "custom".into(),
+            name: id.into(),
+            enabled: true,
+            protocol: "rtmp".into(),
+            ingest_url: "rtmp://example.invalid/live".into(),
+            has_key,
+            encoding: TargetEncoding {
+                action: "copy".into(),
+                preset: None,
+                encoder: "auto".into(),
+                hybrid_override: None,
+                reframe: None,
+            },
+        }
+    }
+
+    #[test]
+    fn rehydrates_every_secret_indicator_for_webviews() {
+        let mut config = AppConfig {
+            targets: vec![target("target_saved", false), target("target_empty", true)],
+            ..AppConfig::default()
+        };
+        config.profiles.push(Profile {
+            id: "profile_1".into(),
+            name: "Evento".into(),
+            mode: "hybrid".into(),
+            targets: vec![
+                target("profile_target_saved", false),
+                target("profile_target_empty", true),
+            ],
+        });
+        config.settings.alert_sources.push(AlertSource {
+            id: "alerts_saved".into(),
+            kind: "streamlabs".into(),
+            name: "Alertas".into(),
+            enabled: true,
+            has_token: true,
+        });
+        config.settings.chat_sources.push(ChatSource {
+            id: "chat_saved".into(),
+            platform: "twitch".into(),
+            value: "channel".into(),
+            name: "Chat".into(),
+            enabled: true,
+            has_send_token: true,
+        });
+
+        let mut config = config.validate_and_normalize().unwrap();
+        assert!(config.targets.iter().all(|target| !target.has_key));
+        assert!(config.profiles[0]
+            .targets
+            .iter()
+            .all(|target| !target.has_key));
+        assert!(!config.settings.alert_sources[0].has_token);
+        assert!(!config.settings.chat_sources[0].has_send_token);
+
+        let present = HashSet::from([
+            "target_saved",
+            "profile_target_saved",
+            "alert_alerts_saved",
+            "chat_send_chat_saved",
+        ]);
+        refresh_secret_presence_with(&mut config, |namespace| present.contains(namespace));
+
+        assert!(config.targets[0].has_key);
+        assert!(!config.targets[1].has_key);
+        assert!(config.profiles[0].targets[0].has_key);
+        assert!(!config.profiles[0].targets[1].has_key);
+        assert!(config.settings.alert_sources[0].has_token);
+        assert!(config.settings.chat_sources[0].has_send_token);
+    }
 }
 
 #[cfg(test)]
