@@ -1,6 +1,6 @@
 [package]
 name = "corneta"
-version = "0.6.2"
+version = "0.6.3"
 description = "Corneta — transmita para todas as plataformas ao mesmo tempo."
 authors = ["Pitrol"]
 edition = "2021"

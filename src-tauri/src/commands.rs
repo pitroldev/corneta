@@ -2581,8 +2581,24 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
         eng.target_platforms.clear();
         eng.operation_id = None;
         let session_path = eng.session_path.take();
+        // O gravador precisa fechar o fragmento e escrever o trailer antes de morrer. Um kill
+        // direto deixa o último pacote AAC pela metade. O plugin mantém o stdin do sidecar
+        // aberto, então o mesmo `q` do terminal encerra o FFmpeg de forma limpa. Se o write
+        // falhar, ele entra na drenagem abaixo e recebe o kill de segurança como antes.
+        let recorder_stopping_gracefully = eng
+            .ffmpegs
+            .get_mut(recorder::RECORDER_KEY)
+            .is_some_and(|child| child.write(b"q\n").is_ok());
+        let recorder_child = recorder_stopping_gracefully
+            .then(|| eng.ffmpegs.remove(recorder::RECORDER_KEY))
+            .flatten();
         let mut children: Vec<tauri_plugin_shell::process::CommandChild> =
-            eng.ffmpegs.drain().map(|(_, c)| c).collect();
+            eng.ffmpegs.drain().map(|(_, child)| child).collect();
+        if let Some(child) = recorder_child {
+            // O supervisor do gravador continua dono do handle: ele aguarda `Terminated`,
+            // registra o fim do segmento e executa o remux. Não bloqueamos o botão Cortar.
+            eng.ffmpegs.insert(recorder::RECORDER_KEY.into(), child);
+        }
         if let Some(m) = eng.mediamtx.take() {
             children.push(m);
         }

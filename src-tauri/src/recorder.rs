@@ -99,7 +99,7 @@ pub fn record_args(source: &str, out: &Path) -> Vec<String> {
         "copy".into(),
         // fMP4: cada fragmento é reproduzível sozinho (ver cabeçalho do módulo).
         "-movflags".into(),
-        "+frag_keyframe+empty_moov+default_base_is_moof".into(),
+        "+frag_keyframe+empty_moov+default_base_moof".into(),
         "-f".into(),
         "mp4".into(),
         "-y".into(),
@@ -545,6 +545,13 @@ pub async fn test_record(app: &AppHandle, dir: &Path) -> Result<String, String> 
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    fn bundled_ffmpeg() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries")
+            .join("ffmpeg-x86_64-pc-windows-msvc.exe")
+    }
+
     #[test]
     fn out_time_e_lido_em_milissegundos_de_verdade() {
         // O campo `out_time_ms` do FFmpeg vem em MICROssegundos apesar do nome; por isso
@@ -595,6 +602,10 @@ mod tests {
             "precisa sobreviver a queda"
         );
         assert!(
+            joined.contains("default_base_moof") && !joined.contains("default_base_is_moof"),
+            "a flag precisa usar o nome aceito pelo muxer MP4 do FFmpeg"
+        );
+        assert!(
             joined.contains("-progress pipe:1"),
             "sem isso não há âncora"
         );
@@ -618,5 +629,79 @@ mod tests {
         assert!(a.contains("lavfi"));
         assert!(a.contains("-t 5"));
         assert!(!a.contains("rtmp"));
+    }
+
+    /// Executa os argumentos reais contra o binário que vai no instalador. O teste puro acima
+    /// protege a intenção; este protege a compatibilidade — uma movflag escrita errado fazia
+    /// todos os testes passarem e o FFmpeg de produção recusar a gravação antes do 1º frame.
+    #[cfg(windows)]
+    #[test]
+    fn ffmpeg_empacotado_aceita_e_decodifica_a_gravacao() {
+        use std::process::Command;
+
+        let ffmpeg = bundled_ffmpeg();
+        assert!(
+            ffmpeg.is_file(),
+            "o sidecar FFmpeg precisa existir para validar a gravação"
+        );
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "corneta-recorder-test-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("source.mp4");
+        let recorded = dir.join("recorded.mp4");
+
+        let generated = Command::new(&ffmpeg)
+            .args(test_args(&source))
+            .output()
+            .unwrap();
+        assert!(
+            generated.status.success(),
+            "fonte sintética falhou: {}",
+            String::from_utf8_lossy(&generated.stderr)
+        );
+
+        let recording = Command::new(&ffmpeg)
+            .args(record_args(&source.to_string_lossy(), &recorded))
+            .output()
+            .unwrap();
+        assert!(
+            recording.status.success(),
+            "argumentos reais de gravação foram rejeitados: {}",
+            String::from_utf8_lossy(&recording.stderr)
+        );
+
+        for selector in ["0:v:0", "0:a:0"] {
+            let decoded = Command::new(&ffmpeg)
+                .args([
+                    "-hide_banner",
+                    "-xerror",
+                    "-v",
+                    "error",
+                    "-i",
+                    &recorded.to_string_lossy(),
+                    "-map",
+                    selector,
+                    "-f",
+                    "null",
+                    "NUL",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                decoded.status.success(),
+                "stream {selector} não decodificou limpo: {}",
+                String::from_utf8_lossy(&decoded.stderr)
+            );
+        }
+
+        let _ = std::fs::remove_file(source);
+        let _ = std::fs::remove_file(recorded);
+        let _ = std::fs::remove_dir(dir);
     }
 }
