@@ -371,7 +371,10 @@ describe("telemetry schema", () => {
     expect(json).not.toContain("free form content");
     expect(json).not.toContain("CanalSentinela19");
     expect(result?.properties?.$exception_list).toEqual([
-      expect.objectContaining({ $exception_type: "Error" }),
+      expect.objectContaining({
+        $exception_type: "Error",
+        stacktrace: expect.objectContaining({ type: "raw" }),
+      }),
     ]);
     expect(result?.properties?.$release_id).toBe("release_12345678");
     expect(result?.properties?.$exception_steps).toEqual([

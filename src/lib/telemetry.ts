@@ -184,11 +184,15 @@ function safePostHogHost(value: string): string | null {
 }
 
 function isRuntimeConfigured(config: RuntimeConfig): boolean {
+  const buildShaIsValid =
+    config.environment === "production"
+      ? /^[0-9a-f]{40}$/i.test(config.buildSha)
+      : /^[0-9a-f]{0,40}$/i.test(config.buildSha);
   return (
     !config.disabled &&
     /^phc_[A-Za-z0-9_-]{8,}$/.test(config.token) &&
     safePostHogHost(config.host) !== null &&
-    /^[0-9a-f]{0,40}$/i.test(config.buildSha)
+    buildShaIsValid
   );
 }
 
@@ -839,12 +843,18 @@ export function addStep(
 export function installGlobalErrorHandlers(): void {
   if (globalHandlersInstalled || typeof window === "undefined") return;
   globalHandlersInstalled = true;
+  // A janela flutuante roda em outra webview, mas compartilha este módulo. Sem
+  // o screen_id, um window.error de chat.html fica indistinguível da janela principal.
+  const screenId = window.location.pathname.endsWith("/chat.html")
+    ? ("chat_popout" as const)
+    : undefined;
   window.addEventListener("error", (event) => {
     captureException(event.error ?? new Error(event.message), {
       handled: false,
       severity: "fatal",
       error_code: "unhandled_error",
       stage: "window_error",
+      screen_id: screenId,
     });
   });
   window.addEventListener("unhandledrejection", (event) => {
@@ -853,6 +863,7 @@ export function installGlobalErrorHandlers(): void {
       severity: "fatal",
       error_code: "unhandled_rejection",
       stage: "promise_rejection",
+      screen_id: screenId,
     });
   });
 }

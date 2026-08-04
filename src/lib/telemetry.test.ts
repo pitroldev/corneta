@@ -6,6 +6,7 @@ import {
   captureOnboarding,
   discardBufferedOnboardingTelemetry,
   flushTelemetry,
+  getTelemetrySnapshot,
   initializeTelemetry,
   regenerateTelemetryId,
   setTelemetryConsent,
@@ -151,6 +152,31 @@ function configure(loader: ReturnType<typeof sdkHarness>["loader"]) {
 }
 
 describe("telemetry facade", () => {
+  it("não envia telemetria de produção sem o SHA completo da release", async () => {
+    const harness = sdkHarness();
+    __configureTelemetryForTests({
+      config: {
+        token: "phc_public_test_token",
+        host: "https://us.i.posthog.com",
+        buildSha: "",
+        disabled: false,
+        environment: "production",
+      },
+      loader: harness.loader,
+    });
+
+    expect(getTelemetrySnapshot().configured).toBe(false);
+    await initializeTelemetry(backend(status("enabled", "enabled")));
+    captureException(new Error("boom"), {
+      handled: false,
+      severity: "fatal",
+      error_code: "unhandled_error",
+      stage: "window_error",
+    });
+    await flushTelemetry();
+    expect(harness.loader).not.toHaveBeenCalled();
+  });
+
   it("does not load the SDK or issue work without consent", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
@@ -666,6 +692,18 @@ describe("telemetry facade", () => {
             $exception_stack_trace_raw: error.stack,
             type: error.name,
             value: originalMessage,
+            stacktrace: {
+              type: "raw",
+              frames: [
+                {
+                  filename: "http://tauri.localhost/assets/index-Ab12.js",
+                  lineno: 10,
+                  colno: 20,
+                  platform: "web:javascript",
+                  in_app: true,
+                },
+              ],
+            },
           },
         ],
       },
@@ -678,6 +716,14 @@ describe("telemetry facade", () => {
     expect(resultJson).toContain(REMOTE_DESKTOP_ERROR_MESSAGE);
     expect(resultJson).toContain(
       "http://tauri.localhost/assets/index-Ab12.js:10:20",
+    );
+    const safeResult = result as {
+      properties?: {
+        $exception_list?: Array<{ stacktrace?: { type?: string } }>;
+      };
+    } | null;
+    expect(safeResult?.properties?.$exception_list?.[0]?.stacktrace?.type).toBe(
+      "raw",
     );
   });
 });

@@ -975,6 +975,7 @@ function redactStacktrace(value: unknown): UnknownRecord | null {
   const raw = value as UnknownRecord;
   if (!Array.isArray(raw.frames)) return null;
   return {
+    type: "raw",
     frames: raw.frames
       .slice(-60)
       .map(redactExceptionFrame)
