@@ -54,7 +54,7 @@
     "posthog-js": "^1.409.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "simple-icons": "^16.27.1",
+    "simple-icons": "^16.28.0",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },
