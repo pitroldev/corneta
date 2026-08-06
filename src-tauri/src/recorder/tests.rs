@@ -7,10 +7,13 @@ use std::path::{Path, PathBuf};
 
 use super::domain::{
     self, AfterSegment, DirCheck, DirProblem, RestartBudget, SegmentProgress, DISK_FLOOR,
-    DISK_START_FLOOR, MAX_RESTARTS, REASON_DIED, REASON_DISK, REASON_STOP, SYNC_EVERY_MS,
+    DISK_START_FLOOR, MAX_RESTARTS, REASON_DIED, REASON_DISK, REASON_STOP, SOURCE_RETRY_MS,
+    SYNC_EVERY_MS,
 };
 
 const GB: u64 = 1024 * 1024 * 1024;
+/// Já passou a paciência com o OBS: daqui pra frente falha conta como falha.
+const DEPOIS_DA_ESPERA: u128 = domain::WAIT_FOR_SOURCE_MS + 1;
 
 #[cfg(windows)]
 fn bundled_ffmpeg() -> PathBuf {
@@ -67,6 +70,44 @@ fn nome_do_segmento_casa_com_a_trava_da_poda() {
             "a poda não reconheceria {name}"
         );
     }
+}
+
+/// O "tentar de novo" sobe o gravador uma segunda vez na MESMA live. Recomeçar do
+/// segmento 1 sobrescreveria o que já tinha sido gravado — o oposto do que o botão promete.
+#[test]
+fn retomar_continua_de_onde_a_pasta_parou() {
+    let nomes = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+
+    // pasta limpa: começa no 1
+    assert_eq!(domain::next_segment(&[], "1721400000000"), 1);
+    // já gravou o primeiro (sem sufixo) e mais dois
+    assert_eq!(
+        domain::next_segment(
+            &nomes(&[
+                "1721400000000.mp4",
+                "1721400000000.p2.mp4",
+                "1721400000000.p3.mp4"
+            ]),
+            "1721400000000"
+        ),
+        4
+    );
+    // vídeo de OUTRA sessão na mesma pasta não empurra a numeração desta
+    assert_eq!(
+        domain::next_segment(
+            &nomes(&["1799999999999.p9.mp4", "1721400000000.mp4"]),
+            "1721400000000"
+        ),
+        2
+    );
+    // arquivo alheio do streamer não conta (é a mesma trava da poda)
+    assert_eq!(
+        domain::next_segment(
+            &nomes(&["ferias.mp4", "2024-07-30 21-15-03.mp4"]),
+            "1721400000000"
+        ),
+        1
+    );
 }
 
 #[test]
@@ -253,10 +294,10 @@ fn pasta_que_nao_serve_devolve_o_codigo_que_o_front_traduz() {
 #[test]
 fn parar_a_live_nao_e_falha_e_nao_gasta_retomada() {
     let mut b = RestartBudget::default();
-    assert_eq!(b.after_segment(1, true, REASON_STOP), AfterSegment::Stop);
+    assert_eq!(b.after_segment(1, true, REASON_STOP, 0), AfterSegment::Stop);
     assert_eq!(b.used(), 0);
     // mesmo que o segmento tenha morrido feio, parar vence o diagnóstico
-    assert_eq!(b.after_segment(1, true, REASON_DIED), AfterSegment::Stop);
+    assert_eq!(b.after_segment(1, true, REASON_DIED, 0), AfterSegment::Stop);
     assert_eq!(b.used(), 0);
 }
 
@@ -266,7 +307,7 @@ fn parar_a_live_nao_e_falha_e_nao_gasta_retomada() {
 fn disco_cheio_encerra_sem_gastar_retomada() {
     let mut b = RestartBudget::default();
     assert_eq!(
-        b.after_segment(1, false, REASON_DISK),
+        b.after_segment(1, false, REASON_DISK, 0),
         AfterSegment::DiskFull
     );
     assert_eq!(b.used(), 0);
@@ -275,22 +316,23 @@ fn disco_cheio_encerra_sem_gastar_retomada() {
 #[test]
 fn backoff_cresce_a_cada_retomada() {
     let mut b = RestartBudget::default();
+    b.earned(); // já gravou: daqui pra frente falha é falha, não espera pela fonte
     assert_eq!(
-        b.after_segment(1, false, REASON_DIED),
+        b.after_segment(1, false, REASON_DIED, 0),
         AfterSegment::Resume {
             seg: 2,
             backoff_ms: 500
         }
     );
     assert_eq!(
-        b.after_segment(2, false, REASON_DIED),
+        b.after_segment(2, false, REASON_DIED, 0),
         AfterSegment::Resume {
             seg: 3,
             backoff_ms: 1_000
         }
     );
     assert_eq!(
-        b.after_segment(3, false, REASON_DIED),
+        b.after_segment(3, false, REASON_DIED, 0),
         AfterSegment::Resume {
             seg: 4,
             backoff_ms: 1_500
@@ -301,17 +343,18 @@ fn backoff_cresce_a_cada_retomada() {
 #[test]
 fn desiste_depois_do_teto_de_retomadas() {
     let mut b = RestartBudget::default();
+    b.earned(); // gravou uma vez; o que vier depois é falha de verdade
     for seg in 1..=MAX_RESTARTS {
         assert!(
             matches!(
-                b.after_segment(seg, false, REASON_DIED),
+                b.after_segment(seg, false, REASON_DIED, 0),
                 AfterSegment::Resume { .. }
             ),
             "a retomada {seg} ainda cabe no orçamento"
         );
     }
     assert_eq!(
-        b.after_segment(MAX_RESTARTS + 1, false, REASON_DIED),
+        b.after_segment(MAX_RESTARTS + 1, false, REASON_DIED, 0),
         AfterSegment::GiveUp
     );
 }
@@ -331,12 +374,85 @@ fn gravar_de_verdade_devolve_o_orcamento() {
 
         assert!(
             matches!(
-                b.after_segment(hora, false, REASON_DIED),
+                b.after_segment(hora, false, REASON_DIED, 0),
                 AfterSegment::Resume { .. }
             ),
             "a queda da hora {hora} não podia desistir: o segmento tinha gravado"
         );
     }
+}
+
+/// O BUG que o beta viveu: o streamer aperta BORA e só então o OBS começa a empurrar.
+/// Antes, os 5 spawns que morreram por falta de fonte queimavam o orçamento inteiro em
+/// menos de 15 segundos e a gravação desistia antes de a live existir.
+#[test]
+fn obs_demorando_a_subir_nao_faz_a_gravacao_desistir() {
+    let mut b = RestartBudget::default();
+    // 40 segundos de OBS abrindo, uma tentativa a cada 2s
+    for tentativa in 0..20u128 {
+        let decisao = b.after_segment(1, false, REASON_DIED, tentativa * SOURCE_RETRY_MS as u128);
+        assert_eq!(
+            decisao,
+            AfterSegment::WaitingForSource {
+                seg: 1,
+                backoff_ms: SOURCE_RETRY_MS
+            },
+            "tentativa {tentativa}: esperar a fonte não é falhar"
+        );
+    }
+    assert_eq!(b.used(), 0, "esperar o OBS não pode gastar orçamento");
+
+    // o OBS subiu: grava, e a partir daí o orçamento vale integral
+    b.earned();
+    assert!(matches!(
+        b.after_segment(1, false, REASON_DIED, 60_000),
+        AfterSegment::Resume { seg: 2, .. }
+    ));
+}
+
+/// Enquanto espera a fonte, o número do segmento NÃO anda: não houve segmento. Se andasse,
+/// a gravação de verdade começaria em `.p61.mp4` e o NDJSON teria 60 pares de linha vazios.
+#[test]
+fn espera_pela_fonte_nao_avanca_o_segmento() {
+    let mut b = RestartBudget::default();
+    for _ in 0..5 {
+        assert_eq!(
+            b.after_segment(1, false, REASON_DIED, 1_000),
+            AfterSegment::WaitingForSource {
+                seg: 1,
+                backoff_ms: SOURCE_RETRY_MS
+            }
+        );
+    }
+}
+
+/// A paciência tem prazo. Passada a janela sem nunca gravar nada, o problema não é o OBS
+/// demorando — é erro de verdade (codec, pasta, permissão) — e o orçamento volta a contar.
+#[test]
+fn passada_a_janela_a_falha_volta_a_contar() {
+    let mut b = RestartBudget::default();
+    assert!(matches!(
+        b.after_segment(1, false, REASON_DIED, domain::WAIT_FOR_SOURCE_MS - 1),
+        AfterSegment::WaitingForSource { .. }
+    ));
+    assert_eq!(b.used(), 0);
+    assert!(matches!(
+        b.after_segment(1, false, REASON_DIED, domain::WAIT_FOR_SOURCE_MS),
+        AfterSegment::Resume { seg: 2, .. }
+    ));
+    assert_eq!(b.used(), 1);
+}
+
+/// Parar a live e encher o disco vencem a espera: nenhum dos dois melhora esperando mais.
+#[test]
+fn espera_pela_fonte_nao_engole_parada_nem_disco_cheio() {
+    let mut b = RestartBudget::default();
+    assert_eq!(b.after_segment(1, true, REASON_DIED, 0), AfterSegment::Stop);
+    let mut b = RestartBudget::default();
+    assert_eq!(
+        b.after_segment(1, false, REASON_DISK, 0),
+        AfterSegment::DiskFull
+    );
 }
 
 /// E o contrário: cinco spawns que NUNCA ancoraram (o disco não aceita, o codec não casa)
@@ -347,7 +463,7 @@ fn falha_seguida_sem_gravar_nada_desiste() {
     let mut ultimo = AfterSegment::Stop;
     for seg in 1..=MAX_RESTARTS + 1 {
         // nenhuma linha de progresso: nada de `earned()`
-        ultimo = b.after_segment(seg, false, REASON_DIED);
+        ultimo = b.after_segment(seg, false, REASON_DIED, DEPOIS_DA_ESPERA);
     }
     assert_eq!(ultimo, AfterSegment::GiveUp);
 }

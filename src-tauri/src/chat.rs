@@ -293,6 +293,7 @@ pub fn start_chat(app: &AppHandle) {
         };
         let (app2, run2, value) = (app.clone(), running.clone(), src.value.clone());
         let sid = src.id.clone();
+        let plat = src.platform.clone();
         match src.platform.as_str() {
             "twitch" => {
                 // Token de envio resolvido A CADA conexão: token colado da fonte OU a conta
@@ -304,7 +305,9 @@ pub fn start_chat(app: &AppHandle) {
                     while run2.load(Ordering::Relaxed) {
                         let tok = crate::keys::get_key(&send_key)
                             .or_else(|| crate::auth::twitch_token(&app2));
-                        if run_twitch(&value, &label, &sid, tok, run2.clone(), app2.clone(), gen) {
+                        if sem_panico(&plat, &label, || {
+                            run_twitch(&value, &label, &sid, tok, run2.clone(), app2.clone(), gen)
+                        }) {
                             backoff = 15; // conectou → próxima queda volta pro ritmo normal
                         }
                         reconnect_for(&run2, backoff); // caiu/erro → tenta de novo
@@ -316,7 +319,9 @@ pub fn start_chat(app: &AppHandle) {
                 tauri::async_runtime::spawn_blocking(move || {
                     let mut backoff: u32 = 15; // idem Twitch: 3s dobrando até 60s
                     while run2.load(Ordering::Relaxed) {
-                        if run_kick(&value, &label, run2.clone(), app2.clone(), gen) {
+                        if sem_panico(&plat, &label, || {
+                            run_kick(&value, &label, run2.clone(), app2.clone(), gen)
+                        }) {
                             backoff = 15;
                         }
                         reconnect_for(&run2, backoff);
@@ -331,7 +336,9 @@ pub fn start_chat(app: &AppHandle) {
                     // ~20s entre tentativas (aguardando a live começar), dobrando até 60s.
                     let mut backoff: u32 = 100;
                     while run2.load(Ordering::Relaxed) {
-                        if run_youtube(&key, &value, &label, run2.clone(), app2.clone(), gen) {
+                        if sem_panico(&plat, &label, || {
+                            run_youtube(&key, &value, &label, run2.clone(), app2.clone(), gen)
+                        }) {
                             backoff = 100;
                         }
                         reconnect_for(&run2, backoff);
@@ -353,6 +360,31 @@ pub fn start_chat(app: &AppHandle) {
     if !vsources.is_empty() {
         let (app_v, run_v, key_v) = (app.clone(), running.clone(), api_key.clone());
         tauri::async_runtime::spawn_blocking(move || run_viewers(vsources, key_v, run_v, app_v));
+    }
+}
+
+/// Roda UMA tentativa de conexão de chat com o pânico contido.
+///
+/// A hierarquia de sacrifício vale aqui igual vale no gravador: transmissão > relatório >
+/// chat. Um parser que entra em pânico com lixo da rede tem que derrubar a FONTE, não a
+/// live — e com `panic = "unwind"` (ver Cargo.toml) isso passou a ser possível. A queda
+/// vira uma reconexão comum, que é o caminho que a interface já sabe mostrar.
+///
+/// O relatório de falha não se perde: o hook de pânico da telemetria roda ANTES do unwind,
+/// com o frame verdadeiro. Aqui só registramos e seguimos.
+///
+/// `AssertUnwindSafe` é honesto neste ponto: depois do pânico nada do estado capturado é
+/// lido — a função só devolve "não conectou" e o laço dorme até a próxima tentativa.
+fn sem_panico(platform: &str, source: &str, tentativa: impl FnOnce() -> bool) -> bool {
+    let _contido = crate::telemetry::ContainedPanicScope::enter();
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(tentativa)) {
+        Ok(conectou) => conectou,
+        Err(_) => {
+            log::error!(
+                "chat/{platform}: pânico contido em {source} — a fonte cai e reconecta, a live segue"
+            );
+            false
+        }
     }
 }
 

@@ -81,6 +81,8 @@ export interface CornetaApi {
   recordPickDir(): Promise<string | null>;
   /** Grava 5s de barras e devolve o caminho — valida o caminho inteiro antes do BORA. */
   recordTest(dir: string): Promise<string>;
+  /** Sobe o gravador de novo NA MESMA live, depois de ele ter desistido. */
+  recordRetry(): Promise<void>;
   /** Libera o arquivo no escopo do asset e devolve a URL que o `<video>` consome. */
   recordVideoUrl(path: string): Promise<string>;
   /** Ajuste manual de sincronia do replay, em ms (grampeado em ±30s no backend). */
@@ -395,6 +397,10 @@ function tauriApi(): CornetaApi {
     async recordTest(dir) {
       const { invoke } = await core();
       return invoke<string>("record_test", { dir });
+    },
+    async recordRetry() {
+      const { invoke } = await core();
+      await invoke("record_retry");
     },
     async recordVideoUrl(path) {
       const { invoke, convertFileSrc } = await core();
@@ -1469,6 +1475,9 @@ function mockApi(): CornetaApi {
       return null;
     },
     async recordTest() {
+      throw new Error("sem gravação no navegador");
+    },
+    async recordRetry() {
       throw new Error("sem gravação no navegador");
     },
     async recordVideoUrl() {

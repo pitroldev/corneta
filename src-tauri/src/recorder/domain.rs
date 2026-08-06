@@ -24,6 +24,16 @@ pub const DISK_START_FLOOR: u64 = 5 * 1024 * 1024 * 1024;
 pub const DISK_CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(30);
 /// Teto de retomadas. Sem ele, um erro permanente vira laço infinito de spawn.
 pub const MAX_RESTARTS: u32 = 5;
+/// Quanto tempo esperar a FONTE aparecer antes de tratar a morte do FFmpeg como falha.
+///
+/// O streamer aperta BORA na Corneta e só DEPOIS o OBS começa a empurrar. Até o programa
+/// existir, o FFmpeg morre na hora — e gastar orçamento nisso fazia a gravação desistir em
+/// menos de 15 segundos, antes de a live sequer ter começado. Os destinos, que leem a MESMA
+/// URL, já esperam indefinidamente (estado `waiting`); o gravador era o único impaciente.
+pub const WAIT_FOR_SOURCE_MS: u128 = 2 * 60_000;
+/// Intervalo entre tentativas enquanto a fonte não subiu. Fixo e folgado: é espera, não
+/// erro, e cada tentativa custa um spawn.
+pub const SOURCE_RETRY_MS: u64 = 2_000;
 /// Depois disto sem `-progress`, a âncora é chutada (marcada como estimada) pra não perder
 /// o replay inteiro por causa de um formato que não reportou.
 pub const ANCHOR_TIMEOUT_MS: u128 = 15_000;
@@ -133,6 +143,23 @@ pub fn test_args(out: &Path) -> Vec<String> {
 /// Lê `out_time=HH:MM:SS.uuuuuu` e NÃO `out_time_ms`: apesar do nome, o FFmpeg emite
 /// microssegundos nesse campo há anos. Confiar no nome dele daria um replay 1000× fora
 /// de escala — e um erro que só apareceria em produção.
+/// Primeiro número de segmento LIVRE desta sessão, dada a lista de nomes da pasta.
+///
+/// O gravador pode subir mais de uma vez na mesma live — é o "tentar de novo" depois de
+/// desistir. Recomeçar sempre do 1 sobrescreveria o que já tinha sido gravado, que é
+/// exatamente o oposto do que o botão promete.
+/// Usa o reconhecedor da PODA de propósito: se o gravador tivesse o seu próprio, os dois
+/// poderiam divergir e a numeração pularia por cima de arquivo que a poda enxerga.
+pub fn next_segment(file_names: &[String], id: &str) -> u32 {
+    file_names
+        .iter()
+        .filter_map(|n| crate::session::parse_video_name(n))
+        .filter(|(video_id, _)| video_id == id)
+        .map(|(_, seg)| seg)
+        .max()
+        .map_or(1, |maior| maior + 1)
+}
+
 pub fn parse_out_time_ms(line: &str) -> Option<u64> {
     let raw = line.trim().strip_prefix("out_time=")?;
     if raw.starts_with('N') {
@@ -310,6 +337,9 @@ pub enum AfterSegment {
     Stop,
     /// Disco no piso: retomar só encheria de novo.
     DiskFull,
+    /// A fonte ainda não subiu (o OBS não começou a empurrar). Tenta de novo com o MESMO
+    /// número de segmento e sem gastar orçamento: não houve segmento nenhum pra fechar.
+    WaitingForSource { seg: u32, backoff_ms: u64 },
     /// Sobe o segmento seguinte depois de esperar. O backoff cresce porque retomada
     /// imediata em erro permanente vira laço de spawn.
     Resume { seg: u32, backoff_ms: u64 },
@@ -325,12 +355,16 @@ pub enum AfterSegment {
 #[derive(Default)]
 pub struct RestartBudget {
     used: u32,
+    /// Este gravador chegou a gravar ALGUMA COISA nesta live? Enquanto não chegou, morte
+    /// do FFmpeg é "a fonte não subiu ainda", não "a gravação falhou".
+    ever_recorded: bool,
 }
 
 impl RestartBudget {
     /// Ancorou: gravou de verdade, o orçamento volta ao começo.
     pub fn earned(&mut self) {
         self.used = 0;
+        self.ever_recorded = true;
     }
 
     /// Quantas retomadas já foram gastas. Existe pro teste conseguir afirmar que parar a
@@ -340,12 +374,29 @@ impl RestartBudget {
         self.used
     }
 
-    pub fn after_segment(&mut self, seg: u32, stopping: bool, reason: &str) -> AfterSegment {
+    /// `since_start_ms` é o tempo desde que o GRAVADOR subiu (não desde o segmento) — é o
+    /// relógio da paciência com o OBS.
+    pub fn after_segment(
+        &mut self,
+        seg: u32,
+        stopping: bool,
+        reason: &str,
+        since_start_ms: u128,
+    ) -> AfterSegment {
         if stopping {
             return AfterSegment::Stop;
         }
         if reason == REASON_DISK {
             return AfterSegment::DiskFull;
+        }
+        // Nunca gravou nada e ainda estamos na janela de espera: o OBS não começou a
+        // empurrar. Não é falha e não gasta orçamento — inclusive o `seg` não avança,
+        // porque não houve segmento nenhum.
+        if !self.ever_recorded && since_start_ms < WAIT_FOR_SOURCE_MS {
+            return AfterSegment::WaitingForSource {
+                seg,
+                backoff_ms: SOURCE_RETRY_MS,
+            };
         }
         self.used += 1;
         if self.used > MAX_RESTARTS {

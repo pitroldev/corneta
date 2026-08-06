@@ -64,8 +64,14 @@ pub async fn run(
     id: String,
     running: Arc<AtomicBool>,
 ) {
-    let mut seg: u32 = 1;
+    // Continua de onde a pasta parou. O gravador pode subir duas vezes na mesma live (o
+    // "tentar de novo" depois de desistir) e recomeçar do 1 apagaria o já gravado.
+    let mut seg: u32 = domain::next_segment(&disk::file_names(&dir), &id);
     let mut budget = RestartBudget::default();
+    // Relógio da PACIÊNCIA com o OBS: conta desde que o gravador subiu, não desde o
+    // segmento. Enquanto a fonte não aparece, morrer não gasta orçamento.
+    let started_at = Instant::now();
+    let mut warned_waiting = false;
 
     while running.load(Ordering::Relaxed) {
         let free = disk::free_bytes(&dir);
@@ -198,12 +204,22 @@ pub async fn run(
         take_and_kill(&app);
         let stopping = !running.load(Ordering::Relaxed);
         let closed_with = domain::final_reason(stopping, reason);
-        session::record_rec_end(&session_path, seg, closed_with);
-        // Finaliza ESTE segmento agora, não no fim da live: se o app morrer daqui a duas
-        // horas, o que já foi gravado continua navegável.
-        finalize(&app, &session_path, seg, &out).await;
+        let outcome =
+            budget.after_segment(seg, stopping, closed_with, started_at.elapsed().as_millis());
 
-        match budget.after_segment(seg, stopping, closed_with) {
+        if let AfterSegment::WaitingForSource { .. } = outcome {
+            // Não houve segmento: o FFmpeg morreu porque não havia o que ler. Escrever
+            // `recEnd` aqui encheria o NDJSON de pares vazios que o replay teria que
+            // aprender a ignorar — e o arquivo, se chegou a existir, está vazio.
+            let _ = std::fs::remove_file(&out);
+        } else {
+            session::record_rec_end(&session_path, seg, closed_with);
+            // Finaliza ESTE segmento agora, não no fim da live: se o app morrer daqui a
+            // duas horas, o que já foi gravado continua navegável.
+            finalize(&app, &session_path, seg, &out).await;
+        }
+
+        match outcome {
             AfterSegment::Stop => break,
             AfterSegment::DiskFull => {
                 toast(&app, "diskFull", None);
@@ -218,6 +234,20 @@ pub async fn run(
                 session::record_rec_end(&session_path, seg, REASON_GIVEUP);
                 toast(&app, "gaveUp", None);
                 break;
+            }
+            AfterSegment::WaitingForSource {
+                seg: same,
+                backoff_ms,
+            } => {
+                // Um aviso só, e não já no primeiro segundo: o caso comum é o OBS subir
+                // em dois piscares, e um toast a cada tentativa viraria spam.
+                if !warned_waiting && started_at.elapsed().as_secs() >= 10 {
+                    warned_waiting = true;
+                    log::info!("gravação: esperando a fonte subir — o OBS ainda não empurrou");
+                    toast(&app, "waitingSource", None);
+                }
+                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                seg = same;
             }
             AfterSegment::Resume {
                 seg: next,

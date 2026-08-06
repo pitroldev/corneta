@@ -402,7 +402,8 @@ Se existir uma única coisa desta seção pra implementar junto com a Fase 1, é
 | Problema | Como perceber | Resposta |
 |---|---|---|
 | FFmpeg morre calado | `out_time_ms` do `-progress` parado por >10s | watchdog marca como morto e **retoma em segmento novo** |
-| Morte repetida (loop) | contagem de retomadas | backoff + máximo de ~5 tentativas, depois desiste e avisa |
+| Fonte ainda não subiu (o OBS demora a empurrar) | nunca ancorou e a live acabou de começar | **espera até 2 min**, tentando a cada 2s, **sem gastar retomada** — igual ao destino, que fica em `waiting` pela mesma URL |
+| Morte repetida (loop) | contagem de retomadas | backoff + máximo de ~5 tentativas, depois desiste e **oferece "tentar de novo"** |
 | Disco enchendo | checagem do volume a cada 30s | **para limpo abaixo de 2 GB** — antes de zerar |
 | Escrita lenta (USB/rede/SMR/antivírus) | fila do leitor crescendo, MediaMTX derrubando | o gravador é só mais um leitor: o servidor o derruba isolado, os destinos não sentem; avisa "sua pasta não está dando conta" |
 | Órfão depois de o app morrer | — | **já resolvido**: `kill_child_tree` (`commands.rs:66`) e `kill_orphan_sidecars` (`commands.rs:1006`); o gravador só precisa entrar por essa mesma porta |
@@ -568,6 +569,10 @@ criados durante o replay, miniatura na timeline.
 - [x] Roda o teste sozinho ao ligar a gravação pela 1ª vez e ao trocar a pasta
 - [x] Watchdog do `-progress`: `out_time_ms` parado >10s = morto
 - [x] Retomada em segmento novo (`seg` na âncora) + backoff + teto de ~5 tentativas
+- [x] Paciência com a fonte: enquanto nada foi gravado, morrer é "o OBS ainda não subiu" e não
+      gasta orçamento (`domain::WAIT_FOR_SOURCE_MS`)
+- [x] "Tentar gravar de novo" (`record_retry`) — continua da numeração onde a pasta parou,
+      então retomar nunca sobrescreve o já gravado
 - [x] Player emenda N segmentos como uma linha do tempo só
 - [x] Monitor de espaço a cada 30s: para limpo abaixo de 2 GB
 - [x] Remux de finalização (`-c copy +faststart`) + `finalized:false` refeito no boot

@@ -1211,7 +1211,11 @@ export const pt = {
   "recorder.toast.resumed":
     "A gravação caiu e voltou — vai faltar um pedacinho.",
   "recorder.toast.gaveUp":
-    "Desisti de gravar depois de 5 tentativas — a live segue no ar, só sem gravação.",
+    "Não consegui gravar depois de 5 tentativas — a live segue no ar. Dá pra tentar de novo.",
+  "recorder.toast.retry": "Tentar de novo",
+  "recorder.toast.retrying": "Bora — tentando gravar de novo.",
+  "recorder.toast.waitingSource":
+    "Esperando o vídeo chegar pra começar a gravar. Se o OBS ainda não subiu, é isso.",
   "recorder.toast.failed": "Não consegui gravar: {error}",
   "recorder.toast.estimatedAnchor":
     "A sincronia do replay pode estar uns segundos fora — dá pra ajustar no relatório.",

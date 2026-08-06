@@ -1605,6 +1605,7 @@ fn normalize_error_code(value: &str) -> &str {
         | "recording_disk_low"
         | "recording_ffmpeg_spawn_failed"
         | "recording_gave_up"
+        | "vault_key_vanished"
         | "splicer_task_failed"
         | "splicer_setup_fallback"
         | "youtube_auto_provision_failed"
@@ -2025,6 +2026,37 @@ fn write_exit_marker(path: &Path, state: &str) {
     }
 }
 
+thread_local! {
+    /// Um pânico nesta thread, AGORA, será contido por quem chamou?
+    ///
+    /// Existe porque o hook de pânico roda antes do unwind e não tem como saber se
+    /// alguém lá em cima vai pegar. Sem esta marca, todo pânico contido chegaria na
+    /// telemetria como `fatal` — e a triagem passaria a caçar quedas que não houve.
+    static PANIC_CONTAINED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn panic_is_contained() -> bool {
+    PANIC_CONTAINED.with(|flag| flag.get())
+}
+
+/// Guarda RAII que desmarca no `Drop` — e `Drop` roda DURANTE o unwind. Um `set(false)`
+/// solto depois da chamada nunca executaria no caminho que importa, e a thread do pool
+/// ficaria marcada pra sempre, rebaixando o próximo pânico de verdade.
+pub struct ContainedPanicScope;
+
+impl ContainedPanicScope {
+    pub fn enter() -> Self {
+        PANIC_CONTAINED.with(|flag| flag.set(true));
+        ContainedPanicScope
+    }
+}
+
+impl Drop for ContainedPanicScope {
+    fn drop(&mut self) {
+        PANIC_CONTAINED.with(|flag| flag.set(false));
+    }
+}
+
 pub fn install_panic_hook(app: AppHandle) {
     static INSTALLED: AtomicBool = AtomicBool::new(false);
     if INSTALLED.swap(true, Ordering::AcqRel) {
@@ -2032,6 +2064,13 @@ pub fn install_panic_hook(app: AppHandle) {
     }
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
+        // Contido = o subsistema cai sozinho e a live segue (ver `chat::sem_panico`).
+        // Rotular isso de `fatal` faria a triagem caçar uma queda que nunca houve.
+        let severity = if panic_is_contained() {
+            "warning"
+        } else {
+            "fatal"
+        };
         // Gate síncrono antes de criar/enfileirar qualquer evento. A mensagem do
         // panic não é lida: pode conter conteúdo/configuração do usuário.
         let telemetry = &app.state::<AppState>().telemetry;
@@ -2047,9 +2086,9 @@ pub fn install_panic_hook(app: AppHandle) {
             let error = AppError::new("native_panic", "native", false, None);
 
             let error_id =
-                telemetry.capture_error_at(error, None, false, "fatal", safe_frame.as_deref());
+                telemetry.capture_error_at(error, None, false, severity, safe_frame.as_deref());
             if let Some(frame) = &safe_frame {
-                log::error!("panic nativo em {frame}; error_id={error_id}");
+                log::error!("panic nativo ({severity}) em {frame}; error_id={error_id}");
             }
             telemetry.flush_after_panic_bounded();
         }
@@ -2881,5 +2920,28 @@ mod tests {
         assert_eq!(reconnect_bucket(0), "0");
         assert_eq!(reconnect_bucket(4), "4_10");
         assert_eq!(reconnect_bucket(11), "gte_11");
+    }
+
+    /// O `Drop` do escopo tem que rodar DURANTE o unwind. Se não rodasse, a thread do pool
+    /// ficaria marcada como "contida" pra sempre — e o próximo pânico de verdade, esse sim
+    /// fatal, chegaria na triagem rebaixado a aviso.
+    #[test]
+    fn escopo_de_panico_contido_se_desmarca_no_unwind() {
+        let anterior = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {})); // silencia o barulho do pânico de mentira
+
+        assert!(!panic_is_contained());
+        let resultado = std::panic::catch_unwind(|| {
+            let _contido = ContainedPanicScope::enter();
+            assert!(panic_is_contained(), "dentro do escopo, está contido");
+            panic!("pânico de mentira");
+        });
+
+        std::panic::set_hook(anterior);
+        assert!(resultado.is_err(), "o pânico foi contido pelo catch_unwind");
+        assert!(
+            !panic_is_contained(),
+            "a marca não pode sobreviver ao unwind"
+        );
     }
 }

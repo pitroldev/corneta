@@ -1670,7 +1670,11 @@ export const en: Dict = {
   "recorder.toast.resumed":
     "Recording dropped and came back — a little bit is missing.",
   "recorder.toast.gaveUp":
-    "I gave up recording after 5 tries — your stream is still going, just not being saved.",
+    "Couldn't record after 5 tries — your stream is still going. You can try again.",
+  "recorder.toast.retry": "Try again",
+  "recorder.toast.retrying": "On it — trying to record again.",
+  "recorder.toast.waitingSource":
+    "Waiting for video before recording starts. If OBS isn't up yet, that's why.",
   "recorder.toast.failed": "Couldn't record: {error}",
   "recorder.toast.estimatedAnchor":
     "Replay sync might be a few seconds off — you can nudge it in the report.",

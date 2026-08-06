@@ -780,6 +780,16 @@ impl AutoBitrate {
     }
 }
 
+/// Os parâmetros com que o gravador subiu — o suficiente pra subir de novo igualzinho.
+#[derive(Clone)]
+pub struct RecorderLaunch {
+    /// A MESMA URL que os destinos leem (`_program` com compositor, `live` sem ele).
+    pub source: String,
+    pub dir: std::path::PathBuf,
+    pub session_path: std::path::PathBuf,
+    pub id: String,
+}
+
 /// Runtime guardado no state do Tauri (handles dos sidecars + último snapshot).
 #[derive(Default)]
 pub struct EngineRuntime {
@@ -800,6 +810,10 @@ pub struct EngineRuntime {
     pub win_title: String,
     /// Arquivo NDJSON da sessão em gravação (relatório pós-live).
     pub session_path: Option<std::path::PathBuf>,
+    /// Como o gravador foi lançado nesta live. Guardado pra que o "tentar de novo" reuse
+    /// EXATAMENTE a mesma fonte que os destinos estão lendo, em vez de recalcular a
+    /// decisão do compositor e correr o risco de apontar pro lugar errado.
+    pub recorder_launch: Option<RecorderLaunch>,
     /// Flag de pausa por destino (controle ao vivo): true = supervisor não sobe FFmpeg.
     pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// Erro TERMINAL por destino (ex.: chave recusada): true = supervisor parqueia sem

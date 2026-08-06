@@ -215,7 +215,7 @@ pub(crate) fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) 
 #[tauri::command]
 pub fn get_config(app: AppHandle) -> AppConfig {
     let mut cfg = config::load(&app);
-    refresh_secret_presence(&mut cfg);
+    refresh_secret_presence(&app, &mut cfg);
     cfg
 }
 
@@ -226,8 +226,39 @@ pub fn get_config(app: AppHandle) -> AppConfig {
 /// uma webview (retorno de comando ou evento) precisa passar por aqui depois da gravação;
 /// caso contrário, qualquer ajuste comum — como ligar/desligar um destino — faz todas as
 /// chaves parecerem removidas até a próxima abertura do app.
-fn refresh_secret_presence(config: &mut AppConfig) {
+fn refresh_secret_presence(app: &AppHandle, config: &mut AppConfig) {
     refresh_secret_presence_with(config, keys::has_key);
+    report_vanished_keys(app, config);
+}
+
+/// Denuncia a chave que SUMIU sem ninguém ter mandado apagar.
+///
+/// Um beta relatou que as chaves de transmissão desapareciam depois de encerrar a live, e
+/// nenhuma reprodução em bancada pegou o caso. Este é o rastro: o cofre já respondeu "tem
+/// chave" para este destino, o destino continua na configuração, e agora o cofre diz que
+/// não tem. Sem nome, sem valor, sem id no evento — só o fato, com o momento exato.
+fn report_vanished_keys(app: &AppHandle, config: &AppConfig) {
+    let atual: Vec<(String, bool)> = config
+        .targets
+        .iter()
+        .map(|t| (t.id.clone(), t.has_key))
+        .collect();
+    for _sumida in keys::drain_vanished(&atual) {
+        log::error!("cofre: a chave de um destino sumiu sem ninguém ter mandado apagar");
+        app.state::<AppState>().telemetry.capture_error(
+            crate::telemetry::AppError::new("vault_key_vanished", "config", false, None),
+            None,
+            true,
+            "warning",
+        );
+    }
+    keys::remember_present(
+        config
+            .targets
+            .iter()
+            .filter(|t| t.has_key)
+            .map(|t| t.id.as_str()),
+    );
 }
 
 fn refresh_secret_presence_with(config: &mut AppConfig, mut has_secret: impl FnMut(&str) -> bool) {
@@ -260,7 +291,7 @@ pub fn save_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, Strin
     config::save(&app, &config)?;
     // O arquivo continua com os indicadores zerados; somente a cópia devolvida às webviews
     // recebe a presença real das credenciais guardadas no cofre.
-    refresh_secret_presence(&mut config);
+    refresh_secret_presence(&app, &mut config);
     // Sincroniza as OUTRAS janelas (o popout do chat é outro webview, com store zustand próprio):
     // sem isto, cada janela persistia sua cópia inteira do AppConfig e revertia em disco as
     // mudanças da outra. Cada janela reassina `config://changed` e atualiza a base SEM re-persistir.
@@ -1714,8 +1745,22 @@ async fn start_engine_inner(
                         .and_then(|s| s.to_str())
                         .unwrap_or_default()
                         .to_string();
-                    let (a, src, run) = (app.clone(), out_source.clone(), running.clone());
-                    tauri::async_runtime::spawn(recorder::run(a, src, dir, sp, id, run));
+                    let launch = engine::RecorderLaunch {
+                        source: out_source.clone(),
+                        dir,
+                        session_path: sp,
+                        id,
+                    };
+                    state.engine.lock().unwrap().recorder_launch = Some(launch.clone());
+                    let (a, run) = (app.clone(), running.clone());
+                    tauri::async_runtime::spawn(recorder::run(
+                        a,
+                        launch.source,
+                        launch.dir,
+                        launch.session_path,
+                        launch.id,
+                        run,
+                    ));
                 }
             }
             (None, _) => {
@@ -2731,6 +2776,38 @@ pub async fn record_pick_dir(app: AppHandle) -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
+/// "Tentar gravar de novo" — sobe o gravador outra vez NA MESMA live.
+///
+/// Sem isto, desistir era definitivo: o streamer via o aviso e a única saída era cortar a
+/// transmissão e recomeçar, que é justamente o que ninguém faz ao vivo. O gravador continua
+/// da numeração onde a pasta parou, então retomar nunca sobrescreve o que já foi gravado.
+#[tauri::command]
+pub fn record_retry(app: AppHandle, state: State<AppState>) -> Result<(), String> {
+    let (launch, running) = {
+        let eng = state.engine.lock().unwrap();
+        if !eng.live {
+            return Err(Msg::RecordRetryNotLive.now());
+        }
+        // Já tem gravador no ar: repetir o spawn daria dois FFmpegs escrevendo na mesma
+        // pasta e um deles perderia a entrada no mapa de filhos — virando processo órfão.
+        if eng.ffmpegs.contains_key(recorder::RECORDER_KEY) {
+            return Err(Msg::RecordRetryAlreadyRunning.now());
+        }
+        (eng.recorder_launch.clone(), eng.running.clone())
+    };
+    let launch = launch.ok_or_else(|| Msg::RecordRetryUnavailable.now())?;
+    log::info!("gravação: retomada manual pedida pelo streamer");
+    tauri::async_runtime::spawn(recorder::run(
+        app,
+        launch.source,
+        launch.dir,
+        launch.session_path,
+        launch.id,
+        running,
+    ));
+    Ok(())
+}
+
 /// Grava 5s de barras e devolve o caminho — o teste do §9.2 do doc.
 ///
 /// Vale mais que qualquer outra mitigação: em um clique valida pasta, escrita, espaço,
@@ -3488,7 +3565,7 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     }
     cfg.revision = config::load(&app).revision.saturating_add(1);
     config::save(&app, &cfg)?;
-    refresh_secret_presence(&mut cfg);
+    refresh_secret_presence(&app, &mut cfg);
     let _ = app.emit("config://changed", &cfg);
     Ok(true)
 }

@@ -324,8 +324,22 @@ export default function App() {
         case "resumed":
           toast.info(t("recorder.toast.resumed"));
           break;
+        case "waitingSource":
+          toast.info(t("recorder.toast.waitingSource"));
+          break;
+        // Desistir não pode ser definitivo: sem este botão a única saída era cortar a
+        // live e recomeçar, que é justamente o que ninguém faz no ar.
         case "gaveUp":
-          toast.error(t("recorder.toast.gaveUp"));
+          toast.errorAction(
+            t("recorder.toast.gaveUp"),
+            t("recorder.toast.retry"),
+            () => {
+              api
+                .recordRetry()
+                .then(() => toast.success(t("recorder.toast.retrying")))
+                .catch((e: unknown) => toast.error(String(e)));
+            },
+          );
           break;
         case "estimatedAnchor":
           toast.info(t("recorder.toast.estimatedAnchor"));

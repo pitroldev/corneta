@@ -549,6 +549,15 @@ messages! {
     RecordDirUnusable = "rust.record.dirUnusable" =>
         pt: "não consigo gravar nessa pasta — confira se ela existe e se dá pra escrever nela",
         en: "I can't record to that folder — check that it exists and is writable";
+    RecordRetryNotLive = "rust.record.retryNotLive" =>
+        pt: "só dá pra retomar a gravação com a live no ar",
+        en: "I can only restart recording while you're live";
+    RecordRetryAlreadyRunning = "rust.record.retryAlreadyRunning" =>
+        pt: "já estou gravando — não precisa retomar",
+        en: "I'm already recording — no need to restart";
+    RecordRetryUnavailable = "rust.record.retryUnavailable" =>
+        pt: "essa live começou sem gravação, então não tenho o que retomar",
+        en: "this stream started without recording, so there's nothing to restart";
 
     // ---- open --------------------------------------------------------------
     OpenExternalRefused = "rust.open.externalRefused" =>

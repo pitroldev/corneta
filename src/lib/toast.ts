@@ -44,4 +44,8 @@ export const toast = {
   /** Toast com botão de ação (ex.: "desfazer"), com tempo maior. */
   action: (m: string, label: string, onClick: () => void) =>
     useToasts.getState().push("info", m, { label, onClick }, 6000),
+  /** Erro que já vem com a saída. Fica MUITO mais tempo: quem está ao vivo não olha
+   *  pra tela a cada segundo, e um botão que some antes de ser visto não existe. */
+  errorAction: (m: string, label: string, onClick: () => void) =>
+    useToasts.getState().push("error", m, { label, onClick }, 15000),
 };

@@ -219,6 +219,7 @@ pub fn run() {
             commands::record_check_dir,
             commands::record_pick_dir,
             commands::record_test,
+            commands::record_retry,
             commands::record_allow_file,
             commands::set_session_offset,
             commands::delete_session_recordings,

@@ -98,7 +98,13 @@ windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "St
 webview2-com = "=0.38.2"
 
 [profile.release]
-panic = "abort"
+# `unwind`, e NÃO `abort`. Com `abort`, um pânico em QUALQUER thread matava o processo
+# inteiro na hora — o parser do chat derrubava a transmissão ao vivo, que é a inversão
+# exata da hierarquia de sacrifício documentada em `recorder/mod.rs` (transmissão >
+# relatório > chat > vídeo). Havia ainda um agravante silencioso: os writers da sessão são
+# bufferizados, e sem unwind o flush nunca acontecia — o crash apagava a prova do crash.
+# Custa alguns KB de binário e devolve a chance de o subsistema cair sozinho.
+panic = "unwind"
 codegen-units = 1
 lto = true
 # O processo está no hot path de vídeo/OCR; priorize throughput e latência. LTO + strip ainda

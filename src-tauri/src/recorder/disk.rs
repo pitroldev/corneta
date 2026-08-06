@@ -59,6 +59,17 @@ pub fn check_dir(dir: &Path) -> DirCheck {
     DirCheck::healthy(&dir.to_string_lossy(), free_bytes(dir))
 }
 
+/// Nomes dos arquivos da pasta (sem caminho). Quem filtra o que é gravação é o domínio.
+pub fn file_names(dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return vec![];
+    };
+    entries
+        .flatten()
+        .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+        .collect()
+}
+
 /// Tamanho do arquivo em bytes (0 quando não dá pra ler) — é o que responde "o arquivo
 /// está crescendo?" quando o `-progress` não deu as caras.
 pub fn file_len(path: &Path) -> u64 {
