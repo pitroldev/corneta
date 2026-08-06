@@ -752,6 +752,120 @@ mod tests {
         assert!(cfg.validate_and_normalize().is_err());
     }
 
+    fn alvo(id: &str) -> Target {
+        Target {
+            id: id.into(),
+            platform_id: "twitch".into(),
+            name: "Twitch".into(),
+            enabled: true,
+            protocol: "rtmp".into(),
+            ingest_url: "rtmp://live.twitch.tv/app".into(),
+            has_key: false,
+            encoding: TargetEncoding {
+                action: "copy".into(),
+                preset: None,
+                encoder: "auto".into(),
+                hybrid_override: None,
+                reframe: None,
+            },
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // O contrato que sustenta "minha chave sumiu"
+    // ------------------------------------------------------------------
+    //
+    // A stream key NUNCA entra no config.json: ela vive no cofre do Windows,
+    // indexada pelo `target.id`. O `has_key` daqui é só um espelho, recomputado a
+    // cada `get_config` com `keys::has_key(&t.id)`.
+    //
+    // Disso saem dois invariantes, e quebrar qualquer um faz a chave "sumir" da
+    // tela sem ter sumido do cofre.
+
+    /// 1. O ID do destino é a CHAVE DE BUSCA no cofre. Se a normalização o
+    ///    reescrevesse, a credencial ficaria órfã: continua gravada, mas ninguém
+    ///    mais acha — que é exatamente o sintoma "sumiu a chave".
+    #[test]
+    fn normalizar_nao_pode_reescrever_o_id_do_destino() {
+        let mut cfg = AppConfig::default();
+        let ids = ["target_1", "target-abc", "a", "A_9-z"];
+        for id in ids {
+            cfg.targets.push(alvo(id));
+        }
+        cfg.profiles.push(Profile {
+            id: "perfil_1".into(),
+            name: "Live de sexta".into(),
+            mode: "per-platform".into(),
+            targets: ids.iter().map(|id| alvo(id)).collect(),
+        });
+        let cfg = cfg.validate_and_normalize().expect("config válida");
+
+        assert_eq!(
+            cfg.targets
+                .iter()
+                .map(|t| t.id.as_str())
+                .collect::<Vec<_>>(),
+            ids,
+            "id de destino mudou na normalização — a chave no cofre vira órfã"
+        );
+        assert_eq!(
+            cfg.profiles[0]
+                .targets
+                .iter()
+                .map(|t| t.id.as_str())
+                .collect::<Vec<_>>(),
+            ids,
+            "id dentro do perfil mudou — mesma órfã, só que ao trocar de perfil"
+        );
+        assert_eq!(cfg.targets.len(), ids.len(), "destino sumiu da config");
+    }
+
+    /// 2. `has_key` NUNCA é persistido como `true`. Um `true` velho no disco faria
+    ///    a tela jurar que a chave está lá depois de ela ter sido apagada do cofre
+    ///    — e o erro só apareceria ao vivo, na recusa da plataforma.
+    #[test]
+    fn has_key_nunca_e_persistido_como_verdadeiro() {
+        let mut cfg = AppConfig::default();
+        let mut com_chave = alvo("target_1");
+        com_chave.has_key = true;
+        cfg.targets.push(com_chave.clone());
+        cfg.profiles.push(Profile {
+            id: "perfil_1".into(),
+            name: "Podcast".into(),
+            mode: "hybrid".into(),
+            targets: vec![com_chave],
+        });
+
+        let cfg = cfg.validate_and_normalize().expect("config válida");
+        assert!(
+            !cfg.targets[0].has_key,
+            "has_key foi persistido — o disco passaria a mentir sobre o cofre"
+        );
+        assert!(
+            !cfg.profiles[0].targets[0].has_key,
+            "has_key persistido dentro do perfil"
+        );
+    }
+
+    /// O `valid_id` é o mesmo portão do `validate_secret_namespace`: id que passa
+    /// aqui tem que servir de chave no cofre, senão salvar a chave falha depois
+    /// que o destino já existe na tela.
+    #[test]
+    fn todo_id_de_destino_aceito_serve_de_chave_no_cofre() {
+        for id in ["target_1", "abc", "A-9_z"] {
+            let mut cfg = AppConfig::default();
+            cfg.targets.push(alvo(id));
+            assert!(
+                cfg.validate_and_normalize().is_ok(),
+                "id {id:?} recusado na config"
+            );
+            assert!(
+                validate_secret_namespace(id).is_ok(),
+                "id {id:?} vale na config mas não vale no cofre"
+            );
+        }
+    }
+
     #[test]
     fn validates_secret_namespaces() {
         assert!(validate_secret_namespace("target_abc-1").is_ok());

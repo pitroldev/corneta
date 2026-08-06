@@ -195,7 +195,7 @@ Ou seja, a Fase 1–3 reaproveita muita coisa; o maior ganho novo é **gravar a 
 
 ## 12. O que foi implementado (v1)
 
-- **Gravação (Rust):** `session.rs` grava NDJSON por sessão (cabeçalho + amostra a cada ~2s com métricas por destino + CPU/GPU + fim), com poda de retenção. Integrado em `start_engine`/`kill_engine`.
+- **Gravação (Rust):** `session/` grava NDJSON por sessão (cabeçalho + amostra a cada ~2s com métricas por destino + CPU/GPU + fim), com poda de retenção. Integrado em `start_engine`/`kill_engine`.
 - **Comandos:** `list_sessions`, `read_session`, `delete_session`, `open_sessions_dir`.
 - **Frontend:** tela **Relatórios** (histórico → detalhe) com veredito, **gráficos SVG** (bitrate por plataforma + CPU/GPU), resumo por plataforma, **janelas problemáticas** (causa + recomendação) e **linha do tempo de eventos**. Análise em `lib/report.ts`.
 - **OBS (Fase 4):** `obs.rs::poll_stats` coleta render lag + congestionamento na sessão; aparece no gráfico "OBS — render lag" e na classificação de causa (cena pesada × rede).

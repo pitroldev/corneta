@@ -3609,6 +3609,55 @@ mod encoder_cache_tests {
 }
 
 #[cfg(test)]
+mod contrato_do_cofre_tests {
+    /// Toda config que volta pra uma webview PRECISA passar pelo
+    /// `refresh_secret_presence` — o `validate_and_normalize` zera `has_key` antes
+    /// de gravar, então o que sai do disco sempre diz "sem chave nenhuma".
+    ///
+    /// Esquecer isso não quebra teste nem compilação: só faz TODAS as chaves
+    /// sumirem da tela depois de uma mexida qualquer, até reabrir o app. Já
+    /// aconteceu uma vez (é o que o comentário do `refresh_secret_presence`
+    /// conta), e um beta reportou o mesmo sintoma de novo.
+    ///
+    /// Como o caminho real precisa de `AppHandle`, o teste é ESTRUTURAL: lê o
+    /// próprio fonte e cobra que cada emissão de `config://changed` tenha o
+    /// refresh perto, acima dela. Feio, mas é a única rede que pega alguém
+    /// adicionando um emissor novo — que é exatamente como o bug volta.
+    #[test]
+    fn todo_config_changed_e_precedido_de_refresh_secret_presence() {
+        let fonte = include_str!("commands.rs");
+        let linhas: Vec<&str> = fonte.lines().collect();
+        let mut emissores = 0;
+
+        for (n, linha) in linhas.iter().enumerate() {
+            // A menção dentro deste próprio teste e os comentários não contam.
+            if !linha.contains("emit(\"config://changed\"") {
+                continue;
+            }
+            emissores += 1;
+            let inicio = n.saturating_sub(12);
+            let tem_refresh = linhas[inicio..n]
+                .iter()
+                .any(|anterior| anterior.contains("refresh_secret_presence("));
+            assert!(
+                tem_refresh,
+                "linha {}: emite config://changed sem refresh_secret_presence nas 12 linhas acima \
+                 — as chaves vão sumir da tela de quem receber este evento",
+                n + 1
+            );
+        }
+
+        // Se alguém renomear o evento e o padrão parar de casar, o teste passaria
+        // vazio e a proteção sumiria em silêncio.
+        assert!(
+            emissores >= 2,
+            "esperava achar os emissores de config://changed; achei {emissores} — \
+             o evento foi renomeado e este teste virou decoração"
+        );
+    }
+}
+
+#[cfg(test)]
 mod diagnostic_export_tests {
     use super::build_diagnostic_report;
     use crate::config::{ChatSource, Target, TargetEncoding};

@@ -2581,6 +2581,168 @@ fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    // ------------------------------------------------------------------
+    // Entrada hostil nos parsers do chat
+    // ------------------------------------------------------------------
+    //
+    // Por que isto existe, e por que é o teste mais importante deste arquivo:
+    // o perfil de release usa `panic = "abort"`. Um panic em QUALQUER thread mata
+    // o processo inteiro — sem unwind, sem toast, sem log. "O app fecha sozinho"
+    // é exatamente o que um beta reportou.
+    //
+    // Estes parsers são a maior superfície de entrada NÃO CONFIÁVEL do app: texto
+    // de terceiro, vindo de três plataformas, sem contrato nenhum. Hoje eles são
+    // seguros por construção (todo índice sai de `find`, que cai em limite de
+    // caractere), mas isso não está travado por nada: basta alguém escrever um
+    // índice fixo — como o `after[7..end]` que já existe no `kick_fragments` —
+    // pra um emoji derrubar a live de todo mundo.
+    //
+    // A propriedade é sempre a mesma: PODE devolver `None`, NÃO PODE entrar em
+    // pânico.
+
+    /// Coisas que já quebraram parser em algum lugar do mundo.
+    fn corpus_hostil() -> Vec<String> {
+        let mut casos: Vec<String> = vec![
+            String::new(),
+            " ".into(),
+            ":".into(),
+            "@".into(),
+            "@;".into(),
+            "@=".into(),
+            "\u{1}".into(),
+            "\u{1}ACTION".into(),
+            "\u{1}ACTION \u{1}".into(),
+            "\0\0\0".into(),
+            "\r\n".into(),
+            // Multibyte colado no ponto de corte — o caso que o índice fixo quebra.
+            "😀".into(),
+            "[emote:😀]".into(),
+            "[emote:".into(),
+            "[emote:]".into(),
+            "[emote::]".into(),
+            "[emote:1:😀]".into(),
+            "😀[emote:1:x]😀".into(),
+            "[emote:1:x".into(),
+            "]]][emote:".into(),
+            // Combinações que o Twitch manda de verdade.
+            "@badge-info=;badges=;color= :a!a@a.tmi.twitch.tv PRIVMSG #c :oi".into(),
+            "@ :a!a@a PRIVMSG #c :".into(),
+            ":a!a@a PRIVMSG".into(),
+            "PRIVMSG #c :sem tags".into(),
+            "@k=v :n!n@n PRIVMSG #c :\u{1}ACTION dança\u{1}".into(),
+            ":tmi.twitch.tv CLEARCHAT #c".into(),
+            ":tmi.twitch.tv CLEARCHAT #c :".into(),
+            "CLEARCHAT:".into(),
+            // JSON do Kick: forma errada em todos os eixos.
+            "{}".into(),
+            "[]".into(),
+            "null".into(),
+            "não é json".into(),
+            r#"{"event":"x"}"#.into(),
+            r#"{"event":"x","data":"{}"}"#.into(),
+            r#"{"event":"x","data":"não é json aninhado"}"#.into(),
+            r#"{"event":"App\\Events\\ChatMessageEvent","data":"{}"}"#.into(),
+        ];
+        // Grande o bastante pra estourar qualquer teto ingênuo, e multibyte.
+        casos.push("á".repeat(20_000));
+        casos.push(format!(
+            "@{} PRIVMSG #c :{}",
+            "t=v;".repeat(2_000),
+            "😀".repeat(2_000)
+        ));
+        casos.push(format!(
+            "[emote:{}:{}]",
+            "9".repeat(5_000),
+            "ç".repeat(5_000)
+        ));
+        casos
+    }
+
+    #[test]
+    fn parsers_do_chat_nunca_entram_em_panico_com_lixo_da_rede() {
+        let emotes: HashMap<String, String> = HashMap::new();
+        for caso in corpus_hostil() {
+            // Cada um pode devolver None à vontade; o que não pode é abortar.
+            let _ = parse_privmsg(&caso, "fonte", &emotes);
+            let _ = parse_usernotice(&caso, "fonte", &emotes);
+            let _ = clearchat_user(&caso);
+            let _ = parse_kick(&caso, "fonte");
+            let _ = parse_kick_alert(&caso, "fonte");
+            let _ = parse_amount(&caso);
+            let _ = tag_val(twitch_tags(&caso), "id");
+            let frags = kick_fragments(&caso);
+            // Invariante do fragmentador: mensagem NUNCA vira lista vazia, senão
+            // ela some do feed em vez de aparecer sem emote.
+            assert!(
+                !frags.is_empty(),
+                "kick_fragments devolveu vazio para {caso:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn kick_fragments_preserva_o_texto_e_separa_o_emote() {
+        let frags = kick_fragments("oi [emote:37226:Kappa] tudo bem");
+        let texto: String = frags
+            .iter()
+            .filter(|f| f.kind == "text")
+            .filter_map(|f| f.text.clone())
+            .collect();
+        assert_eq!(texto, "oi  tudo bem");
+        let emote = frags.iter().find(|f| f.kind == "emote").expect("tem emote");
+        assert_eq!(emote.text.as_deref(), Some("Kappa"));
+        assert_eq!(
+            emote.url.as_deref(),
+            Some("https://files.kick.com/emotes/37226/fullsize")
+        );
+    }
+
+    /// O corte do `[emote:` usa índice FIXO (`after[7..end]`). Com um emote logo
+    /// depois de um multibyte, é aqui que um deslize de um byte aborta o app.
+    #[test]
+    fn kick_fragments_aguenta_emote_grudado_em_multibyte() {
+        for caso in [
+            "😀[emote:1:a]",
+            "[emote:1:a]😀",
+            "ção[emote:1:ção]ção",
+            "[emote:1:😀][emote:2:😀]",
+        ] {
+            let frags = kick_fragments(caso);
+            assert!(!frags.is_empty(), "vazio para {caso:?}");
+        }
+    }
+
+    #[test]
+    fn privmsg_extrai_o_texto_e_ignora_linha_sem_mensagem() {
+        let emotes: HashMap<String, String> = HashMap::new();
+        let msg = parse_privmsg(
+            "@id=1 :fulano!fulano@fulano.tmi.twitch.tv PRIVMSG #canal :bora cornetar 😀",
+            "meu-canal",
+            &emotes,
+        )
+        .expect("mensagem válida");
+        assert_eq!(msg.author, "fulano");
+        assert_eq!(msg.text, "bora cornetar 😀");
+        assert_eq!(msg.source, "meu-canal");
+        assert_eq!(msg.platform, "twitch");
+        // Sem texto depois do ':' não existe mensagem — não pode virar linha vazia
+        // no feed.
+        assert!(parse_privmsg("@id=1 :a!a@a PRIVMSG #c :", "s", &emotes).is_none());
+        assert!(parse_privmsg("PING :tmi.twitch.tv", "s", &emotes).is_none());
+    }
+
+    #[test]
+    fn tag_val_le_a_tag_certa_e_nao_confunde_prefixo() {
+        let tags = twitch_tags("@id=abc;bits=100;idade=9 :resto");
+        assert_eq!(tag_val(tags, "id").as_deref(), Some("abc"));
+        assert_eq!(tag_val(tags, "bits").as_deref(), Some("100"));
+        // Tag vazia é ausência, não string vazia — senão `bits=` viraria "0 bits".
+        assert_eq!(tag_val("id=;bits=", "bits"), None);
+        assert_eq!(tag_val(tags, "nao-existe"), None);
+    }
+
     use super::parse_amount;
 
     #[test]

@@ -7,7 +7,7 @@
 
 - **Status:** ✅ Implementado (Fases 1–3) · 2026-07-31 — falta a validação numa live de
   verdade (§12). Núcleo do mapeamento em `src/lib/replay.ts` (24 testes) e o gravador em
-  `src-tauri/src/recorder.rs`.
+  `src-tauri/src/recorder/` (núcleo puro + adaptadores, ver §14).
 - **Relacionado:** [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md) (a linha do tempo que já
   existe), [`FEATURE-MAQUINA-DO-TEMPO.md`](./FEATURE-MAQUINA-DO-TEMPO.md) (§13 — o gravador contínuo
   muda o plano do clipe), [`CHAT.md`](./CHAT.md)
@@ -545,7 +545,7 @@ criados durante o replay, miniatura na timeline.
 
 **Fase 1**
 - [x] Extrair a escolha de fonte de `commands.rs:1330-1336` numa função compartilhada
-- [x] `recorder.rs`: spawn/stop do FFmpeg de cópia, entrada no mapa de filhos (`engine.rs:777`)
+- [x] `recorder/`: spawn/stop do FFmpeg de cópia, entrada no mapa de filhos (`engine.rs:777`)
 - [x] Parse do `-progress` → `kind:"recording"` no primeiro frame + `kind:"recSync"` a cada 5 min
 - [x] `parseSession` lê as duas linhas novas; `SessionMeta` ganha `hasVideo`
 - [x] Habilitar `assetProtocol` com escopo restrito + `media-src` na CSP (`tauri.conf.json:26`)
@@ -601,3 +601,33 @@ Como as duas não podem depender uma da outra (a gravação é opt-in e o clipe 
 ela), o desenho que sobrevive aos dois casos é: **`clip_now` pergunta se existe gravação em
 andamento** — se existe, corta do arquivo; se não, sobe o anel. O anel deixa de ser a base e vira o
 fallback de quem não grava. Vale ajustar aquele documento quando esta Fase 1 entrar.
+
+## 14. Estrutura do código (arquitetura hexagonal)
+
+Mesmo desenho do guardião ([`FEATURE-PROTETOR-BUFFER.md`](./FEATURE-PROTETOR-BUFFER.md)): a decisão
+no meio, o I/O nas bordas.
+
+```
+src-tauri/src/recorder/
+  domain.rs   ← núcleo PURO: nomes de segmento, argumentos do FFmpeg, leitura do -progress
+                e a POLÍTICA (quando ancorar, quando considerar morto, retomar, desistir)
+  mod.rs      ← a API pública que o resto do app usa
+  ffmpeg.rs   ← adaptador do encoder: sidecar, -progress, remux, matar a árvore
+  disk.rs     ← adaptador do volume: espaço livre (Win32) e a sondagem real da pasta
+```
+
+O que a divisão compra é o §9.3 virar teste: o orçamento de retomadas — que é quem decide o
+`recording_gave_up` que chega na telemetria — roda inteiro sem subir FFmpeg. Dá pra afirmar em
+teste que uma live de 6h com uma queda por hora **não** desiste (cada segmento gravou de verdade,
+então o orçamento volta), e que cinco spawns que nunca gravaram nada **desistem**. Antes essas duas
+frases só podiam ser verificadas em produção.
+
+Não há `trait` de porta aqui, e é de propósito: cada externo tem uma implementação só, e a
+substituição que valeria teste — a política — já é pura e roda sem nenhum deles. Inverter as
+dependências Tauri de `ffmpeg::run` (`AppHandle`, `AppState`) é o próximo passo se um dia o laço em
+si precisar de teste.
+
+A sessão seguiu o mesmo caminho (`src-tauri/src/session/`), com uma diferença: lá a porta
+`SessionStore` **existe**, porque ela paga — a recuperação de sessão interrompida, que só acontece
+depois de um crash, roda contra um `MemStore` em memória em vez de exigir um desligamento na tomada
+pra ser exercitada.
