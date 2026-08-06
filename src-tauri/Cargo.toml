@@ -66,7 +66,7 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 # OAR-OCR 0.8.1 ainda chama a API de execution providers da RC 12; a RC 13
 # removeu `CPUExecutionProvider`. O pin é o máximo compatível até o upstream adaptar.
 oar-ocr = "0.8.1"
-ort = "=2.0.0-rc.12"
+ort = "=2.0.0-rc.13"
 # windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
 # Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
 keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
