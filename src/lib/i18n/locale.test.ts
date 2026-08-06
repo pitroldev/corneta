@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   detectSystemLocale,
   resolveLocale,
@@ -20,7 +20,32 @@ describe("detectSystemLocale", () => {
   it("idioma que não temos cai no padrão", () => {
     expect(detectSystemLocale(["ja", "ko"])).toBe("pt-BR");
     expect(detectSystemLocale([])).toBe("pt-BR");
-    expect(detectSystemLocale(undefined)).toBe("pt-BR");
+  });
+});
+
+/** Sem argumento, a função lê `navigator.languages` — é assim que o "automático"
+ *  funciona no WebView2. Aqui o navigator é FIXADO de propósito: passar
+ *  `undefined` aciona o parâmetro padrão, e sem fixar o teste passaria a medir o
+ *  idioma de quem está rodando (verde no Windows em pt-BR, vermelho no CI em
+ *  inglês) em vez de medir a função. */
+describe("detectSystemLocale sem argumento", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("segue o idioma do sistema quando é um que a gente tem", () => {
+    vi.stubGlobal("navigator", { languages: ["en-US", "en"] });
+    expect(detectSystemLocale()).toBe("en");
+  });
+
+  it("cai no padrão num sistema que a gente não fala", () => {
+    vi.stubGlobal("navigator", { languages: ["ja-JP", "ko"] });
+    expect(detectSystemLocale()).toBe("pt-BR");
+  });
+
+  it("cai no padrão quando não há navigator nenhum", () => {
+    vi.stubGlobal("navigator", undefined);
+    expect(detectSystemLocale()).toBe("pt-BR");
   });
 });
 
