@@ -95,7 +95,7 @@ windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "St
 # o mesmo já fixado pelo wry — sem binding nativo duplicado.
 # O WebView retornado pelo Wry/Tauri usa os bindings 0.38; misturar 0.39 cria
 # interfaces COM de versões distintas de windows-core. Atualizar junto do Wry.
-webview2-com = "=0.38.2"
+webview2-com = "=0.39.1"
 
 [profile.release]
 # `unwind`, e NÃO `abort`. Com `abort`, um pânico em QUALQUER thread matava o processo
