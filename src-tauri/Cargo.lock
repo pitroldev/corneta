@@ -1015,7 +1015,7 @@ dependencies = [
 
 [[package]]
 name = "corneta"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "axum",
  "base64 0.23.0",
