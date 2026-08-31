@@ -1,9 +1,11 @@
-//! Chat unificado multi-fonte: conecta em várias fontes (várias Twitch/YouTube/Kick)
+//! Chat unificado multi-fonte: conecta em várias fontes (Twitch/YouTube/Kick/Cinefy)
 //! e emite mensagens normalizadas (com emotes, badges, origem) + deleções, via eventos
 //! `chat://message`, `chat://status` e `chat://delete`.
+mod cinefy;
+
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
@@ -36,7 +38,7 @@ pub struct ChatBadge {
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub id: String,
-    pub platform: String, // "twitch" | "youtube" | "kick"
+    pub platform: String, // "twitch" | "youtube" | "kick" | "cinefy"
     pub source: String,   // rótulo da fonte (canal/slug) — distingue 2 da mesma plataforma
     pub author: String,
     /// ID do AUTOR na plataforma (Twitch user-id) — pra moderar sem lookup por nome.
@@ -64,6 +66,58 @@ pub struct ChatRuntime {
 static MSG_ID: AtomicU64 = AtomicU64::new(1);
 fn next_id() -> String {
     MSG_ID.fetch_add(1, Ordering::Relaxed).to_string()
+}
+
+/// Janela idempotente do domínio normalizado. Adaptadores com histórico podem
+/// reentregar mensagens após reconectar; elas não devem reaparecer no overlay,
+/// na gravação nem nas métricas antes mesmo de chegar aos stores das webviews.
+const NATIVE_DEDUP_CAP: usize = 4_096;
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct NativeMessageKey {
+    platform: String,
+    source: String,
+    native_id: String,
+}
+
+#[derive(Default)]
+struct NativeMessageDedup {
+    seen: HashSet<NativeMessageKey>,
+    order: VecDeque<NativeMessageKey>,
+}
+
+impl NativeMessageDedup {
+    fn accept(&mut self, msg: &ChatMessage) -> bool {
+        let Some(native_id) = msg.native_id.as_deref() else {
+            return true;
+        };
+        let key = NativeMessageKey {
+            platform: msg.platform.clone(),
+            source: msg.source.clone(),
+            native_id: native_id.to_string(),
+        };
+        if !self.seen.insert(key.clone()) {
+            return false;
+        }
+        self.order.push_back(key);
+        while self.order.len() > NATIVE_DEDUP_CAP {
+            if let Some(oldest) = self.order.pop_front() {
+                self.seen.remove(&oldest);
+            }
+        }
+        true
+    }
+}
+
+static NATIVE_DEDUP: OnceLock<Mutex<NativeMessageDedup>> = OnceLock::new();
+
+fn first_native_delivery(msg: &ChatMessage) -> bool {
+    NATIVE_DEDUP
+        .get_or_init(|| Mutex::new(NativeMessageDedup::default()))
+        .lock()
+        .map(|mut dedup| dedup.accept(msg))
+        // Se o lock estiver envenenado, preservar chat é melhor que perder mensagem.
+        .unwrap_or(true)
 }
 /// Mensagens de chat POR CANAL (`plataforma:fonte`) desde a última amostra — o motor
 /// drena a cada ~2s e isso vira a taxa de chat e a fatia de cada canal no relatório.
@@ -128,6 +182,9 @@ fn frags_to_text(frags: &[ChatFragment]) -> String {
 }
 
 fn emit_chat(app: &AppHandle, msg: ChatMessage) {
+    if !first_native_delivery(&msg) {
+        return;
+    }
     if let Ok(mut counts) = msg_counts().lock() {
         *counts
             .entry(format!("{}:{}", msg.platform, msg.source))
@@ -346,6 +403,23 @@ pub fn start_chat(app: &AppHandle) {
                     }
                 });
             }
+            "cinefy" => {
+                tauri::async_runtime::spawn_blocking(move || {
+                    let mut backoff: u32 = 15;
+                    while run2.load(Ordering::Relaxed) {
+                        let sink = CinefySink {
+                            app: app2.clone(),
+                            source: label.clone(),
+                            gen,
+                        };
+                        if sem_panico(&plat, &label, || cinefy::run(&value, run2.clone(), &sink)) {
+                            backoff = 15;
+                        }
+                        reconnect_for(&run2, backoff);
+                        backoff = (backoff * 2).min(300);
+                    }
+                });
+            }
             _ => {}
         }
     }
@@ -402,6 +476,69 @@ fn reconnect_for(running: &AtomicBool, ticks: u32) {
             return;
         }
         thread::sleep(Duration::from_millis(200));
+    }
+}
+
+// ---------------------------- Cinefy -------------------------------
+
+/// Adaptador de saída da porta Cinefy para o domínio já normalizado da Corneta.
+/// HTTP, Pusher e JSON ficam confinados em `chat/cinefy/adapter.rs`.
+struct CinefySink {
+    app: AppHandle,
+    source: String,
+    gen: u64,
+}
+
+impl cinefy::OutputPort for CinefySink {
+    fn status(&self, status: cinefy::ConnectionStatus) {
+        let status = match status {
+            cinefy::ConnectionStatus::Connected => "connected",
+            cinefy::ConnectionStatus::Disconnected => "disconnected",
+            cinefy::ConnectionStatus::Error => "error",
+        };
+        chat_status_gen(&self.app, self.gen, "cinefy", &self.source, status);
+    }
+
+    fn publish(&self, event: cinefy::Event) {
+        if CHAT_GEN.load(Ordering::SeqCst) != self.gen {
+            return;
+        }
+        match event {
+            cinefy::Event::Message(message) => {
+                let text = message.text;
+                emit_chat_gen(
+                    &self.app,
+                    self.gen,
+                    ChatMessage {
+                        id: next_id(),
+                        platform: "cinefy".into(),
+                        source: self.source.clone(),
+                        author: message.author,
+                        author_id: message.author_id,
+                        native_id: Some(message.native_id),
+                        color: message.color,
+                        fragments: vec![text_frag(&text)],
+                        badges: message
+                            .badges
+                            .into_iter()
+                            .map(|badge| ChatBadge {
+                                label: badge.label,
+                                kind: badge.kind,
+                            })
+                            .collect(),
+                        text,
+                        ts: if message.published_at_ms == 0 {
+                            now_ms()
+                        } else {
+                            message.published_at_ms
+                        },
+                    },
+                );
+            }
+            cinefy::Event::DeleteMessage { native_id } => {
+                delete_message(&self.app, "cinefy", &native_id);
+            }
+        }
     }
 }
 
@@ -2614,6 +2751,43 @@ fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn native_message(source: &str, native_id: Option<&str>) -> ChatMessage {
+        ChatMessage {
+            id: "local".into(),
+            platform: "cinefy".into(),
+            source: source.into(),
+            author: "autor".into(),
+            author_id: None,
+            native_id: native_id.map(String::from),
+            color: None,
+            text: "oi".into(),
+            fragments: vec![text_frag("oi")],
+            badges: vec![],
+            ts: 1,
+        }
+    }
+
+    #[test]
+    fn dedup_nativo_e_idempotente_por_plataforma_e_fonte_e_tem_teto() {
+        let mut dedup = NativeMessageDedup::default();
+        let first = native_message("canal-a", Some("id-1"));
+        assert!(dedup.accept(&first));
+        assert!(!dedup.accept(&first));
+        assert!(dedup.accept(&native_message("canal-b", Some("id-1"))));
+        let local = native_message("canal-a", None);
+        assert!(dedup.accept(&local));
+        assert!(dedup.accept(&local));
+
+        let mut bounded = NativeMessageDedup::default();
+        for i in 0..=NATIVE_DEDUP_CAP {
+            assert!(bounded.accept(&native_message("canal", Some(&format!("id-{i}")))));
+        }
+        assert_eq!(bounded.order.len(), NATIVE_DEDUP_CAP);
+        assert_eq!(bounded.seen.len(), NATIVE_DEDUP_CAP);
+        // O primeiro saiu da janela e pode voltar sem crescimento ilimitado.
+        assert!(bounded.accept(&native_message("canal", Some("id-0"))));
+    }
 
     // ------------------------------------------------------------------
     // Entrada hostil nos parsers do chat

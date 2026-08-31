@@ -621,13 +621,15 @@ function TargetRow({
 // O fragmento só existe por causa da preposição + gênero do português ("o chat
 // DA Twitch", "DO YouTube"). Em inglês a frase pede o nome cru ("Want Twitch
 // chat…"), então o mapa some e entra o nome do catálogo.
-const CHAT_BRIDGE_LABEL_PT: Record<ChatPlatform, string> = {
+type StreamChatPlatform = Extract<PlatformId, ChatPlatform>;
+
+const CHAT_BRIDGE_LABEL_PT: Record<StreamChatPlatform, string> = {
   twitch: "da Twitch",
   youtube: "do YouTube",
   kick: "da Kick",
 };
 
-function isChatPlatform(id: PlatformId): id is ChatPlatform {
+function isChatPlatform(id: PlatformId): id is StreamChatPlatform {
   return id === "twitch" || id === "youtube" || id === "kick";
 }
 

@@ -213,7 +213,8 @@ export interface ObsCheck {
   error?: string;
 }
 
-export type ChatPlatform = "twitch" | "youtube" | "kick";
+/** Fontes de chat. Cinefy é somente chat; não é um destino de transmissão. */
+export type ChatPlatform = "twitch" | "youtube" | "kick" | "cinefy";
 
 export interface ChatSource {
   id: string;

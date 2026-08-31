@@ -414,7 +414,7 @@ function ModButtons({
   );
 }
 
-// Estado vazio: os 3 chats (Twitch/Kick/YouTube) afunilam num feed só — a cara da tela.
+// Estado vazio: as quatro fontes de chat afunilam num feed só — a cara da tela.
 function ChatFunnel() {
   return (
     <div className="flex items-center gap-1" aria-hidden>
@@ -422,10 +422,11 @@ function ChatFunnel() {
         <PlatformGlyph id="twitch" size={20} />
         <PlatformGlyph id="kick" size={20} />
         <PlatformGlyph id="youtube" size={20} />
+        <PlatformGlyph id="cinefy" size={20} />
       </div>
       <svg
-        viewBox="0 0 44 72"
-        className="h-[4.5rem] w-11 text-brass"
+        viewBox="0 0 44 84"
+        className="h-[5.25rem] w-11 text-brass"
         fill="none"
         aria-hidden
       >
@@ -435,10 +436,11 @@ function ChatFunnel() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M4 12 C26 12 20 36 36 36" />
-          <path d="M4 36 H36" />
-          <path d="M4 60 C26 60 20 36 36 36" />
-          <path d="M29 30 L37 36 L29 42" />
+          <path d="M4 9 C25 9 20 42 36 42" />
+          <path d="M4 31 C23 31 22 42 36 42" />
+          <path d="M4 53 C23 53 22 42 36 42" />
+          <path d="M4 75 C25 75 20 42 36 42" />
+          <path d="M29 36 L37 42 L29 48" />
         </g>
       </svg>
       <div className="grid size-11 place-items-center rounded-md bg-brass-ink text-brass pop">

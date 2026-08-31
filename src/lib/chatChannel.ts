@@ -8,6 +8,7 @@ import type { ChatPlatform } from "./types";
  *
  * - Twitch: login puro em minúsculas; rejeita rotas reservadas (/videos, /directory, clipe…).
  * - Kick:   slug puro em minúsculas.
+ * - Cinefy: slug público em minúsculas, inclusive quando veio do link de popout.
  * - YouTube: preserva VÍDEO × CANAL — vídeo vira o ID; canal vira `@handle`, `UC…`, ou
  *   `youtube.com/c|user/<nome>`; um token solto vira `@handle` (é campo de "canal").
  */
@@ -24,6 +25,8 @@ export function normalizeChatChannel(
       return normKick(s);
     case "youtube":
       return normYouTube(s);
+    case "cinefy":
+      return normCinefy(s);
     default:
       return s;
   }
@@ -115,6 +118,33 @@ function normKick(s: string): string {
   return foldAscii(seg)
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, "");
+}
+
+// ------------------------------ Cinefy -------------------------------
+
+const CINEFY_RESERVED = new Set([
+  "creators",
+  "login",
+  "media",
+  "search",
+  "shorts",
+  "watch",
+]);
+
+function normCinefy(s: string): string {
+  let t = s.replace(/^https?:\/\//i, "");
+  if (/^www\.cinefy\.gg(\/|$)/i.test(t))
+    t = t.replace(/^www\.cinefy\.gg\/?/i, "");
+  else if (/^cinefy\.gg(\/|$)/i.test(t)) t = t.replace(/^cinefy\.gg\/?/i, "");
+
+  const parts = t.split(/[/?#]/).filter(Boolean);
+  let slug = parts[0] ?? "";
+  if (slug.toLowerCase() === "popout") slug = parts[1] ?? "";
+  if (CINEFY_RESERVED.has(slug.toLowerCase())) return "";
+  const clean = foldAscii(slug.replace(/^@+/, ""))
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/g, "");
+  return clean.length <= 64 ? clean : "";
 }
 
 // ------------------------------- YouTube ------------------------------

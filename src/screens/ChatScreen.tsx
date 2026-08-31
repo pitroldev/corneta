@@ -49,6 +49,7 @@ import type {
 import {
   Button,
   Card,
+  ExperimentalBadge,
   Input,
   PlatformGlyph,
   SectionTitle,
@@ -61,25 +62,35 @@ import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { AlertsFeed } from "../components/AlertsFeed";
 import { Modal } from "../components/Modal";
 
-const PLATFORM_OPTS = [
+const PLATFORM_OPTS: { value: ChatPlatform; label: string }[] = [
   { value: "twitch", label: "Twitch" },
   { value: "kick", label: "Kick" },
   { value: "youtube", label: "YouTube" },
+  { value: "cinefy", label: "Cinefy · experimental" },
 ];
-const VALUE_LABEL: Record<string, MessageKey> = {
+const CHAT_PLATFORM_LABEL: Record<ChatPlatform, string> = {
+  twitch: "Twitch",
+  kick: "Kick",
+  youtube: "YouTube",
+  cinefy: "Cinefy",
+};
+const VALUE_LABEL: Record<ChatPlatform, MessageKey> = {
   twitch: "chat.source.value.twitch",
   kick: "chat.source.value.kick",
   youtube: "chat.source.value.youtube",
+  cinefy: "chat.source.value.cinefy",
 };
-const PLACEHOLDER: Record<string, MessageKey> = {
+const PLACEHOLDER: Record<ChatPlatform, MessageKey> = {
   twitch: "chat.source.placeholder.twitch",
   kick: "chat.source.placeholder.kick",
   youtube: "chat.source.placeholder.youtube",
+  cinefy: "chat.source.placeholder.cinefy",
 };
-const HINT: Record<string, MessageKey> = {
+const HINT: Record<ChatPlatform, MessageKey> = {
   twitch: "chat.source.hint.twitch",
   kick: "chat.source.hint.kick",
   youtube: "chat.source.hint.youtube",
+  cinefy: "chat.source.hint.cinefy",
 };
 
 type ConfigTab = "canais" | "conta" | "alertas" | "overlays" | "exibicao";
@@ -158,6 +169,7 @@ export function ChatScreen() {
     twitch: true,
     youtube: true,
     kick: true,
+    cinefy: true,
   });
 
   // Deep-link de outra tela (ex.: teaser "Título da live" no Ao vivo) → abre o modal
@@ -213,7 +225,7 @@ export function ChatScreen() {
   ];
   const showFilters = feedPlatforms.length > 1;
   const shown =
-    !showFilters || (filter.twitch && filter.youtube && filter.kick)
+    !showFilters || feedPlatforms.every((platform) => filter[platform])
       ? messages
       : messages.filter((m) => filter[m.platform]);
   const allFilteredOut = messages.length > 0 && shown.length === 0;
@@ -599,23 +611,24 @@ export function ChatScreen() {
                     <span className="px-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
                       {t("chat.channels.which")}
                     </span>
-                    {(["twitch", "kick", "youtube"] as const).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => {
-                          addSource(p);
-                          setAdding(false);
-                        }}
-                        className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-xs font-bold ring-1 ring-border transition hover:-translate-y-px hover:text-ink"
-                      >
-                        <PlatformGlyph id={p} size={18} />
-                        {p === "twitch"
-                          ? "Twitch"
-                          : p === "kick"
-                            ? "Kick"
-                            : "YouTube"}
-                      </button>
-                    ))}
+                    {(["twitch", "kick", "youtube", "cinefy"] as const).map(
+                      (p) => (
+                        <button
+                          key={p}
+                          onClick={() => {
+                            addSource(p);
+                            setAdding(false);
+                          }}
+                          className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-xs font-bold ring-1 ring-border transition hover:-translate-y-px hover:text-ink"
+                        >
+                          <PlatformGlyph id={p} size={18} />
+                          {CHAT_PLATFORM_LABEL[p]}
+                          {p === "cinefy" && (
+                            <ExperimentalBadge className="ml-0.5 scale-90" />
+                          )}
+                        </button>
+                      ),
+                    )}
                   </div>
                 )}
 
@@ -996,9 +1009,7 @@ export function ChatScreen() {
             <FilterChip
               key={p}
               id={p}
-              label={
-                p === "twitch" ? "Twitch" : p === "kick" ? "Kick" : "YouTube"
-              }
+              label={CHAT_PLATFORM_LABEL[p]}
               on={filter[p]}
               onClick={() => setFilter((f) => ({ ...f, [p]: !f[p] }))}
             />
@@ -1601,6 +1612,7 @@ const statusExplain = (t: Translate, platform: string, status: string) => {
   if (status === "error") {
     if (platform === "kick") return t("chat.status.explain.error.kick");
     if (platform === "youtube") return t("chat.status.explain.error.youtube");
+    if (platform === "cinefy") return t("chat.status.explain.error.cinefy");
     return t("chat.status.explain.error");
   }
   return t("chat.status.explain.connecting");
@@ -1620,12 +1632,7 @@ function SourceCard({
   const [confirmRemove, setConfirmRemove] = useState(false);
   const inputCls =
     "h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass";
-  const platLabel =
-    src.platform === "twitch"
-      ? "Twitch"
-      : src.platform === "kick"
-        ? "Kick"
-        : "YouTube";
+  const platLabel = CHAT_PLATFORM_LABEL[src.platform];
   return (
     <div
       className={cn(
@@ -1641,6 +1648,9 @@ function SourceCard({
             <span className="shrink-0 font-display text-sm font-bold">
               {platLabel}
             </span>
+            {src.platform === "cinefy" && (
+              <ExperimentalBadge className="ml-1 scale-90" />
+            )}
             {src.value.trim() ? (
               <span className="truncate text-xs text-ink-muted">
                 · {src.value}

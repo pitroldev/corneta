@@ -21,6 +21,13 @@ const cases: [Parameters<typeof normalizeChatChannel>[0], string, string][] = [
   ["kick", "https://kick.com/pitrol/videos", "pitrol"],
   ["kick", "https://kick.com", ""],
   ["kick", "kick.com", ""],
+  // Cinefy → slug (integração experimental)
+  ["cinefy", "@Kett", "kett"],
+  ["cinefy", "https://cinefy.gg/popout/kett/chat?type=overlay", "kett"],
+  ["cinefy", "https://cinefy.gg/kett", "kett"],
+  ["cinefy", "https://cinefy.gg/watch", ""],
+  ["cinefy", "https://cinefy.gg", ""],
+  ["cinefy", "a".repeat(65), ""],
   // YouTube
   ["youtube", "@Pitrol?si=x", "@Pitrol"],
   ["youtube", "https://www.youtube.com/@Pitrol/live", "@Pitrol"],

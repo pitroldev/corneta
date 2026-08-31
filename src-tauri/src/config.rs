@@ -356,7 +356,7 @@ fn de_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
 #[serde(rename_all = "camelCase")]
 pub struct ChatSource {
     pub id: String,
-    pub platform: String, // twitch | youtube | kick
+    pub platform: String, // twitch | youtube | kick | cinefy
     pub value: String,    // canal/slug/vídeo
     #[serde(default)]
     pub name: String,

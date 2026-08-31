@@ -210,7 +210,7 @@ export const en: Dict = {
   "chat.channels.add": "Add channel",
   // No JSX os nomes das plataformas estão dentro de <strong>; a frase precisa ficar inteira numa chave só.
   "chat.channels.empty":
-    "No channels yet. Add one from **Twitch**, **Kick** or **YouTube** — you can add more than one from the same platform (two Twitch channels, say).",
+    "No channels yet. Add one from **Twitch**, **Kick**, **YouTube** or **Cinefy (experimental)** — you can add more than one from the same platform (two Twitch channels, say).",
   // Rótulo da seção dentro da aba (mesma palavra da aba, chave separada porque pode divergir).
   "chat.channels.section": "Channels",
   // Aparece 2x: escolha de plataforma e escolha de fonte de alerta.
@@ -279,7 +279,7 @@ export const en: Dict = {
   "chat.alerts.verb.tip": "tipped",
   // ---- Estado vazio do feed de chat ----
   "chat.feed.empty.disconnected.body":
-    "Add a channel (Twitch, Kick or YouTube) and click Connect to pull the chat in.",
+    "Add a channel (Twitch, Kick, YouTube or experimental Cinefy) and click Connect to pull the chat in.",
   "chat.feed.empty.disconnected.title": "Chat's disconnected",
   "chat.feed.empty.filtered.body":
     "You turned every platform off. Flip one back on up there to see the chat again.",
@@ -289,12 +289,12 @@ export const en: Dict = {
   "chat.feed.empty.waiting.title": "Waiting on messages…",
   "chat.feed.hint.ready": "Until you connect, Corneta isn't reading your chat.",
   "chat.feed.hint.setup":
-    "Add a channel (Twitch, Kick or YouTube) and click Connect.",
+    "Add a channel (Twitch, Kick, YouTube or experimental Cinefy) and click Connect.",
   // Mesmo termo da LP (protection.chat.kicker).
   "chat.header.kicker": "Everyone in one feed",
   // LP já traduz "2 Twitches" como "two Twitch channels at once".
   "chat.header.subtitle":
-    "Twitch, Kick and YouTube in the same feed — up to two Twitch channels.",
+    "Twitch, Kick, YouTube and experimental Cinefy in the same feed — up to two Twitch channels.",
   // Mesmo termo da LP (protection.chat.tabs.chat.title).
   "chat.header.title": "Unified chat",
   // "Developer" é o nome da página em kick.com/settings/developer.
@@ -445,6 +445,8 @@ export const en: Dict = {
   // Assume o limite antes (§3.4). "SEUNOME" é texto de exemplo dentro da URL, traduzido pra YOURNAME.
   "chat.source.hint.kick":
     "The name in the link: kick.com/YOURNAME. Kick sometimes blocks reading the chat and it won't connect.",
+  "chat.source.hint.cinefy":
+    "The name in the Cinefy link. Experimental and read-only: it relies on undocumented endpoints that may change without notice.",
   "chat.source.hint.twitch":
     "Just the channel name — whatever comes after twitch.tv/.",
   "chat.source.hint.youtube": "Your channel (@handle, URL or ID).",
@@ -455,6 +457,7 @@ export const en: Dict = {
   // Renderizado como "· {texto}".
   "chat.source.noChannel": "no channel",
   "chat.source.placeholder.kick": "e.g. xqc",
+  "chat.source.placeholder.cinefy": "e.g. kett",
   // "pitrol" é um handle real de exemplo — decisão humana se troca.
   "chat.source.placeholder.twitch": "e.g. pitrol",
   "chat.source.placeholder.youtube": "e.g. @yourchannel",
@@ -463,6 +466,7 @@ export const en: Dict = {
   // Rótulo acessível do Toggle; aparece no card de canal e no de fonte de alerta.
   "chat.source.toggle": "Turn it on or off",
   "chat.source.value.kick": "Name in the link",
+  "chat.source.value.cinefy": "Name in the link",
   "chat.source.value.twitch": "Channel",
   "chat.source.value.youtube": "Channel",
   // Reticência de estado de espera (§6 do tom de voz).
@@ -473,6 +477,8 @@ export const en: Dict = {
     "dropped — check the channel name; I'm retrying on my own",
   "chat.status.explain.error.kick":
     "dropped — Kick sometimes blocks reading the chat; I'm retrying on my own",
+  "chat.status.explain.error.cinefy":
+    "dropped — the experimental Cinefy integration didn't answer; I'm retrying on my own",
   "chat.status.explain.error.youtube":
     "dropped — check the channel (@handle or URL); I'm retrying on my own",
   "chat.status.explain.live": "live",
@@ -1892,14 +1898,20 @@ export const en: Dict = {
   "reports.list.empty.body":
     "When your stream ends, I build the report right here.",
   "reports.list.empty.title": "No streams yet",
+  "reports.list.archive": "Earlier streams",
+  "reports.list.archiveCount.one": "1 more stream in your archive",
+  "reports.list.archiveCount.other": "{count} more streams in your archive",
   // Mesmo termo da LP (quality.journey.after.sticker).
   "reports.list.kicker": "After the stream",
+  "reports.list.latest": "Latest stream",
+  "reports.list.openStory": "Open the stream story",
   // Rótulo de botão = verbo do que vai acontecer.
   "reports.list.openFolder": "Open folder",
+  "reports.list.result": "Recap",
   // 'travou' aqui é o engasgo da transmissão → 'choked' (mesmo verbo da LP: 'a report on what choked').
   "reports.list.subtitle":
-    "How every stream went: what choked, and what kept people watching.",
-  "reports.list.title": "Reports",
+    "Replay every broadcast, see what kept people around, and carry the lessons into your next one.",
+  "reports.list.title": "Your streams",
   // Rótulo da linha tracejada em 92%.
   "reports.machine.dangerLine": "danger zone",
   "reports.machine.title": "Machine load (%)",
@@ -1978,6 +1990,28 @@ export const en: Dict = {
   "reports.stat.peakViewers": "Peak viewers",
   "reports.stat.raids": "Raids",
   "reports.stat.subs": "Subs",
+  "reports.story.community.desc":
+    "Chat, alerts, and channels show where the conversation picked up.",
+  "reports.story.community.title": "The crowd joined the story",
+  "reports.story.noEngagement":
+    "This session did not record viewer or engagement data.",
+  "reports.story.replay.desc":
+    "The replay takes center stage: use the moments and charts below to jump straight to what matters.",
+  "reports.story.replay.missingBody":
+    "You can still follow the viewers, highlights, and rough patches recorded during the broadcast.",
+  "reports.story.replay.missingDesc":
+    "There is no video this time, so the story continues through the signals the stream left behind.",
+  "reports.story.replay.missingTitle": "This stream was not recorded",
+  "reports.story.replay.title": "Watch the stream again",
+  "reports.story.technical.clean": "All clear",
+  "reports.story.technical.desc":
+    "Bitrate, CPU/GPU, OBS, destinations, and the full event log stay here when you need to investigate.",
+  "reports.story.technical.review": "Worth a look",
+  "reports.story.technical.title": "What happened backstage",
+  "reports.story.timeline.desc":
+    "The viewer curve and standout moments show where the broadcast changed pace.",
+  "reports.story.timeline.title": "How the stream unfolded",
+  "reports.story.verdict": "In one sentence",
   // Rodapé do gráfico e cabeçalho de coluna do HTML.
   "reports.viewers.peak": "Peak",
   "reports.viewers.raidsLegend": "● raids",

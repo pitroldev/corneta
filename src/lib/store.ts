@@ -704,6 +704,20 @@ export const useStore = create<State>((set, get) => {
       return api.subscribeChat(
         (m) =>
           set((s) => {
+            // IDs nativos formam a chave idempotente na borda do feed. Adaptadores que
+            // reentregam histórico após uma reconexão (como a Cinefy) não precisam
+            // conhecer o estado da UI nem carregar deduplicação entre gerações.
+            if (
+              m.nativeId &&
+              s.chatMessages.some(
+                (seen) =>
+                  seen.platform === m.platform &&
+                  seen.source === m.source &&
+                  seen.nativeId === m.nativeId,
+              )
+            ) {
+              return {};
+            }
             if (s.chatMessages.length < CHAT_CAP) {
               return { chatMessages: [...s.chatMessages, m] };
             }

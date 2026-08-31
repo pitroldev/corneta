@@ -156,7 +156,7 @@ export const pt = {
   "chat.byok.useSaved": "Usar as credenciais que já salvei",
   "chat.channels.add": "Adicionar canal",
   "chat.channels.empty":
-    "Nenhum canal ainda. Adicione um da **Twitch**, **Kick** ou **YouTube** — pode repetir a mesma (ex.: 2 Twitches).",
+    "Nenhum canal ainda. Adicione um da **Twitch**, **Kick**, **YouTube** ou **Cinefy (experimental)** — pode repetir a mesma (ex.: 2 Twitches).",
   "chat.channels.section": "Canais",
   "chat.channels.which": "De qual?",
   "chat.clear": "Limpar",
@@ -212,7 +212,7 @@ export const pt = {
   "chat.alerts.verb.tip": "doou",
   // ---- Estado vazio do feed de chat ----
   "chat.feed.empty.disconnected.body":
-    "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar pra puxar o chat.",
+    "Adicione um canal (Twitch, Kick, YouTube ou Cinefy experimental) e clique em Conectar pra puxar o chat.",
   "chat.feed.empty.disconnected.title": "Chat desconectado",
   "chat.feed.empty.filtered.body":
     "Você desligou todas as plataformas. Religa uma ali em cima pra ver o chat de novo.",
@@ -223,10 +223,10 @@ export const pt = {
   "chat.feed.hint.ready":
     "Enquanto não ligar, a Corneta não lê nada do seu chat.",
   "chat.feed.hint.setup":
-    "Adicione um canal (Twitch, Kick ou YouTube) e clique em Conectar.",
+    "Adicione um canal (Twitch, Kick, YouTube ou Cinefy experimental) e clique em Conectar.",
   "chat.header.kicker": "A galera junta",
   "chat.header.subtitle":
-    "Twitch, Kick e YouTube no mesmo feed — até 2 Twitches.",
+    "Twitch, Kick, YouTube e Cinefy experimental no mesmo feed — até 2 Twitches.",
   "chat.header.title": "Chat unificado",
   "chat.kick.creds.openDeveloper": "abrir Developer",
   "chat.kick.creds.redirect":
@@ -339,6 +339,8 @@ export const pt = {
   "chat.source.expand": "Expandir canal",
   "chat.source.hint.kick":
     "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
+  "chat.source.hint.cinefy":
+    "O nome no link da Cinefy. Experimental e somente leitura: depende de endpoints não documentados e pode mudar sem aviso.",
   "chat.source.hint.twitch":
     "Só o nome do canal — o que vem depois de twitch.tv/.",
   "chat.source.hint.youtube": "Seu canal (@handle, URL ou ID).",
@@ -347,12 +349,14 @@ export const pt = {
   "chat.source.nickname.placeholder": "ex.: Pitrol",
   "chat.source.noChannel": "sem canal",
   "chat.source.placeholder.kick": "ex.: xqc",
+  "chat.source.placeholder.cinefy": "ex.: kett",
   "chat.source.placeholder.twitch": "ex.: pitrol",
   "chat.source.placeholder.youtube": "ex.: @seucanal",
   "chat.source.platformLabel": "Plataforma",
   "chat.source.remove": "Remover canal",
   "chat.source.toggle": "Ligar ou desligar",
   "chat.source.value.kick": "Nome no link",
+  "chat.source.value.cinefy": "Nome no link",
   "chat.source.value.twitch": "Canal",
   "chat.source.value.youtube": "Canal",
   "chat.status.connecting": "conectando…",
@@ -362,6 +366,8 @@ export const pt = {
     "caiu — confira o nome do canal; tô tentando de novo sozinho",
   "chat.status.explain.error.kick":
     "caiu — às vezes a Kick bloqueia a leitura; tô tentando de novo sozinho",
+  "chat.status.explain.error.cinefy":
+    "caiu — a integração experimental da Cinefy não respondeu; tô tentando de novo sozinho",
   "chat.status.explain.error.youtube":
     "caiu — confira o canal (@handle ou URL); tô tentando de novo sozinho",
   "chat.status.explain.live": "no ar",
@@ -1392,11 +1398,17 @@ export const pt = {
   "reports.list.empty.body":
     "Quando a live encerra, monto o relatório dela aqui.",
   "reports.list.empty.title": "Nenhuma live ainda",
+  "reports.list.archive": "Lives anteriores",
+  "reports.list.archiveCount.one": "Mais 1 live no arquivo",
+  "reports.list.archiveCount.other": "Mais {count} lives no arquivo",
   "reports.list.kicker": "Depois da live",
+  "reports.list.latest": "Última live",
+  "reports.list.openStory": "Abrir a história da live",
   "reports.list.openFolder": "Abrir pasta",
+  "reports.list.result": "Resumo",
   "reports.list.subtitle":
-    "O retrato de cada live: o que travou e o que prendeu a galera.",
-  "reports.list.title": "Relatórios",
+    "Reveja cada transmissão, entenda o que prendeu a galera e leve os aprendizados pra próxima.",
+  "reports.list.title": "Suas lives",
   "reports.machine.dangerLine": "zona de perigo",
   "reports.machine.title": "Carga da máquina (%)",
   "reports.marker.error": "● erro",
@@ -1456,6 +1468,28 @@ export const pt = {
   "reports.stat.peakViewers": "Pico de viewers",
   "reports.stat.raids": "Raids",
   "reports.stat.subs": "Inscrições",
+  "reports.story.community.desc":
+    "Chat, alertas e canais mostram onde a conversa ganhou força.",
+  "reports.story.community.title": "A galera entrou na história",
+  "reports.story.noEngagement":
+    "Esta sessão não registrou dados de audiência ou engajamento.",
+  "reports.story.replay.desc":
+    "O replay é o centro: use os momentos e gráficos abaixo para voltar direto ao que importa.",
+  "reports.story.replay.missingBody":
+    "Ainda dá pra acompanhar a audiência, os destaques e os problemas registrados durante a transmissão.",
+  "reports.story.replay.missingDesc":
+    "Não há vídeo desta vez, então a história continua pelos sinais que a live deixou.",
+  "reports.story.replay.missingTitle": "Esta live não foi gravada",
+  "reports.story.replay.title": "A live, de novo",
+  "reports.story.technical.clean": "Tudo certo",
+  "reports.story.technical.desc":
+    "Bitrate, CPU/GPU, OBS, destinos e o registro completo ficam aqui quando você precisar investigar.",
+  "reports.story.technical.review": "Vale revisar",
+  "reports.story.technical.title": "O que aconteceu por trás",
+  "reports.story.timeline.desc":
+    "A curva de audiência e os momentos marcantes mostram onde a transmissão mudou de ritmo.",
+  "reports.story.timeline.title": "Como a live se desenrolou",
+  "reports.story.verdict": "Em uma frase",
   "reports.viewers.peak": "Pico",
   "reports.viewers.raidsLegend": "● raids",
   "reports.viewers.series": "Assistindo",

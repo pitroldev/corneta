@@ -219,6 +219,20 @@ describe("byChannel", () => {
     expect(c.sharePct).toBe(0);
   });
 
+  it("inclui o chat Cinefy no relatório mesmo sem contador de audiência", () => {
+    const key = "cinefy:kett";
+    const d = sessao([
+      { kind: "sample", t: 1000, chat: 4, chatBy: { [key]: 4 }, targets: [] },
+    ]);
+    const channel = analyze(d, t).byChannel.channels.find((c) => c.key === key);
+    expect(channel).toMatchObject({
+      platform: "cinefy",
+      source: "kett",
+      chat: { total: 4, hasData: true },
+      viewers: { hasData: false },
+    });
+  });
+
   it("sessão antiga (sem chatBy) mostra audiência por canal e avisa do chat", () => {
     const d = sessao([
       { kind: "sample", t: 1000, chat: 5, targets: [] },

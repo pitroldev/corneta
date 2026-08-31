@@ -13,7 +13,7 @@ import {
 import { cn, readableOn } from "../lib/utils";
 import { useT } from "../lib/i18n";
 import { PLATFORMS } from "../lib/platforms";
-import type { PlatformId } from "../lib/types";
+import type { ChatPlatform, PlatformId } from "../lib/types";
 import { Mascot } from "./decor";
 import { Tooltip } from "./Tooltip";
 
@@ -211,17 +211,25 @@ export function PlatformGlyph({
   id,
   size = 44,
 }: {
-  id: PlatformId;
+  id: PlatformId | ChatPlatform;
   size?: number;
 }) {
-  const preset = PLATFORMS[id];
-  const fg = readableOn(preset.color);
-  const path = PLATFORM_ICON[id];
+  // Cinefy é uma fonte de chat, não um destino RTMP: sua marca vive nesta borda
+  // visual sem contaminar o catálogo de plataformas de transmissão.
+  const isCinefy = id === "cinefy";
+  const preset = isCinefy ? undefined : PLATFORMS[id as PlatformId];
+  // Configs antigas ou editadas à mão podem trazer um identificador desconhecido.
+  // O glyph vira neutro em vez de derrubar toda a tela tentando ler `.color` de undefined.
+  const color = isCinefy ? "#FFD200" : (preset?.color ?? "#64748B");
+  const fg = readableOn(color);
+  const path = isCinefy
+    ? "M8 5.14v13.72L19 12 8 5.14z"
+    : PLATFORM_ICON[id as PlatformId];
   const glyph = size * 0.52;
   return (
     <div
       className="grid shrink-0 place-items-center rounded-md pop-sm"
-      style={{ width: size, height: size, backgroundColor: preset.color }}
+      style={{ width: size, height: size, backgroundColor: color }}
     >
       {path ? (
         <svg

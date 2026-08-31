@@ -965,7 +965,7 @@ function viewerStats(d: SessionData): ViewerStats {
 export const channelKey = (platform: string, source: string) =>
   `${platform}:${source}`;
 
-const CHAT_PLATFORMS = ["twitch", "youtube", "kick"] as const;
+const CHAT_PLATFORMS = ["twitch", "youtube", "kick", "cinefy"] as const;
 const isChatPlatform = (p: string): p is ChatPlatform =>
   (CHAT_PLATFORMS as readonly string[]).includes(p);
 
