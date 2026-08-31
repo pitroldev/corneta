@@ -499,11 +499,16 @@ export const useStore = create<State>((set, get) => {
     },
 
     async setKey(id, key) {
+      // O backend só aceita gravar em namespaces que já existem na config persistida. Um destino
+      // recém-adicionado aparece na UI antes do save assíncrono terminar; como colar a chave salva
+      // imediatamente, sem esta barreira o cofre pode receber o ID primeiro e rejeitá-lo.
+      await flushSave();
       await api.setKey(id, key);
       get().updateTarget(id, { hasKey: true });
     },
 
     async clearKey(id) {
+      await flushSave();
       await api.clearKey(id);
       get().updateTarget(id, { hasKey: false });
     },
@@ -769,6 +774,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async setAlertToken(id, token) {
+      await flushSave();
       await api.setKey(`alert_${id}`, token);
       const config = get().config;
       if (!config) return;
@@ -784,6 +790,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async clearAlertToken(id) {
+      await flushSave();
       await api.clearKey(`alert_${id}`);
       const config = get().config;
       if (!config) return;
@@ -811,6 +818,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async setChatSendToken(id, token) {
+      await flushSave();
       await api.setKey(`chat_send_${id}`, token);
       const config = get().config;
       if (!config) return;
@@ -826,6 +834,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     async clearChatSendToken(id) {
+      await flushSave();
       await api.clearKey(`chat_send_${id}`);
       const config = get().config;
       if (!config) return;
