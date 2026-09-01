@@ -93,8 +93,60 @@ fn ffmpeg_video_codec<'a>(encoder: &str, auto_codec: Option<&'a str>) -> &'a str
 }
 
 /// URL completa de saída (destino + chave).
+///
+/// Destinos conhecidos entregam uma base simples (`.../app`), mas servidores RTMP
+/// personalizados também aparecem com query string, com a chave já no último segmento ou
+/// com um placeholder. Concatenar `/{key}` no fim da string produzia, por exemplo,
+/// `.../app?token=x/chave`: o OBS estava na Corneta, mas o FFmpeg nunca conseguia abrir o
+/// destino e a tela ficava presa no estado inicial.
 fn output_url(t: &Target, key: &str) -> String {
-    format!("{}/{}", t.ingest_url.trim_end_matches('/'), key)
+    compose_output_url(&t.ingest_url, key)
+}
+
+fn compose_output_url(ingest_url: &str, key: &str) -> String {
+    let base = ingest_url.trim();
+    let key = key.trim().trim_start_matches('/');
+
+    if key.is_empty() {
+        return base.trim_end_matches('/').to_string();
+    }
+
+    // Alguns painéis fornecem uma URL-modelo em vez de separar visualmente servidor/chave.
+    for placeholder in ["{stream_key}", "{streamKey}", "{key}"] {
+        if base.contains(placeholder) {
+            return base.replacen(placeholder, key, 1);
+        }
+    }
+
+    // A query pertence à URL inteira e precisa continuar DEPOIS do caminho/chave.
+    let (base_path, base_query) = base.split_once('?').unwrap_or((base, ""));
+    let (key_path, key_query) = key.split_once('?').unwrap_or((key, ""));
+    let base_path = base_path.trim_end_matches('/');
+
+    // Tolera a URL completa no campo de servidor sem duplicar a chave. A fronteira `/`
+    // impede confundir `abc` com o sufixo de `conta-abc`; `ends_with` também cobre chaves
+    // hierárquicas (`conta/canal`) usadas por alguns servidores personalizados.
+    let key_in_path = base_path
+        .strip_suffix(key_path)
+        .is_some_and(|prefix| prefix.ends_with('/'));
+    let key_in_query = base_query.split('&').any(|part| {
+        let value = part.split_once('=').map_or(part, |(_, value)| value);
+        value == key_path
+    });
+    let already_has_key = key_in_path || key_in_query;
+    let path = if already_has_key || key_path.is_empty() {
+        base_path.to_string()
+    } else {
+        format!("{base_path}/{key_path}")
+    };
+
+    let query = match (base_query.is_empty(), key_query.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => format!("?{base_query}"),
+        (true, false) => format!("?{key_query}"),
+        (false, false) => format!("?{base_query}&{key_query}"),
+    };
+    format!("{path}{query}")
 }
 
 /// Filtro de vídeo pra saída vertical: recorta um 9:16 (posição/zoom do enquadramento)
@@ -586,6 +638,9 @@ pub struct TargetStatus {
 pub struct EngineSnapshot {
     pub state: String, // stopped | starting | live | error
     pub started_at: Option<u128>,
+    /// O MediaMTX está recebendo quadros do OBS, mesmo que nenhum destino tenha aceitado
+    /// a saída ainda. Separa falha da entrada de falha num destino personalizado.
+    pub ingest_live: bool,
     /// Correlação opaca desta tentativa/live; seguro para detalhes copiáveis.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
@@ -624,6 +679,7 @@ impl EngineSnapshot {
         EngineSnapshot {
             state: "stopped".into(),
             started_at: None,
+            ingest_live: false,
             operation_id: None,
             error_id: None,
             targets: HashMap::new(),
@@ -664,6 +720,7 @@ impl EngineSnapshot {
         EngineSnapshot {
             state: "live".into(),
             started_at: Some(started_at),
+            ingest_live: false,
             operation_id: None,
             error_id: None,
             targets,
@@ -1021,6 +1078,47 @@ mod tests {
         assert!(s.contains("-f flv"));
         assert!(s.ends_with("streamkey"), "saída termina com a chave: {s}");
         assert!(!s.contains("-b:v"), "cópia NÃO seta bitrate de vídeo: {s}");
+    }
+
+    #[test]
+    fn custom_output_url_places_key_before_query() {
+        assert_eq!(
+            compose_output_url("rtmps://ingest.example.test/live?token=abc", "stream-1"),
+            "rtmps://ingest.example.test/live/stream-1?token=abc"
+        );
+        assert_eq!(
+            compose_output_url(
+                "rtmp://ingest.example.test/app?token=abc",
+                "stream-1?bandwidthtest=true"
+            ),
+            "rtmp://ingest.example.test/app/stream-1?token=abc&bandwidthtest=true"
+        );
+    }
+
+    #[test]
+    fn custom_output_url_does_not_duplicate_embedded_key() {
+        assert_eq!(
+            compose_output_url("rtmp://ingest.example.test/app/stream-1", "stream-1"),
+            "rtmp://ingest.example.test/app/stream-1"
+        );
+        assert_eq!(
+            compose_output_url("rtmps://ingest.example.test/app/{stream_key}", "/stream-1"),
+            "rtmps://ingest.example.test/app/stream-1"
+        );
+        assert_eq!(
+            compose_output_url(
+                "rtmp://ingest.example.test/app/account/stream-1",
+                "account/stream-1"
+            ),
+            "rtmp://ingest.example.test/app/account/stream-1"
+        );
+        assert_eq!(
+            compose_output_url(
+                "rtmps://ingest.example.test/live?stream_key=stream-1",
+                "stream-1"
+            ),
+            "rtmps://ingest.example.test/live?stream_key=stream-1"
+        );
     }
 
     #[test]

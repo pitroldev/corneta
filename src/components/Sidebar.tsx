@@ -91,6 +91,7 @@ export function Sidebar({
 }) {
   const { t, fmt } = useI18n();
   const state = useStore((s) => s.snapshot.state);
+  const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const viewers = useStore((s) => s.viewers);
   const unseenReport = useStore((s) => s.unseenReport);
@@ -233,7 +234,11 @@ export function Sidebar({
           >
             <span className="size-2.5 rounded-full bg-brass animate-pulse" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">
-              {t("sidebar.state.starting")}
+              {t(
+                ingestLive
+                  ? "sidebar.state.connectingTargets"
+                  : "sidebar.state.starting",
+              )}
             </span>
           </button>
         ) : state === "error" ? (

@@ -427,6 +427,8 @@ export const pt = {
     "JÁ VOLTO no ar — um termo seu apareceu na tela",
   "components.app.live.aria.error": "Erro na transmissão",
   "components.app.live.aria.live": "No ar em todas as plataformas",
+  "components.app.live.aria.connectingTargets":
+    "OBS conectado; conectando aos destinos",
   "components.app.live.aria.starting": "Aguardando o OBS conectar",
   "components.app.live.aria.stopped": "Fora do ar",
   "components.app.loading.boot": "Abrindo sua bancada…",
@@ -851,6 +853,7 @@ export const pt = {
   "golive.bar.protection.bitrate": "Auto-bitrate",
   "golive.bar.protection.brb": "JÁ VOLTO",
   "golive.bar.protection.guardian": "Guardião",
+  "golive.bar.connectingTargets": "OBS conectado · conectando destinos…",
   "golive.bar.waitingObs": "Aguardando o OBS…",
   "golive.bar.watching": "assistindo",
   "golive.block.fixTarget":
@@ -960,6 +963,7 @@ export const pt = {
     "Chamei o OBS pra transmitir — se esta tela não mudar, dê {botao} nele.",
   "golive.starting.manualObs":
     "No OBS, clique {botao} — a Corneta entra no ar sozinha.",
+  "golive.starting.connectingTargets": "OBS conectado — abrindo os destinos…",
   "golive.starting.waiting": "Aguardando o OBS conectar…",
   "golive.stat.bitrate": "Bitrate",
   "golive.stat.drops": "Quedas",
@@ -1003,6 +1007,7 @@ export const pt = {
   "golive.target.retry": "Tentar de novo",
   "golive.target.swapKey": "Trocar a chave →",
   "golive.timer.onAir": "no ar",
+  "golive.timer.connectingTargets": "OBS conectado · abrindo destinos…",
   "golive.timer.waiting": "Sem vídeo do OBS ainda…",
   "golive.toast.canceled": "Cancelei — você não chegou a entrar no ar.",
   "golive.toast.live": "No ar! A corneta tá tocando 📣",
@@ -1649,6 +1654,7 @@ export const pt = {
   "sidebar.start.title": "Ir pro Ao vivo e começar",
   "sidebar.state.error": "Erro",
   "sidebar.state.live": "No ar · cornetando",
+  "sidebar.state.connectingTargets": "Conectando destinos",
   "sidebar.state.starting": "Aguardando o OBS",
   "sidebar.state.stopped": "Fora do ar",
   "sidebar.viewers": "assistindo",

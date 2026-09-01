@@ -221,6 +221,7 @@ interface State {
 const EMPTY_SNAPSHOT: EngineSnapshot = {
   state: "stopped",
   startedAt: null,
+  ingestLive: false,
   targets: {},
 };
 const CHAT_CAP = 400;

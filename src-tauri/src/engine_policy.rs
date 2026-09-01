@@ -156,10 +156,21 @@ pub(crate) fn parse_mediamtx_paths(
     if let Some(arr) = v.get("items").and_then(|i| i.as_array()) {
         for p in arr {
             let name = p.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            let ready = p.get("ready").and_then(|r| r.as_bool()) == Some(true);
+            // MediaMTX novo chama os campos de `online`/`inboundBytes`; versões antigas
+            // expunham `ready`/`bytesReceived`. Aceitar os dois evita regredir o detector ao
+            // atualizar o sidecar (os campos antigos já estão marcados como deprecated).
+            let ready = p
+                .get("online")
+                .and_then(|r| r.as_bool())
+                .or_else(|| p.get("ready").and_then(|r| r.as_bool()))
+                == Some(true);
             if name == ingest_name {
                 ingest_ready = ready;
-                bytes = p.get("bytesReceived").and_then(|b| b.as_u64()).unwrap_or(0);
+                bytes = p
+                    .get("inboundBytes")
+                    .and_then(|b| b.as_u64())
+                    .or_else(|| p.get("bytesReceived").and_then(|b| b.as_u64()))
+                    .unwrap_or(0);
             } else if name == program_name {
                 prog_ready = ready;
             }
@@ -215,6 +226,7 @@ mod tests {
         EngineSnapshot {
             state: state.into(),
             started_at: None,
+            ingest_live: state == "live",
             operation_id: None,
             error_id: None,
             targets: map,
@@ -346,6 +358,14 @@ mod tests {
         assert_eq!(
             parse_mediamtx_paths(body, "live/obs", "live/obs_program"),
             (true, 12345, false)
+        );
+        let current = r#"{"items":[
+            {"name":"live/obs","online":true,"inboundBytes":67890},
+            {"name":"live/obs_program","online":true}
+        ]}"#;
+        assert_eq!(
+            parse_mediamtx_paths(current, "live/obs", "live/obs_program"),
+            (true, 67890, true)
         );
         // JSON inválido → tudo falso (igual falha de rede).
         assert_eq!(

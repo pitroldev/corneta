@@ -112,6 +112,7 @@ export default function App() {
   const leaks = useStore((s) => s.leaks);
   const censored = useStore((s) => s.censored);
   const liveState = useStore((s) => s.snapshot.state);
+  const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const brbSlateKind = useStore((s) => s.config?.settings.brbSlateKind);
   const appStarted = useRef(false);
@@ -132,7 +133,11 @@ export default function App() {
     : liveState === "live"
       ? t("components.app.live.aria.live")
       : liveState === "starting"
-        ? t("components.app.live.aria.starting")
+        ? t(
+            ingestLive
+              ? "components.app.live.aria.connectingTargets"
+              : "components.app.live.aria.starting",
+          )
         : liveState === "error"
           ? t("components.app.live.aria.error")
           : t("components.app.live.aria.stopped");

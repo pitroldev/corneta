@@ -67,6 +67,16 @@ pnpm app:dev                            # compila e roda a Corneta
 pnpm app:build                          # gera o instalador (NSIS)
 ```
 
+O `app:dev`/`app:build` usa `sccache` automaticamente quando ele está no `PATH`. A instalação é
+opcional, mas reduz bastante recompilações Rust locais:
+
+```bash
+cargo install sccache --locked --version 0.16.0
+```
+
+No frontend, `pnpm build` continua verificando tipos antes de gerar o bundle. Para iteração local,
+`pnpm typecheck` roda só o TypeScript incremental e `pnpm build:fast` gera só o bundle Vite.
+
 > **Motor:** o **MediaMTX** é o servidor de ingestão (o OBS publica nele) e a Corneta roda **um
 > FFmpeg por plataforma** lendo dele — assim cada destino tem **métricas reais** (bitrate/fps/quedas)
 > e **reconexão independente** (uma plataforma cair não derruba as outras). Ambos os binários são

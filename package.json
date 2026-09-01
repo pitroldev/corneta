@@ -11,7 +11,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "build:fast": "vite build",
+    "build": "pnpm typecheck && pnpm build:fast",
     "build:release": "pnpm build && pnpm bundle:check",
     "bundle:check": "node scripts/check-bundle.mjs",
     "artifacts:check": "node scripts/check-bundle.mjs dist src-tauri/target/release/corneta.exe src-tauri/target/release/bundle",

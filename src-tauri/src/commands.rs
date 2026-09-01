@@ -805,6 +805,23 @@ fn mediamtx_ingest_ready(config: &crate::config::AppConfig) -> bool {
     ready
 }
 
+/// Publica o estado da ENTRADA sem promover a sessão inteira a `live`: o destino pode estar
+/// recusando a conexão. A UI usa este bit para não atribuir ao OBS uma falha de saída.
+fn set_ingest_live(app: &AppHandle, live: bool) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
+    if snap.state == "stopped" || snap.ingest_live == live {
+        return;
+    }
+    snap.ingest_live = live;
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+}
+
 fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -1663,6 +1680,7 @@ async fn start_engine_inner(
     let run_sig = running.clone();
     let sig = has_signal.clone();
     let prog_sig = prog_ready.clone();
+    let app_sig = app.clone();
     let ingest_name = engine::ingest_path_name(&config);
     let program_name = engine::program_path_name(&config);
     tauri::async_runtime::spawn_blocking(move || {
@@ -1682,6 +1700,7 @@ async fn start_engine_inner(
             let live = ready && stalls < 2;
             sig.store(live, Ordering::Relaxed);
             prog_sig.store(prog, Ordering::Relaxed);
+            set_ingest_live(&app_sig, live);
             std::thread::sleep(std::time::Duration::from_millis(700));
         }
     });

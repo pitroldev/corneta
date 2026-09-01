@@ -82,6 +82,7 @@ export function GoLiveScreen({
   const state = snapshot.state;
   const live = state === "live";
   const starting = state === "starting";
+  const ingestLive = snapshot.ingestLive ?? false;
   const enabled = useMemo(
     () => config.targets.filter((target) => target.enabled),
     [config.targets],
@@ -252,7 +253,7 @@ export function GoLiveScreen({
   // Socorro do limbo: 20s em "starting" sem OBS conectar → card de resgate com diagnóstico.
   const [rescue, setRescue] = useState(false);
   useEffect(() => {
-    if (!starting) {
+    if (!starting || ingestLive) {
       setRescue(false);
       return;
     }
@@ -262,7 +263,7 @@ export function GoLiveScreen({
     }, 20000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [starting]);
+  }, [ingestLive, starting]);
 
   // Cortar uma live de verdade → confirmação em 2 cliques (era a ÚNICA ação destrutiva do
   // app sem confirmação — e mora exatamente onde ficava o BORA) → relatório fresquinho.
@@ -569,7 +570,11 @@ export function GoLiveScreen({
         <>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4">
-              <LiveTimer startedAt={snapshot.startedAt} live={live} />
+              <LiveTimer
+                startedAt={snapshot.startedAt}
+                live={live}
+                ingestLive={ingestLive}
+              />
               {viewers.total > 0 && (
                 <span className="flex items-center gap-1.5">
                   <Eye className="size-4 text-ink-faint" />
@@ -641,7 +646,7 @@ export function GoLiveScreen({
             )}
 
           {/* Resgate do limbo: 20s aguardando o OBS sem sinal → diagnóstico e saída. */}
-          {starting && rescue && (
+          {starting && !ingestLive && rescue && (
             <Card className="mb-2 border-2 border-warn/40 bg-warn/10">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warn" />
@@ -889,7 +894,11 @@ export function GoLiveScreen({
           <div className="flex items-stretch gap-2">
             <div className="flex h-14 flex-1 items-center justify-center gap-2.5 rounded-md bg-surface-2 font-display text-lg font-bold text-ink-muted">
               <Loader2 className="size-5 animate-spin" />{" "}
-              {t("golive.starting.waiting")}
+              {t(
+                ingestLive
+                  ? "golive.starting.connectingTargets"
+                  : "golive.starting.waiting",
+              )}
             </div>
             <Button variant="outline" size="lg" onClick={onCancel}>
               {t("golive.cancel")}
@@ -923,7 +932,7 @@ export function GoLiveScreen({
             {t("golive.cta")}
           </Button>
         )}
-        {starting && (
+        {starting && !ingestLive && (
           <p className="mt-2 text-center text-xs text-ink-faint">
             {rich(
               t,
@@ -1312,9 +1321,11 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
 function LiveTimer({
   startedAt,
   live,
+  ingestLive,
 }: {
   startedAt: number | null;
   live: boolean;
+  ingestLive: boolean;
 }) {
   const t = useT();
   const [now, setNow] = useState(() => Date.now());
@@ -1327,7 +1338,11 @@ function LiveTimer({
       <div className="flex items-center gap-2 text-info">
         <span className="size-2.5 rounded-full bg-info animate-pulse" />
         <span className="font-display text-sm font-bold uppercase tracking-wide">
-          {t("golive.timer.waiting")}
+          {t(
+            ingestLive
+              ? "golive.timer.connectingTargets"
+              : "golive.timer.waiting",
+          )}
         </span>
       </div>
     );

@@ -556,6 +556,8 @@ export const en: Dict = {
   // Anúncio de leitor de tela: funcional, não bem-humorado (§6). Ecoa analysis.event.error ("{target} hit an error") pra quem ouve saber QUAL é o estado.
   "components.app.live.aria.error": "The stream hit an error",
   "components.app.live.aria.live": "Live on every platform",
+  "components.app.live.aria.connectingTargets":
+    "OBS connected; connecting to destinations",
   "components.app.live.aria.starting": "Waiting for OBS to connect",
   "components.app.live.aria.stopped": "Off air",
   // Tela de boot, enquanto o config não carregou.
@@ -1174,6 +1176,7 @@ export const en: Dict = {
   "golive.bar.protection.brb": "BE RIGHT BACK",
   // Tem que bater com golive.security.guardian.label.
   "golive.bar.protection.guardian": "Privacy guard",
+  "golive.bar.connectingTargets": "OBS connected · connecting destinations…",
   "golive.bar.waitingObs": "Waiting for OBS…",
   "golive.bar.watching": "watching",
   // {problemas} vem de blockingIssues() em validation.ts (outra área) — os itens da lista precisam ser traduzidos lá, senão essa frase sai metade em PT.
@@ -1326,6 +1329,8 @@ export const en: Dict = {
     "I told OBS to start streaming — if this screen doesn't change, hit {botao} over there.",
   "golive.starting.manualObs":
     "In OBS, click {botao} — Corneta goes live on its own.",
+  "golive.starting.connectingTargets":
+    "OBS connected — opening the destinations…",
   // É status, não botão.
   "golive.starting.waiting": "Waiting for OBS to connect…",
   "golive.stat.bitrate": "Bitrate",
@@ -1382,6 +1387,7 @@ export const en: Dict = {
   "golive.target.retry": "Try again",
   "golive.target.swapKey": "Swap the key →",
   "golive.timer.onAir": "on air",
+  "golive.timer.connectingTargets": "OBS connected · opening destinations…",
   "golive.timer.waiting": "No video from OBS yet…",
   "golive.toast.canceled": "Canceled — you never went on air.",
   // 'A corneta' é o instrumento e o nome do produto ao mesmo tempo; em inglês só sobra o instrumento.
@@ -2197,6 +2203,7 @@ export const en: Dict = {
   "sidebar.state.error": "Error",
   // "cornetando" é a marca em movimento; em en vira o verbo que a marca sugere.
   "sidebar.state.live": "On air · blowing the horn",
+  "sidebar.state.connectingTargets": "Connecting destinations",
   "sidebar.state.starting": "Waiting on OBS",
   "sidebar.state.stopped": "Off air",
   "sidebar.viewers": "watching",

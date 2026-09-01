@@ -18,7 +18,7 @@
 //   • o `scripts/check-bundle.mjs` varre o bundle atrás de segredo.
 // Nada é impresso aqui, nem nome nem valor.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +54,18 @@ try {
 } catch {
   // Sem `.env` (CI) o comando roda com o ambiente que já existe — que é o certo.
   console.log("with-env: sem .env; usando o ambiente do processo");
+}
+
+// O sccache é opcional no computador do desenvolvedor: se estiver instalado, app:dev e
+// app:build passam a reutilizar os artefatos do rustc automaticamente; se não estiver, o
+// comportamento continua idêntico ao anterior. Um RUSTC_WRAPPER explícito sempre vence.
+const usesRust = command === "tauri" || command === "cargo";
+if (usesRust && !("RUSTC_WRAPPER" in process.env)) {
+  const probe = spawnSync("sccache", ["--version"], { stdio: "ignore" });
+  if (!probe.error && probe.status === 0) {
+    process.env.RUSTC_WRAPPER = "sccache";
+    console.log("with-env: sccache ativado para esta compilação Rust");
+  }
 }
 
 const filho = spawn(command, args, { stdio: "inherit", shell: true });

@@ -1217,7 +1217,10 @@ function mockApi(): CornetaApi {
   const tick = () => {
     const now = Date.now();
     // Demo: depois de "ouvir" um instante, o "OBS conecta" e entra no ar.
-    if (snapshot.state === "starting") snapshot.state = "live";
+    if (snapshot.state === "starting") {
+      snapshot.ingestLive = true;
+      snapshot.state = "live";
+    }
     for (const st of Object.values(snapshot.targets)) {
       if (pausedTargets.has(st.targetId)) continue; // pausado: mantém o estado
       if (st.state === "connecting") {
@@ -1329,7 +1332,12 @@ function mockApi(): CornetaApi {
           uptimeSec: 0,
         };
       }
-      snapshot = { state: "starting", startedAt: Date.now(), targets };
+      snapshot = {
+        state: "starting",
+        startedAt: Date.now(),
+        ingestLive: false,
+        targets,
+      };
       const sid = String(snapshot.startedAt);
       const plats = cfg.targets
         .filter((x) => x.enabled)
@@ -1361,7 +1369,12 @@ function mockApi(): CornetaApi {
         rec = null;
       }
       pausedTargets.clear();
-      snapshot = { state: "stopped", startedAt: null, targets: {} };
+      snapshot = {
+        state: "stopped",
+        startedAt: null,
+        ingestLive: false,
+        targets: {},
+      };
       emit();
     },
     async setTargetPaused(targetId, paused) {

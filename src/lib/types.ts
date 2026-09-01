@@ -385,6 +385,8 @@ export interface ObsStats {
 export interface EngineSnapshot {
   state: EngineState;
   startedAt: number | null;
+  /** Há vídeo chegando do OBS, mesmo que um destino ainda não tenha aceitado a conexão. */
+  ingestLive?: boolean;
   targets: Record<string, TargetStatus>;
   message?: string;
   /** UUID da operação de live corrente, compartilhado entre UI e motor nativo. */

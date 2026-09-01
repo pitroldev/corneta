@@ -111,6 +111,7 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
     crate::engine::EngineSnapshot {
         state: "live".into(),
         started_at: Some(1),
+        ingest_live: true,
         operation_id: None,
         error_id: None,
         targets,

@@ -13,6 +13,7 @@ import { useI18n } from "../lib/i18n";
 export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const { t, fmt } = useI18n();
   const state = useStore((s) => s.snapshot.state);
+  const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const startedAt = useStore((s) => s.snapshot.startedAt);
   const targets = useStore((s) => s.snapshot.targets);
   const viewersTotal = useStore((s) => s.viewers.total);
@@ -112,7 +113,11 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
         <span className="flex items-center gap-2">
           <span className="size-2.5 rounded-full bg-brass-ink animate-pulse" />
           <span className="font-display text-sm font-extrabold uppercase tracking-wide">
-            {t("golive.bar.waitingObs")}
+            {t(
+              ingestLive
+                ? "golive.bar.connectingTargets"
+                : "golive.bar.waitingObs",
+            )}
           </span>
         </span>
       )}
