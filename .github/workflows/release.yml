@@ -54,7 +54,7 @@ jobs:
         with:
           node-version: 24.18.1
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@1.100.0
       - name: Ativar cache de compilação Rust
         uses: mozilla-actions/sccache-action@fd02668681acd5f960e1372061bee5e3e987195c # v0.0.11
         with:
