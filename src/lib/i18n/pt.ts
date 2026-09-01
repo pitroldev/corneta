@@ -220,6 +220,7 @@ export const pt = {
   "chat.feed.empty.waiting.body":
     "Assim que a galera mandar mensagem, aparece aqui.",
   "chat.feed.empty.waiting.title": "Esperando mensagens…",
+  "chat.feed.follow": "Acompanhar chat",
   "chat.feed.hint.ready":
     "Enquanto não ligar, a Corneta não lê nada do seu chat.",
   "chat.feed.hint.setup":
@@ -1236,7 +1237,9 @@ export const pt = {
   "replay.chat.gap": "O chat caiu por aqui — pode faltar mensagem.",
   "replay.chat.hideDeleted": "esconder apagadas",
   "replay.chat.showDeleted": "mostrar apagadas",
-  "replay.chat.title": "Chat naquele momento",
+  "replay.chat.scrollAria": "Mensagens do chat sincronizadas com o replay",
+  "replay.chat.title": "Chat",
+  "replay.clip.action": "Criar clipe",
   "replay.clip.cancel": "cancelar corte",
   "replay.clip.crossSegment":
     "Esse trecho atravessa duas gravações. Escolha um pedaço dentro da mesma.",
@@ -1250,6 +1253,7 @@ export const pt = {
   "replay.fwd10": "10s pra frente",
   "replay.fullscreen": "Tela cheia",
   "replay.marker.added": "Momento marcado",
+  "replay.marker.action": "Marcar momento",
   "replay.marker.cta": "Marcar este momento",
   "replay.marker.default": "Momento marcado no replay",
   "replay.loading": "Preparando a gravação…",
@@ -1356,6 +1360,7 @@ export const pt = {
   "reports.detail.error.read":
     "Não consegui ler este relatório — o arquivo pode estar corrompido.",
   "reports.detail.heading": "Live de {date}",
+  "reports.detail.loading": "Carregando relatório",
   "reports.detail.mode": "modo {mode}",
   "reports.detail.recap": "Montar recap",
   "reports.download.anon.desc":
@@ -1382,8 +1387,10 @@ export const pt = {
   "reports.dur.minutes": "{m}min",
   "reports.events.title": "Eventos",
   "reports.error.retry": "Tentar novamente",
+  "reports.highlights.chartHint":
+    "As marcas no gráfico correspondem aos momentos abaixo.",
   "reports.highlights.note":
-    "⏱️ Os tempos contam do início da live — ache o minuto na gravação (VOD) pra cortar o clipe.",
+    "Os tempos contam do início da live — ache o minuto na gravação (VOD) pra cortar o clipe.",
   "reports.highlights.more.one": "Ver mais 1 momento",
   "reports.highlights.more.other": "Ver mais {count} momentos",
   "reports.highlights.title": "Momentos de destaque (pra clipar)",
@@ -1528,6 +1535,27 @@ export const pt = {
     "A curva de audiência e os momentos marcantes mostram onde a transmissão mudou de ritmo.",
   "reports.story.timeline.title": "Como a live se desenrolou",
   "reports.story.verdict": "Em uma frase",
+  "reports.technical.incidents.desc":
+    "Ocorrências parecidas viram um único diagnóstico. Abra só o que quiser investigar.",
+  "reports.technical.incidents.distribution":
+    "Distribuição de {count} ocorrências ao longo da live",
+  "reports.technical.incidents.groups":
+    "Resumo por causa · total de pontos: {count}",
+  "reports.technical.incidents.individual": "Ocorrências individuais",
+  "reports.technical.incidents.longest": "Trechos mais longos",
+  "reports.technical.incidents.occurrences.one": "1 trecho",
+  "reports.technical.incidents.occurrences.other": "{count} trechos",
+  "reports.technical.incidents.signalsMore": "+{count} sinais",
+  "reports.technical.incidents.title": "Pontos técnicos, agrupados",
+  "reports.technical.incidents.total": "{duration} somados",
+  "reports.technical.showAll": "Ver todos ({count})",
+  "reports.technical.showLess": "Mostrar menos",
+  "reports.technical.tabs.events": "Registro",
+  "reports.technical.tabs.label": "Escolha o detalhe técnico",
+  "reports.technical.tabs.machine": "Máquina",
+  "reports.technical.tabs.obs": "OBS",
+  "reports.technical.tabs.platforms": "Plataformas",
+  "reports.technical.tabs.signal": "Transmissão",
   "reports.viewers.peak": "Pico",
   "reports.viewers.raidsLegend": "● raids",
   "reports.viewers.series": "Assistindo",

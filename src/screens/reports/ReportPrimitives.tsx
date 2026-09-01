@@ -248,15 +248,17 @@ export function DeleteButton({ onDelete }: { onDelete: () => void }) {
 export function WindowCard({
   window,
   time,
+  showCause = false,
   onSeek,
 }: {
   window: ProblemWindow;
   time: string;
+  showCause?: boolean;
   onSeek?: () => void;
 }) {
   const { fmt } = useI18n();
   return (
-    <div className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2">
+    <div className="py-3">
       <div className="flex flex-wrap items-center gap-x-2 text-sm">
         <span className="font-display font-bold tabular-nums text-warn">
           {time}
@@ -264,7 +266,9 @@ export function WindowCard({
         <span className="text-xs text-ink-faint">
           ({fmt.time(window.tStart)} · {window.durationSec}s)
         </span>
-        <span className="font-semibold">{window.cause}</span>
+        {showCause ? (
+          <span className="font-semibold">{window.cause}</span>
+        ) : null}
         {onSeek ? <SeekButton onSeek={onSeek} /> : null}
         <CopyTimeButton time={time} className="ml-auto" />
       </div>
@@ -273,7 +277,6 @@ export function WindowCard({
           {window.signals.join(" · ")}
         </div>
       ) : null}
-      <div className="mt-1 text-xs text-ink">→ {window.advice}</div>
     </div>
   );
 }
@@ -300,7 +303,7 @@ export function EventRow({
 }) {
   const { fmt } = useI18n();
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex min-h-10 items-center gap-2 py-1 text-sm">
       <span className="w-16 shrink-0 text-xs font-semibold tabular-nums text-ink">
         {time}
       </span>
@@ -334,14 +337,20 @@ export function HighlightRow({
 }) {
   const IconComponent = HIGHLIGHT_ICON[highlight.kind];
   return (
-    <div className="flex items-center gap-2.5 rounded-md bg-surface-2 px-3 py-2">
+    <div className="flex min-h-16 items-center gap-3 border-b border-border-soft px-2 py-2.5 transition-colors hover:bg-surface-2/70">
       <IconComponent className="size-4 shrink-0 text-brass" aria-hidden />
-      <span className="w-16 shrink-0 font-display font-extrabold tabular-nums text-ink">
-        {time}
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-sm font-extrabold tabular-nums text-brass">
+          {time}
+        </span>
+        <span className="mt-0.5 block text-sm text-ink-muted">
+          {highlight.reason}
+        </span>
       </span>
-      <span className="flex-1 text-sm text-ink-muted">{highlight.reason}</span>
-      {onSeek ? <SeekButton onSeek={onSeek} /> : null}
-      <CopyTimeButton time={time} />
+      <span className="flex shrink-0 items-center gap-1">
+        {onSeek ? <SeekButton onSeek={onSeek} /> : null}
+        <CopyTimeButton time={time} />
+      </span>
     </div>
   );
 }
@@ -351,7 +360,7 @@ function SeekButton({ onSeek }: { onSeek: () => void }) {
   return (
     <button
       onClick={onSeek}
-      className="rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-brass"
+      className="grid size-10 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-brass"
       title={t("replay.seek.cta")}
       aria-label={t("replay.seek.cta")}
     >
@@ -375,7 +384,7 @@ function CopyTimeButton({
         toast.success(t("reports.copyTime.done"));
       }}
       className={cn(
-        "rounded p-1 text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink",
+        "grid size-10 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink",
         className,
       )}
       title={t("reports.copyTime")}

@@ -102,6 +102,59 @@ describe("parseSession", () => {
   });
 });
 
+describe("problem windows", () => {
+  const resourceSession = (avgRenderMs: number) =>
+    parseSession(
+      nd([
+        {
+          kind: "meta",
+          id: "resource-pressure",
+          startedAt: 0,
+          mode: "per-platform",
+          platforms: [{ id: "twitch", platformId: "twitch", name: "Twitch" }],
+        },
+        ...Array.from({ length: 12 }, (_, index) => ({
+          kind: "sample",
+          t: 1000 + index * 2000,
+          cpu: 99,
+          gpu: 99,
+          obs: {
+            activeFps: 60,
+            avgRenderMs,
+            renderSkipped: 0,
+            outputSkipped: 0,
+            congestion: 0,
+          },
+          targets: [
+            {
+              id: "twitch",
+              name: "Twitch",
+              state: "live",
+              bitrate: 6000,
+              dropped: 0,
+              fps: 60,
+            },
+          ],
+        })),
+        { kind: "end", endedAt: 25000 },
+      ]),
+      t,
+    )!;
+
+  it("não transforma CPU/GPU alta com transmissão saudável em incidente", () => {
+    const analysis = analyze(resourceSession(4), t);
+    expect(analysis.windows).toEqual([]);
+    // A saturação continua registrada como contexto técnico no log e no gráfico.
+    expect(analysis.events.some((event) => event.kind === "cpu")).toBe(true);
+  });
+
+  it("usa CPU/GPU para explicar render lag real do OBS", () => {
+    const analysis = analyze(resourceSession(30), t);
+    expect(analysis.windows).toHaveLength(1);
+    expect(analysis.windows[0].causeKind).toBe("encoding");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Por canal
 // ---------------------------------------------------------------------------

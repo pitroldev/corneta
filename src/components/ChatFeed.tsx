@@ -40,6 +40,9 @@ export function ChatFeed({
   connected,
   allFilteredOut,
   className,
+  emptyTitle,
+  emptyBody,
+  "aria-label": ariaLabel,
   onFontSize,
   modLevel,
   onModerate,
@@ -52,6 +55,10 @@ export function ChatFeed({
   /** Há mensagens, mas o filtro escondeu todas (vazio diferente de "sem chat"). */
   allFilteredOut?: boolean;
   className?: string;
+  /** Cópia contextual para consumidores do mesmo feed, como o replay. */
+  emptyTitle?: string;
+  emptyBody?: string;
+  "aria-label"?: string;
   /** Texto do estado vazio desconectado (cada tela sabe o próximo passo real). */
   disconnectedHint?: string;
   /** Ação do estado vazio desconectado (ex.: "Adicionar canal" / "Conectar"). */
@@ -67,8 +74,6 @@ export function ChatFeed({
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [paused, setPaused] = useState(false);
-  const [missed, setMissed] = useState(0);
-  const lastId = useRef<string | undefined>(messages[messages.length - 1]?.id);
   const onFontSizeRef = useRef(onFontSize);
   const modLevelRef = useRef(modLevel);
   const onModerateRef = useRef(onModerate);
@@ -138,23 +143,6 @@ export function ChatFeed({
     el.scrollTop = Math.max(0, el.scrollTop - removed);
   }, [messages, virt]);
 
-  useEffect(() => {
-    const newLast = messages[messages.length - 1];
-    if (stick.current) {
-      lastId.current = newLast?.id;
-      return;
-    }
-    if (newLast && newLast.id !== lastId.current) {
-      const idx = messages.findIndex((m) => m.id === lastId.current);
-      if (idx >= 0) {
-        const added = messages.length - 1 - idx;
-        if (added > 0) setMissed((n) => n + added);
-      }
-      lastId.current = newLast.id;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
-
   // Ctrl+scroll no feed dimensiona a fonte. Listener nativo (não-passivo) pra poder
   // cancelar o zoom padrão do navegador.
   useEffect(() => {
@@ -179,17 +167,11 @@ export function ChatFeed({
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
     stick.current = atBottom;
     setPaused(!atBottom);
-    if (atBottom) {
-      setMissed(0);
-      lastId.current = messages[messages.length - 1]?.id;
-    }
   };
 
   const jumpToBottom = () => {
     stick.current = true;
     setPaused(false);
-    setMissed(0);
-    lastId.current = messages[messages.length - 1]?.id;
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   };
 
@@ -197,6 +179,8 @@ export function ChatFeed({
     <div className={cn("relative min-h-0", className)}>
       <div
         ref={ref}
+        role="feed"
+        aria-label={ariaLabel}
         onScroll={onScroll}
         style={{ fontSize: view.fontSize }}
         className="h-full overflow-y-auto py-2 [scrollbar-gutter:stable]"
@@ -205,19 +189,21 @@ export function ChatFeed({
           <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
             <ChatFunnel />
             <div className="font-display text-lg font-bold">
-              {allFilteredOut
-                ? t("chat.feed.empty.filtered.title")
-                : connected
-                  ? t("chat.feed.empty.waiting.title")
-                  : t("chat.feed.empty.disconnected.title")}
+              {emptyTitle ??
+                (allFilteredOut
+                  ? t("chat.feed.empty.filtered.title")
+                  : connected
+                    ? t("chat.feed.empty.waiting.title")
+                    : t("chat.feed.empty.disconnected.title"))}
             </div>
             <div className="max-w-sm text-sm text-ink-muted">
-              {allFilteredOut
-                ? t("chat.feed.empty.filtered.body")
-                : connected
-                  ? t("chat.feed.empty.waiting.body")
-                  : (disconnectedHint ??
-                    t("chat.feed.empty.disconnected.body"))}
+              {emptyBody ??
+                (allFilteredOut
+                  ? t("chat.feed.empty.filtered.body")
+                  : connected
+                    ? t("chat.feed.empty.waiting.body")
+                    : (disconnectedHint ??
+                      t("chat.feed.empty.disconnected.body")))}
             </div>
             {!connected && !allFilteredOut && emptyAction}
           </div>
@@ -259,8 +245,8 @@ export function ChatFeed({
           onClick={jumpToBottom}
           className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border-2 border-brass-ink bg-brass px-3 py-1 text-xs font-extrabold text-brass-ink shadow-[2px_2px_0_0_rgba(0,0,0,0.35)] transition-transform hover:scale-105"
         >
-          <ArrowDown className="size-3.5" strokeWidth={2.6} /> Acompanhar chat
-          {missed > 0 ? ` · +${missed}` : ""}
+          <ArrowDown className="size-3.5" strokeWidth={2.6} />
+          {t("chat.feed.follow")}
         </button>
       )}
     </div>

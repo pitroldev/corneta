@@ -287,6 +287,7 @@ export const en: Dict = {
   "chat.feed.empty.waiting.body":
     "The moment anyone says something, it shows up here.",
   "chat.feed.empty.waiting.title": "Waiting on messages…",
+  "chat.feed.follow": "Follow chat",
   "chat.feed.hint.ready": "Until you connect, Corneta isn't reading your chat.",
   "chat.feed.hint.setup":
     "Add a channel (Twitch, Kick, YouTube or experimental Cinefy) and click Connect.",
@@ -1696,7 +1697,9 @@ export const en: Dict = {
   "replay.chat.gap": "Chat dropped around here — messages may be missing.",
   "replay.chat.hideDeleted": "hide deleted",
   "replay.chat.showDeleted": "show deleted",
-  "replay.chat.title": "Chat at that moment",
+  "replay.chat.scrollAria": "Chat messages synchronized with the replay",
+  "replay.chat.title": "Chat",
+  "replay.clip.action": "Create clip",
   "replay.clip.cancel": "cancel clip",
   "replay.clip.crossSegment":
     "That range spans two recordings. Pick a stretch inside one of them.",
@@ -1710,6 +1713,7 @@ export const en: Dict = {
   "replay.fwd10": "Forward 10s",
   "replay.fullscreen": "Fullscreen",
   "replay.marker.added": "Moment marked",
+  "replay.marker.action": "Mark moment",
   "replay.marker.cta": "Mark this moment",
   "replay.marker.default": "Marked during replay",
   "replay.loading": "Preparing the recording…",
@@ -1832,6 +1836,7 @@ export const en: Dict = {
     "Couldn't read this report — the file may be damaged.",
   // 'live' (substantivo BR) → 'stream'. Mesma frase no h1 do HTML exportado e no <title> do arquivo.
   "reports.detail.heading": "Stream on {date}",
+  "reports.detail.loading": "Loading report",
   // A ordem inverte em inglês ('Smart mode') — é o caso clássico de não concatenar.
   "reports.detail.mode": "{mode} mode",
   // Rótulo de botão é verbo do que vai acontecer (§6) — casa com o 'Building…' do histórico.
@@ -1868,9 +1873,11 @@ export const en: Dict = {
   "reports.dur.minutes": "{m}min",
   "reports.events.title": "Events",
   "reports.error.retry": "Try again",
+  "reports.highlights.chartHint":
+    "The chart markers match the moments listed below.",
   // 'gravação (VOD)' → só 'the VOD' (é o nome que o streamer usa em inglês, igual à LP).
   "reports.highlights.note":
-    "⏱️ Times count from when the stream started — find that minute in the VOD to cut your clip.",
+    "Times count from when the stream started — find that minute in the VOD to cut your clip.",
   "reports.highlights.more.one": "Show 1 more moment",
   "reports.highlights.more.other": "Show {count} more moments",
   "reports.highlights.title": "Highlights (worth clipping)",
@@ -2050,6 +2057,27 @@ export const en: Dict = {
     "The viewer curve and standout moments show where the broadcast changed pace.",
   "reports.story.timeline.title": "How the stream unfolded",
   "reports.story.verdict": "In one sentence",
+  "reports.technical.incidents.desc":
+    "Similar occurrences become one diagnosis. Open only what you want to investigate.",
+  "reports.technical.incidents.distribution":
+    "Distribution of {count} occurrences across the stream",
+  "reports.technical.incidents.groups":
+    "Grouped by cause · total points: {count}",
+  "reports.technical.incidents.individual": "Individual occurrences",
+  "reports.technical.incidents.longest": "Longest stretches",
+  "reports.technical.incidents.occurrences.one": "1 stretch",
+  "reports.technical.incidents.occurrences.other": "{count} stretches",
+  "reports.technical.incidents.signalsMore": "+{count} signals",
+  "reports.technical.incidents.title": "Technical points, grouped",
+  "reports.technical.incidents.total": "{duration} combined",
+  "reports.technical.showAll": "Show all ({count})",
+  "reports.technical.showLess": "Show less",
+  "reports.technical.tabs.events": "Log",
+  "reports.technical.tabs.label": "Choose a technical detail",
+  "reports.technical.tabs.machine": "Machine",
+  "reports.technical.tabs.obs": "OBS",
+  "reports.technical.tabs.platforms": "Platforms",
+  "reports.technical.tabs.signal": "Broadcast",
   // Rodapé do gráfico e cabeçalho de coluna do HTML.
   "reports.viewers.peak": "Peak",
   "reports.viewers.raidsLegend": "● raids",

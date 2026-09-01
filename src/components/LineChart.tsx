@@ -1,7 +1,7 @@
 // Gráfico de linhas em SVG (zero-dependência). Multi-série sobre um eixo de
 // tempo (índice de amostra), com marcadores de evento, tratamento de gaps,
 // rótulos de tempo no eixo X, linha de referência e tooltip no hover.
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { buildPath, peakOf, type PathGeometry } from "../lib/chartPath";
 
@@ -53,9 +53,34 @@ export function LineChart({
   onSeek?: (i: number) => void;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [width, setWidth] = useState(640);
+  const rootRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const W = 640;
+  // O SVG tinha viewBox fixo de 640px. Em painéis largos, o preserveAspectRatio
+  // mantinha o desenho nessa largura e criava letterbox nas laterais apesar de o
+  // elemento ocupar 100%. Medir o contêiner mantém texto e geometria sem distorção
+  // e faz a área útil acompanhar todo o espaço horizontal disponível.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const updateWidth = (nextWidth: number) => {
+      const rounded = Math.max(240, Math.round(nextWidth));
+      setWidth((current) => (current === rounded ? current : rounded));
+    };
+
+    updateWidth(root.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) updateWidth(entry.contentRect.width);
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+
+  const W = width;
   const H = height;
   const padL = 40;
   const padR = 10;
@@ -187,8 +212,9 @@ export function LineChart({
 
   return (
     <div
+      ref={rootRef}
       className={cn(
-        "[contain-intrinsic-size:auto_200px] [content-visibility:auto]",
+        "w-full min-w-0 [contain-intrinsic-size:auto_200px] [content-visibility:auto]",
         className,
       )}
     >

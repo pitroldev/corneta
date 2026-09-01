@@ -10,6 +10,7 @@ import type {
   ReplayChatGap,
   ReplayChatMessage,
   SessionData,
+  SessionMarker,
 } from "../../lib/types";
 import { StorySectionHeading } from "./ReportPrimitives";
 import type { ReplayState } from "./useReportModels";
@@ -23,7 +24,8 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   ticks,
   seek,
   onPlayhead,
-  onReload,
+  onMarkerAdded,
+  onRecordingsDeleted,
 }: {
   state: ReplayState;
   data: SessionData;
@@ -33,7 +35,8 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   ticks: ReplayTick[];
   seek: SeekRequest | null;
   onPlayhead: (timestamp: number | null) => void;
-  onReload: () => void;
+  onMarkerAdded: (marker: SessionMarker) => void;
+  onRecordingsDeleted: () => void;
 }) {
   const t = useI18n().t;
   const descriptionKey =
@@ -52,7 +55,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
         description={t(descriptionKey)}
       />
       {state === "ready" ? (
-        <div className="mt-5 overflow-hidden rounded-xl bg-night p-2 pop [&>h3]:sr-only [&>div]:mb-0 [&>div]:bg-surface-2 sm:p-3 [&_video]:max-h-[58vh]">
+        <div className="mt-5 overflow-hidden rounded-xl bg-night pop [&>h3]:sr-only [&>div]:mb-0">
           <ReplayPlayer
             data={data}
             sessionId={sessionId}
@@ -61,8 +64,8 @@ export const ReportReplaySection = memo(function ReportReplaySection({
             ticks={ticks}
             seek={seek}
             onPlayhead={onPlayhead}
-            onMarkerAdded={onReload}
-            onRecordingsDeleted={onReload}
+            onMarkerAdded={onMarkerAdded}
+            onRecordingsDeleted={onRecordingsDeleted}
           />
         </div>
       ) : (

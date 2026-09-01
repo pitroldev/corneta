@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 import { dropCachedSummary } from "../../lib/report";
 import { toast } from "../../lib/toast";
+import { cn } from "../../lib/utils";
 import { ReportCommunitySection } from "./ReportCommunitySection";
 import { DownloadModal, RecapModal } from "./ReportModals";
 import { ReportOverview } from "./ReportOverview";
@@ -110,7 +111,8 @@ export function ReportDetail({
         ticks={story.replayTicks}
         seek={timeline.seek}
         onPlayhead={timeline.setPlayhead}
-        onReload={detail.reload}
+        onMarkerAdded={detail.addMarker}
+        onRecordingsDeleted={detail.clearRecordings}
       />
       <ReportTimelineSection
         analysis={detail.analysis}
@@ -143,17 +145,157 @@ export function ReportDetail({
 function DetailSkeleton({ onBack }: { onBack: () => void }) {
   const t = useI18n().t;
   return (
-    <div className="mx-auto max-w-3xl">
-      <Button variant="ghost" size="sm" onClick={onBack}>
-        <ArrowLeft className="size-4" /> {t("reports.detail.back")}
-      </Button>
-      <div className="mt-4 flex flex-col gap-3" aria-hidden>
-        <div className="h-20 animate-pulse rounded-lg bg-surface-2" />
-        <div className="h-16 animate-pulse rounded-lg bg-surface-2" />
-        <div className="h-44 animate-pulse rounded-lg bg-surface-2" />
+    <article className="mx-auto max-w-6xl pb-8" aria-busy="true">
+      <span className="sr-only" role="status">
+        {t("reports.detail.loading")}
+      </span>
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="size-4" /> {t("reports.detail.back")}
+        </Button>
+        <div
+          className="flex animate-pulse items-center gap-2 motion-reduce:animate-none"
+          aria-hidden
+        >
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-16" />
+        </div>
+      </div>
+
+      <div className="animate-pulse motion-reduce:animate-none" aria-hidden>
+        <header className="mb-7">
+          <Skeleton className="h-12 w-3/4 max-w-xl" />
+          <div className="mt-3 flex items-center gap-3">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-28" />
+          </div>
+        </header>
+
+        <section className="grid overflow-hidden rounded-xl bg-surface pop xl:grid-cols-[minmax(0,1.25fr)_minmax(19rem,0.75fr)]">
+          <div className="bg-surface-2 p-6 sm:p-8">
+            <div className="flex items-start gap-3">
+              <Skeleton className="size-10 shrink-0 bg-brass/25" />
+              <div className="min-w-0 flex-1">
+                <Skeleton className="h-9 w-4/5 max-w-lg" />
+                <Skeleton className="mt-4 h-3 w-full max-w-xl" />
+                <Skeleton className="mt-2 h-3 w-3/4 max-w-md" />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-y divide-border-soft">
+            {[0, 1, 2, 3].map((index) => (
+              <div key={index} className="p-4 sm:p-5">
+                <Skeleton className="h-2.5 w-16" />
+                <Skeleton className="mt-3 h-8 w-20" />
+                <Skeleton className="mt-2 h-2.5 w-24 max-w-full" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <SkeletonSectionHeading className="mt-12" />
+        <div className="mt-5 overflow-hidden rounded-xl bg-night pop">
+          <div className="grid gap-px bg-border-soft xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 bg-night">
+              <div className="grid aspect-video min-h-48 place-items-center xl:min-h-72">
+                <Skeleton className="h-2 w-28 bg-surface-3" />
+              </div>
+              <div className="flex h-14 items-center gap-2 border-t border-border-soft bg-surface px-4">
+                <Skeleton className="size-8" />
+                <Skeleton className="size-10 bg-brass/25" />
+                <Skeleton className="size-8" />
+                <Skeleton className="ml-2 h-3 w-28" />
+              </div>
+              <div className="flex h-12 items-center gap-2 border-t border-border-soft bg-surface-2 px-4">
+                <Skeleton className="h-8 w-28" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+            </div>
+            <div className="h-80 bg-surface xl:h-[36rem]">
+              <div className="flex h-14 items-center gap-2 border-b border-border-soft px-3">
+                <Skeleton className="size-8" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <div className="space-y-3 px-3 py-4">
+                {[0, 1, 2, 3, 4, 5].map((index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <Skeleton className="mt-0.5 size-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton className="h-2.5 w-24" />
+                      <Skeleton
+                        className={cn(
+                          "mt-1.5 h-2.5",
+                          index % 2 === 0 ? "w-full" : "w-3/4",
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <SkeletonSectionHeading className="mt-12" />
+        <div className="mt-5 rounded-xl bg-surface p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-7 w-32" />
+          </div>
+          <Skeleton className="mt-5 h-56 w-full bg-surface-2" />
+          <div className="mt-4 flex gap-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </div>
+
+        <SkeletonSectionHeading className="mt-12" />
+        <div className="mt-5 space-y-4">
+          <div className="flex min-h-20 items-center gap-5 rounded-xl bg-surface px-5 py-4 sm:px-6">
+            <Skeleton className="h-5 w-32 shrink-0" />
+            <Skeleton className="h-3 flex-1" />
+          </div>
+          <div className="rounded-xl bg-surface p-5 sm:p-6">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-5 h-56 w-full bg-surface-2" />
+          </div>
+        </div>
+
+        <div className="mt-12 flex min-h-24 items-center gap-4 rounded-xl bg-surface p-5 sm:p-6">
+          <Skeleton className="size-11 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="mt-2 h-3 w-full max-w-lg" />
+          </div>
+          <Skeleton className="size-5 shrink-0" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function SkeletonSectionHeading({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex items-start gap-3", className)}>
+      <Skeleton className="size-9 shrink-0 bg-brass/25" />
+      <div className="min-w-0 flex-1">
+        <Skeleton className="h-8 w-52 max-w-2/3" />
+        <Skeleton className="mt-2 h-3 w-full max-w-xl" />
       </div>
     </div>
   );
+}
+
+function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("rounded-sm bg-surface-3", className)} />;
 }
 
 function DetailError({

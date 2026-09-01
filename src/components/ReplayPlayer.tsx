@@ -52,8 +52,11 @@ import type {
   ReplayChatGap,
   ReplayChatMessage,
   SessionData,
+  SessionMarker,
 } from "../lib/types";
-import { Button, Card } from "./ui";
+import { ReplayChatPanel } from "./ReplayChatPanel";
+import { Select } from "./Select";
+import { Button } from "./ui";
 
 /** Pedido de salto vindo de FORA (um clique num evento do relatório). O `nonce` existe
  *  porque clicar duas vezes no MESMO evento tem que saltar as duas vezes — comparar só o
@@ -90,10 +93,18 @@ export function ReplayPlayer({
   ticks: ReplayTick[];
   seek: SeekRequest | null;
   onPlayhead: (epoch: number | null) => void;
-  onMarkerAdded: () => void;
+  onMarkerAdded: (marker: SessionMarker) => void;
   onRecordingsDeleted: () => void;
 }) {
   const { t, fmt } = useI18n();
+  const rateOptions = useMemo(
+    () =>
+      PLAY_RATES.map((playRate) => ({
+        value: String(playRate),
+        label: `${fmt.dec(playRate, playRate % 1 === 0 ? 0 : 1)}×`,
+      })),
+    [fmt],
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   /** Vídeo + régua juntos — é este bloco que vai pra tela cheia. */
@@ -114,7 +125,7 @@ export function ReplayPlayer({
         data.clockJumps,
         data.offsetMs,
       ),
-    [data],
+    [data.clockJumps, data.offsetMs, data.recordings],
   );
 
   const [globalMs, setGlobalMs] = useState(0);
@@ -351,10 +362,14 @@ export function ReplayPlayer({
   const addMarker = async () => {
     const epoch = epochAtGlobal(tuned, globalMs);
     if (epoch == null) return;
+    const marker: SessionMarker = {
+      t: Math.round(epoch),
+      label: t("replay.marker.default"),
+    };
     try {
-      await api.addSessionMarker(sessionId, epoch, t("replay.marker.default"));
+      await api.addSessionMarker(sessionId, marker.t, marker.label);
       toast.success(t("replay.marker.added"));
-      onMarkerAdded();
+      onMarkerAdded(marker);
     } catch (e) {
       toast.error(errMsg(e));
     }
@@ -436,12 +451,6 @@ export function ReplayPlayer({
     return (showDeleted ? tail : tail.filter((m) => !m.deleted)).slice(-120);
   }, [chat, cursorEpoch, showDeleted]);
 
-  const chatBoxRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = chatBoxRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [visibleChat.length]);
-
   const gapBefore = useMemo(() => {
     if (cursorEpoch == null) return null;
     return gaps.find((g) => Math.abs(g.t - cursorEpoch) < 15_000) ?? null;
@@ -457,13 +466,23 @@ export function ReplayPlayer({
 
   const onScrub = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const k = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const trackPadding = 16;
+    const trackWidth = Math.max(1, rect.width - trackPadding * 2);
+    const k = Math.max(
+      0,
+      Math.min(1, (e.clientX - rect.left - trackPadding) / trackWidth),
+    );
     seekGlobal(k * tuned.totalMs);
   };
 
   const onScrubHover = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const k = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const trackPadding = 16;
+    const trackWidth = Math.max(1, rect.width - trackPadding * 2);
+    const k = Math.max(
+      0,
+      Math.min(1, (e.clientX - rect.left - trackPadding) / trackWidth),
+    );
     const g = k * tuned.totalMs;
     setHoverMs(g);
     // Miniatura de verdade, sem FFmpeg: um segundo <video> escondido buscando o
@@ -486,29 +505,34 @@ export function ReplayPlayer({
       <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
         <Play className="size-4" /> {t("replay.title")}
       </h3>
-      <Card className="mb-4">
-        <div className="flex flex-col gap-3 xl:flex-row">
-          <div className="min-w-0 flex-1">
-            {/* Em tela cheia o `max-h-[46vh]` do vídeo passaria a valer sobre a TELA
-                inteira e deixaria a imagem pequena no meio do preto — o oposto do que
-                se pede ao ir pra tela cheia. */}
+      <div className="mb-4 overflow-hidden bg-night">
+        <div
+          className={cn(
+            "grid min-h-0 gap-px bg-border-soft",
+            chat.length > 0 &&
+              "xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start",
+          )}
+        >
+          <div className="min-w-0 bg-night">
+            {/* Tela cheia usa o palco inteiro. O teto normal de altura não pode deixar a
+                imagem pequena no meio do preto quando o usuário expande o replay. */}
             <div
               ref={stageRef}
-              className="rounded-lg bg-surface outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-surface [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[88vh]"
+              className="bg-night outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass [&:fullscreen]:flex [&:fullscreen]:h-screen [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:bg-night [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[calc(100vh-9rem)]"
             >
               {mediaState === "missing" ? (
                 <Note tone="warn">{t("replay.missing")}</Note>
               ) : mediaState === "unsupported" ? (
                 <Note tone="bad">{t("replay.warn.codec")}</Note>
               ) : (
-                <div className="relative overflow-hidden rounded-lg bg-black">
+                <div className="relative flex min-h-48 items-center justify-center overflow-hidden bg-black xl:min-h-72">
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
                     ref={videoRef}
                     src={src}
                     tabIndex={0}
                     aria-label={t("replay.stage.aria")}
-                    className="max-h-[46vh] w-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass"
+                    className="aspect-video max-h-[58vh] w-full object-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass"
                     onTimeUpdate={onTimeUpdate}
                     onEnded={onEnded}
                     onLoadedMetadata={onLoadedMetadata}
@@ -552,7 +576,7 @@ export function ReplayPlayer({
               {/* Régua do tempo: posição + marcas dos eventos que o relatório já conhece. */}
               <div
                 className={cn(
-                  "group relative mt-2 h-6",
+                  "group relative h-10 px-4",
                   canControl
                     ? "cursor-pointer"
                     : "cursor-not-allowed opacity-50",
@@ -587,10 +611,10 @@ export function ReplayPlayer({
                 aria-disabled={!canControl}
                 aria-label={t("replay.scrub.aria")}
               >
-                <div className="absolute top-2.5 h-1.5 w-full rounded bg-surface-3" />
+                <div className="absolute top-[17px] right-4 left-4 h-1.5 rounded bg-surface-3" />
                 <div
-                  className="absolute top-2.5 h-1.5 rounded bg-brass"
-                  style={{ width: `${pct}%` }}
+                  className="absolute top-[17px] left-4 h-1.5 rounded bg-brass"
+                  style={{ width: `calc((100% - 2rem) * ${pct / 100})` }}
                 />
                 {ticks.map((k, i) => {
                   const x = tickAt(k.t);
@@ -598,28 +622,36 @@ export function ReplayPlayer({
                     <span
                       key={i}
                       title={k.label}
-                      className="absolute top-1 h-4 w-0.5 rounded-full"
-                      style={{ left: `${x}%`, background: k.color }}
+                      className="absolute top-3 h-4 w-0.5 rounded-full"
+                      style={{
+                        left: `calc(1rem + (100% - 2rem) * ${x / 100})`,
+                        background: k.color,
+                      }}
                     />
                   );
                 })}
                 {clipFrom != null && tuned.totalMs > 0 && (
                   <span
-                    className="absolute top-0.5 h-5 w-0.5 bg-ok"
-                    style={{ left: `${(clipFrom / tuned.totalMs) * 100}%` }}
+                    className="absolute top-2.5 h-5 w-0.5 bg-ok"
+                    style={{
+                      left: `calc(1rem + (100% - 2rem) * ${clipFrom / tuned.totalMs})`,
+                    }}
                   />
                 )}
                 <span
-                  className="absolute top-1 size-4 -translate-x-1/2 rounded-full border-2 border-brass bg-surface-1"
-                  style={{ left: `${pct}%` }}
+                  className="absolute top-[13px] size-4 -translate-x-1/2 rounded-full border-2 border-brass bg-night"
+                  style={{
+                    left: `calc(1rem + (100% - 2rem) * ${pct / 100})`,
+                  }}
                 />
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-h-14 flex-wrap items-center gap-1.5 border-t border-border-soft bg-surface px-3 py-2 sm:px-4">
               <Button
                 size="sm"
                 variant="ghost"
+                className="size-10 px-0"
                 disabled={!canControl}
                 onClick={() => seekGlobal(globalMs - 10_000)}
                 title={t("replay.back10")}
@@ -629,6 +661,7 @@ export function ReplayPlayer({
               <Button
                 size="sm"
                 variant="primary"
+                className="size-11 rounded-md px-0"
                 disabled={!canControl}
                 onClick={togglePlay}
                 aria-label={t(playing ? "replay.pause" : "replay.play")}
@@ -643,39 +676,38 @@ export function ReplayPlayer({
               <Button
                 size="sm"
                 variant="ghost"
+                className="size-10 px-0"
                 disabled={!canControl}
                 onClick={() => seekGlobal(globalMs + 10_000)}
                 title={t("replay.fwd10")}
               >
                 <SkipForward className="size-4" />
               </Button>
-              <span className="font-mono text-xs text-ink-muted">
+              <span className="ml-1 font-mono text-xs tabular-nums text-ink sm:text-sm">
                 {clock(globalMs)} / {clock(tuned.totalMs)}
               </span>
-              <select
-                value={rate}
+              <Select
+                value={String(rate)}
+                options={rateOptions}
+                size="sm"
                 disabled={!canControl}
-                onChange={(e) => {
-                  const r = Number(e.target.value);
-                  setRate(r);
-                  if (videoRef.current) videoRef.current.playbackRate = r;
+                onChange={(value) => {
+                  const nextRate = Number(value);
+                  setRate(nextRate);
+                  if (videoRef.current) {
+                    videoRef.current.playbackRate = nextRate;
+                  }
                 }}
-                className="rounded border-2 border-border bg-surface-2 px-1.5 py-0.5 text-xs font-semibold"
+                className="w-[4.75rem] shrink-0"
                 aria-label={t("replay.rate.aria")}
-              >
-                {PLAY_RATES.map((r) => (
-                  <option key={r} value={r}>
-                    {fmt.dec(r, r % 1 === 0 ? 0 : 1)}×
-                  </option>
-                ))}
-              </select>
+              />
               {/* Volume e tela cheia. Sem eles, revisar uma live seria assistir no volume
                   que o sistema deixou e numa janelinha — o `<video>` aqui não tem os
                   controles nativos, porque a régua sincronizada é que manda. */}
               <button
                 onClick={toggleMute}
                 disabled={!canControl}
-                className="rounded p-1 text-ink-faint transition-colors hover:text-brass disabled:pointer-events-none disabled:opacity-40"
+                className="grid size-10 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-brass disabled:pointer-events-none disabled:opacity-40"
                 title={t(muted ? "replay.unmute" : "replay.mute")}
                 aria-label={t(muted ? "replay.unmute" : "replay.mute")}
               >
@@ -693,27 +725,32 @@ export function ReplayPlayer({
                 value={muted ? 0 : volume}
                 disabled={!canControl}
                 onChange={(e) => applyVolume(Number(e.target.value))}
-                className="h-1 w-16 accent-brass"
+                className="hidden h-1 w-20 accent-brass sm:block"
                 aria-label={t("replay.volume")}
               />
               <button
                 onClick={toggleFullscreen}
                 disabled={!canControl}
-                className="rounded p-1 text-ink-faint transition-colors hover:text-brass disabled:pointer-events-none disabled:opacity-40"
+                className="grid size-10 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-brass disabled:pointer-events-none disabled:opacity-40"
                 title={t("replay.fullscreen")}
                 aria-label={t("replay.fullscreen")}
               >
                 <Maximize2 className="size-4" />
               </button>
-              <span className="flex-1" />
+            </div>
+
+            <div className="flex min-h-12 flex-wrap items-center gap-1.5 border-t border-border-soft bg-surface-2 px-3 py-2 sm:px-4">
               <Button
                 size="sm"
-                variant="ghost"
+                variant="subtle"
                 disabled={!canControl}
                 onClick={() => void addMarker()}
                 title={t("replay.marker.cta")}
               >
                 <Flag className="size-4" />
+                <span className="hidden sm:inline">
+                  {t("replay.marker.action")}
+                </span>
               </Button>
               <Button
                 size="sm"
@@ -723,11 +760,11 @@ export function ReplayPlayer({
                 title={t("replay.clip.cta")}
               >
                 <Scissors className="size-4" />
-                {clipFrom != null && (
-                  <span className="text-[11px]">
-                    {t("replay.clip.pending")}
-                  </span>
-                )}
+                <span className="hidden sm:inline">
+                  {clipFrom == null
+                    ? t("replay.clip.action")
+                    : t("replay.clip.pending")}
+                </span>
               </Button>
               {/* Sair do corte sem exportar. Sem isto, quem marcou o início por engano
                 ficava preso: qualquer clique seguinte viraria um clipe. */}
@@ -739,6 +776,7 @@ export function ReplayPlayer({
                   {t("replay.clip.cancel")}
                 </button>
               )}
+              <span className="flex-1" />
               <Button
                 size="sm"
                 variant="ghost"
@@ -765,7 +803,7 @@ export function ReplayPlayer({
 
             {/* Atalhos. Quem revisa uma live de 4h caçando o instante do travamento vai
               usar o teclado muito mais que o mouse — mas só se souber que ele existe. */}
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-ink-faint">
+            <div className="flex flex-wrap items-center gap-x-3 border-t border-border-soft bg-surface px-4 py-2 text-[11px] text-ink-faint">
               <span>{t("replay.shortcuts")}</span>
               {/* O ajuste é ferramenta de CONSERTO. Deixá-lo sempre à vista sugeriria que
                   a sincronia precisa de supervisão — e ela não precisa em 95% dos casos.
@@ -784,7 +822,7 @@ export function ReplayPlayer({
               O que a automação errar, o streamer arrasta. */}
             <div
               className={cn(
-                "mt-2 items-center gap-2 text-xs text-ink-faint",
+                "items-center gap-2 bg-surface px-4 pb-3 text-xs text-ink-faint",
                 showOffset || hasEstimatedAnchor(tuned) || offset !== 0
                   ? "flex"
                   : "hidden",
@@ -832,55 +870,16 @@ export function ReplayPlayer({
           </div>
 
           {/* Chat do momento. Só existe se a sessão gravou chat. */}
-          {chat.length > 0 && (
-            <div className="flex w-full min-w-0 flex-col xl:w-80">
-              <div className="mb-1 flex items-center justify-between text-xs font-semibold text-ink-muted">
-                <span>{t("replay.chat.title")}</span>
-                <button
-                  onClick={() => setShowDeleted((v) => !v)}
-                  className="font-semibold text-ink-faint hover:text-brass"
-                >
-                  {showDeleted
-                    ? t("replay.chat.hideDeleted")
-                    : t("replay.chat.showDeleted")}
-                </button>
-              </div>
-              <div
-                ref={chatBoxRef}
-                className="h-[38vh] overflow-y-auto rounded-lg border-2 border-border bg-surface-2 p-2 text-sm xl:h-auto xl:flex-1"
-              >
-                {visibleChat.length === 0 ? (
-                  <p className="p-2 text-xs text-ink-faint">
-                    {t("replay.chat.empty")}
-                  </p>
-                ) : (
-                  visibleChat.map((m, i) => (
-                    <p
-                      key={`${m.t}-${i}`}
-                      className={cn(
-                        "py-0.5 leading-snug",
-                        m.deleted && "opacity-40 line-through",
-                      )}
-                    >
-                      <span className="font-mono text-[10px] text-ink-faint">
-                        {fmt.time(m.t)}{" "}
-                      </span>
-                      <strong style={{ color: m.c || undefined }}>{m.a}</strong>
-                      <span className="text-ink-muted">: </span>
-                      <span className="break-words">{m.m}</span>
-                    </p>
-                  ))
-                )}
-                {gapBefore && (
-                  <p className="mt-1 rounded bg-warn/15 px-2 py-1 text-[11px] font-semibold text-warn">
-                    {t("replay.chat.gap")}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          {chat.length > 0 ? (
+            <ReplayChatPanel
+              messages={visibleChat}
+              gap={gapBefore}
+              showDeleted={showDeleted}
+              onToggleDeleted={() => setShowDeleted((value) => !value)}
+            />
+          ) : null}
         </div>
-      </Card>
+      </div>
     </>
   );
 }
@@ -907,7 +906,7 @@ function Note({
   return (
     <p
       className={cn(
-        "mt-2 flex items-start gap-1.5 rounded px-2 py-1 text-[11px] font-semibold",
+        "mx-4 mt-2 flex items-start gap-1.5 rounded px-2 py-1 text-[11px] font-semibold",
         tone === "warn" ? "bg-warn/15 text-warn" : "bg-bad/15 text-bad",
       )}
     >

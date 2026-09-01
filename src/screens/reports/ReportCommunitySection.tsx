@@ -42,7 +42,58 @@ export function ReportCommunitySection({
         title={t("reports.story.community.title")}
         description={t("reports.story.community.desc")}
       />
-      <div className="mt-5 grid items-start gap-4 xl:grid-cols-2">
+      <div className="mt-5 flex flex-col gap-4">
+        {analysis.alerts.hasData ? (
+          <div className="rounded-xl bg-surface px-5 py-4 sm:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="shrink-0 lg:w-52">
+                <h3 className="flex items-center gap-2 text-base">
+                  <Sparkles className="size-4 text-brass" aria-hidden />
+                  {t("reports.alerts.title")}
+                </h3>
+                {analysis.alerts.topRaid &&
+                analysis.alerts.topRaid.amount > 0 ? (
+                  <div className="mt-1 text-xs text-ink-muted">
+                    {rich(t, "reports.alerts.topRaid", {
+                      user: (
+                        <strong className="text-ink">
+                          {analysis.alerts.topRaid.user}
+                        </strong>
+                      ),
+                      n: Math.round(analysis.alerts.topRaid.amount),
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-1 flex-wrap gap-x-5 gap-y-3 border-t border-border-soft pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
+                {ALERT_LABELS.map(([kind, labelKey, Icon]) =>
+                  analysis.alerts.byKind[kind] ? (
+                    <span
+                      key={kind}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Icon className="size-3.5 text-brass" aria-hidden />
+                      <strong>{analysis.alerts.byKind[kind]}</strong>
+                      <span className="text-ink-muted">
+                        {tp(labelKey, analysis.alerts.byKind[kind])}
+                      </span>
+                    </span>
+                  ) : null,
+                )}
+                {analysis.alerts.bits > 0 ? (
+                  <span className="flex items-center gap-2 text-sm">
+                    <Gem className="size-3.5 text-info" aria-hidden />
+                    <strong>{fmt.num(analysis.alerts.bits)}</strong>
+                    <span className="text-ink-muted">
+                      {t("reports.alerts.bitsTotal")}
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {hasChat(data) && story.sampleCount > 1 ? (
           <div className="rounded-xl bg-surface p-5 sm:p-6">
             <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -86,59 +137,11 @@ export function ReportCommunitySection({
           </div>
         ) : null}
 
-        {analysis.alerts.hasData ? (
-          <div className="rounded-xl bg-surface p-5 sm:p-6">
-            <h3 className="mb-3 flex items-center gap-2 text-base">
-              <Sparkles className="size-4 text-brass" aria-hidden />
-              {t("reports.alerts.title")}
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {ALERT_LABELS.map(([kind, labelKey, Icon]) =>
-                analysis.alerts.byKind[kind] ? (
-                  <span
-                    key={kind}
-                    className="flex items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-sm"
-                  >
-                    <Icon className="size-3.5 text-brass" aria-hidden />
-                    <strong>{analysis.alerts.byKind[kind]}</strong>
-                    <span className="text-ink-muted">
-                      {tp(labelKey, analysis.alerts.byKind[kind])}
-                    </span>
-                  </span>
-                ) : null,
-              )}
-              {analysis.alerts.bits > 0 ? (
-                <span className="flex items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-sm">
-                  <Gem className="size-3.5 text-info" aria-hidden />
-                  <strong>{fmt.num(analysis.alerts.bits)}</strong>
-                  <span className="text-ink-muted">
-                    {t("reports.alerts.bitsTotal")}
-                  </span>
-                </span>
-              ) : null}
-            </div>
-            {analysis.alerts.topRaid && analysis.alerts.topRaid.amount > 0 ? (
-              <div className="mt-3 text-xs text-ink-muted">
-                {rich(t, "reports.alerts.topRaid", {
-                  user: (
-                    <strong className="text-ink">
-                      {analysis.alerts.topRaid.user}
-                    </strong>
-                  ),
-                  n: Math.round(analysis.alerts.topRaid.amount),
-                })}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         {analysis.byChannel.channels.length > 1 ? (
-          <div className="xl:col-span-2">
-            <ChannelBreakdownCard
-              breakdown={analysis.byChannel}
-              colors={story.channelColors}
-            />
-          </div>
+          <ChannelBreakdownCard
+            breakdown={analysis.byChannel}
+            colors={story.channelColors}
+          />
         ) : null}
       </div>
     </section>

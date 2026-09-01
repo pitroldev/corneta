@@ -46,4 +46,12 @@ describe("summaryCache", () => {
     localStorage.setItem("corneta.session-summaries", "{lixo");
     expect(getCachedSummary("s1")).toBeNull();
   });
+
+  it("descarta resumos produzidos por uma heurística antiga", () => {
+    localStorage.setItem(
+      "corneta.session-summaries",
+      JSON.stringify({ s1: fake }),
+    );
+    expect(getCachedSummary("s1")).toBeNull();
+  });
 });

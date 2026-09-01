@@ -526,8 +526,10 @@ function isBad(
     )
       return true;
   }
-  if (s.cpu != null && s.cpu > CPU_HIGH) return true;
-  if (s.gpu != null && s.gpu > CPU_HIGH) return true;
+  // CPU/GPU no limite são CONTEXTO, não prova de uma live ruim. Um jogo pode ocupar
+  // 99% da GPU por horas enquanto NVENC, OBS e os destinos seguem perfeitamente
+  // saudáveis. Esses números ajudam a explicar um render lag real em `buildWindow`, mas
+  // nunca abrem um incidente sozinhos.
   if (
     s.obs &&
     (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)
@@ -623,14 +625,16 @@ function buildWindow(
     cause = t("analysis.cause.signal");
     causeKind = "signal";
     advice = t("analysis.advice.signal");
-  } else if (renderLag && !cpuHigh && !gpuHigh) {
-    cause = t("analysis.cause.render");
-    causeKind = "render";
-    advice = t("analysis.advice.render");
-  } else if (cpuHigh || gpuHigh) {
-    cause = t("analysis.cause.encoding");
-    causeKind = "encoding";
-    advice = t("analysis.advice.encoding");
+  } else if (renderLag) {
+    if (cpuHigh || gpuHigh) {
+      cause = t("analysis.cause.encoding");
+      causeKind = "encoding";
+      advice = t("analysis.advice.encoding");
+    } else {
+      cause = t("analysis.cause.render");
+      causeKind = "render";
+      advice = t("analysis.advice.render");
+    }
   } else if (congested || ((bitrateDrop || reconnect) && !singleTarget)) {
     cause = t("analysis.cause.network");
     causeKind = "network";
@@ -685,7 +689,7 @@ function problemWindows(
   return merged
     .filter(([a, b]) => {
       // Sinal DURO (queda de estado real) vale em qualquer duração; sinal leve
-      // (bitrate/congestion/render/CPU) só vira incidente se PERSISTIR — um blip
+      // (bitrate/congestion/render) só vira incidente se PERSISTIR — um blip
       // de 2s pintava o veredito de vermelho sem espectador ter visto nada.
       const hard = samples
         .slice(a, b + 1)

@@ -14,6 +14,7 @@ import type {
   ReplayChatGap,
   ReplayChatMessage,
   SessionData,
+  SessionMarker,
   SessionSummary,
 } from "../../lib/types";
 
@@ -35,6 +36,26 @@ export function useReportDetailData(id: string, previousId: string | null) {
 
   const reload = useCallback(() => {
     setRevision((current) => current + 1);
+  }, []);
+
+  // A persistência já terminou quando estes callbacks rodam. Atualizar só o pedaço
+  // alterado mantém player, chat e gráficos montados — trocar tudo pelo skeleton aqui
+  // fazia a tela inteira piscar ao marcar um único instante.
+  const addMarker = useCallback((marker: SessionMarker) => {
+    setData((current) => {
+      if (!current || current === "loading") return current;
+      return {
+        ...current,
+        markers: [...current.markers, marker].sort((a, b) => a.t - b.t),
+      };
+    });
+  }, []);
+
+  const clearRecordings = useCallback(() => {
+    setData((current) => {
+      if (!current || current === "loading") return current;
+      return { ...current, recordings: [] };
+    });
   }, []);
 
   useEffect(() => {
@@ -129,5 +150,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
     previousSummary,
     chat,
     reload,
+    addMarker,
+    clearRecordings,
   };
 }

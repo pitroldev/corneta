@@ -7,27 +7,44 @@ export interface SelectOption<T extends string> {
   label: string;
 }
 
+type SelectSize = "sm" | "md";
+
+const TRIGGER_SIZES: Record<SelectSize, string> = {
+  sm: "h-8 px-2 text-xs",
+  md: "h-10 px-2.5 text-sm",
+};
+
 /** Select on-brand via Radix: teclado completo, typeahead e portal (sem clipping). */
 export function Select<T extends string>({
   value,
   options,
   onChange,
+  size = "md",
+  disabled = false,
   className,
   "aria-label": ariaLabel,
 }: {
   value: T;
   options: SelectOption<T>[];
   onChange: (v: T) => void;
+  size?: SelectSize;
+  disabled?: boolean;
   className?: string;
   "aria-label"?: string;
 }) {
   return (
-    <RSelect.Root value={value} onValueChange={(v) => onChange(v as T)}>
+    <RSelect.Root
+      value={value}
+      disabled={disabled}
+      onValueChange={(v) => onChange(v as T)}
+    >
       <RSelect.Trigger
         aria-label={ariaLabel}
         className={cn(
-          "group flex h-10 w-full items-center justify-between gap-2 rounded-md border-2 border-border bg-surface-2 px-2.5 text-sm font-medium outline-none transition-colors",
+          "group flex w-full items-center justify-between gap-2 rounded-md border-2 border-border bg-surface-2 font-medium text-ink outline-none transition-colors",
           "hover:border-brass/60 focus:border-brass data-[state=open]:border-brass",
+          "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
+          TRIGGER_SIZES[size],
           className,
         )}
       >
@@ -44,6 +61,7 @@ export function Select<T extends string>({
         <RSelect.Content
           position="popper"
           sideOffset={4}
+          collisionPadding={8}
           className="z-[100] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md bg-surface-2 pop"
         >
           <RSelect.Viewport className="max-h-64 overflow-auto">

@@ -53,7 +53,14 @@ export default tseslint.config(
       "no-empty": ["error", { "allowEmptyCatch": true }],
       "jsx-a11y/no-autofocus": "off",
       "jsx-a11y/media-has-caption": "off",
-      "jsx-a11y/label-has-associated-control": "off"
+      "jsx-a11y/label-has-associated-control": "off",
+      "no-restricted-syntax": [
+        "error",
+        {
+          "selector": "JSXOpeningElement[name.name='select']",
+          "message": "Use o componente Select do design system em src/components/Select.tsx."
+        }
+      ]
     }
   }
 );

@@ -25,6 +25,7 @@ export interface ReportStoryModel {
   replayState: ReplayState;
   replayTicks: ReplayTick[];
   raidMarkers: ChartMarker[];
+  momentMarkers: ChartMarker[];
   channelColors: Record<string, string>;
   canSplitViewers: boolean;
   canSplitChat: boolean;
@@ -113,6 +114,17 @@ export function useReportStoryModel({
           index: viewerIndexAt(event.t),
           color: "#7c9cff",
         })),
+      momentMarkers: analysis.highlights.map((highlight) => ({
+        index: viewerIndexAt(highlight.t),
+        color:
+          highlight.kind === "raid"
+            ? "#7c9cff"
+            : highlight.kind === "viewers"
+              ? "#56e39b"
+              : highlight.kind === "alert"
+                ? "#ff5a36"
+                : "#ffb323",
+      })),
       channelColors: colors,
       canSplitViewers,
       canSplitChat,

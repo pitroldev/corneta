@@ -48,6 +48,19 @@ export const IS_TAURI =
  *  aparecer como falha. Mudou de um lado? Muda do outro. */
 export const START_CANCELLED = "corneta:start-cancelled";
 
+/** O serde do Tauri não converte JSON float para inteiros Rust (`u64`/`i64`).
+ *  Tempos vindos de `<video>` e de interpolação carregam frações de milissegundo,
+ *  então a normalização precisa acontecer nesta última fronteira antes do IPC. */
+function integerArg(value: number, name: string, unsigned = false): number {
+  const rounded = Math.round(value);
+  if (!Number.isSafeInteger(rounded) || (unsigned && rounded < 0)) {
+    throw new TypeError(
+      `${name} precisa ser um inteiro seguro${unsigned ? " não negativo" : ""}`,
+    );
+  }
+  return rounded;
+}
+
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
   saveConfig(config: AppConfig): Promise<AppConfig>;
@@ -411,7 +424,7 @@ function tauriApi(): CornetaApi {
     },
     async setSessionOffset(id, ms) {
       const { invoke } = await core();
-      await invoke("set_session_offset", { id, ms });
+      await invoke("set_session_offset", { id, ms: integerArg(ms, "ms") });
     },
     async deleteSessionRecordings(id) {
       const { invoke } = await core();
@@ -423,11 +436,19 @@ function tauriApi(): CornetaApi {
     },
     async addSessionMarker(id, t, label) {
       const { invoke } = await core();
-      await invoke("add_session_marker", { id, t, label });
+      await invoke("add_session_marker", {
+        id,
+        t: integerArg(t, "t", true),
+        label,
+      });
     },
     async exportClip(path, startMs, endMs) {
       const { invoke } = await core();
-      return invoke<string | null>("export_clip", { path, startMs, endMs });
+      return invoke<string | null>("export_clip", {
+        path,
+        startMs: integerArg(startMs, "startMs", true),
+        endMs: integerArg(endMs, "endMs", true),
+      });
     },
     async chatStart() {
       const { invoke } = await core();
