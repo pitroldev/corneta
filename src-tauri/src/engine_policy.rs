@@ -90,10 +90,16 @@ pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
         || low.contains("not authorized")
         || low.contains("rejected")
         || low.contains("auth")
+        || low.contains("badname")
+        || low.contains("publish denied")
+        || low.contains("invalid stream")
+        || low.contains("invalid key")
+        || low.contains("stream key")
     {
         (
             "error",
-            "Chave recusada — cole a chave nova em Plataformas e clique em Tentar de novo.".into(),
+            "Endereço ou chave recusados — confira o destino em Plataformas e clique em Tentar de novo."
+                .into(),
         )
     } else if low.contains("connection refused")
         || low.contains("cannot open")
@@ -117,6 +123,60 @@ pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
             "Instabilidade no envio — reconectando.".into(),
         )
     }
+}
+
+/// Mantém no log o motivo útil devolvido pelo FFmpeg sem persistir URL/chave de transmissão.
+/// Só produz saída para linhas de erro; stats e avisos normais continuam fora do disco.
+pub(crate) fn safe_ffmpeg_diagnostic(line: &str, stream_key: &str) -> Option<String> {
+    const ERROR_MARKERS: [&str; 12] = [
+        "error",
+        "failed",
+        "refused",
+        "forbidden",
+        "unauthorized",
+        "denied",
+        "badname",
+        "broken pipe",
+        "connection reset",
+        "unable to",
+        "timed out",
+        "end of file",
+    ];
+    let low = line.to_ascii_lowercase();
+    if line.contains("frame=") || !ERROR_MARKERS.iter().any(|marker| low.contains(marker)) {
+        return None;
+    }
+
+    let mut safe = if stream_key.is_empty() {
+        line.trim().to_string()
+    } else {
+        line.trim().replace(stream_key, "<stream-key>")
+    };
+
+    // O FFmpeg costuma ecoar a URL inteira em erros de abertura. Redige do esquema até o
+    // próximo delimitador; o motivo ao redor (TLS, DNS, BadName...) continua visível.
+    loop {
+        let lower = safe.to_ascii_lowercase();
+        let start = [lower.find("rtmp://"), lower.find("rtmps://")]
+            .into_iter()
+            .flatten()
+            .min();
+        let Some(start) = start else { break };
+        let end = safe[start..]
+            .char_indices()
+            .find_map(|(offset, ch)| {
+                (offset > 0 && (ch.is_whitespace() || matches!(ch, '\'' | '"' | ']' | ')')))
+                    .then_some(start + offset)
+            })
+            .unwrap_or(safe.len());
+        safe.replace_range(start..end, "<rtmp-url>");
+    }
+
+    if safe.chars().count() > 600 {
+        safe = safe.chars().take(600).collect();
+        safe.push('…');
+    }
+    Some(safe)
 }
 
 /// `true` se o caminho é um `brb-slate.*` (o nome, sem extensão, é exatamente "brb-slate").
@@ -308,6 +368,10 @@ mod tests {
         assert_eq!(friendly_error("not authorized").0, "error");
         assert_eq!(friendly_error("connection refused").0, "reconnecting");
         assert_eq!(friendly_error("broken pipe").0, "reconnecting");
+        assert_eq!(
+            friendly_error("server error: netstream.publish.badname").0,
+            "error"
+        );
         assert_eq!(friendly_error("algo estranho").0, "reconnecting");
         // a mensagem de chave recusada guia o streamer pra Plataformas.
         assert!(friendly_error("auth failed").1.contains("Plataformas"));
@@ -324,6 +388,20 @@ mod tests {
             friendly_error("algo estranho").1,
             "Instabilidade no envio — reconectando."
         );
+    }
+
+    #[test]
+    fn ffmpeg_diagnostic_keeps_reason_and_redacts_destination() {
+        let safe = safe_ffmpeg_diagnostic(
+            "[rtmp] Server error: BadName opening rtmps://host/app/secret-key",
+            "secret-key",
+        )
+        .unwrap();
+        assert!(safe.contains("BadName"));
+        assert!(safe.contains("<rtmp-url>"));
+        assert!(!safe.contains("host"));
+        assert!(!safe.contains("secret-key"));
+        assert!(safe_ffmpeg_diagnostic("frame=12 fps=30", "secret").is_none());
     }
 
     #[test]

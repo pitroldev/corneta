@@ -4,7 +4,7 @@ use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
     brb_slate_is_video, friendly_error, is_brb_slate_path, parse_ingest_hostport, parse_kv,
-    parse_mediamtx_paths, quality_of, tray_tooltip,
+    parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic, tray_tooltip,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -2037,6 +2037,11 @@ async fn start_engine_inner(
                             match ev {
                                 CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
                                     let line = String::from_utf8_lossy(&b);
+                                    if let Some(diagnostic) =
+                                        safe_ffmpeg_diagnostic(&line, &key)
+                                    {
+                                        log::warn!("FFmpeg do destino: {diagnostic}");
+                                    }
                                     update_target_metrics(
                                         &app_t,
                                         &target_id,

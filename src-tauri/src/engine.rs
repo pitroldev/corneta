@@ -284,6 +284,24 @@ pub fn ffmpeg_args_for_target(
             config.settings.loudness_target_lufs
         ));
     }
+
+    if t.platform_id == "custom" {
+        // O OBS usa librtmp e envia a chave separadamente como `playpath`. Alguns ingests
+        // privados validam esse handshake e recusam o padrão de publisher do libavformat,
+        // embora aceitem exatamente a mesma URL/chave direto no OBS. Restrito ao destino
+        // Personalizado para não mudar o contrato já estável dos presets conhecidos.
+        args.extend(
+            [
+                "-rtmp_flashver",
+                "WIN 10,0,32,18",
+                "-rtmp_playpath",
+                key.trim().trim_start_matches('/'),
+                "-tcp_nodelay",
+                "1",
+            ]
+            .map(String::from),
+        );
+    }
     args.extend(
         [
             "-c:a",
@@ -1119,6 +1137,23 @@ mod tests {
             ),
             "rtmps://ingest.example.test/live?stream_key=stream-1"
         );
+    }
+
+    #[test]
+    fn custom_target_uses_obs_compatible_rtmp_handshake() {
+        let c = cfg("passthrough", vec![tgt("custom", None)]);
+        let args = ffmpeg_args_for_target(
+            &c,
+            &c.targets[0],
+            "/stream-1?token=abc",
+            None,
+            "rtmp://127.0.0.1:1935/live/obs",
+            None,
+        );
+        let s = args.join(" ");
+        assert!(s.contains("-rtmp_flashver WIN 10,0,32,18"), "{s}");
+        assert!(s.contains("-rtmp_playpath stream-1?token=abc"), "{s}");
+        assert!(s.contains("-tcp_nodelay 1"), "{s}");
     }
 
     #[test]
