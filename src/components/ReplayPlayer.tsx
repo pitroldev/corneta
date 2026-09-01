@@ -23,6 +23,7 @@ import {
   Download,
   Flag,
   FolderOpen,
+  LoaderCircle,
   Maximize2,
   Pause,
   Play,
@@ -43,6 +44,7 @@ import {
   globalAtEpoch,
   hasEstimatedAnchor,
   hasUnplayableCodec,
+  isPlayableCodec,
   pointAtGlobal,
   type ReplayIndex,
 } from "../lib/replay";
@@ -133,12 +135,27 @@ export function ReplayPlayer({
   // abre sozinho quando a âncora foi estimada, que é exatamente quando ele é necessário.
   const [showOffset, setShowOffset] = useState(false);
   const [previewOk, setPreviewOk] = useState(false);
+  const [loadedPath, setLoadedPath] = useState<string | null>(null);
+  const [failedPath, setFailedPath] = useState<string | null>(null);
 
   // O offset entra no índice sem reparsear a sessão: arrastar o ajuste tem que responder
   // na hora, senão o streamer não consegue calibrar olhando.
   const tuned = useMemo(() => ({ ...idx, offsetMs: offset }), [idx, offset]);
 
   const segment = tuned.segments[segIndex];
+  const src = segment ? urls[segment.path] : undefined;
+  const codecUnsupported = segment ? !isPlayableCodec(segment.codec) : false;
+  const mediaState: "loading" | "ready" | "missing" | "unsupported" =
+    codecUnsupported
+      ? "unsupported"
+      : !segment || src === undefined
+        ? "loading"
+        : src === "" || failedPath === segment.path
+          ? "missing"
+          : loadedPath === segment.path
+            ? "ready"
+            : "loading";
+  const canControl = mediaState === "ready";
   const truncated = data.recordings.some(
     (r) => r.reason && r.reason !== "stopped",
   );
@@ -150,7 +167,7 @@ export function ReplayPlayer({
     // e não deu" — com o teste de verdade, esse "" seria falsy, o efeito tentaria de novo,
     // guardaria "" de novo, e o arquivo apagado na mão viraria um laço infinito de
     // chamadas ao backend em vez de um aviso.
-    if (!segment || segment.path in urls) return;
+    if (!segment || codecUnsupported || segment.path in urls) return;
     let alive = true;
     void api
       .recordVideoUrl(segment.path)
@@ -164,7 +181,7 @@ export function ReplayPlayer({
     return () => {
       alive = false;
     };
-  }, [segment, urls]);
+  }, [codecUnsupported, segment, urls]);
 
   const emitPlayhead = useCallback(
     (g: number) => {
@@ -212,14 +229,25 @@ export function ReplayPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seek?.nonce]);
 
-  // Teclado. É uma ferramenta de revisão: quem está caçando o instante do travamento vai
-  // usar isto muito mais que o mouse.
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || v.readyState < 1) return;
+    if (v.paused) void v.play().catch(() => setPlaying(false));
+    else v.pause();
+  }, []);
+
+  // Teclado. Os atalhos só ficam ativos quando o palco do replay tem foco: a barra de
+  // espaço continua acionando normalmente qualquer botão do relatório.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      // Não sequestra teclas de quem está digitando num campo. O player só existe quando
-      // há gravação aberta na tela, então fora isso os atalhos não competem com nada.
-      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (!el || !stageRef.current?.contains(el) || !canControl) return;
+      if (
+        el.closest(
+          "button, a, input, textarea, select, [contenteditable='true'], [role='button'], [role='slider']",
+        )
+      )
+        return;
       const step = e.shiftKey ? 60_000 : 10_000;
       switch (e.key) {
         case " ":
@@ -247,15 +275,7 @@ export function ReplayPlayer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalMs, seekGlobal, playing]);
-
-  const togglePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) void v.play().catch(() => setPlaying(false));
-    else v.pause();
-  };
+  }, [canControl, globalMs, seekGlobal, togglePlay]);
 
   const applyVolume = (v: number) => {
     setVolume(v);
@@ -303,7 +323,9 @@ export function ReplayPlayer({
 
   const onLoadedMetadata = () => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || !segment) return;
+    setLoadedPath(segment.path);
+    setFailedPath(null);
     // Trocar o `src` zera velocidade e volume do elemento. Sem reaplicar, emendar no
     // segmento seguinte devolvia o vídeo pra 1× e volume cheio no meio da revisão.
     v.playbackRate = rate;
@@ -426,8 +448,6 @@ export function ReplayPlayer({
   }, [gaps, cursorEpoch]);
 
   if (!tuned.segments.length) return null;
-  const src = segment ? urls[segment.path] : undefined;
-  const missing = src === "";
 
   const pct = tuned.totalMs > 0 ? (globalMs / tuned.totalMs) * 100 : 0;
   const tickAt = (epoch: number): number | null => {
@@ -467,32 +487,53 @@ export function ReplayPlayer({
         <Play className="size-4" /> {t("replay.title")}
       </h3>
       <Card className="mb-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="flex flex-col gap-3 xl:flex-row">
           <div className="min-w-0 flex-1">
             {/* Em tela cheia o `max-h-[46vh]` do vídeo passaria a valer sobre a TELA
                 inteira e deixaria a imagem pequena no meio do preto — o oposto do que
                 se pede ao ir pra tela cheia. */}
             <div
               ref={stageRef}
-              className="bg-surface [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[88vh]"
+              className="rounded-lg bg-surface outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-surface [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[88vh]"
             >
-              {missing ? (
+              {mediaState === "missing" ? (
                 <Note tone="warn">{t("replay.missing")}</Note>
+              ) : mediaState === "unsupported" ? (
+                <Note tone="bad">{t("replay.warn.codec")}</Note>
               ) : (
                 <div className="relative overflow-hidden rounded-lg bg-black">
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
                     ref={videoRef}
                     src={src}
-                    className="max-h-[46vh] w-full"
+                    tabIndex={0}
+                    aria-label={t("replay.stage.aria")}
+                    className="max-h-[46vh] w-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass"
                     onTimeUpdate={onTimeUpdate}
                     onEnded={onEnded}
                     onLoadedMetadata={onLoadedMetadata}
+                    onError={() => {
+                      if (segment) setFailedPath(segment.path);
+                    }}
                     onPlay={() => setPlaying(true)}
                     onPause={() => setPlaying(false)}
                     onClick={togglePlay}
                     preload="metadata"
                   />
+                  {mediaState === "loading" && (
+                    <div
+                      className="absolute inset-0 grid min-h-40 place-items-center bg-night/85 text-sm font-semibold text-ink-muted"
+                      role="status"
+                    >
+                      <span className="flex items-center gap-2">
+                        <LoaderCircle
+                          className="size-4 animate-spin text-brass"
+                          aria-hidden
+                        />
+                        {t("replay.loading")}
+                      </span>
+                    </div>
+                  )}
                   {hoverMs != null && previewOk && (
                     <div className="pointer-events-none absolute right-2 bottom-2 w-40 overflow-hidden rounded border-2 border-border bg-black">
                       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -510,13 +551,19 @@ export function ReplayPlayer({
 
               {/* Régua do tempo: posição + marcas dos eventos que o relatório já conhece. */}
               <div
-                className="group relative mt-2 h-6 cursor-pointer"
-                onClick={onScrub}
-                onMouseMove={onScrubHover}
+                className={cn(
+                  "group relative mt-2 h-6",
+                  canControl
+                    ? "cursor-pointer"
+                    : "cursor-not-allowed opacity-50",
+                )}
+                onClick={canControl ? onScrub : undefined}
+                onMouseMove={canControl ? onScrubHover : undefined}
                 onMouseLeave={() => setHoverMs(null)}
                 // A régua É um slider: com foco, as setas movem. Sem isso ela só existiria
                 // pro mouse — e quem revisa uma live inteira navega no teclado.
                 onKeyDown={(e) => {
+                  if (!canControl) return;
                   const step = e.shiftKey ? 60_000 : 10_000;
                   if (e.key === "ArrowLeft") {
                     e.preventDefault();
@@ -537,6 +584,7 @@ export function ReplayPlayer({
                 aria-valuemin={0}
                 aria-valuemax={Math.round(tuned.totalMs / 1000)}
                 aria-valuenow={Math.round(globalMs / 1000)}
+                aria-disabled={!canControl}
                 aria-label={t("replay.scrub.aria")}
               >
                 <div className="absolute top-2.5 h-1.5 w-full rounded bg-surface-3" />
@@ -572,12 +620,20 @@ export function ReplayPlayer({
               <Button
                 size="sm"
                 variant="ghost"
+                disabled={!canControl}
                 onClick={() => seekGlobal(globalMs - 10_000)}
                 title={t("replay.back10")}
               >
                 <SkipBack className="size-4" />
               </Button>
-              <Button size="sm" variant="primary" onClick={togglePlay}>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={!canControl}
+                onClick={togglePlay}
+                aria-label={t(playing ? "replay.pause" : "replay.play")}
+                title={t(playing ? "replay.pause" : "replay.play")}
+              >
                 {playing ? (
                   <Pause className="size-4" />
                 ) : (
@@ -587,6 +643,7 @@ export function ReplayPlayer({
               <Button
                 size="sm"
                 variant="ghost"
+                disabled={!canControl}
                 onClick={() => seekGlobal(globalMs + 10_000)}
                 title={t("replay.fwd10")}
               >
@@ -597,6 +654,7 @@ export function ReplayPlayer({
               </span>
               <select
                 value={rate}
+                disabled={!canControl}
                 onChange={(e) => {
                   const r = Number(e.target.value);
                   setRate(r);
@@ -616,7 +674,8 @@ export function ReplayPlayer({
                   controles nativos, porque a régua sincronizada é que manda. */}
               <button
                 onClick={toggleMute}
-                className="rounded p-1 text-ink-faint transition-colors hover:text-brass"
+                disabled={!canControl}
+                className="rounded p-1 text-ink-faint transition-colors hover:text-brass disabled:pointer-events-none disabled:opacity-40"
                 title={t(muted ? "replay.unmute" : "replay.mute")}
                 aria-label={t(muted ? "replay.unmute" : "replay.mute")}
               >
@@ -632,13 +691,15 @@ export function ReplayPlayer({
                 max={1}
                 step={0.05}
                 value={muted ? 0 : volume}
+                disabled={!canControl}
                 onChange={(e) => applyVolume(Number(e.target.value))}
                 className="h-1 w-16 accent-brass"
                 aria-label={t("replay.volume")}
               />
               <button
                 onClick={toggleFullscreen}
-                className="rounded p-1 text-ink-faint transition-colors hover:text-brass"
+                disabled={!canControl}
+                className="rounded p-1 text-ink-faint transition-colors hover:text-brass disabled:pointer-events-none disabled:opacity-40"
                 title={t("replay.fullscreen")}
                 aria-label={t("replay.fullscreen")}
               >
@@ -648,6 +709,7 @@ export function ReplayPlayer({
               <Button
                 size="sm"
                 variant="ghost"
+                disabled={!canControl}
                 onClick={() => void addMarker()}
                 title={t("replay.marker.cta")}
               >
@@ -656,7 +718,7 @@ export function ReplayPlayer({
               <Button
                 size="sm"
                 variant={clipFrom == null ? "ghost" : "primary"}
-                disabled={busy}
+                disabled={busy || !canControl}
                 onClick={() => void exportClip()}
                 title={t("replay.clip.cta")}
               >
@@ -758,7 +820,7 @@ export function ReplayPlayer({
             {hasEstimatedAnchor(tuned) && (
               <Note tone="warn">{t("replay.warn.estimated")}</Note>
             )}
-            {hasUnplayableCodec(tuned) && (
+            {hasUnplayableCodec(tuned) && !codecUnsupported && (
               <Note tone="bad">{t("replay.warn.codec")}</Note>
             )}
             {truncated && <Note tone="warn">{t("replay.warn.truncated")}</Note>}
@@ -771,7 +833,7 @@ export function ReplayPlayer({
 
           {/* Chat do momento. Só existe se a sessão gravou chat. */}
           {chat.length > 0 && (
-            <div className="flex w-full min-w-0 flex-col lg:w-80">
+            <div className="flex w-full min-w-0 flex-col xl:w-80">
               <div className="mb-1 flex items-center justify-between text-xs font-semibold text-ink-muted">
                 <span>{t("replay.chat.title")}</span>
                 <button
@@ -785,7 +847,7 @@ export function ReplayPlayer({
               </div>
               <div
                 ref={chatBoxRef}
-                className="h-[38vh] overflow-y-auto rounded-lg border-2 border-border bg-surface-2 p-2 text-sm lg:h-auto lg:flex-1"
+                className="h-[38vh] overflow-y-auto rounded-lg border-2 border-border bg-surface-2 p-2 text-sm xl:h-auto xl:flex-1"
               >
                 {visibleChat.length === 0 ? (
                   <p className="p-2 text-xs text-ink-faint">

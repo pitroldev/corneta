@@ -560,12 +560,25 @@ impl AppConfig {
             if !matches!(target.protocol.as_str(), "rtmp" | "rtmps") {
                 return Err(Msg::ConfigUnsupportedProtocol.text(l));
             }
-            let expected = format!("{}://", target.protocol);
-            if !target.ingest_url.starts_with(&expected)
-                || target.ingest_url.len() > 2_048
-                || target.ingest_url[expected.len()..]
-                    .trim_matches('/')
-                    .is_empty()
+            let protocol = if target
+                .ingest_url
+                .get(..8)
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmps://"))
+            {
+                "rtmps"
+            } else if target
+                .ingest_url
+                .get(..7)
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmp://"))
+            {
+                "rtmp"
+            } else {
+                return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+            };
+            target.protocol = protocol.into();
+            let scheme_len = protocol.len() + 3;
+            if target.ingest_url.len() > 2_048
+                || target.ingest_url[scheme_len..].trim_matches('/').is_empty()
                 || target.ingest_url.chars().any(char::is_whitespace)
             {
                 return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
@@ -769,6 +782,20 @@ mod tests {
                 reframe: None,
             },
         }
+    }
+
+    #[test]
+    fn protocolo_do_destino_acompanha_o_esquema_da_url() {
+        let mut cfg = AppConfig::default();
+        let mut target = alvo("target_secure");
+        target.protocol = "rtmp".into();
+        target.ingest_url = "rtmps://ingest.example.test/app".into();
+        cfg.targets.push(target);
+
+        let cfg = cfg
+            .validate_and_normalize()
+            .expect("URL RTMPS válida não pode impedir o destino de ser salvo");
+        assert_eq!(cfg.targets[0].protocol, "rtmps");
     }
 
     // ------------------------------------------------------------------

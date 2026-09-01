@@ -55,7 +55,21 @@ export function updateTarget(
 ): AppConfig {
   return {
     ...config,
-    targets: config.targets.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    targets: config.targets.map((target) => {
+      if (target.id !== id) return target;
+      const next = { ...target, ...patch };
+      // A URL é a fonte de verdade do protocolo. Sem isto, um destino
+      // Personalizado nasce como RTMP, aceita visualmente uma URL RTMPS, mas o
+      // backend recusa a configuração e o cofre não encontra o novo destino.
+      if (patch.ingestUrl !== undefined && patch.protocol === undefined) {
+        const scheme = /^rtmps?:\/\//i.exec(patch.ingestUrl.trim())?.[0];
+        if (scheme)
+          next.protocol = scheme.toLowerCase().startsWith("rtmps")
+            ? "rtmps"
+            : "rtmp";
+      }
+      return next;
+    }),
   };
 }
 

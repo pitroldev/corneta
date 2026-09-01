@@ -42,6 +42,31 @@ describe("configOps", () => {
     );
   });
 
+  it("updateTarget acompanha o protocolo da URL personalizada", () => {
+    const { config, id } = ops.addTarget(base(), "custom");
+    const secure = ops.updateTarget(config, id, {
+      ingestUrl: "rtmps://ingest.example.test/app",
+    });
+    expect(secure.targets.find((target) => target.id === id)).toMatchObject({
+      protocol: "rtmps",
+      ingestUrl: "rtmps://ingest.example.test/app",
+    });
+
+    const plain = ops.updateTarget(secure, id, {
+      ingestUrl: "RTMP://ingest.example.test/app",
+    });
+    expect(plain.targets.find((target) => target.id === id)?.protocol).toBe(
+      "rtmp",
+    );
+  });
+
+  it("updateTarget preserva o protocolo enquanto a URL ainda está incompleta", () => {
+    const c = base();
+    const id = c.targets[0].id;
+    const next = ops.updateTarget(c, id, { ingestUrl: "rtmps" });
+    expect(next.targets[0].protocol).toBe(c.targets[0].protocol);
+  });
+
   it("duplicateTarget clona sem chave, com sufixo, logo depois do original", () => {
     const c = base();
     const dup = ops.duplicateTarget(c, c.targets[0].id, "tgt_novo");

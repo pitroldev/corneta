@@ -267,5 +267,7 @@ export const hasEstimatedAnchor = (idx: ReplayIndex): boolean =>
 /** Codecs que o webview NÃO toca. Hoje o motor só emite h264, mas registrar o codec na
  *  âncora é o que faz o player AVISAR no dia em que isso mudar, em vez de mostrar preto. */
 const PLAYABLE = new Set(["h264", "avc1", "aac", ""]);
+export const isPlayableCodec = (codec: string): boolean =>
+  PLAYABLE.has(codec.toLowerCase());
 export const hasUnplayableCodec = (idx: ReplayIndex): boolean =>
-  idx.segments.some((s) => s.codec && !PLAYABLE.has(s.codec.toLowerCase()));
+  idx.segments.some((s) => s.codec && !isPlayableCodec(s.codec));

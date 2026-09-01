@@ -1706,6 +1706,7 @@ export const en: Dict = {
   "replay.marker.added": "Moment marked",
   "replay.marker.cta": "Mark this moment",
   "replay.marker.default": "Marked during replay",
+  "replay.loading": "Preparing the recording…",
   "replay.missing": "This recording's file isn't on disk anymore.",
   "replay.mute": "Mute",
   "replay.offset.label": "Sync nudge",
@@ -1713,10 +1714,13 @@ export const en: Dict = {
   "replay.offset.reset": "reset",
   "replay.rate.aria": "Speed",
   "replay.scrub.aria": "Replay timeline",
+  "replay.pause": "Pause replay",
+  "replay.play": "Play replay",
   "replay.seek.cta": "See this moment in the video",
   "replay.seek.notRecorded": "Didn't record that moment.",
   "replay.shortcuts":
     "Space plays/pauses · ← → jump 10s (Shift for 1min) · , and . step frame by frame",
+  "replay.stage.aria": "Replay player; press Space to play or pause",
   "replay.title": "Stream replay",
   "replay.unmute": "Unmute",
   "replay.volume": "Volume",
@@ -1816,6 +1820,7 @@ export const en: Dict = {
   // Primeira pessoa nos dois idiomas: quem apagou foi o app (§3.1).
   "reports.detail.deleted": "Deleted that report.",
   "reports.detail.download": "Download",
+  "reports.detail.error.title": "I couldn't open this stream",
   // Formato fixo do §3.2 nos dois idiomas: assume a falha e diz o que pode ser.
   "reports.detail.error.read":
     "Couldn't read this report — the file may be damaged.",
@@ -1856,9 +1861,12 @@ export const en: Dict = {
   // fmtDur — 'min' é a mesma abreviação nas duas línguas.
   "reports.dur.minutes": "{m}min",
   "reports.events.title": "Events",
+  "reports.error.retry": "Try again",
   // 'gravação (VOD)' → só 'the VOD' (é o nome que o streamer usa em inglês, igual à LP).
   "reports.highlights.note":
     "⏱️ Times count from when the stream started — find that minute in the VOD to cut your clip.",
+  "reports.highlights.more.one": "Show 1 more moment",
+  "reports.highlights.more.other": "Show {count} more moments",
   "reports.highlights.title": "Highlights (worth clipping)",
   // Reticência de estado de espera (§6).
   "reports.history.busy": "Building…",
@@ -1898,6 +1906,9 @@ export const en: Dict = {
   "reports.list.empty.body":
     "When your stream ends, I build the report right here.",
   "reports.list.empty.title": "No streams yet",
+  "reports.list.error.body":
+    "The reports folder did not respond. Your files are still on your computer.",
+  "reports.list.error.title": "I couldn't load your streams",
   "reports.list.archive": "Earlier streams",
   "reports.list.archiveCount.one": "1 more stream in your archive",
   "reports.list.archiveCount.other": "{count} more streams in your archive",
@@ -1995,19 +2006,40 @@ export const en: Dict = {
   "reports.story.community.title": "The crowd joined the story",
   "reports.story.noEngagement":
     "This session did not record viewer or engagement data.",
+  "reports.story.portrait.detail.chat":
+    "It was live for {duration}, with the conversation setting the pace.",
+  "reports.story.portrait.detail.duration":
+    "The broadcast went out to {channels}.",
+  "reports.story.portrait.detail.viewers":
+    "It was live for {duration}, with an average audience of {avg}.",
+  "reports.story.portrait.detail.viewersChat":
+    "It was live for {duration}, with an average audience of {avg} and {messages} chat messages.",
+  "reports.story.portrait.title.chat.one": "1 message set the stream's pace",
+  "reports.story.portrait.title.chat.other":
+    "{messages} messages set the stream's pace",
+  "reports.story.portrait.title.duration": "Live for {duration}",
+  "reports.story.portrait.title.viewers.one":
+    "1 viewer at the stream's biggest moment",
+  "reports.story.portrait.title.viewers.other":
+    "{peak} viewers at the stream's biggest moment",
   "reports.story.replay.desc":
     "The replay takes center stage: use the moments and charts below to jump straight to what matters.",
+  "reports.story.replay.emptyBody":
+    "The recorder started, but did not save a playable frame. The stream's other signals are still available below.",
+  "reports.story.replay.emptyDesc":
+    "The recording was empty, so the story continues through the signals captured during the broadcast.",
+  "reports.story.replay.emptyTitle": "The recording never got started",
   "reports.story.replay.missingBody":
-    "You can still follow the viewers, highlights, and rough patches recorded during the broadcast.",
+    "You can still follow the viewers, highlights, and conversation recorded during the broadcast.",
   "reports.story.replay.missingDesc":
     "There is no video this time, so the story continues through the signals the stream left behind.",
   "reports.story.replay.missingTitle": "This stream was not recorded",
   "reports.story.replay.title": "Watch the stream again",
-  "reports.story.technical.clean": "All clear",
+  "reports.story.technical.clean": "All in order",
   "reports.story.technical.desc":
-    "Bitrate, CPU/GPU, OBS, destinations, and the full event log stay here when you need to investigate.",
-  "reports.story.technical.review": "Worth a look",
-  "reports.story.technical.title": "What happened backstage",
+    "Stream health, bitrate, CPU/GPU, and the full event log are kept here.",
+  "reports.story.technical.review": "Has a technical note",
+  "reports.story.technical.title": "Technical backstage",
   "reports.story.timeline.desc":
     "The viewer curve and standout moments show where the broadcast changed pace.",
   "reports.story.timeline.title": "How the stream unfolded",
@@ -2022,7 +2054,7 @@ export const en: Dict = {
   "reports.viewers.title": "Live viewers (how many stuck around)",
   "reports.windows.note":
     "Copy the time of a rough patch and find it in the VOD.",
-  "reports.windows.title": "Rough patches",
+  "reports.windows.title": "Technical points to review",
 
   // ---- settings ----
   "settings.language.title": "Language",

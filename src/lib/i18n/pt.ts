@@ -1247,6 +1247,7 @@ export const pt = {
   "replay.marker.added": "Momento marcado",
   "replay.marker.cta": "Marcar este momento",
   "replay.marker.default": "Momento marcado no replay",
+  "replay.loading": "Preparando a gravação…",
   "replay.missing": "O arquivo desta gravação não está mais no disco.",
   "replay.mute": "Silenciar",
   "replay.offset.label": "Ajuste de sincronia",
@@ -1254,10 +1255,14 @@ export const pt = {
   "replay.offset.reset": "zerar",
   "replay.rate.aria": "Velocidade",
   "replay.scrub.aria": "Linha do tempo do replay",
+  "replay.pause": "Pausar replay",
+  "replay.play": "Reproduzir replay",
   "replay.seek.cta": "Ver este momento no vídeo",
   "replay.seek.notRecorded": "Não gravei esse instante.",
   "replay.shortcuts":
     "Espaço toca/pausa · ← → pulam 10s (com Shift, 1min) · , e . andam quadro a quadro",
+  "replay.stage.aria":
+    "Player do replay; pressione Espaço para tocar ou pausar",
   "replay.title": "Replay da live",
   "replay.unmute": "Tirar do mudo",
   "replay.volume": "Volume",
@@ -1342,6 +1347,7 @@ export const pt = {
   "reports.detail.delete.confirm": "Excluir mesmo?",
   "reports.detail.deleted": "Excluí o relatório.",
   "reports.detail.download": "Baixar",
+  "reports.detail.error.title": "Não consegui abrir esta live",
   "reports.detail.error.read":
     "Não consegui ler este relatório — o arquivo pode estar corrompido.",
   "reports.detail.heading": "Live de {date}",
@@ -1370,8 +1376,11 @@ export const pt = {
   "reports.dur.hours": "{h}h{m}",
   "reports.dur.minutes": "{m}min",
   "reports.events.title": "Eventos",
+  "reports.error.retry": "Tentar novamente",
   "reports.highlights.note":
     "⏱️ Os tempos contam do início da live — ache o minuto na gravação (VOD) pra cortar o clipe.",
+  "reports.highlights.more.one": "Ver mais 1 momento",
+  "reports.highlights.more.other": "Ver mais {count} momentos",
   "reports.highlights.title": "Momentos de destaque (pra clipar)",
   "reports.history.busy": "Montando…",
   "reports.history.button": "Exportar histórico (CSV)",
@@ -1398,6 +1407,9 @@ export const pt = {
   "reports.list.empty.body":
     "Quando a live encerra, monto o relatório dela aqui.",
   "reports.list.empty.title": "Nenhuma live ainda",
+  "reports.list.error.body":
+    "A pasta de relatórios não respondeu. Seus arquivos continuam no PC.",
+  "reports.list.error.title": "Não consegui carregar suas lives",
   "reports.list.archive": "Lives anteriores",
   "reports.list.archiveCount.one": "Mais 1 live no arquivo",
   "reports.list.archiveCount.other": "Mais {count} lives no arquivo",
@@ -1473,19 +1485,40 @@ export const pt = {
   "reports.story.community.title": "A galera entrou na história",
   "reports.story.noEngagement":
     "Esta sessão não registrou dados de audiência ou engajamento.",
+  "reports.story.portrait.detail.chat":
+    "Foram {duration} no ar, com a conversa marcando o ritmo da transmissão.",
+  "reports.story.portrait.detail.duration":
+    "A transmissão passou por {channels}.",
+  "reports.story.portrait.detail.viewers":
+    "Foram {duration} no ar, com média de audiência de {avg}.",
+  "reports.story.portrait.detail.viewersChat":
+    "Foram {duration} no ar, com média de audiência de {avg} e {messages} mensagens no chat.",
+  "reports.story.portrait.title.chat.one": "1 mensagem deu o ritmo da live",
+  "reports.story.portrait.title.chat.other":
+    "{messages} mensagens deram o ritmo da live",
+  "reports.story.portrait.title.duration": "{duration} ao vivo",
+  "reports.story.portrait.title.viewers.one":
+    "1 pessoa no melhor momento da live",
+  "reports.story.portrait.title.viewers.other":
+    "{peak} pessoas no melhor momento da live",
   "reports.story.replay.desc":
     "O replay é o centro: use os momentos e gráficos abaixo para voltar direto ao que importa.",
+  "reports.story.replay.emptyBody":
+    "O gravador chegou a iniciar, mas não salvou nenhum quadro reproduzível. Os outros sinais da live continuam disponíveis abaixo.",
+  "reports.story.replay.emptyDesc":
+    "A gravação ficou vazia, então a história continua pelos sinais registrados durante a transmissão.",
+  "reports.story.replay.emptyTitle": "A gravação não chegou a começar",
   "reports.story.replay.missingBody":
-    "Ainda dá pra acompanhar a audiência, os destaques e os problemas registrados durante a transmissão.",
+    "Ainda dá pra acompanhar a audiência, os destaques e a conversa registrada durante a transmissão.",
   "reports.story.replay.missingDesc":
     "Não há vídeo desta vez, então a história continua pelos sinais que a live deixou.",
   "reports.story.replay.missingTitle": "Esta live não foi gravada",
   "reports.story.replay.title": "A live, de novo",
-  "reports.story.technical.clean": "Tudo certo",
+  "reports.story.technical.clean": "Tudo em ordem",
   "reports.story.technical.desc":
-    "Bitrate, CPU/GPU, OBS, destinos e o registro completo ficam aqui quando você precisar investigar.",
-  "reports.story.technical.review": "Vale revisar",
-  "reports.story.technical.title": "O que aconteceu por trás",
+    "Saúde da transmissão, bitrate, CPU/GPU e o registro completo ficam guardados aqui.",
+  "reports.story.technical.review": "Tem nota técnica",
+  "reports.story.technical.title": "Bastidores técnicos",
   "reports.story.timeline.desc":
     "A curva de audiência e os momentos marcantes mostram onde a transmissão mudou de ritmo.",
   "reports.story.timeline.title": "Como a live se desenrolou",
@@ -1496,7 +1529,7 @@ export const pt = {
   "reports.viewers.startEnd": "Começo {start} → fim {end}",
   "reports.viewers.title": "Audiência ao vivo (quanto da galera ficou)",
   "reports.windows.note": "Copie o tempo do trecho e ache ele no VOD.",
-  "reports.windows.title": "Trechos que deram problema",
+  "reports.windows.title": "Pontos técnicos para revisar",
 
   // ---- settings ----
   "settings.language.title": "Idioma",
