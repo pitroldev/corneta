@@ -159,7 +159,12 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
         offsetMs = Math.max(-30_000, Math.min(30_000, ms));
     } else if (o.kind === "end") {
       const e = Number(o.endedAt);
-      if (Number.isFinite(e)) endedAt = e;
+      // `end` é terminal, mas relatórios podem receber anotações depois da live.
+      // Versões antigas confundiam um marker posterior com sessão interrompida e
+      // anexavam outro `end` no boot seguinte. O primeiro encerramento válido é o
+      // real; o posterior é só essa recuperação equivocada.
+      if (Number.isFinite(e))
+        endedAt = endedAt == null ? e : Math.min(endedAt, e);
     }
   }
 

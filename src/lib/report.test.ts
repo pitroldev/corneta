@@ -60,6 +60,22 @@ describe("parseSession", () => {
     expect(d.meta.durationSec).toBe(10);
   });
 
+  it("preserva o primeiro end quando uma recuperação tardia foi anexada", () => {
+    const d = parseSession(
+      nd([
+        { kind: "meta", id: "s-recovered", startedAt: 1000, platforms: [] },
+        { kind: "sample", t: 4000, targets: [] },
+        { kind: "end", endedAt: 5000 },
+        { kind: "marker", t: 3000, label: "depois da live" },
+        { kind: "end", endedAt: 2_005_000, recovered: true },
+      ]),
+      t,
+    )!;
+
+    expect(d.meta.endedAt).toBe(5000);
+    expect(d.meta.durationSec).toBe(4);
+  });
+
   it("pula linhas inválidas e samples sem timestamp; sem meta → null", () => {
     const d = parseSession(
       nd([

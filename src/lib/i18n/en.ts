@@ -1961,15 +1961,24 @@ export const en: Dict = {
     "Copied the image — paste it in Discord, X or wherever you post 📋",
   "reports.recap.copy": "Copy image",
   "reports.recap.download": "Download PNG",
+  "reports.recap.duration": "{duration} on air",
   "reports.recap.error.canvas": "Couldn't draw the recap on this machine.",
   // Nomeia o botão que está na tela (§3.5); tem que casar com reports.recap.download.
   "reports.recap.error.copy": "Couldn't copy it — use Download PNG instead",
+  "reports.recap.error.download": "Couldn't download the recap: {err}",
   // Formato fixo 'Couldn't ...' (§3.2), igual ao vizinho reports.recap.error.canvas.
   "reports.recap.error.draw": "Couldn't draw the recap: {err}",
   "reports.recap.footer": "streamed with Corneta — multistream in one app",
+  "reports.recap.modal.close": "Close recap",
+  "reports.recap.modal.description":
+    "A vertical preview of the stream, ready to copy or download.",
+  "reports.recap.modal.format": "PNG · {width} × {height}",
   "reports.recap.modal.heading": "Recap to post",
+  "reports.recap.modal.hint": "Review the whole image before sharing it.",
   // Nome acessível do Dialog (sr-only) — funcional, sem piada (§6).
   "reports.recap.modal.name": "Stream recap",
+  "reports.recap.modal.ready": "Everything fits in the preview",
+  "reports.recap.previewAria": "Stream recap preview",
   "reports.recap.stat.avg": "average",
   "reports.recap.stat.bits": "bits",
   "reports.recap.stat.messages": "messages",
@@ -1980,7 +1989,8 @@ export const en: Dict = {
   "reports.recap.stat.raids": "raids",
   // 'subs' é como o streamer fala em inglês (a LP já usa).
   "reports.recap.stat.subs": "subs",
-  // Título do pôster: o CAPS é do desenho (recap.ts), não da string (§6). Fica 3 caracteres mais longo que o pt e o canvas tem largura fixa (RECAP_SIZE) — conferir se não estoura antes de fechar.
+  // Título do pôster: o CAPS é do desenho (recap.ts), não da string (§6). O canvas
+  // tem largura fixa (RECAP_WIDTH), então drawRecap reduz a fonte antes de desenhar.
   "reports.recap.title": "Stream · {date}",
   // title do ícone de balão na lista.
   "reports.row.chat.title": "Chat messages",

@@ -382,6 +382,16 @@ fn list_in(store: &dyn SessionStore, dir: &Path, recorded: &[String]) -> Vec<Ses
         .filter(|p| domain::is_session_file(p))
         .filter_map(|p| {
             let mut m = domain::parse_meta_line(&store.first_line(&p)?, store.modified_ms(&p))?;
+            // O mtime é só fallback para sessão realmente interrompida. Copiar um
+            // relatório ou marcar um momento muda o mtime, mas não a duração da live.
+            if let Some(ended_at) = store
+                .tail(&p, domain::TAIL_BYTES)
+                .as_deref()
+                .and_then(|tail| domain::ended_at_from_tail(tail, m.started_at))
+            {
+                m.ended_at = Some(ended_at);
+                m.duration_sec = ended_at.saturating_sub(m.started_at) / 1000;
+            }
             m.has_video = recorded.iter().any(|id| id == &m.id);
             m.has_chat = store.len(&chat_path(&p)) > 0;
             Some(m)

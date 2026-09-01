@@ -17,11 +17,14 @@ const C = {
   border: "#3d301c",
   night: "#0b0805",
   live: "#ff4733",
+  brassInk: "#241400",
 };
 const DISPLAY = '"Baloo 2", "Segoe UI", system-ui, sans-serif';
 const SANS = '"Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif';
 
-export const RECAP_SIZE = 1080;
+/** 4:5 mantém o recap grande no feed e dá altura real para a história inteira. */
+export const RECAP_WIDTH = 1080;
+export const RECAP_HEIGHT = 1350;
 
 export interface RecapStat {
   label: string;
@@ -47,14 +50,60 @@ function fit(
   base: number,
   weight: number,
   family = DISPLAY,
+  min = 14,
 ): number {
   let size = base;
   ctx.font = `${weight} ${size}px ${family}`;
-  while (size > 14 && ctx.measureText(text).width > maxWidth) {
+  while (size > min && ctx.measureText(text).width > maxWidth) {
     size -= 2;
     ctx.font = `${weight} ${size}px ${family}`;
   }
   return size;
+}
+
+function trimToWidth(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let end = text.length;
+  while (end > 1 && ctx.measureText(`${text.slice(0, end)}…`).width > maxWidth)
+    end--;
+  return `${text.slice(0, end).trimEnd()}…`;
+}
+
+/** Quebra texto dentro de uma região fixa e abrevia apenas quando nem todas as linhas cabem. */
+function wrapLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = word;
+  }
+  if (current) lines.push(current);
+  if (lines.length <= maxLines)
+    return lines.map((line) => trimToWidth(ctx, line, maxWidth));
+
+  const visible = lines.slice(0, maxLines);
+  visible[maxLines - 1] = trimToWidth(
+    ctx,
+    lines.slice(maxLines - 1).join(" "),
+    maxWidth,
+  );
+  return visible;
 }
 
 export function drawRecap(
@@ -62,144 +111,189 @@ export function drawRecap(
   r: RecapData,
   t: Translate,
 ): void {
-  const W = RECAP_SIZE;
-  const H = RECAP_SIZE;
+  const W = RECAP_WIDTH;
+  const H = RECAP_HEIGHT;
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Painel com sombra dura (estilo pôster/quadrinho).
-  const m = 52;
+  // Uma única folha editorial: o cabeçalho conta qual foi a live; o corpo sustenta
+  // números, momento e plataformas em regiões próprias, sem disputar altura.
+  const m = 48;
   const pw = W - m * 2;
   const ph = H - m * 2;
   ctx.fillStyle = C.night;
-  ctx.fillRect(m + 14, m + 14, pw, ph);
+  ctx.fillRect(m + 12, m + 12, pw, ph);
   ctx.fillStyle = C.surface;
   ctx.fillRect(m, m, pw, ph);
-  ctx.strokeStyle = C.brass;
-  ctx.lineWidth = 6;
-  ctx.strokeRect(m + 3, m + 3, pw - 6, ph - 6);
-
-  const px = m + 56;
-  const pr = W - m - 56;
+  const px = m + 46;
+  const pr = W - m - 46;
+  const innerWidth = pr - px;
   ctx.textBaseline = "alphabetic";
 
-  // Header: 🔴 CORNETA  ·  data
+  // Abertura em latão: a live é o assunto, não uma grade de métricas.
+  const heroBottom = 382;
+  ctx.fillStyle = C.brass;
+  ctx.fillRect(m, m, pw, heroBottom - m);
   ctx.fillStyle = C.live;
   ctx.beginPath();
-  ctx.arc(px + 13, 130, 13, 0, Math.PI * 2);
+  ctx.arc(px + 11, 108, 11, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = C.brass;
-  ctx.font = `800 42px ${DISPLAY}`;
+  ctx.fillStyle = C.brassInk;
+  ctx.font = `800 36px ${DISPLAY}`;
   ctx.textAlign = "left";
-  ctx.fillText(r.brand, px + 38, 144);
-  ctx.fillStyle = C.inkFaint;
-  ctx.font = `700 34px ${DISPLAY}`;
+  ctx.fillText(r.brand, px + 34, 120);
+  ctx.font = `700 28px ${DISPLAY}`;
   ctx.textAlign = "right";
-  ctx.fillText(r.date, pr, 144);
+  const date = trimToWidth(ctx, r.date, 300);
+  ctx.fillText(date, pr, 118);
 
-  // Título + subtítulo
   ctx.textAlign = "left";
-  ctx.fillStyle = C.ink;
-  // A caixa alta do headline é decisão de desenho, não do texto: o dicionário
-  // guarda "Live de {date}" e quem grita é o pôster (§6 do TOM-DE-VOZ).
+  ctx.fillStyle = C.brassInk;
   const title = r.title.toUpperCase();
-  const ts = fit(ctx, title, pr - px, 78, 800);
+  const ts = fit(ctx, title, innerWidth, 86, 800, DISPLAY, 42);
   ctx.font = `800 ${ts}px ${DISPLAY}`;
-  ctx.fillText(title, px, 244);
-  ctx.fillStyle = C.inkMuted;
-  const ss = fit(ctx, r.subtitle, pr - px, 30, 600, SANS);
+  ctx.fillText(title, px, 238);
+  ctx.fillStyle = "rgba(36, 20, 0, 0.72)";
+  const ss = fit(ctx, r.subtitle, innerWidth, 32, 700, SANS, 20);
   ctx.font = `600 ${ss}px ${SANS}`;
-  ctx.fillText(r.subtitle, px, 292);
+  ctx.fillText(r.subtitle, px, 302);
+  ctx.fillStyle = "rgba(36, 20, 0, 0.24)";
+  ctx.fillRect(px, 338, innerWidth, 3);
 
-  let y = 350;
-
-  // Heróis (até 2 colunas)
+  // Números que resumem a sala, com espaço próprio e sem cards concorrentes.
   const big = r.big.slice(0, 2);
+  const bigTop = 430;
+  const bigHeight = 230;
   if (big.length) {
-    const colW = (pr - px) / big.length;
+    const gap = big.length > 1 ? 46 : 0;
+    const colW = (innerWidth - gap) / big.length;
     big.forEach((s, i) => {
-      const cx = px + colW * i;
+      const cx = px + (colW + gap) * i;
       ctx.fillStyle = C.brass;
-      const vs = fit(ctx, s.value, colW - 24, 130, 800);
+      const vs = fit(ctx, s.value, colW, 126, 800, DISPLAY, 62);
       ctx.font = `800 ${vs}px ${DISPLAY}`;
-      ctx.fillText(s.value, cx, y + 116);
+      ctx.fillText(s.value, cx, bigTop + 126);
       ctx.fillStyle = C.inkMuted;
-      ctx.font = `700 30px ${SANS}`;
-      ctx.fillText(s.label.toUpperCase(), cx + 4, y + 158);
+      const ls = fit(ctx, s.label.toUpperCase(), colW, 27, 700, SANS, 17);
+      ctx.font = `700 ${ls}px ${SANS}`;
+      ctx.fillText(s.label.toUpperCase(), cx + 2, bigTop + 172);
     });
-    y += 206;
+    if (big.length > 1) {
+      ctx.fillStyle = C.border;
+      ctx.fillRect(px + (innerWidth - 2) / 2, bigTop + 18, 2, 164);
+    }
   }
+  ctx.fillStyle = C.border;
+  ctx.fillRect(px, bigTop + bigHeight, innerWidth, 2);
 
-  // Secundários (boxes, até 4)
-  const small = r.small.slice(0, 4);
+  // Até seis secundários ocupam no máximo duas linhas. Com cinco ou seis, a
+  // terceira coluna preserva bits e raids em vez de descartá-los do recap.
+  const small = r.small.slice(0, 6);
+  const smallTop = bigTop + bigHeight + 34;
+  let smallBottom = smallTop;
   if (small.length) {
-    const gap = 18;
-    const bw = (pr - px - gap * (small.length - 1)) / small.length;
-    const bh = 140;
+    const gap = 16;
+    const columns = small.length > 4 ? 3 : 2;
+    const bw = (innerWidth - gap * (columns - 1)) / columns;
+    const bh = 108;
     small.forEach((s, i) => {
-      const bx = px + (bw + gap) * i;
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const bx = px + col * (bw + gap);
+      const by = smallTop + row * (bh + gap);
       ctx.fillStyle = C.surface2;
-      ctx.fillRect(bx, y, bw, bh);
-      ctx.strokeStyle = C.border;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
-      ctx.fillStyle = C.ink;
-      const vs = fit(ctx, s.value, bw - 28, 54, 800);
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = C.brass;
+      const valueWidth = columns === 3 ? bw - 36 : bw * 0.42;
+      const vs = fit(ctx, s.value, valueWidth, 48, 800, DISPLAY, 26);
       ctx.font = `800 ${vs}px ${DISPLAY}`;
-      ctx.fillText(s.value, bx + 18, y + 72);
-      ctx.fillStyle = C.inkFaint;
-      ctx.font = `600 23px ${SANS}`;
-      ctx.fillText(s.label.toUpperCase(), bx + 18, y + 110);
+      ctx.fillText(s.value, bx + 22, by + (columns === 3 ? 48 : 67));
+      ctx.fillStyle = C.inkMuted;
+      const label = s.label.toUpperCase();
+      const labelWidth = columns === 3 ? bw - 44 : bw * 0.48;
+      const ls = fit(ctx, label, labelWidth, 22, 700, SANS, 15);
+      ctx.font = `700 ${ls}px ${SANS}`;
+      ctx.textAlign = columns === 3 ? "left" : "right";
+      ctx.fillText(
+        trimToWidth(ctx, label, labelWidth),
+        columns === 3 ? bx + 22 : bx + bw - 22,
+        by + (columns === 3 ? 82 : 62),
+      );
+      ctx.textAlign = "left";
     });
-    y += bh + 34;
+    smallBottom =
+      smallTop + Math.ceil(small.length / columns) * (bh + gap) - gap;
   }
 
-  // Melhor momento
+  // Destaque editorial com até três linhas; o texto diminui antes de abreviar.
   if (r.moment) {
-    const bh = 112;
+    const y = Math.max(smallBottom + 30, 790);
+    const bh = 156;
     ctx.fillStyle = C.surface2;
-    ctx.fillRect(px, y, pr - px, bh);
+    ctx.fillRect(px, y, innerWidth, bh);
     ctx.fillStyle = C.brass;
-    ctx.fillRect(px, y, 8, bh);
-    ctx.fillStyle = C.brass;
-    ctx.font = `800 23px ${SANS}`;
-    ctx.fillText(t("analysis.recap.bestMoment").toUpperCase(), px + 28, y + 42);
+    ctx.font = `800 21px ${SANS}`;
+    ctx.fillText(t("analysis.recap.bestMoment").toUpperCase(), px + 24, y + 35);
     ctx.fillStyle = C.ink;
-    const ms = fit(ctx, r.moment, pr - px - 56, 40, 700);
-    ctx.font = `700 ${ms}px ${DISPLAY}`;
-    ctx.fillText(r.moment, px + 28, y + 88);
-    y += bh + 34;
+    let momentSize = 34;
+    ctx.font = `700 ${momentSize}px ${DISPLAY}`;
+    let lines = wrapLines(ctx, r.moment, innerWidth - 48, 3);
+    while (lines.length > 2 && momentSize > 28) {
+      momentSize -= 2;
+      ctx.font = `700 ${momentSize}px ${DISPLAY}`;
+      lines = wrapLines(ctx, r.moment, innerWidth - 48, 3);
+    }
+    lines.forEach((line, index) =>
+      ctx.fillText(line, px + 24, y + 78 + index * 34),
+    );
   }
 
-  // Plataformas (bolinha da marca + nome). Não vaza: se não couber, mostra "+N".
+  // Plataformas têm duas linhas reservadas. Nomes extremos encolhem e o excedente vira +N.
   if (r.platforms.length) {
+    const platformY = 1160;
     let cx = px;
-    ctx.font = `700 30px ${SANS}`;
+    let row = 0;
     let drawn = 0;
-    for (const p of r.platforms) {
-      const chipW = 34 + ctx.measureText(p.name).width + 42;
-      if (cx + chipW > pr && drawn > 0) {
-        ctx.fillStyle = C.inkFaint;
-        ctx.fillText(`+${r.platforms.length - drawn}`, cx, y + 12);
-        break;
+    for (const [index, p] of r.platforms.entries()) {
+      const fs = fit(ctx, p.name, 220, 24, 700, SANS, 16);
+      ctx.font = `700 ${fs}px ${SANS}`;
+      const name = trimToWidth(ctx, p.name, 220);
+      const chipW = 30 + ctx.measureText(name).width + 34;
+      if (cx + chipW > pr && cx > px) {
+        if (row === 1) break;
+        row = 1;
+        cx = px;
       }
+      // Na última linha, conserva o espaço do contador antes de aceitar mais um chip.
+      const hasMore = index < r.platforms.length - 1;
+      if (row === 1 && hasMore && cx + chipW + 64 > pr) break;
+      const cy = platformY + row * 44;
       ctx.fillStyle = p.color;
       ctx.beginPath();
-      ctx.arc(cx + 12, y + 2, 12, 0, Math.PI * 2);
+      ctx.arc(cx + 10, cy, 10, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = C.inkMuted;
-      ctx.fillText(p.name, cx + 34, y + 12);
+      ctx.fillText(name, cx + 28, cy + 8);
       cx += chipW;
       drawn++;
     }
+    if (drawn < r.platforms.length) {
+      ctx.fillStyle = C.inkFaint;
+      ctx.font = `700 23px ${SANS}`;
+      ctx.fillText(
+        `+${r.platforms.length - drawn}`,
+        cx,
+        platformY + row * 44 + 8,
+      );
+    }
   }
 
-  // Rodapé (marketing orgânico)
   ctx.textAlign = "center";
   ctx.fillStyle = C.inkFaint;
-  ctx.font = `600 26px ${SANS}`;
-  ctx.fillText(r.footer, W / 2, H - m - 38);
+  const footerSize = fit(ctx, r.footer, innerWidth, 24, 600, SANS, 16);
+  ctx.font = `600 ${footerSize}px ${SANS}`;
+  ctx.fillText(r.footer, W / 2, H - m - 26);
 }
 
 export function recapToBlob(canvas: HTMLCanvasElement): Promise<Blob> {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Braces, Copy, Download, FileText, Table2, X } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/ui";
@@ -12,7 +12,8 @@ import { PLATFORMS } from "../../lib/platforms";
 import {
   drawRecap,
   recapToBlob,
-  RECAP_SIZE,
+  RECAP_HEIGHT,
+  RECAP_WIDTH,
   type RecapData,
   type RecapStat,
 } from "../../lib/recap";
@@ -89,20 +90,17 @@ function buildRecap(
       });
   }
 
-  const topMoment = analysis.highlights[0]?.reason;
-  const moment = topMoment
-    ? topMoment.length > 44
-      ? `${topMoment.slice(0, 43)}…`
-      : topMoment
-    : undefined;
+  const moment = analysis.highlights[0]?.reason;
   const bigLabels = new Set(big.map((stat) => stat.label));
   return {
     brand: "CORNETA",
     date: fmt.date(data.meta.startedAt),
     title: t("reports.recap.title", { date: fmt.date(data.meta.startedAt) }),
-    subtitle: `${fmt.dur(data.meta.durationSec)} · ${data.meta.platforms.map((platform) => platform.name).join(" · ")}`,
+    subtitle: t("reports.recap.duration", {
+      duration: fmt.dur(data.meta.durationSec),
+    }),
     big,
-    small: small.filter((stat) => !bigLabels.has(stat.label)).slice(0, 4),
+    small: small.filter((stat) => !bigLabels.has(stat.label)).slice(0, 6),
     moment,
     platforms,
     footer: t("reports.recap.footer"),
@@ -120,6 +118,11 @@ export function RecapModal({
 }) {
   const { t, fmt } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [busy, setBusy] = useState<"copy" | "download" | null>(null);
+  const recap = useMemo(
+    () => buildRecap(data, analysis, t, fmt),
+    [analysis, data, fmt, t],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -136,7 +139,6 @@ export function RecapModal({
         return;
       }
       try {
-        const recap = buildRecap(data, analysis, t, fmt);
         drawRecap(context, recap, t);
         void (document.fonts?.ready ?? Promise.resolve()).then(() => {
           if (alive) drawRecap(context, recap, t);
@@ -150,11 +152,12 @@ export function RecapModal({
       alive = false;
       cancelAnimationFrame(frame);
     };
-  }, [analysis, data, fmt, t]);
+  }, [recap, t]);
 
   const copy = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    setBusy("copy");
     try {
       const blob = await recapToBlob(canvas);
       await navigator.clipboard.write([
@@ -163,46 +166,106 @@ export function RecapModal({
       toast.success(t("reports.recap.copied"));
     } catch {
       toast.error(t("reports.recap.error.copy"));
+    } finally {
+      setBusy(null);
     }
   };
   const download = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const url = URL.createObjectURL(await recapToBlob(canvas));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${t("reports.file.live")}-${fileStamp(data.meta.startedAt)}.png`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setBusy("download");
+    try {
+      const url = URL.createObjectURL(await recapToBlob(canvas));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${t("reports.file.live")}-${fileStamp(data.meta.startedAt)}.png`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      toast.error(t("reports.recap.error.download", { err: errMsg(error) }));
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
     <Modal
       title={t("reports.recap.modal.name")}
       onClose={onClose}
-      className="max-w-lg rounded-xl bg-surface p-5 pop"
+      className="flex h-[calc(100vh-2rem)] max-h-[60rem] max-w-7xl flex-col overflow-hidden rounded-xl bg-surface pop"
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xl">{t("reports.recap.modal.heading")}</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 sm:py-4">
+        <div className="min-w-0">
+          <h3 className="text-xl sm:text-2xl">
+            {t("reports.recap.modal.heading")}
+          </h3>
+          <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:text-sm">
+            {t("reports.recap.modal.description")}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="size-9 shrink-0 px-0"
+          onClick={onClose}
+          aria-label={t("reports.recap.modal.close")}
+          title={t("reports.recap.modal.close")}
+        >
           <X className="size-4" />
         </Button>
-      </div>
-      <canvas
-        ref={canvasRef}
-        width={RECAP_SIZE}
-        height={RECAP_SIZE}
-        className="mb-3 w-full border-2 border-border-soft"
-      />
-      <div className="flex gap-2">
-        <Button variant="primary" className="flex-1" onClick={copy}>
-          <Copy className="size-4" /> {t("reports.recap.copy")}
-        </Button>
-        <Button variant="subtle" className="flex-1" onClick={download}>
-          <Download className="size-4" /> {t("reports.recap.download")}
-        </Button>
+      </header>
+
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-1">
+        <div className="flex min-h-0 items-center justify-center overflow-auto bg-night p-3 sm:p-5">
+          <canvas
+            ref={canvasRef}
+            width={RECAP_WIDTH}
+            height={RECAP_HEIGHT}
+            role="img"
+            aria-label={t("reports.recap.previewAria")}
+            className="block h-auto max-h-full w-auto max-w-full shrink-0 border-2 border-border-soft object-contain"
+            style={{ aspectRatio: `${RECAP_WIDTH} / ${RECAP_HEIGHT}` }}
+          />
+        </div>
+
+        <aside className="flex min-h-0 flex-col border-t border-border-soft bg-surface px-4 py-3 sm:px-5 sm:py-4 lg:border-t-0 lg:border-l">
+          <div className="hidden lg:block">
+            <p className="font-display text-lg font-bold">
+              {t("reports.recap.modal.ready")}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+              {t("reports.recap.modal.hint")}
+            </p>
+          </div>
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-ink-faint lg:mt-auto">
+            {t("reports.recap.modal.format", {
+              width: RECAP_WIDTH,
+              height: RECAP_HEIGHT,
+            })}
+          </p>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+            <Button
+              variant="primary"
+              loading={busy === "copy"}
+              disabled={busy !== null}
+              onClick={() => void copy()}
+            >
+              {busy !== "copy" ? <Copy className="size-4" /> : null}
+              {t("reports.recap.copy")}
+            </Button>
+            <Button
+              variant="subtle"
+              loading={busy === "download"}
+              disabled={busy !== null}
+              onClick={() => void download()}
+            >
+              {busy !== "download" ? <Download className="size-4" /> : null}
+              {t("reports.recap.download")}
+            </Button>
+          </div>
+        </aside>
       </div>
     </Modal>
   );

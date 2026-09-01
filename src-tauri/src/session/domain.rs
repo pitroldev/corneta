@@ -323,28 +323,35 @@ pub enum Recovery {
 /// A cauda pode começar no meio de uma linha (o corte é por bytes); linha quebrada não
 /// parseia e é simplesmente ignorada, que é o comportamento desejado.
 pub fn recovery_from_tail(raw: &str) -> Recovery {
-    let ended = raw
-        .lines()
-        .rev()
-        .find(|line| !line.trim().is_empty())
-        .and_then(|line| serde_json::from_str::<Value>(line).ok())
-        .and_then(|value| value.get("kind").and_then(Value::as_str).map(str::to_owned))
-        .as_deref()
-        == Some("end");
-    if ended {
-        return Recovery::Complete;
-    }
-    let was_recording = raw
+    let mut was_recording = None;
+    for value in raw
         .lines()
         .rev()
         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .find_map(|v| match v.get("kind").and_then(Value::as_str) {
-            Some("recording") => Some(true),
-            Some("recEnd") => Some(false),
-            _ => None,
-        })
-        .unwrap_or(false);
-    Recovery::Interrupted { was_recording }
+    {
+        match value.get("kind").and_then(Value::as_str) {
+            // Marker, offset e recFinalized podem ser gravados depois do fim. O
+            // encerramento continua valendo mesmo quando já não é a última linha.
+            Some("end") => return Recovery::Complete,
+            Some("recording") if was_recording.is_none() => was_recording = Some(true),
+            Some("recEnd") if was_recording.is_none() => was_recording = Some(false),
+            _ => {}
+        }
+    }
+    Recovery::Interrupted {
+        was_recording: was_recording.unwrap_or(false),
+    }
+}
+
+/// Encerramento real presente na cauda. Se uma versão antiga anexou uma
+/// recuperação depois de um `end` legítimo, o menor timestamp válido vence.
+pub fn ended_at_from_tail(raw: &str, started_at: u64) -> Option<u64> {
+    raw.lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|value| value.get("kind").and_then(Value::as_str) == Some("end"))
+        .filter_map(|value| value.get("endedAt").and_then(Value::as_u64))
+        .filter(|ended_at| *ended_at >= started_at)
+        .min()
 }
 
 /// O arquivo tem tamanho que valha a pena examinar no boot?

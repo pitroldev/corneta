@@ -231,6 +231,27 @@ fn recuperacao_reconhece_sessao_que_terminou_direito() {
 }
 
 #[test]
+fn recuperacao_respeita_end_antes_de_anotacoes_pos_live() {
+    let raw = concat!(
+        "{\"kind\":\"end\",\"endedAt\":9000}\n",
+        "{\"kind\":\"marker\",\"t\":4000}\n",
+        "{\"kind\":\"offset\",\"ms\":250}\n",
+        "{\"kind\":\"recFinalized\",\"seg\":1}\n",
+    );
+    assert_eq!(domain::recovery_from_tail(raw), Recovery::Complete);
+}
+
+#[test]
+fn cauda_prefere_o_primeiro_end_valido() {
+    let raw = concat!(
+        "{\"kind\":\"end\",\"endedAt\":5000}\n",
+        "{\"kind\":\"marker\",\"t\":3000}\n",
+        "{\"kind\":\"end\",\"endedAt\":2005000,\"recovered\":true}\n",
+    );
+    assert_eq!(domain::ended_at_from_tail(raw, 1000), Some(5000));
+}
+
+#[test]
 fn recuperacao_ve_gravacao_aberta_como_truncada() {
     let raw = "{\"kind\":\"recording\",\"seg\":1}\n{\"kind\":\"sample\"}\n";
     assert_eq!(
@@ -516,6 +537,25 @@ fn lista_vem_da_mais_recente_pra_mais_antiga() {
     assert!(!lista[1].has_chat);
     assert!(lista[1].has_video, "1000 tem vídeo no disco");
     assert_eq!(lista[1].duration_sec, 1);
+}
+
+#[test]
+fn lista_usa_end_real_em_vez_do_mtime_alterado_por_copia() {
+    let store = MemStore::with(&[(
+        "/s/1000.ndjson",
+        concat!(
+            "{\"kind\":\"meta\",\"id\":\"1000\",\"startedAt\":1000,\"platforms\":[]}\n",
+            "{\"kind\":\"sample\",\"t\":4000}\n",
+            "{\"kind\":\"end\",\"endedAt\":5000}\n",
+            "{\"kind\":\"marker\",\"t\":3000}\n",
+            "{\"kind\":\"end\",\"endedAt\":2005000,\"recovered\":true}\n",
+        ),
+    )]);
+    store.set_mtime("/s/1000.ndjson", 9_999_000);
+
+    let lista = super::list_in(&store, Path::new("/s"), &[]);
+    assert_eq!(lista[0].ended_at, Some(5000));
+    assert_eq!(lista[0].duration_sec, 4);
 }
 
 /// O teto é POR ARQUIVO: chat barulhento não pode custar o diagnóstico que o relatório
