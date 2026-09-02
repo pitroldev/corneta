@@ -169,22 +169,33 @@ export function Badge({
 export function ExperimentalBadge({
   className,
   interactive = false,
+  size = "sm",
 }: {
   className?: string;
   interactive?: boolean;
+  /** `icon` é só o frasco, pra linha de texto corrido (a lista de proteções do Ao vivo):
+   *  a palavra fica no `title` e no leitor de tela, pra não brigar com o nome ao lado. */
+  size?: "sm" | "icon";
 }) {
   const t = useT();
   const label = t("components.ui.experimental.label");
   const title = t("components.ui.experimental.title");
+  const iconOnly = size === "icon";
   const cls = cn(
-    "inline-flex shrink-0 -rotate-2 items-center gap-1 rounded-sm bg-tomate px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-night pop-sm",
+    "inline-flex shrink-0 items-center bg-tomate text-night",
+    iconOnly
+      ? "size-4 justify-center rounded-xs"
+      : "-rotate-2 gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider pop-sm",
     className,
   );
   const inner = (
     <>
-      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden /> {label}
+      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden />
+      {iconOnly ? null : <> {label}</>}
     </>
   );
+  // Sem a palavra na tela, ela precisa ir inteira pro leitor de tela e pro title.
+  const spoken = iconOnly ? `${label} — ${title}` : ` — ${title}`;
   if (interactive) {
     return (
       <Tooltip content={title}>
@@ -195,9 +206,9 @@ export function ExperimentalBadge({
     );
   }
   return (
-    <span title={title} className={cls}>
+    <span title={iconOnly ? spoken : title} className={cls}>
       {inner}
-      <span className="sr-only"> — {title}</span>
+      <span className="sr-only">{spoken}</span>
     </span>
   );
 }

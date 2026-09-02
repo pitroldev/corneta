@@ -1001,21 +1001,24 @@ export const pt = {
   "golive.rescue.title": "O OBS ainda não conectou",
   "golive.security.adjust": "Ajustar",
   "golive.security.armed": "Armado",
-  "golive.security.bitrate.desc": "baixa a qualidade se a internet apertar",
+  "golive.security.bitrate.desc":
+    "se a internet apertar, baixo a qualidade antes de a live travar",
   "golive.security.bitrate.desc.off":
-    "se a internet apertar, a live engasga em vez de baixar a qualidade — liga em Ajustar",
+    "se a internet apertar, a live trava em vez de só baixar a qualidade",
   "golive.security.bitrate.label": "Auto-bitrate",
   "golive.security.brb.desc":
-    "se o sinal do OBS cair, o aviso entra no ar sem a live piscar",
+    "se o OBS cair, corto pro JÁ VOLTO e a live nem pisca",
   "golive.security.brb.desc.off":
-    "se o OBS cair, a galera fica vendo tela parada — liga em Ajustar",
+    "se o OBS cair, a galera fica olhando uma tela congelada",
   "golive.security.brb.label": "JÁ VOLTO",
   "golive.security.guardian.desc.off":
-    "nenhum termo seu é vigiado na tela — liga em Ajustar",
+    "se uma palavra que não pode vazar aparecer na tela, vai pro ar",
   "golive.security.guardian.label": "Guardião",
-  "golive.security.guardian.noTerms": "ligado, mas sem termos — adicione um",
-  "golive.security.guardian.watching": "vigiando {n} termo(s)",
-  "golive.security.loudness.desc": "acertando seu volume automaticamente",
+  "golive.security.guardian.noTerms":
+    "ligado, mas sem nada pra vigiar — adiciona um termo",
+  "golive.security.guardian.watching":
+    "de olho em {n} termo(s) — se um aparecer, corto pro JÁ VOLTO",
+  "golive.security.loudness.desc": "acerto o seu volume sozinha",
   "golive.security.loudness.label": "Normalizador de áudio",
   "golive.security.off": "Off",
   "golive.security.title": "Suas redes de segurança",

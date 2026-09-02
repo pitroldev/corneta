@@ -1359,24 +1359,27 @@ export const en: Dict = {
   // Leva pra Configurações → Segurança ao vivo.
   "golive.security.adjust": "Adjust",
   "golive.security.armed": "Armed",
-  "golive.security.bitrate.desc": "drops the quality if your internet chokes",
+  "golive.security.bitrate.desc":
+    "if your internet chokes, I drop the quality before the stream freezes",
   "golive.security.bitrate.desc.off":
-    "if your internet chokes, the stream stutters instead of dropping quality — turn it on under Adjust",
+    "if your internet chokes, the stream freezes instead of just losing some quality",
   // Mesmo termo da LP.
   "golive.security.bitrate.label": "Auto-bitrate",
   "golive.security.brb.desc":
-    "if OBS drops the signal, BE RIGHT BACK goes on air and your stream never blinks",
+    "if OBS drops, I cut to BE RIGHT BACK and the stream doesn't even blink",
   "golive.security.brb.desc.off":
-    "if OBS drops, everyone's stuck on a frozen frame — turn it on under Adjust",
+    "if OBS drops, everyone's staring at a frozen frame",
   "golive.security.brb.label": "BE RIGHT BACK",
   "golive.security.guardian.desc.off":
-    "none of your words are being watched for on screen — turn it on under Adjust",
+    "if a word that can't leak shows up on screen, it goes on air",
   // Termo já fixado na LP (protection.guard.privacy.title). A imagem do 'guardião' (pessoa) se perde, mas divergir da LP seria pior.
   "golive.security.guardian.label": "Privacy guard",
-  "golive.security.guardian.noTerms": "on, but no words yet — add one",
+  "golive.security.guardian.noTerms":
+    "on, but nothing to watch yet — add a word",
   // Plural montado no código com +'s'; funciona igual em EN. 'termo' → 'word' porque a LP fala 'the words that can't leak'.
-  "golive.security.guardian.watching": "watching {n} word(s)",
-  "golive.security.loudness.desc": "leveling your volume out on its own",
+  "golive.security.guardian.watching":
+    "watching {n} word(s) — if one shows up, I cut to BE RIGHT BACK",
+  "golive.security.loudness.desc": "I level your volume on my own",
   // Mesmo termo da LP (protection.guard.audio.title).
   "golive.security.loudness.label": "Audio normalizer",
   // Já está em inglês no PT; fica igual.

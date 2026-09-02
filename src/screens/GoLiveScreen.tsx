@@ -1319,7 +1319,7 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
               {it.on ? t("golive.security.armed") : t("golive.security.off")}
             </Badge>
             <span className="font-semibold">{it.label}</span>
-            {it.experimental && <ExperimentalBadge />}
+            {it.experimental && <ExperimentalBadge size="icon" />}
             <span className="text-xs text-ink-faint">· {it.desc}</span>
           </div>
         ))}
