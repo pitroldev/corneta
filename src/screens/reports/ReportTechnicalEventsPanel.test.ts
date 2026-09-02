@@ -14,6 +14,9 @@ const windowAt = (
   causeKind: "encoding",
   confidence: "medium",
   advice: "Revise o encoder.",
+  confirm: "Baixa a resolução e testa.",
+  affected: ["Twitch"],
+  totalTargets: 2,
   ...overrides,
 });
 

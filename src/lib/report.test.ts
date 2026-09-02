@@ -275,6 +275,15 @@ describe("problem windows", () => {
     expect(analysis.windows[0].contributingApp).toBe("MeuJogo");
     expect(analysis.windows[0].cause).toContain("MeuJogo");
     expect(analysis.windows[0].signals.join(" ")).toContain("placa de vídeo");
+    // "Por que eu acho isso" é uma história em ordem — quem puxou o quê, o que travou por
+    // causa disso (com o atraso entre os dois), o que ficou de fora — e não uma lista de
+    // contadores. Se voltar a ser lista, o streamer volta a ler "perdeu N quadros".
+    const [quem, oQue, escopo] = analysis.windows[0].signals;
+    expect(quem).toMatch(/^MeuJogo segurou \d+% da placa de vídeo$/);
+    expect(oQue).toMatch(
+      /^(Na mesma hora,|\d+s depois,) o OBS pulou \d+ quadros ao montar a cena$/,
+    );
+    expect(escopo).toContain("dentro do PC");
   });
 
   it("usa a amostra imediatamente anterior quando a pressão vem antes do atraso", () => {

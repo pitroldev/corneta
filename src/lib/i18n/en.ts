@@ -12,9 +12,9 @@ import type { Dict } from "./pt";
 export const en: Dict = {
   // ---- analysis ----
   "analysis.advice.app.cpu":
-    "Before the next stream, close anything you are not using. If {app} is the game, reduce view distance or physics, or cap its frame rate.",
+    "Close {app} before the next stream, or give it less to do (fewer tabs, nothing downloading). If it's a game, cap the frame rate or lower the physics.",
   "analysis.advice.app.gpu":
-    "If {app} is the game, cap its frame rate or lower shadows and effects. Try to leave some graphics-card headroom for OBS.",
+    "Leave some graphics-card headroom for OBS: if {app} is a game, cap the frame rate or lower shadows and effects; if it isn't, close it before the stream.",
   "analysis.advice.app.memory":
     "Before the stream, close tabs and apps you're not using. If {app} keeps growing, close and reopen it before you go live.",
   // "Settings → Output → Encoder" são os rótulos reais do menu do OBS em inglês — não traduzir de novo. "tela Qualidade" é uma tela da Corneta: tem que ca
@@ -48,6 +48,26 @@ export const en: Dict = {
   "analysis.cause.signal": "Video stopped arriving from OBS",
   // Vira o título do card do trecho. Em EN entra no formato fixo "Couldn't ..." e o advice abaixo dá o passo — o PT aqui é mais frio que o resto do app.
   "analysis.cause.unknown": "There isn't enough data to name a cause yet",
+  "analysis.confirm.unknown":
+    "Next stream, open this report again: if the stretch doesn't come back, it was a one-off.",
+  "analysis.confirm.app.gpu":
+    "Do a short stream with {app} capped on frame rate or closed. If the next report doesn't show OBS skipping frames, that was it.",
+  "analysis.confirm.app.cpu":
+    "Do a short stream without {app} open. If the next report comes out clean, that was it.",
+  "analysis.confirm.app.memory":
+    "Close and reopen {app} before the next stream. If memory stays off the ceiling on the machine chart, that was it.",
+  "analysis.confirm.render":
+    "Take one heavy source out of the scene (browser, camera with filters) and do a short stream. If OBS stops skipping frames, it was the scene.",
+  "analysis.confirm.encoding":
+    "Lower the resolution or frame rate in OBS and do a short stream. If OBS stops skipping frames, the video was too heavy for the PC.",
+  "analysis.confirm.local":
+    "Restart OBS and Corneta before the next stream. If the stretch doesn't come back, that was it.",
+  "analysis.confirm.network":
+    "Test your upload on the Quality screen before the next stream. If it wobbles there, the connection is the spot.",
+  "analysis.confirm.platform":
+    "Next stream, watch whether it's only {target} again. Twice in a row on the same platform is the platform; if it moves, it's your route.",
+  "analysis.confirm.signal":
+    "Check that OBS stayed open and pointed at Corneta. If the stretch lines up with a scene switch or OBS freezing, that's where it is.",
   "analysis.event.cpuHigh": "CPU at {pct}%",
   "analysis.event.end": "Stream ended",
   // No código o rótulo é montado por concatenação (`${t.name} ${estado}`) — em EN a frase inteira precisa ser uma chave só, senão a ordem quebra.
@@ -135,6 +155,58 @@ export const en: Dict = {
   "analysis.verdict.windows.detail": "Check the details for each one below.",
   // Aqui "trecho" vira "rough patch" porque anda sozinho; nas outras chaves vira "stretch" porque sempre vem com o qualificador atrás ("stretch(es) with C
   "analysis.verdict.windows.title": "{n} {patch}",
+  "analysis.why.delay.same": "At the same moment,",
+  "analysis.why.delay.after": "{sec}s later,",
+  "analysis.why.app.gpu": "{app} held {pct}% of the graphics card",
+  "analysis.why.app.cpu": "{app} held {pct}% of the processor",
+  "analysis.why.app.memory":
+    "{app} reached {gb} GB with the PC's memory at {pct}%",
+  "analysis.why.effect.render":
+    "{delay} OBS skipped {count} frames while assembling the scene",
+  "analysis.why.effect.encode": "{delay} OBS couldn't encode {count} frames",
+  "analysis.why.effect.renderLag":
+    "{delay} OBS started taking up to {ms} ms per frame",
+  "analysis.why.effect.dropped":
+    "{delay} the platforms went without {count} frames",
+  "analysis.why.mech.render":
+    "OBS skipped {count} frames while assembling the scene",
+  "analysis.why.mech.encode": "OBS couldn't encode {count} frames",
+  "analysis.why.mech.renderLag": "OBS started taking up to {ms} ms per frame",
+  "analysis.why.mech.dropped": "The platforms went without {count} frames",
+  "analysis.why.scope.pcOnly":
+    "Your connection and the platforms stayed fine — the bottleneck was inside the PC",
+  "analysis.why.scope.allTargets": "Every platform felt it at the same time",
+  "analysis.why.scope.oneTarget":
+    "Only {target} felt it; the others stayed fine",
+  "analysis.why.machine.gpu":
+    "The graphics card was at {pct}%, but no single app explains it",
+  "analysis.why.machine.cpu":
+    "The processor was at {pct}%, but no single app explains it",
+  "analysis.why.machine.memory": "The PC's memory was at {pct}%",
+  "analysis.why.machine.headroom":
+    "The graphics card and processor had headroom",
+  "analysis.why.own.obs.gpu": "OBS itself reached {pct}% of the graphics card",
+  "analysis.why.own.obs.cpu": "OBS itself reached {pct}% of the processor",
+  "analysis.why.own.corneta.gpu":
+    "Corneta itself reached {pct}% of the graphics card",
+  "analysis.why.own.corneta.cpu":
+    "Corneta itself reached {pct}% of the processor",
+  "analysis.why.local.congested":
+    "The feed from OBS to Corneta was held back at {pct}%",
+  "analysis.why.local.beforeInternet":
+    "This happens before the video leaves the PC — your connection and the platforms aren't part of it",
+  "analysis.why.network.reconnect": "{targets} reconnected at the same time",
+  "analysis.why.network.bitrate":
+    "The outgoing quality dropped for every platform at once",
+  "analysis.why.network.pcFine":
+    "OBS and the PC were fine — the trouble started after the video left here",
+  "analysis.why.network.limit":
+    "With this data I can't tell your connection, the route and the platform apart",
+  "analysis.why.platform.limit":
+    "It could be the route to {target} or the platform itself — this data can't separate the two",
+  "analysis.why.signal.stopped": "OBS stopped sending video to Corneta",
+  "analysis.why.signal.blank":
+    "Every platform went without a picture at the same time",
   // Substantivos soltos, pros buracos das frases acima. São DOIS porque em inglês
   // a palavra muda de acordo com a companhia: {stretch} sempre vem com o
   // qualificador atrás ("stretch with CPU maxed out"), e {patch} anda sozinho no
@@ -2152,9 +2224,13 @@ export const en: Dict = {
     "Distribution of {count} occurrences across the stream",
   "reports.technical.incidents.groups":
     "Grouped by cause · total points: {count}",
+  "reports.technical.incidents.impact": "Impact",
+  "reports.technical.incidents.impact.allTargets": "every platform",
+  "reports.technical.incidents.impact.from": "from {time}",
+  "reports.technical.incidents.confirm": "How to confirm",
   "reports.technical.incidents.individual": "Individual occurrences",
   "reports.technical.incidents.longest": "Longest stretches",
-  "reports.technical.incidents.next": "What to try",
+  "reports.technical.incidents.next": "For your next stream",
   "reports.technical.incidents.occurrences.one": "1 stretch",
   "reports.technical.incidents.occurrences.other": "{count} stretches",
   "reports.technical.incidents.signalsMore": "{count} more pieces of evidence",

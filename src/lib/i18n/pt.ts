@@ -12,9 +12,9 @@
 export const pt = {
   // ---- analysis ----
   "analysis.advice.app.cpu":
-    "Antes da próxima live, feche o que não estiver usando. Se {app} for o jogo, reduza a distância de visão, a física ou limite os FPS.",
+    "Fecha {app} antes da próxima live, ou deixa ele fazendo menos coisa (menos abas, nada baixando). Se for um jogo, limita os FPS ou baixa a física.",
   "analysis.advice.app.gpu":
-    "Se {app} for o jogo, limite os FPS ou reduza sombras e efeitos. Tente deixar um pouco da placa de vídeo livre para o OBS.",
+    "Deixa um pedaço da placa de vídeo livre pro OBS: se {app} for um jogo, limita os FPS ou baixa sombras e efeitos; se não for, fecha ele antes da live.",
   "analysis.advice.app.memory":
     "Antes da live, fecha aba e programa que você não tá usando. Se {app} continuar crescendo, fecha e abre ele de novo antes de entrar no ar.",
   "analysis.advice.encoding":
@@ -42,6 +42,26 @@ export const pt = {
   "analysis.cause.signal": "O vídeo parou de chegar do OBS",
   "analysis.cause.unknown":
     "Ainda não há dados suficientes para apontar a causa",
+  "analysis.confirm.unknown":
+    "Na próxima live, abre este relatório de novo: se o trecho não voltar, foi coisa daquele dia.",
+  "analysis.confirm.app.gpu":
+    "Faz uma live curta com {app} de FPS limitado ou fechado. Se o próximo relatório não mostrar o OBS pulando quadros, era ele.",
+  "analysis.confirm.app.cpu":
+    "Faz uma live curta sem {app} aberto. Se o próximo relatório sair limpo, era ele.",
+  "analysis.confirm.app.memory":
+    "Fecha e abre {app} antes da próxima live. Se a memória não encostar no limite no gráfico da máquina, era ele.",
+  "analysis.confirm.render":
+    "Tira uma fonte pesada da cena (navegador, câmera com filtro) e faz uma live curta. Se o OBS parar de pular quadros, era a cena.",
+  "analysis.confirm.encoding":
+    "Baixa a resolução ou os FPS no OBS e faz uma live curta. Se o OBS parar de pular quadros, o vídeo estava pesado demais pro PC.",
+  "analysis.confirm.local":
+    "Reinicia o OBS e a Corneta antes da próxima live. Se o trecho não voltar, era isso.",
+  "analysis.confirm.network":
+    "Testa o upload na tela Qualidade antes da próxima live. Se ele oscilar lá, a internet é o ponto.",
+  "analysis.confirm.platform":
+    "Na próxima live, olha se foi só {target} de novo. Duas vezes seguidas na mesma plataforma é a plataforma; se mudar, é a sua rota.",
+  "analysis.confirm.signal":
+    "Confere se o OBS ficou aberto e apontando pra Corneta. Se o trecho coincidir com você trocando de cena ou o OBS travar, é ali.",
   "analysis.event.cpuHigh": "CPU em {pct}%",
   "analysis.event.end": "Fim da transmissão",
   "analysis.event.error": "{target} com erro",
@@ -110,6 +130,58 @@ export const pt = {
   "analysis.verdict.signal.title": "O sinal do OBS caiu",
   "analysis.verdict.windows.detail": "Veja os detalhes de cada um abaixo.",
   "analysis.verdict.windows.title": "{n} {patch} com problema",
+  "analysis.why.delay.same": "Na mesma hora,",
+  "analysis.why.delay.after": "{sec}s depois,",
+  "analysis.why.app.gpu": "{app} segurou {pct}% da placa de vídeo",
+  "analysis.why.app.cpu": "{app} segurou {pct}% do processador",
+  "analysis.why.app.memory":
+    "{app} chegou a {gb} GB com a memória do PC em {pct}%",
+  "analysis.why.effect.render":
+    "{delay} o OBS pulou {count} quadros ao montar a cena",
+  "analysis.why.effect.encode":
+    "{delay} o OBS não conseguiu codificar {count} quadros",
+  "analysis.why.effect.renderLag":
+    "{delay} o OBS passou a levar até {ms} ms por quadro",
+  "analysis.why.effect.dropped":
+    "{delay} as plataformas ficaram sem {count} quadros",
+  "analysis.why.mech.render": "O OBS pulou {count} quadros ao montar a cena",
+  "analysis.why.mech.encode": "O OBS não conseguiu codificar {count} quadros",
+  "analysis.why.mech.renderLag": "O OBS passou a levar até {ms} ms por quadro",
+  "analysis.why.mech.dropped": "As plataformas ficaram sem {count} quadros",
+  "analysis.why.scope.pcOnly":
+    "A internet e as plataformas seguiram normais — o gargalo foi dentro do PC",
+  "analysis.why.scope.allTargets":
+    "Todas as plataformas sentiram ao mesmo tempo",
+  "analysis.why.scope.oneTarget":
+    "Só {target} sentiu; as outras seguiram normais",
+  "analysis.why.machine.gpu":
+    "A placa de vídeo estava em {pct}%, mas nenhum programa sozinho explica",
+  "analysis.why.machine.cpu":
+    "O processador estava em {pct}%, mas nenhum programa sozinho explica",
+  "analysis.why.machine.memory": "A memória do PC estava em {pct}%",
+  "analysis.why.machine.headroom": "Placa de vídeo e processador tinham folga",
+  "analysis.why.own.obs.gpu": "O próprio OBS chegou a {pct}% da placa de vídeo",
+  "analysis.why.own.obs.cpu": "O próprio OBS chegou a {pct}% do processador",
+  "analysis.why.own.corneta.gpu":
+    "A própria Corneta chegou a {pct}% da placa de vídeo",
+  "analysis.why.own.corneta.cpu":
+    "A própria Corneta chegou a {pct}% do processador",
+  "analysis.why.local.congested":
+    "O envio do OBS pra Corneta ficou limitado em {pct}%",
+  "analysis.why.local.beforeInternet":
+    "Isso acontece antes de o vídeo sair do PC — internet e plataformas não entram nessa",
+  "analysis.why.network.reconnect": "{targets} reconectaram ao mesmo tempo",
+  "analysis.why.network.bitrate":
+    "A qualidade enviada caiu pra todas as plataformas de uma vez",
+  "analysis.why.network.pcFine":
+    "O OBS e o PC estavam bem — o problema começou depois que o vídeo saiu daqui",
+  "analysis.why.network.limit":
+    "Com esses dados não dá pra separar internet, rota e plataforma",
+  "analysis.why.platform.limit":
+    "Pode ser a rota até {target} ou a própria plataforma — esses dados não separam os dois",
+  "analysis.why.signal.stopped": "O OBS parou de mandar vídeo pra Corneta",
+  "analysis.why.signal.blank":
+    "Todas as plataformas ficaram sem imagem ao mesmo tempo",
   // Substantivos soltos, pros buracos das frases acima. Em português os dois são
   // a mesma palavra; em inglês {patch} anda sozinho e vira "rough patch".
   "analysis.verdict.patch.one": "trecho",
@@ -1631,9 +1703,13 @@ export const pt = {
     "Distribuição de {count} ocorrências ao longo da live",
   "reports.technical.incidents.groups":
     "Resumo por causa · total de pontos: {count}",
+  "reports.technical.incidents.impact": "Impacto",
+  "reports.technical.incidents.impact.allTargets": "todas as plataformas",
+  "reports.technical.incidents.impact.from": "a partir de {time}",
+  "reports.technical.incidents.confirm": "Como confirmar",
   "reports.technical.incidents.individual": "Ocorrências individuais",
   "reports.technical.incidents.longest": "Trechos mais longos",
-  "reports.technical.incidents.next": "O que tentar",
+  "reports.technical.incidents.next": "Pra próxima live",
   "reports.technical.incidents.occurrences.one": "1 trecho",
   "reports.technical.incidents.occurrences.other": "{count} trechos",
   "reports.technical.incidents.signalsMore": "mais {count} evidências",

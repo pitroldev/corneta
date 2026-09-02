@@ -33,10 +33,15 @@ interface ProblemWindowGroup {
   causeKind: ProblemWindow["causeKind"];
   cause: string;
   advice: string;
+  confirm: string;
   confidence: ProblemWindow["confidence"];
   windows: ProblemWindow[];
   totalSec: number;
   signals: string[];
+  /** União das plataformas que sentiram em qualquer trecho do grupo. */
+  affected: string[];
+  totalTargets: number;
+  contributingApp?: string;
 }
 
 export function groupProblemWindows(
@@ -73,6 +78,8 @@ export function groupProblemWindows(
       }
       if (confidenceRank[window.confidence] > confidenceRank[group.confidence])
         group.confidence = window.confidence;
+      for (const name of window.affected)
+        if (!group.affected.includes(name)) group.affected.push(name);
       continue;
     }
 
@@ -85,6 +92,10 @@ export function groupProblemWindows(
       windows: [window],
       totalSec: window.durationSec,
       signals: window.signals.slice(0, MAX_GROUP_SIGNALS),
+      confirm: window.confirm,
+      affected: [...window.affected],
+      totalTargets: window.totalTargets,
+      contributingApp: window.contributingApp,
     });
   }
 
@@ -232,6 +243,30 @@ function WindowGroupDisclosure({
     .slice(0, GROUP_PREVIEW_ROWS);
   const visibleSignals = group.signals.slice(0, 3);
   const hiddenSignalCount = group.signals.length - visibleSignals.length;
+  // "Onde travou": duração somada · quem sentiu · quando começou. Causa dentro do PC
+  // (app, cena, encoder, OBS→Corneta, sinal) atinge o vídeo ANTES de ele se dividir por
+  // plataforma, então vale "todas" mesmo sem nenhuma marcada; nas causas de rede/rota só
+  // entra quem de fato sentiu.
+  const pcSide = !["network", "platform", "unknown"].includes(group.causeKind);
+  const targetsLabel =
+    group.affected.length === 0
+      ? pcSide
+        ? t("reports.technical.incidents.impact.allTargets")
+        : null
+      : group.affected.length >= group.totalTargets
+        ? t("reports.technical.incidents.impact.allTargets")
+        : group.affected.join(", ");
+  const impactLine = [
+    group.totalSec < 60
+      ? `${Math.round(group.totalSec)}s`
+      : fmt.dur(group.totalSec),
+    targetsLabel,
+    t("reports.technical.incidents.impact.from", {
+      time: timeline.relative(group.windows[0].tStart),
+    }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <details className="group/incident">
@@ -270,41 +305,82 @@ function WindowGroupDisclosure({
       </summary>
 
       <div className="pb-5 pl-5 sm:pl-6">
-        <div className="grid max-w-4xl gap-4 border-l-2 border-border-soft pl-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8">
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-              {t("reports.technical.incidents.next")}
-            </h4>
-            <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-              {group.advice}
-            </p>
-          </div>
+        <div className="max-w-4xl border-l-2 border-border-soft pl-4">
+          {/* Ordem do plano: impacto (onde travou) → por quê (a história) → o que fazer. */}
+          <p className="text-sm text-ink">
+            <span className="mr-2 text-xs font-bold uppercase tracking-wide text-ink-faint">
+              {t("reports.technical.incidents.impact")}
+            </span>
+            <span className="tabular-nums">{impactLine}</span>
+          </p>
 
-          {visibleSignals.length > 0 ? (
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                {t("reports.technical.incidents.why")}
-              </h4>
-              <ul className="mt-1 space-y-1 text-xs leading-relaxed text-ink-muted">
-                {visibleSignals.map((signal) => (
-                  <li key={signal} className="flex gap-2">
-                    <span
-                      className="mt-[0.55em] size-1 shrink-0 rounded-full bg-ink-faint"
-                      aria-hidden
-                    />
-                    <span className="min-w-0 break-words">{signal}</span>
-                  </li>
-                ))}
-              </ul>
-              {hiddenSignalCount > 0 ? (
-                <p className="mt-1 pl-3 text-xs text-ink-faint">
-                  {t("reports.technical.incidents.signalsMore", {
-                    count: hiddenSignalCount,
-                  })}
+          <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-8">
+            {visibleSignals.length > 0 ? (
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                  {t("reports.technical.incidents.why")}
+                </h4>
+                {/* Uma cadeia numerada, não uma lista: o primeiro passo é a causa (leva a
+                    cor do grupo), os seguintes são o que travou por causa dela e o que
+                    ficou de fora. O nome do aplicativo culpado fica em negrito. */}
+                <ol className="mt-2 space-y-0">
+                  {visibleSignals.map((signal, index) => (
+                    <li
+                      key={signal}
+                      className="relative flex gap-3 pb-3 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:left-[9px] [&:not(:last-child)]:after:top-5 [&:not(:last-child)]:after:h-[calc(100%-0.75rem)] [&:not(:last-child)]:after:w-0.5 [&:not(:last-child)]:after:bg-border-soft"
+                    >
+                      <span
+                        className={cn(
+                          "z-10 mt-px grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-extrabold tabular-nums",
+                          index === 0
+                            ? cn(
+                                WINDOW_KIND_TONE[group.causeKind],
+                                "text-night",
+                              )
+                            : "bg-surface-3 text-ink-muted",
+                        )}
+                        aria-hidden
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 break-words text-sm leading-snug text-ink">
+                        <Highlight
+                          text={signal}
+                          term={index === 0 ? group.contributingApp : undefined}
+                        />
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                {hiddenSignalCount > 0 ? (
+                  <p className="pl-8 text-xs text-ink-faint">
+                    {t("reports.technical.incidents.signalsMore", {
+                      count: hiddenSignalCount,
+                    })}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                  {t("reports.technical.incidents.next")}
+                </h4>
+                <p className="mt-1 text-sm leading-relaxed text-ink">
+                  {group.advice}
                 </p>
-              ) : null}
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                  {t("reports.technical.incidents.confirm")}
+                </h4>
+                <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                  {group.confirm}
+                </p>
+              </div>
             </div>
-          ) : null}
+          </div>
         </div>
 
         <WindowDistribution
@@ -330,6 +406,20 @@ function WindowGroupDisclosure({
         </div>
       </div>
     </details>
+  );
+}
+
+/** Põe em negrito a primeira ocorrência do termo (o aplicativo culpado) na frase. */
+function Highlight({ text, term }: { text: string; term?: string }) {
+  if (!term) return <>{text}</>;
+  const at = text.indexOf(term);
+  if (at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <strong className="font-bold">{term}</strong>
+      {text.slice(at + term.length)}
+    </>
   );
 }
 

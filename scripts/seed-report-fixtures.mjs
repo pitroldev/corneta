@@ -162,7 +162,47 @@ const scenarios = [
     platforms: [TWITCH, YOUTUBE, KICK, CUSTOM],
     incidents: [{ type: "encoding", from: 0.55, to: 0.68 }],
     appName: "Cyberpunk 2077",
-    note: "O jogo passa de 95% da GPU junto com frames atrasados e bitrate degradado.",
+    appResource: "gpu",
+    note: "O jogo passa de 95% da GPU um passo ANTES de o OBS pular quadros; a história do relatório sai como jogo → OBS → gargalo no PC.",
+  },
+  {
+    slug: "navegador-cpu",
+    title: "Navegador comeu o processador",
+    ago: 16 * DAY,
+    durationMs: 31 * 60_000,
+    stepMs: 10_000,
+    mode: "per-platform",
+    platforms: [TWITCH, YOUTUBE],
+    incidents: [{ type: "appcpu", from: 0.4, to: 0.5 }],
+    appName: "Google Chrome",
+    appResource: "cpu",
+    markers: [[0.41, "Abriu o navegador com vinte abas"]],
+    note: "Um aplicativo de fora segura ~80% do processador; o OBS deixa de codificar quadros; internet e plataformas seguem bem.",
+  },
+  {
+    slug: "memoria-no-limite",
+    title: "Memória no limite por causa do navegador",
+    ago: 17 * DAY,
+    durationMs: 27 * 60_000,
+    stepMs: 10_000,
+    mode: "hybrid",
+    platforms: [TWITCH, YOUTUBE, KICK],
+    incidents: [{ type: "appmem", from: 0.52, to: 0.6 }],
+    appName: "Google Chrome",
+    appResource: "memory",
+    note: "Memória do PC acima de 92% com um aplicativo passando de 6 GB; o OBS pula quadros ao montar a cena.",
+  },
+  {
+    slug: "obs-pesado",
+    title: "O próprio OBS pesou na placa de vídeo",
+    ago: 18 * DAY,
+    durationMs: 29 * 60_000,
+    stepMs: 10_000,
+    mode: "passthrough",
+    platforms: [TWITCH, YOUTUBE],
+    incidents: [{ type: "obsheavy", from: 0.3, to: 0.4 }],
+    markers: [[0.31, "Cena com três câmeras e filtros de fundo"]],
+    note: "Sem aplicativo de fora: o OBS é quem chega a ~90% da placa. Deve aparecer como contexto, não como culpado.",
   },
   {
     slug: "render-obs",
@@ -441,6 +481,55 @@ function recordingRows(s, startedAt, id) {
   return [];
 }
 
+// O ranking de processos que o app grava (top 3, ~6 s). Aqui: o app de fora do cenário
+// com o recurso que ele pressiona (gpu/cpu/memory), e o OBS como segundo — moderado, ou
+// pesado quando ELE é a história (`obsheavy`).
+function appsFor(s, incident, pressure, cpu, gpu, random) {
+  const obsHeavy =
+    incident?.type === "obsheavy" || pressure?.type === "obsheavy";
+  const obs = {
+    appRef: "obs",
+    name: "OBS Studio",
+    cpu: round(cpu * 0.45, 1),
+    memoryMb: 1380,
+    gpu3d: round(obsHeavy ? 88 + random() * 4 : Math.min(gpu, 60), 1),
+  };
+  if (!s.appName) return [obs];
+  const hot = Boolean(pressure);
+  const resource = s.appResource ?? "gpu";
+  const app = {
+    appRef: String(s.appName).toLowerCase().replace(/\s+/g, "-"),
+    name: s.appName,
+    cpu: round(
+      resource === "cpu"
+        ? hot
+          ? 78 + random() * 8
+          : 18 + random() * 6
+        : hot
+          ? 42 + random() * 8
+          : 24 + random() * 5,
+      1,
+    ),
+    memoryMb: round(
+      resource === "memory"
+        ? hot
+          ? 6100 + random() * 400
+          : 2400 + random() * 300
+        : 3600 + random() * 500,
+      1,
+    ),
+    gpu3d: round(
+      resource === "gpu"
+        ? hot
+          ? 95 + random() * 4
+          : 54 + random() * 8
+        : 12 + random() * 10,
+      1,
+    ),
+  };
+  return [app, obs];
+}
+
 function generateSession(s, index, now) {
   const endedAt = now - s.ago;
   const startedAt = endedAt - s.durationMs;
@@ -489,7 +578,34 @@ function generateSession(s, index, now) {
         gpu = 58 + random() * 8;
         renderMs = 31 + random() * 9;
         renderSkipped = Math.round(120 * progress);
+      } else if (incident?.type === "appcpu") {
+        // Processador tomado por um app de fora: o OBS deixa de CODIFICAR (não de montar).
+        cpu = 95 + random() * 4;
+        gpu = 44 + random() * 6;
+        renderMs = 12 + random() * 4;
+        outputSkipped = Math.round(90 * progress);
+      } else if (incident?.type === "appmem") {
+        // Memória no limite: o OBS engasga ao montar a cena.
+        cpu = 62 + random() * 5;
+        gpu = 51 + random() * 6;
+        memoryPct = 94 + random() * 3;
+        renderMs = 27 + random() * 6;
+        renderSkipped = Math.round(70 * progress);
+      } else if (incident?.type === "obsheavy") {
+        // Sem app de fora: a placa está cheia e quem enche é o próprio OBS.
+        cpu = 58 + random() * 6;
+        gpu = 94 + random() * 4;
+        renderMs = 29 + random() * 7;
+        renderSkipped = Math.round(100 * progress);
       }
+      // A pressão do aplicativo começa UM passo antes do impacto — é esse atraso que deixa o
+      // relatório dizer "10s depois, o OBS pulou quadros" em vez de "aconteceu junto".
+      const leadIn = s.stepMs / s.durationMs;
+      const pressure = s.incidents?.find(
+        (item) =>
+          ["encoding", "appcpu", "appmem", "obsheavy"].includes(item.type) &&
+          within(progress, { from: item.from - leadIn * 1.01, to: item.to }),
+      );
       const targets = s.platforms.map((p, targetIndex) => {
         let state = elapsed < s.stepMs ? "connecting" : "live";
         let bitrate = p.bitrate * (0.96 + random() * 0.08);
@@ -522,6 +638,14 @@ function generateSession(s, index, now) {
             bitrate *= 0.58;
             fps = 42 + Math.round(random() * 8);
             drops[targetIndex] += 5;
+          } else if (
+            incident.type === "appcpu" ||
+            incident.type === "appmem" ||
+            incident.type === "obsheavy"
+          ) {
+            bitrate *= 0.7;
+            fps = 46 + Math.round(random() * 8);
+            drops[targetIndex] += 4;
           }
         }
         if (state === "brb" || state === "censor") bitrate *= 0.72;
@@ -560,33 +684,11 @@ function generateSession(s, index, now) {
         gpu: round(gpu, 1),
         ...(!s.legacy && { memoryPct: round(memoryPct, 1) }),
         ...(!s.legacy &&
-          Math.round(elapsed / s.stepMs) % 3 === 0 &&
-          (s.appName || incident?.type === "render") && {
-            apps: [
-              incident?.type === "render"
-                ? {
-                    appRef: "obs",
-                    name: "OBS Studio",
-                    cpu: round(cpu * 0.45, 1),
-                    memoryMb: 1380,
-                    gpu3d: round(gpu, 1),
-                  }
-                : {
-                    appRef: String(s.appName)
-                      .toLowerCase()
-                      .replace(/\s+/g, "-"),
-                    name: s.appName,
-                    cpu: round(
-                      incident ? 42 + random() * 8 : 24 + random() * 5,
-                      1,
-                    ),
-                    memoryMb: round(3600 + random() * 500, 1),
-                    gpu3d: round(
-                      incident ? 95 + random() * 4 : 54 + random() * 8,
-                      1,
-                    ),
-                  },
-            ],
+          (Math.round(elapsed / s.stepMs) % 3 === 0 || pressure) &&
+          (s.appName ||
+            incident?.type === "render" ||
+            incident?.type === "obsheavy") && {
+            apps: appsFor(s, incident, pressure, cpu, gpu, random),
           }),
         ...(!s.legacy && {
           obs: {

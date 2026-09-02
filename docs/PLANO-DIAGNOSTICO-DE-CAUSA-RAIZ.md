@@ -25,6 +25,15 @@ A primeira entrega segura deste plano já está no aplicativo:
 - memória incluída no gráfico da máquina;
 - fixture “Cyberpunk 2077 ocupou a placa de vídeo” e testes contra falsa acusação
   quando o uso está alto, mas a transmissão continua saudável.
+- “Por que eu acho isso” como história em três passos, montada por tipo de causa:
+  quem puxou o quê → o que travou por causa disso (com o atraso entre os dois) → o que
+  ficou de fora (internet e plataformas seguiram? só uma sentiu?). A lista crua de
+  contadores só sobrevive como fallback quando a causa é desconhecida.
+- card do incidente na ordem da §7: impacto (duração · quem sentiu · a partir de quando) →
+  a história numerada, com o aplicativo culpado em destaque → “Pra próxima live” → “Como
+  confirmar”, com um teste concreto por tipo de causa;
+- seed com quatro cenários de recurso (jogo na GPU, navegador na CPU, memória no limite,
+  o próprio OBS pesado), com a pressão começando um passo antes do impacto.
 
 Sondas externas de rota e códigos estruturados de falha continuam como evolução
 posterior: sem esses dados, rede e plataforma aparecem deliberadamente com confiança

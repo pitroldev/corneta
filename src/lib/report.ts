@@ -397,6 +397,11 @@ export interface ProblemWindow {
   advice: string;
   targetName?: string;
   contributingApp?: string;
+  /** Plataformas que sentiram, pelo nome — é a linha de impacto ("onde travou"). */
+  affected: string[];
+  totalTargets: number;
+  /** Como o streamer confere, na próxima live, que a causa era essa mesmo. */
+  confirm: string;
 }
 
 export interface ViewerStats {
@@ -663,6 +668,9 @@ interface AppPressure {
   name: string;
   resource: "gpu" | "cpu" | "memory";
   value: number;
+  /** Primeira amostra em que este app passou do limiar — é o que deixa dizer
+   *  "3s depois, o OBS pulou quadros" em vez de só "os dois aconteceram". */
+  firstAt: number;
 }
 
 /** Escolhe uma causa por aplicativo apenas quando o uso é realmente excepcional.
@@ -684,6 +692,7 @@ function dominantAppPressure(
       return;
     }
     existing.value = Math.max(existing.value, candidate.value);
+    existing.firstAt = Math.min(existing.firstAt, candidate.firstAt);
   };
   for (const sample of slice) {
     // A lista de processos é esparsa (~6 s), portanto aceitamos uma pequena margem
@@ -696,6 +705,7 @@ function dominantAppPressure(
           name: app.name,
           resource: "gpu",
           value: app.gpu3d ?? 0,
+          firstAt: sample.t,
         });
       }
       if (app.cpu >= APP_CPU_PRESSURE) {
@@ -704,6 +714,7 @@ function dominantAppPressure(
           name: app.name,
           resource: "cpu",
           value: app.cpu,
+          firstAt: sample.t,
         });
       }
       if (maxMemoryPct >= MEMORY_PRESSURE && app.memoryMb >= APP_MEMORY_MB) {
@@ -712,6 +723,7 @@ function dominantAppPressure(
           name: app.name,
           resource: "memory",
           value: app.memoryMb,
+          firstAt: sample.t,
         });
       }
     }
@@ -723,6 +735,159 @@ function dominantAppPressure(
         : item.value;
     return normalized(b) - normalized(a);
   })[0];
+}
+
+interface WhyInput {
+  causeKind: ProblemWindow["causeKind"];
+  /** O aplicativo culpado (só quando a causa é `app`). */
+  app?: AppPressure;
+  /** OBS ou Corneta pesando — contexto, não culpa. */
+  ownApp?: AppPressure;
+  firstImpactAt?: number;
+  renderSkipped: number;
+  outputSkipped: number;
+  renderLag: boolean;
+  maxRenderMs: number;
+  targetDropped: number;
+  reconnect: boolean;
+  bitrateDrop: boolean;
+  affected: string[];
+  totalTargets: number;
+  maxCpu: number;
+  maxGpu: number;
+  maxMemoryPct: number;
+  congestionPct: number;
+}
+
+/** "Por que eu acho isso" como HISTÓRIA, não como lista de contadores.
+ *
+ *  Três passos, nesta ordem: (1) quem puxou o quê, (2) o que travou por causa disso — com o
+ *  atraso entre os dois, que é o que faz a correlação virar causa plausível — e (3) o que
+ *  ficou de fora (internet e plataformas seguiram bem? só uma sentiu?). "O OBS não montou
+ *  148 quadros" é sintoma; o streamer quer saber onde travou, o que causou e o que fazer.
+ *  Cada passo só entra quando o dado existe; onde os dados não separam as hipóteses, o
+ *  último passo diz isso em vez de fingir. */
+function whyBullets(w: WhyInput, t: Translate): string[] {
+  const pct = (v: number) => Math.round(v);
+  const gb = (mb: number) => Math.max(0.1, Math.round((mb / 1024) * 10) / 10);
+  const delay = () => {
+    const at = w.app?.firstAt;
+    if (at == null || w.firstImpactAt == null || w.firstImpactAt - at < 1500)
+      return t("analysis.why.delay.same");
+    return t("analysis.why.delay.after", {
+      sec: Math.round((w.firstImpactAt - at) / 1000),
+    });
+  };
+  // O mecanismo que travou. Com `withDelay`, encadeado à causa ("3s depois, …").
+  const effect = (withDelay: boolean): string | undefined => {
+    const k = withDelay ? "effect" : "mech";
+    if (w.renderSkipped > 0)
+      return t(`analysis.why.${k}.render` as MessageKey, {
+        delay: delay(),
+        count: Math.round(w.renderSkipped),
+      });
+    if (w.outputSkipped > 0)
+      return t(`analysis.why.${k}.encode` as MessageKey, {
+        delay: delay(),
+        count: Math.round(w.outputSkipped),
+      });
+    if (w.renderLag)
+      return t(`analysis.why.${k}.renderLag` as MessageKey, {
+        delay: delay(),
+        ms: pct(w.maxRenderMs),
+      });
+    if (w.targetDropped > 0)
+      return t(`analysis.why.${k}.dropped` as MessageKey, {
+        delay: delay(),
+        count: Math.round(w.targetDropped),
+      });
+    return undefined;
+  };
+  // `pcSide`: a causa mora no PC, então queda de bitrate é CONSEQUÊNCIA (o encoder não
+  // produziu) e não evidência de rede — só uma reconexão diz que a internet entrou.
+  const scope = (pcSide: boolean) =>
+    w.affected.length === 1 && w.totalTargets > 1
+      ? t("analysis.why.scope.oneTarget", { target: w.affected[0] })
+      : w.reconnect || (!pcSide && w.bitrateDrop)
+        ? t("analysis.why.scope.allTargets")
+        : t("analysis.why.scope.pcOnly");
+  // A máquina como contexto quando nenhum app de fora leva a culpa.
+  const machine = () => {
+    if (w.ownApp) {
+      const who = w.ownApp.appRef === "obs" ? "obs" : "corneta";
+      const res = w.ownApp.resource === "gpu" ? "gpu" : "cpu";
+      return t(`analysis.why.own.${who}.${res}` as MessageKey, {
+        pct: pct(w.ownApp.value),
+      });
+    }
+    if (w.maxGpu > CPU_HIGH)
+      return t("analysis.why.machine.gpu", { pct: pct(w.maxGpu) });
+    if (w.maxCpu > CPU_HIGH)
+      return t("analysis.why.machine.cpu", { pct: pct(w.maxCpu) });
+    if (w.maxMemoryPct >= MEMORY_PRESSURE)
+      return t("analysis.why.machine.memory", { pct: pct(w.maxMemoryPct) });
+    return t("analysis.why.machine.headroom");
+  };
+
+  const out: string[] = [];
+  const push = (v: string | undefined) => {
+    if (v) out.push(v);
+  };
+  const target = w.affected[0] ?? "";
+  switch (w.causeKind) {
+    case "app": {
+      const a = w.app;
+      if (!a) break;
+      push(
+        a.resource === "memory"
+          ? t("analysis.why.app.memory", {
+              app: a.name,
+              gb: gb(a.value),
+              pct: pct(w.maxMemoryPct),
+            })
+          : t(`analysis.why.app.${a.resource}` as MessageKey, {
+              app: a.name,
+              pct: pct(a.value),
+            }),
+      );
+      push(effect(true));
+      push(scope(true));
+      break;
+    }
+    case "render":
+    case "encoding":
+      push(effect(false));
+      push(machine());
+      push(scope(true));
+      break;
+    case "local":
+      push(t("analysis.why.local.congested", { pct: pct(w.congestionPct) }));
+      push(t("analysis.why.local.beforeInternet"));
+      break;
+    case "network":
+      push(
+        w.reconnect
+          ? t("analysis.why.network.reconnect", {
+              targets: w.affected.join(", "),
+            })
+          : t("analysis.why.network.bitrate"),
+      );
+      push(t("analysis.why.network.pcFine"));
+      push(t("analysis.why.network.limit"));
+      break;
+    case "platform":
+      push(t("analysis.why.scope.oneTarget", { target }));
+      push(t("analysis.why.network.pcFine"));
+      push(t("analysis.why.platform.limit", { target }));
+      break;
+    case "signal":
+      push(t("analysis.why.signal.stopped"));
+      push(t("analysis.why.signal.blank"));
+      break;
+    default:
+      break;
+  }
+  return out;
 }
 
 function buildWindow(
@@ -822,66 +987,66 @@ function buildWindow(
       renderLag ||
       targetDropped.total > 0);
 
-  const signals: string[] = [];
-  if (signalLost) signals.push(t("analysis.signal.obsSignalLost"));
+  const rawSignals: string[] = [];
+  if (signalLost) rawSignals.push(t("analysis.signal.obsSignalLost"));
   if (!signalLost && appCanExplain && appPressure?.resource === "gpu")
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.appGpu", {
         app: appPressure.name,
         pct: Math.round(appPressure.value),
       }),
     );
   if (!signalLost && appCanExplain && appPressure?.resource === "cpu")
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.appCpu", {
         app: appPressure.name,
         pct: Math.round(appPressure.value),
       }),
     );
   if (!signalLost && appCanExplain && appPressure?.resource === "memory")
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.appMemory", {
         app: appPressure.name,
         gb: Math.max(0.1, Math.round((appPressure.value / 1024) * 10) / 10),
       }),
     );
   if (renderSkipped.total > 0)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.renderSkipped", {
         count: Math.round(renderSkipped.total),
       }),
     );
   if (outputSkipped.total > 0)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.outputSkipped", {
         count: Math.round(outputSkipped.total),
       }),
     );
   if (targetDropped.total > 0)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.targetDropped", {
         count: Math.round(targetDropped.total),
       }),
     );
   if (reconnect)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.reconnected", { targets: [...affected].join(", ") }),
     );
-  if (bitrateDrop) signals.push(t("analysis.signal.bitrateDrop"));
+  if (bitrateDrop) rawSignals.push(t("analysis.signal.bitrateDrop"));
   if (cpuHigh && !appCanExplain)
-    signals.push(t("analysis.signal.cpu", { pct: Math.round(maxCpu) }));
+    rawSignals.push(t("analysis.signal.cpu", { pct: Math.round(maxCpu) }));
   if (gpuHigh && !appCanExplain)
-    signals.push(t("analysis.signal.gpu", { pct: Math.round(maxGpu) }));
+    rawSignals.push(t("analysis.signal.gpu", { pct: Math.round(maxGpu) }));
   if (maxMemoryPct >= MEMORY_PRESSURE && !appCanExplain)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.memory", { pct: Math.round(maxMemoryPct) }),
     );
   if (renderLag)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.obsRender", { ms: Math.round(maxRenderMs) }),
     );
   if (congested)
-    signals.push(
+    rawSignals.push(
       t("analysis.signal.obsCongested", {
         pct: Math.round(maxCongestion * 100),
       }),
@@ -892,12 +1057,14 @@ function buildWindow(
   let causeKind: ProblemWindow["causeKind"] = "unknown";
   let confidence: ProblemWindow["confidence"] = "low";
   let advice = t("analysis.advice.unknown");
+  let confirm = t("analysis.confirm.unknown");
   let contributingApp: string | undefined;
   if (signalLost) {
     cause = t("analysis.cause.signal");
     causeKind = "signal";
     confidence = "high";
     advice = t("analysis.advice.signal");
+    confirm = t("analysis.confirm.signal");
   } else if (appCanExplain && appPressure) {
     cause = t(`analysis.cause.app.${appPressure.resource}` as MessageKey, {
       app: appPressure.name,
@@ -909,44 +1076,88 @@ function buildWindow(
       app: appPressure.name,
     });
     contributingApp = appPressure.name;
+    confirm = t(`analysis.confirm.app.${appPressure.resource}` as MessageKey, {
+      app: appPressure.name,
+    });
   } else if (renderSkipped.total > 0) {
     cause = t("analysis.cause.render");
     causeKind = "render";
     confidence = "high";
     advice = t("analysis.advice.render");
+    confirm = t("analysis.confirm.render");
   } else if (outputSkipped.total > 0) {
     cause = t("analysis.cause.encoding");
     causeKind = "encoding";
     confidence = "high";
     advice = t("analysis.advice.encoding");
+    confirm = t("analysis.confirm.encoding");
   } else if (renderLag) {
     if (cpuHigh || gpuHigh || maxMemoryPct >= MEMORY_PRESSURE) {
       cause = t("analysis.cause.encoding");
       causeKind = "encoding";
       confidence = "medium";
       advice = t("analysis.advice.encoding");
+      confirm = t("analysis.confirm.encoding");
     } else {
       cause = t("analysis.cause.render");
       causeKind = "render";
       confidence = "medium";
       advice = t("analysis.advice.render");
+      confirm = t("analysis.confirm.render");
     }
   } else if (congested) {
     cause = t("analysis.cause.local");
     causeKind = "local";
     confidence = "medium";
     advice = t("analysis.advice.local");
+    confirm = t("analysis.confirm.local");
   } else if ((bitrateDrop || reconnect) && !singleTarget) {
     cause = t("analysis.cause.network");
     causeKind = "network";
     confidence = "low";
     advice = t("analysis.advice.network");
+    confirm = t("analysis.confirm.network");
   } else if (singleTarget) {
     cause = t("analysis.cause.platform", { target: [...affected][0] });
     causeKind = "platform";
     confidence = "low";
     advice = t("analysis.advice.platform");
+    confirm = t("analysis.confirm.platform", { target: [...affected][0] });
   }
+
+  // Pressão de um processo NOSSO (OBS/Corneta) não vira "causa" — mas explica o trecho.
+  const ownApp =
+    appPressure &&
+    !appCanExplain &&
+    (appPressure.appRef === "obs" || appPressure.appRef === "corneta") &&
+    appPressure.resource !== "memory"
+      ? appPressure
+      : undefined;
+  const signals =
+    causeKind === "unknown"
+      ? rawSignals
+      : whyBullets(
+          {
+            causeKind,
+            app: appCanExplain ? appPressure : undefined,
+            ownApp,
+            firstImpactAt,
+            renderSkipped: renderSkipped.total,
+            outputSkipped: outputSkipped.total,
+            renderLag,
+            maxRenderMs,
+            targetDropped: targetDropped.total,
+            reconnect,
+            bitrateDrop,
+            affected: [...affected],
+            totalTargets,
+            maxCpu,
+            maxGpu,
+            maxMemoryPct,
+            congestionPct: maxCongestion * 100,
+          },
+          t,
+        );
 
   return {
     tStart,
@@ -959,6 +1170,9 @@ function buildWindow(
     advice,
     targetName: affected.size === 1 ? [...affected][0] : undefined,
     contributingApp,
+    affected: [...affected],
+    totalTargets,
+    confirm,
   };
 }
 
