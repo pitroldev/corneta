@@ -2,6 +2,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -326,6 +327,7 @@ export function SettingsScreen() {
                 <div className="flex flex-col items-end gap-2">
                   <Input
                     type="password"
+                    aria-label={t("settings.obs.password.title")}
                     placeholder={t("settings.obs.password.placeholder")}
                     className="w-48"
                     value={settings.obsPassword}
@@ -373,7 +375,7 @@ export function SettingsScreen() {
                   <Toggle
                     checked={settings.brbEnabled}
                     onChange={(v) => setSettings({ brbEnabled: v })}
-                    label={t("settings.safety.brb.toggle")}
+                    label={t("settings.safety.brb.title")}
                   />
                 </SecurityFeature>
                 {settings.brbEnabled && (
@@ -393,7 +395,7 @@ export function SettingsScreen() {
                   <Toggle
                     checked={settings.autoBitrate}
                     onChange={(v) => setSettings({ autoBitrate: v })}
-                    label={t("settings.safety.bitrate.toggle")}
+                    label={t("settings.safety.bitrate.title")}
                   />
                 </SecurityFeature>
               </div>
@@ -408,7 +410,7 @@ export function SettingsScreen() {
                   <Toggle
                     checked={settings.loudnessNormalize}
                     onChange={(v) => setSettings({ loudnessNormalize: v })}
-                    label={t("settings.safety.loudness.toggle")}
+                    label={t("settings.safety.loudness.title")}
                   />
                 </SecurityFeature>
                 {settings.loudnessNormalize && (
@@ -433,7 +435,7 @@ export function SettingsScreen() {
                   <Toggle
                     checked={settings.guardianEnabled}
                     onChange={(v) => setSettings({ guardianEnabled: v })}
-                    label={t("settings.safety.guardian.toggle")}
+                    label={t("settings.safety.guardian.title")}
                   />
                 </SecurityFeature>
                 {settings.guardianEnabled && (
@@ -545,6 +547,7 @@ export function SettingsScreen() {
                 desc={t("settings.language.desc")}
               >
                 <Select
+                  aria-label={t("settings.language.title")}
                   value={settings.language}
                   onChange={(v) =>
                     setSettings({ language: v as AppSettings["language"] })
@@ -1008,6 +1011,11 @@ function BrbSlateChooser() {
         ? "border-brass bg-brass/10 text-brass"
         : "border-border text-ink-muted hover:border-brass/60",
     );
+  const isDefault = kind === "auto";
+  const isCustom = kind === "image" || kind === "video";
+  // O rótulo visível nomeia o grupo; `aria-pressed` expõe qual das duas está
+  // escolhida, que até aqui só a borda de latão dizia.
+  const labelId = useId();
 
   return (
     <div className="flex items-start gap-4 py-3.5">
@@ -1022,19 +1030,21 @@ function BrbSlateChooser() {
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="text-sm font-semibold text-ink-muted">
+        <span id={labelId} className="text-sm font-semibold text-ink-muted">
           {t("settings.brb.slate.label")}
         </span>
-        <div className="flex gap-2">
+        <div className="flex gap-2" role="group" aria-labelledby={labelId}>
           <button
-            className={opt(kind === "auto")}
+            className={opt(isDefault)}
+            aria-pressed={isDefault}
             disabled={busy}
             onClick={useDefault}
           >
             {t("settings.brb.slate.default")}
           </button>
           <button
-            className={opt(kind === "image" || kind === "video")}
+            className={opt(isCustom)}
+            aria-pressed={isCustom}
             disabled={busy}
             onClick={pick}
           >
@@ -1143,14 +1153,22 @@ function LoudnessTarget() {
     { v: -16, label: t("settings.loudness.target.minus16") },
     { v: -18, label: t("settings.loudness.target.minus18") },
   ];
+  // O rótulo visível nomeia o grupo; `aria-pressed` expõe o alvo escolhido, que
+  // até aqui só a borda de latão dizia.
+  const labelId = useId();
   return (
-    <div className="flex flex-wrap items-center gap-2 py-3.5">
-      <span className="text-xs font-semibold text-ink-faint">
+    <div
+      className="flex flex-wrap items-center gap-2 py-3.5"
+      role="group"
+      aria-labelledby={labelId}
+    >
+      <span id={labelId} className="text-xs font-semibold text-ink-faint">
         {t("settings.loudness.target.label")}
       </span>
       {opts.map((o) => (
         <button
           key={o.v}
+          aria-pressed={target === o.v}
           onClick={() => setSettings({ loudnessTargetLufs: o.v })}
           className={cn(
             "rounded-md border-2 px-2.5 py-1 text-xs font-bold transition-colors",
@@ -1293,6 +1311,13 @@ function RecordingSettings() {
   const settings = config.settings;
   const setSettings = useStore((s) => s.setSettings);
   const [check, setCheck] = useState<RecordDirCheck | null>(null);
+  // Pasta que o streamer escolheu e eu recusei. Fica FORA de `check`, que é
+  // sempre da pasta que está na tela — é dela o espaço livre mostrado embaixo,
+  // e é ela que continua recebendo as gravações.
+  const [rejected, setRejected] = useState<{
+    path: string;
+    error?: string;
+  } | null>(null);
   const [testing, setTesting] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
 
@@ -1307,6 +1332,9 @@ function RecordingSettings() {
   }, []);
 
   useEffect(() => {
+    // Trocou a pasta (ou religou a gravação): a recusa anterior não descreve
+    // mais nada que esteja na tela.
+    setRejected(null);
     if (settings.recordVideo) void validate(dir);
   }, [dir, settings.recordVideo, validate]);
 
@@ -1343,15 +1371,20 @@ function RecordingSettings() {
     const chosen = await api.recordPickDir();
     if (!chosen) return; // cancelou — não é erro
     const c = await api.recordCheckDir(chosen);
-    setCheck(c);
-    if (!c.ok) return; // pasta que não escreve não vira configuração
+    if (!c.ok) {
+      // Pasta que não escreve não vira configuração — e o caminho que fica na
+      // tela é o de antes, então o erro precisa dizer QUAL pasta não serviu.
+      setRejected({ path: chosen, error: c.error });
+      return;
+    }
+    setRejected(null);
     setSettings({ recordVideoDir: chosen });
   };
 
-  const dirErrorKey =
-    check?.error === "notDir"
+  const dirErrorKey = (error: string | undefined): MessageKey =>
+    error === "notDir"
       ? "settings.record.dir.error.notDir"
-      : check?.error === "readonly"
+      : error === "readonly"
         ? "settings.record.dir.error.readonly"
         : "settings.record.dir.error.missing";
 
@@ -1429,26 +1462,42 @@ function RecordingSettings() {
                 )}
               </div>
 
-              {check &&
-                (check.error || check.removableOrNetwork || check.longPath) && (
-                  <div className="mt-2 flex flex-col gap-1 text-xs">
-                    {check.error && (
+              {(rejected ||
+                (check &&
+                  (check.error ||
+                    check.removableOrNetwork ||
+                    check.longPath))) && (
+                <div className="mt-2 flex flex-col gap-1 text-xs">
+                  {rejected ? (
+                    <>
                       <span className="font-semibold text-bad">
-                        {t(dirErrorKey)}
+                        {t("settings.record.dir.error.kept", {
+                          path: rejected.path,
+                        })}
                       </span>
-                    )}
-                    {check.removableOrNetwork && (
-                      <span className="text-warn">
-                        {t("settings.record.warn.network")}
+                      <span className="text-bad">
+                        {t(dirErrorKey(rejected.error))}
                       </span>
-                    )}
-                    {check.longPath && (
-                      <span className="text-warn">
-                        {t("settings.record.warn.longPath")}
+                    </>
+                  ) : (
+                    check?.error && (
+                      <span className="font-semibold text-bad">
+                        {t(dirErrorKey(check.error))}
                       </span>
-                    )}
-                  </div>
-                )}
+                    )
+                  )}
+                  {check?.removableOrNetwork && (
+                    <span className="text-warn">
+                      {t("settings.record.warn.network")}
+                    </span>
+                  )}
+                  {check?.longPath && (
+                    <span className="text-warn">
+                      {t("settings.record.warn.longPath")}
+                    </span>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="rounded-md bg-surface-2 p-3">

@@ -90,7 +90,7 @@ notify-rust = { git = "https://github.com/hoodie/notify-rust", rev = "a733009b2c
 # "auto" do i18n. É a mesma fonte que o navigator.languages do WebView2 lê.
 # Win32_Storage_FileSystem: GetDiskFreeSpaceExW — espaço livre do VOLUME da pasta de
 # gravação (não do disco do sistema). É o que sustenta a parada antes de o disco zerar.
-windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem"] }
+windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Performance"] }
 # Mesa: auto-concede câmera/mic no WebView2 (PermissionRequested). Resolve pra 0.38.2,
 # o mesmo já fixado pelo wry — sem binding nativo duplicado.
 # O WebView retornado pelo Wry/Tauri usa os bindings 0.38; misturar 0.39 cria

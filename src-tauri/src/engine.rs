@@ -673,6 +673,8 @@ pub struct EngineSnapshot {
     pub cpu: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gpu: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_pct: Option<f64>,
     /// Estatísticas do OBS (render/encode lag, congestionamento), se conectado.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub obs: Option<ObsStats>,
@@ -704,6 +706,7 @@ impl EngineSnapshot {
             message: None,
             cpu: None,
             gpu: None,
+            memory_pct: None,
             obs: None,
             forced_brb: false,
         }
@@ -745,6 +748,7 @@ impl EngineSnapshot {
             message: None,
             cpu: None,
             gpu: None,
+            memory_pct: None,
             obs: None,
             forced_brb: false,
         }

@@ -933,10 +933,16 @@ function mockApi(): CornetaApi {
     mins: number,
     plats: { id: string; name: string; platformId: string }[],
     t: I18n["t"],
-    opts?: { dropAtMin?: number; dropIdx?: number; highCpu?: boolean },
+    opts?: {
+      dropAtMin?: number;
+      dropIdx?: number;
+      highCpu?: boolean;
+      busyApp?: string;
+    },
   ): string => {
     const meta = {
       kind: "meta",
+      schemaVersion: 4,
       id: String(startedAt),
       startedAt,
       mode: "per-platform",
@@ -947,6 +953,8 @@ function mockApi(): CornetaApi {
     const n = Math.round((mins * 60 * 1000) / step);
     const base = [6000, 9000, 6000, 4500];
     const drops = plats.map(() => 0);
+    let renderSkipped = 0;
+    let outputSkipped = 0;
     const raidAtMin = Math.min(mins * 0.35, 11);
     const raidViewers = 90 + Math.floor(Math.random() * 110);
     const vbase = plats.map((p) => (p.platformId === "youtube" ? 70 : 280));
@@ -954,7 +962,8 @@ function mockApi(): CornetaApi {
       const t = startedAt + k * step;
       const minNow = (k * step) / 60000;
       let cpu = 46 + Math.sin(k / 9) * 7 + Math.random() * 5;
-      const gpu = 32 + Math.sin(k / 7) * 6 + Math.random() * 4;
+      let gpu = 32 + Math.sin(k / 7) * 6 + Math.random() * 4;
+      let memoryPct = 52 + Math.sin(k / 13) * 5 + Math.random() * 3;
       const targets = plats.map((p, i) => {
         let bitrate = Math.round(
           base[i % base.length] * (0.96 + Math.random() * 0.07),
@@ -968,7 +977,11 @@ function mockApi(): CornetaApi {
           bitrate = Math.round(base[i % base.length] * 0.3);
           state = "reconnecting";
           drops[i] += 25;
-          if (opts?.highCpu) cpu = 97;
+          if (opts?.highCpu) {
+            cpu = 97;
+            gpu = 98;
+            memoryPct = 78;
+          }
         }
         return {
           id: p.id,
@@ -981,11 +994,15 @@ function mockApi(): CornetaApi {
       });
       const incident =
         opts?.dropAtMin != null && Math.abs(minNow - opts.dropAtMin) < 0.18;
+      if (incident) {
+        renderSkipped += 12;
+        outputSkipped += 7;
+      }
       const obs = {
         activeFps: 60,
         avgRenderMs: incident ? 28 + Math.random() * 5 : 7 + Math.random() * 3,
-        renderSkipped: incident ? 40 : 0,
-        outputSkipped: incident ? 30 : 0,
+        renderSkipped,
+        outputSkipped,
         congestion: incident ? 0.6 + Math.random() * 0.2 : Math.random() * 0.06,
       };
       const nearRaid = Math.abs(minNow - raidAtMin) < 0.5;
@@ -1010,6 +1027,20 @@ function mockApi(): CornetaApi {
           t,
           cpu: Math.round(cpu * 10) / 10,
           gpu: Math.round(gpu * 10) / 10,
+          memoryPct: Math.round(memoryPct * 10) / 10,
+          ...(opts?.busyApp && k % 3 === 0
+            ? {
+                apps: [
+                  {
+                    appRef: opts.busyApp.toLowerCase().replace(/\s+/g, "-"),
+                    name: opts.busyApp,
+                    cpu: incident ? 43 : 26,
+                    memoryMb: incident ? 3900 : 3400,
+                    gpu3d: incident ? 96 : 55,
+                  },
+                ],
+              }
+            : {}),
           obs,
           chat,
           ...(Object.keys(chatBy).length ? { chatBy } : {}),
@@ -1119,6 +1150,7 @@ function mockApi(): CornetaApi {
       dropAtMin: 23,
       dropIdx: 0,
       highCpu: true,
+      busyApp: "Cyberpunk 2077",
     }); // com incidente
     saveSessions(m);
   };

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronRight, Eye, Shield, X } from "lucide-react";
-import { useStore } from "../lib/store";
+import { downTargets, useStore } from "../lib/store";
 import { fmtUptime } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
 
 /**
  * Faixa de status global ao vivo — viaja com o streamer em qualquer tela.
  * Reaproveita o visual da barra "JÁ VOLTO" (bloco sólido latão, borda grossa).
- * Aparece só quando `live`/`starting`; o estado também é anunciado pelo
+ * Aparece só quando `live`/`starting` (inclusive com o JÁ VOLTO do Guardião no ar,
+ * empilhada abaixo da faixa vermelha); o estado também é anunciado pelo
  * `aria-live` do shell (App), então aqui o foco é o relance visual.
  */
 export function LiveBar({ onOpen }: { onOpen: () => void }) {
@@ -15,7 +16,8 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const state = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const startedAt = useStore((s) => s.snapshot.startedAt);
-  const targets = useStore((s) => s.snapshot.targets);
+  // Mesmo filtro do aria-live do App: o chip e o anúncio contam as mesmas plataformas.
+  const down = useStore((s) => downTargets(s.snapshot));
   const viewersTotal = useStore((s) => s.viewers.total);
   const guardianOn = useStore(
     (s) => s.config?.settings.guardianEnabled ?? false,
@@ -46,12 +48,13 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   // no Chat/Mesa e o único sinal era uma pill minúscula no rodapé da sidebar.
   // Dispensável (X) — o erro persiste no snapshot até a próxima live, e a faixa em toda
   // tela pra sempre viraria ruído; a pill da sidebar continua contando a história.
+  // Sem aria-label no botão: ele substituiria o conteúdo visível (título, dica) no nome
+  // acessível. O que o clique faz vai num sr-only no fim, depois do que a faixa mostra.
   if (error && !errDismissed) {
     return (
       <div className="flex items-center border-b-2 border-bad bg-bad text-white">
         <button
           onClick={onOpen}
-          aria-label={t("golive.bar.error.aria")}
           className="flex min-w-0 flex-1 items-center gap-3 px-4 py-1.5 text-left"
         >
           <AlertTriangle className="size-4 shrink-0" />
@@ -64,6 +67,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
           <span className="flex items-center font-display text-xs font-extrabold uppercase">
             {t("golive.bar.panel")} <ChevronRight className="size-4" />
           </span>
+          <span className="sr-only">{t("golive.bar.error.aria")}</span>
         </button>
         <button
           onClick={() => setErrDismissed(true)}
@@ -80,12 +84,6 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   if (!live && !starting) return null;
 
   const secs = live && startedAt ? (now - startedAt) / 1000 : 0;
-  const down = Object.values(targets).filter(
-    (t) =>
-      t.state === "error" ||
-      t.state === "reconnecting" ||
-      t.state === "signal-lost",
-  ).length;
   const protections = [
     guardianOn && t("golive.bar.protection.guardian"),
     brbOn && t("golive.bar.protection.brb"),
@@ -96,7 +94,6 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
     <button
       onClick={onOpen}
       data-on-brass
-      aria-label={t("golive.bar.open.aria")}
       className="flex items-center gap-4 border-b-2 border-brass-ink bg-brass px-4 py-1.5 text-left text-brass-ink"
     >
       {live ? (
@@ -135,7 +132,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
       )}
 
       {down > 0 && (
-        <span className="flex items-center gap-1.5 rounded-sm bg-bad px-2 py-0.5 text-white">
+        <span className="flex items-center gap-1.5 rounded-sm bg-bad px-2 py-0.5 text-night">
           <AlertTriangle className="size-3.5" />
           <span className="text-[11px] font-bold uppercase tracking-wide">
             {t("golive.bar.down", { n: down })}
@@ -153,6 +150,9 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
           {t("golive.bar.panel")} <ChevronRight className="size-4" />
         </span>
       </span>
+      {/* Nome acessível = o conteúdo (cronômetro, viewers, plataformas fora) + o que o
+          clique faz. Um aria-label aqui apagaria tudo isso pro leitor de tela. */}
+      <span className="sr-only">{t("golive.bar.open.aria")}</span>
     </button>
   );
 }

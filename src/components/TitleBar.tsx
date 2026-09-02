@@ -3,6 +3,7 @@ import { Minus, Square, Copy, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
+import { useT } from "../lib/i18n";
 import { Mascot } from "./decor";
 
 async function getWin() {
@@ -11,6 +12,7 @@ async function getWin() {
 }
 
 export function TitleBar() {
+  const t = useT();
   const [maximized, setMaximized] = useState(false);
   // O X não fecha quando "minimizar pra bandeja" está ligado — o tooltip conta a verdade.
   const minimizeToTray = useStore(
@@ -55,12 +57,16 @@ export function TitleBar() {
       </div>
 
       <div className="flex h-full">
-        <WinBtn onClick={min} label="Minimizar">
+        <WinBtn onClick={min} label={t("chat.popout.win.minimize")}>
           <Minus className="size-4" strokeWidth={2.4} />
         </WinBtn>
         <WinBtn
           onClick={toggleMax}
-          label={maximized ? "Restaurar" : "Maximizar"}
+          label={
+            maximized
+              ? t("chat.popout.win.restore")
+              : t("chat.popout.win.maximize")
+          }
         >
           {maximized ? (
             <Copy className="size-3.5" strokeWidth={2.2} />
@@ -70,7 +76,11 @@ export function TitleBar() {
         </WinBtn>
         <WinBtn
           onClick={close}
-          label={minimizeToTray ? "Fechar (fica na bandeja)" : "Fechar"}
+          label={
+            minimizeToTray
+              ? t("shell.win.closeTray")
+              : t("chat.popout.win.close")
+          }
           danger
         >
           <X className="size-4" strokeWidth={2.4} />

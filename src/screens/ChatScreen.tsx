@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   AtSign,
@@ -21,6 +27,7 @@ import {
   Settings2,
   Smile,
   Trash2,
+  TriangleAlert,
   Tv2,
   Wifi,
   WifiOff,
@@ -216,6 +223,11 @@ export function ChatScreen() {
   const configured =
     sources.some((x) => x.enabled && x.value.trim()) ||
     alertSources.some((x) => x.enabled && x.hasToken);
+  // Fonte de alerta caída no meio da live parece "ninguém doou" — o painel avisa
+  // em vez de só ficar vazio. As chaves são o rótulo da fonte (nome ou kind).
+  const downAlertSources = Object.entries(alertStatuses)
+    .filter(([, x]) => x.status === "error" || x.status === "disconnected")
+    .map(([name]) => alertSourceLabel(name));
   // Plataformas que de fato entram no feed (fonte ligada e nomeada). Os chips de filtro
   // só fazem sentido com 2+ — com 1 só viram ruído (e o risco de filtrar sem religar).
   const feedPlatforms = [
@@ -472,27 +484,40 @@ export function ChatScreen() {
                     : t("chat.status.empty")}
               </span>
             ) : (
+              // Gatilho focável: o porquê do status abre no hover E no foco; "no ar"
+              // vai em sr-only pra bolinha verde não ser a única pista.
               Object.entries(statuses).map(([source, st]) => (
-                <span
+                <Tooltip
                   key={source}
-                  className="flex items-center gap-1.5 text-sm"
-                  title={t("chat.status.tooltip", {
+                  content={t("chat.status.tooltip", {
                     source,
                     explain: statusExplain(t, st.platform, st.status),
                   })}
                 >
-                  <PlatformGlyph id={st.platform as ChatPlatform} size={16} />
-                  <span
-                    className={cn("size-2 rounded-full", statusDot(st.status))}
-                    aria-hidden
-                  />
-                  <span className="text-ink-muted">{source}</span>
-                  {st.status !== "connected" && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-                      {statusLabel(t, st.status)}
-                    </span>
-                  )}
-                </span>
+                  <button
+                    type="button"
+                    className="flex cursor-help items-center gap-1.5 text-sm"
+                  >
+                    <PlatformGlyph id={st.platform as ChatPlatform} size={16} />
+                    <span
+                      className={cn(
+                        "size-2 rounded-full",
+                        statusDot(st.status),
+                      )}
+                      aria-hidden
+                    />
+                    <span className="text-ink-muted">{source}</span>
+                    {st.status !== "connected" ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                        {statusLabel(t, st.status)}
+                      </span>
+                    ) : (
+                      <span className="sr-only">
+                        {statusLabel(t, st.status)}
+                      </span>
+                    )}
+                  </button>
+                </Tooltip>
               ))
             )}
             {connected && hasErrored && (
@@ -557,6 +582,7 @@ export function ChatScreen() {
               variant="ghost"
               size="sm"
               onClick={() => setShowConfig(false)}
+              aria-label={t("encoding.close")}
             >
               <X className="size-4" />
             </Button>
@@ -1104,7 +1130,7 @@ export function ChatScreen() {
                   clearAlerts();
                 }}
                 className={cn(
-                  "text-xs font-bold transition-colors",
+                  "grid h-8 min-w-8 place-items-center rounded px-1 text-xs font-bold transition-colors",
                   confirmClearAlerts
                     ? "text-bad"
                     : "text-ink-faint hover:text-bad",
@@ -1114,7 +1140,11 @@ export function ChatScreen() {
                     ? t("chat.alerts.clear.confirmTitle")
                     : t("chat.alerts.clear.title")
                 }
-                aria-label={t("chat.alerts.clear.title")}
+                // Com o "Limpar?" na tela, o texto é o nome do botão; o aria-label
+                // só cobre o estado em que sobra o ícone.
+                aria-label={
+                  confirmClearAlerts ? undefined : t("chat.alerts.clear.title")
+                }
               >
                 {confirmClearAlerts ? (
                   t("chat.alerts.clear.confirmLabel")
@@ -1123,6 +1153,27 @@ export function ChatScreen() {
                 )}
               </button>
             </div>
+            {downAlertSources.length > 0 && (
+              <div
+                role="status"
+                className="flex flex-col gap-1 border-b-2 border-border-soft bg-warn/10 px-3 py-1.5 text-[11px] text-ink-muted"
+              >
+                {downAlertSources.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      setConfigTab("alertas");
+                      setShowConfig(true);
+                    }}
+                    className="flex items-start gap-1.5 text-left font-semibold hover:underline"
+                  >
+                    <TriangleAlert className="mt-px size-3.5 shrink-0 text-warn" />
+                    <span>{t("chat.alerts.sourceDown", { source: name })}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <AlertsFeed
               alerts={alerts}
               className="flex-1"
@@ -1138,6 +1189,7 @@ export function ChatScreen() {
             {sendableSources.length > 1 && (
               <Select
                 className="w-40 shrink-0"
+                aria-label={t("chat.send.target.aria")}
                 value={effectiveSendTo}
                 options={[
                   { value: "all", label: t("chat.send.target.all") },
@@ -1159,6 +1211,7 @@ export function ChatScreen() {
                 }
               }}
               placeholder={t("chat.send.placeholder")}
+              aria-label={t("chat.send.placeholder")}
               className="flex-1"
             />
             <Button
@@ -1209,6 +1262,8 @@ function FilterChip({
 }) {
   return (
     <button
+      type="button"
+      aria-pressed={on}
       onClick={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded-md border-2 px-2.5 py-1 text-xs font-bold transition-colors",
@@ -1345,22 +1400,33 @@ function OverlayCard({
   const enabled = settings.overlayEnabled ?? false;
   const [info, setInfo] = useState<OverlayInfo | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
 
   // O backend sobe o servidor no boot quando ligado; aqui só buscamos as URLs pra exibir.
+  const fetchInfo = useCallback(async () => {
+    if (!IS_TAURI) return;
+    setFetching(true);
+    try {
+      const i = await api.overlayStatus();
+      setInfo(i);
+      setFetchFailed(!i);
+    } catch {
+      setFetchFailed(true);
+    } finally {
+      setFetching(false);
+    }
+  }, []);
+  // Busca quando o overlay liga e de novo quando a janela volta ao foco — a
+  // chamada pode ter falhado com o servidor ainda subindo, e a saída tem que
+  // ser um botão aqui, não "reabra a aba".
   useEffect(() => {
     if (!IS_TAURI || !enabled) return;
-    let alive = true;
-    api
-      .overlayStatus()
-      .then((i) => {
-        if (alive && i) setInfo(i);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void fetchInfo();
+    const onFocus = () => void fetchInfo();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [enabled, fetchInfo]);
 
   const alertUrl = info
     ? `${info.url}?sound=${(settings.overlaySound ?? true) ? 1 : 0}` +
@@ -1384,8 +1450,10 @@ function OverlayCard({
     if (!IS_TAURI) return;
     setBusy(true);
     try {
-      if (on) setInfo(await api.overlayStart());
-      else {
+      if (on) {
+        setInfo(await api.overlayStart());
+        setFetchFailed(false);
+      } else {
         await api.overlayStop();
         setInfo(null);
       }
@@ -1423,8 +1491,21 @@ function OverlayCard({
             {t("chat.account.desktopOnly")}
           </p>
         ) : !info ? (
-          <div className="rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
-            {busy ? t("chat.overlay.starting") : t("chat.overlay.reopenTab")}
+          <div className="flex flex-col items-center gap-2 rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
+            {busy || fetching || !fetchFailed ? (
+              t("chat.overlay.starting")
+            ) : (
+              <>
+                {t("chat.overlay.fetchError")}
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => void fetchInfo()}
+                >
+                  <RefreshCw className="size-3.5" /> {t("golive.error.retry")}
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -1567,15 +1648,20 @@ function ToggleRow({
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
+  // A dica é texto visível (não `title`): teclado e leitor de tela também recebem.
   return (
-    <div
-      className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-2.5 py-2"
-      title={hint}
-    >
+    <div className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-2.5 py-2">
       <span className="flex min-w-0 items-center gap-2">
         <Icon className="size-4 shrink-0 text-brass" />
-        <span className="truncate text-sm font-semibold text-ink-muted">
-          {label}
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-semibold text-ink-muted">
+            {label}
+          </span>
+          {hint && (
+            <span className="text-[11px] leading-snug text-ink-faint">
+              {hint}
+            </span>
+          )}
         </span>
       </span>
       <Toggle checked={checked} onChange={onChange} label={label} />
@@ -1665,7 +1751,9 @@ function SourceCard({
           <Toggle
             checked={src.enabled}
             onChange={(v) => onChange({ enabled: v })}
-            label={t("chat.source.toggle")}
+            label={t("chat.source.toggle", {
+              name: src.name.trim() || src.value.trim() || platLabel,
+            })}
           />
           <Collapsible.Trigger asChild>
             <button
@@ -1693,6 +1781,7 @@ function SourceCard({
               className="w-36"
               value={src.platform}
               options={PLATFORM_OPTS}
+              aria-label={t("chat.source.platformLabel")}
               onChange={(v) =>
                 onChange({
                   platform: v as ChatPlatform,
@@ -1779,6 +1868,11 @@ const ALERT_META: Record<
   },
 };
 
+// O status vem indexado por nome ou, sem apelido, pelo kind (ex.: "streamlabs") —
+// na tela sai o nome do produto.
+const alertSourceLabel = (name: string) =>
+  name in ALERT_META ? ALERT_META[name as AlertSourceKind].label : name;
+
 // As chaves vêm do backend (alert://status) — só os rótulos são copy.
 const ALERT_STATUS: Record<string, MessageKey> = {
   connected: "chat.alertsrc.status.live",
@@ -1814,20 +1908,26 @@ function YoutubeApiKeyField({
       setTesting(false);
     }
   };
+  // Não é <label>: o gatilho do tooltip é um <button> e viria antes do input na
+  // ordem do DOM — o rótulo passaria a nomear o botão. O input recebe o nome direto.
   return (
-    <label className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
+    <div className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
       <span className="flex flex-wrap items-center gap-1.5">
         <PlatformGlyph id="youtube" size={14} />{" "}
         {t("chat.youtube.apikey.label")}
         <Tooltip content={t("chat.youtube.apikey.tooltip")}>
-          <span className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2">
+          <button
+            type="button"
+            className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2"
+          >
             {t("chat.youtube.apikey.optional")}
-          </span>
+          </button>
         </Tooltip>
       </span>
       <div className="flex items-center gap-2">
         <input
           value={value}
+          aria-label={t("chat.youtube.apikey.label")}
           placeholder={t("chat.youtube.apikey.placeholder")}
           onChange={(e) => onChange(e.target.value)}
           onBlur={(e) => {
@@ -1859,7 +1959,7 @@ function YoutubeApiKeyField({
           {result.ok ? "✓" : "✕"} {result.msg}
         </span>
       )}
-    </label>
+    </div>
   );
 }
 
@@ -1955,7 +2055,9 @@ function AlertSourceCard({
           <Toggle
             checked={src.enabled}
             onChange={(v) => onChange({ enabled: v })}
-            label={t("chat.source.toggle")}
+            label={t("chat.source.toggle", {
+              name: src.name.trim() || meta.label,
+            })}
           />
           <Collapsible.Trigger asChild>
             <button
@@ -1981,6 +2083,7 @@ function AlertSourceCard({
                 type="password"
                 autoFocus
                 placeholder={meta.placeholder}
+                aria-label={`${meta.label} — ${meta.placeholder}`}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 onKeyDown={(e) =>
@@ -2228,10 +2331,12 @@ function YoutubeCredsForm({
       )}
 
       <div className="flex flex-col gap-2">
+        {/* Nomes acessíveis só com nome de produto e de campo — iguais nos dois idiomas. */}
         <Input
           name="youtube-client-id"
           autoComplete="off"
           placeholder="Client ID"
+          aria-label="YouTube — Client ID"
           value={id}
           onChange={(e) => setId(e.target.value)}
         />
@@ -2241,6 +2346,7 @@ function YoutubeCredsForm({
             name="youtube-client-secret"
             autoComplete="off"
             placeholder="Client Secret"
+            aria-label="YouTube — Client Secret"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && can && save()}
@@ -2307,6 +2413,7 @@ function KickCredsForm({
           name="kick-client-id"
           autoComplete="off"
           placeholder="Client ID"
+          aria-label="Kick — Client ID"
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
         />
@@ -2316,6 +2423,7 @@ function KickCredsForm({
             autoComplete="off"
             type="password"
             placeholder="Client Secret"
+            aria-label="Kick — Client Secret"
             value={clientSecret}
             onChange={(e) => setClientSecret(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && canSave && save()}

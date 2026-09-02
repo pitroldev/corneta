@@ -116,10 +116,46 @@ describe("parseSession", () => {
     expect(hasObs(comObs)).toBe(true);
     expect(hasChat(comObs)).toBe(true);
   });
+
+  it("lê apps de forma limitada e remove caminhos da fronteira do relatório", () => {
+    const d = parseSession(
+      nd([
+        { kind: "meta", id: "apps", startedAt: 0, platforms: [] },
+        {
+          kind: "sample",
+          t: 1000,
+          memoryPct: 94.2,
+          apps: [
+            {
+              appRef: "game",
+              name: "C:\\Games\\MeuJogo.exe",
+              cpu: 101,
+              memoryMb: 4096,
+              gpu3d: 92.3,
+            },
+          ],
+          targets: [],
+        },
+      ]),
+      t,
+    )!;
+
+    expect(d.samples[0].memoryPct).toBe(94.2);
+    expect(d.samples[0].apps).toEqual([
+      {
+        appRef: "game",
+        name: "MeuJogo.exe",
+        cpu: 100,
+        memoryMb: 4096,
+        gpu3d: 92.3,
+        gpuEncode: undefined,
+      },
+    ]);
+  });
 });
 
 describe("problem windows", () => {
-  const resourceSession = (avgRenderMs: number) =>
+  const resourceSession = (avgRenderMs: number, withBusyApp = false) =>
     parseSession(
       nd([
         {
@@ -134,6 +170,18 @@ describe("problem windows", () => {
           t: 1000 + index * 2000,
           cpu: 99,
           gpu: 99,
+          apps:
+            withBusyApp && index % 3 === 0
+              ? [
+                  {
+                    appRef: "meujogo",
+                    name: "MeuJogo",
+                    cpu: 25,
+                    memoryMb: 2400,
+                    gpu3d: 97,
+                  },
+                ]
+              : undefined,
           obs: {
             activeFps: 60,
             avgRenderMs,
@@ -158,7 +206,7 @@ describe("problem windows", () => {
     )!;
 
   it("não transforma CPU/GPU alta com transmissão saudável em incidente", () => {
-    const analysis = analyze(resourceSession(4), t);
+    const analysis = analyze(resourceSession(4, true), t);
     expect(analysis.windows).toEqual([]);
     // A saturação continua registrada como contexto técnico no log e no gráfico.
     expect(analysis.events.some((event) => event.kind === "cpu")).toBe(true);
@@ -168,6 +216,268 @@ describe("problem windows", () => {
     const analysis = analyze(resourceSession(30), t);
     expect(analysis.windows).toHaveLength(1);
     expect(analysis.windows[0].causeKind).toBe("encoding");
+  });
+
+  it("aponta o aplicativo quando pressão e quadros atrasados coincidem", () => {
+    const session = parseSession(
+      nd([
+        {
+          kind: "meta",
+          id: "app-cause",
+          startedAt: 0,
+          mode: "per-platform",
+          platforms: [{ id: "twitch", platformId: "twitch", name: "Twitch" }],
+        },
+        ...Array.from({ length: 12 }, (_, index) => ({
+          kind: "sample",
+          t: 1000 + index * 2000,
+          cpu: 88,
+          gpu: 98,
+          apps:
+            index % 3 === 0
+              ? [
+                  {
+                    appRef: "meujogo",
+                    name: "MeuJogo",
+                    cpu: 35,
+                    memoryMb: 3200,
+                    gpu3d: 96,
+                  },
+                ]
+              : undefined,
+          obs: {
+            activeFps: 60,
+            avgRenderMs: 31,
+            renderSkipped: index * 12,
+            outputSkipped: 0,
+            congestion: 0,
+          },
+          targets: [
+            {
+              id: "twitch",
+              name: "Twitch",
+              state: "live",
+              bitrate: 6000,
+              dropped: 0,
+              fps: 60,
+            },
+          ],
+        })),
+        { kind: "end", endedAt: 25000 },
+      ]),
+      t,
+    )!;
+
+    const analysis = analyze(session, t);
+    expect(analysis.windows).toHaveLength(1);
+    expect(analysis.windows[0].causeKind).toBe("app");
+    expect(analysis.windows[0].confidence).toBe("high");
+    expect(analysis.windows[0].contributingApp).toBe("MeuJogo");
+    expect(analysis.windows[0].cause).toContain("MeuJogo");
+    expect(analysis.windows[0].signals.join(" ")).toContain("placa de vídeo");
+  });
+
+  it("usa a amostra imediatamente anterior quando a pressão vem antes do atraso", () => {
+    const session = parseSession(
+      nd([
+        {
+          kind: "meta",
+          id: "temporal-cause",
+          startedAt: 0,
+          mode: "per-platform",
+          platforms: [{ id: "twitch", platformId: "twitch", name: "Twitch" }],
+        },
+        {
+          kind: "sample",
+          t: 1000,
+          cpu: 80,
+          gpu: 97,
+          apps: [
+            {
+              appRef: "meujogo",
+              name: "MeuJogo",
+              cpu: 30,
+              memoryMb: 2800,
+              gpu3d: 96,
+            },
+          ],
+          obs: {
+            activeFps: 60,
+            avgRenderMs: 7,
+            renderSkipped: 0,
+            outputSkipped: 0,
+            congestion: 0,
+          },
+          targets: [
+            {
+              id: "twitch",
+              name: "Twitch",
+              state: "live",
+              bitrate: 6000,
+              dropped: 0,
+              fps: 60,
+            },
+          ],
+        },
+        {
+          kind: "sample",
+          t: 3000,
+          cpu: 82,
+          gpu: 97,
+          obs: {
+            activeFps: 60,
+            avgRenderMs: 7,
+            renderSkipped: 40,
+            outputSkipped: 0,
+            congestion: 0,
+          },
+          targets: [
+            {
+              id: "twitch",
+              name: "Twitch",
+              state: "live",
+              bitrate: 6000,
+              dropped: 0,
+              fps: 60,
+            },
+          ],
+        },
+        { kind: "end", endedAt: 5000 },
+      ]),
+      t,
+    )!;
+
+    const analysis = analyze(session, t);
+    expect(analysis.windows).toHaveLength(1);
+    expect(analysis.windows[0].causeKind).toBe("app");
+    expect(analysis.windows[0].contributingApp).toBe("MeuJogo");
+  });
+
+  it("não culpa um aplicativo visto muito antes de um atraso de render", () => {
+    const session = parseSession(
+      nd([
+        {
+          kind: "meta",
+          id: "stale-app-pressure",
+          startedAt: 0,
+          mode: "per-platform",
+          platforms: [{ id: "twitch", platformId: "twitch", name: "Twitch" }],
+        },
+        {
+          kind: "sample",
+          t: 1000,
+          cpu: 85,
+          gpu: 97,
+          apps: [
+            {
+              appRef: "editor",
+              name: "Editor",
+              cpu: 30,
+              memoryMb: 2500,
+              gpu3d: 95,
+            },
+          ],
+          obs: {
+            activeFps: 60,
+            avgRenderMs: 7,
+            renderSkipped: 0,
+            outputSkipped: 0,
+            congestion: 0,
+          },
+          targets: [],
+        },
+        ...[60_000, 72_000].map((timestamp) => ({
+          kind: "sample",
+          t: timestamp,
+          cpu: 35,
+          gpu: 30,
+          obs: {
+            activeFps: 60,
+            avgRenderMs: 32,
+            renderSkipped: 0,
+            outputSkipped: 0,
+            congestion: 0,
+          },
+          targets: [],
+        })),
+        { kind: "end", endedAt: 74_000 },
+      ]),
+      t,
+    )!;
+
+    const analysis = analyze(session, t);
+    expect(analysis.windows).toHaveLength(1);
+    expect(analysis.windows[0].causeKind).toBe("render");
+    expect(analysis.windows[0].contributingApp).toBeUndefined();
+  });
+
+  it("resume pelo aplicativo dominante sem atribuir a ele incidentes de outro app", () => {
+    let skipped = 0;
+    const incidentApps = new Map([
+      [1, "Editor"],
+      [4, "MeuJogo"],
+      [7, "MeuJogo"],
+    ]);
+    const session = parseSession(
+      nd([
+        {
+          kind: "meta",
+          id: "multiple-app-causes",
+          startedAt: 0,
+          mode: "per-platform",
+          platforms: [{ id: "twitch", platformId: "twitch", name: "Twitch" }],
+        },
+        ...Array.from({ length: 8 }, (_, index) => {
+          const app = incidentApps.get(index);
+          if (app) skipped += 40;
+          return {
+            kind: "sample",
+            t: 1000 + index * 2000,
+            cpu: app ? 88 : 35,
+            gpu: app ? 96 : 30,
+            ...(app
+              ? {
+                  apps: [
+                    {
+                      appRef: app.toLowerCase(),
+                      name: app,
+                      cpu: 35,
+                      memoryMb: 2800,
+                      gpu3d: 94,
+                    },
+                  ],
+                }
+              : {}),
+            obs: {
+              activeFps: 60,
+              avgRenderMs: 7,
+              renderSkipped: skipped,
+              outputSkipped: 0,
+              congestion: 0,
+            },
+            targets: [
+              {
+                id: "twitch",
+                name: "Twitch",
+                state: "live",
+                bitrate: 6000,
+                dropped: 0,
+                fps: 60,
+              },
+            ],
+          };
+        }),
+        { kind: "end", endedAt: 17_000 },
+      ]),
+      t,
+    )!;
+
+    const analysis = analyze(session, t);
+    expect(analysis.windows).toHaveLength(3);
+    expect(analysis.verdict.title).toContain("MeuJogo");
+    expect(analysis.verdict.detail).toContain("Em 2 trechos");
+    expect(analysis.verdict.detail).toContain("2s no total");
+    expect(analysis.verdict.detail).not.toContain("Em 3 trechos");
   });
 });
 

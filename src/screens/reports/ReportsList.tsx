@@ -18,9 +18,10 @@ import type { SessionMeta, SessionSummary } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
 import { Button, Card, EmptyState, PlatformGlyph } from "../../components/ui";
 
+/** `summaries[id]`: ausente = ainda lendo · `null` = arquivo ilegível · resumo = lido. */
 interface ReportsListProps {
   sessions: SessionMeta[] | null;
-  summaries: Record<string, SessionSummary>;
+  summaries: Record<string, SessionSummary | null>;
   error: boolean;
   onRetry: () => void;
   onSelect: (id: string) => void;
@@ -144,7 +145,7 @@ const FeaturedSession = memo(function FeaturedSession({
   onSelect,
 }: {
   meta: SessionMeta;
-  summary?: SessionSummary;
+  summary?: SessionSummary | null;
   onSelect: (id: string) => void;
 }) {
   const { t, fmt } = useI18n();
@@ -200,7 +201,18 @@ const FeaturedSession = memo(function FeaturedSession({
           </div>
 
           <div className="flex flex-col justify-between p-6 sm:p-7">
-            {summary?.hasData ? (
+            {summary === undefined ? (
+              <div className="space-y-3" aria-hidden>
+                <div className="h-9 animate-pulse rounded bg-surface-2" />
+                <div className="h-9 animate-pulse rounded bg-surface-2" />
+                <div className="h-9 animate-pulse rounded bg-surface-2" />
+              </div>
+            ) : summary === null ? (
+              <p className="text-sm text-ink-muted">
+                {t("reports.detail.error.read")}
+              </p>
+            ) : summary.hasData &&
+              (summary.peakViewers != null || summary.chatTotal != null) ? (
               <dl className="divide-y divide-border-soft">
                 {summary.peakViewers != null ? (
                   <FeaturedMetric
@@ -217,11 +229,11 @@ const FeaturedSession = memo(function FeaturedSession({
                 ) : null}
               </dl>
             ) : (
-              <div className="space-y-3" aria-hidden>
-                <div className="h-9 animate-pulse rounded bg-surface-2" />
-                <div className="h-9 animate-pulse rounded bg-surface-2" />
-                <div className="h-9 animate-pulse rounded bg-surface-2" />
-              </div>
+              // Live curta ou sem viewers: número não vem, e barra pulsando pra sempre
+              // seria um erro disfarçado de espera.
+              <p className="text-sm text-ink-muted">
+                {t("reports.list.noData")}
+              </p>
             )}
             <span className="mt-6 inline-flex items-center justify-end gap-2 font-display text-sm font-extrabold text-brass">
               {t("reports.list.openStory")}
@@ -266,7 +278,7 @@ const SessionRow = memo(function SessionRow({
   onSelect,
 }: {
   meta: SessionMeta;
-  summary?: SessionSummary;
+  summary?: SessionSummary | null;
   onSelect: (id: string) => void;
 }) {
   const { t, fmt } = useI18n();

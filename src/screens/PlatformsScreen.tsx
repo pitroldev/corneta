@@ -219,7 +219,14 @@ function ProfileBar() {
           );
         })}
 
-        <Button variant="subtle" size="sm" className="h-9" onClick={addProfile}>
+        <Button
+          variant="subtle"
+          size="sm"
+          className="h-9"
+          onClick={() =>
+            addProfile((n) => t("platforms.profile.defaultNew", { n }))
+          }
+        >
           <Plus className="size-4" strokeWidth={2.6} />{" "}
           {t("platforms.profile.new")}
         </Button>
@@ -418,10 +425,13 @@ function TargetRow({
       dragControls={controls}
       layout="position"
     >
+      {/* Desligada = fundo rebaixado + glifo esmaecido. Nunca opacidade no cartão
+          inteiro: o nome, o selo e o interruptor continuam operáveis e precisam de
+          contraste pra ser lidos. */}
       <Card
         className={cn(
-          "transition-opacity",
-          !target.enabled && "opacity-50",
+          "transition-colors",
+          !target.enabled && "bg-surface-2",
           blocking.length > 0 &&
             (keyOnlyPending
               ? "border-l-4 border-warn"
@@ -447,7 +457,15 @@ function TargetRow({
             >
               <GripVertical className="size-5" />
             </button>
-            <PlatformGlyph id={target.platformId} />
+            <div
+              aria-hidden
+              className={cn(
+                "shrink-0 transition-opacity",
+                !target.enabled && "opacity-50",
+              )}
+            >
+              <PlatformGlyph id={target.platformId} />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <input
@@ -474,11 +492,16 @@ function TargetRow({
                 {urlOk ? target.ingestUrl : t("platforms.target.urlUnset")}
               </div>
             </div>
+            {!target.enabled && (
+              <Badge tone="neutral">{t("platforms.target.badge.off")}</Badge>
+            )}
             <Badge tone={readiness.tone}>{readiness.label}</Badge>
             <Toggle
               checked={target.enabled}
               onChange={() => toggleTarget(target.id)}
-              label={t("platforms.target.enableAria")}
+              label={t("platforms.target.enableAria", {
+                name: target.name.trim() || platformName(target.platformId, t),
+              })}
             />
             <Collapsible.Trigger asChild>
               <button
@@ -554,10 +577,10 @@ function TargetRow({
                 variant="subtle"
                 size="sm"
                 onClick={runTest}
-                disabled={testing}
+                loading={testing}
                 title={t("platforms.target.test.title")}
               >
-                <Wifi className="size-3.5" />{" "}
+                {!testing && <Wifi className="size-3.5" />}{" "}
                 {testing
                   ? t("platforms.target.test.running")
                   : t("platforms.target.test.cta")}
@@ -580,16 +603,22 @@ function TargetRow({
                   <Crop className="size-3.5" /> {t("platforms.target.reframe")}
                 </button>
               )}
-              {testResult &&
-                (testResult.ok ? (
-                  <span className="font-medium text-ink-muted">
-                    {t("platforms.target.test.ok", { msg: testResult.msg })}
-                  </span>
-                ) : (
-                  <span className="font-semibold text-bad">
-                    ✕ {testResult.msg}
-                  </span>
-                ))}
+              {/* Região viva sempre montada: o leitor de tela só anuncia o veredito
+                  se o role="status" já existia antes do resultado chegar. */}
+              <span
+                role="status"
+                className={cn(
+                  testResult?.ok === true && "font-medium text-ink-muted",
+                  testResult?.ok === false && "font-semibold text-bad",
+                )}
+              >
+                {testResult &&
+                  (testResult.ok ? (
+                    t("platforms.target.test.ok", { msg: testResult.msg })
+                  ) : (
+                    <>✕ {testResult.msg}</>
+                  ))}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -789,7 +818,7 @@ function KeyField({
         <button
           type="button"
           onClick={() => setReveal((v) => !v)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+          className="absolute right-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-ink-faint hover:text-ink"
           aria-label={
             reveal ? t("platforms.key.hide") : t("platforms.key.show")
           }
@@ -815,7 +844,13 @@ function KeyField({
         {t("platforms.key.save")}
       </Button>
       {editing && (
-        <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditing(false)}
+          aria-label={t("platforms.key.cancelEdit")}
+          title={t("platforms.key.cancelEdit")}
+        >
           <X className="size-4" />
         </Button>
       )}
@@ -845,7 +880,12 @@ function PlatformPicker({
         <h3 id="picker-title" className="text-xl">
           {t("platforms.picker.title")}
         </h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          aria-label={t("encoding.close")}
+        >
           <X className="size-4" />
         </Button>
       </div>

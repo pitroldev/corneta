@@ -118,6 +118,7 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
         message: None,
         cpu,
         gpu: None,
+        memory_pct: Some(61.5),
         obs: None,
         forced_brb: false,
     }
@@ -127,13 +128,15 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
 /// linha engordaria o NDJSON sem dizer nada além do que o `chat: 0` já diz.
 #[test]
 fn amostra_sem_conversa_nao_carrega_o_mapa_por_canal() {
-    let linha = domain::sample_line(100, &snapshot(Some(42.0)), &HashMap::new());
+    let linha = domain::sample_line(100, &snapshot(Some(42.0)), &HashMap::new(), &[]);
     assert_eq!(linha["chat"], 0);
     assert!(linha.get("chatBy").is_none());
     assert_eq!(linha["kind"], "sample");
     assert_eq!(linha["t"], 100);
     assert_eq!(linha["cpu"], 42.0);
+    assert_eq!(linha["memoryPct"], 61.5);
     assert_eq!(linha["targets"][0]["dropped"], 3);
+    assert!(linha.get("apps").is_none());
 }
 
 /// `chat` é o TOTAL e continua existindo: relatório gravado antes da segregação por canal
@@ -143,10 +146,27 @@ fn amostra_soma_o_total_e_preserva_a_quebra_por_canal() {
     let mut por_canal = HashMap::new();
     por_canal.insert("twitch:fulano".to_string(), 7u64);
     por_canal.insert("kick:fulano".to_string(), 5u64);
-    let linha = domain::sample_line(100, &snapshot(None), &por_canal);
+    let linha = domain::sample_line(100, &snapshot(None), &por_canal, &[]);
     assert_eq!(linha["chat"], 12);
     assert_eq!(linha["chatBy"]["twitch:fulano"], 7);
     assert_eq!(linha["chatBy"]["kick:fulano"], 5);
+}
+
+#[test]
+fn amostra_grava_so_os_aplicativos_relevantes_recebidos() {
+    let apps = vec![crate::resources::ResourceAppSample {
+        app_ref: "meujogo".into(),
+        name: "MeuJogo".into(),
+        cpu: 12.5,
+        memory_mb: 2048.0,
+        gpu_3d: Some(94.2),
+        gpu_encode: None,
+    }];
+    let linha = domain::sample_line(100, &snapshot(None), &HashMap::new(), &apps);
+    assert_eq!(linha["apps"][0]["appRef"], "meujogo");
+    assert_eq!(linha["apps"][0]["name"], "MeuJogo");
+    assert_eq!(linha["apps"][0]["gpu3d"], 94.2);
+    assert!(linha["apps"][0].get("gpuEncode").is_none());
 }
 
 /// Sem canal que exponha o contador, não há linha — em vez de uma linha vazia que a
@@ -194,7 +214,7 @@ fn rec_end_de_recuperacao_nao_inventa_segmento() {
 #[test]
 fn cabecalho_declara_a_versao_do_esquema() {
     let linha = domain::meta_line(1721400000000, "multi", vec![json!({ "id": "t1" })]);
-    assert_eq!(linha["schemaVersion"], 3);
+    assert_eq!(linha["schemaVersion"], 4);
     assert_eq!(linha["id"], "1721400000000");
     assert_eq!(linha["startedAt"], 1721400000000u64);
     assert_eq!(linha["mode"], "multi");

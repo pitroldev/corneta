@@ -91,7 +91,7 @@ const AlertRow = memo(function AlertRow({
         accent.bar,
       )}
     >
-      <span className="leading-none" style={{ fontSize: "1.25em" }}>
+      <span className="leading-none" style={{ fontSize: "1.25em" }} aria-hidden>
         {meta.emoji}
       </span>
       <div className="min-w-0 flex-1">
@@ -153,12 +153,20 @@ export function AlertsFeed({
 }) {
   const { t } = useI18n();
   const list = useMemo(() => [...alerts].reverse(), [alerts]);
+  // role="log" + aria-live: doação, raid e sub são anunciados quando chegam.
   return (
-    <div className={cn("overflow-y-auto [scrollbar-gutter:stable]", className)}>
+    <div
+      role="log"
+      aria-live="polite"
+      aria-label={t("chat.alerts.button")}
+      className={cn("overflow-y-auto [scrollbar-gutter:stable]", className)}
+    >
       {list.length === 0 ? (
         <div className="grid h-full place-items-center p-5 text-center text-sm text-ink-faint">
           <div>
-            <div className="mb-1 text-2xl">🔔</div>
+            <div className="mb-1 text-2xl" aria-hidden>
+              🔔
+            </div>
             {t("chat.alerts.empty")}
           </div>
         </div>

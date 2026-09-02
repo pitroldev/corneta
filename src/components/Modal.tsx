@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../lib/utils";
 
@@ -14,6 +14,8 @@ function fromRadixPopper(target: EventTarget | null): boolean {
  * portal — a11y de graça. O visual (bloco sólido, sombra dura) continua nosso.
  * `title` vira o nome acessível (Dialog.Title sr-only); o título visível segue
  * dentro de `children`. `lockOutside` bloqueia o fechar-clicando-fora e o Esc.
+ * `initialFocusRef` escolhe onde o foco cai ao abrir — sem ele o Radix foca o
+ * primeiro focável, que em modais com X no canto é justamente o botão de fechar.
  */
 export function Modal({
   title,
@@ -21,12 +23,14 @@ export function Modal({
   children,
   className,
   lockOutside = false,
+  initialFocusRef,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   className?: string;
   lockOutside?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   return (
     <Dialog.Root
@@ -49,6 +53,12 @@ export function Modal({
           }}
           onEscapeKeyDown={(e) => {
             if (lockOutside) e.preventDefault();
+          }}
+          onOpenAutoFocus={(e) => {
+            const el = initialFocusRef?.current;
+            if (!el) return;
+            e.preventDefault();
+            el.focus();
           }}
           className={cn(
             "fixed left-1/2 top-1/2 z-[90] max-h-[90vh] w-[calc(100%-3rem)] -translate-x-1/2 -translate-y-1/2 overscroll-contain overflow-y-auto outline-none",

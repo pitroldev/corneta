@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
@@ -83,6 +83,8 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
+  // Foco inicial no título: o primeiro focável do DOM é o X de fechar.
+  const titleRef = useRef<HTMLHeadingElement>(null);
 
   const help = error ? obsErrorHelp(t, error) : null;
 
@@ -110,6 +112,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
       title={t("encoding.wizard.title")}
       onClose={onClose}
       className="max-w-lg rounded-xl bg-surface pop"
+      initialFocusRef={titleRef}
     >
       <div className="sticky top-0 flex items-center justify-between bg-brass px-5 py-4 text-brass-ink">
         <div className="flex items-center gap-3">
@@ -117,7 +120,12 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             <Plug className="size-5" strokeWidth={2.3} />
           </div>
           <div>
-            <h2 id="obs-wizard-title" className="text-xl">
+            <h2
+              id="obs-wizard-title"
+              ref={titleRef}
+              tabIndex={-1}
+              className="text-xl outline-none"
+            >
               {t("encoding.wizard.title")}
             </h2>
             <p className="text-xs font-semibold opacity-80">
@@ -143,6 +151,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           {bold(t, "encoding.wizard.step2.body")}
           <Input
             type="password"
+            aria-label={t("encoding.wizard.step2.title")}
             placeholder={t("encoding.wizard.step2.placeholder")}
             className="mt-2"
             value={settings.obsPassword}
@@ -158,8 +167,13 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             : bold(t, "encoding.wizard.step3.body.manual")}
         </Step>
 
+        {/* Os dois blocos montam depois do clique: role=status/alert faz o leitor de
+            tela anunciar o resultado sem a pessoa precisar sair do botão. */}
         {status === "ok" && (
-          <div className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok">
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok"
+          >
             <Check className="size-4 shrink-0" strokeWidth={2.6} />{" "}
             {settings.autoStartObs
               ? bold(t, "encoding.wizard.ok.autostart")
@@ -167,7 +181,10 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {status === "error" && help && (
-          <div className="rounded-md border-2 border-bad/40 bg-bad/10 p-3">
+          <div
+            role="alert"
+            className="rounded-md border-2 border-bad/40 bg-bad/10 p-3"
+          >
             <div className="flex items-center gap-2 font-display font-bold text-bad">
               <AlertTriangle className="size-4 shrink-0" /> {help.title}
             </div>

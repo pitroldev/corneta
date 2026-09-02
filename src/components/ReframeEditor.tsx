@@ -119,7 +119,11 @@ export function ReframeEditor({
     onClose();
   };
 
-  const anyLive = useStore((s) => s.viewers.anyLive);
+  // "Tem vídeo do OBS chegando?" — é o bit que o Rust publica no snapshot, não a
+  // contagem de viewers do chat (que pode existir sem OBS e faltar com OBS). Serve só
+  // pra escolher a dica: o botão de captura fica sempre ligado e, sem sinal, o backend
+  // responde com o aviso certo.
+  const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   // Mudou algo? (pra não descartar sem querer no clique fora)
   const dirty =
     x !== init.x || y !== init.y || zoom !== init.zoom || frame != null;
@@ -277,8 +281,6 @@ export function ReframeEditor({
           size="sm"
           onClick={capture}
           loading={capturing}
-          disabled={capturing || !anyLive}
-          title={!anyLive ? t("platforms.reframe.needLive") : undefined}
         >
           {!capturing && <Camera className="size-4" />}
           {t("platforms.reframe.capture")}
@@ -293,7 +295,7 @@ export function ReframeEditor({
         </div>
       </div>
       <p className="mt-2 text-center text-xs text-ink-faint">
-        {anyLive
+        {ingestLive
           ? t("platforms.reframe.hint.live")
           : t("platforms.reframe.hint.offline")}
       </p>

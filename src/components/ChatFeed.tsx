@@ -266,11 +266,12 @@ const MsgRow = memo(function MsgRow({
   modLevel,
   onModerate,
 }: MsgRowProps) {
+  const t = useT();
   if (m.deleted) {
     return (
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-1 leading-snug">
         <span className="shrink-0 rounded-sm bg-bad/15 px-1 text-[9px] font-extrabold uppercase leading-4 text-bad">
-          removida
+          {t("chat.feed.deleted.stamp")}
         </span>
         <span
           className="font-bold line-through opacity-60"
@@ -279,7 +280,7 @@ const MsgRow = memo(function MsgRow({
           {m.author}
         </span>
         <span className="text-ink-faint line-through opacity-60">
-          um moderador apagou esta mensagem
+          {t("chat.feed.deleted.body")}
         </span>
       </div>
     );
@@ -353,7 +354,9 @@ function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
   );
 }
 
-/** Botões de moderação que aparecem ao passar o mouse na mensagem. */
+/** Botões de moderação: aparecem ao passar o mouse na mensagem ou ao focar um
+ *  deles pelo teclado. Ficam sempre no DOM (só a opacidade muda) pra continuarem
+ *  na ordem do Tab — `display:none` tiraria a moderação de quem não usa mouse. */
 function ModButtons({
   m,
   modLevel,
@@ -370,10 +373,12 @@ function ModButtons({
   const btn =
     "grid size-6 place-items-center rounded text-ink-faint transition-colors";
   return (
-    <div className="absolute right-1.5 top-0.5 hidden items-center gap-0.5 rounded-md bg-surface ring-1 ring-border group-hover:flex">
+    <div className="absolute right-1.5 top-0.5 flex items-center gap-0.5 rounded-md bg-surface opacity-0 ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">
       <button
+        type="button"
         onClick={() => onModerate(m, "delete")}
         title={t("chat.mod.action.delete")}
+        aria-label={t("chat.mod.action.delete")}
         className={cn(btn, "hover:text-bad")}
       >
         <Trash2 className="size-3.5" />
@@ -381,15 +386,19 @@ function ModButtons({
       {lvl === "full" && (
         <>
           <button
+            type="button"
             onClick={() => onModerate(m, "timeout")}
             title={t("chat.mod.action.timeout")}
+            aria-label={t("chat.mod.action.timeout")}
             className={cn(btn, "hover:text-warn")}
           >
             <Clock className="size-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => onModerate(m, "ban")}
             title={t("chat.mod.action.ban")}
+            aria-label={t("chat.mod.action.ban")}
             className={cn(btn, "hover:text-bad")}
           >
             <Ban className="size-3.5" />

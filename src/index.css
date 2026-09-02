@@ -29,6 +29,9 @@
   --color-brass: #ffb323;
   --color-brass-strong: #ffc857;
   --color-brass-ink: #2a1c00;
+  /* Latão como TINTA de texto (links, kicker, ação do toast). No breu é o próprio
+     latão; no papel escurece — ver o tema claro e a regra `.text-brass` abaixo. */
+  --color-brass-text: var(--color-brass);
 
   --color-tomate: #ff5a36;
   --color-tomate-strong: #ff7a55;
@@ -53,7 +56,11 @@
   --radius-xl: 14px;
 }
 
-/* Tema claro (papel/quadrinho) — mantém o latão e as sombras duras escuras. */
+/* Tema claro (papel/quadrinho) — mantém o latão e as sombras duras escuras.
+   Os tokens de status (ok/warn/bad/tomate/live) são mais fundos que no breu porque
+   também servem de TINTA em 11–13px sobre creme (WCAG 1.4.3 pede 4,5:1). Fundo
+   assim de escuro não aceita tinta night por cima — daí a regra "Tinta no papel"
+   logo abaixo, que troca night por branco nesses blocos. */
 :root[data-theme="light"] {
   --color-bg: #f3ead7;
   --color-surface: #fffaf0;
@@ -69,14 +76,17 @@
   --color-brass: #ffb323;
   --color-brass-strong: #ffc857;
   --color-brass-ink: #2a1c00;
+  /* #ffb323 sobre creme dá 1,5:1; este dá ≈5,8:1 sobre --color-bg. */
+  --color-brass-text: #7a5200;
 
-  --color-tomate: #ef4a25;
-  --color-tomate-strong: #ff6a45;
+  --color-tomate: #c93a1a;
+  /* Hover do bloco tomate: no papel a tinta é branca, então o "forte" escurece. */
+  --color-tomate-strong: #b23015;
 
-  --color-live: #e23b2b;
-  --color-ok: #1f9d57;
-  --color-warn: #b87807;
-  --color-bad: #d83a32;
+  --color-live: #d32f22;
+  --color-ok: #14703d;
+  --color-warn: #8a5a00;
+  --color-bad: #c02f28;
   --color-info: #1f6fe0;
 
   --color-night: #241a0d;
@@ -87,6 +97,48 @@
     rgba(42, 28, 10, 0.05) 1px,
     transparent 1.5px
   );
+}
+
+/* ============================================================
+   Tinta no papel. Fora de @layer de propósito: regra sem camada vence as
+   utilities, então vale em cima de `text-brass`/`text-night` sem trocar classe
+   em tela nenhuma.
+   ============================================================ */
+/* Bloco de status/ação (bg-ok, bg-warn, bg-bad, bg-live, bg-tomate) com tinta
+   `night`: no breu a night (#0b0805) passa de 6:1; no papel a night é #241a0d e
+   sobre esses fundos mais fundos fica em 3–3,7:1 — o branco chega a 5–6:1. Vale
+   pra Badge, StatePill, chip da LiveBar, BORA AO VIVO e qualquer chip que copie a
+   receita `bg-X text-night`. Dentro das ilhas escuras (abaixo) segue o breu. */
+[data-theme="light"]
+  :is(.bg-ok, .bg-warn, .bg-bad, .bg-live, .bg-tomate).text-night:not(
+    :is(.bg-night, .bg-brass-ink) *
+  ) {
+  color: #fff;
+}
+/* Latão como tinta (links "Colar a chave →", kicker do SectionTitle, ação do
+   toast, StatePill JÁ VOLTO…): escurece pelo token --color-brass-text. Cobre
+   também os estados que pintam de latão (hover, group-hover, aba ativa, opção
+   marcada); `bg-brass` não muda. Variante nova de `text-brass` entra aqui. */
+[data-theme="light"]
+  :is(
+    .text-brass,
+    .hover\:text-brass:hover,
+    :where(.group):hover .group-hover\:text-brass,
+    .data-\[state\=active\]\:text-brass[data-state="active"],
+    .data-\[state\=checked\]\:text-brass[data-state="checked"]
+  ) {
+  color: var(--color-brass-text);
+}
+/* Ilhas que continuam escuras no papel — o palco do replay (bg-night) e os chips
+   de ícone em chocolate (bg-brass-ink) — recebem de volta as tintas do breu:
+   latão e âmbar escurecidos somem sobre o preto. Mesmos valores do @theme. */
+[data-theme="light"] :is(.bg-night, .bg-brass-ink, [class*="bg-brass-ink/"]) {
+  --color-brass-text: var(--color-brass);
+  --color-tomate: #ff5a36;
+  --color-live: #ff4733;
+  --color-ok: #56e39b;
+  --color-warn: #ffc23d;
+  --color-bad: #ff5e57;
 }
 
 @layer base {
@@ -263,6 +315,15 @@
 [data-on-brass]:focus-visible,
 [data-on-brass] :focus-visible {
   outline-color: var(--color-brass-ink);
+}
+/* No papel o anel de latão também some (1,5:1 sobre o creme): vira tinta (>10:1).
+   Sobre latão a tinta e o brass-ink são praticamente a mesma cor, então a regra
+   de cima segue de pé. Nas ilhas escuras (palco do replay) volta o latão. */
+:root[data-theme="light"] :focus-visible {
+  outline-color: var(--color-ink);
+}
+:root[data-theme="light"] :is(.bg-night, .bg-brass-ink) :focus-visible {
+  outline-color: var(--color-brass);
 }
 
 /* Respeita quem pede menos movimento: corta as animações infinitas (pulso AO

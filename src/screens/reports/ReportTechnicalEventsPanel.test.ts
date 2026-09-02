@@ -12,6 +12,7 @@ const windowAt = (
   signals: ["GPU 99%"],
   cause: "Sobrecarga na codificação",
   causeKind: "encoding",
+  confidence: "medium",
   advice: "Revise o encoder.",
   ...overrides,
 });
@@ -43,5 +44,32 @@ describe("groupProblemWindows", () => {
     ]);
 
     expect(groups).toHaveLength(2);
+  });
+
+  it("limita evidências variáveis para o resumo não voltar a assustar", () => {
+    const groups = groupProblemWindows(
+      Array.from({ length: 20 }, (_, index) =>
+        windowAt(index * 20_000, { signals: [`GPU em ${80 + index}%`] }),
+      ),
+    );
+
+    expect(groups[0].signals).toHaveLength(6);
+  });
+
+  it("limita também uma única ocorrência que já venha com muitas evidências", () => {
+    const groups = groupProblemWindows([
+      windowAt(0, {
+        signals: Array.from({ length: 20 }, (_, index) => `Sinal ${index}`),
+      }),
+    ]);
+
+    expect(groups[0].signals).toEqual([
+      "Sinal 0",
+      "Sinal 1",
+      "Sinal 2",
+      "Sinal 3",
+      "Sinal 4",
+      "Sinal 5",
+    ]);
   });
 });

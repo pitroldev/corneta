@@ -288,7 +288,10 @@ export function DownloadModal({
   const download = async (format: DownloadFormat) => {
     setBusy(true);
     try {
-      const report = anonymous ? anonymize(data) : data;
+      // A mesma palavra da copy do checkbox e do fallback da análise — no idioma da tela.
+      const report = anonymous
+        ? anonymize(data, t("analysis.parse.alert.userFallback"))
+        : data;
       const analysis = analyze(report, t);
       const base = `${t("reports.file.live")}-${fileStamp(report.meta.startedAt)}`;
       const file = {
@@ -351,7 +354,13 @@ export function DownloadModal({
     >
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-xl">{t("reports.download.modal.name")}</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          aria-label={t("encoding.close")}
+          title={t("encoding.close")}
+        >
           <X className="size-4" />
         </Button>
       </div>

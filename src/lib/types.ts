@@ -396,6 +396,7 @@ export interface EngineSnapshot {
   /** Uso real de CPU/GPU (%) enquanto transmite. */
   cpu?: number;
   gpu?: number;
+  memoryPct?: number;
   /** Stats do OBS (se conectado via obs-websocket). */
   obs?: ObsStats;
   /** "JÁ VOLTO agora" manual acionado pelo streamer (botão na sala de guerra). */
@@ -440,10 +441,25 @@ export interface SessionSampleTarget {
   dropped: number;
 }
 
+/** Aplicativo que mais disputou recursos nesta janela. O backend persiste no máximo
+ * três, sem caminho, linha de comando ou título de janela. */
+export interface SessionResourceApp {
+  appRef: string;
+  name: string;
+  /** Percentual do computador inteiro (0..100). */
+  cpu: number;
+  memoryMb: number;
+  gpu3d?: number;
+  gpuEncode?: number;
+}
+
 export interface SessionSample {
   t: number;
   cpu?: number;
   gpu?: number;
+  memoryPct?: number;
+  /** Esparso: normalmente aparece a cada ~6s e fica mais frequente sob pressão. */
+  apps?: SessionResourceApp[];
   obs?: ObsStats;
   /** Mensagens de chat nesta janela (~2s) — vira taxa de chat / picos. */
   chat?: number;

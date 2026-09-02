@@ -94,6 +94,21 @@ describe("reportHtml", () => {
     expect(html).toContain("Início da transmissão");
   });
 
+  it("mantém o gráfico da máquina quando uma sessão traz só memória", () => {
+    const memoryOnly = {
+      ...d,
+      samples: d.samples.map((sample) => ({
+        ...sample,
+        cpu: undefined,
+        memoryPct: 63,
+      })),
+    };
+    const out = reportHtml(memoryOnly, analyze(memoryOnly, t), i18n);
+
+    expect(out).toContain("Carga da máquina (%)");
+    expect(out).toContain("Memória");
+  });
+
   it("escapa o que vem do usuário em vez de injetar HTML", () => {
     const mau = sessao([
       {
@@ -139,7 +154,10 @@ describe("anonymize", () => {
     const cru = analyze(comRaid, t);
     expect(JSON.stringify(cru)).toContain("Gaules");
 
-    const limpo = analyze(anonymize(comRaid), t);
+    const limpo = analyze(
+      anonymize(comRaid, t("analysis.parse.alert.userFallback")),
+      t,
+    );
     expect(JSON.stringify(limpo)).not.toContain("Gaules");
     expect(limpo.highlights.some((h) => h.reason.includes("alguém"))).toBe(
       true,
@@ -148,7 +166,10 @@ describe("anonymize", () => {
 
   it("não mexe nos números nem no nome dos canais do próprio streamer", () => {
     const cru = analyze(comRaid, t);
-    const limpo = analyze(anonymize(comRaid), t);
+    const limpo = analyze(
+      anonymize(comRaid, t("analysis.parse.alert.userFallback")),
+      t,
+    );
     expect(limpo.alerts.raids).toBe(cru.alerts.raids);
     expect(limpo.alerts.raidViewers).toBe(cru.alerts.raidViewers);
     expect(limpo.viewers.peak).toBe(cru.viewers.peak);
@@ -158,7 +179,38 @@ describe("anonymize", () => {
   });
 
   it("não altera a sessão original", () => {
-    anonymize(comRaid);
+    anonymize(comRaid, t("analysis.parse.alert.userFallback"));
     expect(comRaid.alertEvents[0].user).toBe("Gaules");
+  });
+
+  it("remove o ranking de aplicativos locais da exportação anônima", () => {
+    const comApp = {
+      ...comRaid,
+      samples: comRaid.samples.map((sample, index) => ({
+        ...sample,
+        apps:
+          index === 0
+            ? [
+                {
+                  appRef: "jogo-secreto",
+                  name: "Jogo secreto",
+                  cpu: 30,
+                  memoryMb: 2500,
+                  gpu3d: 95,
+                },
+              ]
+            : undefined,
+      })),
+    };
+
+    const limpo = anonymize(comApp, t("analysis.parse.alert.userFallback"));
+    expect(JSON.stringify(limpo)).not.toContain("Jogo secreto");
+    expect(comApp.samples[0].apps?.[0].name).toBe("Jogo secreto");
+  });
+
+  it("põe no lugar do nome a palavra que recebeu — o arquivo em inglês não sai com 'alguém'", () => {
+    const limpo = anonymize(comRaid, "someone");
+    expect(limpo.alertEvents[0].user).toBe("someone");
+    expect(JSON.stringify(limpo)).not.toContain("alguém");
   });
 });

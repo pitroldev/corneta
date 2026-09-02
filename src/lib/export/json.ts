@@ -33,6 +33,8 @@ export function reportJson(d: SessionData, a: ReportAnalysis): string {
         cpuMax: a.maxCpu,
         gpuMedia: a.avgGpu,
         gpuMax: a.maxGpu,
+        memoriaMedia: a.avgMemory,
+        memoriaMax: a.maxMemory,
       },
       trechosComProblema: a.windows,
       momentos: a.highlights,

@@ -2154,23 +2154,20 @@ async fn start_engine_inner(
     let app_u = app.clone();
     let run_u = running.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut sys = sysinfo::System::new();
-        let mut gpu_ok = true;
+        let mut sampler = crate::resources::ResourceSampler::new();
+        // Fallback legado para máquinas NVIDIA em que o contador nativo do Windows
+        // não esteja disponível. Uma falha desarma novas tentativas nesta live.
+        let mut fallback_gpu_ok = true;
         while run_u.load(Ordering::Relaxed) {
-            sys.refresh_cpu_usage();
             std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-            sys.refresh_cpu_usage();
-            let cpu = sys.global_cpu_usage() as f64;
-            let gpu = if gpu_ok {
-                let g = read_gpu();
-                if g.is_none() {
-                    gpu_ok = false;
+            let mut usage = sampler.sample();
+            if usage.gpu.is_none() && fallback_gpu_ok {
+                usage.gpu = read_gpu();
+                if usage.gpu.is_none() {
+                    fallback_gpu_ok = false;
                 }
-                g
-            } else {
-                None
-            };
-            update_usage(&app_u, cpu, gpu);
+            }
+            update_usage(&app_u, usage);
             std::thread::sleep(std::time::Duration::from_secs(2));
         }
     });
@@ -2525,7 +2522,7 @@ fn update_target_metrics(
     }
 }
 
-/// Lê a utilização da GPU NVIDIA (%) via nvidia-smi. None se não houver NVIDIA.
+/// Fallback legado da GPU NVIDIA quando o contador nativo do Windows não existe.
 fn read_gpu() -> Option<f64> {
     let out = quiet_command("nvidia-smi")
         .args([
@@ -2546,7 +2543,7 @@ fn read_gpu() -> Option<f64> {
 }
 
 /// Atualiza CPU/GPU no snapshot e emite (chamado pelo amostrador).
-fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
+fn update_usage(app: &AppHandle, usage: crate::resources::ResourceUsage) {
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     let Some(snap) = eng.snapshot.as_mut() else {
@@ -2555,15 +2552,16 @@ fn update_usage(app: &AppHandle, cpu: f64, gpu: Option<f64>) {
     if snap.state == "stopped" {
         return;
     }
-    snap.cpu = Some((cpu * 10.0).round() / 10.0);
-    snap.gpu = gpu.map(|g| (g * 10.0).round() / 10.0);
+    snap.cpu = Some((usage.cpu * 10.0).round() / 10.0);
+    snap.gpu = usage.gpu.map(|g| (g * 10.0).round() / 10.0);
+    snap.memory_pct = usage.memory_pct.map(|value| (value * 10.0).round() / 10.0);
     let out = snap.clone();
     let session = eng.session_path.clone();
     drop(eng);
     emit(app, &out);
     // Grava a amostra desta janela (~2s) no NDJSON, com o chat por canal (lê+zera).
     if let Some(path) = session {
-        session::record_sample(&path, &out, &chat::drain_msg_counts());
+        session::record_sample(&path, &out, &chat::drain_msg_counts(), &usage.apps);
     }
 }
 

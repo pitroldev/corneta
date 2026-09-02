@@ -293,6 +293,7 @@ mod tests {
             message: None,
             cpu: None,
             gpu: None,
+            memory_pct: None,
             obs: None,
             forced_brb: false,
         }

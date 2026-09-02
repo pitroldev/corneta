@@ -1,10 +1,16 @@
-import type { ReactNode } from "react";
+import { Fragment, isValidElement, type ReactNode } from "react";
 import * as RTooltip from "@radix-ui/react-tooltip";
 import { cn } from "../lib/utils";
 
 /**
  * Tooltip on-brand via Radix: portal (sem clipping por overflow), posicionamento
  * automático e abertura no hover e no foco. Visual de bloco com borda dura.
+ *
+ * Um filho único (botão, span…) vira o próprio gatilho (asChild): é nele que o
+ * Radix põe `aria-describedby` ao abrir. Embrulhado num <span>, a descrição caía
+ * no span e o leitor de tela, focado no botão, nunca ouvia a dica. Texto solto,
+ * fragmento ou vários filhos ainda ganham o <span>, por não terem um elemento só.
+ * `className` vai pro gatilho, seja ele qual for (o Slot do Radix junta as classes).
  */
 export function Tooltip({
   children,
@@ -15,11 +21,12 @@ export function Tooltip({
   content: ReactNode;
   className?: string;
 }) {
+  const single = isValidElement(children) && children.type !== Fragment;
   return (
     <RTooltip.Provider delayDuration={150}>
       <RTooltip.Root>
-        <RTooltip.Trigger asChild>
-          <span className={cn("inline-flex", className)}>{children}</span>
+        <RTooltip.Trigger asChild className={className}>
+          {single ? children : <span className="inline-flex">{children}</span>}
         </RTooltip.Trigger>
         <RTooltip.Portal>
           <RTooltip.Content

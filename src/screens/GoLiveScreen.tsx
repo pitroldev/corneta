@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
@@ -51,8 +51,10 @@ let prewarmedUpload = false;
 // "Liga no OBS" auto-abre UMA vez por execução do app (module-level: useRef resetava a
 // cada troca de tela e o acordeão reabria em toda visita).
 let autoOpenedObsOnce = false;
-// Quem transmite sem OBS local (fonte RTMP externa) dispensa o pré-voo pra sempre.
-const SKIP_PREFLIGHT_FLAG = "corneta.skipObsPreflight";
+// "Ir assim mesmo" no pré-voo vale só nesta execução do app (module-level, como o acordeão
+// acima): gravar em localStorage tornava um clique com pressa irreversível — o aviso do OBS
+// nunca mais voltava, nem quando a pessoa passava a usar OBS local.
+let skippedPreflightOnce = false;
 
 export function GoLiveScreen({
   onNavigate,
@@ -224,14 +226,8 @@ export function GoLiveScreen({
     }
   };
   const onStart = () => {
-    let skipPreflight = false;
-    try {
-      skipPreflight = localStorage.getItem(SKIP_PREFLIGHT_FLAG) === "1";
-    } catch {
-      /* ignore */
-    }
     if (
-      !skipPreflight &&
+      !skippedPreflightOnce &&
       obs !== null &&
       obs !== "loading" &&
       !(obs.reachable && obs.pointingAtCorneta)
@@ -241,13 +237,10 @@ export function GoLiveScreen({
     }
     void doStart();
   };
-  // "Ir assim mesmo" = este fluxo não usa OBS local (fonte externa) — não naga de novo.
-  const skipPreflightForever = () => {
-    try {
-      localStorage.setItem(SKIP_PREFLIGHT_FLAG, "1");
-    } catch {
-      /* ignore */
-    }
+  // "Ir assim mesmo" = este fluxo não usa OBS local (fonte externa) — não naga de novo
+  // até fechar e abrir a Corneta.
+  const skipPreflightThisRun = () => {
+    skippedPreflightOnce = true;
     void doStart();
   };
   // Socorro do limbo: 20s em "starting" sem OBS conectar → card de resgate com diagnóstico.
@@ -314,6 +307,18 @@ export function GoLiveScreen({
         : obs.reachable
           ? { tone: "warn" as const, label: t("golive.obs.status.notPointing") }
           : { tone: "bad" as const, label: t("golive.obs.status.missing") };
+  // Diagnóstico do resgate: senha errada do WebSocket chega como DADO (authFailed) e tem
+  // que ganhar de "não achei" — senão o app manda ligar um WebSocket que já tá ligado.
+  const rescueHint =
+    obs === null || obs === "loading"
+      ? null
+      : obs.authFailed
+        ? t("golive.rescue.authFailed")
+        : !obs.reachable
+          ? t("golive.rescue.notReachable")
+          : !obs.pointingAtCorneta
+            ? t("golive.rescue.notPointing")
+            : null;
   const bandColor =
     bandTone === "ok"
       ? "text-ok"
@@ -336,7 +341,7 @@ export function GoLiveScreen({
       )}
 
       {state === "error" && (
-        <Card className="mb-4 border-2 border-bad/40 bg-bad/10">
+        <Card role="alert" className="mb-4 border-2 border-bad/40 bg-bad/10">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
             <div>
@@ -559,6 +564,7 @@ export function GoLiveScreen({
           obs={obs}
           onRecheck={runObs}
           onGuide={() => setShowGuide(true)}
+          onSetupObs={() => setShowObs(true)}
         />
       )}
 
@@ -608,7 +614,10 @@ export function GoLiveScreen({
             enabled.some(
               (t) => snapshot.targets[t.id]?.state === "signal-lost",
             ) && (
-              <Card className="mb-2 border-2 border-bad/40 bg-bad/10">
+              <Card
+                role="alert"
+                className="mb-2 border-2 border-bad/40 bg-bad/10"
+              >
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
                   <div className="min-w-0 flex-1">
@@ -662,13 +671,7 @@ export function GoLiveScreen({
                         </strong>
                       ),
                     })}{" "}
-                    {obs !== null && obs !== "loading" && !obs.reachable
-                      ? t("golive.rescue.notReachable")
-                      : obs !== null &&
-                          obs !== "loading" &&
-                          !obs.pointingAtCorneta
-                        ? t("golive.rescue.notPointing")
-                        : null}
+                    {rescueHint}
                   </div>
                 </div>
               </div>
@@ -875,7 +878,7 @@ export function GoLiveScreen({
               >
                 <Zap className="size-4" /> {t("golive.obs.fixForMe")}
               </Button>
-              <Button variant="subtle" size="sm" onClick={skipPreflightForever}>
+              <Button variant="subtle" size="sm" onClick={skipPreflightThisRun}>
                 {t("golive.preflight.goAnyway")}
               </Button>
               <Button
@@ -1153,6 +1156,7 @@ function StreamInfoCard() {
             e.key === "Enter" && !busy && title.trim() && void apply()
           }
           placeholder={t("golive.streamInfo.title.placeholder")}
+          aria-label={t("golive.streamInfo.title.placeholder")}
           maxLength={140}
           className="h-10 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
         />
@@ -1164,6 +1168,7 @@ function StreamInfoCard() {
               e.key === "Enter" && !busy && title.trim() && void apply()
             }
             placeholder={t("golive.streamInfo.game.placeholder")}
+            aria-label={t("golive.streamInfo.game.placeholder")}
             className="h-10 flex-1 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
           />
           <Button
@@ -1205,12 +1210,16 @@ function StreamInfoCard() {
       {ready.youtube && (
         <>
           <button
+            type="button"
+            role="checkbox"
+            aria-checked={settings.youtubeAutoLive}
             onClick={() =>
               setSettings({ youtubeAutoLive: !settings.youtubeAutoLive })
             }
             className="mt-2.5 flex w-full items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-left"
           >
             <span
+              aria-hidden
               className={cn(
                 "grid size-5 shrink-0 place-items-center rounded border-2 transition-colors",
                 settings.youtubeAutoLive
@@ -1261,17 +1270,18 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
         ? watchCount > 0
           ? t("golive.security.guardian.watching", { n: watchCount })
           : t("golive.security.guardian.noTerms")
-        : t("golive.security.disabled"),
+        : t("golive.security.guardian.desc.off"),
       experimental: true,
-      // Experimental fica oculto aqui no Ao vivo até ser ligado nas Configurações.
-      show: settings.guardianEnabled,
+      // Nasce desligado — fica visível pra a linha convidar a ligar (o escudo antes do
+      // estrago), não só informar.
+      show: true,
     },
     {
       on: settings.brbEnabled,
       label: t("golive.security.brb.label"),
       desc: settings.brbEnabled
         ? t("golive.security.brb.desc")
-        : t("golive.security.disabled"),
+        : t("golive.security.brb.desc.off"),
       experimental: false,
       show: true,
     },
@@ -1280,7 +1290,7 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
       label: t("golive.security.bitrate.label"),
       desc: settings.autoBitrate
         ? t("golive.security.bitrate.desc")
-        : t("golive.security.disabled"),
+        : t("golive.security.bitrate.desc.off"),
       experimental: false,
       show: true,
     },
@@ -1365,10 +1375,14 @@ function Checkup({
   obs,
   onRecheck,
   onGuide,
+  onSetupObs,
 }: {
   obs: ObsCheck | "loading" | null;
   onRecheck: () => void;
   onGuide?: () => void;
+  /** Abre o "Configura pra mim" direto da linha do OBS — o botão citado pelo texto
+   *  morava num acordeão que pode estar fechado. */
+  onSetupObs?: () => void;
 }) {
   const { t, fmt } = useI18n();
   const config = useStore((s) => s.config)!;
@@ -1443,7 +1457,11 @@ function Checkup({
               ok={obs.reachable}
               warn={!obs.reachable}
               detail={
-                obs.reachable ? undefined : t("golive.checkup.obsConnected.fix")
+                obs.reachable
+                  ? undefined
+                  : obs.authFailed
+                    ? t("golive.rescue.authFailed")
+                    : t("golive.checkup.obsConnected.fix")
               }
             />
             {obs.reachable && (
@@ -1455,6 +1473,14 @@ function Checkup({
                   obs.pointingAtCorneta
                     ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)}fps`
                     : t("golive.checkup.obsPointing.fix")
+                }
+                action={
+                  !obs.pointingAtCorneta && onSetupObs ? (
+                    <Button variant="subtle" size="sm" onClick={onSetupObs}>
+                      <Zap className="size-4 text-brass" />{" "}
+                      {t("golive.obs.fixForMe")}
+                    </Button>
+                  ) : undefined
                 }
               />
             )}
@@ -1503,19 +1529,34 @@ function CheckRow({
   ok,
   warn,
   detail,
+  action,
 }: {
   label: string;
   ok?: boolean;
   warn?: boolean;
   detail?: string;
+  /** Controle que resolve a linha (ex.: "Configura pra mim") — a frase vira o botão. */
+  action?: ReactNode;
 }) {
+  const t = useT();
   const Icon = ok ? Check : warn ? AlertTriangle : Square;
   const cls = ok ? "text-ok" : warn ? "text-warn" : "text-bad";
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
       <Icon className={cn("size-4 shrink-0", cls)} strokeWidth={2.4} />
+      {/* O estado era só ícone + cor — leitor de tela ouvia "Chaves" sem saber se tava certo. */}
+      <span className="sr-only">
+        {t(
+          ok
+            ? "golive.checkup.state.ok"
+            : warn
+              ? "golive.checkup.state.warn"
+              : "golive.checkup.state.bad",
+        )}
+      </span>
       <span className="font-semibold">{label}</span>
       {detail && <span className="text-xs text-ink-faint">· {detail}</span>}
+      {action}
     </div>
   );
 }

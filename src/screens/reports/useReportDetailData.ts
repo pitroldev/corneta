@@ -32,6 +32,10 @@ export function useReportDetailData(id: string, previousId: string | null) {
     null,
   );
   const [chat, setChat] = useState(EMPTY_CHAT);
+  // Sem gravação no disco, uma live que nunca gravou e uma cuja gravação o streamer
+  // acabou de apagar ficam idênticas nos dados — este flag guarda a diferença pra a
+  // seção de replay não afirmar "não foi gravada" logo depois de "Apaguei a gravação".
+  const [recordingsDeleted, setRecordingsDeleted] = useState(false);
   const [revision, setRevision] = useState(0);
 
   const reload = useCallback(() => {
@@ -52,6 +56,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
   }, []);
 
   const clearRecordings = useCallback(() => {
+    setRecordingsDeleted(true);
     setData((current) => {
       if (!current || current === "loading") return current;
       return { ...current, recordings: [] };
@@ -61,6 +66,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
   useEffect(() => {
     let alive = true;
     setData("loading");
+    setRecordingsDeleted(false);
     void api
       .readSession(id)
       .then((raw) => {
@@ -149,6 +155,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
     replayIndex,
     previousSummary,
     chat,
+    recordingsDeleted,
     reload,
     addMarker,
     clearRecordings,

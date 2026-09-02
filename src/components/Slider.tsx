@@ -45,6 +45,8 @@ export function Slider({
         </RSlider.Track>
         <RSlider.Thumb
           aria-label={ariaLabel}
+          // O leitor de tela lê o mesmo que está escrito ao lado ("14px"), não só "14".
+          aria-valuetext={suffix != null ? `${value}${suffix}` : undefined}
           className={cn(
             "block size-4 rounded-[3px] border-2 border-brass-ink bg-brass outline-none",
             "shadow-[1px_1px_0_0_rgba(0,0,0,0.35)] transition-transform hover:scale-110",

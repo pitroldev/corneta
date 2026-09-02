@@ -70,9 +70,13 @@ type T = I18n["t"];
 
 interface State {
   loaded: boolean;
+  /** `load()` não conseguiu ler a config: a tela de boot mostra o erro com saída (tentar de novo / logs). */
+  bootError: string | null;
   config: AppConfig | null;
   snapshot: EngineSnapshot;
   encoders: EncoderInfo[];
+  /** A sonda de encoders falhou (FFmpeg não respondeu) — lista vazia por erro, não por falta. */
+  encodersError: boolean;
   uploadMbps: number | null;
   /** Última operação longa; fica visível após falha para copiar ao suporte. */
   lastOperationId: string | null;
@@ -99,7 +103,7 @@ interface State {
   setSettings: (patch: Partial<AppSettings>) => void;
 
   loadProfile: (id: string) => void;
-  addProfile: () => void;
+  addProfile: (label: (n: number) => string) => void;
   removeProfile: (id: string) => void;
   renameProfile: (id: string, name: string) => void;
 
@@ -227,6 +231,49 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
 const CHAT_CAP = 400;
 const ALERT_CAP = 100;
 
+/** Quantas plataformas estão "fora" na live: em erro, reconectando ou sem o sinal do OBS.
+ *  Um filtro só pra LiveBar (chip vermelho) e pro aria-live do App — antes cada um tinha
+ *  o seu e o leitor de tela dizia "todas" enquanto o chip contava uma caída. */
+export function downTargets(snapshot: EngineSnapshot): number {
+  return Object.values(snapshot.targets).filter(
+    (t) =>
+      t.state === "error" ||
+      t.state === "reconnecting" ||
+      t.state === "signal-lost",
+  ).length;
+}
+
+// Lê a config e aplica as migrações que precisam acontecer antes da primeira tela.
+async function readConfig(t: T): Promise<AppConfig> {
+  let config = await api.getConfig();
+  // Migração: configs antigas sem perfis ganham um "Padrão" com o estado atual.
+  if (!config.profiles || config.profiles.length === 0) {
+    const id = uid("prof");
+    config = {
+      ...config,
+      profiles: [
+        {
+          id,
+          name: t("core.profile.default.name"),
+          mode: config.mode,
+          targets: config.targets,
+        },
+      ],
+      activeProfileId: id,
+    };
+    config = await api.saveConfig(config);
+  } else if (!config.profiles.some((p) => p.id === config.activeProfileId)) {
+    const p = config.profiles[0];
+    config = {
+      ...config,
+      activeProfileId: p.id,
+      mode: p.mode,
+      targets: p.targets.map((t) => ({ ...t })),
+    };
+  }
+  return config;
+}
+
 // Decide se uma mensagem sobrevive a um evento de deleção.
 function keepMessage(m: ChatMessage, d: ChatDelete): boolean {
   if (m.platform !== d.platform) return true;
@@ -274,43 +321,27 @@ export const useStore = create<State>((set, get) => {
 
   return {
     loaded: false,
+    bootError: null,
     config: null,
     snapshot: EMPTY_SNAPSHOT,
     encoders: [],
+    encodersError: false,
     uploadMbps: null,
     lastOperationId: null,
 
     async load(t) {
       // A configuração é tudo de que a primeira tela precisa. A sonda real dos encoders abre
       // processos FFmpeg e agora é lazy (Qualidade/Ao vivo/BORA), fora do caminho crítico do boot.
-      const loaded = await api.getConfig();
-      let config = loaded;
-      // Migração: configs antigas sem perfis ganham um "Padrão" com o estado atual.
-      if (!config.profiles || config.profiles.length === 0) {
-        const id = uid("prof");
-        config = {
-          ...config,
-          profiles: [
-            {
-              id,
-              name: t("core.profile.default.name"),
-              mode: config.mode,
-              targets: config.targets,
-            },
-          ],
-          activeProfileId: id,
-        };
-        config = await api.saveConfig(config);
-      } else if (
-        !config.profiles.some((p) => p.id === config.activeProfileId)
-      ) {
-        const p = config.profiles[0];
-        config = {
-          ...config,
-          activeProfileId: p.id,
-          mode: p.mode,
-          targets: p.targets.map((t) => ({ ...t })),
-        };
+      set({ bootError: null });
+      let config: AppConfig;
+      try {
+        config = await readConfig(t);
+      } catch (error) {
+        // Config ilegível: sem isto `loaded` nunca virava true e o app ficava em
+        // "Abrindo sua bancada…" pra sempre. O App mostra o erro com "Tentar de novo".
+        console.error("Falha ao ler a configuração", error);
+        set({ bootError: String(error) });
+        return;
       }
       saveRevision = config.revision;
       set({ config, loaded: true });
@@ -478,11 +509,11 @@ export const useStore = create<State>((set, get) => {
       if (next !== config) persist(next);
     },
 
-    addProfile() {
+    addProfile(label) {
       pendingRemoval = null;
       const config = get().config;
       if (!config) return;
-      persist(cfgOps.addProfile(config, uid("prof")));
+      persist(cfgOps.addProfile(config, uid("prof"), label));
     },
 
     removeProfile(id) {
@@ -516,11 +547,13 @@ export const useStore = create<State>((set, get) => {
 
     async refreshEncoders() {
       if (get().encoders.length > 0) return;
+      set({ encodersError: false });
       encoderLoadPromise ??= api.detectEncoders();
       try {
         set({ encoders: await encoderLoadPromise });
       } catch (error) {
         console.error("Falha ao detectar encoders", error);
+        set({ encodersError: true });
       } finally {
         encoderLoadPromise = null;
       }

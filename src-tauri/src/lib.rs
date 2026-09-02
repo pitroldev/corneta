@@ -17,6 +17,7 @@ mod obs;
 mod overlay;
 mod permissions;
 mod recorder;
+mod resources;
 mod session;
 mod splicer;
 mod studio;

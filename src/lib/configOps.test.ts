@@ -89,7 +89,7 @@ describe("configOps", () => {
   });
 
   it("perfis: add / rename / load / remove, nunca deixa a lista vazia", () => {
-    let c = ops.addProfile(base(), "prof_2");
+    let c = ops.addProfile(base(), "prof_2", (n) => `Perfil ${n}`);
     expect(c.profiles.length).toBe(2);
     expect(c.activeProfileId).toBe("prof_2");
     expect(c.profiles[1].name).toBe("Perfil 2");
@@ -114,7 +114,7 @@ describe("configOps", () => {
   });
 
   it("removeProfile de id inexistente (com >1 perfil) NÃO é no-op: devolve config nova", () => {
-    const c = ops.addProfile(base(), "prof_2"); // 2 perfis
+    const c = ops.addProfile(base(), "prof_2", (n) => `Perfil ${n}`); // 2 perfis
     const next = ops.removeProfile(c, "nao-existe");
     expect(next).not.toBe(c);
     expect(next.profiles.length).toBe(2);
@@ -172,9 +172,9 @@ describe("configOps", () => {
 
   it("addProfile pula nomes 'Perfil N' já tomados", () => {
     let c = base(); // "Padrão"
-    c = ops.addProfile(c, "p2"); // "Perfil 2"
+    c = ops.addProfile(c, "p2", (n) => `Perfil ${n}`); // "Perfil 2"
     c = ops.renameProfile(c, "p2", "Perfil 3"); // ocupa o próximo nome esperado
-    c = ops.addProfile(c, "p3"); // length+1=3 → "Perfil 3" tomado → "Perfil 4"
+    c = ops.addProfile(c, "p3", (n) => `Perfil ${n}`); // length+1=3 → "Perfil 3" tomado → "Perfil 4"
     expect(c.profiles.find((p) => p.id === "p3")!.name).toBe("Perfil 4");
   });
 });

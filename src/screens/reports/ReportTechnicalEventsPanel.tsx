@@ -9,10 +9,19 @@ import type { ReportTimelineModel } from "./useReportModels";
 
 const PREVIEW_ROWS = 6;
 const GROUP_PREVIEW_ROWS = 3;
+const MAX_GROUP_SIGNALS = 6;
+
+const CONFIDENCE_KEY = {
+  high: "reports.technical.incidents.confidence.high",
+  medium: "reports.technical.incidents.confidence.medium",
+  low: "reports.technical.incidents.confidence.low",
+} as const;
 
 const WINDOW_KIND_TONE: Record<ProblemWindow["causeKind"], string> = {
+  app: "bg-warn",
   render: "bg-info",
   encoding: "bg-warn",
+  local: "bg-info",
   network: "bg-bad",
   platform: "bg-brass",
   signal: "bg-bad",
@@ -24,6 +33,7 @@ interface ProblemWindowGroup {
   causeKind: ProblemWindow["causeKind"];
   cause: string;
   advice: string;
+  confidence: ProblemWindow["confidence"];
   windows: ProblemWindow[];
   totalSec: number;
   signals: string[];
@@ -33,6 +43,11 @@ export function groupProblemWindows(
   windows: ProblemWindow[],
 ): ProblemWindowGroup[] {
   const groups = new Map<string, ProblemWindowGroup>();
+  const confidenceRank: Record<ProblemWindow["confidence"], number> = {
+    low: 0,
+    medium: 1,
+    high: 2,
+  };
 
   for (const window of windows) {
     // Plataformas diferentes podem pedir ações diferentes. O texto da causa e a
@@ -50,8 +65,14 @@ export function groupProblemWindows(
       group.windows.push(window);
       group.totalSec += window.durationSec;
       for (const signal of window.signals) {
-        if (!group.signals.includes(signal)) group.signals.push(signal);
+        if (
+          group.signals.length < MAX_GROUP_SIGNALS &&
+          !group.signals.includes(signal)
+        )
+          group.signals.push(signal);
       }
+      if (confidenceRank[window.confidence] > confidenceRank[group.confidence])
+        group.confidence = window.confidence;
       continue;
     }
 
@@ -60,9 +81,10 @@ export function groupProblemWindows(
       causeKind: window.causeKind,
       cause: window.cause,
       advice: window.advice,
+      confidence: window.confidence,
       windows: [window],
       totalSec: window.durationSec,
-      signals: [...window.signals],
+      signals: window.signals.slice(0, MAX_GROUP_SIGNALS),
     });
   }
 
@@ -221,11 +243,13 @@ function WindowGroupDisclosure({
           )}
           aria-hidden
         />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold">
+        <span className="min-w-0 flex-1 py-0.5">
+          <span className="block text-sm font-bold leading-snug">
             {group.cause}
           </span>
-          <span className="mt-0.5 block text-xs tabular-nums text-ink-muted">
+          <span className="mt-1 block text-xs tabular-nums text-ink-muted">
+            {t(CONFIDENCE_KEY[group.confidence])}
+            {" · "}
             {tp(
               "reports.technical.incidents.occurrences",
               group.windows.length,
@@ -246,20 +270,42 @@ function WindowGroupDisclosure({
       </summary>
 
       <div className="pb-5 pl-5 sm:pl-6">
-        <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
-          {group.advice}
-        </p>
+        <div className="grid max-w-4xl gap-4 border-l-2 border-border-soft pl-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+              {t("reports.technical.incidents.next")}
+            </h4>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+              {group.advice}
+            </p>
+          </div>
 
-        {visibleSignals.length > 0 ? (
-          <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-            {visibleSignals.join(" · ")}
-            {hiddenSignalCount > 0
-              ? ` · ${t("reports.technical.incidents.signalsMore", {
-                  count: hiddenSignalCount,
-                })}`
-              : null}
-          </p>
-        ) : null}
+          {visibleSignals.length > 0 ? (
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                {t("reports.technical.incidents.why")}
+              </h4>
+              <ul className="mt-1 space-y-1 text-xs leading-relaxed text-ink-muted">
+                {visibleSignals.map((signal) => (
+                  <li key={signal} className="flex gap-2">
+                    <span
+                      className="mt-[0.55em] size-1 shrink-0 rounded-full bg-ink-faint"
+                      aria-hidden
+                    />
+                    <span className="min-w-0 break-words">{signal}</span>
+                  </li>
+                ))}
+              </ul>
+              {hiddenSignalCount > 0 ? (
+                <p className="mt-1 pl-3 text-xs text-ink-faint">
+                  {t("reports.technical.incidents.signalsMore", {
+                    count: hiddenSignalCount,
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         <WindowDistribution
           group={group}

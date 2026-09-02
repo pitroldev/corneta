@@ -9,6 +9,7 @@ import {
   chatRateSeriesFor,
   cpuSeries,
   gpuSeries,
+  memorySeries,
   obsRenderSeries,
   viewerSeries,
   viewerSeriesFor,
@@ -171,7 +172,7 @@ export interface ReportTechnicalModel {
   bitrateSeries: ChartSeries[];
   machineSeries: ChartSeries[];
   obsSeries: ChartSeries[];
-  hasCpuOrGpu: boolean;
+  hasMachineData: boolean;
 }
 
 export function useReportTechnicalModel({
@@ -194,8 +195,11 @@ export function useReportTechnicalModel({
     };
     const cpu = cpuSeries(data);
     const gpu = gpuSeries(data);
-    const hasCpuOrGpu =
-      cpu.some((value) => value != null) || gpu.some((value) => value != null);
+    const memory = memorySeries(data);
+    const hasMachineData =
+      cpu.some((value) => value != null) ||
+      gpu.some((value) => value != null) ||
+      memory.some((value) => value != null);
     return {
       markers: analysis.events
         .filter(
@@ -225,6 +229,15 @@ export function useReportTechnicalModel({
         ...(gpu.some((value) => value != null)
           ? [{ label: "GPU", color: "#56b3ff", values: gpu }]
           : []),
+        ...(memory.some((value) => value != null)
+          ? [
+              {
+                label: t("reports.machine.memory"),
+                color: "#a78bfa",
+                values: memory,
+              },
+            ]
+          : []),
       ],
       obsSeries: [
         {
@@ -233,7 +246,7 @@ export function useReportTechnicalModel({
           values: obsRenderSeries(data),
         },
       ],
-      hasCpuOrGpu,
+      hasMachineData,
     };
   }, [analysis, data, open, t]);
 }

@@ -11,30 +11,43 @@ import type { Dict } from "./pt";
 
 export const en: Dict = {
   // ---- analysis ----
+  "analysis.advice.app.cpu":
+    "Before the next stream, close anything you are not using. If {app} is the game, reduce view distance or physics, or cap its frame rate.",
+  "analysis.advice.app.gpu":
+    "If {app} is the game, cap its frame rate or lower shadows and effects. Try to leave some graphics-card headroom for OBS.",
+  "analysis.advice.app.memory":
+    "Before the stream, close tabs and apps you're not using. If {app} keeps growing, close and reopen it before you go live.",
   // "Settings → Output → Encoder" são os rótulos reais do menu do OBS em inglês — não traduzir de novo. "tela Qualidade" é uma tela da Corneta: tem que ca
   "analysis.advice.encoding":
-    "In OBS: Settings → Output → Encoder → pick the one on your graphics card (NVENC/QSV). Or drop the bitrate/resolution on the Quality screen.",
+    "In OBS, lower the resolution or frame rate under Settings → Video. If available, pick your graphics-card encoder under Settings → Output.",
+  "analysis.advice.local":
+    "Restart OBS and Corneta before the next stream. If it happens again, check that only one OBS is sending video to Corneta.",
   // "live" (substantivo BR) → "stream", conforme glossário.
   "analysis.advice.network":
-    "Drop the bitrate on the Quality screen, or take one platform off the stream.",
+    "Test your upload before the next stream. If it is fluctuating, lower the bitrate on the Quality screen or remove one platform.",
   // "chave" → "stream key"; "o status dela" virou "their status page", que é a coisa que existe pra abrir.
   "analysis.advice.platform":
-    "Probably on the platform's side (their server, not you). Check your stream key and their status page.",
+    "Check that channel's stream key and the platform status page. If it happens again only there, reconnect the account.",
   // "resolução base" é o campo Base (Canvas) Resolution do OBS: em EN "base resolution" bate com o rótulo real.
   "analysis.advice.render":
-    "Lighten the scene in OBS — fewer sources, filters and effects — or drop the base resolution there.",
+    "Lighten that scene in OBS: disable hidden sources, use fewer filters and avoid several animated videos at once.",
   // Convive na mesma tela com analysis.verdict.signal.detail, que diz quase a mesma coisa; variei "a galera" (nobody watching / everyone watching) pra não
   "analysis.advice.signal":
     "Check that OBS stayed open, streaming and pointed at Corneta — nobody watching had a picture that whole stretch.",
   "analysis.advice.unknown": "Check the signals in this stretch.",
-  "analysis.cause.encoding": "Your PC couldn't encode the video fast enough",
-  "analysis.cause.network": "Your internet couldn't keep up with the upload",
+  "analysis.cause.app.cpu": "{app} used almost all of the processor",
+  "analysis.cause.app.gpu": "{app} used almost all of the graphics card",
+  "analysis.cause.app.memory":
+    "{app} used a lot of memory while it was nearly full",
+  "analysis.cause.encoding": "OBS couldn't prepare every frame in time",
+  "analysis.cause.local": "The video lost pace between OBS and Corneta",
+  "analysis.cause.network": "Your connection to the platforms got shaky",
   // {target} é o nome do destino (Twitch, Kick, o rótulo que o streamer deu). Troquei o substantivo abstrato "instabilidade" por verbo, senão a frase fica
-  "analysis.cause.platform": "{target} got flaky",
-  "analysis.cause.render": "Heavy scene in OBS (render lag)",
-  "analysis.cause.signal": "The OBS signal dropped (no video coming in)",
+  "analysis.cause.platform": "The connection to {target} became unstable",
+  "analysis.cause.render": "OBS took too long to assemble the picture",
+  "analysis.cause.signal": "Video stopped arriving from OBS",
   // Vira o título do card do trecho. Em EN entra no formato fixo "Couldn't ..." e o advice abaixo dá o passo — o PT aqui é mais frio que o resto do app.
-  "analysis.cause.unknown": "Couldn't pin down the cause",
+  "analysis.cause.unknown": "There isn't enough data to name a cause yet",
   "analysis.event.cpuHigh": "CPU at {pct}%",
   "analysis.event.end": "Stream ended",
   // No código o rótulo é montado por concatenação (`${t.name} ${estado}`) — em EN a frase inteira precisa ser uma chave só, senão a ordem quebra.
@@ -63,16 +76,30 @@ export const en: Dict = {
   "analysis.parse.marker.labelFallback": "Marker",
   // O caixa-alta do pôster é desenho: o recap.ts aplica .toUpperCase() aqui, como já faz nos rótulos vizinhos do canvas.
   "analysis.recap.bestMoment": "Best moment",
-  "analysis.signal.bitrateDrop": "bitrate dropped",
+  "analysis.signal.appCpu": "{app} reached {pct}% of the processor",
+  "analysis.signal.appGpu": "{app} reached {pct}% of the graphics card",
+  "analysis.signal.appMemory": "{app} used {gb} GB of memory",
+  "analysis.signal.bitrateDrop": "The outgoing quality dropped in this stretch",
   // Idêntico nos dois idiomas, mas é string montada — precisa de chave pra não virar concatenação solta.
-  "analysis.signal.cpu": "CPU {pct}%",
-  "analysis.signal.gpu": "GPU {pct}%",
-  "analysis.signal.obsCongested": "OBS congested {pct}%",
-  "analysis.signal.obsRender": "OBS render {ms}ms",
+  "analysis.signal.cpu": "The processor reached {pct}%",
+  "analysis.signal.gpu": "The graphics card reached {pct}%",
+  "analysis.signal.memory": "Memory reached {pct}%",
+  "analysis.signal.obsCongested":
+    "The feed from OBS to Corneta became constrained ({pct}%)",
+  "analysis.signal.obsRender": "OBS took up to {ms} ms to assemble each frame",
   // Chip de sinal dentro do card do trecho — minúscula proposital, é item de lista.
-  "analysis.signal.obsSignalLost": "no signal from OBS",
+  "analysis.signal.obsSignalLost": "OBS stopped sending video",
+  "analysis.signal.outputSkipped":
+    "OBS couldn't prepare {count} frames for delivery",
   // {targets} é a lista de destinos afetados já juntada com ", " no código. Em EN o verbo não muda no plural, mas o PT sim ("reconectou/reconectaram") — a
-  "analysis.signal.reconnected": "{targets} reconnected",
+  "analysis.signal.reconnected": "{targets} had to reconnect",
+  "analysis.signal.renderSkipped":
+    "OBS couldn't assemble {count} frames in time",
+  "analysis.signal.targetDropped":
+    "The platforms lost {count} frames in this stretch",
+  "analysis.verdict.app.detail":
+    "Across {n} {stretch}, {app} competed with the video at the same time frames fell behind.{brief}",
+  "analysis.verdict.app.title": "{app} left too little room for the stream",
   // ATENÇÃO: a string começa com espaço porque é colada no meio dos detalhes (marcada como {brief} nas outras chaves). Mantive o espaço no pt e no en.
   "analysis.verdict.brief":
     " It was quick ({sec}s in total) — chances are nobody watching even noticed.",
@@ -81,20 +108,26 @@ export const en: Dict = {
   "analysis.verdict.clean.title": "Clean stream",
   // {brief} é analysis.verdict.brief (já vem com o espaço na frente) e pode ser vazio. "no talo" → "maxed out".
   "analysis.verdict.encoding.detail":
-    "{n} {stretch} with CPU/GPU maxed out.{brief} In OBS: Settings → Output → switch the Encoder to the one on your graphics card (NVENC/QSV) — or drop the bitrate/resolution on the Quality screen.",
-  "analysis.verdict.encoding.title": "Your PC couldn't keep up (encoding)",
+    "Across {n} {stretch}, OBS couldn't prepare every frame in time.{brief} Lower the resolution or frame rate in OBS to leave more headroom.",
+  "analysis.verdict.encoding.title":
+    "The video became too heavy for the computer",
   // "engasgo" → "stutter" (glossário).
-  "analysis.verdict.encoding.title.brief": "Quick encoding stutter",
+  "analysis.verdict.encoding.title.brief":
+    "A quick stutter while preparing video",
+  "analysis.verdict.local.detail":
+    "Across {n} {stretch}, the video lost pace before it even left your computer.{brief}",
+  "analysis.verdict.local.title": "Video stuttered between OBS and Corneta",
   "analysis.verdict.network.detail":
-    "{n} {stretch} where the bitrate dropped or a platform reconnected while your PC wasn't even breaking a sweat.{brief}",
-  "analysis.verdict.network.title": "Your internet couldn't keep up (upload)",
-  "analysis.verdict.network.title.brief": "Quick internet stutter",
+    "Across {n} {stretch}, quality dropped or more than one platform reconnected at the same time.{brief}",
+  "analysis.verdict.network.title":
+    "Your connection to the platforms got shaky",
+  "analysis.verdict.network.title.brief": "A quick delivery fluctuation",
   "analysis.verdict.platform.detail":
-    "{n} {stretch} hitting one platform only — odds are the problem was on their end, not yours.{brief}",
-  "analysis.verdict.platform.title": "Trouble on the platform's end",
+    "Across {n} {stretch}, only one platform was affected. That points to the channel connection, but doesn't confirm which end caused it.{brief}",
+  "analysis.verdict.platform.title": "One platform lost pace",
   "analysis.verdict.render.detail":
-    "{n} {stretch} with OBS struggling to draw the frame (render lag) — lighten the scene (sources/filters/effects) or drop the base resolution in OBS.{brief}",
-  "analysis.verdict.render.title": "Heavy scene in OBS",
+    "Across {n} {stretch}, OBS took too long to assemble the picture. Lighten the scene, use fewer filters or avoid several animated videos together.{brief}",
+  "analysis.verdict.render.title": "OBS took too long to assemble the picture",
   // Esse veredito nunca recebe {brief} (o código só usa briefNote quando não houve perda de sinal).
   "analysis.verdict.signal.detail":
     "{n} {stretch} with no video coming in from OBS — everyone watching was stuck on a frozen frame.",
@@ -113,7 +146,7 @@ export const en: Dict = {
 
   // Isto NÃO é interface: é o texto desenhado no cartão que vai AO AR quando o
   // sinal do OBS cai. Quem lê é o público do streamer — por isso segue o idioma.
-  "brb.slate.subtitle": "back in a sec — hold the horn 📣",
+  "brb.slate.subtitle": "back in a sec — hang tight 📣",
   "brb.slate.title": "BE RIGHT BACK",
 
   // ---- chat ----
@@ -167,6 +200,8 @@ export const en: Dict = {
   // title e aria-label do botão da lixeira do painel de alertas.
   "chat.alerts.clear.title": "Clear alerts",
   "chat.alerts.newPulse": "New alert just came in!",
+  "chat.alerts.sourceDown":
+    "{source} dropped — check the token under Set up → Alert sources",
   "chat.alertsrc.add": "Add source",
   // aria-label funcional (§6).
   "chat.alertsrc.collapse": "Collapse source",
@@ -287,6 +322,8 @@ export const en: Dict = {
   "chat.feed.empty.waiting.body":
     "The moment anyone says something, it shows up here.",
   "chat.feed.empty.waiting.title": "Waiting on messages…",
+  "chat.feed.deleted.body": "message deleted",
+  "chat.feed.deleted.stamp": "deleted",
   "chat.feed.follow": "Follow chat",
   "chat.feed.hint.ready": "Until you connect, Corneta isn't reading your chat.",
   "chat.feed.hint.setup":
@@ -315,7 +352,6 @@ export const en: Dict = {
     "I already copied the code and opened Google's page for you — just paste it and authorize.",
   "chat.loginrow.device.openPage": "Open the page",
   "chat.loginrow.device.step1": "Copy the code",
-  // PT usa 1ª pessoa do plural; em inglês o app fala por si ("I opened").
   "chat.loginrow.device.step2": "Paste it on the page I opened",
   "chat.loginrow.device.step3":
     "Authorize it and that's it — Corneta signs in on its own.",
@@ -357,6 +393,8 @@ export const en: Dict = {
   "chat.overlay.block.chat": "Chat",
   "chat.overlay.chatPos.bottom": "Bottom (scrolls up)",
   "chat.overlay.chatPos.top": "Top (scrolls down)",
+  "chat.overlay.fetchError":
+    "Overlay's on, but I couldn't fetch the URLs — try again.",
   // "Browser Source" é o nome do recurso no OBS — fica em inglês (igual à LP).
   "chat.overlay.lede":
     "A local server that puts your **alerts** and **chat** (emotes and all) into OBS. Add the URL as a **Browser Source** — just once.",
@@ -408,12 +446,13 @@ export const en: Dict = {
   // title do botão de engrenagem.
   "chat.popout.displaySettings": "Display settings",
   // title funcional do divisor.
-  "chat.popout.divider": "Drag to resize",
+  "chat.popout.divider": "Resize chat and alerts",
   "chat.popout.feed.hint.ready": "Click Connect to pull the chat in.",
   "chat.popout.feed.hint.setup":
     "Set up your channels in the main Corneta window, then connect from here.",
   // title do botão Conectar desabilitado.
   "chat.popout.needSetup": "Set up your channels in the main Corneta window",
+  "chat.popout.openMain": "Open Corneta",
   "chat.popout.tab.alerts": "Alerts",
   // Concatenação de " {n}" ao rótulo (sem parênteses, diferente da tela principal).
   "chat.popout.tab.alerts.count": "Alerts {n}",
@@ -438,6 +477,7 @@ export const en: Dict = {
   "chat.send.status.signIn": "{label}: sign in to {platform}",
   "chat.send.status.signedIn": "{platform} signed in",
   // Opção do seletor de destino do envio; o value "all" é identificador.
+  "chat.send.target.aria": "Which platform to send to",
   "chat.send.target.all": "All",
   // aria-label funcional.
   "chat.source.collapse": "Collapse channel",
@@ -465,7 +505,7 @@ export const en: Dict = {
   "chat.source.platformLabel": "Platform",
   "chat.source.remove": "Remove channel",
   // Rótulo acessível do Toggle; aparece no card de canal e no de fonte de alerta.
-  "chat.source.toggle": "Turn it on or off",
+  "chat.source.toggle": "Turn {name} on or off",
   "chat.source.value.kick": "Name in the link",
   "chat.source.value.cinefy": "Name in the link",
   "chat.source.value.twitch": "Channel",
@@ -557,12 +597,17 @@ export const en: Dict = {
   // Anúncio de leitor de tela: funcional, não bem-humorado (§6). Ecoa analysis.event.error ("{target} hit an error") pra quem ouve saber QUAL é o estado.
   "components.app.live.aria.error": "The stream hit an error",
   "components.app.live.aria.live": "Live on every platform",
+  "components.app.live.aria.live.down.one": "On air, but {count} platform down",
+  "components.app.live.aria.live.down.other":
+    "On air, but {count} platforms down",
   "components.app.live.aria.connectingTargets":
-    "OBS connected; connecting to destinations",
+    "OBS connected; connecting to the platforms",
   "components.app.live.aria.starting": "Waiting for OBS to connect",
   "components.app.live.aria.stopped": "Off air",
   // Tela de boot, enquanto o config não carregou.
   "components.app.loading.boot": "Opening your workbench…",
+  "components.app.loading.error":
+    "Couldn't read your settings. Try again — if it keeps happening, open the logs and send them my way.",
   // Fallback do Suspense. "Afinar" é de instrumento — "tuning" guarda a metáfora da corneta.
   "components.app.loading.screen": "Tuning this screen…",
   // shortcut = a combinação já com "CommandOrControl" trocado por "Ctrl" (ex.: "Ctrl+Shift+L") — o VALOR não se traduz. "Global hotkey" é o termo já fixad
@@ -638,7 +683,7 @@ export const en: Dict = {
   // Aparece 2x no mesmo componente (prop title do Modal, que vira o Dialog.Title sr-only, e o <h2> visível) — uma chave só pros dois. "Sound the horn" é a
   "components.onboarding.title": "Hey! Ready to sound the horn?",
   "components.telemetry.crashes.body":
-    "Sends exceptions, the failure stage and error code, with redacted messages and stacks.",
+    "Sends what broke — the stage, error code and message — with your names, paths and text scrubbed out before it leaves.",
   "components.telemetry.crashes.title": "Send crash reports",
   "components.telemetry.notice.allowed":
     "May be sent: version, screen/stage, outcome, enumerated platform, system categories, and random correlation IDs.",
@@ -872,7 +917,8 @@ export const en: Dict = {
   "encoding.band.fix.passthrough.link": "see the guide →",
   // "ajuste fino" tem que bater com encoding.tuning.title.
   "encoding.band.fix.tuning":
-    "Turn the quality down in the **fine-tuning** below, or take a platform off.",
+    "Turn the quality down in the {link}, or take a platform off.",
+  "encoding.band.fix.tuning.link": "fine-tuning",
   // "engasgar" -> "stutter" (glossário). {bitrate} sai de fmtBitrate e {mbps} é número cru; ambos dentro de <strong> no JSX.
   "encoding.band.over.body":
     "This mode wants **{bitrate}** of upload, but I measured your internet at **{mbps} Mbps**. It's going to stutter mid-stream.",
@@ -885,11 +931,16 @@ export const en: Dict = {
   // {label} vem do Rust (ex.: NVENC, QSV) — nome de produto, não traduzir.
   "encoding.encoder.gpu": "Graphics card ({label})",
   // Estado de espera — mantém a reticência.
+  "encoding.encoders.error":
+    "Couldn't check what this machine has for re-encoding — try again.",
   "encoding.encoders.loading": "Checking what this machine has…",
   // "hits a lot harder" já é a formulação da LP pra CPU (content.faq.performance.answer).
   "encoding.encoders.noHw":
     "No graphics card here — it runs on the processor, it just hits a lot harder.",
   "encoding.encoders.title": "What converts video on this machine",
+  "encoding.encoders.unavailable.sr": "(not available on this machine)",
+  "encoding.empty.cta": "Turn a platform on",
+  "encoding.empty.title": "No platform is on",
   "encoding.fit.bad": "more than your upload can take",
   // "with room to spare" já é o termo da LP (quality.journey.before.stat.caption).
   "encoding.fit.ok": "fits your upload with room to spare",
@@ -900,6 +951,8 @@ export const en: Dict = {
   "encoding.guide.copy.suffix": "— they get **exactly** what comes out of OBS",
   // É o streamer confirmando, não o app: o botão fecha o guia, não o OBS. A versão en confirma o mesmo estado ("deixei o OBS certinho") sem inventar piada.
   "encoding.guide.done": "OBS is all set",
+  "encoding.guide.encoder.error":
+    "Couldn't check this machine's encoders — try again under Quality.",
   "encoding.guide.encoder.checking": "Checking your graphics card…",
   "encoding.guide.encoder.cpuOnly": "Processor — it's what this machine has",
   // "Guardião" não é nome próprio protegido: a LP já o traduz como "Privacy guard" (protection.guard.privacy.title).
@@ -919,7 +972,7 @@ export const en: Dict = {
   "encoding.guide.row.bitrate": "Bitrate",
   // {platform} é lcd.capBy — nome do destino, não traduzir.
   "encoding.guide.row.bitrate.noteCopy":
-    "above that, your stream freezes on {platform}",
+    "above that, {platform} freezes your stream",
   // Tem que rimar com encoding.obs.noCopy na tela de Qualidade.
   "encoding.guide.row.bitrate.noteFree":
     "the better the signal, the better it all looks",
@@ -991,7 +1044,7 @@ export const en: Dict = {
   "encoding.obs.guideLink": "See the full OBS guide →",
   // {platform} é lcd.capBy — nome editável do destino, não traduzir. "em cópia" e o bitrate estão em <strong>.
   "encoding.obs.lcd":
-    "Platforms **on copy** need OBS at **~{bitrate}** to stay inside **{platform}**'s limit.",
+    "Platforms **on copy** need OBS at **~{bitrate}** — that's the most **{platform}** will take.",
   // Tem que rimar com encoding.guide.row.bitrate.noteFree, que diz a mesma coisa no guia.
   "encoding.obs.noCopy":
     "No platform is **on copy** right now: the better the signal out of OBS, the better everything looks.",
@@ -1123,7 +1176,7 @@ export const en: Dict = {
     "With that pasted in, when you hit **GO LIVE** I'll try to hit play in OBS for you — if nothing happens, hit **Start Streaming** there yourself.",
   // Não repete mais o fim do encoding.wizard.step3.body.manual, que aparece no mesmo modal uns 200px acima: aqui a frase fecha com o estado, não com a instrução repetida.
   "encoding.wizard.manual.note.manual":
-    "That's it: OBS points at Corneta now, with no WebSocket in the middle.",
+    "Pasted both into OBS? Then it's pointing at Corneta — no WebSocket in the middle.",
   // Rótulo do CopyField; bate com o campo "Server" do OBS.
   "encoding.wizard.manual.server": "Server",
   "encoding.wizard.manual.toggle": "I'd rather set it up by hand",
@@ -1177,7 +1230,8 @@ export const en: Dict = {
   "golive.bar.protection.brb": "BE RIGHT BACK",
   // Tem que bater com golive.security.guardian.label.
   "golive.bar.protection.guardian": "Privacy guard",
-  "golive.bar.connectingTargets": "OBS connected · connecting destinations…",
+  "golive.bar.connectingTargets":
+    "OBS connected · connecting to the platforms…",
   "golive.bar.waitingObs": "Waiting for OBS…",
   "golive.bar.watching": "watching",
   // {problemas} vem de blockingIssues() em validation.ts (outra área) — os itens da lista precisam ser traduzidos lá, senão essa frase sai metade em PT.
@@ -1209,9 +1263,11 @@ export const en: Dict = {
   "golive.checkup.obsConnected.fix":
     "turn it on under Tools → WebSocket Server Settings (and the password goes in Corneta's Settings, if you set one)",
   "golive.checkup.obsPointing": "OBS pointing at Corneta",
-  // Cita o botão golive.obs.fixForMe e o nome da tela — os três têm que bater.
   "golive.checkup.obsPointing.fix":
-    "click Set it up for me (on the Live screen)",
+    "point OBS here with the button next to this",
+  "golive.checkup.state.bad": "problem",
+  "golive.checkup.state.ok": "done",
+  "golive.checkup.state.warn": "missing",
   // 'travar' → 'stutter' (glossário: engasgo → stutter). 'Simples'/'Avançado' são os modos do OBS ('Simple'/'Advanced').
   "golive.checkup.tip":
     "In OBS, under {caminho}: Simple mode is already right — relax. In Advanced mode, check {taxa} and {keyframe} — that's what the platforms ask for so it doesn't stutter.",
@@ -1247,7 +1303,7 @@ export const en: Dict = {
   "golive.error.logs": "See the logs",
   "golive.error.operationId": "Operation ID",
   "golive.error.retry": "Try again",
-  "golive.error.title": "Couldn't keep the stream going",
+  "golive.error.title": "Couldn't get your stream on air",
   // Kicker da tela. 'Bora cornetar' é nosso e carrega a corneta (instrumento e marca); 'Sound the horn' é a forma que a LP já usa em inglês e atravessa com o mesmo fato.
   "golive.header.kicker": "Sound the horn",
   "golive.header.subtitle":
@@ -1293,6 +1349,8 @@ export const en: Dict = {
   // Os dois lados falam em primeira pessoa do que o app fez (§3.1): 'Desliguei {nome}' / 'Turned {nome} off'.
   "golive.problems.turnedOff.toast":
     "Turned {nome} off — switch it back on under Platforms.",
+  "golive.rescue.authFailed":
+    "Found OBS, but the WebSocket password didn't match — check it under Settings → OBS.",
   "golive.rescue.body": "Is it open? Did you hit {botao}?",
   "golive.rescue.notPointing": "Found OBS, but it's not pointing at Corneta.",
   "golive.rescue.notReachable":
@@ -1302,12 +1360,17 @@ export const en: Dict = {
   "golive.security.adjust": "Adjust",
   "golive.security.armed": "Armed",
   "golive.security.bitrate.desc": "drops the quality if your internet chokes",
+  "golive.security.bitrate.desc.off":
+    "if your internet chokes, the stream stutters instead of dropping quality — turn it on under Adjust",
   // Mesmo termo da LP.
   "golive.security.bitrate.label": "Auto-bitrate",
   "golive.security.brb.desc":
     "if OBS drops the signal, BE RIGHT BACK goes on air and your stream never blinks",
+  "golive.security.brb.desc.off":
+    "if OBS drops, everyone's stuck on a frozen frame — turn it on under Adjust",
   "golive.security.brb.label": "BE RIGHT BACK",
-  "golive.security.disabled": "off",
+  "golive.security.guardian.desc.off":
+    "none of your words are being watched for on screen — turn it on under Adjust",
   // Termo já fixado na LP (protection.guard.privacy.title). A imagem do 'guardião' (pessoa) se perde, mas divergir da LP seria pior.
   "golive.security.guardian.label": "Privacy guard",
   "golive.security.guardian.noTerms": "on, but no words yet — add one",
@@ -1330,8 +1393,7 @@ export const en: Dict = {
     "I told OBS to start streaming — if this screen doesn't change, hit {botao} over there.",
   "golive.starting.manualObs":
     "In OBS, click {botao} — Corneta goes live on its own.",
-  "golive.starting.connectingTargets":
-    "OBS connected — opening the destinations…",
+  "golive.starting.connectingTargets": "OBS connected — opening the platforms…",
   // É status, não botão.
   "golive.starting.waiting": "Waiting for OBS to connect…",
   "golive.stat.bitrate": "Bitrate",
@@ -1342,7 +1404,7 @@ export const en: Dict = {
   "golive.stat.uptime": "On air",
   "golive.state.brb": "BE RIGHT BACK on air",
   // Estado em que o Guardião cortou o vídeo.
-  "golive.state.censor": "Censored",
+  "golive.state.censor": "BE RIGHT BACK (Privacy guard)",
   "golive.state.connecting": "Connecting",
   "golive.state.error": "Error",
   "golive.state.idle": "Waiting",
@@ -1388,7 +1450,7 @@ export const en: Dict = {
   "golive.target.retry": "Try again",
   "golive.target.swapKey": "Swap the key →",
   "golive.timer.onAir": "on air",
-  "golive.timer.connectingTargets": "OBS connected · opening destinations…",
+  "golive.timer.connectingTargets": "OBS connected · opening the platforms…",
   "golive.timer.waiting": "No video from OBS yet…",
   "golive.toast.canceled": "Canceled — you never went on air.",
   // 'A corneta' é o instrumento e o nome do produto ao mesmo tempo; em inglês só sobra o instrumento.
@@ -1441,9 +1503,10 @@ export const en: Dict = {
     "Your horn isn't pointed anywhere yet. Want to add the first platform?",
   "platforms.empty.cta": "Add platform",
   "platforms.empty.title": "So, no platforms yet?",
+  "platforms.key.cancelEdit": "Cancel changing the key",
   "platforms.key.change": "Change",
-  // aria-label + title do olhinho. Se quiser seguir §6 à risca, "Hide the stream key" nomeia melhor o controle — mas aí o PT também deveria mudar.
-  "platforms.key.hide": "Hide",
+  // aria-label + title do olhinho.
+  "platforms.key.hide": "Hide the stream key",
   "platforms.key.pasteSave": "Paste and save",
   "platforms.key.pasteSaveTitle":
     "Pastes from your clipboard and puts it straight into Windows Credential Manager",
@@ -1464,7 +1527,7 @@ export const en: Dict = {
   "platforms.key.saved": "Stream key in Windows Credential Manager",
   "platforms.key.savedToast":
     "Saved your stream key in Windows Credential Manager 🔒",
-  "platforms.key.show": "Show",
+  "platforms.key.show": "Show the stream key",
   "platforms.key.strippedUrl":
     "That looked like the whole URL — I kept just the stream key 👍",
   // Texto dentro do SVG do ingresso. O "MESA1" logo abaixo NÃO traduz — é o prefixo do código.
@@ -1579,6 +1642,7 @@ export const en: Dict = {
   // Segundo clique do botão de excluir (confirmação inline, volta sozinho em 3s).
   "platforms.profile.deleteConfirm": "Delete it for real?",
   "platforms.profile.deleteTitle": 'Delete the "{name}" profile',
+  "platforms.profile.defaultNew": "Profile {n}",
   // Texto do tooltip (Hint).
   "platforms.profile.hint":
     "A profile is a saved set of platforms. Make one for each situation ('Solo Twitch+YT', 'Event with TikTok') and switch with one click.",
@@ -1612,7 +1676,7 @@ export const en: Dict = {
   "platforms.target.badge.urlInvalid": "Bad URL",
   "platforms.target.collapseAria": "Collapse platform",
   // aria-label do Toggle — funcional (§6), então nomeia o que o interruptor liga.
-  "platforms.target.enableAria": "Turn this platform on",
+  "platforms.target.enableAria": "Turn {name} on",
   "platforms.target.expandAria": "Expand platform",
   // Abre a página da plataforma onde a chave fica.
   "platforms.target.getKey": "Get my stream key",
@@ -1629,7 +1693,6 @@ export const en: Dict = {
     "💡 Grabbing a frame needs OBS live. Without one, use the grid to line it up.",
   "platforms.reframe.lede":
     "Drag the box to pick which part of your video goes to the **{size}** (vertical).",
-  "platforms.reframe.needLive": "Needs OBS live",
   "platforms.reframe.preview": "preview",
   "platforms.reframe.result": "How it'll look",
   "platforms.reframe.save": "Save",
@@ -1654,17 +1717,18 @@ export const en: Dict = {
     "Checks whether the platform's server answers — it doesn't check your stream key",
   // Mesmo caso: era concatenação de fragmento + `preset.name`.
   "platforms.target.url.help":
-    "— where your video goes; paste the one {platform}'s dashboard gave you",
+    "— where your video goes; paste the URL the platform's dashboard gave you",
   // Hoje o JSX concatena " — o endereço pra onde seu vídeo vai; " + o ramo da Kick. Virou uma frase só: em inglês a ordem muda.
   "platforms.target.url.helpKick":
     "— where your video goes; I filled this one in, only change it if Kick's dashboard shows a different one",
   "platforms.target.url.invalid":
     "That URL won't work — use rtmp:// or rtmps://",
-  "platforms.target.url.label": "Ingest URL",
+  "platforms.target.url.label": "Server URL",
   // "servidor/app" é exemplo ilustrativo; "rtmp://" e "rtmps://" são protocolo e ficam.
   "platforms.target.url.placeholder":
     "rtmp://server/app  (rtmp:// or rtmps://)",
   // Linha abaixo do nome quando a URL ainda não vale.
+  "platforms.target.badge.off": "off",
   "platforms.target.urlUnset": "No URL set",
   "platforms.title": "Platforms",
   // Kicker acima de "Plataformas". Mantém a metáfora da corneta que a LP já usa ("Sound the horn", "blows the horn").
@@ -1814,6 +1878,7 @@ export const en: Dict = {
   "reports.csv.series.cpuPct": "cpu_pct",
   "reports.csv.series.droppedFor": "dropped_{target}",
   "reports.csv.series.gpuPct": "gpu_pct",
+  "reports.csv.series.memoryPct": "memory_pct",
   "reports.csv.series.obsCongestionPct": "obs_congestion_pct",
   "reports.csv.series.obsRenderMs": "obs_render_ms",
   "reports.csv.series.relTimeS": "rel_time_s",
@@ -1827,6 +1892,8 @@ export const en: Dict = {
   "reports.detail.delete": "Delete",
   // Segundo clique do botão de excluir. 'Sure?' é o que se fala; 'Confirm?' soa a caixa de diálogo.
   "reports.detail.delete.confirm": "Sure?",
+  "reports.detail.delete.error":
+    "Couldn't delete the report — the file is still in the folder. Try again, or open the folder and delete it by hand.",
   // Primeira pessoa nos dois idiomas: quem apagou foi o app (§3.1).
   "reports.detail.deleted": "Deleted that report.",
   "reports.detail.download": "Download",
@@ -1841,9 +1908,9 @@ export const en: Dict = {
   "reports.detail.mode": "{mode} mode",
   // Rótulo de botão é verbo do que vai acontecer (§6) — casa com o 'Building…' do histórico.
   "reports.detail.recap": "Build recap",
-  // A palavra entre aspas TEM que ser a mesma da constante ANON em src/lib/export/anonymize.ts — ver riscos.
+  // A palavra entre aspas TEM que ser a mesma de analysis.parse.alert.userFallback — é a que o anonimizador (src/lib/export/anonymize.ts) põe no lugar do nome.
   "reports.download.anon.desc":
-    "Swaps whoever showed up for “somebody”. Use it when you're sending this to a sponsor or an agency — every number stays.",
+    "Swaps whoever showed up for “someone”. Use it when you're sending this to a sponsor or an agency — every number stays.",
   "reports.download.anon.title": "No viewer names",
   "reports.download.csv.desc":
     "The whole stream, one row every ~2s, ready for Excel.",
@@ -1928,16 +1995,18 @@ export const en: Dict = {
   // Mesmo termo da LP (quality.journey.after.sticker).
   "reports.list.kicker": "After the stream",
   "reports.list.latest": "Latest stream",
+  "reports.list.noData":
+    "No numbers for this stream — open it to see what got recorded.",
   "reports.list.openStory": "Open the stream story",
   // Rótulo de botão = verbo do que vai acontecer.
   "reports.list.openFolder": "Open folder",
   "reports.list.result": "Recap",
-  // 'travou' aqui é o engasgo da transmissão → 'choked' (mesmo verbo da LP: 'a report on what choked').
   "reports.list.subtitle":
-    "Replay every broadcast, see what kept people around, and carry the lessons into your next one.",
+    "Replay each stream: where people showed up, where they left, and the minute it choked.",
   "reports.list.title": "Your streams",
   // Rótulo da linha tracejada em 92%.
   "reports.machine.dangerLine": "danger zone",
+  "reports.machine.memory": "Memory",
   "reports.machine.title": "Machine load (%)",
   "reports.marker.error": "● error",
   "reports.marker.noSignal": "● no signal from OBS",
@@ -2028,7 +2097,7 @@ export const en: Dict = {
     "Chat, alerts, and channels show where the conversation picked up.",
   "reports.story.community.title": "The crowd joined the story",
   "reports.story.noEngagement":
-    "This session did not record viewer or engagement data.",
+    "I didn't record viewers, followers or chat for this stream.",
   "reports.story.portrait.detail.chat":
     "It was live for {duration}, with the conversation setting the pace.",
   "reports.story.portrait.detail.duration":
@@ -2046,21 +2115,25 @@ export const en: Dict = {
   "reports.story.portrait.title.viewers.other":
     "{peak} viewers at the stream's biggest moment",
   "reports.story.replay.desc":
-    "The replay takes center stage: use the moments and charts below to jump straight to what matters.",
+    "Click a moment or a point on the chart and the video jumps there.",
+  "reports.story.replay.deletedBody":
+    "The report is still here — only the video is gone.",
+  "reports.story.replay.deletedTitle": "You deleted this stream's recording",
   "reports.story.replay.emptyBody":
-    "The recorder started, but did not save a playable frame. The stream's other signals are still available below.",
+    "I started recording, but the file came out empty. The rest of the report is right below.",
   "reports.story.replay.emptyDesc":
-    "The recording was empty, so the story continues through the signals captured during the broadcast.",
+    "The recording came out empty — the report goes on without the video.",
   "reports.story.replay.emptyTitle": "The recording never got started",
   "reports.story.replay.missingBody":
-    "You can still follow the viewers, highlights, and conversation recorded during the broadcast.",
+    "Recording starts off. Turn it on under Settings → General → Record the stream and your next stream shows up here to rewatch. Meanwhile, viewers, highlights and chat are still right below.",
   "reports.story.replay.missingDesc":
     "There is no video this time, so the story continues through the signals the stream left behind.",
   "reports.story.replay.missingTitle": "This stream was not recorded",
   "reports.story.replay.title": "Watch the stream again",
+  "reports.story.replay.turnOn": "Turn recording on",
   "reports.story.technical.clean": "All in order",
   "reports.story.technical.desc":
-    "Stream health, bitrate, CPU/GPU, and the full event log are kept here.",
+    "Signal health, machine load, possible causes, and the event log are kept here.",
   "reports.story.technical.review": "Has a technical note",
   "reports.story.technical.title": "Technical backstage",
   "reports.story.timeline.desc":
@@ -2068,18 +2141,23 @@ export const en: Dict = {
   "reports.story.timeline.title": "How the stream unfolded",
   "reports.story.verdict": "In one sentence",
   "reports.technical.incidents.desc":
-    "Similar occurrences become one diagnosis. Open only what you want to investigate.",
+    "Corneta matches what fell behind with what was under pressure at that moment. Open only what you want to investigate.",
+  "reports.technical.incidents.confidence.high": "Likely cause",
+  "reports.technical.incidents.confidence.low": "A clue, not confirmed yet",
+  "reports.technical.incidents.confidence.medium": "Possible cause",
   "reports.technical.incidents.distribution":
     "Distribution of {count} occurrences across the stream",
   "reports.technical.incidents.groups":
     "Grouped by cause · total points: {count}",
   "reports.technical.incidents.individual": "Individual occurrences",
   "reports.technical.incidents.longest": "Longest stretches",
+  "reports.technical.incidents.next": "What to try",
   "reports.technical.incidents.occurrences.one": "1 stretch",
   "reports.technical.incidents.occurrences.other": "{count} stretches",
-  "reports.technical.incidents.signalsMore": "+{count} signals",
+  "reports.technical.incidents.signalsMore": "{count} more pieces of evidence",
   "reports.technical.incidents.title": "Technical points, grouped",
   "reports.technical.incidents.total": "{duration} combined",
+  "reports.technical.incidents.why": "Why I think this",
   "reports.technical.showAll": "Show all ({count})",
   "reports.technical.showLess": "Show less",
   "reports.technical.tabs.events": "Log",
@@ -2109,9 +2187,8 @@ export const en: Dict = {
   // aria-label do Toggle, mesma string do título.
   "settings.appearance.lightTheme.toggle": "Light theme",
   "settings.appearance.title": "Appearance",
-  // Texto dentro da miniatura que ilustra a proteção — é a arte que vai pro ar, nome próprio em PT.
-  "settings.brb.slate.custom": "Use my own file (image or video)",
-  "settings.brb.slate.default": "Default (generated)",
+  "settings.brb.slate.custom": "Pick a file of mine",
+  "settings.brb.slate.default": "Use Corneta's default",
   "settings.brb.slate.label": "Your “BE RIGHT BACK” screen",
   // {current} é uma das quatro linhas "Usando: …" acima; hoje o código concatena a frase depois dela — precisa virar interpolação pra sobreviver.
   "settings.brb.slate.note":
@@ -2153,7 +2230,7 @@ export const en: Dict = {
   "settings.telemetry.buildDisabled":
     "Collection is disabled in this build; your choice stays saved for a configured version.",
   "settings.telemetry.crashes.desc":
-    "Redacted exceptions and technical failures, without attaching logs.",
+    "What broke, with your data scrubbed out and no logs attached.",
   "settings.telemetry.deletion.cta": "How to request deletion",
   "settings.telemetry.deletion.desc":
     "With both options off, copy the ID above and use the channel listed in the policy to delete data already sent.",
@@ -2171,9 +2248,9 @@ export const en: Dict = {
     "Previous ID unlinked. A new one will be created if you enable telemetry again.",
   "settings.telemetry.saveError":
     "Couldn't save that. Your previous choice still applies.",
-  "settings.telemetry.saved": "Telemetry preference updated.",
+  "settings.telemetry.saved": "Saved your choice.",
   "settings.telemetry.unavailable":
-    "The local telemetry service isn't available in this build. No data was sent.",
+    "Telemetry isn't working in this version of Corneta — I didn't send anything.",
   "settings.telemetry.usage.desc":
     "Stages and outcomes in categories, without text or stream content.",
   "settings.guardian.cost.chat":
@@ -2223,7 +2300,7 @@ export const en: Dict = {
   "sidebar.live.title": "Open the live panel",
   "sidebar.nav.chat.hint": "every chat in one place",
   "sidebar.nav.chat.label": "Chat",
-  "sidebar.nav.encoding.hint": "how good it looks",
+  "sidebar.nav.encoding.hint": "picture vs PC load",
   "sidebar.nav.encoding.label": "Quality",
   "sidebar.nav.golive.hint": "puts it all on air",
   "sidebar.nav.golive.label": "Live",
@@ -2241,7 +2318,7 @@ export const en: Dict = {
   "sidebar.state.error": "Error",
   // "cornetando" é a marca em movimento; em en vira o verbo que a marca sugere.
   "sidebar.state.live": "On air · blowing the horn",
-  "sidebar.state.connectingTargets": "Connecting destinations",
+  "sidebar.state.connectingTargets": "Connecting to the platforms",
   "sidebar.state.starting": "Waiting on OBS",
   "sidebar.state.stopped": "Off air",
   "sidebar.viewers": "watching",
@@ -2301,9 +2378,8 @@ export const en: Dict = {
     "The local address where OBS hands your video over. The {key} below is only between OBS and Corneta — it's not your platform stream key, which stays in Windows Credential Manager.",
   "settings.obs.ingest.desc.key": "key",
   "settings.obs.ingest.liveLock":
-    "You're live — I locked the endpoint so I don't drop OBS in the middle of your stream.",
-  // No JSX o texto quebra em duas linhas ("Endpoint de ingestão" + "(OBS)"), mas renderiza como uma frase só.
-  "settings.obs.ingest.title": "Ingest endpoint (OBS)",
+    "You're live — I locked this address so I don't drop OBS in the middle of your stream.",
+  "settings.obs.ingest.title": "Address for OBS",
   // “Show Connect Info” e “Enable Authentication” são os rótulos reais do OBS em inglês (ver riscos).
   "settings.obs.password.desc":
     "The password shows up in that same OBS window, behind the “Show Connect Info” button. If “Enable Authentication” is unchecked there, leave this empty.",
@@ -2331,13 +2407,11 @@ export const en: Dict = {
   "settings.safety.bitrate.title":
     "Hold the stream up when your internet chokes (auto-bitrate)",
   // aria-label do Toggle.
-  "settings.safety.bitrate.toggle": "Auto-bitrate",
   // Frase quase idêntica à da LP (protection.brb.body) — reaproveitei a tradução já aprovada.
   "settings.safety.brb.desc":
     "If OBS drops mid-stream, the “BE RIGHT BACK” screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns.",
   "settings.safety.brb.title": "Drop protection (BE RIGHT BACK)",
   // aria-label do Toggle.
-  "settings.safety.brb.toggle": "Drop protection",
   "settings.safety.desc":
     "What holds your stream up when OBS drops, your internet chokes, or something private of yours shows up on screen.",
   // "Safety net, not a guarantee" e os 12s vêm da LP — mantidos palavra por palavra.
@@ -2346,13 +2420,11 @@ export const en: Dict = {
   // Ao lado dele o <ExperimentalBadge> imprime "experimental" e um title — essa string mora em src/components/ui.tsx, fora desta área.
   "settings.safety.guardian.title": "Privacy guard",
   // aria-label do Toggle. "Guard" sozinho não diz o que o controle faz; aria-label é funcional (§6), então repete o nome inteiro.
-  "settings.safety.guardian.toggle": "Privacy guard",
   // Junta protection.guard.audio.body + .cost da LP, que dizem exatamente isso.
   "settings.safety.loudness.desc":
     "Corneta evens out your audio before it goes out — no “can't hear you” from chat, no blown-out ears when you switch scenes. If you already normalize in OBS, leave this off so the two don't fight.",
   "settings.safety.loudness.title": "Audio normalizer",
   // aria-label do Toggle.
-  "settings.safety.loudness.toggle": "Normalize",
   // Badge que aparece quando a proteção está ligada.
   "settings.safety.state.armed": "Armed",
   // Selo sobre a miniatura; o CAPS vem do CSS, a string é minúscula.
@@ -2378,6 +2450,8 @@ export const en: Dict = {
   "settings.record.desc":
     "Keep the stream on your computer and replay it later with the charts running alongside, in the report.",
   "settings.record.dir.default": "Corneta's default folder",
+  "settings.record.dir.error.kept":
+    "{path} won't work — I'm still recording to the folder you had.",
   "settings.record.dir.error.missing":
     "I couldn't find that folder — pick another one.",
   "settings.record.dir.error.notDir":
@@ -2422,9 +2496,11 @@ export const en: Dict = {
   "settings.tab.safety": "Safety nets",
   // {error} vem cru do backend em pt-BR; o texto do erro em si mora no Rust, não aqui.
   "settings.toast.export.error": "Couldn't export your settings — {error}",
-  // O pt está em particípio; o en volta pra primeira pessoa do que o app fez (§3.1).
   "settings.toast.export.ok": "Exported your settings",
   "settings.toast.import.error": "Couldn't import that file — {error}",
   "settings.toast.import.ok":
     "Imported your settings — I kept the old ones in a backup.",
+
+  // ---- shell (janela principal) ----
+  "shell.win.closeTray": "Close — Corneta stays by the clock",
 };

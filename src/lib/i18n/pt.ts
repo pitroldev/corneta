@@ -11,23 +11,37 @@
 
 export const pt = {
   // ---- analysis ----
+  "analysis.advice.app.cpu":
+    "Antes da próxima live, feche o que não estiver usando. Se {app} for o jogo, reduza a distância de visão, a física ou limite os FPS.",
+  "analysis.advice.app.gpu":
+    "Se {app} for o jogo, limite os FPS ou reduza sombras e efeitos. Tente deixar um pouco da placa de vídeo livre para o OBS.",
+  "analysis.advice.app.memory":
+    "Antes da live, fecha aba e programa que você não tá usando. Se {app} continuar crescendo, fecha e abre ele de novo antes de entrar no ar.",
   "analysis.advice.encoding":
-    "No OBS: Configurações → Saída → Encoder → escolha o da placa de vídeo (NVENC/QSV). Ou baixe o bitrate/resolução na tela Qualidade.",
+    "No OBS, reduza a resolução ou os FPS em Configurações → Vídeo. Se houver a opção, escolha o codificador da placa de vídeo em Configurações → Saída.",
+  "analysis.advice.local":
+    "Reinicie o OBS e a Corneta antes da próxima live. Se isso voltar a acontecer, confira se só um OBS está enviando para a Corneta.",
   "analysis.advice.network":
-    "Baixe o bitrate na tela Qualidade ou tire uma plataforma da live.",
+    "Teste o upload antes da próxima live. Se ele estiver variando, baixe o bitrate na tela Qualidade ou tire uma plataforma da transmissão.",
   "analysis.advice.platform":
-    "Provavelmente foi do lado da plataforma (o servidor dela, não você). Confira a chave e a página de status dela.",
+    "Confira a chave desse canal e a página de status da plataforma. Se acontecer de novo só nela, reconecte a conta.",
   "analysis.advice.render":
-    "Alivie a cena no OBS — menos fontes, filtros e efeitos — ou baixe a resolução base lá.",
+    "Alivie essa cena no OBS: desligue fontes que não aparecem, reduza filtros e evite vários vídeos animados ao mesmo tempo.",
   "analysis.advice.signal":
     "Confere se o OBS ficou aberto, transmitindo e apontando pra Corneta — nesse trecho a galera ficou sem imagem.",
   "analysis.advice.unknown": "Veja os sinais deste trecho.",
-  "analysis.cause.encoding": "Seu PC não deu conta de gerar o vídeo (encoding)",
-  "analysis.cause.network": "A internet não deu conta do upload",
-  "analysis.cause.platform": "Instabilidade em {target}",
-  "analysis.cause.render": "Cena pesada no OBS (render lag)",
-  "analysis.cause.signal": "O sinal do OBS caiu (sem vídeo chegando)",
-  "analysis.cause.unknown": "Causa indeterminada",
+  "analysis.cause.app.cpu": "{app} ocupou quase todo o processador",
+  "analysis.cause.app.gpu": "{app} ocupou quase toda a placa de vídeo",
+  "analysis.cause.app.memory":
+    "{app} ocupou muita memória enquanto ela estava no limite",
+  "analysis.cause.encoding": "O OBS não conseguiu preparar todos os quadros",
+  "analysis.cause.local": "O vídeo perdeu ritmo entre o OBS e a Corneta",
+  "analysis.cause.network": "A internet até as plataformas oscilou",
+  "analysis.cause.platform": "A conexão com {target} ficou instável",
+  "analysis.cause.render": "O OBS demorou para montar a imagem",
+  "analysis.cause.signal": "O vídeo parou de chegar do OBS",
+  "analysis.cause.unknown":
+    "Ainda não há dados suficientes para apontar a causa",
   "analysis.event.cpuHigh": "CPU em {pct}%",
   "analysis.event.end": "Fim da transmissão",
   "analysis.event.error": "{target} com erro",
@@ -47,32 +61,50 @@ export const pt = {
   // O caixa-alta do pôster é desenho: o recap.ts aplica .toUpperCase() aqui, como
   // já faz nos rótulos vizinhos do canvas.
   "analysis.recap.bestMoment": "Melhor momento",
-  "analysis.signal.bitrateDrop": "bitrate caiu",
-  "analysis.signal.cpu": "CPU {pct}%",
-  "analysis.signal.gpu": "GPU {pct}%",
-  "analysis.signal.obsCongested": "OBS congestionado {pct}%",
-  "analysis.signal.obsRender": "OBS render {ms}ms",
-  "analysis.signal.obsSignalLost": "sem sinal do OBS",
-  "analysis.signal.reconnected": "{targets} reconectou",
+  "analysis.signal.appCpu": "{app} chegou a {pct}% do processador",
+  "analysis.signal.appGpu": "{app} chegou a {pct}% da placa de vídeo",
+  "analysis.signal.appMemory": "{app} usou {gb} GB de memória",
+  "analysis.signal.bitrateDrop": "A qualidade enviada caiu nesse trecho",
+  "analysis.signal.cpu": "O processador chegou a {pct}%",
+  "analysis.signal.gpu": "A placa de vídeo chegou a {pct}%",
+  "analysis.signal.memory": "A memória chegou a {pct}%",
+  "analysis.signal.obsCongested":
+    "O envio do OBS para a Corneta ficou limitado ({pct}%)",
+  "analysis.signal.obsRender":
+    "O OBS levou até {ms} ms para montar cada quadro",
+  "analysis.signal.obsSignalLost": "O OBS parou de enviar vídeo",
+  "analysis.signal.outputSkipped":
+    "O OBS não conseguiu preparar {count} quadros para envio",
+  "analysis.signal.reconnected": "{targets} precisou reconectar",
+  "analysis.signal.renderSkipped":
+    "O OBS não conseguiu montar {count} quadros a tempo",
+  "analysis.signal.targetDropped":
+    "As plataformas perderam {count} quadros nesse trecho",
+  "analysis.verdict.app.detail":
+    "Em {n} {stretch}, {app} disputou recursos com o vídeo no mesmo momento em que quadros atrasaram.{brief}",
+  "analysis.verdict.app.title": "{app} deixou pouco espaço para a live",
   "analysis.verdict.brief":
     " Foi coisa rápida ({sec}s no total) — a galera provavelmente nem percebeu.",
   "analysis.verdict.clean.detail":
     "Vasculhei a live inteira e não vi perrengue nenhum.",
   "analysis.verdict.clean.title": "Transmissão limpa",
   "analysis.verdict.encoding.detail":
-    "{n} {stretch} com CPU/GPU no talo.{brief} No OBS: Configurações → Saída → troque o Encoder pro da placa de vídeo (NVENC/QSV) — ou baixe o bitrate/resolução na tela Qualidade.",
-  "analysis.verdict.encoding.title": "Seu PC não deu conta (encoding)",
-  "analysis.verdict.encoding.title.brief": "Engasgo rápido de encoding",
+    "Em {n} {stretch}, o OBS não conseguiu preparar todos os quadros a tempo.{brief} Reduza a resolução ou os FPS no OBS para deixar mais folga.",
+  "analysis.verdict.encoding.title": "O vídeo ficou pesado para o computador",
+  "analysis.verdict.encoding.title.brief": "Engasgo rápido ao preparar o vídeo",
+  "analysis.verdict.local.detail":
+    "Em {n} {stretch}, o vídeo perdeu ritmo antes mesmo de sair do seu computador.{brief}",
+  "analysis.verdict.local.title": "O vídeo engasgou entre o OBS e a Corneta",
   "analysis.verdict.network.detail":
-    "{n} {stretch} com bitrate caindo/reconexão sem o PC estar sobrecarregado.{brief}",
-  "analysis.verdict.network.title": "A internet não deu conta (upload)",
-  "analysis.verdict.network.title.brief": "Engasgo rápido de internet",
+    "Em {n} {stretch}, a qualidade caiu ou mais de uma plataforma reconectou ao mesmo tempo.{brief}",
+  "analysis.verdict.network.title": "A internet até as plataformas oscilou",
+  "analysis.verdict.network.title.brief": "Oscilação rápida no envio",
   "analysis.verdict.platform.detail":
-    "{n} {stretch} afetando uma plataforma só — provavelmente o problema foi do lado dela, não seu.{brief}",
-  "analysis.verdict.platform.title": "Instabilidade de plataforma",
+    "Em {n} {stretch}, só uma plataforma foi afetada. Isso aponta para a conexão daquele canal, mas ainda não confirma de qual lado foi.{brief}",
+  "analysis.verdict.platform.title": "Uma plataforma perdeu o ritmo",
   "analysis.verdict.render.detail":
-    "{n} {stretch} com o OBS penando pra montar o quadro (render lag) — alivie a cena (fontes/filtros/efeitos) ou baixe a resolução base no OBS.{brief}",
-  "analysis.verdict.render.title": "Cena pesada no OBS",
+    "Em {n} {stretch}, o OBS demorou para montar a imagem. Alivie a cena, reduza filtros ou evite vários vídeos animados juntos.{brief}",
+  "analysis.verdict.render.title": "O OBS demorou para montar a imagem",
   "analysis.verdict.signal.detail":
     "{n} {stretch} sem vídeo chegando do OBS — a galera ficou vendo tela parada.",
   "analysis.verdict.signal.title": "O sinal do OBS caiu",
@@ -106,7 +138,7 @@ export const pt = {
     "Adicione um canal da **Twitch**, **YouTube** ou **Kick** na aba Canais pra logar.",
   "chat.account.privacy.link": "Política de Privacidade",
   "chat.account.privacy.text":
-    "A Corneta usa sua conta só pro que está na {link}. Dá pra desconectar quando quiser.",
+    "A Corneta usa sua conta só pro que tá na {link}. Dá pra desconectar quando quiser.",
   "chat.account.youtube.forgot.toast": "Esqueci suas credenciais do YouTube",
   "chat.account.youtube.official.toast": "Login oficial do YouTube de volta",
   "chat.account.youtube.ownCreds.toast":
@@ -126,6 +158,8 @@ export const pt = {
   "chat.alerts.clear.confirmTitle": "Clique pra confirmar",
   "chat.alerts.clear.title": "Limpar alertas",
   "chat.alerts.newPulse": "Chegou alerta novo!",
+  "chat.alerts.sourceDown":
+    "{source} caiu — confere o token em Configurar → Fontes de alerta",
   "chat.alertsrc.add": "Adicionar fonte",
   "chat.alertsrc.collapse": "Recolher fonte",
   "chat.alertsrc.empty":
@@ -220,6 +254,8 @@ export const pt = {
   "chat.feed.empty.waiting.body":
     "Assim que a galera mandar mensagem, aparece aqui.",
   "chat.feed.empty.waiting.title": "Esperando mensagens…",
+  "chat.feed.deleted.body": "mensagem apagada",
+  "chat.feed.deleted.stamp": "apagada",
   "chat.feed.follow": "Acompanhar chat",
   "chat.feed.hint.ready":
     "Enquanto não ligar, a Corneta não lê nada do seu chat.",
@@ -236,13 +272,13 @@ export const pt = {
   "chat.login.prompt": "Entre na sua conta pra **enviar** e **moderar**",
   "chat.login.prompt.cta": "Configurar →",
   "chat.loginrow.browser.note":
-    "Abrimos a autorização no navegador — é só confirmar.",
+    "Abri a autorização no navegador — é só confirmar.",
   "chat.loginrow.browser.openAgain": "Abrir de novo",
   "chat.loginrow.device.note":
-    "Já copiamos o código e abrimos a página do Google pra você — é só colar e autorizar.",
+    "Já copiei o código e abri a página do Google pra você — é só colar e autorizar.",
   "chat.loginrow.device.openPage": "Abrir a página",
   "chat.loginrow.device.step1": "Copie o código",
-  "chat.loginrow.device.step2": "Cole na página que abrimos",
+  "chat.loginrow.device.step2": "Cole na página que eu abri",
   "chat.loginrow.device.step3": "Autorize e pronto — a Corneta entra sozinha.",
   "chat.loginrow.device.title": "Falta 1 passo — autorizar no navegador:",
   "chat.loginrow.device.waitingParens": "(aguardando…)",
@@ -261,7 +297,7 @@ export const pt = {
   "chat.mod.timeout": "Dei 10 min de timeout",
   "chat.overlay.addToObs": "Adicionar no OBS",
   // {block} é o título do bloco em minúsculas ("chat", "alertas").
-  "chat.overlay.added.toast": "Overlay de {block} no OBS",
+  "chat.overlay.added.toast": "Pus o overlay de {block} no OBS",
   "chat.overlay.aria.alertPosition": "Posição do overlay de alertas",
   "chat.overlay.aria.alertSize": "Tamanho do overlay de alertas",
   "chat.overlay.aria.badges": "Selos",
@@ -273,6 +309,8 @@ export const pt = {
   "chat.overlay.block.chat": "Chat",
   "chat.overlay.chatPos.bottom": "Embaixo (sobe)",
   "chat.overlay.chatPos.top": "Em cima (desce)",
+  "chat.overlay.fetchError":
+    "Overlay ligado, mas não consegui pegar as URLs — tenta de novo.",
   "chat.overlay.lede":
     "Servidor local que joga os **alertas** e o **chat** (com emotes) no OBS. Adicione a URL como **Browser Source** — uma vez só.",
   "chat.overlay.opt.badges": "Selos (mod/sub)",
@@ -313,11 +351,12 @@ export const pt = {
   "chat.popout.chatFont": "Fonte do chat",
   "chat.popout.clear.chat": "Limpar chat",
   "chat.popout.displaySettings": "Configurar exibição",
-  "chat.popout.divider": "Arraste pra redimensionar",
+  "chat.popout.divider": "Redimensionar chat e alertas",
   "chat.popout.feed.hint.ready": "Clique em Conectar pra puxar o chat.",
   "chat.popout.feed.hint.setup":
     "Configure os canais na janela principal da Corneta e conecte por aqui.",
   "chat.popout.needSetup": "Configure os canais na janela principal da Corneta",
+  "chat.popout.openMain": "Abrir a Corneta",
   "chat.popout.tab.alerts": "Alertas",
   "chat.popout.tab.alerts.count": "Alertas {n}",
   "chat.popout.tab.both": "Ambos",
@@ -335,6 +374,7 @@ export const pt = {
   "chat.send.status.reconnect": "{label}: reconecte o chat pra logar",
   "chat.send.status.signIn": "{label}: entre no {platform}",
   "chat.send.status.signedIn": "{platform} logado",
+  "chat.send.target.aria": "Pra qual plataforma mandar",
   "chat.send.target.all": "Todas",
   "chat.source.collapse": "Recolher canal",
   "chat.source.expand": "Expandir canal",
@@ -355,7 +395,7 @@ export const pt = {
   "chat.source.placeholder.youtube": "ex.: @seucanal",
   "chat.source.platformLabel": "Plataforma",
   "chat.source.remove": "Remover canal",
-  "chat.source.toggle": "Ligar ou desligar",
+  "chat.source.toggle": "Ligar ou desligar {name}",
   "chat.source.value.kick": "Nome no link",
   "chat.source.value.cinefy": "Nome no link",
   "chat.source.value.twitch": "Canal",
@@ -428,11 +468,17 @@ export const pt = {
     "JÁ VOLTO no ar — um termo seu apareceu na tela",
   "components.app.live.aria.error": "Erro na transmissão",
   "components.app.live.aria.live": "No ar em todas as plataformas",
+  "components.app.live.aria.live.down.one":
+    "No ar, mas {count} plataforma fora",
+  "components.app.live.aria.live.down.other":
+    "No ar, mas {count} plataformas fora",
   "components.app.live.aria.connectingTargets":
-    "OBS conectado; conectando aos destinos",
+    "OBS conectado; conectando às plataformas",
   "components.app.live.aria.starting": "Aguardando o OBS conectar",
   "components.app.live.aria.stopped": "Fora do ar",
   "components.app.loading.boot": "Abrindo sua bancada…",
+  "components.app.loading.error":
+    "Não consegui ler a sua configuração. Tenta de novo — se continuar assim, abre os logs e me manda.",
   "components.app.loading.screen": "Afinando esta tela…",
   "components.app.shortcut.taken":
     "Não consegui ativar o seu atalho {shortcut} — outro programa já tá usando ele. Troque em Configurações → Atalho global.",
@@ -483,7 +529,7 @@ export const pt = {
   "components.onboarding.subtitle": "Em {n} passos, do OBS até o relatório.",
   "components.onboarding.title": "Opa! Bora cornetar?",
   "components.telemetry.crashes.body":
-    "Envia exceções, a etapa e o código da falha, com mensagens e stacks redigidas.",
+    "Manda o que quebrou — a etapa, o código e a mensagem do erro — com nomes, caminhos e textos seus apagados antes de sair.",
   "components.telemetry.crashes.title": "Enviar relatórios de falha",
   "components.telemetry.notice.allowed":
     "Pode sair: versão, tela/etapa, resultado, plataforma em enum, categorias do sistema e IDs aleatórios de correlação.",
@@ -638,23 +684,31 @@ export const pt = {
     "Baixe a **Taxa de bits no OBS** ({link}) ou tire uma plataforma.",
   "encoding.band.fix.passthrough.link": "ver o guia →",
   "encoding.band.fix.tuning":
-    "Baixe a qualidade no **ajuste fino** aqui embaixo ou tire uma plataforma.",
+    "Baixe a qualidade no {link} ou tire uma plataforma.",
+  "encoding.band.fix.tuning.link": "ajuste fino",
   "encoding.band.over.body":
     "Este modo pede **{bitrate}** de upload, mas a sua internet mediu **{mbps} Mbps**. Vai engasgar no meio da live.",
   "encoding.card.upload.label": "Upload",
   "encoding.close": "Fechar",
   "encoding.encoder.cpu": "Processador (x264)",
   "encoding.encoder.gpu": "Placa de vídeo ({label})",
+  "encoding.encoders.error":
+    "Não consegui ver o que esta máquina tem pra recodificar — tenta de novo.",
   "encoding.encoders.loading": "Vendo o que esta máquina tem…",
   "encoding.encoders.noHw":
     "Sem placa de vídeo por aqui — funciona no processador, só pesa mais.",
   "encoding.encoders.title": "O que recodifica nesta máquina",
+  "encoding.encoders.unavailable.sr": "(indisponível nesta máquina)",
+  "encoding.empty.cta": "Ligar uma plataforma",
+  "encoding.empty.title": "Nenhuma plataforma ligada",
   "encoding.fit.bad": "acima da sua banda",
   "encoding.fit.ok": "cabe folgado na sua banda",
   "encoding.fit.warn": "no limite da sua banda",
   "encoding.guide.badge.redo": "eu refaço",
   "encoding.guide.copy.suffix": "— recebem **exatamente** o que sai do OBS",
   "encoding.guide.done": "Deixei o OBS certinho",
+  "encoding.guide.encoder.error":
+    "Não consegui ver os encoders desta máquina — tenta de novo em Qualidade.",
   "encoding.guide.encoder.checking": "Verificando a placa de vídeo…",
   "encoding.guide.encoder.cpuOnly": "Processador — é o que essa máquina tem",
   // Não repete o fim do encoding.obs.noCopy: aquele texto está no card da tela
@@ -670,8 +724,7 @@ export const pt = {
   "encoding.guide.path.lede": "O OBS encoda seu vídeo **uma vez**. Daí:",
   "encoding.guide.path.title": "O que cada plataforma recebe hoje",
   "encoding.guide.row.bitrate": "Taxa de bits",
-  "encoding.guide.row.bitrate.noteCopy":
-    "acima disso a live trava no {platform}",
+  "encoding.guide.row.bitrate.noteCopy": "acima disso, {platform} trava a live",
   "encoding.guide.row.bitrate.noteFree":
     "quanto melhor o sinal, melhor a saída",
   "encoding.guide.row.encoder": "Encoder",
@@ -719,7 +772,7 @@ export const pt = {
   "encoding.mode.perPlatform.title": "Caprichado",
   "encoding.obs.guideLink": "Ver o guia completo do OBS →",
   "encoding.obs.lcd":
-    "Plataformas **em cópia** precisam do OBS em **~{bitrate}** pra caber no **{platform}**.",
+    "Plataformas **em cópia** precisam do OBS em **~{bitrate}** — é o máximo que **{platform}** aceita.",
   "encoding.obs.noCopy":
     "Nenhuma plataforma **em cópia** agora: quanto melhor o sinal do OBS, melhor a saída.",
   "encoding.obs.path": "No OBS: Configurações → Saída → Taxa de bits. ",
@@ -798,9 +851,9 @@ export const pt = {
     "Sem estresse: dá pra configurar na mão logo abaixo.",
   "encoding.wizard.error.generic.title":
     "Não consegui configurar o OBS sozinha.",
-  "encoding.wizard.error.notfound.tip1": "O OBS está aberto aí no seu PC?",
+  "encoding.wizard.error.notfound.tip1": "O OBS tá aberto aí no seu PC?",
   "encoding.wizard.error.notfound.tip2":
-    "O WebSocket está ligado? Ferramentas → Configurações do Servidor WebSocket → Ativar Servidor WebSocket.",
+    "O WebSocket tá ligado? Ferramentas → Configurações do Servidor WebSocket → Ativar Servidor WebSocket.",
   "encoding.wizard.error.notfound.tip3": "A porta continua a padrão, 4455?",
   "encoding.wizard.error.notfound.tip4":
     "Algum firewall pode estar barrando a conexão — libere o OBS pra mim.",
@@ -811,7 +864,7 @@ export const pt = {
   "encoding.wizard.manual.note.autostart":
     "Com isso colado, na hora do **BORA AO VIVO** eu tento dar o play no OBS pra você — se nada acontecer, dê **Iniciar transmissão** nele.",
   "encoding.wizard.manual.note.manual":
-    "Pronto: o OBS já aponta pra Corneta, sem WebSocket nenhum no meio.",
+    "Colou os dois no OBS? Então ele já aponta pra Corneta — sem WebSocket nenhum no meio.",
   "encoding.wizard.manual.server": "Servidor",
   "encoding.wizard.manual.toggle": "Prefiro configurar na mão",
   "encoding.wizard.ok.autostart":
@@ -854,7 +907,7 @@ export const pt = {
   "golive.bar.protection.bitrate": "Auto-bitrate",
   "golive.bar.protection.brb": "JÁ VOLTO",
   "golive.bar.protection.guardian": "Guardião",
-  "golive.bar.connectingTargets": "OBS conectado · conectando destinos…",
+  "golive.bar.connectingTargets": "OBS conectado · conectando às plataformas…",
   "golive.bar.waitingObs": "Aguardando o OBS…",
   "golive.bar.watching": "assistindo",
   "golive.block.fixTarget":
@@ -877,10 +930,12 @@ export const pt = {
   "golive.checkup.obsConnected.fix":
     "ative em Ferramentas → Configurações do Servidor WebSocket (e a senha em Configurações, se houver)",
   "golive.checkup.obsPointing": "OBS apontando pra Corneta",
-  "golive.checkup.obsPointing.fix":
-    "clique em Configura pra mim (tela Ao vivo)",
+  "golive.checkup.obsPointing.fix": "aponta o OBS pra cá com o botão ao lado",
+  "golive.checkup.state.bad": "com problema",
+  "golive.checkup.state.ok": "feito",
+  "golive.checkup.state.warn": "falta",
   "golive.checkup.tip":
-    "No OBS, em {caminho}: no modo Simples já está certo — relaxa. No modo Avançado, confira {taxa} e {keyframe} — é o que as plataformas pedem pra não travar.",
+    "No OBS, em {caminho}: no modo Simples já tá certo — relaxa. No modo Avançado, confira {taxa} e {keyframe} — é o que as plataformas pedem pra não travar.",
   "golive.checkup.tip.guide": "Ver o guia completo →",
   "golive.checkup.tip.keyframe": "Intervalo de quadro-chave: 2 s",
   "golive.checkup.tip.path": "Configurações → Saída",
@@ -930,26 +985,33 @@ export const pt = {
   "golive.preflight.body":
     "Dá pra entrar no ar mesmo assim — a live só começa quando o OBS mandar o vídeo.",
   "golive.preflight.goAnyway": "Ir assim mesmo",
-  "golive.preflight.title": "O OBS ainda não está apontando pra cá",
+  "golive.preflight.title": "O OBS ainda não tá apontando pra cá",
   "golive.problems.pasteKey": "Colar a chave →",
   "golive.problems.title": "Resolva antes de iniciar:",
   "golive.problems.turnOff": "Desligar esta plataforma",
   "golive.problems.turnedOff.toast":
     "Desliguei {nome} — religue em Plataformas.",
-  "golive.rescue.body": "Ele está aberto? Deu {botao}?",
+  "golive.rescue.authFailed":
+    "Achei o OBS, mas a senha do WebSocket não bateu — confere em Configurações → OBS.",
+  "golive.rescue.body": "Ele tá aberto? Deu {botao}?",
   "golive.rescue.notPointing":
-    "Achei o OBS, mas ele não está apontando pra Corneta.",
+    "Achei o OBS, mas ele não tá apontando pra Corneta.",
   "golive.rescue.notReachable":
     "Não achei o OBS por aqui — parece fechado ou sem o WebSocket ligado.",
   "golive.rescue.title": "O OBS ainda não conectou",
   "golive.security.adjust": "Ajustar",
   "golive.security.armed": "Armado",
   "golive.security.bitrate.desc": "baixa a qualidade se a internet apertar",
+  "golive.security.bitrate.desc.off":
+    "se a internet apertar, a live engasga em vez de baixar a qualidade — liga em Ajustar",
   "golive.security.bitrate.label": "Auto-bitrate",
   "golive.security.brb.desc":
     "se o sinal do OBS cair, o aviso entra no ar sem a live piscar",
+  "golive.security.brb.desc.off":
+    "se o OBS cair, a galera fica vendo tela parada — liga em Ajustar",
   "golive.security.brb.label": "JÁ VOLTO",
-  "golive.security.disabled": "desligado",
+  "golive.security.guardian.desc.off":
+    "nenhum termo seu é vigiado na tela — liga em Ajustar",
   "golive.security.guardian.label": "Guardião",
   "golive.security.guardian.noTerms": "ligado, mas sem termos — adicione um",
   "golive.security.guardian.watching": "vigiando {n} termo(s)",
@@ -964,14 +1026,15 @@ export const pt = {
     "Chamei o OBS pra transmitir — se esta tela não mudar, dê {botao} nele.",
   "golive.starting.manualObs":
     "No OBS, clique {botao} — a Corneta entra no ar sozinha.",
-  "golive.starting.connectingTargets": "OBS conectado — abrindo os destinos…",
+  "golive.starting.connectingTargets":
+    "OBS conectado — abrindo as plataformas…",
   "golive.starting.waiting": "Aguardando o OBS conectar…",
   "golive.stat.bitrate": "Bitrate",
   "golive.stat.drops": "Quedas",
   "golive.stat.fps": "FPS",
   "golive.stat.uptime": "No ar",
   "golive.state.brb": "JÁ VOLTO no ar",
-  "golive.state.censor": "Censurado",
+  "golive.state.censor": "JÁ VOLTO (Guardião)",
   "golive.state.connecting": "Conectando",
   "golive.state.error": "Erro",
   "golive.state.idle": "Aguardando",
@@ -1008,7 +1071,7 @@ export const pt = {
   "golive.target.retry": "Tentar de novo",
   "golive.target.swapKey": "Trocar a chave →",
   "golive.timer.onAir": "no ar",
-  "golive.timer.connectingTargets": "OBS conectado · abrindo destinos…",
+  "golive.timer.connectingTargets": "OBS conectado · abrindo as plataformas…",
   "golive.timer.waiting": "Sem vídeo do OBS ainda…",
   "golive.toast.canceled": "Cancelei — você não chegou a entrar no ar.",
   "golive.toast.live": "No ar! A corneta tá tocando 📣",
@@ -1046,8 +1109,9 @@ export const pt = {
     "Sua corneta ainda não aponta pra lugar nenhum. Bora colocar a primeira plataforma?",
   "platforms.empty.cta": "Adicionar plataforma",
   "platforms.empty.title": "Cadê as plataformas?",
+  "platforms.key.cancelEdit": "Cancelar a troca da chave",
   "platforms.key.change": "Trocar",
-  "platforms.key.hide": "Ocultar",
+  "platforms.key.hide": "Ocultar a chave",
   "platforms.key.pasteSave": "Colar e salvar",
   "platforms.key.pasteSaveTitle":
     "Cola da área de transferência e já guarda no cofre",
@@ -1063,7 +1127,7 @@ export const pt = {
   "platforms.key.saveFailed": "Não consegui guardar a chave: {err}",
   "platforms.key.saved": "Chave no cofre",
   "platforms.key.savedToast": "Chave guardada no cofre 🔒",
-  "platforms.key.show": "Mostrar",
+  "platforms.key.show": "Mostrar a chave",
   "platforms.key.strippedUrl":
     "Isso parecia a URL completa — guardei só a chave 👍",
   "platforms.mesa.art.invite": "Convite",
@@ -1142,6 +1206,7 @@ export const pt = {
   "platforms.profile.delete": "Excluir",
   "platforms.profile.deleteConfirm": "Excluir mesmo?",
   "platforms.profile.deleteTitle": 'Excluir o perfil "{name}"',
+  "platforms.profile.defaultNew": "Perfil {n}",
   "platforms.profile.hint":
     "Um perfil é um conjunto salvo de plataformas. Crie um pra cada situação (ex.: 'Solo Twitch+YT', 'Evento com TikTok') e troque num clique.",
   "platforms.profile.label": "Perfil de transmissão",
@@ -1164,7 +1229,7 @@ export const pt = {
   "platforms.target.badge.ready": "Pronto",
   "platforms.target.badge.urlInvalid": "URL inválida",
   "platforms.target.collapseAria": "Recolher plataforma",
-  "platforms.target.enableAria": "Ligar esta plataforma",
+  "platforms.target.enableAria": "Ligar {name}",
   "platforms.target.expandAria": "Expandir plataforma",
   "platforms.target.getKey": "Pegar minha chave",
   "platforms.target.nameAria": "Nome da plataforma",
@@ -1181,7 +1246,6 @@ export const pt = {
     "💡 A captura de frame fica disponível com o OBS ao vivo. Sem frame, use a grade pra posicionar.",
   "platforms.reframe.lede":
     "Arraste o quadro pra escolher que parte do seu vídeo vai pro **{size}** (vertical).",
-  "platforms.reframe.needLive": "Disponível com o OBS ao vivo",
   "platforms.reframe.preview": "prévia",
   "platforms.reframe.result": "Vai sair assim",
   "platforms.reframe.save": "Salvar",
@@ -1199,15 +1263,16 @@ export const pt = {
   "platforms.target.test.ok": "📡 {msg}",
   "platforms.target.test.running": "Testando…",
   "platforms.target.test.title":
-    "Vê se o servidor da plataforma está respondendo — não confere a chave",
+    "Vê se o servidor da plataforma tá respondendo — não confere a chave",
   "platforms.target.url.help":
-    "— o endereço pra onde seu vídeo vai; cole a que o painel da {platform} te deu",
+    "— o endereço pra onde seu vídeo vai; cole a URL que o painel da plataforma te deu",
   "platforms.target.url.helpKick":
     "— o endereço pra onde seu vídeo vai; essa já vem pronta, só troque se o painel da Kick mostrar outra",
   "platforms.target.url.invalid": "URL inválida — use rtmp:// ou rtmps://",
-  "platforms.target.url.label": "URL de ingestão",
+  "platforms.target.url.label": "URL do servidor",
   "platforms.target.url.placeholder":
     "rtmp://servidor/app  (rtmp:// ou rtmps://)",
+  "platforms.target.badge.off": "desligada",
   "platforms.target.urlUnset": "URL não definida",
   "platforms.title": "Plataformas",
   "platforms.title.kicker": "Pra onde a corneta toca",
@@ -1343,6 +1408,7 @@ export const pt = {
   "reports.csv.series.cpuPct": "cpu_pct",
   "reports.csv.series.droppedFor": "quedas_{target}",
   "reports.csv.series.gpuPct": "gpu_pct",
+  "reports.csv.series.memoryPct": "memoria_pct",
   "reports.csv.series.obsCongestionPct": "obs_congestao_pct",
   "reports.csv.series.obsRenderMs": "obs_render_ms",
   "reports.csv.series.relTimeS": "tempo_rel_s",
@@ -1354,6 +1420,8 @@ export const pt = {
   "reports.detail.back": "Voltar",
   "reports.detail.delete": "Excluir",
   "reports.detail.delete.confirm": "Excluir mesmo?",
+  "reports.detail.delete.error":
+    "Não consegui excluir o relatório — o arquivo continua na pasta. Tenta de novo ou abre a pasta e apaga na mão.",
   "reports.detail.deleted": "Excluí o relatório.",
   "reports.detail.download": "Baixar",
   "reports.detail.error.title": "Não consegui abrir esta live",
@@ -1427,13 +1495,16 @@ export const pt = {
   "reports.list.archiveCount.other": "Mais {count} lives no arquivo",
   "reports.list.kicker": "Depois da live",
   "reports.list.latest": "Última live",
+  "reports.list.noData":
+    "Sem números nessa live — abre pra ver o que ficou registrado.",
   "reports.list.openStory": "Abrir a história da live",
   "reports.list.openFolder": "Abrir pasta",
   "reports.list.result": "Resumo",
   "reports.list.subtitle":
-    "Reveja cada transmissão, entenda o que prendeu a galera e leve os aprendizados pra próxima.",
+    "Reveja cada live: onde a galera chegou, onde ela saiu e em que minuto a transmissão engasgou.",
   "reports.list.title": "Suas lives",
   "reports.machine.dangerLine": "zona de perigo",
+  "reports.machine.memory": "Memória",
   "reports.machine.title": "Carga da máquina (%)",
   "reports.marker.error": "● erro",
   "reports.marker.noSignal": "● sem sinal do OBS",
@@ -1505,7 +1576,7 @@ export const pt = {
     "Chat, alertas e canais mostram onde a conversa ganhou força.",
   "reports.story.community.title": "A galera entrou na história",
   "reports.story.noEngagement":
-    "Esta sessão não registrou dados de audiência ou engajamento.",
+    "Não registrei viewers, seguidores nem chat nesta live.",
   "reports.story.portrait.detail.chat":
     "Foram {duration} no ar, com a conversa marcando o ritmo da transmissão.",
   "reports.story.portrait.detail.duration":
@@ -1523,21 +1594,25 @@ export const pt = {
   "reports.story.portrait.title.viewers.other":
     "{peak} pessoas no melhor momento da live",
   "reports.story.replay.desc":
-    "O replay é o centro: use os momentos e gráficos abaixo para voltar direto ao que importa.",
+    "Clica num momento ou num ponto do gráfico e o vídeo pula pra lá.",
+  "reports.story.replay.deletedBody":
+    "O relatório continua aqui — só o vídeo foi embora.",
+  "reports.story.replay.deletedTitle": "Você apagou a gravação desta live",
   "reports.story.replay.emptyBody":
-    "O gravador chegou a iniciar, mas não salvou nenhum quadro reproduzível. Os outros sinais da live continuam disponíveis abaixo.",
+    "Comecei a gravar, mas o arquivo ficou vazio. O resto do relatório tá logo abaixo.",
   "reports.story.replay.emptyDesc":
-    "A gravação ficou vazia, então a história continua pelos sinais registrados durante a transmissão.",
+    "A gravação ficou vazia — o relatório segue sem o vídeo.",
   "reports.story.replay.emptyTitle": "A gravação não chegou a começar",
   "reports.story.replay.missingBody":
-    "Ainda dá pra acompanhar a audiência, os destaques e a conversa registrada durante a transmissão.",
+    "A gravação vem desligada. Liga em Configurações → Geral → Gravar a live e a próxima live já aparece aqui pra rever. Enquanto isso, a audiência, os destaques e o chat continuam logo abaixo.",
   "reports.story.replay.missingDesc":
     "Não há vídeo desta vez, então a história continua pelos sinais que a live deixou.",
   "reports.story.replay.missingTitle": "Esta live não foi gravada",
   "reports.story.replay.title": "A live, de novo",
+  "reports.story.replay.turnOn": "Ligar a gravação",
   "reports.story.technical.clean": "Tudo em ordem",
   "reports.story.technical.desc":
-    "Saúde da transmissão, bitrate, CPU/GPU e o registro completo ficam guardados aqui.",
+    "Saúde do sinal, carga da máquina, possíveis causas e o registro de eventos ficam guardados aqui.",
   "reports.story.technical.review": "Tem nota técnica",
   "reports.story.technical.title": "Bastidores técnicos",
   "reports.story.timeline.desc":
@@ -1545,18 +1620,23 @@ export const pt = {
   "reports.story.timeline.title": "Como a live se desenrolou",
   "reports.story.verdict": "Em uma frase",
   "reports.technical.incidents.desc":
-    "Ocorrências parecidas viram um único diagnóstico. Abra só o que quiser investigar.",
+    "A Corneta cruza o que atrasou com o que estava pesado naquele instante. Abra só o que quiser investigar.",
+  "reports.technical.incidents.confidence.high": "Causa provável",
+  "reports.technical.incidents.confidence.low": "Pista, ainda sem confirmação",
+  "reports.technical.incidents.confidence.medium": "Possível causa",
   "reports.technical.incidents.distribution":
     "Distribuição de {count} ocorrências ao longo da live",
   "reports.technical.incidents.groups":
     "Resumo por causa · total de pontos: {count}",
   "reports.technical.incidents.individual": "Ocorrências individuais",
   "reports.technical.incidents.longest": "Trechos mais longos",
+  "reports.technical.incidents.next": "O que tentar",
   "reports.technical.incidents.occurrences.one": "1 trecho",
   "reports.technical.incidents.occurrences.other": "{count} trechos",
-  "reports.technical.incidents.signalsMore": "+{count} sinais",
+  "reports.technical.incidents.signalsMore": "mais {count} evidências",
   "reports.technical.incidents.title": "Pontos técnicos, agrupados",
   "reports.technical.incidents.total": "{duration} somados",
+  "reports.technical.incidents.why": "Por que eu acho isso",
   "reports.technical.showAll": "Ver todos ({count})",
   "reports.technical.showLess": "Mostrar menos",
   "reports.technical.tabs.events": "Registro",
@@ -1581,8 +1661,8 @@ export const pt = {
   "settings.appearance.lightTheme.title": "Tema claro",
   "settings.appearance.lightTheme.toggle": "Tema claro",
   "settings.appearance.title": "Aparência",
-  "settings.brb.slate.custom": "Usar arquivo meu (imagem ou vídeo)",
-  "settings.brb.slate.default": "Padrão (gerada)",
+  "settings.brb.slate.custom": "Escolher um arquivo meu",
+  "settings.brb.slate.default": "Usar a padrão da Corneta",
   "settings.brb.slate.label": "Tela do “JÁ VOLTO”",
   "settings.brb.slate.note":
     "{current} — entra no ar quando o sinal cai. Vídeo toca em loop e pode ter som.",
@@ -1614,7 +1694,7 @@ export const pt = {
   "settings.telemetry.buildDisabled":
     "A coleta está desativada neste build; sua escolha fica guardada para uma versão configurada.",
   "settings.telemetry.crashes.desc":
-    "Exceções e falhas técnicas redigidas, sem anexar logs.",
+    "O que quebrou, com dados seus apagados e sem anexar logs.",
   "settings.telemetry.deletion.cta": "Como pedir exclusão",
   "settings.telemetry.deletion.desc":
     "Com as duas opções desligadas, copie o ID acima e siga o canal indicado na política para excluir o que já foi enviado.",
@@ -1632,9 +1712,9 @@ export const pt = {
     "ID anterior desvinculado. Um novo será criado se você reativar a telemetria.",
   "settings.telemetry.saveError":
     "Não consegui salvar. A escolha anterior continua valendo.",
-  "settings.telemetry.saved": "Preferência de telemetria atualizada.",
+  "settings.telemetry.saved": "Salvei sua escolha.",
   "settings.telemetry.unavailable":
-    "O serviço local de telemetria não está disponível neste build. Nenhum dado foi enviado.",
+    "A telemetria não tá funcionando nesta versão da Corneta — não mandei nada.",
   "settings.telemetry.usage.desc":
     "Etapas e resultados em categorias, sem texto ou conteúdo da live.",
   "settings.guardian.cost.chat":
@@ -1676,7 +1756,7 @@ export const pt = {
   "sidebar.live.title": "Ver o painel ao vivo",
   "sidebar.nav.chat.hint": "todo chat num lugar",
   "sidebar.nav.chat.label": "Chat",
-  "sidebar.nav.encoding.hint": "capricho da imagem",
+  "sidebar.nav.encoding.hint": "qualidade e peso no PC",
   "sidebar.nav.encoding.label": "Qualidade",
   "sidebar.nav.golive.hint": "bota tudo no ar",
   "sidebar.nav.golive.label": "Ao vivo",
@@ -1691,7 +1771,7 @@ export const pt = {
   "sidebar.start.title": "Ir pro Ao vivo e começar",
   "sidebar.state.error": "Erro",
   "sidebar.state.live": "No ar · cornetando",
-  "sidebar.state.connectingTargets": "Conectando destinos",
+  "sidebar.state.connectingTargets": "Conectando às plataformas",
   "sidebar.state.starting": "Aguardando o OBS",
   "sidebar.state.stopped": "Fora do ar",
   "sidebar.viewers": "assistindo",
@@ -1709,7 +1789,7 @@ export const pt = {
     "Começa/para a transmissão de qualquer lugar — mesmo com a Corneta minimizada na bandeja.",
   "settings.hotkey.title": "Atalho global",
   "settings.hotkey.toast.inUse":
-    "Esse atalho já está em uso por outro programa — mantive o anterior.",
+    "Outro programa já tá usando esse atalho — mantive o anterior.",
   "settings.hotkey.toast.restoreFailed":
     "Não consegui restaurar o atalho anterior — defina um novo.",
   "settings.loading.body": "Já trago seus ajustes.",
@@ -1744,8 +1824,8 @@ export const pt = {
     "Endereço local onde o OBS te entrega o vídeo. A {key} abaixo é só entre OBS e Corneta — não é a chave da plataforma, que fica no cofre.",
   "settings.obs.ingest.desc.key": "chave",
   "settings.obs.ingest.liveLock":
-    "Você tá no ar — travei a edição do endpoint pra não derrubar o OBS no meio da live.",
-  "settings.obs.ingest.title": "Endpoint de ingestão (OBS)",
+    "Você tá no ar — travei esse endereço pra não derrubar o OBS no meio da live.",
+  "settings.obs.ingest.title": "Endereço pro OBS",
   "settings.obs.password.desc":
     "A senha aparece nessa mesma janela do OBS, no botão “Mostrar Chave de Conexão”. Se “Ativar Autenticação” estiver desmarcado lá, deixe vazio.",
   "settings.obs.password.placeholder": "(opcional)",
@@ -1757,30 +1837,26 @@ export const pt = {
     "Senha recusada — confira a senha do WebSocket no OBS (botão “Mostrar Chave de Conexão”).",
   "settings.obs.test.button": "Testar conexão",
   "settings.obs.test.notFound":
-    "Não achei o OBS — ele está aberto? O WebSocket está ativado em Ferramentas → Configurações do Servidor WebSocket?",
+    "Não achei o OBS — ele tá aberto? O WebSocket tá ligado em Ferramentas → Configurações do Servidor WebSocket?",
   "settings.obs.test.ok": "Conectado",
   "settings.obs.test.okDetail": "Conectado · {width}×{height} · {fps}fps",
   "settings.obs.test.wrongTarget":
-    "Conectado, mas o OBS não está apontando pra Corneta — use “Configura pra mim” na tela Ao vivo.",
+    "Conectado, mas o OBS não tá apontando pra Corneta — use “Configura pra mim” na tela Ao vivo.",
   "settings.safety.bitrate.desc":
     "Internet engasgou? A Corneta desce a qualidade do vídeo por um tempo em vez de deixar a live travar ou cair, e sobe de novo quando o upload firma.",
   "settings.safety.bitrate.title":
     "Segurar a live quando a internet aperta (auto-bitrate)",
-  "settings.safety.bitrate.toggle": "Auto-bitrate",
   "settings.safety.brb.desc":
     "Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna.",
   "settings.safety.brb.title": "Proteção contra quedas (JÁ VOLTO)",
-  "settings.safety.brb.toggle": "Proteção contra quedas",
   "settings.safety.desc":
     "O que segura a sua live quando o OBS cai, a internet aperta ou um dado seu aparece na tela.",
   "settings.safety.guardian.desc":
     "Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. Rede de segurança, não garantia. Custo: a live inteira sai com 12s de atraso (o chat também).",
   "settings.safety.guardian.title": "Guardião de privacidade",
-  "settings.safety.guardian.toggle": "Guardião",
   "settings.safety.loudness.desc":
     "A Corneta acerta o volume do seu som antes de enviar — sem “tá baixo” nem estourando na troca de cena. Se você já normaliza no OBS, deixe desligado pra não brigar.",
   "settings.safety.loudness.title": "Normalizador de áudio",
-  "settings.safety.loudness.toggle": "Normalizar",
   "settings.safety.state.armed": "Armado",
   "settings.safety.state.off": "desligado",
   "settings.safety.title": "Segurança ao vivo",
@@ -1799,6 +1875,8 @@ export const pt = {
   "settings.record.desc":
     "Guarde a live no seu computador e reveja depois com os gráficos correndo junto, no relatório.",
   "settings.record.dir.default": "pasta padrão da Corneta",
+  "settings.record.dir.error.kept":
+    "{path} não serve — continuo gravando na pasta de antes.",
   "settings.record.dir.error.missing": "Não achei essa pasta — escolha outra.",
   "settings.record.dir.error.notDir":
     "Isso não é uma pasta — aponte pra uma pasta.",
@@ -1840,10 +1918,14 @@ export const pt = {
   "settings.tab.obs": "OBS",
   "settings.tab.safety": "Segurança ao vivo",
   "settings.toast.export.error": "Não consegui exportar a config: {error}",
-  "settings.toast.export.ok": "Config exportada",
+  "settings.toast.export.ok": "Exportei sua config",
   "settings.toast.import.error": "Não consegui importar esse arquivo: {error}",
   "settings.toast.import.ok":
     "Config importada — guardei a anterior num backup.",
+
+  // ---- shell (janela principal) ----
+  // aria-label + title do X da barra de título quando fechar esconde a Corneta perto do relógio.
+  "shell.win.closeTray": "Fechar — a Corneta fica perto do relógio",
 } as const;
 
 export type Dict = Record<keyof typeof pt, string>;

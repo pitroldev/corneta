@@ -23,6 +23,8 @@ export function Toaster() {
   const t = useT();
   const toasts = useToasts((s) => s.toasts);
   const dismiss = useToasts((s) => s.dismiss);
+  const pause = useToasts((s) => s.pause);
+  const resume = useToasts((s) => s.resume);
 
   return (
     <div
@@ -42,6 +44,18 @@ export function Toaster() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              // Erro interrompe (alert = assertive): "Não consegui guardar a chave"
+              // não pode esperar o leitor de tela terminar o que estava lendo.
+              // Os outros seguem o polite da região.
+              role={item.kind === "error" ? "alert" : undefined}
+              // Mouse em cima ou foco dentro (Tab até "Desfazer"/X) segura o
+              // relógio: o aviso só some depois que a pessoa sai dele.
+              onMouseEnter={() => pause(item.id)}
+              onMouseLeave={() => resume(item.id)}
+              onFocus={() => pause(item.id)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) resume(item.id);
+              }}
               className={`pointer-events-auto flex items-start gap-3 rounded-md border-l-4 bg-surface-2 pop p-3.5 ${STRIPE[item.kind]}`}
             >
               <Icon
@@ -60,10 +74,11 @@ export function Toaster() {
                   {item.action.label}
                 </button>
               )}
+              {/* Alvo de 24px (WCAG 2.5.8) com a pegada visual de 16px do ícone. */}
               <button
                 aria-label={t("components.toaster.dismiss.aria")}
                 onClick={() => dismiss(item.id)}
-                className="text-ink-faint hover:text-ink"
+                className="-m-1 grid size-6 shrink-0 place-items-center text-ink-faint hover:text-ink"
               >
                 <X className="size-4" aria-hidden />
               </button>

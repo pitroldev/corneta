@@ -22,6 +22,7 @@ function encoderLabel(t: I18n["t"], kind: string, label: string): string {
 export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const config = useStore((s) => s.config)!;
   const encoders = useStore((s) => s.encoders);
+  const encodersError = useStore((s) => s.encodersError);
   const { t, fmt } = useI18n();
 
   const enabled = config.targets.filter((x) => x.enabled);
@@ -76,7 +77,12 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const hw = encoders.find((e) => e.available && e.kind !== "software");
   const encAdvice =
     encoders.length === 0
-      ? t("encoding.guide.encoder.checking")
+      ? // Lista vazia por FALHA da sonda não é "verificando": diz e aponta onde tentar de novo.
+        t(
+          encodersError
+            ? "encoding.guide.encoder.error"
+            : "encoding.guide.encoder.checking",
+        )
       : hw
         ? encoderLabel(t, hw.kind, hw.label)
         : t("encoding.guide.encoder.cpuOnly");

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -35,6 +35,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   Hint,
   PlatformGlyph,
   SectionTitle,
@@ -90,10 +91,21 @@ export function EncodingScreen() {
   const snapshot = useStore((s) => s.snapshot);
   const runUploadTest = useStore((s) => s.runUploadTest);
   const refreshEncoders = useStore((s) => s.refreshEncoders);
+  const encodersError = useStore((s) => s.encodersError);
+  const requestNavigate = useStore((s) => s.requestNavigate);
   const { t, fmt } = useI18n();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [measuring, setMeasuring] = useState(false);
+  // O card vermelho de banda manda pro "ajuste fino" — que nasce fechado lá embaixo.
+  // O link abre o acordeão e leva até o cabeçalho dele (foco junto, pro leitor de tela).
+  const tuningToggleRef = useRef<HTMLButtonElement>(null);
+  const openTuning = () => {
+    setShowAdvanced(true);
+    const toggle = tuningToggleRef.current;
+    toggle?.scrollIntoView({ behavior: "smooth", block: "start" });
+    toggle?.focus({ preventScroll: true });
+  };
 
   useEffect(() => {
     if (encoders.length === 0) void refreshEncoders();
@@ -102,6 +114,7 @@ export function EncodingScreen() {
   if (!config) return null;
 
   const lcd = lowestCommonDenominator(config);
+  const anyEnabled = config.targets.some((x) => x.enabled);
 
   // Quantas recodificações simultâneas a placa aguenta (heurística dos encoders).
   const maxHw = Math.max(
@@ -162,6 +175,25 @@ export function EncodingScreen() {
         title={t("encoding.header.title")}
         subtitle={t("encoding.header.subtitle")}
       />
+
+      {/* Sem plataforma ligada, tudo abaixo é zero ("Upload 0 kbps") — o caminho tem
+          que aparecer ANTES dos números, não dentro do acordeão fechado lá embaixo. */}
+      {!anyEnabled && (
+        <EmptyState
+          className="mb-4"
+          title={t("encoding.empty.title")}
+          action={
+            <Button
+              variant="primary"
+              onClick={() => requestNavigate("platforms")}
+            >
+              {t("encoding.empty.cta")}
+            </Button>
+          }
+        >
+          {t("encoding.tuning.noPlatforms")}
+        </EmptyState>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {MODES.map((m) => {
@@ -360,7 +392,19 @@ export function EncodingScreen() {
                 })}
               </p>
             ) : (
-              <p className="mt-1">{bold(t, "encoding.band.fix.tuning")}</p>
+              <p className="mt-1">
+                {rich(t, "encoding.band.fix.tuning", {
+                  link: (
+                    <button
+                      type="button"
+                      onClick={openTuning}
+                      className="font-bold text-brass hover:underline"
+                    >
+                      {t("encoding.band.fix.tuning.link")}
+                    </button>
+                  ),
+                })}
+              </p>
             )}
           </div>
         </Card>
@@ -415,9 +459,22 @@ export function EncodingScreen() {
           <Cpu className="size-4" /> {t("encoding.encoders.title")}
         </h3>
         {encoders.length === 0 ? (
-          <Card className="bg-surface-2 text-sm text-ink-muted">
-            {t("encoding.encoders.loading")}
-          </Card>
+          encodersError ? (
+            <Card className="flex flex-wrap items-center gap-3 bg-surface-2 text-sm text-ink-muted">
+              <p className="min-w-0 flex-1">{t("encoding.encoders.error")}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshEncoders()}
+              >
+                {t("golive.error.retry")}
+              </Button>
+            </Card>
+          ) : (
+            <Card className="bg-surface-2 text-sm text-ink-muted">
+              {t("encoding.encoders.loading")}
+            </Card>
+          )
         ) : (
           <>
             <div className="flex flex-wrap gap-2">
@@ -432,6 +489,11 @@ export function EncodingScreen() {
                   )}
                 >
                   {e.label}
+                  {!e.available && (
+                    <span className="sr-only">
+                      {t("encoding.encoders.unavailable.sr")}
+                    </span>
+                  )}
                 </span>
               ))}
             </div>
@@ -448,6 +510,8 @@ export function EncodingScreen() {
           em vez de sumir da tela (sumir = pulo de layout + "cadê o ajuste fino?"). */}
       <div className="mt-7">
         <button
+          ref={tuningToggleRef}
+          type="button"
           onClick={() => setShowAdvanced((v) => !v)}
           aria-expanded={showAdvanced}
           className="mb-2 flex w-full items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint transition-colors hover:text-ink-muted"
@@ -474,7 +538,7 @@ export function EncodingScreen() {
                 {t("encoding.tuning.passthrough.guideLink")}
               </button>
             </Card>
-          ) : config.targets.some((x) => x.enabled) ? (
+          ) : anyEnabled ? (
             <div className="flex flex-col gap-2">
               {config.targets
                 .filter((x) => x.enabled)

@@ -154,7 +154,7 @@ function TechnicalWorkspace({
       label: t("reports.technical.tabs.signal"),
       Icon: Activity,
     });
-  if (story.sampleCount > 1 && technical.hasCpuOrGpu)
+  if (story.sampleCount > 1 && technical.hasMachineData)
     views.push({
       id: "machine",
       label: t("reports.technical.tabs.machine"),

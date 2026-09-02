@@ -9,6 +9,7 @@ import {
   chatRateSeriesFor,
   cpuSeries,
   gpuSeries,
+  memorySeries,
   type ReportAnalysis,
 } from "../report";
 import type { ReportI18n } from "./html";
@@ -159,6 +160,7 @@ export function seriesCsv(
     t("reports.csv.series.clock"),
     t("reports.csv.series.cpuPct"),
     t("reports.csv.series.gpuPct"),
+    t("reports.csv.series.memoryPct"),
     t("reports.csv.series.obsRenderMs"),
     t("reports.csv.series.obsCongestionPct"),
     t("reports.csv.series.chatPerMin"),
@@ -179,6 +181,7 @@ export function seriesCsv(
 
   const cpu = cpuSeries(d);
   const gpu = gpuSeries(d);
+  const memory = memorySeries(d);
   const chat = chatRateSeries(d);
   const chatPorCanal = canais.map((c) => chatRateSeriesFor(d, c.key));
 
@@ -203,6 +206,7 @@ export function seriesCsv(
       clock(s.t),
       cpu[i],
       gpu[i],
+      memory[i],
       s.obs ? Math.round(s.obs.avgRenderMs * 10) / 10 : null,
       s.obs ? Math.round(s.obs.congestion * 100) : null,
       chat[i],

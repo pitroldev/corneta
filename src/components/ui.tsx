@@ -34,8 +34,10 @@ type Variant =
   "primary" | "tomate" | "pop" | "ghost" | "outline" | "danger" | "subtle";
 type Size = "sm" | "md" | "lg";
 
+// Tinta night sobre tomate: ≈6:1 no breu (branco dava 3,1:1 — e BORA AO VIVO em
+// 18px bold não conta como texto grande). No papel o index.css troca por branco.
 const TOMATE =
-  "bg-tomate text-white hover:bg-tomate-strong pop active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold";
+  "bg-tomate text-night hover:bg-tomate-strong pop active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold";
 const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-brass text-brass-ink hover:bg-brass-strong pop-brass active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold",
@@ -70,8 +72,10 @@ export function Button({
     <button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
+      // `cursor-not-allowed` em vez de `pointer-events-none`: com pointer-events
+      // zerado o `title` (motivo do bloqueio) nunca abria no hover.
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap transition duration-75 disabled:opacity-40 disabled:pointer-events-none disabled:shadow-none",
+        "inline-flex items-center justify-center whitespace-nowrap transition duration-75 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
         VARIANTS[variant],
         SIZES[size],
         className,
@@ -117,12 +121,14 @@ export function Card({
 }
 
 // ---------------- Badge (adesivo) ----------------
+// Texto de 11px bold pede 4,5:1: night sobre bad/live dá ≈7:1 no breu (branco dava
+// 3:1). No papel o index.css troca a night por branco nesses blocos.
 type BadgeTone = "ok" | "warn" | "bad" | "live" | "brass" | "neutral";
 const BADGE_TONES: Record<BadgeTone, string> = {
   ok: "bg-ok text-night",
   warn: "bg-warn text-night",
-  bad: "bg-bad text-white",
-  live: "bg-live text-white",
+  bad: "bg-bad text-night",
+  live: "bg-live text-night",
   brass: "bg-brass text-brass-ink",
   neutral: "bg-surface-3 text-ink-muted",
 };
@@ -156,18 +162,42 @@ export function Badge({
 
 // ---------------- Experimental (adesivo de feature beta) ----------------
 // Selo de gibi torto com frasco — sinaliza "ainda em teste, pode falhar/mudar".
-export function ExperimentalBadge({ className }: { className?: string }) {
+// A explicação chega ao leitor de tela como texto (sr-only) e ao mouse pelo title.
+// `interactive` troca o span por um botão que abre a explicação no foco e no hover
+// (Tooltip do kit) — só fora de outro botão: nos pickers de plataforma o selo fica
+// DENTRO de um <button>, e HTML não aceita botão em botão.
+export function ExperimentalBadge({
+  className,
+  interactive = false,
+}: {
+  className?: string;
+  interactive?: boolean;
+}) {
   const t = useT();
+  const label = t("components.ui.experimental.label");
+  const title = t("components.ui.experimental.title");
+  const cls = cn(
+    "inline-flex shrink-0 -rotate-2 items-center gap-1 rounded-sm bg-tomate px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-night pop-sm",
+    className,
+  );
+  const inner = (
+    <>
+      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden /> {label}
+    </>
+  );
+  if (interactive) {
+    return (
+      <Tooltip content={title}>
+        <button type="button" className={cn(cls, "cursor-help")}>
+          {inner}
+        </button>
+      </Tooltip>
+    );
+  }
   return (
-    <span
-      title={t("components.ui.experimental.title")}
-      className={cn(
-        "inline-flex shrink-0 -rotate-2 items-center gap-1 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white pop-sm",
-        className,
-      )}
-    >
-      <FlaskConical className="size-3" strokeWidth={2.6} aria-hidden />{" "}
-      {t("components.ui.experimental.label")}
+    <span title={title} className={cls}>
+      {inner}
+      <span className="sr-only"> — {title}</span>
     </span>
   );
 }
@@ -323,7 +353,9 @@ export function Stat({
 
 // ---------------- Hint (tooltip didático) ----------------
 // Gatilho focável: abre no hover E no foco/tap (teclado também vê). Usa o Tooltip
-// (tokens, sem hex fixo) pra não quebrar no tema claro.
+// (tokens, sem hex fixo) pra não quebrar no tema claro. O nome do botão é a própria
+// dica: o leitor de tela recebe o texto ao focar, em vez de ouvir um "Ajuda"
+// genérico três vezes na mesma tela.
 export function Hint({
   text,
   className,
@@ -331,15 +363,17 @@ export function Hint({
   text: string;
   className?: string;
 }) {
-  const t = useT();
   return (
-    <Tooltip content={text} className={cn("align-middle", className)}>
+    <Tooltip content={text}>
       <button
         type="button"
-        aria-label={t("components.ui.hint.aria")}
-        className="inline-flex cursor-help text-ink-faint transition-colors hover:text-ink"
+        aria-label={text}
+        className={cn(
+          "inline-flex cursor-help align-middle text-ink-faint transition-colors hover:text-ink",
+          className,
+        )}
       >
-        <Info className="size-3.5" />
+        <Info className="size-3.5" aria-hidden />
       </button>
     </Tooltip>
   );

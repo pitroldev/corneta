@@ -608,6 +608,7 @@ export function ReplayPlayer({
                 aria-valuemin={0}
                 aria-valuemax={Math.round(tuned.totalMs / 1000)}
                 aria-valuenow={Math.round(globalMs / 1000)}
+                aria-valuetext={`${clock(globalMs)} / ${clock(tuned.totalMs)}`}
                 aria-disabled={!canControl}
                 aria-label={t("replay.scrub.aria")}
               >

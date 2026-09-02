@@ -163,13 +163,19 @@ export function loadProfile(config: AppConfig, id: string): AppConfig {
 }
 
 /** Novo perfil = cópia do working set atual, com nome "Perfil N" único. `id` vem de fora. */
-export function addProfile(config: AppConfig, id: string): AppConfig {
+/** `label(n)` devolve o nome padrão do n-ésimo perfil já traduzido ("Perfil {n}" / "Profile {n}").
+ *  Vem de fora porque este módulo é núcleo puro e não conhece o idioma da tela. */
+export function addProfile(
+  config: AppConfig,
+  id: string,
+  label: (n: number) => string,
+): AppConfig {
   const taken = new Set(config.profiles.map((p) => p.name));
   let n = config.profiles.length + 1;
-  while (taken.has(`Perfil ${n}`)) n++;
+  while (taken.has(label(n))) n++;
   const prof = {
     id,
-    name: `Perfil ${n}`,
+    name: label(n),
     mode: config.mode,
     targets: config.targets.map((t) => ({ ...t })),
   };

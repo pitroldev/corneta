@@ -3,10 +3,12 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
+  AppWindow,
   Bell,
   Eye,
   Maximize2,
@@ -19,6 +21,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 import { sendStatusLine, srcLabel, type Translate } from "../lib/chatSend";
@@ -147,6 +150,20 @@ export function ChatPopout() {
       unlisten?.();
     };
   }, []);
+  // Mesmo corte do `min-[820px]:` do layout "auto": decide se o divisor está em pé
+  // (lado a lado) ou deitado (empilhado) pro aria-orientation e pras setas.
+  const [wide, setWide] = useState(
+    () =>
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(min-width: 820px)").matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 820px)");
+    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const st = config?.settings;
   const view: ChatView = useMemo(
@@ -215,6 +232,44 @@ export function ChatPopout() {
   const pickTab = (next: "chat" | "alerts" | "both") => {
     setTab(next);
     setSettings({ chatPopoutTab: next });
+  };
+
+  // Canais só se configuram na janela principal — este botão leva até ela em vez
+  // de mandar a pessoa procurar. Fora do Tauri não há janela: falha em silêncio.
+  const focusMain = async () => {
+    try {
+      const main = await WebviewWindow.getByLabel("main");
+      if (!main) return;
+      if (await main.isMinimized()) await main.unminimize();
+      await main.setFocus();
+    } catch {
+      /* fora do Tauri */
+    }
+  };
+  // Mesma resposta da tela principal quando o Conectar falha.
+  const doConnect = async () => {
+    try {
+      await connectChat(t);
+    } catch {
+      toast.error(t("chat.error.connect"));
+    }
+  };
+
+  // Divisor pelo teclado: a seta move o divisor na direção dela; o painel de
+  // alertas cresce ou encolhe conforme o lado em que ele está (mesma conta do arraste).
+  const isRow = bothLayout === "row" || (bothLayout === "auto" && wide);
+  const nudgeSplit = (delta: number) => {
+    const next = Math.max(15, Math.min(75, split + delta));
+    if (next === split) return;
+    setSplit(next);
+    setSettings({ chatBothSplit: next });
+  };
+  const onDividerKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const fwd = isRow ? e.key === "ArrowRight" : e.key === "ArrowDown";
+    const back = isRow ? e.key === "ArrowLeft" : e.key === "ArrowUp";
+    if (!fwd && !back) return;
+    e.preventDefault();
+    nudgeSplit((fwd ? 5 : -5) * (alertsFirst ? 1 : -1));
   };
 
   // Envio pelo "modo janela": espelha a ChatScreen — fontes capazes conforme login/token.
@@ -332,9 +387,13 @@ export function ChatPopout() {
               ? t("chat.alerts.clear.confirmTitle")
               : t("chat.alerts.clear.title")
           }
-          aria-label={t("chat.alerts.clear.title")}
+          // Com o "Limpar?" na tela, o texto é o nome do botão; o aria-label só
+          // cobre o estado em que sobra o ícone.
+          aria-label={
+            confirmClearAlerts ? undefined : t("chat.alerts.clear.title")
+          }
           className={cn(
-            "transition-colors",
+            "grid h-8 min-w-8 place-items-center rounded px-1 transition-colors",
             confirmClearAlerts
               ? "text-xs font-bold text-bad"
               : "text-ink-faint hover:text-bad",
@@ -369,24 +428,36 @@ export function ChatPopout() {
       }
       emptyAction={
         configured ? (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void connectChat(t)}
-          >
+          <Button variant="primary" size="sm" onClick={() => void doConnect()}>
             <Wifi className="size-4" /> {t("chat.action.connect")}
           </Button>
-        ) : undefined
+        ) : (
+          <Button variant="primary" size="sm" onClick={() => void focusMain()}>
+            <AppWindow className="size-4" /> {t("chat.popout.openMain")}
+          </Button>
+        )
       }
     />
   );
+  // Separator focável é um widget na WAI-ARIA (valuenow/min/max + setas) — o
+  // jsx-a11y não conhece esse padrão e o trata como decoração.
   const divider = (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       key="divider"
+      role="separator"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      aria-orientation={isRow ? "vertical" : "horizontal"}
+      aria-valuenow={split}
+      aria-valuemin={15}
+      aria-valuemax={75}
+      aria-label={t("chat.popout.divider")}
       onPointerDown={onDividerDown}
+      onKeyDown={onDividerKey}
       title={t("chat.popout.divider")}
       className={cn(
-        "shrink-0 bg-border-soft transition-colors hover:bg-brass",
+        "shrink-0 bg-border-soft transition-colors hover:bg-brass focus-visible:bg-brass",
         DIVIDER_CLS[bothLayout],
       )}
     />
@@ -437,7 +508,10 @@ export function ChatPopout() {
 
       {/* Toolbar: abas + viewers + conexão + limpar + config */}
       <div className="flex items-center gap-1.5 border-b-2 border-border-soft px-2 py-1.5">
-        <div className="flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5">
+        <div
+          role="tablist"
+          className="flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5"
+        >
           <TabBtn active={tab === "both"} onClick={() => pickTab("both")}>
             {t("chat.popout.tab.both")}
           </TabBtn>
@@ -482,20 +556,23 @@ export function ChatPopout() {
             >
               <WifiOff className="size-4" />
             </button>
-          ) : (
+          ) : configured ? (
             <button
-              onClick={() => {
-                if (configured) void connectChat(t);
-              }}
-              disabled={!configured}
-              title={
-                configured
-                  ? t("chat.action.connect")
-                  : t("chat.popout.needSetup")
-              }
-              className={cn(iconBtn, !configured && "opacity-40")}
+              onClick={() => void doConnect()}
+              title={t("chat.action.connect")}
+              className={iconBtn}
             >
               <Wifi className="size-4" />
+            </button>
+          ) : (
+            // Sem canal, o ícone leva pra janela principal (onde se configura).
+            <button
+              onClick={() => void focusMain()}
+              title={t("chat.popout.needSetup")}
+              aria-label={t("chat.popout.openMain")}
+              className={iconBtn}
+            >
+              <AppWindow className="size-4" />
             </button>
           )}
           <button
@@ -517,9 +594,22 @@ export function ChatPopout() {
                   ? t("chat.alerts.clear.title")
                   : t("chat.popout.clear.chat")
             }
-            className={cn(iconBtn, confirmClear && "text-bad")}
+            // Confirmação em texto (não só cor); com o texto na tela ele é o nome do botão.
+            aria-label={
+              confirmClear
+                ? undefined
+                : tab === "alerts"
+                  ? t("chat.alerts.clear.title")
+                  : t("chat.popout.clear.chat")
+            }
+            className={cn(
+              iconBtn,
+              confirmClear &&
+                "flex items-center gap-1 text-xs font-bold text-bad",
+            )}
           >
             <Trash2 className="size-4" />
+            {confirmClear && t("chat.clear.confirm")}
           </button>
           <button
             onClick={() => setShowConfig((v) => !v)}
@@ -656,6 +746,7 @@ export function ChatPopout() {
           {sendableSources.length > 1 && (
             <Select
               className="w-24 shrink-0"
+              aria-label={t("chat.send.target.aria")}
               value={effectiveSendTo}
               options={[
                 { value: "all", label: t("chat.send.target.all") },
@@ -677,6 +768,7 @@ export function ChatPopout() {
               }
             }}
             placeholder={t("chat.send.placeholder")}
+            aria-label={t("chat.send.placeholder")}
             className="h-9 flex-1"
           />
           <Button
@@ -707,6 +799,9 @@ function TabBtn({
 }) {
   return (
     <button
+      type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={cn(
         "rounded px-2 py-0.5 font-display text-xs font-extrabold transition-colors",

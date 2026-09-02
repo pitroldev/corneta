@@ -479,10 +479,14 @@ export function MesaScreen() {
                 aparece com ele na grade — antes ele entrava como "Convidado" sem saber). */}
             {!mesa.active && (
               <div>
-                <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint">
+                <label
+                  htmlFor="mesa-name"
+                  className="mb-1 block text-xs font-bold uppercase tracking-wide text-ink-faint"
+                >
                   {t("platforms.mesa.nameLabel")}
-                </span>
+                </label>
                 <Input
+                  id="mesa-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t("platforms.mesa.namePlaceholder")}

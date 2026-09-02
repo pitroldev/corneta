@@ -84,6 +84,9 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const tourStartedAt = useRef(Date.now());
   const tourRun = useRef(0);
   const capturedRun = useRef(-1);
+  // Foco inicial no título, não no X "Pular o tour" (primeiro focável do DOM):
+  // um Enter por reflexo na primeira abertura pulava o tour inteiro.
+  const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (flow !== "tour" || capturedRun.current === tourRun.current) return;
@@ -207,6 +210,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
       title={t("components.onboarding.title")}
       onClose={() => close(false)}
       className="max-w-md overflow-hidden rounded-xl bg-surface pop"
+      initialFocusRef={titleRef}
     >
       <SoundWaves className="pointer-events-none absolute -right-10 -top-10 size-48 text-brass/15" />
       <button
@@ -220,7 +224,12 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
         <div className="mb-3 grid size-14 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
           <Mascot className="size-8 animate-shout" />
         </div>
-        <h2 id="onb-title" className="text-3xl">
+        <h2
+          id="onb-title"
+          ref={titleRef}
+          tabIndex={-1}
+          className="text-3xl outline-none"
+        >
           {t("components.onboarding.title")}
         </h2>
         <p className="mt-1 text-sm font-semibold opacity-80">
@@ -260,19 +269,27 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
           </motion.div>
         </div>
 
-        <div className="my-4 flex justify-center gap-1.5">
+        {/* A bolinha é só desenho: o alvo clicável é o botão de 24×24 em volta dela. */}
+        <div className="my-4 flex justify-center gap-0.5">
           {STEPS.map((_, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => setStep(i)}
               aria-label={t("components.onboarding.dot.aria", { n: i + 1 })}
-              className={cn(
-                "h-2 rounded-full transition-[width,background-color]",
-                i === step
-                  ? "w-5 bg-brass"
-                  : "w-2 bg-surface-3 hover:bg-border",
-              )}
-            />
+              aria-current={i === step ? "step" : undefined}
+              className="group grid size-6 place-items-center rounded-md"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "h-2 rounded-full transition-[width,background-color]",
+                  i === step
+                    ? "w-5 bg-brass"
+                    : "w-2 bg-surface-3 group-hover:bg-border",
+                )}
+              />
+            </button>
           ))}
         </div>
 

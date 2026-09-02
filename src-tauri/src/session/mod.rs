@@ -221,11 +221,16 @@ fn recover_all(store: &dyn SessionStore, dir: &Path, now: u64) {
 // Escrita durante a live
 // ---------------------------------------------------------------------------
 
-pub fn record_sample(path: &Path, snap: &EngineSnapshot, chat_by_channel: &HashMap<String, u64>) {
+pub fn record_sample(
+    path: &Path,
+    snap: &EngineSnapshot,
+    chat_by_channel: &HashMap<String, u64>,
+    apps: &[crate::resources::ResourceAppSample],
+) {
     detect_clock_jump(&DiskStore, path);
     DiskStore.append(
         path,
-        &domain::sample_line(now_ms(), snap, chat_by_channel),
+        &domain::sample_line(now_ms(), snap, chat_by_channel, apps),
         MAX_SESSION_BYTES,
     );
 }

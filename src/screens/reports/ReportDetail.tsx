@@ -66,7 +66,18 @@ export function ReportDetail({
   );
 
   const remove = useCallback(async () => {
-    await api.deleteSession(id);
+    // DeleteButton não espera a Promise: se a exclusão falhar (arquivo em uso, permissão),
+    // o aviso tem que sair daqui — senão o botão volta ao normal e o relatório fica, mudo.
+    try {
+      await api.deleteSession(id);
+    } catch {
+      toast.errorAction(
+        t("reports.detail.delete.error"),
+        t("reports.list.openFolder"),
+        () => void api.openSessionsDir(),
+      );
+      return;
+    }
     dropCachedSummary(id);
     toast.info(t("reports.detail.deleted"));
     onDeleted();
@@ -104,6 +115,7 @@ export function ReportDetail({
 
       <ReportReplaySection
         state={story.replayState}
+        recordingsDeleted={detail.recordingsDeleted}
         data={detail.data}
         sessionId={id}
         chat={detail.chat.messages}

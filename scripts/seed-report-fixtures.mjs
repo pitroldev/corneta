@@ -137,7 +137,7 @@ const scenarios = [
     incidents: [{ type: "network", from: 0.42, to: 0.49 }],
     alerts: "basic",
     markers: [[0.43, "Começou a chover — upload oscilando"]],
-    note: "Bitrate baixo, congestionamento e reconexões simultâneas.",
+    note: "Bitrate baixo e reconexões simultâneas em todos os destinos.",
   },
   {
     slug: "falha-isolada-kick",
@@ -154,14 +154,15 @@ const scenarios = [
   },
   {
     slug: "sobrecarga-cpu-gpu",
-    title: "Encoder sobrecarregado",
+    title: "Jogo ocupou a placa de vídeo",
     ago: 4 * DAY,
     durationMs: 35 * 60_000,
     stepMs: 10_000,
     mode: "per-platform",
     platforms: [TWITCH, YOUTUBE, KICK, CUSTOM],
     incidents: [{ type: "encoding", from: 0.55, to: 0.68 }],
-    note: "CPU/GPU acima de 95%, frames perdidos e bitrate degradado.",
+    appName: "Cyberpunk 2077",
+    note: "O jogo passa de 95% da GPU junto com frames atrasados e bitrate degradado.",
   },
   {
     slug: "render-obs",
@@ -448,7 +449,7 @@ function generateSession(s, index, now) {
   const rows = [
     {
       kind: "meta",
-      schemaVersion: s.legacy ? 1 : 3,
+      schemaVersion: s.legacy ? 1 : 4,
       id,
       startedAt,
       mode: s.mode,
@@ -470,6 +471,7 @@ function generateSession(s, index, now) {
       const progress = elapsed / s.durationMs;
       let cpu = 38 + 8 * Math.sin(progress * Math.PI * 4) + random() * 5;
       let gpu = 31 + 7 * Math.sin(progress * Math.PI * 5) + random() * 4;
+      let memoryPct = 48 + 6 * Math.sin(progress * Math.PI * 3) + random() * 3;
       let congestion = random() * 0.06;
       let renderMs = 6.5 + random() * 3;
       let renderSkipped = 0;
@@ -481,14 +483,12 @@ function generateSession(s, index, now) {
         renderMs = 24 + random() * 8;
         renderSkipped = Math.round(80 * progress);
         outputSkipped = Math.round(55 * progress);
+        memoryPct = 76 + random() * 5;
       } else if (incident?.type === "render") {
         cpu = 55 + random() * 6;
         gpu = 58 + random() * 8;
         renderMs = 31 + random() * 9;
         renderSkipped = Math.round(120 * progress);
-      } else if (incident?.type === "network") {
-        congestion = 0.7 + random() * 0.22;
-        outputSkipped = Math.round(90 * progress);
       }
       const targets = s.platforms.map((p, targetIndex) => {
         let state = elapsed < s.stepMs ? "connecting" : "live";
@@ -558,6 +558,36 @@ function generateSession(s, index, now) {
         t: startedAt + elapsed,
         cpu: round(cpu, 1),
         gpu: round(gpu, 1),
+        ...(!s.legacy && { memoryPct: round(memoryPct, 1) }),
+        ...(!s.legacy &&
+          Math.round(elapsed / s.stepMs) % 3 === 0 &&
+          (s.appName || incident?.type === "render") && {
+            apps: [
+              incident?.type === "render"
+                ? {
+                    appRef: "obs",
+                    name: "OBS Studio",
+                    cpu: round(cpu * 0.45, 1),
+                    memoryMb: 1380,
+                    gpu3d: round(gpu, 1),
+                  }
+                : {
+                    appRef: String(s.appName)
+                      .toLowerCase()
+                      .replace(/\s+/g, "-"),
+                    name: s.appName,
+                    cpu: round(
+                      incident ? 42 + random() * 8 : 24 + random() * 5,
+                      1,
+                    ),
+                    memoryMb: round(3600 + random() * 500, 1),
+                    gpu3d: round(
+                      incident ? 95 + random() * 4 : 54 + random() * 8,
+                      1,
+                    ),
+                  },
+            ],
+          }),
         ...(!s.legacy && {
           obs: {
             activeFps: targets.some((target) => target.state === "signal-lost")

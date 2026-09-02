@@ -16,6 +16,7 @@ import type {
   SessionMarker,
   SessionMeta,
   SessionRecording,
+  SessionResourceApp,
   SessionSample,
   SessionSummary,
   SessionViewerSample,
@@ -27,6 +28,48 @@ import type {
 export type Translate = I18n["t"];
 
 type RawLine = { kind?: string; [k: string]: unknown };
+
+const finiteMetric = (value: unknown, max = 100): number | undefined => {
+  const number = Number(value);
+  return Number.isFinite(number)
+    ? Math.max(0, Math.min(max, number))
+    : undefined;
+};
+
+/** O arquivo pode ter sido editado fora da Corneta. Revalida a fronteira de privacidade
+ * também na leitura para nunca renderizar caminhos/títulos arbitrários como app. */
+function parseResourceApps(value: unknown): SessionResourceApp[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const apps: SessionResourceApp[] = [];
+  for (const raw of value.slice(0, 3)) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    const name = (
+      String(item.name ?? "")
+        .split(/[\\/]/)
+        .pop() ?? ""
+    )
+      .replace(/[\p{Cc}]/gu, "")
+      .trim()
+      .slice(0, 64);
+    if (!name) continue;
+    const appRef = String(item.appRef ?? name)
+      .toLocaleLowerCase("en-US")
+      .replace(/[^\p{L}\p{N}._ -]/gu, "")
+      .trim()
+      .slice(0, 64);
+    if (!appRef) continue;
+    apps.push({
+      appRef,
+      name,
+      cpu: finiteMetric(item.cpu) ?? 0,
+      memoryMb: finiteMetric(item.memoryMb, 1024 * 1024) ?? 0,
+      gpu3d: finiteMetric(item.gpu3d ?? item.gpu3D),
+      gpuEncode: finiteMetric(item.gpuEncode),
+    });
+  }
+  return apps.length ? apps : undefined;
+}
 
 /** Converte o NDJSON cru numa sessão estruturada. */
 export function parseSession(ndjson: string, t: Translate): SessionData | null {
@@ -69,6 +112,8 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
         t: ts,
         cpu: o.cpu == null ? undefined : Number(o.cpu),
         gpu: o.gpu == null ? undefined : Number(o.gpu),
+        memoryPct: o.memoryPct == null ? undefined : finiteMetric(o.memoryPct),
+        apps: parseResourceApps(o.apps),
         obs: o.obs == null ? undefined : (o.obs as SessionSample["obs"]),
         chat: o.chat == null ? undefined : Number(o.chat),
         chatBy:
@@ -248,6 +293,8 @@ export const cpuSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => s.cpu ?? null);
 export const gpuSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => s.gpu ?? null);
+export const memorySeries = (d: SessionData): (number | null)[] =>
+  d.samples.map((s) => s.memoryPct ?? null);
 export function bitrateSeries(
   d: SessionData,
   targetId: string,
@@ -337,9 +384,19 @@ export interface ProblemWindow {
   cause: string;
   /** Classificação estável da causa (o texto de `cause` é copy, pode mudar). */
   causeKind:
-    "render" | "encoding" | "network" | "platform" | "signal" | "unknown";
+    | "app"
+    | "render"
+    | "encoding"
+    | "local"
+    | "network"
+    | "platform"
+    | "signal"
+    | "unknown";
+  /** Nunca usamos "confirmada" para correlação: até a evidência mais forte é provável. */
+  confidence: "high" | "medium" | "low";
   advice: string;
   targetName?: string;
+  contributingApp?: string;
 }
 
 export interface ViewerStats {
@@ -429,6 +486,8 @@ export interface ReportAnalysis {
   maxCpu: number | null;
   avgGpu: number | null;
   maxGpu: number | null;
+  avgMemory: number | null;
+  maxMemory: number | null;
   perTarget: {
     id: string;
     name: string;
@@ -450,6 +509,10 @@ const CPU_HIGH = 92;
 const BITRATE_DROP = 0.6; // < 60% do típico = queda
 const OBS_CONGEST = 0.3; // congestionamento de saída > 30%
 const OBS_RENDER_MS = 25; // render lag do OBS acima disso = cena pesada
+const APP_GPU_PRESSURE = 80;
+const APP_CPU_PRESSURE = 70;
+const MEMORY_PRESSURE = 92;
+const APP_MEMORY_MB = 2048;
 // Sinais LEVES (bitrate/congestion/render/CPU) só viram "trecho com problema" se
 // persistirem — um blip de 1 amostra (~2s) não é incidente que espectador percebe.
 const SOFT_WINDOW_MIN_MS = 10_000;
@@ -517,6 +580,7 @@ function isBad(
   s: SessionSample,
   typical: Record<string, number>,
   ctx: Record<string, TargetCtx>,
+  previous?: SessionSample,
 ): boolean {
   for (const t of s.targets) {
     // Problema de estado só conta DEPOIS do destino ter ido ao ar — o ciclo
@@ -540,7 +604,125 @@ function isBad(
     (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)
   )
     return true;
+  // Contadores do OBS são cumulativos. Só o DELTA é problema; o valor absoluto
+  // continuaria alto pelo resto da live e criaria uma janela infinita.
+  if (
+    counterRise(previous?.obs?.renderSkipped, s.obs?.renderSkipped) > 0 ||
+    counterRise(previous?.obs?.outputSkipped, s.obs?.outputSkipped) > 0 ||
+    targetDroppedIncrease([s], previous).total > 0
+  )
+    return true;
   return false;
+}
+
+const counterRise = (previous?: number, current?: number): number =>
+  previous != null && current != null && current >= previous
+    ? current - previous
+    : 0;
+
+function counterIncrease(
+  samples: SessionSample[],
+  previous: SessionSample | undefined,
+  pick: (sample: SessionSample) => number | undefined,
+): { total: number; firstAt?: number } {
+  let before = previous ? pick(previous) : undefined;
+  let total = 0;
+  let firstAt: number | undefined;
+  for (const sample of samples) {
+    const current = pick(sample);
+    const increase = counterRise(before, current);
+    if (increase > 0 && firstAt == null) firstAt = sample.t;
+    total += increase;
+    before = current;
+  }
+  return { total, firstAt };
+}
+
+function targetDroppedIncrease(
+  samples: SessionSample[],
+  previous?: SessionSample,
+): { total: number; firstAt?: number } {
+  const before = new Map(
+    previous?.targets.map((target) => [target.id, target.dropped]),
+  );
+  let total = 0;
+  let firstAt: number | undefined;
+  for (const sample of samples) {
+    for (const target of sample.targets) {
+      const increase = counterRise(before.get(target.id), target.dropped);
+      if (increase > 0 && firstAt == null) firstAt = sample.t;
+      total += increase;
+      before.set(target.id, target.dropped);
+    }
+  }
+  return { total, firstAt };
+}
+
+interface AppPressure {
+  appRef: string;
+  name: string;
+  resource: "gpu" | "cpu" | "memory";
+  value: number;
+}
+
+/** Escolhe uma causa por aplicativo apenas quando o uso é realmente excepcional.
+ * Aplicativo com 40% de GPU não ganha culpa só por estar no top 3. */
+function dominantAppPressure(
+  slice: SessionSample[],
+  impactAt: number,
+): AppPressure | undefined {
+  const maxMemoryPct = Math.max(
+    0,
+    ...slice.map((sample) => sample.memoryPct ?? 0),
+  );
+  const candidates = new Map<string, AppPressure>();
+  const record = (candidate: AppPressure) => {
+    const key = `${candidate.appRef}\u0000${candidate.resource}`;
+    const existing = candidates.get(key);
+    if (!existing) {
+      candidates.set(key, candidate);
+      return;
+    }
+    existing.value = Math.max(existing.value, candidate.value);
+  };
+  for (const sample of slice) {
+    // A lista de processos é esparsa (~6 s), portanto aceitamos uma pequena margem
+    // em ambos os lados do efeito. Fora dela é só coexistência, não evidência causal.
+    if (Math.abs(sample.t - impactAt) > 10_000) continue;
+    for (const app of sample.apps ?? []) {
+      if ((app.gpu3d ?? 0) >= APP_GPU_PRESSURE) {
+        record({
+          appRef: app.appRef,
+          name: app.name,
+          resource: "gpu",
+          value: app.gpu3d ?? 0,
+        });
+      }
+      if (app.cpu >= APP_CPU_PRESSURE) {
+        record({
+          appRef: app.appRef,
+          name: app.name,
+          resource: "cpu",
+          value: app.cpu,
+        });
+      }
+      if (maxMemoryPct >= MEMORY_PRESSURE && app.memoryMb >= APP_MEMORY_MB) {
+        record({
+          appRef: app.appRef,
+          name: app.name,
+          resource: "memory",
+          value: app.memoryMb,
+        });
+      }
+    }
+  }
+  return [...candidates.values()].sort((a, b) => {
+    const normalized = (item: AppPressure) =>
+      item.resource === "memory"
+        ? Math.min(100, (item.value / 4096) * 100)
+        : item.value;
+    return normalized(b) - normalized(a);
+  })[0];
 }
 
 function buildWindow(
@@ -549,6 +731,7 @@ function buildWindow(
   totalTargets: number,
   typical: Record<string, number>,
   t: Translate,
+  previous?: SessionSample,
 ): ProblemWindow {
   const tStart = slice[0].t;
   const tEnd = slice[slice.length - 1].t;
@@ -556,6 +739,7 @@ function buildWindow(
   let maxGpu = 0;
   let maxCongestion = 0;
   let maxRenderMs = 0;
+  let maxMemoryPct = 0;
   let reconnect = false;
   let bitrateDrop = false;
   let signalLost = false;
@@ -564,6 +748,7 @@ function buildWindow(
   slice.forEach((s, i) => {
     if (s.cpu != null) maxCpu = Math.max(maxCpu, s.cpu);
     if (s.gpu != null) maxGpu = Math.max(maxGpu, s.gpu);
+    if (s.memoryPct != null) maxMemoryPct = Math.max(maxMemoryPct, s.memoryPct);
     if (s.obs) {
       maxCongestion = Math.max(maxCongestion, s.obs.congestion);
       maxRenderMs = Math.max(maxRenderMs, s.obs.avgRenderMs);
@@ -599,18 +784,98 @@ function buildWindow(
   const congested = maxCongestion > OBS_CONGEST;
   const renderLag = maxRenderMs > OBS_RENDER_MS;
   const singleTarget = affected.size === 1 && totalTargets > 1;
+  const renderSkipped = counterIncrease(
+    slice,
+    previous,
+    (sample) => sample.obs?.renderSkipped,
+  );
+  const outputSkipped = counterIncrease(
+    slice,
+    previous,
+    (sample) => sample.obs?.outputSkipped,
+  );
+  const targetDropped = targetDroppedIncrease(slice, previous);
+  const firstRenderLagAt = slice.find(
+    (sample) => (sample.obs?.avgRenderMs ?? 0) > OBS_RENDER_MS,
+  )?.t;
+  const firstImpactAt = [
+    renderSkipped.firstAt,
+    outputSkipped.firstAt,
+    targetDropped.firstAt,
+    firstRenderLagAt,
+  ]
+    .filter((value): value is number => value != null)
+    .sort((a, b) => a - b)[0];
+  const appPressure =
+    firstImpactAt == null
+      ? undefined
+      : dominantAppPressure(
+          previous ? [previous, ...slice] : slice,
+          firstImpactAt,
+        );
+  const appCanExplain =
+    appPressure != null &&
+    appPressure.appRef !== "obs" &&
+    appPressure.appRef !== "corneta" &&
+    (renderSkipped.total > 0 ||
+      outputSkipped.total > 0 ||
+      renderLag ||
+      targetDropped.total > 0);
 
   const signals: string[] = [];
   if (signalLost) signals.push(t("analysis.signal.obsSignalLost"));
+  if (!signalLost && appCanExplain && appPressure?.resource === "gpu")
+    signals.push(
+      t("analysis.signal.appGpu", {
+        app: appPressure.name,
+        pct: Math.round(appPressure.value),
+      }),
+    );
+  if (!signalLost && appCanExplain && appPressure?.resource === "cpu")
+    signals.push(
+      t("analysis.signal.appCpu", {
+        app: appPressure.name,
+        pct: Math.round(appPressure.value),
+      }),
+    );
+  if (!signalLost && appCanExplain && appPressure?.resource === "memory")
+    signals.push(
+      t("analysis.signal.appMemory", {
+        app: appPressure.name,
+        gb: Math.max(0.1, Math.round((appPressure.value / 1024) * 10) / 10),
+      }),
+    );
+  if (renderSkipped.total > 0)
+    signals.push(
+      t("analysis.signal.renderSkipped", {
+        count: Math.round(renderSkipped.total),
+      }),
+    );
+  if (outputSkipped.total > 0)
+    signals.push(
+      t("analysis.signal.outputSkipped", {
+        count: Math.round(outputSkipped.total),
+      }),
+    );
+  if (targetDropped.total > 0)
+    signals.push(
+      t("analysis.signal.targetDropped", {
+        count: Math.round(targetDropped.total),
+      }),
+    );
   if (reconnect)
     signals.push(
       t("analysis.signal.reconnected", { targets: [...affected].join(", ") }),
     );
   if (bitrateDrop) signals.push(t("analysis.signal.bitrateDrop"));
-  if (cpuHigh)
+  if (cpuHigh && !appCanExplain)
     signals.push(t("analysis.signal.cpu", { pct: Math.round(maxCpu) }));
-  if (gpuHigh)
+  if (gpuHigh && !appCanExplain)
     signals.push(t("analysis.signal.gpu", { pct: Math.round(maxGpu) }));
+  if (maxMemoryPct >= MEMORY_PRESSURE && !appCanExplain)
+    signals.push(
+      t("analysis.signal.memory", { pct: Math.round(maxMemoryPct) }),
+    );
   if (renderLag)
     signals.push(
       t("analysis.signal.obsRender", { ms: Math.round(maxRenderMs) }),
@@ -622,31 +887,64 @@ function buildWindow(
       }),
     );
 
-  // Copy de streamer: o que houve + passo concreto, termo técnico entre parênteses.
+  // Copy de streamer: o que aconteceu, por que pensamos isso e o próximo passo.
   let cause = t("analysis.cause.unknown");
   let causeKind: ProblemWindow["causeKind"] = "unknown";
+  let confidence: ProblemWindow["confidence"] = "low";
   let advice = t("analysis.advice.unknown");
+  let contributingApp: string | undefined;
   if (signalLost) {
     cause = t("analysis.cause.signal");
     causeKind = "signal";
+    confidence = "high";
     advice = t("analysis.advice.signal");
+  } else if (appCanExplain && appPressure) {
+    cause = t(`analysis.cause.app.${appPressure.resource}` as MessageKey, {
+      app: appPressure.name,
+    });
+    causeKind = "app";
+    confidence =
+      renderSkipped.total > 0 || outputSkipped.total > 0 ? "high" : "medium";
+    advice = t(`analysis.advice.app.${appPressure.resource}` as MessageKey, {
+      app: appPressure.name,
+    });
+    contributingApp = appPressure.name;
+  } else if (renderSkipped.total > 0) {
+    cause = t("analysis.cause.render");
+    causeKind = "render";
+    confidence = "high";
+    advice = t("analysis.advice.render");
+  } else if (outputSkipped.total > 0) {
+    cause = t("analysis.cause.encoding");
+    causeKind = "encoding";
+    confidence = "high";
+    advice = t("analysis.advice.encoding");
   } else if (renderLag) {
-    if (cpuHigh || gpuHigh) {
+    if (cpuHigh || gpuHigh || maxMemoryPct >= MEMORY_PRESSURE) {
       cause = t("analysis.cause.encoding");
       causeKind = "encoding";
+      confidence = "medium";
       advice = t("analysis.advice.encoding");
     } else {
       cause = t("analysis.cause.render");
       causeKind = "render";
+      confidence = "medium";
       advice = t("analysis.advice.render");
     }
-  } else if (congested || ((bitrateDrop || reconnect) && !singleTarget)) {
+  } else if (congested) {
+    cause = t("analysis.cause.local");
+    causeKind = "local";
+    confidence = "medium";
+    advice = t("analysis.advice.local");
+  } else if ((bitrateDrop || reconnect) && !singleTarget) {
     cause = t("analysis.cause.network");
     causeKind = "network";
+    confidence = "low";
     advice = t("analysis.advice.network");
   } else if (singleTarget) {
     cause = t("analysis.cause.platform", { target: [...affected][0] });
     causeKind = "platform";
+    confidence = "low";
     advice = t("analysis.advice.platform");
   }
 
@@ -657,8 +955,10 @@ function buildWindow(
     signals,
     cause,
     causeKind,
+    confidence,
     advice,
     targetName: affected.size === 1 ? [...affected][0] : undefined,
+    contributingApp,
   };
 }
 
@@ -669,7 +969,9 @@ function problemWindows(
   t: Translate,
 ): ProblemWindow[] {
   const { samples } = data;
-  const flags = samples.map((s, i) => isBad(s, typical, ctxs[i]));
+  const flags = samples.map((s, i) =>
+    isBad(s, typical, ctxs[i], samples[i - 1]),
+  );
 
   // Agrupa amostras ruins consecutivas em intervalos.
   const ranges: [number, number][] = [];
@@ -703,7 +1005,25 @@ function problemWindows(
             (tg) => isProblemState(tg.state) && ctxs[a + i][tg.id]?.everLive,
           ),
         );
-      return hard || samples[b].t - samples[a].t >= SOFT_WINDOW_MIN_MS;
+      const before = samples[a - 1];
+      const windowSamples = samples.slice(a, b + 1);
+      const severeFrameLoss =
+        counterIncrease(
+          windowSamples,
+          before,
+          (sample) => sample.obs?.renderSkipped,
+        ).total >= 30 ||
+        counterIncrease(
+          windowSamples,
+          before,
+          (sample) => sample.obs?.outputSkipped,
+        ).total >= 30 ||
+        targetDroppedIncrease(windowSamples, before).total >= 30;
+      return (
+        hard ||
+        severeFrameLoss ||
+        samples[b].t - samples[a].t >= SOFT_WINDOW_MIN_MS
+      );
     })
     .map(([a, b]) =>
       buildWindow(
@@ -712,6 +1032,7 @@ function problemWindows(
         totalTargets,
         typical,
         t,
+        samples[a - 1],
       ),
     );
 }
@@ -799,6 +1120,9 @@ function aggregates(data: SessionData) {
   const { meta, samples } = data;
   const cpus = samples.map((s) => s.cpu).filter((x): x is number => x != null);
   const gpus = samples.map((s) => s.gpu).filter((x): x is number => x != null);
+  const memories = samples
+    .map((s) => s.memoryPct)
+    .filter((x): x is number => x != null);
   const platOf = (id: string): PlatformId =>
     (meta.platforms.find((p) => p.id === id)?.platformId ??
       "custom") as PlatformId;
@@ -851,6 +1175,8 @@ function aggregates(data: SessionData) {
     maxCpu: cpus.length ? maxOf(cpus) : null,
     avgGpu: avg(gpus),
     maxGpu: gpus.length ? maxOf(gpus) : null,
+    avgMemory: avg(memories),
+    maxMemory: memories.length ? maxOf(memories) : null,
     perTarget,
   };
 }
@@ -867,8 +1193,35 @@ function buildVerdict(
     };
   const count = (k: ProblemWindow["causeKind"]) =>
     windows.filter((w) => w.causeKind === k).length;
+  const appWindows = windows.filter((window) => window.causeKind === "app");
+  const apps = new Map<
+    string,
+    { name: string; count: number; totalSec: number; firstAt: number }
+  >();
+  for (const window of appWindows) {
+    const name = window.contributingApp ?? window.cause;
+    const current = apps.get(name);
+    if (current) {
+      current.count += 1;
+      current.totalSec += window.durationSec;
+    } else {
+      apps.set(name, {
+        name,
+        count: 1,
+        totalSec: window.durationSec,
+        firstAt: window.tStart,
+      });
+    }
+  }
+  const dominantApp = [...apps.values()].sort(
+    (left, right) =>
+      right.totalSec - left.totalSec ||
+      right.count - left.count ||
+      left.firstAt - right.firstAt,
+  )[0];
   const enc = count("encoding");
   const render = count("render");
+  const local = count("local");
   const net = count("network");
   const plat = count("platform");
   const sig = count("signal");
@@ -876,9 +1229,12 @@ function buildVerdict(
   // o espectador quase certamente nem viu — o tom acompanha a experiência real.
   const totalBadSec = windows.reduce((a, w) => a + w.durationSec, 0);
   const brief = sig === 0 && totalBadSec <= 30;
-  const briefNote = brief
-    ? t("analysis.verdict.brief", { sec: totalBadSec })
-    : "";
+  const durationFor = (kind: ProblemWindow["causeKind"]) =>
+    windows
+      .filter((window) => window.causeKind === kind)
+      .reduce((total, window) => total + window.durationSec, 0);
+  const briefNoteFor = (durationSec: number) =>
+    brief ? t("analysis.verdict.brief", { sec: durationSec }) : "";
   // O substantivo entra por buraco em vez de virar "trecho(s)": remendo com
   // parêntese é o tipo de coisa que só passa despercebida em português.
   // `analyze` recebe só o `t`, então a variante sai da mesma regra do `tp`.
@@ -895,6 +1251,18 @@ function buildVerdict(
         stretch: stretch(sig),
       }),
     };
+  if (dominantApp) {
+    return {
+      tone: brief ? "warn" : "bad",
+      title: t("analysis.verdict.app.title", { app: dominantApp.name }),
+      detail: t("analysis.verdict.app.detail", {
+        n: dominantApp.count,
+        app: dominantApp.name,
+        stretch: stretch(dominantApp.count),
+        brief: briefNoteFor(dominantApp.totalSec),
+      }),
+    };
+  }
   if (enc)
     return {
       tone: brief ? "warn" : "bad",
@@ -906,7 +1274,7 @@ function buildVerdict(
       detail: t("analysis.verdict.encoding.detail", {
         n: enc,
         stretch: stretch(enc),
-        brief: briefNote,
+        brief: briefNoteFor(durationFor("encoding")),
       }),
     };
   if (render)
@@ -916,7 +1284,17 @@ function buildVerdict(
       detail: t("analysis.verdict.render.detail", {
         n: render,
         stretch: stretch(render),
-        brief: briefNote,
+        brief: briefNoteFor(durationFor("render")),
+      }),
+    };
+  if (local)
+    return {
+      tone: brief ? "warn" : "bad",
+      title: t("analysis.verdict.local.title"),
+      detail: t("analysis.verdict.local.detail", {
+        n: local,
+        stretch: stretch(local),
+        brief: briefNoteFor(durationFor("local")),
       }),
     };
   if (net)
@@ -930,7 +1308,7 @@ function buildVerdict(
       detail: t("analysis.verdict.network.detail", {
         n: net,
         stretch: stretch(net),
-        brief: briefNote,
+        brief: briefNoteFor(durationFor("network")),
       }),
     };
   if (plat)
@@ -940,7 +1318,7 @@ function buildVerdict(
       detail: t("analysis.verdict.platform.detail", {
         n: plat,
         stretch: stretch(plat),
-        brief: briefNote,
+        brief: briefNoteFor(durationFor("platform")),
       }),
     };
   return {

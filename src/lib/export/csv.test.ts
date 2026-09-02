@@ -130,6 +130,7 @@ describe("seriesCsv", () => {
       t: start + 2000,
       cpu: 40,
       gpu: 22,
+      memoryPct: 58,
       chat: 2,
       chatBy: { "twitch:Twitch": 2 },
       targets: [
@@ -147,6 +148,7 @@ describe("seriesCsv", () => {
       t: start + 4000,
       cpu: 44,
       gpu: 25,
+      memoryPct: 61,
       chat: 0,
       targets: [
         { id: "t1", name: "Twitch", state: "live", bitrate: 6100, dropped: 3 },
@@ -166,6 +168,7 @@ describe("seriesCsv", () => {
     expect(head).toContain("bitrate_kbps_Twitch");
     expect(head).toContain("estado_Twitch");
     expect(head).toContain("chat_por_min_Twitch");
+    expect(head).toContain("memoria_pct");
   });
 
   it("audiência entra como último valor conhecido, e o nome da coluna avisa", () => {

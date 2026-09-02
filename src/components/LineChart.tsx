@@ -34,6 +34,7 @@ export function LineChart({
   className,
   playhead,
   onSeek,
+  ariaLabel,
 }: {
   series: ChartSeries[];
   /** Número de amostras (comprimento do eixo x). */
@@ -51,6 +52,9 @@ export function LineChart({
   playhead?: number | null;
   /** Clique no gráfico → salta o vídeo pra aquela amostra. Sem isso o gráfico é só leitura. */
   onSeek?: (i: number) => void;
+  /** Nome acessível do gráfico, montado por quem tem os números (ex.: "Audiência: pico 120,
+   *  média 80"). Sem ele, cai no nome das séries — o mesmo texto da legenda abaixo. */
+  ariaLabel?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const [width, setWidth] = useState(640);
@@ -220,6 +224,8 @@ export function LineChart({
     >
       <svg
         ref={svgRef}
+        role="img"
+        aria-label={ariaLabel ?? series.map((s) => s.label).join(", ")}
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         height={H}

@@ -12,6 +12,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::engine::EngineSnapshot;
+use crate::resources::ResourceAppSample;
 
 /// Quantas sessões manter no disco (as mais antigas são podadas).
 pub const KEEP: usize = 50;
@@ -24,7 +25,9 @@ pub const MAX_CHAT_BYTES: u64 = 16 * 1024 * 1024;
 /// v3: gravação de vídeo (`recording`/`recSync`/`recEnd`), chat em arquivo irmão,
 ///     `clockJump` e `offset`. Leitor antigo ignora `kind` que não conhece, e o parser
 ///     novo lê v2 sem nada faltando — a compatibilidade vale nos dois sentidos.
-pub const SCHEMA_VERSION: u32 = 3;
+/// v4: pressão de memória e, de forma esparsa, os três aplicativos que mais disputaram
+///     CPU/GPU/memória. Sem caminhos, argumentos ou títulos de janela.
+pub const SCHEMA_VERSION: u32 = 4;
 /// O estado da sessão está na última linha. Ler só a cauda evita carregar até 32 MiB
 /// para cada uma das 50 sessões durante o boot.
 pub const TAIL_BYTES: u64 = 64 * 1024;
@@ -104,7 +107,12 @@ pub fn meta_line(id: u64, mode: &str, platforms: Vec<Value>) -> Value {
 /// `chat_by_channel` vem de `chat::drain_msg_counts` (`plataforma:fonte` → nº de mensagens).
 /// O campo `chat` continua sendo o TOTAL — relatórios gravados antes da segregação por
 /// canal só têm ele, e a análise precisa seguir lendo os dois formatos.
-pub fn sample_line(t: u64, snap: &EngineSnapshot, chat_by_channel: &HashMap<String, u64>) -> Value {
+pub fn sample_line(
+    t: u64,
+    snap: &EngineSnapshot,
+    chat_by_channel: &HashMap<String, u64>,
+    apps: &[ResourceAppSample],
+) -> Value {
     let targets: Vec<Value> = snap
         .targets
         .values()
@@ -124,6 +132,7 @@ pub fn sample_line(t: u64, snap: &EngineSnapshot, chat_by_channel: &HashMap<Stri
         "t": t,
         "cpu": snap.cpu,
         "gpu": snap.gpu,
+        "memoryPct": snap.memory_pct,
         "obs": snap.obs,
         "chat": chat_by_channel.values().sum::<u64>(),
         "targets": targets,
@@ -133,6 +142,11 @@ pub fn sample_line(t: u64, snap: &EngineSnapshot, chat_by_channel: &HashMap<Stri
     // sem dizer nada além do que o `chat: 0` já diz.
     if !chat_by_channel.is_empty() {
         sample["chatBy"] = json!(chat_by_channel);
+    }
+    // A lista só existe nas amostras de processo (~6 s, ou ~2 s sob pressão).
+    // Omitir em vez de gravar `[]` reduz bastante uma live longa.
+    if !apps.is_empty() {
+        sample["apps"] = json!(apps);
     }
     sample
 }

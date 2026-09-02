@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MotionConfig, motion } from "framer-motion";
-import { useStore } from "./lib/store";
+import { FileText, RefreshCw } from "lucide-react";
+import { downTargets, useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
@@ -16,6 +17,7 @@ import {
 } from "./lib/telemetry";
 import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Button } from "./components/ui";
 
 // Ordem = numeração dos atalhos Alt+1..N (espelha a sidebar: jornada primeiro, depois
 // utilitários). Configurações vem antes de Sobre — é a tela recorrente.
@@ -95,8 +97,9 @@ function ScreenLoading() {
 }
 
 export default function App() {
-  const { t, locale } = useI18n();
+  const { t, tp, locale } = useI18n();
   const loaded = useStore((s) => s.loaded);
+  const bootError = useStore((s) => s.bootError);
   const load = useStore((s) => s.load);
   const bindEngine = useStore((s) => s.bindEngine);
   const bindConfigSync = useStore((s) => s.bindConfigSync);
@@ -113,6 +116,7 @@ export default function App() {
   const censored = useStore((s) => s.censored);
   const liveState = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
+  const down = useStore((s) => downTargets(s.snapshot));
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const brbSlateKind = useStore((s) => s.config?.settings.brbSlateKind);
   const appStarted = useRef(false);
@@ -128,10 +132,14 @@ export default function App() {
   }, [loaded]);
 
   // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
+  // "Em todas as plataformas" só quando é verdade — com alguma fora, diz quantas (o mesmo
+  // número do chip vermelho da LiveBar).
   const liveLabel = censored
     ? t("components.app.live.aria.censored")
     : liveState === "live"
-      ? t("components.app.live.aria.live")
+      ? down > 0
+        ? tp("components.app.live.aria.live.down", down)
+        : t("components.app.live.aria.live")
       : liveState === "starting"
         ? t(
             ingestLive
@@ -287,8 +295,18 @@ export default function App() {
   // Cada tela começa no topo: o container de scroll é compartilhado, então um
   // scrollIntoView (ex.: "Fora do ar" → botão BORA) deixava as outras telas cortadas.
   const scrollRef = useRef<HTMLDivElement>(null);
+  // ...e recebe o foco: sem isto, depois de Alt+N ou do clique na sidebar o leitor de
+  // tela continuava no botão de onde saiu, sem saber que a tela mudou (WCAG 2.4.3).
+  const screenRef = useRef<HTMLDivElement>(null);
+  const screenChanged = useRef(false);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    // No 1º render não houve troca — focar aqui roubaria o foco do tour de boas-vindas.
+    if (!screenChanged.current) {
+      screenChanged.current = true;
+      return;
+    }
+    screenRef.current?.focus({ preventScroll: true });
   }, [screen]);
 
   // Alt+1..8 troca de tela (ignora quando o foco está num campo de texto).
@@ -411,17 +429,58 @@ export default function App() {
 
         <UpdateBanner />
 
-        {!censored && <LiveBar onOpen={() => navigate("golive")} />}
+        {/* Fica também com o JÁ VOLTO no ar: a faixa do Guardião diz o que aconteceu, a
+            LiveBar segue com cronômetro, viewers, plataformas fora e o atalho pro painel. */}
+        <LiveBar onOpen={() => navigate("golive")} />
 
         {!loaded ? (
           <div className="grid flex-1 place-items-center" role="status">
             <div className="flex flex-col items-center gap-4">
-              <div className="grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
+              <div
+                className={
+                  bootError
+                    ? "grid size-16 place-items-center rounded-lg bg-brass text-brass-ink pop-brass"
+                    : "grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass"
+                }
+              >
                 <Mascot className="size-9" />
               </div>
-              <span className="font-display text-sm font-bold text-ink-muted">
-                {t("components.app.loading.boot")}
-              </span>
+              {bootError ? (
+                <>
+                  <p
+                    role="alert"
+                    className="max-w-sm text-center font-display text-sm font-bold text-ink"
+                  >
+                    {t("components.app.loading.error")}
+                  </p>
+                  <p
+                    className="max-w-sm text-center text-xs text-ink-muted"
+                    data-selectable
+                  >
+                    {bootError}
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => void load(t)}
+                    >
+                      <RefreshCw className="size-4" /> {t("golive.error.retry")}
+                    </Button>
+                    <Button
+                      variant="subtle"
+                      size="sm"
+                      onClick={() => void api.openLogsDir()}
+                    >
+                      <FileText className="size-4" /> {t("golive.error.logs")}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <span className="font-display text-sm font-bold text-ink-muted">
+                  {t("components.app.loading.boot")}
+                </span>
+              )}
             </div>
           </div>
         ) : (
@@ -442,6 +501,8 @@ export default function App() {
               >
                 <motion.div
                   key={screen}
+                  ref={screenRef}
+                  tabIndex={-1}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.11, ease: "easeOut" }}

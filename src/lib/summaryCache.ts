@@ -6,7 +6,7 @@ import type { SessionSummary } from "./types";
 const SUMMARY_CACHE_KEY = "corneta.session-summaries";
 // A versão representa a heurística que produz `SessionSummary`, não o formato
 // do NDJSON. Subir este número descarta contagens antigas sem tocar nas sessões.
-const SUMMARY_CACHE_VERSION = 2;
+const SUMMARY_CACHE_VERSION = 3;
 
 interface SummaryCacheEnvelope {
   version: number;

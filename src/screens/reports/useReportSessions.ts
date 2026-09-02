@@ -16,9 +16,11 @@ export function useReportSessions() {
   const markReportSeen = useStore((state) => state.markReportSeen);
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [error, setError] = useState(false);
-  const [summaries, setSummaries] = useState<Record<string, SessionSummary>>(
-    {},
-  );
+  // `null` marca sessão que não deu pra ler: sem a marca, o card da lista ficaria
+  // "carregando" pra sempre esperando um resumo que nunca vem.
+  const [summaries, setSummaries] = useState<
+    Record<string, SessionSummary | null>
+  >({});
 
   const refresh = useCallback(async () => {
     setSessions(null);
@@ -39,7 +41,7 @@ export function useReportSessions() {
     if (!sessions?.length) return;
     let alive = true;
     void (async () => {
-      const cached: Record<string, SessionSummary> = {};
+      const cached: Record<string, SessionSummary | null> = {};
       const missing: string[] = [];
       for (const session of sessions) {
         const summary = getCachedSummary(session.id);
@@ -50,16 +52,18 @@ export function useReportSessions() {
 
       // Sequencial por intenção: o pico de memória é uma sessão, não o histórico inteiro.
       for (const id of missing) {
+        let summary: SessionSummary | null = null;
         try {
           const parsed = parseSession(await api.readSession(id), t);
-          if (!alive) return;
-          if (!parsed) continue;
-          const summary = summarize(parsed, analyze(parsed, t));
-          if (parsed.meta.endedAt != null) setCachedSummary(id, summary);
-          setSummaries((current) => ({ ...current, [id]: summary }));
+          if (parsed) {
+            summary = summarize(parsed, analyze(parsed, t));
+            if (parsed.meta.endedAt != null) setCachedSummary(id, summary);
+          }
         } catch {
-          // Uma sessão ilegível não impede as demais de aparecerem.
+          // Uma sessão ilegível não impede as demais de aparecerem — só fica marcada.
         }
+        if (!alive) return;
+        setSummaries((current) => ({ ...current, [id]: summary }));
       }
     })();
     return () => {

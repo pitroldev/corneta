@@ -15,6 +15,7 @@ import {
   chatRateSeries,
   cpuSeries,
   gpuSeries,
+  memorySeries,
   bitrateSeries,
   viewerSeries,
   viewerSeriesFor,
@@ -150,7 +151,7 @@ section{margin:0 0 26px;break-inside:avoid}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
 .verdict{border-left-width:5px;border-left-style:solid}
 .verdict.ok{border-left-color:var(--ok)}.verdict.warn{border-left-color:var(--warn)}.verdict.bad{border-left-color:var(--bad)}
-.verdict b{display:block;font-size:17px;margin-bottom:3px}
+.verdict b{display:block;font-size:17px;margin-bottom:3px;overflow-wrap:anywhere}
 .verdict p{margin:0;color:var(--muted);font-size:14px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
@@ -172,7 +173,7 @@ tr:last-child td{border-bottom:0}
 .lg{font-size:12px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .lg i{width:10px;height:10px;border-radius:2px;display:inline-block}
 .t{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
-.win{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;padding:10px 13px;margin-bottom:8px;background:var(--card)}
+.win{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;padding:10px 13px;margin-bottom:8px;background:var(--card);overflow-wrap:anywhere}
 .win .sig{color:var(--muted);font-size:13px;margin-top:2px}
 .win .adv{font-size:13px;margin-top:5px}
 ul.tl{list-style:none;margin:0;padding:0;font-size:13.5px}
@@ -359,14 +360,28 @@ export function reportHtml(
       )}</div></section>`,
     );
 
+  const cpu = cpuSeries(d);
   const gpu = gpuSeries(d);
-  if (n > 1 && a.maxCpu != null)
+  const memory = memorySeries(d);
+  if (
+    n > 1 &&
+    [cpu, gpu, memory].some((series) => series.some((value) => value != null))
+  )
     partes.push(
       `<section><h2>${esc(t("reports.machine.title"))}</h2><div class="card">${chart(
         [
-          { label: "CPU", color: "#c0392b", values: cpuSeries(d) },
+          { label: "CPU", color: "#c0392b", values: cpu },
           ...(gpu.some((v) => v != null)
             ? [{ label: "GPU", color: "#2a6fb5", values: gpu }]
+            : []),
+          ...(memory.some((v) => v != null)
+            ? [
+                {
+                  label: t("reports.machine.memory"),
+                  color: "#7454b3",
+                  values: memory,
+                },
+              ]
             : []),
         ],
         n,
@@ -390,7 +405,9 @@ export function reportHtml(
     ? `<section><h2>${esc(t("reports.windows.title"))}</h2>${a.windows
         .map(
           (w) => `<div class="win"><span class="t">${esc(rel(w.tStart))}</span>
- · ${w.durationSec}s · <b>${esc(w.cause)}</b>
+ · ${w.durationSec}s · <b>${esc(w.cause)}</b> · ${esc(
+   t(`reports.technical.incidents.confidence.${w.confidence}` as MessageKey),
+ )}
 ${w.signals.length ? `<div class="sig">${esc(w.signals.join(" · "))}</div>` : ""}
 <div class="adv">→ ${esc(w.advice)}</div></div>`,
         )

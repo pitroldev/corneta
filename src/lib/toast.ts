@@ -17,20 +17,61 @@ interface ToastState {
     duration?: number,
   ) => void;
   dismiss: (id: string) => void;
+  /** Segura o relógio do toast (mouse em cima / foco dentro); `resume` solta. */
+  pause: (id: string) => void;
+  resume: (id: string) => void;
 }
 
-export const useToasts = create<ToastState>((set) => ({
-  toasts: [],
-  push: (kind, message, action, duration = 3400) => {
-    const id = Math.random().toString(36).slice(2);
-    set((s) => ({ toasts: [...s.toasts, { id, kind, message, action }] }));
-    setTimeout(() => {
-      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-    }, duration);
-  },
-  dismiss: (id) =>
-    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-}));
+/** Relógio de cada toast, fora do estado do React: pausar/retomar não re-renderiza. */
+interface Clock {
+  handle: ReturnType<typeof setTimeout> | null;
+  endsAt: number;
+  /** Quanto faltava quando pausou. */
+  left: number;
+}
+const clocks = new Map<string, Clock>();
+/** Ao soltar, o toast fica pelo menos isto: quem tirou o mouse em cima da hora
+ *  ainda alcança o botão em vez de ver o aviso sumir debaixo do cursor. */
+const RESUME_MIN_MS = 1500;
+
+export const useToasts = create<ToastState>((set) => {
+  const remove = (id: string) => {
+    clocks.delete(id);
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+  };
+  const arm = (id: string, ms: number) => {
+    clocks.set(id, {
+      handle: setTimeout(() => remove(id), ms),
+      endsAt: Date.now() + ms,
+      left: ms,
+    });
+  };
+  return {
+    toasts: [],
+    push: (kind, message, action, duration = 3400) => {
+      const id = Math.random().toString(36).slice(2);
+      set((s) => ({ toasts: [...s.toasts, { id, kind, message, action }] }));
+      arm(id, duration);
+    },
+    dismiss: (id) => {
+      const clock = clocks.get(id);
+      if (clock?.handle) clearTimeout(clock.handle);
+      remove(id);
+    },
+    pause: (id) => {
+      const clock = clocks.get(id);
+      if (!clock?.handle) return;
+      clearTimeout(clock.handle);
+      clock.handle = null;
+      clock.left = Math.max(clock.endsAt - Date.now(), 0);
+    },
+    resume: (id) => {
+      const clock = clocks.get(id);
+      if (!clock || clock.handle) return;
+      arm(id, Math.max(clock.left, RESUME_MIN_MS));
+    },
+  };
+});
 
 /** Atalho para disparar toasts de qualquer lugar (fora de componentes também). */
 export const toast = {
