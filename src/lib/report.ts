@@ -264,6 +264,7 @@ export function parseChatSession(ndjson: string): {
     }
     const t = Number(o.t);
     if (!Number.isFinite(t)) continue;
+    if (o.unavailable === true) return { messages: [], gaps: [] };
     if (o.del != null) {
       deleted.add(String(o.del));
     } else if (o.gap != null) {
@@ -1928,6 +1929,23 @@ export function analyze(data: SessionData, t: Translate): ReportAnalysis {
 // ---------------------------------------------------------------------------
 // Mini-resumo por sessão (chips na lista + comparação com a live anterior)
 // ---------------------------------------------------------------------------
+
+/** Marcadores alteram a linha do tempo, não os diagnósticos de recursos. */
+export function withReportMarkers(
+  analysis: ReportAnalysis,
+  markers: readonly SessionMarker[],
+  t: Translate,
+): ReportAnalysis {
+  const events = analysis.events.filter((event) => event.kind !== "marker");
+  for (const marker of markers)
+    events.push({
+      t: marker.t,
+      kind: "marker",
+      label: t("analysis.event.marker", { label: marker.label }),
+    });
+  events.sort((a, b) => a.t - b.t);
+  return { ...analysis, events };
+}
 
 /** Extrai o resumo de uma análise completa — zero duplicação de heurística. */
 export function summarize(

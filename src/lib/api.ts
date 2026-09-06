@@ -83,6 +83,7 @@ export interface CornetaApi {
   /** `t` só serve à demo do navegador, que semeia sessões de exemplo com copy. */
   listSessions(t: I18n["t"]): Promise<SessionMeta[]>;
   readSession(id: string): Promise<string>;
+  readSessionBytes(id: string, chat?: boolean): Promise<ArrayBuffer>;
   /** NDJSON do chat gravado. String vazia = a sessão não gravou chat (o caso comum). */
   readSessionChat(id: string): Promise<string>;
   deleteSession(id: string): Promise<void>;
@@ -382,6 +383,10 @@ function tauriApi(): CornetaApi {
     async readSession(id) {
       const { invoke } = await core();
       return invoke<string>("read_session", { id });
+    },
+    async readSessionBytes(id, chat = false) {
+      const { invoke } = await core();
+      return invoke<ArrayBuffer>("read_session_bytes", { id, chat });
     },
     async saveTextFile(file) {
       const { invoke } = await core();
@@ -1498,6 +1503,10 @@ function mockApi(): CornetaApi {
     },
     async readSession(id) {
       return loadSessions()[id] ?? "";
+    },
+    async readSessionBytes(id, chat = false) {
+      return new TextEncoder().encode(chat ? "" : (loadSessions()[id] ?? ""))
+        .buffer;
     },
     // No navegador não existe diálogo nativo: cai no download do próprio browser,
     // que escolhe a pasta de Downloads. Sempre "salvou" — não há como cancelar.

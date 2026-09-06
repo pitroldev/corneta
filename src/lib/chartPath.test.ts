@@ -4,6 +4,7 @@ import {
   sampleIndices,
   peakOf,
   MAX_POINTS,
+  envelopeIndices,
   type PathGeometry,
 } from "./chartPath";
 
@@ -17,6 +18,23 @@ const g: PathGeometry = {
 };
 
 describe("chartPath", () => {
+  it("treats non-finite samples as gaps, never invalid SVG coordinates", () => {
+    expect(buildPath([10, NaN, Infinity, 20], { ...g, n: 4 })).toBe(
+      "M0.0,90.0 M100.0,80.0",
+    );
+  });
+  it("preserves isolated peaks, troughs and the final sample within the point budget", () => {
+    const values = Array<number | null>(14400).fill(50);
+    values[123] = 100;
+    values[456] = 0;
+    values[values.length - 1] = 99;
+    const indices = envelopeIndices(values);
+    expect(indices).toContain(123);
+    expect(indices).toContain(456);
+    expect(indices[indices.length - 1]).toBe(values.length - 1);
+    expect(indices.length).toBeLessThanOrEqual(MAX_POINTS);
+    expect(new Set(indices).size).toBe(indices.length);
+  });
   it("mapeia a série no retângulo, com o zero embaixo", () => {
     // 5 pontos em 100px → um a cada 25px; y é invertido (100 no topo).
     expect(buildPath([0, 50, 100], { ...g, n: 3 })).toBe(

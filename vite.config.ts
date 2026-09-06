@@ -86,7 +86,9 @@ export default defineConfig(async () => ({
     // versão ANTIGA do código, que pode passar ou quebrar por conta própria.
     exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**"],
   },
+  worker: { format: "es" },
   build: {
+    manifest: true,
     // Alvo do WebView2 (Windows) / WKWebView; ES2021 é seguro.
     target: "es2021",
     minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,

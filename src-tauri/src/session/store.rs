@@ -6,82 +6,101 @@
 
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::UNIX_EPOCH;
 
 use serde_json::Value;
 
+use super::writer::JournalWriter;
 use super::SessionStore;
 
-/// Escrita bufferizada: uma live de 3h escreve dezenas de milhares de linhas, e um
-/// `open`/`write`/`close` por linha seria I/O de sobra pra nada.
-struct SessionWriter {
-    writer: BufWriter<File>,
-    pending_lines: u8,
-}
+type FileEntry = Mutex<Option<JournalWriter>>;
+static FILES: OnceLock<Mutex<HashMap<PathBuf, Weak<FileEntry>>>> = OnceLock::new();
 
-static WRITERS: OnceLock<Mutex<HashMap<PathBuf, SessionWriter>>> = OnceLock::new();
-
-fn writers() -> &'static Mutex<HashMap<PathBuf, SessionWriter>> {
-    WRITERS.get_or_init(|| Mutex::new(HashMap::new()))
+fn file_entry(file: &Path) -> Arc<FileEntry> {
+    let mut files = FILES
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap();
+    if let Some(entry) = files.get(file).and_then(Weak::upgrade) {
+        return entry;
+    }
+    // Only active workers/callers own entries. Reap expired keys on cold-path
+    // acquisition, not on every live message, and never hold this lock for I/O.
+    files.retain(|_, entry| entry.strong_count() > 0);
+    let entry = Arc::new(Mutex::new(None));
+    files.insert(file.to_path_buf(), Arc::downgrade(&entry));
+    entry
 }
 
 /// O adaptador de produção.
 pub struct DiskStore;
 
+impl DiskStore {
+    pub(super) fn prepare_chat(&self, file: &Path) {
+        let entry = file_entry(file);
+        let mut writer = entry.lock().unwrap();
+        if writer.as_ref().is_some_and(|writer| !writer.close()) {
+            return;
+        }
+        let Ok(handle) = File::create(file) else {
+            return;
+        };
+        *writer = Some(JournalWriter::start(handle, 0, true, entry.clone()));
+    }
+}
+
 impl SessionStore for DiskStore {
     fn append(&self, file: &Path, line: &Value, cap: u64) {
-        if !super::domain::fits_cap(self.len(file), cap) {
-            log::warn!(
-                "{} atingiu o limite de {cap} bytes; linha descartada",
-                file.display()
-            );
-            return;
+        let entry = file_entry(file);
+        let mut writer = entry.lock().unwrap();
+        if let Some(active) = writer.as_ref() {
+            if active.append(line, cap) {
+                return;
+            }
+            *writer = None;
         }
         let mut text = line.to_string();
         text.push('\n');
-        if let Ok(mut map) = writers().lock() {
-            if let Some(session) = map.get_mut(file) {
-                let _ = session.writer.write_all(text.as_bytes());
-                session.pending_lines += 1;
-                if session.pending_lines >= 10 {
-                    let _ = session.writer.flush();
-                    session.pending_lines = 0;
-                }
-                return;
-            }
+        // The old handle is closed. Keep this per-file lock through the length
+        // check and append so concurrent post-live writes cannot interleave or
+        // both consume the same remaining capacity. Other files stay independent.
+        if self.len(file).saturating_add(text.len() as u64) > cap {
+            return;
         }
-        // Sem writer registrado (chat, ou processo que só anexa): abre e fecha na hora.
         if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(file) {
             let _ = f.write_all(text.as_bytes());
         }
     }
 
     fn create(&self, file: &Path, first: &Value) {
-        let Ok(handle) = File::create(file) else {
+        let entry = file_entry(file);
+        let mut writer = entry.lock().unwrap();
+        if writer.as_ref().is_some_and(|writer| !writer.close()) {
+            return;
+        }
+        let Ok(mut handle) = File::create(file) else {
             return;
         };
-        let mut writer = BufWriter::new(handle);
-        let _ = writeln!(writer, "{first}");
-        let _ = writer.flush();
-        if let Ok(mut map) = writers().lock() {
-            map.insert(
-                file.to_path_buf(),
-                SessionWriter {
-                    writer,
-                    pending_lines: 0,
-                },
-            );
+        let text = format!("{first}\n");
+        if handle.write_all(text.as_bytes()).is_err() || handle.flush().is_err() {
+            return;
         }
+        *writer = Some(JournalWriter::start(
+            handle,
+            text.len() as u64,
+            false,
+            entry.clone(),
+        ));
     }
 
     fn close(&self, file: &Path) {
-        if let Ok(mut map) = writers().lock() {
-            if let Some(mut session) = map.remove(file) {
-                let _ = session.writer.flush();
-            }
+        let entry = file_entry(file);
+        let mut writer = entry.lock().unwrap();
+        if writer.as_ref().is_some_and(JournalWriter::close) {
+            *writer = None;
         }
     }
 
@@ -128,11 +147,193 @@ impl SessionStore for DiskStore {
     }
 
     fn remove(&self, file: &Path) -> bool {
+        let entry = file_entry(file);
+        let mut writer = entry.lock().unwrap();
+        if writer.as_ref().is_some_and(|writer| !writer.close()) {
+            return false;
+        }
+        *writer = None;
         fs::remove_file(file).is_ok()
     }
 }
 
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod disk_tests {
+    use super::*;
+    use serde_json::json;
+    use std::sync::{mpsc, Barrier};
+    use std::time::Duration;
+
+    struct TemporaryJournal(PathBuf);
+
+    impl TemporaryJournal {
+        fn new() -> Self {
+            Self(std::env::temp_dir().join(format!(
+                "corneta-journal-regression-{}.ndjson",
+                uuid::Uuid::new_v4()
+            )))
+        }
+
+        fn lines(&self) -> Vec<Value> {
+            fs::read_to_string(&self.0)
+                .unwrap()
+                .lines()
+                .map(|line| {
+                    serde_json::from_str(line).expect("every NDJSON line must remain valid")
+                })
+                .collect()
+        }
+    }
+
+    impl Drop for TemporaryJournal {
+        fn drop(&mut self) {
+            DiskStore.close(&self.0);
+            let _ = fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn timed_out_close_keeps_ownership_and_drains_late_recorder_events() {
+        let journal = TemporaryJournal::new();
+        let meta = json!({"kind":"meta","startedAt":1000});
+        let text = format!("{meta}\n");
+        // The production open mode is intentional: a second append handle would
+        // be overwritten by this fixed-position handle in the old implementation.
+        let mut file = File::create(&journal.0).unwrap();
+        file.write_all(text.as_bytes()).unwrap();
+        let entry = file_entry(&journal.0);
+        let identity = Arc::downgrade(&entry);
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        *entry.lock().unwrap() = Some(JournalWriter::start_with_write_hook(
+            file,
+            text.len() as u64,
+            false,
+            entry.clone(),
+            move || {
+                entered_tx.send(()).unwrap();
+                let _ = release_rx.recv();
+            },
+        ));
+        let cap = 32 * 1024;
+        DiskStore.append(&journal.0, &json!({"kind":"end","endedAt":2000}), cap);
+        assert!(!entry
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .close_with_timeout(Duration::ZERO));
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        // The worker alone keeps the coordinator alive after the caller times out.
+        drop(entry);
+        assert!(Arc::ptr_eq(
+            &file_entry(&journal.0),
+            &identity.upgrade().unwrap()
+        ));
+        DiskStore.append(
+            &journal.0,
+            &json!({"kind":"recEnd","seg":1,"t":2000,"reason":"stopped"}),
+            cap,
+        );
+        let finalized = json!({"kind":"recFinalized","seg":1,"path":"synthetic-live.mp4"});
+        DiskStore.append(&journal.0, &finalized, cap);
+        release_tx.send(()).unwrap();
+        DiskStore.close(&journal.0);
+        let lines = journal.lines();
+        assert_eq!(lines.len(), 4);
+        assert_eq!(lines[0], meta);
+        assert_eq!(lines[1]["kind"], "end");
+        assert_eq!(lines[2]["kind"], "recEnd");
+        assert_eq!(lines[3], finalized);
+        // Subsequent post-live edits use the synchronous, serialized path.
+        DiskStore.append(&journal.0, &json!({"kind":"offset","ms":250}), cap);
+        assert_eq!(journal.lines().len(), 5);
+    }
+
+    #[test]
+    fn concurrent_close_and_finalizations_preserve_every_record() {
+        let journal = TemporaryJournal::new();
+        let cap = 32 * 1024;
+        DiskStore.create(&journal.0, &json!({"kind":"meta","startedAt":1000}));
+        DiskStore.append(&journal.0, &json!({"kind":"end","endedAt":2000}), cap);
+        let barrier = Barrier::new(9);
+        std::thread::scope(|scope| {
+            for segment in 1..=8 {
+                let path = &journal.0;
+                let barrier = &barrier;
+                scope.spawn(move || {
+                    barrier.wait();
+                    for index in 0..16 {
+                        DiskStore.append(path, &json!({"kind":"recFinalized","seg":segment,"index":index,"path":"synthetic.mp4"}), cap);
+                    }
+                });
+            }
+            barrier.wait();
+            DiskStore.close(&journal.0);
+        });
+        DiskStore.close(&journal.0);
+        let lines = journal.lines();
+        assert_eq!(lines.len(), 130);
+        assert_eq!(lines.iter().filter(|line| line["kind"] == "end").count(), 1);
+        for segment in 1..=8 {
+            let indices: Vec<_> = lines
+                .iter()
+                .filter(|line| line["seg"] == segment)
+                .map(|line| line["index"].as_u64().unwrap())
+                .collect();
+            assert_eq!(indices, (0..16).collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn concurrent_post_live_appends_share_the_file_capacity() {
+        let journal = TemporaryJournal::new();
+        DiskStore.create(&journal.0, &json!({"kind":"meta"}));
+        DiskStore.close(&journal.0);
+        let barrier = Barrier::new(8);
+        let cap = 2048;
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                let path = &journal.0;
+                let barrier = &barrier;
+                scope.spawn(move || {
+                    barrier.wait();
+                    for index in 0..16 {
+                        DiskStore.append(
+                            path,
+                            &json!({"kind":"marker","t":index,"label":"x".repeat(80)}),
+                            cap,
+                        );
+                    }
+                });
+            }
+        });
+        assert!(DiskStore.len(&journal.0) <= cap);
+        assert!(journal.lines().len() > 1);
+    }
+
+    #[test]
+    fn a_busy_file_does_not_lock_another_journal() {
+        let busy = TemporaryJournal::new();
+        let other = TemporaryJournal::new();
+        let entry = file_entry(&busy.0);
+        let _busy = entry.lock().unwrap();
+        std::thread::scope(|scope| {
+            let (done_tx, done_rx) = mpsc::channel();
+            let path = &other.0;
+            scope.spawn(move || {
+                DiskStore.create(path, &json!({"kind":"meta"}));
+                DiskStore.append(path, &json!({"kind":"end","endedAt":2000}), 2048);
+                DiskStore.close(path);
+                done_tx.send(()).unwrap();
+            });
+            done_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        });
+        assert_eq!(other.lines().len(), 2);
+    }
+}
 
 /// Adaptador em memória — a bancada de testes da aplicação.
 #[cfg(test)]

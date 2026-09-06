@@ -23,6 +23,7 @@ function render() {
   );
 }
 
-// Lê somente o arquivo local de consentimento antes de montar. Sem opt-in ou
-// sem token, o módulo do PostHog nem entra no WebView.
-void initializeTelemetry(api).finally(render);
+// The telemetry gate starts closed until local policy has resolved. The shell
+// does not depend on that IPC and must remain usable even if it is slow.
+void initializeTelemetry(api);
+render();

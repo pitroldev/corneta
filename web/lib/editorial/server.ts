@@ -6,6 +6,7 @@ import { cache } from "react";
 import { assertValidEditorialCatalog } from "./catalog";
 import { parseEditorialSource } from "./parse";
 import { editorialPeopleRegistrySchema } from "./schema";
+import { readEditorialManifest } from "./manifest";
 import type {
   EditorialAlternates,
   EditorialDocument,
@@ -55,7 +56,24 @@ async function findMdxFiles(directory: string): Promise<string[]> {
   return nested.flat().sort((left, right) => left.localeCompare(right, "en"));
 }
 
+let productionCatalog: Promise<EditorialDocument[]> | undefined;
+
 const readEditorialCatalog = cache(async (): Promise<EditorialDocument[]> => {
+  if (process.env.NODE_ENV === "production") {
+    productionCatalog ??= (async () => {
+      const contentRoot = await resolveContentRoot();
+      return readEditorialManifest(
+        await readFile(
+          path.join(contentRoot, "..", ".generated", "editorial.json"),
+          "utf8",
+        ),
+      );
+    })().catch((error) => {
+      productionCatalog = undefined;
+      throw error;
+    });
+    return productionCatalog;
+  }
   const contentRoot = await resolveContentRoot();
   const files = await findMdxFiles(contentRoot);
   const documents = await Promise.all(

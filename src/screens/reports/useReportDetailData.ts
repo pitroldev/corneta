@@ -1,160 +1,170 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 import { buildReplayIndex } from "../../lib/replay";
 import {
-  analyze,
   getCachedSummary,
-  parseChatSession,
-  parseSession,
   setCachedSummary,
-  summarize,
+  withReportMarkers,
+  type ReportAnalysis,
 } from "../../lib/report";
+import { ReportClient } from "../../lib/reportClient";
+import type { ReportSummaryResult } from "../../lib/reportTasks";
+import type { ChatPage } from "../../lib/replayChatPage";
 import type {
-  ReplayChatGap,
-  ReplayChatMessage,
   SessionData,
   SessionMarker,
   SessionSummary,
 } from "../../lib/types";
 
-type ReportDataState = SessionData | null | "loading";
-
-const EMPTY_CHAT: {
-  messages: ReplayChatMessage[];
-  gaps: ReplayChatGap[];
-} = { messages: [], gaps: [] };
+interface LoadedReport {
+  data: SessionData;
+  analysis: ReportAnalysis;
+  summary: SessionSummary;
+}
+const EMPTY_CHAT: ChatPage = {
+  messages: [],
+  gaps: [],
+  start: 0,
+  end: 0,
+  total: 0,
+  validFrom: null,
+  validUntil: null,
+};
 
 export function useReportDetailData(id: string, previousId: string | null) {
-  const { t } = useI18n();
-  const [data, setData] = useState<ReportDataState>("loading");
+  const { t, locale } = useI18n();
+  const [loaded, setLoaded] = useState<LoadedReport | null | "loading">(
+    "loading",
+  );
   const [previousSummary, setPreviousSummary] = useState<SessionSummary | null>(
     null,
   );
   const [chat, setChat] = useState(EMPTY_CHAT);
-  // Sem gravação no disco, uma live que nunca gravou e uma cuja gravação o streamer
-  // acabou de apagar ficam idênticas nos dados — este flag guarda a diferença pra a
-  // seção de replay não afirmar "não foi gravada" logo depois de "Apaguei a gravação".
   const [recordingsDeleted, setRecordingsDeleted] = useState(false);
   const [revision, setRevision] = useState(0);
+  const clientRef = useRef<ReportClient | null>(null);
+  const readChatPage = useCallback(
+    (epoch: number) =>
+      clientRef.current?.run<ChatPage>({ kind: "chatPage", epoch }) ??
+      Promise.resolve(EMPTY_CHAT),
+    [],
+  );
+  const reload = useCallback(() => setRevision((current) => current + 1), []);
 
-  const reload = useCallback(() => {
-    setRevision((current) => current + 1);
-  }, []);
-
-  // A persistência já terminou quando estes callbacks rodam. Atualizar só o pedaço
-  // alterado mantém player, chat e gráficos montados — trocar tudo pelo skeleton aqui
-  // fazia a tela inteira piscar ao marcar um único instante.
-  const addMarker = useCallback((marker: SessionMarker) => {
-    setData((current) => {
-      if (!current || current === "loading") return current;
-      return {
-        ...current,
-        markers: [...current.markers, marker].sort((a, b) => a.t - b.t),
-      };
-    });
-  }, []);
+  const addMarker = useCallback(
+    (marker: SessionMarker) => {
+      setLoaded((current) => {
+        if (!current || current === "loading") return current;
+        const markers = [...current.data.markers, marker].sort(
+          (a, b) => a.t - b.t,
+        );
+        return {
+          ...current,
+          data: { ...current.data, markers },
+          analysis: withReportMarkers(current.analysis, markers, t),
+        };
+      });
+    },
+    [t],
+  );
 
   const clearRecordings = useCallback(() => {
     setRecordingsDeleted(true);
-    setData((current) => {
-      if (!current || current === "loading") return current;
-      return { ...current, recordings: [] };
-    });
+    setLoaded((current) =>
+      !current || current === "loading"
+        ? current
+        : { ...current, data: { ...current.data, recordings: [] } },
+    );
   }, []);
 
   useEffect(() => {
     let alive = true;
-    setData("loading");
-    setRecordingsDeleted(false);
-    void api
-      .readSession(id)
-      .then((raw) => {
-        if (!alive) return;
-        const parsed = parseSession(raw, t);
-        setData(parsed);
-        if (parsed?.meta.endedAt != null)
-          setCachedSummary(id, summarize(parsed, analyze(parsed, t)));
-      })
-      .catch(() => {
-        if (alive) setData(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [id, revision, t]);
-
-  useEffect(() => {
-    let alive = true;
+    const client = new ReportClient();
+    clientRef.current = client;
+    setLoaded("loading");
     setChat(EMPTY_CHAT);
-    void api
-      .readSessionChat(id)
-      .then((raw) => {
-        if (alive && raw) setChat(parseChatSession(raw));
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [id]);
-
-  useEffect(() => {
     setPreviousSummary(null);
-    if (!previousId) return;
-    const cached = getCachedSummary(previousId);
-    if (cached) {
-      setPreviousSummary(cached);
-      return;
-    }
-    let alive = true;
-    void api
-      .readSession(previousId)
-      .then((raw) => {
+    setRecordingsDeleted(false);
+    void (async () => {
+      try {
+        const raw = await api.readSessionBytes(id);
         if (!alive) return;
-        const parsed = parseSession(raw, t);
-        if (!parsed) return;
-        const summary = summarize(parsed, analyze(parsed, t));
-        if (parsed.meta.endedAt != null) setCachedSummary(previousId, summary);
-        setPreviousSummary(summary);
-      })
-      .catch(() => {});
+        const result = await client.run<LoadedReport | null>({
+          kind: "analyze",
+          raw,
+          locale,
+        });
+        if (!alive) return;
+        setLoaded(result);
+        if (!result) return;
+        if (result.data.meta.endedAt != null)
+          setCachedSummary(id, result.summary);
+        // One worker, detail first, optional data later. Navigation terminates
+        // pending work instead of just hiding stale results.
+        try {
+          const raw = await api.readSessionBytes(id, true);
+          if (alive && raw.byteLength > 0) {
+            const next = await client.run<ChatPage>({
+              kind: "chat",
+              raw,
+              epoch: result.data.meta.startedAt,
+            });
+            if (alive) setChat(next);
+          }
+        } catch {
+          /* Missing chat is independent of the live story. */
+        }
+        if (!alive || !previousId) return;
+        const cached = getCachedSummary(previousId);
+        if (cached) {
+          setPreviousSummary(cached);
+          return;
+        }
+        try {
+          const raw = await api.readSessionBytes(previousId);
+          if (!alive) return;
+          const next = await client.run<ReportSummaryResult | null>({
+            kind: "summary",
+            raw,
+            locale,
+          });
+          if (alive) setPreviousSummary(next?.summary ?? null);
+        } catch {
+          /* Comparison is optional. */
+        }
+      } catch {
+        if (alive) setLoaded(null);
+      }
+    })();
     return () => {
       alive = false;
+      if (clientRef.current === client) clientRef.current = null;
+      client.dispose();
     };
-  }, [previousId, t]);
+  }, [id, previousId, revision, locale]);
 
-  const parsed = data === "loading" || !data ? null : data;
-  const analysis = useMemo(
-    () => (parsed ? analyze(parsed, t) : null),
-    [parsed, t],
-  );
+  const parsed = loaded && loaded !== "loading" ? loaded.data : null;
+  const analysis = loaded && loaded !== "loading" ? loaded.analysis : null;
+  const recordings = parsed?.recordings;
+  const clockJumps = parsed?.clockJumps;
+  const offsetMs = parsed?.offsetMs;
   const replayIndex = useMemo(
     () =>
-      parsed
-        ? buildReplayIndex(
-            parsed.recordings.map((recording) => ({
-              seg: recording.seg,
-              t: recording.t,
-              path: recording.path,
-              codec: recording.codec,
-              estimated: recording.estimated,
-              syncs: recording.syncs,
-              endT: recording.endT,
-            })),
-            parsed.clockJumps,
-            parsed.offsetMs,
-          )
+      recordings
+        ? buildReplayIndex(recordings, clockJumps ?? [], offsetMs ?? 0)
         : null,
-    [parsed],
+    [recordings, clockJumps, offsetMs],
   );
 
   return {
-    data,
+    data: loaded === "loading" ? ("loading" as const) : parsed,
     parsed,
     analysis,
     replayIndex,
     previousSummary,
     chat,
+    readChatPage,
     recordingsDeleted,
     reload,
     addMarker,

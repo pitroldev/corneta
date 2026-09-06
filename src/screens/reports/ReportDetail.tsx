@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button, Card } from "../../components/ui";
 import { api } from "../../lib/api";
@@ -7,7 +7,6 @@ import { dropCachedSummary } from "../../lib/report";
 import { toast } from "../../lib/toast";
 import { cn } from "../../lib/utils";
 import { ReportCommunitySection } from "./ReportCommunitySection";
-import { DownloadModal, RecapModal } from "./ReportModals";
 import { ReportOverview } from "./ReportOverview";
 import { ReportReplaySection } from "./ReportReplaySection";
 import { ReportTechnicalSection } from "./ReportTechnicalSection";
@@ -20,6 +19,15 @@ import {
   useReportTechnicalModel,
   useReportTimeline,
 } from "./useReportModels";
+
+const DownloadModal = lazy(() =>
+  import("./ReportModals").then((module) => ({
+    default: module.DownloadModal,
+  })),
+);
+const RecapModal = lazy(() =>
+  import("./ReportModals").then((module) => ({ default: module.RecapModal })),
+);
 
 export function ReportDetail({
   id,
@@ -103,14 +111,22 @@ export function ReportDetail({
         onDelete={remove}
       />
       {recapOpen ? (
-        <RecapModal
-          data={detail.data}
-          analysis={detail.analysis}
-          onClose={closeRecap}
-        />
+        <Suspense fallback={null}>
+          <RecapModal
+            data={detail.data}
+            analysis={detail.analysis}
+            onClose={closeRecap}
+          />
+        </Suspense>
       ) : null}
       {downloadOpen ? (
-        <DownloadModal data={detail.data} onClose={closeDownload} />
+        <Suspense fallback={null}>
+          <DownloadModal
+            data={detail.data}
+            analysis={detail.analysis}
+            onClose={closeDownload}
+          />
+        </Suspense>
       ) : null}
 
       <ReportReplaySection
@@ -119,6 +135,7 @@ export function ReportDetail({
         data={detail.data}
         sessionId={id}
         chat={detail.chat.messages}
+        readChatPage={detail.readChatPage}
         gaps={detail.chat.gaps}
         ticks={story.replayTicks}
         seek={timeline.seek}

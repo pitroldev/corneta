@@ -1,9 +1,21 @@
 // Gráfico de linhas em SVG (zero-dependência). Multi-série sobre um eixo de
 // tempo (índice de amostra), com marcadores de evento, tratamento de gaps,
 // rótulos de tempo no eixo X, linha de referência e tooltip no hover.
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { cn } from "../lib/utils";
 import { buildPath, peakOf, type PathGeometry } from "../lib/chartPath";
+import type { PlaybackSource } from "../lib/playbackClock";
+
+const STATIC_PLAYBACK: PlaybackSource = {
+  subscribe: () => () => {},
+  getSnapshot: () => null,
+};
 
 export interface ChartSeries {
   label: string;
@@ -32,7 +44,8 @@ export function LineChart({
   formatX,
   refLine,
   className,
-  playhead,
+  playhead: fixedPlayhead,
+  playheadSource = STATIC_PLAYBACK,
   onSeek,
   ariaLabel,
 }: {
@@ -50,12 +63,19 @@ export function LineChart({
   /** Cursor do replay, em índice de amostra (fracionário: o vídeo anda entre amostras).
    *  `null` = sem gravação ou instante fora dela. */
   playhead?: number | null;
+  playheadSource?: PlaybackSource;
   /** Clique no gráfico → salta o vídeo pra aquela amostra. Sem isso o gráfico é só leitura. */
   onSeek?: (i: number) => void;
   /** Nome acessível do gráfico, montado por quem tem os números (ex.: "Audiência: pico 120,
    *  média 80"). Sem ele, cai no nome das séries — o mesmo texto da legenda abaixo. */
   ariaLabel?: string;
 }) {
+  const clockPlayhead = useSyncExternalStore(
+    playheadSource.subscribe,
+    playheadSource.getSnapshot,
+    STATIC_PLAYBACK.getSnapshot,
+  );
+  const playhead = fixedPlayhead === undefined ? clockPlayhead : fixedPlayhead;
   const [hover, setHover] = useState<number | null>(null);
   const [width, setWidth] = useState(640);
   const rootRef = useRef<HTMLDivElement>(null);

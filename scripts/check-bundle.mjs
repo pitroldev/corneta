@@ -7,9 +7,10 @@ import {
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { gzipSync } from "node:zlib";
+import { entryFiles } from "./entry-budget.mjs";
 
 const root = process.cwd();
 const dist = join(root, "dist");
@@ -52,6 +53,33 @@ if (existsSync(assets)) {
 }
 if (oversized.length) {
   fail(`Chunks acima do budget de 110 KiB gzip:\n${oversized.join("\n")}`);
+}
+
+// A page split into many individually-small chunks can still have a heavy boot.
+// Gate the union of its static graph in addition to the existing per-chunk gate.
+const manifestFile = join(dist, ".vite", "manifest.json");
+if (!existsSync(manifestFile))
+  fail("Manifest ausente: refaça o build antes de verificar as entradas.");
+const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+for (const [entry, chunk] of Object.entries(manifest)) {
+  if (!chunk.isEntry) continue;
+  let javascript = 0;
+  let css = 0;
+  let other = 0;
+  for (const file of entryFiles(manifest, entry)) {
+    const path = resolve(dist, file);
+    if (!path.startsWith(resolve(dist) + sep))
+      fail("Caminho inválido no manifest.");
+    const contents = readFileSync(path);
+    if (file.endsWith(".js")) javascript += gzipSync(contents).byteLength;
+    else if (file.endsWith(".css")) css += gzipSync(contents).byteLength;
+    else other += contents.byteLength;
+  }
+  console.log(
+    `Entrada ${entry}: JS ${(javascript / 1024).toFixed(1)} KiB gzip; CSS ${(css / 1024).toFixed(1)} KiB gzip; assets ${(other / 1024).toFixed(1)} KiB`,
+  );
+  if (javascript > 250 * 1024 || css > 55 * 1024 || other > 256 * 1024)
+    fail(`Entrada ${entry} excede o orçamento agregado.`);
 }
 
 // 2) Monte a lista de arquivos sem manter todos os binários grandes em memória.

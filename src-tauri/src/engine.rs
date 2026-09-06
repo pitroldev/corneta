@@ -44,7 +44,7 @@ fn sanitize_preset(mut p: VideoPreset) -> VideoPreset {
 /// Preset EFETIVO de um destino: o do usuário (sanitizado) ou o recomendado da plataforma
 /// (também sanitizado). Fonte ÚNICA — o encode real e o spec/relatório não podem divergir por
 /// derivarem o preset de jeitos diferentes em lugares diferentes.
-fn effective_preset(t: &Target) -> VideoPreset {
+pub(crate) fn effective_preset(t: &Target) -> VideoPreset {
     sanitize_preset(
         t.encoding
             .preset
@@ -273,10 +273,8 @@ pub fn ffmpeg_args_for_target(
     // `0:a?` torna o mapeamento opcional, para não falhar se a fonte não tiver áudio.
     let audio_kbps = effective_preset(t).audio_bitrate_kbps;
     args.extend(["-map", "0:a?"].map(String::from));
-    // Normalização de loudness (opt-in): como a Corneta JÁ reencoda o áudio de TODO destino
-    // (mesmo no modo cópia, onde só o vídeo é copiado), o `loudnorm` é só mais um filtro de
-    // áudio no encode que já existe — praticamente DE GRAÇA e sem tocar no vídeo. Passada única
-    // (ao vivo não dá 2 passadas): puxa pro alvo com o true-peak travado em -1.5 dBTP.
+    // Normalization is real processing. Shared renditions apply it once; their
+    // egresses use the already-normalized AAC without repeating the filter.
     if config.settings.loudness_normalize {
         args.push("-af".into());
         args.push(format!(
@@ -319,6 +317,52 @@ pub fn ffmpeg_args_for_target(
         .map(String::from),
     );
 
+    // Only the raw Guardian program has a proven AAC-LC/48k/stereo/160k
+    // contract. Never assume arbitrary OBS or splicer input is compatible.
+    let known_audio = config.settings.guardian_enabled
+        && config
+            .settings
+            .guardian_watchlist
+            .iter()
+            .any(|term| !term.trim().is_empty())
+        && source_url == program_url(config)
+        && audio_kbps == 160
+        && !config.settings.loudness_normalize;
+    if known_audio {
+        copy_encoded_audio(&mut args);
+    }
+    args
+}
+
+fn copy_encoded_audio(args: &mut Vec<String>) {
+    let mut index = 0;
+    while index + 1 < args.len() {
+        match args[index].as_str() {
+            "-ar" | "-ac" | "-b:a" | "-af" => {
+                args.drain(index..index + 2);
+            }
+            "-c:a" => {
+                args[index + 1] = "copy".into();
+                index += 2;
+            }
+            _ => index += 1,
+        }
+    }
+}
+
+/// Local rendition output is already encoded with the exact target contract.
+/// Retain destination-specific RTMP handshake/reconnect handling at the edge.
+pub(crate) fn ffmpeg_args_for_rendition_egress(
+    config: &AppConfig,
+    target: &Target,
+    key: &str,
+    source: &str,
+) -> Vec<String> {
+    let mut config = config.clone();
+    config.mode = "passthrough".into();
+    config.settings.loudness_normalize = false;
+    let mut args = ffmpeg_args_for_target(&config, target, key, None, source, None);
+    copy_encoded_audio(&mut args);
     args
 }
 
@@ -978,6 +1022,94 @@ mod tests {
             profiles: vec![],
             active_profile_id: String::new(),
         }
+    }
+
+    #[test]
+    fn audio_copy_requires_a_proven_program_contract() {
+        let target = tgt("twitch", Some(preset(1280, 720, 30, 4000)));
+        let mut config = cfg("per-platform", vec![target.clone()]);
+        config.settings.guardian_enabled = true;
+        config.settings.guardian_watchlist = vec!["private".into()];
+        let audio = |config: &AppConfig, target: &Target, source: &str| {
+            let args = ffmpeg_args_for_target(config, target, "key", None, source, None);
+            args.windows(2).find(|pair| pair[0] == "-c:a").unwrap()[1].clone()
+        };
+        assert_eq!(audio(&config, &target, &program_url(&config)), "copy");
+        assert_eq!(audio(&config, &target, "rtmp://127.0.0.1/live/obs"), "aac");
+        let mut different = target.clone();
+        different
+            .encoding
+            .preset
+            .as_mut()
+            .unwrap()
+            .audio_bitrate_kbps = 128;
+        assert_eq!(audio(&config, &different, &program_url(&config)), "aac");
+        config.settings.loudness_normalize = true;
+        assert_eq!(audio(&config, &target, &program_url(&config)), "aac");
+        config.settings.loudness_normalize = false;
+        config.settings.guardian_watchlist.clear();
+        assert_eq!(audio(&config, &target, &program_url(&config)), "aac");
+    }
+
+    #[test]
+    fn rendition_egress_copies_both_tracks_but_preserves_custom_handshake() {
+        let target = tgt("custom", None);
+        let mut config = cfg("per-platform", vec![target.clone()]);
+        config.settings.loudness_normalize = true;
+        let args = ffmpeg_args_for_rendition_egress(
+            &config,
+            &target,
+            "secret-key",
+            "rtmp://127.0.0.1/live/rendition",
+        );
+        for flag in ["-c:v", "-c:a"] {
+            assert!(args.windows(2).any(|pair| pair == [flag, "copy"]));
+        }
+        assert!(!args
+            .iter()
+            .any(|arg| ["-vf", "-af", "-b:v", "-b:a"].contains(&arg.as_str())));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["-rtmp_playpath", "secret-key"]));
+        assert_eq!(args.last().unwrap(), "rtmp://x/app/secret-key");
+    }
+
+    #[test]
+    fn rendition_groups_compare_the_complete_effective_encoding() {
+        let first = tgt("twitch", Some(preset(1280, 720, 30, 4000)));
+        let mut second = first.clone();
+        second.id = "b".into();
+        second.platform_id = "custom".into();
+        second.ingest_url = "rtmp://another/app".into();
+        let grouped = |second: Target| {
+            crate::renditions::plan(
+                &cfg("per-platform", vec![first.clone(), second]),
+                "source",
+                Some("h264_nvenc"),
+            )
+        };
+        assert_eq!(grouped(second.clone())[0].targets, ["t", "b"]);
+        for field in [
+            "audio", "bitrate", "fps", "gop", "width", "encoder", "disabled",
+        ] {
+            let mut different = second.clone();
+            let p = different.encoding.preset.as_mut().unwrap();
+            match field {
+                "audio" => p.audio_bitrate_kbps = 128,
+                "bitrate" => p.video_bitrate_kbps = 3500,
+                "fps" => p.fps = 60,
+                "gop" => p.keyframe_sec = 1,
+                "width" => p.width = 1920,
+                "encoder" => different.encoding.encoder = "software".into(),
+                "disabled" => different.enabled = false,
+                _ => unreachable!(),
+            }
+            assert!(grouped(different).is_empty(), "must not group {field}");
+        }
+        assert!(
+            crate::renditions::plan(&cfg("passthrough", vec![first, second]), "source", None)
+                .is_empty()
+        );
     }
 
     #[test]

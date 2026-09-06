@@ -56,7 +56,7 @@ export function ReportTimelineSection({
               markers={story.momentMarkers}
               formatValue={(value) => fmt.num(Math.round(value))}
               formatX={timeline.relativeAtViewer}
-              playhead={timeline.playViewer}
+              playheadSource={timeline.viewerClock}
               onSeek={timeline.seekViewer}
             />
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">

@@ -16,8 +16,6 @@ import {
 } from "react";
 import {
   DEFAULT_LOCALE,
-  interpolate,
-  pluralSuffix,
   resolveLocale,
   type LanguageSetting,
   type Locale,
@@ -25,6 +23,7 @@ import {
 } from "./locale";
 import { makeFmt, type Fmt } from "./format";
 import type { Dict, MessageKey } from "./pt";
+import { buildI18n } from "./core";
 
 export * from "./locale";
 export { makeFmt, fileStamp, type Fmt } from "./format";
@@ -53,22 +52,6 @@ export interface I18n {
    *  passa `count` como buraco — é o que evita "1 platforms". */
   tp: (key: string, count: number, vars?: Vars) => string;
   fmt: Fmt;
-}
-
-function build(locale: Locale, dict: Dict): I18n {
-  const t = (key: MessageKey, vars?: Vars) => interpolate(dict[key], vars);
-  return {
-    locale,
-    t,
-    tp: (key, count, vars) => {
-      const chosen = `${key}.${pluralSuffix(count)}` as MessageKey;
-      // Sem a variante, cai na chave crua: melhor a frase no singular do que
-      // `undefined` na tela.
-      const template = dict[chosen] ?? dict[key as MessageKey];
-      return interpolate(template, { count, ...vars });
-    },
-    fmt: makeFmt(locale),
-  };
 }
 
 /** Sem dicionário carregado, `t` devolve a própria chave.
@@ -107,7 +90,7 @@ export function I18nProvider({
   }, [locale]);
 
   const value = useMemo(
-    () => (dict ? build(dict.locale, dict.dict) : LOADING),
+    () => (dict ? buildI18n(dict.locale, dict.dict) : LOADING),
     [dict],
   );
 

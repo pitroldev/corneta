@@ -55,6 +55,11 @@ import type {
   SessionMarker,
 } from "../lib/types";
 import { ReplayChatPanel } from "./ReplayChatPanel";
+import {
+  upperBoundChat,
+  chatPageContains,
+  type ChatPage,
+} from "../lib/replayChatPage";
 import { Select } from "./Select";
 import { Button } from "./ui";
 
@@ -78,8 +83,9 @@ const PLAY_RATES = [0.5, 1, 1.5, 2] as const;
 export function ReplayPlayer({
   data,
   sessionId,
-  chat,
-  gaps,
+  chat: initialChat,
+  gaps: initialGaps,
+  readChatPage,
   ticks,
   seek,
   onPlayhead,
@@ -89,6 +95,7 @@ export function ReplayPlayer({
   data: SessionData;
   sessionId: string;
   chat: ReplayChatMessage[];
+  readChatPage?: (epoch: number) => Promise<ChatPage>;
   gaps: ReplayChatGap[];
   ticks: ReplayTick[];
   seek: SeekRequest | null;
@@ -434,22 +441,38 @@ export function ReplayPlayer({
 
   // Mensagens até o cursor. `deleted` sai por padrão: o replay respeita a moderação.
   const cursorEpoch = epochAtGlobal(tuned, globalMs);
+  const [chatPage, setChatPage] = useState<ChatPage | null>(null);
+  const chat = chatPage?.messages ?? initialChat;
+  const gaps = chatPage?.gaps ?? initialGaps;
+  useEffect(() => {
+    if (
+      !readChatPage ||
+      cursorEpoch == null ||
+      (initialChat.length === 0 && initialGaps.length === 0)
+    )
+      return;
+    if (chatPage && chatPageContains(chatPage, cursorEpoch)) return;
+    let alive = true;
+    void readChatPage(cursorEpoch)
+      .then((page) => {
+        if (alive) setChatPage(page);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [readChatPage, cursorEpoch, initialChat, initialGaps, chatPage]);
+  const chatCursor =
+    cursorEpoch == null ? 0 : upperBoundChat(chat, cursorEpoch);
   const visibleChat = useMemo(() => {
-    if (cursorEpoch == null || !chat.length) return [];
+    if (chatCursor === 0 || !chat.length) return [];
     // BUSCA BINÁRIA, não `filter`. O array já vem ordenado por tempo, e isto roda a cada
     // `timeupdate` (~4×/s): varrer 40 mil mensagens nessa cadência travaria a tela
     // exatamente durante o replay, que é a hora em que ela precisa estar lisa.
-    let lo = 0;
-    let hi = chat.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (chat[mid].t <= cursorEpoch) lo = mid + 1;
-      else hi = mid;
-    }
     // Só a cauda: renderizar a live inteira a cada quadro seria o mesmo problema de novo.
-    const tail = chat.slice(Math.max(0, lo - 300), lo);
+    const tail = chat.slice(Math.max(0, chatCursor - 300), chatCursor);
     return (showDeleted ? tail : tail.filter((m) => !m.deleted)).slice(-120);
-  }, [chat, cursorEpoch, showDeleted]);
+  }, [chat, chatCursor, showDeleted]);
 
   const gapBefore = useMemo(() => {
     if (cursorEpoch == null) return null;

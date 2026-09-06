@@ -111,7 +111,7 @@ export function ReportCommunitySection({
               markers={story.chatMarkers}
               formatValue={(value) => Math.round(value).toString()}
               formatX={timeline.relativeAtSample}
-              playhead={timeline.playSample}
+              playheadSource={timeline.sampleClock}
               onSeek={timeline.seekSample}
             />
             <div className="mt-3 text-xs text-ink-muted">

@@ -380,6 +380,7 @@ pub fn worth_recovering(len: u64) -> bool {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionMeta {
+    pub source_revision: String,
     pub id: String,
     pub started_at: u64,
     pub ended_at: Option<u64>,
@@ -407,6 +408,7 @@ pub fn parse_meta_line(first: &str, mtime_ms: Option<u64>) -> Option<SessionMeta
         .map(|e| e.saturating_sub(started_at) / 1000)
         .unwrap_or(0);
     Some(SessionMeta {
+        source_revision: String::new(),
         id: v.get("id")?.as_str()?.to_string(),
         started_at,
         ended_at: mtime_ms,
@@ -502,6 +504,7 @@ pub fn plan_video_prune(
 }
 
 /// Cabe mais uma linha neste arquivo?
+#[cfg(test)]
 pub fn fits_cap(current_len: u64, cap: u64) -> bool {
     current_len < cap
 }

@@ -16,6 +16,8 @@
     "build": "pnpm typecheck && pnpm build:fast",
     "build:release": "pnpm build && pnpm bundle:check",
     "bundle:check": "node scripts/check-bundle.mjs",
+    "benchmark:build": "node scripts/benchmark-build.mjs",
+    "smoke:reports": "node scripts/smoke-reports.mjs",
     "artifacts:check": "node scripts/check-bundle.mjs dist src-tauri/target/release/corneta.exe src-tauri/target/release/bundle",
     "updater:manifest": "node scripts/create-updater-manifest.mjs",
     "reports:seed": "node scripts/seed-report-fixtures.mjs",

@@ -16,6 +16,7 @@ import type {
 } from "../../lib/types";
 import { StorySectionHeading } from "./ReportPrimitives";
 import type { ReplayState } from "./useReportModels";
+import type { ChatPage } from "../../lib/replayChatPage";
 
 /** O que a seção mostra: os estados do modelo mais "apagada", que só existe nesta visita. */
 type ReplayView = ReplayState | "deleted";
@@ -40,6 +41,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   data,
   sessionId,
   chat,
+  readChatPage,
   gaps,
   ticks,
   seek,
@@ -54,6 +56,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   data: SessionData;
   sessionId: string;
   chat: ReplayChatMessage[];
+  readChatPage: (epoch: number) => Promise<ChatPage>;
   gaps: ReplayChatGap[];
   ticks: ReplayTick[];
   seek: SeekRequest | null;
@@ -88,6 +91,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
             data={data}
             sessionId={sessionId}
             chat={chat}
+            readChatPage={readChatPage}
             gaps={gaps}
             ticks={ticks}
             seek={seek}

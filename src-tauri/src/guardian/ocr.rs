@@ -234,42 +234,77 @@ impl Ocr for WindowsOcr {
     }
 
     fn read_text(&self, gray: &[u8], w: usize, h: usize) -> String {
+        if w <= OCR_TARGET_W as usize {
+            return ocr_text_gray(gray, w as u32, h as u32).unwrap_or_default();
+        }
         let Some(small) = downscale_gray(gray, w, h) else {
             return String::new();
         };
-        let mut jpeg = Vec::new();
-        if small
-            .write_to(
-                &mut std::io::Cursor::new(&mut jpeg),
-                image::ImageFormat::Jpeg,
-            )
-            .is_err()
-        {
-            return String::new();
-        }
-        ocr_text_jpeg(&jpeg).unwrap_or_default()
+        ocr_text_gray(small.as_raw(), small.width(), small.height()).unwrap_or_default()
     }
 }
 
-/// OCR via Windows.Media.Ocr (nativo) sobre um JPEG → texto reconhecido.
+/// Direct lossless Gray8 input: avoids JPEG encode/decode and its text artifacts.
 #[cfg(windows)]
-fn ocr_text_jpeg(bytes: &[u8]) -> Option<String> {
-    use windows::Graphics::Imaging::BitmapDecoder;
+fn ocr_text_gray(bytes: &[u8], width: u32, height: u32) -> Option<String> {
     use windows::Media::Ocr::OcrEngine;
-    use windows::Storage::Streams::{DataWriter, InMemoryRandomAccessStream};
-
-    let stream = InMemoryRandomAccessStream::new().ok()?;
-    let writer = DataWriter::CreateDataWriter(&stream).ok()?;
-    writer.WriteBytes(bytes).ok()?;
-    writer.StoreAsync().ok()?.join().ok()?;
-    let _ = writer.FlushAsync().ok()?.join();
-    let _ = writer.DetachStream();
-    stream.Seek(0).ok()?;
-    let decoder = BitmapDecoder::CreateAsync(&stream).ok()?.join().ok()?;
-    let bitmap = decoder.GetSoftwareBitmapAsync().ok()?.join().ok()?;
+    let bitmap = gray_bitmap(bytes, width, height)?;
     let engine = OcrEngine::TryCreateFromUserProfileLanguages().ok()?;
     let result = engine.RecognizeAsync(&bitmap).ok()?.join().ok()?;
     Some(result.Text().ok()?.to_string())
+}
+
+#[cfg(windows)]
+fn gray_bitmap(
+    bytes: &[u8],
+    width: u32,
+    height: u32,
+) -> Option<windows::Graphics::Imaging::SoftwareBitmap> {
+    use windows::Graphics::Imaging::{BitmapPixelFormat, SoftwareBitmap};
+    use windows::Storage::Streams::DataWriter;
+    if width == 0 || height == 0 || bytes.len() != (width as usize).checked_mul(height as usize)? {
+        return None;
+    }
+    let bitmap = SoftwareBitmap::Create(
+        BitmapPixelFormat::Gray8,
+        i32::try_from(width).ok()?,
+        i32::try_from(height).ok()?,
+    )
+    .ok()?;
+    let writer = DataWriter::new().ok()?;
+    writer.WriteBytes(bytes).ok()?;
+    bitmap.CopyFromBuffer(&writer.DetachBuffer().ok()?).ok()?;
+    Some(bitmap)
+}
+
+#[cfg(all(test, windows))]
+mod bitmap_tests {
+    use super::*;
+
+    #[test]
+    fn native_gray_bitmap_accepts_even_and_odd_widths() {
+        for width in [64, 65, 1919, 1920] {
+            let bitmap =
+                gray_bitmap(&vec![255; width * 32], width as u32, 32).expect("Native Gray8 upload");
+            assert_eq!(bitmap.PixelWidth().unwrap(), width as i32);
+            assert_eq!(bitmap.PixelHeight().unwrap(), 32);
+        }
+        assert!(gray_bitmap(&[0; 15], 4, 4).is_none());
+        assert!(gray_bitmap(&[], 0, 4).is_none());
+    }
+
+    #[test]
+    #[ignore = "Requires an installed Windows OCR language pack"]
+    fn native_ocr_accepts_direct_gray_input() {
+        if windows::Media::Ocr::OcrEngine::TryCreateFromUserProfileLanguages().is_err() {
+            eprintln!("Skipping OCR integration: no Windows OCR language pack available");
+            return;
+        }
+        assert_eq!(
+            ocr_text_gray(&vec![255; 641 * 100], 641, 100),
+            Some(String::new())
+        );
+    }
 }
 
 // -------------------------------- Fallback ---------------------------------

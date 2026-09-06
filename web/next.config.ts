@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR?.trim() || ".next",
   poweredByHeader: false,
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/*": ["./.generated/editorial.json", "./content/people.json"],
+  },
   async redirects() {
     return [
       {

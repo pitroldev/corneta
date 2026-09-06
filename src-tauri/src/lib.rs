@@ -6,6 +6,8 @@ mod compositor;
 mod config;
 mod engine;
 mod engine_policy;
+mod frame_pool;
+mod gpu_pipeline;
 mod guardian;
 mod http_client;
 // `pub` de propósito: o catálogo de mensagens é a fundação do i18n e precisa
@@ -16,7 +18,9 @@ mod keys;
 mod obs;
 mod overlay;
 mod permissions;
+mod queue_probe;
 mod recorder;
+mod renditions;
 mod resources;
 mod session;
 mod splicer;
@@ -215,6 +219,7 @@ pub fn run() {
             commands::list_sessions,
             commands::read_session,
             commands::read_session_chat,
+            commands::read_session_bytes,
             commands::delete_session,
             commands::open_sessions_dir,
             commands::record_check_dir,

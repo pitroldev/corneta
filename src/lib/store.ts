@@ -4,7 +4,6 @@ import type {
   Alert,
   AppConfig,
   AppSettings,
-  ChatDelete,
   ChatMessage,
   EncoderInfo,
   EncodingMode,
@@ -22,6 +21,7 @@ import { OAUTH } from "./oauth";
 import * as cfgOps from "./configOps";
 import { openExternal, uid } from "./utils";
 import { addStep, capture } from "./telemetry";
+import { applyChatBatch, type ChatEvent } from "./chatBatch";
 import {
   createTelemetryId,
   fpsBucket,
@@ -274,19 +274,6 @@ async function readConfig(t: T): Promise<AppConfig> {
   return config;
 }
 
-// Decide se uma mensagem sobrevive a um evento de deleção.
-function keepMessage(m: ChatMessage, d: ChatDelete): boolean {
-  if (m.platform !== d.platform) return true;
-  if (d.scope === "message") return m.nativeId !== d.nativeId;
-  if (d.scope === "user")
-    return !(
-      m.source === d.source &&
-      m.author.toLowerCase() === (d.author ?? "").toLowerCase()
-    );
-  if (d.scope === "all") return m.source !== d.source;
-  return true;
-}
-
 export const useStore = create<State>((set, get) => {
   // Persiste a config + mantém o perfil ativo em sincronia com o working set.
   // Enfileira cada gravação imediatamente. Não dependemos de beforeunload (assíncrono e não
@@ -294,6 +281,7 @@ export const useStore = create<State>((set, get) => {
   let saveChain: Promise<void> = Promise.resolve();
   let saveRevision = 0;
   let pendingSaves = 0;
+  let discardPendingChat = () => {};
   let liveOperation: { id: string } | null = null;
   const flushSave = () => saveChain;
   const persist = (config: AppConfig) => {
@@ -735,50 +723,61 @@ export const useStore = create<State>((set, get) => {
     oauthBrokerError: null,
 
     bindChat() {
-      return api.subscribeChat(
-        (m) =>
-          set((s) => {
-            // IDs nativos formam a chave idempotente na borda do feed. Adaptadores que
-            // reentregam histórico após uma reconexão (como a Cinefy) não precisam
-            // conhecer o estado da UI nem carregar deduplicação entre gerações.
-            if (
-              m.nativeId &&
-              s.chatMessages.some(
-                (seen) =>
-                  seen.platform === m.platform &&
-                  seen.source === m.source &&
-                  seen.nativeId === m.nativeId,
-              )
-            ) {
-              return {};
-            }
-            if (s.chatMessages.length < CHAT_CAP) {
-              return { chatMessages: [...s.chatMessages, m] };
-            }
-            // Uma única cópia quando o ring lógico está cheio (antes criava o array
-            // ampliado e logo em seguida outro array com `slice`).
-            const next = s.chatMessages.slice(-(CHAT_CAP - 1));
-            next.push(m);
-            return { chatMessages: next };
-          }),
-        (st) =>
-          set((s) => ({
+      let queue: ChatEvent[] = [];
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const discard = () => {
+        if (timer) clearTimeout(timer);
+        timer = undefined;
+        queue = [];
+      };
+      discardPendingChat = discard;
+      const flush = () => {
+        if (timer) clearTimeout(timer);
+        timer = undefined;
+        const events = queue;
+        queue = [];
+        if (events.length)
+          set((state) => {
+            const chatMessages = applyChatBatch(
+              state.chatMessages,
+              events,
+              CHAT_CAP,
+            );
+            return chatMessages === state.chatMessages
+              ? state
+              : { chatMessages };
+          });
+      };
+      const enqueue = (event: ChatEvent) => {
+        queue.push(event);
+        if (queue.length >= 128) flush();
+        else if (!timer)
+          timer = setTimeout(
+            flush,
+            typeof document !== "undefined" && document.hidden ? 100 : 16,
+          );
+      };
+      const unsubscribe = api.subscribeChat(
+        (message) => enqueue({ kind: "message", message }),
+        (status) => {
+          flush();
+          set((state) => ({
             chatStatuses: {
-              ...s.chatStatuses,
-              [st.source || st.platform]: {
-                platform: st.platform,
-                status: st.status,
+              ...state.chatStatuses,
+              [status.source || status.platform]: {
+                platform: status.platform,
+                status: status.status,
               },
             },
-          })),
-        // Moderação: em vez de sumir, marca como removida (vira lápide no feed).
-        (d) =>
-          set((s) => ({
-            chatMessages: s.chatMessages.map((m) =>
-              keepMessage(m, d) ? m : { ...m, deleted: true },
-            ),
-          })),
+          }));
+        },
+        (deletion) => enqueue({ kind: "delete", deletion }),
       );
+      return () => {
+        unsubscribe();
+        flush();
+        if (discardPendingChat === discard) discardPendingChat = () => {};
+      };
     },
 
     bindChatRunning() {
@@ -1061,6 +1060,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     clearChat() {
+      discardPendingChat();
       set({ chatMessages: [] });
     },
 

@@ -33,6 +33,7 @@ use crate::i18n::Msg;
 
 pub mod domain;
 mod store;
+mod writer;
 
 use domain::{MAX_CHAT_BYTES, MAX_SESSION_BYTES};
 use store::DiskStore;
@@ -169,6 +170,9 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
         .map(|t| json!({ "id": t.id, "name": t.name, "platformId": t.platform_id }))
         .collect();
     DiskStore.create(&path, &domain::meta_line(id, &config.mode, platforms));
+    if config.settings.record_chat {
+        DiskStore.prepare_chat(&chat_path(&path));
+    }
     reset_clock_anchor();
     log::info!("relatório: gravando sessão em {}", path.display());
     Some(path)
@@ -399,6 +403,7 @@ fn list_in(store: &dyn SessionStore, dir: &Path, recorded: &[String]) -> Vec<Ses
             }
             m.has_video = recorded.iter().any(|id| id == &m.id);
             m.has_chat = store.len(&chat_path(&p)) > 0;
+            m.source_revision = format!("{}:{}", store.len(&p), store.modified_ms(&p).unwrap_or(0));
             Some(m)
         })
         .collect();
@@ -423,6 +428,31 @@ pub fn read_chat(app: &AppHandle, id: &str) -> Option<String> {
         return None;
     }
     DiskStore.read(&path)
+}
+
+/// Bounded binary IPC: no JSON string escaping, and file growth cannot bypass
+/// the byte cap between metadata and reading. IDs still use the same validator.
+pub fn read_bytes(app: &AppHandle, id: &str, chat: bool) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let path = session_path(app, id)?;
+    let path = if chat { chat_path(&path) } else { path };
+    let cap = if chat {
+        MAX_CHAT_BYTES
+    } else {
+        MAX_SESSION_BYTES
+    };
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if chat && error.kind() == std::io::ErrorKind::NotFound => return Some(vec![]),
+        Err(_) => return None,
+    };
+    let len = file.metadata().ok()?.len();
+    if len > cap {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(len as usize);
+    file.take(cap + 1).read_to_end(&mut bytes).ok()?;
+    (bytes.len() as u64 <= cap).then_some(bytes)
 }
 
 // ---------------------------------------------------------------------------

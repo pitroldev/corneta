@@ -3,10 +3,11 @@ import { Braces, Copy, Download, FileText, Table2, X } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/ui";
 import { api } from "../../lib/api";
-import { anonymize } from "../../lib/export/anonymize";
-import { seriesCsv } from "../../lib/export/csv";
-import { reportHtml } from "../../lib/export/html";
-import { reportJson } from "../../lib/export/json";
+import type {
+  DownloadFormat,
+  selectedReportExport,
+} from "../../lib/export/selected";
+import { ReportClient } from "../../lib/reportClient";
 import { fileStamp, useI18n, type Fmt, type I18n } from "../../lib/i18n";
 import { PLATFORMS } from "../../lib/platforms";
 import {
@@ -17,7 +18,7 @@ import {
   type RecapData,
   type RecapStat,
 } from "../../lib/recap";
-import { analyze, type ReportAnalysis } from "../../lib/report";
+import type { ReportAnalysis } from "../../lib/report";
 import { toast } from "../../lib/toast";
 import type { SessionData } from "../../lib/types";
 import { errMsg } from "../../lib/utils";
@@ -271,57 +272,58 @@ export function RecapModal({
   );
 }
 
-type DownloadFormat = "html" | "csv" | "json";
-
 export function DownloadModal({
   data,
+  analysis,
   onClose,
 }: {
   data: SessionData;
+  analysis: ReportAnalysis;
   onClose: () => void;
 }) {
   const i18n = useI18n();
   const { t } = i18n;
   const [anonymous, setAnonymous] = useState(false);
   const [busy, setBusy] = useState(false);
+  const client = useRef<ReportClient | null>(null);
+  useEffect(
+    () => () => {
+      client.current?.dispose();
+      client.current = null;
+    },
+    [],
+  );
 
   const download = async (format: DownloadFormat) => {
+    if (client.current) return;
+    const worker = new ReportClient();
+    client.current = worker;
     setBusy(true);
     try {
-      // A mesma palavra da copy do checkbox e do fallback da análise — no idioma da tela.
-      const report = anonymous
-        ? anonymize(data, t("analysis.parse.alert.userFallback"))
-        : data;
-      const analysis = analyze(report, t);
-      const base = `${t("reports.file.live")}-${fileStamp(report.meta.startedAt)}`;
-      const file = {
-        html: {
-          name: `${base}.html`,
-          label: t("reports.download.html.label"),
-          ext: "html",
-          content: reportHtml(report, analysis, i18n),
-        },
-        csv: {
-          name: `${base}${t("reports.file.seriesSuffix")}.csv`,
-          label: t("reports.download.csv.label"),
-          ext: "csv",
-          content: seriesCsv(report, analysis, i18n),
-        },
-        json: {
-          name: `${base}.json`,
-          label: t("reports.download.json.label"),
-          ext: "json",
-          content: reportJson(report, analysis),
-        },
-      }[format];
+      const file = await worker.run<
+        Awaited<ReturnType<typeof selectedReportExport>>
+      >({
+        kind: "export",
+        data,
+        analysis,
+        locale: i18n.locale,
+        format,
+        anonymous,
+      });
+      if (client.current !== worker) return;
       if (await api.saveTextFile(file)) {
         toast.success(t("reports.download.saved"));
         onClose();
       }
     } catch (error) {
-      toast.error(t("reports.download.error", { err: errMsg(error) }));
+      if (client.current === worker)
+        toast.error(t("reports.download.error", { err: errMsg(error) }));
     } finally {
-      setBusy(false);
+      worker.dispose();
+      if (client.current === worker) {
+        client.current = null;
+        setBusy(false);
+      }
     }
   };
 

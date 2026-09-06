@@ -12,6 +12,7 @@ import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
 import { useT } from "../lib/i18n";
 import { PlatformGlyph } from "./ui";
+import { pruneChatMeasurements } from "../lib/chatMeasurements";
 
 export interface ChatView {
   emotes: boolean;
@@ -141,6 +142,11 @@ export function ChatFeed({
       removed += unknown * (sizes.size > 0 ? sum / sizes.size : ROW_ESTIMATE);
     }
     el.scrollTop = Math.max(0, el.scrollTop - removed);
+  }, [messages, virt]);
+
+  // Must follow the anchor compensation above: it still needs the evicted rows.
+  useLayoutEffect(() => {
+    pruneChatMeasurements(virt.itemSizeCache, messages);
   }, [messages, virt]);
 
   // Ctrl+scroll no feed dimensiona a fonte. Listener nativo (não-passivo) pra poder

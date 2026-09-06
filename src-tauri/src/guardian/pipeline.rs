@@ -8,7 +8,7 @@
 //! escondido pelo buffer, e o diff pula quadros que não mudaram (barato em tela estática).
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
@@ -33,6 +33,7 @@ const SLOW_WARN_MS: u128 = 1500;
 pub(crate) struct Shared {
     /// O quadro mais novo oferecido pro OCR (índice + plano Y). O worker dá `take()` quando livre.
     scan_slot: Mutex<Option<(u64, Vec<u8>)>>,
+    scan_ready: Condvar,
     /// Um único buffer reciclado evita alocar ~2 MiB a cada amostra em 1080p.
     scan_pool: Mutex<Option<Vec<u8>>>,
     /// Linha do tempo binária "tinha segredo no quadro X?".
@@ -43,6 +44,7 @@ impl Shared {
     pub(crate) fn new() -> Self {
         Shared {
             scan_slot: Mutex::new(None),
+            scan_ready: Condvar::new(),
             scan_pool: Mutex::new(None),
             timeline: Mutex::new(Timeline::new()),
         }
@@ -60,14 +62,26 @@ impl Shared {
         let mut slot = self.scan_slot.lock().unwrap();
         if slot.is_none() {
             *slot = Some((idx, buffer));
+            self.scan_ready.notify_one();
         } else {
             drop(slot);
             self.recycle_scan(buffer);
         }
     }
 
-    fn take_scan(&self) -> Option<(u64, Vec<u8>)> {
-        self.scan_slot.lock().unwrap().take()
+    fn take_scan(&self, running: &AtomicBool) -> Option<(u64, Vec<u8>)> {
+        let slot = self.scan_slot.lock().unwrap();
+        let (mut slot, _) = self
+            .scan_ready
+            .wait_timeout_while(slot, Duration::from_millis(250), |slot| {
+                slot.is_none() && running.load(Ordering::Relaxed)
+            })
+            .unwrap();
+        if running.load(Ordering::Relaxed) {
+            slot.take()
+        } else {
+            None
+        }
     }
 
     fn recycle_scan(&self, mut buffer: Vec<u8>) {
@@ -159,9 +173,8 @@ fn ocr_worker(
     let mut last_diag = Instant::now();
     while running.load(Ordering::Relaxed) {
         let iter = Instant::now();
-        let job = shared.take_scan();
+        let job = shared.take_scan(&running);
         let Some((idx, gray)) = job else {
-            std::thread::sleep(Duration::from_millis(8));
             continue;
         };
         diff_small_into(&gray, w, h, &mut small);

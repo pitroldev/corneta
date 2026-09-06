@@ -1,6 +1,7 @@
-import { stat } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { auditEditorialContent } from "../lib/editorial/audit";
+import { createEditorialManifest } from "../lib/editorial/manifest";
 
 async function isDirectory(candidate: string): Promise<boolean> {
   try {
@@ -50,6 +51,15 @@ async function main(): Promise<void> {
   process.stdout.write(
     `Conteúdo editorial válido: ${result.documents.length} arquivo(s), ${result.warningCount} aviso(s).\n`,
   );
+  if (process.argv.includes("--manifest")) {
+    const directory = path.join(webRoot, ".generated");
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      path.join(directory, "editorial.json"),
+      JSON.stringify(createEditorialManifest(result.documents)),
+      "utf8",
+    );
+  }
 }
 
 main().catch((error: unknown) => {

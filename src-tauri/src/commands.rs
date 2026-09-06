@@ -1880,6 +1880,18 @@ async fn start_engine_inner(
         }
     }
 
+    let shared_signal = if compositor_on {
+        &prog_ready
+    } else {
+        &has_signal
+    };
+    let shared_renditions = crate::renditions::start(
+        &app,
+        crate::renditions::plan(&config, &out_source, hw_codec.as_deref()),
+        &running,
+        shared_signal,
+    );
+
     for &t in &enabled {
         let mut target = t.clone();
         let mut key = keymap.get(&t.id).cloned().unwrap_or_default();
@@ -1892,12 +1904,7 @@ async fn start_engine_inner(
         }
         let cfg = config.clone();
         let is_transcode = engine::effective_action(&config.mode, t) == "transcode";
-        let base_kbps = t
-            .encoding
-            .preset
-            .as_ref()
-            .map(|p| p.video_bitrate_kbps)
-            .unwrap_or_else(|| engine::recommended_preset(&t.platform_id).video_bitrate_kbps);
+        let base_kbps = engine::effective_preset(t).video_bitrate_kbps;
         let floor_kbps = ((base_kbps as f64 * 0.4) as u32).max(800);
         let target_id = t.id.clone();
         let target_name = t.name.clone();
@@ -1918,11 +1925,13 @@ async fn start_engine_inner(
         let brb_flag = slate_on.clone();
         let auto_codec = hw_codec.clone();
         let out_source = out_source.clone();
+        let rendition = shared_renditions.get(&t.id).cloned();
         tauri::async_runtime::spawn(async move {
             // Auto-bitrate: state machine PURO decide baixar/subir; persiste entre respawns.
             let mut abr = engine::AutoBitrate::new(base_kbps, floor_kbps);
             // Notifica UMA vez por sequência de aperto (não a cada degrau).
             let mut drop_notified = false;
+            let mut gpu_pipeline = crate::gpu_pipeline::enabled();
             while run_flag.load(Ordering::Relaxed) {
                 // (A censura agora é feita pelo "protetor" via zmq — sem trocar este FFmpeg.)
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
@@ -1972,14 +1981,35 @@ async fn start_engine_inner(
                 }
 
                 // Com sinal: FFmpeg normal (lê do MediaMTX → plataforma) no bitrate atual.
-                let args = engine::ffmpeg_args_for_target(
-                    &cfg,
-                    &target,
-                    &key,
-                    Some(abr.current()),
-                    &out_source,
-                    auto_codec.as_deref(),
-                );
+                let shared = rendition.as_ref().filter(|rendition| {
+                    abr.current() == base_kbps && !rendition.failed.load(Ordering::Relaxed)
+                });
+                let _lease = shared.map(|rendition| rendition.acquire());
+                if shared.is_some_and(|rendition| !rendition.ready.load(Ordering::Relaxed)) {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    continue;
+                }
+                let mut args = if let Some(shared) = shared {
+                    engine::ffmpeg_args_for_rendition_egress(&cfg, &target, &key, &shared.url)
+                } else {
+                    engine::ffmpeg_args_for_target(
+                        &cfg,
+                        &target,
+                        &key,
+                        Some(abr.current()),
+                        &out_source,
+                        auto_codec.as_deref(),
+                    )
+                };
+                let accelerated = if gpu_pipeline {
+                    crate::gpu_pipeline::candidate(&args)
+                } else {
+                    None
+                };
+                let used_gpu_pipeline = accelerated.is_some();
+                if let Some(accelerated) = accelerated {
+                    args = accelerated;
+                }
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")
@@ -2106,6 +2136,10 @@ async fn start_engine_inner(
                                 signal_lost = true;
                                 break;
                             }
+                            if shared.is_some_and(|rendition| !rendition.ready.load(Ordering::Relaxed)) {
+                                signal_lost = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -2122,6 +2156,9 @@ async fn start_engine_inner(
                 }
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
+                }
+                if used_gpu_pipeline && !rebitrate && !signal_lost && !paused_kill {
+                    gpu_pipeline = false;
                 }
                 if pause_flag.load(Ordering::Relaxed) {
                     continue;
@@ -2158,14 +2195,22 @@ async fn start_engine_inner(
         // Fallback legado para máquinas NVIDIA em que o contador nativo do Windows
         // não esteja disponível. Uma falha desarma novas tentativas nesta live.
         let mut fallback_gpu_ok = true;
+        let mut fallback_gpu = None;
+        let mut fallback_sampled_at: Option<std::time::Instant> = None;
         while run_u.load(Ordering::Relaxed) {
             std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
             let mut usage = sampler.sample();
             if usage.gpu.is_none() && fallback_gpu_ok {
-                usage.gpu = read_gpu();
-                if usage.gpu.is_none() {
-                    fallback_gpu_ok = false;
+                if fallback_sampled_at
+                    .is_none_or(|last| last.elapsed() >= std::time::Duration::from_secs(10))
+                {
+                    fallback_gpu = read_gpu(&run_u);
+                    fallback_sampled_at = Some(std::time::Instant::now());
+                    if fallback_gpu.is_none() {
+                        fallback_gpu_ok = false;
+                    }
                 }
+                usage.gpu = fallback_gpu;
             }
             update_usage(&app_u, usage);
             std::thread::sleep(std::time::Duration::from_secs(2));
@@ -2523,23 +2568,59 @@ fn update_target_metrics(
 }
 
 /// Fallback legado da GPU NVIDIA quando o contador nativo do Windows não existe.
-fn read_gpu() -> Option<f64> {
-    let out = quiet_command("nvidia-smi")
+fn read_gpu(running: &std::sync::atomic::AtomicBool) -> Option<f64> {
+    use std::io::Read;
+    use std::process::Stdio;
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, Instant};
+    let mut child = quiet_command("nvidia-smi")
         .args([
             "--query-gpu=utilization.gpu",
             "--format=csv,noheader,nounits",
         ])
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
         .ok()?;
-    if !out.status.success() {
+    let stdout = child.stdout.take()?;
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let result = stdout
+            .take(4096)
+            .read_to_end(&mut bytes)
+            .ok()
+            .map(|_| bytes);
+        let _ = send.send(result);
+    });
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let success = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status.success(),
+            Err(_) => break false,
+            Ok(None) if Instant::now() >= deadline || !running.load(Ordering::Relaxed) => {
+                break false
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
+        }
+    };
+    if !success {
+        let _ = child.kill();
+    }
+    let _ = child.wait();
+    // A misbehaving utility must not hold the sampler on an inherited pipe.
+    // Failure disables this fallback for the remainder of the live.
+    let bytes = receive.recv_timeout(Duration::from_millis(100)).ok()??;
+    if !success || bytes.len() >= 4096 {
         return None;
     }
-    String::from_utf8_lossy(&out.stdout)
+    let gpu = String::from_utf8_lossy(&bytes)
         .lines()
         .next()?
         .trim()
         .parse::<f64>()
-        .ok()
+        .ok()?;
+    (0.0..=100.0).contains(&gpu).then_some(gpu)
 }
 
 /// Atualiza CPU/GPU no snapshot e emite (chamado pelo amostrador).
@@ -2746,21 +2827,68 @@ fn recording_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
 }
 
 #[tauri::command]
-pub fn list_sessions(app: AppHandle) -> Vec<session::SessionMeta> {
-    let dir = recording_dir(&app);
-    session::list_sessions(&app, dir.as_deref())
+pub async fn list_sessions(app: AppHandle) -> Vec<session::SessionMeta> {
+    let Ok(permit) = REPORT_READS.acquire().await else {
+        return vec![];
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        let dir = recording_dir(&app);
+        session::list_sessions(&app, dir.as_deref())
+    })
+    .await
+    .unwrap_or_default()
 }
 
+static REPORT_READS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
+
 #[tauri::command]
-pub fn read_session(app: AppHandle, id: String) -> Result<String, String> {
-    session::read_session(&app, &id).ok_or_else(|| Msg::SessionNotFound.now())
+pub async fn read_session(app: AppHandle, id: String) -> Result<String, String> {
+    let permit = REPORT_READS
+        .acquire()
+        .await
+        .map_err(|_| Msg::SessionNotFound.now())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        session::read_session(&app, &id).ok_or_else(|| Msg::SessionNotFound.now())
+    })
+    .await
+    .map_err(|_| Msg::SessionNotFound.now())?
 }
 
 /// NDJSON do chat gravado. String vazia (não erro) quando a sessão não gravou chat: a
 /// ausência é o caso comum, e um erro aqui faria o relatório abrir com toast vermelho.
 #[tauri::command]
-pub fn read_session_chat(app: AppHandle, id: String) -> String {
-    session::read_chat(&app, &id).unwrap_or_default()
+pub async fn read_session_chat(app: AppHandle, id: String) -> String {
+    let Ok(permit) = REPORT_READS.acquire().await else {
+        return String::new();
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        session::read_chat(&app, &id).unwrap_or_default()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn read_session_bytes(
+    app: AppHandle,
+    id: String,
+    chat: bool,
+) -> Result<tauri::ipc::Response, String> {
+    let permit = REPORT_READS
+        .acquire()
+        .await
+        .map_err(|_| Msg::SessionNotFound.now())?;
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        session::read_bytes(&app, &id, chat)
+    })
+    .await
+    .map_err(|_| Msg::SessionNotFound.now())?
+    .ok_or_else(|| Msg::SessionNotFound.now())?;
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[tauri::command]

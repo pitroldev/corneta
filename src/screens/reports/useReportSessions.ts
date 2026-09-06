@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
+import { getCachedSummary, setCachedSummary } from "../../lib/report";
 import {
-  analyze,
-  getCachedSummary,
-  parseSession,
-  setCachedSummary,
-  summarize,
-} from "../../lib/report";
+  reconcileSummaryCache,
+  flushSummaryCache,
+} from "../../lib/summaryCache";
+import { ReportClient } from "../../lib/reportClient";
+import type { ReportSummaryResult } from "../../lib/reportTasks";
 import { useStore } from "../../lib/store";
 import type { SessionMeta, SessionSummary } from "../../lib/types";
 
 export function useReportSessions() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const markReportSeen = useStore((state) => state.markReportSeen);
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [error, setError] = useState(false);
@@ -38,7 +38,9 @@ export function useReportSessions() {
   }, [markReportSeen, refresh]);
 
   useEffect(() => {
-    if (!sessions?.length) return;
+    if (!sessions) return;
+    reconcileSummaryCache(sessions);
+    const client = new ReportClient();
     let alive = true;
     void (async () => {
       const cached: Record<string, SessionSummary | null> = {};
@@ -52,13 +54,20 @@ export function useReportSessions() {
 
       // Sequencial por intenção: o pico de memória é uma sessão, não o histórico inteiro.
       for (const id of missing) {
+        if (!alive) return;
         let summary: SessionSummary | null = null;
         try {
-          const parsed = parseSession(await api.readSession(id), t);
-          if (parsed) {
-            summary = summarize(parsed, analyze(parsed, t));
-            if (parsed.meta.endedAt != null) setCachedSummary(id, summary);
-          }
+          const raw = await api.readSessionBytes(id);
+          if (!alive) return;
+          const result = await client.run<ReportSummaryResult | null>({
+            kind: "summary",
+            raw,
+            locale,
+          });
+          summary = result?.summary ?? null;
+          // Native listing estimates the end of interrupted/active sessions from
+          // mtime. Only a real end record makes this summary safe to persist.
+          if (alive && result?.complete) setCachedSummary(id, result.summary);
         } catch {
           // Uma sessão ilegível não impede as demais de aparecerem — só fica marcada.
         }
@@ -68,8 +77,10 @@ export function useReportSessions() {
     })();
     return () => {
       alive = false;
+      client.dispose();
+      flushSummaryCache();
     };
-  }, [sessions, t]);
+  }, [sessions, locale]);
 
   return { sessions, summaries, error, refresh };
 }

@@ -17,6 +17,10 @@ import {
 } from "../../lib/report";
 import type { SessionData } from "../../lib/types";
 import { channelColors, platformColor, relativeTime } from "./reportUtils";
+import {
+  createPlaybackClock,
+  type PlaybackSource,
+} from "../../lib/playbackClock";
 
 export type ReplayState = "ready" | "empty" | "missing";
 
@@ -60,9 +64,14 @@ export function useReportStoryModel({
         ? "empty"
         : "missing";
     const indexAt = (timestamp: number) => {
-      for (let index = 0; index < sampleCount; index++)
-        if (data.samples[index].t >= timestamp) return index;
-      return Math.max(0, sampleCount - 1);
+      let low = 0;
+      let high = sampleCount;
+      while (low < high) {
+        const middle = low + ((high - low) >> 1);
+        if (data.samples[middle].t < timestamp) low = middle + 1;
+        else high = middle;
+      }
+      return Math.min(low, Math.max(0, sampleCount - 1));
     };
     const viewerIndexAt = (timestamp: number) => {
       let low = 0;
@@ -253,8 +262,8 @@ export function useReportTechnicalModel({
 
 export interface ReportTimelineModel {
   seek: SeekRequest | null;
-  playSample: number | null;
-  playViewer: number | null;
+  sampleClock: PlaybackSource;
+  viewerClock: PlaybackSource;
   setPlayhead: (timestamp: number | null) => void;
   seekTo: (timestamp: number) => void;
   seekSample?: (index: number) => void;
@@ -268,18 +277,22 @@ export function useReportTimeline(
   data: SessionData | null,
   replayState: ReplayState,
 ): ReportTimelineModel {
-  const [playhead, setPlayhead] = useState<number | null>(null);
+  const clock = useMemo(createPlaybackClock, []);
   const [seek, setSeek] = useState<SeekRequest | null>(null);
   const sampleTimes = useMemo(
     () => data?.samples.map((sample) => sample.t) ?? [],
-    [data],
+    [data?.samples],
   );
   const viewerTimes = useMemo(
     () => data?.viewerSamples.map((sample) => sample.t) ?? [],
-    [data],
+    [data?.viewerSamples],
   );
   const seekTo = useCallback(
-    (timestamp: number) => setSeek({ epoch: timestamp, nonce: Date.now() }),
+    (timestamp: number) =>
+      setSeek((current) => ({
+        epoch: timestamp,
+        nonce: (current?.nonce ?? 0) + 1,
+      })),
     [],
   );
   const seekSampleAt = useCallback(
@@ -320,14 +333,32 @@ export function useReportTimeline(
     [data, relative],
   );
   const hasReplay = replayState === "ready";
+  const sampleClock = useMemo<PlaybackSource>(
+    () => ({
+      subscribe: clock.subscribe,
+      getSnapshot: () => {
+        const value = clock.getSnapshot();
+        return value == null ? null : fractionalIndexAt(sampleTimes, value);
+      },
+    }),
+    [clock, sampleTimes],
+  );
+  const viewerClock = useMemo<PlaybackSource>(
+    () => ({
+      subscribe: clock.subscribe,
+      getSnapshot: () => {
+        const value = clock.getSnapshot();
+        return value == null ? null : fractionalIndexAt(viewerTimes, value);
+      },
+    }),
+    [clock, viewerTimes],
+  );
 
   return {
     seek,
-    playSample:
-      playhead == null ? null : fractionalIndexAt(sampleTimes, playhead),
-    playViewer:
-      playhead == null ? null : fractionalIndexAt(viewerTimes, playhead),
-    setPlayhead,
+    sampleClock,
+    viewerClock,
+    setPlayhead: clock.set,
     seekTo,
     seekSample: hasReplay ? seekSampleAt : undefined,
     seekViewer: hasReplay ? seekViewerAt : undefined,

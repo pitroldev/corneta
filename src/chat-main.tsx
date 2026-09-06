@@ -86,4 +86,5 @@ function render() {
   );
 }
 
-void initializeTelemetry(api).finally(render);
+void initializeTelemetry(api);
+render();

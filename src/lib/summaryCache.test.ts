@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   getCachedSummary,
   setCachedSummary,
   dropCachedSummary,
+  reconcileSummaryCache,
+  flushSummaryCache,
 } from "./summaryCache";
-import type { SessionSummary } from "./types";
+import type { SessionMeta, SessionSummary } from "./types";
 
 // Node não tem localStorage — mock em memória.
 beforeEach(() => {
@@ -28,6 +30,37 @@ beforeEach(() => {
 const fake = { id: "s1" } as unknown as SessionSummary;
 
 describe("summaryCache", () => {
+  it("reads storage once, batches writes and retains at most 50 summaries", () => {
+    const reads = vi.spyOn(localStorage, "getItem");
+    const writes = vi.spyOn(localStorage, "setItem");
+    for (let i = 0; i < 1000; i++) {
+      setCachedSummary(`s${i}`, fake);
+      getCachedSummary(`s${i}`);
+    }
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(writes).not.toHaveBeenCalled();
+    flushSummaryCache();
+    expect(writes).toHaveBeenCalledTimes(1);
+    const stored = JSON.parse(
+      localStorage.getItem("corneta.session-summaries")!,
+    );
+    expect(Object.keys(stored.entries)).toHaveLength(50);
+    expect(getCachedSummary("s0")).toBeNull();
+    expect(getCachedSummary("s999")).toEqual(fake);
+  });
+
+  it("invalidates replaced files and removes orphaned entries", () => {
+    const session = { id: "s1", sourceRevision: "1024:123" } as SessionMeta;
+    reconcileSummaryCache([session]);
+    setCachedSummary("s1", fake);
+    setCachedSummary("orphan", fake);
+    reconcileSummaryCache([session]);
+    expect(getCachedSummary("s1")).toEqual(fake);
+    expect(getCachedSummary("orphan")).toBeNull();
+    reconcileSummaryCache([{ ...session, sourceRevision: "2048:124" }]);
+    expect(getCachedSummary("s1")).toBeNull();
+  });
+
   it("round-trip set → get; ausente → null", () => {
     expect(getCachedSummary("s1")).toBeNull();
     setCachedSummary("s1", fake);

@@ -8,6 +8,7 @@ import { EventRow, WindowCard } from "./ReportPrimitives";
 import type { ReportTimelineModel } from "./useReportModels";
 
 const PREVIEW_ROWS = 6;
+const PAGE_ROWS = 48;
 const GROUP_PREVIEW_ROWS = 3;
 const MAX_GROUP_SIGNALS = 6;
 
@@ -121,15 +122,20 @@ export function ReportTechnicalEventsPanel({
   const { t } = useI18n();
   const [showAllWindows, setShowAllWindows] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const [windowPage, setWindowPage] = useState(0);
+  const [eventPage, setEventPage] = useState(0);
   const windowGroups = useMemo(
     () => groupProblemWindows(analysis.windows),
     [analysis.windows],
   );
   const windows = showAllWindows
-    ? analysis.windows
+    ? analysis.windows.slice(
+        windowPage * PAGE_ROWS,
+        (windowPage + 1) * PAGE_ROWS,
+      )
     : analysis.windows.slice(0, PREVIEW_ROWS);
   const events = showAllEvents
-    ? analysis.events
+    ? analysis.events.slice(eventPage * PAGE_ROWS, (eventPage + 1) * PAGE_ROWS)
     : analysis.events.slice(0, PREVIEW_ROWS);
 
   return (
@@ -189,6 +195,8 @@ export function ReportTechnicalEventsPanel({
                   expanded={showAllWindows}
                   count={analysis.windows.length}
                   onClick={() => setShowAllWindows((value) => !value)}
+                  page={windowPage}
+                  onPage={setWindowPage}
                 />
               ) : null}
             </TechnicalDisclosure>
@@ -216,6 +224,8 @@ export function ReportTechnicalEventsPanel({
               expanded={showAllEvents}
               count={analysis.events.length}
               onClick={() => setShowAllEvents((value) => !value)}
+              page={eventPage}
+              onPage={setEventPage}
             />
           ) : null}
         </TechnicalDisclosure>
@@ -238,9 +248,16 @@ function WindowGroupDisclosure({
   canSeek: boolean;
 }) {
   const { t, tp, fmt } = useI18n();
-  const longest = [...group.windows]
-    .sort((a, b) => b.durationSec - a.durationSec)
-    .slice(0, GROUP_PREVIEW_ROWS);
+  const [open, setOpen] = useState(false);
+  const longest = useMemo(
+    () =>
+      open
+        ? [...group.windows]
+            .sort((a, b) => b.durationSec - a.durationSec)
+            .slice(0, GROUP_PREVIEW_ROWS)
+        : [],
+    [open, group.windows],
+  );
   const visibleSignals = group.signals.slice(0, 3);
   const hiddenSignalCount = group.signals.length - visibleSignals.length;
   // "Onde travou": duração somada · quem sentiu · quando começou. Causa dentro do PC
@@ -269,7 +286,13 @@ function WindowGroupDisclosure({
     .join(" · ");
 
   return (
-    <details className="group/incident">
+    <details
+      className="group/incident"
+      onToggle={(event) => {
+        if (event.target === event.currentTarget)
+          setOpen(event.currentTarget.open);
+      }}
+    >
       <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
         <span
           className={cn(
@@ -304,107 +327,111 @@ function WindowGroupDisclosure({
         />
       </summary>
 
-      <div className="pb-5 pl-5 sm:pl-6">
-        <div className="max-w-4xl border-l-2 border-border-soft pl-4">
-          {/* Ordem do plano: impacto (onde travou) → por quê (a história) → o que fazer. */}
-          <p className="text-sm text-ink">
-            <span className="mr-2 text-xs font-bold uppercase tracking-wide text-ink-faint">
-              {t("reports.technical.incidents.impact")}
-            </span>
-            <span className="tabular-nums">{impactLine}</span>
-          </p>
+      {open ? (
+        <div className="pb-5 pl-5 sm:pl-6">
+          <div className="max-w-4xl border-l-2 border-border-soft pl-4">
+            {/* Ordem do plano: impacto (onde travou) → por quê (a história) → o que fazer. */}
+            <p className="text-sm text-ink">
+              <span className="mr-2 text-xs font-bold uppercase tracking-wide text-ink-faint">
+                {t("reports.technical.incidents.impact")}
+              </span>
+              <span className="tabular-nums">{impactLine}</span>
+            </p>
 
-          <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-8">
-            {visibleSignals.length > 0 ? (
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                  {t("reports.technical.incidents.why")}
-                </h4>
-                {/* Uma cadeia numerada, não uma lista: o primeiro passo é a causa (leva a
+            <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-8">
+              {visibleSignals.length > 0 ? (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                    {t("reports.technical.incidents.why")}
+                  </h4>
+                  {/* Uma cadeia numerada, não uma lista: o primeiro passo é a causa (leva a
                     cor do grupo), os seguintes são o que travou por causa dela e o que
                     ficou de fora. O nome do aplicativo culpado fica em negrito. */}
-                <ol className="mt-2 space-y-0">
-                  {visibleSignals.map((signal, index) => (
-                    <li
-                      key={signal}
-                      className="relative flex gap-3 pb-3 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:left-[9px] [&:not(:last-child)]:after:top-5 [&:not(:last-child)]:after:h-[calc(100%-0.75rem)] [&:not(:last-child)]:after:w-0.5 [&:not(:last-child)]:after:bg-border-soft"
-                    >
-                      <span
-                        className={cn(
-                          "z-10 mt-px grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-extrabold tabular-nums",
-                          index === 0
-                            ? cn(
-                                WINDOW_KIND_TONE[group.causeKind],
-                                "text-night",
-                              )
-                            : "bg-surface-3 text-ink-muted",
-                        )}
-                        aria-hidden
+                  <ol className="mt-2 space-y-0">
+                    {visibleSignals.map((signal, index) => (
+                      <li
+                        key={signal}
+                        className="relative flex gap-3 pb-3 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:left-[9px] [&:not(:last-child)]:after:top-5 [&:not(:last-child)]:after:h-[calc(100%-0.75rem)] [&:not(:last-child)]:after:w-0.5 [&:not(:last-child)]:after:bg-border-soft"
                       >
-                        {index + 1}
-                      </span>
-                      <span className="min-w-0 break-words text-sm leading-snug text-ink">
-                        <Highlight
-                          text={signal}
-                          term={index === 0 ? group.contributingApp : undefined}
-                        />
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-                {hiddenSignalCount > 0 ? (
-                  <p className="pl-8 text-xs text-ink-faint">
-                    {t("reports.technical.incidents.signalsMore", {
-                      count: hiddenSignalCount,
-                    })}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+                        <span
+                          className={cn(
+                            "z-10 mt-px grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-extrabold tabular-nums",
+                            index === 0
+                              ? cn(
+                                  WINDOW_KIND_TONE[group.causeKind],
+                                  "text-night",
+                                )
+                              : "bg-surface-3 text-ink-muted",
+                          )}
+                          aria-hidden
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 break-words text-sm leading-snug text-ink">
+                          <Highlight
+                            text={signal}
+                            term={
+                              index === 0 ? group.contributingApp : undefined
+                            }
+                          />
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  {hiddenSignalCount > 0 ? (
+                    <p className="pl-8 text-xs text-ink-faint">
+                      {t("reports.technical.incidents.signalsMore", {
+                        count: hiddenSignalCount,
+                      })}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                  {t("reports.technical.incidents.next")}
-                </h4>
-                <p className="mt-1 text-sm leading-relaxed text-ink">
-                  {group.advice}
-                </p>
-              </div>
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-                  {t("reports.technical.incidents.confirm")}
-                </h4>
-                <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-                  {group.confirm}
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                    {t("reports.technical.incidents.next")}
+                  </h4>
+                  <p className="mt-1 text-sm leading-relaxed text-ink">
+                    {group.advice}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+                    {t("reports.technical.incidents.confirm")}
+                  </h4>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                    {group.confirm}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <WindowDistribution
-          group={group}
-          startedAt={startedAt}
-          endedAt={endedAt}
-        />
+          <WindowDistribution
+            group={group}
+            startedAt={startedAt}
+            endedAt={endedAt}
+          />
 
-        <h4 className="mt-4 text-xs font-bold uppercase tracking-wide text-ink-faint">
-          {t("reports.technical.incidents.longest")}
-        </h4>
-        <div className="mt-1 divide-y divide-border-soft">
-          {longest.map((window, index) => (
-            <WindowCard
-              key={`${window.tStart}-${index}`}
-              window={window}
-              time={timeline.relative(window.tStart)}
-              onSeek={
-                canSeek ? () => timeline.seekTo(window.tStart) : undefined
-              }
-            />
-          ))}
+          <h4 className="mt-4 text-xs font-bold uppercase tracking-wide text-ink-faint">
+            {t("reports.technical.incidents.longest")}
+          </h4>
+          <div className="mt-1 divide-y divide-border-soft">
+            {longest.map((window, index) => (
+              <WindowCard
+                key={`${window.tStart}-${index}`}
+                window={window}
+                time={timeline.relative(window.tStart)}
+                onSeek={
+                  canSeek ? () => timeline.seekTo(window.tStart) : undefined
+                }
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
     </details>
   );
 }
@@ -485,8 +512,15 @@ function TechnicalDisclosure({
   count: number;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <details className="group/disclosure overflow-hidden rounded-md bg-surface-2">
+    <details
+      className="group/disclosure overflow-hidden rounded-md bg-surface-2"
+      onToggle={(event) => {
+        if (event.target === event.currentTarget)
+          setOpen(event.currentTarget.open);
+      }}
+    >
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 text-sm font-bold [&::-webkit-details-marker]:hidden">
         <span className="flex-1">{title}</span>
         <span className="tabular-nums text-ink-faint">{count}</span>
@@ -495,7 +529,9 @@ function TechnicalDisclosure({
           aria-hidden
         />
       </summary>
-      <div className="border-t border-border-soft">{children}</div>
+      {open ? (
+        <div className="border-t border-border-soft">{children}</div>
+      ) : null}
     </details>
   );
 }
@@ -504,19 +540,53 @@ function ShowAllButton({
   expanded,
   count,
   onClick,
+  page,
+  onPage,
 }: {
   expanded: boolean;
   count: number;
   onClick: () => void;
+  page: number;
+  onPage: (page: number) => void;
 }) {
   const { t } = useI18n();
+  const pages = Math.ceil(count / PAGE_ROWS);
   return (
-    <div className="border-t border-border-soft px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-soft px-3 py-2">
       <Button variant="ghost" size="sm" onClick={onClick}>
         {expanded
           ? t("reports.technical.showLess")
           : t("reports.technical.showAll", { count })}
       </Button>
+      {expanded && pages > 1 ? (
+        <nav
+          className="flex items-center gap-2"
+          aria-label={t("reports.technical.pagination")}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={page === 0}
+            onClick={() => onPage(page - 1)}
+          >
+            {t("reports.technical.pagePrevious")}
+          </Button>
+          <span
+            className="text-xs tabular-nums text-ink-muted"
+            aria-live="polite"
+          >
+            {t("reports.technical.pageCount", { page: page + 1, pages })}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={page >= pages - 1}
+            onClick={() => onPage(page + 1)}
+          >
+            {t("reports.technical.pageNext")}
+          </Button>
+        </nav>
+      ) : null}
     </div>
   );
 }

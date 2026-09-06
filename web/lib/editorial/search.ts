@@ -18,11 +18,20 @@ export function sanitizeEditorialSearchQuery(
   return (raw ?? "").trim().slice(0, SEARCH_QUERY_MAX_LENGTH);
 }
 
-function scoreDocument(
-  document: PublishedEditorialDocument,
-  normalizedQuery: string,
-  tokens: readonly string[],
-): number {
+const searchFields = new WeakMap<
+  PublishedEditorialDocument,
+  {
+    title: string;
+    primaryQuery: string;
+    summary: string;
+    taxonomy: string;
+    haystack: string;
+  }
+>();
+
+function fieldsFor(document: PublishedEditorialDocument) {
+  const cached = searchFields.get(document);
+  if (cached) return cached;
   const { frontmatter } = document;
   const title = normalizeEditorialSearch(frontmatter.title);
   const primaryQuery = normalizeEditorialSearch(frontmatter.primaryQuery);
@@ -32,7 +41,24 @@ function scoreDocument(
   const taxonomy = normalizeEditorialSearch(
     `${frontmatter.collection} ${frontmatter.category} ${frontmatter.slug}`,
   );
-  const haystack = `${title} ${primaryQuery} ${summary} ${taxonomy}`;
+  const fields = {
+    title,
+    primaryQuery,
+    summary,
+    taxonomy,
+    haystack: `${title} ${primaryQuery} ${summary} ${taxonomy}`,
+  };
+  searchFields.set(document, fields);
+  return fields;
+}
+
+function scoreDocument(
+  document: PublishedEditorialDocument,
+  normalizedQuery: string,
+  tokens: readonly string[],
+): number {
+  const { title, primaryQuery, summary, taxonomy, haystack } =
+    fieldsFor(document);
 
   if (!tokens.every((token) => haystack.includes(token))) return -1;
 

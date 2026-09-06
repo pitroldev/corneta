@@ -40,6 +40,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::engine::{self, ProgramSpec};
 use crate::guardian;
+use crate::queue_probe::{QueueProbe, Timed};
 use crate::telemetry::AppError;
 use crate::AppState;
 
@@ -165,12 +166,12 @@ fn kill(child: &mut Child) {
 
 /// Decoder + thread leitora despejando no canal. `rx` desconectado = processo morreu (EOF).
 struct FrameSource {
-    rx: Receiver<Vec<u8>>,
+    rx: Receiver<Timed<Bytes>>,
     child: Child,
 }
 
 struct ByteSource {
-    rx: Receiver<Vec<u8>>,
+    rx: Receiver<Timed<Vec<u8>>>,
     child: Child,
 }
 
@@ -182,13 +183,15 @@ fn spawn_frame_source(
 ) -> std::io::Result<FrameSource> {
     let mut child = spawn_ff(ffmpeg, args, true, tag)?;
     let mut out = std::io::BufReader::with_capacity(fsize * 2, child.stdout.take().unwrap());
-    let (tx, rx): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = std::sync::mpsc::sync_channel(4);
+    let (tx, rx) = std::sync::mpsc::sync_channel(4);
+    let probe = QueueProbe::new("decoder/video");
+    let pool = crate::frame_pool::FramePool::new(fsize, 8);
     std::thread::spawn(move || loop {
-        let mut frame = vec![0u8; fsize];
-        if out.read_exact(&mut frame).is_err() {
+        let mut frame = pool.take();
+        if out.read_exact(frame.as_mut_slice()).is_err() {
             return; // EOF/erro → dropa o tx → rx desconecta
         }
-        if tx.send(frame).is_err() {
+        if tx.send(probe.track(frame.freeze())).is_err() {
             return; // bomba foi embora
         }
     });
@@ -198,14 +201,15 @@ fn spawn_frame_source(
 fn spawn_byte_source(ffmpeg: &std::path::Path, args: &[String]) -> std::io::Result<ByteSource> {
     let mut child = spawn_ff(ffmpeg, args, true, None)?;
     let mut out = child.stdout.take().unwrap();
-    let (tx, rx): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = std::sync::mpsc::sync_channel(64);
+    let (tx, rx) = std::sync::mpsc::sync_channel(64);
+    let probe = QueueProbe::new("decoder/audio");
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
         loop {
             match out.read(&mut buf) {
                 Ok(0) | Err(_) => return,
                 Ok(n) => {
-                    if tx.send(buf[..n].to_vec()).is_err() {
+                    if tx.send(probe.track(buf[..n].to_vec())).is_err() {
                         return;
                     }
                 }
@@ -216,7 +220,7 @@ fn spawn_byte_source(ffmpeg: &std::path::Path, args: &[String]) -> std::io::Resu
 }
 
 /// Drena o canal de quadros: devolve quantos chegaram e se a fonte morreu (desconectou).
-fn drain_frames(src: &mut Option<FrameSource>, mut on_frame: impl FnMut(Vec<u8>)) -> (usize, bool) {
+fn drain_frames(src: &mut Option<FrameSource>, mut on_frame: impl FnMut(Bytes)) -> (usize, bool) {
     let Some(s) = src.as_mut() else {
         return (0, false);
     };
@@ -226,7 +230,7 @@ fn drain_frames(src: &mut Option<FrameSource>, mut on_frame: impl FnMut(Vec<u8>)
         match s.rx.try_recv() {
             Ok(f) => {
                 got += 1;
-                on_frame(f);
+                on_frame(f.into_inner());
             }
             Err(TryRecvError::Empty) => break,
             Err(TryRecvError::Disconnected) => {
@@ -251,7 +255,7 @@ fn drain_audio(src: &mut Option<ByteSource>, fifo: &mut VecDeque<u8>, cap: usize
     let mut dead = false;
     loop {
         match s.rx.try_recv() {
-            Ok(chunk) => fifo.extend(chunk),
+            Ok(chunk) => fifo.extend(chunk.into_inner()),
             Err(TryRecvError::Empty) => break,
             Err(TryRecvError::Disconnected) => {
                 dead = true;
@@ -668,8 +672,9 @@ fn generation(
 
     // O 1º quadro entra antes do relógio partir.
     *head += 1;
+    let first = first.into_inner();
     offer_scan(shared, *head, &first, ysize);
-    delay_buf.push_back((*head, Bytes::from(first)));
+    delay_buf.push_back((*head, first));
     afifo.resize(delay_buf.len() * abpf, 0); // pareia A/V do zero
 
     let clock = Instant::now();
@@ -726,7 +731,7 @@ fn generation(
         let (got, v_dead) = drain_frames(&mut vsrc, |f| {
             *head += 1;
             offer_scan(shared, *head, &f, ysize);
-            delay_buf.push_back((*head, Bytes::from(f)));
+            delay_buf.push_back((*head, f));
         });
         if got > 0 {
             last_arrival = Instant::now();
@@ -812,7 +817,7 @@ fn generation(
                 }
                 slate_afifo.clear();
             }
-            let _ = drain_frames(&mut slate_vsrc, |f| slate_frame = Bytes::from(f));
+            let _ = drain_frames(&mut slate_vsrc, |f| slate_frame = f);
             let _ = drain_audio(&mut slate_asrc, &mut slate_afifo, abpf * spec.fps as usize);
         }
 

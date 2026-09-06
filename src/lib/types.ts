@@ -420,6 +420,8 @@ export interface SessionPlatform {
 }
 
 export interface SessionMeta {
+  /** Native file size/mtime revision; invalidates summaries after external edits. */
+  sourceRevision?: string;
   id: string;
   startedAt: number;
   endedAt?: number;

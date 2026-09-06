@@ -223,7 +223,7 @@ function TechnicalWorkspace({
             markers={technical.markers}
             formatValue={(value) => fmt.dec(value, 1)}
             formatX={timeline.relativeAtSample}
-            playhead={timeline.playSample}
+            playheadSource={timeline.sampleClock}
             onSeek={timeline.seekSample}
           >
             {technical.markers.length > 0 ? (
@@ -255,7 +255,7 @@ function TechnicalWorkspace({
               value: 92,
               label: t("reports.machine.dangerLine"),
             }}
-            playhead={timeline.playSample}
+            playheadSource={timeline.sampleClock}
             onSeek={timeline.seekSample}
           />
         ) : null}
@@ -269,7 +269,7 @@ function TechnicalWorkspace({
             markers={technical.markers}
             formatValue={(value) => `${Math.round(value)}`}
             formatX={timeline.relativeAtSample}
-            playhead={timeline.playSample}
+            playheadSource={timeline.sampleClock}
             onSeek={timeline.seekSample}
           />
         ) : null}
