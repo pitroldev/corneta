@@ -1,17 +1,19 @@
 # Teste de balanceamento — telemetria da Corneta (LGPD art. 7º, IX)
 
 > Legitimate Interest Assessment (LIA) das duas finalidades de telemetria do aplicativo,
-> que passaram a rodar **ligadas por padrão**. Este é o documento que a ANPD pede ver quando
-> alguém invoca legítimo interesse (art. 10 c/c art. 38).
+> que passaram a rodar **ligadas por padrão**. Este rascunho reúne evidências técnicas para
+> avaliar a hipótese de legítimo interesse; não comprova a adequação jurídica do tratamento.
 
 - **Status:** ⚠️ Rascunho de engenharia · precisa de revisão jurídica antes do lançamento
+- **Revisão técnica:** 2026-09-06 · nenhuma aprovação jurídica ou configuração externa é atestada aqui
 - **Controlador:** ver `LEGAL_OPERATOR`/`LEGAL_CNPJ` em `web/lib/legal.ts`
 - **Versão do aviso:** `TELEMETRY_NOTICE_VERSION` em `src/lib/telemetry-schema.ts`
 - **Relacionado:** política de privacidade (`web/app/(legal)/[locale]/legal/_content/privacy.*.tsx`),
   `src/lib/telemetry-schema.ts`, `src-tauri/src/telemetry.rs`
 
 > **Este arquivo não é parecer jurídico.** É a documentação técnica do raciocínio e das
-> salvaguardas, escrita por quem implementou. Quem assina a base legal é advogado.
+> salvaguardas, escrita por quem implementou. A avaliação e a decisão do controlador devem
+> passar por revisão jurídica apropriada antes de ativar coleta de produção.
 
 ---
 
@@ -21,21 +23,23 @@ Até a versão anterior do aviso, as duas finalidades rodavam por **consentiment
 vinham desligadas. A decisão de produto passou a ser: **vir ligadas**, com aviso no primeiro uso e
 desligamento em um clique.
 
-Consentimento não comporta "ligado por padrão" — o art. 5º, XII exige manifestação **livre e
-inequívoca**, e caixa pré-marcada não é manifestação. Logo, a base legal muda junto: passa a ser
-**legítimo interesse** (art. 7º, IX). Não é um contorno; é a base correta para a finalidade, desde
-que o teste abaixo se sustente.
+A intenção registrada é usar **legítimo interesse** (art. 7º, IX), não apresentar o padrão
+ativo como consentimento. Mudar um default no software não valida automaticamente uma base
+legal: é necessário avaliar finalidade, necessidade, direitos, expectativas e salvaguardas no
+contexto real. A ANPD disponibiliza um [guia e modelo de teste de balanceamento](https://www.gov.br/anpd/pt-br/assuntos/noticias/anpd-lanca-guia-orientativo-sobre-legitimo-interesse)
+para essa avaliação. A conclusão abaixo permanece pendente de revisão.
 
 ---
 
 ## 1. Finalidade legítima (art. 10, I)
 
-| finalidade | o que responde | por que é legítima |
-|---|---|---|
+| finalidade              | o que responde                                                           | por que é legítima                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | **Relatórios de falha** | em qual versão, tela e etapa a Corneta quebrou, e em quantas instalações | manter o produto funcionando é atividade-fim do controlador; uma falha não reportada derruba a live de quem paga o preço |
-| **Dados de uso** | quantas instalações concluem o onboarding, chegam ao ar, usam cada tela | priorizar correção e simplificação onde a evidência aponta, em vez de onde o autor imagina |
+| **Dados de uso**        | quantas instalações concluem o onboarding, chegam ao ar, usam cada tela  | priorizar correção e simplificação onde a evidência aponta, em vez de onde o autor imagina                               |
 
-As duas se enquadram em "apoio e promoção das atividades do controlador" (art. 10, I). Nenhuma
+A hipótese a avaliar é o enquadramento em "apoio e promoção das atividades do controlador"
+(art. 10, I). Conforme o catálogo técnico adotado, nenhuma
 tem finalidade publicitária, de perfilamento comportamental, de enriquecimento de base, de venda ou
 de compartilhamento com terceiro além do operador.
 
@@ -65,10 +69,11 @@ Salvaguardas técnicas relevantes para a necessidade:
 - `mask_all_text`, sem autocapture, sem session recording, sem heatmap, sem surveys
 - `$device_id`/`$session_id` do SDK **não atravessam** a allowlist
 - exceções passam por redator de mensagem e de stack antes de sair
-- retenção inicial de 90 dias no operador
+- retenção inicial planejada de 90 dias no operador, cuja configuração precisa ser comprovada
 
-**Conclusão:** o conjunto é o menor que ainda responde às duas perguntas da §1. Não há como
-diagnosticar uma falha sem saber a versão, a etapa e o código — e nada além disso é coletado.
+**Avaliação técnica preliminar:** versão, etapa e código ajudam a diagnosticar falhas. O
+catálogo também inclui as categorias e identificadores acima; sua necessidade e retenção devem
+ser justificadas por finalidade, sem presumir que tudo no catálogo seja indispensável.
 
 ---
 
@@ -76,8 +81,8 @@ diagnosticar uma falha sem saber a versão, a etapa e o código — e nada além
 
 A favor:
 
-- Quem instala um aplicativo de desktop espera que o autor saiba quando ele quebra. Relatório de
-  falha é comportamento padrão e amplamente compreendido em software.
+- Relatórios técnicos podem ajudar a corrigir falhas, mas a expectativa do público quanto ao
+  envio automático precisa ser avaliada, não presumida a partir de outros softwares.
 - O aviso aparece **no primeiro uso**, antes de qualquer uso real, e diz que está ligado.
 - O desligamento é um clique, na mesma tela, e vale imediatamente.
 - O projeto é aberto: a afirmação é verificável, não é promessa.
@@ -100,41 +105,44 @@ de uso. Este é o ponto mais atacável do teste, e está aqui explicitamente.
 
 ## 4. Balanceamento
 
-| risco ao titular | por que é baixo |
-|---|---|
-| reidentificação | nenhum identificador direto ou indireto sai; o UUID não deriva de hardware, hostname ou conta |
-| localização | geoip desligado; IP não é gravado como propriedade |
-| exposição de conteúdo | conteúdo da live nunca entra no evento, por allowlist |
-| perfil comportamental | não há perfil identificado nem cruzamento com outra base |
-| decisão automatizada | não existe (art. 20 não é acionado) |
+| risco ao titular      | por que é baixo                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| reidentificação       | o UUID é um identificador pseudônimo, não anonimização; não deriva de hardware, hostname ou conta, mas permite correlacionar eventos |
+| localização           | geoip desligado; IP não é gravado como propriedade                                                                                   |
+| exposição de conteúdo | conteúdo da live nunca entra no evento, por allowlist                                                                                |
+| perfil comportamental | não há perfil identificado nem cruzamento com outra base                                                                             |
+| decisão automatizada  | não existe (art. 20 não é acionado)                                                                                                  |
 
-| direito do titular | como é exercido |
-|---|---|
-| oposição (art. 18, §2) | interruptor por finalidade em Configurações, efeito imediato |
-| confirmação e acesso (art. 18, I e II) | UUID copiável na tela, canal na política |
-| eliminação (art. 18, IV) | UUID apagado localmente ao desligar as duas; exclusão no operador pelo canal da política |
-| informação (art. 9º) | aviso no primeiro uso + seção dedicada na política |
+| direito do titular                     | como é exercido                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| oposição (art. 18, §2)                 | interruptor por finalidade em Configurações, efeito imediato                                                                                    |
+| confirmação e acesso (art. 18, I e II) | UUID copiável na tela, canal na política                                                                                                        |
+| eliminação (art. 18, IV)               | desativar ambas interrompe novos envios; copiar UUID antes de regenerar/reiniciar permite solicitar exclusão no operador pelo canal da política |
+| informação (art. 9º)                   | aviso no primeiro uso + seção dedicada na política                                                                                              |
 
-**Resultado:** o balanceamento se sustenta para **relatórios de falha** com folga. Para **dados de
-uso** ele se sustenta apoiado nas salvaguardas da §2 — mas é o item que cairia primeiro num
-questionamento, e a decisão de mantê-lo ligado é de negócio, tomada com esse risco à vista.
+**Resultado: pendente.** Este documento descreve salvaguardas e riscos, não uma conclusão de
+conformidade. A revisão deve avaliar separadamente **relatórios de falha** e **dados de uso**,
+registrar sua conclusão e decidir se o padrão ativo é adequado para cada finalidade.
 
 ---
 
 ## 5. Salvaguardas que o código garante (e os testes travam)
 
-| garantia | onde |
-|---|---|
-| oposição atravessa troca de versão do aviso | `Consent::active` (Rust) e `telemetryPurposeActive` (TS); testes nos dois lados |
+| garantia                                                | onde                                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| oposição atravessa troca de versão do aviso             | `Consent::active` (Rust) e `telemetryPurposeActive` (TS); testes nos dois lados   |
 | arquivo de estado ilegível **não** religa quem desligou | `TelemetryStatus::opposed()`; teste `instalacao_nova_liga_e_arquivo_ilegivel_nao` |
-| desligar fecha o portão antes de qualquer I/O | `set_consent` fecha o gate e troca o epoch antes de persistir |
-| instância antiga do SDK não revive após revogação | `sdkEpoch` + `before_send` preso à identidade da instalação |
-| propriedade fora do catálogo não sai | allowlist por evento + `match` exaustivo no Rust |
-| kill switch de release | `TELEMETRY_DISABLED` / `VITE_TELEMETRY_DISABLED`, conferidos pelo gate de release |
+| desligar fecha o portão antes de qualquer I/O           | `set_consent` fecha o gate e troca o epoch antes de persistir                     |
+| instância antiga do SDK não revive após revogação       | `sdkEpoch` + `before_send` preso à identidade da instalação                       |
+| propriedade fora do catálogo não sai                    | allowlist por evento + `match` exaustivo no Rust                                  |
+| kill switch de release                                  | `TELEMETRY_DISABLED` / `VITE_TELEMETRY_DISABLED`, conferidos pelo gate de release |
 
 ---
 
-## 6. Pendências antes de publicar
+## 6. Pendências antes de ativar coleta de produção
+
+Publicar este rascunho junto do código é transparência, não aprovação do tratamento. Não
+confundir abertura do repositório com autorização para coletar dados de usuários em produção.
 
 - [ ] **Revisão jurídica** deste documento e do texto novo da política — a base legal mudou
 - [ ] Ligar **"Discard client IP data"** no projeto do PostHog: o app desliga o geoip, mas o IP

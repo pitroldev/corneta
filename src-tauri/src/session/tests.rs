@@ -1,7 +1,8 @@
 //! Testes da sessão.
 //!
 //! O núcleo (`domain`) é testado direto. A aplicação (recuperação, poda, listagem) roda
-//! contra o `MemStore` — sem disco, sem Tauri, sem relógio de verdade.
+//! contra o `MemStore` — sem Tauri ou relógio de verdade. A regressão de isolamento
+//! da poda usa somente diretórios temporários próprios e vídeos fictícios de poucos bytes.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -384,6 +385,78 @@ fn poda_por_contagem_tira_as_mais_antigas() {
 // ---------------------------------------------------------------------------
 
 const GB: u64 = 1024 * 1024 * 1024;
+
+struct PruneWorkspace(PathBuf);
+
+impl PruneWorkspace {
+    fn new() -> Self {
+        let root =
+            std::env::temp_dir().join(format!("corneta-prune-isolation-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let workspace = Self(root);
+        std::fs::create_dir(workspace.0.join("sessions")).unwrap();
+        std::fs::create_dir(workspace.0.join("imported")).unwrap();
+        workspace
+    }
+}
+
+impl Drop for PruneWorkspace {
+    fn drop(&mut self) {
+        // Só caminhos fixos dentro da árvore criada pelo teste, sem exclusão
+        // recursiva nem consulta a pastas reais de configuração/gravação.
+        for file in [
+            "sessions/1000.mp4",
+            "sessions/3000.mp4",
+            "sessions/3000.ndjson",
+            "imported/2000.mp4",
+        ] {
+            let _ = std::fs::remove_file(self.0.join(file));
+        }
+        let _ = std::fs::remove_dir(self.0.join("sessions"));
+        let _ = std::fs::remove_dir(self.0.join("imported"));
+        let _ = std::fs::remove_dir(&self.0);
+    }
+}
+
+#[test]
+fn contributor_automatic_prune_preserves_imported_videos_and_prunes_only_its_own() {
+    check_automatic_prune_scope(true);
+}
+
+#[test]
+fn official_automatic_prune_keeps_existing_custom_directory_behavior() {
+    check_automatic_prune_scope(false);
+}
+
+fn check_automatic_prune_scope(contributor: bool) {
+    let workspace = PruneWorkspace::new();
+    let sessions = workspace.0.join("sessions");
+    let imported = workspace.0.join("imported");
+    let own_orphan = sessions.join("1000.mp4");
+    let own_kept = sessions.join("3000.mp4");
+    let foreign_video = imported.join("2000.mp4");
+    for file in [&own_orphan, &own_kept, &foreign_video] {
+        std::fs::write(file, b"synthetic-video").unwrap();
+    }
+    std::fs::write(sessions.join("3000.ndjson"), b"{\"kind\":\"meta\"}\n").unwrap();
+
+    assert_eq!(
+        super::prune_videos_in(
+            &super::store::DiskStore,
+            &sessions,
+            Some(&imported),
+            1,
+            contributor,
+        ),
+        0,
+    );
+    assert!(!own_orphan.exists());
+    assert!(own_kept.exists());
+    assert_eq!(foreign_video.exists(), contributor);
+    if contributor {
+        assert_eq!(std::fs::read(foreign_video).unwrap(), b"synthetic-video");
+    }
+}
 
 /// Órfão é vídeo cuja sessão já foi podada: sem relatório que o referencie, ele não tem
 /// como aparecer na interface. Sai independente do teto.

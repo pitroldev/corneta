@@ -46,6 +46,47 @@ describe("editorial content id", () => {
 });
 
 describe("browser telemetry facade", () => {
+  it.each(
+    (["unset", "enabled", "disabled"] as const).flatMap((preference) =>
+      (
+        [
+          "configured",
+          "missing-token",
+          "missing-host",
+          "kill-switch",
+          "browser-opt-out",
+        ] as const
+      ).map((configuration) => ({ preference, configuration })),
+    ),
+  )(
+    "honours the site matrix: $preference / $configuration",
+    async ({ preference, configuration }) => {
+      const sdk = fakeSdk();
+      const loadSdk = vi.fn(async () => sdk);
+      const storage = fakeStorage(
+        preference === "unset"
+          ? {}
+          : { [SITE_TELEMETRY_PREFERENCE_KEY]: preference },
+      );
+      const telemetry = createBrowserTelemetry({
+        token: configuration === "missing-token" ? undefined : "phc_project123",
+        host:
+          configuration === "missing-host"
+            ? undefined
+            : "https://us.i.posthog.com",
+        disabled: configuration === "kill-switch",
+        doNotTrack: () => configuration === "browser-opt-out",
+        loadSdk,
+        storage: () => storage,
+      });
+      await telemetry.capturePageView("/");
+      const active =
+        preference !== "disabled" && configuration === "configured";
+      expect(loadSdk).toHaveBeenCalledTimes(active ? 1 : 0);
+      expect(sdk.capture).toHaveBeenCalledTimes(active ? 1 : 0);
+    },
+  );
+
   it("não carrega o SDK sem configuração ou após opt-out", async () => {
     const sdk = fakeSdk();
     const loadSdk = vi.fn(async () => sdk);

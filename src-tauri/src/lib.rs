@@ -144,7 +144,7 @@ fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let startup_started = std::time::Instant::now();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // single-instance DEVE ser o primeiro plugin (§14.2): evita duas Cornetas
         // disputando a porta de ingestão / subindo motores duplicados.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -186,11 +186,12 @@ pub fn run() {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_dialog::init())
-        // Auto-update via GitHub Releases. Quem decide a hora de instalar é o frontend
-        // (`src/lib/updater.ts`): a instalação REINICIA o app, e reiniciar no meio de
-        // uma live derrubaria a transmissão.
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init());
+    // A contributor binary must never install an official update over itself.
+    // The plugin is absent, not merely hidden behind a frontend condition.
+    #[cfg(not(corneta_contributor))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         .plugin(tauri_plugin_process::init())
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),

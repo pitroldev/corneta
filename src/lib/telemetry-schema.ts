@@ -36,6 +36,13 @@ const TELEMETRY_CHOICES = new Set<TelemetryChoice>([
   "disabled",
 ]);
 
+const OPPOSED_TELEMETRY_STATUS: TelemetryStatus = {
+  ...EMPTY_TELEMETRY_STATUS,
+  noticeVersion: "",
+  usage: "disabled",
+  crashReports: "disabled",
+};
+
 export function isUuid(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -47,33 +54,27 @@ export function isUuid(value: unknown): value is string {
 
 /** Dados inválidos vindos do backend não liberam coleta por acidente. */
 export function normalizeTelemetryStatus(value: unknown): TelemetryStatus {
-  if (!value || typeof value !== "object") return EMPTY_TELEMETRY_STATUS;
+  if (!value || typeof value !== "object") return OPPOSED_TELEMETRY_STATUS;
   const raw = value as Partial<TelemetryStatus>;
-  if (raw.schemaVersion !== TELEMETRY_SCHEMA_VERSION) {
+  if (
+    raw.schemaVersion !== TELEMETRY_SCHEMA_VERSION ||
+    typeof raw.noticeVersion !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(raw.noticeVersion) ||
+    !TELEMETRY_CHOICES.has(raw.usage as TelemetryChoice) ||
+    !TELEMETRY_CHOICES.has(raw.crashReports as TelemetryChoice)
+  ) {
     return {
-      ...EMPTY_TELEMETRY_STATUS,
-      // Um formato desconhecido nunca reaproveita uma decisão antiga. Manter a
+      ...OPPOSED_TELEMETRY_STATUS,
+      // Um formato malformado nunca reaproveita uma decisão antiga. Manter a
       // versão do aviso vazia também obriga a UI a apresentar o aviso atual.
       noticeVersion: "",
     };
   }
-  const usage = TELEMETRY_CHOICES.has(raw.usage as TelemetryChoice)
-    ? (raw.usage as TelemetryChoice)
-    : "unset";
-  const crashReports = TELEMETRY_CHOICES.has(
-    raw.crashReports as TelemetryChoice,
-  )
-    ? (raw.crashReports as TelemetryChoice)
-    : "unset";
-
   return {
     schemaVersion: TELEMETRY_SCHEMA_VERSION,
-    noticeVersion:
-      typeof raw.noticeVersion === "string"
-        ? raw.noticeVersion.slice(0, 32)
-        : "",
-    usage,
-    crashReports,
+    noticeVersion: raw.noticeVersion,
+    usage: raw.usage as TelemetryChoice,
+    crashReports: raw.crashReports as TelemetryChoice,
     installationId: isUuid(raw.installationId) ? raw.installationId : null,
     decidedAt:
       typeof raw.decidedAt === "string" && raw.decidedAt.length <= 40

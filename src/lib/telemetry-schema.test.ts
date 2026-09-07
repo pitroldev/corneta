@@ -49,14 +49,12 @@ describe("telemetry schema", () => {
     });
   });
 
-  // O caminho crítico do opt-out: com o padrão LIGADO, a transparência é a única
-  // coisa que segura a base legal de pé. Se o aviso não abrisse numa instalação
-  // nova, o app estaria coletando sem nunca ter informado — e é isso que o
-  // legítimo interesse (art. 9º c/c art. 10, §2) não perdoa.
+  // Com o padrão ativo, o aviso precisa informar a instalação nova. Este teste
+  // verifica transparência técnica, não certifica a adequação da base legal.
   //
   // O estado abaixo é exatamente o que o backend grava no primeiro boot,
   // conferido em disco: usage/crashReports `unset`, `decidedAt` nulo.
-  it("o aviso ABRE na instalação nova, que é o que sustenta a base legal", () => {
+  it("o aviso ABRE na instalação nova para informar o padrão ativo", () => {
     expect(
       needsTelemetryDecision({
         schemaVersion: TELEMETRY_SCHEMA_VERSION,
@@ -111,8 +109,8 @@ describe("telemetry schema", () => {
         installationId: "machine-name",
       }),
     ).toMatchObject({
-      usage: "unset",
-      crashReports: "enabled",
+      usage: "disabled",
+      crashReports: "disabled",
       installationId: null,
     });
   });
@@ -145,12 +143,49 @@ describe("telemetry schema", () => {
     ).toEqual({
       schemaVersion: 1,
       noticeVersion: "",
-      usage: "unset",
-      crashReports: "unset",
+      usage: "disabled",
+      crashReports: "disabled",
       installationId: null,
       decidedAt: null,
     });
   });
+
+  it("never turns malformed preferences into active unset while preserving an ID", () => {
+    const normalized = normalizeTelemetryStatus({
+      schemaVersion: TELEMETRY_SCHEMA_VERSION,
+      noticeVersion: TELEMETRY_NOTICE_VERSION,
+      usage: "unexpected",
+      crashReports: null,
+      installationId: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(telemetryConsentDraft(normalized)).toEqual({
+      usage: false,
+      crashReports: false,
+    });
+    expect(telemetryConsentDraft(normalizeTelemetryStatus(null))).toEqual({
+      usage: false,
+      crashReports: false,
+    });
+  });
+
+  it.each([undefined, null, "current", "", "2026-08-02-extra"])(
+    "rejects malformed notice %s without reviving telemetry",
+    (noticeVersion) => {
+      expect(
+        normalizeTelemetryStatus({
+          schemaVersion: TELEMETRY_SCHEMA_VERSION,
+          noticeVersion,
+          usage: "enabled",
+          crashReports: "enabled",
+          installationId: "00000000-0000-4000-8000-000000000001",
+        }),
+      ).toMatchObject({
+        usage: "disabled",
+        crashReports: "disabled",
+        installationId: null,
+      });
+    },
+  );
 
   it("accepts only catalogued event properties", () => {
     expect(

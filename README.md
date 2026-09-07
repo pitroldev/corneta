@@ -1,144 +1,120 @@
-<div align="center">
-
 # 📣 Corneta
 
-**Transmita para todas as plataformas ao mesmo tempo — sem dor de cabeça.**
+Transmita do OBS para várias plataformas, acompanhe o chat e reveja a história da sua live em um só app.
 
-App desktop (Tauri 2 + React) que recebe um único stream do OBS e o replica para Twitch,
-YouTube, Facebook, Kick, TikTok e outras, com encoding por plataforma, cofre de chaves e
-painel ao vivo. Veja o racional completo em [`PLANEJAMENTO.md`](./docs/PLANEJAMENTO.md).
+Corneta é um aplicativo desktop feito com **Tauri 2, Rust, React e Tailwind CSS**. Recebe o sinal do OBS localmente e o distribui para os destinos configurados, com modos de qualidade, reconexão, gravação e relatórios. O site e a API de setup OAuth ficam em um workspace Next.js separado, em `web/`.
 
-</div>
+**Status: experimental, em preparação para beta público.** O código e a demonstração podem ser estudados e testados; isso não representa uma certificação de estabilidade para lives de produção. Windows x64 é o alvo atual. macOS, Linux e Windows ARM não têm distribuição validada pelo projeto.
 
----
+[Testar a demonstração](#testar-sem-rust-obs-ou-contas) · [Contribuir](CONTRIBUTING.md) · [Relatar uma vulnerabilidade](SECURITY.md) · [Documentação](docs/README.md)
 
-## Status
+![Tela de preparação da live no modo de demonstração da Corneta](web/public/images/editorial/getting-started/corneta-first-live-checklist.webp)
 
-🟡 **MVP em estabilização.** Frontend e backend compilam localmente; a publicação continua
-bloqueada pelos gates manuais de assinatura, conformidade GPL e matriz real de plataformas.
+_Captura do modo de demonstração da versão 0.6.0, com dados fictícios. O código atual do desktop está na versão 0.7.0; alguns detalhes da interface evoluíram._
 
-| Camada                                                 | Estado                                                |
-| ------------------------------------------------------ | ----------------------------------------------------- |
-| UI (React + Tailwind v4)                               | ✅ funcional — roda no navegador em modo demonstração |
-| Modelo de dados, presets, estimativas                  | ✅                                                    |
-| Backend Rust (config, cofre, motor FFmpeg, supervisão) | ✅ compila e possui testes                            |
-| Sidecars (FFmpeg/MediaMTX) embutidos                   | ⏳ via `scripts/fetch-binaries.ps1`                   |
-| Auto-config OBS / teste de upload                      | ✅ implementados                                      |
+## Quero usar na minha live
 
-## Rodando
+Consulte o [site oficial](https://www.corneta.live) e as [releases do projeto](https://github.com/pitroldev/corneta/releases). A existência deste repositório não significa que já exista um instalador público aprovado. Não use artefatos de desenvolvimento como se fossem uma release estável.
 
-Toolchains fixados e validados: **Node.js 24.18.1 LTS**, **pnpm 11.18.0** e
-**Rust 1.97.1**. `.node-version`, `packageManager`, `engines`, `rust-toolchain.toml` e os
-workflows mantêm essas versões alinhadas.
+Antes de uma distribuição, precisam estar concluídos o pacote de fontes/avisos dos componentes incluídos e a validação real de instalação, atualização e plataformas. Veja os [gates de release](docs/GATES-DE-RELEASE.md) e o [runbook beta](docs/RUNBOOK-BETA.md). O lançamento inicial pode não ter Authenticode, conforme a [política de assinatura](docs/ASSINATURA.md); a assinatura criptográfica do updater continua obrigatória.
 
-### Web: site público + setup API (Next.js)
+## O que já existe
 
-Tudo da Corneta que roda fora do PC do streamer fica em `web/`: a página pública, as páginas
-legais e a **setup API** (`/api/v1/*`) que entrega os Client IDs e faz o exchange/refresh do
-OAuth da Kick. Next.js App Router com React Server Components e Tailwind CSS, isolado do bundle
-do aplicativo desktop.
+- Destinos de transmissão por URL/chave, incluindo serviços conhecidos e destinos personalizados. A disponibilidade de ingestão depende da sua conta e da plataforma.
+- Modos de cópia, reencodificação e combinação dos dois, com compartilhamento de processamento quando os destinos são compatíveis. Suporte a encoders de hardware depende da GPU e do driver.
+- Conexão com OBS, medição de upload, métricas durante a live e reconexão de destinos.
+- Cofre nativo para credenciais e fluxos de autenticação para as integrações implementadas.
+- Chat integrado, gravação local, relatórios com replay/chat, momentos e exportação.
+- Recursos de proteção de transmissão. Recursos marcados como experimentais exigem teste antes do uso real.
 
-```bash
-pnpm install
-pnpm web:dev       # site + API em http://localhost:7390
-pnpm web:check     # lint + tipos + build de produção
+Transmitir para uma plataforma **não implica** ter OAuth, moderação ou todas as funções de chat disponíveis nela. A demonstração usa um motor simulado: ela não testa o OBS, o cofre, o encoder nem o login real.
+
+## Testar sem Rust, OBS ou contas
+
+Instale **Node.js 24.18.1** e **pnpm 11.18.0**, conforme `.node-version`, `engines` e `packageManager`.
+
+```sh
+git clone https://github.com/pitroldev/corneta.git
+cd corneta
+pnpm install --frozen-lockfile
+pnpm contrib:demo
 ```
 
-Defina `NEXT_PUBLIC_SITE_URL` no deploy. Quando houver um instalador ou página de release pública,
-defina também `NEXT_PUBLIC_PRIMARY_CTA_URL`; até lá, a CTA permanece honestamente interna à página.
+Abra `http://localhost:1420`. O perfil de contribuição não carrega o `.env` pessoal e desativa a telemetria; não é necessário copiar exemplos de ambiente ou fornecer credenciais. Em repositório ainda privado, o clone naturalmente exige acesso.
 
-### 1. Frontend (demonstração, sem Rust)
+Para validar app e site sem os segredos da operação oficial:
 
-A UI roda no navegador com um **motor simulado** (dados mock), ótimo para ver/testar o fluxo:
-
-```bash
-pnpm install
-pnpm dev          # abre http://localhost:1420
+```sh
+pnpm contrib:check
 ```
 
-### 2. App completo (Tauri)
+Esse caminho é o indicado para um clone novo. Os comandos normais de desenvolvimento/release continuam disponíveis para quem configura a própria operação; leia [desenvolvimento](docs/DESENVOLVIMENTO.md) antes de usá-los com um `.env` real.
 
-Pré-requisitos: **Rust 1.97.1** (rustup), **VS Build Tools com C++/MSVC** e **WebView2**
-(Win 11 já traz).
+## Site e API local — Next.js
 
-```bash
-pwsh -File scripts/fetch-binaries.ps1   # baixa ffmpeg + mediamtx para src-tauri/binaries
-pnpm app:dev                            # compila e roda a Corneta
-pnpm app:build                          # gera o instalador (NSIS)
+```sh
+pnpm contrib:web
 ```
 
-O `app:dev`/`app:build` usa `sccache` automaticamente quando ele está no `PATH`. A instalação é
-opcional, mas reduz bastante recompilações Rust locais:
+Abra `http://localhost:7390`. O site pode ser desenvolvido sem configurar OAuth. Endpoints que precisam de provedores não passam a autenticar contas por serem executados localmente.
 
-```bash
-cargo install sccache --locked --version 0.16.0
+O perfil de contribuição recusa arquivos reais `web/.env*`, para que o carregamento automático do Next.js não introduza segredos; use um clone limpo se já tiver uma operação local configurada. Não mova nem apague suas credenciais para experimentar o projeto.
+
+O build de contribuição fornece a origem pública esperada para validar o site. Isso **não** anuncia suporte pronto a qualquer domínio de fork nem desativa as validações da produção oficial. Configuração de hospedagem própria e operação do OAuth: [guia de desenvolvimento](docs/DESENVOLVIMENTO.md) e [decisão de OAuth](docs/DECISAO-OAUTH-VIA-API.md).
+
+## Desktop nativo — Windows x64
+
+Além de Node/pnpm, instale **Rust 1.97.1** pelo rustup, **Visual Studio Build Tools com C++/MSVC e Windows SDK**, **PowerShell 7** (`pwsh`) e **WebView2 Runtime**. As versões estão fixadas no repositório. OBS com obs-websocket v5 é necessário apenas para testar sua integração real.
+
+```powershell
+pwsh -NoProfile -File scripts/fetch-binaries.ps1
+pnpm contrib:app:dev
 ```
 
-No frontend, `pnpm build` continua verificando tipos antes de gerar o bundle. Para iteração local,
-`pnpm typecheck` roda só o TypeScript incremental e `pnpm build:fast` gera só o bundle Vite.
+O download fixa e verifica FFmpeg e MediaMTX. O primeiro build nativo é significativamente mais pesado que a demo: baixa dependências e compila Rust/OCR. Tempo, memória e espaço em disco dependem da máquina e do cache; o projeto ainda não publica uma medição universal de requisitos mínimos.
 
-> **Motor:** o **MediaMTX** é o servidor de ingestão (o OBS publica nele) e a Corneta roda **um
-> FFmpeg por plataforma** lendo dele — assim cada destino tem **métricas reais** (bitrate/fps/quedas)
-> e **reconexão independente** (uma plataforma cair não derruba as outras). Ambos os binários são
-> baixados pelo `fetch-binaries.ps1`.
+Para compilar o executável local, **sem gerar nem instalar um pacote de distribuição**:
 
-### 3. Testar ao vivo (OBS)
-
-1. No app: **Plataformas** → adicione um destino e cole a stream key.
-2. **Ao vivo** → **BORA AO VIVO** (status: "Aguardando OBS").
-3. No OBS → Transmissão → Serviço **Personalizado**:
-   - Servidor: `rtmp://127.0.0.1:1935/live` · Chave: `obs`
-4. **Iniciar transmissão** no OBS → a Corneta entra no ar e replica para os destinos.
-
-## Arquitetura (resumo)
-
-```
-OBS ──RTMP──▶ [ Corneta ]
-               UI (React)  ◀──IPC──▶  Core (Rust)
-                                       ├─ config (config.json)
-                                       ├─ cofre de chaves (keychain do SO)
-                                       └─ motor: FFmpeg sidecar (decode-once → encode-N)
-                                                   │
-                                                   ├──▶ Twitch
-                                                   ├──▶ YouTube
-                                                   └──▶ ...
+```sh
+pnpm contrib:app:build
 ```
 
-- **Encoding** (`src/screens/EncodingScreen.tsx` + `src-tauri/src/engine.rs`): modos
-  _Otimizado_ (um por plataforma), _Simples_ (encodar uma vez) e _Híbrido_. Ver §8.
-- **Segurança**: chaves no keychain do SO, webviews sem permissão direta de shell, _tree-kill_ ao
-  fechar. Ver §14.
+Esse perfil usa identidade e cofre de contribuição separados, com updater e telemetria desativados. Isso não torna o OBS e suas portas exclusivos de cada app: não rode testes nativos ao lado de uma live real. Consulte os limites de isolamento no [guia](docs/DESENVOLVIMENTO.md).
 
-## Estrutura
+Não é necessário ter a chave privada oficial do updater. `pnpm app:build` é o caminho de empacotamento configurado pelo mantenedor, não um requisito de contribuição.
 
-```
-src/                 Frontend React
-  lib/               types, presets, api (Tauri+mock), store (zustand), estimativas
-  components/        ui primitives, sidebar
-  screens/           Plataformas, Qualidade, Transmitir
-src-tauri/           Backend Rust (Tauri 2)
-  src/               config, keys, engine, commands, lib
-  capabilities/      ACL (menor privilégio)
-  binaries/          sidecars (não versionados)
-scripts/             make-icons, fetch-binaries
-legacy/              setup antigo (nginx-rtmp + docker)
+## Arquitetura em poucas linhas
+
+```text
+OBS → MediaMTX local → pipeline de mídia Rust/FFmpeg → destinos
+                              ↕
+                        UI React via IPC
+                              ↘ relatórios, chat e gravações locais
+
+Site/API Next.js → bootstrap de configuração pública e suporte ao OAuth
+                  (não recebe nem retransmite o vídeo da live)
 ```
 
-## Documentação
+O modo de qualidade e a compatibilidade dos destinos determinam cópia, reencodificação e compartilhamento de rendições. Os processos de envio mantêm supervisão por destino; não existe uma regra universal de “decodificar uma vez” para todos os modos. Processamento auxiliar não deve comprometer a transmissão.
 
-- [`PLANEJAMENTO.md`](./docs/PLANEJAMENTO.md) — visão de produto, arquitetura, stacks e decisões.
-- [`docs/PENDENCIAS.md`](./docs/PENDENCIAS.md) — **o que falta** para o app ficar pronto (com prioridades).
-- [`docs/ATUALIZACAO-AUTOMATICA.md`](./docs/ATUALIZACAO-AUTOMATICA.md) — auto-update via GitHub Releases.
-- [`docs/ASSINATURA.md`](./docs/ASSINATURA.md) — assinatura de código (Windows) + chave do updater.
-- [`docs/GATES-DE-RELEASE.md`](./docs/GATES-DE-RELEASE.md) — gates automatizados e matriz manual obrigatória.
-- [`docs/PLANO-TELEMETRIA-E-DIAGNOSTICO-POSTHOG.md`](./docs/PLANO-TELEMETRIA-E-DIAGNOSTICO-POSTHOG.md)
-  — contrato de dados, consentimento e arquitetura da observabilidade.
-- [`docs/RUNBOOK-POSTHOG.md`](./docs/RUNBOOK-POSTHOG.md) — provisionamento, dashboards, alertas,
-  suporte, exclusão e rollback da telemetria.
-- [`docs/ATUALIZACAO-DEPENDENCIAS-2026-08-01.md`](./docs/ATUALIZACAO-DEPENDENCIAS-2026-08-01.md)
-  — versões, pins compatíveis, hashes e validação da atualização integral.
-- [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) — licenças e obrigações dos sidecars.
+```text
+src/                    frontend desktop e demonstração
+  components/           design system e componentes reutilizáveis
+  screens/reports/      componentes e hooks dos relatórios
+  lib/                  contratos IPC/mock, estado, análise e testes
+src-tauri/              backend Rust, capabilities e configuração Tauri
+web/                    site, conteúdo e API Next.js
+scripts/                desenvolvimento, testes e preparação de release
+compliance/             manifestos de conformidade
+docs/                   guias, decisões, runbooks e planos
+```
+
+## Privacidade e segurança
+
+Na distribuição oficial com telemetria configurada, uso e falhas são finalidades independentes, **ativas por padrão e desativáveis**. A preferência `unset` não representa opt-in pendente. Builds de contribuição desativam o envio, e ausência de configuração também impede a inicialização pertinente. Veja a [política documentada](docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e o [runbook](docs/RUNBOOK-POSTHOG.md); isso não substitui revisão jurídica da operação.
+
+Não publique stream keys, tokens, `.env`, relatórios pessoais ou logs brutos em issues. Para vulnerabilidades, use [SECURITY.md](SECURITY.md).
 
 ## Licença
 
-MIT, conforme o arquivo [`LICENSE`](./LICENSE). FFmpeg/MediaMTX são processos externos (não linkados).
+O código próprio é [MIT](LICENSE). Dependências, fontes, ícones, modelos e sidecars mantêm suas licenças e avisos; consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Executar FFmpeg em processo separado não dispensa as obrigações relativas ao binário distribuído. Um fork não deve se apresentar como a distribuição oficial nem reutilizar suas chaves e serviços sem configuração apropriada.

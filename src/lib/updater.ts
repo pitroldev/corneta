@@ -46,7 +46,9 @@ export const useUpdate = create<UpdateState>((set) => ({
 
 /** Só existe no app empacotado: no `pnpm dev` e no navegador não há updater. */
 const inTauri = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  import.meta.env.VITE_CONTRIBUTOR !== "1" &&
+  typeof window !== "undefined" &&
+  "__TAURI_INTERNALS__" in window;
 
 /** Procura atualização. `null` = já está na última (ou não dá pra checar).
  *

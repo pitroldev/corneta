@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-06",
+  "reviewScope": "Visible privacy review of editorial masters/derivatives and project artwork; not a legal certification or future approval.",
+  "roots": [
+    "src-tauri/icons",
+    "src-tauri/installer",
+    "web/content/assets/originals",
+    "web/public/images",
+    "web/app/icon.svg"
+  ],
+  "files": [
+    {
+      "file": "src-tauri/icons/128x128.png",
+      "sha256": "e7ff7b669cf0a54bbdad5671f70b6740dc4205794d7bae419ea3292cf9c39d4b"
+    },
+    {
+      "file": "src-tauri/icons/128x128@2x.png",
+      "sha256": "dba809efe4f6c74fe8be3a2d78de6b3464b9eb21abd17164d11335e4135bd0fc"
+    },
+    {
+      "file": "src-tauri/icons/32x32.png",
+      "sha256": "b36939dc0c2bfafd58c7ea99efc780ac10fd29280519b7e1968faadb078c5968"
+    },
+    {
+      "file": "src-tauri/icons/icon.ico",
+      "sha256": "a817794a155aaef62d1b1cc1cc53b6446edfb970e0124b8c29a79d9f0f2a7991"
+    },
+    {
+      "file": "src-tauri/icons/icon.png",
+      "sha256": "4a2dbf9c2d77928b01434e8824db21e27f4850a99de7769311e69a8d283dea96"
+    },
+    {
+      "file": "src-tauri/icons/tray-bad.png",
+      "sha256": "974f30a99abba844ba7d6954bce8a45805225be96beba445b2a17f34231cf3a1"
+    },
+    {
+      "file": "src-tauri/icons/tray-good.png",
+      "sha256": "7ed6453bfa771b4c37eda8b78968db7ed250a46393968cf988ff212bd17a720c"
+    },
+    {
+      "file": "src-tauri/icons/tray-idle.png",
+      "sha256": "078f7910359dc5e70c38a875bf657a3ba9f62ba0edd9be1c76352c801f9f65f2"
+    },
+    {
+      "file": "src-tauri/icons/tray-warn.png",
+      "sha256": "e8e65a028069a3307b9410872aafdc0e9161bb26e40df4a0a91285d9ea8f94be"
+    },
+    {
+      "file": "src-tauri/installer/header.bmp",
+      "sha256": "5cf4ada596ad9572b55a3d65d6385eeb78dd9162b8ba09bfba776620e3e5fe7b"
+    },
+    {
+      "file": "src-tauri/installer/header.png",
+      "sha256": "15cf5e09ae3610638c95de6b07d7ae66e13e85634c88ec15099d0816f8a78070"
+    },
+    {
+      "file": "src-tauri/installer/sidebar.bmp",
+      "sha256": "8f3f2d9a0a879d7724aad7957236e2d02435e4d1bd07168b91f1c8dbf14714b6"
+    },
+    {
+      "file": "src-tauri/installer/sidebar.png",
+      "sha256": "f104bc2d7506afb32c138c8718ee99ac8151de2fc81f0b2aeea70251598f07b0"
+    },
+    {
+      "file": "web/app/icon.svg",
+      "sha256": "4126e0c7ecc681736da7360855928be1a701e5ca4fc9899daf3a3f488ebe4649"
+    },
+    {
+      "file": "web/content/assets/originals/README.md",
+      "sha256": "f6ffbfecc52bcf6ba93be5a4835552389c7f8e496a49d9ad08a5b4db9b826daf"
+    },
+    {
+      "file": "web/content/assets/originals/chat-and-alerts/corneta-unified-chat.png",
+      "sha256": "73e6208657369becec4d6c028892b7aaa6d571863f7d279ef3b933cd204d8c44"
+    },
+    {
+      "file": "web/content/assets/originals/getting-started/corneta-first-live-checklist.png",
+      "sha256": "449f8c34b1727b7b93a52b6aec36273c20d3a7f69e28d9d2cb43a07bf5d698ca"
+    },
+    {
+      "file": "web/content/assets/originals/getting-started/corneta-obs-connection-details.png",
+      "sha256": "2f1c8531db6f610c019687c338d8f3530e62601a2ba30ca130db49745301aaaf"
+    },
+    {
+      "file": "web/content/assets/originals/getting-started/corneta-platform-key-setup.png",
+      "sha256": "3d6e05c865bcb51b024fcc9f09cd55196ef1ad539cf93cb63ea3f4c4b844462a"
+    },
+    {
+      "file": "web/content/assets/originals/multistream/corneta-platform-destinations.png",
+      "sha256": "f02ba8638036f42e2690c44cf4dc90a0c74730a0e9e149f61ad939c5b261e54a"
+    },
+    {
+      "file": "web/content/assets/originals/multistream/corneta-vertical-reframe-editor.png",
+      "sha256": "756c21508b48584244ab214cf0f4871c7849a972b5111cb6a46d61fc1de852de"
+    },
+    {
+      "file": "web/content/assets/originals/multistream/corneta-vertical-target-settings.png",
+      "sha256": "7ebbd2ad65e1bb7b8290cbfd51f96ce7ba5e8f992b4b67a5772777b43c44b95a"
+    },
+    {
+      "file": "web/content/assets/originals/operations/corneta-live-safety-settings.png",
+      "sha256": "98b791b3d3a9714ccf8254eb44a9ba2c649b0f5f4064b49803c715ff10bc3c14"
+    },
+    {
+      "file": "web/content/assets/originals/quality/corneta-quality-modes.png",
+      "sha256": "d2e8eb18f847e19bf30ee2eb0e5b06facd97759b2e0bc4f95d2228e69d60e2ab"
+    },
+    {
+      "file": "web/content/assets/originals/quality/corneta-upload-test-result.png",
+      "sha256": "1953cf49da45b4cd1902c8dc788f3d6a31b12b5ea7babafb350be44794aeecf3"
+    },
+    {
+      "file": "web/content/assets/originals/reports-and-data/corneta-post-live-report.png",
+      "sha256": "ec6c718859616552c55deb09756ac5bd5d1681c6d8b93d3208d663674ae59c72"
+    },
+    {
+      "file": "web/public/images/editorial/chat-and-alerts/corneta-unified-chat.webp",
+      "sha256": "3060e45c43b816798fa1ba1ef7e39422c2c5eb68a33b12edfe40b882b4b81d64"
+    },
+    {
+      "file": "web/public/images/editorial/getting-started/corneta-first-live-checklist.webp",
+      "sha256": "4294a3f2163f341d3833080d88c76df20cd48b95520e5e690e53d3466cdc7eba"
+    },
+    {
+      "file": "web/public/images/editorial/getting-started/corneta-obs-connection-details.webp",
+      "sha256": "fdfa1ad6268a1ddf3a9228f2b875299c99124e4f7cf279e5845986c21f7da0a3"
+    },
+    {
+      "file": "web/public/images/editorial/getting-started/corneta-platform-key-setup.webp",
+      "sha256": "411511a923e6963113c4a09f56b4c1c0959cb01c9c0bf4f853ad4adfb89df222"
+    },
+    {
+      "file": "web/public/images/editorial/multistream/corneta-platform-destinations.webp",
+      "sha256": "d167067b63e6ed66075e1b1f64047259a7cbc4c54d3cc14263f82b5f60a0fc7a"
+    },
+    {
+      "file": "web/public/images/editorial/multistream/corneta-vertical-reframe-editor.webp",
+      "sha256": "b4c8bfffdeb712449270d72bec4559bb7a8f64a7953455b5e740a57b1f2f4aa4"
+    },
+    {
+      "file": "web/public/images/editorial/multistream/corneta-vertical-target-settings.webp",
+      "sha256": "c6bdb299365acb556e584c0d87ac11698565173ab67535912f1b249ed16a6ef9"
+    },
+    {
+      "file": "web/public/images/editorial/operations/corneta-live-safety-settings.webp",
+      "sha256": "180ce38f662b6e12a54cbafa99080a7da3918b66ae15bcd042e89aec0a136215"
+    },
+    {
+      "file": "web/public/images/editorial/quality/corneta-quality-modes.webp",
+      "sha256": "7e5d03701df50f744dc8b79e13c996c86ce05f086fb18cf3ba5bb8ec9d1b080a"
+    },
+    {
+      "file": "web/public/images/editorial/quality/corneta-upload-test-result.webp",
+      "sha256": "a6f824cfdbb01f055cfdb5687b8bb913e94a15d5c767931948b4e02ad3ac2144"
+    },
+    {
+      "file": "web/public/images/editorial/reports-and-data/corneta-post-live-report.webp",
+      "sha256": "6753c3efd0d484fbc75a41d94416adef2a45e3ff025aae1d0974d51a1a79288a"
+    }
+  ],
+  "hashing": "SHA-256 of raw binary bytes; CRLF normalized to LF for UTF-8 SVG and Markdown."
+}

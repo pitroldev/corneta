@@ -50,7 +50,7 @@ export const privacySectionsPt = [
 
 export const privacyTldrPt = {
   points: [
-    "A Corneta não cria conta nem exige cadastro. No aplicativo, dados de uso e relatórios de falha só são enviados se você ativar cada finalidade separadamente.",
+    "A Corneta não cria conta nem exige cadastro. No aplicativo, dados de uso e relatórios de falha vêm ligados por padrão quando a coleta está configurada; você pode desligar cada finalidade separadamente.",
     "Chaves de transmissão e tokens ficam no cofre de credenciais do seu sistema operacional, nunca nos nossos servidores.",
     "Configurações, chat, alertas e relatórios da live ficam em arquivos no seu computador.",
     "Só o login da Kick passa pelos nossos servidores — de passagem, sem ser armazenado. Twitch e YouTube falam direto com o seu app.",
@@ -134,8 +134,11 @@ export function PrivacyBodyPt() {
           <strong>desligar cada uma a qualquer momento</strong> em Configurações
           — é o seu direito de oposição (art. 18, §2), vale na hora e não afeta
           nada no funcionamento da Corneta. Um UUID aleatório de instalação é
-          criado no primeiro uso e apagado quando você desliga as duas. Você
-          pode conferir isso no código-fonte: o projeto é aberto.
+          criado no primeiro uso com alguma finalidade ativa. Desligar as duas
+          interrompe novos envios, mas não apaga dados já recebidos pelo
+          operador. Copie o UUID antes de regenerar o identificador ou reiniciar
+          o app com ambas desligadas, caso queira solicitar exclusão. Você pode
+          conferir o comportamento no código-fonte.
         </Callout>
       </LegalSection>
 
@@ -264,8 +267,8 @@ export function PrivacyBodyPt() {
             plataforma, query string, tokens e cabeçalhos de autenticação não
             entram nesse evento. O UUID de telemetria e o identificador da
             operação só acompanham o pedido quando o aplicativo tiver o
-            consentimento correspondente; caso contrário, a correlação é efêmera
-            e limitada ao pedido.
+            finalidade correspondente ativa; caso contrário, a correlação é
+            efêmera e limitada ao pedido.
           </li>
         </ul>
 
@@ -287,8 +290,9 @@ export function PrivacyBodyPt() {
         <p>
           O aplicativo guarda, na sua máquina, o que ele precisa para trabalhar.
           O conteúdo descrito abaixo não é enviado para nós. Somente dados
-          técnicos expressamente listados mais adiante podem ser enviados se
-          você der consentimento.
+          técnicos expressamente listados mais adiante podem ser enviados quando
+          a coleta estiver configurada e a finalidade correspondente estiver
+          ativa, inclusive antes de uma escolha no primeiro uso.
         </p>
         <ul>
           <li>
@@ -331,26 +335,28 @@ export function PrivacyBodyPt() {
             computador; é você quem decide se e para quem enviar o diagnóstico.
           </li>
           <li>
-            <strong>Telemetria opcional</strong> — “dados de uso” pode enviar
-            versão, idioma, família do sistema, arquitetura e GPU em categorias,
-            etapas e resultado das operações, plataformas em enum, quantidade de
-            destinos e durações em faixas. “Relatórios de falha” pode enviar
-            código e etapa do erro, tipo, stack redigida e identificadores
-            aleatórios de erro/operação, além de um marcador mínimo de abertura
-            com versão e se a saída anterior foi limpa, necessário para medir
-            estabilidade sem ativar métricas de uso. São dois consentimentos
-            independentes, desligados por padrão. Mesmo com eles ativos, nunca
-            enviamos vídeo, áudio, chat, alertas, título da live, canal, chave,
-            token, URL RTMP, hostname, caminho local completo, log cru ou
-            configuração.
+            <strong>Telemetria com opção de desligar</strong> — “dados de uso”
+            pode enviar versão, idioma, família do sistema, arquitetura e GPU em
+            categorias, etapas e resultado das operações, plataformas em enum,
+            quantidade de destinos e durações em faixas. “Relatórios de falha”
+            pode enviar código e etapa do erro, tipo, stack redigida e
+            identificadores aleatórios de erro/operação, além de um marcador
+            mínimo de abertura com versão e se a saída anterior foi limpa,
+            necessário para medir estabilidade sem ativar métricas de uso. São
+            duas preferências independentes, ligadas por padrão. Mesmo com elas
+            ativas, nunca enviamos vídeo, áudio, chat, alertas, título da live,
+            canal, chave, token, URL RTMP, hostname, caminho local completo, log
+            cru ou configuração.
           </li>
           <li>
             <strong>Preferência e UUID de telemetria</strong> — ficam em um
             arquivo local próprio, que não acompanha exportação ou importação de
-            configuração. O UUID nasce somente ao ativar pelo menos uma
-            finalidade. Desligar as duas interrompe os envios, limpa a
-            persistência do SDK e permite copiar o ID para solicitar a exclusão
-            do que já foi enviado; depois disso, você pode gerar um ID novo.
+            configuração. O UUID nasce no primeiro uso com alguma finalidade
+            ativa, mesmo que você ainda não tenha escolhido. Desligar as duas
+            interrompe novos envios e limpa a persistência do SDK. O ID
+            permanece disponível na sessão atual para copiar e solicitar
+            exclusão do que já foi enviado; copie-o antes de reiniciar ou
+            regenerar o identificador. Regenerar não exclui dados no operador.
           </li>
           <li>
             <strong>Overlay para o OBS</strong> — quando ligado, o aplicativo
@@ -366,6 +372,13 @@ export function PrivacyBodyPt() {
             nunca é enviado para nós.
           </li>
         </ul>
+        <p>
+          Sem token ou host válidos, ou com o bloqueio de telemetria do build
+          ativo, o aplicativo não envia esses eventos. Falhas de rede da
+          telemetria não impedem o uso do app nem o início e fim da live;
+          eventos podem ser perdidos. Desligar não desfaz uma requisição já
+          iniciada.
+        </p>
         <p>
           Desinstalar o aplicativo, apagar o arquivo de configuração e remover
           as credenciais do cofre do sistema elimina os dados locais. Eventos de
@@ -607,10 +620,12 @@ export function PrivacyBodyPt() {
                 </td>
               </tr>
               <tr>
-                <td>Consentimentos e UUID de telemetria do aplicativo</td>
+                <td>Preferências e UUID de telemetria do aplicativo</td>
                 <td>
-                  No seu computador enquanto alguma finalidade estiver ativa ou
-                  até você apagar/regenerar o identificador.
+                  As preferências ficam no seu computador até serem alteradas ou
+                  apagadas. O UUID pode ser regenerado com ambas desligadas;
+                  também deixa de estar disponível no app ao reiniciar com ambas
+                  desligadas.
                 </td>
               </tr>
               <tr>
@@ -669,11 +684,11 @@ export function PrivacyBodyPt() {
           Para exercer qualquer um deles, escreva para <Contact locale={L} />.
           Vamos responder no prazo legal. Como não mantemos cadastro, a maior
           parte dos dados que dizem respeito a você já está sob o seu controle
-          direto. Se você ativou a telemetria do aplicativo, inclua o UUID
-          copiável em Configurações para localizarmos e excluirmos os eventos. A
-          telemetria cookieless do site não cria identificador persistente que
-          permita isolar uma visita anterior; o controle abaixo impede novos
-          envios neste navegador.
+          direto. Para dados de telemetria enviados pelo aplicativo, inclua o
+          UUID copiável em Configurações para localizarmos e excluirmos os
+          eventos. A telemetria cookieless do site não cria identificador
+          persistente que permita isolar uma visita anterior; o controle abaixo
+          impede novos envios neste navegador.
         </p>
       </LegalSection>
 

@@ -152,6 +152,78 @@ function configure(loader: ReturnType<typeof sdkHarness>["loader"]) {
 }
 
 describe("telemetry facade", () => {
+  const choices = ["unset", "enabled", "disabled"] as const;
+  const configurations = [
+    "configured",
+    "missing-token",
+    "missing-host",
+    "kill-switch",
+  ] as const;
+  it.each(
+    choices.flatMap((usage) =>
+      choices.flatMap((crashReports) =>
+        configurations.map((configuration) => ({
+          usage,
+          crashReports,
+          configuration,
+        })),
+      ),
+    ),
+  )(
+    "respects opt-out matrix: $usage / $crashReports / $configuration",
+    async ({ usage, crashReports, configuration }) => {
+      const harness = sdkHarness();
+      __configureTelemetryForTests({
+        config: {
+          token:
+            configuration === "missing-token" ? "" : "phc_public_test_token",
+          host:
+            configuration === "missing-host" ? "" : "https://us.i.posthog.com",
+          buildSha: "abc123",
+          disabled: configuration === "kill-switch",
+          environment: "development",
+        },
+        loader: harness.loader,
+      });
+      await initializeTelemetry(backend(status(usage, crashReports)));
+      capture("screen_viewed", { screen_id: "settings" });
+      captureException(new Error("synthetic matrix failure"), {
+        handled: true,
+        severity: "error",
+        error_code: "screen_render_failed",
+        stage: "screen_render",
+      });
+      await flushTelemetry();
+      const configured = configuration === "configured";
+      expect(harness.captures).toHaveLength(
+        configured && usage !== "disabled" ? 1 : 0,
+      );
+      expect(harness.exceptions).toHaveLength(
+        configured && crashReports !== "disabled" ? 1 : 0,
+      );
+      expect(harness.loader).toHaveBeenCalledTimes(
+        configured && (usage !== "disabled" || crashReports !== "disabled")
+          ? 1
+          : 0,
+      );
+    },
+  );
+
+  it("does not load the SDK for malformed preferences even with a valid installation ID", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(
+      backend({
+        ...status("enabled", "enabled"),
+        usage: "invalid",
+        crashReports: null,
+      } as unknown as TelemetryStatus),
+    );
+    capture("screen_viewed", { screen_id: "settings" });
+    await flushTelemetry();
+    expect(harness.loader).not.toHaveBeenCalled();
+  });
+
   it("não envia telemetria de produção sem o SHA completo da release", async () => {
     const harness = sdkHarness();
     __configureTelemetryForTests({
@@ -177,7 +249,7 @@ describe("telemetry facade", () => {
     expect(harness.loader).not.toHaveBeenCalled();
   });
 
-  it("does not load the SDK or issue work without consent", async () => {
+  it("does not load the SDK or issue work when both purposes are disabled", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("disabled", "disabled")));

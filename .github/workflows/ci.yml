@@ -43,16 +43,22 @@ jobs:
   secrets:
     needs: resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          # Sem esta variável, a versão do binário é decidida pelo action.
-          GITLEAKS_VERSION: 8.30.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
+      # Mesmo scanner/checksum e escopo local: TODAS as refs + snapshot atual.
+      # Não publica SARIF/logs brutos nem usa secrets em PRs de forks.
+      - name: Testar exceções estritas de fixtures
+        run: node --test scripts/audit-secrets.check.mjs
+      - name: Auditar histórico completo e arquivos publicáveis
+        run: node scripts/audit-secrets.mjs
 
   frontend:
     needs: resolve

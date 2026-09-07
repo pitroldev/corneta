@@ -16,6 +16,7 @@
     "prebuild": "pnpm content:check --manifest",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:contributor": "node ../scripts/contributor.mjs web:check",
     "check": "pnpm content:maintenance:check && pnpm lint && pnpm typecheck && pnpm build"
   },
   "dependencies": {

@@ -1,9 +1,12 @@
 # Telemetria e diagnóstico de erros com PostHog
 
-> **Status:** implementação técnica concluída no repositório; ativação de produção pendente dos gates externos  
-> **Data:** 2026-08-01  
-> **Escopo:** aplicativo desktop (React + Tauri/Rust), API Next.js e site público cookieless  
-> **Princípio:** nenhuma telemetria do app sai da máquina sem uma escolha explícita; a transmissão nunca depende da telemetria. O serviço pode monitorar as próprias falhas sem associá-las a uma instalação, desde que isso esteja descrito na política e tenha base legal validada.
+> **Status:** implementação técnica concluída no repositório; ativação de produção pendente dos gates externos
+>
+> **Data:** 2026-08-01 · comportamento revisado em 2026-09-06
+>
+> **Escopo:** aplicativo desktop (React + Tauri/Rust), API Next.js e site público cookieless
+>
+> **Princípio:** a transmissão nunca depende da telemetria. A política técnica atual do desktop é **opt-out**: uso e falhas começam ativos (`unset`) e, com token/host válidos, podem enviar desde o primeiro uso, antes da escolha. O aviso informa esse padrão e a oposição desliga cada finalidade. A intenção de usar legítimo interesse está registrada no [rascunho de balanceamento](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md), ainda sujeito à revisão jurídica; este plano não valida a base legal.
 
 ### Registro de execução
 
@@ -11,15 +14,15 @@ As fases 1 a 7 foram implementadas. A fase 0 está concluída no que pertence ao
 (contrato, região US, políticas, variáveis e gates), mas a coleta de produção continua bloqueada
 até que um administrador configure os projetos PostHog e conclua os gates jurídicos e manuais.
 
-| Área | Estado em 2026-08-01 |
-| --- | --- |
-| Desktop React/Tauri | implementado, opt-in duplo e desligado por padrão |
-| Rust/motor e diagnóstico | implementado, correlacionado e fora do hot path |
-| API Next.js | implementada com identidade efêmera sem consentimento |
-| Site público | implementado em modo cookieless, com opt-out local e respeito a DNT/GPC |
-| Source maps/CI | pipeline e gates implementados; upload real depende de credenciais do projeto |
-| PostHog administrativo | pendente: projetos, IP discard, retenção, DPA, MFA, dashboards e alertas |
-| Rollout | pendente: dogfood, beta, ensaio de exclusão e release real |
+| Área                     | Estado técnico revisado em 2026-09-06                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| Desktop React/Tauri      | implementado, opt-out independente por finalidade, ativo por padrão quando configurado |
+| Rust/motor e diagnóstico | implementado, correlacionado e fora do hot path                                        |
+| API Next.js              | identidade efêmera por request sem correlação autorizada pelas preferências do app     |
+| Site público             | implementado em modo cookieless, com opt-out local e respeito a DNT/GPC                |
+| Source maps/CI           | pipeline e gates implementados; upload real depende de credenciais do projeto          |
+| PostHog administrativo   | pendente: projetos, IP discard, retenção, DPA, MFA, dashboards e alertas               |
+| Rollout                  | pendente: dogfood, beta, ensaio de exclusão e release real                             |
 
 ## 1. Objetivo
 
@@ -34,21 +37,21 @@ O PostHog será usado para métricas de produto, eventos operacionais e agrupame
 
 ## 2. Decisões de arquitetura
 
-| Decisão | Escolha |
-| --- | --- |
-| Provedor | PostHog Cloud, com projetos separados para produção e desenvolvimento/staging |
-| Organização | Um projeto por ambiente, com a propriedade `surface` separando `desktop_ui`, `desktop_native`, `setup_api` e futuramente `marketing_site` |
-| Identidade | UUID aleatório por instalação; nunca e-mail, login, canal, nome da máquina ou conta das plataformas |
-| Consentimento no app | Dois opt-ins independentes, ambos desligados por padrão: **dados de uso** e **relatórios automáticos de falha** |
-| Persistência do consentimento | Arquivo próprio `telemetry.json` no diretório de configuração do app; não entra no backup/importação da configuração |
-| Coleta | Eventos manuais e com propriedades permitidas por esquema; `autocapture`, heatmaps, captura de `console.error`, performance de rede e Session Replay desligados |
-| Erros de UI | `captureException`, `ErrorBoundary`, `window.onerror` e `unhandledrejection`, sempre depois da redação local |
-| Erros nativos | SDK `posthog-rs`, erros tratados nos limites das operações e panic hook protegido pelo mesmo gate de consentimento |
-| API Next.js | `posthog-node` para falhas inesperadas e métricas agregadas dos Route Handlers; nunca enviar corpo, cabeçalhos de autenticação ou resposta do provedor |
-| Diagnóstico compartilhável | Gerado sob ação do usuário por `export_diagnostics`, somente com resumo técnico e ring buffer estruturado allowlisted; logs crus permanecem fora do arquivo |
-| Retenção inicial | 90 dias para eventos e exceções; revisar após o beta com base na utilidade real |
-| IP | Ativar “Discard client IP data” no projeto PostHog; não usar GeoIP em dashboards |
-| Falha do PostHog | Silenciosa para o usuário, assíncrona, com timeout/retry limitado pelo SDK; nunca bloqueia `BORA`, FFmpeg ou encerramento da live |
+| Decisão                       | Escolha                                                                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provedor                      | PostHog Cloud, com projetos separados para produção e desenvolvimento/staging                                                                                        |
+| Organização                   | Um projeto por ambiente, com a propriedade `surface` separando `desktop_ui`, `desktop_native`, `setup_api` e futuramente `marketing_site`                            |
+| Identidade                    | UUID aleatório por instalação; nunca e-mail, login, canal, nome da máquina ou conta das plataformas                                                                  |
+| Preferências no app           | Dois controles independentes, ambos ativos por padrão: **dados de uso** e **relatórios automáticos de falha**; oposição por finalidade, sem condicionar o uso do app |
+| Persistência das preferências | Arquivo próprio `telemetry.json` no diretório de configuração do app; não entra no backup/importação da configuração                                                 |
+| Coleta                        | Eventos manuais e com propriedades permitidas por esquema; `autocapture`, heatmaps, captura de `console.error`, performance de rede e Session Replay desligados      |
+| Erros de UI                   | `captureException`, `ErrorBoundary`, `window.onerror` e `unhandledrejection`, sempre depois da redação local                                                         |
+| Erros nativos                 | SDK `posthog-rs`, erros tratados nos limites das operações e panic hook protegido pelo mesmo gate de preferência                                                     |
+| API Next.js                   | `posthog-node` para falhas inesperadas e métricas agregadas dos Route Handlers; nunca enviar corpo, cabeçalhos de autenticação ou resposta do provedor               |
+| Diagnóstico compartilhável    | Gerado sob ação do usuário por `export_diagnostics`, somente com resumo técnico e ring buffer estruturado allowlisted; logs crus permanecem fora do arquivo          |
+| Retenção inicial              | 90 dias para eventos e exceções; revisar após o beta com base na utilidade real                                                                                      |
+| IP                            | Ativar “Discard client IP data” no projeto PostHog; não usar GeoIP em dashboards                                                                                     |
+| Falha do PostHog              | Silenciosa para o usuário, assíncrona, com timeout/retry limitado pelo SDK; nunca bloqueia `BORA`, FFmpeg ou encerramento da live                                    |
 
 ### Fluxo proposto
 
@@ -58,7 +61,7 @@ flowchart LR
     Native[Tauri / Rust] -->|estados, erros e panics redigidos| PH
     API[Next.js / setup API] -->|erros e duração por rota| PH
     UI -->|operation_id| Native
-    UI -->|telemetry_id + finalidade somente com consentimento| API
+    UI -->|telemetry_id + finalidade somente se ativa| API
     Native --> Logs[logs rotativos estritamente locais]
     Native --> Buffer[ring buffer estruturado allowlisted]
     Buffer --> Export[diagnóstico exportado pelo usuário]
@@ -84,7 +87,7 @@ As lacunas registradas naquele momento eram:
 - a política de privacidade afirmava que app e site não tinham telemetria, analytics nem relatório automático de erros;
 - o exportador ainda podia incluir caminhos, nomes de destinos, URLs customizadas e textos de configuração identificáveis.
 
-Estado atual: essas lacunas de código foram resolvidas nas fases 1–7. O export compartilhável contém apenas resumo allowlisted e ring buffer estruturado; logs livres permanecem exclusivamente locais. Source maps são gerados e enviados somente no job autenticado de release, e a política atual descreve a coleta com consentimento. As pendências externas continuam listadas, sem marcação, nas fases abaixo e nos critérios de pronto da seção 11.
+Estado atual: essas lacunas de código foram resolvidas nas fases 1–7. O export compartilhável contém apenas resumo allowlisted e ring buffer estruturado; logs livres permanecem exclusivamente locais. Source maps são gerados e enviados somente no job autenticado de release. A política atual descreve coleta ativa por padrão com opt-out, não consentimento prévio. As pendências externas continuam listadas, sem marcação, nas fases abaixo e nos critérios de pronto da seção 11.
 
 ## 4. Limites de coleta
 
@@ -92,20 +95,20 @@ Estado atual: essas lacunas de código foram resolvidas nas fases 1–7. O expor
 
 Todas as propriedades devem sair de uma allowlist versionada. O conjunto inicial é:
 
-| Grupo | Propriedades permitidas |
-| --- | --- |
-| Contexto | `telemetry_schema_version`, `surface`, `environment`, `app_version`, `build_sha`, `locale` |
-| Sistema | `os_family`, `arch`, `gpu_vendor`, `encoder_kind`; valores enumerados e sem modelo/hostname |
-| Operação | `operation_id`, `stage`, `outcome`, `error_code`, `retryable` |
-| Live | `mode`, `target_count`, `platforms`, `duration_bucket`, `reconnect_count_bucket`, `brb_enabled`, `guardian_enabled`, `record_video_enabled` |
-| API | `request_id`, `route_id`, `provider`, `status_class`, `duration_bucket` |
-| Erro | `error_id`, tipo, stack redigida, frame do app, `handled`, `severity`, fingerprint estável |
+| Grupo    | Propriedades permitidas                                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contexto | `telemetry_schema_version`, `surface`, `environment`, `app_version`, `build_sha`, `locale`                                                  |
+| Sistema  | `os_family`, `arch`, `gpu_vendor`, `encoder_kind`; valores enumerados e sem modelo/hostname                                                 |
+| Operação | `operation_id`, `stage`, `outcome`, `error_code`, `retryable`                                                                               |
+| Live     | `mode`, `target_count`, `platforms`, `duration_bucket`, `reconnect_count_bucket`, `brb_enabled`, `guardian_enabled`, `record_video_enabled` |
+| API      | `request_id`, `route_id`, `provider`, `status_class`, `duration_bucket`                                                                     |
+| Erro     | `error_id`, tipo, stack redigida, frame do app, `handled`, `severity`, fingerprint estável                                                  |
 
 `platforms`, `provider`, `mode`, `stage`, `outcome`, `error_code`, `encoder_kind` e nomes de feature devem aceitar apenas enums definidos no código. Nenhum valor livre vindo de configuração, plataforma ou usuário pode virar propriedade.
 
 ### 4.2 Dados proibidos
 
-Não enviar, mesmo com consentimento:
+Não enviar, mesmo com a finalidade ativa:
 
 - chaves de transmissão, Client Secrets, access/refresh tokens, cookies ou cabeçalhos de autenticação;
 - título/categoria da live, texto de chat, nome ou mensagem de alerta, nomes de canais e autores;
@@ -130,41 +133,61 @@ Criar uma implementação equivalente em TypeScript e Rust, com os mesmos fixtur
 
 O redator precisa ser a última barreira no `before_send`; a disciplina nos call sites é uma barreira adicional, não substituta.
 
-## 5. Consentimento, transparência e direitos
+## 5. Preferências, transparência e direitos
 
 ### 5.1 Modelo local
 
-Adicionar um arquivo que não seja exportado nem importado junto com `AppConfig`:
+O estado é mantido num arquivo que não é exportado nem importado junto com `AppConfig`.
+Exemplo sintético de primeira execução já inicializada (não contém dados de usuário):
 
 ```json
 {
   "schemaVersion": 1,
-  "noticeVersion": "2026-08-01",
+  "noticeVersion": "2026-08-02",
   "usage": "unset",
   "crashReports": "unset",
-  "installationId": null,
+  "installationId": "00000000-0000-4000-8000-000000000001",
   "decidedAt": null
 }
 ```
 
 Regras:
 
-- `unset` e `disabled` não enviam eventos daquela finalidade; quando as duas finalidades estão assim, não há request do app para o PostHog;
-- o UUID só nasce ao habilitar pelo menos uma finalidade;
-- importar configurações em outra máquina não importa o consentimento nem o UUID;
+- `unset` e `enabled` deixam a finalidade ativa; somente `disabled` registra oposição;
+- a ausência de configuração válida ou o kill switch impedem envio, independentemente das preferências;
+- o UUID nasce no primeiro boot com alguma finalidade ativa, inclusive `unset`; não é prova de envio;
+- importar configurações em outra máquina não importa as preferências nem o UUID;
 - desligar uma finalidade interrompe novos eventos imediatamente;
 - desligar as duas limpa a persistência do SDK e oferece “Solicitar exclusão dos dados já enviados”;
 - reativar após uma exclusão gera outro UUID, para não reutilizar um `distinct_id` apagado;
 - o status de telemetria pode aparecer no diagnóstico local, mas o UUID completo só entra se a pessoa escolher incluí-lo/copiar para o suporte.
 
+Matriz técnica (cada finalidade é avaliada separadamente):
+
+| Preferência | Token/host válidos | Kill switch | Resultado                                        |
+| ----------- | ------------------ | ----------- | ------------------------------------------------ |
+| `unset`     | sim                | desligado   | ativa desde o primeiro uso, sem aguardar escolha |
+| `enabled`   | sim                | desligado   | ativa                                            |
+| `disabled`  | sim                | desligado   | não envia eventos da finalidade                  |
+| qualquer    | não                | desligado   | nenhum envio da superfície sem configuração      |
+| qualquer    | sim ou não         | ligado      | nenhum envio da superfície desativada            |
+
+`Consent`/`telemetrySetConsent` são nomes de compatibilidade do contrato, não uma afirmação
+de que a base adotada seja consentimento. Arquivo local ilegível não deve religar preferências.
+Offline, a telemetria pode perder eventos; não existe envio de log bruto nem dependência da live
+em recuperar analytics. Desligar não desfaz um request já iniciado e não exclui dados no operador.
+Para exclusão, copie o UUID antes de regenerá-lo ou reiniciar com ambas desligadas e use o canal
+publicado; veja o [runbook](RUNBOOK-POSTHOG.md).
+
 ### 5.2 UX
 
-Na primeira abertura após a mudança da política, mostrar uma tela curta, adiável e sem opção pré-marcada:
+Na primeira abertura ou nova versão do aviso, mostrar uma tela curta com os controles refletindo
+o estado efetivo: ambos ligados em uma instalação nova, sem reapresentar opt-out como opt-in:
 
 - **Enviar dados de uso:** etapas concluídas, versão, sistema em categorias e resultado das operações.
 - **Enviar relatórios de falha:** exceções, código/etapa do erro e stack redigida.
 - link para “Ver exatamente o que pode e não pode ser enviado”.
-- botões equivalentes visualmente para aceitar e continuar sem enviar.
+- ações para salvar as escolhas ou desligar ambas; fechar o aviso não desliga a coleta.
 
 Em **Configurações → Dados & diagnóstico**:
 
@@ -194,22 +217,22 @@ Antes do primeiro build que contenha token de produção:
 
 ### 6.1 Uso do aplicativo
 
-| Evento | Quando | Propriedades específicas |
-| --- | --- | --- |
-| `app_started` | app pronto para uso | `previous_exit`, `startup_duration_bucket` |
-| `app_closed` | saída limpa | `uptime_bucket`, `live_was_active` |
-| `screen_viewed` | troca de tela principal | `screen_id` enumerado |
-| `onboarding_started` | primeira etapa exibida | `entry_point` |
-| `onboarding_step_completed` | avanço de etapa | `step_id` |
-| `onboarding_completed` | configuração mínima pronta | `duration_bucket` |
-| `obs_check_completed` | check-up manual/automático | `outcome`, `error_code`, `resolution_bucket`, `fps_bucket` |
-| `live_start_requested` | antes da operação | `operation_id`, `mode`, `target_count`, `platforms` |
-| `live_start_completed` | entrou em `live` | `operation_id`, `duration_bucket`, `encoder_kind` |
-| `live_start_failed` | falha/cancelamento | `operation_id`, `stage`, `error_code`, `cancelled` |
-| `target_state_changed` | somente estados relevantes | `operation_id`, `platform`, `from`, `to`, `error_code` |
-| `live_ended` | encerramento | `operation_id`, `reason`, `duration_bucket`, `reconnect_count_bucket` |
-| `diagnostics_exported` | arquivo salvo | `outcome`; nunca caminho ou conteúdo |
-| `update_completed` | atualização instalada/falhou | `from_version`, `to_version`, `outcome`, `error_code` |
+| Evento                      | Quando                       | Propriedades específicas                                              |
+| --------------------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `app_started`               | app pronto para uso          | `previous_exit`, `startup_duration_bucket`                            |
+| `app_closed`                | saída limpa                  | `uptime_bucket`, `live_was_active`                                    |
+| `screen_viewed`             | troca de tela principal      | `screen_id` enumerado                                                 |
+| `onboarding_started`        | primeira etapa exibida       | `entry_point`                                                         |
+| `onboarding_step_completed` | avanço de etapa              | `step_id`                                                             |
+| `onboarding_completed`      | configuração mínima pronta   | `duration_bucket`                                                     |
+| `obs_check_completed`       | check-up manual/automático   | `outcome`, `error_code`, `resolution_bucket`, `fps_bucket`            |
+| `live_start_requested`      | antes da operação            | `operation_id`, `mode`, `target_count`, `platforms`                   |
+| `live_start_completed`      | entrou em `live`             | `operation_id`, `duration_bucket`, `encoder_kind`                     |
+| `live_start_failed`         | falha/cancelamento           | `operation_id`, `stage`, `error_code`, `cancelled`                    |
+| `target_state_changed`      | somente estados relevantes   | `operation_id`, `platform`, `from`, `to`, `error_code`                |
+| `live_ended`                | encerramento                 | `operation_id`, `reason`, `duration_bucket`, `reconnect_count_bucket` |
+| `diagnostics_exported`      | arquivo salvo                | `outcome`; nunca caminho ou conteúdo                                  |
+| `update_completed`          | atualização instalada/falhou | `from_version`, `to_version`, `outcome`, `error_code`                 |
 
 No desktop, cada evento operacional tem um único dono. O Rust é o emissor autoritativo de
 `app_started`/`app_closed` (ele conhece a saída anterior e o encerramento real) e é o único
@@ -236,10 +259,10 @@ Cada evento deve declarar no catálogo a finalidade `usage` ou `crashReports`. P
 
 ### 6.3 API de login
 
-| Evento | Propriedades |
-| --- | --- |
-| `api_request_completed` | `route_id`, `provider`, `status_class`, `duration_bucket`, `retryable` |
-| `$exception` | `request_id`, `route_id`, `provider`, `error_code`; apenas em falha inesperada |
+| Evento                  | Propriedades                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `api_request_completed` | `route_id`, `provider`, `status_class`, `duration_bucket`, `retryable`         |
+| `$exception`            | `request_id`, `route_id`, `provider`, `error_code`; apenas em falha inesperada |
 
 Não criar evento para cada resposta 2xx no PostHog durante o MVP se o volume/custo não justificar. É suficiente capturar falhas, duração em buckets e contadores agregados. `ApiError` esperado (400, 401, 429 etc.) vira evento operacional com código; 5xx inesperado vira exceção.
 
@@ -262,7 +285,7 @@ Não criar evento para cada resposta 2xx no PostHog durante o MVP se o volume/cu
 
 **Critério de saída:** ambiente de desenvolvimento recebe apenas um evento sintético sem PII, e a política nova está pronta para publicação.
 
-### Fase 1 — Consentimento e núcleo compartilhado
+### Fase 1 — Preferências e núcleo compartilhado
 
 **Arquivos principais**
 
@@ -278,8 +301,8 @@ Não criar evento para cada resposta 2xx no PostHog durante o MVP se o volume/cu
 **Implementação**
 
 - [x] Persistir `telemetry.json` com escrita atômica e permissões equivalentes ao restante da configuração.
-- [x] Gerar UUID v4/CSPRNG somente depois do opt-in.
-- [x] Manter o consentimento em memória/`AtomicBool` para que todo call site tenha um gate barato.
+- [x] Gerar UUID v4/CSPRNG ao inicializar com alguma finalidade ativa, inclusive `unset`.
+- [x] Manter a preferência em memória/`AtomicBool` para que todo call site tenha um gate barato.
 - [x] Fazer o redator operar sobre uma cópia e nunca alterar o erro/configuração original.
 - [x] Criar um `operation_id` na UI ao iniciar operações longas e passá-lo ao command Rust correspondente.
 - [x] Fazer SDK ausente, token vazio ou host inválido resultar em no-op.
@@ -300,7 +323,7 @@ Não criar evento para cada resposta 2xx no PostHog durante o MVP se o volume/cu
   - `disable_session_recording: true`;
   - `capture_performance: false`;
   - `capture_dead_clicks: false` e `capture_heatmaps: false`;
-  - exceções não tratadas e rejeições habilitadas apenas quando `crashReports=enabled`;
+  - exceções não tratadas e rejeições habilitadas apenas quando `crashReports` estiver ativa (`unset` ou `enabled`);
   - `capture_console_errors: false`;
   - persistência sem cookie e perfis limitados ao UUID pseudônimo;
   - `before_send` com allowlist/redação final.
@@ -308,7 +331,7 @@ Não criar evento para cada resposta 2xx no PostHog durante o MVP se o volume/cu
 
 **Pontos de captura**
 
-- [x] Inicializar após carregar o status de consentimento, antes de renderizar o app.
+- [x] Inicializar após carregar o status de preferências, antes de renderizar o app.
 - [x] Integrar `src/components/ErrorBoundary.tsx`, incluindo `error_id` e component stack redigida.
 - [x] Integrar o boundary próprio de `src/chat-main.tsx`.
 - [x] Cobrir `window.onerror` e `unhandledrejection` sem duplicar a mesma exceção do boundary.
@@ -326,7 +349,7 @@ realmente publicado.
 **Dependência**
 
 - [x] Adicionar `posthog-rs` 0.21 com Error Tracking. Após a atualização integral do grafo,
-  `oar-ocr` 0.8.1 passou a exigir Rust 1.95; o projeto e o CI ficam fixados em Rust 1.97.1.
+      `oar-ocr` 0.8.1 passou a exigir Rust 1.95; o projeto e o CI ficam fixados em Rust 1.97.1.
 - [x] Usar o cliente assíncrono/background e `on_error` apenas para log local em nível debug.
 
 **Pontos de captura**
@@ -335,7 +358,7 @@ realmente publicado.
 - [x] Capturar apenas transições relevantes de destino (`live`, `reconnecting`, `signal-lost`, `auth-error`, `error`, `stopped`) com deduplicação.
 - [x] Capturar erros nos limites entre módulos: spawn/saída do MediaMTX, compositor, FFmpeg por destino, gravação, OBS e OAuth.
 - [x] Converter primeiro os caminhos críticos para `AppError { code, stage, retryable, source }`; manter a frase localizada apenas para apresentação.
-- [x] Instalar panic hook somente se o gate de consentimento for aplicado antes da fila/rede. Testar explicitamente habilitar e revogar em runtime.
+- [x] Instalar panic hook somente se o gate da preferência for aplicado antes da fila/rede. Testar explicitamente habilitar e desativar em runtime.
 - [x] Registrar no boot se o encerramento anterior foi limpo por meio de marcador local; enviar apenas `previous_exit=unclean`, sem anexar cauda de log.
 - [x] Fazer flush com timeout curto na saída limpa, sem atrasar ou impedir o fechamento.
 
@@ -371,8 +394,8 @@ Em 2026-08-01, o upload de símbolos Rust do PostHog não suporta PDB do Windows
 
 - [x] Trocar `console.error("OAuth broker request failed", { requestId })` por log local da plataforma + `captureException` com contexto seguro.
 - [x] Preservar o `requestId` na resposta e adicionar o mesmo valor ao evento.
-- [x] Se o app consentiu, enviar `X-Corneta-Telemetry-Id`, `X-Corneta-Telemetry-Purposes` e `X-Corneta-Operation-Id` em conjunto; aceitar somente UUIDs/finalidades válidos e nunca repassar ao provedor OAuth.
-- [x] Reutilizar o UUID em evento operacional somente com consentimento de uso e em exceção somente com consentimento de erros; nos demais casos usar ID efêmero por request.
+- [x] Se a finalidade estiver ativa no app, enviar `X-Corneta-Telemetry-Id`, `X-Corneta-Telemetry-Purposes` e `X-Corneta-Operation-Id` em conjunto; aceitar somente UUIDs/finalidades válidos e nunca repassar ao provedor OAuth.
+- [x] Reutilizar o UUID em evento operacional somente com uso ativo e em exceção somente com relatórios de falha ativos; nos demais casos usar ID efêmero por request.
 - [x] Usar captura imediata no ciclo serverless e agendamento pós-resposta, sem alongar a resposta ao cliente.
 - [x] Não registrar `request.text()`, `fields`, tokens, IP ou `body` retornado por Twitch/Google/Kick.
 
@@ -408,7 +431,7 @@ Em 2026-08-01, o upload de símbolos Rust do PostHog não suporta PDB do Windows
 
 ### Fase 7 — Site público cookieless com decisão separada
 
-Foi adotada coleta mínima cookieless, independente do consentimento do app, com opt-out local e
+Foi adotada coleta mínima cookieless, independente das preferências do app, com opt-out local e
 respeito a DNT/GPC. A ativação em produção ainda depende da revisão jurídica e do projeto:
 
 - [x] adicionar `instrumentation-client.ts` conforme o Next.js 16;
@@ -468,8 +491,9 @@ Alertas precisam de volume mínimo para evitar ruído durante o beta. Cada alert
 
 ### Unitários
 
-- consentimento `unset/disabled` resulta em no-op;
-- UUID só é gerado no opt-in e não é copiado no import/export;
+- a matriz `unset/enabled/disabled` mantém o padrão ativo e respeita oposição por finalidade;
+- token ausente, host inválido e kill switch impedem envio, inclusive com `unset`;
+- UUID nasce com alguma finalidade ativa e não é copiado no import/export;
 - allowlist rejeita propriedade/evento desconhecido;
 - redator cobre JWT, Bearer, stream key, secret, URL, query, path Windows/Unix, e-mail e texto longo;
 - buckets e enums são determinísticos;
@@ -498,8 +522,8 @@ Alertas precisam de volume mínimo para evitar ruído durante o beta. Cada alert
 ## 10. Rollout e rollback
 
 1. **Dogfood:** projeto dev, somente máquinas da equipe, eventos sintéticos e inspeção manual de payload.
-2. **Beta:** opt-in real, sem Session Replay, com amostragem determinística por hash do UUID se o volume exigir.
-3. **Produção:** liberar para todos, ainda opt-in, somente após duas semanas sem vazamento/impacto e dashboards úteis.
+2. **Beta:** padrão ativo informado e opt-out por finalidade, sem Session Replay, somente após gates jurídicos e operacionais; com amostragem determinística por hash do UUID se o volume exigir.
+3. **Produção:** manter a política validada para o beta, somente após duas semanas sem vazamento/impacto e dashboards úteis.
 4. **Revisão de 30 dias:** remover eventos sem uso, ajustar retenção e documentar decisões.
 
 Mecanismos de rollback:
@@ -512,7 +536,7 @@ Mecanismos de rollback:
 ## 11. Critérios de pronto
 
 - [ ] Política publicada e DPA assinado antes da coleta de produção.
-- [x] Os dois consentimentos são explícitos, independentes, revogáveis e desligados por padrão.
+- [x] As duas preferências são independentes, começam ativas e podem ser desligadas; o aviso informa o padrão.
 - [x] Zero evento de uma finalidade desligada; zero request do app quando as duas estão desligadas.
 - [x] Nenhum dado da lista proibida aparece nos fixtures e testes automatizados.
 - [ ] Concluir a inspeção manual dos requests com contas de teste.
@@ -529,17 +553,17 @@ Mecanismos de rollback:
 
 ## 12. Riscos e mitigação
 
-| Risco | Mitigação |
-| --- | --- |
-| Segredo em mensagem/stack | allowlist, redator recursivo no último `before_send`, fixtures ofensivos e inspeção de payload |
-| Perda de confiança pela mudança de promessa | opt-in real, copy transparente, política publicada antes do binário e coleta mínima |
-| Impacto na transmissão | eventos fora do hot path, SDK assíncrono, consolidação, rate limit e testes com host offline |
-| Bundle/CSP mais permissivos | extensão empacotada localmente, `script-src 'self'` e host exato apenas em `connect-src` |
-| Custo/cardinalidade | enums, buckets, deduplicação, retenção de 90 dias e remoção de eventos inúteis |
-| Stack Rust incompleta no Windows | códigos estáveis + logs locais; acompanhar suporte oficial a PDB |
-| Evento duplicado | `error_id`, fingerprint e dedupe por janela curta |
-| Exclusão difícil | UUID visível ao titular, perfil sem PII e runbook testado de Right to Be Forgotten |
-| Dados de teste em produção | projetos separados e build dev sem token de produção |
+| Risco                                       | Mitigação                                                                                                                  |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Segredo em mensagem/stack                   | allowlist, redator recursivo no último `before_send`, fixtures ofensivos e inspeção de payload                             |
+| Perda de confiança pela mudança de promessa | padrão ativo informado sem prometer opt-in, oposição simples, política revisada/publicada antes do binário e coleta mínima |
+| Impacto na transmissão                      | eventos fora do hot path, SDK assíncrono, consolidação, rate limit e testes com host offline                               |
+| Bundle/CSP mais permissivos                 | extensão empacotada localmente, `script-src 'self'` e host exato apenas em `connect-src`                                   |
+| Custo/cardinalidade                         | enums, buckets, deduplicação, retenção de 90 dias e remoção de eventos inúteis                                             |
+| Stack Rust incompleta no Windows            | códigos estáveis + logs locais; acompanhar suporte oficial a PDB                                                           |
+| Evento duplicado                            | `error_id`, fingerprint e dedupe por janela curta                                                                          |
+| Exclusão difícil                            | UUID visível ao titular, perfil sem PII e runbook testado de Right to Be Forgotten                                         |
+| Dados de teste em produção                  | projetos separados e build dev sem token de produção                                                                       |
 
 ## 13. Referências
 

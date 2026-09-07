@@ -5,7 +5,10 @@ use std::sync::{Mutex, OnceLock};
 
 use keyring::Entry;
 
+#[cfg(not(corneta_contributor))]
 const SERVICE: &str = "br.com.pitroldev.corneta";
+#[cfg(corneta_contributor)]
+const SERVICE: &str = "br.com.pitroldev.corneta.contributor";
 
 fn entry(target_id: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, target_id).map_err(|e| format!("keyring: {e}"))

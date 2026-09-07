@@ -6,14 +6,17 @@ import {
   resolveBuildSha,
 } from "./lib/server/release-config";
 
+const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 // No desenvolvimento local, reaproveita as credenciais que já existem no `.env`
 // da aplicação desktop. `process.loadEnvFile` não sobrescreve variáveis fornecidas
 // pelo ambiente de deploy e nenhuma delas é enviada ao browser pelo Next.js.
 try {
-  if (process.env.NODE_ENV === "development") {
-    process.loadEnvFile(
-      resolve(dirname(fileURLToPath(import.meta.url)), "../.env"),
-    );
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.CORNETA_CONTRIBUTOR !== "1"
+  ) {
+    process.loadEnvFile(resolve(workspaceRoot, ".env"));
   }
 } catch {
   // CI e produção devem fornecer os segredos pelo ambiente do servidor.
@@ -35,6 +38,9 @@ if (
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR?.trim() || ".next",
+  // An unrelated lockfile in a parent/home directory must not expand the build
+  // workspace or make a clean clone depend on the maintainer's machine layout.
+  turbopack: { root: workspaceRoot },
   poweredByHeader: false,
   reactStrictMode: true,
   // Only public identity is compiled in; never put OAuth/Redis secrets here.

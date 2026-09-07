@@ -1,0 +1,30 @@
+title = "Corneta — defaults plus reviewed synthetic redaction fixtures"
+
+[extend]
+useDefault = true
+
+# These exact strings exercise the telemetry redactors. None can authenticate:
+# the JWT signature/payload are deliberately invalid and the PostHog value is
+# a short numbered placeholder. Keep AND + anchored paths/values: changing a
+# token, its file, or its detector must produce a new finding. Do not allowlist
+# entire test files, telemetry code, commits, or generic token prefixes.
+[[allowlists]]
+description = "Synthetic JWT in the desktop text-redaction regression test"
+condition = "AND"
+targetRules = ["jwt"]
+paths = ['''^src/lib/telemetry-schema\.test\.ts$''']
+regexes = ['''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.signature123456$''']
+
+[[allowlists]]
+description = "Numbered, non-secret PostHog transport placeholder in web tests"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^web/lib/telemetry-schema\.test\.ts$''']
+regexes = ['''^phc_12345678$''']
+
+[[allowlists]]
+description = "Invalid JWT-shaped input to the Rust unit-test redactor"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^src-tauri/src/telemetry\.rs$''']
+regexes = ['''^eyJhbGciOiJIUzI1NiJ9\.abcdefghijk\.abcdefghijklmnop$''']

@@ -2,5 +2,16 @@
   "schemaVersion": 1,
   "reviewed": false,
   "ffmpegArchiveSha256": "e254995d48e6e9e88f5a05eb886a75e9ac33d7c6bb2e8a301e2eb65848a2d489",
-  "sources": []
+  "sources": [
+    {
+      "file": "ffmpeg-1a748fe2cd43e3ead22fafb1b5b7d77f153898a8.tar.gz",
+      "url": "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/1a748fe2cd43e3ead22fafb1b5b7d77f153898a8",
+      "sha256": "519e42c103de98a34fc07c2a52c0d6d7b25031f2bd4e42d544bc409fe9fb6477"
+    },
+    {
+      "file": "ffmpeg-builds-8267213e26c1031621e6e1210fe3aa4867214f6a.tar.gz",
+      "url": "https://codeload.github.com/BtbN/FFmpeg-Builds/tar.gz/8267213e26c1031621e6e1210fe3aa4867214f6a",
+      "sha256": "08279484656a586c149e119a20d3853f2596ee08192d97595edd2a5ba3b4fd51"
+    }
+  ]
 }

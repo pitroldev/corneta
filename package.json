@@ -10,6 +10,12 @@
   "description": "Corneta — transmita para todas as plataformas ao mesmo tempo, sem dor de cabeça.",
   "type": "module",
   "scripts": {
+    "contrib:demo": "node scripts/contributor.mjs demo",
+    "contrib:web": "node scripts/contributor.mjs web",
+    "contrib:check": "node scripts/contributor.mjs check",
+    "contrib:web:check": "node scripts/contributor.mjs web:check",
+    "contrib:app:dev": "node scripts/contributor.mjs app:dev",
+    "contrib:app:build": "node scripts/contributor.mjs app:build",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build:fast": "vite build",

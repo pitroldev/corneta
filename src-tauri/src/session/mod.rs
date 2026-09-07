@@ -550,12 +550,36 @@ pub fn prune_videos(app: &AppHandle, configured: Option<&Path>, keep_gb: u64) ->
     let Some(dir) = sessions_dir(app) else {
         return 0;
     };
-    let ids = known_ids(&DiskStore, &dir);
-    let mut all: Vec<domain::VideoFile> = Vec::new();
-    for d in video_dirs(app, configured) {
-        all.extend(video_files(&DiskStore, &d));
+    prune_videos_in(
+        &DiskStore,
+        &dir,
+        configured,
+        keep_gb,
+        cfg!(corneta_contributor),
+    )
+}
+
+fn prune_videos_in(
+    store: &dyn SessionStore,
+    sessions: &Path,
+    configured: Option<&Path>,
+    keep_gb: u64,
+    contributor: bool,
+) -> u64 {
+    let ids = known_ids(store, sessions);
+    let mut all = video_files(store, sessions);
+    // Importar configuração não transfere a propriedade dos vídeos de outra
+    // instalação. O índice Contributor não conhece os relatórios oficiais e
+    // classificaria seus vídeos como órfãos. Neste perfil, a poda automática
+    // só alcança a pasta de sessões própria, nunca a customizada/importada.
+    // A escolha é de build; não depende de flags fornecidas pelo frontend.
+    if !contributor {
+        if let Some(dir) = configured.filter(|dir| !dir.as_os_str().is_empty() && *dir != sessions)
+        {
+            all.extend(video_files(store, dir));
+        }
     }
-    apply_video_prune(&DiskStore, domain::plan_video_prune(all, &ids, keep_gb))
+    apply_video_prune(store, domain::plan_video_prune(all, &ids, keep_gb))
 }
 
 fn apply_video_prune(store: &dyn SessionStore, plan: domain::VideoPrunePlan) -> u64 {

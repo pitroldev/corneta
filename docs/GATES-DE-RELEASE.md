@@ -65,6 +65,9 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
 - O Environment GitHub `production-telemetry` tem reviewer obrigatório; DPA/MFA, descarte de IP,
   retenção de 90 dias e política PT/EN versão `2026-08-02` precisam estar ativos antes da
   aprovação.
+- Registrar a revisão jurídica do balanceamento e dos textos PT/EN antes de ativar coleta de
+  produção. A política técnica é opt-out; teste automatizado, aviso ou publicação do código não
+  comprovam adequação da base legal nem configuração de retenção/descarte no operador.
 - Em uma instalação limpa, confirmar zero request ao PostHog com as duas finalidades
   **desligadas** — elas agora vêm LIGADAS por legítimo interesse, então o teste é desligar e
   conferir que parou, e não instalar e conferir que está mudo. Depois religar uma de cada vez,

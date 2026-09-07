@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Corneta Contributor",
+  "identifier": "br.com.pitroldev.corneta.contributor",
+  "build": {
+    "beforeDevCommand": "node scripts/contributor.mjs demo",
+    "beforeBuildCommand": "node scripts/contributor.mjs frontend:build"
+  },
+  "bundle": {
+    "active": false,
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [],
+      "pubkey": ""
+    }
+  }
+}

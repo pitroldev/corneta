@@ -36,6 +36,8 @@ const shouldUploadSourceMaps = Boolean(
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
+  // The explicit contributor profile must never compile the maintainer's .env.
+  envDir: process.env.CORNETA_CONTRIBUTOR === "1" ? false : undefined,
   plugins: [
     react(),
     tailwindcss(),
@@ -84,7 +86,12 @@ export default defineConfig(async () => ({
     // `.claude/worktrees` guarda CÓPIAS inteiras do repositório (worktrees de
     // sessão). Sem excluir, o Vitest roda a suíte duas vezes — e a segunda é uma
     // versão ANTIGA do código, que pode passar ou quebrar por conta própria.
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.claude/**",
+      "**/.artifacts/**",
+    ],
   },
   worker: { format: "es" },
   build: {

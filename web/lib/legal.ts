@@ -38,9 +38,9 @@ export const LEGAL_HOST = "Vercel Inc.";
  *  A data por extenso tem uma forma por idioma: escrita à mão em vez de sair de
  *  `Intl`, porque o valor tem que ser IDÊNTICO no HTML servido e no que o
  *  navegador renderiza (o `<time dateTime>` ao lado é a versão de máquina). */
-export const LEGAL_UPDATED_ISO = "2026-08-01";
-export const LEGAL_UPDATED_LABEL_PT = "1º de agosto de 2026";
-export const LEGAL_UPDATED_LABEL_EN = "August 1, 2026";
+export const LEGAL_UPDATED_ISO = "2026-09-06";
+export const LEGAL_UPDATED_LABEL_PT = "6 de setembro de 2026";
+export const LEGAL_UPDATED_LABEL_EN = "September 6, 2026";
 
 /** Versão que exige aceite, espelhada em `src/lib/legal.ts` (o app é outro
  *  workspace e não importa daqui). Só sobe em mudança MATERIAL — passar a cobrar,

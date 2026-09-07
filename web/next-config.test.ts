@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import nextConfig from "./next.config";
 
 describe("legacy editorial redirects", () => {
+  it("fixa a raiz do build no workspace, não em lockfiles da pasta pessoal", () => {
+    expect(nextConfig.turbopack?.root).toBe(
+      resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+    );
+  });
   it("preserva as URLs antigas da categoria OBS com redirects permanentes", async () => {
     const redirects = await nextConfig.redirects?.();
 
