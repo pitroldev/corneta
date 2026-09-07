@@ -2,6 +2,7 @@ import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "./content";
 import { DEFAULT_LOCALE, localePath, translator, type Locale } from "./i18n";
 import { LEGAL_CNPJ, LEGAL_CONTACT, LEGAL_OPERATOR, legalHref } from "./legal";
 import { siteUrl } from "./site";
+import { downloadMetadata } from "./download";
 import type {
   EditorialPerson,
   PublishedEditorialDocument,
@@ -15,13 +16,6 @@ import type {
 // que ninguém consegue baixar. Marcação falsa é penalidade, não otimização.
 
 const abs = (path: string) => new URL(path, siteUrl).toString();
-
-/** URL real do instalador, ou null enquanto for o placeholder. */
-function realDownloadUrl(): string | null {
-  const url = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL?.trim();
-  if (!url || url.includes("example.com")) return null;
-  return url;
-}
 
 const GITHUB = "https://github.com/pitroldev";
 
@@ -54,7 +48,8 @@ const website = {
 /** O app é UM só, então o `@id` não muda por idioma — o que muda é a prosa que
  *  o buscador cita (descrição, lista de recursos, requisitos). */
 function softwareApplication(locale: Locale) {
-  const download = realDownloadUrl();
+  const release = downloadMetadata(process.env.NEXT_PUBLIC_PRIMARY_CTA_URL);
+  const download = release?.url;
   const t = translator(locale);
   return {
     "@type": "SoftwareApplication",
@@ -83,7 +78,8 @@ function softwareApplication(locale: Locale) {
       ...(download ? { url: download } : {}),
     },
     // Só anuncia download quando existir instalador público de verdade.
-    ...(download ? { downloadUrl: download, softwareVersion: "0.5.2" } : {}),
+    ...(download ? { downloadUrl: download } : {}),
+    ...(release?.version ? { softwareVersion: release.version } : {}),
   };
 }
 

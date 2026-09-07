@@ -6,6 +6,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 
 const fail = (message) => {
   console.error(`latest.json não gerado: ${message}`);
@@ -78,6 +81,30 @@ if (!signature || signature.length > 16 * 1024 || signature.includes("\0")) {
   fail("arquivo .sig vazio ou inválido.");
 }
 
+const verification = spawnSync(
+  "cargo",
+  [
+    "run",
+    "--locked",
+    "--release",
+    "--example",
+    "verify-updater",
+    "--",
+    installerPath,
+    signaturePath,
+    tauriConfigPath,
+  ],
+  {
+    cwd: join(root, "src-tauri"),
+    stdio: "inherit",
+    shell: false,
+  },
+);
+if (verification.error || verification.status !== 0)
+  fail(
+    "a assinatura não corresponde ao instalador e à chave pública do aplicativo.",
+  );
+
 const [owner, repo] = repository.split("/");
 const assetUrl = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(basename(installerPath))}`;
 const manifest = {
@@ -95,6 +122,38 @@ const manifest = {
 
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
+// Exact bytes delivered to users; a checksum is not a substitute for a signature.
+const checksumsPath = join(
+  root,
+  "src-tauri",
+  "target",
+  "release",
+  "bundle",
+  "SHA256SUMS.txt",
+);
+const checksums = [];
+const compliancePath = join(
+  root,
+  "src-tauri",
+  "target",
+  "release",
+  "bundle",
+  "corneta-third-party.zip",
+);
+if (!existsSync(compliancePath))
+  fail("pacote de conformidade ausente; execute pnpm compliance:prepare.");
+for (const file of [
+  installerPath,
+  signaturePath,
+  manifestPath,
+  compliancePath,
+]) {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  checksums.push(`${hash.digest("hex")}  ${basename(file)}`);
+}
+writeFileSync(checksumsPath, checksums.join("\n") + "\n", "utf8");
+
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
@@ -102,6 +161,8 @@ if (process.env.GITHUB_OUTPUT) {
       `installer_path=${installerPath}`,
       `signature_path=${signaturePath}`,
       `manifest_path=${manifestPath}`,
+      `checksums_path=${checksumsPath}`,
+      `compliance_path=${compliancePath}`,
       "",
     ].join("\n"),
     "utf8",

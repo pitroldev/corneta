@@ -1,129 +1,66 @@
-# Pendências — o que falta para a Corneta ficar "pronta"
+# Pendências para publicação
 
-> Estado real do projeto e o caminho até um v1 publicável. Atualizado em 2026-06-22.
-> Veja também [`PLANEJAMENTO.md`](./PLANEJAMENTO.md) (visão/arquitetura), [`ATUALIZACAO-AUTOMATICA.md`](./ATUALIZACAO-AUTOMATICA.md) e [`ASSINATURA.md`](./ASSINATURA.md).
+Atualizado em 2026-09-06. Este é o checklist atual; descrições antigas de funcionalidades
+“não implementadas” foram substituídas pelo estado verificável. O histórico permanece no Git.
 
-**Legenda:** ✅ feito · 🟡 parcial · ⛔ não feito · 🔬 não validado
-**Quem:** 🤖 dá pra eu fazer · 🧑 precisa de você (chave real, OBS, compra de cert, conta cloud)
+## Resolvido no repositório nesta rodada
 
----
+- CI Rust prepara seus próprios sidecars, inclusive para os testes de mídia não ignorados.
+- FFmpeg fixado em n8.1.2-50-g1a748fe2cd, com URL versionada e SHA-256 conferido.
+  O download anterior retornava 404. Há cache verificado e suporte a espelho HTTPS.
+- Avisos FFmpeg/MediaMTX, versão, configuração e hashes acompanham os recursos do instalador.
+- OAuth Kick: limitador distribuído via Redis REST, operação atômica, TTL, limite de memória
+  em desenvolvimento, IP obtido somente de proxy confiável e pseudonimizado antes do armazenamento.
+- Produção não recorre a memória local se Redis estiver ausente ou falhar: responde 503.
+  Excesso de tentativas responde 429; ambos informam Retry-After.
+- Corpos de requisição/resposta são limitados durante a leitura; há timeout e validação
+  de objetos JSON/tokens. Credenciais e respostas brutas não entram nas mensagens de erro.
+- Build SHA do site/API alinhado automaticamente. Health usa a identidade compilada do site.
+- A versão anunciada nos dados estruturados vem da release vinculada; removida a versão
+  antiga fixa. Download de produção fica restrito aos assets do repositório oficial.
+- Check específico de produção rejeita configuração incompleta, telemetria divergente e
+  download provisório. Vercel production o executa automaticamente durante o build.
+- Updater verifica a assinatura real do instalador com a chave pública do app em streaming.
+- SHA256SUMS.txt gerado para instalador, assinatura, manifesto e pacote de terceiros.
+- Pipeline de fontes/licenças implementado, com manifesto revisado, hashes, inventários
+  Rust/JS e avisos. A revisão do conteúdo das fontes continua pendente, não foi simulada.
+- Verificação Authenticode alinhada à decisão existente de lançamento sem certificado.
+- Dependências retiradas de circulação: chacha20 0.10.1 → 0.10.2 e wide 1.6.0 → 1.7.0;
+  safe_arch atualizado para 1.2.0 como dependência compatível.
 
-## Onde estamos
+## Pendências reais antes de distribuir
 
-✅ App Tauri 2 + React **compila, abre e fecha limpo** (sem processo órfão, verificado).
-✅ UI completa com personalidade: Plataformas, Qualidade, Ao vivo, Sobre + **barra de título custom**.
-✅ Config em disco · **chaves no cofre do Windows** (keyring).
-✅ Motor: **MediaMTX** (ingestão do OBS) + **um FFmpeg por destino** (métricas reais + **reconexão independente** por plataforma), com *tree-kill*.
-✅ **Configurações** (endpoint de ingestão editável), **bandeja** (minimizar ao fechar) + **autostart**, **teste de upload** (multi-conexão) e **erro por plataforma** no painel.
-✅ **Pipeline ingest→relay validado de ponta a ponta** (sem OBS): publisher → MediaMTX → reader leu **vídeo+áudio H.264/AAC reais**.
-✅ **Transmissão real confirmada:** OBS → Corneta → **Twitch** no ar! 🎉 (2026-06-23)
+| Prioridade | Pendência | O que falta |
+| --- | --- | --- |
+| P0 | Fontes GPL correspondentes | Obter e conferir FFmpeg, bibliotecas, patches e scripts exatos; preencher e revisar compliance/ffmpeg-sources.json. O pipeline bloqueia enquanto estiver vazio/não revisado |
+| P0 | Setup API em produção | Configurar Redis REST, salt estável, origem confiável do IP e credenciais OAuth no host; executar web:release:check e fazer deploy |
+| P0 | OAuth em contas externas | Validar Twitch, YouTube e Kick com contas de teste novas; aprovação/escopos/quota Google; callbacks e renovação reais |
+| P0 | Política/telemetria | Configurar os três ambientes coerentemente, com coleta explicitamente habilitada ou desligada; validar DPA, retenção, aviso e preferências reais |
+| P0 | Release e atualização | Secrets do updater, backup, reviewer obrigatório, draft completo, instalação limpa e N-1 → N com recuperação ensaiada |
+| P0 | Download público | Disponibilizar instalador aprovado e configurar o CTA; testar arquivo, hash, aviso Windows e versão efetivamente baixados |
+| P1 | Espelho durável FFmpeg | Hospedar o mesmo ZIP verificado sob controle do projeto e configurar CORNETA_FFMPEG_MIRROR_URL; o upstream remove builds antigos |
+| P1 | Estabilidade e desempenho reais | Lives de 4–8 h, hardware NVIDIA/Intel/AMD, rede instável, jogo competindo por recursos e relatórios grandes |
+| P1 | Beta com usuários não técnicos | 10–20 pessoas concluindo instalação, conexão, live, relatório e recuperação de falha sem orientação técnica |
+| Acompanhar | Dependências transitivas | Avisos informativos de manutenção continuam; acompanhar atualizações upstream sem ampliar exceções de segurança |
+| Decisão | Certificado Authenticode | Adiado por orçamento; não confundir com updater, que continua obrigatoriamente assinado |
 
----
+Não foram criadas contas, contratados serviços, alteradas credenciais de produção nem
+publicados releases/deploys nesta rodada. Isso evita tratar configuração externa como concluída.
 
-## P0 — Bloqueadores do "funciona de verdade"
+## Comandos
 
-| # | Item | Status | Quem | Critério de pronto |
-|---|---|---|---|---|
-| 1 | **Teste ao vivo end-to-end** (OBS → Corneta → plataforma) | ✅ | 🧑 | Twitch (2026-06-23) e **multi-plataforma simultâneo com streamers reais** (2026-07-30) |
-| 2 | **Caminho de ingestão** (OBS→MediaMTX→fan-out) | ✅ | 🤖 | Validado de ponta a ponta com vídeo+áudio reais |
-| 3 | **Reconexão / resiliência** | ✅ | 🤖 | MediaMTX como ingestão + **respawn do FFmpeg**: OBS pode cair e voltar |
-| 4 | **Saída RTMPS** (Facebook/Kick) confirmada | ✅ | 🧑 | **Kick confirmado** (2026-07-30) |
+```powershell
+pnpm check
+pwsh -NoProfile -File scripts/fetch-binaries.ps1
+cargo test --manifest-path src-tauri/Cargo.toml --locked --all-targets
+pnpm web:release:check
+pnpm compliance:check
+pnpm compliance:prepare
+```
 
-> P0 fechado: o caminho crítico está validado ao vivo, com gente de verdade transmitindo.
+Os dois checks de publicação devem falhar enquanto faltarem configurações/revisão.
+Isso não impede desenvolvimento, testes nem builds locais comuns.
+O pacote de terceiros só pode ser preparado após a revisão; não há flag para ignorar a validação.
 
----
-
-## P1 — Para virar "produto" distribuível
-
-| # | Item | Status | Quem | Critério de pronto |
-|---|---|---|---|---|
-| 5 | **Gerar instalador** (`pnpm tauri build` → NSIS) | ✅ | 🤖+🧑 | Gerado e **validado em máquina limpa** (2026-07-30) |
-| 6 | **Auto-update via GitHub** | 🟡 | 🤖+🧑 | Plugin, UI e workflow de release prontos (2026-07-30). Falta o **secret no GitHub** e um teste real N-1 → N |
-| 7 | **Assinatura de código (Windows)** | ⛔ | 🧑 | **Adiado — sem verba.** Lança com SmartScreen; ver [`ASSINATURA.md`](./ASSINATURA.md) e a mitigação abaixo |
-| 8 | **Licença** (MIT/Apache-2.0) + `LICENSE` no repo | ✅ | 🧑 | MIT, `LICENSE` na raiz |
-| 9 | **Metadados do app** | ✅ | 🤖 | publisher/copyright/category/homepage/descrições no `tauri.conf` |
-| 10 | **Log em arquivo** (`tauri-plugin-log`) | ✅ | 🤖 | Grava no app log dir + stdout; logs do motor (start/stop/respawn/erros) |
-
----
-
-## P1/P2 — Funcionalidades pendentes / stubs
-
-| # | Item | Status | Quem | Observação |
-|---|---|---|---|---|
-| 11 | **Auto-config do OBS** (obs-websocket) | ✅ | 🤖 | Cliente v5 em Rust → `SetStreamServiceSettings` (servidor+chave); senha opcional nas Configurações |
-| 12 | **Teste de upload** real | ✅ | 🤖 | Multi-conexão (6× paralelas), ~3 s de regime estável **descartando o warm-up** — preciso em gigabit |
-| 13 | **Métricas por plataforma** | ✅ | 🤖 | **1 FFmpeg por destino** → bitrate/fps/quedas **reais por plataforma** + reconexão independente (trade-off: N decodes no modo transcode) |
-| 14 | **Tela de Configurações** | ✅ | 🤖 | Edita endpoint de ingestão (host/porta/app/chave) + toggles de bandeja e autostart |
-| 15 | **Bandeja do sistema + autostart** | ✅ | 🤖 | Tray (clique abre, menu Abrir/Sair), fechar→bandeja (transmissão segue), autostart via `tauri-plugin-autostart` |
-
----
-
-## P2 — Robustez & qualidade
-
-- ✅ **Validação de entrada**: URL custom RTMP/RTMPS, chave faltando e nome — inline em Plataformas + **bloqueia o Iniciar** com a lista de problemas. SRT permanece no roadmap até existir muxer/teste dedicado.
-- ✅ **Áudio**: sempre **AAC 48 kHz estéreo** em todos os destinos (vídeo copy ou transcode; `-map 0:a?` se não houver áudio).
-- ✅ **Tratamento de erro do FFmpeg**: mensagens amigáveis por destino (chave recusada/403, sem conexão, queda) com estado `error`/`reconnecting`.
-- ✅ **Múltiplos destinos da mesma plataforma**: auto-sufixo de nome (Twitch 2…) + **nome editável** em todos os destinos.
-- 🟡 **TikTok/Instagram/X**: URLs de ingestão são placeholders (`rtmp://`) marcadas como experimentais — precisam de fluxo manual claro.
-- ✅ **Testes automatizados**: Vitest no frontend, testes Rust, Clippy estrito e E2E de mídia em job dedicado do CI. A matriz ao vivo com contas reais continua manual.
-
----
-
-## P2/P3 — UX & escopo planejado (v1.x)
-
-- ✅ **Perfis** ("Live de sexta", "Podcast"): conjuntos de destinos + modo, troca/cria/renomeia/exclui na tela Plataformas (chaves compartilhadas por id entre perfis).
-- ⛔ **i18n** (PT-BR + EN) e **tema claro**.
-- ✅ **Onboarding guiado** (carrossel de 5 passos com progresso), **estados vazios** (Qualidade/Ao vivo), **estados de erro** (banner do motor + sidebar) e **didática** (tooltips de bitrate/encoder, dica keyframe 2s/CBR).
-- ✅ **Menos fricção:** um clique liga o OBS junto (`StartStream`), "pegar minha chave" por plataforma, testar conexão por destino, **atalho global** começar/parar, **notificações nativas** (no ar / destino caiu), colar+mostrar a chave, **arrastar pra reordenar** destinos, lembrar janela/última tela, abrir logs.
-- ✅ **Pausar/retomar por plataforma ao vivo** — botão por destino no Ao vivo mata/reativa só aquele FFmpeg, sem derrubar os outros (estado `paused`).
-- ✅ **Auto-bitrate** — destino em transcode que engasga (velocidade do FFmpeg < 0.9 sustentada) tem o bitrate baixado (e respawn) e sobe de volta quando estabiliza, em vez de derrubar. Toggle nas Configurações (default on; só transcode).
-- ✅ **Viewers unificados** — soma a audiência ao vivo de todas as plataformas (Twitch via GQL público, YouTube via Data API, Kick via API) reusando as fontes do chat, **sem login**; aparece na sidebar e no Chat. Poll a cada ~30 s.
-- ✅ **Proteção contra quedas (tela "JÁ VOLTO")** — se o sinal do OBS cai **no meio da live** (só após o 1º sinal), a Corneta empurra um **slate** (PNG da marca, em loop) pras plataformas e **mantém a transmissão de pé** até voltar, em vez de derrubar (estado `brb`). Toggle nas Configurações.
-- ✅ **QoL (lote 2):** confirmar Sair no ar · desfazer remoção / confirmar exclusão de perfil · **cronômetro** ao vivo · **marcar momento** (→ relatório) · **abrir canal** por destino · **duplicar destino** · **importar/exportar config** · **check-up pré-live** (com checagem do OBS) · **tema claro** · tamanho de fonte do chat · auto-reconnect do obs-websocket.
-- ✅ Editor de **enquadramento vertical** — saídas portrait (TikTok/Shorts/IG) recortam um **9:16** do sinal landscape (sem distorcer) via `crop`+`scale` no FFmpeg; UI com palco 16:9, recorte arrastável + zoom e **preview com frame real do OBS** (`capture_frame`).
-
----
-
-## Futuro — v2
-
-- ✅ **MediaMTX** como ingestão (feito — reconexão via respawn). Próximos ganhos: **SRT** de entrada e **API de métricas por destino**.
-- **Cloud relay "traga seu VPS"** (não estourar o upload doméstico — §7 do plano).
-- **macOS / Linux** (keyring `apple-native`/`sync-secret-service`, assinatura/notarização Apple).
-- ✅ **Chat unificado** — **múltiplas fontes** (ex.: 2 Twitches), **emotes + badges**, **deleções de moderação**, **Kick**, e **janela flutuante** always-on-top. Configurável; Twitch sem login, Kick via slug, YouTube via API key — [`CHAT.md`](./CHAT.md). FB/TikTok pendentes.
-- **Gravação local simultânea** e **métricas unificadas** por plataforma.
-- ✅ **Relatório pós-live** (Fases 1–4: grava a sessão em NDJSON com métricas/CPU/GPU/**OBS** + tela com gráficos, janelas problemáticas e veredito de causa) — [`RELATORIO-POS-LIVE.md`](./RELATORIO-POS-LIVE.md). Pendente: export formatado (Fase 5).
-- ✅ **Relatório turbinado** — grava também **viewers, taxa de chat e alertas** na sessão e cruza tudo: painel de engajamento (pico/média de viewers, inscrições, bits, raids, mensagens), **curva de retenção** (com marca de raids), **atividade do chat** (msgs/min), **resumo de alertas** e **momentos de destaque/clipes sugeridos** (pico de chat + alerta forte + salto de audiência, com timestamp relativo pro VOD).
-- ✅ **Alertas centralizados** — [`ALERTAS.md`](./ALERTAS.md). **Fase 1:** subs/resubs/gift subs/bits/raids (Twitch), membros/super chats (YouTube), subs/gifts/host (Kick) — **sem login**, reusando as conexões de chat → `alert://event` + **coluna "Alertas"** na tela de Chat. **Fase 2:** follows/donates/tips via **Streamlabs/StreamElements** (`alerts.rs`, Socket.IO). **Fase 3:** **overlay pro OBS** (`overlay.rs` + `overlay.html`: servidor local loopback + porta fixa, alertas animados por WebSocket). Único pendente: **follow NATIVO da Twitch via EventSub** (redundante com Streamlabs/SE — baixa prioridade).
-- 📄 **Enviar mensagens pelo multi-chat** (+ moderar) — exige login por plataforma; planejado em [`ENVIO.md`](./ENVIO.md).
-- 💡 **Backlog de ideias** (clipes/backtrack, "JÁ VOLTO", aviso no Discord, reframe vertical, viewers somados…) — pesquisa + reflexão em [`IDEIAS.md`](./IDEIAS.md).
-- 💡 **Backlog v2 — era da IA** (legendas ao vivo + tradução, auto-moderação cross-platform, relatório com retenção, controle pelo celular) — [`IDEIAS-v2.md`](./IDEIAS-v2.md).
-- 💡 **YouTube: achar a live sozinho** (configura o canal uma vez, sem colar o link do vídeo toda transmissão) — planejamento em [`YOUTUBE-AUTO.md`](./YOUTUBE-AUTO.md).
-- 💡 **Backlog v3 — fora da caixinha** (guardião anti-vazamento, uma comunidade só / placar entre plataformas, o Produtor copiloto, máquina do tempo com chat embutido) — [`IDEIAS-v3.md`](./IDEIAS-v3.md).
-- 💰 **Monetização** (regra: local = grátis pra sempre; pago = sempre server-sided) — estratégia + tiers em [`MONETIZACAO.md`](./MONETIZACAO.md).
-- 🔧 **Planejamentos técnicos** (cada um com TODO de implementação): [`anti-vazamento`](./FEATURE-ANTI-VAZAMENTO.md), [`máquina do tempo`](./FEATURE-MAQUINA-DO-TEMPO.md), [`recap automático`](./FEATURE-RECAP-AUTOMATICO.md), [`vertical ao vivo`](./FEATURE-VERTICAL-AO-VIVO.md), [`dead air`](./FEATURE-DEAD-AIR.md), [`delay de proteção`](./FEATURE-DELAY-PROTECAO.md), [`OCR por GPU`](./FEATURE-OCR-GPU.md).
-- 💡 **Backlog v4 — "o que está saindo está certo?"** (vigia técnico do sinal / tela preta-congelada, guardião de áudio: DMCA + LUFS + balance, título/categoria unificados, sala de espera, rerun) — [`IDEIAS-v4.md`](./IDEIAS-v4.md).
-- 🔎 **Pesquisa de dores reais** (burnout, descoberta, monetização, áudio, dropped frames, setup, moderação… com evidências/fontes) → sugestões de feature priorizadas — [`PESQUISA-DORES.md`](./PESQUISA-DORES.md).
-
----
-
-## Definition of Done — v1 (MVP publicável)
-
-Para chamar de "pronto pra soltar pro mundo", o mínimo é:
-
-- [ ] **P0** (1–4): 1–3 ✅ (transmite e reconecta) — falta só confirmar uma plataforma **RTMPS** (4).
-- [ ] **5, 8**: instalador gerado + licença escolhida (9 metadados ✅).
-- [ ] **7**: assinado (ou beta com aviso documentado).
-- [ ] **6**: auto-update funcionando (pra conseguir corrigir bugs pós-lançamento).
-- [x] **10**: log em arquivo ✅.
-- [x] **11**: auto-config do OBS ✅.
-
-Tudo o mais (12–) pode vir em updates — *graças ao item 6*. 😉
-
----
-
-## Próximo passo recomendado
-
-1. **Você:** rodar o **teste ao vivo** (item 1) — abrir a Corneta, colar uma chave real, BORA AO VIVO + OBS.
-2. **Eu, em paralelo:** gerar o **instalador** (item 5), adiantar **reconnect** (3) e **log** (10),
-   ligar o stub do **OBS auto-config** (11) e **melhorar a precisão do teste de upload** (12, multi-conexão).
-3. Conforme o teste, corrigir os flags do FFmpeg (2) e seguir a lista.
+Procedimentos e evidências: [RUNBOOK-BETA.md](./RUNBOOK-BETA.md).
+Critérios de distribuição: [GATES-DE-RELEASE.md](./GATES-DE-RELEASE.md).

@@ -21,7 +21,10 @@ param(
   [string]$ToolDirectory,
 
   # Permite validar o script sem sobrescrever os sidecars do workspace.
-  [string]$BinaryDirectory
+  [string]$BinaryDirectory,
+
+  # Espelho durável controlado pelo projeto; o hash fixado continua obrigatório.
+  [string]$FfmpegMirrorUrl = $env:CORNETA_FFMPEG_MIRROR_URL
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,12 +35,13 @@ $ErrorActionPreference = 'Stop'
 #   Get-FileHash <zip> -Algorithm SHA256
 #
 # FFmpeg n8.1.2 win64 GPL (build estático) — BtbN/FFmpeg-Builds, release
-# versionado "autobuild-2026-08-01-13-21" (NUNCA usar a tag rolante "latest").
-# Hash conferido em 2026-08-01 contra o digest SHA-256 publicado pelo GitHub
+# versionado "autobuild-2026-09-06-13-06" (NUNCA usar a tag rolante "latest").
+# O pin anterior foi removido pelo upstream (404). Hash conferido em 2026-09-06
+# contra o digest SHA-256 publicado pelo GitHub
 # nos metadados do asset oficial dessa release.
-$ffmpegVersion = 'n8.1.2 (BtbN autobuild-2026-08-01-13-21)'
-$ffmpegUrl     = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-01-13-21/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-gpl-8.1.zip'
-$ffmpegSha256  = 'DA6B04AEAEAB2A061BE5356C7A945F4D80C7CECC3F976F17DD83B23827D96330'
+$ffmpegVersion = 'n8.1.2-50-g1a748fe2cd (BtbN autobuild-2026-09-06-13-06)'
+$ffmpegUrl     = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-06-13-06/ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-8.1.zip'
+$ffmpegSha256  = 'E254995D48E6E9E88F5A05EB886A75E9AC33D7C6BB2E8A301E2EB65848A2D489'
 
 # MediaMTX v1.19.3 windows_amd64 — bluenviron/mediamtx.
 # Hash conferido em 2026-08-01 contra o checksums.sha256 publicado no release:
@@ -57,8 +61,13 @@ $binDir = if ($BinaryDirectory) {
   Join-Path $PSScriptRoot '..\src-tauri\binaries'
 }
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-$tmp = Join-Path $env:TEMP "corneta-bins"
+$cacheDir = Join-Path $env:TEMP 'corneta-bins-cache'
+New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
+# Diretório exclusivo: não apaga nem reutiliza uma extração de outro build.
+$tmp = Join-Path $env:TEMP ("corneta-bins-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+$noticeDir = Join-Path $binDir 'third-party'
+New-Item -ItemType Directory -Force -Path $noticeDir | Out-Null
 
 # Descobre o target-triple (default: Windows MSVC x64)
 $triple = 'x86_64-pc-windows-msvc'
@@ -68,7 +77,7 @@ try {
 } catch { Write-Host "rustc não encontrado; usando $triple" }
 Write-Host "Target triple: $triple"
 if ($triple -notmatch '^x86_64-pc-windows') {
-  Write-Warning "Os binários fixados neste script são win64; triple detectado: $triple."
+  throw "Os binários fixados são Windows x64; target incompatível: $triple."
 }
 
 # Baixa $Url em $OutFile e confere o SHA-256. Se divergir, apaga o arquivo e
@@ -80,20 +89,26 @@ function Get-VerifiedFile {
     [string]$ExpectedSha256,
     [string]$Label
   )
-  Invoke-WebRequest -Uri $Url -OutFile $OutFile
+  if (Test-Path -LiteralPath $OutFile) {
+    if ((Get-FileHash -LiteralPath $OutFile -Algorithm SHA256).Hash -eq $ExpectedSha256) {
+      Write-Host "  cache SHA-256 do $Label conferido."
+      return
+    }
+  }
+  Invoke-WebRequest -Uri $Url -OutFile $OutFile -TimeoutSec 180
   $actual = (Get-FileHash -Path $OutFile -Algorithm SHA256).Hash
   if ($actual -ne $ExpectedSha256) {
-    Remove-Item $OutFile -Force
     throw ("Hash SHA-256 do $Label NÃO confere!`n" +
            "  esperado: $ExpectedSha256`n" +
            "  obtido:   $actual`n" +
-           "Download descartado. Pode ser corrupção de rede ou release adulterado — " +
+           "Download NÃO será usado. Pode ser corrupção de rede ou release adulterado — " +
            "confira URL/hash no topo deste script antes de tentar de novo.")
   }
   Write-Host "  hash SHA-256 do $Label conferido."
 }
 
 # ---------------- FFmpeg ----------------
+try {
 $ffmpegOut = Join-Path $binDir "ffmpeg-$triple.exe"
 $verifiedFfprobe = $null
 $sys = if ($AllowSystemFfmpeg) { Get-Command ffmpeg -ErrorAction SilentlyContinue } else { $null }
@@ -104,18 +119,32 @@ if ($sys) {
 } else {
   if ($AllowSystemFfmpeg) { Write-Host "ffmpeg não encontrado no PATH; baixando a versão fixada." }
   Write-Host "Baixando FFmpeg $ffmpegVersion..."
-  $zip = Join-Path $tmp 'ffmpeg.zip'
-  Get-VerifiedFile -Url $ffmpegUrl -OutFile $zip -ExpectedSha256 $ffmpegSha256 -Label 'FFmpeg'
+  $zip = Join-Path $cacheDir "$ffmpegSha256.zip"
+  $downloadUrl = $ffmpegUrl
+  if ($FfmpegMirrorUrl) {
+    $mirror = [uri]$FfmpegMirrorUrl
+    if ($mirror.Scheme -ne 'https' -or $mirror.UserInfo -or $mirror.Query -or $mirror.Fragment) {
+      throw 'Espelho FFmpeg deve ser HTTPS, sem credenciais, query ou fragmento.'
+    }
+    $downloadUrl = $mirror.AbsoluteUri
+  }
+  Get-VerifiedFile -Url $downloadUrl -OutFile $zip -ExpectedSha256 $ffmpegSha256 -Label 'FFmpeg'
   $ffDir = Join-Path $tmp 'ffmpeg'
-  if (Test-Path $ffDir) { Remove-Item $ffDir -Recurse -Force }
   Expand-Archive $zip -DestinationPath $ffDir -Force
-  $exe = Get-ChildItem $ffDir -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1
-  $ffprobe = Get-ChildItem $ffDir -Recurse -Filter 'ffprobe.exe' | Select-Object -First 1
-  if (-not $exe -or -not $ffprobe) {
+  $exe = @(Get-ChildItem $ffDir -Recurse -File -Filter 'ffmpeg.exe')
+  $ffprobe = @(Get-ChildItem $ffDir -Recurse -File -Filter 'ffprobe.exe')
+  if ($exe.Count -ne 1 -or $ffprobe.Count -ne 1) {
     throw 'O arquivo FFmpeg verificado não contém exatamente as ferramentas esperadas.'
   }
   Copy-Item $exe.FullName $ffmpegOut -Force
   $verifiedFfprobe = $ffprobe.FullName
+  $license = @(Get-ChildItem $ffDir -Recurse -File -Filter 'LICENSE.txt')
+  if ($license.Count -ne 1) { throw 'Licença do FFmpeg ausente ou ambígua.' }
+  Copy-Item -LiteralPath $license[0].FullName -Destination (Join-Path $noticeDir 'FFmpeg-LICENSE.txt') -Force
+  (& $ffmpegOut -version 2>&1) | Out-File -LiteralPath (Join-Path $noticeDir 'FFmpeg-version.txt') -Encoding utf8
+  if ($LASTEXITCODE -ne 0) { throw 'FFmpeg verificado não executou.' }
+  (& $ffmpegOut -buildconf 2>&1) | Out-File -LiteralPath (Join-Path $noticeDir 'FFmpeg-buildconf.txt') -Encoding utf8
+  if ($LASTEXITCODE -ne 0) { throw 'Não foi possível obter a configuração do FFmpeg.' }
 }
 Write-Host "  -> $ffmpegOut"
 
@@ -130,14 +159,34 @@ if ($ToolDirectory) {
 # ---------------- MediaMTX ----------------
 $mtxOut = Join-Path $binDir "mediamtx-$triple.exe"
 Write-Host "Baixando MediaMTX $mtxVersion..."
-$zip = Join-Path $tmp 'mediamtx.zip'
+$zip = Join-Path $cacheDir "$mtxSha256.zip"
 Get-VerifiedFile -Url $mtxUrl -OutFile $zip -ExpectedSha256 $mtxSha256 -Label 'MediaMTX'
 $mtxDir = Join-Path $tmp 'mtx'
-if (Test-Path $mtxDir) { Remove-Item $mtxDir -Recurse -Force }
 Expand-Archive $zip -DestinationPath $mtxDir -Force
-$exe = Get-ChildItem $mtxDir -Recurse -Filter 'mediamtx.exe' | Select-Object -First 1
+$exe = @(Get-ChildItem $mtxDir -Recurse -File -Filter 'mediamtx.exe')
+if ($exe.Count -ne 1) { throw 'MediaMTX ausente ou ambíguo no arquivo verificado.' }
 Copy-Item $exe.FullName $mtxOut -Force
+$license = @(Get-ChildItem $mtxDir -Recurse -File -Filter 'LICENSE')
+if ($license.Count -ne 1) { throw 'Licença do MediaMTX ausente ou ambígua.' }
+Copy-Item -LiteralPath $license[0].FullName -Destination (Join-Path $noticeDir 'MediaMTX-LICENSE.txt') -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../THIRD_PARTY_NOTICES.md') -Destination (Join-Path $noticeDir 'THIRD_PARTY_NOTICES.md') -Force
+@{
+  ffmpeg = @{ version = $ffmpegVersion; upstreamUrl = $ffmpegUrl; archiveSha256 = $ffmpegSha256; binarySha256 = (Get-FileHash -LiteralPath $ffmpegOut).Hash; verified = -not [bool]$sys }
+  mediamtx = @{ version = $mtxVersion; upstreamUrl = $mtxUrl; archiveSha256 = $mtxSha256; binarySha256 = (Get-FileHash -LiteralPath $mtxOut).Hash }
+} | ConvertTo-Json -Depth 4 | Out-File -LiteralPath (Join-Path $noticeDir 'sidecars.json') -Encoding utf8
 Write-Host "  -> $mtxOut"
 
 Write-Host "`nPronto. Os sidecars verificados estão disponíveis para o Tauri."
 Get-ChildItem $binDir | Select-Object Name, Length | Format-Table -AutoSize
+} finally {
+  # Apenas nossa extração exclusiva; nunca apagar uma pasta fornecida pelo usuário.
+  $resolvedTemp = [System.IO.Path]::GetFullPath($env:TEMP).TrimEnd('\', '/')
+  $resolvedExtraction = [System.IO.Path]::GetFullPath($tmp)
+  if ([System.IO.Path]::GetDirectoryName($resolvedExtraction) -ne $resolvedTemp -or
+      [System.IO.Path]::GetFileName($resolvedExtraction) -notmatch '^corneta-bins-[a-f0-9]{32}$') {
+    throw 'Limpeza recusada: diretório temporário fora do escopo esperado.'
+  }
+  if (Test-Path -LiteralPath $resolvedExtraction) {
+    Remove-Item -LiteralPath $resolvedExtraction -Recurse -Force
+  }
+}

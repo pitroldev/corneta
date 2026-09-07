@@ -5,6 +5,7 @@ node_modules/
 # Frontend build
 dist/
 dist-ssr/
+.artifacts/
 *.local
 
 # Tauri / Rust

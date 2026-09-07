@@ -97,6 +97,10 @@ windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "St
 # interfaces COM de versões distintas de windows-core. Atualizar junto do Wry.
 webview2-com = "=0.38.2"
 
+[dev-dependencies]
+# Mesma implementação criptográfica do updater, apenas para verificar a release.
+minisign-verify = "=0.2.5"
+
 [profile.release]
 # `unwind`, e NÃO `abort`. Com `abort`, um pânico em QUALQUER thread matava o processo
 # inteiro na hora — o parser do chat derrubava a transmissão ao vivo, que é a inversão

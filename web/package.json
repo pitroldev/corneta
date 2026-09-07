@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev --port 7390",
     "build": "next build",
+    "release:check": "tsx scripts/check-release-config.ts",
+    "build:release": "pnpm release:check && pnpm build",
     "start": "next start",
     "content:check": "tsx scripts/check-editorial-content.ts",
     "content:maintenance": "tsx scripts/check-editorial-maintenance.ts",

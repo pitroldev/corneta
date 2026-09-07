@@ -62,6 +62,7 @@ export const API_ERROR_CODES = [
   "PROVIDER_REJECTED_REQUEST",
   "PROVIDER_UNAVAILABLE",
   "RATE_LIMITED",
+  "RATE_LIMIT_UNAVAILABLE",
   "UNEXPECTED_ERROR",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

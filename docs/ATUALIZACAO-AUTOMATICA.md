@@ -246,7 +246,9 @@ atualizam no próximo `check()`.
   (faixa no topo + botão "Procurar atualizações" na tela Sobre).
 - `.github/workflows/release.yml`: valida tag/deploy/política, baixa sidecars com SHA-256, separa
   source maps dos segredos de assinatura, builda e assina uma única vez, gera o `latest.json`,
-  extrai/escaneia o mesmo NSIS e só então publica os três artefatos como **rascunho**.
+  verifica a assinatura com a chave pública, extrai/escaneia o mesmo NSIS e só então envia cinco
+  artefatos como **rascunho**: instalador, assinatura, manifesto, checksums e pacote de terceiros.
+  O pacote exige fontes correspondentes revisadas; ver `RUNBOOK-BETA.md`.
 
 **A regra de produto que moldou o código:** instalar reinicia o app, e o processo é dono do
 MediaMTX e de um FFmpeg por destino. Reiniciar no ar **derruba a transmissão**. Por isso o botão

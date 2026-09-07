@@ -37,7 +37,20 @@ function tokenDigest(value: string | undefined) {
 }
 
 export function readTelemetryDeploymentMetadata(
-  env: Readonly<Record<string, string | undefined>> = process.env,
+  // Literal property access is required for Next to inline the same values that
+  // the browser received at build time. Dynamic env[name] reports runtime state.
+  env: Readonly<Record<string, string | undefined>> = {
+    NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN:
+      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA,
+    NEXT_PUBLIC_TELEMETRY_DISABLED: process.env.NEXT_PUBLIC_TELEMETRY_DISABLED,
+    POSTHOG_PROJECT_TOKEN: process.env.POSTHOG_PROJECT_TOKEN,
+    POSTHOG_HOST: process.env.POSTHOG_HOST,
+    BUILD_SHA: process.env.BUILD_SHA,
+    VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
+    TELEMETRY_DISABLED: process.env.TELEMETRY_DISABLED,
+  },
 ): TelemetryDeploymentMetadata {
   const publicToken = first(env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN);
   const serverToken = first(env.POSTHOG_PROJECT_TOKEN, publicToken);

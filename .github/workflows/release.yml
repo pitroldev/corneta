@@ -123,7 +123,13 @@ jobs:
       # copiar pra src-tauri/binaries. Sem isso o bundle sai sem ffmpeg/mediamtx.
       - name: Baixar sidecars (ffmpeg + mediamtx)
         shell: pwsh
+        env:
+          CORNETA_FFMPEG_MIRROR_URL: ${{ vars.CORNETA_FFMPEG_MIRROR_URL }}
         run: pwsh -File scripts/fetch-binaries.ps1
+
+      - name: Preparar fontes correspondentes, avisos e inventário de licenças
+        shell: pwsh
+        run: pnpm compliance:prepare
 
       - name: Gate de privacidade e configuração da telemetria
         shell: pwsh
@@ -231,6 +237,13 @@ jobs:
         shell: pwsh
         run: pnpm updater:manifest
 
+      - name: Verificar política de assinatura Windows
+        shell: pwsh
+        env:
+          REQUIRE_WINDOWS_CODE_SIGNING: ${{ vars.REQUIRE_WINDOWS_CODE_SIGNING || '0' }}
+          INSTALLER_PATH: ${{ steps.updater.outputs.installer_path }}
+        run: pwsh -NoProfile -File scripts/check-windows-signature.ps1 -InstallerPath $env:INSTALLER_PATH
+
       # Este gate inspeciona o dist, o binário, a árvore bundle e o conteúdo que o 7-Zip consegue
       # extrair do MESMO NSIS assinado acima. Nada foi enviado ao GitHub até este ponto.
       - name: Verificar artefatos antes de qualquer upload de release
@@ -244,14 +257,18 @@ jobs:
           INSTALLER_PATH: ${{ steps.updater.outputs.installer_path }}
           SIGNATURE_PATH: ${{ steps.updater.outputs.signature_path }}
           MANIFEST_PATH: ${{ steps.updater.outputs.manifest_path }}
+          CHECKSUMS_PATH: ${{ steps.updater.outputs.checksums_path }}
+          COMPLIANCE_PATH: ${{ steps.updater.outputs.compliance_path }}
         run: |
           $expectedAssets = @(
             [System.IO.Path]::GetFileName($env:INSTALLER_PATH),
             [System.IO.Path]::GetFileName($env:SIGNATURE_PATH),
-            [System.IO.Path]::GetFileName($env:MANIFEST_PATH)
+            [System.IO.Path]::GetFileName($env:MANIFEST_PATH),
+            [System.IO.Path]::GetFileName($env:CHECKSUMS_PATH),
+            [System.IO.Path]::GetFileName($env:COMPLIANCE_PATH)
           )
-          if (($expectedAssets | Select-Object -Unique).Count -ne 3) {
-            throw 'Os três artefatos aprovados precisam ter nomes distintos.'
+          if (($expectedAssets | Select-Object -Unique).Count -ne 5) {
+            throw 'Os cinco artefatos aprovados precisam ter nomes distintos.'
           }
 
           $releaseJson = gh release view $env:RELEASE_TAG --json isDraft,assets 2>$null
@@ -260,7 +277,7 @@ jobs:
               --verify-tag `
               --draft `
               --title "Corneta $env:RELEASE_TAG" `
-              --notes 'Baixe o .exe abaixo. Quem já tem a Corneta instalada recebe o aviso de atualização dentro do app.'
+              --notes 'Baixe o .exe e confira SHA256SUMS.txt. Este lançamento pode exibir um aviso do SmartScreen: confirme a origem antes de executar. corneta-third-party.zip contém avisos, fontes correspondentes e inventário de licenças. Quem já usa a Corneta recebe o aviso de atualização no app.'
             if ($LASTEXITCODE -ne 0) {
               throw 'Não foi possível criar o draft da release; nenhum asset será enviado.'
             }
@@ -279,7 +296,7 @@ jobs:
                 Where-Object { $_ -cnotin $expectedAssets }
             )
             if ($unexpectedAssets.Count -gt 0) {
-              throw 'O draft existente contém assets fora dos três nomes aprovados; revise/remova-os manualmente antes de repetir.'
+              throw 'O draft existente contém assets fora dos cinco nomes aprovados; revise/remova-os manualmente antes de repetir.'
             }
           }
 
@@ -287,4 +304,7 @@ jobs:
             $env:INSTALLER_PATH `
             $env:SIGNATURE_PATH `
             $env:MANIFEST_PATH `
+            $env:CHECKSUMS_PATH `
+            $env:COMPLIANCE_PATH `
             --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Falha no upload dos artefatos aprovados.' }

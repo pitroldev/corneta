@@ -1,6 +1,10 @@
 import "server-only";
 
 import { after } from "next/server";
+import { ApiError } from "./api-error";
+import { readBoundedText } from "./bounded-body";
+export { ApiError } from "./api-error";
+export { clientAddress } from "./rate-limit-core";
 import type { ApiErrorCode } from "../telemetry-schema";
 import { reportApiFailure } from "./posthog";
 import {
@@ -13,17 +17,6 @@ export const NO_STORE_HEADERS = {
   Pragma: "no-cache",
   "X-Content-Type-Options": "nosniff",
 } as const;
-
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly code: ApiErrorCode,
-    message: string,
-    public readonly retryable = false,
-  ) {
-    super(message);
-  }
-}
 
 export function json(data: unknown, init: ResponseInit = {}) {
   const headers = new Headers(init.headers);
@@ -92,7 +85,12 @@ export function errorResponse(error: unknown, context: ApiTelemetryContext) {
         },
       },
       context,
-      { status: error.status },
+      {
+        status: error.status,
+        ...(error.retryAfterSeconds !== undefined
+          ? { headers: { "Retry-After": String(error.retryAfterSeconds) } }
+          : {}),
+      },
     );
   }
 
@@ -123,14 +121,22 @@ export async function readJson<T>(request: Request, maxBytes = 8_192) {
     throw new ApiError(413, "BODY_TOO_LARGE", "Requisição muito grande.");
   }
 
-  const raw = await request.text();
-  if (Buffer.byteLength(raw, "utf8") > maxBytes) {
-    throw new ApiError(413, "BODY_TOO_LARGE", "Requisição muito grande.");
-  }
-
   try {
-    return JSON.parse(raw) as T;
-  } catch {
+    const raw = await readBoundedText(request.body, maxBytes);
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("INVALID_JSON");
+    return value as T;
+  } catch (error) {
+    if (error instanceof Error && error.message === "BODY_TOO_LARGE")
+      throw new ApiError(413, "BODY_TOO_LARGE", "Requisição muito grande.");
+    if (error instanceof Error && error.message === "BODY_TIMEOUT")
+      throw new ApiError(
+        408,
+        "INVALID_REQUEST",
+        "A requisição demorou demais. Tente novamente.",
+        true,
+      );
     throw new ApiError(400, "INVALID_JSON", "JSON inválido.");
   }
 }
@@ -172,10 +178,13 @@ export async function providerForm(
     );
   }
 
-  const raw = await response.text();
   let body: Record<string, unknown> = {};
   try {
-    body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const raw = await readBoundedText(response.body, 32_768);
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("INVALID_PROVIDER_RESPONSE");
+    body = value as Record<string, unknown>;
   } catch {
     throw new ApiError(
       502,
@@ -185,12 +194,4 @@ export async function providerForm(
     );
   }
   return { response, body };
-}
-
-export function clientAddress(request: Request) {
-  return (
-    request.headers.get("x-real-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown"
-  );
 }

@@ -8,6 +8,7 @@ import {
   requiredString,
 } from "@/lib/server/http";
 import { getOAuthConfig } from "@/lib/server/oauth-config";
+import { oauthTokens } from "@/lib/server/oauth-tokens";
 import { rateLimit } from "@/lib/server/rate-limit";
 import { createApiTelemetryContext } from "@/lib/server/telemetry-reporter";
 
@@ -19,7 +20,7 @@ const PKCE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
 export async function POST(request: Request) {
   const telemetry = createApiTelemetryContext(request, "kick_exchange", "kick");
   try {
-    rateLimit(`kick:exchange:${clientAddress(request)}`, 20, 60_000);
+    await rateLimit(`kick:exchange:${clientAddress(request)}`, 20, 60_000);
     const config = getOAuthConfig();
     if (!config.kick.clientId || !config.kick.clientSecret) {
       throw new ApiError(
@@ -65,22 +66,7 @@ export async function POST(request: Request) {
         "A Kick recusou a conclusão do login.",
       );
     }
-    const accessToken = String(provider.access_token ?? "");
-    if (!accessToken) {
-      throw new ApiError(
-        502,
-        "INVALID_PROVIDER_RESPONSE",
-        "A Kick não retornou o token esperado.",
-      );
-    }
-    return apiJson(
-      {
-        accessToken,
-        refreshToken: provider.refresh_token ?? null,
-        expiresIn: Number(provider.expires_in) || null,
-      },
-      telemetry,
-    );
+    return apiJson(oauthTokens(provider), telemetry);
   } catch (error) {
     return errorResponse(error, telemetry);
   }

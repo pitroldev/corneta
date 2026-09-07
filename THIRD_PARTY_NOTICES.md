@@ -10,6 +10,11 @@ BtbN/FFmpeg-Builds. Ao distribuir o instalador que contém esse binário, publiq
 avisos da GPL, o código-fonte correspondente e as informações de configuração/build exigidas
 pela licença. Não publique o instalador antes de concluir esse pacote de conformidade.
 
+O pipeline preserva licenças e `-buildconf` no instalador. `pnpm compliance:prepare` gera
+`corneta-third-party.zip` com fontes verificadas por SHA-256 e inventários Rust/JS. Antes disso,
+preencha e revise `compliance/ffmpeg-sources.json` para o build exato; o manifesto começa
+deliberadamente não aprovado. A automação não substitui a revisão da correspondência das fontes.
+
 - Projeto: https://ffmpeg.org/
 - Build usado e hash: documentados em `scripts/fetch-binaries.ps1`
 - Licença: https://ffmpeg.org/legal.html

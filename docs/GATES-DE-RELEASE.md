@@ -13,6 +13,10 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
   exigem justificativa no `deny.toml`; vulnerabilidades não podem ser ignoradas.
 - Testes de integração de mídia ignorados executados com FFmpeg/FFprobe real.
 - Sidecars baixados pelo script versionado e com SHA-256 conferido.
+- O job Rust prepara seus próprios sidecars; espelho opcional via `CORNETA_FFMPEG_MIRROR_URL`
+  mantém o mesmo hash fixado. O upstream remove builds antigos.
+- Next de produção exige `web:release:check` (automático na Vercel production): configuração
+  OAuth/Redis/proxy, download HTTPS e identidade/telemetria coerentes.
 - O step shell de Vite envia os source maps ao projeto correto e os apaga; é o único que recebe
   `POSTHOG_API_KEY` e `POSTHOG_PROJECT_ID`. Gate, build Rust, scanner e upload não recebem a
   Personal API Key. Antes do build, um GET autenticado e sem redirects confirma no PostHog US que
@@ -24,13 +28,17 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
 - Um único `pnpm tauri build` com Rust 1.97.1 produz o executável, o NSIS e a assinatura do updater.
   A tag precisa ser exatamente `v` + a versão do Tauri, e `create-updater-manifest.mjs` gera o
   `latest.json` v2 usando o conteúdo do `.exe.sig` e a URL desse mesmo instalador.
+- O exemplo Rust `verify-updater` verifica criptograficamente o instalador com a chave pública
+  do app em blocos de 64 KiB. Assinatura inválida bloqueia a geração do manifesto.
+- `compliance:prepare` exige fontes correspondentes revisadas e hashes; gera pacote com avisos,
+  fontes e inventários. `SHA256SUMS.txt` acompanha os quatro demais arquivos da distribuição.
 - Antes de qualquer upload de artefato da release, `pnpm artifacts:check` exige 7-Zip, lista e extrai o NSIS e confirma
   que `.map`, `phx_`, chaves minisign/PEM e outros segredos não aparecem no `dist`, binário,
   árvore de bundle ou conteúdo extraído. O scan cobre o conteúdo que o 7-Zip consegue
   interpretar; não é uma prova sobre bytes comprimidos em um formato opaco que ele não abra.
 - Somente após esse scan o workflow usa `gh release create/upload` para criar ou atualizar um
   draft. Um draft existente é recusado se contiver qualquer asset fora dos basenames exatos do
-  `.exe`, `.exe.sig` e `latest.json` aprovados; nenhuma action de release recebe os segredos de
+  `.exe`, `.exe.sig`, `latest.json`, `SHA256SUMS.txt` e `corneta-third-party.zip` aprovados; nenhuma action de release recebe os segredos de
   assinatura/telemetria.
 - O gate `telemetry:release:check` confirma região US e o mesmo project token público no
   desktop, site e Setup API, faz smoke da metadata publicada sem expor a Personal API Key e exige
@@ -41,10 +49,12 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
 
 ## Manuais e externos
 
-- Certificado Authenticode válido disponível e instalador NSIS assinado; verificar com
-  `Get-AuthenticodeSignature` em uma máquina limpa.
-- Chave pública e endpoint do updater configurados; testar atualização N-1 → N e rollback usando
-  o `latest.json` do draft antes de publicar.
+- Authenticode continua adiado conforme decisão de orçamento em `ASSINATURA.md`. O gate aceita
+  `NotSigned` com aviso ou `Valid`, nunca assinatura inválida. `REQUIRE_WINDOWS_CODE_SIGNING=1`
+  exige assinatura quando adotada. Conferir o aviso em Windows limpo; assinatura não garante
+  ausência de SmartScreen.
+- Testar N-1 → N em endpoint HTTPS de teste e recuperação com snapshot/backup compatível.
+  Draft privado não é endpoint público; não presumir downgrade automático. Ver `RUNBOOK-BETA.md`.
 - Pacote de conformidade GPL do FFmpeg anexado à distribuição conforme
   `THIRD_PARTY_NOTICES.md`.
 - Matriz real aprovada: Windows 10 e 11; NVIDIA, Intel, AMD e software; OBS autenticado e sem

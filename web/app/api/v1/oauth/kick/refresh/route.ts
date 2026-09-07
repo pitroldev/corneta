@@ -8,6 +8,7 @@ import {
   requiredString,
 } from "@/lib/server/http";
 import { getOAuthConfig } from "@/lib/server/oauth-config";
+import { oauthTokens } from "@/lib/server/oauth-tokens";
 import { rateLimit } from "@/lib/server/rate-limit";
 import { createApiTelemetryContext } from "@/lib/server/telemetry-reporter";
 
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const telemetry = createApiTelemetryContext(request, "kick_refresh", "kick");
   try {
-    rateLimit(`kick:refresh:${clientAddress(request)}`, 60, 60_000);
+    await rateLimit(`kick:refresh:${clientAddress(request)}`, 60, 60_000);
     const config = getOAuthConfig();
     if (!config.kick.clientId || !config.kick.clientSecret) {
       throw new ApiError(
@@ -49,22 +50,7 @@ export async function POST(request: Request) {
         !invalid,
       );
     }
-    const accessToken = String(provider.access_token ?? "");
-    if (!accessToken) {
-      throw new ApiError(
-        502,
-        "INVALID_PROVIDER_RESPONSE",
-        "A Kick não retornou o token esperado.",
-      );
-    }
-    return apiJson(
-      {
-        accessToken,
-        refreshToken: provider.refresh_token ?? null,
-        expiresIn: Number(provider.expires_in) || null,
-      },
-      telemetry,
-    );
+    return apiJson(oauthTokens(provider), telemetry);
   } catch (error) {
     return errorResponse(error, telemetry);
   }

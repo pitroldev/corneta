@@ -54,6 +54,9 @@
       "binaries/ffmpeg",
       "binaries/mediamtx"
     ],
+    "resources": {
+      "binaries/third-party/": "third-party/"
+    },
     "windows": {
       "nsis": {
         "languages": [
