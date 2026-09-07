@@ -1,0 +1,54 @@
+name: Bug
+description: Relate um problema reproduzível com dados sanitizados.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Não publique tokens, stream keys, chat completo, cofre ou logs brutos. Vulnerabilidades devem seguir [SECURITY.md](https://github.com/pitroldev/corneta/blob/main/SECURITY.md). Português e inglês são aceitos."
+  - type: input
+    id: version
+    attributes:
+      label: Versão ou commit da Corneta
+      placeholder: "0.7.0 / commit; oficial, Contributor ou demo"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Ambiente
+      description: Windows/build, OBS, GPU/driver se relevante. Não inclua nome do computador ou caminhos pessoais.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Modo afetado
+      options:
+        - Demo / sem transmissão
+        - Cópia (passthrough)
+        - Por plataforma (encode)
+        - Híbrido
+        - Não sei / não se aplica
+  - type: input
+    id: destination
+    attributes:
+      label: Plataformas e integração
+      description: "Ex.: Twitch/OAuth, personalizado/URL e chave (não cole URL ou chave), apenas relatórios."
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Passos mínimos para reproduzir
+      description: Informe o identificador do cenário fictício, se utilizou um.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado e observado
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidências opcionais e sanitizadas
+      description: Trecho mínimo ou captura sem credenciais, nomes de usuários ou conteúdo privado. Não anexe a live inteira.

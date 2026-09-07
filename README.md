@@ -6,7 +6,7 @@ Corneta é um aplicativo desktop feito com **Tauri 2, Rust, React e Tailwind CSS
 
 **Status: experimental, em preparação para beta público.** O código e a demonstração podem ser estudados e testados; isso não representa uma certificação de estabilidade para lives de produção. Windows x64 é o alvo atual. macOS, Linux e Windows ARM não têm distribuição validada pelo projeto.
 
-[Testar a demonstração](#testar-sem-rust-obs-ou-contas) · [Contribuir](CONTRIBUTING.md) · [Relatar uma vulnerabilidade](SECURITY.md) · [Documentação](docs/README.md)
+[Testar a demonstração](#testar-sem-rust-obs-ou-contas) · [Contribuir](CONTRIBUTING.md) · [Suporte](SUPPORT.md) · [Relatar uma vulnerabilidade](SECURITY.md) · [Documentação](docs/README.md) · [Changelog](CHANGELOG.md)
 
 ![Tela de preparação da live no modo de demonstração da Corneta](web/public/images/editorial/getting-started/corneta-first-live-checklist.webp)
 

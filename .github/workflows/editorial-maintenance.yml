@@ -7,11 +7,20 @@ on:
 
 permissions:
   contents: read
-  issues: write
+
+concurrency:
+  group: editorial-maintenance-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   review:
+    # Operational issue creation is opt-in in forks, independent of code checks.
+    if: github.repository == 'pitroldev/corneta' || vars.ENABLE_EDITORIAL_AUTOMATION == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,6 +47,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Stop'
           $report = Get-Content -Raw editorial-maintenance.md
           $report | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
@@ -66,13 +76,15 @@ jobs:
           ) -join "`n"
           $checklist | Set-Content -Path editorial-maintenance-issue.md -Encoding utf8
 
-          $openIssues = @(
-            gh issue list `
-              --state open `
-              --label editorial-maintenance `
-              --limit 1 `
-              --json number | ConvertFrom-Json
-          )
+          $openIssuesJson = gh issue list `
+            --state open `
+            --label editorial-maintenance `
+            --limit 1 `
+            --json number
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($openIssuesJson)) {
+            throw 'Não foi possível consultar as tarefas editoriais abertas.'
+          }
+          $openIssues = @($openIssuesJson | ConvertFrom-Json -ErrorAction Stop)
           if ($openIssues.Count -gt 0) {
             gh issue edit $openIssues[0].number --body-file editorial-maintenance-issue.md
             if ($LASTEXITCODE -ne 0) {
@@ -81,13 +93,15 @@ jobs:
             exit 0
           }
 
-          $closedIssues = @(
-            gh issue list `
-              --state closed `
-              --label editorial-maintenance `
-              --limit 1 `
-              --json number,closedAt | ConvertFrom-Json
-          )
+          $closedIssuesJson = gh issue list `
+            --state closed `
+            --label editorial-maintenance `
+            --limit 1 `
+            --json number,closedAt
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($closedIssuesJson)) {
+            throw 'Não foi possível consultar as tarefas editoriais encerradas.'
+          }
+          $closedIssues = @($closedIssuesJson | ConvertFrom-Json -ErrorAction Stop)
           if (
             $closedIssues.Count -gt 0 -and
             $closedIssues[0].closedAt -and

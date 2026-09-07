@@ -167,6 +167,7 @@ function ProfileBar() {
             return (
               <input
                 key={p.id}
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- Renomear substitui o botão acionado por este campo, conservando o fluxo de teclado.
                 autoFocus
                 value={active.name}
                 onChange={(e) => renameProfile(active.id, e.target.value)}
@@ -808,7 +809,9 @@ function KeyField({
         <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
         <Input
           type={reveal ? "text" : "password"}
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- Somente após editar ou adicionar um destino, nunca na carga inicial.
           autoFocus={editing || autoFocusKey}
+          aria-label={t("platforms.key.placeholder")}
           className="pl-9 pr-9"
           placeholder={t("platforms.key.placeholder")}
           value={value}

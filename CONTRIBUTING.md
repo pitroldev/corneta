@@ -65,3 +65,5 @@ Explique o problema, a solução escolhida e o que ficou fora do escopo. Liste o
 Você deve ter direito de contribuir com código e materiais enviados, mantendo autoria e avisos de terceiros. O código próprio do projeto segue a [MIT](LICENSE); não introduza conteúdo de licença incompatível ou dados privados. Ferramentas de assistência não dispensam revisão, testes e verificação de procedência.
 
 Seja respeitoso, discuta decisões técnicas com evidências e evite ataques pessoais. O mantenedor pode pedir ajustes ou recusar uma mudança por escopo, segurança, manutenção ou prioridade do produto.
+
+Consulte também [conduta](CODE_OF_CONDUCT.md), [suporte](SUPPORT.md), [arquitetura](docs/ARQUITETURA.md) e [performance](docs/PERFORMANCE.md). A indicação em CODEOWNERS corresponde ao mantenedor atual; não existe uma equipe fictícia nem aprovação automática.

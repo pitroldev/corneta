@@ -649,7 +649,8 @@ pub fn ffmpeg_args_for_encoder(
 }
 
 /// Gera um mediamtx.yml mínimo: só o servidor RTMP de ingestão, na porta configurada.
-/// Os demais servidores (RTSP/HLS/WebRTC/SRT/API) ficam desligados.
+/// RTSP/HLS/WebRTC/SRT ficam desligados. A API de diagnóstico fica ativa somente
+/// em 127.0.0.1:9997 para consultar os paths e detectar o sinal recebido do OBS.
 pub fn mediamtx_config(config: &AppConfig) -> String {
     format!(
         concat!(

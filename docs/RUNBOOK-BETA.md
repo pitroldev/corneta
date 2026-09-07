@@ -60,7 +60,7 @@ controlado pelo projeto e configurar `CORNETA_FFMPEG_MIRROR_URL` nos workflows. 
 servir os mesmos bytes; o hash fixado continua obrigatório. Não espelhar apenas o binário sem
 atender também às obrigações de fontes/licenças.
 
-`compliance/ffmpeg-sources.json` começa com `reviewed: false` e `sources: []` deliberadamente.
+`compliance/ffmpeg-sources.json` mantém `reviewed: false` enquanto a correspondência não estiver concluída. Fontes já coletadas não constituem aprovação; veja [a evidência atual](CONFORMIDADE-FFMPEG.md).
 Preencher as fontes com entradas `{ "file": "nome.tar.xz", "url": "URL_HTTPS_VERSIONADA",
 "sha256": "SHA256_COMPLETO" }`. Incluir FFmpeg, bibliotecas correspondentes, patches e scripts
 necessários à reprodução. Conferir correspondência com `-buildconf` e a identidade fixada antes
@@ -99,14 +99,14 @@ Usar build release. Comparar a mesma cena/bitrate/destinos com OBS sozinho e OBS
 Medir a árvore Corneta + sidecars + WebView, separando memória privada de working set; observar
 GPU encode/decode/3D e VRAM. Não confundir memória compartilhada com consumo privado somável.
 
-| Cenário | Duração | Evidência |
-| --- | --- | --- |
-| App parado; depois chat ativo | 15 min cada | CPU, RAM e responsividade |
-| Live 1080p60 com múltiplos destinos | 4–8 h | Memória após aquecimento, deriva, reconexão, áudio/vídeo |
-| Jogo competindo por recursos | 30–60 min | Comparação com OBS sozinho; causas apresentadas como hipóteses |
-| Gravação on/off, chat intenso | 30 min cada | Disco, RAM, player, chat limitado, exportação |
-| Queda OBS/rede/destino custom | 3 ciclos cada | Recuperação, outros destinos vivos, ausência de órfãos |
-| Relatório grande | 10 aberturas | Feedback, largura dos gráficos, scroll, seek, marcação sem piscar |
+| Cenário                             | Duração       | Evidência                                                         |
+| ----------------------------------- | ------------- | ----------------------------------------------------------------- |
+| App parado; depois chat ativo       | 15 min cada   | CPU, RAM e responsividade                                         |
+| Live 1080p60 com múltiplos destinos | 4–8 h         | Memória após aquecimento, deriva, reconexão, áudio/vídeo          |
+| Jogo competindo por recursos        | 30–60 min     | Comparação com OBS sozinho; causas apresentadas como hipóteses    |
+| Gravação on/off, chat intenso       | 30 min cada   | Disco, RAM, player, chat limitado, exportação                     |
+| Queda OBS/rede/destino custom       | 3 ciclos cada | Recuperação, outros destinos vivos, ausência de órfãos            |
+| Relatório grande                    | 10 aberturas  | Feedback, largura dos gráficos, scroll, seek, marcação sem piscar |
 
 Metas iniciais para validar, não resultados já medidos: feedback de ações locais em até 100 ms,
 nenhuma espera sem indicação, memória estabilizada sem crescimento proporcional à duração/chat,
@@ -127,7 +127,7 @@ Não anexar `.env`, chats pessoais, logs crus, stream keys ou tokens.
   Redis retorna 503/Retry-After=5.
 - Suítes JS/TS, Rust, assinatura e testes reais de mídia/OCR passaram com os sidecars novos.
 - Total final: 457 testes JS/TS + 232 nativos + 4 do experimento offline + 2 de assinatura
-  + 3 integrações de mídia/OCR = 698 aprovações. Lint, TypeScript, formatação, builds e Clippy passaram.
+  - 3 integrações de mídia/OCR = 698 aprovações. Lint, TypeScript, formatação, builds e Clippy passaram.
 - Cargo audit/deny passaram após remover os pins retirados de circulação. Permanecem avisos
   informativos de manutenção de dependências transitivas e o aviso conhecido de soundness do
   GLib da árvore Linux, conforme política existente; isso não equivale a ausência de qualquer risco.

@@ -27,7 +27,9 @@ if (!KINDS.includes(kind) && !explicit) {
 
 // Versão atual = package.json (fonte da verdade).
 const pkgPath = join(root, "package.json");
-const cur = readFileSync(pkgPath, "utf8").match(/"version":\s*"(\d+)\.(\d+)\.(\d+)"/);
+const cur = readFileSync(pkgPath, "utf8").match(
+  /"version":\s*"(\d+)\.(\d+)\.(\d+)"/,
+);
 if (!cur) {
   console.error("Não achei a versão atual no package.json.");
   process.exit(1);
@@ -43,18 +45,35 @@ if (explicit) {
   to = explicit;
 } else {
   let [maj, min, pat] = [Number(cur[1]), Number(cur[2]), Number(cur[3])];
-  if (kind === "major") (maj++, (min = 0), (pat = 0));
-  else if (kind === "minor") (min++, (pat = 0));
-  else pat++;
+  if (kind === "major") {
+    maj++;
+    min = 0;
+    pat = 0;
+  } else if (kind === "minor") {
+    min++;
+    pat = 0;
+  } else pat++;
   to = `${maj}.${min}.${pat}`;
 }
 
 // Alvos: cada um com 1+ regex (substitui só a 1ª ocorrência de cada).
 const SEM = "\\d+\\.\\d+\\.\\d+";
 const targets = [
-  { file: "package.json", res: [new RegExp(`("version":\\s*")${SEM}(")`)], required: true },
-  { file: "src-tauri/tauri.conf.json", res: [new RegExp(`("version":\\s*")${SEM}(")`)], required: true },
-  { file: "src-tauri/Cargo.toml", res: [new RegExp(`^(version\\s*=\\s*")${SEM}(")`, "m")], required: true },
+  {
+    file: "package.json",
+    res: [new RegExp(`("version":\\s*")${SEM}(")`)],
+    required: true,
+  },
+  {
+    file: "src-tauri/tauri.conf.json",
+    res: [new RegExp(`("version":\\s*")${SEM}(")`)],
+    required: true,
+  },
+  {
+    file: "src-tauri/Cargo.toml",
+    res: [new RegExp(`^(version\\s*=\\s*")${SEM}(")`, "m")],
+    required: true,
+  },
   {
     file: "src-tauri/Cargo.lock",
     res: [

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Node release tooling intentionally uses dependency-free ESM.
-import { complianceErrors } from "./release-compliance.mjs";
+import {
+  complianceErrors,
+  compliancePackageFiles,
+} from "./release-compliance.mjs";
 
 const sha = "a".repeat(64);
 const sidecars = { ffmpeg: { verified: true, archiveSha256: sha } };
@@ -18,6 +21,22 @@ const manifest = {
 };
 
 describe("release source compliance gate", () => {
+  it("packages notices, source identity and provenance without granting approval", () => {
+    expect(compliancePackageFiles).toEqual(
+      expect.arrayContaining([
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
+        "compliance/ffmpeg-sources.json",
+        "compliance/ffmpeg-provenance.json",
+        "docs/CONFORMIDADE-FFMPEG.md",
+      ]),
+    );
+    expect(
+      new Set(
+        compliancePackageFiles.map((file: string) => file.split("/").at(-1)),
+      ).size,
+    ).toBe(compliancePackageFiles.length);
+  });
   it("accepts a reviewed manifest matching the verified FFmpeg archive", () =>
     expect(complianceErrors(manifest, sidecars)).toEqual([]));
   it("blocks an unreviewed or empty package", () =>

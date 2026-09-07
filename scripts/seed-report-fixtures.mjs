@@ -2,24 +2,59 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import {
+  assertNoFixtureLinks,
+  copyFixtureExclusive,
+  fixtureHash,
+  preflightFixtureOutputs,
+  validateFixtureManifest,
+} from "./report-fixture-safety.mjs";
 
-const APP_ID = "br.com.pitroldev.corneta";
+const APP_ID = "br.com.pitroldev.corneta.contributor";
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-const root = process.env.APPDATA
-  ? path.join(process.env.APPDATA, APP_ID)
-  : path.join(os.homedir(), ".local", "share", APP_ID);
+const { values: options } = parseArgs({
+  options: {
+    contributor: { type: "boolean" },
+    video: { type: "boolean" },
+    clean: { type: "boolean" },
+    restore: { type: "boolean" },
+    list: { type: "boolean" },
+    scenario: { type: "string" },
+    at: { type: "string" },
+  },
+});
+const workspace = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+const root = options.contributor
+  ? path.join(
+      process.env.APPDATA || path.join(os.homedir(), ".local", "share"),
+      APP_ID,
+    )
+  : path.join(workspace, ".artifacts", "report-fixtures");
+assertNoFixtureLinks(root);
 const sessionsDir = path.join(root, "sessions");
 const manifestPath = path.join(root, ".report-fixtures.json");
 const guidePath = path.join(root, "REPORT-FIXTURES.md");
+for (const target of [sessionsDir, manifestPath, guidePath])
+  assertNoFixtureLinks(target);
 const ffmpeg = path.resolve(
+  workspace,
   "src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe",
 );
 
-const args = new Set(process.argv.slice(2));
+const args = new Set(
+  Object.keys(options)
+    .filter((key) => options[key])
+    .map((key) => `--${key}`),
+);
 
 function removeGenerated(manifest) {
-  for (const file of manifest?.generatedFiles ?? []) {
+  for (const file of validateFixtureManifest(manifest, root)) {
     const resolved = path.resolve(file);
     if (
       resolved.startsWith(`${path.resolve(sessionsDir)}${path.sep}`) &&
@@ -30,31 +65,28 @@ function removeGenerated(manifest) {
   }
 }
 
-function copyPreservingTimes(source, destination) {
-  fs.copyFileSync(source, destination);
-  const stat = fs.statSync(source);
-  fs.utimesSync(destination, stat.atime, stat.mtime);
-}
-
 if (args.has("--clean") || args.has("--restore")) {
   if (!fs.existsSync(manifestPath)) {
     console.log("Nenhum pacote de relatórios fictícios registrado.");
     process.exit(0);
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  removeGenerated(manifest);
+  validateFixtureManifest(manifest, root);
+  const restoreEntries = [];
   if (args.has("--restore") && fs.existsSync(manifest.backupDir)) {
     for (const entry of fs.readdirSync(manifest.backupDir, {
       withFileTypes: true,
     })) {
+      const source = path.join(manifest.backupDir, entry.name);
       const destination = path.join(sessionsDir, entry.name);
-      if (entry.isFile() && !fs.existsSync(destination)) {
-        copyPreservingTimes(
-          path.join(manifest.backupDir, entry.name),
-          destination,
-        );
-      }
+      assertNoFixtureLinks(source);
+      assertNoFixtureLinks(destination);
+      if (entry.isFile()) restoreEntries.push({ source, destination });
     }
+  }
+  removeGenerated(manifest);
+  for (const { source, destination } of restoreEntries) {
+    if (!fs.existsSync(destination)) copyFixtureExclusive(source, destination);
   }
   fs.rmSync(manifestPath, { force: true });
   fs.rmSync(guidePath, { force: true });
@@ -64,24 +96,6 @@ if (args.has("--clean") || args.has("--restore")) {
       : `Fixtures removidos. O backup dos dados anteriores continua em ${manifest.backupDir}`,
   );
   process.exit(0);
-}
-
-fs.mkdirSync(sessionsDir, { recursive: true });
-if (fs.existsSync(manifestPath)) {
-  const previous = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  removeGenerated(previous);
-}
-
-const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-const backupDir = path.join(root, `sessions-backup-before-fixtures-${stamp}`);
-fs.mkdirSync(backupDir, { recursive: true });
-for (const entry of fs.readdirSync(sessionsDir, { withFileTypes: true })) {
-  if (entry.isFile()) {
-    copyPreservingTimes(
-      path.join(sessionsDir, entry.name),
-      path.join(backupDir, entry.name),
-    );
-  }
 }
 
 const platform = (platformId, name, bitrate) => ({
@@ -347,6 +361,80 @@ const scenarios = [
   },
 ];
 
+if (options.list) {
+  console.table(
+    scenarios.map(({ slug, title, video, note }) => ({
+      slug,
+      title,
+      video: video || "none",
+      note,
+    })),
+  );
+  process.exit(0);
+}
+const videoScenarios = new Set(["single", "multi", "truncated"]);
+const selectedScenarios = scenarios.filter((scenario) =>
+  options.scenario
+    ? scenario.slug === options.scenario
+    : options.video || !videoScenarios.has(scenario.video),
+);
+if (!selectedScenarios.length)
+  throw new Error("Cenário desconhecido; consulte --list.");
+const needsVideo = selectedScenarios.some((scenario) =>
+  videoScenarios.has(scenario.video),
+);
+if (needsVideo && !options.video)
+  throw new Error(
+    "Este cenário exige --video para gerar a gravação sintética.",
+  );
+if (needsVideo && !fs.existsSync(ffmpeg))
+  throw new Error(
+    "Prepare os sidecars verificados antes de gerar vídeo sintético.",
+  );
+const now = Date.parse(options.at || "2026-01-15T12:00:00.000Z");
+if (!Number.isSafeInteger(now) || now < 30 * DAY)
+  throw new Error("Use --at com uma data ISO válida após janeiro de 1970.");
+assertNoFixtureLinks(sessionsDir);
+assertNoFixtureLinks(manifestPath);
+assertNoFixtureLinks(guidePath);
+fs.mkdirSync(sessionsDir, { recursive: true });
+const previousManifest = fs.existsSync(manifestPath)
+  ? JSON.parse(fs.readFileSync(manifestPath, "utf8"))
+  : null;
+const plannedNames = selectedScenarios.flatMap((scenario) => {
+  const id = String(now - scenario.ago - scenario.durationMs);
+  return [
+    `${id}.ndjson`,
+    ...(scenario.chatReplay ? [`${id}.chat.ndjson`] : []),
+    ...(videoScenarios.has(scenario.video) ? [`${id}.mp4`] : []),
+    ...(scenario.video === "multi" ? [`${id}.p2.mp4`] : []),
+  ];
+});
+// Check all reports, chat and video before deleting the previous generation.
+preflightFixtureOutputs(previousManifest, root, plannedNames);
+for (const entry of fs.readdirSync(sessionsDir, { withFileTypes: true })) {
+  assertNoFixtureLinks(path.join(sessionsDir, entry.name));
+}
+if (!previousManifest && fs.existsSync(guidePath)) {
+  throw new Error(
+    "Guia de fixtures preexistente sem manifesto; dados preservados.",
+  );
+}
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+const backupDir = path.join(root, `sessions-backup-before-fixtures-${stamp}`);
+fs.mkdirSync(backupDir);
+for (const entry of fs.readdirSync(sessionsDir, { withFileTypes: true })) {
+  if (entry.isFile())
+    copyFixtureExclusive(
+      path.join(sessionsDir, entry.name),
+      path.join(backupDir, entry.name),
+    );
+}
+
+// Staging failures preserve the installed generation and remain inspectable.
+const stagingDir = fs.mkdtempSync(path.join(root, ".report-fixtures-staging-"));
+const stagedPath = (file) => path.join(stagingDir, path.basename(file));
+
 function rngFor(seed) {
   let n = seed >>> 0;
   return () => {
@@ -550,7 +638,7 @@ function generateSession(s, index, now) {
     },
     {
       kind: "marker",
-      t: startedAt + Math.min(2_000, s.durationMs / 3),
+      t: Math.round(startedAt + Math.min(2_000, s.durationMs / 3)),
       label: `CENÁRIO: ${s.title}`,
     },
   ];
@@ -820,11 +908,14 @@ function generateChat(s, startedAt, id, random) {
       i: nativeId,
     });
     if (i === 18)
-      rows.push({ t: startedAt + s.durationMs * 0.3, del: nativeId });
+      rows.push({
+        t: Math.round(startedAt + s.durationMs * 0.3),
+        del: nativeId,
+      });
   }
   rows.push({
-    t: startedAt + s.durationMs * 0.52,
-    gap: startedAt + s.durationMs * 0.48,
+    t: Math.round(startedAt + s.durationMs * 0.52),
+    gap: Math.round(startedAt + s.durationMs * 0.48),
   });
   return rows.sort((a, b) => a.t - b.t);
 }
@@ -836,7 +927,7 @@ function createVideo(file, seconds, frequency) {
       "-hide_banner",
       "-loglevel",
       "error",
-      "-y",
+      "-n",
       "-f",
       "lavfi",
       "-i",
@@ -864,7 +955,7 @@ function createVideo(file, seconds, frequency) {
       "-shortest",
       file,
     ],
-    { encoding: "utf8" },
+    { encoding: "utf8", windowsHide: true, timeout: 120_000 },
   );
   if (
     result.status !== 0 ||
@@ -877,24 +968,22 @@ function createVideo(file, seconds, frequency) {
   }
 }
 
-if (!fs.existsSync(ffmpeg))
-  throw new Error(`FFmpeg empacotado não encontrado: ${ffmpeg}`);
-
-const now = Date.now();
 const generatedFiles = [];
 const catalog = [];
-for (const [index, scenario] of scenarios.entries()) {
+for (const scenario of selectedScenarios) {
+  const index = scenarios.indexOf(scenario);
   const generated = generateSession(scenario, index, now);
   const reportFile = path.join(sessionsDir, `${generated.id}.ndjson`);
-  if (fs.existsSync(reportFile))
-    throw new Error(`ID de fixture colidiu: ${generated.id}`);
   fs.writeFileSync(
-    reportFile,
+    stagedPath(reportFile),
     `${generated.rows.map(line).join("\n")}\n`,
-    "utf8",
+    {
+      encoding: "utf8",
+      flag: "wx",
+    },
   );
   fs.utimesSync(
-    reportFile,
+    stagedPath(reportFile),
     generated.endedAt / 1_000,
     generated.endedAt / 1_000,
   );
@@ -907,9 +996,16 @@ for (const [index, scenario] of scenarios.entries()) {
   );
   if (chatRows) {
     const chatFile = path.join(sessionsDir, `${generated.id}.chat.ndjson`);
-    fs.writeFileSync(chatFile, `${chatRows.map(line).join("\n")}\n`, "utf8");
+    fs.writeFileSync(
+      stagedPath(chatFile),
+      `${chatRows.map(line).join("\n")}\n`,
+      {
+        encoding: "utf8",
+        flag: "wx",
+      },
+    );
     fs.utimesSync(
-      chatFile,
+      stagedPath(chatFile),
       generated.endedAt / 1_000,
       generated.endedAt / 1_000,
     );
@@ -917,17 +1013,17 @@ for (const [index, scenario] of scenarios.entries()) {
   }
   if (scenario.video === "single") {
     const file = path.join(sessionsDir, `${generated.id}.mp4`);
-    createVideo(file, 30, 440);
+    createVideo(stagedPath(file), 30, 440);
     generatedFiles.push(file);
   } else if (scenario.video === "multi") {
     const first = path.join(sessionsDir, `${generated.id}.mp4`);
     const second = path.join(sessionsDir, `${generated.id}.p2.mp4`);
-    createVideo(first, 12, 523);
-    createVideo(second, 15, 659);
+    createVideo(stagedPath(first), 12, 523);
+    createVideo(stagedPath(second), 15, 659);
     generatedFiles.push(first, second);
   } else if (scenario.video === "truncated") {
     const file = path.join(sessionsDir, `${generated.id}.mp4`);
-    createVideo(file, 18, 330);
+    createVideo(stagedPath(file), 18, 330);
     generatedFiles.push(file);
   }
   catalog.push({
@@ -945,7 +1041,7 @@ for (const [index, scenario] of scenarios.entries()) {
 for (const item of catalog) {
   const report = path.join(sessionsDir, `${item.id}.ndjson`);
   const rows = fs
-    .readFileSync(report, "utf8")
+    .readFileSync(stagedPath(report), "utf8")
     .trim()
     .split("\n")
     .map((raw) => JSON.parse(raw));
@@ -958,22 +1054,37 @@ for (const item of catalog) {
   }
 }
 for (const file of generatedFiles.filter((value) => value.endsWith(".mp4"))) {
-  if (fs.statSync(file).size === 0) throw new Error(`Vídeo vazio: ${file}`);
+  if (fs.statSync(stagedPath(file)).size === 0)
+    throw new Error(`Vídeo vazio: ${file}`);
 }
 
 const manifest = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   sessionsDir,
   backupDir,
   generatedFiles,
+  generatedHashes: Object.fromEntries(
+    generatedFiles.map((file) => [
+      path.basename(file),
+      fixtureHash(stagedPath(file)),
+    ]),
+  ),
   scenarios: catalog,
 };
-fs.writeFileSync(
-  manifestPath,
-  `${JSON.stringify(manifest, null, 2)}\n`,
-  "utf8",
-);
+// Recheck: another process may have changed files while video was generated.
+preflightFixtureOutputs(previousManifest, root, plannedNames);
+if (previousManifest) removeGenerated(previousManifest);
+assertNoFixtureLinks(manifestPath);
+const stagedManifest = path.join(stagingDir, ".manifest.json");
+fs.writeFileSync(stagedManifest, `${JSON.stringify(manifest, null, 2)}\n`, {
+  encoding: "utf8",
+  flag: "wx",
+});
+// Register intended files/hashes before publication. Missing files are safe to
+// clean, so an interrupted publication remains accounted for by the manifest.
+fs.renameSync(stagedManifest, manifestPath);
+for (const file of generatedFiles) copyFixtureExclusive(stagedPath(file), file);
 const guide = [
   "# Relatórios fictícios da Corneta",
   "",
@@ -988,10 +1099,21 @@ const guide = [
       `| ${new Date(item.startedAt).toLocaleString("pt-BR")} | ${item.title} | ${item.video} | ${item.chatReplay ? "sim" : "não"} | ${item.note} |`,
   ),
   "",
-  "Para remover somente estes fixtures: `pnpm reports:fixtures:clean`.",
+  `Para remover somente estes fixtures: \`pnpm reports:fixtures:clean${options.contributor ? " --contributor" : ""}\`.`,
   "",
 ].join("\n");
-fs.writeFileSync(guidePath, guide, "utf8");
+assertNoFixtureLinks(guidePath);
+const stagedGuide = path.join(stagingDir, ".guide.md");
+fs.writeFileSync(stagedGuide, guide, { encoding: "utf8", flag: "wx" });
+fs.renameSync(stagedGuide, guidePath);
+// Remove only our known, unchanged flat staging files; never recurse.
+for (const file of generatedFiles) {
+  const staged = stagedPath(file);
+  assertNoFixtureLinks(staged);
+  if (fixtureHash(staged) === manifest.generatedHashes[path.basename(file)])
+    fs.unlinkSync(staged);
+}
+if (fs.readdirSync(stagingDir).length === 0) fs.rmdirSync(stagingDir);
 
 console.table(
   catalog.map(({ id, title, video, chatReplay }) => ({

@@ -53,8 +53,10 @@ function VideoTile({
   const empty = !stream || down;
   return (
     <div className="relative aspect-video overflow-hidden rounded-lg bg-night pop">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- Prévia de MediaStream ao vivo; a fonte não fornece uma faixa de legendas. */}
       <video
         ref={ref}
+        aria-label={label}
         autoPlay
         playsInline
         muted={muted}

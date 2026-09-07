@@ -583,7 +583,6 @@ export function ReplayPlayer({
                   )}
                   {hoverMs != null && previewOk && (
                     <div className="pointer-events-none absolute right-2 bottom-2 w-40 overflow-hidden rounded border-2 border-border bg-black">
-                      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                       <video
                         ref={previewRef}
                         src={src}

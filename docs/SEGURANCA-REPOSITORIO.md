@@ -101,5 +101,24 @@ gh api repos/pitroldev/corneta/actions/permissions/fork-pr-contributor-approval
 4. Conferir todos os novos textos/anexos e repetir o scanner no SHA final.
 
 Nenhum desses passos autoriza tornar o repositório público automaticamente.
+
+## Rechecagem no segundo lote
+
+Em 6 de setembro de 2026 (Brasília), o HEAD local passou a `8a2815d` após o commit
+das correções anteriores. A nova varredura cobre 270 commits/40 refs e o snapshot
+das mudanças seguintes; os números/hash exatos ficam no resumo ignorado de cada
+execução. Três achados novos eram digests da baseline de formatação associados a
+nomes de documentos sobre OAuth/chaves, não credenciais. Os digests passaram a
+usar o tipo explícito `sha256:`; comparação de bytes mantida e nenhuma nova
+allowlist foi criada. A varredura com esse formato passou sem achados.
+
+As consultas externas confirmaram novamente repositório privado, relato privado
+404 e aprovação de forks 422; secret protection continua sem estado informado.
+Não houve novas mudanças de configuração no GitHub. O novo smoke do navegador é
+pré-requisito do check `frontend`, que falha explicitamente se ele não passar;
+isso preserva os cinco contextos já exigidos, sem tratar job pulado como aprovação.
+Ainda é necessário executar os workflows remotos do SHA final após o envio pelo
+mantenedor e confirmar recebimento do canal privado.
+
 Referências: [proteção de branches](https://docs.github.com/en/rest/branches/branch-protection),
 [relato privado](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).

@@ -119,6 +119,9 @@ describe("credential-free contributor profile", () => {
   it("includes source checks but not calendar-dependent editorial publication gates", () => {
     const plan = contributorPlan("check");
     expect(plan.map(({ tool }) => tool)).toEqual([
+      "format-check",
+      "doc-links",
+      "scripts-syntax",
       "eslint",
       "vitest",
       "tsc",
@@ -142,7 +145,8 @@ describe("credential-free contributor profile", () => {
     expect(web.scripts["check:contributor"]).not.toContain(
       "content:maintenance",
     );
-    expect(web.scripts.check).toContain("content:maintenance:check");
+    expect(web.scripts.check).not.toContain("content:maintenance:check");
+    expect(web.scripts["build:release"]).toContain("content:maintenance:check");
   });
 
   it("resolves every CLI to installed JS without an arbitrary global pnpm shim", () => {

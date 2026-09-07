@@ -12,6 +12,41 @@
       "file": "ffmpeg-builds-8267213e26c1031621e6e1210fe3aa4867214f6a.tar.gz",
       "url": "https://codeload.github.com/BtbN/FFmpeg-Builds/tar.gz/8267213e26c1031621e6e1210fe3aa4867214f6a",
       "sha256": "08279484656a586c149e119a20d3853f2596ee08192d97595edd2a5ba3b4fd51"
+    },
+    {
+      "file": "x265-b81f650e21e8aacbe6a9ad04ce14aefc05b932c0.tar.gz",
+      "url": "https://bitbucket.org/multicoreware/x265_git/get/b81f650e21e8aacbe6a9ad04ce14aefc05b932c0.tar.gz",
+      "sha256": "540de59b5004274f70a4fe229e86c7602d49b5b1a96112fd95a9dcdb5c9f1dc9"
+    },
+    {
+      "file": "xavs2-eae1e8b9d12468059bdd7dee893508e470fa83d8.tar.gz",
+      "url": "https://codeload.github.com/pkuvcl/xavs2/tar.gz/eae1e8b9d12468059bdd7dee893508e470fa83d8",
+      "sha256": "48d69abb070e6326b8894fd88f61d696eb6d4626cd052fecfeb36b4d528c270c"
+    },
+    {
+      "file": "davs2-b41cf117452e2d73d827f02d3e30aa20f1c721ac.tar.gz",
+      "url": "https://codeload.github.com/pkuvcl/davs2/tar.gz/b41cf117452e2d73d827f02d3e30aa20f1c721ac",
+      "sha256": "efa1d5080a42c6fe4a74177111bc20c82dd1cef7adfc5ed2ca997f4b03c8dd9c"
+    },
+    {
+      "file": "rubberband-e4296ac80b1170018a110bc326fd0d45a0eb27d6.tar.gz",
+      "url": "https://codeload.github.com/breakfastquay/rubberband/tar.gz/e4296ac80b1170018a110bc326fd0d45a0eb27d6",
+      "sha256": "32770ab6a395badb6a5ee3443bf5a0cfd5cac07f332af8e03fd6dcd61f5b3759"
+    },
+    {
+      "file": "vidstab-c9985e75303da2ba1a78b37083a2bec2ed5baebc.tar.gz",
+      "url": "https://codeload.github.com/georgmartius/vid.stab/tar.gz/c9985e75303da2ba1a78b37083a2bec2ed5baebc",
+      "sha256": "63e0e8af3a4deac95949effec67f4604915477b48a6291ac47bc2d08853087a2"
+    },
+    {
+      "file": "fftw-93ed4c786934aec9946f8dda4b4e3eb08f8be41c.tar.gz",
+      "url": "https://codeload.github.com/FFTW/fftw3/tar.gz/93ed4c786934aec9946f8dda4b4e3eb08f8be41c",
+      "sha256": "b4789c0f864f1237629c752075e6bf98c05d723873f59f9f50f604c1c0978369"
+    },
+    {
+      "file": "frei0r-253addfd4bea3c90b0bf765589ca28ea18f3ddc0.tar.gz",
+      "url": "https://codeload.github.com/dyne/frei0r/tar.gz/253addfd4bea3c90b0bf765589ca28ea18f3ddc0",
+      "sha256": "67fe30d919a42ff10d507ef929a89852c7851f8c927c18822840e65dbb3bd35d"
     }
   ]
 }

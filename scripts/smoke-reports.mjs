@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import {
   access,
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -18,7 +19,32 @@ import { preview } from "vite";
 
 const browser =
   process.argv[2] ??
+  process.env.CORNETA_CHROMIUM_PATH ??
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+const locale = process.env.CORNETA_SMOKE_LOCALE || "pt-BR";
+assert(["pt-BR", "en"].includes(locale), "Smoke locale must be pt-BR or en");
+const labels =
+  locale === "en"
+    ? {
+        consent: "Turn both off",
+        reports: "Reports",
+        story: "Open the stream story",
+        download: "Download",
+        noVideo: "This stream was not recorded",
+      }
+    : {
+        consent: "Desligar as duas",
+        reports: "Relatórios",
+        story: "Abrir a história da live",
+        download: "Baixar",
+        noVideo: "Esta live não foi gravada",
+      };
+const output = process.env.CORNETA_SMOKE_OUTPUT_DIR
+  ? path.resolve(process.env.CORNETA_SMOKE_OUTPUT_DIR)
+  : await mkdtemp(path.join(tmpdir(), "corneta-smoke-result-"));
+await mkdir(output, { recursive: true });
+const screenshot = path.join(output, `report-${locale}.png`);
+const reportFile = path.join(output, `result-${locale}.json`);
 await access(browser);
 const profile = await mkdtemp(path.join(tmpdir(), "corneta-browser-smoke-"));
 const server = await preview({
@@ -43,6 +69,10 @@ child.on("error", (error) => {
   process.exitCode = 1;
 });
 let socket;
+let stage = "browser-start";
+let captureScreenshot;
+let browserVersion;
+let pending;
 try {
   let port;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -64,7 +94,7 @@ try {
   );
   await once(socket, "open");
   let serial = 0;
-  const pending = new Map();
+  pending = new Map();
   const errors = [];
   const call = (method, params = {}) =>
     new Promise((resolve, reject) => {
@@ -87,11 +117,13 @@ try {
     }
     if (message.method === "Runtime.exceptionThrown")
       errors.push(message.params.exceptionDetails.text);
-    if (message.method === "Fetch.requestPaused")
-      void call("Fetch.failRequest", {
+    if (message.method === "Fetch.requestPaused") {
+      const local = new URL(message.params.request.url).origin === base;
+      void call(local ? "Fetch.continueRequest" : "Fetch.failRequest", {
         requestId: message.params.requestId,
-        errorReason: "BlockedByClient",
-      });
+        ...(local ? {} : { errorReason: "BlockedByClient" }),
+      }).catch(() => {});
+    }
   });
   const evaluate = async (expression) => {
     const result = await call("Runtime.evaluate", {
@@ -111,10 +143,17 @@ try {
   };
   await call("Runtime.enable");
   await call("Page.enable");
-  await call("Fetch.enable", { patterns: [{ urlPattern: "https://*" }] });
+  browserVersion = (await call("Browser.getVersion")).product;
+  captureScreenshot = async () => {
+    const capture = await call("Page.captureScreenshot", { format: "png" });
+    await writeFile(screenshot, Buffer.from(capture.data, "base64"));
+  };
+  await call("Fetch.enable", {
+    patterns: [{ urlPattern: "https://*" }, { urlPattern: "http://*" }],
+  });
   await call("Emulation.setDeviceMetricsOverride", {
     width: 1440,
-    height: 1000,
+    height: 600,
     deviceScaleFactor: 1,
     mobile: false,
   });
@@ -122,37 +161,77 @@ try {
   const version = legal.match(/LEGAL_ACCEPT_VERSION = "([^"]+)"/)[1];
   await call("Page.addScriptToEvaluateOnNewDocument", {
     source: `
+    Object.defineProperty(navigator, "languages", { get: () => [${JSON.stringify(locale)}] });
+    Object.defineProperty(navigator, "language", { get: () => ${JSON.stringify(locale)} });
     localStorage.setItem("corneta.welcomed", "1");
     localStorage.setItem("corneta.legal.accepted", JSON.stringify({ version: ${JSON.stringify(version)}, at: new Date().toISOString() }));
   `,
   });
+  stage = "consent";
   await call("Page.navigate", { url: base });
   // Dismiss the notice through its real UI, in this disposable profile only.
   await until(
-    `[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Desligar as duas')`,
+    `[...document.querySelectorAll('button')].some(button => button.textContent.trim() === ${JSON.stringify(labels.consent)})`,
   );
   await evaluate(
-    `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Desligar as duas').click()`,
+    `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === ${JSON.stringify(labels.consent)}).click()`,
   );
   await until(`!document.querySelector('[role="dialog"]')`);
+  stage = "report-list";
   await until(
-    `[...document.querySelectorAll('button')].some(button => button.textContent.includes('Relatórios'))`,
+    `[...document.querySelectorAll('button')].some(button => button.textContent.includes(${JSON.stringify(labels.reports)}))`,
   );
   await evaluate(
-    `[...document.querySelectorAll('button')].find(button => button.textContent.includes('Relatórios')).click()`,
+    `[...document.querySelectorAll('button')].find(button => button.textContent.includes(${JSON.stringify(labels.reports)})).click()`,
   );
   await until(
-    `!!document.querySelector('button[aria-label*="Abrir a história"]') || [...document.querySelectorAll('button')].some(button => button.textContent.includes('Abrir a história'))`,
+    `[...document.querySelectorAll('button')].some(button => (button.getAttribute('aria-label') || button.textContent).includes(${JSON.stringify(labels.story)}))`,
   );
+  const previousScroll = await evaluate(
+    `(() => { const scroller = document.getElementById('screen-scroll'); scroller.scrollTop = scroller.scrollHeight; return scroller.scrollTop; })()`,
+  );
+  assert(
+    previousScroll > 0,
+    "The list must actually be scrolled before testing report navigation",
+  );
+  stage = "report-open-top";
   await evaluate(
-    `(document.querySelector('button[aria-label*="Abrir a história"]') || [...document.querySelectorAll('button')].find(button => button.textContent.includes('Abrir a história'))).click()`,
+    `[...document.querySelectorAll('button')].find(button => (button.getAttribute('aria-label') || button.textContent).includes(${JSON.stringify(labels.story)})).click()`,
   );
   await until(
-    `[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Baixar')`,
+    `[...document.querySelectorAll('button')].some(button => button.textContent.trim() === ${JSON.stringify(labels.download)})`,
   );
+  await until(`document.getElementById('screen-scroll').scrollTop <= 1`);
+  assert(
+    await evaluate(
+      `document.body.textContent.includes(${JSON.stringify(labels.noVideo)})`,
+    ),
+    "Synthetic no-video state must be visible",
+  );
+  await call("Emulation.setDeviceMetricsOverride", {
+    width: 1440,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  stage = "download-keyboard-focus";
+  await call("Page.bringToFront");
   await evaluate(
-    `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Baixar').click()`,
+    `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === ${JSON.stringify(labels.download)}).focus()`,
   );
+  await call("Input.dispatchKeyEvent", {
+    type: "keyDown",
+    key: "Enter",
+    code: "Enter",
+    windowsVirtualKeyCode: 13,
+    text: "\r",
+  });
+  await call("Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: "Enter",
+    code: "Enter",
+    windowsVirtualKeyCode: 13,
+  });
   await until(`!!document.querySelector('[role="dialog"]')`);
   await call("Input.dispatchKeyEvent", {
     type: "keyDown",
@@ -167,13 +246,25 @@ try {
     windowsVirtualKeyCode: 27,
   });
   await until(`!document.querySelector('[role="dialog"]')`);
-  const screenshot = path.join(
-    tmpdir(),
-    `corneta-report-smoke-${Date.now()}.png`,
+  await until(
+    `document.activeElement.textContent.trim() === ${JSON.stringify(labels.download)}`,
   );
-  const capture = await call("Page.captureScreenshot", { format: "png" });
-  await writeFile(screenshot, Buffer.from(capture.data, "base64"));
+  // Browser zoom/text scaling: avoid a horizontal document scrollbar or clipped
+  // main story when a streamer uses larger fonts.
+  await evaluate(`document.documentElement.style.fontSize = '20px'`);
+  await evaluate(
+    `new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`,
+  );
+  assert(
+    await evaluate(
+      `document.getElementById('screen-scroll').scrollWidth <= document.getElementById('screen-scroll').clientWidth + 1`,
+    ),
+    "Large-font story must not overflow horizontally",
+  );
+  await evaluate(`document.documentElement.style.fontSize = ''`);
+  await captureScreenshot();
 
+  stage = "large-report-worker";
   const workerFile = (await readdir("dist/assets")).find((file) =>
     /^report\.worker-.*\.js$/.test(file),
   );
@@ -197,8 +288,9 @@ try {
       const chat = Array.from({length:10000},(_,i)=>JSON.stringify({t:i,m:'message '+i,i:String(i),p:'twitch'}));
       chat.push(JSON.stringify({t:20000,del:'5000'}));
       const page = await run({kind:'chat',raw:chat.join('\\n'),epoch:5100});
+      const latePage = await run({kind:'chat',raw:chat.join('\\n'),epoch:9000});
       const exported = await run({kind:'export',data:detail.data,analysis:detail.analysis,format:'json',anonymous:true,locale:'pt-BR'});
-      return {samples:detail.data.samples.length,detached:bytes.byteLength===0,pageSize:page.messages.length,total:page.total,deleted:page.messages.find(message=>message.i==='5000').deleted,exportBytes:exported.content.length,analysisMs};
+      return {samples:detail.data.samples.length,detached:bytes.byteLength===0,pageSize:page.messages.length,latePageSize:latePage.messages.length,seekChangedPage:latePage.messages.some(message=>message.i==='9000')&&!page.messages.some(message=>message.i==='9000'),total:page.total,deleted:page.messages.find(message=>message.i==='5000').deleted,exportBytes:exported.content.length,analysisMs};
     } finally { worker.terminate(); }
   })()`);
   assert.equal(result.samples, 14400);
@@ -206,10 +298,37 @@ try {
   assert.equal(result.total, 10000);
   assert.equal(result.deleted, true);
   assert(result.pageSize <= 700);
+  assert(result.latePageSize <= 700);
+  assert(result.seekChangedPage);
   assert(result.exportBytes > 0);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ...result, screenshot }, null, 2));
+  const summary = {
+    outcome: "passed",
+    locale,
+    browserVersion,
+    ...result,
+    reportOpenedAtTop: true,
+    noVideo: true,
+    keyboardFocusRestored: true,
+    largeTextNoOverflow: true,
+  };
+  await writeFile(reportFile, JSON.stringify(summary, null, 2) + "\n");
+  console.log(JSON.stringify({ ...summary, screenshot }, null, 2));
+} catch (error) {
+  await captureScreenshot?.().catch(() => {});
+  // Only constants/counters and the synthetic fixture screenshot are uploadable.
+  // Never include exception messages, console text, requests, tokens or profiles.
+  await writeFile(
+    reportFile,
+    JSON.stringify(
+      { outcome: "failed", locale, stage, browserVersion },
+      null,
+      2,
+    ) + "\n",
+  );
+  throw error;
 } finally {
+  for (const request of pending?.values() || []) clearTimeout(request.timer);
   socket?.close();
   child.kill();
   await new Promise((resolve) => server.httpServer.close(resolve));

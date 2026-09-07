@@ -15,7 +15,10 @@ import {
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { complianceErrors } from "./release-compliance.mjs";
+import {
+  complianceErrors,
+  compliancePackageFiles,
+} from "./release-compliance.mjs";
 
 const root = process.cwd();
 const readJson = (path) =>
@@ -58,13 +61,25 @@ try {
   for (const file of readdirSync(notices, { withFileTypes: true }))
     if (file.isFile())
       copyFileSync(join(notices, file.name), join(staging, file.name));
-  for (const file of [
-    "LICENSE",
-    "pnpm-lock.yaml",
-    "src-tauri/Cargo.lock",
-    "compliance/ffmpeg-sources.json",
-  ])
-    copyFileSync(join(root, file), join(staging, file.split("/").at(-1)));
+  for (const file of compliancePackageFiles) {
+    // Keep repository paths so source-manifest/provenance links remain usable.
+    const target = join(staging, file);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(join(root, file), target);
+  }
+  writeFileSync(
+    join(staging, "README-THIRD-PARTY.txt"),
+    [
+      "Corneta third-party materials",
+      "",
+      "Source archives are at this directory's root; their identities are in compliance/ffmpeg-sources.json.",
+      "Binary identities and build configuration are in sidecars.json and FFmpeg-buildconf.txt.",
+      "See LICENSE, THIRD_PARTY_NOTICES.md, compliance/ffmpeg-provenance.json and docs/CONFORMIDADE-FFMPEG.md.",
+      "Some documentation links refer to the full source repository: https://github.com/pitroldev/corneta",
+      "A package generator is not legal certification or evidence of a completed source correspondence review.",
+      "",
+    ].join("\n"),
+  );
 
   for (const source of manifest.sources) {
     const response = await fetch(source.url, {
@@ -191,7 +206,18 @@ try {
   if (
     dirname(resolve(staging)) !== resolve(stagingParent) ||
     !/^compliance-[A-Za-z0-9]+$/.test(basename(staging))
-  )
-    throw new Error("Limpeza de staging fora do escopo recusada.");
-  rmSync(staging, { recursive: true, force: true });
+  ) {
+    console.error(
+      "Limpeza de staging fora do escopo recusada; diretório preservado.",
+    );
+    process.exitCode = 1;
+  } else {
+    // Cleanup must not hide the original preparation error.
+    try {
+      rmSync(staging, { recursive: true, force: true });
+    } catch {
+      console.error("Não foi possível limpar o staging de conformidade.");
+      process.exitCode = 1;
+    }
+  }
 }

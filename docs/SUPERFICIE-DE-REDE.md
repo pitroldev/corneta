@@ -1,0 +1,90 @@
+# Superfície de rede e limites das integrações
+
+Inventário do código em 2026-09-06. Esta referência descreve capacidades implementadas, não uma auditoria externa, autorização dos provedores ou promessa de disponibilidade. Configuração e responsabilidades: [CONFIGURACAO.md](CONFIGURACAO.md). Vulnerabilidades: [SECURITY.md](../SECURITY.md).
+
+## As três funções são independentes
+
+**Transmitir vídeo por URL/chave não equivale a ler chat nem a ter OAuth.** O programa pode enviar vídeo para um destino e não ter integração alguma com a conta desse serviço. Ter OAuth também não garante permissões de moderação: o provedor e o papel da conta continuam decidindo.
+
+| Plataforma            | Transmissão                                                                     | Autenticação integrada                                                                      | Leitura de chat                                         | Envio                        | Moderação implementada                                      |
+| --------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| Twitch                | Preset RTMP + chave                                                             | Device flow de cliente público; direto ao provedor                                          | IRC sobre WSS; leitura pública                          | Com login                    | Apagar mensagem, timeout e ban, com escopos/papel adequados |
+| YouTube               | Preset RTMP + chave; automação de broadcast depende de login/permissão          | Oficial: cliente desktop + PKCE loopback; BYOK legado: device flow com credenciais próprias | API com API key opcional ou leitura do chat web público | Com login e live chat válido | Apagar mensagem; **não** timeout/ban de autor               |
+| Kick                  | Preset RTMPS + chave/URL correspondente                                         | Oficial: PKCE com troca/refresh pela Setup API; BYOK: direto com secret próprio             | Endpoints do site + Pusher público                      | Com login                    | Apagar mensagem; **não** timeout/ban de autor               |
+| Cinefy                | Não tem preset dedicado; URL/chave compatível pode ser usada como Personalizado | Não implementada                                                                            | Adaptador de leitura experimental                       | Não                          | Não                                                         |
+| Facebook              | Preset RTMPS + chave                                                            | Não implementada                                                                            | Não                                                     | Não                          | Não                                                         |
+| TikTok, X e Instagram | Presets experimentais; acesso à ingestão e URL/chave dependem da conta/provedor | Não implementada                                                                            | Não                                                     | Não                          | Não                                                         |
+| Personalizado         | URL/chave RTMP/RTMPS configurada pelo usuário                                   | Não implica OAuth                                                                           | Não implica chat                                        | Não                          | Não                                                         |
+
+Evidência: [`platforms.ts`](../src/lib/platforms.ts), [`chat.rs`](../src-tauri/src/chat.rs), [`auth.rs`](../src-tauri/src/auth.rs), [adaptador Cinefy](../src-tauri/src/chat/cinefy/adapter.rs). Os presets são referências: o usuário deve usar o destino que o provedor atribuiu à sua conta. Não atribuímos a RTMP a confidencialidade de RTMPS; URL/chave e mídia em RTMP não têm TLS.
+
+## Serviços que escutam no computador
+
+| Superfície               | Endereço/ativação                                       | Dados e fronteira de confiança                                                                                               | Limites/encerramento                                                                                                                               |
+| ------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ingestão do MediaMTX     | `127.0.0.1`, padrão TCP `1935`; engine da live          | Vídeo/áudio recebidos do OBS e fluxos internos. Validação rejeita host fora do loopback. Não é um endpoint para a Internet.  | Configuração aplica fila de 4.096 e timeouts de leitura/escrita de 20 s; subprocesso acompanha o ciclo da engine.                                  |
+| API MediaMTX             | HTTP `127.0.0.1:9997`, durante a engine                 | Diagnóstico de paths/sinal de entrada. **Ativa**, apesar de não ser um servidor público do produto.                          | RTSP/HLS/WebRTC/SRT, métricas, pprof e playback estão desligados na configuração gerada. Não expor API por proxy/port forwarding.                  |
+| Overlays OBS             | HTTP/WS `127.0.0.1`, padrão TCP `7393` configurável     | `/alerts`, `/chat` e sockets correspondentes: nomes, mensagens e dados de alertas. A URL local não é uma credencial secreta. | Broadcasts limitados; stop fecha servidor/conexões. Outros processos locais podem alcançar a porta; loopback não é autenticação entre aplicativos. |
+| Callback Google oficial  | HTTP `127.0.0.1:porta efêmera/callback`, durante login  | Código de autorização + `state`; PKCE é validado na troca com o provedor. Nunca escuta a LAN.                                | Janela de 5 min; leitura até 8 KiB, timeout de socket de 5 s; state errado/ruído não cancela o login legítimo. Listener acaba ao sair do fluxo.    |
+| Callback Kick            | HTTP `localhost:7395/callback`, durante login           | Listeners somente em IPv4/IPv6 loopback disponíveis; código + `state`; secret oficial não passa no callback.                 | Mesmos limites do callback Google. Conflito de porta deve produzir erro; não trocar por uma porta/endereço público.                                |
+| Compositor/áudio interno | TCP loopback com porta efêmera                          | Transporte local entre compositor e processos de mídia                                                                       | Ciclo de vida da sessão, sem exposição deliberada à LAN.                                                                                           |
+| **Mesa experimental**    | **HTTP/WS em `0.0.0.0:porta efêmera`**, ao iniciar Mesa | **Exceção ao loopback:** serve `/studio` e sinalização `/ws` a convidados na LAN. Nome/sala/SDP/ICE circulam na sinalização. | Mensagens WS até 64 KiB e fila de 256 por par; stop desconecta pares. Não há aqui um serviço público hospedado/autenticado.                        |
+| Dev servers              | Vite `1420`, Next `7390`; só desenvolvimento            | Código fonte, HMR e páginas de desenvolvimento; não são servidores de uma instalação normal                                  | `contrib:demo/web` fixa `127.0.0.1`. Não mudar host para LAN sem compreender a exposição.                                                          |
+
+Fontes: [`engine.rs`](../src-tauri/src/engine.rs), [`config.rs`](../src-tauri/src/config.rs), [`overlay.rs`](../src-tauri/src/overlay.rs), [`auth.rs`](../src-tauri/src/auth.rs), [`compositor.rs`](../src-tauri/src/compositor.rs), [`studio.rs`](../src-tauri/src/studio.rs).
+
+### Mesa não deve ser apresentada como segura para exposição pública
+
+O relay usa salas e segredo por par para impedir a retomada indevida de um `peerId`, mas isso **não equivale a autenticação forte de entrada na sala, autorização de conta ou TLS da sinalização**. O servidor aceita novos participantes pela mensagem `join`; o limite por fila não constitui um limite global de conexões/salas.
+
+A mídia WebRTC usa DTLS-SRTP; isso não cifra o HTTP/WS de sinalização. Os padrões incluem STUN `stun.l.google.com:19302` e `stun1.l.google.com:19302`; P2P/ICE pode revelar endereços de rede aos pares. Não há TURN gerenciado que garanta conectividade em qualquer NAT. Use apenas redes/participantes confiáveis, não publique convites reais, não encaminhe a porta no roteador e não exponha esse relay diretamente à Internet.
+
+Antes de anunciar Mesa para cenários públicos, são necessários autenticação/autorização explícitas, transporte de sinalização protegido, limites globais/por origem e testes de abuso. Documentar esse limite não implementa essas proteções. Referências: [`mesa.ts`](../src/lib/mesa.ts), [`studio.rs`](../src-tauri/src/studio.rs), [`studio.html`](../src-tauri/assets/studio.html).
+
+## Conexões de saída
+
+| Destino                 | Quem conecta/por quê                                                                                      | Dados enviados e controles                                                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OBS WebSocket           | Desktop → OBS, padrão `127.0.0.1:4455`                                                                    | Comandos/estado do OBS, autenticação configurada pelo usuário. Senha no cofre; não exige abrir o OBS à Internet.                                                                  |
+| Destinos de live        | FFmpeg → URL atribuída/configurada                                                                        | Áudio/vídeo e stream key. RTMP não cifra; RTMPS usa TLS. URLs personalizadas são uma escolha explícita do usuário, não uma allowlist de serviços verificados.                     |
+| Twitch                  | Desktop → `id.twitch.tv`, `api.twitch.tv`, IRC WSS; leitura complementar do site                          | Device code, tokens, identificadores de canal, mensagens e ações. Tokens de acesso/refresh ficam no cofre após login; APIs ainda podem negar escopos/papel.                       |
+| Google/YouTube          | Desktop/browser → `accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`, `www.youtube.com` | OAuth, dados de transmissão/chat e API key opcional. Tokens do fluxo oficial não passam pelo broker Kick. Quota/estado da live afetam disponibilidade.                            |
+| Kick                    | Desktop → site/API/Pusher; servidor → `id.kick.com` no fluxo oficial                                      | Chat público, ações autenticadas; código/verifier ou refresh token passam transitoriamente pelo broker. BYOK envia ao provedor usando o secret próprio do cofre.                  |
+| Setup API Corneta       | Desktop → origem configurada, HTTPS em release                                                            | Bootstrap público, troca/refresh Kick. Não recebe a transmissão nem é um proxy de mídia/chat. Headers de correlação só são adicionados conforme finalidades ativas da telemetria. |
+| Cinefy                  | Desktop → `cinefy.gg`, API/configuração do adaptador e Pusher                                             | Resolução do canal e leitura pública de mensagens/eventos; contrato não publicado, sem promessa de estabilidade.                                                                  |
+| Emotes/avatares         | Desktop/WebView → CDNs e APIs Twitch, Kick, BTTV, FFZ, 7TV                                                | Pedidos de imagens/metadados; IP e dados normais de conexão são visíveis ao CDN. Não são eventos de telemetria da Corneta.                                                        |
+| PostHog                 | Desktop frontend/Rust, site e API → host configurado                                                      | Eventos permitidos pelo schema/redação e finalidade; nunca usar token de ingestão como segredo. Opt-out desktop e kill switches documentados em CONFIGURACAO.                     |
+| GitHub/releases/modelos | Ferramentas de build/updater/OCR → assets de release e redirects do provedor                              | Download de sidecars/atualizações/modelos; pins, hashes e assinatura conforme componente. O OCR baixa modelos quando necessários, mas executa o reconhecimento localmente.        |
+
+A CSP do Tauri limita o **WebView**; não é um firewall para conexões feitas por Rust, FFmpeg, navegador externo, OBS ou páginas de Browser Source. Alterações de domínio/protocolo precisam ser revisadas na superfície correta, não apenas adicionadas ao `connect-src`.
+
+Downloads de OCR em [`guardian/ocr.rs`](../src-tauri/src/guardian/ocr.rs) possuem versão, tamanho e SHA-256 esperados, escrita temporária e timeout de 60 s por arquivo; falha pode acionar fallback Windows OCR. A existência do download não significa envio dos frames para um serviço de OCR. Confira também [`tauri.conf.json`](../src-tauri/tauri.conf.json), [`http_client.rs`](../src-tauri/src/http_client.rs) e scripts de sidecars antes de alterar origens.
+
+## Setup API: fronteira de tokens
+
+O código atual oferece `GET /api/v1/bootstrap`, `GET /api/v1/health`, `POST /api/v1/oauth/kick/exchange` e `POST /api/v1/oauth/kick/refresh`. Não há armazenamento de tokens do usuário em Redis implementado nesses handlers: Redis é usado para rate limiting. Os tokens transitam pela memória/resposta do servidor; não afirmar que “o servidor nunca vê tokens”. Logs/proxies externos precisam manter a mesma restrição de não registrar bodies/credenciais.
+
+- Exchange: 20 tentativas/minuto por chave de origem; refresh: 60/minuto, com `Retry-After` ao limitar.
+- Corpo JSON padrão até 8 KiB; verifier PKCE de 43–128 caracteres válidos; callback comparado à allowlist exata.
+- Requisições ao token endpoint têm timeout de 12 s, `cache: no-store` e redirects recusados. Respostas da API têm `Cache-Control: no-store` e `nosniff`.
+- Produção requer limitador remoto. Redis usa contador/TTL atômicos e chave derivada por HMAC; falha retorna indisponibilidade, não acesso ilimitado. Fallback local fora da produção tem teto de 10.000 entradas.
+- Fora da Vercel, o proxy deve sobrescrever o header de IP configurado e impedir acesso direto ao Next. Confiar em `X-Forwarded-For` enviado pelo cliente permite falsear a origem; não remova essa fronteira para “destravar” login.
+- O broker não cria uma conta Corneta: posse de code + verifier/refresh token é verificada pelo provedor. Rate limiting reduz abuso; não transforma o cliente desktop público em um cliente capaz de guardar um secret oficial.
+
+Evidências e regressões: [handlers Kick](../web/app/api/v1/oauth/kick/exchange/route.ts), [refresh](../web/app/api/v1/oauth/kick/refresh/route.ts), [`http.ts`](../web/lib/server/http.ts), [`http.test.ts`](../web/lib/server/http.test.ts), [`rate-limit-core.ts`](../web/lib/server/rate-limit-core.ts), [`rate-limit-core.test.ts`](../web/lib/server/rate-limit-core.test.ts).
+
+## Cofre, saída da conta e arquivos locais
+
+Stream keys, tokens OAuth e credenciais avançadas usam [`keys.rs`](../src-tauri/src/keys.rs). O namespace oficial é diferente do contributor. O cofre não protege contra todo programa executado sob a conta do usuário nem transforma um secret BYOK em segredo inacessível ao dono do computador.
+
+Os comandos de logout apagam credenciais locais e caches pertinentes. **Não há revogação remota garantida pelo logout atual**: para remover a autorização no provedor, use também a área de aplicativos/conexões da própria conta. A expiração/renovação segue o provedor; falha de refresh pode exigir novo login. Não prometer que desconectar localmente invalida cópias já comprometidas de um token.
+
+Relatórios/chat/gravações são arquivos locais que podem conter nomes, mensagens, títulos, eventos e imagem/áudio da live. Não são automaticamente seguros para anexar numa issue porque a stream key está no cofre. Use fixtures artificiais ou revisão/redação antes de compartilhar; nunca publicar um arquivo `.ndjson`, vídeo, convite Mesa ou screenshot real sem verificar dados pessoais e credenciais.
+
+## Integrações experimentais e revisão de mudanças
+
+Leitura por endpoints web internos/públicos (incluindo Cinefy e partes de YouTube/Kick/Twitch) não deve ser apresentada como um contrato oficial estável. O adaptador Cinefy registra expressamente essa limitação. Isso não demonstra violação de termos, nem permite presumir suporte ilimitado: o mantenedor deve acompanhar documentação/requisitos do provedor e desabilitar ou adaptar um fluxo que deixe de ser suportável.
+
+Mudanças de rede/OAuth precisam incluir testes proporcionais: callbacks com state incorreto/expirado, ocupação de porta, refresh inválido, callbacks fora da allowlist, bodies grandes/lentos, Redis indisponível, origem forjada, logout local e separação de credenciais oficiais/BYOK/contributor. Não executar testes de envio/moderação em canais reais sem autorização do responsável.
+
+Este inventário não afirma que todos esses cenários tiveram teste manual nesta revisão. Testes automatizados existentes são uma base; fluxos reais e alterações de contrato precisam continuar na matriz de release. Não abrir portas, transmitir ou publicar para “verificar” uma documentação.

@@ -329,7 +329,6 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Avisos do gravador. Ficam aqui, e não numa tela, porque o streamer pode estar em

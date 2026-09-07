@@ -152,7 +152,19 @@ export function contributorPlan(task) {
       ];
     case "check":
       return [
-        { tool: "eslint", args: ["src", "--max-warnings=0"] },
+        { tool: "format-check", args: [] },
+        { tool: "doc-links", args: [] },
+        { tool: "scripts-syntax", args: [] },
+        {
+          tool: "eslint",
+          args: [
+            "src",
+            "scripts",
+            "*.config.js",
+            "*.config.ts",
+            "--max-warnings=0",
+          ],
+        },
         { tool: "vitest", args: ["run"] },
         ...frontendBuild,
         ...webCheck,
@@ -198,7 +210,13 @@ export function contributorToolScript(tool, cwd) {
     next: ["next", "dist/bin/next"],
     tsx: ["tsx", "dist/cli.mjs"],
   };
-  if (tool === "bundle-check") return resolve(root, "scripts/check-bundle.mjs");
+  const localScripts = {
+    "bundle-check": "check-bundle.mjs",
+    "format-check": "check-format.mjs",
+    "doc-links": "check-doc-links.mjs",
+    "scripts-syntax": "check-scripts.mjs",
+  };
+  if (localScripts[tool]) return resolve(root, "scripts", localScripts[tool]);
   const [pkg, entry] = bins[tool] || [];
   if (!pkg) throw new Error("Ferramenta contributor desconhecida.");
   const resolver = cwd === "web" ? webRequire : require;

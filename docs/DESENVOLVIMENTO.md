@@ -39,7 +39,7 @@ Não precisa criar `.env` para usar os comandos `contrib:*`.
 - O build do site usa `https://www.corneta.live` apenas para passar pela validação de metadados canônicos. Não utiliza secrets oficiais nem autoriza publicar um fork sob essa identidade.
 - Em ambiente explicitamente marcado como release/produção oficial, o wrapper recusa substituir os gates pelo perfil de contribuição.
 
-`pnpm dev`, `web:dev`, `web:check`, `app:dev` e `app:build` preservam seus comportamentos de desenvolvimento/operação configurada. Não são atalhos equivalentes aos comandos isolados. Veja [`.env.example`](../.env.example), [`web/.env.example`](../web/.env.example), [decisão OAuth](DECISAO-OAUTH-VIA-API.md) e [gates oficiais](GATES-DE-RELEASE.md) antes de operar com credenciais próprias.
+`pnpm dev`, `web:dev`, `web:check`, `app:dev` e `app:build` continuam caminhos de desenvolvimento/operação configurada, não equivalentes aos comandos isolados. `web:check` verifica qualidade e integridade; revisão vencida por calendário fica nos gates de publicação do site, não no check comum. Veja [configuração](CONFIGURACAO.md), [decisão OAuth](DECISAO-OAUTH-VIA-API.md) e [gates oficiais](GATES-DE-RELEASE.md) antes de operar com credenciais próprias.
 
 ## Desktop de contribuição
 
@@ -73,6 +73,19 @@ Para testar ingestão, use os valores mostrados na própria UI, confira se a por
 ## Testes, formatação e artefatos
 
 O [guia de contribuição](../CONTRIBUTING.md) descreve comandos por área e invariantes. `contrib:check` não inclui assinatura, instalação nem revisão editorial vencida por calendário; esses controles permanecem nos caminhos próprios da operação oficial.
+
+| Comando                                              | Alcance                                                                                                                      |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm lint`                                          | App, scripts JS/TS da raiz e configurações de ferramentas. O site usa seu próprio ESLint em `web:check`.                     |
+| `pnpm format:check`                                  | App, web, scripts, configuração e documentação reconhecidos pelo Prettier; fontes Rust/PowerShell têm ferramentas próprias.  |
+| `pnpm format`                                        | Corrige fontes novas/modificadas; não normaliza de uma vez os débitos históricos intactos da baseline.                       |
+| `node scripts/check-format.mjs --all`                | Expõe também a dívida histórica; `pnpm format:all` a reescreve e deve ser uma alteração de normalização deliberada/separada. |
+| `pnpm docs:check`                                    | Destinos Markdown locais, sem consultar URLs externas ou âncoras. Funciona em clone ou snapshot de fontes.                   |
+| `pnpm scripts:check`                                 | Sintaxe de todos JS/MJS/CJS de fontes, sem executar os scripts. Não substitui lint/testes.                                   |
+| `pwsh -NoProfile -File scripts/check-powershell.ps1` | Parser dos scripts PowerShell, sem executar downloads/instalação.                                                            |
+| `pnpm smoke:reports`                                 | Fluxos de relatório no Chromium; também executados no CI em PT/EN.                                                           |
+
+A baseline de formatação usa hashes exatos (normalizados somente quanto a LF/CRLF) e a versão fixada de Prettier. Ao modificar um arquivo legado, a exceção deixa de valer: formate-o. Não acrescente hashes para esconder erros novos. EditorConfig/Gitattributes orientam futuras edições/checkouts; esta implementação não executa `git add --renormalize`.
 
 Builds escrevem artefatos locais em `dist/`, `web/.next/` e caches ignorados. Não rode `contrib:web:check` ou outro build Next ao mesmo tempo que `contrib:web` na mesma cópia. Para tarefas simultâneas, use cópias separadas. Não compartilhe `target` entre perfis de build oficiais e contributor.
 

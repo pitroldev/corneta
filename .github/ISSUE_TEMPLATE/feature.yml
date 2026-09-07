@@ -1,0 +1,26 @@
+name: Melhoria
+description: Proponha uma mudança com problema e resultado claros.
+title: "[Melhoria]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Que problema você quer resolver?
+      description: Descreva a tarefa do streamer, não apenas a solução técnica.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Resultado desejado
+      description: Como saberemos que ficou melhor? Considere performance, privacidade e impacto durante a live.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas e escopo
+      description: O que você já tentou? O que pode ficar fora desta mudança?
+  - type: markdown
+    attributes:
+      value: "Leia [CONTRIBUTING.md](https://github.com/pitroldev/corneta/blob/main/CONTRIBUTING.md). Propostas não representam compromisso de implementação ou prazo. Não publique dados privados."

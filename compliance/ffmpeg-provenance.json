@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "ffmpegArchiveSha256": "e254995d48e6e9e88f5a05eb886a75e9ac33d7c6bb2e8a301e2eb65848a2d489",
+  "ffmpegCommit": "1a748fe2cd43e3ead22fafb1b5b7d77f153898a8",
+  "releaseRecipeCommit": "8267213e26c1031621e6e1210fe3aa4867214f6a",
+  "buildJob": "https://github.com/BtbN/FFmpeg-Builds/actions/runs/34032460921/job/101487116328",
+  "image": {
+    "repository": "btbn/ffmpeg-builds/win64-gpl-8.1",
+    "digest": "sha256:e73561029585dd796ba432bc6580bc4bd37258b080ae17aec99530c040f269b5",
+    "configDigest": "sha256:5fa40f4d32b3a0e969e96056bf781036a60d5c2453be58c32ea4ecff71147e3c",
+    "dependencyLayerDigest": "sha256:affce1534023589dc88916522f2cdbf2b6b5299fa105e0d02d8c322642f8ba99"
+  },
+  "limitations": [
+    "The release recipe commit is not by itself proof of the dependency-image recipe revision.",
+    "Package metadata establishes installed library versions, not all corresponding sources or static-link inclusion.",
+    "This evidence does not approve distribution; ffmpeg-sources.json remains the independent release gate."
+  ]
+}

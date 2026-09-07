@@ -2081,7 +2081,8 @@ function AlertSourceCard({
             <div className="flex items-center gap-2">
               <Input
                 type="password"
-                autoFocus
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- Foco apenas após a ação explícita de editar, nunca ao abrir a tela sem token.
+                autoFocus={editing}
                 placeholder={meta.placeholder}
                 aria-label={`${meta.label} — ${meta.placeholder}`}
                 value={token}

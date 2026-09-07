@@ -1,5 +1,12 @@
-dist
-node_modules
-src-tauri
+dist/
+node_modules/
+.artifacts/
+.claude/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+web/.next*/
+web/.generated/
+web/out/
+web/next-env.d.ts
 pnpm-lock.yaml
-docs

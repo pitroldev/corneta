@@ -1,0 +1,10 @@
+# Responsável real atual; não exige uma segunda pessoa fictícia nem autoaprova PRs.
+* @pitroldev
+# Áreas de atenção: OAuth/cofre, mídia, persistência, telemetria e release.
+/src-tauri/src/auth.rs @pitroldev
+/src-tauri/src/keys.rs @pitroldev
+/src-tauri/src/engine.rs @pitroldev
+/src-tauri/src/session/ @pitroldev
+/web/lib/server/ @pitroldev
+/compliance/ @pitroldev
+/.github/ @pitroldev

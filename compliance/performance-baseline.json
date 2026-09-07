@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "scenario": "report-8h-4-targets-v1",
+  "measuredAt": "2026-09-07T02:13:32.159Z",
+  "runtime": {
+    "node": "24.18.1",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26220",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i7-13700K",
+    "logicalCpus": 24,
+    "memoryGiB": 32
+  },
+  "sampleCount": 14400,
+  "inputBytes": 5841193,
+  "warmup": 5,
+  "iterations": 25,
+  "milliseconds": {
+    "p50": 28.83,
+    "p95": 38.8,
+    "max": 40.05200000000002
+  },
+  "scope": "JSON parse, normalização e análise no Node; exclui serialização da fixture, disco, React, GPU e IPC. Não mede startup, RSS da live ou vazamento de memória.",
+  "sourceCommit": "8a2815d (worktree desta implementação; benchmark novo)"
+}

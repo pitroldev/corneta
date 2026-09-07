@@ -1,76 +1,163 @@
-// Roda um comando com o `.env` da raiz carregado no AMBIENTE do processo.
-//
-// Existe porque a cadeia do Tauri não lê `.env`: o Vite lê (só o que tem prefixo
-// `VITE_`), o Next lê (o `web/next.config.ts` chama `loadEnvFile` na mão), mas o
-// `tauri build`/`cargo` não leem nada. O sintoma é sempre o mesmo e sempre no
-// fim de uma compilação de 10 minutos:
-//
-//   A public key has been found, but no private key.
-//   Make sure to set `TAURI_SIGNING_PRIVATE_KEY` environment variable.
-//
-// Uso: node scripts/with-env.mjs <comando> [args...]
-//
-// FRONTEIRA DE CONFIANÇA: aqui entra o `.env` INTEIRO, secrets inclusive — é o
-// mesmo que o dev faria com `set -a && . ./.env`. O que impede um secret de
-// vazar pro artefato não é este script:
-//   • o `src-tauri/build.rs` tem allowlist e só assa no binário o que é público;
-//   • o Vite só expõe pro bundle o que começa com `VITE_`;
-//   • o `scripts/check-bundle.mjs` varre o bundle atrás de segredo.
-// Nada é impresso aqui, nem nome nem valor.
-
+// Trusted maintainer commands only. The root .env is passed to the CHILD process,
+// including signing credentials; this launcher is not a sandbox or a bundling
+// allowlist. Use contrib:* for credential-free development. See CONFIGURACAO.md.
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseEnv } from "node:util";
 
-const [command, ...args] = process.argv.slice(2);
-if (!command) {
-  console.error("uso: node scripts/with-env.mjs <comando> [args...]");
-  process.exit(2);
-}
+const require = createRequire(import.meta.url);
+const rootEnv = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env");
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env");
-let carregadas = 0;
-try {
-  for (const linha of readFileSync(envPath, "utf8").split(/\r?\n/)) {
-    const texto = linha.trim();
-    if (!texto || texto.startsWith("#")) continue;
-    const corte = texto.indexOf("=");
-    if (corte <= 0) continue;
-    const chave = texto.slice(0, corte).trim();
-    // O ambiente REAL vence: no CI as variáveis vêm do runner e o `.env` não
-    // existe. Aqui só preenchemos buraco.
-    if (chave in process.env) continue;
-    // Vazio ENTRA, ao contrário do build.rs: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=`
-    // significa "chave sem senha", e deixar a variável ausente faz o Tauri
-    // parar pra perguntar a senha no meio do bundle.
-    process.env[chave] = texto
-      .slice(corte + 1)
-      .trim()
-      .replace(/^(['"])(.*)\1$/, "$2");
-    carregadas += 1;
+export function mergeEnvironment(
+  source,
+  inherited,
+  platform = process.platform,
+) {
+  const env = { ...inherited };
+  const normalize = (key) => (platform === "win32" ? key.toUpperCase() : key);
+  const existing = new Set(Object.keys(inherited).map(normalize));
+  let loaded = 0;
+  // Native Node dotenv semantics: quoted multiline values, comments, export,
+  // empty strings and no shell/$VARIABLE interpolation. A present but EMPTY
+  // inherited value still wins (notably TAURI_SIGNING_PRIVATE_KEY_PASSWORD).
+  for (const [key, value] of Object.entries(parseEnv(source))) {
+    if (existing.has(normalize(key))) continue;
+    Object.defineProperty(env, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    existing.add(normalize(key));
+    loaded++;
   }
-  console.log(`with-env: ${carregadas} variável(is) do .env carregada(s)`);
-} catch {
-  // Sem `.env` (CI) o comando roda com o ambiente que já existe — que é o certo.
-  console.log("with-env: sem .env; usando o ambiente do processo");
+  return { env, loaded };
 }
 
-// O sccache é opcional no computador do desenvolvedor: se estiver instalado, app:dev e
-// app:build passam a reutilizar os artefatos do rustc automaticamente; se não estiver, o
-// comportamento continua idêntico ao anterior. Um RUSTC_WRAPPER explícito sempre vence.
-const usesRust = command === "tauri" || command === "cargo";
-if (usesRust && !("RUSTC_WRAPPER" in process.env)) {
-  const probe = spawnSync("sccache", ["--version"], { stdio: "ignore" });
-  if (!probe.error && probe.status === 0) {
-    process.env.RUSTC_WRAPPER = "sccache";
-    console.log("with-env: sccache ativado para esta compilação Rust");
+export function loadEnvironmentFile(
+  path,
+  inherited,
+  { read = readFileSync, platform = process.platform } = {},
+) {
+  let source;
+  try {
+    source = read(path, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return { env: { ...inherited }, loaded: 0, missing: true };
+    }
+    // Permission/I/O failures must not look like no .env. Do not echo paths,
+    // file contents or low-level error messages: they can contain credentials.
+    throw new Error(
+      "with-env: não foi possível ler o arquivo de configuração.",
+    );
+  }
+  try {
+    return { ...mergeEnvironment(source, inherited, platform), missing: false };
+  } catch {
+    throw new Error("with-env: não foi possível interpretar a configuração.");
   }
 }
 
-const filho = spawn(command, args, { stdio: "inherit", shell: true });
-filho.on("exit", (code, signal) => process.exit(signal ? 1 : (code ?? 1)));
-filho.on("error", (erro) => {
-  console.error(`with-env: não consegui rodar "${command}": ${erro.message}`);
-  process.exit(1);
-});
+export function commandInvocation(
+  command,
+  args,
+  {
+    platform = process.platform,
+    node = process.execPath,
+    resolveTauri = () => require.resolve("@tauri-apps/cli/tauri.js"),
+  } = {},
+) {
+  if (
+    !command ||
+    command.includes("\0") ||
+    args.some((arg) => arg.includes("\0"))
+  ) {
+    throw new Error("with-env: comando ou argumentos inválidos.");
+  }
+  // A pnpm Windows shim is a .cmd, which Node cannot execute without cmd.exe.
+  // Resolve our CLI to JS instead: same pinned Node and literal arguments.
+  if (
+    command === "tauri" ||
+    (platform === "win32" && command === "tauri.cmd")
+  ) {
+    let script;
+    try {
+      script = resolveTauri();
+    } catch {
+      throw new Error("with-env: CLI Tauri ausente; execute pnpm install.");
+    }
+    return { command: node, args: [script, ...args], usesRust: true };
+  }
+  if (platform === "win32" && /\.(?:cmd|bat)$/i.test(command)) {
+    throw new Error(
+      "with-env: scripts .cmd/.bat não são suportados; use um executável ou node com o arquivo JS.",
+    );
+  }
+  return {
+    command,
+    args: [...args],
+    usesRust: /(?:^|[\\/])cargo(?:\.exe)?$/i.test(command),
+  };
+}
+
+async function main() {
+  const [command, ...args] = process.argv.slice(2);
+  if (!command) {
+    console.error(
+      "uso: node scripts/with-env.mjs <executável|tauri> [args...]",
+    );
+    process.exitCode = 2;
+    return;
+  }
+  const invocation = commandInvocation(command, args);
+  const { env, loaded, missing } = loadEnvironmentFile(rootEnv, process.env);
+  console.log(
+    missing
+      ? "with-env: sem .env; usando o ambiente do processo"
+      : `with-env: ${loaded} variável(is) do .env carregada(s)`,
+  );
+  const wrapperConfigured = Object.keys(env).some((key) =>
+    process.platform === "win32"
+      ? key.toUpperCase() === "RUSTC_WRAPPER"
+      : key === "RUSTC_WRAPPER",
+  );
+  if (invocation.usesRust && !wrapperConfigured) {
+    const probe = spawnSync("sccache", ["--version"], {
+      env,
+      stdio: "ignore",
+      shell: false,
+      timeout: 3000,
+    });
+    if (!probe.error && probe.status === 0) {
+      env.RUSTC_WRAPPER = "sccache";
+      console.log("with-env: sccache ativado para esta compilação Rust");
+    }
+  }
+  process.exitCode = await new Promise((complete, reject) => {
+    const child = spawn(invocation.command, invocation.args, {
+      env,
+      stdio: "inherit",
+      shell: false,
+    });
+    child.once("exit", (code) => complete(code ?? 1));
+    child.once("error", () =>
+      reject(
+        new Error("with-env: não foi possível iniciar o comando solicitado."),
+      ),
+    );
+  });
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Vulnerabilidade ou credencial exposta
+    url: https://github.com/pitroldev/corneta/blob/main/SECURITY.md
+    about: Use o canal privado; não abra uma issue pública.
+  - name: Dúvidas de uso e suporte
+    url: https://github.com/pitroldev/corneta/blob/main/SUPPORT.md
+    about: Consulte ambientes atendidos e como pedir ajuda.

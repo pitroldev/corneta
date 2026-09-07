@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   quality:
     uses: ./.github/workflows/ci.yml
@@ -32,6 +36,7 @@ jobs:
   release:
     needs: quality
     runs-on: windows-2025
+    timeout-minutes: 90
     env:
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_ENABLED: "true"
@@ -54,7 +59,9 @@ jobs:
         with:
           node-version: 24.18.1
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master; immutable implementation
+        with:
+          toolchain: 1.97.1
       - name: Ativar cache de compilação Rust
         uses: mozilla-actions/sccache-action@fd02668681acd5f960e1372061bee5e3e987195c # v0.0.11
         with:
@@ -230,7 +237,7 @@ jobs:
           TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --config '{"build":{"beforeBuildCommand":"pnpm --version"}}'
+        run: pnpm tauri build --config '{"build":{"beforeBuildCommand":"pnpm --version"}}' -- --locked
 
       - name: Gerar latest.json do updater
         id: updater

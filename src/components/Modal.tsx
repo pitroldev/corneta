@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../lib/utils";
 
@@ -16,6 +16,8 @@ function fromRadixPopper(target: EventTarget | null): boolean {
  * dentro de `children`. `lockOutside` bloqueia o fechar-clicando-fora e o Esc.
  * `initialFocusRef` escolhe onde o foco cai ao abrir — sem ele o Radix foca o
  * primeiro focável, que em modais com X no canto é justamente o botão de fechar.
+ * Sem Dialog.Trigger (modais condicionais/lazy), preserva o foco de origem para
+ * fechar com Esc sem perder a posição do teclado nem saltar o scroll da página.
  */
 export function Modal({
   title,
@@ -32,6 +34,7 @@ export function Modal({
   lockOutside?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root
       open
@@ -55,10 +58,21 @@ export function Modal({
             if (lockOutside) e.preventDefault();
           }}
           onOpenAutoFocus={(e) => {
+            const active = document.activeElement;
+            returnFocus.current =
+              active instanceof HTMLElement && active !== document.body
+                ? active
+                : null;
             const el = initialFocusRef?.current;
             if (!el) return;
             e.preventDefault();
             el.focus();
+          }}
+          onCloseAutoFocus={(e) => {
+            const el = returnFocus.current;
+            if (!el?.isConnected) return;
+            e.preventDefault();
+            el.focus({ preventScroll: true });
           }}
           className={cn(
             "fixed left-1/2 top-1/2 z-[90] max-h-[90vh] w-[calc(100%-3rem)] -translate-x-1/2 -translate-y-1/2 overscroll-contain overflow-y-auto outline-none",

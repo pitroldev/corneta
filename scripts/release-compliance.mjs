@@ -1,3 +1,15 @@
+// Keep these notices/instructions alongside the exact source archives. This list
+// is packaging metadata, never evidence that the source review is complete.
+export const compliancePackageFiles = [
+  "LICENSE",
+  "THIRD_PARTY_NOTICES.md",
+  "pnpm-lock.yaml",
+  "src-tauri/Cargo.lock",
+  "compliance/ffmpeg-sources.json",
+  "compliance/ffmpeg-provenance.json",
+  "docs/CONFORMIDADE-FFMPEG.md",
+];
+
 export function complianceErrors(manifest, sidecars) {
   const errors = [];
   if (manifest?.schemaVersion !== 1 || manifest.reviewed !== true)

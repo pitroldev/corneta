@@ -764,6 +764,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                       <input
                         type="number"
                         step={500}
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- O usuário abriu explicitamente o editor numérico; mantém a continuação pelo teclado.
                         autoFocus
                         value={brDraft ?? String(p.videoBitrateKbps)}
                         // Rascunho local: só COMMITA no blur/Enter — commitar por tecla
