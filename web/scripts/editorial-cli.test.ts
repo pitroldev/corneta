@@ -81,26 +81,26 @@ describe("editorial CLI arguments", () => {
   it.each([[], ["--"]])(
     "keeps validation after a leading separator (%j)",
     (...prefix) => {
-      expect(() => parseRevision(prefix)).toThrow("--base é obrigatório");
+      expect(() => parseRevision(prefix)).toThrow("--base is required");
       expect(() => parseRevision([...prefix, "--base"])).toThrow(
-        "exige um valor",
+        "requires a value",
       );
       expect(() =>
         parseMaintenance([...prefix, "--as-of", "2026-02-30"]),
-      ).toThrow("data real");
+      ).toThrow("real date");
       expect(() =>
         parseMaintenance([...prefix, "--warning-days", "366"]),
-      ).toThrow("entre 0 e 365");
+      ).toThrow("between 0 and 365");
       expect(() => parseMaintenance([...prefix, "--format", "xml"])).toThrow(
-        "text, json ou github",
+        "text, json, or github",
       );
       expect(() =>
         parseImage([...prefix, ...imageArgs, "--width", "319"]),
-      ).toThrow("entre 320 e 4000");
+      ).toThrow("between 320 and 4000");
       expect(() =>
         parseImage([...prefix, ...imageArgs, "--quality", "100"]),
-      ).toThrow("entre 40 e 95");
-      expect(() => parseImage([...prefix, "--input"])).toThrow("Valor ausente");
+      ).toThrow("between 40 and 95");
+      expect(() => parseImage([...prefix, "--input"])).toThrow("Missing value");
       for (const [parseArgs, args] of [
         [parseRevision, ["--base", "HEAD"]],
         [parseMaintenance, []],
@@ -108,17 +108,16 @@ describe("editorial CLI arguments", () => {
       ] as const) {
         expect(() =>
           parseArgs([...prefix, ...args, "--unknown", "value"]),
-        ).toThrow("desconhecid");
+        ).toThrow("Unknown");
         expect(() =>
           parseArgs([...prefix, ...args, "--", "--unknown"]),
-        ).toThrow("desconhecid");
+        ).toThrow("Unknown");
       }
     },
   );
 });
 
-// These checked-in examples use static shell words, quoted values and line
-// continuations. Replace workflow expressions, but never execute their commands.
+// Inspect workflow commands without executing shell fragments from their contents.
 function editorialCommands(text: string): string[][] {
   return text
     .replace(/\$\{\{[^}]*\}\}/g, "fixture-ref")

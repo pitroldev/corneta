@@ -1,4 +1,4 @@
-//! Modelo de configuração (espelha src/lib/types.ts) e persistência em disco.
+//! Persisted configuration contract shared with src/lib/types.ts.
 use crate::i18n::{self, Locale, Msg};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
@@ -25,7 +25,7 @@ impl std::fmt::Display for ConfigReadError {
     }
 }
 
-/// Bounds the bytes actually read, including files that grow after being opened.
+/// Bound actual reads, including files that grow after being opened.
 fn read_config_bytes(reader: impl Read) -> Result<String, ConfigReadError> {
     let mut bytes = Vec::new();
     reader
@@ -56,8 +56,7 @@ fn valid_id(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
 }
 
-/// O rótulo entra como `Msg` (não como `&str`) porque a frase é MONTADA: o texto do
-/// rótulo é uma mensagem própria, renderizada no mesmo idioma da moldura.
+/// Render the field label in the same locale as its enclosing validation message.
 fn limited(l: Locale, label: Msg<'_>, value: &str, max: usize) -> Result<(), String> {
     if value.len() > max {
         Err(Msg::ConfigLimitExceeded {
@@ -93,8 +92,7 @@ pub struct VideoPreset {
     pub keyframe_sec: u32,
 }
 
-/// Enquadramento pra saída vertical: posição/zoom do recorte 9:16 sobre o sinal landscape.
-/// `x`/`y` são panorâmica (0..1) do espaço disponível; `zoom` é a altura do recorte (0.25..1).
+/// x/y pan across available space (0..1); zoom is the crop height fraction (0.25..1).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Reframe {
@@ -106,16 +104,16 @@ pub struct Reframe {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetEncoding {
-    /// "copy" | "transcode" (legado — não usado; o híbrido decide via hybrid_override/auto)
+    /// copy or transcode in per-platform mode; hybrid uses hybrid_override or automatic selection.
     pub action: String,
     #[serde(default)]
     pub preset: Option<VideoPreset>,
-    /// "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software"
+    /// auto | nvenc | qsv | amf | videotoolbox | software
     pub encoder: String,
-    /// No modo híbrido: override manual ("copy"/"transcode"). None = decisão automática.
+    /// None lets hybrid mode select copy or transcode automatically.
     #[serde(default)]
     pub hybrid_override: Option<String>,
-    /// Enquadramento do recorte vertical (saída portrait). None = centralizado.
+    /// None centers the portrait crop.
     #[serde(default)]
     pub reframe: Option<Reframe>,
 }
@@ -148,25 +146,20 @@ pub struct IngestConfig {
 pub struct Settings {
     pub minimize_to_tray: bool,
     pub autostart: bool,
-    /// Senha do obs-websocket (vazio = sem autenticação). Usada no auto-config do OBS.
+    /// Empty means unauthenticated obs-websocket access.
     #[serde(default)]
     pub obs_password: String,
-    /// Ligar/parar o OBS junto com o BORA AO VIVO (via obs-websocket).
     #[serde(default = "default_true")]
     pub auto_start_obs: bool,
-    /// Atalho global pra começar/parar (acelerador do Tauri).
     #[serde(default = "default_live_shortcut")]
     pub live_shortcut: String,
-    /// Chat: API key do YouTube Data API v3 (compartilhada entre as fontes do YouTube).
     #[serde(default)]
     pub youtube_api_key: String,
-    /// Chat: lista de fontes (várias por plataforma).
     #[serde(default)]
     pub chat_sources: Vec<ChatSource>,
-    /// Alertas: fontes externas (Streamlabs/StreamElements). Token vai no keyring, não aqui.
+    /// Aggregator credentials live in the keyring, not these source records.
     #[serde(default)]
     pub alert_sources: Vec<AlertSource>,
-    /// Exibição do chat.
     #[serde(default = "default_true")]
     pub chat_show_emotes: bool,
     #[serde(default = "default_true")]
@@ -179,143 +172,97 @@ pub struct Settings {
     pub chat_show_timestamps: bool,
     #[serde(default = "default_true")]
     pub chat_show_viewers: bool,
-    /// Tema da interface: "dark" | "light".
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// Idioma da interface: "auto" | "pt-BR" | "en". Em "auto" segue o idioma
-    /// do Windows. O Rust também lê isto: as mensagens de erro que ele devolve
-    /// aparecem na tela, então precisam sair no idioma escolhido.
+    /// auto | pt-BR | en; auto follows the OS locale, including native user-facing errors.
     #[serde(default = "default_language")]
     pub language: String,
-    /// Tamanho da fonte do chat em pixels (slider). Aceita os antigos "sm/md/lg" salvos.
+    /// Pixel size; also accepts persisted legacy sm/md/lg values.
     #[serde(default = "default_font", deserialize_with = "de_font")]
     pub chat_font_size: u32,
-    /// Tamanho da fonte dos ALERTAS em pixels (slider próprio, igual ao do chat).
     #[serde(default = "default_font", deserialize_with = "de_font")]
     pub alert_font_size: u32,
-    /// Layout do modo "Ambos" da janela do chat: "auto" | "row" (lado a lado) | "col" (empilhado).
+    /// auto | row | col
     #[serde(default = "default_both_layout")]
     pub chat_both_layout: String,
-    /// No modo "Ambos", mostrar os alertas antes do chat.
     #[serde(default)]
     pub chat_both_alerts_first: bool,
-    /// Posição do divisor do modo "Ambos": % que o painel de alertas ocupa (15–75).
+    /// Percentage occupied by the alerts panel (15..75).
     #[serde(default = "default_both_split")]
     pub chat_both_split: u32,
-    /// Proteção contra quedas: se o sinal cair NO MEIO da live, o slate "JÁ VOLTO" entra SEM
-    /// derrubar a conexão das plataformas. Sem o Guardião, usa o SPLICER (copia o sinal do OBS
-    /// pro programa, sem re-encode — quase não pesa, ver splicer.rs); com o Guardião, é o
-    /// compositor que recodifica (delay de 12s). Padrão DESLIGADO.
     #[serde(default)]
     pub brb_enabled: bool,
-    /// Tela "JÁ VOLTO": "auto" (gerada pela Corneta) | "image" | "video" (arquivo escolhido pelo
-    /// usuário, salvo como brb-slate.* na pasta de config). Vídeo pode ter som.
+    /// auto | image | video; custom files are stored as brb-slate.*.
     #[serde(default = "default_brb_slate_kind")]
     pub brb_slate_kind: String,
-    /// Auto-bitrate: baixa o bitrate de um destino que recodifica quando a banda aperta
-    /// (e sobe de volta quando estabiliza). Só vale pra destinos em transcode.
+    /// Adaptive bitrate applies only to transcoded destinations.
     #[serde(default = "default_true")]
     pub auto_bitrate: bool,
-    /// Guardião de privacidade: mostra a tela "JÁ VOLTO" quando um TERMO da watchlist aparece na
-    /// tela, antes de ir ao ar (preventivo, via delay fixo). Sem termos, não faz nada.
     #[serde(default)]
     pub guardian_enabled: bool,
-    /// Termos EXPLÍCITOS a vigiar (endereço, nome real, @, placa…). É o único gatilho da feature.
+    /// Only explicitly supplied terms participate in privacy detection.
     #[serde(default)]
     pub guardian_watchlist: Vec<String>,
-    /// Normalizador de ÁUDIO: acerta o volume (loudness) pro alvo antes de enviar, via `loudnorm`
-    /// no encode que a Corneta JÁ faz por destino → quase sem custo e sem tocar no vídeo. Opt-in
-    /// (padrão DESLIGADO): a passada única pode bombear e briga com quem já normaliza no OBS.
+    /// Opt-in: single-pass loudness correction may pump or conflict with normalization in OBS.
     #[serde(default)]
     pub loudness_normalize: bool,
-    /// Alvo de loudness integrado (LUFS) do normalizador. -14 é o comum de Twitch/YouTube.
+    /// Integrated loudness target in LUFS.
     #[serde(default = "default_loudness_target")]
     pub loudness_target_lufs: f64,
-    /// YouTube automático: ao dar BORA, a Corneta cria a transmissão (broadcast) e injeta a
-    /// chave RTMP do YouTube sozinha — o streamer não abre o YouTube Studio.
     #[serde(default = "default_true")]
     pub youtube_auto_live: bool,
-    /// Título da live, lembrado entre sessões. Alimenta o broadcast automático do YouTube.
     #[serde(default)]
     pub stream_title: String,
-    /// Conectar o chat sozinho quando a transmissão entra no ar.
     #[serde(default = "default_true")]
     pub chat_auto_connect: bool,
-    /// Última aba usada na janela flutuante do chat: "chat" | "alerts" | "both".
     #[serde(default = "default_popout_tab")]
     pub chat_popout_tab: String,
-    /// Painel de alertas da tela de Chat aberto (persistido entre visitas).
     #[serde(default)]
     pub chat_show_alerts_panel: bool,
-    /// Overlay de alertas pro OBS: mantém o servidor local (Browser Source) de pé. A URL é fixa
-    /// (porta abaixo) pra colar no OBS UMA vez. Só loopback — nome/valor de quem doou não vaza
-    /// pra LAN. Padrão DESLIGADO.
+    /// Loopback-only server with a stable URL between restarts.
     #[serde(default)]
     pub overlay_enabled: bool,
-    /// Overlay: tocar um som (chime) quando um alerta aparece.
     #[serde(default = "default_true")]
     pub overlay_sound: bool,
-    /// Overlay: posição do card na tela (top | bottom | center | top-left | top-right | …).
+    /// top | bottom | center | top-left | top-right | bottom-left | bottom-right
     #[serde(default = "default_overlay_position")]
     pub overlay_position: String,
-    /// Overlay: porta do servidor local (URL fixa pro OBS). Troque se a 7393 estiver ocupada.
     #[serde(default = "default_overlay_port")]
     pub overlay_port: u32,
-    /// Overlay do CHAT: de onde a lista cresce na tela ("bottom" | "top").
+    /// bottom | top
     #[serde(default = "default_overlay_chat_position")]
     pub overlay_chat_position: String,
-    /// Overlay de alertas: quanto tempo cada card fica na tela (segundos).
     #[serde(default = "default_overlay_duration")]
     pub overlay_duration_secs: u32,
-    /// Overlay de alertas: escala do card ("sm" | "md" | "lg").
+    /// sm | md | lg
     #[serde(default = "default_overlay_scale")]
     pub overlay_scale: String,
-    /// Overlay de alertas: mostrar alertas de seguidor (os mais frequentes — dá pra esconder).
     #[serde(default = "default_true")]
     pub overlay_show_follows: bool,
-    /// Overlay do chat: tamanho da fonte (px).
     #[serde(default = "default_overlay_chat_size")]
     pub overlay_chat_size: u32,
-    /// Overlay do chat: máximo de mensagens na tela.
     #[serde(default = "default_overlay_chat_max")]
     pub overlay_chat_max: u32,
-    /// Overlay do chat: mostrar os selos (mod/sub/vip).
     #[serde(default = "default_true")]
     pub overlay_chat_badges: bool,
-    /// Overlay do chat: mostrar o pontinho da plataforma.
     #[serde(default = "default_true")]
     pub overlay_chat_platform: bool,
-    /// Overlay do chat: esconder mensagens de comando (começam com "!").
     #[serde(default)]
     pub overlay_chat_hide_commands: bool,
-    /// Overlay do chat: sumir com a mensagem após N segundos (0 = nunca).
+    /// Zero disables message fading.
     #[serde(default)]
     pub overlay_chat_fade_secs: u32,
-    /// Nome original do arquivo custom do "JÁ VOLTO" (só exibição; o arquivo vira brb-slate.*).
+    /// Display-only original filename; the stored file is renamed to brb-slate.*.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brb_slate_file_name: Option<String>,
-    /// GRAVAÇÃO da live (vídeo do programa em disco, pro replay do relatório).
-    ///
-    /// Padrão DESLIGADO, e é uma decisão de produto, não de implementação: a 6000 kbps são
-    /// ~2,7 GB/hora. Ligar isso sem o streamer pedir encheria o SSD de alguém em duas
-    /// semanas.
     #[serde(default)]
     pub record_video: bool,
-    /// Pasta das gravações. VAZIO = pasta de sessões, resolvida na hora.
-    ///
-    /// Vazio em vez de um caminho concreto de propósito: este config viaja entre perfis e é
-    /// lido pelo Rust e pelo TS — um caminho gravado amarraria a configuração a uma máquina
-    /// e continuaria errado depois que o `app_data_dir` mudasse.
+    /// Empty resolves to the current session directory, keeping exported settings portable.
     #[serde(default)]
     pub record_video_dir: String,
-    /// Teto de disco das gravações, em GB. A poda de vídeo é por ESPAÇO (a de sessões é por
-    /// contagem): 50 relatórios são alguns MB, 50 vídeos são centenas de GB.
     #[serde(default = "default_record_keep_gb")]
     pub record_video_keep_gb: u64,
-    /// GRAVAÇÃO do chat (mensagens com autor e texto, pro replay).
-    ///
-    /// Chave SEPARADA da de vídeo porque os motivos de recusar cada uma são diferentes: uma
-    /// custa disco, a outra guarda dado pessoal de terceiros na máquina do streamer.
+    /// Separate consent: video consumes disk; chat stores other people's personal data.
     #[serde(default)]
     pub record_chat: bool,
 }
@@ -369,7 +316,7 @@ fn default_language() -> String {
 fn default_font() -> u32 {
     14
 }
-/// Tamanho da fonte: aceita número (px) ou os rótulos antigos "sm/md/lg".
+/// Accept pixel values and persisted legacy sm/md/lg labels.
 fn de_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
     #[derive(Deserialize)]
     #[serde(untagged)]
@@ -387,23 +334,21 @@ fn de_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u32, D::Error> {
     })
 }
 
-/// Uma fonte de chat (um canal de uma plataforma).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatSource {
     pub id: String,
     pub platform: String, // twitch | youtube | kick | cinefy
-    pub value: String,    // canal/slug/vídeo
+    pub value: String,    // channel, slug, or video identifier
     #[serde(default)]
     pub name: String,
     pub enabled: bool,
-    /// Tem token de envio no cofre (`chat_send_<id>`)? Recomputado no get_config.
+    /// Recomputed from chat_send_<id> in the vault during get_config.
     #[serde(default)]
     pub has_send_token: bool,
 }
 
-/// Uma fonte de alerta externa (agregador). O token NUNCA fica aqui — só no keyring,
-/// sob a chave `alert_<id>`. `has_token` é recomputado no get_config (igual Target.has_key).
+/// Credentials remain in alert_<id>; get_config recomputes has_token from the vault.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AlertSource {
@@ -467,8 +412,7 @@ impl Default for Settings {
             overlay_chat_hide_commands: false,
             overlay_chat_fade_secs: 0,
             brb_slate_file_name: None,
-            // As duas gravações nascem DESLIGADAS: uma custa disco, a outra guarda dado
-            // pessoal de terceiros. Nenhuma das duas é decisão da Corneta.
+            // Both require explicit consent: disk usage and third-party personal data are independent choices.
             record_video: false,
             record_video_dir: String::new(),
             record_video_keep_gb: default_record_keep_gb(),
@@ -484,7 +428,6 @@ fn default_both_layout() -> String {
     "auto".to_string()
 }
 
-/// Um perfil salvo = um conjunto de destinos + modo de encoding.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
@@ -502,12 +445,11 @@ pub struct AppConfig {
     #[serde(default)]
     pub revision: u64,
     pub ingest: IngestConfig,
-    /// "per-platform" | "passthrough" | "hybrid"
+    /// per-platform | passthrough | hybrid
     pub mode: String,
     pub targets: Vec<Target>,
     #[serde(default)]
     pub settings: Settings,
-    /// Perfis salvos (espelham o working set ativo). Migrados no frontend se vazios.
     #[serde(default)]
     pub profiles: Vec<Profile>,
     #[serde(default)]
@@ -536,10 +478,12 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    pub fn validate_and_normalize(mut self) -> Result<Self, String> {
-        // UMA leitura do idioma ativo pra função inteira: duas leituras poderiam divergir
-        // se o streamer trocasse o idioma no meio da validação.
-        let l = i18n::locale();
+    pub fn validate_and_normalize(self) -> Result<Self, String> {
+        // Capture one locale so a concurrent language change cannot mix validation messages.
+        self.validate_and_normalize_for_locale(i18n::locale())
+    }
+
+    fn validate_and_normalize_for_locale(mut self, l: Locale) -> Result<Self, String> {
         if self.schema_version > CURRENT_SCHEMA_VERSION {
             return Err(Msg::ConfigSchemaTooNew {
                 n: self.schema_version,
@@ -690,8 +634,6 @@ impl AppConfig {
         if !matches!(s.theme.as_str(), "dark" | "light") {
             s.theme = default_theme();
         }
-        // Teto de gravação: 1 GB não cabe nem meia hora e o zero desligaria a retenção
-        // (deixando o disco crescer sem freio). 2 TB é o limite de sanidade.
         s.record_video_keep_gb = s.record_video_keep_gb.clamp(1, 2048);
         s.record_video_dir = s.record_video_dir.trim().chars().take(400).collect();
         Ok(self)
@@ -707,6 +649,31 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("config.json"))
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ConfigLoadError {
+    Structure,
+    Validation,
+}
+
+impl std::fmt::Display for ConfigLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Structure => "invalid_structure",
+            Self::Validation => "invalid_values",
+        })
+    }
+}
+
+fn config_from_value(
+    value: serde_json::Value,
+    locale: Locale,
+) -> Result<AppConfig, ConfigLoadError> {
+    serde_json::from_value::<AppConfig>(value)
+        .map_err(|_| ConfigLoadError::Structure)?
+        .validate_and_normalize_for_locale(locale)
+        .map_err(|_| ConfigLoadError::Validation)
+}
+
 pub fn load(app: &AppHandle) -> AppConfig {
     let path = match config_path(app) {
         Ok(p) => p,
@@ -719,31 +686,26 @@ pub fn load(app: &AppHandle) -> AppConfig {
                     .get("schemaVersion")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32;
-                match serde_json::from_value::<AppConfig>(value)
-                    .map_err(|e| e.to_string())
-                    .and_then(AppConfig::validate_and_normalize)
-                {
+                match config_from_value(value, i18n::locale()) {
                     Ok(cfg) => {
                         if old_schema < CURRENT_SCHEMA_VERSION {
                             let backup =
                                 path.with_extension(format!("schema-{old_schema}.json.bak"));
                             let _ = std::fs::copy(&path, backup);
                             if let Err(e) = save(app, &cfg) {
-                                log::warn!("não foi possível persistir a migração: {e}");
+                                log::warn!("could not persist configuration migration: {e}");
                             }
                         }
                         cfg
                     }
                     Err(e) => {
-                        log::error!("config.json rejeitado: {e}");
+                        log::error!("config.json rejected: {e}");
                         AppConfig::default()
                     }
                 }
             }
             Err(e) => {
-                log::error!(
-                    "config.json inválido ({e}); preservando como .corrupt e usando o padrão"
-                );
+                log::error!("config.json invalid ({e}); preserving as .corrupt and using defaults");
                 let ts = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
@@ -753,7 +715,7 @@ pub fn load(app: &AppHandle) -> AppConfig {
             }
         },
         Err(ConfigReadError::TooLarge) => {
-            log::error!("config.json excede o limite de 2 MiB");
+            log::error!("config.json exceeds the 2 MiB limit");
             AppConfig::default()
         }
         Err(_) => AppConfig::default(),
@@ -771,6 +733,33 @@ pub fn save(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn config_load_diagnostics_do_not_reuse_localized_validation_or_user_values() {
+        for locale in [Locale::PtBr, Locale::En] {
+            let mut config = AppConfig::default();
+            config.ingest.host = "private-fixture.invalid".into();
+            let message = config
+                .clone()
+                .validate_and_normalize_for_locale(locale)
+                .unwrap_err();
+            assert_eq!(message, Msg::ConfigIngestMustBeLoopback.text(locale));
+            let error =
+                config_from_value(serde_json::to_value(config).unwrap(), locale).unwrap_err();
+            assert_eq!(error, ConfigLoadError::Validation);
+            assert_eq!(error.to_string(), "invalid_values");
+            assert!(!error.to_string().contains(&message));
+
+            let error = config_from_value(
+                serde_json::json!({ "ingest": "segredo private-fixture" }),
+                locale,
+            )
+            .unwrap_err();
+            assert_eq!(error, ConfigLoadError::Structure);
+            assert_eq!(error.to_string(), "invalid_structure");
+            assert!(!error.to_string().contains("private-fixture"));
+        }
+    }
 
     #[test]
     fn config_read_limits_actual_bytes_and_rejects_invalid_utf8() {
@@ -834,7 +823,7 @@ mod tests {
         assert!(cfg.validate_and_normalize().is_err());
     }
 
-    fn alvo(id: &str) -> Target {
+    fn target_fixture(id: &str) -> Target {
         Target {
             id: id.into(),
             platform_id: "twitch".into(),
@@ -854,47 +843,34 @@ mod tests {
     }
 
     #[test]
-    fn protocolo_do_destino_acompanha_o_esquema_da_url() {
+    fn destination_protocol_follows_the_ingest_url_scheme() {
         let mut cfg = AppConfig::default();
-        let mut target = alvo("target_secure");
+        let mut target = target_fixture("target_secure");
         target.protocol = "rtmp".into();
         target.ingest_url = "rtmps://ingest.example.test/app".into();
         cfg.targets.push(target);
 
         let cfg = cfg
             .validate_and_normalize()
-            .expect("URL RTMPS válida não pode impedir o destino de ser salvo");
+            .expect("a valid RTMPS URL must not prevent saving the destination");
         assert_eq!(cfg.targets[0].protocol, "rtmps");
     }
 
-    // ------------------------------------------------------------------
-    // O contrato que sustenta "minha chave sumiu"
-    // ------------------------------------------------------------------
-    //
-    // A stream key NUNCA entra no config.json: ela vive no cofre do Windows,
-    // indexada pelo `target.id`. O `has_key` daqui é só um espelho, recomputado a
-    // cada `get_config` com `keys::has_key(&t.id)`.
-    //
-    // Disso saem dois invariantes, e quebrar qualquer um faz a chave "sumir" da
-    // tela sem ter sumido do cofre.
-
-    /// 1. O ID do destino é a CHAVE DE BUSCA no cofre. Se a normalização o
-    ///    reescrevesse, a credencial ficaria órfã: continua gravada, mas ninguém
-    ///    mais acha — que é exatamente o sintoma "sumiu a chave".
+    /// Normalization must preserve destination IDs because they index vault credentials.
     #[test]
-    fn normalizar_nao_pode_reescrever_o_id_do_destino() {
+    fn normalization_must_preserve_destination_ids() {
         let mut cfg = AppConfig::default();
         let ids = ["target_1", "target-abc", "a", "A_9-z"];
         for id in ids {
-            cfg.targets.push(alvo(id));
+            cfg.targets.push(target_fixture(id));
         }
         cfg.profiles.push(Profile {
             id: "perfil_1".into(),
             name: "Live de sexta".into(),
             mode: "per-platform".into(),
-            targets: ids.iter().map(|id| alvo(id)).collect(),
+            targets: ids.iter().map(|id| target_fixture(id)).collect(),
         });
-        let cfg = cfg.validate_and_normalize().expect("config válida");
+        let cfg = cfg.validate_and_normalize().expect("valid configuration");
 
         assert_eq!(
             cfg.targets
@@ -902,7 +878,7 @@ mod tests {
                 .map(|t| t.id.as_str())
                 .collect::<Vec<_>>(),
             ids,
-            "id de destino mudou na normalização — a chave no cofre vira órfã"
+            "normalization changed the destination ID and orphaned its vault credential"
         );
         assert_eq!(
             cfg.profiles[0]
@@ -911,53 +887,53 @@ mod tests {
                 .map(|t| t.id.as_str())
                 .collect::<Vec<_>>(),
             ids,
-            "id dentro do perfil mudou — mesma órfã, só que ao trocar de perfil"
+            "normalization changed a profile destination ID and orphaned its credential"
         );
-        assert_eq!(cfg.targets.len(), ids.len(), "destino sumiu da config");
+        assert_eq!(
+            cfg.targets.len(),
+            ids.len(),
+            "a destination disappeared from the configuration"
+        );
     }
 
-    /// 2. `has_key` NUNCA é persistido como `true`. Um `true` velho no disco faria
-    ///    a tela jurar que a chave está lá depois de ela ter sido apagada do cofre
-    ///    — e o erro só apareceria ao vivo, na recusa da plataforma.
+    /// Never trust persisted credential presence; derive it from the vault.
     #[test]
-    fn has_key_nunca_e_persistido_como_verdadeiro() {
+    fn normalization_clears_persisted_credential_presence() {
         let mut cfg = AppConfig::default();
-        let mut com_chave = alvo("target_1");
-        com_chave.has_key = true;
-        cfg.targets.push(com_chave.clone());
+        let mut with_key = target_fixture("target_1");
+        with_key.has_key = true;
+        cfg.targets.push(with_key.clone());
         cfg.profiles.push(Profile {
             id: "perfil_1".into(),
             name: "Podcast".into(),
             mode: "hybrid".into(),
-            targets: vec![com_chave],
+            targets: vec![with_key],
         });
 
-        let cfg = cfg.validate_and_normalize().expect("config válida");
+        let cfg = cfg.validate_and_normalize().expect("valid configuration");
         assert!(
             !cfg.targets[0].has_key,
-            "has_key foi persistido — o disco passaria a mentir sobre o cofre"
+            "persisted has_key must not claim stale vault presence"
         );
         assert!(
             !cfg.profiles[0].targets[0].has_key,
-            "has_key persistido dentro do perfil"
+            "profile credential presence must also be cleared"
         );
     }
 
-    /// O `valid_id` é o mesmo portão do `validate_secret_namespace`: id que passa
-    /// aqui tem que servir de chave no cofre, senão salvar a chave falha depois
-    /// que o destino já existe na tela.
+    /// Destination validation and vault lookup must accept the same identifier namespace.
     #[test]
-    fn todo_id_de_destino_aceito_serve_de_chave_no_cofre() {
+    fn valid_destination_ids_are_valid_vault_namespaces() {
         for id in ["target_1", "abc", "A-9_z"] {
             let mut cfg = AppConfig::default();
-            cfg.targets.push(alvo(id));
+            cfg.targets.push(target_fixture(id));
             assert!(
                 cfg.validate_and_normalize().is_ok(),
-                "id {id:?} recusado na config"
+                "configuration rejected ID {id:?}"
             );
             assert!(
                 validate_secret_namespace(id).is_ok(),
-                "id {id:?} vale na config mas não vale no cofre"
+                "ID {id:?} is valid in configuration but not in the vault"
             );
         }
     }

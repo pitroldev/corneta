@@ -8,7 +8,6 @@ import {
 } from "./summaryCache";
 import type { SessionMeta, SessionSummary } from "./types";
 
-// Node não tem localStorage — mock em memória.
 beforeEach(() => {
   const store = new Map<string, string>();
   globalThis.localStorage = {
@@ -61,26 +60,26 @@ describe("summaryCache", () => {
     expect(getCachedSummary("s1")).toBeNull();
   });
 
-  it("round-trip set → get; ausente → null", () => {
+  it("round-trips cached values and returns null for missing entries", () => {
     expect(getCachedSummary("s1")).toBeNull();
     setCachedSummary("s1", fake);
     expect(getCachedSummary("s1")).toEqual(fake);
     expect(getCachedSummary("outro")).toBeNull();
   });
 
-  it("drop remove; drop de ausente é no-op (não lança)", () => {
+  it("drops entries and ignores missing keys", () => {
     setCachedSummary("s1", fake);
     dropCachedSummary("s1");
     expect(getCachedSummary("s1")).toBeNull();
     expect(() => dropCachedSummary("inexistente")).not.toThrow();
   });
 
-  it("JSON corrompido no storage → get devolve null, sem lançar", () => {
+  it("returns null without throwing for malformed stored JSON", () => {
     localStorage.setItem("corneta.session-summaries", "{lixo");
     expect(getCachedSummary("s1")).toBeNull();
   });
 
-  it("descarta resumos produzidos por uma heurística antiga", () => {
+  it("discards summaries produced by an older heuristic", () => {
     localStorage.setItem(
       "corneta.session-summaries",
       JSON.stringify({ version: 2, summaries: { s1: fake } }),

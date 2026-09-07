@@ -11,14 +11,12 @@ import {
 import { interpolate, type Vars } from "./i18n/locale";
 import { pt, type MessageKey } from "./i18n/pt";
 
-/** `parseSession`/`analyze` recebem a tradução por parâmetro (não são componentes).
- *  Aqui entra o dicionário pt de verdade — é objeto puro, sem React no caminho. */
 const t = (k: MessageKey, vars?: Vars) => interpolate(pt[k], vars);
 
 const nd = (lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
 
 describe("parseSession", () => {
-  it("lê meta + samples e calcula a duração até o 'end'", () => {
+  it("reads metadata and samples and measures duration to end", () => {
     const d = parseSession(
       nd([
         {
@@ -36,13 +34,13 @@ describe("parseSession", () => {
     )!;
     expect(d).not.toBeNull();
     expect(d.meta.id).toBe("s1");
-    expect(d.meta.durationSec).toBe(4); // (5000-1000)/1000
+    expect(d.meta.durationSec).toBe(4);
     expect(d.meta.endedAt).toBe(5000);
     expect(d.samples).toHaveLength(2);
     expect(timeAxis(d)).toEqual([2000, 3000]);
   });
 
-  it("sem 'end' (ainda no ar): duração vai até o último sample e endedAt fica indefinido", () => {
+  it("uses the last sample for an unfinished session without endedAt", () => {
     const d = parseSession(
       nd([
         {
@@ -60,7 +58,7 @@ describe("parseSession", () => {
     expect(d.meta.durationSec).toBe(10);
   });
 
-  it("preserva o primeiro end quando uma recuperação tardia foi anexada", () => {
+  it("preserves the first end record after late recovery", () => {
     const d = parseSession(
       nd([
         { kind: "meta", id: "s-recovered", startedAt: 1000, platforms: [] },
@@ -76,7 +74,7 @@ describe("parseSession", () => {
     expect(d.meta.durationSec).toBe(4);
   });
 
-  it("pula linhas inválidas e samples sem timestamp; sem meta → null", () => {
+  it("skips malformed lines and untimed samples and requires metadata", () => {
     const d = parseSession(
       nd([
         { kind: "meta", id: "s3", startedAt: 0, platforms: [] },
@@ -90,17 +88,17 @@ describe("parseSession", () => {
     expect(parseSession("", t)).toBeNull();
   });
 
-  it("hasObs / hasChat refletem a presença dos dados", () => {
-    const semObs = parseSession(
+  it("sets hasObs and hasChat from observed data", () => {
+    const withoutObs = parseSession(
       nd([
         { kind: "meta", id: "s4", startedAt: 0, platforms: [] },
         { kind: "sample", t: 1000, targets: [] },
       ]),
       t,
     )!;
-    expect(hasObs(semObs)).toBe(false);
-    expect(hasChat(semObs)).toBe(false);
-    const comObs = parseSession(
+    expect(hasObs(withoutObs)).toBe(false);
+    expect(hasChat(withoutObs)).toBe(false);
+    const withObs = parseSession(
       nd([
         { kind: "meta", id: "s5", startedAt: 0, platforms: [] },
         {
@@ -113,11 +111,11 @@ describe("parseSession", () => {
       ]),
       t,
     )!;
-    expect(hasObs(comObs)).toBe(true);
-    expect(hasChat(comObs)).toBe(true);
+    expect(hasObs(withObs)).toBe(true);
+    expect(hasChat(withObs)).toBe(true);
   });
 
-  it("lê apps de forma limitada e remove caminhos da fronteira do relatório", () => {
+  it("bounds process data and removes paths at the report boundary", () => {
     const d = parseSession(
       nd([
         { kind: "meta", id: "apps", startedAt: 0, platforms: [] },
@@ -205,20 +203,19 @@ describe("problem windows", () => {
       t,
     )!;
 
-  it("não transforma CPU/GPU alta com transmissão saudável em incidente", () => {
+  it("does not turn high CPU or GPU usage alone into an incident", () => {
     const analysis = analyze(resourceSession(4, true), t);
     expect(analysis.windows).toEqual([]);
-    // A saturação continua registrada como contexto técnico no log e no gráfico.
     expect(analysis.events.some((event) => event.kind === "cpu")).toBe(true);
   });
 
-  it("usa CPU/GPU para explicar render lag real do OBS", () => {
+  it("uses CPU and GPU pressure to explain observed OBS render lag", () => {
     const analysis = analyze(resourceSession(30), t);
     expect(analysis.windows).toHaveLength(1);
     expect(analysis.windows[0].causeKind).toBe("encoding");
   });
 
-  it("aponta o aplicativo quando pressão e quadros atrasados coincidem", () => {
+  it("identifies an application when pressure and delayed frames coincide", () => {
     const session = parseSession(
       nd([
         {
@@ -275,18 +272,18 @@ describe("problem windows", () => {
     expect(analysis.windows[0].contributingApp).toBe("MeuJogo");
     expect(analysis.windows[0].cause).toContain("MeuJogo");
     expect(analysis.windows[0].signals.join(" ")).toContain("placa de vídeo");
-    // "Por que eu acho isso" é uma história em ordem — quem puxou o quê, o que travou por
-    // causa disso (com o atraso entre os dois), o que ficou de fora — e não uma lista de
-    // contadores. Se voltar a ser lista, o streamer volta a ler "perdeu N quadros".
-    const [quem, oQue, escopo] = analysis.windows[0].signals;
-    expect(quem).toMatch(/^MeuJogo segurou \d+% da placa de vídeo$/);
-    expect(oQue).toMatch(
+    const [resourcePressure, observedImpact, affectedScope] =
+      analysis.windows[0].signals;
+    expect(resourcePressure).toMatch(
+      /^MeuJogo segurou \d+% da placa de vídeo$/,
+    );
+    expect(observedImpact).toMatch(
       /^(Na mesma hora,|\d+s depois,) o OBS pulou \d+ quadros ao montar a cena$/,
     );
-    expect(escopo).toContain("dentro do PC");
+    expect(affectedScope).toContain("dentro do PC");
   });
 
-  it("usa a amostra imediatamente anterior quando a pressão vem antes do atraso", () => {
+  it("uses the preceding pressure sample when it leads render lag", () => {
     const session = parseSession(
       nd([
         {
@@ -362,7 +359,7 @@ describe("problem windows", () => {
     expect(analysis.windows[0].contributingApp).toBe("MeuJogo");
   });
 
-  it("não culpa um aplicativo visto muito antes de um atraso de render", () => {
+  it("does not blame an application observed long before render lag", () => {
     const session = parseSession(
       nd([
         {
@@ -420,7 +417,7 @@ describe("problem windows", () => {
     expect(analysis.windows[0].contributingApp).toBeUndefined();
   });
 
-  it("resume pelo aplicativo dominante sem atribuir a ele incidentes de outro app", () => {
+  it("summarizes the dominant application without attributing other applications' incidents to it", () => {
     let skipped = 0;
     const incidentApps = new Map([
       [1, "Editor"],
@@ -490,12 +487,7 @@ describe("problem windows", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Por canal
-// ---------------------------------------------------------------------------
-
-/** Sessão de 2 min (durMin = 2) com o que for passado no meio. */
-const sessao = (body: object[]) =>
+const sessionData = (body: object[]) =>
   parseSession(
     nd([
       { kind: "meta", id: "c", startedAt: 0, mode: "hybrid", platforms: [] },
@@ -507,7 +499,6 @@ const sessao = (body: object[]) =>
 
 const A = "twitch:Canal A";
 const B = "youtube:Canal B";
-/** Identificação do canal A num registro de seguidores. */
 const seg = { platform: "twitch", source: "Canal A" };
 
 const viewers = (t: number, items: object[]) => ({
@@ -521,7 +512,7 @@ const viewers = (t: number, items: object[]) => ({
 });
 
 describe("byChannel", () => {
-  const completa = sessao([
+  const completeSession = sessionData([
     {
       kind: "sample",
       t: 1000,
@@ -557,10 +548,13 @@ describe("byChannel", () => {
     },
   ]);
 
-  it("junta audiência, chat e alertas de cada canal", () => {
-    const { channels, hasChatByChannel } = analyze(completa, t).byChannel;
+  it("combines audience, chat and alerts per channel", () => {
+    const { channels, hasChatByChannel } = analyze(
+      completeSession,
+      t,
+    ).byChannel;
     expect(hasChatByChannel).toBe(true);
-    expect(channels.map((c) => c.key)).toEqual([A, B]); // maior audiência primeiro
+    expect(channels.map((c) => c.key)).toEqual([A, B]);
 
     const [a, b] = channels;
     expect(a.viewers).toMatchObject({ peak: 200, avg: 150, hasData: true });
@@ -571,30 +565,34 @@ describe("byChannel", () => {
     expect(b.alerts.bits).toBe(300);
   });
 
-  it("a soma das médias por canal bate com a média total da live", () => {
-    const r = analyze(completa, t);
-    const soma = r.byChannel.channels.reduce((s, c) => s + c.viewers.avg, 0);
-    expect(soma).toBe(r.viewers.avg); // 150 + 50 = 200
+  it("channel averages sum to the stream average", () => {
+    const r = analyze(completeSession, t);
+    const audienceSum = r.byChannel.channels.reduce(
+      (s, c) => s + c.viewers.avg,
+      0,
+    );
+    expect(audienceSum).toBe(r.viewers.avg);
   });
 
-  it("a fatia vem da audiência acumulada, não do pico", () => {
-    const [a, b] = analyze(completa, t).byChannel.channels;
-    // Pelos picos (200×50) daria 80/20 — mas os picos dos canais não são
-    // simultâneos, então somá-los inventaria audiência que nunca existiu junta.
+  it("computes shares from accumulated audience rather than peaks", () => {
+    const [a, b] = analyze(completeSession, t).byChannel.channels;
+    // Channel peaks are not simultaneous; summing them would invent concurrent viewers.
     expect(a.sharePct).toBe(75);
     expect(b.sharePct).toBe(25);
   });
 
-  it("expõe a série de audiência e a de chat de um canal só", () => {
-    expect(viewerSeriesFor(completa, A)).toEqual([100, 200]);
-    expect(viewerSeriesFor(completa, "kick:Nao existe")).toEqual([null, null]);
-    // 2 msgs numa janela de 2s = 60/min; na segunda amostra o canal B ficou calado.
-    expect(chatRateSeriesFor(completa, A)).toEqual([60, 60]);
-    expect(chatRateSeriesFor(completa, B)).toEqual([30, 0]);
+  it("exposes audience and chat series for a single channel", () => {
+    expect(viewerSeriesFor(completeSession, A)).toEqual([100, 200]);
+    expect(viewerSeriesFor(completeSession, "kick:Nao existe")).toEqual([
+      null,
+      null,
+    ]);
+    expect(chatRateSeriesFor(completeSession, A)).toEqual([60, 60]);
+    expect(chatRateSeriesFor(completeSession, B)).toEqual([30, 0]);
   });
 
-  it("canal fora do ar entra na lista, mas sem inflar pico nem fatia", () => {
-    const d = sessao([
+  it("includes offline channels without inflating peaks or shares", () => {
+    const d = sessionData([
       viewers(1000, [
         { platform: "twitch", source: "Canal A", viewers: 100 },
         { platform: "kick", source: "Canal C", viewers: null },
@@ -607,9 +605,9 @@ describe("byChannel", () => {
     expect(c.sharePct).toBe(0);
   });
 
-  it("inclui o chat Cinefy no relatório mesmo sem contador de audiência", () => {
+  it("includes Cinefy chat without an audience counter", () => {
     const key = "cinefy:kett";
-    const d = sessao([
+    const d = sessionData([
       { kind: "sample", t: 1000, chat: 4, chatBy: { [key]: 4 }, targets: [] },
     ]);
     const channel = analyze(d, t).byChannel.channels.find((c) => c.key === key);
@@ -621,8 +619,8 @@ describe("byChannel", () => {
     });
   });
 
-  it("sessão antiga (sem chatBy) mostra audiência por canal e avisa do chat", () => {
-    const d = sessao([
+  it("preserves channel audience for legacy sessions without per-channel chat", () => {
+    const d = sessionData([
       { kind: "sample", t: 1000, chat: 5, targets: [] },
       viewers(1000, [
         { platform: "twitch", source: "Canal A", viewers: 100 },
@@ -636,8 +634,8 @@ describe("byChannel", () => {
     expect(channels.every((c) => c.chat.hasData === false)).toBe(true);
   });
 
-  it("alerta sem canal: credita quando a plataforma tem um só, senão deixa de fora", () => {
-    const alerta = {
+  it("attributes sourceless alerts only when the platform has one channel", () => {
+    const alertRecord = {
       kind: "alert",
       t: 1500,
       platform: "twitch",
@@ -645,34 +643,34 @@ describe("byChannel", () => {
       user: "fulano",
       amount: 30,
     };
-    const umCanal = analyze(
-      sessao([
+    const oneChannel = analyze(
+      sessionData([
         viewers(1000, [
           { platform: "twitch", source: "Canal A", viewers: 100 },
         ]),
-        alerta,
+        alertRecord,
       ]),
       t,
     ).byChannel;
-    expect(umCanal.unattributedAlerts).toBe(0);
-    expect(umCanal.channels[0].alerts.raids).toBe(1);
+    expect(oneChannel.unattributedAlerts).toBe(0);
+    expect(oneChannel.channels[0].alerts.raids).toBe(1);
 
-    const doisCanais = analyze(
-      sessao([
+    const twoChannels = analyze(
+      sessionData([
         viewers(1000, [
           { platform: "twitch", source: "Canal A", viewers: 100 },
           { platform: "twitch", source: "Canal B", viewers: 90 },
         ]),
-        alerta,
+        alertRecord,
       ]),
       t,
     ).byChannel;
-    expect(doisCanais.unattributedAlerts).toBe(1);
-    expect(doisCanais.channels.every((c) => c.alerts.total === 0)).toBe(true);
+    expect(twoChannels.unattributedAlerts).toBe(1);
+    expect(twoChannels.channels.every((c) => c.alerts.total === 0)).toBe(true);
   });
 
-  it("ganho de seguidores é a diferença do contador, ponta a ponta", () => {
-    const d = sessao([
+  it("computes follower gains from the first and last counter samples", () => {
+    const d = sessionData([
       viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
       { kind: "followers", t: 1000, items: [{ ...seg, total: 12_480 }] },
       { kind: "followers", t: 60000, items: [{ ...seg, total: 12_509 }] },
@@ -688,16 +686,16 @@ describe("byChannel", () => {
     expect(b.followersNet).toBe(true);
   });
 
-  it("contador que cai vira ganho negativo — a live perdeu seguidor", () => {
-    const d = sessao([
+  it("reports falling follower counters as negative gains", () => {
+    const d = sessionData([
       { kind: "followers", t: 1000, items: [{ ...seg, total: 900 }] },
       { kind: "followers", t: 60000, items: [{ ...seg, total: 897 }] },
     ]);
     expect(analyze(d, t).byChannel.followersGained).toBe(-3);
   });
 
-  it("uma amostra só não vira ganho (não dá pra tirar diferença de um ponto)", () => {
-    const d = sessao([
+  it("does not infer a follower gain from one sample", () => {
+    const d = sessionData([
       { kind: "followers", t: 1000, items: [{ ...seg, total: 900 }] },
     ]);
     const f = analyze(d, t).byChannel.channels[0].followers;
@@ -705,8 +703,8 @@ describe("byChannel", () => {
     expect(analyze(d, t).byChannel.followersGained).toBeNull();
   });
 
-  it("sem contador, cai nos alertas de follow do próprio canal", () => {
-    const d = sessao([
+  it("falls back to channel follow alerts without a counter", () => {
+    const d = sessionData([
       viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
       ...[1500, 1600, 1700].map((t) => ({
         kind: "alert",
@@ -726,7 +724,7 @@ describe("byChannel", () => {
     expect(b.followersGained).toBe(3);
   });
 
-  it("Streamlabs sozinho conta; com contador junto, não conta duas vezes", () => {
+  it("counts standalone Streamlabs follows without double-counting platform counters", () => {
     const slFollow = (t: number) => ({
       kind: "alert",
       t,
@@ -735,15 +733,16 @@ describe("byChannel", () => {
       alertKind: "follow",
       user: "fulano",
     });
-    // Sem contador: os follows do agregador são a única fonte que existe.
-    const so = analyze(sessao([slFollow(1500), slFollow(1600)]), t).byChannel;
-    expect(so.followersGained).toBe(2);
-    expect(so.followersNet).toBe(false);
+    const standalone = analyze(
+      sessionData([slFollow(1500), slFollow(1600)]),
+      t,
+    ).byChannel;
+    expect(standalone.followersGained).toBe(2);
+    expect(standalone.followersNet).toBe(false);
 
-    // Com contador da Twitch medindo AS MESMAS pessoas, o agregador é descartado —
-    // somar daria 31 seguidores numa live que ganhou 29.
-    const junto = analyze(
-      sessao([
+    // The platform counter and aggregator can observe the same followers; do not add both.
+    const combined = analyze(
+      sessionData([
         { kind: "followers", t: 1000, items: [{ ...seg, total: 12_480 }] },
         { kind: "followers", t: 60000, items: [{ ...seg, total: 12_509 }] },
         slFollow(1500),
@@ -751,20 +750,20 @@ describe("byChannel", () => {
       ]),
       t,
     ).byChannel;
-    expect(junto.followersGained).toBe(29);
-    expect(junto.followersNet).toBe(true);
+    expect(combined.followersGained).toBe(29);
+    expect(combined.followersNet).toBe(true);
   });
 
-  it("sessão sem nenhuma fonte de seguidores não inventa zero", () => {
-    const d = sessao([
+  it("does not invent zero followers without a measurement source", () => {
+    const d = sessionData([
       viewers(1000, [{ platform: "twitch", source: "Canal A", viewers: 100 }]),
     ]);
     expect(analyze(d, t).byChannel.followersGained).toBeNull();
   });
 
-  it("alerta de agregador não vira canal nem é chutado num", () => {
+  it("does not invent channel attribution for aggregator alerts", () => {
     const { channels, unattributedAlerts } = analyze(
-      sessao([
+      sessionData([
         viewers(1000, [
           { platform: "twitch", source: "Canal A", viewers: 100 },
         ]),

@@ -2,7 +2,6 @@ import { ScanEye } from "lucide-react";
 import { rich, useI18n } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
 
-/** Editor da watchlist do Guardião: contagem positiva + trim/dedup no blur. */
 export function GuardianEditor() {
   const { t, tp } = useI18n();
   const settings = useStore((s) => s.config!.settings);
@@ -10,7 +9,7 @@ export function GuardianEditor() {
   const watchCount = settings.guardianWatchlist.filter(
     (term) => term.trim().length >= 3,
   ).length;
-  // Termos de 1–2 letras são descartados pelo motor — avisar em vez de fingir proteção.
+  // The engine ignores terms shorter than three characters.
   const shortTerms = settings.guardianWatchlist
     .map((term) => term.trim())
     .filter((term) => term.length > 0 && term.length < 3);
@@ -22,7 +21,6 @@ export function GuardianEditor() {
           {t("settings.guardian.cost.title")}
         </div>
         {rich(t, "settings.guardian.cost.intro", {
-          // Nome próprio da tela: não traduz, mesma string nos dois idiomas.
           jaVolto: (
             <strong className="text-ink">
               {t("golive.bar.protection.brb")}
@@ -79,9 +77,6 @@ export function GuardianEditor() {
           placeholder={t("settings.guardian.list.placeholder")}
           className="resize-y rounded-md border-2 border-border bg-surface px-2 py-1.5 text-sm font-medium text-ink outline-none focus:border-brass"
         />
-        {/* A frase inteira vem do dicionário, pelo tp(): o singular não é a
-            mesma costura em todo idioma, e "termo(s)" é remendo, não texto.
-            {terms} chega com as aspas já postas. */}
         {watchCount === 0 ? (
           <span className="text-xs font-semibold text-brass">
             {t("settings.guardian.list.empty")}

@@ -1,7 +1,6 @@
 import * as RSlider from "@radix-ui/react-slider";
 import { cn } from "../lib/utils";
 
-/** Slider on-brand via Radix (thumb chunky brass com borda dura). Mostra o valor + sufixo opcional. */
 export function Slider({
   value,
   min,
@@ -45,7 +44,7 @@ export function Slider({
         </RSlider.Track>
         <RSlider.Thumb
           aria-label={ariaLabel}
-          // O leitor de tela lê o mesmo que está escrito ao lado ("14px"), não só "14".
+          // Expose the displayed value and unit to assistive technology.
           aria-valuetext={suffix != null ? `${value}${suffix}` : undefined}
           className={cn(
             "block size-4 rounded-[3px] border-2 border-brass-ink bg-brass outline-none",

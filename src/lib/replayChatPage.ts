@@ -32,8 +32,7 @@ export function upperBoundChat(
   return low;
 }
 
-/** The worker retains the full journal; the renderer gets only a bounded page.
- * All deletions were applied before indexing, including deletions after the page. */
+/** Keep the full journal in the worker and return a bounded page; apply all deletions before indexing. */
 export function replayChatPage(
   chat: { messages: ReplayChatMessage[]; gaps: ReplayChatGap[] },
   timestamp: number,

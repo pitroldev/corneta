@@ -1,17 +1,13 @@
-// Dicionário inglês do desktop. Voz e glossário: docs/TOM-DE-VOZ.md.
-// Preserve placeholders, marcação rica, unidades e nomes de produto/protocolo.
-// Campos vindos do usuário/provedor não são copy; rótulos OBS seguem a interface em inglês.
+// Desktop English dictionary. Follow docs/TOM-DE-VOZ.md; preserve placeholders, rich markup, units, and provider labels.
 import type { Dict } from "./pt";
 
 export const en: Dict = {
-  // ---- analysis ----
   "analysis.advice.app.cpu":
     "Close {app} before the next stream, or give it less to do (fewer tabs, nothing downloading). If it's a game, cap the frame rate or lower the physics.",
   "analysis.advice.app.gpu":
     "Leave some graphics-card headroom for OBS: if {app} is a game, cap the frame rate or lower shadows and effects; if it isn't, close it before the stream.",
   "analysis.advice.app.memory":
     "Before the stream, close tabs and apps you're not using. If {app} keeps growing, close and reopen it before you go live.",
-  // Use os rótulos reais do OBS em inglês para os caminhos de menu.
   "analysis.advice.encoding":
     "In OBS, lower the resolution or frame rate under Settings → Video. If available, pick your graphics-card encoder under Settings → Output.",
   "analysis.advice.local":
@@ -32,7 +28,6 @@ export const en: Dict = {
   "analysis.cause.encoding": "OBS couldn't prepare every frame in time",
   "analysis.cause.local": "The video lost pace between OBS and Corneta",
   "analysis.cause.network": "Your connection to the platforms got shaky",
-  // {target} é o nome do destino, inclusive um rótulo editável; não traduza o dado.
   "analysis.cause.platform": "The connection to {target} became unstable",
   "analysis.cause.render": "OBS took too long to assemble the picture",
   "analysis.cause.signal": "Video stopped arriving from OBS",
@@ -60,7 +55,6 @@ export const en: Dict = {
   "analysis.event.cpuHigh": "CPU at {pct}%",
   "analysis.event.end": "Stream ended",
   "analysis.event.error": "{target} hit an error",
-  // {label} é texto fornecido pelo streamer; somente o prefixo pertence à tradução.
   "analysis.event.marker": "📍 {label}",
   "analysis.event.reconnect": "{target} reconnected",
   "analysis.event.recover": "{target} came back",
@@ -68,12 +62,9 @@ export const en: Dict = {
   "analysis.event.start": "Stream started",
   "analysis.highlight.bits": "{user}: {n} bits",
   "analysis.highlight.chatSpike": "Chat blew up ({rate}/min)",
-  // Raid e bits são termos da Twitch; {user} é dado da plataforma.
   "analysis.highlight.raid": "Raid from {user} (+{n})",
   "analysis.highlight.subgift": "{user} gifted {n} subs",
-  // Super Chat é o nome do recurso do YouTube.
   "analysis.highlight.superchat": "Big Super Chat from {user}",
-  // {delta} descreve a variação entre amostras, não a audiência total.
   "analysis.highlight.viewerJump": "+{delta} people showed up at once",
   "analysis.parse.alert.userFallback": "someone",
   "analysis.parse.marker.labelFallback": "Marker",
@@ -91,7 +82,6 @@ export const en: Dict = {
   "analysis.signal.obsSignalLost": "OBS stopped sending video",
   "analysis.signal.outputSkipped":
     "OBS couldn't prepare {count} frames for delivery",
-  // {targets} já contém a lista de destinos; esta frase precisa aceitar um ou vários.
   "analysis.signal.reconnected": "{targets} had to reconnect",
   "analysis.signal.renderSkipped":
     "OBS couldn't assemble {count} frames in time",
@@ -100,7 +90,7 @@ export const en: Dict = {
   "analysis.verdict.app.detail":
     "Across {n} {stretch}, {app} competed with the video at the same time frames fell behind.{brief}",
   "analysis.verdict.app.title": "{app} left too little room for the stream",
-  // Preserve o espaço inicial: {brief} é inserido depois de outra frase e pode ser vazio.
+  // Preserve the leading space: this optional fragment follows another sentence.
   "analysis.verdict.brief":
     " It was quick ({sec}s in total) — chances are nobody watching even noticed.",
   "analysis.verdict.clean.detail": "Didn't spot any trouble in this one.",
@@ -182,17 +172,16 @@ export const en: Dict = {
   "analysis.why.signal.stopped": "OBS stopped sending video to Corneta",
   "analysis.why.signal.blank":
     "Every platform went without a picture at the same time",
-  // patch fica sozinho no título; stretch recebe um qualificador. Preserve as duas famílias.
+  // patch stands alone; stretch takes a qualifier. Preserve both placeholder families.
   "analysis.verdict.patch.one": "rough patch",
   "analysis.verdict.patch.other": "rough patches",
   "analysis.verdict.stretch.one": "stretch",
   "analysis.verdict.stretch.other": "stretches",
 
-  // Texto transmitido ao público no slate, não apenas um rótulo da interface.
+  // This copy appears on air to viewers, not only in the app.
   "brb.slate.subtitle": "back in a sec — hang tight 📣",
   "brb.slate.title": "BE RIGHT BACK",
 
-  // ---- chat ----
   "chat.account.brokerError":
     "Corneta's official sign-in is down: {error}. You can sign in with your own credentials under advanced options.",
   "chat.account.byok.hide": "hide advanced options",
@@ -235,7 +224,6 @@ export const en: Dict = {
   "chat.alertsrc.empty":
     "No alert sources yet. Add **Streamlabs** or **StreamElements** to see donations.",
   "chat.alertsrc.expand": "Expand source",
-  // Channels, Show secrets e JWT Token são rótulos do serviço, não traduções livres.
   "chat.alertsrc.hint.streamelements":
     'StreamElements → your profile → Channels → "Show secrets" → JWT Token. ⚠️ It expires every ~2 weeks — just paste a new one.',
   "chat.alertsrc.hint.streamlabs":
@@ -297,7 +285,6 @@ export const en: Dict = {
   "chat.display.viewers": "Who's watching",
   "chat.display.viewers.hint": "viewer count",
   "chat.error.connect": "Couldn't connect the chat — check your channels.",
-  // ---- Feed de alertas ----
   "chat.alerts.empty":
     "Subs, gifts, bits, raids and super chats from every platform show up here.",
   "chat.alerts.detail.bits": "{n} bits",
@@ -315,7 +302,6 @@ export const en: Dict = {
   "chat.alerts.verb.subgift": "gifted",
   "chat.alerts.verb.superchat": "sent a Super Chat",
   "chat.alerts.verb.tip": "tipped",
-  // ---- Estado vazio do feed de chat ----
   "chat.feed.empty.disconnected.body":
     "Add a channel (Twitch, Kick, YouTube or experimental Cinefy) and click Connect to pull the chat in.",
   "chat.feed.empty.disconnected.title": "Chat's disconnected",
@@ -336,7 +322,6 @@ export const en: Dict = {
     "Twitch, Kick, YouTube and experimental Cinefy in the same feed — up to two Twitch channels.",
   "chat.header.title": "Unified chat",
   "chat.kick.creds.openDeveloper": "open Developer",
-  // O endereço de callback é protocolo e deve permanecer literal.
   "chat.kick.creds.redirect":
     "Use the redirect **http://localhost:7395/callback**. The secret only ever goes into Windows Credential Manager.",
   "chat.kick.creds.saved.toast":
@@ -383,7 +368,6 @@ export const en: Dict = {
   "chat.overlay.chatPos.top": "Top (scrolls down)",
   "chat.overlay.fetchError":
     "Overlay's on, but I couldn't fetch the URLs — try again.",
-  // Browser Source é o nome do recurso do OBS.
   "chat.overlay.lede":
     "A local server that puts your **alerts** and **chat** (emotes and all) into OBS. Add the URL as a **Browser Source** — just once.",
   "chat.overlay.opt.badges": "Badges (mod/sub)",
@@ -547,7 +531,6 @@ export const en: Dict = {
   "chat.youtube.guide.warn.text":
     "while your app stays in **“Testing”** mode — the normal thing, without going through Google's verification — the YouTube sign-in **expires every ~7 days**. When it drops, come back here and click **Sign in** again. That's why adding yourself as a **Test user** isn't optional (publishing/verifying the app is, and it's a lot more paperwork).",
 
-  // ---- components ----
   "components.app.censored.body":
     "The Privacy Guard is covering the picture. The stream returns once the segment is checked and no terms are detected. The Privacy Guard does not mute audio.",
   "components.app.censored.title": "BE RIGHT BACK on air",
@@ -583,7 +566,6 @@ export const en: Dict = {
   "components.firstLive.step.key": "Paste one platform's stream key",
   "components.firstLive.step.obs": "Connect OBS",
   "components.firstLive.title": "Your first stream in 3 steps",
-  // {terms} e {privacy} são links inseridos na frase; preserve a mensagem inteira.
   "components.legal.accept":
     "By continuing, you accept the {terms} and the {privacy}.",
   "components.legal.link.privacy": "Privacy policy",
@@ -681,7 +663,6 @@ export const en: Dict = {
     "Installed it — close and reopen Corneta to finish.",
   "components.update.ready": "I'll install it and reopen in a second.",
 
-  // ---- core ----
   "core.auth.login.error.fallback": "couldn't log in",
   "core.chat.autoConnect.failed":
     "Couldn't connect the chat on my own — open the Chat screen and hit Connect.",
@@ -698,7 +679,6 @@ export const en: Dict = {
     "Couldn't reach the host — are you two on the same network?",
   "core.mesa.error.joinRefused":
     "The Table turned you away — check the invite or ask the host for a new one.",
-  // A apresentação é traduzida; o código de protocolo peer-taken não é.
   "core.mesa.error.peerTaken":
     "Somebody already took your seat at the Table — hang on a sec and try again.",
   "core.mesa.invite.invalid": "That invite isn't valid. Check the code.",
@@ -778,7 +758,6 @@ export const en: Dict = {
   "core.target.issue.noName": "no name",
   "core.target.issue.noUrl": "no URL set",
 
-  // ---- encoding ----
   "encoding.band.cta.hybridOk": "Switch to Smart — it fits your upload",
   "encoding.band.cta.hybridWarn":
     "Switch to Smart — right at the edge, but it makes it",
@@ -986,7 +965,6 @@ export const en: Dict = {
   "encoding.wizard.subtitle": "Corneta sets OBS up for you.",
   "encoding.wizard.title": "Connect to OBS",
 
-  // ---- golive ----
   "golive.band.atEdge": "cutting it close — give it some room",
   "golive.band.test": "Measure now",
   "golive.band.test.disabledTitle":
@@ -1161,7 +1139,7 @@ export const en: Dict = {
     "Sign in and set the title (and the game) for every platform right here — no Studio, no dashboard.",
   "golive.streamInfo.title": "Stream title",
   "golive.streamInfo.title.placeholder": "Stream title (goes to all of them)",
-  // Preserve o espaço inicial: este fragmento é anexado ao rótulo anterior.
+  // Preserve the leading space when appending this fragment.
   "golive.streamInfo.youtubeAuto.desc":
     " — Corneta creates the broadcast when you hit GO LIVE, so you never open YouTube Studio.",
   "golive.streamInfo.youtubeAuto.title": "YouTube on autopilot",
@@ -1195,7 +1173,6 @@ export const en: Dict = {
     "Couldn't measure your upload — no internet?",
   "golive.viewers.label": "watching",
 
-  // ---- platforms ----
   "platforms.about.blog.sub": "My blog and my projects.",
   "platforms.about.footer.made":
     "Corneta is free and open source. Made with {heart} and code.",
@@ -1237,7 +1214,6 @@ export const en: Dict = {
   "platforms.key.show": "Show the stream key",
   "platforms.key.strippedUrl":
     "That looked like the whole URL — I kept just the stream key 👍",
-  // O prefixo de protocolo MESA1 exibido junto do convite não é traduzível.
   "platforms.mesa.art.invite": "Invite",
   "platforms.mesa.art.you": "You",
   "platforms.mesa.cam.off": "No video",
@@ -1341,7 +1317,6 @@ export const en: Dict = {
   "platforms.target.expandAria": "Expand platform",
   "platforms.target.getKey": "Get my stream key",
   "platforms.target.nameAria": "Platform name",
-  // ---- Editor de enquadramento (modal) ----
   "platforms.reframe.capture": "Grab a frame from OBS",
   "platforms.reframe.cancel": "Cancel",
   "platforms.reframe.center": "Recenter",
@@ -1388,7 +1363,6 @@ export const en: Dict = {
   "platforms.toast.removed": "{name} is out",
   "platforms.toast.undo": "Undo",
 
-  // ---- recording + replay ----
   "recorder.toast.diskFull":
     "No room to record — your stream is fine, it just isn't being saved.",
   "recorder.toast.noDir":
@@ -1455,7 +1429,6 @@ export const en: Dict = {
     "This stream has {n} recording pieces (recording dropped and came back).",
   "replay.warn.truncated": "Recording stopped before the stream ended.",
 
-  // ---- reports ----
   "reports.alerts.bitsTotal": "bits total",
   "reports.alerts.kind.follow.one": "follow",
   "reports.alerts.kind.follow.other": "follows",
@@ -1490,7 +1463,6 @@ export const en: Dict = {
   "reports.chat.title": "Chat activity (msgs/min)",
   "reports.copyTime": "Copy timestamp",
   "reports.copyTime.done": "Copied the timestamp.",
-  // ---- Cabeçalhos do CSV ----
   "reports.csv.history.avgAudience": "avg_audience",
   "reports.csv.history.bits": "bits",
   "reports.csv.history.chatMessages": "chat_messages",
@@ -1519,7 +1491,6 @@ export const en: Dict = {
   "reports.csv.series.relTimeS": "rel_time_s",
   "reports.csv.series.stateFor": "state_{target}",
   "reports.csv.series.watchingLastKnownFor": "watching_last_known_{source}",
-  // {pct} já contém o sinal positivo ou negativo.
   "reports.delta.pct": "{pct}% vs last stream",
   "reports.delta.same": "same as last stream",
   "reports.detail.back": "Back",
@@ -1551,7 +1522,7 @@ export const en: Dict = {
   "reports.download.json.label": "Data (JSON)",
   "reports.download.modal.name": "Download report",
   "reports.download.saved": "Saved your report.",
-  // Nomes de arquivo não devem conter espaços nem separadores de caminho; a data é acrescentada pelo exportador.
+  // Filename stems must not contain spaces or path separators; exporters append the date.
   "reports.file.history": "corneta-history",
   "reports.file.live": "corneta-live",
   "reports.file.seriesSuffix": "-series",
@@ -1649,7 +1620,6 @@ export const en: Dict = {
   "reports.recap.stat.peakViewers": "peak viewers",
   "reports.recap.stat.raids": "raids",
   "reports.recap.stat.subs": "subs",
-  // O renderer aplica caixa-alta e ajusta fonte ao canvas; não codifique o layout na tradução.
   "reports.recap.title": "Stream · {date}",
   "reports.row.chat.title": "Chat messages",
   "reports.row.clean": "clean",
@@ -1763,7 +1733,6 @@ export const en: Dict = {
     "Copy the time of a rough patch and find it in the VOD.",
   "reports.windows.title": "Technical points to review",
 
-  // ---- settings ----
   "settings.language.title": "Language",
   "settings.language.desc":
     "On automatic, Corneta follows your Windows language. Switching takes effect right away, no restart.",
@@ -1793,7 +1762,6 @@ export const en: Dict = {
   "settings.data.backup.import": "Import",
   "settings.data.backup.import.confirm": "Replace your current settings?",
   "settings.data.backup.title": "Settings backup",
-  // Diagnóstico compartilhável é estruturado/allowlisted; logs brutos ficam no fluxo local separado.
   "settings.data.logs.desc":
     "Export a structured technical summary for support — without logs, names, paths or credentials — or open logs separately on this PC.",
   "settings.data.logs.export": "Export diagnostics",
@@ -1846,7 +1814,6 @@ export const en: Dict = {
   "settings.guardian.list.label": "Terms to watch",
   "settings.guardian.list.placeholder":
     "me@myemail.com\n42 Oak Street\nMy Real Name",
-  // tp() escolhe .one/.other usando {count}; {terms} já contém a lista com aspas.
   "settings.guardian.list.watching.one": "Watching 1 term.",
   "settings.guardian.list.watching.other": "Watching {count} terms.",
   "settings.guardian.list.watchingManyShort.one":
@@ -1857,8 +1824,7 @@ export const en: Dict = {
     "Watching 1 term — 1 skipped for being too short (3 letters minimum): {terms}.",
   "settings.guardian.list.watchingOneShort.other":
     "Watching {count} terms — 1 skipped for being too short (3 letters minimum): {terms}.",
-  // ---- Barra lateral ----
-  // Rótulos da navegação devem coincidir com os títulos e referências às telas.
+  // Navigation labels must match screen titles and cross-screen references.
   "sidebar.about": "About",
   "sidebar.live.title": "Open the live panel",
   "sidebar.nav.chat.hint": "every chat in one place",
@@ -1924,7 +1890,6 @@ export const en: Dict = {
   "settings.obs.advanced.field.port": "Port",
   "settings.obs.advanced.port.invalid": "Port goes from 1 to 65535.",
   "settings.obs.advanced.trigger": "Advanced — change the local address",
-  // {button} é o rótulo de ação; {path} usa o caminho real do menu OBS em inglês.
   "settings.obs.autoconfig.desc":
     "For the {button} button (on the Live screen) to work, turn the WebSocket server on in OBS, under {path}. If there's a password, paste it here.",
   "settings.obs.autoconfig.desc.button": "“Set it up for me”",
@@ -1934,19 +1899,17 @@ export const en: Dict = {
     "When you hit GO LIVE, Corneta tells OBS to start streaming too.",
   "settings.obs.autostart.title": "Start OBS too",
   "settings.obs.autostart.toggle": "Start OBS too",
-  // {key} distingue a chave local OBS↔Corneta da stream key da plataforma.
   "settings.obs.ingest.desc":
     "The local address where OBS hands your video over. The {key} below is only between OBS and Corneta — it's not your platform stream key, which stays in Windows Credential Manager.",
   "settings.obs.ingest.desc.key": "key",
   "settings.obs.ingest.liveLock":
     "You're live — I locked this address so I don't drop OBS in the middle of your stream.",
   "settings.obs.ingest.title": "Address for OBS",
-  // Show Connect Info e Enable Authentication são rótulos reais do OBS.
   "settings.obs.password.desc":
     "The password shows up in that same OBS window, behind the “Show Connect Info” button. If “Enable Authentication” is unchecked there, leave this empty.",
   "settings.obs.password.placeholder": "(optional)",
   "settings.obs.password.title": "WebSocket password",
-  // Esta é a chave local de ingestão; não a rotule como stream key da plataforma.
+  // This is the local ingest key, not the destination platform's stream key.
   "settings.obs.paste.field.key": "Key",
   "settings.obs.paste.field.server": "Server",
   "settings.obs.paste.label": "Paste into OBS",
@@ -2040,6 +2003,5 @@ export const en: Dict = {
   "settings.toast.import.ok":
     "Imported your settings — I kept the old ones in a backup.",
 
-  // ---- shell (janela principal) ----
   "shell.win.closeTray": "Close — Corneta stays by the clock",
 };

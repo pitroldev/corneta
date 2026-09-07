@@ -84,8 +84,7 @@ export function validateEditorialRevision(
   if (substantiveChange && !updatedAdvanced) {
     issues.push({
       code: "substantive-change-without-updated-at",
-      message:
-        "o conteúdo mudou de forma substancial, mas updatedAt não avançou",
+      message: "content changed substantively, but updatedAt did not advance",
       file: current.relativePath,
     });
   }
@@ -93,14 +92,14 @@ export function validateEditorialRevision(
     issues.push({
       code: "artificial-freshness-date",
       message:
-        "updatedAt avançou sem mudança substancial; use reviewedAt para registrar somente a revisão",
+        "updatedAt advanced without a substantive change; use reviewedAt for review-only updates",
       file: current.relativePath,
     });
   }
   if (current.frontmatter.reviewedAt < previous.frontmatter.reviewedAt) {
     issues.push({
       code: "review-date-regression",
-      message: "reviewedAt não pode retroceder",
+      message: "reviewedAt cannot move backwards",
       file: current.relativePath,
     });
   }
@@ -125,9 +124,9 @@ export function validateChangedInternalSources(
   if (current.frontmatter.reviewedAt <= previous.frontmatter.reviewedAt) {
     issues.push({
       code: "changed-source-without-article-review",
-      message: `fontes internas mudaram (${affectedSources
+      message: `internal sources changed (${affectedSources
         .map((source) => source.repoPath)
-        .join(", ")}), mas reviewedAt não avançou`,
+        .join(", ")}), but reviewedAt did not advance`,
       file: current.relativePath,
     });
   }
@@ -145,7 +144,7 @@ export function validateChangedInternalSources(
     ) {
       issues.push({
         code: "changed-source-without-source-review",
-        message: `a fonte ${source.repoPath} mudou, mas sources[].reviewedAt não avançou`,
+        message: `source ${source.repoPath} changed, but sources[].reviewedAt did not advance`,
         file: current.relativePath,
       });
     }
@@ -154,7 +153,7 @@ export function validateChangedInternalSources(
   if (productVersion && current.frontmatter.productVersion !== productVersion) {
     issues.push({
       code: "reviewed-against-wrong-product-version",
-      message: `a revisão deve declarar productVersion ${productVersion}`,
+      message: `the review must declare productVersion ${productVersion}`,
       file: current.relativePath,
     });
   }

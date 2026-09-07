@@ -10,7 +10,6 @@ import { splitAt, StepNum } from "./primitives";
 import { useAccountAction } from "./useAccountAction";
 import { YoutubeBroadcastRecovery } from "./YoutubeBroadcastRecovery";
 
-/** Quais caminhos de login existem numa plataforma, e qual está em uso. */
 type ByokModes = {
   officialReady: boolean;
   ownCreds: boolean;
@@ -50,7 +49,6 @@ function ByokModeActions({
           {t("chat.byok.useSaved")}
         </button>
       )}
-      {/* Esquecer é destrutivo: só aparece quando o oficial pode assumir no lugar. */}
       {modes.ownCreds && modes.officialReady && onForget && (
         <button
           onClick={onForget}
@@ -98,8 +96,6 @@ export function YoutubeCredsForm({
       },
     );
   };
-  // O passo 1 tem um LINK no meio da frase; "Google Cloud Console" é nome de
-  // produto e sai igual nos dois idiomas, então dá pra cortar a frase nele.
   const [step1Before, step1After] = splitAt(
     t("chat.youtube.guide.step1"),
     "Google Cloud Console",
@@ -143,9 +139,6 @@ export function YoutubeCredsForm({
               </button>
               {step1After}
             </li>
-            {/* Os negritos são os rótulos que a pessoa vai caçar na tela do
-                Google — vêm marcados no dicionário porque em cada idioma o
-                rótulo é outro e cai em outro lugar da frase. */}
             <li>{bold(t, "chat.youtube.guide.step2")}</li>
             <li>{bold(t, "chat.youtube.guide.step3")}</li>
             <li>{bold(t, "chat.youtube.guide.step4")}</li>
@@ -163,7 +156,6 @@ export function YoutubeCredsForm({
       )}
 
       <div className="flex flex-col gap-2">
-        {/* Nomes acessíveis só com nome de produto e de campo — iguais nos dois idiomas. */}
         <Input
           name="youtube-client-id"
           disabled={busy}
@@ -327,7 +319,7 @@ export function LoginRow({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* clipboard indisponível */
+      /* Clipboard access may be denied; manual copying remains available. */
     }
   };
   return (
@@ -377,7 +369,6 @@ export function LoginRow({
       {platform === "youtube" ? <YoutubeBroadcastRecovery /> : null}
       {state.state === "code" &&
         (state.userCode && !state.verifyUriComplete ? (
-          // Fallback BYOK do Google sem URL pré-preenchida: guiamos copiar → colar → autorizar.
           <div className="mt-2 rounded-md bg-brass/5 px-3 py-2.5 ring-1 ring-brass/25">
             <div className="mb-2 text-xs font-bold text-ink">
               {t("chat.loginrow.device.title")}
@@ -429,8 +420,6 @@ export function LoginRow({
             </p>
           </div>
         ) : (
-          // Twitch, YouTube oficial ou Kick: abrir e autorizar. Mostra o código como referência
-          // quando houver (a Twitch pede para conferi-lo).
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
             <span>{t("chat.loginrow.browser.note")}</span>
             {state.userCode && (

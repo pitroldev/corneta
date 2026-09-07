@@ -13,9 +13,6 @@ import {
   Shell,
 } from "../_components/ui";
 
-// "Por que" — duas linhas largas de benefício, nunca grade de cards. Cada uma
-// traz a cópia de um lado e uma demonstração real do app do outro.
-
 const CHAT_LINE =
   "grid grid-cols-[26px_1fr] items-center gap-2.5 rounded-md bg-surface-2 px-2.5 py-[9px] " +
   "[&_.glyph]:h-[26px] [&_.glyph]:w-[26px] " +
@@ -32,8 +29,6 @@ export function Benefits({ t }: { t: T }) {
           kicker={t("benefits.heading.kicker")}
           title={t("benefits.heading.title")}
         >
-          {/* Não cita plataforma: a linha de baixo já usa a Kick como exemplo,
-              e repetir a mesma piada em três linhas mata as duas. */}
           <p>{t("benefits.heading.subtitle")}</p>
         </SectionHeading>
 

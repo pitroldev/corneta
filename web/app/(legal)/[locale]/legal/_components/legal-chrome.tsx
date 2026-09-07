@@ -13,7 +13,6 @@ import {
 } from "@/lib/legal";
 import { legalUi } from "@/lib/legal-ui";
 
-/** Valor que o dono do site precisa preencher antes de publicar. */
 export function Todo({
   children,
   locale,
@@ -23,7 +22,7 @@ export function Todo({
 }) {
   return (
     <span
-      className="rounded-sm bg-tomate-ink px-1.5 py-px text-[0.82em] font-extrabold tracking-[0.02em] whitespace-nowrap text-white"
+      className="rounded-sm bg-tomato-ink px-1.5 py-px text-[0.82em] font-extrabold tracking-[0.02em] whitespace-nowrap text-white"
       data-placeholder-legal="replace-me"
     >
       {legalUi(locale).todo(children)}
@@ -31,7 +30,6 @@ export function Todo({
   );
 }
 
-/** E-mail de contato ou a pendência visível, quando ainda não há um. */
 export function Contact({ locale }: { locale: Locale }) {
   if (!LEGAL_CONTACT)
     return <Todo locale={locale}>{legalUi(locale).contactPlaceholder}</Todo>;
@@ -75,13 +73,13 @@ export function LegalHero({
   title: string;
   intro: string;
   version: string;
-  /** Caminho SEM idioma deste documento, pro link do outro idioma. */
+  // Keep the unprefixed Portuguese legal URL stable for installed clients.
   path: string;
 }) {
   const ui = legalUi(locale);
   return (
     <Shell className="pt-[clamp(46px,5vw,74px)] pb-[clamp(30px,3.5vw,44px)]">
-      <span className="mb-5 inline-flex items-center gap-2.5 text-[0.78rem] font-extrabold tracking-[0.1em] text-tomate-ink uppercase before:h-1 before:w-[26px] before:bg-brass before:content-['']">
+      <span className="mb-5 inline-flex items-center gap-2.5 text-[0.78rem] font-extrabold tracking-[0.1em] text-tomato-ink uppercase before:h-1 before:w-[26px] before:bg-brass before:content-['']">
         {kicker}
       </span>
       <h1 className="max-w-[22ch] text-[clamp(2.4rem,5vw,3.6rem)] leading-[0.98] tracking-[-0.03em]">
@@ -99,10 +97,8 @@ export function LegalHero({
           {ui.version} {version}
         </span>
         <span>{ui.languageChip}</span>
-        {/* Escrito no idioma de DESTINO: quem procura a outra versão lê a
-            própria língua, não a que está na tela. */}
         <Link
-          className="inline-flex min-h-[30px] items-center rounded-sm bg-paper-sunk px-2.5 py-1.5 text-[0.74rem] font-bold text-tomate-ink underline decoration-2 underline-offset-[3px]"
+          className="inline-flex min-h-[30px] items-center rounded-sm bg-paper-sunk px-2.5 py-1.5 text-[0.74rem] font-bold text-tomato-ink underline decoration-2 underline-offset-[3px]"
           href={ui.otherLanguageHref(path)}
           hrefLang={locale === "en" ? "pt-BR" : "en"}
         >
@@ -113,7 +109,6 @@ export function LegalHero({
   );
 }
 
-/** Faixa que diz qual versão vale juridicamente. Só aparece na tradução. */
 export function LegalBindingNotice({
   locale,
   path,
@@ -124,7 +119,7 @@ export function LegalBindingNotice({
   const notice = legalUi(locale).binding;
   if (!notice) return null;
   return (
-    <aside className="mb-[clamp(22px,2.6vw,30px)] rounded-xl border-l-4 border-tomate bg-paper-sunk px-[clamp(18px,2.2vw,26px)] py-[clamp(16px,2vw,22px)]">
+    <aside className="mb-[clamp(22px,2.6vw,30px)] rounded-xl border-l-4 border-tomato bg-paper-sunk px-[clamp(18px,2.2vw,26px)] py-[clamp(16px,2vw,22px)]">
       <strong className="block font-display text-[1.02rem] leading-[1.2] font-extrabold text-ink">
         {notice.title}
       </strong>
@@ -132,7 +127,7 @@ export function LegalBindingNotice({
         {notice.body}
       </p>
       <Link
-        className="mt-3 inline-flex min-h-[30px] items-center gap-1.5 text-[0.86rem] font-bold text-tomate-ink underline decoration-2 underline-offset-[3px]"
+        className="mt-3 inline-flex min-h-[30px] items-center gap-1.5 text-[0.86rem] font-bold text-tomato-ink underline decoration-2 underline-offset-[3px]"
         href={path}
         hrefLang="pt-BR"
       >
@@ -171,14 +166,12 @@ export function LegalTldr({
   );
 }
 
-// A numeração do sumário é `counter`, não índice do array: assim ela acompanha
-// a ordem visual mesmo se a lista mudar, e sai com zero à esquerda.
 const TOC_LIST =
   "m-0 list-none border-t-2 border-paper-line p-0 [counter-reset:toc] " +
   "[&>li]:border-b-2 [&>li]:border-paper-line [&>li]:[counter-increment:toc] " +
   "[&_a]:flex [&_a]:gap-[9px] [&_a]:px-0.5 [&_a]:py-[9px] [&_a]:text-[0.82rem] [&_a]:leading-[1.35] [&_a]:font-[650] [&_a]:text-ink-muted [&_a]:transition-colors " +
   "[&_a]:before:font-display [&_a]:before:text-[0.76rem] [&_a]:before:font-extrabold [&_a]:before:text-brass-ink [&_a]:before:opacity-55 [&_a]:before:[content:counter(toc,decimal-leading-zero)] " +
-  "[&_a:hover]:text-tomate-ink";
+  "[&_a:hover]:text-tomato-ink";
 
 export function LegalToc({
   locale,
@@ -190,7 +183,7 @@ export function LegalToc({
   const ui = legalUi(locale);
   return (
     <nav className="sticky top-23" aria-label={ui.tocLabel}>
-      <strong className="mb-3.5 block text-[0.72rem] font-extrabold tracking-[0.1em] text-tomate-ink uppercase">
+      <strong className="mb-3.5 block text-[0.72rem] font-extrabold tracking-[0.1em] text-tomato-ink uppercase">
         {ui.tocTitle}
       </strong>
       <ol className={TOC_LIST}>
@@ -204,12 +197,7 @@ export function LegalToc({
   );
 }
 
-/**
- * Grade do documento: sumário grudento à esquerda, texto à direita.
- *
- * `minmax(0,1fr)` na coluna do texto, não `1fr`: com a tabela larga dentro, o
- * min-content do item estourava a coluna e a página ganhava rolagem horizontal.
- */
+/* minmax(0, 1fr) lets wide tables scroll without expanding the page. */
 export function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <Shell className="grid items-start gap-[clamp(34px,5vw,72px)] pb-[clamp(70px,8vw,110px)] [grid-template-columns:minmax(210px,0.32fr)_minmax(0,1fr)] max-[980px]:[grid-template-columns:minmax(0,1fr)]">
@@ -218,15 +206,8 @@ export function LegalLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Tipografia de texto corrido. É o único lugar da LP onde faz sentido concentrar
-// dezenas de variantes descendentes num componente: o conteúdo é prosa jurídica
-// escrita em JSX solto, e anotar classe em cada <p> de 600 linhas seria pior.
-//
-// Dois detalhes que já causaram bug e estão preservados:
-//  • o marcador da lista é `::before` absoluto, não `flex` — como item de flex,
-//    um <strong> no começo da linha virava coluna de duas palavras;
-//  • `overflow-wrap: anywhere` no <code> — sem isso um host longo esticava a
-//    página inteira e criava rolagem horizontal no celular.
+// Keep list markers out of flow so inline emphasis cannot become a separate flex column.
+// Long hostnames must wrap instead of expanding the page.
 const BODY =
   "max-w-[72ch] max-[760px]:max-w-none " +
   "[&_section]:pt-[clamp(30px,3.5vw,46px)] " +
@@ -240,15 +221,13 @@ const BODY =
   "[&_ul_li]:relative [&_ul_li]:pl-[21px] [&_ul_li]:text-[0.98rem] [&_ul_li]:leading-[1.6] [&_ul_li]:font-medium [&_ul_li]:text-ink-muted " +
   "[&_ul_li]:before:absolute [&_ul_li]:before:top-[9px] [&_ul_li]:before:left-0 [&_ul_li]:before:h-[9px] [&_ul_li]:before:w-[9px] [&_ul_li]:before:bg-brass [&_ul_li]:before:content-[''] " +
   "[&_code]:font-mono [&_code]:text-[0.9em] [&_code]:[overflow-wrap:anywhere] " +
-  "[&_a:not(.pair)]:font-bold [&_a:not(.pair)]:text-tomate-ink [&_a:not(.pair)]:underline [&_a:not(.pair)]:decoration-2 [&_a:not(.pair)]:underline-offset-[3px]";
+  "[&_a:not(.pair)]:font-bold [&_a:not(.pair)]:text-tomato-ink [&_a:not(.pair)]:underline [&_a:not(.pair)]:decoration-2 [&_a:not(.pair)]:underline-offset-[3px]";
 
 export function LegalBody({ children }: { children: React.ReactNode }) {
   return <div className={BODY}>{children}</div>;
 }
 
-// A tabela rola sozinha em vez de esticar a página; o `code` dentro dela NÃO
-// quebra no meio da palavra (ao contrário do resto do corpo), porque ali são
-// nomes de host que só fazem sentido inteiros.
+// Tables own their scrolling, so route tokens can remain intact.
 export function LegalTable({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-5 overflow-x-auto [&_code]:font-mono [&_code]:text-[0.82rem] [&_code]:whitespace-nowrap [&_code]:[overflow-wrap:normal] [&_table]:w-full [&_table]:border-collapse [&_table]:text-[0.9rem] [&_td]:border-b-2 [&_td]:border-paper-line [&_td]:px-[13px] [&_td]:py-[11px] [&_td]:text-left [&_td]:align-top [&_td]:leading-[1.55] [&_td]:font-medium [&_td]:text-ink-muted [&_th]:border-b-[3px] [&_th]:border-paper-line [&_th]:px-[13px] [&_th]:py-[11px] [&_th]:text-left [&_th]:align-top [&_th]:text-[0.72rem] [&_th]:font-extrabold [&_th]:tracking-[0.08em] [&_th]:whitespace-nowrap [&_th]:text-ink [&_th]:uppercase [&_td:first-child]:min-w-[21ch] [&_th:first-child]:min-w-[21ch]">
@@ -281,7 +260,7 @@ export function LegalSection({
 
 export function Callout({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-5 flex items-start gap-3 border-l-4 border-brass bg-paper-sunk px-[18px] py-4 text-[0.94rem] leading-[1.6] font-[550] text-ink [&>svg]:mt-0.5 [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomate-ink">
+    <p className="mt-5 flex items-start gap-3 border-l-4 border-brass bg-paper-sunk px-[18px] py-4 text-[0.94rem] leading-[1.6] font-[550] text-ink [&>svg]:mt-0.5 [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomato-ink">
       <InfoIcon />
       <span>{children}</span>
     </p>
@@ -302,7 +281,6 @@ export function LegalFoot({
   return (
     <>
       <div className="mt-[clamp(34px,4vw,52px)] flex flex-wrap items-center justify-between gap-[18px] border-t-[3px] border-ink pt-[clamp(24px,3vw,34px)]">
-        {/* A seta da LP aponta pra frente; aqui ela volta, então é espelhada. */}
         <Link
           className="inline-flex min-h-[30px] items-center gap-[9px] font-display text-[0.95rem] font-extrabold text-ink [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:-scale-x-100 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:transition-transform [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.4] hover:[&>svg]:-translate-x-1"
           href={locale === "en" ? "/en" : "/"}

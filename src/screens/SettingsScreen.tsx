@@ -61,8 +61,7 @@ import {
 } from "./settings/SettingPrimitives";
 import { ShortcutCapture } from "./settings/ShortcutCapture";
 
-// Os ids ("obs" | "seguranca" | "geral") são identificadores de deep-link
-// (store.settingsTab) — só o rótulo é texto de tela.
+// Tab IDs are stable deep-link values; only labels are localized.
 type SettingsTab = "obs" | "seguranca" | "geral";
 
 const TABS: { id: SettingsTab; labelKey: MessageKey; icon: typeof Plug }[] = [
@@ -104,10 +103,8 @@ export function SettingsScreen() {
       setShortcutBusy(false);
     }
   };
-  // C20: os campos crus do endpoint nascem escondidos — a persona só copia.
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  // Deep-link do "Ajustar" (Ao vivo) → abre direto na aba certa, e consome o pedido.
   useEffect(() => {
     if (requestedTab) {
       setTab(requestedTab as SettingsTab);
@@ -150,9 +147,7 @@ export function SettingsScreen() {
     setConfirmImport(false);
     try {
       if (await api.importConfig()) {
-        // O store não é componente e não tem `useT()` — quem chama passa o `t`.
         await load(t);
-        // O backend guarda a config antiga antes de sobrescrever — dá o caminho de volta.
         toast.success(t("settings.toast.import.ok"));
       }
     } catch (e) {
@@ -197,7 +192,6 @@ export function SettingsScreen() {
           })}
         </RTabs.List>
 
-        {/* ===================== OBS ===================== */}
         <RTabs.Content value="obs">
           <Card className="mb-4">
             <h3 className="flex items-center gap-2 text-lg">
@@ -221,7 +215,6 @@ export function SettingsScreen() {
               </div>
             )}
 
-            {/* A tarefa nº1 aqui é COPIAR, não editar — os campos crus ficam no "Avançado". */}
             <div className="rounded-md bg-surface-2 p-3">
               <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
                 {t("settings.obs.paste.label")}
@@ -259,7 +252,6 @@ export function SettingsScreen() {
                       disabled={live}
                       onChange={(e) => setIngest({ host: e.target.value })}
                       onBlur={(e) => {
-                        // Se colar a URL inteira no campo de host, fica só o host.
                         const clean = sanitizeHost(e.target.value);
                         if (clean !== e.target.value)
                           setIngest({ host: clean });
@@ -274,7 +266,6 @@ export function SettingsScreen() {
                       invalid={portInvalid}
                       onChange={(e) => setPortDraft(e.target.value)}
                       onBlur={(e) => {
-                        // No blur (como no EncodingScreen): clampa pra 1–65535; vazio/inválido volta pro valor da config.
                         const v = Number(e.target.value);
                         const port =
                           e.target.value.trim() !== "" && Number.isFinite(v)
@@ -361,7 +352,6 @@ export function SettingsScreen() {
           </Card>
         </RTabs.Content>
 
-        {/* ===================== Segurança ao vivo ===================== */}
         <RTabs.Content value="seguranca">
           <Card accent>
             <h3 className="mb-1 flex items-center gap-2 text-lg">
@@ -371,8 +361,6 @@ export function SettingsScreen() {
             <p className="mb-2 text-xs text-ink-faint">
               {t("settings.safety.desc")}
             </p>
-            {/* Cada feature + seus parâmetros formam um GRUPO: o divisor fica entre grupos, e os
-                parâmetros só aparecem com a feature ligada, aninhados (colados) logo abaixo dela. */}
             <div className="divide-y divide-border-soft">
               <div>
                 <SecurityFeature
@@ -429,10 +417,6 @@ export function SettingsScreen() {
                 )}
               </div>
 
-              {/* O guardião fecha a lista porque é o único EXPERIMENTAL daqui.
-                  No meio, ele emprestava a hesitação dele às redes que estão
-                  prontas — e a ordem de uma lista de proteções é uma
-                  recomendação, queira ela ou não. */}
               <div>
                 <SecurityFeature
                   preview={<GuardianPreview />}
@@ -457,7 +441,6 @@ export function SettingsScreen() {
           </Card>
         </RTabs.Content>
 
-        {/* ===================== Geral ===================== */}
         <RTabs.Content value="geral">
           <RecordingSettings />
           <Card className="mb-4">
@@ -530,9 +513,7 @@ export function SettingsScreen() {
                 />
               </SettingRow>
 
-              {/* O rótulo de cada idioma fica NO próprio idioma: quem abriu o
-                  app em inglês por engano procura "Português", não "Portuguese".
-                  Por isso os nomes não passam pelo `t`. */}
+              {/* Language names use their own language so users can recover from an accidental locale choice. */}
               <SettingRow
                 title={t("settings.language.title")}
                 desc={t("settings.language.desc")}

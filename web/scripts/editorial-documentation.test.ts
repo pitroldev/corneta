@@ -62,8 +62,7 @@ describe("documented frontmatter contract", () => {
         expect(draft.kind).toBe("troubleshooting");
         expect(draft.category).toBe("troubleshooting");
       }
-      // The templates intentionally leave evidence empty. Supply synthetic test
-      // evidence here; no date or test result is written to a real article.
+      // Synthetic metadata validates the example without claiming an actual review.
       expect(
         editorialFrontmatterSchema.safeParse({
           ...draft,

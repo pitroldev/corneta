@@ -12,7 +12,7 @@ export class ObsConfigChangedError extends Error {
   }
 }
 
-/** One OBS query at a time. Results belong to the settings used to request them. */
+/** One OBS query at a time; each result belongs to its requesting configuration. */
 export function createObsCoordinator(deps: {
   flushSave: () => Promise<void>;
   configKey: () => string;
@@ -41,7 +41,7 @@ export function createObsCoordinator(deps: {
           if (key !== deps.configKey()) continue;
           throw error;
         }
-        // Password/address changed during the query: never publish its stale verdict.
+        // Never publish a verdict for settings changed during the query.
         if (key !== deps.configKey()) continue;
         cached = { key, at: now(), result };
         return result;
@@ -60,7 +60,7 @@ export function createObsCoordinator(deps: {
     if (configuring) return configuring;
     const previousCheck = checking;
     const task = (async () => {
-      // Keep a configuration request from racing an older query to the same OBS.
+      // Do not configure OBS concurrently with an older query.
       await previousCheck?.catch(() => {});
       await deps.flushSave();
       const key = deps.configKey();

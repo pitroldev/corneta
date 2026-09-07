@@ -18,7 +18,7 @@ import type { SessionMeta, SessionSummary } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
 import { Button, Card, EmptyState, PlatformGlyph } from "../../components/ui";
 
-/** `summaries[id]`: ausente = ainda lendo · `null` = arquivo ilegível · resumo = lido. */
+/** Summary states: absent means pending, null means unreadable, otherwise loaded. */
 interface ReportsListProps {
   sessions: SessionMeta[] | null;
   summaries: Record<string, SessionSummary | null>;
@@ -229,8 +229,6 @@ const FeaturedSession = memo(function FeaturedSession({
                 ) : null}
               </dl>
             ) : (
-              // Live curta ou sem viewers: número não vem, e barra pulsando pra sempre
-              // seria um erro disfarçado de espera.
               <p className="text-sm text-ink-muted">
                 {t("reports.list.noData")}
               </p>
@@ -350,7 +348,7 @@ const SessionRow = memo(function SessionRow({
   );
 });
 
-/** Exporta uma sessão por vez para limitar o pico de memória. */
+/** Export one session at a time to bound peak memory. */
 function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
   const i18n = useI18n();
   const { t } = i18n;

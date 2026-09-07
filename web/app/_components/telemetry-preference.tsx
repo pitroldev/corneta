@@ -28,7 +28,7 @@ export function TelemetryPreference({ locale }: { locale: Locale }) {
   const optedOut = useSyncExternalStore(
     subscribeToSiteTelemetryPreference,
     isSiteTelemetryOptedOut,
-    // O HTML inicial é conservador e igual no servidor/primeiro hydrate.
+    // Keep the server and first client render identical, conservatively assuming opt-out.
     () => true,
   );
   const [saving, setSaving] = useState(false);

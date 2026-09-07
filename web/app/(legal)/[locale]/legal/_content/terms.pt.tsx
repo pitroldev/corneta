@@ -14,13 +14,7 @@ import {
   LEGAL_VENUE,
 } from "@/lib/legal";
 
-// Termos de uso — TEXTO VINCULANTE.
-//
-// Esta é a versão que vale juridicamente (CDC, foro brasileiro). A tradução em
-// `terms.en.tsx` é cortesia e diz isso na própria página. Mexeu aqui, mexa lá:
-// as duas têm que contar a mesma história, e a seção que existir só de um lado
-// é exatamente o tipo de divergência que o aviso de "prevalece o português"
-// deveria nunca precisar resolver.
+// Binding Portuguese text; keep the English translation aligned.
 
 const L = "pt-BR" as const;
 

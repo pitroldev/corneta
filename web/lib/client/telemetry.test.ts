@@ -30,7 +30,7 @@ function fakeSdk() {
 const UUID = "318f95fc-6f70-4cf5-a625-e250e43b1234";
 
 describe("editorial content id", () => {
-  it("aceita apenas o identificador opaco da metadata", () => {
+  it("accepts only the opaque metadata identifier", () => {
     const root = (content: string) =>
       ({
         querySelector: () => ({ content }),
@@ -87,7 +87,7 @@ describe("browser telemetry facade", () => {
     },
   );
 
-  it("não carrega o SDK sem configuração ou após opt-out", async () => {
+  it("does not load the SDK without configuration or after opt-out", async () => {
     const sdk = fakeSdk();
     const loadSdk = vi.fn(async () => sdk);
     const missing = createBrowserTelemetry({ loadSdk });
@@ -121,7 +121,7 @@ describe("browser telemetry facade", () => {
     expect(loadSdk).not.toHaveBeenCalled();
   });
 
-  it("inicializa em modo cookieless, manual e sem captura de conteúdo", async () => {
+  it("initializes in manual cookieless mode without content capture", async () => {
     const sdk = fakeSdk();
     const telemetry = createBrowserTelemetry({
       token: "phc_project123",
@@ -162,7 +162,7 @@ describe("browser telemetry facade", () => {
     });
   });
 
-  it("captura só rota, idioma e CTA enumerada", async () => {
+  it("captures only the route, locale, and enumerated CTA", async () => {
     const sdk = fakeSdk();
     const telemetry = createBrowserTelemetry({
       token: "phc_project123",
@@ -200,7 +200,7 @@ describe("browser telemetry facade", () => {
     );
   });
 
-  it("captura content_id validado e deduplica por artigo sem enviar a URL", async () => {
+  it("captures validated content_id and deduplicates articles without sending URLs", async () => {
     const sdk = fakeSdk();
     const telemetry = createBrowserTelemetry({
       token: "phc_project123",
@@ -267,7 +267,7 @@ describe("browser telemetry facade", () => {
     expect(serialized).not.toContain("guide_multistream/leak");
   });
 
-  it("redige exceções e interrompe a captura imediatamente ao desativar", async () => {
+  it("redacts exceptions and stops capture immediately on opt-out", async () => {
     const sdk = fakeSdk();
     const storage = fakeStorage();
     const telemetry = createBrowserTelemetry({
@@ -303,7 +303,7 @@ describe("browser telemetry facade", () => {
     expect(sdk.capture).not.toHaveBeenCalled();
   });
 
-  it("tenta carregar novamente depois de falha transitória", async () => {
+  it("retries loading after a transient failure", async () => {
     const sdk = fakeSdk();
     const loadSdk = vi
       .fn<() => Promise<ReturnType<typeof fakeSdk>>>()
@@ -322,7 +322,7 @@ describe("browser telemetry facade", () => {
     expect(sdk.init).toHaveBeenCalledOnce();
   });
 
-  it("permite reativar depois de opt-out durante o download sem enviar na corrida", async () => {
+  it("allows reactivation after opt-out during download without racing to capture", async () => {
     const sdk = fakeSdk();
     const storage = fakeStorage();
     let resolveSdk!: (value: ReturnType<typeof fakeSdk>) => void;
@@ -353,7 +353,7 @@ describe("browser telemetry facade", () => {
     expect(sdk.capture).not.toHaveBeenCalled();
   });
 
-  it("notifica mudanças locais e de outras abas apenas para a preferência", () => {
+  it("notifies local and cross-tab changes only for the preference", () => {
     const originalWindow = globalThis.window;
     const target = new EventTarget();
     vi.stubGlobal("window", target);

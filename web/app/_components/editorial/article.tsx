@@ -8,7 +8,6 @@ import type { TocItem } from "@/lib/editorial/types";
 export interface EditorialMetaItem {
   label: string;
   value: ReactNode;
-  /** Quando presente e `value` for texto, usa um elemento time semântico. */
   dateTime?: string;
 }
 
@@ -105,7 +104,6 @@ export function EditorialArticleShell({
   );
 }
 
-/** Wrapper da saída MDX. A tipografia fica deliberadamente restrita a ele. */
 export function EditorialBody({ children }: { children: ReactNode }) {
   return <div className="editorial-prose">{children}</div>;
 }

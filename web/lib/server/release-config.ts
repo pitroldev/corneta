@@ -26,9 +26,7 @@ export function resolveBuildSha(
     values.some((s) => !SHA_RE.test(s)) ||
     new Set(values.map((s) => s.toLowerCase())).size > 1
   )
-    throw new Error(
-      "Os SHAs do site e da API devem identificar o mesmo commit completo.",
-    );
+    throw new Error("Site and API SHAs must identify the same full commit.");
   if (values.length) return values[0].toLowerCase();
   try {
     const sha = gitSha();
@@ -47,26 +45,26 @@ export function releaseConfigErrors(env: Environment): string[] {
     "KICK_CLIENT_SECRET",
   ];
   for (const name of required)
-    if (!env[name]?.trim()) errors.push(`${name}: ausente`);
+    if (!env[name]?.trim()) errors.push(`${name}: missing`);
   if (
     env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") !== "https://www.corneta.live"
   )
-    errors.push("NEXT_PUBLIC_SITE_URL: use o domínio canônico HTTPS");
+    errors.push("NEXT_PUBLIC_SITE_URL: use the canonical HTTPS origin");
   if (!downloadMetadata(env.NEXT_PUBLIC_PRIMARY_CTA_URL)) {
     errors.push(
-      "NEXT_PUBLIC_PRIMARY_CTA_URL: configure a URL HTTPS do instalador .exe em github.com/pitroldev/corneta/releases",
+      "NEXT_PUBLIC_PRIMARY_CTA_URL: configure the HTTPS .exe installer URL at github.com/pitroldev/corneta/releases",
     );
   }
   if (!rateLimitConfiguration(env))
     errors.push(
-      "OAuth: configure UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN e OAUTH_RATE_LIMIT_SALT (segredo aleatório de pelo menos 32 caracteres)",
+      "OAuth: configure UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, and OAUTH_RATE_LIMIT_SALT (a random secret of at least 32 characters)",
     );
   if (
     env.VERCEL !== "1" &&
     !/^[a-z0-9-]+$/i.test(env.OAUTH_TRUSTED_IP_HEADER ?? "")
   )
     errors.push(
-      "OAUTH_TRUSTED_IP_HEADER: configure um header sobrescrito pelo proxy confiável",
+      "OAUTH_TRUSTED_IP_HEADER: configure a header overwritten by the trusted proxy",
     );
   const redirects =
     env.KICK_REDIRECT_URIS?.split(",").map((s) => s.trim()) ?? [];
@@ -79,18 +77,18 @@ export function releaseConfigErrors(env: Environment): string[] {
     )
   )
     errors.push(
-      "KICK_REDIRECT_URIS: use somente os callbacks loopback do desktop cadastrados na Kick",
+      "KICK_REDIRECT_URIS: use only desktop loopback callbacks registered with Kick",
     );
   if (
     !SHA_RE.test(env.NEXT_PUBLIC_BUILD_SHA ?? "") ||
     env.NEXT_PUBLIC_BUILD_SHA?.toLowerCase() !== env.BUILD_SHA?.toLowerCase()
   )
-    errors.push("BUILD_SHA/NEXT_PUBLIC_BUILD_SHA: faltando ou divergentes");
+    errors.push("BUILD_SHA/NEXT_PUBLIC_BUILD_SHA: missing or inconsistent");
   for (const name of ["TELEMETRY_DISABLED", "NEXT_PUBLIC_TELEMETRY_DISABLED"])
     if (!/^[01]$/.test(env[name] ?? ""))
-      errors.push(`${name}: escolha explicitamente 0 ou 1`);
+      errors.push(`${name}: explicitly choose 0 or 1`);
   if (env.TELEMETRY_DISABLED !== env.NEXT_PUBLIC_TELEMETRY_DISABLED)
-    errors.push("Os switches de telemetria do site e API devem coincidir");
+    errors.push("Site and API telemetry switches must match");
   if (
     env.TELEMETRY_DISABLED !== "1" ||
     env.NEXT_PUBLIC_TELEMETRY_DISABLED !== "1"
@@ -101,18 +99,18 @@ export function releaseConfigErrors(env: Environment): string[] {
       metadata.site.projectTokenSha256 !== metadata.setupApi.projectTokenSha256
     )
       errors.push(
-        "Telemetria: site e API precisam do mesmo project token público phc_ válido",
+        "Telemetry: site and API require the same valid public phc_ project token",
       );
     if (
       metadata.site.posthogHost !== "https://us.i.posthog.com" ||
       metadata.setupApi.posthogHost !== "https://us.i.posthog.com"
     )
-      errors.push("Telemetria: host US obrigatório no site e na API");
+      errors.push("Telemetry: the US host is required for both site and API");
     if (
       env.NEXT_PUBLIC_DEPLOYMENT_ENV !== "production" ||
       env.POSTHOG_ENVIRONMENT !== "production"
     )
-      errors.push("Telemetria: declare production nas duas superfícies");
+      errors.push("Telemetry: declare production on both surfaces");
   }
   return errors;
 }

@@ -3,7 +3,7 @@ import { makeTarget, defaultConfig, obsIngestUrl } from "./factory";
 import { PLATFORMS } from "./platforms";
 
 describe("makeTarget", () => {
-  it("herda nome/preset da plataforma, começa habilitado e sem chave", () => {
+  it("inherits platform name and preset and starts enabled without a key", () => {
     const t = makeTarget("twitch");
     expect(t.platformId).toBe("twitch");
     expect(t.name).toBe(PLATFORMS.twitch.name);
@@ -14,13 +14,13 @@ describe("makeTarget", () => {
     expect(t.id).toMatch(/^tgt/);
   });
 
-  it("ids são únicos", () => {
+  it("creates unique IDs", () => {
     expect(makeTarget("twitch").id).not.toBe(makeTarget("twitch").id);
   });
 });
 
 describe("defaultConfig", () => {
-  it("nasce com Twitch + YouTube, modo híbrido e 1 perfil ativo", () => {
+  it("starts with Twitch, YouTube, hybrid mode and one active profile", () => {
     const c = defaultConfig();
     expect(c.targets.map((t) => t.platformId)).toEqual(["twitch", "youtube"]);
     expect(c.mode).toBe("hybrid");
@@ -31,7 +31,7 @@ describe("defaultConfig", () => {
 });
 
 describe("obsIngestUrl", () => {
-  it("monta a URL sem expor a chave", () => {
+  it("constructs the URL without exposing the destination key", () => {
     expect(
       obsIngestUrl({
         protocol: "rtmp",

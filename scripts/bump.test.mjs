@@ -87,7 +87,7 @@ it("rejects unrelated staged work before any version write or commit", () => {
 it("rejects an existing target tag without writes", () => {
   const repo = repository();
   repo.git("tag", "v0.7.1");
-  expect(() => repo.run("patch", "--commit")).toThrow("já existe");
+  expect(() => repo.run("patch", "--commit")).toThrow("already exists");
   expect(repo.git("status", "--porcelain")).toBe("");
   expect(repo.git("rev-parse", "HEAD")).toBe(repo.initial);
 });
@@ -97,7 +97,7 @@ it("rejects target edits and mismatched committed versions before writing", () =
     join(repo.root, "package.json"),
     repo.contents["package.json"] + " ",
   );
-  expect(() => repo.run("patch")).toThrow("alterações locais");
+  expect(() => repo.run("patch")).toThrow("local changes");
   writeFileSync(join(repo.root, "package.json"), repo.contents["package.json"]);
   writeFileSync(
     join(repo.root, "src-tauri/tauri.conf.json"),
@@ -105,7 +105,7 @@ it("rejects target edits and mismatched committed versions before writing", () =
   );
   repo.git("add", ".");
   repo.git("commit", "--quiet", "-m", "inconsistent fixture");
-  expect(() => repo.run("patch")).toThrow("divergente");
+  expect(() => repo.run("patch")).toThrow("mismatched");
   expect(repo.git("status", "--porcelain")).toBe("");
 });
 it("commits only synchronized targets, leaves unrelated unstaged work and creates the exact tag", () => {
@@ -148,7 +148,7 @@ it("restores owned replacements after an injected filesystem failure", () => {
         renameSync(source, destination);
       },
     }),
-  ).toThrow("Escritas próprias revertidas");
+  ).toThrow("This operation's writes were restored");
   expect(repo.git("status", "--porcelain")).toBe("");
 });
 it("preserves changes with recovery instructions when a commit hook fails", () => {
@@ -159,7 +159,7 @@ it("preserves changes with recovery instructions when a commit hook fails", () =
     mode: 0o755,
   });
   repo.git("config", "core.hooksPath", hooks);
-  expect(() => repo.run("patch", "--commit")).toThrow("Nada foi resetado");
+  expect(() => repo.run("patch", "--commit")).toThrow("Nothing was reset");
   expect(repo.git("rev-parse", "HEAD")).toBe(repo.initial);
   expect(
     JSON.parse(readFileSync(join(repo.root, "package.json"), "utf8")).version,

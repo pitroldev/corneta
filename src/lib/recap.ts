@@ -1,9 +1,5 @@
-// Recap pós-live: desenha um pôster quadrado (1080×1080) compartilhável a partir do relatório.
-// Canvas 2D puro (sem dependência), no visual de pôster da Corneta. Copiar/baixar PNG.
 import type { I18n } from "./i18n";
 
-/** Tradução injetada: aqui não é componente, então quem desenha passa o `t` do
- *  idioma ativo. O resto da copy do pôster chega pronta dentro de `RecapData`. */
 type Translate = I18n["t"];
 
 const C = {
@@ -22,7 +18,6 @@ const C = {
 const DISPLAY = '"Baloo 2", "Segoe UI", system-ui, sans-serif';
 const SANS = '"Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif';
 
-/** 4:5 mantém o recap grande no feed e dá altura real para a história inteira. */
 export const RECAP_WIDTH = 1080;
 export const RECAP_HEIGHT = 1350;
 
@@ -35,14 +30,14 @@ export interface RecapData {
   date: string;
   title: string;
   subtitle: string;
-  big: RecapStat[]; // até 2 números-herói
-  small: RecapStat[]; // até 4 secundários
-  moment?: string; // melhor momento
+  big: RecapStat[];
+  small: RecapStat[];
+  moment?: string;
   platforms: { name: string; color: string }[];
   footer: string;
 }
 
-/** Reduz a fonte até o texto caber em maxWidth. Deixa ctx.font setado. */
+/** Shrink text to maxWidth and leave the selected font in ctx.font. */
 function fit(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -73,7 +68,7 @@ function trimToWidth(
   return `${text.slice(0, end).trimEnd()}…`;
 }
 
-/** Quebra texto dentro de uma região fixa e abrevia apenas quando nem todas as linhas cabem. */
+/** Wrap within fixed bounds; truncate only when all lines cannot fit. */
 function wrapLines(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -117,8 +112,6 @@ export function drawRecap(
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Uma única folha editorial: o cabeçalho conta qual foi a live; o corpo sustenta
-  // números, momento e plataformas em regiões próprias, sem disputar altura.
   const m = 48;
   const pw = W - m * 2;
   const ph = H - m * 2;
@@ -131,7 +124,6 @@ export function drawRecap(
   const innerWidth = pr - px;
   ctx.textBaseline = "alphabetic";
 
-  // Abertura em latão: a live é o assunto, não uma grade de métricas.
   const heroBottom = 382;
   ctx.fillStyle = C.brass;
   ctx.fillRect(m, m, pw, heroBottom - m);
@@ -161,7 +153,6 @@ export function drawRecap(
   ctx.fillStyle = "rgba(36, 20, 0, 0.24)";
   ctx.fillRect(px, 338, innerWidth, 3);
 
-  // Números que resumem a sala, com espaço próprio e sem cards concorrentes.
   const big = r.big.slice(0, 2);
   const bigTop = 430;
   const bigHeight = 230;
@@ -187,8 +178,6 @@ export function drawRecap(
   ctx.fillStyle = C.border;
   ctx.fillRect(px, bigTop + bigHeight, innerWidth, 2);
 
-  // Até seis secundários ocupam no máximo duas linhas. Com cinco ou seis, a
-  // terceira coluna preserva bits e raids em vez de descartá-los do recap.
   const small = r.small.slice(0, 6);
   const smallTop = bigTop + bigHeight + 34;
   let smallBottom = smallTop;
@@ -226,7 +215,6 @@ export function drawRecap(
       smallTop + Math.ceil(small.length / columns) * (bh + gap) - gap;
   }
 
-  // Destaque editorial com até três linhas; o texto diminui antes de abreviar.
   if (r.moment) {
     const y = Math.max(smallBottom + 30, 790);
     const bh = 156;
@@ -249,7 +237,6 @@ export function drawRecap(
     );
   }
 
-  // Plataformas têm duas linhas reservadas. Nomes extremos encolhem e o excedente vira +N.
   if (r.platforms.length) {
     const platformY = 1160;
     let cx = px;
@@ -265,7 +252,7 @@ export function drawRecap(
         row = 1;
         cx = px;
       }
-      // Na última linha, conserva o espaço do contador antes de aceitar mais um chip.
+      // Reserve overflow-count width before adding the last visible platform chip.
       const hasMore = index < r.platforms.length - 1;
       if (row === 1 && hasMore && cx + chipW + 64 > pr) break;
       const cy = platformY + row * 44;
@@ -299,7 +286,7 @@ export function drawRecap(
 export function recapToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
     canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("falha ao gerar PNG"))),
+      (b) => (b ? resolve(b) : reject(new Error("Failed to generate PNG"))),
       "image/png",
     ),
   );

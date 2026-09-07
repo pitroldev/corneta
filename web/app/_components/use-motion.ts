@@ -2,11 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** `true` quando a pessoa pediu menos movimento no sistema.
- *
- *  Começa em `true`: o servidor não tem como saber a preferência, e nascer
- *  parado significa que quem pediu calma nunca vê um quadro de animação antes
- *  da hidratação. */
+// Start motion-free until the client's reduced-motion preference is known.
 export function useCalm() {
   const [calm, setCalm] = useState(true);
   useEffect(() => {
@@ -19,11 +15,7 @@ export function useCalm() {
   return calm;
 }
 
-/**
- * `true` enquanto o elemento está VISÍVEL na tela e a aba em primeiro plano.
- *
- * Animações por quadro devem retornar cedo quando este valor for falso.
- */
+// Background tabs and off-screen demonstrations must not run animation loops.
 export function useOnScreen(
   ref: React.RefObject<HTMLElement | null>,
   amount = 0.15,
@@ -51,13 +43,7 @@ export function useOnScreen(
   return on;
 }
 
-/**
- * Roda `fn` a cada `ms` — mas só enquanto o elemento está VISÍVEL na tela e a
- * aba está em primeiro plano.
- *
- * Para conteúdo discreto, não animação contínua; esta usa MotionValue.
- * `paused` interrompe trocas durante hover/foco para preservar a leitura.
- */
+// Use discrete ticks for content; per-frame visuals belong in MotionValues.
 export function useHeartbeat(
   ref: React.RefObject<HTMLElement | null>,
   ms: number,
@@ -65,9 +51,7 @@ export function useHeartbeat(
   fn: () => void,
   paused = false,
 ) {
-  // O callback vive num ref pra o intervalo não ser recriado a cada tique (a
-  // `fn` é nova a cada render). A escrita fica num efeito: mexer em ref durante
-  // o render é o que faz o React perder atualização em modo concorrente.
+  // Refresh the callback after commit, not during render; keep the interval stable.
   const saved = useRef(fn);
   useEffect(() => {
     saved.current = fn;

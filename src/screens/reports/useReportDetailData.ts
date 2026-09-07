@@ -87,8 +87,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
         if (!result) return;
         if (result.data.meta.endedAt != null)
           setCachedSummary(id, result.summary);
-        // One worker, detail first, optional data later. Navigation terminates
-        // pending work instead of just hiding stale results.
+        // Load detail first; navigation terminates pending worker work.
         try {
           const raw = await api.readSessionBytes(id, true);
           if (alive && raw.byteLength > 0) {
@@ -100,7 +99,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
             if (alive) setChat(next);
           }
         } catch {
-          /* Missing chat is independent of the live story. */
+          /* Missing chat must not prevent loading the session. */
         }
         if (!alive || !previousId) return;
         const cached = getCachedSummary(previousId);

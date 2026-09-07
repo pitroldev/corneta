@@ -2,7 +2,7 @@
 name: Corneta
 description: Uma live. Várias comunidades. Tudo no seu controle.
 colors:
-  breu: "#100b07"
+  charcoal: "#100b07"
   surface: "#1a130c"
   surface-raised: "#221a10"
   surface-high: "#2e2314"
@@ -22,9 +22,9 @@ colors:
   brass: "#ffb323"
   brass-strong: "#ffc857"
   brass-ink: "#2a1c00"
-  tomate: "#ff5a36"
-  tomate-strong: "#ff7a55"
-  tomate-ink: "#b83218"
+  tomato: "#ff5a36"
+  tomato-strong: "#ff7a55"
+  tomato-ink: "#b83218"
   live: "#ff4733"
   ok: "#56e39b"
   warn: "#ffc23d"
@@ -106,21 +106,21 @@ spacing:
   section: "clamp(78px, 8vw, 122px)"
 components:
   button-download:
-    backgroundColor: "{colors.tomate}"
+    backgroundColor: "{colors.tomato}"
     textColor: "{colors.brass-ink}"
     typography: "{typography.action}"
     rounded: "{rounded.md}"
     padding: "0 26px"
     height: "70px"
   button-download-hover:
-    backgroundColor: "{colors.tomate-strong}"
+    backgroundColor: "{colors.tomato-strong}"
     textColor: "{colors.brass-ink}"
     typography: "{typography.action}"
     rounded: "{rounded.md}"
     padding: "0 26px"
     height: "70px"
   button-download-compact:
-    backgroundColor: "{colors.tomate}"
+    backgroundColor: "{colors.tomato}"
     textColor: "{colors.brass-ink}"
     rounded: "{rounded.sm}"
     padding: "0 15px"
@@ -131,8 +131,8 @@ components:
     typography: "{typography.label}"
     rounded: "{rounded.sm}"
     padding: "7px 12px"
-  sticker-tomate:
-    backgroundColor: "{colors.tomate}"
+  sticker-tomato:
+    backgroundColor: "{colors.tomato}"
     textColor: "{colors.brass-ink}"
     typography: "{typography.label}"
     rounded: "{rounded.sm}"

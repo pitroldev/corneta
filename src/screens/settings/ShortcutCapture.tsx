@@ -3,8 +3,6 @@ import { useT } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
 import { captureShortcut } from "../../lib/shortcuts";
 
-/** Captura um atalho global: clica e pressiona a combinação (exige um modificador).
- *  Tecla solta não passa batido: avisa na hora que precisa de Ctrl/Alt/Shift. Esc cancela. */
 export function ShortcutCapture({
   value,
   onChange,
@@ -21,7 +19,6 @@ export function ShortcutCapture({
   );
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Feedback de ~1.5s quando vier tecla sem modificador — some sozinho (reinicia se repetir).
   const flashHint = useCallback((kind: "needsModifier" | "unsupported") => {
     if (hintTimer.current) clearTimeout(hintTimer.current);
     setHint(kind);
@@ -47,7 +44,6 @@ export function ShortcutCapture({
       isComposing: e.nativeEvent.isComposing,
     });
     if (result.kind === "cancel") {
-      // Cancela sem mexer no atalho atual.
       setCapturing(false);
       setHint(null);
       return;

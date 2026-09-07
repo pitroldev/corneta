@@ -42,8 +42,7 @@ impl JournalWriter {
         Self::start_with_write_hook(file, initial_len, chat, keep_alive, || {})
     }
 
-    // A one-shot write hook lets regression tests hold a detached batch behind
-    // a barrier without depending on disk speed or sleeps.
+    // Tests can block a detached batch without relying on disk speed or sleeps.
     pub(super) fn start_with_write_hook(
         file: File,
         initial_len: u64,
@@ -140,7 +139,7 @@ impl JournalWriter {
                 }
             };
             if !success {
-                log::warn!("relatório: falha na escrita do journal");
+                log::warn!("report: journal write failed");
             }
         });
         Self { shared, chat }
@@ -196,7 +195,7 @@ impl JournalWriter {
         if !fits {
             state.dropped += 1;
             if state.dropped == 1 {
-                log::warn!("relatório: limite de escrita atingido; descartes serão agregados");
+                log::warn!("report: write limit reached; dropped records will be aggregated");
             }
             if self.chat {
                 if line.get("del").is_some() {
@@ -236,7 +235,7 @@ impl JournalWriter {
             .wait_timeout_while(state, timeout, |state| !state.closed)
             .unwrap();
         if !state.closed {
-            log::warn!("relatório: journal ainda drenando após o prazo de encerramento");
+            log::warn!("report: journal still draining after the shutdown deadline");
         }
         state.closed
     }

@@ -56,11 +56,11 @@ describe("credential-free contributor profile", () => {
 
   it("cannot silently downgrade an official production deployment or release gate", () => {
     expect(() => contributorEnvironment({ VERCEL_ENV: "production" })).toThrow(
-      "oficial",
+      "official",
     );
     expect(() =>
       contributorEnvironment({ CORNETA_RELEASE_CHECK: "1" }),
-    ).toThrow("oficial");
+    ).toThrow("official");
   });
 
   it("accepts a clean clone and examples without requiring any environment file", () => {
@@ -79,7 +79,7 @@ describe("credential-free contributor profile", () => {
       mkdirSync(join(workspace, "web"));
       const path = join(workspace, "web", file);
       writeFileSync(path, "DO_NOT_LOAD=sentinel\n");
-      expect(() => assertNoWebEnv(workspace)).toThrow("clone/worktree limpo");
+      expect(() => assertNoWebEnv(workspace)).toThrow("clean clone/worktree");
       expect(readFileSync(path, "utf8")).toBe("DO_NOT_LOAD=sentinel\n");
     },
   );
@@ -89,7 +89,7 @@ describe("credential-free contributor profile", () => {
     expect(command.tool).toBe("tauri");
     expect(command.args).toContain("--no-bundle");
     expect(command.args).toContain("src-tauri/tauri.contributor.conf.json");
-    expect(() => contributorPlan("release")).toThrow("Uso:");
+    expect(() => contributorPlan("release")).toThrow("Usage:");
   });
 
   it("preserves official updater settings while giving the contributor its own identity", () => {
@@ -155,6 +155,6 @@ describe("credential-free contributor profile", () => {
         readFileSync(contributorToolScript(tool, cwd), "utf8").length,
       ).toBeGreaterThan(0);
     }
-    expect(() => contributorToolScript("unknown")).toThrow("desconhecida");
+    expect(() => contributorToolScript("unknown")).toThrow("Unknown");
   });
 });

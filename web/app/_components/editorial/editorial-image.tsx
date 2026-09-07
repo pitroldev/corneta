@@ -39,11 +39,7 @@ export interface EditorialImageProps {
   className?: string;
 }
 
-/**
- * Imagem editorial com lightbox interno e controles de ampliação. O dialog
- * nativo mantém foco, Escape e isolamento do restante da página sem trocar de
- * rota ou abrir outra aba.
- */
+// Native dialog supplies focus isolation and restoration for the lightbox.
 export function EditorialImage({
   src,
   alt,

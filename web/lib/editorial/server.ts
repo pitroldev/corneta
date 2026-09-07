@@ -35,7 +35,7 @@ async function resolveContentRoot(): Promise<string> {
   }
 
   throw new Error(
-    `Diretório editorial não encontrado. Caminhos verificados: ${candidates.join(", ")}`,
+    `Editorial directory not found. Checked paths: ${candidates.join(", ")}`,
   );
 }
 

@@ -1,5 +1,3 @@
-// Explicit, credential-free contributor commands. Official build/release commands
-// deliberately do not use this profile, and their production gates stay intact.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -10,8 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const webRequire = createRequire(resolve(root, "web/package.json"));
 
-// Keep only machine/toolchain settings. No inherited OAuth, signing, analytics,
-// npm lifecycle hooks, NODE_OPTIONS or arbitrary application environment values.
+// Allow only toolchain settings; inherited application credentials must not reach children.
 const machineKeys = new Set([
   "PATH",
   "PATHEXT",
@@ -74,7 +71,7 @@ export function contributorEnvironment(source, workspace = root) {
     source.CORNETA_RELEASE_CHECK === "1"
   ) {
     throw new Error(
-      "O perfil contributor não pode substituir um deploy/release oficial.",
+      "The contributor profile cannot replace an official deployment or release.",
     );
   }
   const env = Object.fromEntries(
@@ -95,16 +92,14 @@ export function contributorEnvironment(source, workspace = root) {
     VITE_TELEMETRY_DISABLED: "1",
     NEXT_PUBLIC_TELEMETRY_DISABLED: "1",
     NEXT_TELEMETRY_DISABLED: "1",
-    // This public URL validates canonical metadata; it is not a credential or
-    // permission to deploy. Keep site.ts's official production checks unchanged.
+    // Canonical metadata still uses the public origin; this profile cannot deploy.
     NEXT_PUBLIC_SITE_URL: "https://www.corneta.live",
     CARGO_TARGET_DIR: resolve(workspace, ".artifacts/contributor/target"),
   };
 }
 
 export function assertNoWebEnv(workspace = root) {
-  // Next has automatic dotenv loading and hot reload. Do not rely on its private
-  // flags, edit people's dotenv files or copy their secrets into child processes.
+  // Next reloads dotenv automatically, so environment sanitization alone is insufficient.
   const files = [
     ".env",
     ".env.local",
@@ -117,8 +112,8 @@ export function assertNoWebEnv(workspace = root) {
   ];
   if (files.some((file) => existsSync(resolve(workspace, "web", file)))) {
     throw new Error(
-      "O perfil contributor exige web/ sem arquivos .env reais. Use um clone/worktree limpo; " +
-        "nenhum arquivo pessoal será movido ou removido. A .env.example é permitida.",
+      "The contributor profile requires web/ without real .env files. Use a clean clone/worktree; " +
+        "no personal files will be moved or removed. .env.example is allowed.",
     );
   }
 }
@@ -195,7 +190,7 @@ export function contributorPlan(task) {
       ];
     default:
       throw new Error(
-        "Uso: pnpm contrib:{demo|web|check|web:check|app:dev|app:build}",
+        "Usage: pnpm contrib:{demo|web|check|web:check|app:dev|app:build}",
       );
   }
 }
@@ -218,7 +213,7 @@ export function contributorToolScript(tool, cwd) {
   };
   if (localScripts[tool]) return resolve(root, "scripts", localScripts[tool]);
   const [pkg, entry] = bins[tool] || [];
-  if (!pkg) throw new Error("Ferramenta contributor desconhecida.");
+  if (!pkg) throw new Error("Unknown contributor tool.");
   const resolver = cwd === "web" ? webRequire : require;
   return resolve(dirname(resolver.resolve(`${pkg}/package.json`)), entry);
 }
@@ -227,23 +222,22 @@ async function main() {
   const [task, ...extra] = process.argv.slice(2);
   if (extra.length)
     throw new Error(
-      "O perfil contributor não aceita overrides de comandos ou configuração.",
+      "The contributor profile does not accept command or configuration overrides.",
     );
   const plan = contributorPlan(task);
   const env = contributorEnvironment(process.env);
   if (["web", "web:check", "check"].includes(task)) assertNoWebEnv();
   if (task.startsWith("app:")) {
     if (process.platform !== "win32")
-      throw new Error("O desktop contributor é suportado no Windows x64.");
+      throw new Error("The contributor desktop is supported on Windows x64.");
     console.log(
-      "Corneta Contributor: perfil/cofre separados, sem updater, telemetria ou instalador.\n" +
-        "Feche a Corneta real antes de testar: OBS, portas e atalhos ainda são recursos compartilhados.\n" +
-        "O comando não inicia uma live nem instala o aplicativo automaticamente.",
+      "Corneta Contributor: isolated profile/vault, without updater, telemetry, or installer.\n" +
+        "Close the production Corneta app before testing: OBS, ports, and shortcuts are still shared resources.\n" +
+        "This command does not start a stream or install the app automatically.",
     );
   }
   for (const { tool, args, cwd } of plan) {
-    // A global Windows pnpm.cmd can hardcode a different Node beside the shim.
-    // Run every CLI entry through this exact Node; never nest a shell pnpm chain.
+    // Windows pnpm.cmd may hardcode another Node; use this runtime for every CLI.
     const script = contributorToolScript(tool, cwd);
     console.log(`contributor: ${cwd || "app"} / ${tool}`);
     const status = await new Promise((complete, reject) => {

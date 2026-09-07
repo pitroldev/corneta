@@ -3,8 +3,7 @@ import { legalUrl } from "../lib/legal";
 import { useI18n } from "../lib/i18n";
 import { cn, openExternal } from "../lib/utils";
 
-/** Link pra um documento legal. Abre no navegador — o app não embute o texto pra
- *  não ficar com uma cópia velha do que o site publica. */
+/** Open current legal documents in the browser instead of embedding a stale copy. */
 export function LegalLink({
   href,
   children,
@@ -23,21 +22,10 @@ export function LegalLink({
   );
 }
 
-/**
- * Aviso de aceite das boas-vindas.
- *
- * Fica visível em TODOS os passos do tour e em todos os caminhos de saída do
- * modal (Bora começar, Pular, Esc, X) — é ele que dá a "oportunidade de tomar
- * conhecimento prévio" do art. 46 do CDC, sem a qual as cláusulas de limitação
- * dos termos simplesmente não vinculam o usuário. Por isso é aviso adjacente ao
- * botão, e não checkbox: o ato afirmativo já existe, e travar o Avançar num
- * checkbox só adicionaria atrito sem ganho jurídico.
- */
+/** Keep the acceptance notice visible on every onboarding step and dismissal path. */
 export function LegalAcceptNote({ className }: { className?: string }) {
   const { t, locale } = useI18n();
-  // A frase inteira vem do dicionário com os dois buracos ainda no lugar (sem
-  // `vars`, `interpolate` devolve o template cru) e é partida neles. Montar a
-  // frase por pedaços de JSX prenderia a ordem das palavras ao português.
+  // Translate the complete sentence before inserting links so word order remains locale-specific.
   const parts = t("components.legal.accept").split(/(\{terms\}|\{privacy\})/);
   return (
     <p

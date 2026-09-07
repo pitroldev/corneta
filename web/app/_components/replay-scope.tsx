@@ -16,74 +16,20 @@ import { PlatformGlyph } from "./decor";
 import { InfoIcon, LoaderIcon, PauseIcon, PlayIcon } from "./icons";
 import { cn } from "./ui";
 
-// ============================================================
-// O relatório TOCANDO: o vídeo da live e o gráfico no mesmo relógio.
-//
-// Esta peça existe porque é a única coisa que a Corneta faz e ninguém mais faz —
-// e era justamente a metade invisível da página. Todo o resto da LP conta a live
-// até o "BORA"; aqui a live já acabou e o streamer está procurando o que travou.
-//
-// ------------------------------------------------------------
-// COMO O TEMPO ANDA AQUI
-// ------------------------------------------------------------
-// O cursor CAMINHA. O relógio anda, o quadro muda de estado no minuto certo, o
-// chat volta a rolar na hora em que foi digitado e os dois gráficos têm um ponto
-// correndo em cima da curva. É um player: tem play, tem pausa e tem barra pra
-// arrastar.
-//
-// O passeio não percorre as 3h12 num fôlego — ele TOCA as três janelas que
-// interessam e passa rápido pelo meio, que é o que qualquer resumo de gravação
-// faz. Cada janela contém a virada dela: você vê a Twitch cair, e vê o OBS zerar
-// enquanto as plataformas continuam recebendo.
-//
-// ------------------------------------------------------------
-// POSIÇÃO NÃO É ESTADO DO REACT — E ISSO NÃO É OTIMIZAÇÃO PREMATURA
-// ------------------------------------------------------------
-// A primeira versão desta peça tocava com um `setInterval` de 100 ms chamando
-// `setState`. Dez quadros por segundo: engasgado a olho nu, e cada tique
-// re-renderizava o painel inteiro (quadro, chat, veredito, dois gráficos) só pra
-// mover um cursor dois pixels.
-//
-// Agora o minuto atual é um `MotionValue` empurrado pelo `useAnimationFrame`: o
-// framer escreve direto no estilo do cursor e dos pontos, sem passar pelo React.
-// O React só entra pro que muda em SALTOS — o estado do quadro, as falas que
-// já foram ditas, qual momento está ativo — e isso é sincronizado por um limiar
-// de minutos, não por quadro.
-//
-// ------------------------------------------------------------
-// O QUE SUMIU DE PROPÓSITO
-// ------------------------------------------------------------
-// As curvas se desenhavam com `pathLength` do framer. Isso é `stroke-dasharray`
-// medido em unidades do usuário, dentro de um `viewBox` que estica X e Y por
-// fatores diferentes e com `vector-effect: non-scaling-stroke` mandando o traço
-// ser calculado em pixels de tela. As três coisas juntas desenhavam o tracejado
-// numa escala e o traço noutra: a linha aparecia cortada. Onde o desenho
-// estica, o movimento é posição/opacidade/recorte — nunca tracejado.
-//
-// A copy chega RESOLVIDA, não como `t`: função não atravessa a fronteira
-// servidor→cliente do Next.
-// ============================================================
+// Animate MotionValues rather than React state per frame. Avoid pathLength on stretched, non-scaling SVG strokes.
 
-/** Duração da sessão de exemplo, em minutos: 3h12. */
 const SPAN_MIN = 192;
-/** Posição de um minuto no eixo, em % da largura. Marcas, cursor e pontos moram
- *  em HTML (não dentro do SVG), então a unidade comum tem que ser relativa. */
 const pctAt = (min: number) => (min / SPAN_MIN) * 100;
 
-/** Cada faixa é um SVG de 600×56 no seu próprio quadro. */
 const W = 600;
 const LANE_H = 56;
 
-export type MomentId = "chat" | "queda" | "brb";
+export type MomentId = "chat" | "drop" | "brb";
 type PlatId = "twitch" | "youtube" | "kick";
 
 interface Moment {
   id: MomentId;
-  /** Minuto de referência — é o que a marca do eixo aponta. */
   min: number;
-  /** A janela que o passeio TOCA. Contém a virada: a queda começa dentro dela,
-   *  e o OBS zera dentro dela. Ver a virada acontecer é o argumento; chegar
-   *  depois de pronta é só uma foto. */
   from: number;
   to: number;
   tone: "brass" | "warn" | "ok";
@@ -108,7 +54,7 @@ const MOMENTS: Moment[] = [
     ],
   },
   {
-    id: "queda",
+    id: "drop",
     min: 121,
     from: 116,
     to: 130,
@@ -137,8 +83,6 @@ const MOMENTS: Moment[] = [
   },
 ];
 
-/** As duas viradas da live, nos minutos em que as CURVAS as desenham — os
- *  números saem do próprio traço abaixo, não de uma segunda verdade. */
 const RECONNECT: [number, number] = [118, 129];
 const OBS_OUT: [number, number] = [157, 174];
 
@@ -150,29 +94,41 @@ const frameAt = (min: number): FrameState =>
       ? "reconnect"
       : "live";
 
-// DUAS FAIXAS, não duas linhas no mesmo quadro.
-//
-// Na primeira versão as duas séries dividiam um gráfico só — e como elas passam
-// quase no mesmo valor, a do OBS ficava escondida atrás da outra. Isso matava
-// justamente a leitura que a seção existe pra provar: lá pelo minuto 157 o OBS
-// zera e as plataformas NÃO.
-
-/** O que as PLATAFORMAS receberam. Só afunda no engasgo da Twitch. */
 const PLATFORMS: [number, number][] = [
-  [0, 20], [60, 18], [131, 15], [200, 19], [300, 17], [350, 20], [369, 44],
-  [386, 45], [404, 20], [470, 18], [484, 19], [520, 17], [600, 19],
+  [0, 20],
+  [60, 18],
+  [131, 15],
+  [200, 19],
+  [300, 17],
+  [350, 20],
+  [369, 44],
+  [386, 45],
+  [404, 20],
+  [470, 18],
+  [484, 19],
+  [520, 17],
+  [600, 19],
 ];
-/** O que o OBS mandou. Zera quando o OBS fecha e volta quando ele abre. */
 const OBS: [number, number][] = [
-  [0, 21], [60, 19], [131, 16], [200, 20], [300, 18], [350, 20], [369, 21],
-  [404, 22], [470, 19], [484, 20], [490, 50], [540, 50], [548, 26], [600, 21],
+  [0, 21],
+  [60, 19],
+  [131, 16],
+  [200, 20],
+  [300, 18],
+  [350, 20],
+  [369, 21],
+  [404, 22],
+  [470, 19],
+  [484, 20],
+  [490, 50],
+  [540, 50],
+  [548, 26],
+  [600, 21],
 ];
 
 const path = (pts: [number, number][]) =>
   pts.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ");
 
-/** Altura da curva num minuto qualquer — é o que põe o ponto EM CIMA do traço
- *  em vez de perto dele. */
 function yAt(pts: [number, number][], min: number) {
   const x = Math.max(0, Math.min(W, (min / SPAN_MIN) * W));
   for (let i = 1; i < pts.length; i++) {
@@ -183,11 +139,7 @@ function yAt(pts: [number, number][], min: number) {
   return pts[pts.length - 1][1];
 }
 
-/** Quando cada fala foi digitada, em minutos de live.
- *
- *  As falas não se espalham pela janela inteira: elas começam depois do
- *  primeiro terço, porque chat REAGE. Numa janela que contém a virada, isso põe
- *  o "travou aí?" depois da queda, e não antes dela. */
+// Place chat reactions after the event within each playback window.
 const EVENTS = MOMENTS.flatMap((m) =>
   m.who.map((w, k) => ({
     moment: m.id,
@@ -198,12 +150,10 @@ const EVENTS = MOMENTS.flatMap((m) =>
   })),
 );
 
-/** Relógio de parede: a live começou 21:00. Mesma hora que o outro painel usa. */
 const wallClock = (min: number) => {
   const t = Math.round(21 * 60 + min) % 1440;
   return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 };
-/** Relógio da GRAVAÇÃO: quanto de vídeo já correu. */
 const elapsed = (min: number) =>
   `${Math.floor(min / 60)}:${String(Math.floor(min % 60)).padStart(2, "0")}`;
 
@@ -234,13 +184,9 @@ export interface ReplayCopy {
   moments: Record<MomentId, MomentCopy>;
 }
 
-/** Quanto tempo cada janela leva pra tocar, e quanto leva o pulo até a próxima.
- *  A janela é longa de propósito: o veredito embaixo tem duas linhas pra ler. */
 const PLAY_MS = 6200;
 const SEEK_MS = 1100;
-/** De quantos em quantos minutos o conteúdo discreto (quadro, chat, veredito)
- *  se atualiza. Na velocidade do passeio isso dá ~4 renders por segundo — o
- *  cursor continua a 60 fps porque ele não depende disto. */
+// Limit discrete content updates; the cursor animates independently through a MotionValue.
 const SYNC_MIN = 0.35;
 
 const easeInOut = (k: number) =>
@@ -255,7 +201,6 @@ const nearest = (min: number) => {
   return best;
 };
 
-/** Onde o cursor começa: no meio da primeira janela, com o chat já rolando. */
 const START = MOMENTS[0].from + (MOMENTS[0].to - MOMENTS[0].from) * 0.42;
 
 export function ReplayScope({ copy }: { copy: ReplayCopy }) {
@@ -266,9 +211,8 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
   const [playing, setPlaying] = useState(true);
   const [hover, setHover] = useState(false);
 
-  /** O minuto em que o cursor está. Fonte da verdade da peça inteira. */
   const pos = useMotionValue(START);
-  /** A máquina do passeio mora num ref: mexer nela não pode custar um render. */
+  // Per-frame playback bookkeeping must not trigger React renders.
   const tour = useRef({
     i: 0,
     kind: "play" as "play" | "seek",
@@ -276,15 +220,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     from: START,
   });
 
-  // O passeio para quando: pediram menos movimento, apertaram pausa, o mouse
-  // está em cima (ninguém lê um veredito que troca sozinho) ou a peça saiu da
-  // tela / a aba foi pro fundo.
   useAnimationFrame((_, delta) => {
     if (!playing || hover || reduce || !onScreen) return;
     const t = tour.current;
     const m = MOMENTS[t.i];
-    // Teto no `delta`: voltando de uma aba no fundo ele vem gigante, e o cursor
-    // pularia a janela inteira num quadro só.
+    // Clamp the first frame after backgrounding so it cannot skip an entire playback window.
     t.el += Math.min(delta, 64);
 
     if (t.kind === "seek") {
@@ -307,31 +247,21 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     pos.set(m.from + (m.to - m.from) * (t.el / PLAY_MS));
   });
 
-  /** O conteúdo que muda em saltos. Sincroniza por limiar de minutos: o quadro
-   *  não precisa ser recalculado sessenta vezes por segundo pra virar de estado
-   *  três vezes na live inteira. */
   const [at, setAt] = useState(START);
   useMotionValueEvent(pos, "change", (p) => {
     setAt((cur) => (Math.abs(cur - p) < SYNC_MIN ? cur : p));
   });
 
-  // Com movimento reduzido o cursor simplesmente não anda — e não precisa de
-  // efeito nenhum pra "arrumar" a posição: `START` já cai dentro da primeira
-  // janela, a meio caminho do minuto que o primeiro momento aponta. O veredito e
-  // o chat daquele trecho aparecem parados, que é o combinado.
   const active = MOMENTS[nearest(at)];
   const state = frameAt(at);
 
-  /** Todo caminho manual escreve nos DOIS: no valor contínuo (o cursor segue o
-   *  dedo no mesmo quadro) e no discreto (o quadro e o chat viram na hora, sem
-   *  esperar o limiar). */
+  // Manual seeking updates continuous and discrete values immediately, bypassing the render threshold.
   const jump = (min: number, keepPlaying = false) => {
     const t = tour.current;
     t.i = nearest(min);
     t.kind = "play";
     t.el =
-      ((min - MOMENTS[t.i].from) /
-        (MOMENTS[t.i].to - MOMENTS[t.i].from)) *
+      ((min - MOMENTS[t.i].from) / (MOMENTS[t.i].to - MOMENTS[t.i].from)) *
       PLAY_MS;
     t.from = min;
     pos.set(min);
@@ -351,8 +281,6 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     );
   };
 
-  /** Play: retoma de onde o cursor parou. Se ele estiver no meio do nada, pula
-   *  pra janela mais próxima em vez de tocar 40 minutos de linha reta. */
   const toggle = () => {
     if (playing) return setPlaying(false);
     const p = pos.get();
@@ -371,7 +299,6 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     setPlaying(true);
   };
 
-  /** Botão de momento = botão de capítulo: pula pra lá e CONTINUA tocando. */
   const chapter = (i: number) => {
     const t = tour.current;
     t.i = i;
@@ -401,8 +328,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
   const played = useTransform(pos, (p) => p / SPAN_MIN);
   const clock = useTransform(pos, elapsed);
 
-  // Com movimento reduzido o tempo não anda, então prender o chat ao relógio
-  // esconderia quase todas as falas. Aí ele mostra o momento inteiro.
+  // Reduced motion shows the complete moment's chat because its clock does not advance.
   const lines = (
     reduce
       ? EVENTS.filter((e) => e.moment === active.id)
@@ -412,21 +338,17 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
   return (
     <div
       ref={box}
-      // Passar o mouse ou dar foco PAUSA (não mata): quem está lendo o veredito
-      // não pode ver o texto trocar embaixo do olho. Sair retoma.
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onFocusCapture={() => setHover(true)}
       onBlurCapture={() => setHover(false)}
       className="rounded-xl bg-panel p-[clamp(14px,2vw,20px)] shadow-pop-lg"
     >
-      {/* --- quadro + chat --- */}
       <div className="grid gap-3 [grid-template-columns:minmax(0,1.34fr)_minmax(0,1fr)] max-[820px]:grid-cols-1">
         <Frame state={state} pos={pos} copy={copy} reduce={reduce} />
         <ChatColumn lines={lines} copy={copy} reduce={reduce} />
       </div>
 
-      {/* --- a linha do tempo: o eixo que as duas metades compartilham --- */}
       <div className="mt-3 rounded-lg bg-surface p-[13px]">
         <div className="mb-2 flex items-center gap-2.5">
           <button
@@ -440,15 +362,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           <span className="text-[0.62rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
             {copy.axis}
           </span>
-          {/* O relógio é o `MotionValue` renderizado como filho: o framer
-              escreve o texto direto no nó, sem re-render do React. */}
           <motion.span className="ml-auto font-display text-[0.8rem] font-extrabold text-cream tabular-nums">
             {clock}
           </motion.span>
         </div>
 
-        {/* O desenho é decorativo pro leitor de tela: a leitura vem do texto do
-            veredito e dos rótulos dos momentos, que são botões de verdade. */}
         <p className="sr-only">{copy.chartAria}</p>
         <div
           ref={track}
@@ -467,11 +385,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           onPointerMove={(e) => {
             if (e.currentTarget.hasPointerCapture(e.pointerId)) seek(e.clientX);
           }}
-          onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
+          onPointerUp={(e) =>
+            e.currentTarget.releasePointerCapture(e.pointerId)
+          }
           className="relative cursor-ew-resize touch-pan-y rounded-sm outline-offset-4 focus-visible:outline-[3px] focus-visible:outline-brass"
         >
-          {/* A janela em que o OBS esteve fora. Atravessa as DUAS faixas: é ela
-              que emoldura o contraste (uma zera, a outra não). */}
           <span
             className="pointer-events-none absolute inset-y-0 bg-ok/10"
             style={{
@@ -479,8 +397,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
               width: `${pctAt(OBS_OUT[1]) - pctAt(OBS_OUT[0])}%`,
             }}
           />
-          {/* O trecho já tocado, como em qualquer player. `scaleX` num elemento
-              de largura fixa: transformação pura, sem refazer layout por quadro. */}
+          {/* Scale a fixed-width element to avoid layout work on every frame. */}
           <motion.span
             className="pointer-events-none absolute inset-y-0 left-0 w-full origin-left bg-cream/5"
             style={{ scaleX: played }}
@@ -503,8 +420,6 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             reduce={reduce}
           />
 
-          {/* Marcas dos momentos que não estão selecionados. A ativa some: quem
-              ocupa aquele lugar passa a ser o cursor. */}
           {MOMENTS.map((m) => (
             <span
               key={m.id}
@@ -521,8 +436,6 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             />
           ))}
 
-          {/* O cursor: linha cheia + ponto no topo, igual ao do app. Sem mola:
-              ele não persegue um alvo, ele É o tempo. */}
           <motion.span
             className="pointer-events-none absolute inset-y-0 w-0.5 bg-cream"
             style={{ left: cursor }}
@@ -531,9 +444,6 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           </motion.span>
         </div>
 
-        {/* Os momentos são botões de verdade — teclado, foco, aria-pressed — e
-            ficam ANCORADOS na posição do instante, não espalhados em fileira: o
-            rótulo é a legenda daquela marca, e longe dela vira lista solta. */}
         <div className="relative mt-2 h-8 max-[620px]:flex max-[620px]:h-auto max-[620px]:flex-wrap max-[620px]:gap-1.5">
           {MOMENTS.map((m, i) => (
             <button
@@ -544,16 +454,11 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
               style={{ left: `${pctAt(m.min)}%` }}
               className={cn(
                 "absolute top-0 max-[620px]:static max-[620px]:translate-x-0",
-                // Nas pontas o rótulo encosta na borda; por isso o primeiro
-                // alinha pela esquerda, o último pela direita, o do meio centra.
                 i === 0
                   ? "translate-x-0"
                   : i === MOMENTS.length - 1
                     ? "-translate-x-full"
                     : "-translate-x-1/2",
-                // Alvo de toque: 21px de altura reprova em qualquer régua. Em
-                // ponteiro grosso a caixa cresce; no mouse fica compacta, que é
-                // o que mantém o rótulo colado na marca do eixo.
                 "cursor-pointer rounded-sm px-2 py-1 text-[0.64rem] leading-[1.25] font-extrabold tracking-[0.02em] whitespace-nowrap uppercase",
                 "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2.5",
                 "outline-offset-2 transition-colors duration-150 focus-visible:outline-[3px] focus-visible:outline-brass",
@@ -569,12 +474,8 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
         </div>
       </div>
 
-      {/* --- o veredito: a frase que o relatório escreve sozinho --- */}
       <p className="mt-3 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[0.84rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
         <InfoIcon />
-        {/* Troca com transição, não piscando: o veredito é a frase que o
-            relatório escreve, e ela aparecendo suave lê como conclusão sendo
-            calculada. Corte seco leria como bug. */}
         <motion.span
           key={active.id}
           initial={reduce ? false : { opacity: 0, y: 6 }}
@@ -595,13 +496,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
   );
 }
 
-/**
- * Uma faixa do gráfico: rótulo à esquerda, curva à direita, ponto correndo em
- * cima dela.
- *
- * `floor` desenha o fio do zero — sem ele, a linha do OBS deitada no fundo
- * pareceria "sem dado" em vez de "zerado", que é o contrário do que ela diz.
- */
+// A visible zero baseline distinguishes a stopped signal from missing data.
 function Lane({
   pts,
   tone,
@@ -619,8 +514,6 @@ function Lane({
 }) {
   const left = useTransform(pos, (p) => `${pctAt(p)}%`);
   const top = useTransform(pos, (p) => `${(yAt(pts, p) / LANE_H) * 100}%`);
-  // O ponto incha quando a curva encosta no chão. É o único instante da peça em
-  // que uma das duas séries diz algo que a outra não diz.
   const target = useTransform(pos, (p): number =>
     yAt(pts, p) > LANE_H - 12 ? 1.35 : 1,
   );
@@ -628,8 +521,6 @@ function Lane({
 
   return (
     <div className="relative">
-      {/* O rótulo ganha o fundo da faixa atrás: sem isso a curva passa por baixo
-          das letras logo no começo do eixo e as duas viram um borrão. */}
       <span className="pointer-events-none absolute top-0.5 left-0 z-2 bg-surface pr-2 text-[0.58rem] font-extrabold tracking-[0.08em] text-faint-raised uppercase">
         {label}
       </span>
@@ -655,14 +546,10 @@ function Lane({
           strokeWidth={tone === "brass" ? 3 : 2}
           strokeLinejoin="round"
           strokeLinecap="round"
-          // `preserveAspectRatio: none` estica o traço junto com o quadro; sem
-          // isto a linha engorda na horizontal e some na vertical.
+          // Keep stroke width independent of the stretched viewBox.
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      {/* O ponto que corre EM CIMA da curva. É ele que fecha o argumento da
-          seção: no minuto do JÁ VOLTO um mergulha até o chão e o outro segue
-          reto — lado a lado, no mesmo instante. */}
       <motion.i
         aria-hidden="true"
         className={cn(
@@ -675,13 +562,6 @@ function Lane({
   );
 }
 
-/**
- * O quadro do replay.
- *
- * Não há foto: a moldura é a mesma abstração de meio-tom que o editor de recorte
- * usa, com o ESTADO do instante escrito nela. No momento do JÁ VOLTO ela vira a
- * arte que o app coloca no ar de verdade — a única "cena" honesta que existe.
- */
 function Frame({
   state,
   pos,
@@ -702,8 +582,7 @@ function Frame({
 
   return (
     <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px]">
-      {/* A `key` é o ESTADO, não o momento: o quadro remonta exatamente quando o
-          que está no ar muda — e é aí que a troca tem significado. */}
+      {/* Remount only when the transmitted frame state changes, not when its moment changes. */}
       <motion.div
         key={state}
         initial={reduce ? false : { opacity: 0, scale: 1.015 }}
@@ -712,7 +591,6 @@ function Frame({
         className="grid h-full place-content-center justify-items-center px-4 pb-9 text-center"
       >
         {state === "slate" ? (
-          // A arte real da tela JÁ VOLTO, a mesma da seção de proteção.
           <div className="grid place-items-center">
             <small className="font-display text-[0.6rem] font-bold tracking-[0.14em] text-brass">
               {copy.slateBrand}
@@ -723,9 +601,6 @@ function Frame({
           </div>
         ) : state === "reconnect" ? (
           <>
-            {/* O arco girando é o mesmo sinal que o app dá enquanto tenta: é uma
-                tentativa em curso, não um erro parado. Gira o INVÓLUCRO, não o
-                ícone: assim quem desenha o arco continua sendo o lucide. */}
             <motion.span
               className="grid place-items-center text-warn [&>svg]:h-11 [&>svg]:w-11 [&>svg]:[stroke-width:2.4]"
               animate={reduce ? undefined : { rotate: 360 }}
@@ -749,15 +624,10 @@ function Frame({
         )}
       </motion.div>
 
-      {/* Só o selo aqui. O relógio da gravação mora na barra de transporte, logo
-          abaixo: três relógios na mesma peça (o de parede no meio do quadro, um
-          no canto e outro no transporte) é ruído, não informação. */}
       <span className="absolute top-2 right-2.5 text-[0.54rem] font-extrabold tracking-[0.1em] text-faint-raised uppercase">
         {copy.preview}
       </span>
 
-      {/* A barra de destinos daquele segundo — a leitura que fecha o argumento:
-          no quadro do JÁ VOLTO os três continuam NO AR. */}
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 border-t border-border-dry bg-night/85 px-2.5 py-2">
         {dests.map((d) => (
           <span
@@ -785,8 +655,6 @@ function Frame({
   );
 }
 
-/** As falas daquele trecho. É o chat gravado voltando a rolar — cada uma entra
- *  no minuto em que foi digitada, não todas de uma vez na troca de momento. */
 function ChatColumn({
   lines,
   copy,
@@ -801,8 +669,6 @@ function ChatColumn({
       <span className="mb-2.5 text-[0.62rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
         {copy.chat}
       </span>
-      {/* Ancorado embaixo, como todo chat: a fala nova entra no pé e as antigas
-          sobem. Altura livre — a coluna acompanha o quadro ao lado. */}
       <div className="flex flex-1 flex-col justify-end gap-[7px] overflow-hidden">
         {lines.map((line) => (
           <motion.p

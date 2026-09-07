@@ -18,7 +18,6 @@ import { StorySectionHeading } from "./ReportPrimitives";
 import type { ReplayState } from "./useReportModels";
 import type { ChatPage } from "../../lib/replayChatPage";
 
-/** O que a seção mostra: os estados do modelo mais "apagada", que só existe nesta visita. */
 type ReplayView = ReplayState | "deleted";
 
 const UNAVAILABLE_COPY = {
@@ -51,7 +50,6 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   recordingsDeleted,
 }: {
   state: ReplayState;
-  /** O streamer apagou a gravação nesta visita — ver `useReportDetailData`. */
   recordingsDeleted: boolean;
   data: SessionData;
   sessionId: string;
@@ -65,9 +63,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   onRecordingsDeleted: () => void;
 }) {
   const t = useI18n().t;
-  // Nos dados, gravação apagada e live que nunca gravou são a mesma coisa (sem trecho
-  // no índice). Só o flag distingue — e evita dizer "não foi gravada" sobre um vídeo
-  // que o app acabou de apagar a pedido do streamer.
+  // Only this visit's deletion flag distinguishes a removed recording from a session that never recorded.
   const view: ReplayView =
     state === "missing" && recordingsDeleted ? "deleted" : state;
   const descriptionKey =
@@ -112,9 +108,6 @@ function ReplayUnavailable({ state }: { state: Exclude<ReplayView, "ready"> }) {
   const setSettingsTab = useStore((s) => s.setSettingsTab);
   const requestNavigate = useStore((s) => s.requestNavigate);
   const copy = UNAVAILABLE_COPY[state];
-  // A gravação nasce desligada e o único lugar que liga é Configurações → Geral →
-  // "Gravar a live". Sem este atalho, quem chega aqui sem vídeo dá com um beco: o texto
-  // explica, mas não leva. Quem acabou de apagar a gravação não recebe o convite.
   const openRecordingSettings = () => {
     setSettingsTab("geral");
     requestNavigate("settings");

@@ -4,7 +4,6 @@ import { useT } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
 import { cn } from "../../lib/utils";
 
-/** O bitrate de saída (latão) descendo pra caber embaixo da banda disponível (linha tracejada). */
 export function BitratePreview() {
   return (
     <div className="absolute inset-0 bg-surface-2">
@@ -39,7 +38,6 @@ export function BitratePreview() {
   );
 }
 
-/** Prévia do guardião de áudio: um medidor com a agulha na zona-alvo (verde). */
 export function LoudnessPreview() {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-surface-2 px-2.5">
@@ -55,19 +53,16 @@ export function LoudnessPreview() {
   );
 }
 
-/** Alvo de volume (LUFS) do normalizador: presets comuns. -14 é o padrão de Twitch/YouTube. */
 export function LoudnessTarget() {
   const t = useT();
   const target = useStore((s) => s.config!.settings.loudnessTargetLufs);
   const setSettings = useStore((s) => s.setSettings);
-  // -14/-16/-18 são os valores em LUFS gravados na config; só o rótulo é texto.
+  // LUFS targets are persisted values; only their labels are localized.
   const opts = [
     { v: -14, label: t("settings.loudness.target.minus14") },
     { v: -16, label: t("settings.loudness.target.minus16") },
     { v: -18, label: t("settings.loudness.target.minus18") },
   ];
-  // O rótulo visível nomeia o grupo; `aria-pressed` expõe o alvo escolhido, que
-  // até aqui só a borda de latão dizia.
   const labelId = useId();
   return (
     <div

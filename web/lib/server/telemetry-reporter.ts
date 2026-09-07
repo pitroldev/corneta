@@ -173,7 +173,7 @@ export function createTelemetryReporter(options: ReporterOptions) {
           properties,
         });
       } catch {
-        // A captura nunca muda a resposta da API.
+        // Telemetry must not change API responses.
       }
     },
   };

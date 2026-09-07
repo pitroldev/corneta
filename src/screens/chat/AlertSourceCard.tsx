@@ -59,7 +59,7 @@ export function AlertSourceCard({
       const pasted = await navigator.clipboard.readText();
       if (pasted) setToken(sanitizeToken(pasted));
     } catch {
-      /* área de transferência bloqueada */
+      /* Clipboard access may be denied; keep the editable field available. */
     }
   };
 
@@ -68,7 +68,6 @@ export function AlertSourceCard({
     ok: boolean;
     msg: string;
   } | null>(null);
-  // O resultado do teste envelhece: some ao trocar o token (o card volta pro modo input).
   useEffect(() => setTestResult(null), [src.hasToken, editing]);
   const test = async () => {
     setTesting(true);
@@ -144,7 +143,7 @@ export function AlertSourceCard({
               <Input
                 type="password"
                 disabled={busy}
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- Foco apenas após a ação explícita de editar, nunca ao abrir a tela sem token.
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- Focus follows an explicit edit, never initial rendering.
                 autoFocus={editing}
                 placeholder={meta.placeholder}
                 aria-label={`${meta.label} — ${meta.placeholder}`}

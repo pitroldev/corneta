@@ -1,10 +1,3 @@
-//! Telemetria nativa com opt-out por finalidade e diagnóstico local estruturado.
-//!
-//! Este módulo é deliberadamente uma fronteira estreita: call sites fornecem
-//! apenas códigos/enums, o catálogo rejeita propriedades desconhecidas e um
-//! `before_send` repete preferência + allowlist + redação imediatamente antes
-//! da rede. Logs/configuração crus nunca entram no PostHog.
-
 use crate::config::AppConfig;
 use crate::AppState;
 use chrono::{SecondsFormat, Utc};
@@ -26,7 +19,7 @@ use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
 pub const TELEMETRY_SCHEMA_VERSION: u32 = 1;
-/// Gêmeo do `TELEMETRY_NOTICE_VERSION` do TS — os dois sobem juntos.
+// Keep synchronized with the frontend TELEMETRY_NOTICE_VERSION.
 pub const NOTICE_VERSION: &str = "2026-08-02";
 const TELEMETRY_FILE: &str = "telemetry.json";
 const EXIT_MARKER_FILE: &str = "telemetry-exit.json";
@@ -64,16 +57,7 @@ pub enum Consent {
 }
 
 impl Consent {
-    /// A finalidade está valendo?
-    ///
-    /// `Unset` conta como ATIVA: a base legal destas duas finalidades é o
-    /// legítimo interesse (LGPD art. 7º, IX), não o consentimento — o
-    /// tratamento começa informado e para quando a pessoa se opõe. Ver
-    /// `docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`.
-    ///
-    /// `Disabled` é a OPOSIÇÃO registrada (art. 18, §2) e vence sempre, inclusive
-    /// quando o texto do aviso muda de versão. Reapresentar o aviso não pode
-    /// religar quem já disse não.
+    // Under the opt-out policy, Unset is active; notice updates must never clear Disabled.
     fn active(self) -> bool {
         self != Self::Disabled
     }
@@ -114,13 +98,7 @@ impl Default for TelemetryStatus {
 }
 
 impl TelemetryStatus {
-    /// Estado de quem se opôs às duas finalidades.
-    ///
-    /// É para onde vai um arquivo ILEGÍVEL — e a distinção importa desde que
-    /// `Unset` passou a significar "ativa": arquivo ausente é instalação nova
-    /// (e aí o padrão ligado vale), mas arquivo corrompido é um estado que já
-    /// existiu e não dá mais pra ler. Cair no `default()` religaria justamente
-    /// quem tinha desligado, que é o pior erro possível aqui.
+    // Corrupt existing preferences must fail closed, not inherit new-install defaults.
     fn opposed() -> Self {
         Self {
             usage: Consent::Disabled,
@@ -130,9 +108,7 @@ impl TelemetryStatus {
     }
 
     fn normalize(mut self) -> Self {
-        // Um schema futuro/desconhecido ou um notice malformado não pode ser
-        // reinterpretado como autorização. Falha FECHADA e deixa a UI pedir
-        // uma decisão nova.
+        // Unknown schemas/notices must not be reinterpreted as permission to collect.
         if self.schema_version != TELEMETRY_SCHEMA_VERSION
             || !valid_notice_version(&self.notice_version)
         {
@@ -141,10 +117,7 @@ impl TelemetryStatus {
         self.installation_id = self
             .installation_id
             .filter(|value| Uuid::parse_str(value).is_ok());
-        // Sem NENHUMA finalidade ativa não existe o que correlacionar, então o UUID
-        // é apagado — vale tanto pra quem se opôs às duas quanto pro caso, hoje raro,
-        // de as duas nascerem desligadas. Com pelo menos uma ativa o identificador é
-        // criado no primeiro boot: é o que o legítimo interesse pressupõe.
+        // Clear identity when no purpose remains active.
         if !self.usage.active() && !self.crash_reports.active() {
             self.installation_id = None;
         }
@@ -160,16 +133,7 @@ pub struct TelemetryConsentInput {
     pub notice_version: String,
 }
 
-/// Portões efetivos das duas finalidades.
-///
-/// Não dependem da versão do aviso, e isso é deliberado: com legítimo interesse,
-/// um texto novo é INFORMAÇÃO, não um pedido de permissão — reapresentar o aviso
-/// reabre a conversa sem interromper um tratamento que continua legítimo. Quem
-/// gate é a oposição (`Disabled`), que atravessa qualquer versão.
-///
-/// Consequência a lembrar: finalidade NOVA não pode entrar como `Unset`, senão
-/// nasceria ligada sem ninguém ter sido informado dela. Ao adicionar uma, grave
-/// `Disabled` nas instalações existentes e só ligue depois do aviso novo.
+// New purposes must migrate existing installations to Disabled, not active Unset.
 fn effective_gates(status: &TelemetryStatus) -> (bool, bool) {
     (status.usage.active(), status.crash_reports.active())
 }
@@ -219,8 +183,7 @@ pub struct AppError {
     pub code: String,
     pub stage: String,
     pub retryable: bool,
-    /// Detalhe para logs locais. Não participa de Display/source e nunca é
-    /// entregue ao SDK, pois pode conter texto, caminho ou segredo externo.
+    /// Local-only detail: exclude from Display/source and the SDK because it may contain secrets.
     pub source: Option<String>,
 }
 
@@ -241,14 +204,7 @@ impl fmt::Display for AppError {
     }
 }
 
-/// `arquivo:linha` que vai pro `top_app_frame` e pro fingerprint.
-///
-/// O frame explícito vence o do `#[track_caller]`. Quem precisa disso é o panic
-/// hook: lá o "caller" é o próprio hook, e sem o override todo panic nativo do
-/// app cai no mesmo fingerprint — crashes diferentes viram uma issue só.
-///
-/// Só o NOME do arquivo atravessa; o caminho completo entregaria a estrutura de
-/// diretórios de quem compilou.
+// Explicit panic frames prevent the hook location from merging distinct crashes; send basenames only.
 fn top_app_frame_from(frame: Option<&str>, caller: &std::panic::Location<'_>) -> String {
     if let Some(frame) = frame.map(str::trim).filter(|value| !value.is_empty()) {
         return frame.to_string();
@@ -276,7 +232,7 @@ struct ConsentEpoch {
 impl Default for ConsentEpoch {
     fn default() -> Self {
         Self {
-            // Zero fica reservado para eventos sem epoch/legados.
+            // Zero is reserved for legacy events without an epoch.
             generation: 1,
             installation_id: None,
         }
@@ -361,27 +317,23 @@ impl TelemetryRuntime {
         let config_dir = match app.path().app_config_dir() {
             Ok(path) => path,
             Err(error) => {
-                log::warn!("telemetria: diretório de configuração indisponível: {error}");
+                log::warn!("telemetry: configuration directory unavailable: {error}");
                 return;
             }
         };
         if let Err(error) = std::fs::create_dir_all(&config_dir) {
-            log::warn!("telemetria: não foi possível criar diretório: {error}");
+            log::warn!("telemetry: could not create directory: {error}");
             return;
         }
         let path = config_dir.join(TELEMETRY_FILE);
         let mut status = load_status_file(&path);
         let (usage_enabled, crash_enabled) = effective_gates(&status);
-        // Com opt-out o identificador nasce no PRIMEIRO BOOT, não na primeira
-        // decisão: sem ele os eventos não têm a quem se referir e a instalação
-        // ficaria muda até alguém abrir Configurações. Só é criado se alguma
-        // finalidade está de fato ativa — quem se opôs às duas segue sem UUID.
+        // Active opt-out purposes need an identity before the first settings interaction.
         if (usage_enabled || crash_enabled) && status.installation_id.is_none() {
             status.installation_id = Some(new_id());
             if let Err(error) = save_status_file(&path, &status) {
-                // Sem persistir, o próximo boot geraria outro UUID e a mesma
-                // máquina viraria duas instalações na contagem.
-                log::warn!("telemetria: não consegui gravar o id de instalação: {error}");
+                // An unpersisted ID would count the next boot as another installation.
+                log::warn!("telemetry: could not persist installation ID: {error}");
             }
         }
         self.usage_enabled.store(usage_enabled, Ordering::Release);
@@ -391,15 +343,15 @@ impl TelemetryRuntime {
         *lock(&self.path) = Some(path);
 
         if self.build_disabled {
-            log::debug!("telemetria: desabilitada por TELEMETRY_DISABLED");
+            log::debug!("telemetry: disabled by TELEMETRY_DISABLED");
             return;
         }
         let Some(token) = posthog_token() else {
-            log::debug!("telemetria: sem POSTHOG_DESKTOP_TOKEN; cliente em no-op");
+            log::debug!("telemetry: missing POSTHOG_DESKTOP_TOKEN; client is a no-op");
             return;
         };
         let Some(host) = posthog_host() else {
-            log::warn!("telemetria: POSTHOG_HOST inválido; cliente em no-op");
+            log::warn!("telemetry: invalid POSTHOG_HOST; client is a no-op");
             return;
         };
 
@@ -414,7 +366,7 @@ impl TelemetryRuntime {
         {
             Ok(options) => options,
             Err(error) => {
-                log::warn!("telemetria: opções de Error Tracking inválidas: {error}");
+                log::warn!("telemetry: invalid Error Tracking options: {error}");
                 return;
             }
         };
@@ -427,9 +379,7 @@ impl TelemetryRuntime {
             .flush_at(20)
             .flush_interval_ms(5_000)
             .max_queue_size(256)
-            // O before_send é aplicado antes de o SDK serializar um batch.
-            // Uma única tentativa impede que um body já aprovado seja repetido
-            // depois de uma revogação ocorrida durante o backoff.
+            // A retry could reuse a serialized batch after revocation; allow only one capture attempt.
             .max_capture_attempts(1u32)
             .shutdown_timeout_ms(POSTHOG_SHUTDOWN_TIMEOUT_MS)
             .error_tracking(error_tracking)
@@ -437,10 +387,9 @@ impl TelemetryRuntime {
                 final_before_send(event, &usage_gate, &crash_gate, &consent_epoch)
             })
             .on_error(|error: &PostHogError<'_>| {
-                // Nunca logar Debug/Display: algumas variantes preservam corpo
-                // de resposta e strings de conexão controladas remotamente.
+                // SDK errors may retain response bodies and connection strings; log only the category.
                 log::debug!(
-                    "telemetria: falha terminal do PostHog ({})",
+                    "telemetry: terminal PostHog failure ({})",
                     posthog_error_category(error)
                 );
             })
@@ -448,7 +397,7 @@ impl TelemetryRuntime {
         {
             Ok(options) => options,
             Err(error) => {
-                log::warn!("telemetria: configuração inválida; cliente em no-op: {error}");
+                log::warn!("telemetry: invalid configuration; client is a no-op: {error}");
                 return;
             }
         };
@@ -469,9 +418,7 @@ impl TelemetryRuntime {
         epoch.installation_id = installation_id;
     }
 
-    /// Snapshot consistente para correlacionar exclusivamente chamadas ao
-    /// serviço Corneta. ID e finalidades sempre nascem juntos; se os gates
-    /// mudarem durante a leitura, falha fechado em vez de combinar estados.
+    /// Correlate only Corneta service calls; reject torn snapshots of identity and active purposes.
     pub(crate) fn correlation(&self) -> Option<TelemetryCorrelation> {
         if self.build_disabled || self.client_shutdown.load(Ordering::Acquire) {
             return None;
@@ -484,18 +431,14 @@ impl TelemetryRuntime {
             if gates_before == (false, false) {
                 return None;
             }
-            // Cada guard morre antes da próxima leitura. set_consent usa status
-            // -> epoch; não manter epoch enquanto esperamos status evita inverter
-            // essa ordem e torna o caminho seguro contra deadlock.
+            // Release epoch before locking status to preserve set_consent's status -> epoch lock order.
             let epoch_before = lock(self.consent_epoch.as_ref()).clone();
             let installation_id = lock(&self.status).installation_id.clone();
             let gates_after = (
                 self.usage_enabled.load(Ordering::Acquire),
                 self.crash_enabled.load(Ordering::Acquire),
             );
-            // Deve ser a última leitura: um ABA entre gates_after e este ponto
-            // ainda altera generation e é rejeitado; depois daqui o snapshot
-            // pode ser linearizado imediatamente antes de uma nova mudança.
+            // Read epoch last: its generation detects ABA changes even if gates return to the same values.
             let epoch_after = lock(self.consent_epoch.as_ref()).clone();
             if let Some(correlation) = stable_correlation_snapshot(
                 gates_before,
@@ -517,7 +460,7 @@ impl TelemetryRuntime {
         notice_version: String,
     ) -> Result<TelemetryStatus, String> {
         if notice_version != NOTICE_VERSION {
-            return Err("noticeVersion não corresponde ao aviso de privacidade atual".into());
+            return Err("noticeVersion does not match the current privacy notice".into());
         }
         let mut status = lock(&self.status);
         let previous = status.clone();
@@ -532,9 +475,7 @@ impl TelemetryRuntime {
         }
         let (next_usage, next_crash) = effective_gates(&next);
 
-        // Fechar um gate não espera I/O. A troca de epoch invalida também itens
-        // que o worker ainda não examinou e impede que eles revivam depois de um
-        // opt-in rápido. Gates novos só abrem DEPOIS da persistência.
+        // Revoke before I/O and invalidate queued epochs; open new gates only after persistence.
         if !next_usage {
             self.usage_enabled.store(false, Ordering::Release);
         }
@@ -550,11 +491,10 @@ impl TelemetryRuntime {
         }
         let persist_result = lock(&self.path)
             .clone()
-            .ok_or_else(|| "telemetria ainda não inicializada".to_string())
+            .ok_or_else(|| "telemetry is not initialized".to_string())
             .and_then(|path| save_status_file(&path, &next));
         if let Err(error) = persist_result {
-            // Mantém em memória qualquer revogação mesmo quando o disco falha;
-            // opt-ins sem persistência voltam ao estado anterior e ficam fechados.
+            // Disk failure must preserve revocation in memory and reject unpersisted opt-ins.
             let mut fail_closed = previous;
             if !next_usage {
                 fail_closed.usage = next.usage;
@@ -579,18 +519,15 @@ impl TelemetryRuntime {
     pub fn regenerate_id(&self) -> Result<TelemetryStatus, String> {
         let mut status = lock(&self.status);
         if status.usage.active() || status.crash_reports.active() {
-            return Err(
-                "desative dados de uso e relatórios de falha antes de regenerar o ID".into(),
-            );
+            return Err("disable usage data and crash reports before regenerating the ID".into());
         }
         let mut next = status.clone();
-        // Depois de uma solicitação de exclusão, o próximo opt-in nasce com
-        // outro UUID e não religa dados que acabaram de ser apagados.
+        // A later opt-in must not relink data covered by the deletion request.
         next.installation_id = None;
         next.decided_at = Some(now_iso());
         let path = lock(&self.path)
             .clone()
-            .ok_or_else(|| "telemetria ainda não inicializada".to_string())?;
+            .ok_or_else(|| "telemetry is not initialized".to_string())?;
         save_status_file(&path, &next)?;
         self.advance_consent_epoch(next.installation_id.clone());
         *status = next.clone();
@@ -610,8 +547,7 @@ impl TelemetryRuntime {
             return None;
         }
         let epoch = lock(self.consent_epoch.as_ref()).clone();
-        // Repetir o gate depois do snapshot fecha a corrida com revogação. Se a
-        // epoch girar logo depois, o before_send rejeitará este snapshot antigo.
+        // Recheck revocation after the snapshot; before_send rejects any subsequent epoch change.
         if !self.should_send(purpose) {
             return None;
         }
@@ -644,7 +580,7 @@ impl TelemetryRuntime {
         properties: Map<String, Value>,
     ) -> Result<bool, String> {
         let purpose = event_purpose(event_name)
-            .ok_or_else(|| format!("evento de telemetria desconhecido: {event_name}"))?;
+            .ok_or_else(|| format!("unknown telemetry event: {event_name}"))?;
         self.capture_for(event_name, purpose, properties)
     }
 
@@ -758,7 +694,7 @@ impl TelemetryRuntime {
             match options.property(key, value) {
                 Ok(next) => options = next,
                 Err(_) => {
-                    log::debug!("telemetria: propriedade de exceção rejeitada pelo SDK");
+                    log::debug!("telemetry: exception property rejected by the SDK");
                     return error_id;
                 }
             }
@@ -767,7 +703,7 @@ impl TelemetryRuntime {
             options = match options.property("operation_id", operation_id) {
                 Ok(next) => next,
                 Err(_) => {
-                    log::debug!("telemetria: operation_id rejeitado pelo SDK");
+                    log::debug!("telemetry: operation_id rejected by the SDK");
                     return error_id;
                 }
             };
@@ -776,13 +712,13 @@ impl TelemetryRuntime {
             options = match options.property(key, value) {
                 Ok(next) => next,
                 Err(_) => {
-                    log::debug!("telemetria: contexto de exceção rejeitado pelo SDK");
+                    log::debug!("telemetry: exception context rejected by the SDK");
                     return error_id;
                 }
             };
         }
         if client.capture_exception_with(&error, options).is_err() {
-            log::debug!("telemetria: exceção não enfileirada pelo SDK");
+            log::debug!("telemetry: exception not queued by the SDK");
         }
         error_id
     }
@@ -922,8 +858,7 @@ impl TelemetryRuntime {
             );
             let _ = self.capture_for("app_started", Purpose::Usage, props);
         } else {
-            // Com apenas relatórios de falha, o evento mínimo não ganha duração,
-            // locale, arquitetura, família do SO ou qualquer identificador extra.
+            // Crash-only startup must not inherit usage dimensions or duration.
             let _ = self.capture_for("app_started", Purpose::StartupMinimal, props);
         }
     }
@@ -961,9 +896,7 @@ impl TelemetryRuntime {
                 let _ = done_tx.try_send(());
             });
         if let Ok(worker) = worker {
-            // `Client::flush` não expõe timeout. Executá-lo fora da thread em
-            // panic garante que o hook sempre devolva o controle neste teto,
-            // inclusive se before_send aguardar um lock preso pelo panic.
+            // Flush has no timeout and may wait on a panic-held lock; bound the hook's wait on another thread.
             let _ = done_rx.recv_timeout(Duration::from_millis(POSTHOG_SHUTDOWN_TIMEOUT_MS));
             drop(worker);
         }
@@ -974,8 +907,7 @@ impl TelemetryRuntime {
             return;
         }
         if let Some(client) = lock(&self.client).clone() {
-            // posthog-rs limita o drain a 300ms; um request já em voo respeita o
-            // timeout de 1s. Falha nunca altera o fechamento do aplicativo.
+            // Queue drain is bounded separately from the one-second timeout of an in-flight request.
             client.shutdown();
         }
     }
@@ -997,7 +929,7 @@ fn valid_posthog_token(token: &str) -> bool {
     static PROJECT_TOKEN: OnceLock<Regex> = OnceLock::new();
     token.len() <= 256
         && PROJECT_TOKEN
-            .get_or_init(|| Regex::new(r"^phc_[A-Za-z0-9_-]{8,}$").expect("regex fixa válida"))
+            .get_or_init(|| Regex::new(r"^phc_[A-Za-z0-9_-]{8,}$").expect("valid static regex"))
             .is_match(token)
 }
 
@@ -1021,7 +953,7 @@ fn valid_posthog_host(host: &str, allow_local: bool) -> bool {
             Regex::new(
                 r"^https://(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*(?::([0-9]{1,5}))?$",
             )
-            .expect("regex fixa válida")
+            .expect("valid static regex")
         })
         .captures(host)
         .is_some_and(|captures| valid_optional_port(captures.get(1).map(|item| item.as_str())));
@@ -1029,7 +961,7 @@ fn valid_posthog_host(host: &str, allow_local: bool) -> bool {
         && LOCAL_ORIGIN
             .get_or_init(|| {
                 Regex::new(r"^http://(?:127\.0\.0\.1|localhost)(?::([0-9]{1,5}))?$")
-                    .expect("regex fixa válida")
+                    .expect("valid static regex")
             })
             .captures(host)
             .is_some_and(|captures| valid_optional_port(captures.get(1).map(|item| item.as_str())));
@@ -1060,7 +992,7 @@ fn truthy(value: &str) -> bool {
 }
 
 fn new_id() -> String {
-    // Uuid::new_v4 usa getrandom do SO (CSPRNG); não deriva de hostname/hardware.
+    // Use OS randomness, never hostname or hardware identifiers.
     Uuid::new_v4().to_string()
 }
 
@@ -1079,7 +1011,7 @@ fn valid_id(value: Option<&str>) -> Option<String> {
 fn valid_notice_version(value: &str) -> bool {
     static NOTICE: OnceLock<Regex> = OnceLock::new();
     NOTICE
-        .get_or_init(|| Regex::new(r"^\d{4}-\d{2}-\d{2}$").expect("regex fixa válida"))
+        .get_or_init(|| Regex::new(r"^\d{4}-\d{2}-\d{2}$").expect("valid static regex"))
         .is_match(value)
 }
 
@@ -1088,7 +1020,7 @@ fn load_status_file(path: &Path) -> TelemetryStatus {
         return TelemetryStatus::default();
     };
     if metadata.len() > MAX_TELEMETRY_FILE_BYTES {
-        log::warn!("telemetria: telemetry.json excede 64 KiB; usando padrão");
+        log::warn!("telemetry: telemetry.json exceeds 64 KiB; disabling collection");
         preserve_corrupt(path);
         return TelemetryStatus::opposed();
     }
@@ -1098,7 +1030,7 @@ fn load_status_file(path: &Path) -> TelemetryStatus {
     {
         Some(status) => status.normalize(),
         None => {
-            log::warn!("telemetria: telemetry.json inválido; preservando cópia");
+            log::warn!("telemetry: invalid telemetry.json; preserving a copy");
             preserve_corrupt(path);
             TelemetryStatus::opposed()
         }
@@ -1239,9 +1171,7 @@ fn final_before_send(
         return None;
     }
     drop(current_epoch);
-    // O SDK injeta versão detalhada do SO antes do hook. A taxonomia do produto
-    // permite somente `os_family`, calculada por nós; remover estes defaults
-    // conhecidos preserva o evento sem ampliar silenciosamente o contrato.
+    // Strip SDK OS-version defaults; the catalog permits only our os_family dimension.
     for sdk_default in [
         "$os",
         "$os_version",
@@ -1258,8 +1188,7 @@ fn final_before_send(
         }
         let value = event.remove_prop(&key)?;
         if key == "$debug_images" {
-            // `code_file` e qualquer extensão futura do SDK são omitidos; só o
-            // envelope mínimo para simbolicação pode sair do processo.
+            // Allow only the symbolication envelope; omit local paths and future SDK fields.
             if let Some(safe) = sanitize_debug_images(value) {
                 if event.insert_prop(key, safe).is_err() {
                     return None;
@@ -1281,8 +1210,7 @@ fn final_before_send(
             return None;
         }
     }
-    // O SDK nativo usa eventos identificados por padrão. Nenhum chamador ou
-    // default pode habilitar perfis; preservar o UUID mantém a correlação dos eventos.
+    // Force person profiles off even if SDK defaults or callers enable them; retain event correlation.
     event.insert_prop("$process_person_profile", false).ok()?;
     if serde_json::to_vec(&event).ok()?.len() > MAX_EVENT_BYTES {
         return None;
@@ -1416,7 +1344,7 @@ fn property_allowed(event: &str, key: &str) -> bool {
 fn validate_input_properties(event: &str, properties: &Map<String, Value>) -> Result<(), String> {
     for (key, value) in properties {
         if !property_allowed(event, key) || key.starts_with('$') || key.starts_with('_') {
-            return Err(format!("propriedade de telemetria desconhecida: {key}"));
+            return Err(format!("unknown telemetry property: {key}"));
         }
         validate_property_value(event, key, value)?;
     }
@@ -1474,8 +1402,7 @@ fn validate_property_value(event: &str, key: &str, value: &Value) -> Result<(), 
         | "brb_enabled"
         | "guardian_enabled"
         | "record_video_enabled" => value.is_boolean(),
-        // IDs de tela/etapa/entrada e versões são limitados e não podem conter
-        // texto livre, URL ou separadores de caminho.
+        // Identifiers must not become free-text, URL, or path dimensions.
         "screen_id" | "step_id" | "entry_point" | "encoder_kind" => value
             .as_str()
             .is_some_and(|item| valid_enum_token(item, 48)),
@@ -1487,7 +1414,7 @@ fn validate_property_value(event: &str, key: &str, value: &Value) -> Result<(), 
     if valid {
         Ok(())
     } else {
-        Err(format!("valor inválido para {key}"))
+        Err(format!("invalid value for {key}"))
     }
 }
 
@@ -1584,8 +1511,7 @@ fn normalize_stage(value: &str) -> &'static str {
 
 fn normalize_error_code(value: &str) -> &str {
     match value {
-        // Códigos de falha nativos/operacionais. A lista fechada evita que
-        // mensagens, nomes ou valores de provedor virem dimensões livres.
+        // A closed catalog prevents provider messages and names from becoming dimensions.
         "unknown_error"
         | "none"
         | "native_panic"
@@ -1619,7 +1545,7 @@ fn normalize_error_code(value: &str) -> &str {
         | "diagnostics_write_failed"
         | "target_auth_error"
         | "signal_lost"
-        // O ring local usa o nome do evento quando não existe error_code.
+        // Local diagnostics use event names when no error_code is present.
         | "app_started"
         | "app_closed"
         | "screen_viewed"
@@ -1733,8 +1659,7 @@ fn sanitize_debug_images(value: Value) -> Option<Value> {
         {
             safe.insert("image_vmaddr".into(), Value::String(image_vmaddr.into()));
         }
-        // `code_file` identifica caminhos locais e não é necessário para casar
-        // o debug_id com os símbolos enviados separadamente.
+        // debug_id is sufficient for symbol matching; code_file would disclose local paths.
         safe_images.push(Value::Object(safe));
     }
     (!safe_images.is_empty()).then_some(Value::Array(safe_images))
@@ -1845,30 +1770,30 @@ fn redactors() -> &'static Redactors {
         json_string_secret: Regex::new(
             r#"(?i)("(?:authorization|access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|password|passwd|senha|stream[_ -]?key|api[_ -]?key|private[_ -]?key|token|secret|cookie)"\s*:\s*)"(?:\\.|[^"\\])*""#,
         )
-        .expect("regex fixa válida"),
+        .expect("valid static regex"),
         json_scalar_secret: Regex::new(
             r#"(?i)("(?:authorization|access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|password|passwd|senha|stream[_ -]?key|api[_ -]?key|private[_ -]?key|token|secret|cookie)"\s*:\s*)(?:true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"#,
         )
-        .expect("regex fixa válida"),
+        .expect("valid static regex"),
         authorization: Regex::new(r"(?i)(authorization\s*[:=]\s*)(?:bearer\s+)?[^\s,;]+")
-            .expect("regex fixa válida"),
+            .expect("valid static regex"),
         labeled_secret: Regex::new(
             r"(?i)(access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|password|passwd|senha|stream[_ -]?key|api[_ -]?key|private[_ -]?key|token|secret|cookie)(\s*[:=]\s*)[^\s,;]+",
         )
-        .expect("regex fixa válida"),
+        .expect("valid static regex"),
         jwt: Regex::new(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
-            .expect("regex fixa válida"),
-        long_token: Regex::new(r"\b[A-Za-z0-9_+/=-]{40,}\b").expect("regex fixa válida"),
+            .expect("valid static regex"),
+        long_token: Regex::new(r"\b[A-Za-z0-9_+/=-]{40,}\b").expect("valid static regex"),
         email: Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
-            .expect("regex fixa válida"),
+            .expect("valid static regex"),
         url: Regex::new(r#"(?i)\b(?:https?|rtmps?|wss?)://[^\s<>"']+"#)
-            .expect("regex fixa válida"),
+            .expect("valid static regex"),
         windows_user: Regex::new(r"(?i)[A-Z]:\\Users\\[^\\/:\r\n]+")
-            .expect("regex fixa válida"),
+            .expect("valid static regex"),
         unix_home: Regex::new(r"/(?:home|Users)/[^/\s:\r\n]+")
-            .expect("regex fixa válida"),
+            .expect("valid static regex"),
         windows_path: Regex::new(r#"(?i)\b[A-Z]:\\[^\s"']+"#)
-            .expect("regex fixa válida"),
+            .expect("valid static regex"),
     })
 }
 
@@ -1900,8 +1825,7 @@ fn redact_text_with_limit(text: &str, max_chars: usize) -> String {
         .long_token
         .replace_all(&safe, "<redacted-token>")
         .into_owned();
-    // URLs não são dimensão nem contexto de erro: retirar tudo evita userinfo,
-    // stream keys no path e query/fragment de OAuth de uma só vez.
+    // Remove whole URLs to cover credentials in userinfo, stream paths, and OAuth query/fragment values.
     safe = rules
         .url
         .replace_all(&safe, |caps: &Captures<'_>| {
@@ -1938,8 +1862,7 @@ fn truncate_chars(value: &str, max: usize) -> String {
     out
 }
 
-/// Resumo explicitamente allowlisted para o diagnóstico. Não serializa IDs,
-/// nomes, títulos, paths, URLs, chaves, fontes de chat/watchlist ou perfis.
+/// Allowlisted diagnostic summary: never serialize names, IDs, URLs, paths, keys, or user content.
 pub fn diagnostic_config_summary(config: &AppConfig) -> Value {
     let mut platform_counts: HashMap<&'static str, u64> = HashMap::new();
     let mut encoder_kinds = HashSet::new();
@@ -2031,11 +1954,7 @@ fn write_exit_marker(path: &Path, state: &str) {
 }
 
 thread_local! {
-    /// Um pânico nesta thread, AGORA, será contido por quem chamou?
-    ///
-    /// Existe porque o hook de pânico roda antes do unwind e não tem como saber se
-    /// alguém lá em cima vai pegar. Sem esta marca, todo pânico contido chegaria na
-    /// telemetria como `fatal` — e a triagem passaria a caçar quedas que não houve.
+    // Hooks run before unwind and cannot know whether a caller will catch this panic.
     static PANIC_CONTAINED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -2043,9 +1962,7 @@ fn panic_is_contained() -> bool {
     PANIC_CONTAINED.with(|flag| flag.get())
 }
 
-/// Guarda RAII que desmarca no `Drop` — e `Drop` roda DURANTE o unwind. Um `set(false)`
-/// solto depois da chamada nunca executaria no caminho que importa, e a thread do pool
-/// ficaria marcada pra sempre, rebaixando o próximo pânico de verdade.
+/// Clear during unwind so reused worker threads do not misclassify later fatal panics.
 pub struct ContainedPanicScope;
 
 impl ContainedPanicScope {
@@ -2068,15 +1985,12 @@ pub fn install_panic_hook(app: AppHandle) {
     }
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
-        // Contido = o subsistema cai sozinho e a live segue (ver `chat::sem_panico`).
-        // Rotular isso de `fatal` faria a triagem caçar uma queda que nunca houve.
         let severity = if panic_is_contained() {
             "warning"
         } else {
             "fatal"
         };
-        // Gate síncrono antes de criar/enfileirar qualquer evento. A mensagem do
-        // panic não é lida: pode conter conteúdo/configuração do usuário.
+        // Check the gate before capture; never read a panic message that may contain user data.
         let telemetry = &app.state::<AppState>().telemetry;
         if telemetry.crash_enabled.load(Ordering::Acquire) {
             let location = panic_info.location();
@@ -2092,7 +2006,7 @@ pub fn install_panic_hook(app: AppHandle) {
             let error_id =
                 telemetry.capture_error_at(error, None, false, severity, safe_frame.as_deref());
             if let Some(frame) = &safe_frame {
-                log::error!("panic nativo ({severity}) em {frame}; error_id={error_id}");
+                log::error!("native panic ({severity}) at {frame}; error_id={error_id}");
             }
             telemetry.flush_after_panic_bounded();
         }
@@ -2144,13 +2058,13 @@ pub fn telemetry_capture_exception(
     severity: Option<String>,
 ) -> Result<String, String> {
     if normalize_error_code(&error_code) != error_code || normalize_stage(&stage) != stage {
-        return Err("código ou etapa de erro fora do catálogo".into());
+        return Err("error code or stage is not in the catalog".into());
     }
     if operation_id
         .as_deref()
         .is_some_and(|value| Uuid::parse_str(value).is_err())
     {
-        return Err("operationId inválido".into());
+        return Err("invalid operationId".into());
     }
     Ok(app.state::<AppState>().telemetry.capture_error(
         AppError::new(&error_code, &stage, retryable, None),
@@ -2207,7 +2121,7 @@ mod tests {
                     &AtomicBool::new(crash),
                     &epoch,
                 )
-                .expect("a finalidade ativa deve preservar o evento");
+                .expect("an active purpose must preserve the event");
                 let payload = serde_json::to_value(safe).unwrap();
                 assert_eq!(payload["properties"]["$process_person_profile"], false);
                 assert_eq!(payload["distinct_id"], installation_id);
@@ -2243,9 +2157,9 @@ mod tests {
                             installation_id: Some(hook_installation_id.clone()),
                         }),
                     )
-                    .expect("o envelope real do SDK deve passar pelo hook");
+                    .expect("the real SDK envelope must pass the hook");
                     lock(&hook_seen).push(serde_json::to_value(safe).unwrap());
-                    // Inspeciona o payload serializável e descarta antes do transporte.
+                    // Inspect the serializable envelope, then discard it before transport.
                     None
                 })
                 .build()
@@ -2280,8 +2194,7 @@ mod tests {
     #[test]
     fn enabling_a_purpose_creates_and_persists_a_valid_v4_uuid() {
         let path = temp_file("telemetry-consent");
-        // Fixture local: testa consentimento, não a configuração do binário Contributor.
-        // Nenhum cliente SDK é inicializado nestes testes de persistência/gates.
+        // Exercise preference persistence without initializing an SDK client or using build credentials.
         let runtime = TelemetryRuntime {
             build_disabled: false,
             ..TelemetryRuntime::default()
@@ -2416,13 +2329,13 @@ mod tests {
             &crash_gate,
             &epoch,
         )
-        .expect("epoch atual deve passar");
+        .expect("current epoch must pass");
         assert!(!accepted
             .properties()
             .contains_key(INTERNAL_PURPOSE_PROPERTY));
         assert!(!accepted.properties().contains_key(INTERNAL_EPOCH_PROPERTY));
 
-        // Simula revoke -> regenerar -> opt-in antes de o worker visitar a fila.
+        // Revoke -> regenerate -> opt-in completes before the worker examines the queue.
         *lock(&epoch) = ConsentEpoch {
             generation: 9,
             installation_id: Some(new_id),
@@ -2481,7 +2394,7 @@ mod tests {
             .unwrap();
 
         let safe = final_before_send(event, &usage_gate, &crash_gate, &epoch)
-            .expect("envelope válido do SDK não pode ser descartado");
+            .expect("a valid SDK envelope must not be discarded");
         let images = safe.properties()["$debug_images"].as_array().unwrap();
         assert_eq!(images.len(), 1);
         assert!(images[0].get("code_file").is_none());
@@ -2529,7 +2442,7 @@ mod tests {
             .before_send(move |event| {
                 let safe = final_before_send(event, &hook_usage, &hook_crash, &hook_epoch);
                 *lock(&hook_seen) = safe.as_ref().map(|event| event.properties().clone());
-                // O teste nunca toca a rede; basta observar o envelope final.
+                // Observe the final envelope without sending network traffic.
                 None
             })
             .build()
@@ -2562,7 +2475,7 @@ mod tests {
         let raw_properties = lock(&raw_seen).clone().unwrap_or_default();
         let properties = lock(&seen).clone().unwrap_or_else(|| {
             panic!(
-                "o before_send deve aceitar o envelope real do SDK; chaves recebidas: {:?}",
+                "before_send must accept the real SDK envelope; received keys: {:?}",
                 raw_properties.keys().collect::<Vec<_>>()
             )
         });
@@ -2581,33 +2494,28 @@ mod tests {
         }
     }
 
-    /// Com legítimo interesse, aviso velho é INFORMAÇÃO desatualizada, não
-    /// autorização vencida: o texto novo é reapresentado, mas o tratamento não
-    /// para. O que atravessa qualquer versão é a OPOSIÇÃO.
     #[test]
-    fn aviso_velho_nao_para_o_envio_mas_a_oposicao_para() {
-        let seguindo = TelemetryStatus {
+    fn outdated_notice_preserves_collection_but_opt_out_stops_it() {
+        let active = TelemetryStatus {
             notice_version: "2025-01-01".into(),
             usage: Consent::Enabled,
             crash_reports: Consent::Enabled,
             installation_id: Some(new_id()),
             ..TelemetryStatus::default()
         };
-        assert_eq!(effective_gates(&seguindo), (true, true));
+        assert_eq!(effective_gates(&active), (true, true));
 
-        let opposto = TelemetryStatus {
+        let opposed = TelemetryStatus {
             notice_version: "2025-01-01".into(),
             usage: Consent::Disabled,
             crash_reports: Consent::Disabled,
             ..TelemetryStatus::default()
         };
-        assert_eq!(effective_gates(&opposto), (false, false));
+        assert_eq!(effective_gates(&opposed), (false, false));
     }
 
-    /// Instalação nova (sem arquivo) nasce LIGADA; arquivo ilegível não pode ser
-    /// confundido com ela, senão a corrupção religaria quem tinha desligado.
     #[test]
-    fn instalacao_nova_liga_e_arquivo_ilegivel_nao() {
+    fn new_installation_is_active_but_unreadable_preferences_are_not() {
         assert_eq!(effective_gates(&TelemetryStatus::default()), (true, true));
         assert_eq!(effective_gates(&TelemetryStatus::opposed()), (false, false));
     }
@@ -2644,8 +2552,6 @@ mod tests {
                         (gates.0 || gates.1) && !build_disabled
                     );
 
-                    // Sem configuração, initialize não cria cliente. Mesmo com
-                    // a finalidade ativa e identidade válida, não há envio.
                     runtime.sync_epoch_installation_id(Some(new_id()));
                     assert!(runtime.client().is_none());
                     assert!(!runtime.capture("app_started", Map::new()).unwrap());
@@ -2713,15 +2619,12 @@ mod tests {
             },
         ] {
             let normalized = status.normalize();
-            // `Disabled`, não `Unset`: desde que `Unset` virou "ativa", devolver
-            // o padrão aqui religaria a telemetria de quem tinha desligado.
             assert_eq!(normalized.usage, Consent::Disabled);
             assert_eq!(normalized.crash_reports, Consent::Disabled);
             assert!(normalized.installation_id.is_none());
             assert_eq!(effective_gates(&normalized), (false, false));
         }
 
-        // Ausência de versão também não herda silenciosamente o schema atual.
         let missing_schema = serde_json::json!({
             "noticeVersion": NOTICE_VERSION,
             "usage": "enabled",
@@ -2843,7 +2746,7 @@ mod tests {
             "json-secret",
             "json-senha",
         ] {
-            assert!(!safe.contains(forbidden), "vazou {forbidden}: {safe}");
+            assert!(!safe.contains(forbidden), "leaked {forbidden}: {safe}");
         }
         assert!(safe.contains("<redacted>"));
         assert!(safe.contains("<local-path>"));
@@ -2904,60 +2807,46 @@ mod tests {
         );
     }
 
-    /// O que o `build.rs` assou tem que ser utilizável — meio-configurado é pior
-    /// que desligado, porque some em silêncio (os avisos daqui são `debug!`, e o
-    /// app roda em `Info`).
-    ///
-    /// Não exige configuração: sem `.env` — que é o caso do CI — os dois lados
-    /// ficam `None` e o teste passa. O que ele proíbe é o estado intermediário,
-    /// que é como um `.env` com token torto se manifestaria.
     #[test]
-    fn configuracao_assada_no_build_e_coerente() {
+    fn embedded_build_configuration_is_consistent() {
         let token = option_env!("POSTHOG_DESKTOP_TOKEN").map(str::trim);
         let host = option_env!("POSTHOG_HOST").map(str::trim);
         if let Some(token) = token.filter(|t| !t.is_empty()) {
             assert!(
                 valid_posthog_token(token),
-                "POSTHOG_DESKTOP_TOKEN assado não é um project token phc_ público"
+                "embedded POSTHOG_DESKTOP_TOKEN is not a public phc_ project token"
             );
         }
         if let Some(host) = host.filter(|h| !h.is_empty()) {
             assert!(
                 valid_posthog_host(host.trim_end_matches('/'), cfg!(debug_assertions)),
-                "POSTHOG_HOST assado não é um origin aceito"
+                "embedded POSTHOG_HOST is not an accepted origin"
             );
         }
-        let tem_token = posthog_token().is_some();
-        let tem_host = posthog_host().is_some();
+        let has_token = posthog_token().is_some();
+        let has_host = posthog_host().is_some();
         assert_eq!(
-            tem_token, tem_host,
-            "token e host precisam estar os DOIS presentes ou os dois ausentes — \
-             com só um deles o cliente cai em no-op sem dizer por quê"
+            has_token, has_host,
+            "token and host must both be present or both absent; \
+             a partial configuration silently leaves the client in no-op mode"
         );
     }
 
-    /// Regressão do PRIMEIRO crash reportado por um beta: o panic hook chamava
-    /// `capture_error`, o `#[track_caller]` resolvia o frame como a linha do
-    /// próprio hook, e o relatório chegou com
-    /// `desktop_native:native_panic:telemetry.rs:2022`. Sem o arquivo:linha de
-    /// verdade, todo panic do app é a mesma issue e nenhum é diagnosticável.
     #[test]
-    fn frame_explicito_vence_o_do_track_caller() {
-        let aqui = std::panic::Location::caller();
+    fn explicit_frame_overrides_track_caller() {
+        let caller = std::panic::Location::caller();
         assert_eq!(
-            top_app_frame_from(Some("chat.rs:1234"), aqui),
+            top_app_frame_from(Some("chat.rs:1234"), caller),
             "chat.rs:1234"
         );
-        // Vazio e só-espaço não são frame: caem no caller em vez de virar ":0".
-        for vazio in [Some(""), Some("   "), None] {
-            let resolvido = top_app_frame_from(vazio, aqui);
+        for empty in [Some(""), Some("   "), None] {
+            let resolved = top_app_frame_from(empty, caller);
             assert!(
-                resolvido.starts_with("telemetry.rs:"),
-                "esperava o arquivo do caller, veio {resolvido}"
+                resolved.starts_with("telemetry.rs:"),
+                "expected the caller's file, received {resolved}"
             );
         }
-        // O caminho completo do disco de quem compilou nunca atravessa.
-        assert!(!top_app_frame_from(None, aqui).contains(['/', '\\']));
+        assert!(!top_app_frame_from(None, caller).contains(['/', '\\']));
     }
 
     #[test]
@@ -3067,7 +2956,6 @@ mod tests {
             None,
         );
         runtime.capture_target_transition(Some(&operation_id), "youtube", "live", "live", None);
-        // Estado calmo não pertence ao catálogo operacional do motor.
         runtime.capture_target_transition(Some(&operation_id), "youtube", "live", "waiting", None);
         runtime.capture_target_transition(
             Some(&operation_id),
@@ -3108,26 +2996,20 @@ mod tests {
         assert_eq!(reconnect_bucket(11), "gte_11");
     }
 
-    /// O `Drop` do escopo tem que rodar DURANTE o unwind. Se não rodasse, a thread do pool
-    /// ficaria marcada como "contida" pra sempre — e o próximo pânico de verdade, esse sim
-    /// fatal, chegaria na triagem rebaixado a aviso.
     #[test]
-    fn escopo_de_panico_contido_se_desmarca_no_unwind() {
-        let anterior = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {})); // silencia o barulho do pânico de mentira
+    fn contained_panic_scope_clears_during_unwind() {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
 
         assert!(!panic_is_contained());
-        let resultado = std::panic::catch_unwind(|| {
-            let _contido = ContainedPanicScope::enter();
-            assert!(panic_is_contained(), "dentro do escopo, está contido");
-            panic!("pânico de mentira");
+        let result = std::panic::catch_unwind(|| {
+            let _contained = ContainedPanicScope::enter();
+            assert!(panic_is_contained(), "panic is contained inside the scope");
+            panic!("synthetic panic");
         });
 
-        std::panic::set_hook(anterior);
-        assert!(resultado.is_err(), "o pânico foi contido pelo catch_unwind");
-        assert!(
-            !panic_is_contained(),
-            "a marca não pode sobreviver ao unwind"
-        );
+        std::panic::set_hook(previous);
+        assert!(result.is_err(), "catch_unwind contained the panic");
+        assert!(!panic_is_contained(), "the flag must not survive unwind");
     }
 }

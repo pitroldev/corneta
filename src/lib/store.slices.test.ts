@@ -33,7 +33,7 @@ describe("store slices preserve shared contracts", () => {
     "keeps %s connected when local credential deletion fails",
     async (platform) => {
       const action = `${platform}Logout` as const;
-      mocks[action].mockRejectedValue(new Error("cofre indisponível"));
+      mocks[action].mockRejectedValue(new Error("vault unavailable"));
       useStore.setState({
         chatLogin: {
           ...useStore.getState().chatLogin,
@@ -41,7 +41,7 @@ describe("store slices preserve shared contracts", () => {
         },
       });
       await expect(useStore.getState()[action]()).rejects.toThrow(
-        "cofre indisponível",
+        "vault unavailable",
       );
       expect(useStore.getState().chatLogin[platform].state).toBe("connected");
       mocks[action].mockResolvedValue(undefined);
@@ -54,7 +54,7 @@ describe("store slices preserve shared contracts", () => {
     const config = defaultConfig();
     config.targets[0].hasKey = true;
     useStore.setState({ config });
-    mocks.clearKey.mockRejectedValue(new Error("cofre indisponível"));
+    mocks.clearKey.mockRejectedValue(new Error("vault unavailable"));
     await expect(
       useStore.getState().clearKey(config.targets[0].id),
     ).rejects.toThrow();
@@ -86,7 +86,7 @@ describe("store slices preserve shared contracts", () => {
         },
       ];
       useStore.setState({ config });
-      mocks.clearKey.mockRejectedValue(new Error("cofre indisponível"));
+      mocks.clearKey.mockRejectedValue(new Error("vault unavailable"));
       const state = useStore.getState();
       await expect(
         state[action](action === "clearAlertToken" ? "alert" : "chat"),

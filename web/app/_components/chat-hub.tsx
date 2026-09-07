@@ -13,26 +13,22 @@ import { Switch } from "./switch";
 import { Board, Chip, HubNote } from "./ui";
 import { InfoIcon } from "./icons";
 
-// Chat, alertas e overlay pro OBS — as três coisas que a tela de Chat do app
-// faz. As abas vêm do <Switch>; os três painéis são CLIENTES, porque os três
-// estão acontecendo (ver chat-live.tsx).
-//
-// A copy chega resolvida em objeto simples: função não atravessa a fronteira
-// servidor→cliente do Next, e este arquivo é o lugar onde ela para.
+// Resolve copy on the server; functions cannot cross the client-component boundary.
 
-/** As oito falas do feed, na ordem em que chegam. Plataformas alternadas de
- *  propósito: é a alegação da seção — três chats caindo num lugar só. */
-const POOL: { key: string; platform: ChatMsg["platform"]; tone?: "mod" | "member" }[] =
-  [
-    { key: "1", platform: "twitch", tone: "mod" },
-    { key: "2", platform: "youtube", tone: "member" },
-    { key: "3", platform: "kick" },
-    { key: "4", platform: "twitch" },
-    { key: "5", platform: "youtube" },
-    { key: "6", platform: "twitch" },
-    { key: "7", platform: "kick" },
-    { key: "8", platform: "youtube" },
-  ];
+const POOL: {
+  key: string;
+  platform: ChatMsg["platform"];
+  tone?: "mod" | "member";
+}[] = [
+  { key: "1", platform: "twitch", tone: "mod" },
+  { key: "2", platform: "youtube", tone: "member" },
+  { key: "3", platform: "kick" },
+  { key: "4", platform: "twitch" },
+  { key: "5", platform: "youtube" },
+  { key: "6", platform: "twitch" },
+  { key: "7", platform: "kick" },
+  { key: "8", platform: "youtube" },
+];
 
 const chatCopy = (t: T): ChatFeedCopy => ({
   label: t("protection.chat.demo.label"),
@@ -58,8 +54,6 @@ const chatCopy = (t: T): ChatFeedCopy => ({
   mineBadge: t("protection.chat.mine.badge"),
 });
 
-/** Os seis alertas que o feed cicla. `amount` só onde o alerta tem número —
- *  seguidor não tem, e inventar um seria mentira pequena e desnecessária. */
 const ALERTS: AlertItem["kind"][] = [
   "follow",
   "sub",
@@ -160,9 +154,7 @@ export function ChatHub({ t }: { t: T }) {
               <HubNote>
                 <InfoIcon />
                 <span>
-                  {/* Sem `<strong>` no meio: marcação dentro da frase obrigaria
-                      a fatiá-la em pedaços que a tradução não recompõe na mesma
-                      ordem. */}
+                  {/* Keep translated sentences intact instead of splitting them around emphasis. */}
                   {t("protection.overlay.note")}
                 </span>
               </HubNote>

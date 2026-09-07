@@ -21,7 +21,7 @@ const windowAt = (
 });
 
 describe("groupProblemWindows", () => {
-  it("resume muitas ocorrências da mesma causa em um diagnóstico", () => {
+  it("summarizes repeated occurrences of one cause as a diagnosis", () => {
     const groups = groupProblemWindows(
       Array.from({ length: 61 }, (_, index) => windowAt(index * 20_000)),
     );
@@ -32,7 +32,7 @@ describe("groupProblemWindows", () => {
     expect(groups[0].signals).toEqual(["GPU 99%"]);
   });
 
-  it("não mistura incidentes de plataformas diferentes", () => {
+  it("keeps incidents from different platforms separate", () => {
     const groups = groupProblemWindows([
       windowAt(0, {
         causeKind: "platform",
@@ -49,7 +49,7 @@ describe("groupProblemWindows", () => {
     expect(groups).toHaveLength(2);
   });
 
-  it("limita evidências variáveis para o resumo não voltar a assustar", () => {
+  it("bounds varying evidence in grouped summaries", () => {
     const groups = groupProblemWindows(
       Array.from({ length: 20 }, (_, index) =>
         windowAt(index * 20_000, { signals: [`GPU em ${80 + index}%`] }),
@@ -59,7 +59,7 @@ describe("groupProblemWindows", () => {
     expect(groups[0].signals).toHaveLength(6);
   });
 
-  it("limita também uma única ocorrência que já venha com muitas evidências", () => {
+  it("bounds evidence even within a single occurrence", () => {
     const groups = groupProblemWindows([
       windowAt(0, {
         signals: Array.from({ length: 20 }, (_, index) => `Sinal ${index}`),

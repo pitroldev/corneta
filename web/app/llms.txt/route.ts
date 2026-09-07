@@ -10,21 +10,12 @@ import { siteUrl } from "@/lib/site";
 import { listPublishedEditorial } from "@/lib/editorial/server";
 import { editorialCollectionHref } from "@/lib/editorial/urls";
 
-// /llms.txt — convenção emergente (llmstxt.org) que entrega a um modelo um
-// resumo curado do site em markdown, em vez de deixá-lo adivinhar a partir do
-// HTML. Não é padrão sancionado por ninguém e pode ser ignorado; o custo é uma
-// rota estática, e o ganho é controlar a frase que o motor generativo copia.
-//
-// O conteúdo sai das MESMAS constantes da página. Nada exclusivo aqui: um
-// arquivo pra robô que diz algo diferente do que o humano lê é cloaking.
+// Reuse public localized content; never introduce crawler-only claims.
 
 export const dynamic = "force-static";
 
 const abs = (path: string) => new URL(path, siteUrl).toString();
 
-// Em pt-BR: o /llms.txt vive na raiz, que é a URL canônica em português.
-// Uma versão inglesa exigiria /en/llms.txt — vale quando/se o inglês virar
-// tráfego relevante.
 async function body() {
   const t = translator("pt-BR");
   const ONE_LINER = oneLinerFor(t);

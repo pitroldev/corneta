@@ -250,11 +250,7 @@ function pushUniqueFinding(
   }
 }
 
-/**
- * Parses public SVGs as strict, namespace-aware XML and accepts only a passive
- * subset. Unknown elements/attributes are rejected instead of relying on a
- * blocklist that can become stale as browser SVG capabilities evolve.
- */
+// Parse a strict passive XML allowlist; a blocklist cannot cover every active SVG feature.
 export function inspectPublicEditorialSvg(
   source: string,
 ): EditorialAssetSafetyFinding[] {
@@ -273,9 +269,9 @@ export function inspectPublicEditorialSvg(
       message,
     });
 
-  parser.on("doctype", () => unsafe("DOCTYPE/ENTITY não é permitido"));
+  parser.on("doctype", () => unsafe("DOCTYPE/ENTITY is not allowed"));
   parser.on("processinginstruction", () =>
-    unsafe("processing instructions não são permitidas"),
+    unsafe("processing instructions are not allowed"),
   );
 
   parser.on("opentag", (tag) => {
@@ -285,18 +281,18 @@ export function inspectPublicEditorialSvg(
     if (!rootSeen) {
       rootSeen = true;
       if (localName !== "svg" || tag.uri !== SVG_NAMESPACE) {
-        unsafe("o elemento raiz deve ser svg no namespace SVG oficial");
+        unsafe("the root element must be svg in the official SVG namespace");
       }
     } else if (tag.uri !== SVG_NAMESPACE) {
-      unsafe(`namespace não permitido em <${tag.name}>`);
+      unsafe(`namespace not allowed on <${tag.name}>`);
     }
 
     if (!PASSIVE_SVG_ELEMENTS.has(localName)) {
-      unsafe(`elemento ativo ou desconhecido não permitido: <${tag.name}>`);
+      unsafe(`active or unknown element not allowed: <${tag.name}>`);
     }
 
     if (parent === "title" || parent === "desc") {
-      unsafe(`<${parent}> deve conter somente texto`);
+      unsafe(`<${parent}> must contain text only`);
     }
 
     if (parent === "svg" && localName === "title") directTitleCount += 1;
@@ -320,14 +316,12 @@ export function inspectPublicEditorialSvg(
         attribute.uri !== "" ||
         !PASSIVE_SVG_ATTRIBUTES.has(attribute.local)
       ) {
-        unsafe(
-          `atributo ativo ou desconhecido não permitido: ${attribute.name}`,
-        );
+        unsafe(`active or unknown attribute not allowed: ${attribute.name}`);
         continue;
       }
 
       if (URI_OR_ACTIVE_VALUE.test(attribute.value)) {
-        unsafe(`valor ativo ou externo não permitido em ${attribute.name}`);
+        unsafe(`active or external value not allowed in ${attribute.name}`);
       }
 
       if (/\burl\s*\(/i.test(attribute.value)) {
@@ -335,7 +329,7 @@ export function inspectPublicEditorialSvg(
           !INTERNAL_FRAGMENT_ATTRIBUTES.has(attribute.local) ||
           !INTERNAL_FRAGMENT_URL.test(attribute.value)
         ) {
-          unsafe(`referência externa não permitida em ${attribute.name}`);
+          unsafe(`external reference not allowed in ${attribute.name}`);
         }
       }
     }
@@ -362,7 +356,7 @@ export function inspectPublicEditorialSvg(
   } catch (error) {
     findings.push({
       code: "invalid-svg",
-      message: `SVG não é XML válido: ${
+      message: `SVG is not valid XML: ${
         error instanceof Error ? error.message : String(error)
       }`,
     });
@@ -371,14 +365,13 @@ export function inspectPublicEditorialSvg(
   if (directTitleCount !== 1 || !hasReadableText(titleText)) {
     findings.push({
       code: "inaccessible-svg-title",
-      message:
-        "SVG público precisa de exatamente um <title> direto e não vazio",
+      message: "public SVG requires exactly one nonempty direct <title>",
     });
   }
   if (directDescriptionCount !== 1 || !hasReadableText(descriptionText)) {
     findings.push({
       code: "inaccessible-svg-description",
-      message: "SVG público precisa de exatamente um <desc> direto e não vazio",
+      message: "public SVG requires exactly one nonempty direct <desc>",
     });
   }
 

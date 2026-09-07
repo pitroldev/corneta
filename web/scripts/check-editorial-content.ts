@@ -21,7 +21,7 @@ async function resolveWebRoot(): Promise<string> {
       return candidate;
     }
   }
-  throw new Error("Não encontrei web/content a partir do diretório atual.");
+  throw new Error("Could not locate web/content from the current directory.");
 }
 
 async function main(): Promise<void> {
@@ -42,14 +42,17 @@ async function main(): Promise<void> {
 
   if (result.errorCount > 0) {
     process.stderr.write(
-      `\nFalha editorial: ${result.errorCount} erro(s), ${result.warningCount} aviso(s).\n`,
+      `
+Editorial validation failed: ${result.errorCount} error(s), ${result.warningCount} warning(s).
+`,
     );
     process.exitCode = 1;
     return;
   }
 
   process.stdout.write(
-    `Conteúdo editorial válido: ${result.documents.length} arquivo(s), ${result.warningCount} aviso(s).\n`,
+    `Editorial content is valid: ${result.documents.length} file(s), ${result.warningCount} warning(s).
+`,
   );
   if (process.argv.includes("--manifest")) {
     const directory = path.join(webRoot, ".generated");
@@ -64,7 +67,7 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   process.stderr.write(
-    `Falha ao auditar conteúdo editorial: ${
+    `Editorial content audit failed: ${
       error instanceof Error ? error.message : String(error)
     }\n`,
   );

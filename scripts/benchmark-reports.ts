@@ -54,7 +54,7 @@ for (let run = 0; run < warmup + iterations; run++) {
   const start = performance.now();
   const data = parseSession(input, t);
   if (!data || data.samples.length !== sampleCount)
-    throw new Error("Fixture de benchmark inválida.");
+    throw new Error("Invalid benchmark fixture.");
   analyze(data, t);
   const elapsed = performance.now() - start;
   if (run >= warmup) samples.push(elapsed);
@@ -87,11 +87,11 @@ const result = {
     max: samples.at(-1),
   },
   scope:
-    "JSON parse, normalização e análise no Node; exclui serialização da fixture, disco, React, GPU e IPC. Não mede startup, RSS da live ou vazamento de memória.",
+    "JSON parsing, normalization and analysis in Node; excludes fixture serialization, disk, React, GPU and IPC. Does not measure startup, live-stream RSS or memory leaks.",
 };
 if (sourceIdentity(root).sourceTreeSha256 !== source.sourceTreeSha256)
   throw new Error(
-    "Os fontes mudaram durante o benchmark. Execute novamente após concluir as edições.",
+    "Source files changed during the benchmark. Rerun after finishing the edits.",
   );
 const destination = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -105,5 +105,5 @@ writeFileSync(
 console.log(JSON.stringify(result, null, 2));
 if (result.milliseconds.p95 > 750)
   throw new Error(
-    "Regressão: análise p95 excede 750 ms neste cenário sintético.",
+    "Regression: analysis p95 exceeds 750 ms in this synthetic scenario.",
   );

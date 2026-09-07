@@ -27,22 +27,19 @@ const PLATFORM_ICON: Partial<Record<PlatformId, string>> = {
   instagram: siInstagram.path,
 };
 
-// ---------------- Button ----------------
-// "tomate" é o nome canônico do botão de ação (bloco tomate, sombra dura).
-// "pop" segue como alias retrocompatível — a utility `.pop` é a sombra, não a variante.
+// pop is a compatibility alias for tomato, distinct from the CSS shadow utility.
 type Variant =
-  "primary" | "tomate" | "pop" | "ghost" | "outline" | "danger" | "subtle";
+  "primary" | "tomato" | "pop" | "ghost" | "outline" | "danger" | "subtle";
 type Size = "sm" | "md" | "lg";
 
-// Tinta night sobre tomate: ≈6:1 no breu (branco dava 3,1:1 — e BORA AO VIVO em
-// 18px bold não conta como texto grande). No papel o index.css troca por branco.
-const TOMATE =
-  "bg-tomate text-night hover:bg-tomate-strong pop active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold";
+// Use contrasting status ink; index.css overrides it for the light theme.
+const TOMATO =
+  "bg-tomato text-night hover:bg-tomato-strong pop active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold";
 const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-brass text-brass-ink hover:bg-brass-strong pop-brass active:translate-x-1 active:translate-y-1 active:shadow-none font-display font-bold",
-  tomate: TOMATE,
-  pop: TOMATE,
+  tomato: TOMATO,
+  pop: TOMATO,
   ghost: "text-ink-muted hover:text-ink hover:bg-surface-2",
   outline: "border-2 border-border text-ink hover:border-brass",
   danger:
@@ -72,8 +69,7 @@ export function Button({
     <button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      // `cursor-not-allowed` em vez de `pointer-events-none`: com pointer-events
-      // zerado o `title` (motivo do bloqueio) nunca abria no hover.
+      // Keep pointer events enabled so the disabled reason remains available on hover.
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap transition duration-75 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
         VARIANTS[variant],
@@ -90,9 +86,6 @@ export function Button({
   );
 }
 
-// ---------------- Panel (ex-"Card") ----------------
-// Bloco sólido, canto seco. Sem borda/glow por padrão — diferencia pela cor de
-// preenchimento. Acentos opcionais: barra de latão (`accent`) e sombra dura (`pop`).
 export function Card({
   className,
   accent,
@@ -120,9 +113,6 @@ export function Card({
   );
 }
 
-// ---------------- Badge (adesivo) ----------------
-// Texto de 11px bold pede 4,5:1: night sobre bad/live dá ≈7:1 no breu (branco dava
-// 3:1). No papel o index.css troca a night por branco nesses blocos.
 type BadgeTone = "ok" | "warn" | "bad" | "live" | "brass" | "neutral";
 const BADGE_TONES: Record<BadgeTone, string> = {
   ok: "bg-ok text-night",
@@ -160,12 +150,7 @@ export function Badge({
   );
 }
 
-// ---------------- Experimental (adesivo de feature beta) ----------------
-// Selo de gibi torto com frasco — sinaliza "ainda em teste, pode falhar/mudar".
-// A explicação chega ao leitor de tela como texto (sr-only) e ao mouse pelo title.
-// `interactive` troca o span por um botão que abre a explicação no foco e no hover
-// (Tooltip do kit) — só fora de outro botão: nos pickers de plataforma o selo fica
-// DENTRO de um <button>, e HTML não aceita botão em botão.
+// Use an interactive tooltip only outside another button to avoid nested buttons.
 export function ExperimentalBadge({
   className,
   interactive = false,
@@ -173,8 +158,6 @@ export function ExperimentalBadge({
 }: {
   className?: string;
   interactive?: boolean;
-  /** `icon` é só o frasco, pra linha de texto corrido (a lista de proteções do Ao vivo):
-   *  a palavra fica no `title` e no leitor de tela, pra não brigar com o nome ao lado. */
   size?: "sm" | "icon";
 }) {
   const t = useT();
@@ -182,7 +165,7 @@ export function ExperimentalBadge({
   const title = t("components.ui.experimental.title");
   const iconOnly = size === "icon";
   const cls = cn(
-    "inline-flex shrink-0 items-center bg-tomate text-night",
+    "inline-flex shrink-0 items-center bg-tomato text-night",
     iconOnly
       ? "size-4 justify-center rounded-xs"
       : "-rotate-2 gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider pop-sm",
@@ -194,7 +177,6 @@ export function ExperimentalBadge({
       {iconOnly ? null : <> {label}</>}
     </>
   );
-  // Sem a palavra na tela, ela precisa ir inteira pro leitor de tela e pro title.
   const spoken = iconOnly ? `${label} — ${title}` : ` — ${title}`;
   if (interactive) {
     return (
@@ -213,7 +195,6 @@ export function ExperimentalBadge({
   );
 }
 
-// ---------------- Toggle / Switch ----------------
 export function Toggle({
   checked,
   onChange,
@@ -247,7 +228,6 @@ export function Toggle({
   );
 }
 
-// ---------------- Platform glyph (logo oficial em chip de marca) ----------------
 export function PlatformGlyph({
   id,
   size = 44,
@@ -255,12 +235,10 @@ export function PlatformGlyph({
   id: PlatformId | ChatPlatform;
   size?: number;
 }) {
-  // Cinefy é uma fonte de chat, não um destino RTMP: sua marca vive nesta borda
-  // visual sem contaminar o catálogo de plataformas de transmissão.
+  // Cinefy is a chat source, not a streaming destination.
   const isCinefy = id === "cinefy";
   const preset = isCinefy ? undefined : PLATFORMS[id as PlatformId];
-  // Configs antigas ou editadas à mão podem trazer um identificador desconhecido.
-  // O glyph vira neutro em vez de derrubar toda a tela tentando ler `.color` de undefined.
+  // Old or manually edited configurations may contain unknown platform IDs.
   const color = isCinefy ? "#FFD200" : (preset?.color ?? "#64748B");
   const fg = readableOn(color);
   const path = isCinefy
@@ -294,7 +272,6 @@ export function PlatformGlyph({
   );
 }
 
-// ---------------- Section title (editorial) ----------------
 export function SectionTitle({
   kicker,
   title,
@@ -324,7 +301,6 @@ export function SectionTitle({
   );
 }
 
-// ---------------- Stat (bloco com topo de latão) ----------------
 export function Stat({
   label,
   value,
@@ -362,11 +338,6 @@ export function Stat({
   );
 }
 
-// ---------------- Hint (tooltip didático) ----------------
-// Gatilho focável: abre no hover E no foco/tap (teclado também vê). Usa o Tooltip
-// (tokens, sem hex fixo) pra não quebrar no tema claro. O nome do botão é a própria
-// dica: o leitor de tela recebe o texto ao focar, em vez de ouvir um "Ajuda"
-// genérico três vezes na mesma tela.
 export function Hint({
   text,
   className,
@@ -390,7 +361,6 @@ export function Hint({
   );
 }
 
-// ---------------- Text input ----------------
 export function Input({
   className,
   invalid,
@@ -409,8 +379,6 @@ export function Input({
   );
 }
 
-// ---------------- CopyField (valor copiável com 1 clique) ----------------
-// Feedback é inline no próprio botão — sem toast duplicado.
 export function CopyField({
   label,
   value,
@@ -430,7 +398,7 @@ export function CopyField({
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
     } catch {
-      /* área de transferência bloqueada */
+      /* Clipboard access may be denied; leave the value available for manual copying. */
     }
   };
   return (
@@ -453,8 +421,7 @@ export function CopyField({
         variant="subtle"
         size="sm"
         onClick={copy}
-        // Duas chaves em vez de concatenar "Copiar" + rótulo: em outros idiomas
-        // a ordem das palavras muda, e a frase montada no código sairia torta.
+        // Translate complete accessible labels to preserve locale-specific word order.
         aria-label={
           label
             ? t("components.ui.copy.aria", { label })
@@ -472,9 +439,6 @@ export function CopyField({
   );
 }
 
-// ---------------- EmptyState (palco vazio com mascote) ----------------
-// Estado vazio on-brand: bloco sólido com sombra dura, mascote e CTA. Centraliza
-// o padrão que telas vazias improvisavam (Plataformas/Relatórios).
 export function EmptyState({
   title,
   children,

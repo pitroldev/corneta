@@ -16,8 +16,7 @@ import {
   LEGAL_UPDATED_LABEL_PT,
 } from "@/lib/legal";
 
-// Política de privacidade — TEXTO VINCULANTE (LGPD, ANPD).
-// A tradução vive em `privacy.en.tsx`. Mexeu aqui, mexa lá.
+// Binding Portuguese text; keep the English translation aligned.
 
 const L = "pt-BR" as const;
 

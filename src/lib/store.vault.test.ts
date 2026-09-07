@@ -19,14 +19,14 @@ vi.mock("./telemetry", () => ({
 
 import { useStore } from "./store";
 
-describe("ordenação entre configuração e cofre", () => {
+describe("config and vault ordering", () => {
   beforeEach(() => {
     mocks.saveConfig.mockReset();
     mocks.setKey.mockReset();
     useStore.setState({ config: defaultConfig(), loaded: true });
   });
 
-  it("persiste um destino novo antes de gravar sua chave", async () => {
+  it("persists a new destination before storing its key", async () => {
     let releaseFirstSave!: () => void;
     let first = true;
     mocks.saveConfig.mockImplementation(async (config) => {

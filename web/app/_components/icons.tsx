@@ -37,9 +37,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// Ícones de interface usam Lucide, sem fill e com tamanho definido pelo consumidor.
-// Marcas mantêm seus traçados próprios; transporte pode usar formas preenchidas.
-// Ícones são decorativos: texto/controle externo fornece o nome acessível.
+// Icons are decorative; their enclosing control supplies the accessible name.
 
 function wrap(Base: LucideIcon) {
   return function Icon() {
@@ -47,7 +45,7 @@ function wrap(Base: LucideIcon) {
   };
 }
 
-/** Marca Windows: traçado do catálogo simple-icons (CC0), com preenchimento. */
+// Windows logo from Simple Icons (CC0).
 export function WindowsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -88,7 +86,6 @@ export const SettingsIcon = wrap(Settings);
 export const ShieldIcon = wrap(Shield);
 export const SlidersIcon = wrap(Sliders);
 export const StarIcon = wrap(Star);
-/** "Fecha pra bandeja" é minimizar, não uma caixinha de sistema. */
 export const TrayIcon = wrap(Minimize2);
 export const ThemeIcon = wrap(Palette);
 export const VolumeIcon = wrap(Volume2);

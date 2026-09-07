@@ -1,7 +1,3 @@
-// ============================================================
-// Corneta — modelo de dados (compartilhado conceitualmente com o backend Rust)
-// ============================================================
-
 export type PlatformId =
   | "twitch"
   | "youtube"
@@ -14,13 +10,10 @@ export type PlatformId =
 
 export type Protocol = "rtmp" | "rtmps";
 
-/** O que o relay faz com cada destino. */
 export type EncodingAction = "copy" | "transcode";
 
-/** Modo global de encoding. */
 export type EncodingMode = "per-platform" | "passthrough" | "hybrid";
 
-/** Encoders de hardware suportados. */
 export type EncoderKind =
   "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software";
 
@@ -33,29 +26,21 @@ export interface VideoPreset {
   keyframeSec: number;
 }
 
-/** Catálogo de uma plataforma (valores de referência — atualizáveis). */
 export interface PlatformPreset {
   id: PlatformId;
   name: string;
-  /** Cor de marca para a UI. */
   color: string;
   protocol: Protocol;
-  /** URL de ingestão (sem a chave). */
+  /** Ingest URL without the stream key. */
   ingestUrl: string;
-  /** Configuração recomendada de encoding. */
   recommended: VideoPreset;
-  /** Observações didáticas exibidas na UI. */
   note?: string;
-  /** Página do painel onde o usuário pega a stream key. */
   keyUrl?: string;
-  /** Página ao vivo/dashboard pra conferir a transmissão. */
   liveUrl?: string;
-  /** Plataforma cuja chave não é auto-serviço / suporte experimental. */
   experimental?: boolean;
 }
 
-/** Configuração de encoding de um destino específico. */
-/** Enquadramento do recorte vertical (saída portrait). x/y = panorâmica 0..1; zoom 0.25..1. */
+/** Portrait crop: x/y pan within 0–1; zoom within 0.25–1. */
 export interface Reframe {
   x: number;
   y: number;
@@ -63,18 +48,16 @@ export interface Reframe {
 }
 
 export interface TargetEncoding {
-  /** Legado — não usado; o híbrido decide via hybridOverride/auto. */
+  /** Persisted legacy field; hybrid behavior uses hybridOverride or automatic selection. */
   action: EncodingAction;
-  /** Parâmetros de saída quando recodifica. */
   preset?: VideoPreset;
   encoder: EncoderKind;
-  /** No modo híbrido: override manual. undefined = decisão automática. */
+  /** undefined selects automatic behavior in hybrid mode. */
   hybridOverride?: EncodingAction;
-  /** Enquadramento da saída vertical (crop 9:16). undefined = centralizado. */
+  /** undefined selects a centered portrait crop. */
   reframe?: Reframe;
 }
 
-/** Um destino de transmissão configurado pelo usuário. */
 export interface Target {
   id: string;
   platformId: PlatformId;
@@ -82,12 +65,11 @@ export interface Target {
   enabled: boolean;
   protocol: Protocol;
   ingestUrl: string;
-  /** A chave NUNCA é guardada aqui — só sabemos se existe no cofre. */
+  /** Never store the stream key here; only record its vault presence. */
   hasKey: boolean;
   encoding: TargetEncoding;
 }
 
-/** Endpoint local que o OBS usa para publicar. */
 export interface IngestConfig {
   protocol: "rtmp";
   host: string;
@@ -99,112 +81,78 @@ export interface IngestConfig {
 export interface AppSettings {
   minimizeToTray: boolean;
   autostart: boolean;
-  /** Senha do obs-websocket (vazio = sem auth). */
+  /** Empty means OBS WebSocket authentication is disabled. */
   obsPassword: string;
-  /** Ligar/parar o OBS junto com o BORA AO VIVO. */
   autoStartObs: boolean;
-  /** Atalho global pra começar/parar (acelerador do Tauri). */
   liveShortcut: string;
-  /** Chat: API key do YouTube Data API v3 (compartilhada entre as fontes do YouTube). */
+  /** One YouTube Data API key shared by YouTube chat sources. */
   youtubeApiKey: string;
-  /** Chat: fontes (várias por plataforma). */
   chatSources: ChatSource[];
-  /** Alertas: fontes externas (Streamlabs/StreamElements). Token no cofre. */
   alertSources: AlertSource[];
-  /** Exibição do chat. */
   chatShowEmotes: boolean;
   chatShowBadges: boolean;
   chatShowPlatform: boolean;
   chatShowSource: boolean;
   chatShowTimestamps: boolean;
-  /** Mostrar o contador de quem está assistindo (clicável pra esconder). */
   chatShowViewers: boolean;
-  /** Tema da interface. */
   theme: "dark" | "light";
-  /** Idioma da interface. "auto" segue o idioma do Windows. */
+  /** auto follows the system locale. */
   language: "auto" | "pt-BR" | "en";
-  /** Tamanho da fonte do chat, em pixels. */
+  /** Chat font size in pixels. */
   chatFontSize: number;
-  /** Tamanho da fonte dos alertas, em pixels (slider próprio, igual ao do chat). */
+  /** Alert font size in pixels. */
   alertFontSize: number;
-  /** Layout do modo "Ambos" da janela do chat. */
   chatBothLayout: "auto" | "row" | "col";
-  /** No modo "Ambos", mostrar os alertas antes do chat. */
   chatBothAlertsFirst: boolean;
-  /** Posição do divisor do modo "Ambos": % que o painel de alertas ocupa. */
+  /** Percentage of the combined popout occupied by alerts. */
   chatBothSplit: number;
-  /** Guardião de privacidade: mostra a tela "JÁ VOLTO" quando um TERMO seu aparece (preventivo). */
   guardianEnabled: boolean;
-  /** Termos EXPLÍCITOS a vigiar (e-mail, nome real, endereço, @…). Único gatilho da feature. */
+  /** Explicit user watchlist; the engine ignores terms shorter than three characters. */
   guardianWatchlist: string[];
-  /** Normalizador de áudio: acerta o volume pro alvo antes de enviar (loudnorm no encode que já roda). */
   loudnessNormalize: boolean;
-  /** Alvo de loudness integrado (LUFS) do normalizador — ~-14 pra Twitch/YouTube. */
+  /** Integrated loudness target in LUFS. */
   loudnessTargetLufs: number;
-  /** Tela "JÁ VOLTO": mantém a live de pé com um slate quando o sinal cai. */
   brbEnabled: boolean;
-  /** Tela "JÁ VOLTO": "auto" (gerada) | "image" | "video" (arquivo escolhido pelo usuário). */
   brbSlateKind: "auto" | "image" | "video";
-  /** Nome original do arquivo custom do "JÁ VOLTO" (só exibição — o arquivo vira brb-slate.*). */
+  /** Original filename for display only; the backend stores brb-slate.*. */
   brbSlateFileName?: string;
-  /** Gravar o programa em disco (pro replay do relatório). Padrão DESLIGADO: a 6000 kbps
-   *  são ~2,7 GB/hora, e ligar sem o streamer pedir encheria o disco dele. */
+  /** Recording is opt-in to avoid unexpected disk usage. */
   recordVideo: boolean;
-  /** Pasta das gravações. VAZIO = pasta de sessões, resolvida na hora — um caminho
-   *  concreto aqui amarraria a config a uma máquina. */
+  /** Empty resolves to the session directory at runtime, keeping exported config portable. */
   recordVideoDir: string;
-  /** Teto de disco das gravações, em GB (a poda de vídeo é por espaço, não por contagem). */
+  /** Recording retention limit in GB, based on space rather than file count. */
   recordVideoKeepGb: number;
-  /** Gravar as mensagens do chat. Chave separada da de vídeo: uma custa disco, a outra
-   *  guarda dado pessoal de terceiros. */
+  /** Chat recording is independent of video because it stores third-party personal data. */
   recordChat: boolean;
-  /** Auto-bitrate: baixa o bitrate de destinos em transcode quando a banda aperta. */
   autoBitrate: boolean;
-  /** YouTube automático: cria a transmissão (broadcast) e injeta a chave no BORA — sem Studio. */
   youtubeAutoLive: boolean;
-  /** Título da live, lembrado entre sessões (alimenta o broadcast automático do YouTube). */
+  /** Persisted across sessions and used for automatic YouTube broadcasts. */
   streamTitle: string;
-  /** Conectar o chat sozinho quando a transmissão entra no ar. */
   chatAutoConnect: boolean;
-  /** Última aba usada na janela flutuante do chat (persistida entre aberturas). */
   chatPopoutTab: "chat" | "alerts" | "both";
-  /** Painel de alertas da tela de Chat aberto (persistido entre visitas). */
   chatShowAlertsPanel: boolean;
-  /** Overlay de alertas pro OBS: servidor local (Browser Source) ligado. URL fixa pra colar 1x. */
   overlayEnabled: boolean;
-  /** Overlay: tocar um som (chime) quando um alerta aparece. */
   overlaySound: boolean;
-  /** Overlay: posição do card na tela (top | bottom | center | top-left | …). */
   overlayPosition: string;
-  /** Overlay: porta do servidor local (URL fixa pro OBS). */
   overlayPort: number;
-  /** Overlay do chat: de onde a lista cresce ("bottom" | "top"). */
   overlayChatPosition: string;
-  /** Overlay de alertas: tempo que cada card fica na tela (s). */
+  /** Alert display duration in seconds. */
   overlayDurationSecs: number;
-  /** Overlay de alertas: escala do card ("sm" | "md" | "lg"). */
   overlayScale: string;
-  /** Overlay de alertas: mostrar alertas de seguidor. */
   overlayShowFollows: boolean;
-  /** Overlay do chat: tamanho da fonte (px). */
+  /** Overlay chat font size in pixels. */
   overlayChatSize: number;
-  /** Overlay do chat: máximo de mensagens na tela. */
   overlayChatMax: number;
-  /** Overlay do chat: mostrar selos (mod/sub/vip). */
   overlayChatBadges: boolean;
-  /** Overlay do chat: mostrar o pontinho da plataforma. */
   overlayChatPlatform: boolean;
-  /** Overlay do chat: esconder mensagens de comando (começam com "!"). */
   overlayChatHideCommands: boolean;
-  /** Overlay do chat: sumir com a mensagem após N segundos (0 = nunca). */
+  /** Seconds before hiding a message; zero means never. */
   overlayChatFadeSecs: number;
 }
 
 export interface ObsCheck {
   reachable: boolean;
-  /** A conexão falhou por SENHA? Vem do Rust como DADO — o front precisa
-   *  distinguir senha errada de OBS fechado, e farejar palavra na mensagem
-   *  deixou de funcionar quando ela ganhou tradução. */
+  /** Structured authentication failure flag; do not infer it from localized error text. */
   authFailed?: boolean;
   pointingAtCorneta: boolean;
   width: number;
@@ -213,7 +161,7 @@ export interface ObsCheck {
   error?: string;
 }
 
-/** Fontes de chat. Cinefy é somente chat; não é um destino de transmissão. */
+/** Cinefy is a chat source, not a streaming destination. */
 export type ChatPlatform = "twitch" | "youtube" | "kick" | "cinefy";
 
 export interface ChatSource {
@@ -222,19 +170,18 @@ export interface ChatSource {
   value: string;
   name: string;
   enabled: boolean;
-  /** Tem token de envio no cofre (recomputado pelo backend). Só Twitch por enquanto. */
+  /** Vault-derived sending-token presence, currently for Twitch only. */
   hasSendToken?: boolean;
 }
 
 export type AlertSourceKind = "streamlabs" | "streamelements";
 
-/** Fonte de alerta externa (agregador). O token fica no cofre, não aqui. */
 export interface AlertSource {
   id: string;
   kind: AlertSourceKind;
   name: string;
   enabled: boolean;
-  /** Recomputado pelo backend a partir do cofre (não confiar pra persistir). */
+  /** Recomputed by the backend from the vault; not authoritative for persistence. */
   hasToken?: boolean;
 }
 
@@ -254,7 +201,7 @@ export interface ChatMessage {
   platform: ChatPlatform;
   source: string;
   author: string;
-  /** ID do autor na plataforma (Twitch user-id) — pra moderar sem lookup por nome. */
+  /** Platform author ID permits moderation without a username lookup. */
   authorId?: string;
   nativeId?: string;
   color?: string;
@@ -262,7 +209,7 @@ export interface ChatMessage {
   fragments: ChatFragment[];
   badges: ChatBadge[];
   ts: number;
-  /** Removida pela moderação — vira lápide (tombstone) no feed em vez de sumir. */
+  /** Moderated messages remain as tombstones in the live feed. */
   deleted?: boolean;
 }
 
@@ -277,7 +224,7 @@ export interface ChatDelete {
 export interface ChatStatus {
   platform: string;
   source: string;
-  status: string; // connected | disconnected | error
+  status: string;
 }
 
 export interface ViewerItem {
@@ -306,7 +253,6 @@ export type AlertKind =
 
 export interface Alert {
   id: string;
-  /** Origem: plataforma de chat (twitch/youtube/kick) OU agregador (streamlabs/streamelements). */
   platform: string;
   source: string;
   kind: AlertKind;
@@ -315,13 +261,11 @@ export interface Alert {
   currency?: string;
   tier?: string;
   message?: string;
-  /** Fragmentos com emotes (BTTV/FFZ/7TV + nativos) da mensagem — hoje só Twitch (resub/sub).
-   *  Vazio/ausente = renderiza `message` como texto puro. */
+  /** Emote fragments; empty or absent falls back to plain message text. */
   fragments?: ChatFragment[];
   ts: number;
 }
 
-/** Termo do usuário detectado na tela pelo guardião de privacidade. */
 export interface Leak {
   label: string;
   snippet: string;
@@ -345,8 +289,6 @@ export interface AppConfig {
   activeProfileId: string;
 }
 
-// ---- Estado de execução ----
-
 export type EngineState = "stopped" | "starting" | "live" | "error";
 
 export type TargetState =
@@ -357,7 +299,7 @@ export type TargetState =
   | "error"
   | "paused"
   | "waiting"
-  /** Estava AO VIVO e o sinal do OBS sumiu (sem JÁ VOLTO) — urgente, diferente do waiting pré-live. */
+  /** OBS signal loss after going live, distinct from preflight waiting. */
   | "signal-lost"
   | "brb"
   | "censor";
@@ -378,28 +320,26 @@ export interface ObsStats {
   avgRenderMs: number;
   renderSkipped: number;
   outputSkipped: number;
-  /** Congestionamento de saída (0..1). */
+  /** Output congestion, 0–1. */
   congestion: number;
 }
 
 export interface EngineSnapshot {
   state: EngineState;
   startedAt: number | null;
-  /** Há vídeo chegando do OBS, mesmo que um destino ainda não tenha aceitado a conexão. */
+  /** Input video can be present before any destination accepts its connection. */
   ingestLive?: boolean;
   targets: Record<string, TargetStatus>;
   message?: string;
-  /** UUID da operação de live corrente, compartilhado entre UI e motor nativo. */
+  /** Current live-operation UUID shared by UI and native engine. */
   operationId?: string;
-  /** UUID opaco da falha nativa, quando o backend capturou um evento correlato. */
+  /** Opaque native failure UUID for a correlated diagnostic event. */
   errorId?: string;
-  /** Uso real de CPU/GPU (%) enquanto transmite. */
+  /** Observed CPU and GPU usage percentages. */
   cpu?: number;
   gpu?: number;
   memoryPct?: number;
-  /** Stats do OBS (se conectado via obs-websocket). */
   obs?: ObsStats;
-  /** "JÁ VOLTO agora" manual acionado pelo streamer (botão na sala de guerra). */
   forcedBrb?: boolean;
   guardianStatus?: "starting" | "ready" | "unavailable";
 }
@@ -408,11 +348,9 @@ export interface EncoderInfo {
   kind: EncoderKind;
   label: string;
   available: boolean;
-  /** Sessões simultâneas estimadas (heurística). */
+  /** Estimated simultaneous hardware sessions, not a measured limit. */
   maxSessions?: number;
 }
-
-// ---- Relatório pós-live ----
 
 export interface SessionPlatform {
   id: string;
@@ -421,7 +359,7 @@ export interface SessionPlatform {
 }
 
 export interface SessionMeta {
-  /** Native file size/mtime revision; invalidates summaries after external edits. */
+  /** Native size/mtime revision invalidates summaries after external edits. */
   sourceRevision?: string;
   id: string;
   startedAt: number;
@@ -429,8 +367,7 @@ export interface SessionMeta {
   durationSec: number;
   mode: EncodingMode;
   platforms: SessionPlatform[];
-  /** Existe vídeo desta sessão no disco? Vem de existência de ARQUIVO, não do NDJSON:
-   *  quem apaga o MP4 na mão perde a aba de replay, não ganha um erro vermelho. */
+  /** Derived from file existence, not merely recording entries in NDJSON. */
   hasVideo?: boolean;
   hasChat?: boolean;
 }
@@ -444,12 +381,11 @@ export interface SessionSampleTarget {
   dropped: number;
 }
 
-/** Aplicativo que mais disputou recursos nesta janela. O backend persiste no máximo
- * três, sem caminho, linha de comando ou título de janela. */
+/** At most three competing processes, without paths, command lines or window titles. */
 export interface SessionResourceApp {
   appRef: string;
   name: string;
-  /** Percentual do computador inteiro (0..100). */
+  /** Percentage of whole-machine capacity, 0–100. */
   cpu: number;
   memoryMb: number;
   gpu3d?: number;
@@ -461,13 +397,12 @@ export interface SessionSample {
   cpu?: number;
   gpu?: number;
   memoryPct?: number;
-  /** Esparso: normalmente aparece a cada ~6s e fica mais frequente sob pressão. */
+  /** Sparse process sampling, normally about every six seconds and faster under pressure. */
   apps?: SessionResourceApp[];
   obs?: ObsStats;
-  /** Mensagens de chat nesta janela (~2s) — vira taxa de chat / picos. */
+  /** Chat messages during this sample window, approximately two seconds. */
   chat?: number;
-  /** As mesmas mensagens por canal (`plataforma:fonte`). Ausente em sessão antiga
-   *  (gravada antes da segregação) e em janela sem mensagem nenhuma. */
+  /** Counts keyed by platform:source; absent in legacy sessions and windows with no messages. */
   chatBy?: Record<string, number>;
   targets: SessionSampleTarget[];
 }
@@ -483,9 +418,7 @@ export interface SessionViewerSample {
   items: { platform: ChatPlatform; source: string; viewers: number | null }[];
 }
 
-/** Total ABSOLUTO de seguidores de cada canal num instante — o ganho da live é a
- *  diferença entre a primeira e a última amostra. Só existe pra plataforma que
- *  expõe o contador (hoje Twitch e Kick). */
+/** Absolute follower totals; gains require differences between samples. */
 export interface SessionFollowerSample {
   t: number;
   items: { platform: ChatPlatform; source: string; total: number }[];
@@ -494,19 +427,17 @@ export interface SessionFollowerSample {
 export interface SessionAlertEvent {
   t: number;
   platform: ChatPlatform;
-  /** Rótulo do canal de origem (mesmo namespace de `viewers`/`chatBy`).
-   *  Ausente em sessão antiga; em alerta de agregador, o `platform` é o agregador. */
+  /** Source label in the viewers/chatBy namespace; absent in legacy records. Aggregator alerts use their aggregator as platform. */
   source?: string;
   kind: AlertKind;
   user: string;
   amount?: number;
 }
 
-/** Resultado da validação da pasta de gravação. Só `error` impede gravar — o resto avisa
- *  e deixa seguir, porque a máquina é do streamer. */
+/** Only error prevents recording; other fields are advisory. */
 export interface RecordDirCheck {
   ok: boolean;
-  /** "missing" | "notDir" | "readonly" — chave de protocolo, o front traduz. */
+  /** Stable protocol reason translated by the frontend. */
   error?: string;
   freeBytes?: number;
   lowSpace: boolean;
@@ -514,8 +445,7 @@ export interface RecordDirCheck {
   longPath: boolean;
 }
 
-/** Uma mensagem do chat gravado. Campos curtos porque são dezenas de milhares de linhas:
- *  `t` epoch · `p` plataforma · `s` fonte · `a` autor · `c` cor · `m` texto · `i` id nativo. */
+/** Compact persisted chat fields: t epoch, p platform, s source, a author, c color, m text, i native ID. */
 export interface ReplayChatMessage {
   t: number;
   p: ChatPlatform;
@@ -524,11 +454,10 @@ export interface ReplayChatMessage {
   c?: string;
   m: string;
   i?: string;
-  /** Removida pela moderação depois de dita — o replay esconde por padrão. */
+  /** Moderated after delivery; replay hides the message by default. */
   deleted?: boolean;
 }
 
-/** Buraco no chat gravado (caiu e voltou). O replay mostra em vez de fingir continuidade. */
 export interface ReplayChatGap {
   t: number;
   from: number;
@@ -541,11 +470,9 @@ export interface SessionData {
   viewerSamples: SessionViewerSample[];
   followerSamples: SessionFollowerSample[];
   alertEvents: SessionAlertEvent[];
-  /** Segmentos de vídeo gravados (uma sessão tem N: o gravador pode morrer e retomar). */
   recordings: SessionRecording[];
-  /** Saltos do relógio do sistema durante a live (NTP, horário de verão). */
   clockJumps: { t: number; delta: number }[];
-  /** Ajuste manual de sincronia do streamer, em ms. */
+  /** Manual replay synchronization offset in milliseconds. */
   offsetMs: number;
 }
 
@@ -557,22 +484,16 @@ export interface SessionRecording {
   estimated: boolean;
   syncs: { t: number; out: number }[];
   endT: number;
-  /** Motivo do fim: "stopped" | "disk" | "died" | "giveup" | "truncated". */
   reason?: string;
-  /** O remux de finalização rodou — o arquivo já navega bem. */
   finalized: boolean;
 }
 
-/** Resumo de uma sessão pra lista/comparação (computado no front a partir de analyze(), cacheado). */
 export interface SessionSummary {
-  /** false = sessão sem amostras úteis (não mostrar chips). */
+  /** false means no usable samples; do not render summary metrics. */
   hasData: boolean;
   peakViewers: number | null;
   avgViewers: number | null;
-  /** Total de mensagens de chat na live. */
   chatTotal: number | null;
-  /** Quantidade de trechos com problema detectados pela análise. */
   problemWindows: number;
-  /** Cor do veredito da análise (bolinha na lista). */
   verdictTone: "ok" | "warn" | "bad";
 }

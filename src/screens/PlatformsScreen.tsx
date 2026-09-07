@@ -63,7 +63,6 @@ export function PlatformsScreen() {
   const reorderTargets = useStore((s) => s.reorderTargets);
   const [picking, setPicking] = useState(false);
   const [reframeTarget, setReframeTarget] = useState<Target | null>(null);
-  // Plataforma recém-adicionada: rola até o card novo e foca o campo da chave.
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   if (!config) return null;
@@ -133,9 +132,6 @@ export function PlatformsScreen() {
   );
 }
 
-// Perfis = combos salvos de plataformas (+ modo de qualidade). Cada perfil é uma pílula:
-// vê todos de relance, troca num clique. Renomear é só pelo botão dedicado (clicar na
-// pílula ativa não faz nada — evitava renomeio acidental no mesmo gesto da troca).
 function ProfileBar() {
   const t = useT();
   const config = useStore((s) => s.config)!;
@@ -167,7 +163,7 @@ function ProfileBar() {
             return (
               <input
                 key={p.id}
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- Renomear substitui o botão acionado por este campo, conservando o fluxo de teclado.
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- Renaming replaces the activated button and preserves keyboard flow.
                 autoFocus
                 value={active.name}
                 onChange={(e) => renameProfile(active.id, e.target.value)}
@@ -292,13 +288,12 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-// Resumo "pronto pra live": o que está pronto e o que falta (chave/URL) num relance.
 function ReadinessSummary({ targets }: { targets: Target[] }) {
   const t = useT();
   const enabled = targets.filter((x) => x.enabled);
   const ready = enabled.filter((x) => blockingIssues(x, t).length === 0).length;
-  const semChave = enabled.filter((x) => !x.hasKey).length;
-  const semUrl = enabled.filter((x) => !hasValidUrl(x)).length;
+  const missingKey = enabled.filter((x) => !x.hasKey).length;
+  const missingUrl = enabled.filter((x) => !hasValidUrl(x)).length;
   const off = targets.length - enabled.length;
   const allReady = enabled.length > 0 && ready === enabled.length;
   return (
@@ -316,17 +311,16 @@ function ReadinessSummary({ targets }: { targets: Target[] }) {
           </span>
         </span>
       )}
-      {/* Chave ausente é pendência (warn), não erro — vermelho fica pra URL quebrada. */}
-      {semChave > 0 && (
+      {missingKey > 0 && (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-warn/15 px-2.5 py-1 font-bold text-warn">
           <KeyRound className="size-3.5" />{" "}
-          {t("platforms.readiness.noKey", { n: semChave })}
+          {t("platforms.readiness.noKey", { n: missingKey })}
         </span>
       )}
-      {semUrl > 0 && (
+      {missingUrl > 0 && (
         <span className="inline-flex items-center gap-1.5 rounded-md bg-bad/15 px-2.5 py-1 font-bold text-bad">
           <AlertTriangle className="size-3.5" />{" "}
-          {t("platforms.readiness.noUrl", { n: semUrl })}
+          {t("platforms.readiness.noUrl", { n: missingUrl })}
         </span>
       )}
       {off > 0 && (
@@ -358,16 +352,12 @@ function TargetRow({
   const controls = useDragControls();
   const preset = PLATFORMS[target.platformId];
   const isCustom = target.platformId === "custom";
-  // Mostra o campo de URL quando o preset não traz uma URL completa (custom + betas
-  // TikTok/X/Instagram, que vêm com "rtmp://" e dependem do painel da plataforma).
-  // A Kick também mostra, pré-preenchido: a URL dela varia por conta/região.
+  // Incomplete presets require a user-provided ingest URL; Kick URLs can vary by account or region.
   const presetUrlIncomplete = !INGEST_URL_RE.test(preset.ingestUrl.trim());
   const showUrlField =
     isCustom || presetUrlIncomplete || target.platformId === "kick";
   const urlInvalid = isUrlInvalid(target);
   const urlOk = hasValidUrl(target);
-  // Selo de prontidão (independe de estar ligado): o erro deixa de aparecer só no Ao vivo.
-  // Chave ausente é pendência convidativa (warn) — vermelho só pra URL quebrada/faltando.
   const readiness = !urlOk
     ? {
         tone: "bad" as const,
@@ -383,13 +373,10 @@ function TargetRow({
 
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
-  // Bloqueios reais (chave/URL) — acendem o acento na borda e abrem o cartão por padrão.
-  // Só chave faltando (URL ok) = warn; URL quebrada = vermelho.
   const blocking = blockingIssues(target, t);
   const keyOnlyPending = blocking.length > 0 && urlOk;
   const [open, setOpen] = useState(() => blocking.length > 0);
 
-  // Recém-adicionada: rola até o card (o foco da chave vai via autoFocus no KeyField).
   const itemRef = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (!justAdded) return;
@@ -402,7 +389,6 @@ function TargetRow({
     ok: boolean;
     msg: string;
   } | null>(null);
-  // Resultado do "Testar o servidor" envelhece: zera ao trocar chave/URL/enabled.
   useEffect(() => {
     setTestResult(null);
   }, [target.hasKey, target.ingestUrl, target.enabled]);
@@ -426,9 +412,6 @@ function TargetRow({
       dragControls={controls}
       layout="position"
     >
-      {/* Desligada = fundo rebaixado + glifo esmaecido. Nunca opacidade no cartão
-          inteiro: o nome, o selo e o interruptor continuam operáveis e precisam de
-          contraste pra ser lidos. */}
       <Card
         className={cn(
           "transition-colors",
@@ -477,8 +460,6 @@ function TargetRow({
                   aria-label={t("platforms.target.nameAria")}
                   className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
                 />
-                {/* Protocolo é jargão — só interessa no Personalizado, e aí reflete
-                    o esquema da URL digitada (rtmp/rtmps), não o preset fixo. */}
                 {isCustom && (
                   <Badge color={preset.color}>
                     {target.ingestUrl
@@ -524,8 +505,6 @@ function TargetRow({
           </div>
 
           <Collapsible.Content className="mt-4 flex flex-col gap-4">
-            {/* A nota didática vem ANTES dos campos: é o que precisa ser lido
-                antes de preencher (liberação de conta, onde pegar a chave etc.). */}
             <p className="text-xs text-ink-faint">
               {platformNote(target.platformId, t)}
             </p>
@@ -556,7 +535,6 @@ function TargetRow({
                     updateTarget(target.id, { ingestUrl: e.target.value })
                   }
                   onBlur={(e) => {
-                    // Tira espaços/aspas/quebras que colam junto com a URL.
                     const clean = sanitizeIngestUrl(e.target.value);
                     if (clean !== e.target.value)
                       updateTarget(target.id, { ingestUrl: clean });
@@ -604,8 +582,7 @@ function TargetRow({
                   <Crop className="size-3.5" /> {t("platforms.target.reframe")}
                 </button>
               )}
-              {/* Região viva sempre montada: o leitor de tela só anuncia o veredito
-                  se o role="status" já existia antes do resultado chegar. */}
+              {/* Keep the status region mounted before the asynchronous result so screen readers announce it. */}
               <span
                 role="status"
                 className={cn(
@@ -645,12 +622,7 @@ function TargetRow({
   );
 }
 
-// Ponte plataforma→chat: guardar a chave NÃO configura o chat agregado (são
-// cadastros separados). Depois de salvar, oferece criar a fonte na tela de Chat.
-//
-// O fragmento só existe por causa da preposição + gênero do português ("o chat
-// DA Twitch", "DO YouTube"). Em inglês a frase pede o nome cru ("Want Twitch
-// chat…"), então o mapa some e entra o nome do catálogo.
+// Portuguese platform names require gendered prepositions; English uses the catalog name.
 type StreamChatPlatform = Extract<PlatformId, ChatPlatform>;
 
 const CHAT_BRIDGE_LABEL_PT: Record<StreamChatPlatform, string> = {
@@ -663,20 +635,18 @@ function isChatPlatform(id: PlatformId): id is StreamChatPlatform {
   return id === "twitch" || id === "youtube" || id === "kick";
 }
 
-// Não é componente: recebe `t` e o idioma de quem chama (o app tem duas janelas,
-// então estado global de idioma viraria corrida entre elas).
+// Pass the caller's locale to avoid shared-state races between webviews.
 function offerChatBridge(platformId: PlatformId, t: I18n["t"], locale: Locale) {
   if (!isChatPlatform(platformId)) return;
   const sources = useStore.getState().config?.settings.chatSources ?? [];
   if (sources.some((s) => s.platform === platformId)) return;
-  // Oferece UMA vez por plataforma: quem trocar a chave 3x não leva 3 toasts.
-  // Marcamos no momento da oferta (aceitar/ignorar não re-oferece).
+  // Record the offer immediately, regardless of whether it is accepted or dismissed.
   const offeredKey = `corneta.chatBridgeOffered.${platformId}`;
   try {
     if (localStorage.getItem(offeredKey)) return;
     localStorage.setItem(offeredKey, "1");
   } catch {
-    /* storage indisponível: melhor arriscar oferecer de novo que nunca */
+    /* Unavailable storage may repeat the offer; it must not prevent offering chat setup. */
   }
   const platformLabel =
     locale === "pt-BR"
@@ -688,7 +658,7 @@ function offerChatBridge(platformId: PlatformId, t: I18n["t"], locale: Locale) {
     () => {
       const st = useStore.getState();
       const cur = st.config?.settings.chatSources ?? [];
-      // Pode ter sido criada enquanto o toast estava na tela — não duplica.
+      // The source may have been created while the toast was visible.
       if (!cur.some((s) => s.platform === platformId)) {
         st.setSettings({
           chatSources: [
@@ -726,10 +696,8 @@ function KeyField({
 
   const save = async (raw: string = value) => {
     try {
-      // Idempotente: se digitou/colou a URL inteira, cortamos o servidor e avisamos.
       const { key, strippedUrl } = sanitizeStreamKey(raw, target.ingestUrl);
       if (!key) {
-        // Colou só a URL do servidor (ou nada): não tem chave pra guardar.
         if (strippedUrl) toast.error(t("platforms.key.pastedUrlOnly"));
         return;
       }
@@ -743,15 +711,13 @@ function KeyField({
       toast.error(t("platforms.key.saveFailed", { err: String(e) }));
     }
   };
-  // Colar já salva: um clique a menos no caminho mais quente do onboarding
-  // (quem prefere digitar continua com o campo + Salvar).
   const paste = async () => {
     try {
       const clip = await navigator.clipboard.readText();
       if (!clip.trim()) return;
       await save(clip);
     } catch {
-      /* área de transferência bloqueada */
+      /* Clipboard access may be denied; manual entry remains available. */
     }
   };
 
@@ -809,7 +775,7 @@ function KeyField({
         <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
         <Input
           type={reveal ? "text" : "password"}
-          // eslint-disable-next-line jsx-a11y/no-autofocus -- Somente após editar ou adicionar um destino, nunca na carga inicial.
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- Only focus after editing or adding a destination, never on initial load.
           autoFocus={editing || autoFocusKey}
           aria-label={t("platforms.key.placeholder")}
           className="pl-9 pr-9"
@@ -910,8 +876,6 @@ function PlatformPicker({
                   <ExperimentalBadge className="shrink-0 scale-90" />
                 )}
               </div>
-              {/* Descrição humana no lugar do protocolo: o pré-requisito
-                  (conta liberada, vídeo em pé) aparece antes do clique. */}
               <div className="mt-0.5 text-[11px] font-medium text-ink-faint">
                 {platformTagline(p.id, t)}
               </div>

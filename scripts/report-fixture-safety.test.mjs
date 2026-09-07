@@ -35,7 +35,7 @@ describe("fixture data ownership", () => {
     const { root, file, manifest } = fixture();
     expect(validateFixtureManifest(manifest, root)).toEqual([file]);
     writeFileSync(file, "user edited this report");
-    expect(() => validateFixtureManifest(manifest, root)).toThrow(/modificado/);
+    expect(() => validateFixtureManifest(manifest, root)).toThrow(/modified/);
   });
   it("refuses old, duplicate and escaping manifests before any removal", () => {
     const { root, file, manifest } = fixture();

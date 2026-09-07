@@ -196,9 +196,7 @@ export function TelemetrySettingsPanel() {
       crashReports: telemetry.status.crashReports,
     };
     choices[which] = enabled ? "enabled" : "disabled";
-    // Mexer num interruptor não pode desligar o OUTRO. Antes o `unset` virava
-    // `disabled` porque `unset` significava "não autorizado"; agora ele significa
-    // "ativo e não contestado", então a materialização certa é `enabled`.
+    // Materialize unset as enabled so changing one purpose does not disable the other.
     if (choices[other] === "unset") choices[other] = "enabled";
     try {
       await setTelemetryConsent(choices);

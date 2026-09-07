@@ -1,16 +1,5 @@
-//! Overlays pro OBS (Browser Source). UM servidor HTTP local serve DUAS páginas:
-//!   - `/alerts` (+ `/alerts-ws`) → alertas animados (sub, doação, raid…)
-//!   - `/chat`   (+ `/chat-ws`)   → o chat unificado, com emotes (BTTV/FFZ/7TV + nativos)
-//!
-//! Mesma família do `studio.rs` da Mesa, com duas diferenças de propósito:
-//!   1. **Porta FIXA** (não efêmera): a URL é colada no OBS UMA vez e precisa valer entre
-//!      reinícios do app — porta efêmera quebraria a Browser Source a cada boot.
-//!   2. **Só loopback (127.0.0.1)**: alertas/chat carregam NOME e VALOR de quem doou e o que
-//!      a galera escreve — isso não pode vazar pra LAN (a Mesa expõe de propósito; aqui é o oposto).
-//!
-//! As fontes são os funis únicos `chat::emit_alert` → `push` e `chat::emit_chat` → `push_chat`,
-//! cada um difundido por um broadcast SEPARADO (o chat é volumoso; o overlay de alertas não deve
-//! receber essa enxurrada). Sem servidor de pé (ou sem página aberta), os push são no-op.
+//! OBS overlays use a stable port and loopback-only binding to keep chat and donation data off the LAN.
+//! Separate bounded broadcasts keep chat traffic from crowding out alerts.
 
 use std::net::Ipv4Addr;
 use std::sync::Mutex;
@@ -27,7 +16,6 @@ use tokio::sync::{broadcast, oneshot, watch};
 
 use crate::chat::{Alert, ChatMessage};
 
-/// Páginas self-contained (CSS/JS inline). CARGO_MANIFEST_DIR = src-tauri/.
 const OVERLAY_HTML: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/overlay.html"));
 const CHAT_OVERLAY_HTML: &str = include_str!(concat!(
@@ -35,17 +23,14 @@ const CHAT_OVERLAY_HTML: &str = include_str!(concat!(
     "/assets/chat-overlay.html"
 ));
 
-/// Buffer do broadcast de ALERTAS: raros; 64 cobre uma rajada (raid + gifts) sem crescer memória.
 const ALERT_BUF: usize = 64;
-/// Buffer do broadcast de CHAT: volumoso; 256 dá folga pra uma página lenta sem estourar memória.
 const CHAT_BUF: usize = 256;
 
 #[derive(Default)]
 pub struct OverlayServer {
     handle: Option<JoinHandle<()>>,
-    shutdown: Option<oneshot::Sender<()>>, // para o accept loop
-    disconnect: Option<watch::Sender<bool>>, // fecha as páginas conectadas agora
-    /// Fan-out dos alertas / do chat pras páginas. `None` = servidor parado (push vira no-op).
+    shutdown: Option<oneshot::Sender<()>>, // Stop accepting new connections.
+    disconnect: Option<watch::Sender<bool>>, // Close existing connections.
     alerts: Option<broadcast::Sender<String>>,
     chat: Option<broadcast::Sender<String>>,
     pub port: u16,
@@ -55,9 +40,7 @@ pub struct OverlayServer {
 #[serde(rename_all = "camelCase")]
 pub struct OverlayInfo {
     pub port: u16,
-    /// URL base do overlay de ALERTAS (sem query) pra colar no OBS como Browser Source.
     pub url: String,
-    /// URL base do overlay de CHAT (sem query).
     pub chat_url: String,
 }
 
@@ -65,7 +48,6 @@ pub struct OverlayInfo {
 struct Ctx {
     alerts: broadcast::Sender<String>,
     chat: broadcast::Sender<String>,
-    /// Vira `true` no stop() → fecha as conexões vivas (não só o accept loop).
     shutdown: watch::Receiver<bool>,
 }
 
@@ -83,7 +65,6 @@ async fn ws_chat(ws: WebSocketUpgrade, State(ctx): State<Ctx>) -> impl IntoRespo
     ws.on_upgrade(move |socket| handle_conn(socket, ctx.chat.subscribe(), ctx.shutdown.clone()))
 }
 
-/// Encaminha o que chega no broadcast pra a página, até ela sair ou o servidor parar.
 async fn handle_conn(
     mut socket: WebSocket,
     mut rx: broadcast::Receiver<String>,
@@ -102,15 +83,13 @@ async fn handle_conn(
                             break;
                         }
                     }
-                    // Página lenta pulou eventos antigos: segue (não derruba a conexão).
+                    // A slow page may miss old events without losing its connection.
                     Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                    // Servidor parou (todos os senders sumiram): encerra.
                     Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
             inbound = socket.recv() => {
                 match inbound {
-                    // A página não fala — só ouve. Só reagimos ao fim da conexão.
                     Some(Ok(Message::Close(_))) | None | Some(Err(_)) => break,
                     _ => {}
                 }
@@ -119,8 +98,6 @@ async fn handle_conn(
     }
 }
 
-/// Empurra um ALERTA pras páginas de overlay conectadas. No-op se o servidor está parado
-/// (ou sem nenhuma página aberta) — nunca bloqueia o funil de alertas do chat.
 pub fn push(server: &Mutex<OverlayServer>, alert: &Alert) {
     push_json(
         server,
@@ -129,12 +106,11 @@ pub fn push(server: &Mutex<OverlayServer>, alert: &Alert) {
     );
 }
 
-/// Empurra uma MENSAGEM de chat pras páginas do overlay de chat conectadas. No-op sem servidor.
 pub fn push_chat(server: &Mutex<OverlayServer>, msg: &ChatMessage) {
     push_json(server, |s| s.chat.clone(), || serde_json::to_string(msg));
 }
 
-/// Núcleo dos dois push: pega o sender (curto lock), serializa fora do lock, difunde.
+/// Serialize outside the server lock so active producers do not block each other.
 fn push_json(
     server: &Mutex<OverlayServer>,
     pick: impl FnOnce(&OverlayServer) -> Option<broadcast::Sender<String>>,
@@ -142,9 +118,9 @@ fn push_json(
 ) {
     let tx = match pick(&server.lock().unwrap()) {
         Some(tx) => tx,
-        None => return, // servidor desligado / canal inexistente
+        None => return,
     };
-    // Nenhuma página desse tipo conectada → nem serializa (chat é volumoso; poupa CPU à toa).
+    // Avoid serializing high-volume chat when no page is listening.
     if tx.receiver_count() == 0 {
         return;
     }
@@ -167,8 +143,54 @@ fn info_for(port: u16) -> OverlayInfo {
     }
 }
 
-/// Sobe o servidor na porta FIXA `port`, ou devolve a info se já estiver rodando (idempotente).
-pub async fn start(server: &Mutex<OverlayServer>, port: u16) -> Result<OverlayInfo, String> {
+#[derive(Debug)]
+enum StartStage {
+    Bind,
+    LocalAddress,
+}
+
+pub struct StartError {
+    stage: StartStage,
+    port: u16,
+    source: std::io::Error,
+}
+
+impl std::fmt::Debug for StartError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl std::fmt::Display for StartError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let code = match self.stage {
+            StartStage::Bind => "bind_failed",
+            StartStage::LocalAddress => "local_address_failed",
+        };
+        write!(
+            f,
+            "{code}: port={} kind={:?} os_code={:?}",
+            self.port,
+            self.source.kind(),
+            self.source.raw_os_error()
+        )
+    }
+}
+
+impl StartError {
+    pub fn message(&self, locale: crate::i18n::Locale) -> String {
+        match self.stage {
+            StartStage::Bind => crate::i18n::Msg::OverlayPortOpenFailed {
+                port: self.port,
+                e: &self.source.to_string(),
+            }
+            .text(locale),
+            StartStage::LocalAddress => self.source.to_string(),
+        }
+    }
+}
+
+pub async fn start(server: &Mutex<OverlayServer>, port: u16) -> Result<OverlayInfo, StartError> {
     {
         let s = server.lock().unwrap();
         if s.handle.is_some() && s.port != 0 {
@@ -176,17 +198,21 @@ pub async fn start(server: &Mutex<OverlayServer>, port: u16) -> Result<OverlayIn
         }
     }
 
-    // Só loopback + porta fixa: URL estável pro OBS e sem exposição na LAN. bind antes do lock
-    // final fecha a corrida (TOCTOU) entre dois starts.
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port))
         .await
-        .map_err(|e| {
-            format!(
-                "não consegui abrir o overlay na porta {port} — parece ocupada por outro programa \
-             ({e}). Feche o que estiver usando essa porta e ligue o overlay de novo."
-            )
+        .map_err(|source| StartError {
+            stage: StartStage::Bind,
+            port,
+            source,
         })?;
-    let bound = listener.local_addr().map_err(|e| e.to_string())?.port();
+    let bound = listener
+        .local_addr()
+        .map_err(|source| StartError {
+            stage: StartStage::LocalAddress,
+            port,
+            source,
+        })?
+        .port();
 
     let (sh_tx, sh_rx) = oneshot::channel::<()>();
     let (kick_tx, kick_rx) = watch::channel(false);
@@ -224,24 +250,73 @@ pub async fn start(server: &Mutex<OverlayServer>, port: u16) -> Result<OverlayIn
 
 pub fn stop(server: &Mutex<OverlayServer>) {
     let mut s = server.lock().unwrap();
-    s.alerts = None; // corta os fan-outs
+    s.alerts = None;
     s.chat = None;
     if let Some(k) = s.disconnect.take() {
-        let _ = k.send(true); // fecha as páginas conectadas agora
+        let _ = k.send(true); // Close existing connections.
     }
     if let Some(tx) = s.shutdown.take() {
-        let _ = tx.send(()); // para de aceitar novas conexões
+        let _ = tx.send(());
     }
-    s.handle = None; // dropar o handle DESACOPLA (não aborta) — a task drena e libera a porta
+    s.handle = None; // Dropping the handle detaches; graceful shutdown drains the task and releases the port.
     s.port = 0;
 }
 
-/// Info atual (pra UI mostrar as URLs sem reiniciar o servidor). `None` = parado.
 pub fn info(server: &Mutex<OverlayServer>) -> Option<OverlayInfo> {
     let s = server.lock().unwrap();
     if s.handle.is_some() && s.port != 0 {
         Some(info_for(s.port))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n::Locale;
+
+    #[test]
+    fn startup_diagnostics_never_format_localized_or_private_error_text() {
+        for stage in [StartStage::Bind, StartStage::LocalAddress] {
+            let error = StartError {
+                stage,
+                port: 1234,
+                source: std::io::Error::new(
+                    std::io::ErrorKind::AddrInUse,
+                    "falha privada https://example.invalid/private-fixture",
+                ),
+            };
+            let diagnostic = error.to_string();
+            assert_eq!(format!("{error:?}"), diagnostic);
+            assert!(diagnostic.contains("port=1234 kind=AddrInUse os_code=None"));
+            assert!(!diagnostic.contains("privada"));
+            assert!(!diagnostic.contains("private-fixture"));
+            for locale in [Locale::PtBr, Locale::En] {
+                let message = error.message(locale);
+                assert!(message.contains("private-fixture"));
+                assert_ne!(message, diagnostic);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn occupied_port_preserves_the_localized_ipc_error() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = Mutex::new(OverlayServer::default());
+        let error = start(&server, port)
+            .await
+            .err()
+            .expect("an occupied port must fail");
+        assert!(matches!(error.stage, StartStage::Bind));
+        assert!(error.to_string().starts_with("bind_failed:"));
+        assert!(error
+            .message(Locale::PtBr)
+            .starts_with("não consegui abrir o overlay"));
+        assert!(error
+            .message(Locale::En)
+            .starts_with("couldn't open the overlay"));
+        assert!(info(&server).is_none());
     }
 }

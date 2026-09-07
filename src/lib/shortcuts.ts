@@ -73,7 +73,7 @@ const namedCodes = new Set([
   "MediaTrackPrevious",
 ]);
 
-/** Match the global-hotkey backend's physical Code names, not layout-dependent characters. */
+/** Match backend physical Code names, not layout-dependent characters. */
 export function captureShortcut(
   event: Pick<
     KeyboardEvent,

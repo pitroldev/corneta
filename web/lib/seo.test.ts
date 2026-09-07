@@ -3,7 +3,7 @@ import type { PublishedEditorialDocument } from "./editorial/types";
 import { editorialArticleJsonLd } from "./seo";
 
 describe("editorial structured data", () => {
-  it("atribui a revisão factual à WebPage, conforme o domínio de reviewedBy", () => {
+  it("assigns factual review to WebPage according to the reviewedBy domain", () => {
     const document = {
       href: "/guides/quality/choose-bitrate",
       frontmatter: {

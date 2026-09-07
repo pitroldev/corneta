@@ -20,10 +20,6 @@ import { Button, CopyField, Input } from "./ui";
 
 type Status = "idle" | "connecting" | "ok" | "error";
 
-/** Traduz o erro cru do obs-websocket pra um recado na voz da casa + checklist.
- *
- *  Não é componente: recebe o `t` de quem chama. As palavras comparadas aqui
- *  ("senha", "fechou"…) são o texto CRU do backend, não copy — não traduzir. */
 function obsErrorHelp(
   t: I18n["t"],
   raw: string,
@@ -98,7 +94,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
       active.current = false;
     };
   }, []);
-  // Foco inicial no título: o primeiro focável do DOM é o X de fechar.
+  // Focus the heading rather than the close button, which is first in DOM order.
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   const help = error ? obsErrorHelp(t, error) : null;
@@ -119,7 +115,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
       else if (e instanceof ObsConfigChangedError) setConfigError("changed");
       else setError(String(e));
       setStatus("error");
-      setManualOpen(true); // erro → já oferece o plano B na mão
+      setManualOpen(true);
     } finally {
       connecting.current = false;
     }
@@ -178,16 +174,12 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           />
         </Step>
 
-        {/* O autoconfigure só grava servidor+chave no OBS — quem dá o play é o
-              BORA (se autoStartObs) ou o próprio streamer. A copy segue a realidade. */}
         <Step n={3} title={t("encoding.wizard.step3.title")}>
           {settings.autoStartObs
             ? bold(t, "encoding.wizard.step3.body.autostart")
             : bold(t, "encoding.wizard.step3.body.manual")}
         </Step>
 
-        {/* Os dois blocos montam depois do clique: role=status/alert faz o leitor de
-            tela anunciar o resultado sem a pessoa precisar sair do botão. */}
         {status === "ok" && (
           <div
             role="status"
@@ -238,7 +230,6 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {/* Plano B sempre presente: configurar na mão (auto-aberto no erro). */}
         <div className="rounded-md border-2 border-border-soft bg-surface-2">
           <button
             onClick={() => setManualOpen((o) => !o)}
@@ -269,7 +260,6 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
                 mono
               />
               <p className="text-xs text-ink-faint">
-                {/* Na mão, o WebSocket pode não estar de pé — promessa mais modesta. */}
                 {settings.autoStartObs
                   ? bold(t, "encoding.wizard.manual.note.autostart")
                   : bold(t, "encoding.wizard.manual.note.manual")}

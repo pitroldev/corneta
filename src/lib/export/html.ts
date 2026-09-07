@@ -1,14 +1,5 @@
-// ============================================================
-// Relatório em HTML autocontido: um arquivo que abre em qualquer navegador, sem
-// internet e sem a Corneta instalada — e que vira PDF pelo "Imprimir → Salvar".
-//
-// DUAS RESTRIÇÕES que moldam tudo aqui:
-//  • zero recurso externo (fonte, CDN, imagem): o arquivo vai por WhatsApp/e-mail e
-//    precisa abrir igual na máquina de quem recebeu, offline. Os gráficos já são SVG,
-//    então saem inline; a tipografia é a pilha do sistema.
-//  • fundo CLARO, ao contrário do app: o navegador descarta cor de fundo ao imprimir
-//    por padrão, e um relatório escuro sairia com texto claro sobre papel branco.
-// ============================================================
+// Keep exports self-contained for offline use.
+// Use a light background: browsers may omit background colors when printing.
 import { PLATFORMS } from "../platforms";
 import { buildPath, peakOf, xAt, type PathGeometry } from "../chartPath";
 import {
@@ -25,8 +16,6 @@ import {
 import type { SessionData } from "../types";
 import type { I18n, MessageKey } from "../i18n";
 
-/** Este módulo não é componente: não pode chamar hook. O idioma entra por
- *  parâmetro — quem chama é a tela, que já tem o contexto. */
 export type ReportI18n = Pick<I18n, "locale" | "t" | "fmt">;
 
 const esc = (s: string): string =>
@@ -45,30 +34,23 @@ const esc = (s: string): string =>
 const platColor = (id: string) =>
   PLATFORMS[id as keyof typeof PLATFORMS]?.color ?? "#c98a00";
 
-// A CHAVE é enum do meta da sessão; só o rótulo é texto de tela.
 const MODE_KEY: Record<string, MessageKey> = {
   "per-platform": "reports.mode.perPlatform",
   passthrough: "reports.mode.passthrough",
   hybrid: "reports.mode.hybrid",
 };
 
-// ---------------------------------------------------------------------------
-// Gráfico
-// ---------------------------------------------------------------------------
-
-interface Serie {
+interface Series {
   label: string;
   color: string;
   values: (number | null)[];
 }
 
-/** SVG de linhas com eixo Y de 3 marcas, legenda e (opcional) linha de referência. */
 function chart(
-  series: Serie[],
+  series: Series[],
   n: number,
   opts: {
-    /** Rótulo do eixo X pra amostra `i`. Cada gráfico tem sua própria escala de
-     *  tempo (máquina a ~2s, audiência a ~30s), então vem de fora. */
+    /** Each chart receives labels for its own sampling cadence. */
     xLabel: (i: number) => string;
     yMax?: number;
     fmt?: (v: number) => string;
@@ -112,7 +94,6 @@ function chart(
     )
     .join("");
 
-  // 4 marcas no eixo do tempo (início · 1/3 · 2/3 · fim), ancoradas pra não vazar.
   const ticks = [
     ...new Set([0, 1 / 3, 2 / 3, 1].map((f) => Math.round(f * (n - 1)))),
   ];
@@ -135,8 +116,6 @@ function chart(
 
   return `<svg viewBox="0 0 ${W} ${H}" class="ch" role="img">${grid}${ref}${paths}${xLabels}</svg><div class="lgs">${legend}</div>`;
 }
-
-// ---------------------------------------------------------------------------
 
 const CSS = `
 :root{--brass:#c98a00;--ink:#191207;--muted:#6b5c45;--line:#e4dccd;--paper:#fffdf8;--card:#fff;--bad:#c0392b;--warn:#b7791f;--ok:#1e7a4d}
@@ -182,16 +161,12 @@ ul.tl .lbl{color:var(--muted)}
 footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
 .note{font-size:12px;color:var(--muted);margin:9px 0 0}
 @media print{
-  /* Uma live longa tem dezenas de eventos: cortar um card no meio da página é o
-     defeito clássico de exportar HTML pra PDF. */
   .wrap{padding:0}
   section,.win,.card,.stat{break-inside:avoid}
   @page{margin:14mm}
 }
 @media (max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
 `;
-
-// ---------------------------------------------------------------------------
 
 export function reportHtml(
   d: SessionData,
@@ -201,7 +176,6 @@ export function reportHtml(
   const { t, fmt, locale } = i18n;
   const num = fmt.num;
   const start = d.meta.startedAt;
-  // `ms`, não `t`: `t` agora é a tradução.
   const rel = (ms: number) => {
     const s = Math.max(0, Math.round((ms - start) / 1000));
     const h = Math.floor(s / 3600);
@@ -211,9 +185,9 @@ export function reportHtml(
   };
   const n = d.samples.length;
   const vN = d.viewerSamples.length;
-  const eixoAmostras = (i: number) =>
+  const sampleAxisLabel = (i: number) =>
     rel(d.samples[Math.min(i, n - 1)]?.t ?? start);
-  const eixoAudiencia = (i: number) =>
+  const audienceAxisLabel = (i: number) =>
     rel(d.viewerSamples[Math.min(i, vN - 1)]?.t ?? start);
 
   const modeKey = MODE_KEY[d.meta.mode];
@@ -229,7 +203,6 @@ export function reportHtml(
     .filter(Boolean)
     .join(" · ");
 
-  // --- Números ---
   const stats: [string, string][] = [];
   if (a.viewers.hasData) {
     stats.push([t("reports.stat.peakViewers"), num(a.viewers.peak)]);
@@ -268,30 +241,29 @@ export function reportHtml(
         .join("")}</section>`
     : "";
 
-  // --- Público por canal ---
-  const canais = a.byChannel.channels;
-  const canaisHtml =
-    canais.length > 1
+  const channels = a.byChannel.channels;
+  const channelsHtml =
+    channels.length > 1
       ? `<section><h2>${esc(t("reports.channels.title"))}</h2><div class="card"><table>
 <thead><tr><th>${esc(t("reports.html.table.channel"))}</th><th class="n">${esc(t("reports.viewers.peak"))}</th><th class="n">${esc(t("reports.stat.avg"))}</th><th class="n">${esc(t("reports.html.table.chat"))}</th><th class="n">${esc(t("reports.html.table.followers"))}</th><th>${esc(t("reports.html.table.share"))}</th></tr></thead>
-<tbody>${canais
+<tbody>${channels
           .map((c) => {
-            const cor = platColor(c.platform);
-            const fatia =
+            const color = platColor(c.platform);
+            const shareBar =
               c.sharePct == null
                 ? "—"
-                : `<div class="bar"><i style="width:${Math.max(c.sharePct, 2)}%;background:${esc(cor)}"></i></div>`;
+                : `<div class="bar"><i style="width:${Math.max(c.sharePct, 2)}%;background:${esc(color)}"></i></div>`;
             const f =
               c.followers.hasData && c.followers.gained !== 0
                 ? `${c.followers.gained > 0 ? "+" : ""}${num(c.followers.gained)}`
                 : "—";
             return `<tr>
-<td><span class="dot" style="background:${esc(cor)}"></span>${esc(c.source)}</td>
+<td><span class="dot" style="background:${esc(color)}"></span>${esc(c.source)}</td>
 <td class="n">${c.viewers.hasData ? num(c.viewers.peak) : "—"}</td>
 <td class="n">${c.viewers.hasData ? num(c.viewers.avg) : "—"}</td>
 <td class="n">${c.chat.hasData && c.chat.total ? num(c.chat.total) : "—"}</td>
 <td class="n">${f}</td>
-<td>${fatia}</td></tr>`;
+<td>${shareBar}</td></tr>`;
           })
           .join("")}</tbody></table>${
           a.byChannel.followersNet
@@ -300,14 +272,13 @@ export function reportHtml(
         }</div></section>`
       : "";
 
-  // --- Gráficos ---
-  const partes: string[] = [];
+  const sections: string[] = [];
 
   if (a.viewers.hasData && vN > 1) {
-    const comAud = canais.filter((c) => c.viewers.hasData);
-    const series: Serie[] =
-      comAud.length > 1
-        ? comAud.map((c) => ({
+    const audienceChannels = channels.filter((c) => c.viewers.hasData);
+    const series: Series[] =
+      audienceChannels.length > 1
+        ? audienceChannels.map((c) => ({
             label: c.source,
             color: platColor(c.platform),
             values: viewerSeriesFor(d, c.key),
@@ -319,19 +290,19 @@ export function reportHtml(
               values: viewerSeries(d),
             },
           ];
-    partes.push(
+    sections.push(
       `<section><h2>${esc(t("reports.html.viewers.title"))}</h2><div class="card">${chart(
         series,
         vN,
         {
-          xLabel: eixoAudiencia,
+          xLabel: audienceAxisLabel,
         },
       )}</div></section>`,
     );
   }
 
   if (hasChat(d) && n > 1)
-    partes.push(
+    sections.push(
       `<section><h2>${esc(t("reports.chat.title"))}</h2><div class="card">${chart(
         [
           {
@@ -341,12 +312,12 @@ export function reportHtml(
           },
         ],
         n,
-        { xLabel: eixoAmostras },
+        { xLabel: sampleAxisLabel },
       )}</div></section>`,
     );
 
   if (n > 1 && d.meta.platforms.length)
-    partes.push(
+    sections.push(
       `<section><h2>${esc(t("reports.bitrate.title"))}</h2><div class="card">${chart(
         d.meta.platforms.map((p) => ({
           label: p.name,
@@ -356,7 +327,7 @@ export function reportHtml(
           ),
         })),
         n,
-        { xLabel: eixoAmostras, fmt: (v) => fmt.dec(v, 1) },
+        { xLabel: sampleAxisLabel, fmt: (v) => fmt.dec(v, 1) },
       )}</div></section>`,
     );
 
@@ -367,7 +338,7 @@ export function reportHtml(
     n > 1 &&
     [cpu, gpu, memory].some((series) => series.some((value) => value != null))
   )
-    partes.push(
+    sections.push(
       `<section><h2>${esc(t("reports.machine.title"))}</h2><div class="card">${chart(
         [
           { label: "CPU", color: "#c0392b", values: cpu },
@@ -385,12 +356,11 @@ export function reportHtml(
             : []),
         ],
         n,
-        { xLabel: eixoAmostras, yMax: 100, refLine: 92 },
+        { xLabel: sampleAxisLabel, yMax: 100, refLine: 92 },
       )}</div></section>`,
     );
 
-  // --- Momentos, trechos, eventos ---
-  const momentos = a.highlights.length
+  const highlightsHtml = a.highlights.length
     ? `<section><h2>${esc(t("reports.html.highlights.title"))}</h2><div class="card"><ul class="tl">${a.highlights
         .map(
           (h) =>
@@ -401,7 +371,7 @@ export function reportHtml(
         )}</ul><p class="note">${esc(t("reports.html.highlights.note"))}</p></div></section>`
     : "";
 
-  const trechos = a.windows.length
+  const problemWindowsHtml = a.windows.length
     ? `<section><h2>${esc(t("reports.windows.title"))}</h2>${a.windows
         .map(
           (w) => `<div class="win"><span class="t">${esc(rel(w.tStart))}</span>
@@ -414,7 +384,7 @@ ${w.signals.length ? `<div class="sig">${esc(w.signals.join(" · "))}</div>` : "
         .join("")}</section>`
     : "";
 
-  const eventos = `<section><h2>${esc(t("reports.events.title"))}</h2><div class="card"><ul class="tl">${a.events
+  const eventsHtml = `<section><h2>${esc(t("reports.events.title"))}</h2><div class="card"><ul class="tl">${a.events
     .map(
       (e) =>
         `<li><span class="t">${esc(rel(e.t))}</span><span class="lbl">${esc(e.label)}</span></li>`,
@@ -443,11 +413,11 @@ ${w.signals.length ? `<div class="sig">${esc(w.signals.join(" · "))}</div>` : "
 </section>
 
 ${statsHtml}
-${canaisHtml}
-${partes.join("\n")}
-${momentos}
-${trechos}
-${eventos}
+${channelsHtml}
+${sections.join("\n")}
+${highlightsHtml}
+${problemWindowsHtml}
+${eventsHtml}
 
 <footer>${esc(t("reports.html.footer", { date: fmt.date(Date.now()) }))}</footer>
 </div>

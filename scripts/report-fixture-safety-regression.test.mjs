@@ -102,13 +102,13 @@ describe("fixture path and copy regression guards", () => {
       writeFileSync(existing, "user-owned");
       expect(() =>
         preflightFixtureOutputs(manifest, root, ["1000.ndjson", name]),
-      ).toThrow(/colidiu/);
+      ).toThrow(/collides/);
       expect(readFileSync(existing, "utf8")).toBe("user-owned");
       expect(readFileSync(file, "utf8")).toContain("meta");
     }
     expect(() =>
       preflightFixtureOutputs(null, root, ["../1000.ndjson"]),
-    ).toThrow(/inválido/);
+    ).toThrow(/Invalid/);
   });
 
   it("accepts an interrupted publication with registered but still missing files", () => {
@@ -133,7 +133,7 @@ describe("fixture path and copy regression guards", () => {
         { ...manifest, generatedFiles: [file, pending] },
         root,
       ),
-    ).toThrow(/modificado/);
+    ).toThrow(/modified/);
   });
 });
 
@@ -230,7 +230,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
     writeFileSync(collision, "user-owned chat");
     const result = run("--scenario", "viral-raid");
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("colidiu");
+    expect(result.stderr).toContain("collides");
     expect(readFileSync(manifestPath, "utf8")).toBe(before);
     expect(existsSync(join(root, "sessions", `${id}.ndjson`))).toBe(false);
     expect(readFileSync(collision, "utf8")).toBe("user-owned chat");

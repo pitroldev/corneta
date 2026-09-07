@@ -102,16 +102,13 @@ export function createChatSlice({
       };
     },
     bindChatRunning() {
-      // "Conectado" é estado global do backend: start/stop de qualquer janela reflete na outra
-      // (sem isto, desconectar pelo popout deixava a principal presa em "conectado", e o popout
-      // nascia mostrando "Conectar" com o chat já no ar). Não mexe nas mensagens.
+      // Connection state is backend-global across webviews; updating it must not clear messages.
       return api.subscribeChatRunning((running) =>
         set({ chatConnected: running }),
       );
     },
     async connectChat(t) {
-      // NÃO zera chatMessages: reconectar (ex.: pra ressuscitar uma fonte que caiu)
-      // não pode apagar o histórico das outras. Limpar é só no botão "Limpar" (clearChat).
+      // Reconnection preserves history; only explicit clearChat removes it.
       set({ chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
       await api.chatStart(t);
       await api.alertsStart();

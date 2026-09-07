@@ -58,11 +58,11 @@ function scheduleFailureReport(
       try {
         await reportApiFailure(failure);
       } catch {
-        // A resposta já foi produzida; falha do provedor é sempre descartável.
+        // Reporting failures must not change the response already produced.
       }
     });
   } catch {
-    // Fora de um request do Next (por exemplo, num teste), telemetria é no-op.
+    // Outside a Next request, reporting remains a no-op.
   }
 }
 

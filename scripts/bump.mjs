@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// pnpm bump <patch|minor|major> [X.Y.Z] [--commit]
 // Predictable conflicts are rejected before writes. Git/hook failures preserve
 // the version changes for inspection; never reset user data to simulate rollback.
 import {
@@ -20,10 +19,10 @@ import { spawnSync } from "node:child_process";
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 function versionParts(version) {
   if (!versionPattern.test(version))
-    throw new Error("Versão inválida: esperado X.Y.Z sem zeros à esquerda.");
+    throw new Error("Invalid version: expected X.Y.Z without leading zeros.");
   const values = version.split(".").map(Number);
   if (values.some((value) => !Number.isSafeInteger(value)))
-    throw new Error("Versão excede o limite inteiro seguro.");
+    throw new Error("Version exceeds the safe integer limit.");
   return values;
 }
 
@@ -35,7 +34,7 @@ export function bumpOptions(args, current) {
     !["patch", "minor", "major"].includes(positional[0]) ||
     positional.length > 2
   )
-    throw new Error("Uso: pnpm bump <patch|minor|major> [X.Y.Z] [--commit]");
+    throw new Error("Usage: pnpm bump <patch|minor|major> [X.Y.Z] [--commit]");
   const previous = versionParts(current);
   const parts = [...previous];
   const index = { major: 0, minor: 1, patch: 2 }[positional[0]];
@@ -45,7 +44,9 @@ export function bumpOptions(args, current) {
   const next = versionParts(version);
   const difference = next.findIndex((part, at) => part !== previous[at]);
   if (difference < 0 || next[difference] < previous[difference])
-    throw new Error("A nova versão precisa ser maior que a atual.");
+    throw new Error(
+      "The new version must be greater than the current version.",
+    );
   return { version, commit: args.includes("--commit") };
 }
 
@@ -72,7 +73,7 @@ export function bumpVersion(
     });
     if (result.error || !allowed.includes(result.status))
       throw new Error(
-        `Git falhou em ${arguments_[0]}; confira o estado do repositório.`,
+        `Git failed at ${arguments_[0]}; inspect the repository state.`,
       );
     return result;
   };
@@ -80,7 +81,7 @@ export function bumpVersion(
     resolve(git(["rev-parse", "--show-toplevel"]).stdout.trim()) !==
     resolve(root)
   )
-    throw new Error("Execute bump na raiz do repositório.");
+    throw new Error("Run bump from the repository root.");
   const packagePath = join(root, "package.json");
   const current = JSON.parse(readFileSync(packagePath, "utf8")).version;
   const options = bumpOptions(args, current);
@@ -102,12 +103,12 @@ export function bumpVersion(
     const path = join(root, file);
     for (let at = path; at !== dirname(at); at = dirname(at))
       if (lstatSync(at).isSymbolicLink())
-        throw new Error("Alvos de versão não podem atravessar links.");
+        throw new Error("Version targets must not traverse links.");
     const original = readFileSync(path, "utf8");
     const match = expression.exec(original);
     if (!match || match[2] !== current)
       throw new Error(
-        `Versão ausente/divergente em ${file}; nada foi escrito.`,
+        `Missing or mismatched version in ${file}; nothing was written.`,
       );
     return {
       file,
@@ -124,7 +125,7 @@ export function bumpVersion(
   git(["ls-files", "--error-unmatch", "--", ...files]);
   if (git(["diff", "--cached", "--quiet", "--exit-code"], [0, 1]).status !== 0)
     throw new Error(
-      "Index contém alterações staged; finalize-as antes de bump.",
+      "The index contains staged changes; finish them before bumping the version.",
     );
   if (
     git([
@@ -136,13 +137,13 @@ export function bumpVersion(
     ]).stdout.trim()
   )
     throw new Error(
-      "Arquivos de versão têm alterações locais; finalize-as antes de bump.",
+      "Version files have local changes; finish them before bumping the version.",
     );
   if (
     git(["show-ref", "--verify", "--quiet", `refs/tags/${tag}`], [0, 1])
       .status === 0
   )
-    throw new Error(`A tag ${tag} já existe; nada foi escrito.`);
+    throw new Error(`Tag ${tag} already exists; nothing was written.`);
   if (options.commit) {
     git(["symbolic-ref", "--quiet", "HEAD"]);
     git(["var", "GIT_AUTHOR_IDENT"]);
@@ -170,7 +171,9 @@ export function bumpVersion(
     }
     for (const write of staged) {
       if (readFileSync(write.path, "utf8") !== write.original)
-        throw new Error("Um alvo mudou durante bump; operação interrompida.");
+        throw new Error(
+          "A target changed during the version bump; operation interrupted.",
+        );
       replaceFile(write.temporary, write.path);
       replaced.push(write);
     }
@@ -188,7 +191,7 @@ export function bumpVersion(
       }
     }
     failure = new Error(
-      `${error.message} ${restored ? "Escritas próprias revertidas." : "Recuperação parcial: revise git diff; não execute reset destrutivo."}`,
+      `${error.message} ${restored ? "This operation's writes were restored." : "Partial recovery: inspect git diff; do not run a destructive reset."}`,
     );
   }
   for (const write of staged) {
@@ -196,7 +199,7 @@ export function bumpVersion(
       if (existsSync(write.temporary)) unlinkSync(write.temporary);
     } catch {
       failure ??= new Error(
-        "Não foi possível limpar arquivos .bump-* desta operação; revise o estado antes de continuar.",
+        "Could not clean up this operation's .bump-* files; inspect the state before continuing.",
       );
     }
   }
@@ -208,7 +211,7 @@ export function bumpVersion(
       git(["tag", "--", tag]);
     } catch {
       throw new Error(
-        `Versões ${options.version} preservadas, mas commit/tag não concluídos. Confira git status, git diff e git log -1; finalize o commit e a tag ${tag} manualmente após revisão. Nada foi resetado.`,
+        `Version ${options.version} was preserved, but the commit/tag did not complete. Inspect git status, git diff and git log -1; finish the commit and tag ${tag} manually after review. Nothing was reset.`,
       );
     }
   }
@@ -225,7 +228,7 @@ if (
       process.argv.slice(2),
     );
     console.log(
-      `Versão: ${result.from} → ${result.version}. ${result.commit ? "Commit e tag criados." : "Revise e commite as alterações."}`,
+      `Version: ${result.from} → ${result.version}. ${result.commit ? "Commit and tag created." : "Review and commit the changes."}`,
     );
   } catch (error) {
     console.error(error.message);

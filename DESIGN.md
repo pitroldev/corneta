@@ -14,8 +14,8 @@ colors:
   brass: "#ffb323"
   brass-strong: "#ffc857"
   brass-ink: "#2a1c00"
-  tomate: "#ff5a36"
-  tomate-strong: "#ff7a55"
+  tomato: "#ff5a36"
+  tomato-strong: "#ff7a55"
   live: "#ff4733"
   ok: "#56e39b"
   warn: "#ffc23d"
@@ -92,15 +92,15 @@ components:
     rounded: "{rounded.md}"
     padding: "0 16px"
     height: "40px"
-  button-tomate:
-    backgroundColor: "{colors.tomate}"
+  button-tomato:
+    backgroundColor: "{colors.tomato}"
     textColor: "#ffffff"
     typography: "{typography.action}"
     rounded: "{rounded.md}"
     padding: "0 16px"
     height: "40px"
-  button-tomate-hover:
-    backgroundColor: "{colors.tomate-strong}"
+  button-tomato-hover:
+    backgroundColor: "{colors.tomato-strong}"
     textColor: "#ffffff"
     typography: "{typography.action}"
     rounded: "{rounded.md}"
@@ -195,8 +195,8 @@ A paleta combina tinta marrom-negra, papéis quentes, marfim e dois acentos de i
 
 ### Secondary
 
-- **Tomate de Chamada** (`colors.tomate`): ação enfática, estado ao vivo e selos que precisam interromper a varredura.
-- **Tomate Aceso** (`colors.tomate-strong`): resposta de hover da chamada tomate.
+- **Tomate de Chamada** (`colors.tomato`): ação enfática, estado ao vivo e selos que precisam interromper a varredura.
+- **Tomate Aceso** (`colors.tomato-strong`): resposta de hover da chamada tomate.
 
 ### Tertiary
 

@@ -7,29 +7,6 @@ import { CoinIcon, HeartIcon, RaidIcon, StarIcon } from "./icons";
 import { cn } from "./ui";
 import { useCalm, useHeartbeat } from "./use-motion";
 
-// ============================================================
-// "A galera junta" — as três peças que ESTÃO acontecendo
-// ============================================================
-// A versão anterior era uma lista parada com uma mensagem já riscada: o
-// RESULTADO da moderação, sem o ato. E a única coisa que se movia era um risco
-// que corria uma vez, quando o painel entrava na tela.
-//
-// O que a seção promete é um chat de três plataformas caindo num lugar só e
-// você moderando dali. Então:
-//
-//  • o feed RECEBE mensagem o tempo todo, das três plataformas;
-//  • chegar perto de uma mensagem revela apagar / timeout / responder no lugar
-//    do horário — a troca que o app faz;
-//  • apagar apaga DE VERDADE: o risco corre, o texto vira lápide e some. É a
-//    frase do dicionário ("a mensagem vira lápide em vez de sumir sem
-//    explicação") acontecendo em vez de sendo prometida;
-//  • responder joga o @ no campo de baixo, que é pra onde a resposta iria.
-//
-// Nada disso é decoração: cada gesto é uma função que a tela de Chat do app tem.
-//
-// Com `prefers-reduced-motion` o laço para (o feed congela onde está) e TODAS
-// as ações continuam funcionando. Some o movimento, não a ferramenta.
-
 type PlatId = "twitch" | "youtube" | "kick";
 
 export interface ChatMsg {
@@ -37,7 +14,6 @@ export interface ChatMsg {
   text: string;
   platform: PlatId;
   badge?: string;
-  /** `mod` é verde, `member` é latão — as mesmas cores dos selos do app. */
   badgeTone?: "mod" | "member";
 }
 
@@ -53,22 +29,17 @@ export interface ChatFeedCopy {
   input: string;
   sendAll: string;
   hint: string;
-  /** Como a SUA fala aparece no feed depois de enviada. */
   me: string;
   mineBadge: string;
 }
 
-/** Uma linha de mensagem: glifo de 26px + corpo. */
-// `shrink-0` não é detalhe: a caixa tem altura fixa e guarda mais falas do que
-// cabe. Sem ele o flex ESPREME todas pra caber, e o chat vira um acordeão em vez
-// de rolar.
+/** Rows must not shrink to fit; the viewport clips older messages instead. */
 const MSG =
   "group relative grid shrink-0 grid-cols-[26px_minmax(0,1fr)] gap-[9px] rounded-md bg-surface px-2.5 py-[9px] " +
   "[&_.glyph]:h-[26px] [&_.glyph]:w-[26px]";
 const MSG_HEAD =
   "flex items-center gap-1.5 [&>strong]:text-[0.74rem] [&>strong]:font-extrabold";
-// `text-faint` sobre superfície elevada dá 4.44:1 e não passa AA. O token
-// `faint-raised` existe exatamente pra esse caso.
+// Raised surfaces need a lighter muted token to maintain text contrast.
 const MSG_TIME =
   "ml-auto text-[0.56rem] font-bold tabular-nums text-faint-raised transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0";
 const BADGE =
@@ -78,19 +49,9 @@ const ACTION =
   "outline-offset-2 transition-colors duration-120 hover:border-brass hover:text-cream focus-visible:outline-2 focus-visible:outline-brass " +
   "[@media(pointer:coarse)]:px-2.5 [@media(pointer:coarse)]:py-1.5";
 
-/** Ritmo do feed. Rápido o bastante pra parecer chat de live, devagar o
- *  bastante pra dar tempo de ler antes da próxima subir. */
 const ARRIVAL_MS = 2600;
-/** Quantas falas o estado guarda.
- *
- *  A CAIXA é que decide quantas aparecem (altura fixa + `justify-end`): as mais
- *  velhas sobem e são cortadas na borda, como em qualquer chat. Guardar mais do
- *  que cabe é de propósito — assim a fala que sai por cima some CLIPADA, sem
- *  animação de saída. Se ela saísse do array, o `AnimatePresence` daria a ela a
- *  mesma despedida da mensagem apagada, e as duas coisas leriam igual: uma é
- *  chat rolando, a outra é moderação. */
+// Retain enough rows to clip older messages below the visible viewport.
 const KEEP = 10;
-/** Quanto tempo a lápide fica antes de a linha sair de vez. */
 const TOMB_MS = 1400;
 
 type Status = "live" | "gone" | "muted";
@@ -98,11 +59,9 @@ interface Line {
   key: number;
   idx: number;
   status: Status;
-  /** Preenchido quando a fala é SUA — o texto vem do campo, não do dicionário. */
   mine?: string;
 }
 
-/** Horário da fala: 21:42 andando ~7 s por mensagem. */
 const at = (key: number) => {
   const s = 21 * 3600 + 42 * 60 + key * 7;
   return `${String(Math.floor(s / 3600) % 24).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`;
@@ -130,10 +89,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
   const setStatus = (key: number, status: Status) =>
     setLines((cur) => cur.map((l) => (l.key === key ? { ...l, status } : l)));
 
-  /** O campo de baixo manda de verdade: a sua fala entra no feed com o megafone
-   *  no lugar do glifo de plataforma, porque ela saiu pras TRÊS de uma vez — que
-   *  é exatamente o que o botão promete. Sem isso, o "enviar pra todas" era um
-   *  rótulo bonito num campo que não fazia nada. */
   const send = (e: React.FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
@@ -151,8 +106,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
 
   const remove = (key: number) => {
     setStatus(key, "gone");
-    // O `setTimeout` mora no HANDLER, não num efeito: mexer em estado de forma
-    // síncrona dentro de efeito dispara render em cascata e o lint pega.
     setTimeout(
       () => setLines((cur) => cur.filter((l) => l.key !== key)),
       TOMB_MS,
@@ -168,10 +121,7 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
         <span>{copy.example}</span>
       </div>
 
-      {/* Altura fixa e ancorada embaixo: as falas se acumulam de baixo pra cima
-          e a mais velha é cortada na borda, como num chat de verdade. Sem isso
-          a seção inteira pularia a cada mensagem. A máscara é o que apaga o
-          topo — opacidade por item briga com a animação de entrada. */}
+      {/* Keep the viewport height fixed and messages bottom-aligned to prevent section growth. */}
       <div className="flex h-[292px] flex-col justify-end gap-[7px] overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_34px)] max-[760px]:h-[248px]">
         <AnimatePresence initial={false}>
           {shown.map((line, i) => {
@@ -181,8 +131,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
             return (
               <motion.div
                 key={line.key}
-                // `layout` fecha o buraco com suavidade quando a fala apagada
-                // sai da lista; sem ele as de baixo pulam 44px de uma vez.
                 layout={!calm}
                 initial={calm ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -190,9 +138,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                 transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
                 className={cn(MSG, (dead || muted) && "opacity-80")}
               >
-                {/* Fala sua: o megafone da marca no lugar do glifo de
-                    plataforma. Não é enfeite — é a única linha do feed que saiu
-                    pelas três de uma vez, e o desenho diz isso sem legenda. */}
                 {line.mine ? (
                   <span className="grid size-[26px] place-items-center rounded-sm bg-brass text-brass-ink shadow-pop-sm [&>svg]:h-[62%] [&>svg]:w-[62%]">
                     <Mascot />
@@ -238,17 +183,7 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                     )}
                   >
                     {line.mine ?? msg.text}
-                    {/* O risco CORRE da esquerda pra direita em vez de aparecer
-                        pronto: é a diferença entre ver a moderação acontecer e
-                        ver que ela já aconteceu.
-
-                        Ele fica SEMPRE montado, em `scaleX: 0`, e o estado é que
-                        anima. Montar só quando morre parecia mais limpo e não
-                        funcionava: `<AnimatePresence initial={false}>` não vale
-                        só pros filhos diretos — ele propaga "não anime a
-                        entrada" pro subárvore inteira, então o `initial` deste
-                        risco era ignorado e a linha nascia pronta. Animar por
-                        MUDANÇA DE ESTADO não depende de montagem nenhuma. */}
+                    {/* Keep the strike mounted: AnimatePresence initial={false} suppresses descendant entry animations. */}
                     <motion.i
                       aria-hidden="true"
                       className="absolute top-1/2 left-0 block h-px w-full origin-left bg-current"
@@ -262,21 +197,14 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                   </p>
                 </div>
 
-                {/* As ações ocupam o lugar do horário, que apaga junto: mesma
-                    troca que a linha de chat do app faz. `pointer-events-none`
-                    enquanto invisível pra não haver alvo fantasma.
-
-                    Na SUA fala elas não aparecem: dar timeout em si mesmo e
-                    responder a si mesmo são botões sem sentido, e "apagar" ali
-                    contaria outra história (a de moderar o público). */}
+                {/* Disable pointer events while actions are hidden so invisible controls cannot capture clicks. */}
                 {!line.mine && (
                   <div
                     className={cn(
                       "absolute top-[7px] right-2.5 flex gap-1 rounded-sm opacity-0 transition-opacity duration-150",
                       "pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100",
                       "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-                      // Em ponteiro grosso não existe hover: as ações ficam na
-                      // fala mais nova, que é a que se modera na prática.
+                      /* Touch devices lack hover; expose actions on the newest message. */
                       i === shown.length - 1
                         ? "[@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100"
                         : "[@media(pointer:coarse)]:opacity-0",
@@ -313,8 +241,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
         </AnimatePresence>
       </div>
 
-      {/* Formulário de verdade: Enter envia (é o gesto de todo chat) e o botão
-          também. "Responder" tem pra onde escrever, e o que se escreve SAI. */}
       <form
         onSubmit={send}
         className="mt-[7px] flex min-h-[38px] items-center gap-1.5 rounded-md border-2 border-border-dry pl-[11px] focus-within:border-brass"
@@ -332,8 +258,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
           className={cn(
             "my-0.5 mr-0.5 cursor-pointer rounded-sm px-2.5 py-1.5 text-[0.74rem] font-extrabold whitespace-nowrap text-brass",
             "outline-offset-2 transition-colors duration-150 hover:bg-brass hover:text-brass-ink focus-visible:outline-2 focus-visible:outline-brass",
-            // Vazio, o botão fica visivelmente inerte em vez de parecer quebrado
-            // quando o clique não faz nada.
             "disabled:cursor-default disabled:text-faint-raised disabled:hover:bg-transparent disabled:hover:text-faint-raised",
             "[@media(pointer:coarse)]:min-h-9",
           )}
@@ -348,14 +272,6 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
     </div>
   );
 }
-
-// ============================================================
-// Alertas — o painel que RECEBE
-// ============================================================
-// Um feed de alertas parado é uma lista de exemplos; o que o app faz é receber.
-// Aqui eles chegam sozinhos, pelo topo, e o botão de teste é o mesmo que existe
-// nas Configurações (a nota do painel já promete: "tem botão de alerta de teste
-// pra você conferir sem esperar ninguém").
 
 export type AlertKind =
   "follow" | "sub" | "raid" | "superchat" | "bits" | "member";
@@ -385,10 +301,10 @@ const ICON: Record<AlertKind, React.ReactNode> = {
 const KIND_TONE: Record<AlertKind, string> = {
   follow: "bg-ok text-night",
   sub: "bg-brass text-brass-ink",
-  raid: "bg-tomate text-white",
+  raid: "bg-tomato text-white",
   superchat: "bg-brass text-brass-ink",
   bits: "bg-ok text-night",
-  member: "bg-tomate text-white",
+  member: "bg-tomato text-white",
 };
 
 const ALERT_MS = 3400;
@@ -411,8 +327,6 @@ export function AlertsFeed({ copy }: { copy: AlertsFeedCopy }) {
         <span>{copy.example}</span>
       </div>
 
-      {/* Altura fixa pelo mesmo motivo do chat: sem ela o painel cresce e
-          encolhe embaixo do dedo de quem está lendo. */}
       <div className="flex h-[268px] flex-col gap-[7px] overflow-hidden max-[760px]:h-[248px]">
         <AnimatePresence initial={false}>
           {keys.map((key) => {
@@ -469,14 +383,6 @@ export function AlertsFeed({ copy }: { copy: AlertsFeedCopy }) {
   );
 }
 
-// ============================================================
-// Overlay — o alerta ENTRANDO na cena do OBS
-// ============================================================
-// A cena não precisa de vida artificial: ela é uma cena parada mesmo. O que se
-// move é o que o overlay faz — o alerta aparece, fica, sai. E os dois campos de
-// URL copiam de verdade, porque é literalmente a única coisa que se faz com
-// eles.
-
 export interface OverlayCopy {
   label: string;
   example: string;
@@ -489,8 +395,6 @@ export interface OverlayCopy {
   urls: string[];
 }
 
-/** O alerta fica 3,6 s no ar e some por 2,4 s — a mesma ordem de grandeza da
- *  duração que o app deixa configurar. */
 const ALERT_ON = 3600;
 const ALERT_OFF = 2400;
 
@@ -500,8 +404,6 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
   const [on, setOn] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
 
-  // Um só temporizador com dois tempos: o batimento dispara no ritmo do estado
-  // atual, então "ligado" dura mais que "desligado" sem precisar de dois hooks.
   useHeartbeat(box, on ? ALERT_ON : ALERT_OFF, !calm, () => setOn((v) => !v));
 
   const copyUrl = (url: string) => {
@@ -511,8 +413,7 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
         setCopied(url);
         setTimeout(() => setCopied((cur) => (cur === url ? null : cur)), 1800);
       })
-      // Sem área de transferência (contexto inseguro, permissão negada) o botão
-      // não mente dizendo "copiado!".
+      // Never claim a successful copy when the clipboard rejects it.
       .catch(() => {});
   };
 
@@ -528,8 +429,7 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
           {copy.scene}
         </small>
 
-        {/* O espaço do alerta fica reservado: sem a altura fixa a cena inteira
-            se reorganiza duas vezes a cada ciclo. */}
+        {/* Reserve alert space to avoid layout shifts as the demonstration loops. */}
         <div className="mt-3.5 flex h-[42px] items-center justify-center">
           <AnimatePresence>
             {on && (
@@ -553,8 +453,6 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
           </AnimatePresence>
         </div>
 
-        {/* A moldura da câmera dá escala à cena e explica por que o meio fica
-            livre: ali é o seu conteúdo. */}
         <span
           className="absolute right-3 bottom-3 grid aspect-4/3 w-[27%] content-end justify-end rounded-md border-2 border-dashed border-border-dry px-[9px] py-[7px] text-[0.58rem] font-extrabold tracking-[0.08em] text-faint-raised uppercase"
           aria-hidden="true"

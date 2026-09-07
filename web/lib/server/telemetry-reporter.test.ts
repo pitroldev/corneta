@@ -17,7 +17,7 @@ function sink(): TelemetrySink {
 }
 
 describe("API telemetry context", () => {
-  it("aceita somente UUIDs válidos e usa identidade efêmera no fallback", () => {
+  it("accepts valid UUIDs only and falls back to ephemeral identity", () => {
     const correlated = createApiTelemetryContext(
       {
         headers: new Headers({
@@ -55,7 +55,7 @@ describe("API telemetry context", () => {
     expect(ephemeral.crashDistinctId).toBe(`request:${REQUEST_ID}`);
   });
 
-  it("separa as identidades por finalidade e falha fechado sem header válido", () => {
+  it("separates identity by purpose and fails closed without a valid header", () => {
     const usageOnly = createApiTelemetryContext(
       {
         headers: new Headers({
@@ -110,7 +110,7 @@ describe("API telemetry context", () => {
 });
 
 describe("server telemetry facade", () => {
-  it("envia erro esperado como evento operacional agregado", async () => {
+  it("sends expected errors as aggregate operational events", async () => {
     const target = sink();
     const reporter = createTelemetryReporter({
       sink: target,
@@ -149,7 +149,7 @@ describe("server telemetry facade", () => {
     expect(target.captureException).not.toHaveBeenCalled();
   });
 
-  it("envia exceção redigida sem corpo, token ou mensagem livre", async () => {
+  it("sends redacted exceptions without bodies, tokens, or free-text messages", async () => {
     const target = sink();
     const reporter = createTelemetryReporter({
       sink: target,
@@ -193,7 +193,7 @@ describe("server telemetry facade", () => {
     expect(captured?.[2]).toMatchObject({ error_type: "UnknownError" });
   });
 
-  it("vira no-op quando não configurado e engole falha do provedor", async () => {
+  it("becomes a no-op when unconfigured and contains provider failures", async () => {
     await expect(
       createTelemetryReporter({}).reportApiFailure({
         context: {

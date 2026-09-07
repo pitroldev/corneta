@@ -3,7 +3,6 @@ import { PLATFORMS } from "./platforms";
 import { INGEST_URL_RE } from "./validation";
 import { uid } from "./utils";
 
-/** Cria um destino a partir do preset de uma plataforma. */
 export function makeTarget(platformId: PlatformId): Target {
   const preset = PLATFORMS[platformId];
   return {
@@ -15,7 +14,6 @@ export function makeTarget(platformId: PlatformId): Target {
     ingestUrl: INGEST_URL_RE.test(preset.ingestUrl) ? preset.ingestUrl : "",
     hasKey: false,
     encoding: {
-      // Cada destino começa com a codificação recomendada da plataforma.
       action: "transcode",
       preset: { ...preset.recommended },
       encoder: "auto",
@@ -23,7 +21,6 @@ export function makeTarget(platformId: PlatformId): Target {
   };
 }
 
-/** Configuração inicial (primeira execução / demo). */
 export function defaultConfig(): AppConfig {
   const targets = [makeTarget("twitch"), makeTarget("youtube")];
   const profId = uid("prof");
@@ -87,7 +84,7 @@ export function defaultConfig(): AppConfig {
       overlayChatPlatform: true,
       overlayChatHideCommands: false,
       overlayChatFadeSecs: 0,
-      // As duas gravações nascem desligadas — espelha o `Settings::default()` do Rust.
+      // Keep both recording defaults disabled, matching Rust Settings::default().
       recordVideo: false,
       recordVideoDir: "",
       recordVideoKeepGb: 20,
@@ -98,7 +95,6 @@ export function defaultConfig(): AppConfig {
   };
 }
 
-/** URL completa que o OBS deve usar (sem expor a chave do destino). */
 export function obsIngestUrl(cfg: AppConfig["ingest"]): string {
   return `${cfg.protocol}://${cfg.host}:${cfg.port}/${cfg.app}`;
 }

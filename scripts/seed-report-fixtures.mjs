@@ -67,7 +67,7 @@ function removeGenerated(manifest) {
 
 if (args.has("--clean") || args.has("--restore")) {
   if (!fs.existsSync(manifestPath)) {
-    console.log("Nenhum pacote de relatórios fictícios registrado.");
+    console.log("No report fixture package registered.");
     process.exit(0);
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -92,8 +92,8 @@ if (args.has("--clean") || args.has("--restore")) {
   fs.rmSync(guidePath, { force: true });
   console.log(
     args.has("--restore")
-      ? `Fixtures removidos e arquivos ausentes restaurados de ${manifest.backupDir}`
-      : `Fixtures removidos. O backup dos dados anteriores continua em ${manifest.backupDir}`,
+      ? `Fixtures removed and missing files restored from ${manifest.backupDir}`
+      : `Fixtures removed. The previous data backup remains in ${manifest.backupDir}`,
   );
   process.exit(0);
 }
@@ -378,22 +378,21 @@ const selectedScenarios = scenarios.filter((scenario) =>
     ? scenario.slug === options.scenario
     : options.video || !videoScenarios.has(scenario.video),
 );
-if (!selectedScenarios.length)
-  throw new Error("Cenário desconhecido; consulte --list.");
+if (!selectedScenarios.length) throw new Error("Unknown scenario; see --list.");
 const needsVideo = selectedScenarios.some((scenario) =>
   videoScenarios.has(scenario.video),
 );
 if (needsVideo && !options.video)
   throw new Error(
-    "Este cenário exige --video para gerar a gravação sintética.",
+    "This scenario requires --video to generate the synthetic recording.",
   );
 if (needsVideo && !fs.existsSync(ffmpeg))
   throw new Error(
-    "Prepare os sidecars verificados antes de gerar vídeo sintético.",
+    "Prepare verified sidecars before generating synthetic video.",
   );
 const now = Date.parse(options.at || "2026-01-15T12:00:00.000Z");
 if (!Number.isSafeInteger(now) || now < 30 * DAY)
-  throw new Error("Use --at com uma data ISO válida após janeiro de 1970.");
+  throw new Error("Use --at with a valid ISO date after January 1970.");
 assertNoFixtureLinks(sessionsDir);
 assertNoFixtureLinks(manifestPath);
 assertNoFixtureLinks(guidePath);
@@ -416,9 +415,7 @@ for (const entry of fs.readdirSync(sessionsDir, { withFileTypes: true })) {
   assertNoFixtureLinks(path.join(sessionsDir, entry.name));
 }
 if (!previousManifest && fs.existsSync(guidePath)) {
-  throw new Error(
-    "Guia de fixtures preexistente sem manifesto; dados preservados.",
-  );
+  throw new Error("Existing fixture guide has no manifest; data preserved.");
 }
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const backupDir = path.join(root, `sessions-backup-before-fixtures-${stamp}`);
@@ -569,9 +566,6 @@ function recordingRows(s, startedAt, id) {
   return [];
 }
 
-// O ranking de processos que o app grava (top 3, ~6 s). Aqui: o app de fora do cenário
-// com o recurso que ele pressiona (gpu/cpu/memory), e o OBS como segundo — moderado, ou
-// pesado quando ELE é a história (`obsheavy`).
 function appsFor(s, incident, pressure, cpu, gpu, random) {
   const obsHeavy =
     incident?.type === "obsheavy" || pressure?.type === "obsheavy";
@@ -667,27 +661,24 @@ function generateSession(s, index, now) {
         renderMs = 31 + random() * 9;
         renderSkipped = Math.round(120 * progress);
       } else if (incident?.type === "appcpu") {
-        // Processador tomado por um app de fora: o OBS deixa de CODIFICAR (não de montar).
+        // CPU contention affects OBS encoding, not scene rendering.
         cpu = 95 + random() * 4;
         gpu = 44 + random() * 6;
         renderMs = 12 + random() * 4;
         outputSkipped = Math.round(90 * progress);
       } else if (incident?.type === "appmem") {
-        // Memória no limite: o OBS engasga ao montar a cena.
         cpu = 62 + random() * 5;
         gpu = 51 + random() * 6;
         memoryPct = 94 + random() * 3;
         renderMs = 27 + random() * 6;
         renderSkipped = Math.round(70 * progress);
       } else if (incident?.type === "obsheavy") {
-        // Sem app de fora: a placa está cheia e quem enche é o próprio OBS.
         cpu = 58 + random() * 6;
         gpu = 94 + random() * 4;
         renderMs = 29 + random() * 7;
         renderSkipped = Math.round(100 * progress);
       }
-      // A pressão do aplicativo começa UM passo antes do impacto — é esse atraso que deixa o
-      // relatório dizer "10s depois, o OBS pulou quadros" em vez de "aconteceu junto".
+      // Start resource pressure one sample before OBS symptoms to test cause timing.
       const leadIn = s.stepMs / s.durationMs;
       const pressure = s.incidents?.find(
         (item) =>
@@ -963,7 +954,7 @@ function createVideo(file, seconds, frequency) {
     fs.statSync(file).size === 0
   ) {
     throw new Error(
-      `FFmpeg não criou ${file}: ${result.stderr || result.error}`,
+      `FFmpeg failed to create ${file}: ${result.stderr || result.error}`,
     );
   }
 }
@@ -1050,12 +1041,12 @@ for (const item of catalog) {
     rows[0]?.id !== item.id ||
     rows.at(-1)?.kind !== "end"
   ) {
-    throw new Error(`Contrato NDJSON inválido em ${report}`);
+    throw new Error(`Invalid NDJSON contract in ${report}`);
   }
 }
 for (const file of generatedFiles.filter((value) => value.endsWith(".mp4"))) {
   if (fs.statSync(stagedPath(file)).size === 0)
-    throw new Error(`Vídeo vazio: ${file}`);
+    throw new Error(`Empty video: ${file}`);
 }
 
 const manifest = {
@@ -1118,11 +1109,11 @@ if (fs.readdirSync(stagingDir).length === 0) fs.rmdirSync(stagingDir);
 console.table(
   catalog.map(({ id, title, video, chatReplay }) => ({
     id,
-    cenário: title,
-    vídeo: video,
-    chat: chatReplay ? "sim" : "não",
+    scenario: title,
+    video,
+    chat: chatReplay ? "yes" : "no",
   })),
 );
-console.log(`\n${catalog.length} relatórios criados em ${sessionsDir}`);
-console.log(`Backup preservado em ${backupDir}`);
-console.log(`Guia detalhado em ${guidePath}`);
+console.log(`\n${catalog.length} reports created in ${sessionsDir}`);
+console.log(`Backup preserved in ${backupDir}`);
+console.log(`Detailed guide in ${guidePath}`);

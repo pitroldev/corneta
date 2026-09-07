@@ -1,6 +1,3 @@
-// Gráfico de linhas em SVG (zero-dependência). Multi-série sobre um eixo de
-// tempo (índice de amostra), com marcadores de evento, tratamento de gaps,
-// rótulos de tempo no eixo X, linha de referência e tooltip no hover.
 import {
   useLayoutEffect,
   useMemo,
@@ -28,7 +25,6 @@ export interface ChartMarker {
   color: string;
 }
 
-/** Linha horizontal tracejada de referência (ex.: zona de perigo da CPU). */
 export interface ChartRefLine {
   value: number;
   label: string;
@@ -50,24 +46,20 @@ export function LineChart({
   ariaLabel,
 }: {
   series: ChartSeries[];
-  /** Número de amostras (comprimento do eixo x). */
+  /** Sample count defining the x-axis. */
   n: number;
   height?: number;
   yMax?: number;
   markers?: ChartMarker[];
   formatValue?: (v: number) => string;
-  /** Rótulo do eixo X pra amostra i (ex.: tempo relativo ao início). Liga eixo X + tooltip com tempo. */
   formatX?: (i: number) => string;
   refLine?: ChartRefLine;
   className?: string;
-  /** Cursor do replay, em índice de amostra (fracionário: o vídeo anda entre amostras).
-   *  `null` = sem gravação ou instante fora dela. */
+  /** Replay cursor in fractional sample coordinates; null when outside the recording. */
   playhead?: number | null;
   playheadSource?: PlaybackSource;
-  /** Clique no gráfico → salta o vídeo pra aquela amostra. Sem isso o gráfico é só leitura. */
   onSeek?: (i: number) => void;
-  /** Nome acessível do gráfico, montado por quem tem os números (ex.: "Audiência: pico 120,
-   *  média 80"). Sem ele, cai no nome das séries — o mesmo texto da legenda abaixo. */
+  /** Accessible summary supplied by the caller; defaults to series names. */
   ariaLabel?: string;
 }) {
   const clockPlayhead = useSyncExternalStore(
@@ -81,10 +73,7 @@ export function LineChart({
   const rootRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // O SVG tinha viewBox fixo de 640px. Em painéis largos, o preserveAspectRatio
-  // mantinha o desenho nessa largura e criava letterbox nas laterais apesar de o
-  // elemento ocupar 100%. Medir o contêiner mantém texto e geometria sem distorção
-  // e faz a área útil acompanhar todo o espaço horizontal disponível.
+  // Match the viewBox to the container to avoid letterboxing without distorting labels.
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -109,7 +98,7 @@ export function LineChart({
   const padL = 40;
   const padR = 10;
   const padT = 10;
-  const padB = formatX ? 26 : 14; // espaço extra pros rótulos de tempo
+  const padB = formatX ? 26 : 14;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
@@ -118,25 +107,19 @@ export function LineChart({
   const yAt = (v: number) => padT + (1 - Math.min(v, yMax) / yMax) * innerH;
   const fmt = formatValue ?? ((v: number) => `${Math.round(v)}`);
 
-  // Hover muda dezenas de vezes por segundo. A geometria das séries não muda junto, então os
-  // paths (e a varredura de até milhares de amostras) ficam memorizados entre esses renders.
-  // A geometria é montada AQUI dentro: como objeto novo a cada render, na lista de
-  // dependências ela invalidaria o memo justamente a cada hover.
+  // Memoize paths independently of hover; construct geometry inside the memo to keep dependencies stable.
   const paths = useMemo(() => {
     const geo: PathGeometry = { n, yMax, padL, padT, innerW, innerH };
     return series.map((s) => buildPath(s.values, geo));
   }, [innerH, innerW, n, series, yMax]);
 
   const ticks = [1, 0.5, 0].map((f) => yMax * f);
-  // 4 rótulos de tempo (início · 1/3 · 2/3 · fim), sem repetir índice em séries curtas.
   const xTicks =
     formatX && n > 1
       ? [...new Set([0, 1 / 3, 2 / 3, 1].map((f) => Math.round(f * (n - 1))))]
       : [];
 
-  // O SVG escala via viewBox: mapeia o mouse de px da tela → coordenada do gráfico
-  // pela matriz real do SVG (getScreenCTM), que já desconta o letterbox do
-  // preserveAspectRatio — regra de três com o rect erraria perto das bordas.
+  // The SVG screen matrix accounts for viewBox scaling and letterboxing.
   const indexAtEvent = (e: React.MouseEvent<SVGSVGElement>): number | null => {
     const el = svgRef.current;
     if (!el || n <= 1) return null;
@@ -177,7 +160,6 @@ export function LineChart({
     const bx = xAt(hover);
     const title = formatX ? formatX(hover) : null;
     const lines = rows.map((r) => `${r.label}: ${fmt(r.v)}`);
-    // largura estimada por caracteres (canvas de medição seria exagero aqui)
     const wEst =
       Math.max(...lines.map((t) => t.length), title?.length ?? 0) * 6 + 16;
     const lineH = 13;
@@ -345,9 +327,7 @@ export function LineChart({
           />
         ))}
 
-        {/* Cursor do replay. Desenhado DEPOIS das séries e ANTES do tooltip: tem que
-            ficar por cima da linha (é a informação que o olho procura enquanto o vídeo
-            corre) e por baixo do tooltip (que é o que o mouse pediu agora). */}
+        {/* Layer the replay cursor above series but below the tooltip. */}
         {playhead != null && n > 1 && (
           <g pointerEvents="none">
             <line

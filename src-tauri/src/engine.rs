@@ -1,12 +1,8 @@
-//! Motor de relay: monta o comando FFmpeg a partir da config (decode-once → encode-N),
-//! supervisiona o sidecar e emite status para a UI.
 use crate::config::{AppConfig, Reframe, Target, VideoPreset};
 use serde::Serialize;
 use std::collections::HashMap;
 
-// ---------------------------------------------------------------------------
-// Presets de referência (espelham src/lib/platforms.ts)
-// ---------------------------------------------------------------------------
+// Keep default presets aligned with src/lib/platforms.ts.
 pub fn recommended_preset(platform_id: &str) -> VideoPreset {
     let v = |width, height, fps, vb, ab| VideoPreset {
         width,
@@ -28,9 +24,7 @@ pub fn recommended_preset(platform_id: &str) -> VideoPreset {
     }
 }
 
-/// Sanitiza um preset vindo da config: import_config aceita qualquer JSON, então os campos
-/// não são confiáveis — clampa cada um numa faixa sã pra evitar overflow nos cálculos
-/// derivados (`vbr * 2`, `fps * keyframe_sec`) e args absurdos no FFmpeg.
+// Imported presets are untrusted; bound derived bitrate/GOP arithmetic and FFmpeg arguments.
 fn sanitize_preset(mut p: VideoPreset) -> VideoPreset {
     p.width = p.width.clamp(16, 7680);
     p.height = p.height.clamp(16, 7680);
@@ -41,9 +35,7 @@ fn sanitize_preset(mut p: VideoPreset) -> VideoPreset {
     p
 }
 
-/// Preset EFETIVO de um destino: o do usuário (sanitizado) ou o recomendado da plataforma
-/// (também sanitizado). Fonte ÚNICA — o encode real e o spec/relatório não podem divergir por
-/// derivarem o preset de jeitos diferentes em lugares diferentes.
+/// Shared by encoding and reports so the displayed preset matches the actual output.
 pub(crate) fn effective_preset(t: &Target) -> VideoPreset {
     sanitize_preset(
         t.encoding
@@ -53,8 +45,6 @@ pub(crate) fn effective_preset(t: &Target) -> VideoPreset {
     )
 }
 
-/// No híbrido sem override: copia plataformas landscape, recodifica as verticais
-/// (ex.: TikTok/Instagram), que precisam de formato diferente do stream do OBS.
 fn smart_hybrid_action(platform_id: &str) -> &'static str {
     let r = recommended_preset(platform_id);
     if r.height > r.width {
@@ -64,12 +54,10 @@ fn smart_hybrid_action(platform_id: &str) -> &'static str {
     }
 }
 
-/// Ação efetiva considerando o modo global.
 pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
     match mode {
         "passthrough" => "copy",
         "per-platform" => "transcode",
-        // híbrido: override manual, senão decide sozinho.
         _ => match t.encoding.hybrid_override.as_deref() {
             Some(o) if !o.is_empty() => o,
             _ => smart_hybrid_action(&t.platform_id),
@@ -77,10 +65,7 @@ pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
     }
 }
 
-/// Codec de vídeo do FFmpeg pra escolha do usuário. `auto_codec` = o melhor encoder de
-/// HARDWARE que realmente funciona nesta máquina (sondado com um encode de verdade em
-/// `detect_hw_encoder` — a listagem `-encoders` mente), na prioridade NVENC > QSV > AMF >
-/// VideoToolbox. "Automático" usa ele; sem hardware, x264.
+/// `auto_codec` must pass a real encode probe; `-encoders` does not prove hardware availability.
 fn ffmpeg_video_codec<'a>(encoder: &str, auto_codec: Option<&'a str>) -> &'a str {
     match encoder {
         "nvenc" => "h264_nvenc",
@@ -88,17 +73,10 @@ fn ffmpeg_video_codec<'a>(encoder: &str, auto_codec: Option<&'a str>) -> &'a str
         "amf" => "h264_amf",
         "videotoolbox" => "h264_videotoolbox",
         "software" => "libx264",
-        _ => auto_codec.unwrap_or("libx264"), // "auto": melhor hardware REAL, senão x264
+        _ => auto_codec.unwrap_or("libx264"),
     }
 }
 
-/// URL completa de saída (destino + chave).
-///
-/// Destinos conhecidos entregam uma base simples (`.../app`), mas servidores RTMP
-/// personalizados também aparecem com query string, com a chave já no último segmento ou
-/// com um placeholder. Concatenar `/{key}` no fim da string produzia, por exemplo,
-/// `.../app?token=x/chave`: o OBS estava na Corneta, mas o FFmpeg nunca conseguia abrir o
-/// destino e a tela ficava presa no estado inicial.
 fn output_url(t: &Target, key: &str) -> String {
     compose_output_url(&t.ingest_url, key)
 }
@@ -111,21 +89,18 @@ fn compose_output_url(ingest_url: &str, key: &str) -> String {
         return base.trim_end_matches('/').to_string();
     }
 
-    // Alguns painéis fornecem uma URL-modelo em vez de separar visualmente servidor/chave.
     for placeholder in ["{stream_key}", "{streamKey}", "{key}"] {
         if base.contains(placeholder) {
             return base.replacen(placeholder, key, 1);
         }
     }
 
-    // A query pertence à URL inteira e precisa continuar DEPOIS do caminho/chave.
+    // Queries must follow the combined path/key, not become part of the stream key.
     let (base_path, base_query) = base.split_once('?').unwrap_or((base, ""));
     let (key_path, key_query) = key.split_once('?').unwrap_or((key, ""));
     let base_path = base_path.trim_end_matches('/');
 
-    // Tolera a URL completa no campo de servidor sem duplicar a chave. A fronteira `/`
-    // impede confundir `abc` com o sufixo de `conta-abc`; `ends_with` também cobre chaves
-    // hierárquicas (`conta/canal`) usadas por alguns servidores personalizados.
+    // Require a slash boundary when deduplicating embedded keys, including hierarchical keys.
     let key_in_path = base_path
         .strip_suffix(key_path)
         .is_some_and(|prefix| prefix.ends_with('/'));
@@ -149,9 +124,7 @@ fn compose_output_url(ingest_url: &str, key: &str) -> String {
     format!("{path}{query}")
 }
 
-/// Filtro de vídeo pra saída vertical: recorta um 9:16 (posição/zoom do enquadramento)
-/// do sinal landscape e escala pra resolução final — sem distorcer. A panorâmica usa o
-/// espaço disponível `(iw - crop)`, então o recorte nunca sai da fonte (qualquer aspecto).
+// Pan within the remaining source area so crops cannot extend beyond the input.
 fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
     let ar = out_w as f64 / out_h as f64;
     let (x, y, z) = match reframe {
@@ -160,16 +133,13 @@ fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
             r.y.clamp(0.0, 1.0),
             r.zoom.clamp(0.25, 1.0),
         ),
-        None => (0.5, 0.5, 1.0), // centralizado, altura cheia
+        None => (0.5, 0.5, 1.0),
     };
     let cw = format!("min(iw\\,ih*{z:.4}*{ar:.4})");
     let ch = format!("ih*{z:.4}");
     format!("crop={cw}:{ch}:(iw-{cw})*{x:.4}:(ih-{ch})*{y:.4},scale={out_w}:{out_h}")
 }
 
-/// Monta os argumentos de UM FFmpeg para UM destino (lê do MediaMTX → 1 saída).
-/// Um processo por plataforma → métricas REAIS por destino e reconexão independente.
-/// URL de leitura ao vivo (ingestão do OBS).
 pub fn ingest_url(config: &AppConfig) -> String {
     format!(
         "{}://{}:{}/{}/{}",
@@ -180,9 +150,7 @@ pub fn ingest_url(config: &AppConfig) -> String {
         config.ingest.key
     )
 }
-/// URL do **feed de programa** — o sinal contínuo republicado pelo compositor (com ou sem
-/// delay do guardião). Os destinos leem DAQUI quando o compositor está ativo: como o encoder
-/// do programa nunca para de publicar, a conexão com as plataformas nunca cai.
+/// The compositor publishes continuously here, keeping destination connections alive during input loss.
 pub fn program_url(config: &AppConfig) -> String {
     format!(
         "{}://{}:{}/{}/{}_program",
@@ -194,13 +162,11 @@ pub fn program_url(config: &AppConfig) -> String {
     )
 }
 
-/// Nome do path do programa na API do MediaMTX (`<app>/<key>_program`).
 pub fn program_path_name(config: &AppConfig) -> String {
     format!("{}/{}_program", config.ingest.app, config.ingest.key)
 }
 
-/// Nome do path de ingestão na API do MediaMTX (`<app>/<key>`). Usado pra checar o sinal do
-/// OBS SEM confundir com o publisher do próprio compositor (que fica em `_program`).
+/// Check OBS input independently from the compositor's `_program` publisher.
 pub fn ingest_path_name(config: &AppConfig) -> String {
     format!("{}/{}", config.ingest.app, config.ingest.key)
 }
@@ -227,21 +193,18 @@ pub fn ffmpeg_args_for_target(
     ];
 
     if action == "copy" {
-        // Vídeo sem reencode (lossless).
         args.extend(["-map", "0:v", "-c:v", "copy"].map(String::from));
     } else {
         let p = effective_preset(t);
         let codec = ffmpeg_video_codec(&t.encoding.encoder, auto_codec);
         let fps = p.fps.max(1);
         let gop = (fps * p.keyframe_sec.max(1)).to_string();
-        // Saída vertical → recorta/enquadra 9:16; saída landscape → só escala.
         let vf = if p.height > p.width {
             reframe_filter(t.encoding.reframe.as_ref(), p.width.max(2), p.height.max(2))
         } else {
             format!("scale={}:{}", p.width.max(2), p.height.max(2))
         };
-        // Bitrate efetivo: o auto-bitrate pode estar empurrando um valor menor. O clamp
-        // protege o `vbr * 2` do bufsize (o override parte do preset cru da config).
+        // Overrides originate in raw config; bound them before computing `vbr * 2`.
         let vbr = br_override
             .unwrap_or(p.video_bitrate_kbps)
             .clamp(100, 100_000);
@@ -269,12 +232,10 @@ pub fn ffmpeg_args_for_target(
         );
     }
 
-    // Áudio: sempre AAC 48 kHz estéreo (todas as plataformas exigem AAC).
-    // `0:a?` torna o mapeamento opcional, para não falhar se a fonte não tiver áudio.
+    // Optional mapping permits video-only sources.
     let audio_kbps = effective_preset(t).audio_bitrate_kbps;
     args.extend(["-map", "0:a?"].map(String::from));
-    // Normalization is real processing. Shared renditions apply it once; their
-    // egresses use the already-normalized AAC without repeating the filter.
+    // Shared renditions normalize once; their egresses must not repeat this filter.
     if config.settings.loudness_normalize {
         args.push("-af".into());
         args.push(format!(
@@ -284,10 +245,7 @@ pub fn ffmpeg_args_for_target(
     }
 
     if t.platform_id == "custom" {
-        // O OBS usa librtmp e envia a chave separadamente como `playpath`. Alguns ingests
-        // privados validam esse handshake e recusam o padrão de publisher do libavformat,
-        // embora aceitem exatamente a mesma URL/chave direto no OBS. Restrito ao destino
-        // Personalizado para não mudar o contrato já estável dos presets conhecidos.
+        // Some custom ingests require OBS-compatible publisher metadata and a separate playpath.
         args.extend(
             [
                 "-rtmp_flashver",
@@ -317,8 +275,7 @@ pub fn ffmpeg_args_for_target(
         .map(String::from),
     );
 
-    // Only the raw Guardian program has a proven AAC-LC/48k/stereo/160k
-    // contract. Never assume arbitrary OBS or splicer input is compatible.
+    // Only the raw Guardian program guarantees AAC-LC/48k/stereo/160k; other sources must be encoded.
     let known_audio = config.settings.guardian_enabled
         && config
             .settings
@@ -350,8 +307,7 @@ fn copy_encoded_audio(args: &mut Vec<String>) {
     }
 }
 
-/// Local rendition output is already encoded with the exact target contract.
-/// Retain destination-specific RTMP handshake/reconnect handling at the edge.
+/// Renditions already satisfy the target codec contract; preserve only destination-specific transport.
 pub(crate) fn ffmpeg_args_for_rendition_egress(
     config: &AppConfig,
     target: &Target,
@@ -366,23 +322,13 @@ pub(crate) fn ffmpeg_args_for_rendition_egress(
     args
 }
 
-/// Delay FIXO (s) do guardião de privacidade — não-configurável. É o mínimo que viabiliza a
-/// proteção de forma PREVENTIVA mesmo numa tela SATURADA de texto (ex.: Google Search), onde o
-/// OCR sobe pra ~6s (medido). A máquina do tempo só funciona se OCR < delay → 12s dá folga pro
-/// OCR de tela cheia + pra re-confirmar um termo PARADO (cadência de OCR forçado + scan). A
-/// transmissão inteira (e o chat) fica esse tanto atrás do tempo real — o preço da cobertura.
+/// Must exceed full-frame OCR plus stationary-text rescan latency to keep protection preventive.
 pub const GUARD_DELAY_SEC: u32 = 12;
 
-// --- Compositor (feed de programa): vídeo CRU pelo nosso processo, saída CONTÍNUA ---
-// O vídeo passa CRU por uma bomba no nosso processo e a saída (encoder → `_program`) nunca
-// para: sinal caiu → a bomba injeta o slate "JÁ VOLTO" + silêncio NO MESMO fluxo, sem trocar
-// processo — a conexão com as plataformas não cai. O guardião roda em cima disto (delay+OCR).
-
-/// Áudio do programa: sempre s16le 48 kHz estéreo (a bomba alinha vídeo e áudio por tick).
+/// Program PCM is s16le, 48 kHz stereo, aligned to video ticks.
 pub const PROG_AUDIO_HZ: u32 = 48_000;
 pub const PROG_AUDIO_CH: u32 = 2;
 
-/// Dimensões/taxa/bitrate do feed de programa.
 #[derive(Clone, Copy, Debug)]
 pub struct ProgramSpec {
     pub w: u32,
@@ -392,23 +338,17 @@ pub struct ProgramSpec {
 }
 
 impl ProgramSpec {
-    /// Bytes de um quadro yuv420p.
+    /// Size of one yuv420p frame in bytes.
     pub fn frame_size(&self) -> usize {
         (self.w as usize) * (self.h as usize) * 3 / 2
     }
-    /// Bytes de áudio (s16le estéreo 48 kHz) por quadro de vídeo — mantém A/V casados por tick.
+    /// PCM bytes per video tick; truncation follows the fixed-rate pump contract.
     pub fn audio_bytes_per_frame(&self) -> usize {
         ((PROG_AUDIO_HZ * PROG_AUDIO_CH * 2) / self.fps.max(1)) as usize
     }
 }
 
-/// Resolução do feed de programa. Base **720p**; sobe pra 1080p só quando ALGUM destino
-/// ativo precisa — saída vertical (recorta 9:16 da fonte cheia) ou saída acima de 720p.
-/// Rodar 1080p com todo mundo em 720p é encode em DOBRO à toa: o compositor reencoda a live
-/// inteira e a 1080p isso custa ~2x um 720p, sem ganho nenhum pras plataformas. O guardião
-/// fica SEMPRE em 1080p (`guard`): o OCR é calibrado pra 1920 de largura (ver guardian/ocr.rs)
-/// e é recurso de segurança — não dá pra degradar a leitura pra poupar CPU. Espelhado em
-/// src/components/ObsQualityGuide.tsx (`needsFullHd`) pra o guia mandar o OBS enviar o MESMO.
+// Guardian OCR is calibrated at 1080p; other streams can use 720p unless a target needs more.
 fn program_resolution(config: &AppConfig, guard: bool) -> (u32, u32) {
     let enabled: Vec<&Target> = config.targets.iter().filter(|t| t.enabled).collect();
     let needs_full_hd = guard
@@ -424,10 +364,7 @@ fn program_resolution(config: &AppConfig, guard: bool) -> (u32, u32) {
     }
 }
 
-/// Deriva o spec do programa dos destinos ativos: fps acompanha o maior preset (cap 60;
-/// TRAVADO em 30 com o guardião — o buffer de 12s a 60fps dobraria pra ~2 GB de RAM), o
-/// bitrate acompanha o maior destino (os "copy" empurram o encode do programa como está) e
-/// a resolução é adaptativa (ver `program_resolution`) — 720p quando dá, poupando o encode.
+// Guardian stays at 30 fps to bound the raw delay buffer; copy targets inherit the program bitrate.
 pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
     let mut max_fps = 30u32;
     let mut max_kbps = 4500u32;
@@ -445,15 +382,13 @@ pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
     }
 }
 
-/// **Decoder de vídeo**: lê o `live` e cospe vídeo CRU (yuv420p, tamanho/fps do spec) no
-/// stdout, que a bomba lê. Sem áudio aqui (o áudio tem decoder próprio).
+/// Decodes live video to yuv420p on stdout; audio uses a separate decoder.
 pub fn ffmpeg_args_for_decoder(config: &AppConfig, spec: &ProgramSpec) -> Vec<String> {
     vec![
         "-hide_banner".into(),
         "-loglevel".into(),
         "error".into(),
-        // Decodifica no HARDWARE (NVDEC na NVIDIA) — tira o custo da CPU. `auto` cai pra software
-        // se não houver GPU, sem quebrar. O scale/fps seguem na CPU (leve).
+        // `auto` permits software fallback when hardware decoding is unavailable.
         "-hwaccel".into(),
         "auto".into(),
         "-i".into(),
@@ -470,9 +405,7 @@ pub fn ffmpeg_args_for_decoder(config: &AppConfig, spec: &ProgramSpec) -> Vec<St
     ]
 }
 
-/// **Decoder de áudio**: lê o `live` e cospe PCM cru (s16le 48 kHz estéreo) no stdout.
-/// Se a fonte não tiver áudio, o FFmpeg sai na hora (sem stream de saída) e a bomba
-/// preenche com silêncio — mesma resiliência da queda de sinal.
+/// Missing audio ends this decoder; the program pump supplies silence instead.
 pub fn ffmpeg_args_for_audio_decoder(config: &AppConfig) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -493,8 +426,7 @@ pub fn ffmpeg_args_for_audio_decoder(config: &AppConfig) -> Vec<String> {
     ]
 }
 
-/// **Decoder do slate-vídeo**: loop INFINITO do arquivo escolhido pelo usuário → vídeo CRU
-/// no ritmo real (`-re`), pro slate animado entrar no MESMO fluxo do programa.
+/// Pace the looping file to wall time so it can replace live frames in the continuous program.
 pub fn ffmpeg_args_for_slate_video(path: &str, spec: &ProgramSpec) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -517,7 +449,6 @@ pub fn ffmpeg_args_for_slate_video(path: &str, spec: &ProgramSpec) -> Vec<String
     ]
 }
 
-/// **Decoder do áudio do slate-vídeo**: loop infinito da trilha do arquivo → PCM cru.
 pub fn ffmpeg_args_for_slate_audio(path: &str) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -541,29 +472,21 @@ pub fn ffmpeg_args_for_slate_audio(path: &str) -> Vec<String> {
     ]
 }
 
-/// **Encoder do programa**: lê o vídeo CRU da bomba (stdin) + o áudio CRU da bomba (TCP
-/// loopback — a bomba é o servidor) e publica CONTINUAMENTE em `_program`. Como as duas
-/// entradas vêm da bomba (que nunca para), este processo sobrevive à queda do OBS — e é
-/// isso que mantém a conexão das plataformas de pé. A/V já chegam alinhados (a bomba emite
-/// 1 quadro + N bytes de áudio por tick), então não há `adelay`.
+/// The pump supplies aligned video on stdin and PCM over loopback, even while OBS is disconnected.
 pub fn ffmpeg_args_for_encoder(
     config: &AppConfig,
     spec: &ProgramSpec,
     hw_codec: Option<&str>,
     audio_port: u16,
 ) -> Vec<String> {
-    let gop = (spec.fps * 2).to_string(); // keyframe 2s
+    let gop = (spec.fps * 2).to_string();
     let vbr = spec.video_kbps;
-    // CRÍTICO: `-analyzeduration 0 -probesize 32` nas DUAS entradas cruas. Os formatos são
-    // 100% forçados por flag (rawvideo/s16le + tamanho/taxa), então a sondagem do
-    // find_stream_info é inútil — e o padrão dela (~5 s de dados!) criava um deadlock:
-    // o FFmpeg segurava o stdin do vídeo enquanto esperava áudio suficiente pra análise,
-    // a bomba travava no write do quadro e o áudio parava de chegar. Círculo perfeito.
+    // Disable probing on both fully specified raw inputs: waiting for audio analysis can block
+    // video writes in the same pump that supplies the audio, deadlocking startup.
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
         "warning".into(),
-        // Entrada 0: vídeo cru da bomba (stdin).
         "-analyzeduration".into(),
         "0".into(),
         "-probesize".into(),
@@ -578,8 +501,7 @@ pub fn ffmpeg_args_for_encoder(
         spec.fps.to_string(),
         "-i".into(),
         "-".into(),
-        // Entrada 1: áudio cru da bomba (TCP local — o connect entra na backlog do listener,
-        // então não há deadlock com o accept).
+        // Loopback connect can queue before the pump accepts.
         "-analyzeduration".into(),
         "0".into(),
         "-probesize".into(),
@@ -647,15 +569,13 @@ pub fn ffmpeg_args_for_encoder(
     args
 }
 
-/// Gera um mediamtx.yml mínimo: só o servidor RTMP de ingestão, na porta configurada.
-/// RTSP/HLS/WebRTC/SRT ficam desligados. A API de diagnóstico fica ativa somente
-/// em 127.0.0.1:9997 para consultar os paths e detectar o sinal recebido do OBS.
+/// Enable only RTMP ingest and a loopback-only diagnostic API.
 pub fn mediamtx_config(config: &AppConfig) -> String {
     format!(
         concat!(
             "logLevel: info\n",
             "logDestinations: [stdout]\n",
-            // Folga de buffer + timeouts generosos: evita derrubar leitor/publisher que atrase um pouco.
+            // Allow brief reader/publisher stalls without dropping their connections.
             "writeQueueSize: 4096\n",
             "readTimeout: 20s\n",
             "writeTimeout: 20s\n",
@@ -678,9 +598,6 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
     )
 }
 
-// ---------------------------------------------------------------------------
-// Estado de execução (espelha EngineSnapshot do TS)
-// ---------------------------------------------------------------------------
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetStatus {
@@ -700,35 +617,32 @@ pub struct TargetStatus {
 pub struct EngineSnapshot {
     pub state: String, // stopped | starting | live | error
     pub started_at: Option<u128>,
-    /// O MediaMTX está recebendo quadros do OBS, mesmo que nenhum destino tenha aceitado
-    /// a saída ainda. Separa falha da entrada de falha num destino personalizado.
+    /// OBS input can be live even when no destination accepts output.
     pub ingest_live: bool,
-    /// Correlação opaca desta tentativa/live; seguro para detalhes copiáveis.
+    /// Opaque attempt ID, safe to include in copied diagnostics.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
-    /// Presente apenas em falha nativa já registrada/redigida.
+    /// Set only for a native failure already recorded and redacted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_id: Option<String>,
     pub targets: HashMap<String, TargetStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
-    /// Uso real de CPU/GPU (%) enquanto transmite.
+    /// CPU and GPU usage are percentages.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gpu: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_pct: Option<f64>,
-    /// Estatísticas do OBS (render/encode lag, congestionamento), se conectado.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub obs: Option<ObsStats>,
-    /// "JÁ VOLTO agora" acionado pelo streamer (slate manual, sem queda de sinal).
+    /// Manual slate activation, independent of input loss.
     pub forced_brb: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guardian_status: Option<crate::guardian::GuardianStatus>,
 }
 
-/// Estatísticas do OBS via obs-websocket `GetStats`/`GetStreamStatus`.
 #[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ObsStats {
@@ -736,7 +650,7 @@ pub struct ObsStats {
     pub avg_render_ms: f64,
     pub render_skipped: u32,
     pub output_skipped: u32,
-    /// Congestionamento de saída (0..1) — alto = rede sofrendo.
+    /// Output congestion as a ratio in 0..1.
     pub congestion: f64,
 }
 
@@ -759,7 +673,6 @@ impl EngineSnapshot {
         }
     }
 
-    /// Estado inicial: FFmpeg ouvindo, aguardando o OBS publicar.
     pub fn starting(config: &AppConfig, started_at: u128) -> Self {
         let mut s = Self::live(config, started_at);
         s.state = "starting".into();
@@ -775,8 +688,7 @@ impl EngineSnapshot {
                     target_id: t.id.clone(),
                     name: t.name.clone(),
                     state: "connecting".into(),
-                    // Zero até a PRIMEIRA medição real do FFmpeg — semear com o preset fazia
-                    // um destino travado exibir "6.0 Mbps / 60 FPS" como se estivesse saudável.
+                    // Do not seed metrics from presets: only measured output may appear healthy.
                     bitrate_kbps: 0,
                     fps: 0,
                     dropped_frames: 0,
@@ -809,43 +721,30 @@ impl EngineSnapshot {
     }
 }
 
-/// O que o auto-bitrate decidiu a partir de uma leitura de `speed=` do FFmpeg.
+/// Bitrate changes are in kbps and require the supervisor to restart the encoder.
 pub enum BitrateAction {
-    /// Segura o bitrate atual.
     Hold,
-    /// Aperto de internet: baixou pra X kbps (respawna o FFmpeg com esse valor).
     Down(u32),
-    /// Recuperou: subiu pra X kbps.
     Up(u32),
 }
 
-/// Auto-bitrate PURO e testável de UM destino (transcode). A cada `speed=` do FFmpeg (≈1/s),
-/// decide baixar/subir o bitrate dentro de `[floor, base]` — AIMD com reação proporcional:
-///
-/// - **BAIXA rápido e proporcional ao aperto:** `speed<0.6` (severo) age em 3 amostras cortando
-///   40%; `speed<0.9` (leve) age em 8 cortando 20%. Aperto sério some da tela em ~3s, não ~8s.
-/// - **SOBE aditivo** (passos de ~⅛ do base), só após estabilidade sustentada — sem o ×1.2 antigo
-///   que estourava acima e voltava a apertar (a gangorra de reconexões).
-/// - **COOLDOWN** após cada mudança: cada troca de bitrate reinicia o FFmpeg (reconecta a
-///   plataforma), então espera algumas amostras antes de reagir de novo — evita thrash de restart.
-///
-/// Só decide; o supervisor em `commands.rs` é quem respawna o FFmpeg com o novo valor.
+/// AIMD controller; cooldown counts speed samples because each change reconnects the destination.
 pub struct AutoBitrate {
-    base: u32,     // teto: o bitrate configurado do destino
-    floor: u32,    // piso: nunca abaixo disso (imagem mínima aceitável)
-    current: u32,  // bitrate ativo
-    slow: u32,     // leituras lentas consecutivas
-    fast: u32,     // leituras boas consecutivas
-    cooldown: u32, // amostras a ignorar após uma mudança
+    base: u32,
+    floor: u32,
+    current: u32,
+    slow: u32,
+    fast: u32,
+    cooldown: u32,
 }
 
 impl AutoBitrate {
-    const SLOW: f64 = 0.9; // abaixo disso o FFmpeg não segura o tempo real
-    const SEVERE: f64 = 0.6; // aperto sério → reage mais rápido e corta mais
-    const COOLDOWN: u32 = 5; // ~5s de carência após cada mudança (anti-thrash)
-    const RECOVER: u32 = 45; // ~45s de estabilidade antes de tentar subir
-    const NEED_MILD: u32 = 8; // amostras lentas leves antes de baixar
-    const NEED_SEVERE: u32 = 3; // amostras lentas severas antes de baixar
+    const SLOW: f64 = 0.9;
+    const SEVERE: f64 = 0.6;
+    const COOLDOWN: u32 = 5;
+    const RECOVER: u32 = 45;
+    const NEED_MILD: u32 = 8;
+    const NEED_SEVERE: u32 = 3;
 
     pub fn new(base: u32, floor: u32) -> Self {
         let floor = floor.min(base);
@@ -863,14 +762,13 @@ impl AutoBitrate {
         self.current
     }
 
-    /// Nova conexão (respawn do FFmpeg): zera os contadores por-instância; MANTÉM bitrate e
-    /// cooldown (a carência da última mudança não pode ser apagada pelo respawn que ela causou).
+    /// Preserve bitrate and cooldown across the restart caused by the last bitrate change.
     pub fn on_reconnect(&mut self) {
         self.slow = 0;
         self.fast = 0;
     }
 
-    /// Uma leitura de `speed=` → decisão. `Down`/`Up` já atualizam `current`.
+    /// Up/Down decisions also update `current`.
     pub fn on_speed(&mut self, speed: f64) -> BitrateAction {
         if self.cooldown > 0 {
             self.cooldown -= 1;
@@ -900,7 +798,7 @@ impl AutoBitrate {
             self.slow = 0;
             self.fast += 1;
             if self.cooldown == 0 && self.fast >= Self::RECOVER && self.current < self.base {
-                // Aditivo (não ×fator): sobe um passo fixo, sem estourar acima do base.
+                // Additive recovery avoids overshooting into another congestion/restart cycle.
                 let step = (self.base / 8).max(300);
                 let next = (self.current + step).min(self.base);
                 self.current = next;
@@ -913,83 +811,62 @@ impl AutoBitrate {
     }
 }
 
-/// Os parâmetros com que o gravador subiu — o suficiente pra subir de novo igualzinho.
 #[derive(Clone)]
 pub struct RecorderLaunch {
-    /// A MESMA URL que os destinos leem (`_program` com compositor, `live` sem ele).
+    /// Must match the source read by destinations, whether live or composited.
     pub source: String,
     pub dir: std::path::PathBuf,
     pub session_path: std::path::PathBuf,
     pub id: String,
 }
 
-/// Runtime guardado no state do Tauri (handles dos sidecars + último snapshot).
 #[derive(Default)]
 pub struct EngineRuntime {
-    /// Um FFmpeg por destino (target_id -> processo).
     pub ffmpegs: std::collections::HashMap<String, tauri_plugin_shell::process::CommandChild>,
     pub mediamtx: Option<tauri_plugin_shell::process::CommandChild>,
-    /// Trava de sessão: `true` enquanto UM start_engine está no ar (ou subindo). É reivindicada
-    /// ATOMICAMENTE sob o lock no topo do start (antes de qualquer trabalho lento) e solta por
-    /// kill_engine/erro fatal — impede TOCTOU (dois cliques em BORA subindo dois motores).
+    /// Claim under the engine mutex before startup work; release on stop/fatal error to prevent double starts.
     pub live: bool,
-    /// Held by the native updater from download through installer/restart.
-    /// Startup checks this under the same engine mutex, before any side effects.
+    /// Hold from updater download through restart; startup checks the same engine mutex.
     pub update_in_progress: bool,
-    /// Cleanup/setup/recording tasks may outlive `live` and the registered children.
-    /// Reserve under the engine mutex before exposing stopped state or spawning work.
+    /// Background work can outlive `live`; reserve under the mutex before exposing stopped state.
     pub pending_activity: std::sync::Arc<std::sync::atomic::AtomicUsize>,
-    /// Liga/desliga os supervisores de respawn (reconexão).
     pub running: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub snapshot: Option<EngineSnapshot>,
     pub started_ms: u128,
-    /// Última qualidade refletida no ícone da bandeja (evita redesenhar à toa).
+    /// Cached to avoid redrawing an unchanged tray icon.
     pub tray_quality: String,
-    /// Último título aplicado na janela principal (evita set_title repetido a cada emit).
+    /// Cached to avoid a window-title update on every metric emission.
     pub win_title: String,
-    /// Arquivo NDJSON da sessão em gravação (relatório pós-live).
     pub session_path: Option<std::path::PathBuf>,
-    /// Como o gravador foi lançado nesta live. Guardado pra que o "tentar de novo" reuse
-    /// EXATAMENTE a mesma fonte que os destinos estão lendo, em vez de recalcular a
-    /// decisão do compositor e correr o risco de apontar pro lugar errado.
+    /// Retry must reuse the original source, not recompute a possibly changed compositor decision.
     pub recorder_launch: Option<RecorderLaunch>,
-    /// Flag de pausa por destino (controle ao vivo): true = supervisor não sobe FFmpeg.
+    /// A true flag prevents the target supervisor from respawning FFmpeg.
     pub paused: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
-    /// Erro TERMINAL por destino (ex.: chave recusada): true = supervisor parqueia sem
-    /// respawn até o "Tentar de novo" (retry_target) limpar a flag.
+    /// Terminal failures park the supervisor until retry_target clears the flag.
     pub auth_error:
         std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
-    /// "JÁ VOLTO agora" manual — só existe quando o compositor está no ar.
+    /// Available only while the compositor is running.
     pub force_brb: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
-    /// Geração da sessão: bump a cada claim do start_engine. O setup (cheio de awaits)
-    /// revalida `live && start_gen == minha_gen` antes de instalar/spawnar — um Cortar
-    /// (ou um segundo BORA) no meio do setup invalida a geração antiga.
+    /// Revalidate `live` and this generation after awaits so stopped/superseded setup cannot install children.
     pub start_gen: u64,
-    /// Último emit pra UI (ms) — throttle das atualizações de métrica (mantém transições).
+    /// Throttle metrics in milliseconds without suppressing state transitions.
     pub last_emit_ms: u128,
-    /// UUID opaco criado no clique de BORA e propagado por todo o ciclo da live.
-    /// Nunca deriva do ID/nome de destino.
+    /// Random operation ID; never derive it from target names or IDs.
     pub operation_id: Option<String>,
-    /// Mapa interno target_id -> plataforma enumerada. O target_id não sai em
-    /// telemetria; serve apenas para traduzir transições ao catálogo seguro.
+    /// Map target IDs to safe platform enums; target IDs must not enter telemetry.
     pub target_platforms: std::collections::HashMap<String, String>,
-    /// Encoder consolidado para o evento único de entrada ao vivo.
     pub telemetry_encoder_kind: String,
-    /// Reconexões consolidadas fora do hot path, emitidas apenas no fim.
+    /// Aggregate off the hot path and emit only at session end.
     pub telemetry_reconnect_count: u32,
-    /// Instante do clique de início (Unix ms), separado de `started_ms`, que é
-    /// resetado quando o primeiro pacote realmente entra ao vivo.
+    /// Request time in Unix ms; unlike started_ms, it is not reset when output first goes live.
     pub telemetry_start_requested_ms: u128,
-    /// Último ID capturado durante o setup, para que o erro retornado ao
-    /// frontend possa referenciar o issue sem duplicar a exceção.
+    /// Reference the existing setup error without capturing the exception twice.
     pub telemetry_last_error_id: Option<String>,
-    /// Operação à qual `telemetry_last_error_id` pertence. Impede que um erro
-    /// antigo (por exemplo, um check do OBS) seja anexado a um novo BORA.
+    /// Bind the last error to its operation so stale diagnostics cannot attach to a new start.
     pub telemetry_last_error_operation_id: Option<String>,
 }
 
-/// Keeps native installation excluded until background work (including remux) ends.
-/// Dropping a cancelled or unpolled task releases its reservation without engine locking.
+/// Keep updates excluded until background work ends; cancellation releases without locking the engine.
 #[must_use = "Keep the activity guard alive until all reserved work finishes"]
 pub struct EngineActivityGuard {
     pending: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -1233,7 +1110,6 @@ mod tests {
             effective_action("per-platform", &tgt("twitch", None)),
             "transcode"
         );
-        // híbrido "esperto": landscape copia, vertical (TikTok) recodifica.
         assert_eq!(effective_action("hybrid", &tgt("twitch", None)), "copy");
         assert_eq!(
             effective_action("hybrid", &tgt("tiktok", None)),
@@ -1267,51 +1143,43 @@ mod tests {
 
     #[test]
     fn effective_preset_is_single_source() {
-        // sem preset → cai no recomendado (sanitizado) da plataforma.
         let t = tgt("twitch", None);
         assert_eq!(
             effective_preset(&t),
             sanitize_preset(recommended_preset("twitch"))
         );
-        // com preset absurdo → sanitizado.
         let t2 = tgt("twitch", Some(preset(999_999, 1080, 60, 6000)));
         assert_eq!(effective_preset(&t2).width, 7680);
     }
 
     #[test]
     fn program_resolution_adapts() {
-        // tudo 720p landscape → programa em 720p (não desperdiça encode em 1080p).
         let c = cfg(
             "hybrid",
             vec![tgt("facebook", Some(preset(1280, 720, 30, 4000)))],
         );
         assert_eq!(program_resolution(&c, false), (1280, 720));
-        // algum destino 1080p → 1080p.
         let c2 = cfg(
             "hybrid",
             vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
         );
         assert_eq!(program_resolution(&c2, false), (1920, 1080));
-        // vertical (recorte 9:16) precisa da fonte cheia → 1080p.
         let c3 = cfg(
             "hybrid",
             vec![tgt("tiktok", Some(preset(720, 1280, 30, 3000)))],
         );
         assert_eq!(program_resolution(&c3, false), (1920, 1080));
-        // guardião sempre 1080p.
         assert_eq!(program_resolution(&c, true), (1920, 1080));
     }
 
     #[test]
     fn program_spec_fps_and_bitrate() {
-        // fps acompanha o maior preset (cap 60); guardião trava em 30.
         let c = cfg(
             "hybrid",
             vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
         );
         assert_eq!(program_spec(&c, false).fps, 60);
         assert_eq!(program_spec(&c, true).fps, 30);
-        // bitrate do programa acompanha o maior destino, com piso de 2500.
         let low = cfg(
             "hybrid",
             vec![tgt("facebook", Some(preset(1280, 720, 30, 1000)))],
@@ -1338,11 +1206,14 @@ mod tests {
             None,
         );
         let s = args.join(" ");
-        assert!(s.contains("-c:v copy"), "cópia lossless de vídeo: {s}");
-        assert!(s.contains("-c:a aac"), "áudio sempre AAC");
+        assert!(s.contains("-c:v copy"), "lossless video copy: {s}");
+        assert!(s.contains("-c:a aac"), "audio must remain AAC");
         assert!(s.contains("-f flv"));
-        assert!(s.ends_with("streamkey"), "saída termina com a chave: {s}");
-        assert!(!s.contains("-b:v"), "cópia NÃO seta bitrate de vídeo: {s}");
+        assert!(s.ends_with("streamkey"), "output ends with the key: {s}");
+        assert!(
+            !s.contains("-b:v"),
+            "copy must not set a video bitrate: {s}"
+        );
     }
 
     #[test]
@@ -1419,38 +1290,33 @@ mod tests {
         );
         let s = args.join(" ");
         assert!(s.contains("-c:v h264_nvenc"), "encoder auto→nvenc: {s}");
-        assert!(s.contains("-b:v 4500k"), "br_override aplicado: {s}");
+        assert!(s.contains("-b:v 4500k"), "br_override applied: {s}");
         assert!(s.contains("-maxrate 4500k"));
         assert!(s.contains("-bufsize 9000k"), "bufsize = vbr*2");
-        assert!(s.contains("-vf scale=1920:1080"), "escala landscape: {s}");
+        assert!(s.contains("-vf scale=1920:1080"), "landscape scaling: {s}");
         assert!(s.contains("-g 120"), "gop = fps*keyframe_sec (60*2): {s}");
-        // sem normalização por padrão → nada de loudnorm.
         assert!(!s.contains("loudnorm"));
     }
 
     #[test]
     fn ffmpeg_args_loudnorm_when_enabled() {
         let mut c = cfg("passthrough", vec![tgt("twitch", None)]);
-        // desligado → sem loudnorm (mesmo alvo definido).
         c.settings.loudness_target_lufs = -16.0;
         assert!(
             !ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None)
                 .join(" ")
                 .contains("loudnorm")
         );
-        // ligado → injeta loudnorm no alvo, com TP travado; e NÃO reencoda o vídeo (segue em cópia).
         c.settings.loudness_normalize = true;
         let s = ffmpeg_args_for_target(&c, &c.targets[0], "k", None, "rtmp://x/live/obs", None)
             .join(" ");
         assert!(s.contains("-af loudnorm=I=-16.0:TP=-1.5:LRA=11"), "{s}");
         assert!(
             s.contains("-c:v copy"),
-            "áudio normaliza, vídeo segue em cópia: {s}"
+            "audio is normalized while video remains a copy: {s}"
         );
         assert!(s.contains("-c:a aac"));
     }
-
-    // ---- auto-bitrate (AIMD) ----
 
     fn feed_down(abr: &mut AutoBitrate, speed: f64, n: u32) -> Option<u32> {
         let mut last = None;
@@ -1470,7 +1336,6 @@ mod tests {
     #[test]
     fn abr_mild_congestion_cuts_20pct_after_8() {
         let mut a = AutoBitrate::new(6000, 2400);
-        // 7 amostras leves não bastam; a 8ª corta 20% → 4800.
         assert_eq!(feed_down(&mut a, 0.85, 7), None);
         assert_eq!(feed_down(&mut a, 0.85, 1), Some(4800));
         assert_eq!(a.current(), 4800);
@@ -1479,7 +1344,6 @@ mod tests {
     #[test]
     fn abr_severe_congestion_cuts_40pct_fast() {
         let mut a = AutoBitrate::new(6000, 2400);
-        // aperto severo (speed<0.6) age em 3 amostras cortando 40% → 3600 (vs 8 no leve).
         assert_eq!(feed_down(&mut a, 0.5, 3), Some(3600));
         assert_eq!(a.current(), 3600);
     }
@@ -1490,49 +1354,43 @@ mod tests {
         for _ in 0..200 {
             a.on_speed(0.3);
         }
-        assert_eq!(a.current(), 2400); // 6000→3600→2400 (piso), nunca abaixo
+        assert_eq!(a.current(), 2400);
     }
 
     #[test]
     fn abr_recovers_additively_capped_at_base() {
         let mut a = AutoBitrate::new(6000, 2400);
-        feed_down(&mut a, 0.85, 8); // → 4800
+        feed_down(&mut a, 0.85, 8);
         assert_eq!(a.current(), 4800);
-        // muitas amostras boas: sobe em passos aditivos (+base/8=750), sem passar do base.
         let mut ups = vec![];
         for _ in 0..300 {
             if let BitrateAction::Up(k) = a.on_speed(1.0) {
                 ups.push(k);
             }
         }
-        assert!(
-            ups.contains(&5550),
-            "primeiro passo aditivo 4800+750: {ups:?}"
-        );
+        assert!(ups.contains(&5550), "first additive step 4800+750: {ups:?}");
         assert_eq!(a.current(), 6000);
         assert!(
             ups.iter().all(|&k| k <= 6000),
-            "nunca acima do base: {ups:?}"
+            "never above the base: {ups:?}"
         );
     }
 
     #[test]
     fn abr_cooldown_blocks_immediate_rethrash() {
         let mut a = AutoBitrate::new(6000, 2400);
-        feed_down(&mut a, 0.5, 3); // → 3600, cooldown liga
-                                   // durante o cooldown, mesmo com aperto, NÃO muda de novo...
+        feed_down(&mut a, 0.5, 3);
         for _ in 0..4 {
             assert!(matches!(a.on_speed(0.5), BitrateAction::Hold));
         }
-        // ...e ao fim do cooldown volta a baixar (o aperto persistiu).
         assert!(matches!(a.on_speed(0.5), BitrateAction::Down(_)));
     }
 
     #[test]
     fn abr_on_reconnect_keeps_bitrate() {
         let mut a = AutoBitrate::new(6000, 2400);
-        feed_down(&mut a, 0.85, 8); // → 4800
+        feed_down(&mut a, 0.85, 8);
         a.on_reconnect();
-        assert_eq!(a.current(), 4800); // respawn mantém o bitrate; só zera contadores
+        assert_eq!(a.current(), 4800);
     }
 }

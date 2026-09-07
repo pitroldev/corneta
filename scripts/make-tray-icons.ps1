@@ -1,4 +1,3 @@
-# Gera os ícones de status da bandeja (megafone em fundo de cor por qualidade).
 Add-Type -AssemblyName System.Drawing
 $outDir = Join-Path $PSScriptRoot '..\src-tauri\icons'
 
@@ -45,10 +44,10 @@ function Save-Tray([string]$name, [System.Drawing.Color]$bg, [System.Drawing.Col
 
 $ink = [System.Drawing.Color]::FromArgb(26, 18, 4)
 $white = [System.Drawing.Color]::White
-Save-Tray 'tray-idle.png' ([System.Drawing.Color]::FromArgb(245, 165, 36)) $ink     # latão (offline)
-Save-Tray 'tray-good.png' ([System.Drawing.Color]::FromArgb(34, 197, 94)) $white    # verde (tudo bem)
-Save-Tray 'tray-warn.png' ([System.Drawing.Color]::FromArgb(249, 115, 22)) $white   # laranja (atenção)
-Save-Tray 'tray-bad.png'  ([System.Drawing.Color]::FromArgb(239, 68, 68)) $white    # vermelho (erro)
+Save-Tray 'tray-idle.png' ([System.Drawing.Color]::FromArgb(245, 165, 36)) $ink
+Save-Tray 'tray-good.png' ([System.Drawing.Color]::FromArgb(34, 197, 94)) $white
+Save-Tray 'tray-warn.png' ([System.Drawing.Color]::FromArgb(249, 115, 22)) $white
+Save-Tray 'tray-bad.png'  ([System.Drawing.Color]::FromArgb(239, 68, 68)) $white
 
-Write-Host "Ícones de bandeja gerados:"
+Write-Host "Tray icons generated:"
 Get-ChildItem $outDir -Filter 'tray-*.png' | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Output

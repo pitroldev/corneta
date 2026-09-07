@@ -3,7 +3,6 @@ import { categoriesForCollection, isEditorialCollection } from "../_shared";
 
 export const dynamicParams = false;
 
-/** Segundo nível top-down: só materializa categorias válidas da coleção pai. */
 export function generateStaticParams({
   params,
 }: {

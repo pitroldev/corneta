@@ -11,9 +11,7 @@ import { captureException, initializeTelemetry } from "./lib/telemetry";
 import { redactTelemetryText } from "./lib/telemetry-schema";
 import "./index.css";
 
-// Entry DEDICADO da janela flutuante do chat. Não importa o App (motor, telas,
-// atalhos, etc.) — só o necessário pro chat. Se algo quebrar, mostra o erro na
-// tela em vez de ficar em branco.
+// Keep this entry independent of App so the popout does not load engine, navigation or shortcut setup.
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null; errorId: string | null }

@@ -14,12 +14,7 @@ import {
   useUpdate,
 } from "../lib/updater";
 
-// Faixa de "tem versão nova". Fica no topo, acima das telas.
-//
-// Regra dura: NÃO reiniciar durante a live. A instalação mata o processo, e o
-// processo é dono do MediaMTX e de um FFmpeg por destino — reiniciar no ar derruba
-// a transmissão de todo mundo que está assistindo. Com o motor rodando, o botão
-// vira aviso e a atualização espera.
+// Restarting terminates the media processes, so installation must wait until the engine is fully stopped.
 
 export function UpdateBanner() {
   const t = useT();
@@ -31,8 +26,7 @@ export function UpdateBanner() {
   // After reload only the native lock is known, not the download's current phase.
   const phase = useUpdate((s) => (s.installing ? s.phase : null));
   const installing = useUpdate(updateBusy);
-  // Qualquer estado que não seja "stopped" conta como no ar: em `starting` os
-  // processos já subiram, e em `error` um destino pode continuar transmitindo.
+  // Starting and error states can still own active media processes.
   const live = useStore((s) => s.snapshot.state !== "stopped");
 
   useEffect(() => scheduleBootCheck(setInfo), [setInfo]);
@@ -44,7 +38,6 @@ export function UpdateBanner() {
     if (!info || installing || live) return;
     try {
       await installUpdate(info);
-      // Só chega aqui se o relaunch não aconteceu.
       toast.info(t("components.update.installed.toast"));
     } catch (e) {
       toast.error(t("components.update.install.error", { error: errMsg(e) }));
@@ -62,8 +55,6 @@ export function UpdateBanner() {
             ? t("components.update.headline", { version: info.version })
             : t("components.update.inProgress")}
         </strong>
-        {/* No ar, a frase diz o MOTIVO de o botão estar morto. "Atualize depois"
-            sozinho parece capricho; "derrubaria a live" a pessoa entende na hora. */}
         <span className="ml-2 text-ink-muted">
           {installing
             ? t("golive.block.updating")
@@ -113,8 +104,6 @@ export function UpdateBanner() {
   );
 }
 
-/** Botão "Procurar atualizações" da tela Sobre — o caminho manual, sem esperar o
- *  boot. Diz explicitamente quando NÃO há nada, senão o clique parece não fazer nada. */
 export function CheckUpdateButton({ version }: { version: string }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
@@ -130,8 +119,6 @@ export function CheckUpdateButton({ version }: { version: string }) {
         toast.success(
           t("components.update.check.found", { version: info.version }),
         );
-      // Dizer a versão em que a pessoa está importa: sem isso o clique parece
-      // não ter feito nada.
       else toast.info(t("components.update.check.none", { version }));
     } catch (e) {
       toast.error(t("components.update.check.error", { error: errMsg(e) }));

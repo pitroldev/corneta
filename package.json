@@ -7,7 +7,7 @@
     "node": ">=24.18.1 <25",
     "pnpm": ">=11 <12"
   },
-  "description": "Corneta — transmita para todas as plataformas ao mesmo tempo, sem dor de cabeça.",
+  "description": "Corneta — stream to multiple platforms from your desktop.",
   "type": "module",
   "scripts": {
     "contrib:demo": "node scripts/contributor.mjs demo",
@@ -53,6 +53,7 @@
     "benchmark:reports": "node web/node_modules/tsx/dist/cli.mjs scripts/benchmark-reports.ts",
     "docs:check": "node scripts/check-doc-links.mjs",
     "scripts:check": "node scripts/check-scripts.mjs",
+    "source:check": "node scripts/check-source-language.mjs",
     "format:all": "node scripts/check-format.mjs --all --write"
   },
   "dependencies": {

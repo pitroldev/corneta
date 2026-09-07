@@ -6,7 +6,7 @@ const SHA = "0123456789abcdef0123456789abcdef01234567";
 const TOKEN = "phc_public-project-token";
 
 describe("telemetry deployment metadata", () => {
-  it("expõe somente fingerprint/configuração pública das duas superfícies", () => {
+  it("exposes only public configuration and fingerprints for both surfaces", () => {
     const metadata = readTelemetryDeploymentMetadata({
       NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: TOKEN,
       NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/",
@@ -39,7 +39,7 @@ describe("telemetry deployment metadata", () => {
     expect(JSON.stringify(metadata)).not.toContain("hunter2");
   });
 
-  it("reflete kill switches e falha fechado para token/SHA inválidos", () => {
+  it("reflects kill switches and fails closed for invalid tokens or SHAs", () => {
     expect(
       readTelemetryDeploymentMetadata({
         NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: "phx_personal-key",

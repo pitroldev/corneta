@@ -16,13 +16,7 @@ import {
   legalHref,
 } from "@/lib/legal";
 
-// Política de privacidade — TRADUÇÃO. O texto que vincula é o `privacy.pt.tsx`.
-//
-// Os nomes das leis brasileiras ficam com o nome original e a glosa em inglês
-// ao lado (LGPD, ANPD, CDC): quem for pesquisar precisa do termo que existe, e
-// traduzir "Autoridade Nacional de Proteção de Dados" pra "national data
-// protection authority" apagaria justamente o nome do órgão que a pessoa tem
-// que procurar. Os artigos de lei ficam na forma brasileira (art. 7º, V).
+// English translation; privacy.pt.tsx is binding. Preserve published anchors and legal names.
 
 const L = "en" as const;
 

@@ -92,7 +92,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
     const pending = options
       .loadSdk()
       .then((loaded) => {
-        // A preferência pode mudar enquanto o chunk é baixado.
+        // Recheck opt-out after the asynchronous SDK download.
         if (isOptedOut()) return undefined;
         loaded.init(options.token!, {
           api_host: host,
@@ -118,9 +118,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
           save_campaign_params: false,
           save_referrer: false,
           request_batching: false,
-          // `advanced_disable_flags` desliga a requisição /flags e, com ela,
-          // toda configuração remota. As duas opções seguintes tornam a
-          // intenção explícita mesmo se o comportamento do gate mudar no SDK.
+          // Disable remote configuration as well as flag requests.
           advanced_disable_flags: true,
           advanced_disable_feature_flags: true,
           advanced_disable_feature_flags_on_first_load: true,
@@ -142,9 +140,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
       })
       .catch(() => undefined)
       .finally(() => {
-        // Uma falha transitória ou um opt-out durante o download não pode
-        // deixar uma Promise resolvida em `undefined` bloqueando reativações.
-        // O teste de identidade evita apagar uma tentativa mais nova.
+        // Clear only this attempt so failure or opt-out does not block later initialization.
         if (sdkPromise === pending) sdkPromise = undefined;
       });
     sdkPromise = pending;
@@ -170,7 +166,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
           : undefined,
       );
     } catch {
-      // Observabilidade nunca altera a navegação ou a experiência do site.
+      // Telemetry must not affect navigation.
     }
   };
 
@@ -270,7 +266,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
         safeProperties,
       );
     } catch {
-      // O Error Boundary continua funcional mesmo sem o provedor.
+      // Error reporting must not mask the original failure.
     }
   };
 
@@ -283,7 +279,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
       try {
         client?.opt_in_capturing();
       } catch {
-        // Preferência local ainda foi aplicada; falha do SDK é irrelevante.
+        // The local preference remains effective if the SDK fails.
       }
       return Boolean(client);
     }
@@ -297,7 +293,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
       sdk?.opt_out_capturing();
       sdk?.reset?.(true);
     } catch {
-      // O gate local já impede novas capturas.
+      // The local gate already blocks new captures if SDK reset fails.
     }
     return false;
   };
@@ -320,8 +316,7 @@ const browserTelemetry = createBrowserTelemetry({
     process.env.NEXT_PUBLIC_DEPLOYMENT_ENV ?? process.env.NODE_ENV ?? "unknown",
   buildSha: process.env.NEXT_PUBLIC_BUILD_SHA,
   loadSdk: async () => {
-    // A variante no-external mantém toda extensão dentro do bundle versionado:
-    // nenhuma configuração remota pode injetar código no navegador.
+    // Keep extensions bundled; remote configuration must not inject browser code.
     const posthogModule = await import("posthog-js/dist/module.no-external");
     return posthogModule.default as unknown as BrowserPostHog;
   },
@@ -346,7 +341,7 @@ export function captureSitePageView(pathOrUrl: string, contentId?: string) {
   return browserTelemetry.capturePageView(pathOrUrl, contentId);
 }
 
-/** Lê somente o identificador opaco publicado pela metadata do artigo. */
+/** Read only the allowlisted opaque article identifier. */
 export function editorialContentIdFromDocument(
   root: Pick<Document, "querySelector"> = document,
 ) {

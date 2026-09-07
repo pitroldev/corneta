@@ -131,30 +131,30 @@ export function renderEditorialReviewMarkdown(
 ): string {
   const attention = queue.items.filter((item) => item.status !== "current");
   const lines = [
-    "# Manutenção editorial",
+    "# Editorial maintenance",
     "",
-    `Data de referência: **${queue.asOf}**`,
+    `Reference date: **${queue.asOf}**`,
     "",
-    `- Vencidos: **${queue.overdueCount}**`,
-    `- Vencem em até ${queue.warningDays} dias: **${queue.dueSoonCount}**`,
-    `- Em dia: **${queue.currentCount}**`,
-    `- Publicados ou revisados substancialmente nos últimos ${queue.activityWindowDays} dias: **${queue.substantialActivityCount}** (meta: 2)`,
+    `- Overdue: **${queue.overdueCount}**`,
+    `- Due within ${queue.warningDays} days: **${queue.dueSoonCount}**`,
+    `- Current: **${queue.currentCount}**`,
+    `- Published or substantively revised in the past ${queue.activityWindowDays} days: **${queue.substantialActivityCount}** (target: 2)`,
     "",
   ];
 
   if (attention.length === 0) {
-    lines.push("Nenhum artigo exige revisão nesta janela.", "");
+    lines.push("No articles require review in this window.", "");
     return lines.join("\n");
   }
 
   lines.push(
-    "| Estado | Vencimento | Artigo | Intervalo | Fonte externa |",
+    "| Status | Due date | Article | Interval | External source |",
     "| --- | --- | --- | ---: | --- |",
   );
   for (const item of attention) {
-    const state = item.status === "overdue" ? "Vencido" : "Próximo";
+    const state = item.status === "overdue" ? "Overdue" : "Due soon";
     lines.push(
-      `| ${state} | ${item.dueAt} | [${item.title}](${item.href}) | ${item.reviewIntervalDays} dias | ${item.hasExternalSources ? "sim" : "não"} |`,
+      `| ${state} | ${item.dueAt} | [${item.title}](${item.href}) | ${item.reviewIntervalDays} days | ${item.hasExternalSources ? "yes" : "no"} |`,
     );
   }
   lines.push("");

@@ -17,21 +17,18 @@ interface ToastState {
     duration?: number,
   ) => void;
   dismiss: (id: string) => void;
-  /** Segura o relógio do toast (mouse em cima / foco dentro); `resume` solta. */
   pause: (id: string) => void;
   resume: (id: string) => void;
 }
 
-/** Relógio de cada toast, fora do estado do React: pausar/retomar não re-renderiza. */
+/** Keep timers outside reactive state so pause and resume do not rerender. */
 interface Clock {
   handle: ReturnType<typeof setTimeout> | null;
   endsAt: number;
-  /** Quanto faltava quando pausou. */
   left: number;
 }
 const clocks = new Map<string, Clock>();
-/** Ao soltar, o toast fica pelo menos isto: quem tirou o mouse em cima da hora
- *  ainda alcança o botão em vez de ver o aviso sumir debaixo do cursor. */
+/** After resume, retain enough time to reach the toast action. */
 const RESUME_MIN_MS = 1500;
 
 export const useToasts = create<ToastState>((set) => {
@@ -73,20 +70,15 @@ export const useToasts = create<ToastState>((set) => {
   };
 });
 
-/** Atalho para disparar toasts de qualquer lugar (fora de componentes também). */
 export const toast = {
   success: (m: string) => useToasts.getState().push("success", m),
-  // Erro fica mais tempo na tela: instrução de correção precisa dar tempo de ler.
   error: (m: string) =>
     useToasts
       .getState()
       .push("error", m, undefined, m.length > 60 ? 10000 : 6000),
   info: (m: string) => useToasts.getState().push("info", m),
-  /** Toast com botão de ação (ex.: "desfazer"), com tempo maior. */
   action: (m: string, label: string, onClick: () => void) =>
     useToasts.getState().push("info", m, { label, onClick }, 6000),
-  /** Erro que já vem com a saída. Fica MUITO mais tempo: quem está ao vivo não olha
-   *  pra tela a cada segundo, e um botão que some antes de ser visto não existe. */
   errorAction: (m: string, label: string, onClick: () => void) =>
     useToasts.getState().push("error", m, { label, onClick }, 15000),
 };

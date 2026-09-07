@@ -17,13 +17,7 @@ import type {
   PublishedEditorialDocument,
 } from "../lib/editorial/types";
 
-// Só páginas HTML indexáveis entram aqui. Ficam de fora, de propósito:
-// `/llms.txt` (é insumo pra modelo, não página de busca), `/robots.txt`,
-// `/manifest.webmanifest`, `/opengraph-image` e as rotas de `/api/v1/*`.
-//
-// `priority` e `changeFrequency` seguem preenchidos por compatibilidade com
-// outros buscadores, mas o Google declaradamente ignora os dois — quem faz
-// trabalho aqui é o `lastModified`, e por isso ele existe em toda entrada.
+// Include indexable HTML pages only, using content revision dates.
 
 const at = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const abs = (path: string) => new URL(path, siteUrl).toString();
@@ -55,8 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const legal = at(LEGAL_UPDATED_ISO);
   const editorial = await listPublishedEditorial();
 
-  // Home e páginas legais entram com `alternates.languages` recíproco. O
-  // conteúdo editorial só recebe hreflang quando o par completo foi publicado.
+  // Emit reciprocal alternates only for complete published translation pairs.
   const home = at(CONTENT_UPDATED_ISO);
   const languages = {
     "pt-BR": abs(localePath("pt-BR")),
@@ -161,9 +154,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
       alternates: { languages },
     },
-    // Os quatro documentos: dois idiomas × dois textos. Cada um declara o par
-    // hreflang recíproco, igual à home — sem isso o Google trata a tradução
-    // como página órfã.
     ...(["privacy", "terms"] as const).flatMap((doc) => {
       const alternates = {
         languages: {

@@ -1,10 +1,4 @@
-//! Adaptadores da porta [`Ocr`]: transformam pixels em TEXTO (a watchlist é casada no domínio).
-//! Dois motores locais (sem nuvem — privacidade):
-//! - **PaddleOCR** (PP-OCRv6 Tiny via ONNX Runtime na CPU) — preciso; a GPU fica pro codec.
-//! - **Windows.Media.Ocr** — nativo, leve, sem baixar modelo (fallback / 1ª sessão).
-//!
-//! Resolução e detecção são limitadas por `OCR_TARGET_W` e `DET_LIMIT`.
-//! O diff no pipeline evita repetir OCR em quadros iguais.
+//! Local OCR only: CPU PaddleOCR leaves the GPU to video codecs; Windows OCR needs no download.
 
 use super::{Ocr, OcrError};
 use crate::http_client as ureq;
@@ -14,14 +8,10 @@ use std::io::{Read, Write};
 use std::time::Duration;
 use tauri::AppHandle;
 
-/// Largura-alvo do OCR = resolução cheia (sem encolher o quadro 1920) → MÁXIMA precisão. Medido:
-/// o custo por linha quase não muda com a resolução (o tempo é dominado pelo nº de linhas), então
-/// vale ler no detalhe máximo; o delay de 12s absorve.
+// Preserve small text at 1080p; line count dominates recognition cost.
 const OCR_TARGET_W: u32 = 1920;
-/// Limite da detecção (lado maior). 1280 lê texto bem menor (nomes em feed denso) com custo baixo.
 const DET_LIMIT: u32 = 1280;
 
-/// Encolhe o plano de cinza pra ~`OCR_TARGET_W` de largura (no-op se já for menor).
 fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {
     if w == 0 || h == 0 || gray.len() != w.checked_mul(h)? {
         return None;
@@ -39,8 +29,6 @@ fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {
         image::imageops::FilterType::Triangle,
     ))
 }
-
-// ----------------------------- PaddleOCR (CPU) -----------------------------
 
 pub(super) struct PaddleOcr {
     inner: oar_ocr::oarocr::OAROCR,
@@ -122,7 +110,6 @@ fn models_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
     Some(app.path().app_config_dir().ok()?.join("ocr-models"))
 }
 
-/// Os 3 modelos PP-OCRv6 Tiny já estão baixados? (Paddle agora vs Windows OCR + baixar no fundo).
 fn models_cached(app: &AppHandle) -> bool {
     match models_dir(app) {
         Some(dir) => MODELS
@@ -132,10 +119,8 @@ fn models_cached(app: &AppHandle) -> bool {
     }
 }
 
-/// Garante os 3 modelos PP-OCRv6 Tiny (baixa do GitHub Releases na 1ª vez). (det, rec, dict).
 static DL_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// Com timeout por arquivo — uma rede ruim falha rápido (cai pro Windows OCR) em vez de pendurar.
 fn ensure_paddle_models(
     app: &AppHandle,
     cache_already_verified: bool,
@@ -148,13 +133,12 @@ fn ensure_paddle_models(
     for (n, size, expected_sha256) in MODELS {
         let p = dir.join(n);
         if !cache_already_verified && !verify_model(&p, size, expected_sha256) {
-            log::info!("OCR: baixando modelo {n}…");
+            log::info!("OCR: downloading model {n}");
             let resp = ureq::get(format!("{base}/{n}"))
                 .timeout(Duration::from_secs(60))
                 .call()
                 .ok()?;
-            // Baixa e calcula o hash em streaming: o maior modelo não precisa existir duas vezes
-            // (buffer HTTP + buffer de escrita) na memória do processo.
+            // Stream hashing and writing to avoid retaining a second model-sized allocation.
             let tmp = p.with_extension("part");
             let mut reader = resp.into_reader().take(size + 1);
             let mut output =
@@ -180,11 +164,10 @@ fn ensure_paddle_models(
                 .collect::<String>();
             if total != size || actual_sha256 != expected_sha256 {
                 let _ = std::fs::remove_file(&tmp);
-                log::error!("OCR: integridade inválida em {n}; download descartado");
+                log::error!("OCR: integrity check failed for {n}; download discarded");
                 return None;
             }
-            // Escreve em .part e troca atômico → um download interrompido NUNCA deixa um arquivo
-            // parcial que o `models_cached` trataria como válido.
+            // Publish only a fully downloaded and verified model.
             let _ = std::fs::remove_file(&p);
             std::fs::rename(&tmp, &p).ok()?;
             log::info!("OCR: {n} ok ({} KB)", total / 1024);
@@ -194,9 +177,7 @@ fn ensure_paddle_models(
     Some((paths[0].clone(), paths[1].clone(), paths[2].clone()))
 }
 
-/// Constrói o pipeline PaddleOCR (uma vez) na CPU, afinado pra latência baixa. None se falhar.
-/// CPU (não GPU): o decode/encode já ocupam a GPU (NVDEC/NVENC) e o OCR na GPU disputava o codec,
-/// degradando pra 5-15s ao vivo. Intra-threads limitado (sobra core pro encoder/compositor).
+// Bound OCR parallelism to leave CPU capacity for encoding and composition.
 fn build_paddle(app: &AppHandle, cache_already_verified: bool) -> Option<PaddleOcr> {
     use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
     use oar_ocr::domain::tasks::TextDetectionConfig;
@@ -220,8 +201,6 @@ fn build_paddle(app: &AppHandle, cache_already_verified: bool) -> Option<PaddleO
         .ok()?;
     Some(PaddleOcr { inner })
 }
-
-// --------------------------- Windows.Media.Ocr -----------------------------
 
 #[cfg(windows)]
 pub(super) struct WindowsOcr;
@@ -326,33 +305,25 @@ mod bitmap_tests {
     }
 }
 
-// -------------------------------- Fallback ---------------------------------
-
-/// Adaptador indisponível: nunca equivale a uma leitura vazia bem-sucedida.
-/// Só usado fora do Windows, onde não há o motor nativo como fallback.
 #[cfg(not(windows))]
 struct NullOcr;
 #[cfg(not(windows))]
 impl Ocr for NullOcr {
     fn name(&self) -> &'static str {
-        "nenhum (OCR indisponível)"
+        "none (OCR unavailable)"
     }
     fn read_text(&self, _g: &[u8], _w: usize, _h: usize) -> Result<String, OcrError> {
         Err(OcrError::Unavailable)
     }
 }
 
-/// Escolhe o melhor motor, **sem nunca travar o arranque da live esperando download**:
-/// - Modelos em cache → PaddleOCR na CPU (preciso).
-/// - 1ª vez (sem cache) → baixa o Paddle NO FUNDO (próxima sessão usa) e usa o Windows OCR AGORA.
-///
-/// Chame DENTRO da thread que vai usar o OCR (evita mover sessões ONNX entre threads).
+/// Construct on the OCR worker thread; cached models avoid delaying startup for downloads.
 pub(super) fn build_ocr(app: &AppHandle) -> Box<dyn Ocr> {
     if models_cached(app) {
         if let Some(p) = build_paddle(app, true) {
             return Box::new(p);
         }
-        log::warn!("OCR: modelos em cache mas o PaddleOCR não subiu — fallback");
+        log::warn!("OCR: cached PaddleOCR initialization failed; using fallback");
     } else {
         #[cfg(windows)]
         {
@@ -360,7 +331,9 @@ pub(super) fn build_ocr(app: &AppHandle) -> Box<dyn Ocr> {
             std::thread::spawn(move || {
                 let _ = ensure_paddle_models(&app2, false);
             });
-            log::info!("OCR: baixando PaddleOCR no fundo; Windows OCR nesta sessão");
+            log::info!(
+                "OCR: downloading PaddleOCR in background; using Windows OCR for this session"
+            );
         }
         #[cfg(not(windows))]
         {

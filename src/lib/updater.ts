@@ -1,29 +1,20 @@
-// The native install command owns exclusion with stream startup through restart.
+// Native installation owns exclusion with stream startup through restart.
 import { create } from "zustand";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import { addStep, capture } from "./telemetry";
 import { normalizeErrorCode } from "./telemetry-schema";
 
-/** Espera antes da checagem automática do boot. O primeiro minuto de app é o mais
- *  disputado (motor, chat, OBS, ícones) — a atualização não tem pressa nenhuma. */
+/** Defer update checks to avoid competing with initial app setup. */
 const BOOT_DELAY_MS = 20_000;
 
 export interface UpdateInfo {
   version: string;
-  /** Notas da release (markdown do GitHub). Vazio se a release não trouxe corpo. */
   notes: string;
-  /** Handle do plugin — só serve pra `installUpdate`. */
   handle: Update;
 }
 
-/** Store mínimo só pra atualização.
- *
- *  Existe porque duas telas distantes falam da MESMA atualização: a faixa do topo
- *  (que descobre no boot) e o botão da tela Sobre (que descobre sob demanda). Sem um
- *  lugar comum, o botão manual não teria como acender a faixa. */
 interface UpdateState {
   info: UpdateInfo | null;
-  /** Usuário fechou a faixa nesta sessão — não insiste até reabrir o app. */
   dismissed: boolean;
   installing: boolean;
   nativeInstalling: boolean;
@@ -40,8 +31,6 @@ export const useUpdate = create<UpdateState>((set) => ({
   nativeInstalling: false,
   progress: null,
   phase: "downloading",
-  // Achar de novo reabre a faixa: se a pessoa foi no Sobre e clicou em procurar,
-  // ela QUER ver o aviso outra vez.
   setInfo: (info) => set({ info, dismissed: false }),
   dismiss: () => set({ dismissed: true }),
 }));
@@ -51,16 +40,12 @@ export const updateBusy = (state: UpdateState): boolean =>
 
 let installation: Promise<void> | null = null;
 
-/** Só existe no app empacotado: no `pnpm dev` e no navegador não há updater. */
 const inTauri = (): boolean =>
   import.meta.env.VITE_CONTRIBUTOR !== "1" &&
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
 
-/** Procura atualização. `null` = já está na última (ou não dá pra checar).
- *
- *  Nunca lança: falha de rede é o caso comum (o usuário pode estar offline, ou o
- *  GitHub fora do ar) e isso não é problema do usuário — só significa "hoje não". */
+/** Return null when current or unavailable; network check failures do not throw. */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   if (!inTauri()) return null;
   try {
@@ -77,7 +62,7 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   }
 }
 
-/** One request across buttons/remounts; native code also rejects competing starts. */
+/** Share one request across buttons and remounts; native code also rejects competing starts. */
 export function installUpdate(info: UpdateInfo): Promise<void> {
   if (installation) return installation;
   useUpdate.setState({
@@ -95,7 +80,7 @@ export function installUpdate(info: UpdateInfo): Promise<void> {
 async function runInstallation(info: UpdateInfo): Promise<void> {
   addStep("update_install_requested", { stage: "update_install" });
   let total = 0;
-  let baixado = 0;
+  let downloaded = 0;
   let active = true;
   try {
     const { Channel, invoke } = await import("@tauri-apps/api/core");
@@ -106,9 +91,9 @@ async function runInstallation(info: UpdateInfo): Promise<void> {
         total = ev.data.contentLength ?? 0;
         useUpdate.setState({ progress: total > 0 ? 0 : null });
       } else if (ev.event === "Progress") {
-        baixado += ev.data.chunkLength;
+        downloaded += ev.data.chunkLength;
         useUpdate.setState({
-          progress: total > 0 ? Math.min(1, baixado / total) : null,
+          progress: total > 0 ? Math.min(1, downloaded / total) : null,
         });
       } else if (ev.event === "Finished") {
         useUpdate.setState({ progress: 1, phase: "installing" });
@@ -161,7 +146,7 @@ export function subscribeUpdateStatus(): () => void {
         useUpdate.setState({ nativeInstalling: busy });
     })
     .catch(() => {
-      // Native startup still enforces the lock if event delivery is unavailable.
+      // Native startup still enforces exclusion when event delivery is unavailable.
     });
   return () => {
     cancelled = true;
@@ -169,7 +154,7 @@ export function subscribeUpdateStatus(): () => void {
   };
 }
 
-/** Agenda a checagem do boot. Devolve o cancelador (pro cleanup do efeito). */
+/** Return a cancellation function for effect cleanup. */
 export function scheduleBootCheck(
   onFound: (info: UpdateInfo) => void,
 ): () => void {

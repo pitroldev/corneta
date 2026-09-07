@@ -3,8 +3,7 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { sourceFiles } from "./source-files.mjs";
 
-// Small local-path checker, not an MDX renderer or an external URL checker.
-// Keep offsets/newlines while masking examples so errors point at the source.
+// Preserve offsets while masking examples so diagnostics retain their source locations.
 function proseOnly(source) {
   let fence;
   const text = source
@@ -78,7 +77,6 @@ export function markdownDestinations(source) {
         line: prose.slice(0, match.index).split("\n").length,
       });
   }
-  // Images follow the same destination syntax; checking them is useful too.
   if (prose.includes("!["))
     destinations.push(
       ...markdownDestinations(prose.replace(/!\[/g, "[")).filter(
@@ -102,7 +100,7 @@ export function checkDocLinks(root) {
   for (const file of files) {
     const absolute = resolve(root, file);
     if (lstatSync(absolute).isSymbolicLink()) {
-      errors.push(`${file}: documento é um link de filesystem.`);
+      errors.push(`${file}: document is a filesystem link.`);
       continue;
     }
     for (const { destination, line } of markdownDestinations(
@@ -113,7 +111,7 @@ export function checkDocLinks(root) {
       try {
         path = decodeURIComponent(destination.split(/[?#]/, 1)[0]);
       } catch {
-        errors.push(`${file}:${line}: escape inválido.`);
+        errors.push(`${file}:${line}: invalid escape sequence.`);
         continue;
       }
       if (!path) continue;
@@ -124,7 +122,7 @@ export function checkDocLinks(root) {
       checked++;
       if (rel.startsWith("..") || isAbsolute(rel) || !existsSync(target))
         errors.push(
-          `${file}:${line}: destino local inexistente/externo: ${destination}`,
+          `${file}:${line}: missing or external local destination: ${destination}`,
         );
     }
   }
@@ -140,7 +138,7 @@ if (
   );
   for (const error of result.errors) console.error(error);
   console.log(
-    `Links locais: ${result.documents} documentos, ${result.checked} destinos, ${result.errors.length} erros. Âncoras e URLs externas não são verificadas.`,
+    `Local links: ${result.documents} documents, ${result.checked} destinations, ${result.errors.length} errors. Anchors and external URLs are not checked.`,
   );
   if (result.errors.length) process.exitCode = 1;
 }

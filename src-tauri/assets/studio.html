@@ -1,377 +1,465 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Corneta · Mesa (estúdio)</title>
-  <!--
-    Página de ESTÚDIO da Mesa — carregada pelo OBS como Browser Source.
-    É um par WebRTC só-recepção: entra na sala de sinalização, recebe a câmera de
-    cada participante (mídia P2P direta) e monta a grade de SLOT FIXO. Quem cai vira
-    um tile "JÁ VOLTO" (não reflui). Servida pela Corneta em http://127.0.0.1:<porta>.
-
-    Parâmetros (query):
-      room    = código da Mesa (obrigatório)
-      signal  = URL do websocket de sinalização (ex.: ws://127.0.0.1:7777/ws)
-      ice     = JSON de RTCIceServer[] (opcional; padrão = STUN público)
-      layout  = "grid" (padrão) | "solo"
-      peer    = (solo) peerId do participante a exibir em tela cheia
-      slot    = (solo) índice do slot (1-based) a exibir, alternativa ao peer
-      self    = peerId do próprio host (muta o áudio dele — já está no OBS)
-      hideSelf= "1" remove o tile do próprio host da grade
-      bg      = "transparent" (padrão) | cor CSS (ex.: "#14100a")
-      labels  = "1" mostra o nome do participante no tile (padrão: oculto)
-  -->
-  <style>
-    :root {
-      --brass: #ffb323;
-      --brass-ink: #2a1c00;
-      --paper: #14100a;
-      --ink-faint: #c6b69b;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      width: 100%; height: 100%; overflow: hidden;
-      background: transparent;
-      font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    #stage {
-      width: 100vw; height: 100vh;
-      display: grid; gap: 10px; padding: 10px;
-      grid-auto-rows: 1fr;
-    }
-    .tile {
-      position: relative; overflow: hidden;
-      border-radius: 12px; background: #0b0805;
-      display: grid; place-items: center;
-      box-shadow: 0 6px 0 rgba(0,0,0,0.35);
-    }
-    .tile video {
-      width: 100%; height: 100%; object-fit: cover;
-      background: #0b0805; display: block;
-    }
-    .tile.empty video { visibility: hidden; }
-    /* Slate "JÁ VOLTO" reaproveitando a cara do dead-air. */
-    .brb {
-      position: absolute; inset: 0; display: none;
-      flex-direction: column; align-items: center; justify-content: center;
-      gap: 12px; text-align: center;
-      background:
-        radial-gradient(circle at 1px 1px, rgba(255,179,35,0.06) 1px, transparent 0) 0 0 / 22px 22px,
-        var(--paper);
-    }
-    .tile.empty .brb, .tile.down .brb { display: flex; }
-    .brb .kicker {
-      color: var(--brass); font-weight: 700; font-size: 14px;
-      letter-spacing: 0.18em; text-transform: uppercase;
-    }
-    .brb .slab {
-      transform: rotate(-3deg);
-      background: var(--brass); color: var(--brass-ink);
-      font-weight: 800; font-size: clamp(22px, 7vw, 64px);
-      padding: 6px 22px; box-shadow: 6px 6px 0 #0b0805;
-    }
-    .brb .sub { color: var(--ink-faint); font-size: 14px; font-weight: 600; }
-    .label {
-      position: absolute; left: 10px; bottom: 10px;
-      background: rgba(11,8,5,0.7); color: #fff;
-      font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 6px;
-      display: none;
-    }
-    body[data-labels="1"] .label { display: block; }
-    /* Pílula de status (só visível na grade, ajuda o host a ver conexões). */
-    .dot {
-      position: absolute; right: 10px; top: 10px;
-      width: 10px; height: 10px; border-radius: 999px; background: #e0b341;
-      box-shadow: 0 0 0 3px rgba(0,0,0,0.25);
-    }
-    .dot.ok { background: #34d399; }
-    .dot.bad { background: #ef4444; }
-    body[data-solo="1"] .dot, body[data-solo="1"] .label { display: none; }
-  </style>
-</head>
-<body>
-  <div id="stage"></div>
-  <script>
-  (() => {
-    "use strict";
-    const q = new URLSearchParams(location.search);
-    const ROOM = q.get("room") || "";
-    const SIGNAL = q.get("signal") || `ws://${location.host}/ws`;
-    const LAYOUT = q.get("layout") || "grid";
-    const SOLO_PEER = q.get("peer") || "";
-    const SOLO_SLOT = parseInt(q.get("slot") || "0", 10) || 0;
-    const SELF = q.get("self") || "";
-    const HIDE_SELF = q.get("hideSelf") === "1";
-    const BG = q.get("bg") || "transparent";
-    const SHOW_LABELS = q.get("labels") === "1";
-
-    let ICE = [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-    ];
-    try { if (q.get("ice")) ICE = JSON.parse(q.get("ice")); } catch (_) {}
-
-    document.body.style.background = BG;
-    document.body.dataset.labels = SHOW_LABELS ? "1" : "0";
-    document.body.dataset.solo = LAYOUT === "solo" ? "1" : "0";
-
-    const stage = document.getElementById("stage");
-    const myId = "studio-" + Math.random().toString(36).slice(2, 10);
-    // Segredo por par: prova ao relay que sou o dono deste peerId ao reconectar
-    // (anti-sequestro de slot). Só viaja no join, nunca é difundido.
-    const SECRET = (() => {
-      const b = new Uint8Array(16);
-      crypto.getRandomValues(b);
-      return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
-    })();
-
-    // peerId -> { pc, slot, name, role, video, tile, brb, dot, label }
-    const peers = new Map();
-    // Slot estável por peerId (ordem de chegada). Nunca reflui.
-    const slotOf = new Map();
-    let nextSlot = 0;
-    const names = new Map();
-    const roles = new Map();
-
-    function assignSlot(peerId) {
-      if (slotOf.has(peerId)) return slotOf.get(peerId);
-      const s = nextSlot++;
-      slotOf.set(peerId, s);
-      return s;
-    }
-
-    // --- layout da grade ---
-    function relayout() {
-      const slots = [...slotOf.entries()]
-        .filter(([id]) => !(HIDE_SELF && id === SELF))
-        .sort((a, b) => a[1] - b[1])
-        .map(([id]) => id);
-
-      if (LAYOUT === "solo") {
-        const wanted = SOLO_PEER
-          ? SOLO_PEER
-          : [...slotOf.entries()].find(([, s]) => s === SOLO_SLOT - 1)?.[0];
-        stage.style.gridTemplateColumns = "1fr";
-        for (const [id, info] of peers) {
-          info.tile.style.display = id === wanted ? "" : "none";
-        }
-        return;
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Corneta · Mesa (estúdio)</title>
+    <style>
+      :root {
+        --brass: #ffb323;
+        --brass-ink: #2a1c00;
+        --paper: #14100a;
+        --ink-faint: #c6b69b;
       }
-
-      const n = Math.max(slots.length, 1);
-      const cols = Math.ceil(Math.sqrt(n));
-      stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-      // Ordena os tiles na grade pelo slot fixo.
-      for (const id of slots) {
-        const info = peers.get(id);
-        if (info) info.tile.style.order = String(slotOf.get(id));
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    }
-
-    function ensureTile(peerId) {
-      let info = peers.get(peerId);
-      if (info && info.tile) return info;
-      const tile = document.createElement("div");
-      tile.className = "tile down";
-      const video = document.createElement("video");
-      video.autoplay = true; video.playsInline = true;
-      // Muta o próprio host (mic dele já entra direto no OBS) pra não dobrar áudio.
-      video.muted = peerId === SELF;
-      const brb = document.createElement("div");
-      brb.className = "brb";
-      brb.innerHTML =
-        '<div class="kicker">Corneta · Mesa</div>' +
-        '<div class="slab">JÁ VOLTO</div>' +
-        '<div class="sub">já já tá de volta — segura a corneta 📣</div>';
-      const dot = document.createElement("div");
-      dot.className = "dot";
-      const label = document.createElement("div");
-      label.className = "label";
-      label.textContent = names.get(peerId) || "convidado";
-      tile.append(video, brb, dot, label);
-      if (HIDE_SELF && peerId === SELF) tile.style.display = "none";
-      stage.appendChild(tile);
-      info = { ...(info || {}), tile, video, brb, dot, label, slot: assignSlot(peerId) };
-      peers.set(peerId, info);
-      relayout();
-      return info;
-    }
-
-    function setStatus(peerId, kind) {
-      const info = peers.get(peerId);
-      if (!info) return;
-      info.dot.className = "dot" + (kind === "ok" ? " ok" : kind === "bad" ? " bad" : "");
-      info.tile.classList.toggle("down", kind !== "ok");
-      info.tile.classList.remove("empty");
-    }
-
-    function markGone(peerId) {
-      const info = peers.get(peerId);
-      if (!info) return;
-      info.tile.classList.add("empty");
-      info.dot.className = "dot bad";
-      if (info.video) info.video.srcObject = null;
-      const pc = info.pc;
-      if (pc) {
-        pc.onicecandidate = null;
-        pc.ontrack = null;
-        pc.onnegotiationneeded = null;
-        pc.onconnectionstatechange = null;
-        try { pc.close(); } catch (_) {}
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
-      // Solta a referência da negociação (senão o pc fechado + closures ficam presos
-      // no peers map pra sempre — slot fixo nunca remove a entrada). Rejoin recria _neg.
-      info.pc = null;
-      info._neg = null;
-    }
-
-    // ------------------------------------------------------------------
-    // Sinalização (WebSocket) + reconexão
-    // ------------------------------------------------------------------
-    let ws = null;
-    let retry = 0;
-    let alive = true;
-
-    function send(obj) {
-      if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
-    }
-
-    function connect() {
-      ws = new WebSocket(SIGNAL);
-      ws.onopen = () => {
-        retry = 0;
-        send({ t: "join", room: ROOM, peerId: myId, role: "studio", name: "OBS", secret: SECRET });
-      };
-      ws.onmessage = (ev) => {
-        let m; try { m = JSON.parse(ev.data); } catch (_) { return; }
-        onSignal(m);
-      };
-      ws.onclose = () => {
-        if (!alive) return;
-        retry = Math.min(retry + 1, 6);
-        setTimeout(connect, 400 * retry);
-      };
-      ws.onerror = () => { try { ws.close(); } catch (_) {} };
-    }
-
-    function isPublisher(role) { return role === "control"; }
-
-    function onSignal(m) {
-      switch (m.t) {
-        case "welcome":
-          for (const p of m.peers || []) {
-            names.set(p.peerId, p.name);
-            roles.set(p.peerId, p.role);
-            if (isPublisher(p.role)) connectTo(p.peerId);
-          }
-          break;
-        case "peer-join":
-          if (m.peer) {
-            names.set(m.peer.peerId, m.peer.name);
-            roles.set(m.peer.peerId, m.peer.role);
-            if (isPublisher(m.peer.role)) connectTo(m.peer.peerId);
-          }
-          break;
-        case "peer-leave":
-          markGone(m.peerId);
-          break;
-        case "signal":
-          handlePeerSignal(m.from, m.data);
-          break;
+      #stage {
+        width: 100vw;
+        height: 100vh;
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+        grid-auto-rows: 1fr;
       }
-    }
+      .tile {
+        position: relative;
+        overflow: hidden;
+        border-radius: 12px;
+        background: #0b0805;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+      }
+      .tile video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background: #0b0805;
+        display: block;
+      }
+      .tile.empty video {
+        visibility: hidden;
+      }
+      .brb {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        text-align: center;
+        background:
+          radial-gradient(
+              circle at 1px 1px,
+              rgba(255, 179, 35, 0.06) 1px,
+              transparent 0
+            )
+            0 0 / 22px 22px,
+          var(--paper);
+      }
+      .tile.empty .brb,
+      .tile.down .brb {
+        display: flex;
+      }
+      .brb .kicker {
+        color: var(--brass);
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .brb .slab {
+        transform: rotate(-3deg);
+        background: var(--brass);
+        color: var(--brass-ink);
+        font-weight: 800;
+        font-size: clamp(22px, 7vw, 64px);
+        padding: 6px 22px;
+        box-shadow: 6px 6px 0 #0b0805;
+      }
+      .brb .sub {
+        color: var(--ink-faint);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .label {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        background: rgba(11, 8, 5, 0.7);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 6px;
+        display: none;
+      }
+      body[data-labels="1"] .label {
+        display: block;
+      }
+      .dot {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #e0b341;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
+      }
+      .dot.ok {
+        background: #34d399;
+      }
+      .dot.bad {
+        background: #ef4444;
+      }
+      body[data-solo="1"] .dot,
+      body[data-solo="1"] .label {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script>
+      (() => {
+        "use strict";
+        const q = new URLSearchParams(location.search);
+        const ROOM = q.get("room") || "";
+        const SIGNAL = q.get("signal") || `ws://${location.host}/ws`;
+        const LAYOUT = q.get("layout") || "grid";
+        const SOLO_PEER = q.get("peer") || "";
+        const SOLO_SLOT = parseInt(q.get("slot") || "0", 10) || 0;
+        const SELF = q.get("self") || "";
+        const HIDE_SELF = q.get("hideSelf") === "1";
+        const BG = q.get("bg") || "transparent";
+        const SHOW_LABELS = q.get("labels") === "1";
 
-    // ------------------------------------------------------------------
-    // WebRTC — recepção com "perfect negotiation" (lado educado/impolite)
-    // ------------------------------------------------------------------
-    function makePeer(remoteId) {
-      const pc = new RTCPeerConnection({ iceServers: ICE, bundlePolicy: "max-bundle" });
-      const polite = myId > remoteId; // regra determinística para evitar glare
-      const state = { pc, polite, makingOffer: false, ignoreOffer: false };
-
-      pc.onicecandidate = ({ candidate }) => {
-        if (candidate) send({ t: "signal", to: remoteId, data: { candidate } });
-      };
-      pc.ontrack = ({ streams }) => {
-        const info = ensureTile(remoteId);
-        if (streams[0] && info.video.srcObject !== streams[0]) {
-          info.video.srcObject = streams[0];
-        }
-      };
-      pc.onconnectionstatechange = () => {
-        const s = pc.connectionState;
-        if (s === "connected") setStatus(remoteId, "ok");
-        else if (s === "failed") { setStatus(remoteId, "bad"); try { pc.restartIce(); } catch (_) {} }
-        else if (s === "disconnected") setStatus(remoteId, "warn");
-      };
-      pc.onnegotiationneeded = async () => {
+        let ICE = [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+        ];
         try {
-          state.makingOffer = true;
-          await pc.setLocalDescription();
-          send({ t: "signal", to: remoteId, data: { description: pc.localDescription } });
-        } catch (_) {} finally { state.makingOffer = false; }
-      };
-      return state;
-    }
+          if (q.get("ice")) ICE = JSON.parse(q.get("ice"));
+        } catch (_) {}
 
-    function connectTo(remoteId) {
-      if (remoteId === myId) return;
-      ensureTile(remoteId);
-      let info = peers.get(remoteId);
-      if (info.pc) return;
-      const state = makePeer(remoteId);
-      info.pc = state.pc;
-      info._neg = state;
-      // Recepção pura: NÃO adiciona faixas nem inicia oferta. O publicador (control)
-      // dirige a negociação; aqui só respondemos. ontrack dispara quando a oferta chega.
-    }
+        document.body.style.background = BG;
+        document.body.dataset.labels = SHOW_LABELS ? "1" : "0";
+        document.body.dataset.solo = LAYOUT === "solo" ? "1" : "0";
 
-    async function handlePeerSignal(fromId, data) {
-      if (!data) return;
-      ensureTile(fromId);
-      let info = peers.get(fromId);
-      if (!info.pc) { connectTo(fromId); info = peers.get(fromId); }
-      const state = info._neg;
-      const pc = info.pc;
-      try {
-        if (data.description) {
-          const desc = data.description;
-          const offerCollision =
-            desc.type === "offer" && (state.makingOffer || pc.signalingState !== "stable");
-          state.ignoreOffer = !state.polite && offerCollision;
-          if (state.ignoreOffer) return;
-          await pc.setRemoteDescription(desc);
-          if (desc.type === "offer") {
-            await pc.setLocalDescription();
-            send({ t: "signal", to: fromId, data: { description: pc.localDescription } });
-          }
-        } else if (data.candidate) {
-          try { await pc.addIceCandidate(data.candidate); }
-          catch (e) { if (!state.ignoreOffer) throw e; }
+        const stage = document.getElementById("stage");
+        const myId = "studio-" + Math.random().toString(36).slice(2, 10);
+        // Prove ownership on reconnect; this per-peer secret is sent only on join, never broadcast.
+        const SECRET = (() => {
+          const b = new Uint8Array(16);
+          crypto.getRandomValues(b);
+          return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+        })();
+
+        const peers = new Map();
+        // Keep slots stable across disconnects so the OBS composition does not reflow.
+        const slotOf = new Map();
+        let nextSlot = 0;
+        const names = new Map();
+        const roles = new Map();
+
+        function assignSlot(peerId) {
+          if (slotOf.has(peerId)) return slotOf.get(peerId);
+          const s = nextSlot++;
+          slotOf.set(peerId, s);
+          return s;
         }
-      } catch (_) {}
-    }
 
-    window.addEventListener("beforeunload", () => {
-      alive = false;
-      send({ t: "leave" });
-      try { ws && ws.close(); } catch (_) {}
-    });
+        function relayout() {
+          const slots = [...slotOf.entries()]
+            .filter(([id]) => !(HIDE_SELF && id === SELF))
+            .sort((a, b) => a[1] - b[1])
+            .map(([id]) => id);
 
-    // Keepalive (mantém o NAT/relé acordado).
-    setInterval(() => send({ t: "ping" }), 25000);
+          if (LAYOUT === "solo") {
+            const wanted = SOLO_PEER
+              ? SOLO_PEER
+              : [...slotOf.entries()].find(([, s]) => s === SOLO_SLOT - 1)?.[0];
+            stage.style.gridTemplateColumns = "1fr";
+            for (const [id, info] of peers) {
+              info.tile.style.display = id === wanted ? "" : "none";
+            }
+            return;
+          }
 
-    if (!ROOM) {
-      stage.innerHTML =
-        '<div class="tile down"><div class="brb" style="display:flex">' +
-        '<div class="kicker">Corneta · Mesa</div><div class="slab">Sem sala</div>' +
-        '<div class="sub">abra pela Corneta (faltou o código)</div></div></div>';
-      return;
-    }
-    connect();
-  })();
-  </script>
-</body>
+          const n = Math.max(slots.length, 1);
+          const cols = Math.ceil(Math.sqrt(n));
+          stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+          for (const id of slots) {
+            const info = peers.get(id);
+            if (info) info.tile.style.order = String(slotOf.get(id));
+          }
+        }
+
+        function ensureTile(peerId) {
+          let info = peers.get(peerId);
+          if (info && info.tile) return info;
+          const tile = document.createElement("div");
+          tile.className = "tile down";
+          const video = document.createElement("video");
+          video.autoplay = true;
+          video.playsInline = true;
+          // OBS already captures the host microphone; mute this peer to avoid duplicate audio.
+          video.muted = peerId === SELF;
+          const brb = document.createElement("div");
+          brb.className = "brb";
+          brb.innerHTML =
+            '<div class="kicker">Corneta · Mesa</div>' +
+            '<div class="slab">JÁ VOLTO</div>' +
+            '<div class="sub">já já tá de volta — segura a corneta 📣</div>';
+          const dot = document.createElement("div");
+          dot.className = "dot";
+          const label = document.createElement("div");
+          label.className = "label";
+          label.textContent = names.get(peerId) || "convidado";
+          tile.append(video, brb, dot, label);
+          if (HIDE_SELF && peerId === SELF) tile.style.display = "none";
+          stage.appendChild(tile);
+          info = {
+            ...(info || {}),
+            tile,
+            video,
+            brb,
+            dot,
+            label,
+            slot: assignSlot(peerId),
+          };
+          peers.set(peerId, info);
+          relayout();
+          return info;
+        }
+
+        function setStatus(peerId, kind) {
+          const info = peers.get(peerId);
+          if (!info) return;
+          info.dot.className =
+            "dot" + (kind === "ok" ? " ok" : kind === "bad" ? " bad" : "");
+          info.tile.classList.toggle("down", kind !== "ok");
+          info.tile.classList.remove("empty");
+        }
+
+        function markGone(peerId) {
+          const info = peers.get(peerId);
+          if (!info) return;
+          info.tile.classList.add("empty");
+          info.dot.className = "dot bad";
+          if (info.video) info.video.srcObject = null;
+          const pc = info.pc;
+          if (pc) {
+            pc.onicecandidate = null;
+            pc.ontrack = null;
+            pc.onnegotiationneeded = null;
+            pc.onconnectionstatechange = null;
+            try {
+              pc.close();
+            } catch (_) {}
+          }
+          // Fixed slots retain map entries; release closed connections and negotiation closures explicitly.
+          info.pc = null;
+          info._neg = null;
+        }
+
+        let ws = null;
+        let retry = 0;
+        let alive = true;
+
+        function send(obj) {
+          if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+        }
+
+        function connect() {
+          ws = new WebSocket(SIGNAL);
+          ws.onopen = () => {
+            retry = 0;
+            send({
+              t: "join",
+              room: ROOM,
+              peerId: myId,
+              role: "studio",
+              name: "OBS",
+              secret: SECRET,
+            });
+          };
+          ws.onmessage = (ev) => {
+            let m;
+            try {
+              m = JSON.parse(ev.data);
+            } catch (_) {
+              return;
+            }
+            onSignal(m);
+          };
+          ws.onclose = () => {
+            if (!alive) return;
+            retry = Math.min(retry + 1, 6);
+            setTimeout(connect, 400 * retry);
+          };
+          ws.onerror = () => {
+            try {
+              ws.close();
+            } catch (_) {}
+          };
+        }
+
+        function isPublisher(role) {
+          return role === "control";
+        }
+
+        function onSignal(m) {
+          switch (m.t) {
+            case "welcome":
+              for (const p of m.peers || []) {
+                names.set(p.peerId, p.name);
+                roles.set(p.peerId, p.role);
+                if (isPublisher(p.role)) connectTo(p.peerId);
+              }
+              break;
+            case "peer-join":
+              if (m.peer) {
+                names.set(m.peer.peerId, m.peer.name);
+                roles.set(m.peer.peerId, m.peer.role);
+                if (isPublisher(m.peer.role)) connectTo(m.peer.peerId);
+              }
+              break;
+            case "peer-leave":
+              markGone(m.peerId);
+              break;
+            case "signal":
+              handlePeerSignal(m.from, m.data);
+              break;
+          }
+        }
+
+        function makePeer(remoteId) {
+          const pc = new RTCPeerConnection({
+            iceServers: ICE,
+            bundlePolicy: "max-bundle",
+          });
+          const polite = myId > remoteId; // Deterministic tie-break for simultaneous offers.
+          const state = { pc, polite, makingOffer: false, ignoreOffer: false };
+
+          pc.onicecandidate = ({ candidate }) => {
+            if (candidate)
+              send({ t: "signal", to: remoteId, data: { candidate } });
+          };
+          pc.ontrack = ({ streams }) => {
+            const info = ensureTile(remoteId);
+            if (streams[0] && info.video.srcObject !== streams[0]) {
+              info.video.srcObject = streams[0];
+            }
+          };
+          pc.onconnectionstatechange = () => {
+            const s = pc.connectionState;
+            if (s === "connected") setStatus(remoteId, "ok");
+            else if (s === "failed") {
+              setStatus(remoteId, "bad");
+              try {
+                pc.restartIce();
+              } catch (_) {}
+            } else if (s === "disconnected") setStatus(remoteId, "warn");
+          };
+          pc.onnegotiationneeded = async () => {
+            try {
+              state.makingOffer = true;
+              await pc.setLocalDescription();
+              send({
+                t: "signal",
+                to: remoteId,
+                data: { description: pc.localDescription },
+              });
+            } catch (_) {
+            } finally {
+              state.makingOffer = false;
+            }
+          };
+          return state;
+        }
+
+        function connectTo(remoteId) {
+          if (remoteId === myId) return;
+          ensureTile(remoteId);
+          let info = peers.get(remoteId);
+          if (info.pc) return;
+          const state = makePeer(remoteId);
+          info.pc = state.pc;
+          info._neg = state;
+          // Receive-only: the publisher adds tracks and initiates negotiation; this peer answers.
+        }
+
+        async function handlePeerSignal(fromId, data) {
+          if (!data) return;
+          ensureTile(fromId);
+          let info = peers.get(fromId);
+          if (!info.pc) {
+            connectTo(fromId);
+            info = peers.get(fromId);
+          }
+          const state = info._neg;
+          const pc = info.pc;
+          try {
+            if (data.description) {
+              const desc = data.description;
+              const offerCollision =
+                desc.type === "offer" &&
+                (state.makingOffer || pc.signalingState !== "stable");
+              state.ignoreOffer = !state.polite && offerCollision;
+              if (state.ignoreOffer) return;
+              await pc.setRemoteDescription(desc);
+              if (desc.type === "offer") {
+                await pc.setLocalDescription();
+                send({
+                  t: "signal",
+                  to: fromId,
+                  data: { description: pc.localDescription },
+                });
+              }
+            } else if (data.candidate) {
+              try {
+                await pc.addIceCandidate(data.candidate);
+              } catch (e) {
+                if (!state.ignoreOffer) throw e;
+              }
+            }
+          } catch (_) {}
+        }
+
+        window.addEventListener("beforeunload", () => {
+          alive = false;
+          send({ t: "leave" });
+          try {
+            ws && ws.close();
+          } catch (_) {}
+        });
+
+        setInterval(() => send({ t: "ping" }), 25000);
+
+        if (!ROOM) {
+          stage.innerHTML =
+            '<div class="tile down"><div class="brb" style="display:flex">' +
+            '<div class="kicker">Corneta · Mesa</div><div class="slab">Sem sala</div>' +
+            '<div class="sub">abra pela Corneta (faltou o código)</div></div></div>';
+          return;
+        }
+        connect();
+      })();
+    </script>
+  </body>
 </html>

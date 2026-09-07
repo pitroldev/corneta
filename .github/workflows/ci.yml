@@ -8,12 +8,12 @@ on:
   workflow_call:
     inputs:
       checkout_ref:
-        description: "Ref exato que todos os jobs devem validar"
+        description: "Exact ref all jobs must validate"
         required: false
         type: string
     outputs:
       validated_sha:
-        description: "SHA completo validado por todos os jobs"
+        description: "Full SHA validated by all jobs"
         value: ${{ jobs.resolve.outputs.sha }}
 
 permissions:
@@ -37,12 +37,12 @@ jobs:
           ref: ${{ inputs.checkout_ref || github.ref }}
           persist-credentials: false
       - id: revision
-        name: Fixar commit validado
+        name: Pin the validated commit
         shell: bash
         run: |
           sha="$(git rev-parse HEAD)"
           if [[ ! "$sha" =~ ^[a-f0-9]{40}$ ]]; then
-            echo 'Não foi possível fixar o SHA completo do CI.' >&2
+            echo 'Could not pin the full CI commit SHA.' >&2
             exit 1
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
@@ -60,11 +60,10 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.18.1
-      # Mesmo scanner/checksum e escopo local: TODAS as refs + snapshot atual.
-      # Não publica SARIF/logs brutos nem usa secrets em PRs de forks.
-      - name: Testar exceções estritas de fixtures
+      # Keep the local scanner's full-ref scope; never upload raw findings or expose secrets to forks.
+      - name: Test strict fixture exceptions
         run: node --test scripts/audit-secrets.check.mjs
-      - name: Auditar histórico completo e arquivos publicáveis
+      - name: Audit full history and publishable files
         run: node scripts/audit-secrets.mjs
 
   frontend:
@@ -79,13 +78,13 @@ jobs:
       VITE_TELEMETRY_DISABLED: "1"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - name: Exigir commit resolvido e smoke aprovado
+      - name: Require resolved commit and passing smoke tests
         env:
           RESOLVE_RESULT: ${{ needs.resolve.result }}
           BROWSER_RESULT: ${{ needs.browser-smoke.result }}
         run: |
           if [[ "$RESOLVE_RESULT" != success || "$BROWSER_RESULT" != success ]]; then
-            echo 'A resolução do commit e o smoke do navegador devem passar.' >&2
+            echo 'Commit resolution and browser smoke tests must pass.' >&2
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,7 +100,7 @@ jobs:
           node-version: 24.18.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verificar revisões dos artigos alterados
+      - name: Check changed article reviews
         if: github.event_name == 'pull_request'
         run: >-
           pnpm --dir web content:revision:check
@@ -109,19 +108,19 @@ jobs:
           --head "${{ needs.resolve.outputs.sha }}"
       - run: pnpm lint
       - run: pnpm format:check
-      - name: Verificar links locais da documentação
+      - name: Check local documentation links
         run: node scripts/check-doc-links.mjs
       - run: pnpm test
       - run: pnpm build
       - run: pnpm bundle:check
-      - name: Verificar scripts de release/segredos
+      - name: Check release and secret-scanning scripts
         run: node scripts/check-scripts.mjs
-      - name: Verificar site e setup API
+      - name: Check website and Setup API
         env:
           NEXT_PUBLIC_SITE_URL: https://www.corneta.live
           NEXT_PUBLIC_PRIMARY_CTA_URL: https://example.com/corneta-download
         run: pnpm web:check
-      - name: Impedir alteração incidental dos lockfiles
+      - name: Prevent incidental lockfile changes
         run: git diff --exit-code -- pnpm-lock.yaml src-tauri/Cargo.lock
 
   browser-smoke:
@@ -147,18 +146,18 @@ jobs:
           node-version: 24.18.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Compilar a demo sem credenciais ou perfil do aplicativo
+      - name: Build the demo without credentials or application profile
         run: node scripts/contributor.mjs frontend:build
-      - name: Smoke de relatórios em Chromium real e perfil descartável
+      - name: Smoke-test reports in real Chromium with a disposable profile
         timeout-minutes: 3
         shell: pwsh
         run: |
           foreach ($locale in @('pt-BR', 'en')) {
             $env:CORNETA_SMOKE_LOCALE = $locale
             node scripts/smoke-reports.mjs
-            if ($LASTEXITCODE -ne 0) { throw "Smoke do browser falhou para $locale." }
+            if ($LASTEXITCODE -ne 0) { throw "Browser smoke test failed for $locale." }
           }
-      - name: Preservar somente diagnóstico sintético do smoke
+      - name: Preserve only synthetic smoke diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -182,13 +181,12 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
-      # Mesmo toolchain estável e exato usado na release. Mantê-lo fixo aqui
-      # impede que `rust-version` vire apenas documentação não testada.
+      # Test the exact release toolchain so rust-version remains an enforced contract.
       - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master; immutable implementation
         with:
           toolchain: 1.97.1
           components: rustfmt, clippy
-      - name: Ativar cache de compilação Rust
+      - name: Enable Rust compilation cache
         uses: mozilla-actions/sccache-action@fd02668681acd5f960e1372061bee5e3e987195c # v0.0.11
         with:
           version: v0.16.0
@@ -196,8 +194,8 @@ jobs:
         with:
           workspaces: src-tauri
           cache-targets: true
-      # Os jobs não compartilham disco. Há testes de mídia não-ignorados aqui.
-      - name: Preparar sidecars verificados para os testes Rust
+      # Jobs do not share sidecars, and non-ignored Rust tests require media tools.
+      - name: Prepare verified sidecars for Rust tests
         shell: pwsh
         env:
           CORNETA_FFMPEG_MIRROR_URL: ${{ vars.CORNETA_FFMPEG_MIRROR_URL }}
@@ -233,7 +231,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master; immutable implementation
         with:
           toolchain: 1.97.1
-      - name: Ativar cache de compilação Rust
+      - name: Enable Rust compilation cache
         uses: mozilla-actions/sccache-action@fd02668681acd5f960e1372061bee5e3e987195c # v0.0.11
         with:
           version: v0.16.0
@@ -241,14 +239,14 @@ jobs:
         with:
           workspaces: src-tauri
           cache-targets: true
-      - name: Preparar exatamente o FFmpeg verificado da release
+      - name: Prepare the exact verified release FFmpeg
         shell: pwsh
         env:
           CORNETA_FFMPEG_MIRROR_URL: ${{ vars.CORNETA_FFMPEG_MIRROR_URL }}
         run: |
           $toolDirectory = Join-Path $env:RUNNER_TEMP 'corneta-media-tools'
           pwsh -NoProfile -File ../scripts/fetch-binaries.ps1 -ToolDirectory $toolDirectory
-          if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar mídia verificada.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to prepare verified media tools.' }
           $toolDirectory | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           & (Join-Path $toolDirectory 'ffmpeg.exe') -version
           & (Join-Path $toolDirectory 'ffprobe.exe') -version

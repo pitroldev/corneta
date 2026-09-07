@@ -4,13 +4,12 @@ import { useI18n, type I18n, type MessageKey } from "../lib/i18n";
 import { PlatformGlyph } from "./ui";
 import type { Alert, AlertKind, PlatformId } from "../lib/types";
 
-// Origem agregadora (não é plataforma de chat) → mostra o nome no lugar do glifo.
 const ORIGIN: Record<string, string> = {
   streamlabs: "Streamlabs",
   streamelements: "StreamElements",
 };
 
-// A CHAVE é o enum do alerta (vem do backend) — só o verbo é texto de tela.
+// Alert kinds are backend enum values, not display copy.
 const KIND_META: Record<
   AlertKind,
   { emoji: string; verbKey: MessageKey; accent: string }
@@ -21,7 +20,7 @@ const KIND_META: Record<
   subgift: {
     emoji: "🎁",
     verbKey: "chat.alerts.verb.subgift",
-    accent: "tomate",
+    accent: "tomato",
   },
   bits: { emoji: "💎", verbKey: "chat.alerts.verb.bits", accent: "brass" },
   tip: { emoji: "💰", verbKey: "chat.alerts.verb.tip", accent: "ok" },
@@ -36,13 +35,12 @@ const KIND_META: Record<
 
 const ACCENT: Record<string, { bar: string }> = {
   brass: { bar: "border-brass" },
-  tomate: { bar: "border-tomate" },
+  tomato: { bar: "border-tomato" },
   info: { bar: "border-info" },
   ok: { bar: "border-ok" },
 };
 
-/** Detalhe (valor/quantidade) por tipo de alerta. `a.tier` vem da plataforma
- *  ("Tier 1", "Prime") — é rótulo dela, não copy nossa, e passa cru. */
+/** Platform-provided tier labels are displayed verbatim. */
 function detail(a: Alert, i18n: Pick<I18n, "t" | "tp">): string {
   const months = (n: number) => i18n.tp("chat.alerts.detail.months", n);
   switch (a.kind) {
@@ -140,7 +138,6 @@ const AlertRow = memo(function AlertRow({
   );
 });
 
-/** Feed dos alertas (mais novo no topo). */
 export function AlertsFeed({
   alerts,
   className,
@@ -148,12 +145,11 @@ export function AlertsFeed({
 }: {
   alerts: Alert[];
   className?: string;
-  /** Tamanho base da fonte das linhas, em pixels (proporções escalam a partir daqui). */
+  /** Base row font size in pixels. */
   fontSize?: number;
 }) {
   const { t } = useI18n();
   const list = useMemo(() => [...alerts].reverse(), [alerts]);
-  // role="log" + aria-live: doação, raid e sub são anunciados quando chegam.
   return (
     <div
       role="log"

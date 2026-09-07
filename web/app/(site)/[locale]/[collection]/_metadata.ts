@@ -47,8 +47,7 @@ export function completeLanguageAlternates(
 
   return {
     canonical,
-    // Um objeto vazio substitui os hreflangs genéricos herdados da home.
-    // Só emitimos o conjunto quando as duas páginas realmente existem.
+    // Empty alternates clear inherited home links when no published translation pair exists.
     languages:
       portuguese && english
         ? { "pt-BR": portuguese, en: english, "x-default": portuguese }
@@ -87,7 +86,6 @@ interface EditorialMetadataOptions {
   };
 }
 
-/** Contrato puro e testável para nenhuma rota herdar canonical/OG da home. */
 export function buildEditorialMetadata({
   locale,
   canonical,

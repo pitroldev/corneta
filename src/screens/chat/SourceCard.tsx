@@ -104,7 +104,6 @@ export function SourceCard({
               onChange={(v) =>
                 onChange({
                   platform: v as ChatPlatform,
-                  // Re-limpa o valor pro formato da NOVA plataforma (ex.: @handle→login).
                   value: normalizeChatChannel(v as ChatPlatform, src.value),
                 })
               }
@@ -118,7 +117,6 @@ export function SourceCard({
                 placeholder={t(PLACEHOLDER[src.platform])}
                 onChange={(e) => onChange({ value: e.target.value })}
                 onBlur={(e) => {
-                  // Ao sair do campo, limpa o que colou (URL/@/ID/subpágina) pro formato certo.
                   const clean = normalizeChatChannel(
                     src.platform,
                     e.target.value,
@@ -169,8 +167,6 @@ export function SourceCard({
   );
 }
 
-// API key do YouTube: salva sozinha (onChange), mas ninguém saberia se presta — daí o
-// "Verificar", que faz uma chamada barata à Data API e mostra ✓/motivo real do Google.
 export function YoutubeApiKeyField({
   value,
   onChange,
@@ -183,7 +179,6 @@ export function YoutubeApiKeyField({
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(
     null,
   );
-  // Resultado envelhece: some ao editar a chave (senão um ✓ antigo fica mentindo).
   useEffect(() => setResult(null), [value]);
   const verify = async () => {
     if (!value.trim()) return;
@@ -197,8 +192,7 @@ export function YoutubeApiKeyField({
       setTesting(false);
     }
   };
-  // Não é <label>: o gatilho do tooltip é um <button> e viria antes do input na
-  // ordem do DOM — o rótulo passaria a nomear o botão. O input recebe o nome direto.
+  // A label wrapper would name the tooltip button first; name the input directly.
   return (
     <div className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
       <span className="flex flex-wrap items-center gap-1.5">

@@ -12,7 +12,6 @@ import { Button } from "./ui";
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
 
-/** Editor de enquadramento vertical: recorta um 9:16 do sinal landscape. */
 export function ReframeEditor({
   target,
   onClose,
@@ -24,7 +23,7 @@ export function ReframeEditor({
   const updateTarget = useStore((s) => s.updateTarget);
   const preset =
     target.encoding.preset ?? PLATFORMS[target.platformId].recommended;
-  const ar = preset.width / preset.height; // < 1 (portrait), ex.: 0.5625
+  const ar = preset.width / preset.height;
 
   const init = target.encoding.reframe ?? { x: 0.5, y: 0.5, zoom: 1 };
   const [x, setX] = useState(init.x);
@@ -43,7 +42,7 @@ export function ReframeEditor({
   const rafId = useRef<number | null>(null);
   const pendingXY = useRef<{ x: number; y: number } | null>(null);
 
-  // Dimensões do recorte como fração do palco (16:9).
+  // Crop dimensions as fractions of the 16:9 stage.
   const cropW = Math.min(1, zoom * ar * (9 / 16));
   const cropH = zoom;
   const left = x * (1 - cropW);
@@ -119,12 +118,8 @@ export function ReframeEditor({
     onClose();
   };
 
-  // "Tem vídeo do OBS chegando?" — é o bit que o Rust publica no snapshot, não a
-  // contagem de viewers do chat (que pode existir sem OBS e faltar com OBS). Serve só
-  // pra escolher a dica: o botão de captura fica sempre ligado e, sem sinal, o backend
-  // responde com o aviso certo.
+  // Use the native ingest flag; chat viewer counts do not indicate an OBS signal.
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
-  // Mudou algo? (pra não descartar sem querer no clique fora)
   const dirty =
     x !== init.x || y !== init.y || zoom !== init.zoom || frame != null;
   const nudge = (dx: number, dy: number) => {
@@ -135,7 +130,6 @@ export function ReframeEditor({
   const bg = frame
     ? { backgroundImage: `url(${frame})`, backgroundSize: "cover" }
     : undefined;
-  // Mini-preview do 9:16 final: mostra só a região recortada do frame.
   const previewStyle = frame
     ? {
         backgroundImage: `url(${frame})`,
@@ -171,7 +165,6 @@ export function ReframeEditor({
       </p>
 
       <div className="flex flex-col gap-4 sm:flex-row">
-        {/* Palco 16:9 com o recorte arrastável */}
         <div className="flex-1">
           <div
             ref={stageRef}
@@ -256,7 +249,6 @@ export function ReframeEditor({
           </div>
         </div>
 
-        {/* Preview do resultado 9:16 */}
         <div className="flex flex-col items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
             {t("platforms.reframe.result")}
@@ -303,8 +295,6 @@ export function ReframeEditor({
   );
 }
 
-// Cena-fantasma: sem frame do OBS, mostra uma silhueta (busto) centralizada pra você
-// já enxergar onde o recorte 9:16 vai cair. Latão suave de fundo, contorno duro do tema.
 function GhostScene() {
   return (
     <svg

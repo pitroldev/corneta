@@ -37,7 +37,7 @@ export async function checkFormatting(
     )
   ) {
     throw new Error(
-      "Baseline de formatação inválida ou versão de Prettier diferente; revise a migração explicitamente.",
+      "Invalid formatting baseline or mismatched Prettier version; explicitly review the migration.",
     );
   }
   const result = { checked: 0, legacy: [], failures: [], formatted: [] };
@@ -45,12 +45,12 @@ export async function checkFormatting(
   for (const path of sourceFiles(workspace)) {
     const file = resolve(workspace, path);
     if (!file.startsWith(`${resolve(workspace)}${sep}`))
-      throw new Error("Caminho de fonte fora do workspace.");
+      throw new Error("Source path is outside the workspace.");
     if (!existsSync(file)) continue; // tracked deletion in a working tree
     if (lstatSync(file).isSymbolicLink())
-      throw new Error(`Symlink não é fonte formatável: ${path}`);
+      throw new Error(`Cannot format a symlink source: ${path}`);
     if (!realpathSync(file).startsWith(`${workspaceReal}${sep}`))
-      throw new Error(`Fonte formatável fora do workspace: ${path}`);
+      throw new Error(`Formatting source is outside the workspace: ${path}`);
     const info = await prettier.getFileInfo(file, {
       ignorePath: resolve(workspace, ".prettierignore"),
     });
@@ -82,7 +82,7 @@ if (
 ) {
   const flags = process.argv.slice(2);
   if (flags.some((flag) => !["--write", "--all"].includes(flag))) {
-    console.error("Uso: node scripts/check-format.mjs [--write] [--all]");
+    console.error("Usage: node scripts/check-format.mjs [--write] [--all]");
     process.exitCode = 1;
   } else {
     checkFormatting(root, {
@@ -91,11 +91,11 @@ if (
     })
       .then((result) => {
         console.log(
-          `Formatação: ${result.checked} arquivos inspecionados; ${result.legacy.length} débitos históricos inalterados; ${result.formatted.length} formatados.`,
+          `Formatting: ${result.checked} files checked; ${result.legacy.length} unchanged legacy exceptions; ${result.formatted.length} formatted.`,
         );
         if (result.failures.length) {
           console.error(
-            `Arquivos novos/modificados fora do padrão:\n${result.failures.join("\n")}\nExecute pnpm format. --all verifica também a dívida histórica.`,
+            `New or modified files are not formatted:\n${result.failures.join("\n")}\nRun pnpm format. --all also checks legacy exceptions.`,
           );
           process.exitCode = 1;
         }

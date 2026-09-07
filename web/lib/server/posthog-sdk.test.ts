@@ -9,7 +9,7 @@ const REQUEST_ID = "318f95fc-6f70-4cf5-a625-e250e43b1234";
 const ERROR_ID = "0ed0e00e-acb7-4a10-8909-d791e52c945d";
 
 describe("PostHog Node exception contract", () => {
-  it("mantém $exception_list compatível depois da redação final", async () => {
+  it("keeps $exception_list compatible after final redaction", async () => {
     const observed: Array<Record<string, unknown> | null> = [];
     const fetch = vi.fn(async () => ({
       status: 200,

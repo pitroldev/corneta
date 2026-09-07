@@ -4,14 +4,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { CropIcon } from "./icons";
 
-// Recorte 9:16 da live deitada. Antes: três radios escondidos e três regras
-// (`#crop-esq:checked ~ .vframe .vcrop { left: 4% }`) com uma `transition: left`
-// no CSS. Agora o quadro é conduzido por mola, que dá o peso de arrastar algo
-// físico em vez do deslize linear de antes.
-//
-// As posições são as MESMAS do CSS original, escritas para não depender da
-// largura do quadro (que sai do aspect-ratio 9/16): "direita" continua sendo
-// `right: 4%`, só que expresso como left 96% com translate -100%.
 const SPOTS = [
   { id: "esq", label: "Enquadrar à esquerda", at: { left: "4%", x: "0%" } },
   { id: "meio", label: "Enquadrar no centro", at: { left: "50%", x: "-50%" } },

@@ -18,9 +18,6 @@ import {
   TwoCol,
 } from "../_components/ui";
 
-// Duas seções que andam juntas: a mesa de qualidade (o que cada modo faz) e a
-// jornada da live (antes, durante, depois).
-
 export function Quality({ t }: { t: T }) {
   return (
     <Section id="qualidade">
@@ -53,14 +50,8 @@ export function Quality({ t }: { t: T }) {
   );
 }
 
-// A jornada pousa em PAPEL, então os filetes usam a linha de papel e o texto de
-// apoio usa a tinta escura — por isso `tone` aparece nas duas pontas.
 const ROW =
-  // Colapsa em 860, não em 760: as três colunas somam 710px de mínimo mais os
-  // vãos, e a casca em 768px oferece 728. Entre 760 e ~810 a linha estourava
-  // 16px — cortados pelo `overflow-x: clip` do body, então sem barra de
-  // rolagem pra denunciar. É a largura do CONTEÚDO que manda no ponto de
-  // quebra, não o número redondo do tablet.
+  // Collapse before the content's minimum column widths exceed the available container width.
   "grid items-center gap-[clamp(26px,3.5vw,46px)] border-b-2 border-paper-line py-[clamp(30px,4vw,46px)] max-[860px]:grid-cols-1! max-[860px]:gap-6 " +
   "[&_h3]:text-[clamp(1.6rem,2.4vw,2.3rem)] [&_h3]:tracking-[-0.02em] " +
   "[&_p]:mt-3.5 [&_p]:max-w-[46ch] [&_p]:leading-[1.62] [&_p]:font-medium [&_p]:text-ink-muted";
@@ -69,9 +60,6 @@ const COLS_3 =
 const COLS_2 =
   "[grid-template-columns:minmax(260px,0.85fr)_minmax(360px,1.15fr)]";
 
-/** Copy dos dois painéis da jornada, resolvida no SERVIDOR — função não
- *  atravessa a fronteira pro componente animado. Os templates chegam com os
- *  buracos intactos: quem preenche é o cliente, a cada segundo. */
 const liveRoomCopy = (t: T, locale: Locale): LiveRoomCopy => ({
   label: t("replica.live.label"),
   tag: t("replica.live.tag"),
@@ -123,8 +111,6 @@ export function Journey({ t, locale }: { t: T; locale: Locale }) {
             </div>
             <div>
               <p className="mt-0!">{t("quality.journey.before.body")}</p>
-              {/* Sobre papel o visto verde do tema escuro perde contraste;
-                  `ok-ink` é o mesmo verde um passo mais fundo. */}
               <Checklist className="[&>li]:text-ink [&_svg]:stroke-ok-ink">
                 <li>
                   <CheckIcon /> {t("quality.journey.before.check.upload")}
@@ -156,7 +142,7 @@ export function Journey({ t, locale }: { t: T; locale: Locale }) {
 
           <article className={`${ROW} ${COLS_2}`}>
             <div>
-              <Sticker tone="tomate" className="mb-4">
+              <Sticker tone="tomato" className="mb-4">
                 {t("quality.journey.during.sticker")}
               </Sticker>
               <h3>{t("quality.journey.during.title")}</h3>
@@ -170,10 +156,6 @@ export function Journey({ t, locale }: { t: T; locale: Locale }) {
               <Sticker className="mb-4">
                 {t("quality.journey.after.sticker")}
               </Sticker>
-              {/* "Junta os dados" é o que qualquer painel de analytics faz. O
-                  que só um app que é dono da máquina, do OBS e do envio
-                  consegue é CRUZAR os três e dizer a causa. É esse o verbo
-                  que a copy precisa carregar. */}
               <h3>{t("quality.journey.after.title")}</h3>
               <p>{t("quality.journey.after.body")}</p>
             </div>

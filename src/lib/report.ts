@@ -1,7 +1,3 @@
-// ============================================================
-// Relatório pós-live: parse do NDJSON + análise (eventos, janelas
-// problemáticas, veredito).
-// ============================================================
 import type { I18n, MessageKey } from "./i18n";
 import { pluralSuffix } from "./i18n/locale";
 import type {
@@ -22,9 +18,7 @@ import type {
   SessionViewerSample,
 } from "./types";
 
-/** Tradução injetada. Este módulo é núcleo puro (nada de React aqui dentro), então
- *  quem chama passa o `t` do idioma ativo — nunca um estado global, que viraria
- *  corrida entre a janela principal e a do chat. */
+/** Inject translation to avoid shared locale state between webviews. */
 export type Translate = I18n["t"];
 
 type RawLine = { kind?: string; [k: string]: unknown };
@@ -36,8 +30,7 @@ const finiteMetric = (value: unknown, max = 100): number | undefined => {
     : undefined;
 };
 
-/** O arquivo pode ter sido editado fora da Corneta. Revalida a fronteira de privacidade
- * também na leitura para nunca renderizar caminhos/títulos arbitrários como app. */
+/** Revalidate process labels from editable files before rendering; never expose arbitrary paths or titles. */
 function parseResourceApps(value: unknown): SessionResourceApp[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const apps: SessionResourceApp[] = [];
@@ -71,7 +64,6 @@ function parseResourceApps(value: unknown): SessionResourceApp[] | undefined {
   return apps.length ? apps : undefined;
 }
 
-/** Converte o NDJSON cru numa sessão estruturada. */
 export function parseSession(ndjson: string, t: Translate): SessionData | null {
   const lines = ndjson
     .split("\n")
@@ -83,8 +75,6 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
   const viewerSamples: SessionViewerSample[] = [];
   const followerSamples: SessionFollowerSample[] = [];
   const alertEvents: SessionAlertEvent[] = [];
-  // Gravação: um segmento por vida do FFmpeg, indexado pelo número do segmento enquanto
-  // as linhas chegam (`recording` abre, `recSync` reancora, `recEnd` fecha).
   const recs = new Map<number, SessionRecording>();
   const clockJumps: { t: number; delta: number }[] = [];
   let offsetMs = 0;
@@ -163,8 +153,7 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
         path: String(o.path ?? ""),
         codec: String(o.codec ?? "h264"),
         estimated: o.estimated === true,
-        // A âncora inicial JÁ é a primeira sincronia: sem ela, um segmento sem `recSync`
-        // (live curta) ficaria sem nenhuma referência.
+        // The initial anchor is also a sync point, including for short segments with no recSync.
         syncs: [{ t: ts, out: 0 }],
         endT: ts,
         finalized: false,
@@ -179,8 +168,7 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
       }
     } else if (o.kind === "recEnd") {
       const ts = Number(o.t);
-      // `recEnd` sem `seg` vem da recuperação de boot (sessão truncada por queda de
-      // energia): aplica no último segmento aberto, que é o que ficou pela metade.
+      // Boot recovery emits recEnd without a segment ID; apply it to the last open segment.
       const seg =
         o.seg == null ? Math.max(...recs.keys(), 1) : Number(o.seg) || 1;
       const r = recs.get(seg);
@@ -197,17 +185,13 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
       if (Number.isFinite(ts) && Number.isFinite(delta))
         clockJumps.push({ t: ts, delta });
     } else if (o.kind === "offset") {
-      // Última linha vence: o NDJSON é append-only, então o ajuste manual é reescrito
-      // em vez de editado. Grampeado porque o arquivo pode ter sido mexido na mão.
+      // The last offset wins in append-only files; clamp values from manually edited reports.
       const ms = Number(o.ms);
       if (Number.isFinite(ms))
         offsetMs = Math.max(-30_000, Math.min(30_000, ms));
     } else if (o.kind === "end") {
       const e = Number(o.endedAt);
-      // `end` é terminal, mas relatórios podem receber anotações depois da live.
-      // Versões antigas confundiam um marker posterior com sessão interrompida e
-      // anexavam outro `end` no boot seguinte. O primeiro encerramento válido é o
-      // real; o posterior é só essa recuperação equivocada.
+      // Use the first valid end: later annotations and legacy recovery records must not extend the session.
       if (Number.isFinite(e))
         endedAt = endedAt == null ? e : Math.min(endedAt, e);
     }
@@ -215,16 +199,13 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
 
   if (!meta || !Number.isFinite(meta.startedAt)) return null;
   const last = samples.length ? samples[samples.length - 1].t : meta.startedAt;
-  // endedAt só existe com o registro "end" — sessão AINDA NO AR fica sem, e o
-  // ReportsScreen usa isso pra não gravar resumo parcial no cache.
+  // Only an end record sets endedAt, preventing partial reports from entering the completed-summary cache.
   meta.endedAt = endedAt;
   meta.durationSec = Math.max(
     0,
     Math.round(((endedAt ?? last) - meta.startedAt) / 1000),
   );
-  // Segmento que nunca fechou (o app morreu antes do `recEnd`) fica com `endT === t` e
-  // seria descartado como vazio. Fecha na última amostra: é o instante mais tardio que
-  // sabemos ter existido, e é melhor um replay que termina cedo do que replay nenhum.
+  // Recover an unclosed segment to the last observed sample instead of dropping the entire replay.
   for (const r of recs.values()) {
     if (r.endT <= r.t) r.endT = Math.max(endedAt ?? last, r.t);
   }
@@ -242,10 +223,7 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
   };
 }
 
-/** Converte o `<id>.chat.ndjson` em mensagens + buracos.
- *
- *  As deleções são aplicadas NA LEITURA: quem foi moderado sai do replay por padrão, em
- *  vez de ficar guardado num campo que alguém esquece de filtrar depois. */
+/** Apply moderation deletions while parsing chat so consumers cannot accidentally expose deleted messages. */
 export function parseChatSession(ndjson: string): {
   messages: ReplayChatMessage[];
   gaps: ReplayChatGap[];
@@ -286,9 +264,6 @@ export function parseChatSession(ndjson: string): {
   return { messages, gaps };
 }
 
-// ---------------------------------------------------------------------------
-// Séries para os gráficos
-// ---------------------------------------------------------------------------
 export const timeAxis = (d: SessionData): number[] => d.samples.map((s) => s.t);
 export const cpuSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => s.cpu ?? null);
@@ -310,11 +285,9 @@ export const hasObs = (d: SessionData): boolean =>
 export const obsRenderSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => (s.obs ? s.obs.avgRenderMs : null));
 
-/** Audiência somada (todas as plataformas) ao longo do tempo. */
 export const viewerSeries = (d: SessionData): (number | null)[] =>
   d.viewerSamples.map((s) => s.total);
 
-/** Taxa de chat em mensagens/min, por amostra (~2s). */
 export function chatRateSeries(d: SessionData): (number | null)[] {
   const s = d.samples;
   return s.map((x, i) => {
@@ -326,7 +299,6 @@ export function chatRateSeries(d: SessionData): (number | null)[] {
 export const hasChat = (d: SessionData): boolean =>
   d.samples.some((s) => (s.chat ?? 0) > 0);
 
-/** Audiência de UM canal ao longo do tempo (eixo = índice de `viewerSamples`). */
 export function viewerSeriesFor(
   d: SessionData,
   key: string,
@@ -338,25 +310,21 @@ export function viewerSeriesFor(
   );
 }
 
-/** Taxa de chat (msgs/min) de UM canal. Só faz sentido com `hasChatByChannel`. */
 export function chatRateSeriesFor(
   d: SessionData,
   key: string,
 ): (number | null)[] {
   const s = d.samples;
   return s.map((x, i) => {
-    // Sem o campo `chat` a amostra é anterior à contagem de chat: não é zero, é ausência.
+    // A missing chat field means unmeasured, not zero.
     if (x.chat == null) return null;
-    // Com `chat` mas sem `chatBy`, ninguém falou na janela — aí zero é a resposta certa.
+    // With chat measured but no per-channel counts, this channel had zero messages.
     const c = x.chatBy?.[key] ?? 0;
     const dt = i > 0 ? (x.t - s[i - 1].t) / 1000 : 2;
     return dt > 0 ? Math.round((c * 60) / dt) : 0;
   });
 }
 
-// ---------------------------------------------------------------------------
-// Análise
-// ---------------------------------------------------------------------------
 export interface ReportEvent {
   t: number;
   kind:
@@ -371,7 +339,6 @@ export interface ReportEvent {
   label: string;
 }
 
-/** Estados de destino que contam como problema (mesma régua em toda a análise). */
 const isProblemState = (state: string): boolean =>
   state === "reconnecting" || state === "error" || state === "signal-lost";
 
@@ -381,7 +348,7 @@ export interface ProblemWindow {
   durationSec: number;
   signals: string[];
   cause: string;
-  /** Classificação estável da causa (o texto de `cause` é copy, pode mudar). */
+  /** Stable cause classification, independent of localized cause text. */
   causeKind:
     | "app"
     | "render"
@@ -391,15 +358,13 @@ export interface ProblemWindow {
     | "platform"
     | "signal"
     | "unknown";
-  /** Nunca usamos "confirmada" para correlação: até a evidência mais forte é provável. */
+  /** Correlation is at most probable, never confirmed. */
   confidence: "high" | "medium" | "low";
   advice: string;
   targetName?: string;
   contributingApp?: string;
-  /** Plataformas que sentiram, pelo nome — é a linha de impacto ("onde travou"). */
   affected: string[];
   totalTargets: number;
-  /** Como o streamer confere, na próxima live, que a causa era essa mesmo. */
   confirm: string;
 }
 
@@ -411,24 +376,18 @@ export interface ViewerStats {
   hasData: boolean;
 }
 
-/** Um canal do relatório: uma fonte de chat/audiência (`plataforma:rótulo`).
- *  Duas contas na mesma plataforma são DOIS canais — é o caso que motivou a feature. */
 export interface ChannelStats {
   key: string;
   platform: ChatPlatform;
-  /** Rótulo que o usuário deu à fonte (ou o próprio @/slug, se não nomeou). */
   source: string;
   viewers: { peak: number; avg: number; last: number; hasData: boolean };
-  /** Fatia da audiência da live (0..100), ou null se a sessão não tem audiência. */
+  /** Share of concurrent audience, 0–100; null when audience was not measured. */
   sharePct: number | null;
   followers: {
-    /** Seguidores ganhos na live. Pelo contador é LÍQUIDO: quem deixou de seguir
-     *  subtrai, e o número pode ser negativo (a Twitch também faz limpeza de bots). */
+    /** Counter-derived follower gains are net and may be negative. */
     gained: number;
-    /** Total do canal ao fim da live — só existe medido pelo contador. */
     total: number | null;
-    /** `counter` = diferença do contador da plataforma (líquido, autoritativo).
-     *  `alerts` = soma de eventos de follow (bruto). */
+    /** counter is the authoritative net delta; alerts are gross event counts. */
     from: "counter" | "alerts" | null;
     hasData: boolean;
   };
@@ -445,15 +404,12 @@ export interface ChannelStats {
 
 export interface ChannelBreakdown {
   channels: ChannelStats[];
-  /** A sessão gravou chat por canal? Sessão antiga só tem o total da live. */
   hasChatByChannel: boolean;
-  /** Alertas que não dá pra creditar a um canal (agregador, ou sessão antiga com
-   *  duas fontes da mesma plataforma) — contados à parte em vez de chutados. */
+  /** Keep unattributable alerts separate rather than guessing their channel. */
   unattributedAlerts: number;
-  /** Seguidores ganhos na live inteira. `null` = nenhuma fonte soube dizer. */
+  /** Total follower gain; null when no source can measure it. */
   followersGained: number | null;
-  /** Algum canal foi medido pelo contador da plataforma — então o número é LÍQUIDO
-   *  e a UI precisa dizer isso, senão não bate com o que o streamer contou de alertas. */
+  /** Counter-derived totals are net and must be labeled accordingly. */
   followersNet: boolean;
 }
 
@@ -504,39 +460,32 @@ export interface ReportAnalysis {
   viewers: ViewerStats;
   chat: ChatStats;
   alerts: AlertStats;
-  /** As mesmas métricas de público quebradas por canal. */
   byChannel: ChannelBreakdown;
   highlights: Highlight[];
 }
 
 const CPU_HIGH = 92;
-const BITRATE_DROP = 0.6; // < 60% do típico = queda
-const OBS_CONGEST = 0.3; // congestionamento de saída > 30%
-const OBS_RENDER_MS = 25; // render lag do OBS acima disso = cena pesada
+const BITRATE_DROP = 0.6;
+const OBS_CONGEST = 0.3;
+const OBS_RENDER_MS = 25;
 const APP_GPU_PRESSURE = 80;
 const APP_CPU_PRESSURE = 70;
 const MEMORY_PRESSURE = 92;
 const APP_MEMORY_MB = 2048;
-// Sinais LEVES (bitrate/congestion/render/CPU) só viram "trecho com problema" se
-// persistirem — um blip de 1 amostra (~2s) não é incidente que espectador percebe.
+// Soft symptoms must persist before becoming incidents; a single sample is insufficient.
 const SOFT_WINDOW_MIN_MS = 10_000;
-// Warm-up: primeiras amostras "live" de um destino têm a média de bitrate do FFmpeg
-// ainda subindo do zero — comparar com a mediana acusava "queda" em TODO começo de live.
-const WARMUP_LIVE_SAMPLES = 8; // ~16s
-// Antes do PRIMEIRO "live" de um destino, reconexão é setup (ninguém assistindo ainda).
+// Ignore bitrate warm-up while FFmpeg's average rises from zero.
+const WARMUP_LIVE_SAMPLES = 8;
+// Reconnection before a destination first goes live is setup, not an outage.
 
 const maxOf = (a: number[]) => a.reduce((m, v) => (v > m ? v : m), -Infinity);
 const minOf = (a: number[]) => a.reduce((m, v) => (v < m ? v : m), Infinity);
 
-/** Contexto por destino em cada amostra: separa incidente real de ruído de partida. */
 interface TargetCtx {
-  /** Já esteve "live" ao menos uma vez — antes disso, reconexão é SETUP, não queda. */
   everLive: boolean;
-  /** Live há amostras suficientes (média de bitrate do FFmpeg já aquecida). */
   warm: boolean;
 }
 
-/** Pré-computa everLive/warm por amostra×destino (warm zera quando sai do ar). */
 function targetCtxs(
   samples: SessionSample[],
 ): Array<Record<string, TargetCtx>> {
@@ -560,8 +509,7 @@ function targetCtxs(
   });
 }
 
-/** Bitrate "típico" (mediana) por destino — só de amostras aquecidas, senão o warm-up
- *  puxa a mediana e o começo de TODA live vira "queda". */
+/** Compute median bitrate only from warmed-up samples. */
 function typicalBitrates(
   samples: SessionSample[],
   ctxs: Array<Record<string, TargetCtx>>,
@@ -587,8 +535,6 @@ function isBad(
   previous?: SessionSample,
 ): boolean {
   for (const t of s.targets) {
-    // Problema de estado só conta DEPOIS do destino ter ido ao ar — o ciclo
-    // conectar→tentar de novo da partida acusava "reconectou" em toda live.
     if (isProblemState(t.state) && ctx[t.id]?.everLive) return true;
     const typ = typical[t.id];
     if (
@@ -599,17 +545,13 @@ function isBad(
     )
       return true;
   }
-  // CPU/GPU no limite são CONTEXTO, não prova de uma live ruim. Um jogo pode ocupar
-  // 99% da GPU por horas enquanto NVENC, OBS e os destinos seguem perfeitamente
-  // saudáveis. Esses números ajudam a explicar um render lag real em `buildWindow`, mas
-  // nunca abrem um incidente sozinhos.
+  // High CPU or GPU usage alone is context, not evidence that the stream degraded.
   if (
     s.obs &&
     (s.obs.congestion > OBS_CONGEST || s.obs.avgRenderMs > OBS_RENDER_MS)
   )
     return true;
-  // Contadores do OBS são cumulativos. Só o DELTA é problema; o valor absoluto
-  // continuaria alto pelo resto da live e criaria uma janela infinita.
+  // OBS counters are cumulative; only deltas indicate new frame loss.
   if (
     counterRise(previous?.obs?.renderSkipped, s.obs?.renderSkipped) > 0 ||
     counterRise(previous?.obs?.outputSkipped, s.obs?.outputSkipped) > 0 ||
@@ -667,13 +609,10 @@ interface AppPressure {
   name: string;
   resource: "gpu" | "cpu" | "memory";
   value: number;
-  /** Primeira amostra em que este app passou do limiar — é o que deixa dizer
-   *  "3s depois, o OBS pulou quadros" em vez de só "os dois aconteceram". */
   firstAt: number;
 }
 
-/** Escolhe uma causa por aplicativo apenas quando o uso é realmente excepcional.
- * Aplicativo com 40% de GPU não ganha culpa só por estar no top 3. */
+/** Attribute process pressure only when usage is exceptional, not merely high in the ranked list. */
 function dominantAppPressure(
   slice: SessionSample[],
   impactAt: number,
@@ -694,8 +633,7 @@ function dominantAppPressure(
     existing.firstAt = Math.min(existing.firstAt, candidate.firstAt);
   };
   for (const sample of slice) {
-    // A lista de processos é esparsa (~6 s), portanto aceitamos uma pequena margem
-    // em ambos os lados do efeito. Fora dela é só coexistência, não evidência causal.
+    // Allow a small timing margin for sparse process samples; observations outside it are not causal evidence.
     if (Math.abs(sample.t - impactAt) > 10_000) continue;
     for (const app of sample.apps ?? []) {
       if ((app.gpu3d ?? 0) >= APP_GPU_PRESSURE) {
@@ -738,9 +676,7 @@ function dominantAppPressure(
 
 interface WhyInput {
   causeKind: ProblemWindow["causeKind"];
-  /** O aplicativo culpado (só quando a causa é `app`). */
   app?: AppPressure;
-  /** OBS ou Corneta pesando — contexto, não culpa. */
   ownApp?: AppPressure;
   firstImpactAt?: number;
   renderSkipped: number;
@@ -758,14 +694,7 @@ interface WhyInput {
   congestionPct: number;
 }
 
-/** "Por que eu acho isso" como HISTÓRIA, não como lista de contadores.
- *
- *  Três passos, nesta ordem: (1) quem puxou o quê, (2) o que travou por causa disso — com o
- *  atraso entre os dois, que é o que faz a correlação virar causa plausível — e (3) o que
- *  ficou de fora (internet e plataformas seguiram bem? só uma sentiu?). "O OBS não montou
- *  148 quadros" é sintoma; o streamer quer saber onde travou, o que causou e o que fazer.
- *  Cada passo só entra quando o dado existe; onde os dados não separam as hipóteses, o
- *  último passo diz isso em vez de fingir. */
+/** Build an evidence chain: resource pressure, observed degradation, and unaffected paths. Omit unsupported steps. */
 function whyBullets(w: WhyInput, t: Translate): string[] {
   const pct = (v: number) => Math.round(v);
   const gb = (mb: number) => Math.max(0.1, Math.round((mb / 1024) * 10) / 10);
@@ -777,7 +706,6 @@ function whyBullets(w: WhyInput, t: Translate): string[] {
       sec: Math.round((w.firstImpactAt - at) / 1000),
     });
   };
-  // O mecanismo que travou. Com `withDelay`, encadeado à causa ("3s depois, …").
   const effect = (withDelay: boolean): string | undefined => {
     const k = withDelay ? "effect" : "mech";
     if (w.renderSkipped > 0)
@@ -802,15 +730,13 @@ function whyBullets(w: WhyInput, t: Translate): string[] {
       });
     return undefined;
   };
-  // `pcSide`: a causa mora no PC, então queda de bitrate é CONSEQUÊNCIA (o encoder não
-  // produziu) e não evidência de rede — só uma reconexão diz que a internet entrou.
+  // For local causes, reduced bitrate can be a consequence; only reconnection adds independent network evidence.
   const scope = (pcSide: boolean) =>
     w.affected.length === 1 && w.totalTargets > 1
       ? t("analysis.why.scope.oneTarget", { target: w.affected[0] })
       : w.reconnect || (!pcSide && w.bitrateDrop)
         ? t("analysis.why.scope.allTargets")
         : t("analysis.why.scope.pcOnly");
-  // A máquina como contexto quando nenhum app de fora leva a culpa.
   const machine = () => {
     if (w.ownApp) {
       const who = w.ownApp.appRef === "obs" ? "obs" : "corneta";
@@ -917,7 +843,6 @@ function buildWindow(
       maxCongestion = Math.max(maxCongestion, s.obs.congestion);
       maxRenderMs = Math.max(maxRenderMs, s.obs.avgRenderMs);
     }
-    // `tg` (não `t`): o `t` deste escopo é a tradução.
     for (const tg of s.targets) {
       const ctx = sliceCtxs[i][tg.id];
       const typ = typical[tg.id];
@@ -1051,7 +976,6 @@ function buildWindow(
       }),
     );
 
-  // Copy de streamer: o que aconteceu, por que pensamos isso e o próximo passo.
   let cause = t("analysis.cause.unknown");
   let causeKind: ProblemWindow["causeKind"] = "unknown";
   let confidence: ProblemWindow["confidence"] = "low";
@@ -1124,7 +1048,6 @@ function buildWindow(
     confirm = t("analysis.confirm.platform", { target: [...affected][0] });
   }
 
-  // Pressão de um processo NOSSO (OBS/Corneta) não vira "causa" — mas explica o trecho.
   const ownApp =
     appPressure &&
     !appCanExplain &&
@@ -1186,7 +1109,6 @@ function problemWindows(
     isBad(s, typical, ctxs[i], samples[i - 1]),
   );
 
-  // Agrupa amostras ruins consecutivas em intervalos.
   const ranges: [number, number][] = [];
   let start = -1;
   for (let k = 0; k <= samples.length; k++) {
@@ -1197,7 +1119,6 @@ function problemWindows(
       start = -1;
     }
   }
-  // Funde intervalos separados por ≤1 amostra boa (ruído).
   const merged: [number, number][] = [];
   for (const r of ranges) {
     const prev = merged[merged.length - 1];
@@ -1208,9 +1129,7 @@ function problemWindows(
   const totalTargets = data.meta.platforms.length || 1;
   return merged
     .filter(([a, b]) => {
-      // Sinal DURO (queda de estado real) vale em qualquer duração; sinal leve
-      // (bitrate/congestion/render) só vira incidente se PERSISTIR — um blip
-      // de 2s pintava o veredito de vermelho sem espectador ter visto nada.
+      // State outages count immediately; soft symptoms require sustained degradation.
       const hard = samples
         .slice(a, b + 1)
         .some((s, i) =>
@@ -1256,16 +1175,13 @@ function deriveEvents(data: SessionData, t: Translate): ReportEvent[] {
     { t: meta.startedAt, kind: "start", label: t("analysis.event.start") },
   ];
   const prev: Record<string, string> = {};
-  // Recuperação só faz sentido depois de uma QUEDA anunciada — sem isso, o primeiro
-  // "live" após o setup gerava um "voltou" órfão.
+  // Emit recovery only after an observed outage, never after initial setup.
   const droppedSince: Record<string, boolean> = {};
   let prevCpuHigh = false;
 
   for (const s of samples) {
-    // `tg` (não `t`): o `t` deste escopo é a tradução.
     for (const tg of s.targets) {
-      // prev inicia no PRÓPRIO estado (não "live"): a partida conectando/tentando
-      // não é transição — era daqui que saía o "reconectou" fantasma de toda live.
+      // Initialize from the current state so startup is not mistaken for a transition.
       const was = prev[tg.id] ?? tg.state;
       if (isProblemState(tg.state) && was === "live") {
         droppedSince[tg.id] = true;
@@ -1352,8 +1268,7 @@ function aggregates(data: SessionData) {
   > = {};
   for (const s of samples)
     for (const t of s.targets) {
-      // prev inicia no próprio estado: o conectando/tentando da PARTIDA não conta
-      // como reconexão (só transições live→problema são quedas de verdade).
+      // Only live-to-problem transitions count as reconnections.
       const e = (byId[t.id] ??= {
         name: t.name,
         brs: [],
@@ -1438,8 +1353,6 @@ function buildVerdict(
   const net = count("network");
   const plat = count("platform");
   const sig = count("signal");
-  // Perrengue CURTO (≤30s somados, sem perda de sinal) não merece veredito vermelho:
-  // o espectador quase certamente nem viu — o tom acompanha a experiência real.
   const totalBadSec = windows.reduce((a, w) => a + w.durationSec, 0);
   const brief = sig === 0 && totalBadSec <= 30;
   const durationFor = (kind: ProblemWindow["causeKind"]) =>
@@ -1448,9 +1361,6 @@ function buildVerdict(
       .reduce((total, window) => total + window.durationSec, 0);
   const briefNoteFor = (durationSec: number) =>
     brief ? t("analysis.verdict.brief", { sec: durationSec }) : "";
-  // O substantivo entra por buraco em vez de virar "trecho(s)": remendo com
-  // parêntese é o tipo de coisa que só passa despercebida em português.
-  // `analyze` recebe só o `t`, então a variante sai da mesma regra do `tp`.
   const stretch = (n: number) =>
     t(`analysis.verdict.stretch.${pluralSuffix(n)}` as MessageKey);
   const patch = (n: number) =>
@@ -1557,11 +1467,6 @@ function viewerStats(d: SessionData): ViewerStats {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Por canal — a mesma live vista de cada plataforma/conta
-// ---------------------------------------------------------------------------
-
-/** Chave estável de um canal. `source` é o rótulo que o usuário deu à fonte. */
 export const channelKey = (platform: string, source: string) =>
   `${platform}:${source}`;
 
@@ -1577,9 +1482,7 @@ interface ChannelAcc {
   viewerLast: number;
   viewerSeen: boolean;
   chat: number;
-  /** Primeiro e último total de seguidores visto — a diferença é o ganho da live.
-   *  `followCount` existe porque UM ponto não é uma diferença: primeiro e último
-   *  seriam o mesmo valor e o ganho sairia como zero medido, que é mentira. */
+  /** At least two follower samples are required for a measured gain; one sample only establishes the total. */
   followFirst: number | null;
   followLast: number | null;
   followCount: number;
@@ -1619,13 +1522,11 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
     return c;
   };
 
-  // --- Audiência ---
   for (const v of d.viewerSamples)
     for (const it of v.items) {
       const c = get(it.platform, it.source);
       if (it.viewers == null) continue;
-      // Canal FORA do ar entra como zero na soma (não é ignorado): só assim a soma das
-      // médias dos canais bate com a média total e as fatias fecham em 100%.
+      // Offline channels count as zero so channel averages sum to the total audience.
       c.viewerSum += it.viewers;
       c.viewerPeak = Math.max(c.viewerPeak, it.viewers);
       c.viewerLast = it.viewers;
@@ -1633,7 +1534,6 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
     }
   const vN = d.viewerSamples.length;
 
-  // --- Seguidores (contador da plataforma) ---
   for (const f of d.followerSamples)
     for (const it of f.items) {
       const c = get(it.platform, it.source);
@@ -1643,14 +1543,12 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
       c.followCount++;
     }
 
-  // --- Chat ---
   let hasChatByChannel = false;
   for (const s of d.samples) {
     if (!s.chatBy) continue;
     hasChatByChannel = true;
     for (const [k, n] of Object.entries(s.chatBy)) {
-      // A chave já vem como `plataforma:fonte`; um split ingênuo quebraria um rótulo
-      // que contenha ":" — daí o corte no PRIMEIRO separador só.
+      // Split only at the first separator; source labels may contain colons.
       const i = k.indexOf(":");
       if (i <= 0) continue;
       const platform = k.slice(0, i);
@@ -1659,9 +1557,7 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
     }
   }
 
-  // --- Alertas ---
-  // Depois dos outros de propósito: o fallback de sessão antiga (alerta sem `source`)
-  // precisa saber quantos canais aquela plataforma tem.
+  // Resolve channels before alerts so legacy attribution can detect ambiguity.
   const perPlatform = new Map<string, string[]>();
   for (const c of acc.values()) {
     const list = perPlatform.get(c.platform) ?? [];
@@ -1670,16 +1566,14 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
   }
   let unattributedAlerts = 0;
   for (const e of d.alertEvents) {
-    // Alerta de agregador (Streamlabs/StreamElements) traz o nome do agregador em
-    // `platform` — não dá pra dizer de qual canal veio.
+    // Aggregator alerts do not identify an originating channel.
     if (!isChatPlatform(e.platform)) {
       unattributedAlerts++;
       continue;
     }
     let source = e.source;
     if (source == null) {
-      // Sessão gravada antes do `source`. Com um canal só na plataforma, a atribuição é
-      // certa; com dois, qualquer palpite estaria errado metade das vezes.
+      // Legacy alerts without a source can be assigned only when the platform has one channel.
       const known = perPlatform.get(e.platform) ?? [];
       if (known.length !== 1) {
         unattributedAlerts++;
@@ -1720,8 +1614,6 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
     alerts: { ...c.alerts, hasData: c.alerts.total > 0 },
   }));
 
-  // Maior audiência primeiro; sem audiência, quem teve mais chat. O nome desempata pra
-  // ordem não dançar entre duas aberturas do mesmo relatório.
   channels.sort(
     (a, b) =>
       b.viewers.avg - a.viewers.avg ||
@@ -1736,10 +1628,8 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
   };
 }
 
-/** Seguidores de UM canal: o contador da plataforma ganha dos alertas quando existe. */
 function channelFollowers(c: ChannelAcc): ChannelStats["followers"] {
-  // Uma amostra só (live curta demais, ou o contador só respondeu no fim) não permite
-  // diferença nenhuma — o total é conhecido, o ganho não.
+  // A single follower sample cannot establish a delta.
   if (c.followCount >= 2 && c.followFirst != null && c.followLast != null)
     return {
       gained: c.followLast - c.followFirst,
@@ -1757,13 +1647,7 @@ function channelFollowers(c: ChannelAcc): ChannelStats["followers"] {
   return { gained: 0, total: c.followLast, from: null, hasData: false };
 }
 
-/** Total da live, sem contar o mesmo seguidor duas vezes.
- *
- *  O conflito é real: quem tem Streamlabs ligado na Twitch recebe o evento de follow
- *  E tem o contador da Twitch medindo a mesma pessoa. Somar os dois dobraria o número.
- *  A regra é: quando ALGUM canal foi medido por contador, os follows de agregador
- *  (que não pertencem a canal nenhum) são descartados como duplicata — o contador da
- *  plataforma é a fonte mais confiável que existe pra isso. */
+/** When a platform counter measures followers, discard unattributed aggregator follows to prevent double counting. */
 function followersRollup(
   channels: ChannelStats[],
   alerts: SessionAlertEvent[],
@@ -1831,7 +1715,6 @@ function alertStats(d: SessionData): AlertStats {
   };
 }
 
-/** Momentos de destaque (clipes sugeridos): picos de chat, alertas fortes e saltos de audiência. */
 function highlights(d: SessionData, t: Translate): Highlight[] {
   const out: Highlight[] = [];
   const rate = chatRateSeries(d);
@@ -1924,11 +1807,7 @@ export function analyze(data: SessionData, t: Translate): ReportAnalysis {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Mini-resumo por sessão (chips na lista + comparação com a live anterior)
-// ---------------------------------------------------------------------------
-
-/** Marcadores alteram a linha do tempo, não os diagnósticos de recursos. */
+/** Markers change the timeline, not resource diagnostics. */
 export function withReportMarkers(
   analysis: ReportAnalysis,
   markers: readonly SessionMarker[],
@@ -1945,7 +1824,6 @@ export function withReportMarkers(
   return { ...analysis, events };
 }
 
-/** Extrai o resumo de uma análise completa — zero duplicação de heurística. */
 export function summarize(
   data: SessionData,
   a: ReportAnalysis,

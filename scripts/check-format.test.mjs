@@ -81,7 +81,7 @@ describe("formatting coverage and exact legacy baseline", () => {
     );
     writeFileSync(path, JSON.stringify(baseline));
     await expect(checkFormatting(root)).rejects.toThrow(
-      "Baseline de formatação inválida",
+      "Invalid formatting baseline",
     );
   });
   it("formats changed files without rewriting untouched historical prose", async () => {
@@ -168,7 +168,7 @@ describe("formatting coverage and exact legacy baseline", () => {
     renameSync(join(root, "src"), join(external, "src"));
     symlinkSync(join(external, "src"), join(root, "src"), "junction");
     await expect(checkFormatting(root, { write: true })).rejects.toThrow(
-      "fora do workspace",
+      "outside the workspace",
     );
     expect(readFileSync(join(external, "src/a.ts"), "utf8")).toBe(source);
   });

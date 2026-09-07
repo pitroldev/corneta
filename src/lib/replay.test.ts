@@ -16,7 +16,6 @@ import {
 
 const T0 = 1_700_000_000_000;
 
-/** Segmento de `durMs` começando em `t`, com âncoras de sincronia perfeitas (sem deriva). */
 function seg(
   n: number,
   t: number,
@@ -38,11 +37,11 @@ function seg(
   };
 }
 
-describe("replay — índice", () => {
-  it("soma as durações e ignora segmento vazio", () => {
+describe("replay index", () => {
+  it("sums durations and ignores empty segments", () => {
     const idx = buildReplayIndex([
       seg(1, T0, 60_000),
-      seg(2, T0 + 90_000, 0), // FFmpeg morreu antes do 1º frame
+      seg(2, T0 + 90_000, 0),
       seg(3, T0 + 120_000, 30_000),
     ]);
     expect(idx.segments).toHaveLength(2);
@@ -50,8 +49,7 @@ describe("replay — índice", () => {
     expect(idx.starts).toEqual([0, 60_000]);
   });
 
-  it("ordena pela âncora, não pelo número do segmento", () => {
-    // Numa retomada com relógio bagunçado o número pode mentir; o instante não.
+  it("sorts by anchor rather than segment number", () => {
     const idx = buildReplayIndex([
       seg(2, T0 + 60_000, 10_000),
       seg(1, T0, 10_000),
@@ -59,7 +57,7 @@ describe("replay — índice", () => {
     expect(idx.segments.map((s) => s.path)).toEqual(["S1.mp4", "S2.mp4"]);
   });
 
-  it("sessão sem gravação nenhuma não quebra nada", () => {
+  it("handles sessions without recordings", () => {
     const idx = buildReplayIndex([]);
     expect(idx.totalMs).toBe(0);
     expect(globalAtEpoch(idx, T0)).toBeNull();
@@ -69,55 +67,51 @@ describe("replay — índice", () => {
   });
 });
 
-describe("replay — epoch ↔ global", () => {
+describe("replay epoch/global mapping", () => {
   const idx = buildReplayIndex([
     seg(1, T0, 60_000),
     seg(2, T0 + 90_000, 30_000),
   ]);
 
-  it("mapeia um instante dentro do primeiro segmento", () => {
+  it("maps a timestamp inside the first segment", () => {
     expect(globalAtEpoch(idx, T0 + 10_000)).toBe(10_000);
   });
 
-  it("pula o buraco entre segmentos", () => {
-    // O 2º arquivo começa 90s depois do início, mas no eixo global ele encosta nos 60s:
-    // o tempo em que ninguém gravou não existe pro player.
+  it("omits unrecorded gaps between segments", () => {
+    // Recording time omits the unrecorded gap between files.
     expect(globalAtEpoch(idx, T0 + 90_000)).toBe(60_000);
     expect(globalAtEpoch(idx, T0 + 100_000)).toBe(70_000);
   });
 
-  it("instante DENTRO do buraco encosta na borda seguinte, não recusa o clique", () => {
-    // 75s caiu no meio da retomada. Clicar num evento dali tem que levar o vídeo
-    // pra beirada — devolver null faria o clique não fazer nada, sem explicação.
+  it("clamps timestamps inside gaps to the next boundary", () => {
     expect(globalAtEpoch(idx, T0 + 75_000)).toBe(60_000);
   });
 
-  it("fora da gravação devolve null nas duas pontas", () => {
+  it("returns null before and after the recording", () => {
     expect(globalAtEpoch(idx, T0 - 1)).toBeNull();
     expect(globalAtEpoch(idx, T0 + 120_001)).toBeNull();
   });
 
-  it("ida e volta se fecha", () => {
+  it("round-trips between time axes", () => {
     const g = globalAtEpoch(idx, T0 + 100_000);
     expect(g).not.toBeNull();
     expect(epochAtGlobal(idx, g as number)).toBeCloseTo(T0 + 100_000, -1);
   });
 
-  it("localiza o arquivo e o segundo dentro dele", () => {
+  it("locates the file and its local time", () => {
     expect(pointAtGlobal(idx, 70_000)).toEqual({ index: 1, localSec: 10 });
     expect(pointAtGlobal(idx, 0)).toEqual({ index: 0, localSec: 0 });
   });
 
-  it("posição fora da faixa é grampeada nas bordas", () => {
+  it("clamps out-of-range positions", () => {
     expect(pointAtGlobal(idx, -5_000)).toEqual({ index: 0, localSec: 0 });
     expect(pointAtGlobal(idx, 999_999)?.index).toBe(1);
   });
 });
 
-describe("replay — deriva e âncoras", () => {
-  it("interpola POR TRECHOS: a deriva do fim não contamina o começo", () => {
-    // 60s de parede que renderam 66s de vídeo no último trecho (relógios divergindo).
-    // Extrapolar da âncora inicial daria 30s no meio; por trechos dá o valor certo.
+describe("replay drift and anchors", () => {
+  it("interpolates piecewise without applying late drift to the beginning", () => {
+    // Piecewise interpolation must follow clock drift rather than extrapolating from the initial anchor.
     const s: ReplaySegment = {
       ...seg(1, T0, 120_000),
       syncs: [
@@ -132,12 +126,12 @@ describe("replay — deriva e âncoras", () => {
     expect(globalAtEpoch(idx, T0 + 90_000)).toBe(93_000);
   });
 
-  it("segmento sem âncora nenhuma cai no tempo real", () => {
+  it("uses real-time progression without anchors", () => {
     const s = { ...seg(1, T0, 60_000), syncs: [] };
     expect(globalAtEpoch(buildReplayIndex([s]), T0 + 20_000)).toBe(20_000);
   });
 
-  it("âncoras fora de ordem são reordenadas em vez de embaralhar o mapa", () => {
+  it("sorts out-of-order anchors", () => {
     const s: ReplaySegment = {
       ...seg(1, T0, 60_000),
       syncs: [
@@ -149,7 +143,7 @@ describe("replay — deriva e âncoras", () => {
     expect(globalAtEpoch(buildReplayIndex([s]), T0 + 45_000)).toBe(45_000);
   });
 
-  it("duas âncoras no mesmo instante não viram divisão por zero", () => {
+  it("handles coincident anchors without division by zero", () => {
     const s: ReplaySegment = {
       ...seg(1, T0, 60_000),
       syncs: [
@@ -163,7 +157,7 @@ describe("replay — deriva e âncoras", () => {
     expect(Number.isFinite(g as number)).toBe(true);
   });
 
-  it("acusa âncora estimada e codec que o webview não toca", () => {
+  it("detects estimated anchors and unsupported codecs", () => {
     expect(hasEstimatedAnchor(buildReplayIndex([seg(1, T0, 1_000)]))).toBe(
       false,
     );
@@ -183,25 +177,22 @@ describe("replay — deriva e âncoras", () => {
   });
 });
 
-describe("replay — salto de relógio", () => {
+describe("replay clock jumps", () => {
   const jumps = [{ t: T0 + 40_000, delta: 10_000 }];
 
-  it("desfaz e refaz o salto simetricamente", () => {
-    // Depois do salto, o relógio marca 10s a mais do que o tempo real passado.
+  it("normalizes and restores clock jumps symmetrically", () => {
     expect(normalizeEpoch(T0 + 50_000, jumps)).toBe(T0 + 40_000);
     expect(normalizeEpoch(T0 + 30_000, jumps)).toBe(T0 + 30_000);
     expect(denormalizeEpoch(T0 + 40_000, jumps)).toBe(T0 + 50_000);
   });
 
-  it("mantém o mapeamento coerente quando o relógio pula no meio da gravação", () => {
-    // 120s de gravação com um salto de +10s aos 40s: o instante marcado como 50s
-    // é, na verdade, o segundo 40 do vídeo.
+  it("keeps mapping consistent across a recording-time clock jump", () => {
     const s: ReplaySegment = { ...seg(1, T0, 120_000), syncs: [] };
     const idx = buildReplayIndex([s], jumps);
     expect(globalAtEpoch(idx, T0 + 50_000)).toBe(40_000);
   });
 
-  it("salto pra trás (NTP corrigindo adiantamento) também fecha", () => {
+  it("round-trips backward clock adjustments", () => {
     const back = [{ t: T0 + 40_000, delta: -5_000 }];
     expect(normalizeEpoch(T0 + 50_000, back)).toBe(T0 + 55_000);
     expect(denormalizeEpoch(normalizeEpoch(T0 + 50_000, back), back)).toBe(
@@ -210,25 +201,25 @@ describe("replay — salto de relógio", () => {
   });
 });
 
-describe("replay — offset manual", () => {
-  it("desloca o mapeamento pelo ajuste do streamer", () => {
+describe("replay manual offset", () => {
+  it("shifts mapping by the user offset", () => {
     const base = buildReplayIndex([seg(1, T0, 60_000)]);
     const ahead = buildReplayIndex([seg(1, T0, 60_000)], [], 5_000);
     expect(globalAtEpoch(base, T0 + 20_000)).toBe(20_000);
     expect(globalAtEpoch(ahead, T0 + 20_000)).toBe(25_000);
   });
 
-  it("a volta desconta o offset — o cursor não sai andando sozinho", () => {
+  it("subtracts the offset on the reverse mapping", () => {
     const idx = buildReplayIndex([seg(1, T0, 60_000)], [], 5_000);
     const g = globalAtEpoch(idx, T0 + 20_000) as number;
     expect(epochAtGlobal(idx, g)).toBeCloseTo(T0 + 20_000, -1);
   });
 });
 
-describe("replay — amostra mais próxima", () => {
+describe("replay nearest sample", () => {
   const times = [0, 100, 200, 300, 400];
 
-  it("acha o índice vizinho e grampeia nas pontas", () => {
+  it("finds neighboring sample indices and clamps boundaries", () => {
     expect(sampleIndexAt(times, 0)).toBe(0);
     expect(sampleIndexAt(times, 149)).toBe(1);
     expect(sampleIndexAt(times, 151)).toBe(2);
@@ -236,19 +227,18 @@ describe("replay — amostra mais próxima", () => {
     expect(sampleIndexAt(times, 9_999)).toBe(4);
   });
 
-  it("empate cai no anterior e lista vazia devolve null", () => {
+  it("breaks ties toward the earlier sample and returns null for empty input", () => {
     expect(sampleIndexAt(times, 150)).toBe(1);
     expect(sampleIndexAt([], 10)).toBeNull();
   });
 
-  it("a versão fracionária anda ENTRE as amostras", () => {
-    // Sem isso o cursor pularia de 2 em 2s enquanto o vídeo corre liso.
+  it("interpolates fractional positions between samples", () => {
     expect(fractionalIndexAt(times, 150)).toBeCloseTo(1.5, 5);
     expect(fractionalIndexAt(times, 100)).toBe(1);
     expect(fractionalIndexAt(times, 275)).toBeCloseTo(2.75, 5);
   });
 
-  it("fracionária nas pontas e em série degenerada não explode", () => {
+  it("handles fractional boundaries and degenerate series", () => {
     expect(fractionalIndexAt(times, -10)).toBe(0);
     expect(fractionalIndexAt(times, 9_999)).toBe(4);
     expect(fractionalIndexAt([5], 5)).toBe(0);

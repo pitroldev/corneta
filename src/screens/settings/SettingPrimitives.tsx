@@ -18,10 +18,6 @@ export function Field({
   );
 }
 
-/** Uma linha da tela com um termo seu tampado — o Guardião viu e cortou. */
-/** Sub-painel dos parâmetros de uma feature: acento de latão à esquerda + fundo sutil, colado
- *  logo abaixo do toggle. Renderizado só quando a feature está ligada — deixa claro que aquilo
- *  pertence à feature acima (em vez de virar uma linha solta na lista). */
 export function SubSettings({ children }: { children: ReactNode }) {
   return (
     <div className="-mt-1 mb-3 ml-1 rounded-md border-l-2 border-brass/30 bg-surface-2/40 px-3">
@@ -30,8 +26,6 @@ export function SubSettings({ children }: { children: ReactNode }) {
   );
 }
 
-/** Linha ILUSTRADA da "Segurança ao vivo": uma mini-tela mostra a proteção em ação e
- *  ganha moldura de latão (com sombra) quando está armada — como na tela Ao vivo. */
 export function SecurityFeature({
   preview,
   on,
@@ -111,8 +105,6 @@ export function SettingRow({
   );
 }
 
-/** Título de um bloco dentro dos ajustes de gravação. Existe pra que "onde
- *  salvar" e "espaço em disco" sejam ASSUNTOS, e não mais duas linhas na pilha. */
 export function RecordGroup({
   icon,
   children,

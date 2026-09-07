@@ -23,7 +23,6 @@ function render() {
   );
 }
 
-// The telemetry gate starts closed until local policy has resolved. The shell
-// does not depend on that IPC and must remain usable even if it is slow.
+// Telemetry stays gated until local policy resolves; the shell must not await that IPC.
 void initializeTelemetry(api);
 render();

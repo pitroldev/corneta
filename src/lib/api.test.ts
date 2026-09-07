@@ -4,9 +4,7 @@ import { TELEMETRY_NOTICE_VERSION } from "./telemetry-schema";
 const { invoke } = vi.hoisted(() => ({
   invoke: vi.fn(async () => ({
     schemaVersion: 1,
-    // Literal de propósito: `vi.hoisted` roda ANTES dos imports do módulo, então
-    // a constante ainda não existe aqui. É só o retorno falso do backend — o que
-    // importa pro teste é o `noticeVersion` que o app ENVIA, logo abaixo.
+    // vi.hoisted runs before imports, so this backend fixture must use a literal.
     noticeVersion: "2026-08-02",
     usage: "enabled",
     crashReports: "disabled",
@@ -77,7 +75,7 @@ describe("Tauri telemetry IPC", () => {
 
     await expect(
       api.addSessionMarker("1786151052661", Number.NaN, "Inválido"),
-    ).rejects.toThrow("t precisa ser um inteiro seguro não negativo");
+    ).rejects.toThrow("t must be a safe non-negative integer");
     expect(invoke).not.toHaveBeenCalled();
   });
 });

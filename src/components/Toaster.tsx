@@ -44,12 +44,8 @@ export function Toaster() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              // Erro interrompe (alert = assertive): "Não consegui guardar a chave"
-              // não pode esperar o leitor de tela terminar o que estava lendo.
-              // Os outros seguem o polite da região.
               role={item.kind === "error" ? "alert" : undefined}
-              // Mouse em cima ou foco dentro (Tab até "Desfazer"/X) segura o
-              // relógio: o aviso só some depois que a pessoa sai dele.
+              // Pause dismissal while hovered or focused so actions remain reachable.
               onMouseEnter={() => pause(item.id)}
               onMouseLeave={() => resume(item.id)}
               onFocus={() => pause(item.id)}
@@ -74,7 +70,6 @@ export function Toaster() {
                   {item.action.label}
                 </button>
               )}
-              {/* Alvo de 24px (WCAG 2.5.8) com a pegada visual de 16px do ícone. */}
               <button
                 aria-label={t("components.toaster.dismiss.aria")}
                 onClick={() => dismiss(item.id)}

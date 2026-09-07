@@ -236,9 +236,7 @@ export function imageEvidence(manifest, configuration, provenance) {
   };
 }
 
-// Stream TAR members without extracting or executing anything. Only regular
-// pkg-config files are retained; malformed headers/unsupported metadata fail
-// closed. Memory and decompressed bytes are capped even for a compressed bomb.
+// Bound decompression and retain only regular pkg-config members; never extract vendor paths.
 export async function readTarText(archive, limits = {}) {
   const maximumExpanded = limits.maximumExpanded ?? 2 * 1024 * 1024 * 1024;
   const maximumMetadata = limits.maximumMetadata ?? 8 * 1024 * 1024;

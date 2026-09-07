@@ -30,10 +30,8 @@ const context: TelemetryContext = {
 };
 
 describe("telemetry schema", () => {
-  // As duas finalidades rodam por LEGÍTIMO INTERESSE (LGPD art. 7º, IX), então
-  // `unset` é ativa e o aviso abre com os interruptores LIGADOS — mostrar
-  // desligado seria a tela mentindo sobre o que o app já está fazendo.
-  it("mostra o aviso com o que já está valendo, não com tudo desligado", () => {
+  // unset is active under the opt-out policy; switches must reflect the effective state.
+  it("shows the notice with the effective preference state", () => {
     const base: Parameters<typeof telemetryConsentDraft>[0] = {
       schemaVersion: TELEMETRY_SCHEMA_VERSION,
       noticeVersion: TELEMETRY_NOTICE_VERSION,
@@ -42,19 +40,15 @@ describe("telemetry schema", () => {
       installationId: "00000000-0000-4000-8000-000000000001",
       decidedAt: null,
     };
-    expect(needsTelemetryDecision(base)).toBe(true); // nunca respondeu → aviso abre
+    expect(needsTelemetryDecision(base)).toBe(true);
     expect(telemetryConsentDraft(base)).toEqual({
       usage: true,
       crashReports: true,
     });
   });
 
-  // Com o padrão ativo, o aviso precisa informar a instalação nova. Este teste
-  // verifica transparência técnica, não certifica a adequação da base legal.
-  //
-  // O estado abaixo é exatamente o que o backend grava no primeiro boot,
-  // conferido em disco: usage/crashReports `unset`, `decidedAt` nulo.
-  it("o aviso ABRE na instalação nova para informar o padrão ativo", () => {
+  // This checks notice behavior, not legal adequacy.
+  it("shows the notice on a fresh installation to disclose the active defaults", () => {
     expect(
       needsTelemetryDecision({
         schemaVersion: TELEMETRY_SCHEMA_VERSION,
@@ -67,8 +61,7 @@ describe("telemetry schema", () => {
     ).toBe(true);
   });
 
-  // …e para de abrir depois que a pessoa respondeu, senão vira pop-up eterno.
-  it("o aviso PARA de abrir depois de respondido", () => {
+  it("stops showing the notice after a decision", () => {
     expect(
       needsTelemetryDecision({
         schemaVersion: TELEMETRY_SCHEMA_VERSION,
@@ -81,9 +74,8 @@ describe("telemetry schema", () => {
     ).toBe(false);
   });
 
-  // O que não pode acontecer NUNCA: trocar o texto do aviso religar quem se opôs.
-  it("oposição atravessa a troca de versão do aviso", () => {
-    const opposto: Parameters<typeof telemetryConsentDraft>[0] = {
+  it("preserves opposition across notice versions", () => {
+    const opposed: Parameters<typeof telemetryConsentDraft>[0] = {
       schemaVersion: TELEMETRY_SCHEMA_VERSION,
       noticeVersion: "2026-07-01",
       usage: "disabled",
@@ -91,13 +83,13 @@ describe("telemetry schema", () => {
       installationId: null,
       decidedAt: "2026-07-01T12:00:00.000Z",
     };
-    expect(needsTelemetryDecision(opposto)).toBe(true); // reapresenta o texto novo
-    expect(telemetryConsentDraft(opposto)).toEqual({
+    expect(needsTelemetryDecision(opposed)).toBe(true);
+    expect(telemetryConsentDraft(opposed)).toEqual({
       usage: false,
-      crashReports: false, // …mas continua desligado
+      crashReports: false,
     });
-    expect(telemetryPurposeActive(opposto.usage)).toBe(false);
-    expect(telemetryPurposeActive(opposto.crashReports)).toBe(false);
+    expect(telemetryPurposeActive(opposed.usage)).toBe(false);
+    expect(telemetryPurposeActive(opposed.crashReports)).toBe(false);
   });
 
   it("fails closed for malformed consent", () => {

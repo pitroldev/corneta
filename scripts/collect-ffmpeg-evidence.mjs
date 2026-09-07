@@ -1,5 +1,4 @@
-// Local, bounded evidence collection. No Docker runtime, gh login, .env, vendor
-// recipe execution, uploads, source approval, or release mutation is involved.
+// Inspect vendor artifacts without executing them or approving corresponding sources.
 import {
   copyFileSync,
   existsSync,

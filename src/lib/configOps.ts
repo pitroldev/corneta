@@ -1,10 +1,6 @@
-// Reducers PUROS da config (sem I/O, sem zustand): recebem a config e devolvem a próxima.
-// O store vira um coordenador fino — lê a config, chama o op, e persiste. Assim a lógica de
-// adicionar/remover/duplicar/reordenar destino e perfil fica testável sem tocar no disco.
 import { makeTarget } from "./factory";
 import type { AppConfig, PlatformId, Target } from "./types";
 
-/** Nome único com sufixo numérico: "Twitch" → "Twitch 2" se já existir. */
 export function suffixName(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
   let n = 2;
@@ -24,15 +20,7 @@ export function addTarget(
   return { config: { ...config, targets: [...config.targets, t] }, id: t.id };
 }
 
-/**
- * Alinha os destinos às plataformas escolhidas nas boas-vindas: cria o que falta,
- * remove o que sobra, numa passada só.
- *
- * Duas garantias que valem mais que a conveniência:
- *  • NUNCA remove destino que já tem chave — ali o usuário investiu, e a tela de
- *    boas-vindas não é lugar de faxina;
- *  • NUNCA esvazia a lista — sem escolha nenhuma, devolve a config intacta.
- */
+/** Preserve destinations with stored keys and never empty the destination list during onboarding. */
 export function syncTargetsToPlatforms(
   config: AppConfig,
   selected: PlatformId[],
@@ -58,9 +46,7 @@ export function updateTarget(
     targets: config.targets.map((target) => {
       if (target.id !== id) return target;
       const next = { ...target, ...patch };
-      // A URL é a fonte de verdade do protocolo. Sem isto, um destino
-      // Personalizado nasce como RTMP, aceita visualmente uma URL RTMPS, mas o
-      // backend recusa a configuração e o cofre não encontra o novo destino.
+      // Derive protocol from the URL to keep frontend validation and vault persistence consistent.
       if (patch.ingestUrl !== undefined && patch.protocol === undefined) {
         const scheme = /^rtmps?:\/\//i.exec(patch.ingestUrl.trim())?.[0];
         if (scheme)
@@ -73,7 +59,7 @@ export function updateTarget(
   };
 }
 
-/** Remove e devolve o que saiu (target + índice) pra o "desfazer" restaurar no lugar. */
+/** Return the removed target and index so undo can restore its position. */
 export function removeTarget(
   config: AppConfig,
   id: string,
@@ -86,7 +72,6 @@ export function removeTarget(
   };
 }
 
-/** Reinsere um destino removido no índice original (clamp no fim) — o "desfazer". */
 export function insertTarget(
   config: AppConfig,
   target: Target,
@@ -113,7 +98,7 @@ export function reorderTargets(
   return { ...config, targets: ordered };
 }
 
-/** Duplica um destino (sem a chave; nome com sufixo) logo após o original. `newId` vem de fora. */
+/** Duplicate without a stream key; the caller supplies the new ID. */
 export function duplicateTarget(
   config: AppConfig,
   id: string,
@@ -150,7 +135,6 @@ export function moveTarget(
   return { ...config, targets };
 }
 
-/** Ativa um perfil salvo: adota o modo e os destinos dele (cópia). No-op se o id não existe. */
 export function loadProfile(config: AppConfig, id: string): AppConfig {
   const prof = config.profiles.find((p) => p.id === id);
   if (!prof) return config;
@@ -162,9 +146,6 @@ export function loadProfile(config: AppConfig, id: string): AppConfig {
   };
 }
 
-/** Novo perfil = cópia do working set atual, com nome "Perfil N" único. `id` vem de fora. */
-/** `label(n)` devolve o nome padrão do n-ésimo perfil já traduzido ("Perfil {n}" / "Profile {n}").
- *  Vem de fora porque este módulo é núcleo puro e não conhece o idioma da tela. */
 export function addProfile(
   config: AppConfig,
   id: string,
@@ -186,7 +167,7 @@ export function addProfile(
   };
 }
 
-/** Remove um perfil; nunca deixa a lista vazia. Se era o ativo, cai pro primeiro que sobrou. */
+/** Never remove the last profile; removing the active one selects the first remaining profile. */
 export function removeProfile(config: AppConfig, id: string): AppConfig {
   if (config.profiles.length <= 1) return config;
   const profiles = config.profiles.filter((p) => p.id !== id);

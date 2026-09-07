@@ -31,7 +31,7 @@ const missingAlways = alwaysRequired.filter(
 );
 if (missingAlways.length) {
   console.error(
-    `Release bloqueada: configuração de telemetria ausente (${missingAlways.join(", ")}).`,
+    `Release blocked: missing telemetry configuration (${missingAlways.join(", ")}).`,
   );
   process.exit(1);
 }
@@ -41,12 +41,12 @@ const webviewDisabled = process.env.VITE_TELEMETRY_DISABLED === "1";
 const nativeDisabled = process.env.TELEMETRY_DISABLED === "1";
 for (const name of ["VITE_TELEMETRY_DISABLED", "TELEMETRY_DISABLED"]) {
   if (!/^[01]$/.test(process.env[name])) {
-    failures.push(`${name} deve ser exatamente 0 ou 1`);
+    failures.push(`${name} must be exactly 0 or 1`);
   }
 }
 if (webviewDisabled !== nativeDisabled) {
   failures.push(
-    "os kill switches VITE_TELEMETRY_DISABLED e TELEMETRY_DISABLED devem mudar juntos",
+    "VITE_TELEMETRY_DISABLED and TELEMETRY_DISABLED kill switches must change together",
   );
 }
 const telemetryDisabled = webviewDisabled && nativeDisabled;
@@ -59,12 +59,14 @@ const buildShaNames = [
 ];
 for (const name of buildShaNames) {
   if (!BUILD_SHA_RE.test(process.env[name])) {
-    failures.push(`${name} deve conter o SHA completo do commit`);
+    failures.push(`${name} must contain the full commit SHA`);
   }
 }
 const buildShas = buildShaNames.map((name) => process.env[name].toLowerCase());
 if (new Set(buildShas).size !== 1) {
-  failures.push("desktop, site e Setup API devem usar o mesmo SHA de release");
+  failures.push(
+    "desktop, website, and Setup API must use the same release SHA",
+  );
 }
 const expectedBuildSha = buildShas[0];
 
@@ -75,7 +77,7 @@ if (!telemetryDisabled) {
   );
   if (missingEnabled.length) {
     failures.push(
-      `telemetria ativa exige configuração pública (${missingEnabled.join(", ")})`,
+      `active telemetry requires public configuration (${missingEnabled.join(", ")})`,
     );
   } else {
     const projectTokenNames = [
@@ -88,13 +90,13 @@ if (!telemetryDisabled) {
     for (const [index, token] of projectTokens.entries()) {
       if (!PROJECT_TOKEN_RE.test(token)) {
         failures.push(
-          `${projectTokenNames[index]} deve ser um project token público phc_ (nunca Personal API Key)`,
+          `${projectTokenNames[index]} must be a public phc_ project token (never a Personal API Key)`,
         );
       }
     }
     if (new Set(projectTokens).size !== 1) {
       failures.push(
-        "desktop, site e Setup API devem usar o mesmo project token de produção",
+        "desktop, website, and Setup API must use the same production project token",
       );
     }
     if (PROJECT_TOKEN_RE.test(projectTokens[0])) {
@@ -110,7 +112,7 @@ if (!telemetryDisabled) {
     ]) {
       const host = process.env[name].replace(/\/+$/, "");
       if (host !== EXPECTED_HOST) {
-        failures.push(`${name} deve ser ${EXPECTED_HOST} (região US aprovada)`);
+        failures.push(`${name} must be ${EXPECTED_HOST} (approved US region)`);
       }
     }
   }
@@ -120,14 +122,14 @@ if (
   process.env.TELEMETRY_POLICY_PUBLISHED_VERSION !== EXPECTED_NOTICE_VERSION
 ) {
   failures.push(
-    `a política publicada deve declarar o aviso ${EXPECTED_NOTICE_VERSION}`,
+    `the published policy must declare notice ${EXPECTED_NOTICE_VERSION}`,
   );
 }
 
 const metadataUrl = process.env.TELEMETRY_DEPLOYMENT_METADATA_URL;
 if (metadataUrl !== EXPECTED_METADATA_URL) {
   failures.push(
-    `TELEMETRY_DEPLOYMENT_METADATA_URL deve ser ${EXPECTED_METADATA_URL}`,
+    `TELEMETRY_DEPLOYMENT_METADATA_URL must be ${EXPECTED_METADATA_URL}`,
   );
 }
 
@@ -137,23 +139,23 @@ function isObject(value) {
 
 function validateSurface(label, surface, expectedHost) {
   if (!isObject(surface)) {
-    failures.push(`deploy de produção não informou metadata de ${label}`);
+    failures.push(`production deployment did not report metadata for ${label}`);
     return;
   }
   if (surface.disabled !== telemetryDisabled) {
     failures.push(
-      `kill switch implantado em ${label} diverge da release (${String(surface.disabled)})`,
+      `deployed kill switch in ${label} differs from the release (${String(surface.disabled)})`,
     );
   }
   if (surface.buildSha !== expectedBuildSha) {
-    failures.push(`${label} implantado não corresponde ao SHA da release`);
+    failures.push(`deployed ${label} does not match the release SHA`);
   }
   if (!telemetryDisabled) {
     if (surface.posthogHost !== expectedHost) {
-      failures.push(`${label} implantado usa host PostHog diferente`);
+      failures.push(`deployed ${label} uses a different PostHog host`);
     }
     if (surface.projectTokenSha256 !== expectedProjectTokenSha256) {
-      failures.push(`${label} implantado usa project token diferente`);
+      failures.push(`deployed ${label} uses a different project token`);
     }
   }
 }
@@ -169,19 +171,21 @@ async function verifyProductionDeployment() {
     });
     if (!response.ok) {
       failures.push(
-        `metadata do deploy de produção respondeu HTTP ${response.status}`,
+        `production deployment metadata returned HTTP ${response.status}`,
       );
       return;
     }
     const raw = await response.text();
     if (Buffer.byteLength(raw, "utf8") > 32_768) {
-      failures.push("metadata do deploy de produção excede 32 KiB");
+      failures.push("production deployment metadata exceeds 32 KiB");
       return;
     }
     const body = JSON.parse(raw);
     const metadata = isObject(body) ? body.telemetryDeployment : undefined;
     if (!isObject(metadata) || metadata.schemaVersion !== 1) {
-      failures.push("deploy de produção não expõe metadata de telemetria v1");
+      failures.push(
+        "production deployment does not expose telemetry metadata v1",
+      );
       return;
     }
     validateSurface(
@@ -195,19 +199,19 @@ async function verifyProductionDeployment() {
       process.env.POSTHOG_HOST?.replace(/\/+$/, ""),
     );
   } catch {
-    failures.push("não foi possível validar a metadata do deploy de produção");
+    failures.push("could not validate production deployment metadata");
   }
 }
 
 await verifyProductionDeployment();
 
 if (failures.length) {
-  console.error(`Release bloqueada:\n- ${failures.join("\n- ")}`);
+  console.error(`Release blocked:\n- ${failures.join("\n- ")}`);
   process.exit(1);
 }
 
 console.log(
   telemetryDisabled
-    ? `Gate aprovado: telemetria desativada em desktop/site/API, política ${EXPECTED_NOTICE_VERSION} e deploy no mesmo SHA.`
-    : `Gate aprovado: desktop/site/API ativos na região US, política ${EXPECTED_NOTICE_VERSION}, token e SHA conferidos contra o deploy real.`,
+    ? `Gate passed: desktop/site/API telemetry disabled, policy ${EXPECTED_NOTICE_VERSION}, and deployment on the same SHA.`
+    : `Gate passed: desktop/site/API active in the US region, policy ${EXPECTED_NOTICE_VERSION}, token and SHA verified against the live deployment.`,
 );

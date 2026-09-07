@@ -6,19 +6,11 @@ import { bold, useI18n, type I18n } from "../lib/i18n";
 import { Modal } from "./Modal";
 import { Badge, Button, PlatformGlyph } from "./ui";
 
-/** Rótulo humano do encoder (mesmo espírito da tela Qualidade).
- *  Não é componente: recebe o `t` de quem chama. */
 function encoderLabel(t: I18n["t"], kind: string, label: string): string {
   if (kind === "software") return t("encoding.encoder.cpu");
   return t("encoding.encoder.gpu", { label });
 }
 
-/**
- * Guia "qualidade certa no OBS": lê a config REAL (modo, plataformas, JÁ VOLTO/Guardião,
- * encoders da máquina) e cospe os números exatos pra colocar no OBS — em vez de conselho
- * genérico. O objetivo: nem perda de qualidade (bitrate curto onde a Corneta copia), nem
- * recodificação desperdiçada (sinal fraco onde a Corneta refaz o vídeo).
- */
 export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const config = useStore((s) => s.config)!;
   const encoders = useStore((s) => s.encoders);
@@ -29,9 +21,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const guardArmed =
     config.settings.guardianEnabled &&
     config.settings.guardianWatchlist.some((w) => w.trim().length >= 3);
-  // Só o GUARDIÃO faz a Corneta recodificar TUDO (o OBS vira contribuição local). O JÁ VOLTO
-  // sozinho é o splicer: copia o sinal do OBS pras plataformas SEM recodificar — então, pro
-  // bitrate, se comporta igual a "sem compositor" (a cópia por-plataforma manda no teto).
+  // Only Privacy Guard re-encodes the complete program; the BRB splicer preserves stream copy.
   const reencodesAll = guardArmed;
 
   const copies = reencodesAll
@@ -44,11 +34,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
     Math.max(30, ...enabled.map((x) => x.encoding.preset?.fps ?? 30)),
   );
 
-  // Resolução recomendada = a MAIOR saída que alguma plataforma realmente usa — mandar
-  // 1080p com tudo em 720p é peso puro no PC sem ganho nenhum (e com o Guardião ligado
-  // dobra, porque ele reencoda a live inteira). Plataforma vertical (recorte 9:16) precisa
-  // da fonte cheia em 1080p. O guardião fica sempre em 1080p (o OCR lê melhor no detalhe).
-  // Espelha engine.rs::program_resolution — o número aqui é o MESMO que o motor roda.
+  // Keep resolution selection aligned with engine.rs::program_resolution, including vertical crops and OCR.
   const needsFullHd =
     guardArmed ||
     enabled.length === 0 ||
@@ -58,11 +44,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
     });
   const srcRes = needsFullHd ? "1920×1080" : "1280×720";
 
-  // Bitrate recomendado pro OBS:
-  // - com cópia: o teto é a plataforma mais apertada (menor denominador) — acima disso
-  //   a live trava/cai NELA, porque o vídeo vai como saiu do OBS;
-  // - só recodificação: o OBS manda pro localhost — capricha (fonte melhor = saída melhor;
-  //   bitrate alto quase não pesa no encoder — quem pesa é resolução/fps).
+  // Copied destinations constrain input bitrate; re-encoded destinations use a higher-quality local source.
   const lcd = lowestCommonDenominator(config);
   const hasCopy = copies.length > 0 && lcd.videoKbps != null;
   const contribKbps = needsFullHd
@@ -77,8 +59,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const hw = encoders.find((e) => e.available && e.kind !== "software");
   const encAdvice =
     encoders.length === 0
-      ? // Lista vazia por FALHA da sonda não é "verificando": diz e aponta onde tentar de novo.
-        t(
+      ? t(
           encodersError
             ? "encoding.guide.encoder.error"
             : "encoding.guide.encoder.checking",
@@ -107,7 +88,6 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
         </Button>
       </div>
 
-      {/* 1. O caminho do vídeo — com a config REAL do usuário */}
       <div className="rounded-md bg-surface-2 p-3">
         <div className="mb-1.5 flex items-center gap-2 text-sm font-bold">
           <Route className="size-4 text-brass" />{" "}
@@ -167,7 +147,6 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* 2. Os números — prontos pra copiar no OBS */}
       <div className="mt-3">
         <div className="mb-1.5 text-sm font-bold">
           {bold(t, "encoding.guide.setup.title")}
@@ -197,7 +176,6 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
             }
           />
         </div>
-        {/* Válvula de escape pra PC fraco: x264 em 1080p60 pena — fps custa quase linear. */}
         {!hw && (needsFullHd || fps >= 60) && (
           <p className="mt-2 text-[11px] font-semibold leading-relaxed text-warn">
             {t(
@@ -213,7 +191,6 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
         </p>
       </div>
 
-      {/* 3. O porquê, em 3 linhas */}
       <div className="mt-3 flex flex-col gap-1.5 text-xs text-ink-muted">
         <p className="flex gap-2">
           <Check

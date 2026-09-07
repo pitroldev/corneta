@@ -1,37 +1,31 @@
-# Dependencies
 node_modules/
 .pnpm-store/
 
-# Frontend build
 dist/
 dist-ssr/
 .artifacts/
 *.local
 
-# Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
 
-# Bundled sidecar binaries (baixados pelo script, não versionar)
+# Verified downloads; keep sidecars out of source control.
 src-tauri/binaries/*
 !src-tauri/binaries/.gitkeep
 
-# Worktrees de sessão do Claude Code (cópias inteiras do repo — nunca versionar)
+# Nested worktrees must not be included in the publication snapshot.
 .claude/worktrees/
 
-# Logs
 *.log
 npm-debug.log*
 pnpm-debug.log*
 
-# Editor / OS
 .vscode/*
 !.vscode/extensions.json
 .idea/
 .DS_Store
 Thumbs.db
 
-# Secrets / signing keys / certificados gerados (NUNCA versionar)
 *.key
 *.pem
 *.crt

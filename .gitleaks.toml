@@ -3,11 +3,8 @@ title = "Corneta — defaults plus reviewed synthetic redaction fixtures"
 [extend]
 useDefault = true
 
-# These exact strings exercise the telemetry redactors. None can authenticate:
-# the JWT signature/payload are deliberately invalid and the PostHog value is
-# a short numbered placeholder. Keep AND + anchored paths/values: changing a
-# token, its file, or its detector must produce a new finding. Do not allowlist
-# entire test files, telemetry code, commits, or generic token prefixes.
+# Non-authenticating redaction fixtures only. Keep AND and anchored paths/values
+# so any change to the token, file, or detector produces a finding.
 [[allowlists]]
 description = "Synthetic JWT in the desktop text-redaction regression test"
 condition = "AND"

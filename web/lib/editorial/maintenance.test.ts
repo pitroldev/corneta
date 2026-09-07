@@ -52,8 +52,8 @@ function document(
   };
 }
 
-describe("manutenção editorial", () => {
-  it("separa vencidos, próximos e atuais pela data de revisão", () => {
+describe("editorial maintenance", () => {
+  it("separates overdue, due-soon, and current articles by review date", () => {
     const queue = buildEditorialReviewQueue(
       [
         document("overdue", "2026-01-01", 30),
@@ -76,7 +76,7 @@ describe("manutenção editorial", () => {
     ]);
   });
 
-  it("não usa updatedAt para fingir revisão", () => {
+  it("does not use updatedAt to imply a review", () => {
     const item = document("review-date", "2026-01-01", 90);
     item.frontmatter.updatedAt = "2026-03-01";
 
@@ -92,7 +92,7 @@ describe("manutenção editorial", () => {
     });
   });
 
-  it("mede separadamente a cadência de mudanças substanciais", () => {
+  it("measures substantive change cadence separately", () => {
     const item = document("recent-change", "2026-03-01", 90);
     item.frontmatter.updatedAt = "2026-03-01";
 
@@ -104,16 +104,16 @@ describe("manutenção editorial", () => {
     expect(queue.activityWindowDays).toBe(28);
   });
 
-  it("gera um resumo adequado ao GitHub", () => {
+  it("renders a GitHub-compatible summary", () => {
     const markdown = renderEditorialReviewMarkdown(
       buildEditorialReviewQueue([document("rules", "2026-01-01", 60)], {
         asOf: "2026-03-15",
       }),
     );
 
-    expect(markdown).toContain("# Manutenção editorial");
-    expect(markdown).toContain("Vencido");
-    expect(markdown).toContain("meta: 2");
+    expect(markdown).toContain("# Editorial maintenance");
+    expect(markdown).toContain("Overdue");
+    expect(markdown).toContain("target: 2");
     expect(markdown).toContain("/guides/quality/rules");
   });
 });

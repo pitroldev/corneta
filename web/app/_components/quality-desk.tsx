@@ -4,12 +4,7 @@ import { Switch } from "./switch";
 import { BenefitCopy, BenefitNote, Checklist, DemoLabel, Tag } from "./ui";
 import { CheckIcon, CropIcon, InfoIcon } from "./icons";
 
-// Mesa de qualidade: os três modos do app (t("quality.mode.lata.title"), t("quality.mode.esperto.title"), t("quality.mode.caprichado.title"))
-// com o que cada destino recebe. Os números saem da mesma conta do app
-// (src/lib/estimates.ts + os presets de src/lib/platforms.ts):
-// cópia usa o menor bitrate da lista (menor denominador comum) e recodificação
-// usa o recomendado da plataforma. Twitch 6000/160 · YouTube 9000/192 ·
-// Kick 6000/160 · TikTok 720×1280 3000/128.
+// Keep illustrative estimates aligned with desktop encoding modes and platform presets.
 
 type Row = {
   id: "twitch" | "youtube" | "kick" | "tiktok";
@@ -19,12 +14,10 @@ type Row = {
   tone?: "copy" | "warn";
 };
 
-// Os modos carregam copy (título, resumo, veredito), então a lista se monta
-// com o `t` do idioma — array de módulo não enxerga o `t` do componente.
 const modesFor = (t: T) =>
   [
     {
-      id: "lata",
+      id: "copy",
       title: "Na lata",
       tag: t("quality.mode.lata.tag"),
       lead: t("quality.mode.lata.lead"),
@@ -64,7 +57,7 @@ const modesFor = (t: T) =>
       verdict: t("quality.mode.lata.verdict"),
     },
     {
-      id: "esperto",
+      id: "smart",
       title: "Esperto",
       tag: t("quality.mode.esperto.tag"),
       lead: t("quality.mode.esperto.lead"),
@@ -103,7 +96,7 @@ const modesFor = (t: T) =>
       verdict: t("quality.mode.esperto.verdict"),
     },
     {
-      id: "caprichado",
+      id: "quality",
       title: "Caprichado",
       tag: t("quality.mode.caprichado.tag"),
       lead: t("quality.mode.caprichado.lead"),
@@ -214,8 +207,7 @@ function ModePanel({
         </div>
       </div>
 
-      {/* O ícone é absoluto pra o texto correr embaixo dele sem virar item de
-          flex — senão o parágrafo quebra numa coluna estreita. */}
+      {/* Keep the icon out of text flow so inline emphasis does not form narrow flex columns. */}
       <p className="relative mt-3.5 pl-[26px] text-[0.8rem] leading-[1.5] font-[550] text-muted [&>svg]:absolute [&>svg]:top-0.5 [&>svg]:left-0 [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
         <InfoIcon />
         {mode.verdict}

@@ -51,8 +51,8 @@ vi.mock("../lib/editorial/server", () => ({
 
 import sitemap from "./sitemap";
 
-describe("sitemap editorial publicado", () => {
-  it("inclui hubs, categorias, artigos e o par hreflang", async () => {
+describe("published editorial sitemap", () => {
+  it("includes hubs, categories, articles, and the hreflang pair", async () => {
     const entries = await sitemap();
     const byPath = new Map(
       entries.map((entry) => [new URL(entry.url).pathname, entry]),
@@ -77,12 +77,12 @@ describe("sitemap editorial publicado", () => {
       "x-default": expect.stringMatching(/\/guides\/quality\/choose-bitrate$/),
     });
 
-    expect(
-      byPath.get("/guides/quality/choose-bitrate")?.lastModified,
-    ).toEqual(new Date("2026-08-01T00:00:00Z"));
+    expect(byPath.get("/guides/quality/choose-bitrate")?.lastModified).toEqual(
+      new Date("2026-08-01T00:00:00Z"),
+    );
   });
 
-  it("não inventa hreflang para artigo ou categoria de locale único", async () => {
+  it("does not invent hreflang for single-locale articles or categories", async () => {
     const entries = await sitemap();
     const byPath = new Map(
       entries.map((entry) => [new URL(entry.url).pathname, entry]),

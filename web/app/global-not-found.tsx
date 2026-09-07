@@ -13,9 +13,7 @@ import {
 } from "./_components/ui";
 import "./globals.css";
 
-// Com DOIS layouts raiz (o do site e o das legais), o 404 não herda nenhum —
-// por isso ele monta o próprio documento. Fica em português: quem cai aqui veio
-// de uma URL quebrada, e a raiz do site é a versão portuguesa.
+// Multiple root layouts require a standalone document for unmatched routes.
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
@@ -31,7 +29,7 @@ export default function GlobalNotFound() {
           <SoundWaves className={heroWaves} />
           <Shell className="flex max-w-[620px] flex-col items-start">
             <BrandMark />
-            <Sticker tone="tomate" className="mt-[42px] mb-[18px]">
+            <Sticker tone="tomato" className="mt-[42px] mb-[18px]">
               Erro 404
             </Sticker>
             <h1 className="text-[clamp(2.6rem,8vw,4.4rem)] leading-[0.95] tracking-[-0.035em] [&>span]:block">

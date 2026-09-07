@@ -5,7 +5,7 @@ import {
 } from "./_metadata";
 
 describe("editorial metadata boundary", () => {
-  it("mantém canonical próprio e aplica noindex em hub vazio", () => {
+  it("keeps its own canonical URL and marks empty hubs as noindex", () => {
     const metadata = buildEditorialMetadata({
       locale: "pt-BR",
       canonical: "/help",
@@ -26,7 +26,7 @@ describe("editorial metadata boundary", () => {
     });
   });
 
-  it("não emite hreflang com tradução parcial", () => {
+  it("omits hreflang for partial translations", () => {
     expect(
       completeLanguageAlternates("/guides/quality", {
         "pt-BR": "/guides/quality",
@@ -34,7 +34,7 @@ describe("editorial metadata boundary", () => {
     ).toEqual({ canonical: "/guides/quality", languages: {} });
   });
 
-  it("emite par completo e usa o hero factual no OG do artigo", () => {
+  it("emits the complete translation pair and factual article hero in Open Graph", () => {
     const metadata = buildEditorialMetadata({
       locale: "en",
       canonical: "/en/guides/quality/choose-bitrate",

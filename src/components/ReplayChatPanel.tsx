@@ -13,7 +13,6 @@ import { Button } from "./ui";
 const replayMessageCache = new WeakMap<ReplayChatMessage, ChatMessage>();
 let replayMessageSequence = 0;
 
-/** O arquivo histórico é compacto, mas a apresentação é exatamente a do chat ao vivo. */
 function asLiveChatMessage(message: ReplayChatMessage): ChatMessage {
   const cached = replayMessageCache.get(message);
   if (cached) return cached;

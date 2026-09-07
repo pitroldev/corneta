@@ -5,12 +5,12 @@ import { fileURLToPath } from "node:url";
 import nextConfig from "./next.config";
 
 describe("legacy editorial redirects", () => {
-  it("fixa a raiz do build no workspace, não em lockfiles da pasta pessoal", () => {
+  it("pins the build root to the workspace rather than home-directory lockfiles", () => {
     expect(nextConfig.turbopack?.root).toBe(
       resolve(dirname(fileURLToPath(import.meta.url)), ".."),
     );
   });
-  it("preserva as URLs antigas da categoria OBS com redirects permanentes", async () => {
+  it("preserves existing OBS category URLs through permanent redirects", async () => {
     const redirects = await nextConfig.redirects?.();
 
     expect(redirects).toEqual(

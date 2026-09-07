@@ -18,21 +18,12 @@ import {
 import { fontVars } from "../../fonts";
 import "../../globals.css";
 
-// Layout raiz do SITE. Existe um segundo, em (legal)/legal — é o que permite
-// `<html lang>` mudar por idioma sem arrastar as páginas jurídicas junto, que
-// são pt-BR e ponto.
-
-/** As duas versões são geradas no build; qualquer outro segmento é 404 em vez de
- *  virar uma página vazia com `locale` inventado. */
 export const dynamicParams = false;
 
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }));
 }
 
-/** As keywords vivem numeradas no dicionário porque cada uma é um termo de busca
- *  próprio — traduzir a lista inteira como uma frase daria termo que ninguém
- *  digita. Listadas à mão pra o TypeScript conferir que todas existem. */
 const KEYWORD_KEYS = [
   "chrome.meta.keywords.1",
   "chrome.meta.keywords.2",
@@ -60,9 +51,6 @@ function searchVerification(): Metadata["verification"] | undefined {
   };
 }
 
-/** Alternates completos: cada idioma aponta pro outro E pra si mesmo, que é o
- *  par recíproco que o Google exige pra aceitar o hreflang. O `x-default` é o
- *  português porque `/` é a URL canônica do site. */
 function alternatesFor(locale: Locale) {
   return {
     canonical: localePath(locale),
@@ -87,7 +75,6 @@ export async function generateMetadata({
     metadataBase: siteUrl,
     title: {
       default: t("chrome.meta.title.default"),
-      // O template não é copy: é a moldura "%s | Corneta" das páginas internas.
       template: "%s | Corneta",
     },
     description: t("chrome.meta.description"),

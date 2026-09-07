@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "chat",
-  "description": "Permissões mínimas da janela flutuante do chat.",
+  "description": "Minimal permissions for the floating chat window.",
   "windows": ["chat"],
   "permissions": [
     "core:default",

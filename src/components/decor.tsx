@@ -1,4 +1,3 @@
-/** Mascote da Corneta — o megafone. Herda a cor via currentColor. */
 export function Mascot({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -27,7 +26,6 @@ export function Mascot({ className }: { className?: string }) {
   );
 }
 
-/** Ondas sonoras concêntricas (mesmo centro), abrindo para a direita. */
 export function SoundWaves({
   className,
   count = 4,
@@ -37,7 +35,7 @@ export function SoundWaves({
 }) {
   const cx = 6;
   const cy = 100;
-  const a = (52 * Math.PI) / 180; // meia-abertura do arco
+  const a = (52 * Math.PI) / 180;
   return (
     <svg viewBox="0 0 200 200" className={className} fill="none" aria-hidden>
       {Array.from({ length: count }).map((_, i) => {

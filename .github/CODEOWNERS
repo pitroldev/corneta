@@ -1,6 +1,4 @@
-# Mantenedor responsável pela revisão do repositório.
 * @pitroldev
-# Áreas de atenção: OAuth/cofre, mídia, persistência, telemetria e release.
 /src-tauri/src/auth.rs @pitroldev
 /src-tauri/src/keys.rs @pitroldev
 /src-tauri/src/engine.rs @pitroldev

@@ -14,7 +14,6 @@ const TRIGGER_SIZES: Record<SelectSize, string> = {
   md: "h-10 px-2.5 text-sm",
 };
 
-/** Select on-brand via Radix: teclado completo, typeahead e portal (sem clipping). */
 export function Select<T extends string>({
   value,
   options,

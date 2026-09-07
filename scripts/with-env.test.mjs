@@ -90,7 +90,7 @@ describe("with-env: native dotenv semantics", () => {
     for (const code of ["EACCES", "EIO", "EISDIR"]) {
       expect(() =>
         loadEnvironmentFile("unused", {}, { read: readError(code) }),
-      ).toThrow("with-env: não foi possível ler o arquivo de configuração.");
+      ).toThrow("with-env: could not read the configuration file.");
       try {
         loadEnvironmentFile("unused", {}, { read: readError(code) });
       } catch (error) {
@@ -135,7 +135,7 @@ describe("with-env: literal child invocation", () => {
     for (const command of ["other.cmd", "C:\\tools\\OTHER.BAT"]) {
       expect(() =>
         commandInvocation(command, [], { platform: "win32" }),
-      ).toThrow("não são suportados");
+      ).toThrow("are not supported");
     }
   });
 
@@ -152,7 +152,7 @@ describe("with-env: literal child invocation", () => {
           throw new Error("private-path-or-value");
         },
       }),
-    ).toThrow("with-env: CLI Tauri ausente; execute pnpm install.");
+    ).toThrow("with-env: Tauri CLI not found; run pnpm install.");
   });
 
   it("passes spaces, quotes and shell metacharacters literally to an actual child", () => {
@@ -188,7 +188,7 @@ describe("with-env: literal child invocation", () => {
     );
     expect(commandInvocation("not-cargo", []).usesRust).toBe(false);
     expect(() => commandInvocation("node", ["secret\0fixture"])).toThrow(
-      "argumentos inválidos",
+      "invalid command or arguments",
     );
   });
 });

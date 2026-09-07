@@ -26,7 +26,7 @@ try {
 
     $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualSha256 -cne $expectedSha256) {
-        throw 'O SHA-256 do PostHog CLI não corresponde ao valor revisado.'
+        throw 'PostHog CLI SHA-256 does not match the reviewed value.'
     }
 
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDirectory -Force
@@ -34,13 +34,13 @@ try {
         Get-ChildItem -LiteralPath $extractDirectory -Recurse -File -Filter 'posthog-cli.exe'
     )
     if ($binaries.Count -ne 1) {
-        throw "Esperado exatamente um posthog-cli.exe; encontrados $($binaries.Count)."
+        throw "Expected exactly one posthog-cli.exe; found $($binaries.Count)."
     }
 
     $binaryPath = $binaries[0].FullName
     $reportedVersion = (& $binaryPath --version 2>$null | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $reportedVersion -notmatch "(^|\s)$([regex]::Escape($version))(\s|$)") {
-        throw 'O executável do PostHog CLI não informou a versão esperada.'
+        throw 'The PostHog CLI executable did not report the expected version.'
     }
 
     if ($EnvironmentFile) {

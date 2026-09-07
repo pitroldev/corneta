@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import type { SiteCtaId } from "@/lib/telemetry-schema";
 
 export interface NavItem {
-  /** Destino público. Rotas editoriais usam apenas segmentos em inglês. */
   href: string;
   ctaId?: SiteCtaId;
   label: string;
@@ -19,14 +18,6 @@ const LINK =
   "after:absolute after:inset-x-0 after:bottom-0.5 after:h-[3px] after:origin-right after:scale-x-0 after:bg-brass after:transition-transform after:duration-140 after:content-[''] " +
   "hover:text-cream hover:after:origin-left hover:after:scale-x-100 focus-visible:rounded-sm focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-brass";
 
-/**
- * Navegação global deliberadamente curta.
- *
- * A landing já explica o produto em sequência; repetir cada seção no cabeçalho
- * criava oito destinos concorrendo com o download. Quatro links dão contexto
- * sem reconstruir um índice: dois pontos-chave da página e dois destinos
- * editoriais. Em telas pequenas, o bloco sai para preservar marca + ação.
- */
 export function SiteNav({
   copy,
   locale,

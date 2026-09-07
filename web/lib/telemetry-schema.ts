@@ -178,7 +178,6 @@ const EVENT_PROPERTY_ALLOWLIST: Record<
     "$exception_handled",
     "$exception_message",
     "$exception_type",
-    // Metadados estritamente técnicos adicionados pelos SDKs.
     "token",
     "distinct_id",
     "$lib",
@@ -230,10 +229,7 @@ const DURATION_BUCKETS = new Set([
   "gte_10s",
 ]);
 const SEVERITIES = new Set(["error", "fatal"]);
-/**
- * Dimensão fechada: `Error.name` pode ser sobrescrito pela aplicação e não
- * deve virar um canal para nomes de lives, contas ou outros identificadores.
- */
+// Error.name is mutable and may contain identifiers or other private text.
 const SAFE_EXCEPTION_NAMES: ReadonlySet<string> = new Set([
   "AbortError",
   "Error",
@@ -287,7 +283,6 @@ function sanitizeUrl(raw: string) {
   }
 }
 
-/** Redige uma cópia textual; nunca altera a exceção ou o objeto original. */
 export function redactTelemetryText(
   value: string,
   maxLength = MAX_TEXT_LENGTH,
@@ -389,11 +384,7 @@ export function normalizeErrorType(value: unknown) {
     : "UnknownError";
 }
 
-/**
- * Identificador editorial estável, opaco e deliberadamente incapaz de carregar
- * URL, query, título ou texto livre. O prefixo separa as duas coleções sem
- * depender do caminho publicado.
- */
+// Accept only opaque registered IDs, never URLs, queries, titles, or free text.
 export function normalizeContentId(value: unknown) {
   return typeof value === "string" &&
     value.length <= MAX_CONTENT_ID_LENGTH &&
@@ -640,18 +631,14 @@ export function sanitizeTelemetryProperties(
   const output: TelemetryProperties = {};
   for (const [key, value] of Object.entries(properties)) {
     if (!allowlist.has(key) && !SDK_TRANSPORT_PROPERTIES.has(key)) {
-      // O SDK acrescenta propriedades reservadas automaticamente. Elas podem
-      // ser descartadas; as cinco chaves de transporte acima são a exceção
-      // mínima para ingestão cookieless, sem perfil e sem GeoIP. Uma
-      // propriedade livre do call site reprova o evento inteiro.
+      // Drop SDK-owned properties, but reject the whole event for unexpected application properties.
       if (key.startsWith("$")) {
         continue;
       }
       return null;
     }
     const safe = sanitizeProperty(key, value);
-    // Um ID editorial presente mas inválido indica contrato quebrado. Não
-    // rebaixamos silenciosamente o evento para uma page view/CTA genérica.
+    // An invalid article ID rejects the event; do not downgrade it to a generic page view.
     if (key === "content_id" && safe === undefined) return null;
     if (safe !== undefined) output[key] = safe;
   }
@@ -667,7 +654,6 @@ export function sanitizeTelemetryProperties(
   }
 }
 
-/** Última barreira usada no `before_send` dos dois SDKs. */
 export function redactPostHogMessage<T extends TelemetryMessage>(
   message: T | null,
 ): T | null {

@@ -22,7 +22,6 @@ export function GET() {
         background: "#100b07",
       }}
     >
-      {/* Cabeçalho: marca + selo */}
       <div
         style={{
           display: "flex",
@@ -76,7 +75,6 @@ export function GET() {
         </div>
       </div>
 
-      {/* Corpo */}
       <div
         style={{
           display: "flex",

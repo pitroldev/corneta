@@ -47,7 +47,7 @@ import { ObsQualityGuide } from "../components/ObsQualityGuide";
 const MIN_BR = 1000;
 const MAX_BR = 51000;
 
-// `id` é valor de enum (vai pra config e pro Rust) — só os *Key* são copy.
+// IDs are persisted Rust enum values; only translation keys are display copy.
 const MODES: {
   id: EncodingMode;
   titleKey: MessageKey;
@@ -97,8 +97,6 @@ export function EncodingScreen() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [measuring, setMeasuring] = useState(false);
-  // O card vermelho de banda manda pro "ajuste fino" — que nasce fechado lá embaixo.
-  // O link abre o acordeão e leva até o cabeçalho dele (foco junto, pro leitor de tela).
   const tuningToggleRef = useRef<HTMLButtonElement>(null);
   const openTuning = () => {
     setShowAdvanced(true);
@@ -116,7 +114,6 @@ export function EncodingScreen() {
   const lcd = lowestCommonDenominator(config);
   const anyEnabled = config.targets.some((x) => x.enabled);
 
-  // Quantas recodificações simultâneas a placa aguenta (heurística dos encoders).
   const maxHw = Math.max(
     0,
     ...encoders
@@ -127,12 +124,9 @@ export function EncodingScreen() {
   );
   const anyHw = encoders.some((e) => e.available && e.kind !== "software");
   const activeEst = estimate(config, { anyHwAvailable: anyHw });
-  // Só transcodes que caem na PLACA disputam o limite de sessões (x264 é CPU).
+  // Only GPU transcodes count against hardware session limits.
   const overSessions = maxHw > 0 && activeEst.hwTranscodeCount > maxHw;
 
-  // Plataforma vertical recebendo CÓPIA (vídeo deitado) — em QUALQUER modo, não só no
-  // "Na lata": no Esperto um override "Copiar" causa o mesmo estrago, e o único aviso
-  // ficava num texto de 11px dentro do acordeão fechado.
   const verticalCopies = config.targets.filter((x) => {
     const r = PLATFORMS[x.platformId].recommended;
     return (
@@ -144,7 +138,6 @@ export function EncodingScreen() {
   const verticalNames = verticalCopies.map((x) => x.name);
 
   const activeFit = bandFit(activeEst.uploadKbps, uploadMbps);
-  // Se o Esperto couber na banda (mesmo no limite), é a saída de 1 clique do card vermelho.
   const hybridFit =
     config.mode !== "hybrid"
       ? bandFit(
@@ -155,7 +148,7 @@ export function EncodingScreen() {
       : "bad";
   const hybridFits = hybridFit === "ok" || hybridFit === "warn";
 
-  // Medir durante a transmissão roubaria banda da própria live.
+  // Measuring upload during a stream would consume its bandwidth.
   const onAir = snapshot.state === "live" || snapshot.state === "starting";
   const measure = async () => {
     setMeasuring(true);
@@ -176,8 +169,6 @@ export function EncodingScreen() {
         subtitle={t("encoding.header.subtitle")}
       />
 
-      {/* Sem plataforma ligada, tudo abaixo é zero ("Upload 0 kbps") — o caminho tem
-          que aparecer ANTES dos números, não dentro do acordeão fechado lá embaixo. */}
       {!anyEnabled && (
         <EmptyState
           className="mb-4"
@@ -217,8 +208,6 @@ export function EncodingScreen() {
                   : "border-2 border-transparent bg-surface-2 hover:bg-surface-3",
               )}
             >
-              {/* Selo em linha própria: dividindo a linha com o título, ele quebrava
-                  só no card de título longo e os três ficavam desalinhados. */}
               <Badge tone={m.tone} className="mb-2 self-start">
                 {t(m.tagKey)}
               </Badge>
@@ -240,8 +229,6 @@ export function EncodingScreen() {
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">
                 {t(m.descKey)}
               </p>
-              {/* mt-auto: métricas ancoradas no rodapé — descrições de tamanhos
-                  diferentes não desalinham as barras entre os três cards. */}
               <div className="mt-auto space-y-2 pt-3">
                 <LoadBar load={est.load} />
                 <div className="flex items-center justify-between text-xs">
@@ -252,8 +239,6 @@ export function EncodingScreen() {
                     {fmt.bitrate(est.uploadKbps)}
                   </span>
                 </div>
-                {/* Slot SEMPRE presente: quando a medição chega, o texto preenche o
-                    espaço já reservado — os 3 cards não crescem de uma vez. */}
                 <div
                   className={cn(
                     "min-h-4 text-[11px] font-bold",
@@ -280,8 +265,6 @@ export function EncodingScreen() {
         })}
       </div>
 
-      {/* Linha fixa (não some após medir → sem pulo). Texto CURTO de propósito: se
-          quebrasse em 2 linhas no estado não-medido, medir encolheria o parágrafo. */}
       <p className="mt-3 min-h-4 truncate text-xs text-ink-faint">
         {uploadMbps == null
           ? t("encoding.upload.unmeasured")
@@ -377,8 +360,6 @@ export function EncodingScreen() {
                 )}
               </Button>
             ) : config.mode === "passthrough" ? (
-              // No Na lata a qualidade se define no OBS — mandar pro "ajuste fino"
-              // (que aqui diz "não tem o que ajustar") era um beco sem saída.
               <p className="mt-1">
                 {rich(t, "encoding.band.fix.passthrough", {
                   link: (
@@ -425,8 +406,6 @@ export function EncodingScreen() {
         </Card>
       )}
 
-      {/* Card do OBS SEMPRE presente (conteúdo muda, a moldura não): trocar um destino de
-          cópia↔recodifica no ajuste fino não pode encolher a tela acima do cursor. */}
       <Card className="mt-4 flex gap-3 bg-surface-2">
         <Info className="mt-0.5 size-5 shrink-0 text-brass" />
         <div className="flex-1 text-sm text-ink-muted">
@@ -506,8 +485,6 @@ export function EncodingScreen() {
         )}
       </div>
 
-      {/* Sempre presente: no "Na lata" a seção explica por que não há o que ajustar,
-          em vez de sumir da tela (sumir = pulo de layout + "cadê o ajuste fino?"). */}
       <div className="mt-7">
         <button
           ref={tuningToggleRef}
@@ -569,7 +546,6 @@ function LoadBar({ load }: { load: number }) {
           ? "encoding.load.word.warm"
           : "encoding.load.word.easy",
   );
-  // Sem percentual: é heurística, não medição — número exato passaria falsa precisão.
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
@@ -589,8 +565,6 @@ function LoadBar({ load }: { load: number }) {
   );
 }
 
-/** Tradução do encoder pra linguagem de gente ("quem faz o trabalho").
- *  Não é componente: recebe o `t` de quem chama. */
 function friendlyEncoder(
   t: I18n["t"],
   x: { kind: EncoderKind; label: string },
@@ -605,7 +579,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const updateTarget = useStore((s) => s.updateTarget);
   const encoders = useStore((s) => s.encoders);
   const { t, fmt } = useI18n();
-  // `target` (e não `t`) porque `t` aqui é a tradução.
   const target = config.targets.find((x) => x.id === targetId)!;
   const preset = PLATFORMS[target.platformId];
   const enc = target.encoding;
@@ -615,8 +588,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const recVertical = preset.recommended.height > preset.recommended.width;
   const [reframing, setReframing] = useState(false);
   const [showBrNumber, setShowBrNumber] = useState(false);
-  // Rascunho LOCAL do número: commitar a cada tecla fazia os cards de modo e o veredito
-  // de banda lá em cima piscarem com valores transitórios ("1" kbps) enquanto digitava.
+  // Commit numeric drafts on blur or Enter; intermediate keystrokes would alter live estimates.
   const [brDraft, setBrDraft] = useState<string | null>(null);
 
   const recBr = preset.recommended.videoBitrateKbps;
@@ -632,7 +604,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       encoding: { ...enc, preset: { ...p, ...patch } },
     });
 
-  // Paradas do slider RELATIVAS ao recomendado da plataforma (cada uma tem o seu).
   const clampBr = (v: number) =>
     Math.min(MAX_BR, Math.max(MIN_BR, Math.round(v / 100) * 100));
   const stops: { nameKey: MessageKey; kbps: number }[] = [
@@ -642,7 +613,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   ];
   const stopIdx = stops.findIndex((s) => s.kbps === p.videoBitrateKbps);
 
-  // O que o "Automático" vai escolher de verdade (1º hardware disponível, senão software).
   const autoEnc =
     encoders.find((x) => x.available && x.kind !== "software") ??
     encoders.find((x) => x.available);
@@ -655,8 +625,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       .map((x) => ({ value: x.kind, label: friendlyEncoder(t, x) })),
   ];
 
-  // No híbrido: 3 opções com a decisão do automático resolvida no rótulo.
-  // `v` é valor de enum (vai pra config) — só o rótulo é copy.
   const autoAct = smartHybridAction(target.platformId);
   const overrideOpts: {
     v: EncodingAction | undefined;
@@ -673,14 +641,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
     { v: "copy", labelKey: "encoding.target.override.copy" },
   ];
 
-  // GEOMETRIA ESTÁVEL: cabeçalho fixo (identidade + segmented do híbrido) e um corpo com
-  // altura mínima única pros dois estados (recodifica/cópia) — trocar de opção, abrir o
-  // número ou mudar o encoder NÃO move nada ao redor. (O layout antigo era um flex-wrap
-  // justify-end que quebrava linha de forma imprevisível.)
   return (
     <>
       <Card className="bg-surface-2 py-3.5">
-        {/* Cabeçalho: quem é + (no híbrido) o que fazer com ela */}
         <div className="flex flex-wrap items-center gap-3">
           <PlatformGlyph id={target.platformId} size={36} />
           <div className="min-w-0 flex-1">
@@ -688,8 +651,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
               {target.name}
             </div>
             <div className="text-[11px] text-ink-faint">
-              {/* Em cópia a resolução/fps são as do OBS — mostrar as do preset aqui
-                  parecia promessa de "mando 1080p60" que a cópia não cumpre. */}
               {action === "copy"
                 ? t("encoding.target.copy.resolution")
                 : fmtResolution(p.width, p.height, p.fps)}
@@ -698,8 +659,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
           {config.mode === "hybrid" && (
             <div className="flex h-9 shrink-0 items-center overflow-hidden rounded-md border-2 border-border">
               {overrideOpts.map((o) => {
-                // hybridOverride pode chegar como null do JSON (Rust serializa
-                // Option::None assim) — normaliza pra casar com o v: undefined do Auto.
+                // Rust serializes Option::None as null; normalize it to the undefined automatic option.
                 const sel = (enc.hybridOverride ?? undefined) === o.v;
                 return (
                   <button
@@ -726,13 +686,9 @@ function PerTargetRow({ targetId }: { targetId: string }) {
           )}
         </div>
 
-        {/* Corpo: mesma altura mínima nos dois estados → trocar cópia↔recodifica não pula.
-            Abaixo de sm o grid empilha (fica mais alto) — o piso acompanha. */}
         <div className="mt-3 min-h-52 border-t border-border-soft pt-3 sm:min-h-28">
           {action === "transcode" ? (
             <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-[minmax(0,1fr)_13rem]">
-              {/* Qualidade: segmented de 3 paradas (posição nunca mente — "personalizado"
-                  simplesmente não acende nenhuma) + slot fixo pro número */}
               <div className="flex flex-col gap-1.5 text-[11px] font-semibold text-ink-faint">
                 <span className="flex items-center gap-1">
                   {t("encoding.target.quality.label")}
@@ -757,18 +713,15 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                     </button>
                   ))}
                 </div>
-                {/* Slot de altura FIXA: linha de status OU o editor de número — mesma h-8 */}
                 <div className="flex h-8 items-center gap-2">
                   {showBrNumber ? (
                     <>
                       <input
                         type="number"
                         step={500}
-                        // eslint-disable-next-line jsx-a11y/no-autofocus -- O usuário abriu explicitamente o editor numérico; mantém a continuação pelo teclado.
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- Focus follows an explicit request to edit this value.
                         autoFocus
                         value={brDraft ?? String(p.videoBitrateKbps)}
-                        // Rascunho local: só COMMITA no blur/Enter — commitar por tecla
-                        // fazia os cards de modo lá em cima piscarem com "1 kbps".
                         onChange={(e) => setBrDraft(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter")
@@ -799,8 +752,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                         )}
                       />
                       <span className="font-normal">kbps</span>
-                      {/* "fechar" ANTES do trecho variável: a mensagem de inválido e o
-                          "usar recomendado" trocam de largura — o alvo do clique não anda. */}
                       <button
                         type="button"
                         onClick={() => setShowBrNumber(false)}
@@ -852,7 +803,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 </div>
               </div>
 
-              {/* Encoder: coluna fixa à direita, com o "usa X" sempre reservado */}
               <div className="flex flex-col gap-1.5 text-[11px] font-semibold text-ink-faint">
                 <span className="flex items-center gap-1">
                   {t("encoding.target.encoder.label")}
@@ -871,8 +821,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                     })
                   }
                 />
-                {/* Coluna de largura FIXA (13rem no grid): o "usa X" some ao escolher um
-                    encoder explícito, e sem truncate a coluna encolhia deslizando o Select. */}
                 <div className="flex h-8 items-center gap-3">
                   <span
                     className="min-w-0 flex-1 truncate font-normal text-ink-faint"
@@ -904,8 +852,6 @@ function PerTargetRow({ targetId }: { targetId: string }) {
               </div>
             </div>
           ) : (
-            // Estado "cópia": painel explicativo com a MESMA presença visual do estado
-            // com controles — nada de badge solitária flutuando à direita.
             <div className="flex min-h-22 flex-col justify-center gap-1">
               <div className="flex items-center gap-2">
                 <Badge tone="neutral">{t("encoding.target.copy.badge")}</Badge>

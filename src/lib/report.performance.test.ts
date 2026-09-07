@@ -6,8 +6,8 @@ import { pt, type MessageKey } from "./i18n/pt";
 const t = (key: MessageKey, vars?: Vars) => interpolate(pt[key], vars);
 
 describe("report performance", () => {
-  it("analisa oito horas e quatro destinos sem caminho quadrático", () => {
-    const sampleCount = 8 * 60 * 30; // uma amostra a cada dois segundos
+  it("analyzes eight hours and four destinations without quadratic scaling", () => {
+    const sampleCount = 8 * 60 * 30;
     const platforms = ["Twitch", "YouTube", "Kick", "Servidor próprio"].map(
       (name, index) => ({
         id: `target-${index}`,
@@ -77,8 +77,7 @@ describe("report performance", () => {
     const elapsedMs = performance.now() - started;
 
     expect(analysis.windows.length).toBeGreaterThan(0);
-    // Inclui JSON.parse, normalização e análise. O teto folgado evita teste instável,
-    // mas pega imediatamente uma regressão O(n²) numa sessão longa.
+    // Include parsing and analysis; a generous ceiling catches quadratic regressions without tight timing assumptions.
     expect(elapsedMs).toBeLessThan(750);
   });
 });

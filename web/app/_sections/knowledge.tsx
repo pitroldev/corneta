@@ -4,7 +4,7 @@ import { ArrowIcon } from "../_components/icons";
 import { cn, Section, SectionHeading, Shell } from "../_components/ui";
 
 const CARD =
-  "group relative isolate flex min-h-[250px] flex-col justify-between overflow-hidden rounded-lg border-[3px] border-ink p-[clamp(24px,3vw,36px)] text-ink shadow-[7px_7px_0_0_var(--ink)] outline-offset-4 transition-transform duration-180 hover:-translate-y-1 focus-visible:outline-[4px] focus-visible:outline-tomate";
+  "group relative isolate flex min-h-[250px] flex-col justify-between overflow-hidden rounded-lg border-[3px] border-ink p-[clamp(24px,3vw,36px)] text-ink shadow-[7px_7px_0_0_var(--ink)] outline-offset-4 transition-transform duration-180 hover:-translate-y-1 focus-visible:outline-[4px] focus-visible:outline-tomato";
 
 export function KnowledgeEntryPoints({ t, locale }: { t: T; locale: Locale }) {
   const entries = [
@@ -16,7 +16,7 @@ export function KnowledgeEntryPoints({ t, locale }: { t: T; locale: Locale }) {
       title: t("knowledge.guides.title"),
       description: t("knowledge.guides.description"),
       action: t("knowledge.guides.action"),
-      className: "bg-tomate",
+      className: "bg-tomato",
     },
     {
       href: localePath(locale, "/help"),

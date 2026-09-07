@@ -18,15 +18,10 @@ function setFlagDone() {
   try {
     localStorage.setItem(FLAG, "1");
   } catch {
-    /* ignore */
+    /* Storage may be unavailable; the checklist remains dismissible for this session. */
   }
 }
 
-/**
- * "Sua 1ª live em 3 passos" — o guia persistente que o tour não é: fica no topo de
- * Plataformas e Ao vivo até a primeira live acontecer (ou o veterano dispensar), com cada
- * passo clicável levando pro lugar certo. Fecha o buraco entre "fechei o tour" e "tô no ar".
- */
 export function FirstLiveChecklist({
   onSetupObs,
 }: {
@@ -40,7 +35,6 @@ export function FirstLiveChecklist({
   const state = useStore((s) => s.snapshot.state);
   const [hidden, setHidden] = useState(flagDone);
 
-  // Entrou no ar = missão cumprida: grava e some pra sempre (o resto da tela assume).
   useEffect(() => {
     if (!hidden && state === "live") {
       setFlagDone();

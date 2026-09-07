@@ -1,11 +1,3 @@
-// ============================================================
-// Mesa — co-stream P2P (WebRTC mesh). Lado "control": publica a própria câmera/mic
-// e recebe as câmeras dos outros (preview). A composição que vai pro OBS é feita pela
-// página de estúdio (src-tauri/assets/studio.html), que entra na MESMA sala.
-//
-// WebRTC roda no WebView (Chromium/WebView2) — nada de crate Rust. A sinalização é um
-// relay de texto servido pela Corneta do host; a mídia é direta entre os pares.
-// ============================================================
 import type { I18n } from "./i18n";
 
 export type MesaRole = "control" | "studio";
@@ -15,7 +7,6 @@ export interface MesaPeer {
   name: string;
   role: MesaRole;
   connection: RTCPeerConnectionState;
-  /** Stream remoto (pra preview na sala de controle). */
   stream: MediaStream | null;
 }
 
@@ -23,11 +14,9 @@ export type MesaStatus = "idle" | "connecting" | "online" | "offline" | "error";
 
 export interface MesaClientOpts {
   signalUrl: string;
-  /** Chave da sala (id + segredo) — quem tem o convite tem acesso. */
+  /** Room ID and secret; possession of the invitation grants access. */
   room: string;
   name: string;
-  /** Tradutor do idioma ativo: o cliente escreve erros que o convidado lê na tela.
-   *  Entra pelas opções (não é componente e não pode ter idioma global). */
   t: I18n["t"];
   iceServers?: RTCIceServer[];
   onReady?: (myId: string) => void;
@@ -56,32 +45,24 @@ const DEFAULT_ICE: RTCIceServer[] = [
   { urls: "stun:stun1.l.google.com:19302" },
 ];
 
-/** Reconexões seguidas antes de desistir (~15s com o backoff) — sem teto, o convidado
- *  com host inalcançável ficaria em "conectando…" pra sempre, sem nenhum aviso. */
+/** Bound consecutive retries so unreachable rooms eventually produce a recoverable error. */
 const MAX_ATTEMPTS = 6;
 
 function randomId(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
 }
 
-/** Segredo por par (CSPRNG): prova ao relay que sou o dono deste peerId ao reconectar.
- *  Só viaja no `join`, nunca é difundido — um terceiro não consegue roubar meu slot. */
+/** Per-peer CSPRNG secret proves ownership on reconnect; sent only in join, never broadcast. */
 function randomSecret(): string {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
   return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-// ------------------------------------------------------------------
-// Convite (token) — carrega o endereço do host + a chave da sala, sem servidor de
-// rendezvous. base64url de um JSON pequeno. Curto o bastante pra copiar/QR.
-// ------------------------------------------------------------------
 export interface MesaInvite {
-  /** host:porta alcançável do relay de sinalização (LAN ou túnel). */
+  /** Reachable signaling host and port, over LAN or a tunnel. */
   addr: string;
-  /** Chave da sala (id.segredo). */
   room: string;
-  /** Nome amigável da Mesa (opcional). */
   title?: string;
 }
 
@@ -115,8 +96,7 @@ export function decodeInvite(code: string): MesaInvite | null {
   }
 }
 
-/** Gera uma chave de sala nova (id curto + segredo). A chave É o controle de acesso
- *  (quem a tem entra na sala), então usa CSPRNG — nada de Math.random adivinhável. */
+/** Room keys grant access and must use cryptographically secure randomness. */
 export function newRoomKey(): string {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
@@ -124,9 +104,6 @@ export function newRoomKey(): string {
   return `${hex.slice(0, 5)}.${hex.slice(5)}`;
 }
 
-// ------------------------------------------------------------------
-// Dispositivos (câmera/mic)
-// ------------------------------------------------------------------
 export interface DeviceList {
   cameras: MediaDeviceInfo[];
   mics: MediaDeviceInfo[];
@@ -148,7 +125,6 @@ export interface CameraOpts {
   fps?: number;
 }
 
-/** Abre câmera + mic com a resolução pedida (padrão 1280×720@30). */
 export async function openCamera(opts: CameraOpts = {}): Promise<MediaStream> {
   const video: MediaTrackConstraints = {
     width: { ideal: opts.width ?? 1280 },
@@ -165,9 +141,6 @@ export async function openCamera(opts: CameraOpts = {}): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({ video, audio });
 }
 
-// ------------------------------------------------------------------
-// Cliente da Mesa (lado control)
-// ------------------------------------------------------------------
 export class MesaClient {
   readonly myId = randomId("control");
   private readonly secret = randomSecret();
@@ -179,9 +152,7 @@ export class MesaClient {
   private maxBitrateKbps = 0;
   private alive = false;
   private retry = 0;
-  /** Falhas de conexão seguidas (zera ao abrir) — controla o desistir. */
   private attempts = 0;
-  /** Já esteve online nesta sessão? Muda a mensagem de desistência (caiu vs. nunca alcançou). */
   private wasOnline = false;
   private keepalive: ReturnType<typeof setInterval> | null = null;
 
@@ -191,23 +162,20 @@ export class MesaClient {
       opts.iceServers && opts.iceServers.length ? opts.iceServers : DEFAULT_ICE;
   }
 
-  /** Define/atualiza a stream local publicada pra todos os pares. */
   setLocalStream(stream: MediaStream | null): void {
     this.local = stream;
     for (const rec of this.recs.values()) this.syncTracks(rec);
   }
 
-  /** Liga/desliga a câmera (mantém a conexão). */
   setCameraEnabled(on: boolean): void {
     this.local?.getVideoTracks().forEach((t) => (t.enabled = on));
   }
 
-  /** Liga/desliga o mic. */
   setMicEnabled(on: boolean): void {
     this.local?.getAudioTracks().forEach((t) => (t.enabled = on));
   }
 
-  /** Teto de bitrate do vídeo enviado (0 = sem teto). */
+  /** Outgoing video bitrate cap; zero means uncapped. */
   setMaxBitrate(kbps: number): void {
     this.maxBitrateKbps = kbps;
     for (const rec of this.recs.values()) void this.applyBitrate(rec);
@@ -232,7 +200,7 @@ export class MesaClient {
       try {
         rec.pc.close();
       } catch {
-        /* ignore */
+        /* Best-effort peer shutdown. */
       }
     }
     this.recs.clear();
@@ -240,28 +208,25 @@ export class MesaClient {
     try {
       this.ws?.close();
     } catch {
-      /* ignore */
+      /* Best-effort signaling shutdown. */
     }
     this.ws = null;
     this.opts.onStatus("idle");
   }
 
-  // ---------------- sinalização ----------------
   private connect(): void {
     let ws: WebSocket;
     try {
       ws = new WebSocket(this.opts.signalUrl);
     } catch (e) {
-      console.warn("[mesa] sinalização inválida:", e);
+      console.warn("[mesa] invalid signaling:", e);
       this.opts.onError?.(this.opts.t("core.mesa.error.badInviteAddress"));
       this.opts.onStatus("error");
       return;
     }
     this.ws = ws;
     ws.onopen = () => {
-      // NÃO zera attempts nem vira "online" aqui: o socket abrir não prova nada
-      // (proxy/host que aceita o handshake e derruba em seguida entraria num loop
-      // infinito de reconexão). Só o "welcome" — sala aceitou o join — confirma.
+      // A socket handshake does not prove room access; reset retries only after welcome.
       this.opts.onReady?.(this.myId);
       this.send({
         t: "join",
@@ -285,7 +250,6 @@ export class MesaClient {
       if (!this.alive) return;
       this.attempts += 1;
       if (this.attempts >= MAX_ATTEMPTS) {
-        // Desiste: erro claro com saída é melhor que "conectando…" eterno.
         this.alive = false;
         this.opts.onStatus("error");
         this.opts.onError?.(
@@ -305,7 +269,7 @@ export class MesaClient {
       try {
         ws.close();
       } catch {
-        /* ignore */
+        /* Closing an already-failed signaling socket is best-effort. */
       }
     };
   }
@@ -318,8 +282,6 @@ export class MesaClient {
   private async onMessage(m: Record<string, unknown>): Promise<void> {
     switch (m.t) {
       case "welcome": {
-        // Join aceito: só agora a conexão conta como estabelecida (zera o
-        // desistir e libera o status "online" — ver comentário no onopen).
         this.retry = 0;
         this.attempts = 0;
         this.wasOnline = true;
@@ -343,18 +305,15 @@ export class MesaClient {
         break;
       case "error": {
         const code = typeof m.code === "string" ? m.code : "";
-        console.warn("[mesa] sala recusou:", code || "(sem código)");
-        // O relay recusa o join mas mantém o socket aberto — sem isso o status
-        // ficaria "conectando" (ou pior, "online") com o convidado FORA da sala,
-        // e o ciclo de reconexão apagaria o erro a cada onopen.
+        console.warn("[mesa] room rejected:", code || "(no code)");
+        // A rejected join may leave the socket open; preserve the rejection instead of reconnecting over it.
         this.alive = false;
         try {
           this.ws?.close();
         } catch {
-          /* ignore */
+          /* Best-effort shutdown after a rejected join. */
         }
         this.opts.onStatus("error");
-        // O código do relay ("peer-taken") é protocolo e não se traduz — só a frase.
         this.opts.onError?.(
           this.opts.t(
             code === "peer-taken"
@@ -367,7 +326,6 @@ export class MesaClient {
     }
   }
 
-  // ---------------- WebRTC (perfect negotiation) ----------------
   private connectTo(
     remoteId: string,
     role: MesaRole,
@@ -408,7 +366,7 @@ export class MesaClient {
         try {
           pc.restartIce();
         } catch {
-          /* ignore */
+          /* ICE restart failure must not prevent publishing connection status. */
         }
       }
       this.emitPeers();
@@ -423,13 +381,12 @@ export class MesaClient {
           data: { description: pc.localDescription ?? undefined },
         });
       } catch {
-        /* ignore */
+        /* Concurrent negotiation may invalidate the local offer. */
       } finally {
         rec!.makingOffer = false;
       }
     };
 
-    // Publica a câmera/mic local pra este par (control → todos). Dispara negotiationneeded.
     this.syncTracks(rec);
     this.emitPeers();
     return rec;
@@ -439,12 +396,10 @@ export class MesaClient {
     if (!this.local) return;
     const vt = this.local.getVideoTracks()[0] ?? null;
     const at = this.local.getAudioTracks()[0] ?? null;
-    // Vídeo
     if (vt) {
       if (rec.videoSender) void rec.videoSender.replaceTrack(vt);
       else rec.videoSender = rec.pc.addTrack(vt, this.local);
     }
-    // Áudio
     if (at) {
       if (rec.audioSender) void rec.audioSender.replaceTrack(at);
       else rec.audioSender = rec.pc.addTrack(at, this.local);
@@ -461,14 +416,13 @@ export class MesaClient {
       params.encodings[0].maxBitrate = this.maxBitrateKbps * 1000;
       await rec.videoSender.setParameters(params);
     } catch {
-      /* navegador pode recusar — best-effort */
+      /* The browser may reject bitrate parameters. */
     }
   }
 
   private async onPeerSignal(fromId: string, data: SignalData): Promise<void> {
     if (!data) return;
     let rec = this.recs.get(fromId);
-    // "control" é papel do protocolo; o nome é rótulo de tela e vem do dicionário.
     if (!rec)
       rec =
         this.connectTo(
@@ -503,7 +457,7 @@ export class MesaClient {
         }
       }
     } catch {
-      /* ignore — perfect negotiation tolera corridas */
+      /* Perfect negotiation tolerates concurrent offer races. */
     }
   }
 
@@ -513,7 +467,7 @@ export class MesaClient {
     try {
       rec.pc.close();
     } catch {
-      /* ignore */
+      /* Peer shutdown must not prevent removing its local record. */
     }
     this.recs.delete(remoteId);
     this.emitPeers();
@@ -524,19 +478,13 @@ export class MesaClient {
   }
 }
 
-// ------------------------------------------------------------------
-// URL da página de estúdio (carregada pelo OBS como Browser Source).
-// ------------------------------------------------------------------
 export interface StudioUrlOpts {
-  /** Base do servidor local que serve studio.html (ex.: http://127.0.0.1:7777). */
   base: string;
-  /** URL de sinalização que ESTE cliente usa (host: 127.0.0.1; convidado: addr do host). */
   signalUrl: string;
   room: string;
-  /** peerId do próprio control (muta o áudio do próprio host no estúdio). */
+  /** The local control peer ID prevents duplicate self-audio in the studio. */
   selfId: string;
   layout?: "grid" | "solo";
-  /** Solo: peerId a exibir em tela cheia. */
   peer?: string;
   hideSelf?: boolean;
   labels?: boolean;

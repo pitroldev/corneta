@@ -6,9 +6,6 @@ import { useStore } from "../../lib/store";
 import { toast } from "../../lib/toast";
 import { cn } from "../../lib/utils";
 
-/** Escolhe a tela do "JÁ VOLTO": padrão gerada ou arquivo próprio (imagem ou vídeo —
- *  a kind vem da extensão). O arquivo é copiado pro backend (brb-slate.*) e entra no
- *  ar quando o sinal cai. Preview 16:9 pra conferir o que vai pro ar de verdade. */
 export function BrbSlateChooser() {
   const { t, locale } = useI18n();
   const kind = useStore((s) => s.config!.settings.brbSlateKind) ?? "auto";
@@ -17,7 +14,7 @@ export function BrbSlateChooser() {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string>("");
 
-  // Preview vem do backend em JPEG base64 (vídeo = 1 frame); "" = indisponível.
+  // Backend previews are base64 JPEGs; an empty string means unavailable.
   const loadPreview = useCallback(async () => {
     try {
       setPreview(await api.getBrbSlatePreview());
@@ -38,7 +35,6 @@ export function BrbSlateChooser() {
         toast.success(t("settings.brb.slate.toast.updated"));
         await loadPreview();
       }
-      // null = usuário cancelou o seletor → sem mudança.
     } catch (e) {
       toast.error(
         t("settings.brb.slate.toast.fileError", { error: String(e) }),
@@ -48,7 +44,6 @@ export function BrbSlateChooser() {
     }
   };
 
-  // Volta pro padrão: apaga o custom e regenera o PNG da Corneta (como o App faz no boot).
   const useDefault = async () => {
     setBusy(true);
     try {
@@ -67,8 +62,7 @@ export function BrbSlateChooser() {
     }
   };
 
-  // "image"/"video"/"auto" são os valores gravados na config e lidos pelo Rust —
-  // só a frase muda de idioma.
+  // Media kinds are persisted Rust enum values, not display labels.
   const current =
     kind === "image"
       ? t("settings.brb.slate.using.image", {
@@ -89,13 +83,10 @@ export function BrbSlateChooser() {
     );
   const isDefault = kind === "auto";
   const isCustom = kind === "image" || kind === "video";
-  // O rótulo visível nomeia o grupo; `aria-pressed` expõe qual das duas está
-  // escolhida, que até aqui só a borda de latão dizia.
   const labelId = useId();
 
   return (
     <div className="flex items-start gap-4 py-3.5">
-      {/* Mesmo formato 16:9 dos previews de SecurityFeature — é isso que vai pro ar. */}
       {preview && (
         <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md ring-1 ring-border">
           <img
@@ -135,7 +126,6 @@ export function BrbSlateChooser() {
   );
 }
 
-/** A tela "JÁ VOLTO" que vai pro ar quando o sinal do OBS cai. */
 export function BrbPreview() {
   const t = useT();
   return (

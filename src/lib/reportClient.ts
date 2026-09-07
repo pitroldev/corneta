@@ -4,7 +4,7 @@ import type {
   ReportResultByKind,
 } from "./reportTasks";
 
-/** One bounded, cancellable worker per consumer. It loads only when requested. */
+/** One bounded, cancellable worker per consumer, loaded on demand. */
 export class ReportClient {
   private worker: Worker | null = null;
   private serial = 0;

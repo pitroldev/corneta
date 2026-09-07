@@ -15,18 +15,13 @@ import {
   TwoCol,
 } from "../_components/ui";
 
-// Três steps, o argumento do "roda no seu PC", os destinos e as permissões de
-// conta. São as seções de meio de página, todas de leitura corrida.
-
-// Os filetes de 3px em tinta escura são o que dá o ar de tabela impressa; a
-// numeração é um bloco torto de latão, como no app.
 const STEPS_LIST =
   "m-0 list-none border-t-[3px] border-ink p-0 " +
   "[&>li]:grid [&>li]:grid-cols-[52px_1fr] [&>li]:items-start [&>li]:gap-5 [&>li]:border-b-[3px] [&>li]:border-ink [&>li]:py-6.5 " +
   "[&>li>b]:grid [&>li>b]:size-[46px] [&>li>b]:rotate-[-2.4deg] [&>li>b]:place-items-center [&>li>b]:rounded-md [&>li>b]:bg-brass [&>li>b]:font-display [&>li>b]:text-[1.35rem] [&>li>b]:font-extrabold [&>li>b]:text-brass-ink [&>li>b]:shadow-pop-ink " +
   "[&_h3]:text-[clamp(1.42rem,2.2vw,1.9rem)] [&_h3]:leading-[1.1] " +
   "[&_p]:mt-1.5 [&_p]:max-w-[54ch] [&_p]:leading-[1.6] [&_p]:font-medium [&_p]:text-ink-muted " +
-  "[&_em]:mt-3 [&_em]:inline-flex [&_em]:rotate-[-1.5deg] [&_em]:items-center [&_em]:gap-[7px] [&_em]:rounded-sm [&_em]:bg-tomate [&_em]:px-[9px] [&_em]:py-[5px] [&_em]:font-display [&_em]:text-[0.86rem] [&_em]:font-extrabold [&_em]:text-brass-ink [&_em]:not-italic [&_em]:shadow-[3px_3px_0_0_var(--ink)] " +
+  "[&_em]:mt-3 [&_em]:inline-flex [&_em]:rotate-[-1.5deg] [&_em]:items-center [&_em]:gap-[7px] [&_em]:rounded-sm [&_em]:bg-tomato [&_em]:px-[9px] [&_em]:py-[5px] [&_em]:font-display [&_em]:text-[0.86rem] [&_em]:font-extrabold [&_em]:text-brass-ink [&_em]:not-italic [&_em]:shadow-[3px_3px_0_0_var(--ink)] " +
   "[&_em>svg]:h-[15px] [&_em>svg]:w-[15px] [&_em>svg]:fill-none [&_em>svg]:stroke-current";
 
 export function Steps({ t }: { t: T }) {
@@ -55,9 +50,6 @@ export function Steps({ t }: { t: T }) {
                 <div>
                   <h3>{step.title}</h3>
                   <p>{step.text}</p>
-                  {/* O passo 3 não descreve mais o BORA: ele DÁ o BORA. A copy
-                      ao lado promete "cada plataforma entrando no ar, uma por
-                      uma" — agora é isso que acontece quando se aperta. */}
                   {i === steps.length - 1 && (
                     <GoLive
                       copy={{
@@ -234,7 +226,7 @@ export function Platforms({
               ))}
             </div>
 
-            <p className="mt-[clamp(22px,2.5vw,30px)] flex max-w-[90ch] items-start gap-3 text-[0.9rem] leading-[1.6] font-medium text-ink-muted [&>svg]:mt-px [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomate-ink [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2] [&_a]:font-[750] [&_a]:text-tomate-ink [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-[3px]">
+            <p className="mt-[clamp(22px,2.5vw,30px)] flex max-w-[90ch] items-start gap-3 text-[0.9rem] leading-[1.6] font-medium text-ink-muted [&>svg]:mt-px [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomato-ink [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2] [&_a]:font-[750] [&_a]:text-tomato-ink [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-[3px]">
               <LockIcon />
               <span>
                 {t("steps.accounts.privacy.text")}{" "}

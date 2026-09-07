@@ -14,7 +14,6 @@ async function getWin() {
 export function TitleBar() {
   const t = useT();
   const [maximized, setMaximized] = useState(false);
-  // O X não fecha quando "minimizar pra bandeja" está ligado — o tooltip conta a verdade.
   const minimizeToTray = useStore(
     (s) => s.config?.settings.minimizeToTray ?? true,
   );

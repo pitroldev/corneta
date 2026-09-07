@@ -1,7 +1,3 @@
-// ============================================================
-// CSV — primitiva de escrita + as duas tabelas que o relatório exporta.
-// Funções puras: recebem dado e devolvem string. Quem salva é o adapter.
-// ============================================================
 import type { SessionData, SessionMeta } from "../types";
 import type { Locale } from "../i18n/locale";
 import {
@@ -16,20 +12,10 @@ import type { ReportI18n } from "./html";
 
 export type Cell = string | number | null | undefined;
 
-/** BOM de UTF-8. Sem ele o Excel em português lê o arquivo como ANSI e "audiência"
- *  chega como "audiÃªncia".
- *
- *  Montado pelo código de propósito: U+FEFF é INVISÍVEL no editor. Escrito direto no
- *  fonte, some numa cópia distraída e ninguém vê o que quebrou. */
+/** Use an explicit UTF-8 BOM so Excel detects encoding; a numeric escape remains visible in source. */
 export const BOM = String.fromCharCode(0xfeff);
 
-/** Como o Excel do idioma escreve uma planilha.
- *
- *  Não é cosmético: o Excel corta as colunas no separador de lista DA MÁQUINA. Um
- *  arquivo com `;` aberto num Excel em inglês cai inteiro numa coluna só — o
- *  mesmo estrago que `,` faz num Excel em português, ao contrário. E o separador
- *  de lista anda colado no decimal: quem usa `;` usa vírgula decimal, quem usa
- *  `,` usa ponto. Trocar um sem o outro faz "1,5" virar duas células. */
+/** Keep list and decimal separators aligned with the export locale. */
 interface Dialect {
   sep: string;
   decimal: string;
@@ -40,22 +26,17 @@ const DIALECT: Record<Locale, Dialect> = {
   en: { sep: ",", decimal: "." },
 };
 
-/** Caracteres que fazem o Excel/Sheets tratar a célula como FÓRMULA ao abrir.
- *  Nome de canal vem da config do usuário, então um rótulo `=...` viraria execução
- *  na planilha de quem recebeu o relatório. O apóstrofo à frente neutraliza. */
+/** Prefix formula-like text with an apostrophe to prevent spreadsheet execution. */
 const FORMULA_START = /^[=+\-@\t\r]/;
 
 function escapeText(s: string, sep: string): string {
   const guarded = FORMULA_START.test(s) ? `'${s}` : s;
-  // Aspas em volta quando o texto contém o próprio separador — que muda com o
-  // idioma, então a regra tem que olhar pro separador em uso, não pro `;`.
   return guarded.includes(sep) || /["\n\r]/.test(guarded)
     ? `"${guarded.replace(/"/g, '""')}"`
     : guarded;
 }
 
-/** Só texto passa pelo escudo de fórmula — senão todo valor negativo viraria
- *  texto com apóstrofo. */
+/** Protect text only; negative numeric cells must remain numbers. */
 function cell(v: Cell, dialect: Dialect): string {
   if (v == null) return "";
   if (typeof v === "number")
@@ -63,7 +44,7 @@ function cell(v: Cell, dialect: Dialect): string {
   return escapeText(v, dialect.sep);
 }
 
-/** Linhas → CSV com BOM. CRLF porque é o que o Excel no Windows espera. */
+/** Use a UTF-8 BOM and CRLF for Windows spreadsheet compatibility. */
 export function toCsv(rows: Cell[][], locale: Locale = "pt-BR"): string {
   const dialect = DIALECT[locale];
   return (
@@ -75,11 +56,6 @@ export function toCsv(rows: Cell[][], locale: Locale = "pt-BR"): string {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Tabela 1 — histórico: UMA LINHA POR LIVE
-// ---------------------------------------------------------------------------
-
-/** Uma live já analisada, pronta pra virar linha. */
 export interface HistoryRow {
   meta: SessionMeta;
   analysis: ReportAnalysis;
@@ -114,8 +90,6 @@ const HISTORY_HEADER = [
   "reports.csv.history.verdict",
 ] as const;
 
-/** Histórico pra planilha: a evolução entre lives, que é pra isso que serve planilha.
- *  Série de 2s aqui não ajudaria ninguém — essa é a outra tabela. */
 export function historyCsv(rows: HistoryRow[], i18n: ReportI18n): string {
   const body = rows.map(({ meta, analysis: a }) => [
     isoDate(meta.startedAt),
@@ -137,24 +111,15 @@ export function historyCsv(rows: HistoryRow[], i18n: ReportI18n): string {
   return toCsv([HISTORY_HEADER.map((k) => i18n.t(k)), ...body], i18n.locale);
 }
 
-// ---------------------------------------------------------------------------
-// Tabela 2 — série temporal de UMA live (eixo das amostras, ~2s)
-// ---------------------------------------------------------------------------
-
-/** Série da live no eixo das amostras.
- *
- *  Audiência e seguidores são amostrados a cada ~30s, num eixo diferente. Em vez de
- *  ficarem de fora, entram como ÚLTIMO VALOR CONHECIDO — e o nome da coluna diz isso,
- *  pra ninguém ler um degrau de 30s como se fosse medição instantânea. */
+/** Audience and follower columns carry the last known value from their slower sampling cadence. */
 export function seriesCsv(
   d: SessionData,
   a: ReportAnalysis,
   i18n: ReportI18n,
 ): string {
-  // `t` aqui é a tradução; a coluna de tempo é `relTimeS`.
   const { t } = i18n;
-  const canais = a.byChannel.channels;
-  const alvos = a.perTarget;
+  const channels = a.byChannel.channels;
+  const targets = a.perTarget;
   const header = [
     t("reports.csv.series.relTimeS"),
     t("reports.csv.series.clock"),
@@ -164,15 +129,15 @@ export function seriesCsv(
     t("reports.csv.series.obsRenderMs"),
     t("reports.csv.series.obsCongestionPct"),
     t("reports.csv.series.chatPerMin"),
-    ...canais.map((c) =>
+    ...channels.map((c) =>
       t("reports.csv.series.chatPerMinFor", { source: c.source }),
     ),
-    ...alvos.flatMap((target) => [
+    ...targets.flatMap((target) => [
       t("reports.csv.series.bitrateKbpsFor", { target: target.name }),
       t("reports.csv.series.stateFor", { target: target.name }),
       t("reports.csv.series.droppedFor", { target: target.name }),
     ]),
-    ...canais
+    ...channels
       .filter((c) => c.viewers.hasData)
       .map((c) =>
         t("reports.csv.series.watchingLastKnownFor", { source: c.source }),
@@ -183,21 +148,20 @@ export function seriesCsv(
   const gpu = gpuSeries(d);
   const memory = memorySeries(d);
   const chat = chatRateSeries(d);
-  const chatPorCanal = canais.map((c) => chatRateSeriesFor(d, c.key));
+  const chatByChannel = channels.map((c) => chatRateSeriesFor(d, c.key));
 
-  // Audiência por canal com um ponteiro que anda junto: as duas séries estão em ordem
-  // de tempo, então basta avançar enquanto a amostra de audiência ficou pra trás.
-  const comAudiencia = canais.filter((c) => c.viewers.hasData);
-  const ultimo: (number | null)[] = comAudiencia.map(() => null);
+  // Advance one pointer through the sorted audience series rather than rescanning per sample.
+  const audienceChannels = channels.filter((c) => c.viewers.hasData);
+  const lastKnown: (number | null)[] = audienceChannels.map(() => null);
   let vi = 0;
 
   const body = d.samples.map((s, i) => {
     while (vi < d.viewerSamples.length && d.viewerSamples[vi].t <= s.t) {
-      for (const [k, c] of comAudiencia.entries()) {
+      for (const [k, c] of audienceChannels.entries()) {
         const it = d.viewerSamples[vi].items.find(
           (x) => `${x.platform}:${x.source}` === c.key,
         );
-        if (it?.viewers != null) ultimo[k] = it.viewers;
+        if (it?.viewers != null) lastKnown[k] = it.viewers;
       }
       vi++;
     }
@@ -210,16 +174,16 @@ export function seriesCsv(
       s.obs ? Math.round(s.obs.avgRenderMs * 10) / 10 : null,
       s.obs ? Math.round(s.obs.congestion * 100) : null,
       chat[i],
-      ...chatPorCanal.map((serie) => serie[i]),
-      ...alvos.flatMap((target) => {
-        const alvo = s.targets.find((x) => x.id === target.id);
+      ...chatByChannel.map((channelSeries) => channelSeries[i]),
+      ...targets.flatMap((target) => {
+        const sampleTarget = s.targets.find((x) => x.id === target.id);
         return [
-          alvo?.bitrate ?? null,
-          alvo?.state ?? null,
-          alvo?.dropped ?? null,
+          sampleTarget?.bitrate ?? null,
+          sampleTarget?.state ?? null,
+          sampleTarget?.dropped ?? null,
         ];
       }),
-      ...ultimo,
+      ...lastKnown,
     ];
   });
 

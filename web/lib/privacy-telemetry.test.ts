@@ -1,8 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-// Contrato textual, sem SDK nem rede: bloqueia a regressão que fazia o resumo e
-// a seção do app prometerem opt-in enquanto a seção de bases dizia opt-out.
 function privacySource(locale: "pt" | "en") {
   return readFileSync(
     new URL(

@@ -15,10 +15,8 @@ import {
 } from "../_components/ui";
 import { DownloadButton } from "./hero";
 
-// Fecho da página: miudezas, dúvidas, ticker, chamada final e rodapé.
-
 const TINY =
-  "flex items-start gap-[13px] bg-breu px-5 py-4.5 " +
+  "flex items-start gap-[13px] bg-charcoal px-5 py-4.5 " +
   "[&>i>svg]:h-[21px] [&>i>svg]:w-[21px] [&>i>svg]:fill-none [&>i>svg]:stroke-current [&>i>svg]:[stroke-linecap:round] [&>i>svg]:[stroke-linejoin:round] [&>i>svg]:[stroke-width:2.2] " +
   "[&_strong]:block [&_strong]:font-display [&_strong]:text-base [&_strong]:leading-[1.15] [&_strong]:font-bold " +
   "[&_p]:mt-[3px] [&_p]:text-[0.8rem] [&_p]:leading-[1.45] [&_p]:font-medium [&_p]:text-muted";
@@ -38,8 +36,6 @@ export function TinyThings({
           title={t("closing.tiny.title")}
         />
 
-        {/* A grade tem 1px de vão sobre o breu: os cartões encostam e a linha
-            fina entre eles é o próprio fundo aparecendo. */}
         <div className="mt-[clamp(38px,4vw,56px)] grid grid-cols-3 gap-px bg-border-soft max-[980px]:grid-cols-1">
           {items.map((item) => (
             <div className={TINY} key={item.title}>
@@ -56,8 +52,6 @@ export function TinyThings({
   );
 }
 
-// O "+" do acordeão são duas barras cruzadas; ao abrir, a vertical gira pra
-// horizontal e vira "−". Sem ícone, sem JS.
 const FAQ_LIST =
   "border-t-[3px] border-ink max-[980px]:max-w-[720px] " +
   "[&>details]:border-b-[3px] [&>details]:border-ink " +
@@ -120,7 +114,6 @@ export function Faq({ t, downloadUrl }: { t: T; downloadUrl: string }) {
 const TICKER_ROW =
   "inline-flex items-center gap-5.5 pr-5.5 whitespace-nowrap [&_svg]:h-[17px] [&_svg]:w-[17px] [&_svg]:fill-current";
 
-// Chaves, não texto: a lista é de módulo e `t` só existe dentro do componente.
 const TICKER_KEYS = [
   "closing.ticker.item1",
   "closing.ticker.item2",
@@ -128,23 +121,9 @@ const TICKER_KEYS = [
   "closing.ticker.item4",
 ] as const;
 
-/** Quantas vezes a lista se repete DENTRO de cada cópia.
- *
- *  Não é o que conserta o buraco (quem conserta é o `min-w-[100vw]` abaixo) — é o
- *  que mantém o espaçamento apertado do desenho. Uma passada dos 4 itens mede
- *  ~1080px; quatro passadas dão ~4300px, então em qualquer tela até 4K o conteúdo
- *  já passa da viewport sozinho e o `justify-around` não tem folga pra distribuir. */
 const TICKER_PASSES = 4;
 
-/** Uma cópia da faixa, com largura mínima de uma tela.
- *
- *  O `min-w-[100vw]` é o conserto: com duas cópias e `translateX(-50%)`, no fim do
- *  ciclo só UMA cópia continua cobrindo a tela. Cópia mais estreita que a viewport
- *  = faixa vazia à direita — era o bug, e ele aparecia em TODA tela acima de
- *  ~1080px (837px de tomate vazio num monitor de 1920).
- *
- *  Numa tela mais larga que as quatro passadas, o `justify-around` espalha os itens
- *  em vez de abrir buraco: degrada o espaçamento, não a faixa. */
+// Each ticker copy must cover the viewport throughout the -50% translation cycle.
 function TickerRow({ t }: { t: T }) {
   return (
     <span className="flex min-w-[100vw] justify-around">
@@ -160,12 +139,10 @@ function TickerRow({ t }: { t: T }) {
   );
 }
 
-/** Duas cópias da faixa: a animação desliza uma largura inteira e a segunda
- *  entra sem emenda. */
 export function Ticker({ t }: { t: T }) {
   return (
     <div
-      className="overflow-hidden border-y-[3px] border-night bg-tomate text-brass-ink select-none"
+      className="overflow-hidden border-y-[3px] border-night bg-tomato text-brass-ink select-none"
       aria-hidden="true"
     >
       <div className="flex w-max animate-[marquee_52s_linear_infinite] items-center py-[11px] font-display text-[0.95rem] font-extrabold tracking-[0.06em] uppercase">

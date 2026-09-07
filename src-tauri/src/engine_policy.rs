@@ -1,13 +1,7 @@
-//! Política PURA do motor — decisões sem I/O que estavam enterradas no meio do `commands.rs`
-//! (ao lado de locks, spawns e emits). Aqui viram funções testáveis: como uma linha de erro do
-//! FFmpeg vira estado+mensagem, quando a bandeja fica vermelha/amarela, como o JSON do MediaMTX
-//! e a URL de ingestão são lidos. Espelha o formato de `guardian/domain.rs` (núcleo puro + testes).
-
 use crate::engine::{EngineSnapshot, TargetStatus};
 use crate::i18n::{Locale, Msg};
 use std::path::Path;
 
-/// Bitrate em Mbps (ou kbps abaixo de 1 Mbps) pra exibição.
 pub(crate) fn fmt_mbps(kbps: u32) -> String {
     if kbps >= 1000 {
         format!("{:.1} Mbps", kbps as f64 / 1000.0)
@@ -16,7 +10,6 @@ pub(crate) fn fmt_mbps(kbps: u32) -> String {
     }
 }
 
-/// Qualidade geral do multistream → cor do ícone da bandeja.
 pub(crate) fn quality_of(snap: &EngineSnapshot) -> &'static str {
     match snap.state.as_str() {
         "stopped" => "idle",
@@ -43,7 +36,6 @@ pub(crate) fn quality_of(snap: &EngineSnapshot) -> &'static str {
     }
 }
 
-/// Tooltip da bandeja: cabeçalho + uma linha por plataforma (métrica/estado).
 pub(crate) fn tray_tooltip(snap: &EngineSnapshot, locale: Locale) -> String {
     if snap.state == "stopped" {
         return Msg::TrayTooltipIdle.text(locale);
@@ -75,7 +67,6 @@ pub(crate) fn tray_tooltip(snap: &EngineSnapshot, locale: Locale) -> String {
     lines.join("\n")
 }
 
-/// Lê um valor numérico do tipo "fps= 60" / "drop=5" do log do FFmpeg.
 pub(crate) fn parse_kv(line: &str, key: &str) -> Option<f64> {
     let idx = line.find(key)?;
     let rest = line[idx + key.len()..].trim_start();
@@ -86,7 +77,6 @@ pub(crate) fn parse_kv(line: &str, key: &str) -> Option<f64> {
     num.parse().ok()
 }
 
-/// Traduz uma linha de erro do FFmpeg para (estado, mensagem amigável).
 pub(crate) fn friendly_error(low: &str, locale: Locale) -> (&'static str, String) {
     if low.contains("403")
         || low.contains("forbidden")
@@ -122,8 +112,7 @@ pub(crate) fn friendly_error(low: &str, locale: Locale) -> (&'static str, String
     }
 }
 
-/// Mantém no log o motivo útil devolvido pelo FFmpeg sem persistir URL/chave de transmissão.
-/// Só produz saída para linhas de erro; stats e avisos normais continuam fora do disco.
+/// Keep FFmpeg failure context while redacting stream keys and RTMP URLs.
 pub(crate) fn safe_ffmpeg_diagnostic(line: &str, stream_key: &str) -> Option<String> {
     const ERROR_MARKERS: [&str; 12] = [
         "error",
@@ -150,8 +139,7 @@ pub(crate) fn safe_ffmpeg_diagnostic(line: &str, stream_key: &str) -> Option<Str
         line.trim().replace(stream_key, "<stream-key>")
     };
 
-    // O FFmpeg costuma ecoar a URL inteira em erros de abertura. Redige do esquema até o
-    // próximo delimitador; o motivo ao redor (TLS, DNS, BadName...) continua visível.
+    // Opening errors echo the full URL; retain the surrounding TLS, DNS, or server failure reason.
     loop {
         let lower = safe.to_ascii_lowercase();
         let start = [lower.find("rtmp://"), lower.find("rtmps://")]
@@ -176,7 +164,6 @@ pub(crate) fn safe_ffmpeg_diagnostic(line: &str, stream_key: &str) -> Option<Str
     Some(safe)
 }
 
-/// `true` se o caminho é um `brb-slate.*` (o nome, sem extensão, é exatamente "brb-slate").
 pub(crate) fn is_brb_slate_path(p: &Path) -> bool {
     p.file_stem()
         .and_then(|s| s.to_str())
@@ -184,7 +171,6 @@ pub(crate) fn is_brb_slate_path(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// A extensão indica um VÍDEO (não uma imagem/still)?
 pub(crate) fn brb_slate_is_video(p: &Path) -> bool {
     matches!(
         p.extension()
@@ -195,9 +181,6 @@ pub(crate) fn brb_slate_is_video(p: &Path) -> bool {
     )
 }
 
-/// Parte PURA do estado dos paths do MediaMTX: lê o JSON da API `/v3/paths/list` e devolve
-/// (ingestão pronta, bytes recebidos na ingestão, programa pronto). O byte count distingue OBS
-/// no ar de OBS travado. JSON inválido/ausente → (false, 0, false), igual à falha de rede.
 pub(crate) fn parse_mediamtx_paths(
     body: &str,
     ingest_name: &str,
@@ -213,9 +196,7 @@ pub(crate) fn parse_mediamtx_paths(
     if let Some(arr) = v.get("items").and_then(|i| i.as_array()) {
         for p in arr {
             let name = p.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            // MediaMTX novo chama os campos de `online`/`inboundBytes`; versões antigas
-            // expunham `ready`/`bytesReceived`. Aceitar os dois evita regredir o detector ao
-            // atualizar o sidecar (os campos antigos já estão marcados como deprecated).
+            // Accept current MediaMTX fields and deprecated aliases for sidecar compatibility.
             let ready = p
                 .get("online")
                 .and_then(|r| r.as_bool())
@@ -236,8 +217,6 @@ pub(crate) fn parse_mediamtx_paths(
     (ingest_ready, bytes, prog_ready)
 }
 
-/// Parte PURA do teste de alcance: extrai (host, porta) da URL de ingestão. Porta padrão 443
-/// pra rtmps, 1935 pro resto. Host vazio → erro. (A conexão TCP em si fica no adapter.)
 pub(crate) fn parse_ingest_hostport(ingest_url: &str) -> Result<(String, u16), String> {
     let after = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
     let hostport = after.split('/').next().unwrap_or("");
@@ -253,7 +232,7 @@ pub(crate) fn parse_ingest_hostport(ingest_url: &str) -> Result<(String, u16), S
         }
     };
     if host.is_empty() {
-        return Err("URL de ingestão inválida".into());
+        return Err("invalid ingest URL".into());
     }
     Ok((host, port))
 }
@@ -309,7 +288,6 @@ mod tests {
         assert_eq!(quality_of(&snap("stopped", vec![])), "idle");
         assert_eq!(quality_of(&snap("error", vec![])), "bad");
         assert_eq!(quality_of(&snap("starting", vec![])), "warn");
-        // um destino em erro → bad, mesmo com outro no ar.
         assert_eq!(
             quality_of(&snap(
                 "live",
@@ -317,7 +295,6 @@ mod tests {
             )),
             "bad"
         );
-        // reconectando sem erro → warn.
         assert_eq!(
             quality_of(&snap(
                 "live",
@@ -325,17 +302,14 @@ mod tests {
             )),
             "warn"
         );
-        // tudo live → good.
         assert_eq!(
             quality_of(&snap("live", vec![target("a", "live", 6000)])),
             "good"
         );
-        // signal-lost também é bad.
         assert_eq!(
             quality_of(&snap("live", vec![target("a", "signal-lost", 0)])),
             "bad"
         );
-        // connecting / waiting / brb → warn (não bad).
         for st in ["connecting", "waiting", "brb"] {
             assert_eq!(
                 quality_of(&snap("live", vec![target("a", st, 0)])),
@@ -379,9 +353,7 @@ mod tests {
             "error"
         );
         assert_eq!(friendly_error("algo estranho").0, "reconnecting");
-        // a mensagem de chave recusada guia o streamer pra Plataformas.
         assert!(friendly_error("auth failed").1.contains("Plataformas"));
-        // cada tier de reconexão tem a sua mensagem.
         assert_eq!(
             friendly_error("connection refused").1,
             "Sem conexão com a plataforma — tentando de novo."
@@ -453,7 +425,6 @@ mod tests {
         assert_eq!(parse_kv("bitrate= 6000.5kbits/s", "bitrate="), Some(6000.5));
         assert_eq!(parse_kv("drop=5", "drop="), Some(5.0));
         assert_eq!(parse_kv("sem chave aqui", "fps="), None);
-        // chave presente mas sem dígito depois → None (não pânico).
         assert_eq!(parse_kv("fps= abc", "fps="), None);
     }
 
@@ -485,17 +456,14 @@ mod tests {
             parse_mediamtx_paths(current, "live/obs", "live/obs_program"),
             (true, 67890, true)
         );
-        // JSON inválido → tudo falso (igual falha de rede).
         assert_eq!(
             parse_mediamtx_paths("nao é json", "live/obs", "live/obs_program"),
             (false, 0, false)
         );
-        // path ausente → não pronto.
         assert_eq!(
             parse_mediamtx_paths(r#"{"items":[]}"#, "live/obs", "live/obs_program"),
             (false, 0, false)
         );
-        // só o _program pronto (OBS ainda não publicou) → prog_ready=true, ingest false.
         let prog = r#"{"items":[{"name":"live/obs_program","ready":true}]}"#;
         assert_eq!(
             parse_mediamtx_paths(prog, "live/obs", "live/obs_program"),
@@ -518,12 +486,10 @@ mod tests {
             ("host".into(), 1234)
         );
         assert!(parse_ingest_hostport("rtmp:///app").is_err());
-        // porta não-numérica → cai pro default 1935 (unwrap_or).
         assert_eq!(
             parse_ingest_hostport("rtmp://host:abc/app").unwrap(),
             ("host".into(), 1935)
         );
-        // múltiplos ':' → rsplit_once pega o ÚLTIMO como porta.
         assert_eq!(
             parse_ingest_hostport("rtmp://host:1234:5/app").unwrap(),
             ("host:1234".into(), 5)

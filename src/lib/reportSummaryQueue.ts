@@ -16,7 +16,7 @@ interface SummaryQueue {
   receive: (id: string, result: ReportSummaryResult | null) => void;
 }
 
-/** At most one input is held at a time. Cancellation prevents the next disk read. */
+/** Hold at most one input; cancellation prevents the next disk read. */
 export function startReportSummaryQueue({
   ids,
   locale,
@@ -34,7 +34,7 @@ export function startReportSummaryQueue({
         if (cancelled) return;
         result = await client.run({ kind: "summary", raw, locale });
       } catch {
-        // One unreadable report must not block the remaining library.
+        // One unreadable report must not block the rest of the library.
       }
       if (cancelled) return;
       receive(id, result);

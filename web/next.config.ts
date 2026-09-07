@@ -8,9 +8,7 @@ import {
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// No desenvolvimento local, reaproveita as credenciais que já existem no `.env`
-// da aplicação desktop. `process.loadEnvFile` não sobrescreve variáveis fornecidas
-// pelo ambiente de deploy e nenhuma delas é enviada ao browser pelo Next.js.
+// Local development may reuse app configuration; contributor checks must never load it.
 try {
   if (
     process.env.NODE_ENV === "development" &&
@@ -19,7 +17,7 @@ try {
     process.loadEnvFile(resolve(workspaceRoot, ".env"));
   }
 } catch {
-  // CI e produção devem fornecer os segredos pelo ambiente do servidor.
+  // CI can supply configuration directly through the environment.
 }
 
 const buildSha = resolveBuildSha(process.env);
@@ -33,7 +31,7 @@ if (
     NEXT_PUBLIC_BUILD_SHA: buildSha,
   });
   if (errors.length)
-    throw new Error(`Publicação bloqueada:\n${errors.join("\n")}`);
+    throw new Error(`Publication blocked:\n${errors.join("\n")}`);
 }
 
 const nextConfig: NextConfig = {
@@ -43,7 +41,7 @@ const nextConfig: NextConfig = {
   turbopack: { root: workspaceRoot },
   poweredByHeader: false,
   reactStrictMode: true,
-  // Only public identity is compiled in; never put OAuth/Redis secrets here.
+  // Only public metadata belongs in the browser bundle; never expose OAuth or Redis credentials.
   env: { NEXT_PUBLIC_BUILD_SHA: buildSha, BUILD_SHA: buildSha },
   outputFileTracingIncludes: {
     "/*": ["./.generated/editorial.json", "./content/people.json"],

@@ -202,7 +202,7 @@ pub(crate) fn start(
                                 if idle_since.get_or_insert_with(Instant::now).elapsed() >= Duration::from_secs(2) { expected_stop = true; break; }
                             } else { idle_since = None; }
                             if progress.timed_out(Instant::now()) {
-                                log::warn!("encoder compartilhado sem avanço por 8s; reiniciando conversão");
+                                log::warn!("shared encoder made no progress for 8s; restarting conversion");
                                 break;
                             }
                         }
@@ -228,7 +228,7 @@ pub(crate) fn start(
                     }
                     if record_failure(&mut failures, &progress) {
                         rendition.failed.store(true, Ordering::Relaxed);
-                        log::warn!("encoder compartilhado indisponível; destinos voltam à conversão independente");
+                        log::warn!("shared encoder unavailable; destinations reverting to independent conversion");
                     }
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
@@ -300,7 +300,6 @@ mod tests {
         for attempt in 1..=3 {
             let mut progress = ProgressWatchdog::new(start);
             progress.observe("frame=1", start + Duration::from_secs(1));
-            // Wall-clock uptime cannot count as 30 seconds of healthy video.
             assert!(progress.timed_out(start + Duration::from_secs(120)));
             assert_eq!(record_failure(&mut failures, &progress), attempt == 3);
         }
@@ -336,7 +335,7 @@ mod tests {
         };
         let a = rendition.acquire();
         let b = rendition.acquire();
-        drop(a); // Pausing one destination cannot stop a peer's encoder.
+        drop(a);
         assert_eq!(rendition.demand.load(Ordering::Relaxed), 1);
         assert!(rendition.ready.load(Ordering::Relaxed));
         drop(b);

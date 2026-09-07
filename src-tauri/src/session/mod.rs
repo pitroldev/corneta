@@ -1,22 +1,4 @@
-//! Gravação da sessão de transmissão em NDJSON (uma linha por amostra/evento)
-//! para o relatório pós-live.
-//!
-//! # Estrutura do código (arquitetura hexagonal)
-//!
-//! Mesmo desenho do `guardian/`: núcleo puro no meio, I/O nas bordas.
-//!
-//! - [`domain`] — núcleo PURO (sem tauri, sem disco, sem relógio). Nomes de arquivo,
-//!   formato de CADA linha do NDJSON, detecção de salto de relógio, decisão de
-//!   recuperação e os dois planos de poda. Testado em isolamento.
-//! - `mod.rs` (aqui) — a porta [`SessionStore`] + a aplicação: junta domínio e porta, e
-//!   expõe a API pública que o resto do app usa.
-//! - [`store`] — adaptadores da porta: `DiskStore` (NDJSON bufferizado em disco) e, em
-//!   teste, `MemStore`.
-//!
-//! O que a divisão compra: o formato do relatório é contrato com o parser do frontend, e
-//! agora dá pra testar cada linha sem escrever arquivo; e a recuperação de sessão
-//! interrompida — que só acontece depois de um crash, o caso mais difícil de reproduzir
-//! na mão — roda inteira contra o `MemStore`.
+//! Bounded NDJSON journals for post-stream reports and chat replay.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -41,43 +23,27 @@ use store::DiskStore;
 pub(crate) use domain::parse_video_name;
 pub use domain::{chat_path, valid_session_id, SessionMeta};
 
-// ---------------------------------------------------------------------------
-// A porta
-// ---------------------------------------------------------------------------
-
-/// Onde a sessão é guardada. O domínio decide O QUE gravar; a porta só sabe pôr bytes
-/// em algum lugar e devolvê-los.
-///
-/// Todo método é silencioso em falha de propósito: perder uma linha de métrica não pode
-/// derrubar a live nem virar erro na cara do streamer.
+/// Storage failures must not interrupt the live stream.
 pub trait SessionStore {
-    /// Anexa uma linha, respeitando o teto PRÓPRIO do arquivo.
-    ///
-    /// O teto é por arquivo (não global) porque métricas e chat competem por espaço mas
-    /// não pela mesma cota: chat barulhento não pode custar o diagnóstico que o relatório
-    /// já entrega hoje.
+    /// Append within this file's independent capacity limit.
     fn append(&self, file: &Path, line: &Value, cap: u64);
-    /// Cria (ou trunca) o arquivo com a primeira linha, deixando-o pronto pra escrita.
+    /// Create or truncate the journal with its first record.
     fn create(&self, file: &Path, first: &Value);
-    /// Drena o que estiver em buffer.
+    /// Request a bounded drain; a timeout does not release an active writer's ownership.
     fn close(&self, file: &Path);
-    /// Tamanho em bytes; 0 quando não existe.
+    /// Byte length, or zero when missing.
     fn len(&self, file: &Path) -> u64;
-    /// Últimos `max` bytes, em texto.
+    /// Read at most max bytes from the tail.
     fn tail(&self, file: &Path, max: u64) -> Option<String>;
     fn first_line(&self, file: &Path) -> Option<String>;
     fn read(&self, file: &Path) -> Option<String>;
-    /// Última modificação (epoch ms).
+    /// Modification time in epoch milliseconds.
     fn modified_ms(&self, file: &Path) -> Option<u64>;
-    /// Conteúdo de uma pasta (sem filtro — quem filtra é o domínio).
+    /// Return unfiltered directory entries; callers enforce filename policy.
     fn list(&self, dir: &Path) -> Vec<PathBuf>;
-    /// Apagou de fato?
+    /// Return whether the file was actually removed.
     fn remove(&self, file: &Path) -> bool;
 }
-
-// ---------------------------------------------------------------------------
-// Relógio e caminhos (as duas dependências que o domínio não tem)
-// ---------------------------------------------------------------------------
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -86,7 +52,6 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// `app_data_dir/sessions` (criada se não existir).
 pub fn sessions_dir(app: &AppHandle) -> Option<PathBuf> {
     let dir = app.path().app_data_dir().ok()?.join("sessions");
     std::fs::create_dir_all(&dir).ok()?;
@@ -100,8 +65,7 @@ fn session_path(app: &AppHandle, id: &str) -> Option<PathBuf> {
     Some(sessions_dir(app)?.join(domain::session_file_name(id)))
 }
 
-/// Chat sendo gravado nesta sessão? Lido a cada mensagem, então é uma flag e não uma
-/// leitura de config — abrir o `config.json` a cada linha de chat seria absurdo.
+/// Cache this per-message decision to avoid configuration I/O in the chat path.
 static RECORD_CHAT: AtomicBool = AtomicBool::new(false);
 
 pub fn set_chat_recording(on: bool) {
@@ -112,14 +76,9 @@ pub fn chat_recording() -> bool {
     RECORD_CHAT.load(Ordering::Relaxed)
 }
 
-/// Âncora monotônica pra detectar salto do relógio de parede.
+/// Compare wall time against a monotonic anchor to detect clock adjustments.
 static CLOCK: OnceLock<Mutex<Option<(Instant, u64)>>> = OnceLock::new();
 
-/// Detecta que o relógio do sistema pulou (NTP, horário de verão, ajuste manual).
-///
-/// Conserta mais do que a gravação: o epoch da sessão é relógio de parede puro, então uma
-/// correção de NTP no meio da live JÁ hoje entorta o eixo do relatório. Comparar com um
-/// `Instant` (monotônico, imune a acerto de relógio) é o único jeito de perceber.
 fn detect_clock_jump(store: &dyn SessionStore, path: &Path) {
     let cell = CLOCK.get_or_init(|| Mutex::new(None));
     let Ok(mut last) = cell.lock() else { return };
@@ -131,7 +90,7 @@ fn detect_clock_jump(store: &dyn SessionStore, path: &Path) {
             now_wall as i64 - prev_wall as i64,
         );
         if domain::is_clock_jump(drift) {
-            log::warn!("relógio do sistema saltou {drift}ms — registrando na sessão");
+            log::warn!("system clock jumped {drift}ms; recording the adjustment");
             store.append(
                 path,
                 &domain::clock_jump_line(now_ms(), drift),
@@ -142,10 +101,7 @@ fn detect_clock_jump(store: &dyn SessionStore, path: &Path) {
     *last = Some((now_mono, now_wall));
 }
 
-/// Zera a âncora do relógio. Sem isto, a primeira amostra de uma sessão compararia com a
-/// última da sessão ANTERIOR — e no Windows o `Instant` (QPC) não anda enquanto a máquina
-/// dorme. Um notebook fechado entre duas lives faria a diferença entre os dois relógios dar
-/// horas, e a sessão nova nasceria com um "salto de relógio" inventado.
+/// Do not compare across sessions: Windows QPC pauses during sleep, unlike wall time.
 fn reset_clock_anchor() {
     if let Some(cell) = CLOCK.get() {
         if let Ok(mut last) = cell.lock() {
@@ -153,10 +109,6 @@ fn reset_clock_anchor() {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Ciclo de vida
-// ---------------------------------------------------------------------------
 
 pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
     let dir = sessions_dir(app)?;
@@ -174,21 +126,18 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
         DiskStore.prepare_chat(&chat_path(&path));
     }
     reset_clock_anchor();
-    log::info!("relatório: gravando sessão em {}", path.display());
+    log::info!("report: recording session to {}", path.display());
     Some(path)
 }
 
-/// Fecha a sessão (marca o fim).
 pub fn end_session(path: &Path) {
     DiskStore.append(path, &domain::end_line(now_ms()), MAX_SESSION_BYTES);
     DiskStore.close(path);
-    // O chat mora em arquivo irmão e tem writer próprio — sem este flush, as últimas
-    // mensagens da live ficariam no buffer e sumiriam no fechamento do processo.
+    // Chat has its own writer and must also drain before process shutdown.
     DiskStore.close(&chat_path(path));
 }
 
-/// Fecha sessões deixadas sem evento `end` por queda de energia/processo. Executado uma vez
-/// no boot, antes que uma nova sessão possa ser iniciada.
+/// Recover interrupted sessions at startup, before another session can begin.
 pub fn recover_incomplete_sessions(app: &AppHandle) {
     let Some(dir) = sessions_dir(app) else { return };
     recover_all(&DiskStore, &dir, now_ms());
@@ -220,10 +169,6 @@ fn recover_all(store: &dyn SessionStore, dir: &Path, now: u64) {
         store.append(&path, &domain::recovered_end_line(now), MAX_SESSION_BYTES);
     }
 }
-
-// ---------------------------------------------------------------------------
-// Escrita durante a live
-// ---------------------------------------------------------------------------
 
 pub fn record_sample(
     path: &Path,
@@ -268,20 +213,14 @@ pub fn record_alert(
     );
 }
 
-/// Crava um marcador ("momento") na sessão — aparece na linha do tempo do relatório.
 pub fn record_marker(path: &Path, label: &str) {
     record_marker_at(path, now_ms(), label);
 }
 
-/// Marcador num instante ARBITRÁRIO — o "marcar este momento" feito durante o replay,
-/// depois da live. O `t` é do momento assistido, não do clique.
+/// Use the replayed instant, not the time the user clicked the marker button.
 pub fn record_marker_at(path: &Path, t: u64, label: &str) {
     DiskStore.append(path, &domain::marker_line(t, label), MAX_SESSION_BYTES);
 }
-
-// ---------------------------------------------------------------------------
-// Gravação de vídeo: âncoras de sincronia
-// ---------------------------------------------------------------------------
 
 pub fn record_recording(
     path: &Path,
@@ -326,10 +265,6 @@ pub fn record_offset(path: &Path, offset_ms: i64) {
     DiskStore.append(path, &domain::offset_line(offset_ms), MAX_SESSION_BYTES);
 }
 
-// ---------------------------------------------------------------------------
-// Gravação de chat (arquivo irmão)
-// ---------------------------------------------------------------------------
-
 #[allow(clippy::too_many_arguments)]
 pub fn record_chat_msg(
     session: &Path,
@@ -364,17 +299,11 @@ pub fn record_chat_delete(session: &Path, native_id: &str) {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Leitura
-// ---------------------------------------------------------------------------
-
-/// Lista as sessões gravadas (mais recente primeiro).
 pub fn list_sessions(app: &AppHandle, video_dir: Option<&Path>) -> Vec<SessionMeta> {
     let Some(dir) = sessions_dir(app) else {
         return vec![];
     };
-    // UMA varredura das pastas de vídeo pra toda a lista: um `read_dir` por sessão faria
-    // 50 varreduras de uma pasta que pode estar num HD externo dormindo.
+    // Share one directory scan across the list, especially for slow external drives.
     let recorded: Vec<String> = video_dirs(app, video_dir)
         .iter()
         .flat_map(|d| video_files(&DiskStore, d))
@@ -391,8 +320,7 @@ fn list_in(store: &dyn SessionStore, dir: &Path, recorded: &[String]) -> Vec<Ses
         .filter(|p| domain::is_session_file(p))
         .filter_map(|p| {
             let mut m = domain::parse_meta_line(&store.first_line(&p)?, store.modified_ms(&p))?;
-            // O mtime é só fallback para sessão realmente interrompida. Copiar um
-            // relatório ou marcar um momento muda o mtime, mas não a duração da live.
+            // Prefer a recorded end: copying files or editing markers changes mtime, not live duration.
             if let Some(ended_at) = store
                 .tail(&p, domain::TAIL_BYTES)
                 .as_deref()
@@ -411,17 +339,15 @@ fn list_in(store: &dyn SessionStore, dir: &Path, recorded: &[String]) -> Vec<Ses
     out
 }
 
-/// Conteúdo NDJSON cru de uma sessão (o frontend parseia e analisa).
 pub fn read_session(app: &AppHandle, id: &str) -> Option<String> {
     let path = session_path(app, id)?;
     if DiskStore.len(&path) > MAX_SESSION_BYTES {
-        log::warn!("sessão recusada: arquivo excede {MAX_SESSION_BYTES} bytes");
+        log::warn!("session rejected: file exceeds {MAX_SESSION_BYTES} bytes");
         return None;
     }
     DiskStore.read(&path)
 }
 
-/// Conteúdo do `<id>.chat.ndjson` (vazio se a sessão não gravou chat).
 pub fn read_chat(app: &AppHandle, id: &str) -> Option<String> {
     let path = chat_path(&session_path(app, id)?);
     if DiskStore.len(&path) > MAX_CHAT_BYTES {
@@ -430,8 +356,7 @@ pub fn read_chat(app: &AppHandle, id: &str) -> Option<String> {
     DiskStore.read(&path)
 }
 
-/// Bounded binary IPC: no JSON string escaping, and file growth cannot bypass
-/// the byte cap between metadata and reading. IDs still use the same validator.
+/// Binary IPC avoids JSON escaping and caps the read itself against concurrent file growth.
 pub fn read_bytes(app: &AppHandle, id: &str, chat: bool) -> Option<Vec<u8>> {
     use std::io::Read;
     let path = session_path(app, id)?;
@@ -455,10 +380,6 @@ pub fn read_bytes(app: &AppHandle, id: &str, chat: bool) -> Option<Vec<u8>> {
     (bytes.len() as u64 <= cap).then_some(bytes)
 }
 
-// ---------------------------------------------------------------------------
-// Exclusão
-// ---------------------------------------------------------------------------
-
 pub fn delete_session(app: &AppHandle, id: &str, video_dir: Option<&Path>) -> Result<(), String> {
     let path = session_path(app, id).ok_or_else(|| Msg::SessionInvalidId.now())?;
     DiskStore.remove(&chat_path(&path));
@@ -470,8 +391,7 @@ pub fn delete_session(app: &AppHandle, id: &str, video_dir: Option<&Path>) -> Re
     }
 }
 
-/// Apaga só os vídeos de uma sessão, preservando relatório e chat. É o botão "apagar
-/// gravações" — o MP4 é 99,9% do peso e quase sempre é ele que a pessoa quer de volta.
+/// Remove recordings without deleting the report or chat.
 pub fn delete_recordings(
     app: &AppHandle,
     id: &str,
@@ -490,11 +410,6 @@ pub fn delete_recordings(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Retenção
-// ---------------------------------------------------------------------------
-
-/// Pastas onde pode haver gravação: a configurada e a de sessões (o padrão).
 fn video_dirs(app: &AppHandle, configured: Option<&Path>) -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = Vec::new();
     if let Some(d) = configured {
@@ -510,7 +425,6 @@ fn video_dirs(app: &AppHandle, configured: Option<&Path>) -> Vec<PathBuf> {
     out
 }
 
-/// Arquivos de gravação reconhecidos numa pasta, com o tamanho de cada um.
 fn video_files(store: &dyn SessionStore, dir: &Path) -> Vec<domain::VideoFile> {
     store
         .list(dir)
@@ -523,7 +437,6 @@ fn video_files(store: &dyn SessionStore, dir: &Path) -> Vec<domain::VideoFile> {
         .collect()
 }
 
-/// Ids das sessões que ainda têm relatório no disco.
 fn known_ids(store: &dyn SessionStore, dir: &Path) -> Vec<String> {
     store
         .list(dir)
@@ -533,19 +446,15 @@ fn known_ids(store: &dyn SessionStore, dir: &Path) -> Vec<String> {
         .collect()
 }
 
-/// Mantém só as `KEEP` sessões mais recentes, levando os IRMÃOS junto.
 fn prune_sessions(store: &dyn SessionStore, dir: &Path, keep: usize) {
     for path in domain::plan_session_prune(&store.list(dir), keep) {
         store.remove(&chat_path(&path));
         store.remove(&path);
     }
-    // Os vídeos das sessões que acabaram de sair viram órfãos — o `prune_videos` do boot
-    // (e o do próximo start) recolhe.
+    // The next video prune collects recordings orphaned by this session prune.
 }
 
-/// Poda de vídeo por ESPAÇO. Devolve quantos bytes ainda sobram acima do teto quando não
-/// deu pra fechar a conta só com arquivos reconhecidos — quem chama avisa em vez de
-/// relaxar o critério.
+/// Return bytes still over budget; never broaden deletion beyond recognized recordings.
 pub fn prune_videos(app: &AppHandle, configured: Option<&Path>, keep_gb: u64) -> u64 {
     let Some(dir) = sessions_dir(app) else {
         return 0;
@@ -568,11 +477,8 @@ fn prune_videos_in(
 ) -> u64 {
     let ids = known_ids(store, sessions);
     let mut all = video_files(store, sessions);
-    // Importar configuração não transfere a propriedade dos vídeos de outra
-    // instalação. O índice Contributor não conhece os relatórios oficiais e
-    // classificaria seus vídeos como órfãos. Neste perfil, a poda automática
-    // só alcança a pasta de sessões própria, nunca a customizada/importada.
-    // A escolha é de build; não depende de flags fornecidas pelo frontend.
+    // Contributor builds may prune only their own session directory, not imported recording folders.
+    // This isolation is a build-time decision, not a frontend-controlled flag.
     if !contributor {
         if let Some(dir) = configured.filter(|dir| !dir.as_os_str().is_empty() && *dir != sessions)
         {
@@ -584,7 +490,7 @@ fn prune_videos_in(
 
 fn apply_video_prune(store: &dyn SessionStore, plan: domain::VideoPrunePlan) -> u64 {
     for path in &plan.orphans {
-        log::info!("gravação órfã removida: {}", path.display());
+        log::info!("removing orphaned recording: {}", path.display());
         store.remove(path);
     }
     let mut total = plan.total;
@@ -592,7 +498,10 @@ fn apply_video_prune(store: &dyn SessionStore, plan: domain::VideoPrunePlan) -> 
         if total <= plan.budget {
             break;
         }
-        log::info!("gravação podada por espaço: {}", path.display());
+        log::info!(
+            "pruning recording to satisfy space budget: {}",
+            path.display()
+        );
         if store.remove(&path) {
             total = total.saturating_sub(len);
         }

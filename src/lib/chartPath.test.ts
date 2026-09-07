@@ -35,32 +35,29 @@ describe("chartPath", () => {
     expect(indices.length).toBeLessThanOrEqual(MAX_POINTS);
     expect(new Set(indices).size).toBe(indices.length);
   });
-  it("mapeia a série no retângulo, com o zero embaixo", () => {
-    // 5 pontos em 100px → um a cada 25px; y é invertido (100 no topo).
+  it("maps the series into the rectangle with zero at the bottom", () => {
     expect(buildPath([0, 50, 100], { ...g, n: 3 })).toBe(
       "M0.0,100.0 L50.0,50.0 L100.0,0.0",
     );
   });
 
-  it("levanta a caneta no buraco em vez de ligar os dois lados", () => {
-    // Sem isso a linha atravessaria a queda como se nada tivesse acontecido.
+  it("breaks the path across a gap", () => {
     expect(buildPath([10, null, 30], { ...g, n: 3 })).toBe(
       "M0.0,90.0 M100.0,70.0",
     );
   });
 
-  it("subamostra série longa, mas ainda enxerga o buraco entre dois pontos", () => {
+  it("preserves gaps between downsampled points", () => {
     const n = MAX_POINTS * 3;
     const vals: (number | null)[] = Array.from({ length: n }, () => 50);
     expect(sampleIndices(n)).toHaveLength(MAX_POINTS);
-    // Índice 1 não é visitado (o passo é 3), mas o corte precisa aparecer:
-    // é justamente a queda de 2s que a subamostragem não pode engolir.
+    // Downsampling must preserve this missing sample even though its index is skipped.
     vals[1] = null;
     const d = buildPath(vals, { ...g, n });
     expect(d.match(/M/g)?.length).toBe(2);
   });
 
-  it("pico com folga de 10%, e nunca abaixo de 1", () => {
+  it("adds ten percent headroom with a minimum maximum of one", () => {
     expect(peakOf([{ values: [10, 50, null] }])).toBeCloseTo(55);
     expect(peakOf([{ values: [null] }])).toBeCloseTo(1.1);
   });

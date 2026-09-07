@@ -7,30 +7,7 @@ import { PlatformGlyph } from "./decor";
 import { CheckIcon } from "./icons";
 import { cn } from "./ui";
 
-// ============================================================
-// O miolo VIVO da réplica do herói: o painel "Ao vivo" e o chat reunido.
-//
-// TESE DE MOTION — uma ideia só: **a janela está no ar agora**. O relógio anda,
-// o bitrate oscila, as barrinhas respiram e o chat chega. Não são quatro efeitos
-// diferentes; são quatro leituras do mesmo dado em tempo real, que é exatamente
-// o que o app mostra. Tirar qualquer uma delas não tira "um enfeite": tira a
-// prova de que a Corneta continua trabalhando depois do BORA.
-//
-// Por que o chat é o único laço que EXISTE por significado e não por energia:
-// "chat reunido" é uma alegação que você precisa imaginar enquanto a lista está
-// parada. Vendo três plataformas caindo numa coluna só, não precisa imaginar.
-//
-// ORÇAMENTO. Tudo é transform/opacity e texto; nada de layout. Os dois timers
-// param quando a aba fica escondida ou quando a janela sai da tela, porque isto
-// mora no primeiro viewport de uma página que a pessoa deixa aberta. Com
-// `prefers-reduced-motion` nada roda e o estado final aparece de uma vez.
-//
-// A divisão servidor/cliente segue o contrato do resto da LP: a copy chega
-// RESOLVIDA, porque função não atravessa a fronteira do Next.
-// ============================================================
-
 export interface LiveWindowCopy {
-  /** Painel */
   kicker: string;
   title: string;
   stateLive: string;
@@ -39,34 +16,23 @@ export interface LiveWindowCopy {
   statDrops: string;
   verdict: string;
   stop: string;
-  /** "{kbps} kbps · 60 fps · {drops} quedas" — esta linha estava CRAVADA em
-   *  português dentro do JSX, junto com um `toLocaleString("pt-BR")`. A página
-   *  em inglês mostrava "6.000 kbps · 60 fps · 0 quedas" no primeiro viewport.
-   *  O teste de paridade não pegava: a frase nunca entrou em dicionário nenhum. */
   metrics: string;
-  /** Separador de milhar do idioma — o número muda a cada segundo, então ele
-   *  não pode sair de uma frase pronta. */
   sep: string;
-  /** Chat */
   chatTitle: string;
   chatPlatforms: string;
   compose: string;
   send: string;
-  /** Uma fala: quem, plataforma e texto — já traduzidos. */
   messages: { from: string; who: string; platform: PlatId; text: string }[];
 }
 
 type PlatId = "twitch" | "youtube" | "kick";
 
-/** Alvo de bitrate de cada destino. São os mesmos 6000 kbps da conta do app —
- *  a oscilação em volta deles é que é ilustrativa, e é o que um encoder faz. */
 const TARGETS: { id: PlatId; name: string; target: number }[] = [
   { id: "twitch", name: "Twitch", target: 6000 },
   { id: "youtube", name: "YouTube", target: 6000 },
   { id: "kick", name: "Kick", target: 6000 },
 ];
 
-/** Começa em 1h42 e anda: o mesmo tempo que o resto da página usa de exemplo. */
 const START_SEC = 1 * 3600 + 42 * 60 + 8;
 
 const clock = (s: number) =>
@@ -74,8 +40,7 @@ const clock = (s: number) =>
     .map((n) => String(n).padStart(2, "0"))
     .join(":");
 
-/** Oscilação determinística em volta do alvo. Sem `Math.random` no primeiro
- *  render: valor diferente no servidor e no cliente vira erro de hidratação. */
+// Deterministic values keep server rendering and hydration identical.
 const wobble = (target: number, tick: number, seed: number) =>
   target +
   Math.round(
@@ -106,7 +71,6 @@ export function LivePanel({ copy }: { copy: LiveWindowCopy }) {
             {copy.title}
           </strong>
         </div>
-        {/* O ponto AO VIVO é o único pulso que o design system já autorizava. */}
         <span className="flex shrink-0 items-center gap-2 rounded-sm bg-live px-2.5 py-1.5 text-[0.62rem] font-extrabold tracking-[0.1em] text-white uppercase shadow-pop">
           <i
             className={cn(
@@ -166,10 +130,6 @@ export function LivePanel({ copy }: { copy: LiveWindowCopy }) {
         {copy.verdict}
       </p>
 
-      {/* "Cortar transmissão" é discreto de propósito, e não só por estética: o
-          BORA em tomate ficava a 44px do botão de download da página, que é a
-          ÚNICA ação real do primeiro viewport. Com a live já no ar, o tomate
-          volta a ter um dono só. */}
       <div className="flex min-h-[44px] items-center justify-center gap-2.5 rounded-md border border-border-dry bg-surface-2 font-display text-[0.98rem] font-bold text-muted">
         <span className="size-[9px] rounded-sm bg-muted" />
         {copy.stop}
@@ -178,17 +138,7 @@ export function LivePanel({ copy }: { copy: LiveWindowCopy }) {
   );
 }
 
-/**
- * Medidor de sinal do destino — cinco tracinhos que respiram com o bitrate.
- *
- * A primeira versão era uma barra cheia de largura total em ~90%. Ela lia como
- * "carregando 90%", que é o oposto do que a peça diz: o número é a SAÚDE de uma
- * conexão estável, não o progresso de alguma coisa. Cinco segmentos curtos
- * dizem "sinal", e o último acende/apaga conforme a oscilação — o único
- * movimento que sobra é o que carrega informação.
- */
 function Meter({ value }: { value: number }) {
-  // Oscila ~±38 kbps em volta do alvo; abaixo de -12 o último tracinho apaga.
   const lit = value < -12 ? 4 : 5;
   return (
     <span className="flex items-end gap-[3px]" aria-hidden="true">
@@ -232,7 +182,6 @@ function Stat({
   );
 }
 
-/** O chat chegando. A lista mostra as últimas cinco e anda a cada ~3s. */
 export function LiveChat({ copy }: { copy: LiveWindowCopy }) {
   const calm = useCalm();
   const ref = useRef<HTMLDivElement>(null);
@@ -240,7 +189,6 @@ export function LiveChat({ copy }: { copy: LiveWindowCopy }) {
   useHeartbeat(ref, 3000, !calm, () => setHead((n) => n + 1));
 
   const n = copy.messages.length;
-  // Janela deslizante sobre a lista: sempre cinco, sempre em ordem de chegada.
   const shown = Array.from({ length: 6 }, (_, i) => {
     const idx = (head + i) % n;
     return { ...copy.messages[idx], key: `${head + i}` };
@@ -263,13 +211,8 @@ export function LiveChat({ copy }: { copy: LiveWindowCopy }) {
         </span>
       </div>
 
-      {/* `overflow-hidden` + `justify-end`: as falas se acumulam de baixo pra
-          cima e a mais velha é cortada na borda de cima, como num chat de
-          verdade. Sem o corte, a entrada de uma nova empurraria a coluna e
-          mexeria na altura da janela inteira. */}
-      {/* O desvanecer do topo é MÁSCARA, não opacidade por item: o `both` da
-          animação de entrada fixa opacity:1 no fim e engolia qualquer classe de
-          opacidade que eu pusesse na fala mais velha. A máscara não disputa. */}
+      {/* Fix the chat viewport height so incoming messages cannot resize the window. */}
+      {/* Use a mask for fading; an opacity animation would override per-row opacity. */}
       <div className="flex flex-1 flex-col justify-end gap-[13px] overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_38px)]">
         {shown.map((m) => (
           <div

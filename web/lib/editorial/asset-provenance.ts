@@ -1,6 +1,5 @@
 import type { EditorialAssetManifestEntry, EditorialImage } from "./types";
 
-/** Compares every shared provenance field, including source-specific versions. */
 export function editorialImageMatchesManifest(
   image: EditorialImage,
   manifestEntry: EditorialAssetManifestEntry,

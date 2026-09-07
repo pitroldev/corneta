@@ -1,4 +1,5 @@
 import { ESLint } from "eslint";
+import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const eslint = new ESLint();
@@ -15,6 +16,36 @@ it("rejects browser globals accidentally used in the Node smoke harness", async 
   );
 });
 describe("lint contract for new desktop code", () => {
+  it("enforces the shared language rule in the website ESLint config", async () => {
+    const webLint = new ESLint({ cwd: resolve(import.meta.dirname, "../web") });
+    const [result] = await webLint.lintText(
+      "// salva os dados\nexport const numero = 1;",
+      {
+        filePath: "lib/source-language-probe.ts",
+      },
+    );
+    expect(
+      result.messages.some(
+        (message) => message.ruleId === "corneta-source/english-source",
+      ),
+    ).toBe(true);
+  }, 30_000);
+  it.each([
+    "// salva os dados\nexport const numero = 1;",
+    "// Set the value to one.\nexport const value = 1;",
+  ])(
+    "rejects source-language regressions in the real ESLint config",
+    async (source) => {
+      const [result] = await eslint.lintText(source, {
+        filePath: "src/source-language-probe.ts",
+      });
+      expect(
+        result.messages.some(
+          (message) => message.ruleId === "corneta-source/english-source",
+        ),
+      ).toBe(true);
+    },
+  );
   it.each([
     ["@typescript-eslint/no-explicit-any", "export const value: any = 1;"],
     ["no-empty", "export function task() { try { JSON.parse(''); } catch {} }"],

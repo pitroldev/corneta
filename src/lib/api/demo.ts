@@ -23,9 +23,6 @@ import type {
 } from "../types";
 import { CornetaApi } from "./types";
 
-// ---------------------------------------------------------------------------
-// Implementação mock (navegador) — simula motor e cofre via localStorage
-// ---------------------------------------------------------------------------
 export function mockApi(): CornetaApi {
   const CONFIG_KEY = "corneta.config";
   const VAULT_KEY = "corneta.vault";
@@ -70,14 +67,13 @@ export function mockApi(): CornetaApi {
         };
       }
     } catch {
-      /* ignore */
+      /* Storage may be unavailable in browser previews. */
     }
     const cfg = defaultConfig();
     localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
     return cfg;
   };
 
-  // --- sessões (relatório pós-live) ---
   const SESSIONS_KEY = "corneta.sessions";
   const loadSessions = (): Record<string, string> => {
     try {
@@ -89,7 +85,6 @@ export function mockApi(): CornetaApi {
   const saveSessions = (m: Record<string, string>) =>
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(m));
 
-  // Gera uma sessão sintética (demo), com opção de janela problemática.
   const genSession = (
     startedAt: number,
     mins: number,
@@ -171,8 +166,7 @@ export function mockApi(): CornetaApi {
       let chat = Math.round(5 + Math.sin(k / 11) * 2 + Math.random() * 4);
       if (nearRaid) chat += 18;
       if (Math.random() < 0.015) chat += 14;
-      // Reparte o chat entre os canais: a primeira plataforma fala mais que as outras,
-      // que é o formato que o relatório por canal precisa exercitar.
+      // Use unequal channel activity to exercise per-channel report shares.
       const chatBy: Record<string, number> = {};
       let left = chat;
       plats.forEach((p, i) => {
@@ -218,8 +212,6 @@ export function mockApi(): CornetaApi {
         });
         const total = items.reduce((acc, x) => acc + (x.viewers ?? 0), 0);
         lines.push(JSON.stringify({ kind: "viewers", t, total, items }));
-        // Contador de seguidores: só Twitch e Kick expõem (o YouTube arredonda), e o
-        // total é absoluto — o relatório tira o ganho da diferença ponta a ponta.
         const seg = plats
           .filter((p) => p.platformId === "twitch" || p.platformId === "kick")
           .map((p) => ({
@@ -231,7 +223,6 @@ export function mockApi(): CornetaApi {
           lines.push(JSON.stringify({ kind: "followers", t, items: seg }));
       }
     }
-    // Alertas de exemplo: raid (pico), subs/membros espalhados, gift bomb e bits.
     const at = (mm: number) => startedAt + mm * 60000;
     lines.push(
       JSON.stringify({
@@ -307,17 +298,16 @@ export function mockApi(): CornetaApi {
     const yt = { id: "y1", name: "YouTube", platformId: "youtube" };
     const a = Date.now() - 26 * 3600 * 1000;
     const b = Date.now() - 3 * 3600 * 1000;
-    m[String(a)] = genSession(a, 35, [tw, yt], t); // sem incidentes
+    m[String(a)] = genSession(a, 35, [tw, yt], t);
     m[String(b)] = genSession(b, 48, [tw, yt], t, {
       dropAtMin: 23,
       dropIdx: 0,
       highCpu: true,
       busyApp: "Cyberpunk 2077",
-    }); // com incidente
+    });
     saveSessions(m);
   };
 
-  // --- simulador do motor ---
   let snapshot: EngineSnapshot = {
     state: "stopped",
     startedAt: null,
@@ -325,12 +315,9 @@ export function mockApi(): CornetaApi {
   };
   const listeners = new Set<(s: EngineSnapshot) => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
-  // Gravação da sessão demo em andamento.
   let rec: { id: string; lines: string[] } | null = null;
-  // Destinos pausados (controle ao vivo).
   const pausedTargets = new Set<string>();
 
-  // --- chat demo ---
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
   const chatStatusListeners = new Set<(s: ChatStatus) => void>();
   const chatDeleteListeners = new Set<(d: ChatDelete) => void>();
@@ -395,7 +382,6 @@ export function mockApi(): CornetaApi {
       case "member":
         return {
           ...base,
-          // Rótulo exibido no card (ao contrário do "T1", que é código de tier).
           tier: t("core.mock.alert.tier.member"),
           amount: 1 + Math.floor(Math.random() * 12),
         };
@@ -431,17 +417,15 @@ export function mockApi(): CornetaApi {
 
   const tick = () => {
     const now = Date.now();
-    // Demo: depois de "ouvir" um instante, o "OBS conecta" e entra no ar.
     if (snapshot.state === "starting") {
       snapshot.ingestLive = true;
       snapshot.state = "live";
     }
     for (const st of Object.values(snapshot.targets)) {
-      if (pausedTargets.has(st.targetId)) continue; // pausado: mantém o estado
+      if (pausedTargets.has(st.targetId)) continue;
       if (st.state === "connecting") {
         st.state = "live";
       } else if (st.state === "live") {
-        // pequena flutuação ao redor do alvo
         const jitter = (Math.random() - 0.5) * 0.06;
         st.bitrateKbps = Math.max(0, Math.round(st.bitrateKbps * (1 + jitter)));
         st.fps = 30 + Math.round(Math.random() * 30);
@@ -491,7 +475,6 @@ export function mockApi(): CornetaApi {
       return saved;
     },
     subscribeConfigChanged() {
-      // Navegador = uma janela só; não há outra webview pra sincronizar.
       return () => {};
     },
     async setKey(targetId, key) {
@@ -523,12 +506,9 @@ export function mockApi(): CornetaApi {
       ];
     },
     async testUpload() {
-      // simula um teste: ~25–60 Mbps
       return Math.round(25 + Math.random() * 35);
     },
-    async setAutostart() {
-      // no-op no navegador (sem SO pra registrar autostart)
-    },
+    async setAutostart() {},
     async start(_operationId) {
       const cfg = loadConfig();
       pausedTargets.clear();
@@ -644,7 +624,7 @@ export function mockApi(): CornetaApi {
           const last = JSON.parse(lines[lines.length - 1]);
           endedAt = last.kind === "end" ? last.endedAt : (last.t ?? startedAt);
         } catch {
-          /* ignore */
+          /* Ignore a malformed trailing record and retain the estimated end time. */
         }
         out.push({
           id,
@@ -665,8 +645,7 @@ export function mockApi(): CornetaApi {
       return new TextEncoder().encode(chat ? "" : (loadSessions()[id] ?? ""))
         .buffer;
     },
-    // No navegador não existe diálogo nativo: cai no download do próprio browser,
-    // que escolhe a pasta de Downloads. Sempre "salvou" — não há como cancelar.
+    // Browser downloads have no native cancellation result.
     async saveTextFile({ name, content }) {
       const url = URL.createObjectURL(
         new Blob([content], { type: "text/plain;charset=utf-8" }),
@@ -685,12 +664,8 @@ export function mockApi(): CornetaApi {
       delete m[id];
       saveSessions(m);
     },
-    async openSessionsDir() {
-      // No navegador não há pasta de sessões (no app, abre o explorador de arquivos).
-    },
-    // Gravação não existe na demo do navegador: não há FFmpeg, não há disco e não há
-    // protocolo de asset. Os stubs devolvem "nada gravado" em vez de lançar — assim a
-    // tela de relatório abre igual, só sem a aba de replay.
+    async openSessionsDir() {},
+    // Browser previews have no native recorder or recording files; return empty recording results.
     async readSessionChat() {
       return "";
     },
@@ -707,13 +682,13 @@ export function mockApi(): CornetaApi {
       return null;
     },
     async recordTest() {
-      throw new Error("sem gravação no navegador");
+      throw new Error("Recording is unavailable in browser previews");
     },
     async recordRetry() {
-      throw new Error("sem gravação no navegador");
+      throw new Error("Recording is unavailable in browser previews");
     },
     async recordVideoUrl() {
-      throw new Error("sem gravação no navegador");
+      throw new Error("Recording is unavailable in browser previews");
     },
     async setSessionOffset() {},
     async deleteSessionRecordings() {},
@@ -723,7 +698,7 @@ export function mockApi(): CornetaApi {
       return null;
     },
     async chatStart(t) {
-      // Frases da demo resolvidas UMA vez por conexão (o timer roda a cada 1,1 s).
+      // Resolve demo copy once per connection, not on each timer tick.
       const chatMsgs = CHAT_MSG_KEYS.map((k) => t(k));
       const SOURCES = [
         { platform: "twitch", name: "Twitch Demo A" },
@@ -736,7 +711,6 @@ export function mockApi(): CornetaApi {
           l({ platform: src.platform, source: src.name, status: "connected" }),
         ),
       );
-      // Viewers simulados (oscilam ao redor de uma base por canal).
       const VBASE: Record<string, number> = {
         "Twitch Demo A": 820,
         "Twitch Demo B": 4200,
@@ -781,14 +755,12 @@ export function mockApi(): CornetaApi {
       };
       const COLORS = ["#ff5a36", "#7c9cff", "#34d399", "#f5a524", "#e879f9"];
       chatTimer = setInterval(() => {
-        // Demonstra o fluxo de deleção de vez em quando.
         if (recentIds.length > 8 && Math.random() < 0.08) {
           const r = recentIds[Math.floor(Math.random() * recentIds.length)];
           chatDeleteListeners.forEach((l) =>
             l({ scope: "message", platform: r.platform, nativeId: r.nativeId }),
           );
         }
-        // De vez em quando, dispara um alerta de exemplo.
         if (Math.random() < 0.12) {
           const a = randomAlert(++alertSeq, t);
           alertListeners.forEach((l) => l(a));
@@ -852,19 +824,11 @@ export function mockApi(): CornetaApi {
       return chatTimer != null;
     },
     subscribeChatRunning() {
-      // Navegador = uma janela só; nada pra sincronizar entre webviews.
       return () => {};
     },
-    async openChatWindow() {
-      // No navegador não dá pra abrir janela nativa (no app instalado, abre a flutuante).
-    },
+    async openChatWindow() {},
     async chatSend(text) {
-      // Demo: ecoa local pra UI funcionar no navegador.
-      //
-      // NÃO TRADUZIR "você" aqui sozinho: a ChatScreen compara `m.author === "você"`
-      // pra não deixar você moderar a própria mensagem. Os dois lados são um par —
-      // trocar um só destrava a moderação do próprio eco. Chave pronta no
-      // dicionário: core.mock.chat.self.
+      // Keep the self-echo label aligned with the moderation guard in ChatScreen.
       chatMsgListeners.forEach((l) =>
         l({
           id: `me-${Date.now()}`,
@@ -948,9 +912,7 @@ export function mockApi(): CornetaApi {
       viewerListeners.add(onViewers);
       return () => viewerListeners.delete(onViewers);
     },
-    async obsSetStream() {
-      // no-op no navegador (sem OBS).
-    },
+    async obsSetStream() {},
     async testTarget(_targetId, t) {
       return t("core.mock.target.test.ok");
     },
@@ -960,9 +922,7 @@ export function mockApi(): CornetaApi {
     async alertTest(_sourceId, t) {
       return t("core.mock.alertToken.ok");
     },
-    async openLogsDir() {
-      // no-op no navegador.
-    },
+    async openLogsDir() {},
     async exportDiagnostics() {
       return true;
     },
@@ -993,9 +953,7 @@ export function mockApi(): CornetaApi {
         decidedAt: new Date().toISOString(),
       });
     },
-    async registerShortcut() {
-      // no-op no navegador (atalho global é do SO).
-    },
+    async registerShortcut() {},
     subscribeRecorder() {
       return () => {};
     },
@@ -1011,32 +969,25 @@ export function mockApi(): CornetaApi {
         fps: 60,
       };
     },
-    async obsAutoconfigure() {
-      // Browser preview has no OBS connection or persistent native configuration.
-    },
-    async markMoment() {
-      // no-op no navegador (sem sessão real gravando)
-    },
+    async obsAutoconfigure() {},
+    async markMoment() {},
     async exportConfig() {
       return false;
     },
     async importConfig() {
       return false;
     },
-    async saveBrbSlate() {
-      // no-op no navegador (sem backend pra salvar o slate)
-    },
+    async saveBrbSlate() {},
     async brbSlateNeedsRefresh() {
       return false;
     },
     async setBrbSlate() {
-      // no-op no navegador (sem seletor de arquivo nativo)
-      console.log("[mock] setBrbSlate: sem seletor de arquivo no navegador");
+      console.log(
+        "[mock] setBrbSlate: no native file picker in browser previews",
+      );
       return null;
     },
-    async clearBrbSlate() {
-      // no-op no navegador
-    },
+    async clearBrbSlate() {},
     async getBrbSlatePreview() {
       return "";
     },
@@ -1046,20 +997,18 @@ export function mockApi(): CornetaApi {
     subscribeGuardian() {
       return () => {};
     },
-    // Mesa: sem backend no navegador — a conexão real só roda no app instalado.
     async mesaStartServer() {
       return { port: 0, lanIp: "127.0.0.1" };
     },
     async mesaStopServer() {
-      /* no-op no navegador */
+      /* No native Mesa server in browser previews. */
     },
     async mesaObsAddSource() {
-      /* no-op no navegador (sem OBS) */
+      /* No OBS connection in browser previews. */
     },
     async mesaObsRemoveSource() {
-      /* no-op no navegador */
+      /* No OBS connection in browser previews. */
     },
-    // Overlay: sem backend no navegador — só roda no app instalado.
     async overlayStart() {
       return {
         port: 7393,
@@ -1068,22 +1017,22 @@ export function mockApi(): CornetaApi {
       };
     },
     async overlayStop() {
-      /* no-op no navegador */
+      /* No native overlay server in browser previews. */
     },
     async overlayStatus() {
       return null;
     },
     async overlayTest() {
-      /* no-op no navegador */
+      /* No native overlay server in browser previews. */
     },
     async overlayChatTest() {
-      /* no-op no navegador */
+      /* No native overlay server in browser previews. */
     },
     async overlayObsAddSource() {
-      /* no-op no navegador (sem OBS) */
+      /* No OBS connection in browser previews. */
     },
     async openPrivacySettings() {
-      /* no-op no navegador */
+      /* No native privacy settings in browser previews. */
     },
   };
 }

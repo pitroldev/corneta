@@ -17,53 +17,9 @@ import { Chip, cn, DemoLabel, State } from "./ui";
 import { useCalm, useHeartbeat, useOnScreen } from "./use-motion";
 import { fill, group } from "@/lib/i18n";
 
-// Sala de guerra e relatório: os dois painéis da jornada da live.
-//
-// ------------------------------------------------------------
-// POR QUE ISTO FOI REESCRITO
-// ------------------------------------------------------------
-// A versão anterior animava a ENTRADA: as barrinhas subiam do zero e a curva se
-// desenhava quando a seção aparecia, uma vez só. Dois problemas, e o segundo é
-// grave:
-//
-//  1. Rolando a página normalmente, não havia nada acontecendo. Uma entrada de
-//     um segundo que roda uma vez por visita não é um painel vivo — é um GIF
-//     que já terminou. E estes dois painéis vendem justamente o que a Corneta
-//     faz ENQUANTO a live acontece.
-//
-//  2. A curva `pathLength` + `vector-effect: non-scaling-stroke` +
-//     `preserveAspectRatio="none"` desenhava ERRADO. O framer implementa
-//     `pathLength` como `stroke-dasharray`, medida em unidades do usuário; o
-//     `non-scaling-stroke` manda o traço ser calculado em pixels de tela; e o
-//     `preserveAspectRatio="none"` estica X e Y por fatores diferentes. Os três
-//     juntos fazem o tracejado ser calculado numa escala e desenhado noutra: a
-//     linha aparecia cortada no meio, ou não aparecia. Foi o "sumiram ou
-//     ficaram cortadas" que apareceu na revisão.
-//
-// A regra que fica: `pathLength` NÃO combina com viewBox esticado. Onde o
-// desenho estica, o movimento tem que ser posição/opacidade/clipe — nunca
-// tracejado.
-//
-// ------------------------------------------------------------
-// A TESE NOVA: os dois painéis ESTÃO RODANDO
-// ------------------------------------------------------------
-// Sala de guerra: os números oscilam, a Kick cai e volta sozinha num ciclo, e
-// as barras de CPU/placa respondem. E o painel ACEITA COMANDO: clicar num
-// destino liga ou pausa ele — e a conta de máquina sobe junto, que é a relação
-// que o app mostra de verdade (mais destino convertendo, mais CPU).
-//
-// Relatório: o gráfico TOCA. Um cursor caminha pela live inteira e a leitura
-// embaixo acompanha minuto a minuto; passar o mouse (ou arrastar o dedo) toma o
-// controle e vira busca livre. É o mesmo laço da tela de Relatórios do app.
-//
-// Com `prefers-reduced-motion` nenhum laço roda — os painéis ficam no estado
-// inicial e o CLIQUE continua funcionando. Movimento é o que some; função, não.
-//
-// A copy chega RESOLVIDA (função não atravessa a fronteira servidor→cliente) e
-// os números entram por `fill`, então o texto em volta continua no dicionário.
+// Avoid pathLength on stretched SVG viewBoxes with non-scaling strokes; animate position or opacity instead.
 
-/** `text-cream` explícito: estes painéis aparecem sobre seções de PAPEL, onde a
- *  tinta herdada é escura — sem isso o nome da plataforma some no fundo escuro. */
+// Explicit light text prevents inheritance from the surrounding paper section.
 const PANEL = "rounded-lg bg-surface p-[18px] text-cream shadow-pop-ink-lg";
 
 const ROW =
@@ -81,15 +37,10 @@ const ROWS: { id: PlatId; name: string; target: number }[] = [
   { id: "tiktok", name: "TikTok", target: 4500 },
 ];
 
-/** A Kick cai e volta sozinha: 10s fora, 16s no ar. O ciclo é o argumento do
- *  painel — não adianta mostrar uma queda congelada, porque o que a Corneta faz
- *  é a RECUPERAÇÃO, e recuperação só existe no tempo. */
 const KICK_CYCLE = 26;
 const KICK_DOWN = 10;
 
-/** Oscilação determinística em volta do alvo — mesma função da janela do herói.
- *  Sem `Math.random`: valor diferente no servidor e no cliente vira erro de
- *  hidratação. */
+// Deterministic values keep server rendering and hydration identical.
 const wobble = (target: number, tick: number, seed: number) =>
   target +
   Math.round(
@@ -99,8 +50,6 @@ const wobble = (target: number, tick: number, seed: number) =>
 export interface LiveRoomCopy {
   label: string;
   tag: string;
-  /** Template com os buracos do bitrate e das quedas — só os números são do
-   *  cliente; o texto em volta continua saindo do dicionário. */
   metrics: string;
   onAir: string;
   reconnecting: string;
@@ -109,11 +58,8 @@ export interface LiveRoomCopy {
   pausedState: string;
   cpu: string;
   gpu: string;
-  /** "{n} assistindo" */
   watching: string;
   hint: string;
-  /** Separador de milhar do idioma. Vem resolvido de fora porque o componente
-   *  não conhece o locale — e não precisa conhecer. */
   sep: string;
 }
 
@@ -132,8 +78,7 @@ export interface ReportChartCopy {
   sep: string;
 }
 
-/** Medidor de carga: rótulo, barrinha e número. A barra é `scaleX`, não
- *  `width` — largura reflui a linha inteira a cada segundo. */
+// Scale the bar instead of changing width to avoid layout work on every tick.
 function Meter({
   label,
   pct,
@@ -172,8 +117,6 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
   const calm = useCalm();
   const box = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
-  /** O que a PESSOA desligou. A TikTok começa pausada — é o estado que o painel
-   *  sempre mostrou; a diferença é que agora dá pra ligar. */
   const [off, setOff] = useState<Partial<Record<PlatId, boolean>>>({
     tiktok: true,
   });
@@ -182,13 +125,9 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
 
   const kickPhase = tick % KICK_CYCLE;
   const kickDown = kickPhase < KICK_DOWN;
-  // A Kick já caiu uma vez antes do painel abrir: começa em 1, não em 0.
   const kickDrops = Math.floor(tick / KICK_CYCLE) + 1;
 
   const active = ROWS.filter((r) => !off[r.id]).length;
-  // A conta de máquina responde ao que está ligado. Não é enfeite: é a relação
-  // que a tela de Qualidade do app mostra, e é o que justifica o painel ter
-  // CPU e placa em vez de só bitrate.
   const cpu = 6 + active * 4 + Math.round(Math.sin(tick * 0.9) * 2);
   const gpu =
     11 + Math.round(active * 6.7) + Math.round(Math.sin(tick * 0.6 + 1) * 2);
@@ -240,9 +179,7 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
                       })}
               </small>
             </div>
-            {/* A `key` é o ESTADO: quando a Kick volta, a pastilha remonta e
-                entra com um pulinho. É o instante que o painel existe pra
-                mostrar, e sem a remontagem ele passaria como troca de cor. */}
+            {/* Remount the status badge to replay its transition when the state changes. */}
             <motion.span
               key={state}
               initial={calm ? false : { scale: 0.72, opacity: 0 }}
@@ -250,7 +187,6 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
               transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             >
               <State tone={down ? "warn" : isOff ? "quiet" : "ok"}>
-                {/* Só a linha que está TENTANDO alguma coisa pulsa. */}
                 <i
                   className={cn(
                     down &&
@@ -274,8 +210,6 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
         </span>
       </div>
 
-      {/* O convite. Sem ele o painel parece uma figura, e ninguém descobre que
-          as linhas respondem — affordance que não se anuncia não existe. */}
       <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
         {copy.hint}
       </p>
@@ -283,17 +217,6 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
   );
 }
 
-// ============================================================
-// Relatório pós-live — a curva de audiência TOCANDO
-// ============================================================
-// A análise real (src/screens/ReportsScreen.tsx) cruza viewerSamples,
-// alertEvents, taxa de chat e janelas com problema; aqui é uma sessão de
-// exemplo. O que NÃO é exemplo é o gesto: no app o relatório tem um cursor que
-// atravessa todos os gráficos junto, e é ele que está aqui.
-
-/** Audiência a cada 9,6 min de uma live de 3h12. O pico (índice 10) é o raid
- *  das 22:30 e o índice 14 é o trecho com queda de sinal — os dois marcadores
- *  que a legenda embaixo nomeia. */
 const SAMPLES = [
   362, 430, 495, 560, 610, 680, 650, 740, 800, 880, 1284, 1160, 1130, 1040,
   1090, 980, 900, 940, 830, 760, 610,
@@ -302,7 +225,6 @@ const PEAK = 1284;
 const LAST = SAMPLES.length - 1;
 const W = 360;
 const H = 96;
-/** Minuto zero da live e duração — o eixo em números, pra leitura do cursor. */
 const START_MIN = 21 * 60;
 const SPAN_MIN = 192;
 
@@ -312,68 +234,52 @@ const CURVE = SAMPLES.map(
   (v, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)},${yOf(v).toFixed(1)}`,
 ).join(" ");
 
-/** Audiência em qualquer ponto do eixo (0..1), interpolando entre amostras. */
 function viewersAt(p: number) {
   const x = Math.max(0, Math.min(LAST, p * LAST));
   const i = Math.min(LAST - 1, Math.floor(x));
   return SAMPLES[i] + (SAMPLES[i + 1] - SAMPLES[i]) * (x - i);
 }
 
-/** Relógio de parede naquele ponto — a live vira madrugada, então dá a volta. */
 function clockAt(p: number) {
   const total = Math.round(START_MIN + p * SPAN_MIN) % 1440;
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
-/** Os dois instantes marcados na curva, em fração do eixo. */
 const RAID = 10 / LAST;
 const DROP = 14 / LAST;
-/** Quão perto o cursor precisa chegar pra "acender" um marcador. */
 const NEAR = 0.035;
 
 const GRID =
   "stroke-border-dry [stroke-width:1] [vector-effect:non-scaling-stroke]";
 
-/** Quanto tempo o cursor leva pra atravessar a live inteira, tocando sozinho. */
 const SWEEP_MS = 18000;
 
 export function ReportChart({ copy }: { copy: ReportChartCopy }) {
-  // Aqui é o `useReducedMotion` do framer, não o `useCalm`: este componente
-  // precisa saber a preferência JÁ NO PRIMEIRO EFEITO (pra decidir onde o cursor
-  // descansa), e o `useCalm` nasce dizendo "calmo" pra todo mundo.
+  // The first effect needs the actual motion preference; useCalm initially assumes reduced motion.
   const reduce = useReducedMotion() ?? false;
   const box = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const onScreen = useOnScreen(box);
-  /** `true` enquanto a pessoa está com o cursor (ou o dedo, ou o foco) em cima.
-   *  O passeio automático para: ninguém consegue ler um ponto que foge. */
   const [held, setHeld] = useState(false);
 
-  // MotionValue atualiza o cursor sem render React por quadro; estado React
-  // fica restrito aos indicadores discretos e ao anúncio acessível.
+  // MotionValues update visuals per frame; React state tracks only discrete indicators and announcements.
   const pos = useMotionValue(0);
 
   useAnimationFrame((_, delta) => {
     if (!onScreen || held || reduce) return;
-    // `delta` volta gigante quando a aba estava no fundo; sem o teto o cursor
-    // daria um salto de meia live no primeiro quadro de volta.
+    // Clamp the first frame after backgrounding so the cursor cannot skip across the session.
     const next = pos.get() + Math.min(delta, 64) / SWEEP_MS;
     pos.set(next >= 1 ? 0 : next);
   });
 
-  // Com movimento reduzido o cursor não anda — então ele descansa no FIM, com o
-  // relatório inteiro lido. Parado no começo, o gráfico apareceria todo apagado
-  // pra quem pediu menos movimento, que é o contrário de acessível.
+  // Reduced motion must reveal the complete chart instead of leaving it dimmed at the start.
   useEffect(() => {
     if (reduce) pos.set(1);
   }, [reduce, pos]);
 
   const left = useTransform(pos, (p) => `${p * 100}%`);
   const dotTop = useTransform(pos, (p) => `${(yOf(viewersAt(p)) / H) * 100}%`);
-  /** O véu sobre o trecho que o cursor ainda não leu. É `scaleX` num elemento
-   *  ancorado à direita — transformação pura, que o compositor resolve sem
-   *  refazer layout. A versão anterior fazia isso com um recorte de SVG cujo
-   *  `width` só mudava quando o React re-renderizava. */
+  // A right-anchored scale transform reveals the chart without per-frame layout work.
   const veil = useTransform(pos, (p) => 1 - p);
   const readout = useTransform(
     pos,
@@ -388,8 +294,7 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
     const raid = Math.abs(p - RAID) < NEAR;
     const drop = Math.abs(p - DROP) < NEAR;
     const min = Math.round(p * SPAN_MIN);
-    // Devolver o MESMO objeto é o que corta o render: o React compara por
-    // identidade e não reconcilia nada.
+    // Reuse the object when indicators are unchanged to avoid a React render.
     setMark((cur) =>
       cur.raid === raid && cur.drop === drop && Math.abs(cur.min - min) < 4
         ? cur
@@ -397,8 +302,6 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
     );
   });
 
-  /** Posição do ponteiro → fração do eixo. Escreve direto no `MotionValue`:
-   *  arrastar não passa pelo React em quadro nenhum. */
   const seek = (clientX: number) => {
     const el = track.current;
     if (!el) return;
@@ -431,9 +334,7 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         <span>{copy.tag}</span>
       </DemoLabel>
 
-      {/* O quadro do gráfico é o próprio controle: cursor em cima já busca, sem
-          exigir clique. `touch-action: pan-y` deixa a página rolar no celular e
-          reserva só o arrasto horizontal pra busca. */}
+      {/* Reserve horizontal dragging for seeking while allowing vertical page scrolling. */}
       <div
         ref={track}
         role="slider"
@@ -475,16 +376,14 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
           />
         </svg>
 
-        {/* O véu entra ANTES das marcas: elas ficam por cima e continuam
-            legíveis do outro lado do cursor — é delas que a legenda fala. */}
+        {/* Draw the veil before markers so they remain legible in the unread region. */}
         <motion.span
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 origin-right bg-surface/65"
           style={{ scaleX: veil }}
         />
 
-        {/* Marcas, cursor e ponto moram em HTML sobre o SVG: dentro dele o
-            `preserveAspectRatio="none"` viraria a bolinha numa elipse. */}
+        {/* Keep dots in HTML; a stretched SVG viewBox would turn circles into ellipses. */}
         <Marker at={RAID} tone="brass" pos={pos} reduce={reduce} />
         <Marker at={DROP} tone="warn" pos={pos} reduce={reduce} />
 
@@ -502,12 +401,6 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         />
       </div>
 
-      {/* A leitura do cursor. Fica numa linha própria e não flutuando sobre a
-          curva: pastilha que persegue o ponteiro tapa justamente o pedaço do
-          gráfico que a pessoa está tentando ver.
-
-          O texto é o próprio `MotionValue` renderizado como filho — o framer
-          escreve o conteúdo direto no nó, sem passar pelo React. */}
       <div className="flex items-center justify-between gap-2 text-[0.6rem] font-bold tabular-nums text-faint-raised">
         <span>{clockAt(0)}</span>
         <motion.strong className="rounded-sm bg-surface-2 px-2 py-1 text-[0.66rem] font-extrabold text-cream">
@@ -520,8 +413,6 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         <Chip tone="ok">{copy.peak}</Chip>
         <Chip quiet>{copy.average}</Chip>
         <Chip quiet>{copy.messages}</Chip>
-        {/* As duas pastilhas de evento acendem quando o cursor chega nelas: é a
-            legenda dizendo "é ISTO que você está olhando agora". */}
         <motion.span
           animate={{ scale: mark.raid ? 1.07 : 1 }}
           transition={{ duration: reduce ? 0 : 0.2 }}
@@ -547,11 +438,6 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
   );
 }
 
-/** Marcador de evento na curva: cresce quando o cursor chega perto.
- *
- *  A mola pendura no `MotionValue` do cursor, então o "acender" também acontece
- *  fora do render — este componente não re-renderiza nenhuma vez por causa
- *  disso. */
 function Marker({
   at,
   tone,
@@ -563,8 +449,7 @@ function Marker({
   pos: MotionValue<number>;
   reduce: boolean;
 }) {
-  // O `: number` não é enfeite: sem ele o TS infere a união `1 | 1.55` e a mola
-  // não aceita um `MotionValue` de literais.
+  // Widen the result to number so useSpring accepts the MotionValue rather than a literal union.
   const target = useTransform(pos, (p): number =>
     Math.abs(p - at) < NEAR ? 1.55 : 1,
   );

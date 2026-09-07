@@ -70,11 +70,8 @@ export const EDITORIAL_CONTENT_ID_PATTERN =
 export const LOWERCASE_ASCII_KEBAB_CASE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const TRANSLATION_KEY_PATTERN = /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
 
-/**
- * Human-reviewed semantic paths. A regex can enforce ASCII/kebab syntax, but
- * cannot prove that words are English. Additions require editorial review and
- * a version bump; the same approval covers the optional public `/en` prefix.
- */
+// These path categories require human approval; matching a pattern is not evidence.
+// Bump the policy version when the approval contract changes.
 export const EDITORIAL_ENGLISH_PATH_APPROVALS = {
   version: 4,
   paths: [
@@ -126,7 +123,6 @@ export interface EditorialEnglishAssetPathApproval {
   readonly originalPath: string;
 }
 
-/** Human-reviewed complete paths used by editorial assets and their masters. */
 export const EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS: {
   readonly version: number;
   readonly paths: readonly EditorialEnglishAssetPathApproval[];

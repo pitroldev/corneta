@@ -1,16 +1,6 @@
-// ============================================================
-// Dicionário pt-BR da LP — a fonte da verdade da copy.
-//
-// Gerado a partir das strings que já estavam nos componentes; daqui pra frente
-// é AQUI que se escreve. Chave em dot.case, prefixada pela seção.
-//
-// O tipo `Dict` sai deste arquivo, então o TypeScript recusa build se o inglês
-// esquecer uma chave — que é o jeito de a tradução não apodrecer em silêncio.
-// Ver docs/TOM-DE-VOZ.md antes de mexer em qualquer frase.
-// ============================================================
+// Desktop pt-BR dictionary and Dict type source. Follow docs/TOM-DE-VOZ.md before changing copy.
 
 export const pt = {
-  // ---- analysis ----
   "analysis.advice.app.cpu":
     "Fecha {app} antes da próxima live, ou deixa ele fazendo menos coisa (menos abas, nada baixando). Se for um jogo, limita os FPS ou baixa a física.",
   "analysis.advice.app.gpu":
@@ -78,8 +68,6 @@ export const pt = {
   "analysis.highlight.viewerJump": "+{delta} assistindo de uma vez",
   "analysis.parse.alert.userFallback": "alguém",
   "analysis.parse.marker.labelFallback": "Momento",
-  // O caixa-alta do pôster é desenho: o recap.ts aplica .toUpperCase() aqui, como
-  // já faz nos rótulos vizinhos do canvas.
   "analysis.recap.bestMoment": "Melhor momento",
   "analysis.signal.appCpu": "{app} chegou a {pct}% do processador",
   "analysis.signal.appGpu": "{app} chegou a {pct}% da placa de vídeo",
@@ -182,20 +170,15 @@ export const pt = {
   "analysis.why.signal.stopped": "O OBS parou de mandar vídeo pra Corneta",
   "analysis.why.signal.blank":
     "Todas as plataformas ficaram sem imagem ao mesmo tempo",
-  // Substantivos soltos, pros buracos das frases acima. Em português os dois são
-  // a mesma palavra; em inglês {patch} anda sozinho e vira "rough patch".
   "analysis.verdict.patch.one": "trecho",
   "analysis.verdict.patch.other": "trechos",
   "analysis.verdict.stretch.one": "trecho",
   "analysis.verdict.stretch.other": "trechos",
 
-  // ---- slate do JÁ VOLTO ----
-  // Isto NÃO é interface: é o texto desenhado no cartão que vai AO AR quando o
-  // sinal do OBS cai. Quem lê é o público do streamer.
+  // This copy appears on air to viewers, not only in the app.
   "brb.slate.subtitle": "já já tô de volta — segura a corneta 📣",
   "brb.slate.title": "JÁ VOLTO",
 
-  // ---- chat ----
   "chat.account.brokerError":
     "Login oficial da Corneta fora do ar: {error}. Dá pra entrar com credenciais próprias nas opções avançadas.",
   "chat.account.byok.hide": "ocultar opções avançadas",
@@ -297,8 +280,6 @@ export const pt = {
   "chat.display.viewers": "Quem assiste",
   "chat.display.viewers.hint": "contador de espectadores",
   "chat.error.connect": "Não consegui conectar o chat — confira os canais.",
-  // ---- Feed de alertas ----
-  // O verbo entra depois do nome de quem fez: "@fulano seguiu".
   "chat.alerts.empty":
     "Inscrições, gifts, bits, raids e super chats de todas as plataformas aparecem aqui.",
   "chat.alerts.detail.bits": "{n} bits",
@@ -316,7 +297,6 @@ export const pt = {
   "chat.alerts.verb.subgift": "presenteou",
   "chat.alerts.verb.superchat": "mandou um Super Chat",
   "chat.alerts.verb.tip": "doou",
-  // ---- Estado vazio do feed de chat ----
   "chat.feed.empty.disconnected.body":
     "Adicione um canal (Twitch, Kick, YouTube ou Cinefy experimental) e clique em Conectar pra puxar o chat.",
   "chat.feed.empty.disconnected.title": "Chat desconectado",
@@ -360,7 +340,6 @@ export const pt = {
   "chat.loginrow.signout": "Sair",
   "chat.loginrow.unavailable": "indisponível nesta versão",
   "chat.loginrow.waiting": "aguardando…",
-  // title dos botões que aparecem ao passar o mouse na mensagem.
   "chat.mod.action.ban": "Banir",
   "chat.mod.action.delete": "Apagar",
   "chat.mod.action.timeout": "Timeout 10 min",
@@ -368,7 +347,6 @@ export const pt = {
   "chat.mod.deleted": "Apaguei a mensagem",
   "chat.mod.timeout": "Dei 10 min de timeout",
   "chat.overlay.addToObs": "Adicionar no OBS",
-  // {block} é o título do bloco em minúsculas ("chat", "alertas").
   "chat.overlay.added.toast": "Pus o overlay de {block} no OBS",
   "chat.overlay.aria.alertPosition": "Posição do overlay de alertas",
   "chat.overlay.aria.alertSize": "Tamanho do overlay de alertas",
@@ -440,7 +418,6 @@ export const pt = {
   "chat.popout.windowTitle": "Chat da Corneta",
   "chat.send.button": "Mandar",
   "chat.send.placeholder": "Manda no chat",
-  // Linha de status do envio, uma por canal, coladas com " · ".
   "chat.send.status.connect": "{label}: conecte o chat pra logar",
   "chat.send.status.invalidToken": "{label}: token de envio inválido",
   "chat.send.status.reconnect": "{label}: reconecte o chat pra logar",
@@ -530,9 +507,7 @@ export const pt = {
   "youtube.recovery.check": "Consultar novamente",
   "chat.youtube.guide.step1":
     "Abra o Google Cloud Console e crie um projeto (dê qualquer nome, ex.: “Corneta”). Quando terminar, confira lá no topo se o projeto novo é o que está selecionado.",
-  // Cada **negrito** deste passo a passo é um rótulo REAL da tela do Google
-  // Cloud, e é o que a pessoa vai caçar com o olho enquanto lê. Traduzir junto
-  // com o Console: se o Google mudar o nome do menu, muda aqui.
+  // Bold labels must match the corresponding localized Google interface.
   "chat.youtube.guide.step2":
     "No menu **☰ → APIs e serviços → Biblioteca**, busque por **YouTube Data API v3** e clique em **Ativar**.",
   "chat.youtube.guide.step3":
@@ -549,7 +524,6 @@ export const pt = {
   "chat.youtube.guide.warn.text":
     "enquanto o app ficar em modo **“Teste” (Testing)** — o normal, sem passar pela verificação do Google — o login do YouTube **expira a cada ~7 dias**. Quando cair, é só voltar aqui e clicar em **Entrar** de novo. Por isso o passo de se colocar como **Usuário de teste** é obrigatório (publicar/verificar o app é opcional e bem mais burocrático).",
 
-  // ---- components ----
   "components.app.censored.body":
     "O Guardião está cobrindo a imagem. A live volta quando o trecho estiver verificado e sem termos detectados. O Guardião não silencia o áudio.",
   "components.app.censored.title": "JÁ VOLTO no ar",
@@ -682,7 +656,6 @@ export const pt = {
     "Instalei — feche e abra a Corneta pra terminar.",
   "components.update.ready": "Instalo e abro de novo num instante.",
 
-  // ---- core ----
   "core.auth.login.error.fallback": "erro no login",
   "core.chat.autoConnect.failed":
     "Não consegui ligar o chat sozinho — vá na tela Chat e clique em Conectar.",
@@ -777,7 +750,6 @@ export const pt = {
   "core.target.issue.noName": "nome vazio",
   "core.target.issue.noUrl": "URL não definida",
 
-  // ---- encoding ----
   "encoding.band.cta.hybridOk": "Usar o Esperto — cabe na sua banda",
   "encoding.band.cta.hybridWarn": "Usar o Esperto — fica no limite, mas passa",
   "encoding.band.fix.passthrough":
@@ -811,8 +783,6 @@ export const pt = {
     "Não consegui ver os encoders desta máquina — tenta de novo em Qualidade.",
   "encoding.guide.encoder.checking": "Verificando a placa de vídeo…",
   "encoding.guide.encoder.cpuOnly": "Processador — é o que essa máquina tem",
-  // Não repete o fim do encoding.obs.noCopy: aquele texto está no card da tela
-  // Qualidade cujo link ABRE este guia — as duas frases ficam a um clique.
   "encoding.guide.guardian":
     "Guardião ligado — mande o melhor sinal que der do OBS.",
   "encoding.guide.noPlatforms":
@@ -986,11 +956,8 @@ export const pt = {
   "encoding.wizard.subtitle": "A Corneta configura o OBS sozinha.",
   "encoding.wizard.title": "Conectar ao OBS",
 
-  // ---- golive ----
   "golive.band.atEdge": "no limite — dar uma folga",
   "golive.band.test": "Medir agora",
-  // Só aparece com a live SUBINDO: o card inteiro some quando ela entra no ar
-  // (GoLiveScreen.tsx:431) — prometer medição "depois que subir" seria mentira.
   "golive.band.test.disabledTitle":
     "A live tá subindo — medir agora ia roubar banda dela",
   "golive.band.testing": "Testando…",
@@ -1193,7 +1160,6 @@ export const pt = {
     "Não consegui medir o upload — sem internet?",
   "golive.viewers.label": "assistindo",
 
-  // ---- platforms ----
   "platforms.about.blog.sub": "Meu blog e meus projetos.",
   "platforms.about.footer.made":
     "Corneta é grátis e de código aberto. Feita com {heart} e código.",
@@ -1338,7 +1304,6 @@ export const pt = {
   "platforms.target.expandAria": "Expandir plataforma",
   "platforms.target.getKey": "Pegar minha chave",
   "platforms.target.nameAria": "Nome da plataforma",
-  // ---- Editor de enquadramento (modal) ----
   "platforms.reframe.capture": "Capturar frame do OBS",
   "platforms.reframe.cancel": "Cancelar",
   "platforms.reframe.center": "Centralizar",
@@ -1385,7 +1350,6 @@ export const pt = {
   "platforms.toast.removed": "{name} saiu da corneta",
   "platforms.toast.undo": "Desfazer",
 
-  // ---- gravação + replay ----
   "recorder.toast.diskFull":
     "Sem espaço pra gravar — a live segue normal, só sem gravação.",
   "recorder.toast.noDir":
@@ -1453,7 +1417,6 @@ export const pt = {
     "Esta live tem {n} pedaços de gravação (a gravação caiu e voltou).",
   "replay.warn.truncated": "A gravação foi interrompida antes do fim da live.",
 
-  // ---- reports ----
   "reports.alerts.bitsTotal": "bits no total",
   "reports.alerts.kind.follow.one": "follow",
   "reports.alerts.kind.follow.other": "follows",
@@ -1488,9 +1451,7 @@ export const pt = {
   "reports.chat.title": "Atividade do chat (msgs/min)",
   "reports.copyTime": "Copiar tempo",
   "reports.copyTime.done": "Copiei o tempo.",
-  // ---- Cabeçalhos do CSV ----
-  // São NOMES DE COLUNA, não frase: minúsculas, sem acento e com underscore, pra
-  // aguentar fórmula de planilha e import de script sem aspas em volta.
+  // CSV headers use lowercase ASCII with underscores for stable spreadsheet imports.
   "reports.csv.history.avgAudience": "media_audiencia",
   "reports.csv.history.bits": "bits",
   "reports.csv.history.chatMessages": "mensagens_chat",
@@ -1551,8 +1512,7 @@ export const pt = {
   "reports.download.json.label": "Dados (JSON)",
   "reports.download.modal.name": "Baixar relatório",
   "reports.download.saved": "Salvei o relatório.",
-  // Nomes de arquivo: sem acento, sem espaço e sem barra — vão pro disco, e a data
-  // ISO entra depois no código (ordena sozinha no explorador, não muda com o idioma).
+  // Filename stems exclude accents, spaces and path separators; exporters append an ISO date.
   "reports.file.history": "corneta-historico",
   "reports.file.live": "corneta-live",
   "reports.file.seriesSuffix": "-serie",
@@ -1650,8 +1610,6 @@ export const pt = {
   "reports.recap.stat.peakViewers": "pico de audiência",
   "reports.recap.stat.raids": "raids",
   "reports.recap.stat.subs": "inscrições",
-  // O pôster desenha este título em caixa alta (recap.ts); aqui ele fica como se
-  // fala, porque CAPS na string é ênfase à mão (§6).
   "reports.recap.title": "Live de {date}",
   "reports.row.chat.title": "Mensagens no chat",
   "reports.row.clean": "limpa",
@@ -1661,8 +1619,6 @@ export const pt = {
     "Esta live tem gravação — dá pra assistir junto com os gráficos",
   "reports.row.onAir": "{dur} no ar",
   "reports.row.peakViewers.title": "Pico de audiência",
-  // Variantes .one/.other: quem monta é o tp(). Zero tem frase própria
-  // (reports.row.clean), então aqui a contagem sempre começa em 1.
   "reports.row.problems.one": "1 perrengue",
   "reports.row.problems.other": "{count} perrengues",
   "reports.row.problems.title": "Trechos com problema — abra pra ver",
@@ -1766,7 +1722,6 @@ export const pt = {
   "reports.windows.note": "Copie o tempo do trecho e ache ele no VOD.",
   "reports.windows.title": "Pontos técnicos para revisar",
 
-  // ---- settings ----
   "settings.language.title": "Idioma",
   "settings.language.desc":
     "Em automático, a Corneta segue o idioma do Windows. A troca vale na hora, sem reiniciar.",
@@ -1832,8 +1787,6 @@ export const pt = {
     "Etapas e resultados em categorias, sem texto ou conteúdo da live.",
   "settings.guardian.cost.chat":
     "O chat e a interação chegam até você com esse mesmo atraso.",
-  // Os {buracos} destas três viram negrito: são o preço da proteção, e é o que a
-  // pessoa precisa ler mesmo passando o olho.
   "settings.guardian.cost.delay": "A transmissão fica {delay} do tempo real.",
   "settings.guardian.cost.delay.value": "12s atrás",
   "settings.guardian.cost.intro":
@@ -1850,7 +1803,6 @@ export const pt = {
   "settings.guardian.list.label": "Termos a vigiar",
   "settings.guardian.list.placeholder":
     "meu@email.com\nRua das Flores, 42\nMeu Nome Real",
-  // Variantes .one/.other: quem monta é o tp(), com {count} = nº de termos.
   "settings.guardian.list.watching.one": "Vigiando 1 termo.",
   "settings.guardian.list.watching.other": "Vigiando {count} termos.",
   "settings.guardian.list.watchingManyShort.one":
@@ -1861,10 +1813,7 @@ export const pt = {
     "Vigiando 1 termo — 1 ignorado por ser curto demais (mínimo 3 letras): {terms}.",
   "settings.guardian.list.watchingOneShort.other":
     "Vigiando {count} termos — 1 ignorado por ser curto demais (mínimo 3 letras): {terms}.",
-  // ---- Barra lateral ----
-  // Os rótulos são o NOME DAS TELAS: têm que bater com o título de cada uma
-  // (platforms.title, encoding.header.title, …) e com toda frase que manda a
-  // pessoa "lá em Plataformas". Mudou um, muda os dois.
+  // Navigation labels must match screen titles and cross-screen references.
   "sidebar.about": "Sobre",
   "sidebar.live.title": "Ver o painel ao vivo",
   "sidebar.nav.chat.hint": "todo chat num lugar",
@@ -1931,8 +1880,6 @@ export const pt = {
   "settings.obs.advanced.field.port": "Porta",
   "settings.obs.advanced.port.invalid": "A porta vai de 1 a 65535.",
   "settings.obs.advanced.trigger": "Avançado — mudar o endereço local",
-  // {button} = nome do botão; {path} = caminho de menu do OBS. Os dois em negrito:
-  // são justamente as duas coisas que a pessoa vai PROCURAR na tela.
   "settings.obs.autoconfig.desc":
     "Pro botão {button} (na tela Ao vivo) funcionar, ative no OBS: {path}. Se tiver senha, cole aqui.",
   "settings.obs.autoconfig.desc.button": "“Configura pra mim”",
@@ -1943,8 +1890,7 @@ export const pt = {
     "No BORA AO VIVO, a Corneta também manda o OBS começar a transmitir.",
   "settings.obs.autostart.title": "Ligar o OBS junto",
   "settings.obs.autostart.toggle": "Ligar o OBS junto",
-  // {key} = a palavra "chave", em negrito: é ela que separa esta chave (interna,
-  // OBS↔Corneta) da chave da plataforma — trocar as duas é erro caro.
+  // Distinguish the local OBS-to-Corneta key from the platform stream key.
   "settings.obs.ingest.desc":
     "Endereço local onde o OBS te entrega o vídeo. A {key} abaixo é só entre OBS e Corneta — não é a chave da plataforma, que fica no cofre.",
   "settings.obs.ingest.desc.key": "chave",
@@ -2048,8 +1994,6 @@ export const pt = {
   "settings.toast.import.ok":
     "Config importada — guardei a anterior num backup.",
 
-  // ---- shell (janela principal) ----
-  // aria-label + title do X da barra de título quando fechar esconde a Corneta perto do relógio.
   "shell.win.closeTray": "Fechar — a Corneta fica perto do relógio",
 } as const;
 

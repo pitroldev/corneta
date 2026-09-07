@@ -1,7 +1,4 @@
-//! Adaptador de entrada da Cinefy: REST para canal/histórico e Pusher para tempo real.
-//!
-//! A Cinefy não publica esse contrato. Por isso tudo que pode mudar sem aviso fica
-//! confinado neste arquivo e chega ao núcleo por [`OutputPort`].
+//! Cinefy's undocumented REST and Pusher contracts are isolated behind OutputPort.
 
 use super::domain::{Badge, ChatMessage, ConnectionStatus, Event};
 use super::ports::OutputPort;
@@ -38,8 +35,7 @@ impl Default for RuntimeConfig {
     }
 }
 
-/// Resolve as constantes usadas pelo próprio frontend. O fallback mantém a conexão
-/// funcional se esse endpoint auxiliar estiver temporariamente indisponível.
+/// Reuse the web client's runtime constants, with fallbacks for auxiliary-endpoint outages.
 fn runtime_config() -> RuntimeConfig {
     ureq::get(CONSTANTS_URL)
         .timeout(Duration::from_secs(6))
@@ -61,7 +57,7 @@ fn decode_runtime_config(body: &str) -> Option<RuntimeConfig> {
         api_url: v
             .get("apiUrl")
             .and_then(Value::as_str)
-            // Não deixa configuração remota transformar o cliente num fetcher arbitrário.
+            // Remote configuration must not turn this client into an arbitrary-origin fetcher.
             .filter(|s| s.trim_end_matches('/') == FALLBACK_API_URL)
             .unwrap_or(FALLBACK_API_URL)
             .trim_end_matches('/')
@@ -269,8 +265,6 @@ fn parse_event(raw: &str) -> Option<Event> {
     }
 }
 
-/// Executa uma tentativa completa. Toda saída cruza a porta; nenhuma dependência de UI
-/// ou de Tauri entra neste adaptador.
 pub(crate) fn run(input: &str, running: Arc<AtomicBool>, sink: &dyn OutputPort) -> bool {
     let Some(slug) = normalize_slug(input) else {
         sink.status(ConnectionStatus::Error);
@@ -278,7 +272,7 @@ pub(crate) fn run(input: &str, running: Arc<AtomicBool>, sink: &dyn OutputPort) 
     };
     let config = runtime_config();
     let Some(channel_id) = resolve_channel_id(&config.api_url, &slug) else {
-        log::warn!("cinefy chat: canal não resolvido para {slug}");
+        log::warn!("cinefy chat: could not resolve channel {slug}");
         sink.status(ConnectionStatus::Error);
         return false;
     };
@@ -289,7 +283,7 @@ pub(crate) fn run(input: &str, running: Arc<AtomicBool>, sink: &dyn OutputPort) 
     let mut socket = match tungstenite::connect(websocket_url.as_str()) {
         Ok((socket, _)) => socket,
         Err(error) => {
-            log::warn!("cinefy chat: conexão Pusher falhou: {error}");
+            log::warn!("cinefy chat: Pusher connection failed: {error}");
             sink.status(ConnectionStatus::Error);
             return false;
         }
@@ -317,9 +311,7 @@ pub(crate) fn run(input: &str, running: Arc<AtomicBool>, sink: &dyn OutputPort) 
 
     let mut seen = HashSet::new();
 
-    // O TCP aberto não basta: só declaramos a fonte conectada depois que o Pusher
-    // confirma a assinatura do canal correto. Uma chave expirada, por exemplo, pode
-    // aceitar o handshake e devolver `pusher:error` sem fechar o socket imediatamente.
+    // TCP/WebSocket acceptance is not channel authorization; wait for the expected subscription ack.
     let subscribe_deadline = Instant::now() + Duration::from_secs(8);
     let mut subscribed = false;
     while running.load(Ordering::Relaxed) && Instant::now() < subscribe_deadline {
@@ -423,13 +415,13 @@ mod tests {
     }
 
     #[test]
-    fn decodifica_constantes_e_rejeita_origens_ou_identificadores_inseguros() {
+    fn runtime_constants_reject_unsafe_origins_and_identifiers() {
         let config = decode_runtime_config(&constants_body(json!({
             "apiUrl": "https://api.cinefy.gg/",
             "pusherKey": "novaChave123",
             "pusherCluster": "sa1"
         })))
-        .expect("constantes válidas");
+        .expect("valid runtime constants");
         assert_eq!(config.api_url, FALLBACK_API_URL);
         assert_eq!(config.pusher_key, "novaChave123");
         assert_eq!(config.pusher_cluster, "sa1");
@@ -439,7 +431,7 @@ mod tests {
             "pusherKey": "chave/com/barra",
             "pusherCluster": "sa1.example.com"
         })))
-        .expect("json/base64 continuam válidos");
+        .expect("JSON and Base64 remain valid");
         assert_eq!(guarded.api_url, FALLBACK_API_URL);
         assert_eq!(guarded.pusher_key, FALLBACK_PUSHER_KEY);
         assert_eq!(guarded.pusher_cluster, FALLBACK_PUSHER_CLUSTER);
@@ -447,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn normaliza_slug_e_url_de_popout() {
+    fn normalizes_slugs_and_popout_urls() {
         assert_eq!(normalize_slug("@Kett"), Some("kett".into()));
         assert_eq!(
             normalize_slug("https://cinefy.gg/popout/kett/chat?type=overlay"),
@@ -458,8 +450,8 @@ mod tests {
     }
 
     #[test]
-    fn converte_thread_no_dominio_sem_vazar_o_json() {
-        let message = parse_thread(&thread()).expect("thread válida");
+    fn thread_parsing_exposes_only_domain_fields() {
+        let message = parse_thread(&thread()).expect("valid thread");
         assert_eq!(message.native_id, "PmiEPpZwe9LdM");
         assert_eq!(message.author, "Kett");
         assert_eq!(message.text, "galera");
@@ -469,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn converte_eventos_pusher_com_data_string_ou_objeto() {
+    fn pusher_events_accept_string_or_object_data() {
         let created = json!({
             "event": "ThreadCreated",
             "data": thread().to_string()
@@ -489,8 +481,7 @@ mod tests {
             })
         );
 
-        // O cliente web remove uma thread falha pelo `id`; é um payload diferente
-        // do `threadId` usado por ThreadDeleted.
+        // ThreadFailure uses id, unlike ThreadDeleted's threadId.
         let failed = json!({
             "event": "ThreadFailure",
             "data": { "id": "PmiEPpZwe9LdM" }
@@ -504,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn so_confirma_a_assinatura_do_canal_esperado() {
+    fn subscription_ack_must_match_the_expected_channel() {
         let expected = "chatroom.53660e03-ebc3-4888-879d-058c5b876ef2";
         let ok = json!({
             "event": "pusher_internal:subscription_succeeded",
@@ -517,7 +508,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_rejeita_entrada_hostil_sem_panico() {
+    fn parser_rejects_hostile_input_without_panicking() {
         for raw in [
             "",
             "[]",

@@ -1,11 +1,4 @@
-//! Lado do OCR do guardião de privacidade.
-//!
-//! A bomba de quadros (delay REAL + slate preventivo) mora no `compositor` — o guardião é o
-//! MESMO feed de programa, com `delay_frames > 0` e esta thread de OCR pendurada. O compositor
-//! oferece o quadro mais novo em `Shared::scan_slot`; esta thread lê o texto, casa a watchlist
-//! e marca por ÍNDICE de quadro em `Shared::timeline` (`domain::Timeline`); quando ESSE quadro
-//! sai (N s depois), o compositor já sabe se dá slate → preventivo. O atraso do OCR fica
-//! escondido pelo buffer, e o diff pula quadros que não mudaram (barato em tela estática).
+//! OCR results use compositor frame indices so delayed output retains the matching privacy verdict.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -17,26 +10,21 @@ use super::domain::{self, Timeline};
 use super::ocr::build_ocr;
 use super::{GuardianStatus, Ocr};
 
-// Diff (pra pular OCR): resolução pequena + limiares. Sensível de propósito (erra pra MAIS OCR) —
-// pega até um termo curto aparecendo, pra não depender da rede de segurança.
+// Sensitive thresholds favor extra scans over missing a short term.
 const DIFF_W: usize = 640;
-const DIFF_PIX: u8 = 18; // ignora ruído de compressão
-const DIFF_FRAC: f32 = 0.0008; // ~0,08% dos pixels mudou → re-OCR
-const THROTTLE_MS: u64 = 100; // teto da taxa de diff (o buffer absorve de sobra)
-                              // Rede de segurança: força um OCR cheio se passou TANTO sem OCR (pega mudança que o diff perdeu).
-                              // Por tempo de PAREDE (não por nº de pulos) pra ser previsível. < delay → preventivo.
+const DIFF_PIX: u8 = 18; // Ignore compression noise.
+const DIFF_FRAC: f32 = 0.0008;
+const THROTTLE_MS: u64 = 100;
+// A wall-clock rescan deadline catches changes below the diff threshold.
 const FORCE_MS: u64 = 1200;
 const SLOW_WARN_MS: u128 = 1500;
 
-/// Estado compartilhado entre a thread de OCR e a bomba do compositor. Locks curtos e NUNCA
-/// aninhados.
+// Keep these locks short and never nest them.
 pub(crate) struct Shared {
-    /// O quadro mais novo oferecido pro OCR (índice + plano Y). O worker dá `take()` quando livre.
     scan_slot: Mutex<Option<(u64, Vec<u8>)>>,
     scan_ready: Condvar,
-    /// Um único buffer reciclado evita alocar ~2 MiB a cada amostra em 1080p.
+    // Recycle one buffer rather than allocate roughly 2 MiB per 1080p scan.
     scan_pool: Mutex<Option<Vec<u8>>>,
-    /// Linha do tempo binária "tinha segredo no quadro X?".
     pub(crate) timeline: Mutex<Timeline>,
     failed: AtomicBool,
     status: AtomicU8,
@@ -107,8 +95,7 @@ impl Shared {
     }
 
     pub(crate) fn offer_scan(&self, idx: u64, gray: &[u8]) {
-        // Há um único produtor (o compositor). Verificar antes de copiar poupa trabalho quando o
-        // OCR ainda está ocupado; o segundo teste mantém a operação robusta caso isso mude.
+        // Avoid copying while the worker is busy; recheck after copying before publishing.
         if self.scan_slot.lock().unwrap().is_some() {
             return;
         }
@@ -146,8 +133,6 @@ impl Shared {
     }
 }
 
-/// Constrói o OCR (cache-aware; o download do modelo fica no fundo) e sobe a thread do worker.
-/// `w`/`h` = dimensões do plano Y que o compositor oferece no `scan_slot`.
 pub(crate) fn spawn_ocr(
     app: AppHandle,
     running: Arc<AtomicBool>,
@@ -175,15 +160,12 @@ pub(crate) fn spawn_ocr(
         if result.is_err() {
             shared.mark_failed();
             shared.publish_status(&app, &running, GuardianStatus::Unavailable);
-            log::error!(
-                "guardião/OCR: worker indisponível; imagens não verificadas serão cobertas"
-            );
+            log::error!("guardian/OCR: worker unavailable; unverified images will remain covered");
         }
     });
 }
 
-/// Encolhe o plano Y para o diff sem copiar o quadro inteiro para um `GrayImage`. A média da
-/// célula visita cada pixel de origem uma vez e não perde traços finos entre pontos de amostragem.
+// Average source cells without a full-frame copy or gaps that could miss thin text strokes.
 fn diff_small_into(gray: &[u8], w: usize, h: usize, out: &mut Vec<u8>) {
     if w == 0 || h == 0 || gray.len() < w.saturating_mul(h) {
         out.clear();
@@ -215,13 +197,7 @@ fn diff_small_into(gray: &[u8], w: usize, h: usize, out: &mut Vec<u8>) {
     }
 }
 
-/// Thread de OCR: pega o quadro oferecido, PULA se a tela não mudou (diff), senão lê o texto, casa
-/// a watchlist e marca por índice. Avisa (toast) quando um termo NOVO aparece.
-///
-/// CRÍTICO: só grava na Timeline quando REALMENTE faz OCR. Gravar `false` nos pulos punha uma
-/// amostra falsa BEM perto do quadro que airava e MASCARAVA a detecção verdadeira (mais longe) →
-/// o termo vazava por um instante. Sem gravar nos pulos, o bracket pega a detecção real (vizinha
-/// ≤ ou >), mesmo que distante.
+// Only real OCR results may enter the timeline; marking skipped scans clean hides nearby detections.
 #[allow(clippy::too_many_arguments)]
 fn ocr_worker(
     app: AppHandle,
@@ -232,7 +208,7 @@ fn ocr_worker(
     w: usize,
     h: usize,
 ) {
-    log::info!("guardião/OCR: {}", ocr.name());
+    log::info!("guardian/OCR: {}", ocr.name());
     if ocr.read_text(&vec![16u8; w * h], w, h).is_err() {
         shared.mark_failed();
         shared.publish_status(&app, &running, GuardianStatus::Unavailable);
@@ -257,13 +233,11 @@ fn ocr_worker(
             continue;
         }
         diff_small_into(&gray, w, h, &mut small);
-        // Faz OCR se a tela MUDOU OU se faz tempo demais sem OCR (rede de segurança por tempo).
         let force = last_failure.is_some() || last_ocr.elapsed() >= Duration::from_millis(FORCE_MS);
         let changed = force || domain::frames_differ(&last_small, &small, DIFF_PIX, DIFF_FRAC);
         std::mem::swap(&mut last_small, &mut small);
         if !changed {
             shared.recycle_scan(gray);
-            // Tela igual → NÃO grava nada (não mascara a detecção real). Só descansa.
             let spent = iter.elapsed();
             if spent < Duration::from_millis(THROTTLE_MS) {
                 std::thread::sleep(Duration::from_millis(THROTTLE_MS) - spent);
@@ -278,7 +252,7 @@ fn ocr_worker(
             }
             Err(error) => {
                 if last_failure.is_none() {
-                    log::warn!("guardião/OCR: leitura indisponível ({error:?})");
+                    log::warn!("guardian/OCR: recognition unavailable ({error:?})");
                 }
                 last_failure = Some(Instant::now());
                 shared.mark_failed();
@@ -292,15 +266,15 @@ fn ocr_worker(
         last_ocr = Instant::now();
         if t.elapsed().as_millis() > SLOW_WARN_MS {
             log::warn!(
-                "guardião/OCR: scan lento ({} ms) — tela muito cheia? o slate pode atrasar",
+                "guardian/OCR: slow scan ({} ms); cover output may lag",
                 t.elapsed().as_millis()
             );
         }
-        // Diagnóstico sem conteúdo: texto reconhecido pode conter senhas, documentos e endereços.
+        // Recognized text may contain secrets or personal data; log counts only.
         if last_diag.elapsed() >= Duration::from_secs(4) {
             last_diag = Instant::now();
             log::debug!(
-                "guardião/OCR diag: match={secret} chars={} matches={}",
+                "guardian/OCR diag: match={secret} chars={} matches={}",
                 text.chars().count(),
                 leaks.len()
             );

@@ -1,7 +1,5 @@
-// Peças de marca da Corneta — as MESMAS do app (src/components/decor.tsx e
-// src/lib/platforms.ts). Se o desenho mudar lá, muda aqui.
+// Keep shared brand geometry aligned with src/components/decor.tsx.
 
-/** Mascote: o megafone. Herda a cor via currentColor. */
 export function Mascot({ className }: { className?: string }) {
   return (
     <svg
@@ -35,7 +33,6 @@ export function Mascot({ className }: { className?: string }) {
   );
 }
 
-/** Ondas sonoras concêntricas abrindo para a direita (decoração de seção). */
 export function SoundWaves({
   className,
   count = 5,
@@ -74,8 +71,7 @@ export function SoundWaves({
   );
 }
 
-// ---------------- Plataformas ----------------
-// Logos oficiais (simple-icons, CC0) e as mesmas cores do catálogo do app.
+// Platform logos from Simple Icons (CC0); colors match the desktop catalog.
 
 type PlatformId =
   | "twitch"
@@ -113,16 +109,8 @@ const COLORS: Record<PlatformId, string> = {
   custom: "#8b93a7",
 };
 
-// Tinta legível sobre a cor da marca — mesma regra do readableOn() do app.
 const DARK_INK = new Set<PlatformId>(["kick", "tiktok", "custom"]);
 
-/** Chip quadrado com o logo oficial da plataforma (app: PlatformGlyph). */
-// O tamanho NÃO vem daqui de propósito: cada contexto define o seu. O que é
-// fixo é o quadrado com canto seco, sombra dura e o SVG a 56% — o mesmo do app.
-//
-// O `glyph` solto no fim é um MARCADOR, não estilo: regras de pai ainda não
-// migradas (`.route-row .glyph`, `.chat-line .glyph`) dimensionam por ele. Sai
-// quando esses pais virarem utilitário.
 const GLYPH =
   "grid place-items-center rounded-sm shadow-pop-sm [&>svg]:h-[56%] [&>svg]:w-[56%] [&>svg]:fill-current glyph";
 
@@ -153,7 +141,7 @@ export function PlatformGlyph({
   );
 }
 
-/** Logo do OBS (simple-icons) para a fonte do sinal. */
+// OBS logo from Simple Icons (CC0).
 export function ObsMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">

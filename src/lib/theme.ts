@@ -1,8 +1,3 @@
-// Troca de tema (light/dark) com a cara da Corneta: a corneta SOPRA o tema novo — um
-// sopro de latão + ondas sonoras (megafone!) saindo do ponto onde você clicou, e o tema
-// vira no meio do sopro. Sem clique ainda, no 1º load, ou com "menos movimento": troca
-// na hora, sem firula. A animação das ondas vive em src/index.css (.theme-blast).
-
 let pointer = { x: 0, y: 0 };
 let pointerSeen = false;
 
@@ -24,7 +19,6 @@ function reducedMotion(): boolean {
   );
 }
 
-/** Aplica o tema no documento. `animate` liga o sopro (deixe `false` no 1º load). */
 export function applyTheme(theme: "dark" | "light", animate: boolean): void {
   const root = document.documentElement;
   const set = () => {
@@ -37,8 +31,7 @@ export function applyTheme(theme: "dark" | "light", animate: boolean): void {
     return;
   }
 
-  // As cores DERRETEM pro tema novo durante o sopro (em vez de pular seco). A classe
-  // liga as transições; o reflow fixa a base antes de virar o data-theme.
+  // Force layout before changing data-theme so color transitions start from the previous theme.
   root.classList.add("theme-anim");
   void root.offsetWidth;
 
@@ -58,7 +51,6 @@ export function applyTheme(theme: "dark" | "light", animate: boolean): void {
   }
 
   document.body.appendChild(blast);
-  // Vira o tema logo no início do sopro; as cores transicionam suave (ver index.css).
   window.setTimeout(set, 120);
   window.setTimeout(() => root.classList.remove("theme-anim"), 700);
   window.setTimeout(() => blast.remove(), 900);

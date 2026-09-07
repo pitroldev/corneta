@@ -1,8 +1,7 @@
 import { createReportTaskRunner, type ReportTask } from "./reportTasks";
 const runReportTask = createReportTaskRunner();
 
-// Keep request order, including async dictionary/export imports. No resident
-// session cache: results become owned by the UI and inputs can be collected.
+// Preserve request order across async imports; release inputs after transferring ownership to the UI.
 let queue = Promise.resolve();
 self.onmessage = (event: MessageEvent<{ id: number; task: ReportTask }>) => {
   queue = queue.then(async () => {

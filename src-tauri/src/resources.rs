@@ -1,9 +1,4 @@
-//! Amostragem leve de recursos para explicar incidentes pós-live.
-//!
-//! O caminho quente continua enxuto: CPU/memória globais a cada amostra, processos
-//! a cada ~6 s (temporariamente ~2 s sob pressão) e somente os três aplicativos mais
-//! relevantes persistidos. No Windows, a GPU usa uma consulta PDH persistente — sem
-//! abrir `nvidia-smi` a cada dois segundos.
+//! Sparse process sampling and persistent GPU counters keep reporting overhead bounded.
 
 use std::collections::HashMap;
 
@@ -20,11 +15,10 @@ const MIN_RELEVANT_MEMORY_MB: f64 = 512.0;
 #[derive(Clone, Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceAppSample {
-    /// Identificador normalizado e estável dentro da sessão; nunca é caminho de arquivo.
+    /// Session-stable normalized identifier, never a file path.
     pub app_ref: String,
-    /// Nome curto do executável ou grupo amigável (OBS/Corneta).
     pub name: String,
-    /// Percentual do computador inteiro (0..100), não "100% por núcleo".
+    /// Percentage of the whole machine, not per-core utilization.
     pub cpu: f64,
     pub memory_mb: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,7 +31,7 @@ pub struct ResourceUsage {
     pub cpu: f64,
     pub gpu: Option<f64>,
     pub memory_pct: Option<f64>,
-    /// Vazio nas amostras intermediárias para manter o NDJSON pequeno.
+    /// Empty between detailed samples to limit journal overhead.
     pub apps: Vec<ResourceAppSample>,
 }
 
@@ -73,8 +67,7 @@ impl ResourceSampler {
         }
     }
 
-    /// Deve ser chamado depois de `MINIMUM_CPU_UPDATE_INTERVAL`, para que o delta de
-    /// CPU global e por processo represente uma janela real.
+    /// Wait at least MINIMUM_CPU_UPDATE_INTERVAL between samples for meaningful CPU deltas.
     pub fn sample(&mut self) -> ResourceUsage {
         self.system.refresh_cpu_usage();
         self.system.refresh_memory();
@@ -111,9 +104,7 @@ impl ResourceSampler {
                 memory_pct.unwrap_or_default(),
                 gpu_sample.as_ref(),
             );
-            // Sob pressão podemos olhar os processos a cada ~2 s para não perder a
-            // mudança que causou o atraso, mas só escrevemos quando o ranking muda
-            // materialmente ou chega o intervalo normal de ~6 s.
+            // During pressure bursts, persist only material ranking changes or the normal interval.
             if self.tick.is_multiple_of(NORMAL_PROCESS_EVERY_TICKS)
                 || materially_changed(&self.last_recorded_apps, &fresh)
             {
@@ -138,9 +129,7 @@ impl ResourceSampler {
     }
 }
 
-/// Abre uma janela curta ao ENTRAR em pressão. Não renova o burst a cada ciclo:
-/// jogos costumam ficar perto de 100% da GPU durante horas e varrer todos os processos
-/// a cada ~2 s nessa situação seria justamente competir com a live que observamos.
+/// Start one short burst on entering pressure; sustained GPU load must not trigger permanent fast scans.
 fn update_pressure_burst(was_under_pressure: &mut bool, ticks_left: &mut u8, under_pressure: bool) {
     if under_pressure && !*was_under_pressure {
         *ticks_left = PRESSURE_DETAIL_TICKS;
@@ -270,8 +259,7 @@ fn app_pressure_score(app: &ResourceAppSample, memory_is_tight: bool, total_memo
 }
 
 fn normalized_app_name(raw: &str) -> Option<(String, String)> {
-    // `sysinfo` normalmente entrega só o executável, mas preservar apenas o basename
-    // também evita vazar partes de um caminho se uma plataforma retornar algo diferente.
+    // Keep only the basename even if a platform unexpectedly supplies a full path.
     let basename = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
     let clean: String = basename
         .chars()
@@ -353,12 +341,12 @@ impl WindowsGpuSampler {
         };
 
         let mut query = PDH_HQUERY::default();
-        // SAFETY: os handles de saída são válidos e a string é NUL-terminated pelo macro `w!`.
+        // SAFETY: Output handles are valid writable storage; w! produces a NUL-terminated string.
         if unsafe { PdhOpenQueryW(None, 0, &mut query) } != 0 {
             return None;
         }
         let mut counter = PDH_HCOUNTER::default();
-        // O contador inglês independe do idioma do Windows do streamer.
+        // English counter names are independent of the user's Windows language.
         let add_status = unsafe {
             PdhAddEnglishCounterW(
                 query,
@@ -373,7 +361,7 @@ impl WindowsGpuSampler {
             }
             return None;
         }
-        // Primeira coleta estabelece a base; a próxima já traz o delta.
+        // Prime counters before requesting their first delta.
         unsafe {
             PdhCollectQueryData(query);
         }
@@ -399,8 +387,7 @@ impl WindowsGpuSampler {
             return None;
         }
 
-        // `Vec<MaybeUninit<Item>>` garante o alinhamento do struct e reserva também o
-        // espaço extra das strings, cujo tamanho veio do próprio PDH em bytes.
+        // Aligned storage includes the extra string bytes reported by PDH.
         let slots = (bytes as usize).div_ceil(size_of::<PDH_FMT_COUNTERVALUE_ITEM_W>());
         let mut buffer = vec![MaybeUninit::<PDH_FMT_COUNTERVALUE_ITEM_W>::uninit(); slots];
         let status = unsafe {
@@ -501,8 +488,7 @@ fn parse_gpu_instance(instance: &str) -> Option<(u32, GpuEngine)> {
 
 #[cfg(windows)]
 unsafe fn wide_ptr_to_string(ptr: *const u16, max_len: usize) -> String {
-    // Nomes de instância do PDH são curtos. `max_len` termina no fim do buffer que
-    // nós mesmos alocamos, evitando seguir um ponteiro/terminador malformado.
+    // max_len is bounded by our allocation, even if a counter name lacks a terminator.
     let mut len = 0usize;
     while len < max_len && unsafe { *ptr.add(len) } != 0 {
         len += 1;
@@ -515,7 +501,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn esconde_implementacao_e_preserva_nome_util() {
+    fn app_names_hide_implementation_details_and_preserve_useful_labels() {
         assert_eq!(
             normalized_app_name("ffmpeg.exe"),
             Some(("corneta".into(), "Corneta".into()))
@@ -536,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    fn amostrador_limita_e_normaliza_a_saida() {
+    fn sampler_bounds_and_normalizes_output() {
         let mut sampler = ResourceSampler::new();
         std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
         let usage = sampler.sample();
@@ -560,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn so_persiste_ranking_quando_muda_de_verdade() {
+    fn rankings_are_persisted_only_after_material_changes() {
         let app = |cpu: f64, gpu: f64| ResourceAppSample {
             app_ref: "jogo".into(),
             name: "Jogo".into(),
@@ -575,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn pressao_continua_nao_transforma_o_burst_em_varredura_permanente() {
+    fn sustained_pressure_does_not_extend_the_sampling_burst() {
         let mut was_under_pressure = false;
         let mut ticks_left = 0;
         update_pressure_burst(&mut was_under_pressure, &mut ticks_left, true);
@@ -592,7 +578,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn entende_pid_e_tipo_do_contador_de_gpu() {
+    fn gpu_counter_instance_identifies_process_and_engine() {
         let parsed = parse_gpu_instance("pid_1788_luid_0x00000000_eng_0_engtype_3D");
         assert!(matches!(parsed, Some((1788, GpuEngine::ThreeD))));
         let parsed = parse_gpu_instance("pid_42_luid_0x0_eng_4_engtype_VideoEncode");

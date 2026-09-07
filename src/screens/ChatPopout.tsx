@@ -35,27 +35,23 @@ import { Slider } from "../components/Slider";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { AlertsFeed } from "../components/AlertsFeed";
 
-// Layout do modo "Ambos" — classes literais (Tailwind precisa vê-las no código).
-// "auto" só vira lado a lado a partir de ~820px de largura da janela.
+// Keep Tailwind classes literal so the compiler discovers both layouts.
 const BOTH_DIR: Record<string, string> = {
   auto: "flex-col min-[820px]:flex-row",
   row: "flex-row",
   col: "flex-col",
 };
-// Barra do divisor: horizontal (empilhado) vs vertical (lado a lado), com cursor.
 const DIVIDER_CLS: Record<string, string> = {
   auto: "h-1.5 w-full cursor-row-resize min-[820px]:h-auto min-[820px]:w-1.5 min-[820px]:cursor-col-resize",
   row: "w-1.5 cursor-col-resize",
   col: "h-1.5 w-full cursor-row-resize",
 };
-// Os `value` são o chatBothLayout gravado na config — só o rótulo é texto de tela.
 const layoutOpts = (t: Translate) => [
   { value: "auto", label: t("chat.popout.bothLayout.auto") },
   { value: "row", label: t("chat.popout.bothLayout.row") },
   { value: "col", label: t("chat.popout.bothLayout.col") },
 ];
 
-/** Versão compacta do chat para a janela flutuante (always-on-top). */
 export function ChatPopout() {
   const { t, fmt } = useI18n();
   const config = useStore((s) => s.config);
@@ -91,7 +87,6 @@ export function ChatPopout() {
   const [sending, setSending] = useState(false);
   const [sendTo, setSendTo] = useState("all");
 
-  // Setup próprio do popout (sem o motor/atalhos do app): config + chat + alertas + viewers.
   useEffect(() => {
     void load(t);
     void setupOauth();
@@ -126,8 +121,7 @@ export function ChatPopout() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
-  // Estado maximizado da janela: sincroniza no mount e a cada resize (o usuário pode
-  // maximizar arrastando pra borda, não só pelo botão).
+  // Window-edge gestures can maximize without using our button; resync on resize.
   useEffect(() => {
     if (!IS_TAURI) return;
     let alive = true;
@@ -142,7 +136,7 @@ export function ChatPopout() {
         await sync();
         unlisten = await w.onResized(() => void sync());
       } catch {
-        /* fora do Tauri */
+        /* Window APIs are unavailable outside Tauri. */
       }
     })();
     return () => {
@@ -150,8 +144,7 @@ export function ChatPopout() {
       unlisten?.();
     };
   }, []);
-  // Mesmo corte do `min-[820px]:` do layout "auto": decide se o divisor está em pé
-  // (lado a lado) ou deitado (empilhado) pro aria-orientation e pras setas.
+  // Keep separator orientation aligned with the 820 px auto-layout breakpoint.
   const [wide, setWide] = useState(
     () =>
       typeof window.matchMedia === "function" &&
@@ -186,19 +179,15 @@ export function ChatPopout() {
   );
   const bothLayout = st?.chatBothLayout ?? "auto";
   const alertsFirst = st?.chatBothAlertsFirst ?? false;
-  // Canais se configuram na janela principal — aqui só dá pra ligar se já houver.
-  // Fonte de alerta com token também conta (mesmo critério da ChatScreen): quem só tem
-  // Streamlabs/StreamElements consegue conectar os alertas por aqui.
   const configured =
     (st?.chatSources ?? []).some((x) => x.enabled && x.value.trim()) ||
     (st?.alertSources ?? []).some((x) => x.enabled && x.hasToken);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Posição do divisor (local pra arrastar suave; persiste no fim do drag).
+  // Keep drag state local and persist only on release.
   const [split, setSplit] = useState(35);
   useEffect(() => {
     if (st?.chatBothSplit != null) setSplit(st.chatBothSplit);
   }, [st?.chatBothSplit]);
-  // Última aba escolhida persiste (default "both" — ordem Ambos→Chat→Alertas é decisão de produto).
   useEffect(() => {
     if (st?.chatPopoutTab) setTab(st.chatPopoutTab);
   }, [st?.chatPopoutTab]);
@@ -228,14 +217,11 @@ export function ChatPopout() {
       setMaximized(await w.isMaximized());
     });
 
-  // Troca de aba: aplica na hora e persiste (a janelinha reabre onde o streamer deixou).
   const pickTab = (next: "chat" | "alerts" | "both") => {
     setTab(next);
     setSettings({ chatPopoutTab: next });
   };
 
-  // Canais só se configuram na janela principal — este botão leva até ela em vez
-  // de mandar a pessoa procurar. Fora do Tauri não há janela: falha em silêncio.
   const focusMain = async () => {
     try {
       const main = await WebviewWindow.getByLabel("main");
@@ -243,10 +229,9 @@ export function ChatPopout() {
       if (await main.isMinimized()) await main.unminimize();
       await main.setFocus();
     } catch {
-      /* fora do Tauri */
+      /* Window APIs are unavailable outside Tauri. */
     }
   };
-  // Mesma resposta da tela principal quando o Conectar falha.
   const doConnect = async () => {
     try {
       await connectChat(t);
@@ -255,8 +240,6 @@ export function ChatPopout() {
     }
   };
 
-  // Divisor pelo teclado: a seta move o divisor na direção dela; o painel de
-  // alertas cresce ou encolhe conforme o lado em que ele está (mesma conta do arraste).
   const isRow = bothLayout === "row" || (bothLayout === "auto" && wide);
   const nudgeSplit = (delta: number) => {
     const next = Math.max(15, Math.min(75, split + delta));
@@ -272,7 +255,6 @@ export function ChatPopout() {
     nudgeSplit((fwd ? 5 : -5) * (alertsFirst ? 1 : -1));
   };
 
-  // Envio pelo "modo janela": espelha a ChatScreen — fontes capazes conforme login/token.
   const sendSources = st?.chatSources ?? [];
   const twitchReady = chatLogin.twitch.state === "connected";
   const youtubeReady = chatLogin.youtube.state === "connected";
@@ -290,7 +272,7 @@ export function ChatPopout() {
     effectiveSendTo === "all"
       ? sendableSources
       : sendableSources.filter((x) => x.id === effectiveSendTo);
-  // Twitch só envia depois que o IRC autentica (chatAuth.ok); YouTube/Kick mandam via HTTP.
+  // Twitch requires IRC authentication before sending; YouTube and Kick send over HTTP.
   const canSend = sendTargets.some((x) =>
     x.platform === "youtube"
       ? youtubeReady
@@ -298,7 +280,6 @@ export function ChatPopout() {
         ? kickReady
         : !!chatAuth[x.id]?.ok,
   );
-  // Mesmo texto da tela principal — aqui vira title do Enviar desabilitado (espaço curto).
   const sendStatus = sendStatusLine(
     sendTargets,
     chatAuth,
@@ -322,7 +303,6 @@ export function ChatPopout() {
     }
   };
 
-  // Arraste do divisor: redimensiona o painel de alertas (% do container no eixo ativo).
   const onDividerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const container = containerRef.current;
@@ -351,7 +331,7 @@ export function ChatPopout() {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
-      setSettings({ chatBothSplit: latest }); // persiste só no fim
+      setSettings({ chatBothSplit: latest });
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -373,7 +353,6 @@ export function ChatPopout() {
         </span>
         <button
           onClick={() => {
-            // Registro das doações da live — misclick não pode apagar: confirma em 2 cliques.
             if (!confirmClearAlerts) {
               setConfirmClearAlerts(true);
               setTimeout(() => setConfirmClearAlerts(false), 3000);
@@ -387,8 +366,6 @@ export function ChatPopout() {
               ? t("chat.alerts.clear.confirmTitle")
               : t("chat.alerts.clear.title")
           }
-          // Com o "Limpar?" na tela, o texto é o nome do botão; o aria-label só
-          // cobre o estado em que sobra o ícone.
           aria-label={
             confirmClearAlerts ? undefined : t("chat.alerts.clear.title")
           }
@@ -439,8 +416,7 @@ export function ChatPopout() {
       }
     />
   );
-  // Separator focável é um widget na WAI-ARIA (valuenow/min/max + setas) — o
-  // jsx-a11y não conhece esse padrão e o trata como decoração.
+  // WAI-ARIA separators support keyboard interaction; jsx-a11y treats this widget as decorative.
   const divider = (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
@@ -465,7 +441,6 @@ export function ChatPopout() {
 
   return (
     <div className="flex h-screen flex-col border border-border-soft bg-panel">
-      {/* Titlebar custom (arrastável) + controles da janela */}
       <div
         data-tauri-drag-region
         className="flex h-8 shrink-0 items-center gap-2 border-b border-border-soft pl-2 select-none"
@@ -506,7 +481,6 @@ export function ChatPopout() {
         </div>
       </div>
 
-      {/* Toolbar: abas + viewers + conexão + limpar + config */}
       <div className="flex items-center gap-1.5 border-b-2 border-border-soft px-2 py-1.5">
         <div
           role="tablist"
@@ -565,7 +539,6 @@ export function ChatPopout() {
               <Wifi className="size-4" />
             </button>
           ) : (
-            // Sem canal, o ícone leva pra janela principal (onde se configura).
             <button
               onClick={() => void focusMain()}
               title={t("chat.popout.needSetup")}
@@ -586,7 +559,6 @@ export function ChatPopout() {
               if (tab === "alerts") clearAlerts();
               else clearChat();
             }}
-            // Em "Ambos" a lixeira limpa SÓ o chat (os alertas têm a própria, no painel).
             title={
               confirmClear
                 ? t("chat.alerts.clear.confirmTitle")
@@ -594,7 +566,6 @@ export function ChatPopout() {
                   ? t("chat.alerts.clear.title")
                   : t("chat.popout.clear.chat")
             }
-            // Confirmação em texto (não só cor); com o texto na tela ele é o nome do botão.
             aria-label={
               confirmClear
                 ? undefined
@@ -621,7 +592,6 @@ export function ChatPopout() {
         </div>
       </div>
 
-      {/* Painel de configuração da exibição */}
       {showConfig && (
         <div className="flex flex-col gap-3 border-b-2 border-border-soft bg-surface-2 px-2.5 py-2.5 text-xs">
           <div>
@@ -717,7 +687,6 @@ export function ChatPopout() {
         </div>
       )}
 
-      {/* Feed */}
       {tab === "both" ? (
         <div
           ref={containerRef}
@@ -740,7 +709,6 @@ export function ChatPopout() {
         />
       )}
 
-      {/* Barra de composição (modo janela): só com fonte enviável (login/token). */}
       {IS_TAURI && sendableSources.length > 0 && (
         <div className="flex shrink-0 items-center gap-1.5 border-t-2 border-border-soft px-2 py-1.5">
           {sendableSources.length > 1 && (

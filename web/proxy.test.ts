@@ -10,7 +10,7 @@ function request(path: string, acceptLanguage = "pt-BR") {
 }
 
 describe("site proxy", () => {
-  it("reescreve Ajuda e Guias em português para o locale interno", () => {
+  it("rewrites Portuguese Help and Guides routes to the internal locale", () => {
     for (const path of [
       "/help",
       "/help/obs",
@@ -31,7 +31,7 @@ describe("site proxy", () => {
     }
   });
 
-  it("redireciona a versão pt-BR interna para a URL pública com 308", () => {
+  it("redirects internal pt-BR routes to public URLs with 308", () => {
     for (const [internal, publicPath] of [
       ["/pt-BR/help", "/help"],
       ["/pt-BR/help/obs/first-live?from=old", "/help/obs/first-live?from=old"],
@@ -49,7 +49,7 @@ describe("site proxy", () => {
     }
   });
 
-  it("mantém inglês direto e negocia idioma somente na raiz", () => {
+  it("keeps English routes direct and negotiates language only at the root", () => {
     for (const path of [
       "/en/help",
       "/en/help/obs/first-live",
@@ -69,7 +69,7 @@ describe("site proxy", () => {
     expect(root.headers.get("location")).toBe("https://www.corneta.live/en");
   });
 
-  it("limita o matcher à raiz e aos aliases portugueses", () => {
+  it("limits the matcher to the root and Portuguese aliases", () => {
     expect(config.matcher).toEqual([
       "/",
       "/pt-BR",

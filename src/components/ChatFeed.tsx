@@ -20,11 +20,11 @@ export interface ChatView {
   platform: boolean;
   source: boolean;
   timestamps: boolean;
-  /** Tamanho da fonte do feed, em pixels. */
+  /** Feed font size in pixels. */
   fontSize: number;
 }
 
-/** Altura estimada de uma linha antes de ser medida, em pixels. */
+/** Estimated row height before measurement, in pixels. */
 const ROW_ESTIMATE = 28;
 
 const fmtTime = (ms: number) =>
@@ -33,8 +33,6 @@ const fmtTime = (ms: number) =>
     minute: "2-digit",
   });
 
-/** Feed rolável com auto-scroll (pausa ao rolar pra cima). Compartilhado pela
- *  tela de Chat e pela janela flutuante. */
 export function ChatFeed({
   messages,
   view,
@@ -53,22 +51,17 @@ export function ChatFeed({
   messages: ChatMessage[];
   view: ChatView;
   connected: boolean;
-  /** Há mensagens, mas o filtro escondeu todas (vazio diferente de "sem chat"). */
+  /** Messages exist, but the active filter hides them all. */
   allFilteredOut?: boolean;
   className?: string;
-  /** Cópia contextual para consumidores do mesmo feed, como o replay. */
   emptyTitle?: string;
   emptyBody?: string;
   "aria-label"?: string;
-  /** Texto do estado vazio desconectado (cada tela sabe o próximo passo real). */
   disconnectedHint?: string;
-  /** Ação do estado vazio desconectado (ex.: "Adicionar canal" / "Conectar"). */
   emptyAction?: ReactNode;
-  /** Ctrl+scroll redimensiona a fonte (8–44px). */
+  /** Ctrl+wheel adjusts font size within 8–44 px. */
   onFontSize?: (next: number) => void;
-  /** Moderação: nível de ação permitido por mensagem ("full" Twitch, "delete" YouTube). */
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
-  /** Moderação: ação numa mensagem (apagar/timeout/ban). */
   onModerate?: (m: ChatMessage, action: string) => void;
 }) {
   const t = useT();
@@ -81,8 +74,7 @@ export function ChatFeed({
   onFontSizeRef.current = onFontSize;
   modLevelRef.current = modLevel;
   onModerateRef.current = onModerate;
-  // Os pais derivam essas funções de estado e por isso recriam closures com frequência.
-  // Indireções estáveis preservam o memo das linhas sem capturar estado antigo.
+  // Stable indirections preserve memoized rows without capturing stale callbacks.
   const stableModLevel = useRef(
     (m: ChatMessage) => modLevelRef.current?.(m) ?? "none",
   ).current;
@@ -106,12 +98,7 @@ export function ChatFeed({
     }
   }, [totalSize]);
 
-  // Com o buffer cheio (cap do store), cada mensagem nova expulsa a mais antiga
-  // do TOPO da lista; o conteúdo acima da viewport encurta e, com o usuário
-  // rolado pra cima (stick=false), o texto deslizaria junto com o chat — o
-  // scroll-anchoring nativo não atua porque as linhas são posicionadas por
-  // translateY. Antes do paint, subtraímos do scrollTop a soma das alturas das
-  // linhas que saíram do início, mantendo o que o usuário lê parado na tela.
+  // Translated virtual rows bypass native scroll anchoring; compensate for evicted rows before paint.
   const prevMsgs = useRef<ChatMessage[]>(messages);
   useLayoutEffect(() => {
     const prev = prevMsgs.current;
@@ -120,13 +107,10 @@ export function ChatFeed({
     if (stick.current || !el || prev === messages) return;
     const firstId = messages[0]?.id;
     if (!firstId || prev.length === 0 || prev[0].id === firstId) return;
-    // Remoções acontecem só no início (cap do buffer): tudo antes do novo
-    // primeiro id saiu. Se ele nem existia antes, a lista inteira trocou
-    // (limpar/reconectar) — aí não há posição a preservar.
+    // Only prefix eviction preserves the anchor; a replaced list has no shared position.
     const cut = prev.findIndex((m) => m.id === firstId);
     if (cut <= 0) return;
-    // O virtualizer guarda as alturas medidas por id e não descarta as das
-    // linhas removidas — dá pra somar o encolhimento exato acima da viewport.
+    // Measured heights remain available for evicted row IDs until pruning.
     const sizes = virt.itemSizeCache;
     let removed = 0;
     let unknown = 0;
@@ -136,7 +120,7 @@ export function ChatFeed({
       else unknown++;
     }
     if (unknown > 0) {
-      // Linha removida sem medição: aproxima pela média das alturas conhecidas.
+      // Approximate unmeasured rows using the mean known height.
       let sum = 0;
       for (const h of sizes.values()) sum += h;
       removed += unknown * (sizes.size > 0 ? sum / sizes.size : ROW_ESTIMATE);
@@ -144,13 +128,12 @@ export function ChatFeed({
     el.scrollTop = Math.max(0, el.scrollTop - removed);
   }, [messages, virt]);
 
-  // Must follow the anchor compensation above: it still needs the evicted rows.
+  // Must follow anchor compensation, which still needs the evicted rows.
   useLayoutEffect(() => {
     pruneChatMeasurements(virt.itemSizeCache, messages);
   }, [messages, virt]);
 
-  // Ctrl+scroll no feed dimensiona a fonte. Listener nativo (não-passivo) pra poder
-  // cancelar o zoom padrão do navegador.
+  // A non-passive listener is required to cancel browser zoom.
   useEffect(() => {
     const el = ref.current;
     if (!el || !fontResizeEnabled) return;
@@ -360,9 +343,7 @@ function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
   );
 }
 
-/** Botões de moderação: aparecem ao passar o mouse na mensagem ou ao focar um
- *  deles pelo teclado. Ficam sempre no DOM (só a opacidade muda) pra continuarem
- *  na ordem do Tab — `display:none` tiraria a moderação de quem não usa mouse. */
+/** Keep moderation controls mounted so keyboard users can reach them even before hover. */
 function ModButtons({
   m,
   modLevel,
@@ -415,7 +396,6 @@ function ModButtons({
   );
 }
 
-// Estado vazio: as quatro fontes de chat afunilam num feed só — a cara da tela.
 function ChatFunnel() {
   return (
     <div className="flex items-center gap-1" aria-hidden>
@@ -454,7 +434,7 @@ function ChatFunnel() {
 function badgeColor(kind: string): string {
   switch (kind) {
     case "broadcaster":
-      return "bg-tomate text-white";
+      return "bg-tomato text-white";
     case "moderator":
       return "bg-[#22c55e] text-white";
     case "vip":

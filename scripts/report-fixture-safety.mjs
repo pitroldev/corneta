@@ -21,7 +21,9 @@ export function assertNoFixtureLinks(target) {
       if (error.code !== "ENOENT") throw error;
     }
     if (stat?.isSymbolicLink()) {
-      throw new Error("Fixtures recusam symlinks/junctions no destino.");
+      throw new Error(
+        "Fixture destinations must not contain symlinks or junctions.",
+      );
     }
     const parent = dirname(current);
     if (parent === current) break;
@@ -37,8 +39,7 @@ export function copyFixtureExclusive(source, destination) {
   assertNoFixtureLinks(source);
   assertNoFixtureLinks(destination);
   const stat = lstatSync(source);
-  if (!stat.isFile())
-    throw new Error("A origem do fixture não é um arquivo regular.");
+  if (!stat.isFile()) throw new Error("Fixture source is not a regular file.");
   // Never replace a path created by another process after preflight.
   copyFileSync(source, destination, constants.COPYFILE_EXCL);
   utimesSync(destination, stat.atime, stat.mtime);
@@ -57,15 +58,15 @@ export function preflightFixtureOutputs(manifest, root, names) {
       typeof name !== "string" ||
       !/^\d{1,20}(?:\.chat\.ndjson|\.ndjson|(?:\.p\d+)?\.mp4)$/.test(name)
     ) {
-      throw new Error("Nome de fixture inválido.");
+      throw new Error("Invalid fixture name.");
     }
     const file = resolve(sessions, name);
     if (output.has(file))
-      throw new Error("ID de fixture duplicado; dados preservados.");
+      throw new Error("Duplicate fixture ID; existing data was preserved.");
     assertNoFixtureLinks(file);
     if (existsSync(file) && !previous.has(file)) {
       throw new Error(
-        "ID de fixture colidiu com arquivo preexistente; dados preservados.",
+        "Fixture ID collides with an existing file; existing data was preserved.",
       );
     }
     output.add(file);
@@ -81,13 +82,13 @@ export function validateFixtureManifest(manifest, root) {
     !Array.isArray(manifest.generatedFiles)
   ) {
     throw new Error(
-      "Manifesto de fixtures incompatível; dados preservados. Use uma pasta descartável nova.",
+      "Incompatible fixture manifest; existing data was preserved. Use a new disposable directory.",
     );
   }
   const files = new Set();
   for (const file of manifest.generatedFiles) {
     if (typeof file !== "string" || !isAbsolute(file))
-      throw new Error("Caminho de fixture inválido.");
+      throw new Error("Invalid fixture path.");
     const name = relative(sessions, file);
     if (
       isAbsolute(name) ||
@@ -96,7 +97,7 @@ export function validateFixtureManifest(manifest, root) {
       files.has(file)
     ) {
       throw new Error(
-        "Manifesto aponta para arquivo externo ou duplicado; dados preservados.",
+        "Manifest points to an external or duplicate file; existing data was preserved.",
       );
     }
     assertNoFixtureLinks(file);
@@ -106,7 +107,7 @@ export function validateFixtureManifest(manifest, root) {
         manifest.generatedHashes?.[name] !== fixtureHash(file))
     ) {
       throw new Error(
-        "Um fixture foi modificado; limpeza recusada para preservar os dados.",
+        "A fixture was modified; cleanup was refused to preserve existing data.",
       );
     }
     files.add(file);
@@ -117,7 +118,7 @@ export function validateFixtureManifest(manifest, root) {
       relative(resolve(root), manifest.backupDir),
     )
   ) {
-    throw new Error("Backup de fixtures fora do destino esperado.");
+    throw new Error("Fixture backup is outside the expected destination.");
   }
   assertNoFixtureLinks(manifest.backupDir);
   return [...files];

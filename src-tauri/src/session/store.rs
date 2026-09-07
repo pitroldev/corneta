@@ -1,9 +1,3 @@
-//! Adaptadores da porta [`SessionStore`](super::SessionStore).
-//!
-//! `DiskStore` é o de produção: NDJSON em disco com escrita bufferizada. `MemStore` (só em
-//! teste) guarda tudo num mapa, e é ele que deixa a recuperação e a poda serem testadas
-//! sem criar arquivo nenhum.
-
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -27,15 +21,13 @@ fn file_entry(file: &Path) -> Arc<FileEntry> {
     if let Some(entry) = files.get(file).and_then(Weak::upgrade) {
         return entry;
     }
-    // Only active workers/callers own entries. Reap expired keys on cold-path
-    // acquisition, not on every live message, and never hold this lock for I/O.
+    // Reap expired worker entries on acquisition, not per message; never hold this map lock for I/O.
     files.retain(|_, entry| entry.strong_count() > 0);
     let entry = Arc::new(Mutex::new(None));
     files.insert(file.to_path_buf(), Arc::downgrade(&entry));
     entry
 }
 
-/// O adaptador de produção.
 pub struct DiskStore;
 
 impl DiskStore {
@@ -64,9 +56,7 @@ impl SessionStore for DiskStore {
         }
         let mut text = line.to_string();
         text.push('\n');
-        // The old handle is closed. Keep this per-file lock through the length
-        // check and append so concurrent post-live writes cannot interleave or
-        // both consume the same remaining capacity. Other files stay independent.
+        // Serialize the capacity check and post-live append per file; other journals remain independent.
         if self.len(file).saturating_add(text.len() as u64) > cap {
             return;
         }
@@ -157,8 +147,6 @@ impl SessionStore for DiskStore {
     }
 }
 
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod disk_tests {
     use super::*;
@@ -199,8 +187,7 @@ mod disk_tests {
         let journal = TemporaryJournal::new();
         let meta = json!({"kind":"meta","startedAt":1000});
         let text = format!("{meta}\n");
-        // The production open mode is intentional: a second append handle would
-        // be overwritten by this fixed-position handle in the old implementation.
+        // A second append handle can be overwritten by this fixed-position production handle.
         let mut file = File::create(&journal.0).unwrap();
         file.write_all(text.as_bytes()).unwrap();
         let entry = file_entry(&journal.0);
@@ -226,7 +213,7 @@ mod disk_tests {
             .unwrap()
             .close_with_timeout(Duration::ZERO));
         entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-        // The worker alone keeps the coordinator alive after the caller times out.
+        // A timed-out close must leave the worker owning the coordinator.
         drop(entry);
         assert!(Arc::ptr_eq(
             &file_entry(&journal.0),
@@ -247,7 +234,7 @@ mod disk_tests {
         assert_eq!(lines[1]["kind"], "end");
         assert_eq!(lines[2]["kind"], "recEnd");
         assert_eq!(lines[3], finalized);
-        // Subsequent post-live edits use the synchronous, serialized path.
+        // Exercise the synchronous append path after worker shutdown.
         DiskStore.append(&journal.0, &json!({"kind":"offset","ms":250}), cap);
         assert_eq!(journal.lines().len(), 5);
     }
@@ -335,12 +322,11 @@ mod disk_tests {
     }
 }
 
-/// Adaptador em memória — a bancada de testes da aplicação.
 #[cfg(test)]
 #[derive(Default)]
 pub struct MemStore {
     files: Mutex<HashMap<PathBuf, String>>,
-    /// mtime fingido, por arquivo (epoch ms).
+    /// Simulated per-file mtime in epoch milliseconds.
     mtimes: Mutex<HashMap<PathBuf, u64>>,
 }
 
@@ -375,7 +361,6 @@ impl MemStore {
         self.files.lock().unwrap().contains_key(Path::new(file))
     }
 
-    /// Linhas anexadas a um arquivo, já parseadas (ignora o que não for JSON).
     pub fn lines(&self, file: &str) -> Vec<Value> {
         self.body(file)
             .lines()
@@ -417,8 +402,7 @@ impl SessionStore for MemStore {
     fn tail(&self, file: &Path, max: u64) -> Option<String> {
         let body = self.files.lock().unwrap().get(file)?.clone();
         let start = body.len().saturating_sub(max as usize);
-        // Corta em fronteira de caractere: o disco corta por byte, mas `String::from_utf8_lossy`
-        // já normaliza lá — aqui basta não entrar em pânico.
+        // Unlike disk reads, this String cannot be sliced inside a UTF-8 character.
         Some(body.get(start..).unwrap_or(&body).to_string())
     }
 

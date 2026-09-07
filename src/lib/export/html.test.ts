@@ -7,14 +7,12 @@ import { interpolate, type Vars } from "../i18n/locale";
 import { pt, type MessageKey } from "../i18n/pt";
 import { makeFmt } from "../i18n/format";
 
-/** `parseSession`/`analyze` recebem a tradução por parâmetro — aqui entra o dicionário pt de verdade. */
 const t = (k: MessageKey, vars?: Vars) => interpolate(pt[k], vars);
-/** O HTML exportado precisa de locale e formatadores além do texto. */
 const i18n = { locale: "pt-BR" as const, t, fmt: makeFmt("pt-BR") };
 
 const start = new Date(2026, 6, 30, 20, 15).getTime();
 
-const sessao = (extra: object[] = []) =>
+const sessionData = (extra: object[] = []) =>
   parseSession(
     [
       {
@@ -75,26 +73,25 @@ const sessao = (extra: object[] = []) =>
   )!;
 
 describe("reportHtml", () => {
-  const d = sessao();
+  const d = sessionData();
   const html = reportHtml(d, analyze(d, t), i18n);
 
-  it("é um documento completo e autocontido", () => {
+  it("exports a complete self-contained document", () => {
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("<title>Live de 30/07/26 — Corneta</title>");
     expect(html).toContain("<svg");
-    // Nada de rede: o arquivo vai por e-mail e precisa abrir offline na máquina
-    // de quem recebeu. Nenhuma fonte, CDN ou imagem externa.
+    // Exports must remain self-contained: no external fonts, images, or CDN resources.
     expect(html).not.toMatch(/<(script|link|img)\b/i);
     expect(html).not.toMatch(/https?:\/\//);
   });
 
-  it("traz o veredito, os números e a linha do tempo", () => {
+  it("includes verdict, metrics and timeline", () => {
     expect(html).toContain("Transmissão limpa");
     expect(html).toContain("Pico de viewers");
     expect(html).toContain("Início da transmissão");
   });
 
-  it("mantém o gráfico da máquina quando uma sessão traz só memória", () => {
+  it("keeps the machine chart for memory-only sessions", () => {
     const memoryOnly = {
       ...d,
       samples: d.samples.map((sample) => ({
@@ -109,36 +106,35 @@ describe("reportHtml", () => {
     expect(out).toContain("Memória");
   });
 
-  it("escapa o que vem do usuário em vez de injetar HTML", () => {
-    const mau = sessao([
+  it("escapes user content instead of injecting HTML", () => {
+    const untrusted = sessionData([
       {
         kind: "marker",
         t: start + 3000,
         label: "<img src=x onerror=alert(1)>",
       },
     ]);
-    const out = reportHtml(mau, analyze(mau, t), i18n);
+    const out = reportHtml(untrusted, analyze(untrusted, t), i18n);
     expect(out).not.toContain("<img src=x");
     expect(out).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 });
 
 describe("reportJson", () => {
-  it("carrega formato, versão e a análise pronta", () => {
-    const d = sessao();
+  it("includes format, version and analysis", () => {
+    const d = sessionData();
     const j = JSON.parse(reportJson(d, analyze(d, t)));
     expect(j.formato).toBe("corneta.relatorio");
     expect(j.versao).toBe(REPORT_JSON_VERSION);
     expect(j.audiencia.peak).toBe(300);
     expect(j.amostras).toEqual({ maquina: 2, audiencia: 2, seguidores: 0 });
-    // Instante em ISO: epoch-ms obrigaria quem consome a saber de que relógio veio.
     expect(j.eventos[0].instante).toBe(new Date(start).toISOString());
     expect(j.eventos[0].segundosDoInicio).toBe(0);
   });
 });
 
 describe("anonymize", () => {
-  const comRaid = sessao([
+  const withRaid = sessionData([
     {
       kind: "alert",
       t: start + 3000,
@@ -150,43 +146,43 @@ describe("anonymize", () => {
     },
   ]);
 
-  it("tira o nome de tudo que deriva do alerta, inclusive dos destaques", () => {
-    const cru = analyze(comRaid, t);
-    expect(JSON.stringify(cru)).toContain("Gaules");
+  it("removes viewer names from all alert-derived text including highlights", () => {
+    const original = analyze(withRaid, t);
+    expect(JSON.stringify(original)).toContain("Gaules");
 
-    const limpo = analyze(
-      anonymize(comRaid, t("analysis.parse.alert.userFallback")),
+    const anonymized = analyze(
+      anonymize(withRaid, t("analysis.parse.alert.userFallback")),
       t,
     );
-    expect(JSON.stringify(limpo)).not.toContain("Gaules");
-    expect(limpo.highlights.some((h) => h.reason.includes("alguém"))).toBe(
+    expect(JSON.stringify(anonymized)).not.toContain("Gaules");
+    expect(anonymized.highlights.some((h) => h.reason.includes("alguém"))).toBe(
       true,
     );
   });
 
-  it("não mexe nos números nem no nome dos canais do próprio streamer", () => {
-    const cru = analyze(comRaid, t);
-    const limpo = analyze(
-      anonymize(comRaid, t("analysis.parse.alert.userFallback")),
+  it("preserves metrics and streamer channel names", () => {
+    const original = analyze(withRaid, t);
+    const anonymized = analyze(
+      anonymize(withRaid, t("analysis.parse.alert.userFallback")),
       t,
     );
-    expect(limpo.alerts.raids).toBe(cru.alerts.raids);
-    expect(limpo.alerts.raidViewers).toBe(cru.alerts.raidViewers);
-    expect(limpo.viewers.peak).toBe(cru.viewers.peak);
-    expect(limpo.byChannel.channels.map((c) => c.source)).toEqual(
-      cru.byChannel.channels.map((c) => c.source),
+    expect(anonymized.alerts.raids).toBe(original.alerts.raids);
+    expect(anonymized.alerts.raidViewers).toBe(original.alerts.raidViewers);
+    expect(anonymized.viewers.peak).toBe(original.viewers.peak);
+    expect(anonymized.byChannel.channels.map((c) => c.source)).toEqual(
+      original.byChannel.channels.map((c) => c.source),
     );
   });
 
-  it("não altera a sessão original", () => {
-    anonymize(comRaid, t("analysis.parse.alert.userFallback"));
-    expect(comRaid.alertEvents[0].user).toBe("Gaules");
+  it("does not mutate the original session", () => {
+    anonymize(withRaid, t("analysis.parse.alert.userFallback"));
+    expect(withRaid.alertEvents[0].user).toBe("Gaules");
   });
 
-  it("remove o ranking de aplicativos locais da exportação anônima", () => {
-    const comApp = {
-      ...comRaid,
-      samples: comRaid.samples.map((sample, index) => ({
+  it("removes local process rankings from anonymous exports", () => {
+    const withProcess = {
+      ...withRaid,
+      samples: withRaid.samples.map((sample, index) => ({
         ...sample,
         apps:
           index === 0
@@ -203,14 +199,17 @@ describe("anonymize", () => {
       })),
     };
 
-    const limpo = anonymize(comApp, t("analysis.parse.alert.userFallback"));
-    expect(JSON.stringify(limpo)).not.toContain("Jogo secreto");
-    expect(comApp.samples[0].apps?.[0].name).toBe("Jogo secreto");
+    const anonymized = anonymize(
+      withProcess,
+      t("analysis.parse.alert.userFallback"),
+    );
+    expect(JSON.stringify(anonymized)).not.toContain("Jogo secreto");
+    expect(withProcess.samples[0].apps?.[0].name).toBe("Jogo secreto");
   });
 
-  it("põe no lugar do nome a palavra que recebeu — o arquivo em inglês não sai com 'alguém'", () => {
-    const limpo = anonymize(comRaid, "someone");
-    expect(limpo.alertEvents[0].user).toBe("someone");
-    expect(JSON.stringify(limpo)).not.toContain("alguém");
+  it("uses the caller's localized name placeholder", () => {
+    const anonymized = anonymize(withRaid, "someone");
+    expect(anonymized.alertEvents[0].user).toBe("someone");
+    expect(JSON.stringify(anonymized)).not.toContain("alguém");
   });
 });

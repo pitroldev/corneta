@@ -31,16 +31,15 @@ const fail = (message) => {
 const missingRoots = resolvedRoots.filter((path) => !existsSync(path));
 if (missingRoots.length) {
   fail(
-    `Artefatos esperados não encontrados:\n${missingRoots
+    `Expected artifacts were not found:\n${missingRoots
       .map((path) => relative(root, path))
       .join("\n")}`,
   );
 }
 if (!resolvedRoots.length) {
-  fail("Nada para verificar: faça o build antes de rodar este gate.");
+  fail("Nothing to check: build the project before running this gate.");
 }
 
-// 1) Budget de tamanho dos chunks do frontend.
 const oversized = [];
 if (existsSync(assets)) {
   for (const name of readdirSync(assets).filter((file) =>
@@ -53,14 +52,13 @@ if (existsSync(assets)) {
   }
 }
 if (oversized.length) {
-  fail(`Chunks acima do budget de 110 KiB gzip:\n${oversized.join("\n")}`);
+  fail(`Chunks exceed the 110 KiB gzip budget:\n${oversized.join("\n")}`);
 }
 
-// A page split into many individually-small chunks can still have a heavy boot.
-// Gate the union of its static graph in addition to the existing per-chunk gate.
+// Small chunks can still make a heavy boot; also cap their static dependency graph.
 const manifestFile = join(dist, ".vite", "manifest.json");
 if (!existsSync(manifestFile))
-  fail("Manifest ausente: refaça o build antes de verificar as entradas.");
+  fail("Manifest missing: rebuild before checking entries.");
 const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
 for (const [entry, chunk] of Object.entries(manifest)) {
   if (!chunk.isEntry) continue;
@@ -70,20 +68,19 @@ for (const [entry, chunk] of Object.entries(manifest)) {
   for (const file of entryFiles(manifest, entry)) {
     const path = resolve(dist, file);
     if (!path.startsWith(resolve(dist) + sep))
-      fail("Caminho inválido no manifest.");
+      fail("Invalid path in the manifest.");
     const contents = readFileSync(path);
     if (file.endsWith(".js")) javascript += gzipSync(contents).byteLength;
     else if (file.endsWith(".css")) css += gzipSync(contents).byteLength;
     else other += contents.byteLength;
   }
   console.log(
-    `Entrada ${entry}: JS ${(javascript / 1024).toFixed(1)} KiB gzip; CSS ${(css / 1024).toFixed(1)} KiB gzip; assets ${(other / 1024).toFixed(1)} KiB`,
+    `Entry ${entry}: JS ${(javascript / 1024).toFixed(1)} KiB gzip; CSS ${(css / 1024).toFixed(1)} KiB gzip; assets ${(other / 1024).toFixed(1)} KiB`,
   );
   if (javascript > 250 * 1024 || css > 55 * 1024 || other > 256 * 1024)
-    fail(`Entrada ${entry} excede o orçamento agregado.`);
+    fail(`Entry ${entry} exceeds the aggregate budget.`);
 }
 
-// 2) Monte a lista de arquivos sem manter todos os binários grandes em memória.
 const files = [];
 const walk = (path) => {
   if (statSync(path).isFile()) {
@@ -98,9 +95,7 @@ const walk = (path) => {
 };
 for (const path of resolvedRoots) walk(path);
 
-// Em modo artefato, falhe fechado sem 7-Zip e escaneie também a árvore que ele consegue
-// extrair do NSIS. Isso cobre o conteúdo instalável; não afirma interpretar formatos opacos
-// aninhados que o próprio 7-Zip não consiga abrir.
+// Scan extractable NSIS contents, not just the container; fail closed without 7-Zip.
 let extractedRoot;
 const cleanupExtractedRoot = () => {
   if (!extractedRoot) return;
@@ -122,12 +117,12 @@ if (artifactMode) {
   });
   if (installers.length !== 1) {
     fail(
-      `Esperado exatamente um instalador em bundle/nsis; encontrados ${installers.length}. Limpe artefatos antigos e refaça o build.`,
+      `Expected exactly one installer in bundle/nsis; found ${installers.length}. Remove stale artifacts and rebuild.`,
     );
   }
   const installer = installers[0];
   if (!existsSync(`${installer}.sig`)) {
-    fail(`Assinatura do updater ausente para ${relative(root, installer)}.`);
+    fail(`Updater signature missing for ${relative(root, installer)}.`);
   }
 
   const listResult = spawnSync("7z", ["l", "-slt", installer], {
@@ -136,12 +131,12 @@ if (artifactMode) {
   });
   if (listResult.error?.code === "ENOENT") {
     fail(
-      "7-Zip (comando `7z`) é obrigatório no gate de artefatos; scan fechado porque não foi encontrado.",
+      "The artifact gate requires 7-Zip (`7z`); scanning was blocked because it was not found.",
     );
   }
   if (listResult.error || listResult.status !== 0) {
     fail(
-      `7-Zip não conseguiu listar o NSIS ${relative(root, installer)}; artefato bloqueado.`,
+      `7-Zip could not list NSIS ${relative(root, installer)}; artifact blocked.`,
     );
   }
 
@@ -153,32 +148,31 @@ if (artifactMode) {
   );
   if (extractResult.error || extractResult.status !== 0) {
     fail(
-      `7-Zip não conseguiu extrair o NSIS ${relative(root, installer)}; artefato bloqueado.`,
+      `7-Zip could not extract NSIS ${relative(root, installer)}; artifact blocked.`,
     );
   }
   if (!readdirSync(extractedRoot).length) {
-    fail("7-Zip não retornou conteúdo extraível do NSIS; artefato bloqueado.");
+    fail("7-Zip returned no extractable NSIS contents; artifact blocked.");
   }
   walk(extractedRoot);
 }
 
-const onde = (path) => {
+const artifactLocation = (path) => {
   if (extractedRoot && path.startsWith(extractedRoot)) {
-    return `NSIS extraído/${relative(extractedRoot, path).replaceAll("\\", "/")}`;
+    return `Extracted NSIS/${relative(extractedRoot, path).replaceAll("\\", "/")}`;
   }
   return relative(root, path).replaceAll("\\", "/");
 };
 
 const sourceMaps = files
   .filter((path) => /\.map(?:\.|$)/i.test(path))
-  .map(onde);
+  .map(artifactLocation);
 if (sourceMaps.length) {
   fail(
-    `Source maps não podem entrar no bundle/artefato:\n${sourceMaps.join("\n")}`,
+    `Source maps must not be included in bundles or artifacts:\n${sourceMaps.join("\n")}`,
   );
 }
 
-// 3) Detect known dotenv values and fixed secret markers. Report names only.
 const envValues = [];
 const envPaths = [
   ".env",
@@ -192,7 +186,7 @@ for (const envPath of envPaths) {
   envValues.push(...dotenvSecretValues(readFileSync(envPath, "utf8")));
 }
 
-// Quando o gate for executado manualmente com secrets no ambiente, compare-os sem imprimi-los.
+// Include inherited secrets in matching without printing their values.
 for (const name of [
   "POSTHOG_API_KEY",
   "POSTHOG_CLI_API_KEY",
@@ -208,24 +202,24 @@ for (const name of [
 }
 
 const fixedSecretMarkers = [
-  [Buffer.from("GOCSPX-"), "Client Secret do Google (GOCSPX-…)"],
+  [Buffer.from("GOCSPX-"), "Google Client Secret (GOCSPX-…)"],
   [
     Buffer.from("untrusted comment: minisign secret key"),
-    "chave privada minisign",
+    "minisign private key",
   ],
   [
     Buffer.from("untrusted comment: minisign encrypted secret key"),
-    "chave privada minisign criptografada",
+    "encrypted minisign private key",
   ],
   [
     Buffer.from("dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHNlY3JldCBrZXk"),
-    "chave privada minisign em base64",
+    "base64-encoded minisign private key",
   ],
   [
     Buffer.from(
       "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5",
     ),
-    "chave privada minisign criptografada em base64",
+    "base64-encoded encrypted minisign private key",
   ],
 ];
 
@@ -259,24 +253,25 @@ const leaks = [];
 for (const path of files) {
   const bytes = readFileSync(path);
   for (const name of detectedSecretNames(bytes, envValues))
-    leaks.push(`${name} em ${onde(path)}`);
+    leaks.push(`${name} in ${artifactLocation(path)}`);
   for (const [marker, label] of fixedSecretMarkers) {
-    if (bytes.includes(marker)) leaks.push(`${label} em ${onde(path)}`);
+    if (bytes.includes(marker))
+      leaks.push(`${label} in ${artifactLocation(path)}`);
   }
   if (containsPosthogPersonalApiKey(bytes)) {
-    leaks.push(`Personal API Key do PostHog (phx_…) em ${onde(path)}`);
+    leaks.push(`PostHog Personal API Key (phx_…) in ${artifactLocation(path)}`);
   }
   if (
     bytes.includes(Buffer.from("-----BEGIN ")) &&
     bytes.includes(Buffer.from("PRIVATE KEY-----"))
   ) {
-    leaks.push(`chave privada PEM em ${onde(path)}`);
+    leaks.push(`PEM private key in ${artifactLocation(path)}`);
   }
 }
 
 if (leaks.length) {
   fail(
-    `Segredo no bundle — isso vai pra máquina do usuário:\n${[
+    `Secret detected in the bundle that would be shipped to users:\n${[
       ...new Set(leaks),
     ].join("\n")}`,
   );
@@ -284,6 +279,6 @@ if (leaks.length) {
 
 console.log(
   artifactMode
-    ? "Artefatos e conteúdo extraível do NSIS: nenhum source map/segredo detectado pelas verificações; chunks JS dentro do budget de 110 KiB gzip."
-    : "Bundle: nenhum source map/segredo detectado pelas verificações; chunks JS dentro do budget de 110 KiB gzip.",
+    ? "Artifacts and extractable NSIS contents: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget."
+    : "Bundle: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget.",
 );

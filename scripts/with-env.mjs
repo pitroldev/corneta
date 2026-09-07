@@ -1,6 +1,4 @@
-// Trusted maintainer commands only. The root .env is passed to the CHILD process,
-// including signing credentials; this launcher is not a sandbox or a bundling
-// allowlist. Use contrib:* for credential-free development. See CONFIGURACAO.md.
+// Passes the root .env, including signing credentials, to the child; this is not a sandbox.
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -20,9 +18,7 @@ export function mergeEnvironment(
   const normalize = (key) => (platform === "win32" ? key.toUpperCase() : key);
   const existing = new Set(Object.keys(inherited).map(normalize));
   let loaded = 0;
-  // Native Node dotenv semantics: quoted multiline values, comments, export,
-  // empty strings and no shell/$VARIABLE interpolation. A present but EMPTY
-  // inherited value still wins (notably TAURI_SIGNING_PRIVATE_KEY_PASSWORD).
+  // An inherited empty value still wins, including TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
   for (const [key, value] of Object.entries(parseEnvironment(source))) {
     if (existing.has(normalize(key))) continue;
     Object.defineProperty(env, key, {
@@ -51,14 +47,12 @@ export function loadEnvironmentFile(
     }
     // Permission/I/O failures must not look like no .env. Do not echo paths,
     // file contents or low-level error messages: they can contain credentials.
-    throw new Error(
-      "with-env: não foi possível ler o arquivo de configuração.",
-    );
+    throw new Error("with-env: could not read the configuration file.");
   }
   try {
     return { ...mergeEnvironment(source, inherited, platform), missing: false };
   } catch {
-    throw new Error("with-env: não foi possível interpretar a configuração.");
+    throw new Error("with-env: could not parse the configuration.");
   }
 }
 
@@ -76,7 +70,7 @@ export function commandInvocation(
     command.includes("\0") ||
     args.some((arg) => arg.includes("\0"))
   ) {
-    throw new Error("with-env: comando ou argumentos inválidos.");
+    throw new Error("with-env: invalid command or arguments.");
   }
   // A pnpm Windows shim is a .cmd, which Node cannot execute without cmd.exe.
   // Resolve our CLI to JS instead: same pinned Node and literal arguments.
@@ -88,13 +82,13 @@ export function commandInvocation(
     try {
       script = resolveTauri();
     } catch {
-      throw new Error("with-env: CLI Tauri ausente; execute pnpm install.");
+      throw new Error("with-env: Tauri CLI not found; run pnpm install.");
     }
     return { command: node, args: [script, ...args], usesRust: true };
   }
   if (platform === "win32" && /\.(?:cmd|bat)$/i.test(command)) {
     throw new Error(
-      "with-env: scripts .cmd/.bat não são suportados; use um executável ou node com o arquivo JS.",
+      "with-env: .cmd/.bat scripts are not supported; use an executable or run the JS file with Node.",
     );
   }
   return {
@@ -108,7 +102,7 @@ async function main() {
   const [command, ...args] = process.argv.slice(2);
   if (!command) {
     console.error(
-      "uso: node scripts/with-env.mjs <executável|tauri> [args...]",
+      "Usage: node scripts/with-env.mjs <executable|tauri> [args...]",
     );
     process.exitCode = 2;
     return;
@@ -117,8 +111,8 @@ async function main() {
   const { env, loaded, missing } = loadEnvironmentFile(rootEnv, process.env);
   console.log(
     missing
-      ? "with-env: sem .env; usando o ambiente do processo"
-      : `with-env: ${loaded} variável(is) do .env carregada(s)`,
+      ? "with-env: no .env file; using the process environment"
+      : `with-env: ${loaded} variable(s) loaded from .env`,
   );
   const wrapperConfigured = Object.keys(env).some((key) =>
     process.platform === "win32"
@@ -134,7 +128,7 @@ async function main() {
     });
     if (!probe.error && probe.status === 0) {
       env.RUSTC_WRAPPER = "sccache";
-      console.log("with-env: sccache ativado para esta compilação Rust");
+      console.log("with-env: sccache enabled for this Rust build");
     }
   }
   process.exitCode = await new Promise((complete, reject) => {
@@ -145,9 +139,7 @@ async function main() {
     });
     child.once("exit", (code) => complete(code ?? 1));
     child.once("error", () =>
-      reject(
-        new Error("with-env: não foi possível iniciar o comando solicitado."),
-      ),
+      reject(new Error("with-env: could not start the requested command.")),
     );
   });
 }

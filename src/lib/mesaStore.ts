@@ -1,5 +1,3 @@
-// Estado de longa vida da Mesa (sobrevive à navegação entre telas — igual o motor/chat
-// vivem no store). Dono do MesaClient e da stream local; a tela só observa e dispara ações.
 import { create } from "zustand";
 import { api, IS_TAURI } from "./api";
 import { toast } from "./toast";
@@ -17,13 +15,12 @@ import {
   buildStudioUrl,
 } from "./mesa";
 
-// Fora do estado reativo (não serializável / mutável): o cliente e a stream local.
+// Keep mutable client and MediaStream objects outside reactive state.
 let client: MesaClient | null = null;
 let localStream: MediaStream | null = null;
 
 type MesaMode = "host" | "guest";
 
-// Store não é componente: quem chama a ação passa o tradutor do idioma ativo.
 type T = I18n["t"];
 
 interface MesaState {
@@ -32,11 +29,8 @@ interface MesaState {
   status: MesaStatus;
   myId: string | null;
   room: string | null;
-  /** Código do convite (host gera / convidado usa). */
   invite: string | null;
-  /** URL de sinalização que ESTE cliente usa. */
   signalUrl: string | null;
-  /** Porta do servidor local (serve a página de estúdio pro MEU OBS). */
   localPort: number | null;
   peers: MesaPeer[];
 
@@ -46,14 +40,10 @@ interface MesaState {
   camOn: boolean;
   micOn: boolean;
   localStream: MediaStream | null;
-  /** Esconder o meu tile na grade do OBS (quem já tem facecam própria). */
   hideSelf: boolean;
   obsAdded: boolean;
-  /** Erro de permissão de câmera (mostra o atalho pra privacidade do Windows). */
   camError: string | null;
-  /** Falha ao subir o servidor local da Mesa (nada a ver com câmera/privacidade). */
   serverError: string | null;
-  /** Erro de conexão/sala vindo do MesaClient — some quando volta a ficar online. */
   lastError: string | null;
 
   refreshDevices: () => Promise<void>;
@@ -65,7 +55,6 @@ interface MesaState {
   setHideSelf: (v: boolean, t: T) => void;
   host: (name: string, t: T) => Promise<void>;
   join: (code: string, name: string, t: T) => Promise<void>;
-  /** Reconecta do zero (mesmo cliente, mesmo id) depois de um erro de conexão. */
   retry: () => void;
   leave: () => Promise<void>;
   addToObs: (t: T) => Promise<void>;
@@ -83,18 +72,15 @@ export const useMesa = create<MesaState>((set, get) => {
       t,
       onReady: (id) => set({ myId: id }),
       onPeers: (peers) => set({ peers }),
-      // Voltou a ficar online → o erro antigo não vale mais.
       onStatus: (status) =>
         set(status === "online" ? { status, lastError: null } : { status }),
-      // Erro de sala/conexão precisa chegar na tela — em console.warn ninguém vê.
       onError: (msg) => {
         console.warn("[mesa]", msg);
         toast.error(msg);
         set({ lastError: msg });
       },
     });
-    // myId já existe na construção (é o peerId do join) — expõe já, sem esperar o onReady
-    // (senão "Adicionar no OBS" antes do socket abrir gravaria self="" e quebraria o mute).
+    // Expose myId before signaling connects; early OBS setup needs it to suppress self-audio.
     set({ myId: client.myId });
     if (localStream) client.setLocalStream(localStream);
     client.start();
@@ -103,10 +89,7 @@ export const useMesa = create<MesaState>((set, get) => {
   const isLoopback = (host: string) =>
     host === "localhost" || host.startsWith("127.");
 
-  // Desliga câmera+mic locais (para as tracks → LED apaga e o dispositivo é liberado).
-  // Usado no leave() e em TODO caminho de erro de host()/join() após openLocal() ter
-  // dado certo — senão a stream ficaria viva sem nenhum caminho na UI pra desligar
-  // (leave() só é alcançável com a Mesa ativa).
+  // Stop local tracks on leave and every failed join/host path so device access cannot become orphaned.
   const closeLocal = () => {
     if (!localStream) return;
     localStream.getTracks().forEach((t) => t.stop());
@@ -138,7 +121,7 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         set({ devices: await listDevices() });
       } catch {
-        /* rótulos só aparecem após permissão — tudo bem */
+        /* Device labels may remain unavailable before permission. */
       }
     },
 
@@ -154,7 +137,6 @@ export const useMesa = create<MesaState>((set, get) => {
         set({ localStream: stream, camError: null });
         await get().refreshDevices();
       } catch (e) {
-        // `name` é código do DOM (NotAllowedError…) — só a frase muda de idioma.
         const name = e instanceof DOMException ? e.name : "";
         const msg = t(
           name === "NotAllowedError"
@@ -175,7 +157,7 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         await get().openLocal(t);
       } catch {
-        set({ cameraId: prev }); // dispositivo ocupado/sumiu → volta pro que funcionava
+        set({ cameraId: prev });
       }
     },
 
@@ -205,8 +187,7 @@ export const useMesa = create<MesaState>((set, get) => {
 
     setHideSelf(v, t) {
       set({ hideSelf: v });
-      // Com a Mesa já no OBS, o hideSelf vive na URL do Browser Source — sem re-adicionar
-      // (o backend faz add-or-update) o toggle seria no-op silencioso.
+      // hideSelf is encoded in the OBS source URL; update that source when the setting changes.
       const { obsAdded, room, signalUrl, localPort, myId } = get();
       if (!obsAdded || !room || !signalUrl || !localPort || !myId) return;
       const url = buildStudioUrl({
@@ -234,24 +215,24 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         await get().openLocal(t);
       } catch {
-        /* segue sem câmera — dá pra ligar depois */
+        /* Joining without a camera is allowed; it can be enabled later. */
       }
       let info;
       try {
         info = await api.mesaStartServer();
       } catch (e) {
-        console.warn("[mesa] servidor:", e);
+        console.warn("[mesa] server:", e);
         set({ serverError: t("core.mesa.server.startFailed") });
         closeLocal();
         return;
       }
-      // Sem IP de LAN, o convite sairia como loopback (inalcançável pelos convidados).
+      // Do not issue loopback invitations when no guest-reachable LAN address exists.
       if (isLoopback(info.lanIp)) {
         toast.error(t("core.mesa.noLanNetwork"));
         try {
           await api.mesaStopServer();
         } catch {
-          /* ignore */
+          /* Best-effort cleanup of a failed host attempt. */
         }
         closeLocal();
         return;
@@ -293,13 +274,13 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         await get().openLocal(t);
       } catch {
-        /* segue sem câmera */
+        /* Joining without a camera is allowed. */
       }
       let info;
       try {
         info = await api.mesaStartServer();
       } catch (e) {
-        console.warn("[mesa] servidor:", e);
+        console.warn("[mesa] server:", e);
         set({ serverError: t("core.mesa.server.startFailed") });
         closeLocal();
         return;
@@ -320,8 +301,7 @@ export const useMesa = create<MesaState>((set, get) => {
     retry() {
       if (!client) return;
       set({ lastError: null });
-      // stop() derruba o socket velho (senão a reconexão automática duplicaria a conexão)
-      // e start() volta do zero com o MESMO cliente — preserva myId e a stream local.
+      // Restart the existing client to preserve peer identity and tracks without duplicate reconnect loops.
       client.stop();
       client.start();
     },
@@ -334,12 +314,12 @@ export const useMesa = create<MesaState>((set, get) => {
         try {
           await api.mesaObsRemoveSource();
         } catch {
-          /* OBS pode não estar acessível */
+          /* OBS may be unavailable during cleanup. */
         }
         try {
           await api.mesaStopServer();
         } catch {
-          /* ignore */
+          /* Best-effort local server cleanup. */
         }
       }
       set({
@@ -399,7 +379,7 @@ export const useMesa = create<MesaState>((set, get) => {
       try {
         await api.openPrivacySettings(which);
       } catch {
-        /* ignore */
+        /* Native privacy settings may be unavailable in browser previews. */
       }
     },
   };

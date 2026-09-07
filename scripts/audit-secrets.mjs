@@ -1,8 +1,4 @@
-// Run with Node 24: node scripts/audit-secrets.mjs
-// Downloads a checksum-pinned Gitleaks release; never loads .env or uploads data.
-// The snapshot includes tracked files + new non-ignored files, not local ignored
-// secrets/build outputs. Git scanning covers ALL locally available refs, not
-// merely a PR diff. Fetch the refs you intend to publish before the final run.
+// Scan publishable files and all local refs without loading .env or uploading data.
 import { createHash } from "node:crypto";
 import {
   copyFileSync,

@@ -7,8 +7,7 @@ import { PlatformGlyph } from "./decor";
 import { RadioIcon } from "./icons";
 import { cn, State } from "./ui";
 
-// Prévia ilustrativa: conecta destinos em sequência, sem iniciar transmissão real.
-// Com movimento reduzido, a mudança de estado é imediata.
+// This illustration never connects to a platform; reduced motion keeps interactions immediate.
 
 type PlatId = "twitch" | "youtube" | "kick";
 
@@ -18,8 +17,6 @@ const DESTS: { id: PlatId; name: string }[] = [
   { id: "kick", name: "Kick" },
 ];
 
-/** Intervalo entre um destino entrar no ar e o próximo. Não é decoração: é o
- *  "uma por uma" da copy, e num piscar só ninguém vê a ordem. */
 const STEP_MS = 650;
 
 export interface GoLiveCopy {
@@ -28,7 +25,6 @@ export interface GoLiveCopy {
   live: string;
   off: string;
   connecting: string;
-  /** "no ar · {n} plataformas" */
   onAir: string;
   pick: string;
 }
@@ -41,12 +37,9 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
     kick: true,
   });
   const [phase, setPhase] = useState<"off" | "going" | "live">("off");
-  /** Quem já subiu. Lista, não contador: a ordem de subida é a escolhida. */
   const [lit, setLit] = useState<PlatId[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Os temporizadores da subida precisam morrer com o componente — senão um
-  // `setState` chega depois da desmontagem e o React reclama, com razão.
   useEffect(
     () => () => {
       timers.current.forEach(clearTimeout);
@@ -83,8 +76,6 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
     setPhase("off");
   };
 
-  /** Antes de subir dá pra escolher; no ar, mexer na lista mentiria sobre o que
-   *  o app faz (lá você corta primeiro). */
   const toggle = (id: PlatId) => {
     if (phase !== "off") return;
     setPicked((cur) => ({ ...cur, [id]: !cur[id] }));
@@ -115,8 +106,7 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
             >
               <PlatformGlyph id={d.id} />
               <span>{d.name}</span>
-              {/* A `key` é o ESTADO: cada mudança remonta a pastilha e ela entra
-                  com um pulinho. É o instante que o painel existe pra mostrar. */}
+              {/* Remount on state changes to replay the status transition. */}
               <motion.span
                 key={up ? "up" : connecting ? "conn" : "off"}
                 initial={reduce ? false : { scale: 0.72, opacity: 0 }}
@@ -149,10 +139,6 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
           {copy.stop}
         </button>
       ) : (
-        // Sem inclinação: o adesivo torto que ele substitui tinha 120px de
-        // largura, e a mesma rotação numa barra que atravessa o painel inteiro
-        // lê como erro de alinhamento, não como adesivo. O que fica da
-        // linguagem é o gesto de apertar — a sombra afunda em vez de piscar.
         <button
           type="button"
           onClick={golive}

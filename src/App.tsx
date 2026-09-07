@@ -19,8 +19,7 @@ import { Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Button } from "./components/ui";
 
-// Ordem = numeração dos atalhos Alt+1..N (espelha a sidebar: jornada primeiro, depois
-// utilitários). Configurações vem antes de Sobre — é a tela recorrente.
+// Navigation order defines Alt+N shortcuts and must match Sidebar.
 const SCREENS: Screen[] = [
   "platforms",
   "encoding",
@@ -134,9 +133,6 @@ export default function App() {
     addStep("app_ready");
   }, [loaded]);
 
-  // Anúncio do estado da transmissão pra leitor de tela (o resto é só cor/ponto).
-  // "Em todas as plataformas" só quando é verdade — com alguma fora, diz quantas (o mesmo
-  // número do chip vermelho da LiveBar).
   const liveLabel = censored
     ? t("components.app.live.aria.censored")
     : liveState === "live"
@@ -160,18 +156,16 @@ export default function App() {
       return "platforms";
     }
   });
-  // D3: lembra a última tela aberta.
   const navigate = (s: Screen) => {
     preloadScreen(s);
     setScreen(s);
     try {
       localStorage.setItem("corneta.screen", s);
     } catch {
-      /* ignore */
+      /* Storage may be unavailable; navigation remains usable. */
     }
   };
 
-  // A última tela lembrada baixa em paralelo ao config; hover/foco cuida das próximas.
   useEffect(() => preloadScreen(screen), [screen]);
 
   useEffect(() => {
@@ -201,7 +195,6 @@ export default function App() {
     const unbindAlertStatus = bindAlertStatus();
     const unbindChatAuth = bindChatAuth();
     const unbindAuthFlow = bindAuthFlow(t);
-    // C1: atalho global começar/parar (alterna conforme o estado atual).
     const unbindShortcut = api.subscribeShortcut(() => {
       const s = useStore.getState();
       const st = s.snapshot.state;
@@ -237,7 +230,6 @@ export default function App() {
     bindAuthFlow,
   ]);
 
-  // Guardião: avisa por toast a cada novo vazamento detectado.
   const leakSeen = useRef(0);
   useEffect(() => {
     if (leaks.length > leakSeen.current) {
@@ -247,20 +239,14 @@ export default function App() {
     leakSeen.current = leaks.length;
   }, [leaks, t]);
 
-  // D1: aplica o tema (dark/light). Na troca pela mão, a corneta "sopra" o tema novo
-  // (ondas de latão saindo do clique — ver lib/theme); no 1º load aplica direto.
   const firstTheme = useRef(true);
   useEffect(() => {
     applyTheme(theme, !firstTheme.current);
     firstTheme.current = false;
   }, [theme]);
 
-  // Gera o slate "JÁ VOLTO" e salva no disco — SÓ no modo "auto" (tela gerada). Se o usuário
-  // escolheu uma imagem/vídeo custom (image/video), NÃO sobrescreve. Espera o config carregar
-  // (`loaded`) pra não regerar por engano enquanto a kind ainda é desconhecida.
-  //
-  // Depende do `locale`: o cartão vai AO AR com texto, então trocar o idioma
-  // tem que redesenhar o PNG que está no disco (a generation carrega o idioma).
+  // Generate a slate only after config loads and only in auto mode; never overwrite custom media.
+  // Locale changes must regenerate the on-air image, not just interface labels.
   useEffect(() => {
     if (!IS_TAURI || !loaded) return;
     const generation = brbSlateGeneration(locale);
@@ -278,16 +264,13 @@ export default function App() {
               void api
                 .saveBrbSlate(b64, generation)
                 .catch((error) =>
-                  console.warn(
-                    "Não foi possível atualizar o slate padrão",
-                    error,
-                  ),
+                  console.warn("Could not update the default slate", error),
                 );
           });
         });
       })
       .catch((error) =>
-        console.warn("Não foi possível verificar o slate padrão", error),
+        console.warn("Could not check the default slate", error),
       );
     return () => {
       cancelled = true;
@@ -295,16 +278,14 @@ export default function App() {
     };
   }, [loaded, brbSlateKind, locale, t]);
 
-  // Cada tela começa no topo: o container de scroll é compartilhado, então um
-  // scrollIntoView (ex.: "Fora do ar" → botão BORA) deixava as outras telas cortadas.
+  // Reset the shared scroll container on navigation.
   const scrollRef = useRef<HTMLDivElement>(null);
-  // ...e recebe o foco: sem isto, depois de Alt+N ou do clique na sidebar o leitor de
-  // tela continuava no botão de onde saiu, sem saber que a tela mudou (WCAG 2.4.3).
+  // Move focus to the new screen so keyboard and screen-reader navigation follows the route.
   const screenRef = useRef<HTMLDivElement>(null);
   const screenChanged = useRef(false);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    // No 1º render não houve troca — focar aqui roubaria o foco do tour de boas-vindas.
+    // Do not steal initial focus from onboarding.
     if (!screenChanged.current) {
       screenChanged.current = true;
       return;
@@ -312,7 +293,6 @@ export default function App() {
     screenRef.current?.focus({ preventScroll: true });
   }, [screen]);
 
-  // Alt+1..8 troca de tela (ignora quando o foco está num campo de texto).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -334,9 +314,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Avisos do gravador. Ficam aqui, e não numa tela, porque o streamer pode estar em
-  // qualquer aba quando o disco enche — e porque nenhum deles é erro do MOTOR: a live
-  // segue no ar em todos os casos. É informação, não alarme.
+  // Recorder notices belong in the shell because users may be on any screen when recording fails.
   useEffect(() => {
     return api.subscribeRecorder(({ kind, detail }) => {
       switch (kind) {
@@ -352,8 +330,6 @@ export default function App() {
         case "waitingSource":
           toast.info(t("recorder.toast.waitingSource"));
           break;
-        // Desistir não pode ser definitivo: sem este botão a única saída era cortar a
-        // live e recomeçar, que é justamente o que ninguém faz no ar.
         case "gaveUp":
           toast.errorAction(
             t("recorder.toast.gaveUp"),
@@ -377,7 +353,6 @@ export default function App() {
     });
   }, [t]);
 
-  // Deep-link global: qualquer tela pede navegação pelo store (ex.: "Configurar chat" em Plataformas).
   const navRequest = useStore((s) => s.navRequest);
   const requestNavigate = useStore((s) => s.requestNavigate);
   useEffect(() => {
@@ -388,8 +363,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navRequest]);
 
-  // Atalho global: registra no boot COM feedback — se outro programa já usa a combinação,
-  // o streamer fica sabendo agora, não no meio da live com um atalho morto.
   const liveShortcut = useStore((s) => s.config?.settings.liveShortcut);
   const shortcutBootDone = useRef(false);
   useEffect(() => {
@@ -432,8 +405,6 @@ export default function App() {
 
         <UpdateBanner />
 
-        {/* Fica também com o JÁ VOLTO no ar: a faixa do Guardião diz o que aconteceu, a
-            LiveBar segue com cronômetro, viewers, plataformas fora e o atalho pro painel. */}
         <LiveBar onOpen={() => navigate("golive")} />
 
         {!loaded ? (

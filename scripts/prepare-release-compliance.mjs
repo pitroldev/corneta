@@ -27,13 +27,13 @@ const sidecars = readJson(join(notices, "sidecars.json"));
 const errors = complianceErrors(manifest, sidecars);
 if (errors.length) {
   console.error(
-    `Pacote de conformidade bloqueado:\n${errors.map((e) => `- ${e}`).join("\n")}`,
+    `Compliance package blocked:\n${errors.map((e) => `- ${e}`).join("\n")}`,
   );
   process.exit(1);
 }
 if (process.argv.includes("--check")) {
   console.log(
-    "Manifesto de fontes aprovado e compatível com os sidecars. Downloads ainda precisam ser verificados.",
+    "Source manifest approved and compatible with the sidecars. Downloads still require verification.",
   );
   process.exit(0);
 }
@@ -47,7 +47,7 @@ for (const name of ["ffmpeg", "mediamtx"]) {
     hash.update(chunk);
   if (hash.digest("hex") !== sidecars[name].binarySha256.toLowerCase())
     throw new Error(
-      "Um sidecar mudou depois da verificação. Refaça fetch-binaries.",
+      "A sidecar changed after verification. Run fetch-binaries again.",
     );
 }
 const bundle = join(root, "src-tauri/target/release/bundle");
@@ -92,7 +92,7 @@ try {
   const pnpmCli = process.env.npm_execpath;
   if (!pnpmCli || !existsSync(pnpmCli))
     throw new Error(
-      "Execute via pnpm compliance:prepare para gerar o inventário JS.",
+      "Run pnpm compliance:prepare to generate the JS inventory.",
     );
   const jsMetadata = JSON.parse(
     execFileSync(
@@ -165,23 +165,21 @@ try {
     },
   );
   console.log(
-    "corneta-third-party.zip preparado: fontes verificadas, avisos e inventários. A aprovação de correspondência continua sendo humana.",
+    "corneta-third-party.zip prepared: verified sources, notices, and inventories. Corresponding-source approval still requires human review.",
   );
 } finally {
   if (
     dirname(resolve(staging)) !== resolve(stagingParent) ||
     !/^compliance-[A-Za-z0-9]+$/.test(basename(staging))
   ) {
-    console.error(
-      "Limpeza de staging fora do escopo recusada; diretório preservado.",
-    );
+    console.error("Out-of-scope staging cleanup refused; directory preserved.");
     process.exitCode = 1;
   } else {
     // Cleanup must not hide the original preparation error.
     try {
       rmSync(staging, { recursive: true, force: true });
     } catch {
-      console.error("Não foi possível limpar o staging de conformidade.");
+      console.error("Could not clean up the compliance staging directory.");
       process.exitCode = 1;
     }
   }

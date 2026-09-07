@@ -2,23 +2,13 @@ import { useRef, type ReactNode, type RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../lib/utils";
 
-// Cliques num popper portalado (Select/Dropdown/Tooltip) ficam FORA do DOM do Dialog,
-// mas são "dentro" pra UX — não podem fechar o modal nem cancelar a seleção.
+// Portaled poppers are outside the dialog DOM but must not dismiss it.
 function fromRadixPopper(target: EventTarget | null): boolean {
   const el = target as Element | null;
   return !!el?.closest?.("[data-radix-popper-content-wrapper]");
 }
 
-/**
- * Modal on-brand via Radix Dialog: overlay, foco preso, Esc, trava de scroll e
- * portal — a11y de graça. O visual (bloco sólido, sombra dura) continua nosso.
- * `title` vira o nome acessível (Dialog.Title sr-only); o título visível segue
- * dentro de `children`. `lockOutside` bloqueia o fechar-clicando-fora e o Esc.
- * `initialFocusRef` escolhe onde o foco cai ao abrir — sem ele o Radix foca o
- * primeiro focável, que em modais com X no canto é justamente o botão de fechar.
- * Sem Dialog.Trigger (modais condicionais/lazy), preserva o foco de origem para
- * fechar com Esc sem perder a posição do teclado nem saltar o scroll da página.
- */
+/** lockOutside blocks outside clicks and Escape. Preserve the opening focus target when no Dialog.Trigger exists. */
 export function Modal({
   title,
   onClose,

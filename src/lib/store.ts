@@ -19,11 +19,9 @@ import type { AppConfig, EncoderInfo, EngineSnapshot, Target } from "./types";
 import { uid } from "./utils";
 import { createObsCoordinator, ObsConfigSaveError } from "./obsCoordinator";
 
-// Última remoção de destino (para o "desfazer").
 let pendingRemoval: { target: Target; index: number } | null = null;
 
-// Uma única sonda por WebView. Encoding/Ao vivo podem montar quase juntos; ambas aguardam
-// a mesma Promise em vez de abrir processos FFmpeg duplicados.
+// Share one encoder probe per webview to avoid duplicate FFmpeg processes.
 let encoderLoadPromise: Promise<EncoderInfo[]> | null = null;
 
 const EMPTY_SNAPSHOT: EngineSnapshot = {
@@ -33,9 +31,6 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
   targets: {},
 };
 
-/** Quantas plataformas estão "fora" na live: em erro, reconectando ou sem o sinal do OBS.
- *  Um filtro só pra LiveBar (chip vermelho) e pro aria-live do App — antes cada um tinha
- *  o seu e o leitor de tela dizia "todas" enquanto o chip contava uma caída. */
 export function downTargets(snapshot: EngineSnapshot): number {
   return Object.values(snapshot.targets).filter(
     (t) =>
@@ -45,10 +40,8 @@ export function downTargets(snapshot: EngineSnapshot): number {
   ).length;
 }
 
-// Lê a config e aplica as migrações que precisam acontecer antes da primeira tela.
 async function readConfig(t: T): Promise<AppConfig> {
   let config = await api.getConfig();
-  // Migração: configs antigas sem perfis ganham um "Padrão" com o estado atual.
   if (!config.profiles || config.profiles.length === 0) {
     const id = uid("prof");
     config = {
@@ -77,9 +70,7 @@ async function readConfig(t: T): Promise<AppConfig> {
 }
 
 export const useStore = create<State>((set, get) => {
-  // Persiste a config + mantém o perfil ativo em sincronia com o working set.
-  // Enfileira cada gravação imediatamente. Não dependemos de beforeunload (assíncrono e não
-  // garantido por WebView); a fila preserva a ordem quando duas edições acontecem em sequência.
+  // Queue writes immediately and in order; asynchronous beforeunload is not reliable in WebView.
   let saveChain: Promise<void> = Promise.resolve();
   let saveRevision = 0;
   let pendingSaves = 0;
@@ -107,13 +98,13 @@ export const useStore = create<State>((set, get) => {
       .catch((error) => {
         saveFailed = true;
         pendingSaves = Math.max(0, pendingSaves - 1);
-        console.error("Falha ao salvar configuração", error);
+        console.error("Failed to save configuration", error);
       });
   };
 
   const obs = createObsCoordinator({
     async flushSave() {
-      // New edits can be queued while we wait; OBS must see the latest saved value.
+      // New edits can arrive while awaiting persistence; OBS must see the latest saved value.
       let pending: Promise<void>;
       do {
         pending = saveChain;
@@ -123,7 +114,7 @@ export const useStore = create<State>((set, get) => {
     },
     configKey() {
       const config = get().config;
-      // In-memory only: never log/cache this key outside this coordinator.
+      // In-memory only: never log or persist this coordinator key.
       return JSON.stringify([config?.ingest, config?.settings.obsPassword]);
     },
     check: () => api.obsCheck(),
@@ -143,31 +134,25 @@ export const useStore = create<State>((set, get) => {
     uploadMbps: null,
     lastOperationId: null,
     async load(t) {
-      // A configuração é tudo de que a primeira tela precisa. A sonda real dos encoders abre
-      // processos FFmpeg e agora é lazy (Qualidade/Ao vivo/BORA), fora do caminho crítico do boot.
+      // Encoder probing starts native processes, so keep it off the initial configuration load path.
       set({ bootError: null });
       let config: AppConfig;
       try {
         config = await readConfig(t);
       } catch (error) {
-        // Config ilegível: sem isto `loaded` nunca virava true e o app ficava em
-        // "Abrindo sua bancada…" pra sempre. O App mostra o erro com "Tentar de novo".
-        console.error("Falha ao ler a configuração", error);
+        // Expose config failures and complete loading so the boot screen can offer recovery.
+        console.error("Failed to load configuration", error);
         set({ bootError: String(error) });
         return;
       }
       saveRevision = config.revision;
       saveFailed = false;
       set({ config, loaded: true });
-      // Semeia o estado de conexão do chat: a janela pode ter aberto (ou o popout montado)
-      // com o chat já no ar — sem isto o botão nasceria em "Conectar" com o chat rodando.
       try {
         set({ chatConnected: await api.chatRunning() });
       } catch {
-        /* backend indisponível (demo) — mantém o default */
+        /* Keep the disconnected default when the backend is unavailable. */
       }
-      // Selo "NOVO" de relatório sobrevive ao fechar o app: se existe sessão mais nova
-      // que a última visita a Relatórios, o selo volta aceso.
       try {
         const sessions = await api.listSessions(t);
         const newest = sessions[0];
@@ -175,14 +160,13 @@ export const useStore = create<State>((set, get) => {
           localStorage.getItem("corneta.lastSeenReportAt") || 0,
         );
         if (seenAt === 0) {
-          // Migração (1ª execução com o recurso): sessões antigas não acendem o selo —
-          // o usuário pode já tê-las visto antes de existir o carimbo.
+          // Existing sessions should not appear unread when the visit timestamp is first introduced.
           localStorage.setItem("corneta.lastSeenReportAt", String(Date.now()));
         } else if (newest && (newest.endedAt ?? newest.startedAt) > seenAt) {
           set({ unseenReport: true });
         }
       } catch {
-        /* sem sessões ainda */
+        /* An empty session directory is valid. */
       }
     },
     bindEngine(t) {
@@ -203,8 +187,6 @@ export const useStore = create<State>((set, get) => {
           (snapshot.state === "error" || snapshot.state === "stopped")
         )
           liveOperation = null;
-        // Entrou no ar → liga o chat sozinho (se tem fonte configurada e a opção está on).
-        // O streamer médio esquece o clique manual em outra tela — e conclui que "o chat não funciona".
         if (prev !== "live" && snapshot.state === "live") {
           const s = get();
           const st = s.config?.settings;
@@ -220,9 +202,7 @@ export const useStore = create<State>((set, get) => {
       });
     },
     bindConfigSync() {
-      // Config salva por outra janela → atualiza a base local SEM re-persistir (senão as
-      // janelas entrariam em loop sobrescrevendo o disco uma da outra). Fecha o clobber em
-      // que o popout revertia um destino/perfil criado na janela principal (e vice-versa).
+      // Apply other-window saves without persisting again to avoid write loops.
       return api.subscribeConfigChanged((config) => {
         saveRevision = Math.max(saveRevision, config.revision);
         if (pendingSaves === 0) {
@@ -231,7 +211,6 @@ export const useStore = create<State>((set, get) => {
         }
       });
     },
-    // Coordenadores finos: lê a config, chama o reducer PURO (configOps), persiste se mudou.
     addTarget(platformId) {
       const config = get().config;
       if (!config) return;
@@ -253,7 +232,7 @@ export const useStore = create<State>((set, get) => {
       const config = get().config;
       if (!config) return;
       const { config: next, removed } = cfgOps.removeTarget(config, id);
-      // Não apaga a chave do cofre — assim o "desfazer" restaura tudo, chave inclusa.
+      // Keep the vault key so undo can restore the destination completely.
       if (removed) pendingRemoval = removed;
       persist(next);
     },
@@ -300,7 +279,6 @@ export const useStore = create<State>((set, get) => {
       const config = get().config;
       if (!config) return;
       persist({ ...config, settings: { ...config.settings, ...patch } });
-      // Efeito colateral: ligar/desligar o autostart no nível do SO.
       if (patch.autostart !== undefined) void api.setAutostart(patch.autostart);
     },
     loadProfile(id) {
@@ -329,9 +307,7 @@ export const useStore = create<State>((set, get) => {
       persist(cfgOps.renameProfile(config, id, name));
     },
     async setKey(id, key) {
-      // O backend só aceita gravar em namespaces que já existem na config persistida. Um destino
-      // recém-adicionado aparece na UI antes do save assíncrono terminar; como colar a chave salva
-      // imediatamente, sem esta barreira o cofre pode receber o ID primeiro e rejeitá-lo.
+      // Wait for the persisted namespace before writing a newly created destination's vault key.
       await flushSave();
       await api.setKey(id, key);
       get().updateTarget(id, { hasKey: true });
@@ -348,7 +324,7 @@ export const useStore = create<State>((set, get) => {
       try {
         set({ encoders: await encoderLoadPromise });
       } catch (error) {
-        console.error("Falha ao detectar encoders", error);
+        console.error("Failed to detect encoders", error);
         set({ encodersError: true });
       } finally {
         encoderLoadPromise = null;
@@ -356,8 +332,6 @@ export const useStore = create<State>((set, get) => {
     },
     obs: null,
     async checkObs(force = false) {
-      // force = clique explícito em "Verificar OBS" → feedback visível (spinner);
-      // polls de fundo trocam o resultado em silêncio pra não piscar a tela.
       if (force || get().obs === null) set({ obs: "loading" });
       try {
         const r = await obs.check(force);
@@ -402,8 +376,7 @@ export const useStore = create<State>((set, get) => {
       }
     },
     async runObsCheck(force = false) {
-      // Background polls are fire-and-forget. Explicit actions use checkObs and
-      // receive failures; both paths publish the same shared connection state.
+      // Background polls handle errors; explicit checks propagate them after updating shared state.
       await get()
         .checkObs(force)
         .catch(() => {});
@@ -413,7 +386,6 @@ export const useStore = create<State>((set, get) => {
       set({ obs: null });
     },
     async runUploadTest() {
-      // Propaga o erro pra a tela mostrar um toast (ex.: sem internet).
       set({ uploadMbps: await api.testUpload() });
     },
     async start() {
@@ -449,8 +421,7 @@ export const useStore = create<State>((set, get) => {
           censored: false,
           viewers: { total: 0, anyLive: false, items: [] },
         });
-        // A UI é dona do request porque conhece a intenção e captura exatamente
-        // antes do invoke; do recebimento em diante, outcomes pertencem ao Rust.
+        // The UI owns request intent before invoke; native code owns subsequent outcomes.
         capture("live_start_requested", requestProperties);
         requestCaptured = true;
         await api.start(operation.id);
@@ -473,8 +444,6 @@ export const useStore = create<State>((set, get) => {
         if (liveOperation?.id === operation.id) liveOperation = null;
         throw error;
       }
-      // A1: liga o OBS junto (melhor-esforço) — e CONTA pra tela o que aconteceu,
-      // pra o toast não mentir "no ar" quando o OBS nem recebeu o play.
       if (get().config?.settings.autoStartObs) {
         try {
           await api.obsSetStream(true);
@@ -487,7 +456,7 @@ export const useStore = create<State>((set, get) => {
     },
     async stop() {
       await flushSave();
-      // Só marca relatório novo se chegou a ficar AO VIVO (cancelar no "starting" não gera live).
+      // Cancelled startup does not produce a completed live report.
       const wasLive = get().snapshot.state === "live";
       const operationId =
         liveOperation?.id ??
@@ -503,7 +472,7 @@ export const useStore = create<State>((set, get) => {
         try {
           await api.obsSetStream(false);
         } catch {
-          /* ignore */
+          /* OBS may be unavailable after the native stream has already stopped. */
         }
       }
       await api.stop(operationId);

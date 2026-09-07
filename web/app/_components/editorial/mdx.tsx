@@ -13,11 +13,7 @@ export interface EditorialMdxImagePresentation {
   zoomFitLabel: string;
 }
 
-/**
- * Componentes autorizados no documento atual. `ContentImage` aceita somente
- * um baseName declarado no frontmatter: o autor do MDX nunca controla src,
- * dimensões, alt, legenda ou proveniência pelo corpo do artigo.
- */
+// Images must come from validated frontmatter, not arbitrary MDX sources or dimensions.
 export function createEditorialMdxComponents({
   images,
   imagePresentation,
@@ -35,7 +31,7 @@ export function createEditorialMdxComponents({
     const image = baseName ? imagesByBaseName.get(baseName) : undefined;
     if (!image) {
       throw new Error(
-        `ContentImage referencia asset não declarado no frontmatter: ${baseName ?? "ausente"}`,
+        `ContentImage references an asset not declared in frontmatter: ${baseName ?? "missing"}`,
       );
     }
     const presentation = imagePresentation(image);

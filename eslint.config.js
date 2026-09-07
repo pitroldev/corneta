@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
+import sourceLanguage from "./scripts/eslint-source-language.mjs";
 
 export default tseslint.config(
   {
@@ -10,6 +11,11 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ["**/*.{js,mjs,ts,tsx}"],
+    plugins: { "corneta-source": sourceLanguage },
+    rules: { "corneta-source/english-source": "error" },
+  },
   {
     files: ["scripts/**/*.{js,mjs,ts}", "*.config.{js,ts}"],
     languageOptions: {
@@ -104,7 +110,7 @@ export default tseslint.config(
         {
           selector: "JSXOpeningElement[name.name='select']",
           message:
-            "Use o componente Select do design system em src/components/Select.tsx.",
+            "Use the design system Select component from src/components/Select.tsx.",
         },
       ],
     },

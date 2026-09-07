@@ -16,7 +16,6 @@ function ReportLibrary({
   return <ReportsList {...props} summaries={summaries} />;
 }
 
-/** Entry point da rota. Dados, lista e narrativa do detalhe vivem em módulos próprios. */
 export function ReportsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [summaryCache] = useState(() => new ReportLibraryCache());
@@ -28,7 +27,7 @@ export function ReportsScreen() {
     void refresh();
   }, [refresh]);
 
-  // Shared shell scroll must reset before painting a different report or the list.
+  // Reset shared shell scroll before painting another report or the list.
   useLayoutEffect(() => {
     const scroller = document.getElementById("screen-scroll");
     if (!scroller) return;

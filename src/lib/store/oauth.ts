@@ -78,7 +78,7 @@ export function createOauthSlice({
           oauthBrokerError: a.brokerError,
         });
       } catch {
-        /* sem login ainda */
+        /* Keep login unavailable if session status cannot be read. */
       }
     },
     async setYoutubeOauth(clientId, clientSecret) {
@@ -89,9 +89,7 @@ export function createOauthSlice({
       }));
       await get().setupOauth();
     },
-    // Só apaga as credenciais do cofre. Trocar de modo NÃO passa por aqui: a troca é
-    // `youtubeUseOfficial`, que mantém tudo salvo — apagar era o que fazia o login do YouTube
-    // desaparecer de vez quando o fluxo oficial não estava disponível pra assumir.
+    // Delete credentials only on explicit forgetting; mode switches retain them.
     async clearYoutubeOauth() {
       await api.clearYoutubeOauth();
       await get().setupOauth();
@@ -146,22 +144,19 @@ export function createOauthSlice({
           else if (a.state === "loggedout") next = { state: "out" };
           return { chatLogin: { ...s.chatLogin, [k]: next } };
         });
-        // Código chegou → abre o navegador direto na autorização (a URL completa, quando existe,
-        // já pré-preenche o código). O link no app continua como plano B.
         if (a.state === "code") {
-          // No fallback BYOK por device flow, copia o código antes de abrir o navegador. Twitch e
-          // o fluxo oficial PKCE do YouTube já levam tudo na URL e não entram neste bloco.
+          // Copy device-flow codes before opening authorization; URL-prefilled flows do not need this.
           if (a.userCode) {
             try {
               void navigator.clipboard.writeText(a.userCode);
             } catch {
-              /* clipboard indisponível */
+              /* Clipboard may be unavailable; the code remains visible for manual copying. */
             }
           }
           const url = a.verifyUriComplete || a.verifyUri;
           if (url) void openExternal(url);
         }
-        // Twitch logou e o chat está no ar → reconecta pra o IRC autenticar (mantém o histórico).
+        // Reconnect active Twitch chat after login so IRC authenticates, preserving history.
         if (
           who === "twitch" &&
           a.state === "connected" &&

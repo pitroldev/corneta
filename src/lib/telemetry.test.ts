@@ -57,8 +57,7 @@ function status(
     noticeVersion,
     usage,
     crashReports,
-    // Espelha o backend: o UUID existe sempre que ALGUMA finalidade está ativa —
-    // e `unset` é ativa, porque a base legal é legítimo interesse.
+    // Match the backend: any active purpose, including unset, retains an installation UUID.
     installationId:
       usage !== "disabled" || crashReports !== "disabled"
         ? INSTALLATION_ID
@@ -224,7 +223,7 @@ describe("telemetry facade", () => {
     expect(harness.loader).not.toHaveBeenCalled();
   });
 
-  it("não envia telemetria de produção sem o SHA completo da release", async () => {
+  it("does not send production telemetry without a full release SHA", async () => {
     const harness = sdkHarness();
     __configureTelemetryForTests({
       config: {
@@ -269,10 +268,7 @@ describe("telemetry facade", () => {
     );
   });
 
-  // Com legítimo interesse, um aviso mais novo é INFORMAÇÃO e não permissão:
-  // reapresentar o texto reabre a conversa, mas não interrompe um tratamento que
-  // continua legítimo. Quem interrompe é a oposição — coberta no teste seguinte.
-  it("segue enviando quando só o texto do aviso ficou velho", async () => {
+  it("keeps the effective preference when only the notice text is outdated", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(
@@ -283,7 +279,7 @@ describe("telemetry facade", () => {
     expect(harness.captures).toHaveLength(1);
   });
 
-  it("oposição desliga mesmo com o aviso velho — e não é religada por ele", async () => {
+  it("preserves disabled preferences when the notice is outdated", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(
@@ -302,9 +298,7 @@ describe("telemetry facade", () => {
     expect(harness.exceptions).toHaveLength(0);
   });
 
-  // O caso que a mudança pra opt-out cria: instalação nova, ninguém tocou em
-  // nada. Tem que enviar — é isso que "ligado por padrão" significa.
-  it("envia na instalação nova, sem ninguém ter mexido nos interruptores", async () => {
+  it("uses active defaults on a fresh installation", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("unset", "unset")));
@@ -342,10 +336,7 @@ describe("telemetry facade", () => {
     });
   };
 
-  // O buffer nasceu pra segurar o funil até um opt-in que agora não existe: com
-  // legítimo interesse a finalidade já está ativa no primeiro run, então o funil
-  // sai na hora em vez de esperar.
-  it("manda o funil do primeiro run direto, sem esperar decisão", async () => {
+  it("sends first-run funnel events under the active default", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("unset", "unset")));
@@ -358,9 +349,7 @@ describe("telemetry facade", () => {
     ]);
   });
 
-  // E o caminho que o buffer ainda protege: quem se opôs não tem funil nenhum
-  // enviado, nem no ato nem depois.
-  it("não guarda nem envia o funil de quem se opôs", async () => {
+  it("does not retain or send funnel events after opposition", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("disabled", "disabled")));
@@ -461,14 +450,14 @@ describe("telemetry facade", () => {
     expect(staleBeforeSend?.(preRevokePayload)).not.toBeNull();
     first.captures.splice(0);
 
-    // Fica aguardando a continuação do await de ensureSdk no mesmo tick.
+    // Let the awaiting ensureSdk continuation run in the same tick.
     capture("screen_viewed", { screen_id: "about" });
     const saving = setTelemetryConsent({
       usage: "enabled",
       crashReports: "disabled",
     });
 
-    // Não espera a persistência: revogar limpa batches e exception_steps já.
+    // Revocation clears batches immediately, before persistence resolves.
     expect(first.instance.opt_out_capturing).toHaveBeenCalledOnce();
     expect(first.instance.reset).toHaveBeenCalledWith(true);
     persistConsent?.();
@@ -666,8 +655,7 @@ describe("telemetry facade", () => {
     await Promise.resolve();
     expect(stale.instance.init).not.toHaveBeenCalled();
 
-    // O finally do loader obsoleto não pode apagar a Promise atual e abrir um
-    // terceiro loader quando chega um evento.
+    // An obsolete loader's finally must not clear the current promise.
     capture("screen_viewed", { screen_id: "settings" });
     expect(delayedLoader).toHaveBeenCalledTimes(2);
     releaseCurrent?.();

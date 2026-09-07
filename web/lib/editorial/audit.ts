@@ -105,7 +105,7 @@ async function validateImageFiles(
       assetIssue(
         document,
         "unsafe-public-asset",
-        "asset público saiu de publicRoot",
+        "public asset escaped publicRoot",
         field,
       ),
     );
@@ -116,7 +116,7 @@ async function validateImageFiles(
         assetIssue(
           document,
           "missing-public-asset",
-          `derivada pública não encontrada: ${image.src}`,
+          `public derivative not found: ${image.src}`,
           field,
         ),
       );
@@ -125,7 +125,7 @@ async function validateImageFiles(
         assetIssue(
           document,
           "public-asset-too-large",
-          `derivada tem ${bytes} bytes; o limite é ${EDITORIAL_ASSET_MAX_BYTES}`,
+          `derivative contains ${bytes} bytes; the limit is ${EDITORIAL_ASSET_MAX_BYTES}`,
           field,
         ),
       );
@@ -137,7 +137,7 @@ async function validateImageFiles(
       assetIssue(
         document,
         "unsafe-original-asset",
-        "master saiu de contentRoot",
+        "master escaped contentRoot",
         field,
       ),
     );
@@ -146,7 +146,7 @@ async function validateImageFiles(
       assetIssue(
         document,
         "missing-original-asset",
-        `master não encontrado: ${image.originalPath}`,
+        `master not found: ${image.originalPath}`,
         field,
       ),
     );
@@ -160,7 +160,7 @@ async function validateImageFiles(
       assetIssue(
         document,
         "asset-language-mismatch",
-        `imagem ${image.language} não corresponde ao conteúdo ${document.frontmatter.locale}`,
+        `image language ${image.language} does not match content locale ${document.frontmatter.locale}`,
         `${field}.language`,
       ),
     );
@@ -172,7 +172,7 @@ async function validateImageFiles(
       assetIssue(
         document,
         "asset-missing-from-manifest",
-        `asset não declarado em assets/manifest.json: ${image.src}`,
+        `asset is not declared in assets/manifest.json: ${image.src}`,
         field,
       ),
     );
@@ -182,7 +182,7 @@ async function validateImageFiles(
         assetIssue(
           document,
           "asset-manifest-mismatch",
-          `metadados divergem de assets/manifest.json: ${image.src}`,
+          `metadata differs from assets/manifest.json: ${image.src}`,
           field,
         ),
       );
@@ -225,7 +225,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "invalid-linked-public-resource",
-          `recurso público tem encoding inválido: ${rawHref}`,
+          `public resource has invalid encoding: ${rawHref}`,
           "body",
         ),
       );
@@ -238,7 +238,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "unsafe-linked-public-resource",
-          `recurso público saiu de publicRoot: ${rawHref}`,
+          `public resource escaped publicRoot: ${rawHref}`,
           "body",
         ),
       );
@@ -247,7 +247,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "missing-linked-public-resource",
-          `recurso público não encontrado: ${rawHref}`,
+          `public resource not found: ${rawHref}`,
           "body",
         ),
       );
@@ -265,7 +265,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "unsafe-source-path",
-          "repoPath saiu do repositório",
+          "repoPath escaped the repository",
           `sources.${index}.repoPath`,
         ),
       );
@@ -274,7 +274,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "missing-source-file",
-          `fonte interna não encontrada: ${source.repoPath}`,
+          `internal source not found: ${source.repoPath}`,
           `sources.${index}.repoPath`,
         ),
       );
@@ -289,7 +289,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "unregistered-person",
-          `${field} não existe em people.json: ${person}`,
+          `${field} does not exist in people.json: ${person}`,
           field,
         ),
       );
@@ -302,7 +302,7 @@ async function validateDocumentFiles(
         assetIssue(
           document,
           "invalid-published-person",
-          `${field} de conteúdo publicado precisa ser person com URL factual`,
+          `${field} on published content must be a person with a factual URL`,
           field,
         ),
       );
@@ -388,7 +388,7 @@ async function loadEditorialRegistries(
       issues.push({
         severity: "error",
         code: "duplicate-manifest-base-name",
-        message: `baseName duplicado: ${entry.baseName}`,
+        message: `duplicate baseName: ${entry.baseName}`,
         file: "assets/manifest.json",
       });
     }
@@ -406,7 +406,7 @@ async function loadEditorialRegistries(
       issues.push({
         severity: "error",
         code: "unapproved-asset-path",
-        message: `asset sem aprovação semântica do path completo: ${entry.originalPath} (allowlist v${EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS.version})`,
+        message: `asset lacks semantic approval for its complete path: ${entry.originalPath} (allowlist v${EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS.version})`,
         file: "assets/manifest.json",
       });
     }
@@ -416,14 +416,14 @@ async function loadEditorialRegistries(
       issues.push({
         severity: "error",
         code: "unsafe-manifest-original",
-        message: `master saiu de contentRoot: ${entry.originalPath}`,
+        message: `master escaped contentRoot: ${entry.originalPath}`,
         file: "assets/manifest.json",
       });
     } else if (!(await pathExists(originalFile))) {
       issues.push({
         severity: "error",
         code: "missing-manifest-original",
-        message: `master não encontrado: ${entry.originalPath}`,
+        message: `master not found: ${entry.originalPath}`,
         file: "assets/manifest.json",
       });
     } else {
@@ -433,9 +433,9 @@ async function loadEditorialRegistries(
           issues.push({
             severity: "error",
             code: "manifest-original-format-mismatch",
-            message: `${entry.originalPath} tem formato real ${metadata.format}${
+            message: `${entry.originalPath} has actual format ${metadata.format}${
               metadata.compression ? `/${metadata.compression}` : ""
-            }, incompatível com a extensão`,
+            }, incompatible with its extension`,
             file: "assets/manifest.json",
           });
         }
@@ -459,7 +459,7 @@ async function loadEditorialRegistries(
             issues.push({
               severity: "error",
               code: "embedded-original-raster-metadata",
-              message: `${entry.originalPath} contém metadados incorporados: ${embedded.join(
+              message: `${entry.originalPath} contains embedded metadata: ${embedded.join(
                 ", ",
               )}`,
               file: "assets/manifest.json",
@@ -470,7 +470,7 @@ async function loadEditorialRegistries(
         issues.push({
           severity: "error",
           code: "unreadable-manifest-original",
-          message: `${entry.originalPath} não é uma imagem legível: ${
+          message: `${entry.originalPath} is not a readable image: ${
             error instanceof Error ? error.message : String(error)
           }`,
           file: "assets/manifest.json",
@@ -483,7 +483,7 @@ async function loadEditorialRegistries(
         issues.push({
           severity: "error",
           code: "duplicate-manifest-src",
-          message: `src duplicado: ${derivative.src}`,
+          message: `duplicate src: ${derivative.src}`,
           file: "assets/manifest.json",
         });
       }
@@ -497,7 +497,7 @@ async function loadEditorialRegistries(
         issues.push({
           severity: "error",
           code: "unsafe-manifest-derivative",
-          message: `derivada saiu de publicRoot: ${derivative.src}`,
+          message: `derivative escaped publicRoot: ${derivative.src}`,
           file: "assets/manifest.json",
         });
         continue;
@@ -507,35 +507,37 @@ async function loadEditorialRegistries(
         issues.push({
           severity: "error",
           code: "missing-manifest-derivative",
-          message: `derivada não encontrada: ${derivative.src}`,
+          message: `derivative not found: ${derivative.src}`,
           file: "assets/manifest.json",
         });
       } else if (actualBytes !== derivative.bytes) {
         issues.push({
           severity: "error",
           code: "manifest-byte-mismatch",
-          message: `${derivative.src} declara ${derivative.bytes} bytes, mas tem ${actualBytes}`,
-          file: "assets/manifest.json",
-        });
-      } else if (actualBytes > EDITORIAL_ASSET_MAX_BYTES) {
-        issues.push({
-          severity: "error",
-          code: "manifest-asset-too-large",
-          message: `${derivative.src} ultrapassa ${EDITORIAL_ASSET_MAX_BYTES} bytes`,
+          message: `${derivative.src} declares ${derivative.bytes} bytes, but contains ${actualBytes}`,
           file: "assets/manifest.json",
         });
       }
 
       if (actualBytes !== null) {
+        if (actualBytes > EDITORIAL_ASSET_MAX_BYTES) {
+          issues.push({
+            severity: "error",
+            code: "manifest-asset-too-large",
+            message: `${derivative.src} exceeds ${EDITORIAL_ASSET_MAX_BYTES} bytes`,
+            file: "assets/manifest.json",
+          });
+        }
+
         try {
           const metadata = await sharp(publicFile).metadata();
           if (!imageFormatMatchesExtension(derivative.src, metadata)) {
             issues.push({
               severity: "error",
               code: "manifest-derivative-format-mismatch",
-              message: `${derivative.src} tem formato real ${metadata.format}${
+              message: `${derivative.src} has actual format ${metadata.format}${
                 metadata.compression ? `/${metadata.compression}` : ""
-              }, incompatível com a extensão`,
+              }, incompatible with its extension`,
               file: "assets/manifest.json",
             });
           }
@@ -546,7 +548,7 @@ async function loadEditorialRegistries(
             issues.push({
               severity: "error",
               code: "manifest-dimension-mismatch",
-              message: `${derivative.src} declara ${derivative.width}x${derivative.height}, mas tem ${metadata.width ?? "?"}x${metadata.height ?? "?"}`,
+              message: `${derivative.src} declares ${derivative.width}x${derivative.height}, but contains ${metadata.width ?? "?"}x${metadata.height ?? "?"}`,
               file: "assets/manifest.json",
             });
           }
@@ -568,7 +570,7 @@ async function loadEditorialRegistries(
               issues.push({
                 severity: "error",
                 code: "embedded-raster-metadata",
-                message: `${derivative.src} contém metadados incorporados: ${embedded.join(
+                message: `${derivative.src} contains embedded metadata: ${embedded.join(
                   ", ",
                 )}`,
                 file: "assets/manifest.json",
@@ -579,7 +581,7 @@ async function loadEditorialRegistries(
           issues.push({
             severity: "error",
             code: "unreadable-manifest-image",
-            message: `${derivative.src} não pôde ter dimensões verificadas: ${
+            message: `${derivative.src} dimensions could not be verified: ${
               error instanceof Error ? error.message : String(error)
             }`,
             file: "assets/manifest.json",

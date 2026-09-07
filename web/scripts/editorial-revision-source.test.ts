@@ -33,8 +33,8 @@ async function compare(previous: string, current: string) {
   return validateEditorialRevision(...normalized);
 }
 
-describe("normalização restrita à formatação do MDX", () => {
-  it("não exige data artificial por alinhamento de tabela e CRLF", async () => {
+describe("formatting-only MDX normalization", () => {
+  it("does not require an artificial date for table alignment and CRLF changes", async () => {
     const previous =
       "## Dados\r\n\r\n| Métrica | Valor |\r\n| --- | --- |\r\n| CPU | 10% |\r\n";
     const current =
@@ -42,7 +42,7 @@ describe("normalização restrita à formatação do MDX", () => {
     expect(await compare(previous, current)).toEqual([]);
   });
 
-  it("normaliza a quebra de linhas de texto dentro de JSX", async () => {
+  it("normalizes text wrapping inside JSX", async () => {
     const previous =
       '<Callout label="Aviso">\n  Revise a transmissão com o mesmo cuidado antes de compartilhar qualquer arquivo com outras pessoas.\n</Callout>';
     const current =
@@ -51,9 +51,9 @@ describe("normalização restrita à formatação do MDX", () => {
   });
 
   it.each([
-    ["texto", "Faça isto.", "Faça outra coisa."],
+    ["text", "Faça isto.", "Faça outra coisa."],
     [
-      "valor de tabela",
+      "table value",
       "| A | B |\n| --- | --- |\n| CPU | 10% |",
       "| A | B |\n| --- | --- |\n| CPU | 90% |",
     ],
@@ -63,22 +63,22 @@ describe("normalização restrita à formatação do MDX", () => {
       '<Steps label="Aviso">Texto.</Steps>',
     ],
     [
-      "propriedade",
+      "property",
       '<ContentImage baseName="first-image" />',
       '<ContentImage baseName="second-image" />',
     ],
     [
-      "espaço literal",
+      "literal spacing",
       '<Callout label="dois  espaços">Texto.</Callout>',
       '<Callout label="dois espaços">Texto.</Callout>',
     ],
     [
-      "código",
+      "code",
       '```js\nconst text = "dois  espaços";\n```',
       '```js\nconst text = "dois espaços";\n```',
     ],
   ])(
-    "continua cobrando revisão substancial para %s",
+    "still requires substantive revision for %s",
     async (_, previous, current) => {
       expect(await compare(previous, current)).toEqual([
         expect.objectContaining({
@@ -88,7 +88,7 @@ describe("normalização restrita à formatação do MDX", () => {
     },
   );
 
-  it("não normaliza metadados nem enfraquece a revisão de fonte interna", async () => {
+  it("does not normalize metadata or weaken internal-source review", async () => {
     const previous = snapshot("Texto.");
     const current = await normalizeEditorialRevisionSource(previous);
     expect(current.frontmatter).toBe(previous.frontmatter);

@@ -39,7 +39,6 @@ interface ProblemWindowGroup {
   windows: ProblemWindow[];
   totalSec: number;
   signals: string[];
-  /** União das plataformas que sentiram em qualquer trecho do grupo. */
   affected: string[];
   totalTargets: number;
   contributingApp?: string;
@@ -56,9 +55,7 @@ export function groupProblemWindows(
   };
 
   for (const window of windows) {
-    // Plataformas diferentes podem pedir ações diferentes. O texto da causa e a
-    // recomendação entram na chave para não fundir diagnósticos só porque ambos
-    // pertencem à categoria ampla "platform".
+    // Include cause and recommendation in the key so distinct platform diagnoses do not merge.
     const id = [
       window.causeKind,
       window.targetName ?? "",
@@ -260,10 +257,7 @@ function WindowGroupDisclosure({
   );
   const visibleSignals = group.signals.slice(0, 3);
   const hiddenSignalCount = group.signals.length - visibleSignals.length;
-  // "Onde travou": duração somada · quem sentiu · quando começou. Causa dentro do PC
-  // (app, cena, encoder, OBS→Corneta, sinal) atinge o vídeo ANTES de ele se dividir por
-  // plataforma, então vale "todas" mesmo sem nenhuma marcada; nas causas de rede/rota só
-  // entra quem de fato sentiu.
+  // Local causes affect the shared video before fan-out; network causes affect only identified destinations.
   const pcSide = !["network", "platform", "unknown"].includes(group.causeKind);
   const targetsLabel =
     group.affected.length === 0
@@ -330,7 +324,6 @@ function WindowGroupDisclosure({
       {open ? (
         <div className="pb-5 pl-5 sm:pl-6">
           <div className="max-w-4xl border-l-2 border-border-soft pl-4">
-            {/* Ordem do plano: impacto (onde travou) → por quê (a história) → o que fazer. */}
             <p className="text-sm text-ink">
               <span className="mr-2 text-xs font-bold uppercase tracking-wide text-ink-faint">
                 {t("reports.technical.incidents.impact")}
@@ -344,9 +337,6 @@ function WindowGroupDisclosure({
                   <h4 className="text-xs font-bold uppercase tracking-wide text-ink-faint">
                     {t("reports.technical.incidents.why")}
                   </h4>
-                  {/* Uma cadeia numerada, não uma lista: o primeiro passo é a causa (leva a
-                    cor do grupo), os seguintes são o que travou por causa dela e o que
-                    ficou de fora. O nome do aplicativo culpado fica em negrito. */}
                   <ol className="mt-2 space-y-0">
                     {visibleSignals.map((signal, index) => (
                       <li
@@ -436,7 +426,6 @@ function WindowGroupDisclosure({
   );
 }
 
-/** Põe em negrito a primeira ocorrência do termo (o aplicativo culpado) na frase. */
 function Highlight({ text, term }: { text: string; term?: string }) {
   if (!term) return <>{text}</>;
   const at = text.indexOf(term);

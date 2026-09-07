@@ -52,7 +52,7 @@ export function flushSummaryCache(): void {
     if (entries)
       storage?.setItem(KEY, JSON.stringify({ version: VERSION, entries }));
   } catch {
-    /* Optional cache. */
+    /* Cache failures must not prevent reading reports. */
   }
 }
 

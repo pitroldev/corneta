@@ -4,13 +4,13 @@ targets = ["x86_64-pc-windows-msvc"]
 [advisories]
 version = 2
 ignore = [
-  { id = "RUSTSEC-2024-0436", reason = "paste é transitivo de image/rav1e/simba; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
-  { id = "RUSTSEC-2026-0192", reason = "ttf-parser é transitivo de oar-ocr/imageproc; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
-  { id = "RUSTSEC-2025-0081", reason = "rust-unic é transitivo de urlpattern/Tauri; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
-  { id = "RUSTSEC-2025-0075", reason = "rust-unic é transitivo de urlpattern/Tauri; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
-  { id = "RUSTSEC-2025-0080", reason = "rust-unic é transitivo de urlpattern/Tauri; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
-  { id = "RUSTSEC-2025-0100", reason = "rust-unic é transitivo de urlpattern/Tauri; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
-  { id = "RUSTSEC-2025-0098", reason = "rust-unic é transitivo de urlpattern/Tauri; advisory apenas informativo, sem vulnerabilidade e sem upgrade seguro" },
+  { id = "RUSTSEC-2024-0436", reason = "paste is transitive through image/rav1e/simba; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser is transitive through oar-ocr/imageproc; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2025-0081", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2025-0075", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2025-0080", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2025-0100", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2025-0098", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
 ]
 
 [licenses]
@@ -39,6 +39,5 @@ wildcards = "deny"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# Única exceção: hotfix pinado do repositório oficial do notify-rust para retirar
-# quick-xml vulnerável do grafo Windows. O rev exato permanece no Cargo.lock.
+# Pinned upstream notify-rust hotfix removes vulnerable quick-xml from the Windows graph.
 allow-git = ["https://github.com/hoodie/notify-rust"]

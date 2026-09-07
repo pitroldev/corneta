@@ -1,13 +1,7 @@
-/**
- * Contrato de telemetria do desktop.
- *
- * Este arquivo e o equivalente Rust devem evoluir juntos. O frontend nunca
- * envia objetos livres: cada evento passa por esta allowlist antes de chegar
- * ao SDK e novamente no `before_send`.
- */
+/** Keep this contract aligned with Rust. Allowlist every event before the SDK and again at before_send. */
 
 export const TELEMETRY_SCHEMA_VERSION = 1;
-// Gêmeo do `NOTICE_VERSION` em src-tauri/src/telemetry.rs — os dois sobem juntos.
+// Must match NOTICE_VERSION in src-tauri/src/telemetry.rs.
 export const TELEMETRY_NOTICE_VERSION = "2026-08-02";
 
 export type TelemetryChoice = "unset" | "enabled" | "disabled";
@@ -52,7 +46,7 @@ export function isUuid(value: unknown): value is string {
   );
 }
 
-/** Dados inválidos vindos do backend não liberam coleta por acidente. */
+/** Malformed backend data must not enable collection. */
 export function normalizeTelemetryStatus(value: unknown): TelemetryStatus {
   if (!value || typeof value !== "object") return OPPOSED_TELEMETRY_STATUS;
   const raw = value as Partial<TelemetryStatus>;
@@ -65,8 +59,7 @@ export function normalizeTelemetryStatus(value: unknown): TelemetryStatus {
   ) {
     return {
       ...OPPOSED_TELEMETRY_STATUS,
-      // Um formato malformado nunca reaproveita uma decisão antiga. Manter a
-      // versão do aviso vazia também obriga a UI a apresentar o aviso atual.
+      // Discard malformed decisions and leave noticeVersion empty so the current notice appears.
       noticeVersion: "",
     };
   }
@@ -83,21 +76,11 @@ export function normalizeTelemetryStatus(value: unknown): TelemetryStatus {
   };
 }
 
-/** A finalidade está valendo?
- *
- *  `unset` conta como ATIVA. A base legal das duas é o legítimo interesse (LGPD
- *  art. 7º, IX), não o consentimento: o tratamento começa informado e para quando
- *  a pessoa se opõe. `disabled` é a oposição registrada (art. 18, §2) e vence
- *  sempre — inclusive quando o texto do aviso muda de versão, porque reapresentar
- *  o aviso não pode religar quem já disse não.
- *
- *  Gêmeo do `Consent::active` em `src-tauri/src/telemetry.rs`.
- *  Ver `docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`. */
+/** unset is active; disabled always wins, including after notice updates. Match Rust Consent::active. */
 export const telemetryPurposeActive = (choice: TelemetryChoice): boolean =>
   choice !== "disabled";
 
-/** Mostrar o aviso? Diferente de "pode enviar": o aviso reaparece quando o texto
- *  muda de versão, mas o envio segue pela oposição, não pela versão. */
+/** Notice visibility depends on version; collection depends on the recorded opposition state. */
 export function needsTelemetryDecision(status: TelemetryStatus): boolean {
   return (
     status.noticeVersion !== TELEMETRY_NOTICE_VERSION ||
@@ -106,8 +89,6 @@ export function needsTelemetryDecision(status: TelemetryStatus): boolean {
   );
 }
 
-/** Estado dos interruptores quando o aviso abre — espelha o que JÁ está valendo,
- *  senão a tela mostraria desligado enquanto o app envia. */
 export function telemetryConsentDraft(status: TelemetryStatus): {
   usage: boolean;
   crashReports: boolean;
@@ -735,9 +716,7 @@ const UNIX_PATH =
 const URL_LIKE = /https?:\/\/[^\s)\]}>,"']+/gi;
 
 function redactUrl(raw: string): string {
-  // Preserva somente frames do bundle local, incluindo :linha:coluna. É o
-  // mínimo necessário para casar o frame com o source map enviado no CI;
-  // URLs externas/configuráveis continuam opacas.
+  // Keep only local bundle frame positions for source-map matching; external URLs remain opaque.
   if (
     /^https?:\/\/(?:localhost|127\.0\.0\.1|tauri\.localhost)(?::\d+)?\/(?:assets|src)\/[A-Za-z0-9._/-]+(?::\d+){0,2}$/i.test(
       raw,
@@ -760,7 +739,7 @@ function redactUrl(raw: string): string {
   }
 }
 
-/** Redige uma cópia; nunca altera a mensagem/erro original mostrado localmente. */
+/** Redact a copy without changing the original local error. */
 export function redactTelemetryText(value: string, maxLength = 1_000): string {
   const redacted = value
     .replace(AUTHORIZATION, "Authorization=<redacted>")
@@ -809,17 +788,14 @@ const SAFE_EXCEPTION_NAMES: ReadonlySet<string> = new Set([
 const LOCAL_APP_STACK_LOCATION =
   /(?:https?|tauri):\/\/(?:localhost|127\.0\.0\.1|tauri\.localhost)(?::\d+)?\/(?:assets|src)\/[A-Za-z0-9._/-]+:\d+:\d+/gi;
 
-/** Nomes de exceção são dimensão técnica; títulos/mensagens livres não entram. */
+/** Exception names are bounded technical dimensions; free-form titles and messages are excluded. */
 export function normalizeTelemetryExceptionName(value: unknown): string {
   return typeof value === "string" && SAFE_EXCEPTION_NAMES.has(value)
     ? value
     : "Error";
 }
 
-/**
- * Reconstrói o stack apenas com locais do bundle que podem casar com source
- * maps. A primeira linha original contém `Error.message` e nunca é copiada.
- */
+/** Rebuild stacks from local bundle locations only; never copy the original Error.message line. */
 export function sanitizeTelemetryExceptionStack(
   value: unknown,
   name: unknown,
@@ -836,7 +812,6 @@ export function sanitizeTelemetryExceptionStack(
   ].join("\n");
 }
 
-/** Normaliza frases variáveis em uma dimensão pequena e estável. */
 export function normalizeErrorCode(
   error: unknown,
   fallback: TelemetryErrorCode = "unknown_error",
@@ -875,7 +850,6 @@ function eventName(value: string): value is TelemetryEventName {
   return Object.prototype.hasOwnProperty.call(EVENT_KEYS, value);
 }
 
-/** Valida propriedades fornecidas pelo app antes de chamar o SDK. */
 export function sanitizeTelemetryProperties(
   event: TelemetryEventName,
   properties: Record<string, unknown>,
@@ -1026,7 +1000,7 @@ export function redactExceptionList(value: unknown): UnknownRecord[] | null {
   return safe.length > 0 ? safe : null;
 }
 
-/** Mantém breadcrumbs úteis no issue sem aceitar mensagens ou argumentos livres. */
+/** Allow structured breadcrumbs only, never free-form messages or arguments. */
 export function redactExceptionSteps(value: unknown): UnknownRecord[] | null {
   if (!Array.isArray(value)) return null;
   const safe: UnknownRecord[] = [];
@@ -1073,9 +1047,7 @@ const TRANSPORT_KEYS = new Set([
 ]);
 
 function safeTransportProperty(key: string, value: unknown): unknown {
-  // `distinct_id` é o UUID visível/regenerável da instalação. IDs auxiliares
-  // gerados pelo SDK (`$device_id`/`$session_id`) não atravessam a allowlist,
-  // evitando uma segunda identidade que o titular não conseguiria consultar.
+  // Only the visible, rotatable installation UUID may identify events; reject auxiliary SDK device and session IDs.
   if (key === "distinct_id") return isUuid(value) ? value : undefined;
   if (key === "$process_person_profile")
     return value === false ? false : undefined;
@@ -1102,7 +1074,6 @@ export interface PostHogLikeEvent {
   [key: string]: unknown;
 }
 
-/** Última barreira chamada pelo `before_send` do SDK. */
 export function sanitizePostHogEvent(
   input: PostHogLikeEvent | null,
   context: TelemetryContext,
@@ -1151,7 +1122,6 @@ export function sanitizePostHogEvent(
     if (steps) safe.$exception_steps = steps;
   } else {
     const picked: Record<string, unknown> = {};
-    // `catalogEvent` foi validado acima; o ramo de exceção já saiu no outro lado.
     if (!catalogEvent) return null;
     for (const key of EVENT_KEYS[catalogEvent]) {
       if (key in input.properties) picked[key] = input.properties[key];
@@ -1170,8 +1140,7 @@ export function sanitizePostHogEvent(
     const value = safeTransportProperty(key, input.properties[key]);
     if (value !== undefined) safe[key] = value;
   }
-  // Reconstrói também o envelope: campos top-level acrescentados pelo SDK
-  // não fazem parte do contrato e não atravessam esta última barreira.
+  // Rebuild the envelope to exclude unknown top-level fields added by the SDK.
   return JSON.stringify(safe).length <= 24_576
     ? { event: input.event, properties: safe }
     : null;

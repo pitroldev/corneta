@@ -11,7 +11,7 @@ import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 
 const fail = (message) => {
-  console.error(`latest.json não gerado: ${message}`);
+  console.error(`latest.json was not generated: ${message}`);
   process.exit(1);
 };
 
@@ -29,18 +29,18 @@ const manifestPath = join(
 );
 
 if (!existsSync(tauriConfigPath) || !existsSync(packagePath)) {
-  fail("execute o script na raiz do repositório.");
+  fail("run the script from the repository root.");
 }
 
 const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, "utf8"));
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
 const version = String(tauriConfig.version ?? "").trim();
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
-  fail("`version` do Tauri não é um SemVer válido.");
+  fail("Tauri `version` is not valid SemVer.");
 }
 if (packageJson.version !== version) {
   fail(
-    `versões divergentes: tauri.conf.json=${version}, package.json=${packageJson.version ?? "ausente"}.`,
+    `version mismatch: tauri.conf.json=${version}, package.json=${packageJson.version ?? "missing"}.`,
   );
 }
 
@@ -49,16 +49,16 @@ const tag = String(
 ).trim();
 const expectedTag = `v${version}`;
 if (tag !== expectedTag) {
-  fail(`a tag deve ser exatamente ${expectedTag}; recebido ${tag || "vazio"}.`);
+  fail(`the tag must be exactly ${expectedTag}; received ${tag || "empty"}.`);
 }
 
 const repository = String(process.env.GITHUB_REPOSITORY ?? "").trim();
 if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
-  fail("GITHUB_REPOSITORY deve estar no formato owner/repo.");
+  fail("GITHUB_REPOSITORY must use the owner/repo format.");
 }
 
 if (!existsSync(nsisDir)) {
-  fail(`diretório NSIS ausente: ${nsisDir}.`);
+  fail(`NSIS directory missing: ${nsisDir}.`);
 }
 const installers = readdirSync(nsisDir, { withFileTypes: true })
   .filter(
@@ -66,19 +66,17 @@ const installers = readdirSync(nsisDir, { withFileTypes: true })
   )
   .map((entry) => resolve(nsisDir, entry.name));
 if (installers.length !== 1) {
-  fail(
-    `esperado exatamente um instalador NSIS; encontrados ${installers.length}.`,
-  );
+  fail(`expected exactly one NSIS installer; found ${installers.length}.`);
 }
 
 const installerPath = installers[0];
 const signaturePath = `${installerPath}.sig`;
 if (!existsSync(signaturePath)) {
-  fail(`assinatura do updater ausente para ${basename(installerPath)}.`);
+  fail(`updater signature missing for ${basename(installerPath)}.`);
 }
 const signature = readFileSync(signaturePath, "utf8").trim();
 if (!signature || signature.length > 16 * 1024 || signature.includes("\0")) {
-  fail("arquivo .sig vazio ou inválido.");
+  fail("empty or invalid .sig file.");
 }
 
 const verification = spawnSync(
@@ -102,7 +100,7 @@ const verification = spawnSync(
 );
 if (verification.error || verification.status !== 0)
   fail(
-    "a assinatura não corresponde ao instalador e à chave pública do aplicativo.",
+    "the signature does not match the installer and the application's public key.",
   );
 
 const [owner, repo] = repository.split("/");
@@ -141,7 +139,7 @@ const compliancePath = join(
   "corneta-third-party.zip",
 );
 if (!existsSync(compliancePath))
-  fail("pacote de conformidade ausente; execute pnpm compliance:prepare.");
+  fail("compliance archive missing; run pnpm compliance:prepare.");
 for (const file of [
   installerPath,
   signaturePath,
@@ -170,5 +168,5 @@ if (process.env.GITHUB_OUTPUT) {
 }
 
 console.log(
-  `latest.json criado para ${tag} / windows-x86_64 usando ${basename(installerPath)}.`,
+  `latest.json created for ${tag} / windows-x86_64 using ${basename(installerPath)}.`,
 );

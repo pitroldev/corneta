@@ -49,12 +49,9 @@ import { ObsQualityGuide } from "../components/ObsQualityGuide";
 import { FirstLiveChecklist } from "../components/FirstLiveChecklist";
 
 let prewarmedUpload = false;
-// "Liga no OBS" auto-abre UMA vez por execução do app (module-level: useRef resetava a
-// cada troca de tela e o acordeão reabria em toda visita).
+// Module state keeps the OBS setup prompt from reopening on every route visit.
 let autoOpenedObsOnce = false;
-// "Ir assim mesmo" no pré-voo vale só nesta execução do app (module-level, como o acordeão
-// acima): gravar em localStorage tornava um clique com pressa irreversível — o aviso do OBS
-// nunca mais voltava, nem quando a pessoa passava a usar OBS local.
+// The preflight bypass lasts only for this process; persisting it would hide future OBS warnings.
 let skippedPreflightOnce = false;
 
 export function GoLiveScreen({
@@ -99,8 +96,6 @@ export function GoLiveScreen({
     [enabled, t],
   );
   const canStart = !updating && enabled.length > 0 && problems.length === 0;
-  // Motivo do BORA estar travado (pra leitor de tela e legenda — o tooltip nativo
-  // não dispara em botão desabilitado).
   const blockReason = updating
     ? t("golive.block.updating")
     : enabled.length === 0
@@ -112,9 +107,7 @@ export function GoLiveScreen({
           })
         : "";
 
-  // Avisa quando o OBS realmente conecta (stopped/starting → live).
-  // Inicia com o estado ATUAL: se a tela montar já "live" (voltou pra aba
-  // durante a transmissão), não é transição — não re-dispara o toast.
+  // Initialize from the current state so remounting during a stream does not announce a new transition.
   const prevState = useRef<EngineState>(state);
   useEffect(() => {
     if (state === "live" && prevState.current !== "live") {
@@ -130,7 +123,6 @@ export function GoLiveScreen({
   const est = useMemo(() => estimate(config), [config]);
   const neededMbps = est.uploadKbps / 1000;
 
-  // Mesma régua da tela Qualidade (bandFit, margem 1.2x) — antes cada tela media diferente.
   const fit = bandFit(est.uploadKbps, uploadMbps);
   const bandTone = fit === "unknown" ? "default" : fit;
 
@@ -142,7 +134,6 @@ export function GoLiveScreen({
   useEffect(() => {
     if (encoders.length === 0) void refreshEncoders();
   }, [encoders.length, refreshEncoders]);
-  // Estado do OBS vem do store (compartilhado com o checklist/Configurações, cache de 5s).
   const obs = useStore((s) => s.obs);
   const runObsCheck = useStore((s) => s.runObsCheck);
   const runObs = () => runObsCheck(true);
@@ -157,7 +148,6 @@ export function GoLiveScreen({
     }
   };
 
-  // Pré-aquece a medição de banda na 1ª visita (fora do ar) pra a tela já chegar pronta.
   useEffect(() => {
     if (prewarmedUpload || live || starting || uploadMbps != null) return;
     prewarmedUpload = true;
@@ -168,8 +158,6 @@ export function GoLiveScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fora do ar, o status do OBS se mantém FRESCO (a cada 6s + no foco da janela) — o badge
-  // "não configurado" mentia depois que o usuário abria o OBS.
   useEffect(() => {
     if (live || starting) return;
     void runObsCheck();
@@ -183,8 +171,6 @@ export function GoLiveScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, starting]);
 
-  // "Liga no OBS" abre SOZINHO (uma vez por execução) quando o primeiro check dá "não
-  // configurado" — a ação mais importante do primeiro uso nascia escondida num acordeão.
   useEffect(() => {
     if (autoOpenedObsOnce) return;
     if (
@@ -197,10 +183,8 @@ export function GoLiveScreen({
     }
   }, [obs]);
 
-  // Guarda contra duplo clique: o snapshot "starting" demora a voltar do
-  // backend (o start() ainda salva a config antes do IPC), então trava local.
+  // Block duplicate clicks locally while config persistence delays the native starting snapshot.
   const [startBusy, setStartBusy] = useState(false);
-  // Pré-voo: OBS sabidamente fora do lugar no clique do BORA → oferece o conserto antes.
   const [preflightWarn, setPreflightWarn] = useState(false);
   const doStart = async () => {
     if (startBusy) return;
@@ -208,7 +192,6 @@ export function GoLiveScreen({
     setStartBusy(true);
     try {
       const obsRes = await start();
-      // O toast conta a VERDADE do momento — "No ar!" só sai na transição real (efeito acima).
       if (obsRes === "obs-ok") toast.success(t("golive.toast.obsPlay"));
       else if (obsRes === "obs-failed")
         toast.action(
@@ -219,9 +202,7 @@ export function GoLiveScreen({
       else toast.success(t("golive.toast.serverUp"));
     } catch (e) {
       const msg = errMsg(e);
-      // Cancelou no meio do setup? Sem toast de erro — quem cancelou já sabe o
-      // que fez. O backend devolve um CÓDIGO nesse caso, não uma frase, então a
-      // comparação sobrevive a qualquer idioma.
+      // Cancellation uses a stable backend code, independent of the active locale.
       if (!msg.includes(START_CANCELLED))
         toast.error(t("golive.toast.startFailed", { erro: msg }));
     } finally {
@@ -240,13 +221,10 @@ export function GoLiveScreen({
     }
     void doStart();
   };
-  // "Ir assim mesmo" = este fluxo não usa OBS local (fonte externa) — não naga de novo
-  // até fechar e abrir a Corneta.
   const skipPreflightThisRun = () => {
     skippedPreflightOnce = true;
     void doStart();
   };
-  // Socorro do limbo: 20s em "starting" sem OBS conectar → card de resgate com diagnóstico.
   const [rescue, setRescue] = useState(false);
   useEffect(() => {
     if (!starting || ingestLive) {
@@ -261,8 +239,6 @@ export function GoLiveScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingestLive, starting]);
 
-  // Cortar uma live de verdade → confirmação em 2 cliques (era a ÚNICA ação destrutiva do
-  // app sem confirmação — e mora exatamente onde ficava o BORA) → relatório fresquinho.
   const [confirmStop, setConfirmStop] = useState(false);
   const confirmStopAt = useRef(0);
   const onStop = async () => {
@@ -280,13 +256,11 @@ export function GoLiveScreen({
       setTimeout(() => setConfirmStop(false), 3000);
       return;
     }
-    // Duplo-clique acidental derrotaria a confirmação — o 2º clique só vale com uma
-    // pausa humana depois do 1º.
+    // Require a pause between confirmation clicks so an accidental double-click cannot stop the stream.
     if (Date.now() - confirmStopAt.current < 400) return;
     setConfirmStop(false);
     void onStop();
   };
-  // Cancelar antes de ficar no ar (não gerou live).
   const onCancel = async () => {
     await stop();
     toast.info(t("golive.toast.canceled"));
@@ -296,7 +270,7 @@ export function GoLiveScreen({
       await api.markMoment();
       toast.success(t("golive.toast.markerSaved"));
     } catch {
-      /* sem sessão gravando */
+      /* Marker failures must not interrupt the active stream. */
     }
   };
 
@@ -310,8 +284,7 @@ export function GoLiveScreen({
         : obs.reachable
           ? { tone: "warn" as const, label: t("golive.obs.status.notPointing") }
           : { tone: "bad" as const, label: t("golive.obs.status.missing") };
-  // Diagnóstico do resgate: senha errada do WebSocket chega como DADO (authFailed) e tem
-  // que ganhar de "não achei" — senão o app manda ligar um WebSocket que já tá ligado.
+  // Authentication failure takes precedence over the generic OBS-unavailable diagnosis.
   const rescueHint =
     obs === null || obs === "loading"
       ? null
@@ -397,10 +370,8 @@ export function GoLiveScreen({
         </Card>
       )}
 
-      {/* Título + categoria pra todas as plataformas logadas, de uma tacada. */}
       <StreamInfoCard />
 
-      {/* ---- BANCADA DE SETUP (some quando já está no ar) ---- */}
       {!live && (
         <Card className="mb-4">
           <Collapsible.Root open={obsOpen} onOpenChange={setObsOpen}>
@@ -524,7 +495,6 @@ export function GoLiveScreen({
                   </strong>
                   : {p.issues.join(", ")}
                 </span>
-                {/* A saída fica a 1 clique — antes o usuário travava numa plataforma que nunca tocou. */}
                 <button
                   onClick={() => onNavigate?.("platforms")}
                   className="text-xs font-bold text-brass hover:underline"
@@ -553,8 +523,6 @@ export function GoLiveScreen({
       {!live && !starting && enabled.length === 0 && (
         <Card className="mb-4 bg-surface-2 text-sm text-ink-muted">
           {rich(t, "golive.empty.noPlatforms", {
-            // Nome da tela — a chave é da área de Plataformas de propósito, pra
-            // as duas telas dizerem a mesma palavra.
             plataformas: (
               <strong className="text-ink">{t("platforms.title")}</strong>
             ),
@@ -571,10 +539,8 @@ export function GoLiveScreen({
         />
       )}
 
-      {/* Confirma a rede de proteção ANTES do BORA (e durante, lá embaixo). */}
       {!live && !starting && <SecurityPanel onAdjust={openSecurity} />}
 
-      {/* ---- SALA DE GUERRA (sobe pro topo quando está no ar) ---- */}
       {(live || starting) && (
         <>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
@@ -612,7 +578,6 @@ export function GoLiveScreen({
             </div>
           </div>
 
-          {/* O sinal do OBS SUMIU no meio da live (sem JÁ VOLTO): urgência máxima. */}
           {live &&
             enabled.some(
               (t) => snapshot.targets[t.id]?.state === "signal-lost",
@@ -657,7 +622,6 @@ export function GoLiveScreen({
               </Card>
             )}
 
-          {/* Resgate do limbo: 20s aguardando o OBS sem sinal → diagnóstico e saída. */}
           {starting && !ingestLive && rescue && (
             <Card className="mb-2 border-2 border-warn/40 bg-warn/10">
               <div className="flex items-start gap-3">
@@ -714,8 +678,7 @@ export function GoLiveScreen({
               {enabled.map((target, i) => {
                 const st = snapshot.targets[target.id];
                 const paused = st?.state === "paused";
-                // Métricas só quando há transmissão de verdade — semear com o preset fazia
-                // um destino travado parecer saudável ("6.0 Mbps / 60 FPS" sem nada fluindo).
+                // Show only observed metrics, never preset values for a destination that is not transmitting.
                 const flowing = st?.state === "live" || st?.state === "brb";
                 return (
                   <motion.div
@@ -745,7 +708,6 @@ export function GoLiveScreen({
                         )}
                         {st?.state === "error" && (
                           <div className="mt-0.5 flex flex-wrap gap-x-3">
-                            {/* Retry sem cortar a live: o backend relê a chave do cofre. */}
                             <button
                               onClick={() =>
                                 void api
@@ -790,7 +752,6 @@ export function GoLiveScreen({
                           value={flowing ? fmtUptime(st?.uptimeSec ?? 0) : "—"}
                         />
                       </div>
-                      {/* Em telas estreitas mantém ao menos Bitrate + Quedas. */}
                       <div className="flex gap-4 sm:hidden">
                         <MiniStat
                           label={t("golive.stat.bitrate")}
@@ -858,9 +819,7 @@ export function GoLiveScreen({
         </>
       )}
 
-      {/* ---- BOTÃO PRINCIPAL (rodapé fixo) ---- */}
       <div className="sticky -bottom-8 z-10 mt-4 border-t-2 border-border bg-bg pb-3 pt-3">
-        {/* Pré-voo: o OBS não está pronto — avisa SEM bloquear (dá pra ir assim mesmo). */}
         {preflightWarn && !live && !starting && (
           <div className="mb-2 rounded-md border-2 border-warn/40 bg-warn/10 p-3">
             <div className="flex items-center gap-2 text-sm font-bold text-warn">
@@ -895,8 +854,6 @@ export function GoLiveScreen({
           </div>
         )}
         {starting ? (
-          // Status ≠ ação: o rodapé inteiro era um botãozão de cancelar — o clique ansioso
-          // (costume herdado do BORA no mesmo lugar) matava a inicialização.
           <div className="flex items-stretch gap-2">
             <div className="flex h-14 flex-1 items-center justify-center gap-2.5 rounded-md bg-surface-2 font-display text-lg font-bold text-ink-muted">
               <Loader2 className="size-5 animate-spin" />{" "}
@@ -922,7 +879,7 @@ export function GoLiveScreen({
           </Button>
         ) : (
           <Button
-            variant="tomate"
+            variant="tomato"
             size="lg"
             className="w-full"
             disabled={!canStart || startBusy}
@@ -975,9 +932,6 @@ export function GoLiveScreen({
   );
 }
 
-/** "JÁ VOLTO agora": pausa manual (banheiro/água) — slate no ar com o mic mudo, sem parar
- *  o OBS nem derrubar nada. Só funciona quando a live subiu com o JÁ VOLTO/Guardião armado
- *  (é o compositor que segura o truque); desarmado, mostra o caminho pra armar. */
 function BrbNowButton({ live }: { live: boolean }) {
   const t = useT();
   const settings = useStore((s) => s.config!.settings);
@@ -985,14 +939,11 @@ function BrbNowButton({ live }: { live: boolean }) {
   const [busy, setBusy] = useState(false);
   const armed = settings.brbEnabled || settings.guardianEnabled;
 
-  // Com o slate manual NO AR, o botão "Voltei!" nunca some — mesmo que o streamer desarme
-  // o JÁ VOLTO nas Configurações no meio da live (senão o aviso ficava preso sem saída).
+  // Keep the resume action available even if BRB is disabled while a manual pause is active.
   if (!armed && !forced) {
     return live ? (
       <span className="max-w-52 text-right text-[11px] leading-tight text-ink-faint">
         {rich(t, "golive.brb.armHint", {
-          // Nome próprio, sem glosa: quem lê isto já viu a glosa no painel
-          // "Seu segurança" logo acima.
           jaVolto: (
             <strong className="text-ink-muted">
               {t("golive.bar.protection.brb")}
@@ -1020,7 +971,7 @@ function BrbNowButton({ live }: { live: boolean }) {
 
   return (
     <Button
-      variant={forced ? "tomate" : "subtle"}
+      variant={forced ? "tomato" : "subtle"}
       size="sm"
       onClick={toggle}
       disabled={!live || busy}
@@ -1044,7 +995,6 @@ const PLAT_LABEL: Record<string, string> = {
   kick: "Kick",
 };
 
-/** Define título (+jogo) da live em todas as plataformas logadas de uma vez. */
 function StreamInfoCard() {
   const t = useT();
   const chatLogin = useStore((s) => s.chatLogin);
@@ -1068,8 +1018,6 @@ function StreamInfoCard() {
     { ok: boolean; error?: string; warn?: string }
   > | null>(null);
 
-  // Teaser: sem conta logada o recurso era INVISÍVEL — e a chave pra destravar (login)
-  // morava escondida em Chat → Configurar → Conta. Agora ele se apresenta e leva até lá.
   if (targets.length === 0) {
     return (
       <Card className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -1094,7 +1042,7 @@ function StreamInfoCard() {
     );
   }
 
-  // O título é lembrado entre sessões — alimenta o broadcast automático do YouTube.
+  // The persisted title also feeds automatic YouTube broadcast creation.
   const persistTitle = () => {
     const trimmed = title.trim();
     if (trimmed !== settings.streamTitle) setSettings({ streamTitle: trimmed });
@@ -1243,8 +1191,6 @@ function StreamInfoCard() {
           </button>
           <p className="mt-1.5 text-[11px] text-ink-faint">
             {rich(t, "golive.streamInfo.youtubeNote", {
-              // Sem chave pro substantivo solto ("título"): o destaque cita o
-              // rótulo do campo logo acima, que é a mesma coisa por extenso.
               titulo: (
                 <strong className="text-ink-muted">
                   {t("golive.streamInfo.title")}
@@ -1258,7 +1204,6 @@ function StreamInfoCard() {
   );
 }
 
-/** Painel "Seu segurança": Guardião / JÁ VOLTO / Auto-bitrate visíveis e confirmáveis. */
 function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
   const t = useT();
   const settings = useStore((s) => s.config!.settings);
@@ -1286,8 +1231,6 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
               : t("golive.security.guardian.noTerms")
             : t("golive.security.guardian.desc.off"),
       experimental: true,
-      // Nasce desligado — fica visível pra a linha convidar a ligar (o escudo antes do
-      // estrago), não só informar.
       show: true,
     },
     {
@@ -1313,7 +1256,7 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
       label: t("golive.security.loudness.label"),
       desc: t("golive.security.loudness.desc"),
       experimental: false,
-      show: settings.loudnessNormalize, // opt-in → só aparece quando ligado
+      show: settings.loudnessNormalize,
     },
   ].filter((it) => it.show);
   return (
@@ -1398,8 +1341,6 @@ function Checkup({
   obs: ObsCheck | "loading" | null;
   onRecheck: () => void;
   onGuide?: () => void;
-  /** Abre o "Configura pra mim" direto da linha do OBS — o botão citado pelo texto
-   *  morava num acordeão que pode estar fechado. */
   onSetupObs?: () => void;
 }) {
   const { t, fmt } = useI18n();
@@ -1409,8 +1350,6 @@ function Checkup({
   const enabled = config.targets.filter((target) => target.enabled);
   const neededKbps = estimate(config).uploadKbps;
   const needed = neededKbps / 1000;
-  // Mesma régua (margem 1.2x) das telas Qualidade e Banda — o check-up dava verde
-  // exatamente onde as outras telas diziam "no limite".
   const upFit = bandFit(neededKbps, uploadMbps);
 
   return (
@@ -1505,8 +1444,6 @@ function Checkup({
           </>
         )}
       </div>
-      {/* Só quando algum destino recebe o vídeo DO OBS como saiu (cópia) — em transcode a
-          Corneta já força GOP 2s/CBR e a dica viraria ruído. E agora diz ONDE fica. */}
       {enabled.some(
         (target) => effectiveAction(config.mode, target) === "copy",
       ) && (
@@ -1553,7 +1490,6 @@ function CheckRow({
   ok?: boolean;
   warn?: boolean;
   detail?: string;
-  /** Controle que resolve a linha (ex.: "Configura pra mim") — a frase vira o botão. */
   action?: ReactNode;
 }) {
   const t = useT();
@@ -1562,7 +1498,6 @@ function CheckRow({
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
       <Icon className={cn("size-4 shrink-0", cls)} strokeWidth={2.4} />
-      {/* O estado era só ícone + cor — leitor de tela ouvia "Chaves" sem saber se tava certo. */}
       <span className="sr-only">
         {t(
           ok
@@ -1581,7 +1516,6 @@ function CheckRow({
 
 function StatePill({ state }: { state: TargetState }) {
   const t = useT();
-  // As CHAVES são o enum que vem do backend — só o `label` é texto de tela.
   const map: Record<TargetState, { label: string; cls: string; dot: string }> =
     {
       idle: {

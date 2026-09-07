@@ -4,6 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
 import { auditEditorialContent } from "./audit";
+import { EDITORIAL_ASSET_MAX_BYTES } from "./constants";
 import {
   embeddedRasterMetadata,
   imageFormatMatchesExtension,
@@ -32,6 +33,8 @@ async function auditSingleAsset(options: {
   derivative: Buffer | string;
   width?: number;
   height?: number;
+  declaredBytes?: number;
+  article?: { locale: "pt-BR" | "en"; imageLanguage: "pt-BR" | "en" };
 }) {
   const root = await mkdtemp(path.join(tmpdir(), "corneta-assets-"));
   temporaryRoots.push(root);
@@ -75,17 +78,53 @@ async function auditSingleAsset(options: {
               src,
               width: options.width ?? 4,
               height: options.height ?? 4,
-              bytes: derivativeBytes,
+              bytes: options.declaredBytes ?? derivativeBytes,
             },
           ],
           kind: "diagram",
           source: "original",
           rights: "owned",
-          language: "none",
+          language: options.article?.imageLanguage ?? "none",
         },
       ],
     }),
   );
+
+  if (options.article) {
+    const articleDirectory = path.join(
+      contentRoot,
+      options.article.locale,
+      "guides",
+      "multistream",
+    );
+    await mkdir(articleDirectory, { recursive: true });
+    await writeFile(
+      path.join(articleDirectory, "test-article.mdx"),
+      `---\n${JSON.stringify({
+        contentId: "guide_test_article",
+        locale: options.article.locale,
+        collection: "guides",
+        kind: "guide",
+        category: "multistream",
+        slug: "test-article",
+        status: "draft",
+        images: [
+          {
+            src,
+            originalPath,
+            baseName: options.baseName,
+            alt: "Synthetic connection diagram",
+            width: options.width ?? 4,
+            height: options.height ?? 4,
+            kind: "diagram",
+            source: "original",
+            rights: "owned",
+            language: options.article.imageLanguage,
+          },
+        ],
+      })}\n---\n\n## Start\n\nTest article.\n`,
+    );
+  }
 
   return auditEditorialContent({ contentRoot, publicRoot });
 }
@@ -95,6 +134,75 @@ function accessibleSvg(
 ) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><title>Connection diagram</title><desc>Static diagram used by the editorial test.</desc>${body}</svg>`;
 }
+
+describe("editorial asset diagnostics", () => {
+  it("reports expected and actual metadata in English", async () => {
+    const result = await auditSingleAsset({
+      baseName: "incorrect-metadata",
+      originalExtension: "svg",
+      original: accessibleSvg(),
+      derivativeExtension: "svg",
+      derivative: accessibleSvg(),
+      width: 7,
+      height: 9,
+      declaredBytes: 1,
+    });
+
+    expect(
+      result.issues.find((issue) => issue.code === "manifest-byte-mismatch")
+        ?.message,
+    ).toContain("declares 1 bytes, but contains");
+    expect(
+      result.issues.find(
+        (issue) => issue.code === "manifest-dimension-mismatch",
+      )?.message,
+    ).toContain("declares 7x9, but contains 100x100");
+  });
+
+  it("reports the asset-size budget even when the declared byte count differs", async () => {
+    const result = await auditSingleAsset({
+      baseName: "oversized-diagram",
+      originalExtension: "svg",
+      original: accessibleSvg(),
+      derivativeExtension: "svg",
+      derivative: accessibleSvg() + " ".repeat(EDITORIAL_ASSET_MAX_BYTES),
+      width: 100,
+      height: 100,
+      declaredBytes: 1,
+    });
+
+    expect(
+      result.issues.filter((issue) => issue.code === "manifest-byte-mismatch"),
+    ).toHaveLength(1);
+    expect(
+      result.issues.filter(
+        (issue) => issue.code === "manifest-asset-too-large",
+      ),
+    ).toHaveLength(1);
+    expect(
+      result.issues.find((issue) => issue.code === "manifest-asset-too-large")
+        ?.message,
+    ).toContain(`exceeds ${EDITORIAL_ASSET_MAX_BYTES} bytes`);
+  });
+
+  it("reports a language mismatch without localizing the diagnostic", async () => {
+    const result = await auditSingleAsset({
+      baseName: "wrong-language",
+      originalExtension: "svg",
+      original: accessibleSvg(),
+      derivativeExtension: "svg",
+      derivative: accessibleSvg(),
+      width: 100,
+      height: 100,
+      article: { locale: "pt-BR", imageLanguage: "en" },
+    });
+
+    expect(
+      result.issues.find((issue) => issue.code === "asset-language-mismatch")
+        ?.message,
+    ).toContain("image language en does not match content locale pt-BR");
+  });
+});
 
 describe("public editorial SVG safety", () => {
   it("accepts a passive, accessible SVG", () => {

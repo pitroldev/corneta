@@ -36,7 +36,7 @@ async function resolveWebRoot(): Promise<string> {
       return candidate;
     }
   }
-  throw new Error("Não encontrei web/content a partir do diretório atual.");
+  throw new Error("Could not locate web/content from the current directory.");
 }
 
 function todayUtc(): string {
@@ -54,7 +54,7 @@ function realIsoDate(value: string): boolean {
 function readValue(args: string[], index: number, option: string): string {
   const value = args[index + 1];
   if (!value || value.startsWith("--")) {
-    throw new Error(`${option} exige um valor.`);
+    throw new Error(`${option} requires a value.`);
   }
   return value;
 }
@@ -76,7 +76,7 @@ export function parseOptions(argv: string[]): Options {
     } else if (argument === "--warning-days") {
       const value = Number(readValue(args, index, argument));
       if (!Number.isInteger(value) || value < 0 || value > 365) {
-        throw new Error("--warning-days deve ser um inteiro entre 0 e 365.");
+        throw new Error("--warning-days must be an integer between 0 and 365.");
       }
       options.warningDays = value;
       index += 1;
@@ -85,7 +85,7 @@ export function parseOptions(argv: string[]): Options {
       if (
         !(["text", "json", "github"] as const).includes(value as OutputFormat)
       ) {
-        throw new Error("--format aceita text, json ou github.");
+        throw new Error("--format accepts text, json, or github.");
       }
       options.format = value as OutputFormat;
       index += 1;
@@ -95,12 +95,12 @@ export function parseOptions(argv: string[]): Options {
     } else if (argument === "--fail-on-overdue") {
       options.failOnOverdue = true;
     } else {
-      throw new Error(`Opção desconhecida: ${argument}`);
+      throw new Error(`Unknown option: ${argument}`);
     }
   }
 
   if (!realIsoDate(options.asOf)) {
-    throw new Error("--as-of deve usar uma data real no formato YYYY-MM-DD.");
+    throw new Error("--as-of must be a real date in YYYY-MM-DD format.");
   }
   return options;
 }
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
 
   if (audit.errorCount > 0) {
     throw new Error(
-      `O conteúdo tem ${audit.errorCount} erro(s); rode content:check antes da manutenção.`,
+      `Content has ${audit.errorCount} error(s); run content:check before maintenance.`,
     );
   }
 
@@ -136,7 +136,9 @@ async function main(): Promise<void> {
 
   if (options.failOnOverdue && queue.overdueCount > 0) {
     process.stderr.write(
-      `\nManutenção editorial vencida: ${queue.overdueCount} artigo(s).\n`,
+      `
+Editorial maintenance is overdue: ${queue.overdueCount} article(s).
+`,
     );
     process.exitCode = 1;
   }
@@ -145,7 +147,7 @@ async function main(): Promise<void> {
 if (isEditorialCliEntrypoint(import.meta.url)) {
   main().catch((error: unknown) => {
     process.stderr.write(
-      `Falha ao verificar manutenção editorial: ${
+      `Editorial maintenance check failed: ${
         error instanceof Error ? error.message : String(error)
       }\n`,
     );

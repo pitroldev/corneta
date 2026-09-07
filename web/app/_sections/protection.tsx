@@ -43,7 +43,6 @@ export function ChatSection({ t }: { t: T }) {
   );
 }
 
-/** Interruptor do app, em miniatura. `off` mostra o estado desligado. */
 function Toggle({ off = false }: { off?: boolean }) {
   return (
     <span
@@ -60,9 +59,6 @@ function Toggle({ off = false }: { off?: boolean }) {
   );
 }
 
-// O cartão de proteção pousa em papel, então declara tinta clara. O custo fica
-// colado no rodapé (`mt-auto`) pra os três cartões alinharem embaixo, e o ícone
-// é absoluto pra a frase não virar item de flex e se espremer numa coluna.
 const GUARD =
   "flex flex-col rounded-lg bg-surface p-[clamp(20px,2.4vw,28px)] text-cream shadow-pop-lg " +
   "[&_h3]:text-[1.28rem] [&_h3]:leading-[1.1] " +
@@ -101,7 +97,6 @@ export function Protection({ t }: { t: T }) {
               </BenefitNote>
             </BenefitCopy>
 
-            {/* Mesma arte que o app coloca no ar. */}
             <div
               className="grid min-h-[218px] place-content-center justify-items-center rounded-lg bg-[#14100a] bg-[image:var(--halftone-dark)] bg-[length:22px_22px] px-5 py-6.5 text-center text-cream shadow-pop-ink-lg"
               aria-label={t("protection.brb.art.aria")}
@@ -154,9 +149,6 @@ export function Protection({ t }: { t: T }) {
             </span>
           </div>
 
-          {/* O guardião fecha a fileira porque é o único EXPERIMENTAL dela — a
-              mesma ordem que a aba de Segurança do app usa. No meio, ele
-              emprestava a hesitação dele às duas redes que já estão prontas. */}
           <div className={GUARD}>
             <div className={GUARD_HEAD}>
               <i>
@@ -169,7 +161,7 @@ export function Protection({ t }: { t: T }) {
               <InfoIcon /> {t("protection.guard.privacy.cost")}
             </span>
             <span className={GUARD_SWITCH}>
-              <Sticker tone="tomate">
+              <Sticker tone="tomato">
                 {t("protection.guard.privacy.switch")}
               </Sticker>
             </span>

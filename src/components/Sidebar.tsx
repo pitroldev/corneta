@@ -25,9 +25,7 @@ export type Screen =
   | "about"
   | "settings";
 
-// Relatórios entra na jornada numerada (é o passo que FECHA o ciclo da live) — no rodapé
-// apagado ninguém descobria que o app gera relatório.
-// `id` é o identificador da tela (rota interna) — só as *Key* são texto de tela.
+// Navigation IDs are stable internal routes; only translation keys are display copy.
 const NAV: {
   id: Screen;
   labelKey: MessageKey;
@@ -76,7 +74,7 @@ const NAV: {
   },
 ];
 
-// Numeração dos utilitários do rodapé segue a nav (Alt+N contínuo, com ou sem Mesa).
+// Footer shortcuts continue Alt+N numbering, with or without Mesa.
 const SETTINGS_N = NAV.length + 1;
 const ABOUT_N = NAV.length + 2;
 
@@ -98,7 +96,6 @@ export function Sidebar({
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border-soft bg-panel p-4">
-      {/* Marca */}
       <div className="mb-9 flex items-center gap-3 px-1 pt-2">
         <div className="grid size-12 rotate-[-3deg] place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
           <Mascot className="size-7" />
@@ -157,7 +154,7 @@ export function Sidebar({
                 </span>
               </div>
               {item.id === "reports" && unseenReport && !active ? (
-                <span className="ml-auto -rotate-3 rounded-sm bg-tomate px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
+                <span className="ml-auto -rotate-3 rounded-sm bg-tomato px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
                   {t("sidebar.new")}
                 </span>
               ) : (
@@ -175,7 +172,6 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Configurações + Sobre + estado ao vivo */}
       <div className="mt-auto flex flex-col gap-2">
         <button
           onClick={() => onNavigate("settings")}
@@ -219,7 +215,7 @@ export function Sidebar({
           <button
             onClick={() => onNavigate("golive")}
             title={t("sidebar.live.title")}
-            className="flex w-full -rotate-1 items-center gap-2 rounded-md bg-tomate px-3 py-2.5 text-left text-white pop transition-transform hover:scale-[1.02]"
+            className="flex w-full -rotate-1 items-center gap-2 rounded-md bg-tomato px-3 py-2.5 text-left text-white pop transition-transform hover:scale-[1.02]"
           >
             <span className="size-2.5 rounded-full bg-white live-dot" />
             <span className="font-display text-sm font-extrabold uppercase tracking-wide">

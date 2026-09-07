@@ -74,8 +74,7 @@ export function ReportDetail({
   );
 
   const remove = useCallback(async () => {
-    // DeleteButton não espera a Promise: se a exclusão falhar (arquivo em uso, permissão),
-    // o aviso tem que sair daqui — senão o botão volta ao normal e o relatório fica, mudo.
+    // DeleteButton does not await this promise; report deletion failures here.
     try {
       await api.deleteSession(id);
     } catch {

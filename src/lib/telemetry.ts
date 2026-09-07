@@ -242,10 +242,7 @@ export function useTelemetry(): TelemetrySnapshot {
   );
 }
 
-// Os portões não olham a versão do aviso, e isso é deliberado: com legítimo
-// interesse, texto novo é INFORMAÇÃO e não pedido de permissão. Quem gate é a
-// oposição (`disabled`), que atravessa qualquer versão. Ver
-// `telemetryPurposeActive` e docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md.
+// Notice updates do not override opposition; see telemetryPurposeActive.
 function canCaptureUsage(): boolean {
   return (
     telemetryPurposeActive(snapshot.status.usage) &&
@@ -351,9 +348,7 @@ function beforeSend(
   epoch: number,
   installationId: string,
 ): PostHogLikeEvent | null {
-  // O gate fica preso à identidade desta instalação do SDK. Assim, mesmo se
-  // uma instância antiga conservar callbacks e o consentimento voltar ao
-  // estado anterior (ABA), ela não consegue enviar depois da revogação.
+  // Bind the gate to this SDK instance so stale callbacks cannot resume sending after an ABA state change.
   if (sdkEpoch !== epoch || snapshot.status.installationId !== installationId)
     return null;
   return sanitizePostHogEvent(
@@ -364,7 +359,7 @@ function beforeSend(
   );
 }
 
-/** `telemetry.json` é a única autoridade de consentimento persistente. */
+/** telemetry.json is the sole persistent authority for telemetry preferences. */
 function clearPostHogConsentStorage(): void {
   try {
     if (typeof localStorage !== "undefined") {
@@ -376,7 +371,7 @@ function clearPostHogConsentStorage(): void {
       for (const key of keys) localStorage.removeItem(key);
     }
   } catch {
-    // WebViews com storage indisponível continuam protegidas pelo gate/epoch.
+    // The gate and epoch still protect webviews without storage.
   }
   try {
     if (typeof document !== "undefined") {
@@ -387,7 +382,7 @@ function clearPostHogConsentStorage(): void {
       }
     }
   } catch {
-    // Cookies podem estar bloqueados; não há o que persistir nesse caso.
+    // Cookies may be blocked; there is nothing to clear in that case.
   }
 }
 
@@ -395,26 +390,22 @@ function clearSdkConsent(current: PostHogSdk | null): void {
   try {
     current?.clear_opt_in_out_capturing?.();
   } catch {
-    // A limpeza explícita abaixo cobre versões/mocks sem a API.
+    // Explicit cleanup below covers SDK versions or mocks without this API.
   }
   clearPostHogConsentStorage();
 }
 
-/**
- * Invalida também loaders em voo. O epoch impede que uma resolução antiga
- * reinstale o SDK; limpar a referência permite que o consentimento restante
- * abra uma instância nova sem esperar a Promise obsoleta.
- */
+/** Invalidate in-flight loaders by epoch; clear their references so a fresh instance need not await stale work. */
 function retireSdk(current: PostHogSdk | null): void {
   try {
     current?.opt_out_capturing?.();
   } catch {
-    // Revogação local não pode falhar por causa do SDK.
+    // SDK errors must not prevent local revocation.
   }
   try {
     current?.reset?.(true);
   } catch {
-    // A referência já não será reutilizada.
+    // This instance reference will not be reused.
   }
   clearSdkConsent(current);
 }
@@ -438,9 +429,7 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
 
   if (sdk) {
     if (sdkInstallationId !== snapshot.status.installationId) {
-      // Uma instância nova recebe o ID via bootstrap anônimo. Reusar `identify`
-      // transformaria o UUID em perfil identificado e conservaria um device_id
-      // auxiliar que a pessoa não consegue consultar/excluir.
+      // Bootstrap an anonymous installation ID; identify would create an identified profile and an auxiliary device ID.
       invalidateSdk();
     } else {
       clearSdkConsent(sdk);
@@ -507,9 +496,7 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
             !anyCurrentConsent() ||
             snapshot.status.installationId !== installationId
           ) {
-            // Um callback loaded atrasado não pode reabilitar a instância
-            // revogada. Se o mock reutilizou o mesmo objeto como instância
-            // atual, apenas ignora o callback antigo para não resetar a nova.
+            // Ignore stale loaded callbacks; do not reset a current instance reused by a mock.
             if (sdk !== loadedSdk) retireSdk(loadedSdk);
             return;
           }
@@ -528,7 +515,7 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
     .catch(() => null);
   sdkPromise = loading;
   void loading.finally(() => {
-    // Uma Promise de epoch antigo não pode apagar a referência da nova.
+    // An old loader must not clear the current promise.
     if (sdkPromise === loading) sdkPromise = null;
   });
   return loading;
@@ -537,7 +524,7 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
 function schedule(task: () => Promise<void>): void {
   const promise = task()
     .catch(() => {
-      // Telemetria nunca disputa a UX nem o pipeline de mídia.
+      // Telemetry failures must not interrupt the UI or media pipeline.
     })
     .finally(() => pending.delete(promise));
   pending.add(promise);
@@ -582,9 +569,7 @@ export async function setTelemetryConsent(input: {
     throw new Error("telemetry_backend_unavailable");
 
   const previous = snapshot.status;
-  // Oposição é sair de ATIVA (que inclui `unset`) pra `disabled` — com opt-out,
-  // comparar contra "enabled" deixaria de invalidar o SDK de quem nunca tinha
-  // mexido nos interruptores e acabou de desligar.
+  // Revoking unset also closes an active purpose; checking enabled alone would miss fresh installations.
   const revoked =
     (telemetryPurposeActive(previous.usage) && input.usage === "disabled") ||
     (telemetryPurposeActive(previous.crashReports) &&
@@ -598,8 +583,7 @@ export async function setTelemetryConsent(input: {
       previous.noticeVersion === TELEMETRY_NOTICE_VERSION || refusingBoth
         ? TELEMETRY_NOTICE_VERSION
         : previous.noticeVersion,
-    // Desabilitar fecha o gate no clique; habilitar só abre depois que o
-    // backend persistir com sucesso a decisão da versão atual do aviso.
+    // Disable immediately; enable only after the backend persists the decision.
     usage: input.usage === "disabled" ? "disabled" : previous.usage,
     crashReports:
       input.crashReports === "disabled" ? "disabled" : previous.crashReports,
@@ -667,7 +651,6 @@ export function capture<Name extends TelemetryEventName>(
   );
   if (!safe) return;
 
-  // React StrictMode executa alguns efeitos duas vezes em desenvolvimento.
   const signature = eventSignature(
     event,
     properties as Record<string, unknown>,
@@ -690,11 +673,6 @@ export function capture<Name extends TelemetryEventName>(
   });
 }
 
-/**
- * Única exceção ao no-op pré-consentimento: guarda somente o funil fechado do
- * onboarding em memória. Nada é persistido, o SDK não é carregado e o replay
- * só ocorre depois de um opt-in de uso da versão atual do aviso.
- */
 export function captureOnboarding(
   input: BufferedOnboardingTelemetryEvent,
 ): void {
@@ -774,8 +752,7 @@ export function captureException(
     seenErrors.set(error as object, errorId);
   recentErrors.set(signature, { id: errorId, at: now });
 
-  // O ID é diagnóstico local e continua disponível para copiar no boundary.
-  // Sem consentimento não sanitizamos para o SDK, não o carregamos e não enviamos.
+  // Keep the error ID locally available even when SDK reporting is disabled.
   if (!canCaptureCrashes()) return errorId;
 
   const safe = sanitizeExceptionProperties(
@@ -842,8 +819,7 @@ export function addStep(
 export function installGlobalErrorHandlers(): void {
   if (globalHandlersInstalled || typeof window === "undefined") return;
   globalHandlersInstalled = true;
-  // A janela flutuante roda em outra webview, mas compartilha este módulo. Sem
-  // o screen_id, um window.error de chat.html fica indistinguível da janela principal.
+  // Include screen_id to distinguish errors from the main and chat webviews.
   const screenId = window.location.pathname.endsWith("/chat.html")
     ? ("chat_popout" as const)
     : undefined;
@@ -877,7 +853,7 @@ export async function flushTelemetry(timeoutMs = 300): Promise<void> {
   ]);
 }
 
-/** Injeção isolada para testes; não é chamada pelo aplicativo. */
+/** Isolated test injection; never called by the application. */
 export function __configureTelemetryForTests(input: {
   config?: Partial<RuntimeConfig>;
   loader?: SdkLoader;

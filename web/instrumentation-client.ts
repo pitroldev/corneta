@@ -6,9 +6,7 @@ import {
 } from "./lib/client/telemetry";
 import { siteRoute } from "./lib/telemetry-schema";
 
-// Os listeners são manuais e globais para cobrir falhas anteriores à hidratação.
-// A importação do SDK continua dinâmica e só ocorre com configuração válida e
-// sem opt-out persistido/DNT/GPC.
+// Install early listeners before hydration and lazy SDK initialization.
 installSiteTelemetryListeners();
 void initializeSiteTelemetry().then((client) => {
   if (client) {
@@ -20,9 +18,7 @@ void initializeSiteTelemetry().then((client) => {
 });
 
 export function onRouterTransitionStart(url: string) {
-  // O novo documento ainda não chegou neste hook. Artigos são capturados pelo
-  // pequeno island montado junto do conteúdo, já com seu contentId allowlisted;
-  // emitir aqui geraria uma page view genérica e outra identificada.
+  // Count the initial document here; the article island owns its page view to avoid duplicates.
   const { routeId } = siteRoute(url);
   if (routeId === "help_article" || routeId === "guide_article") return;
   void captureSitePageView(url);

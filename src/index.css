@@ -9,11 +9,6 @@
     format("woff2-variations");
 }
 
-/* ============================================================
-   CORNETA — sistema de design v2
-   Direção: pôster/quadrinho. Blocos sólidos, sombras DURAS (offset, sem blur),
-   cantos secos, tipografia chunky com marca-texto. Nada de glow/borda genérica.
-   ============================================================ */
 @theme {
   --color-bg: #100b07;
   --color-surface: #1a130c;
@@ -29,12 +24,11 @@
   --color-brass: #ffb323;
   --color-brass-strong: #ffc857;
   --color-brass-ink: #2a1c00;
-  /* Latão como TINTA de texto (links, kicker, ação do toast). No breu é o próprio
-     latão; no papel escurece — ver o tema claro e a regra `.text-brass` abaixo. */
+  /* Text ink uses a darker brass token in the light theme; background brass remains unchanged. */
   --color-brass-text: var(--color-brass);
 
-  --color-tomate: #ff5a36;
-  --color-tomate-strong: #ff7a55;
+  --color-tomato: #ff5a36;
+  --color-tomato-strong: #ff7a55;
 
   --color-live: #ff4733;
   --color-ok: #56e39b;
@@ -43,24 +37,18 @@
   --color-info: #6aa6ff;
 
   --color-night: #0b0805;
-  /* Painel (sidebar/titlebar/popout) — temável; "night" fica só p/ sombras. */
   --color-panel: #0b0805;
 
   --font-display: "Baloo 2", "Segoe UI", system-ui, sans-serif;
   --font-sans: "Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif;
 
-  /* Cantos secos por padrão */
   --radius-sm: 4px;
   --radius-md: 7px;
   --radius-lg: 10px;
   --radius-xl: 14px;
 }
 
-/* Tema claro (papel/quadrinho) — mantém o latão e as sombras duras escuras.
-   Os tokens de status (ok/warn/bad/tomate/live) são mais fundos que no breu porque
-   também servem de TINTA em 11–13px sobre creme (WCAG 1.4.3 pede 4,5:1). Fundo
-   assim de escuro não aceita tinta night por cima — daí a regra "Tinta no papel"
-   logo abaixo, que troca night por branco nesses blocos. */
+/* Light-theme status colors must contrast both as text and as backgrounds; override status ink below. */
 :root[data-theme="light"] {
   --color-bg: #f3ead7;
   --color-surface: #fffaf0;
@@ -76,12 +64,10 @@
   --color-brass: #ffb323;
   --color-brass-strong: #ffc857;
   --color-brass-ink: #2a1c00;
-  /* #ffb323 sobre creme dá 1,5:1; este dá ≈5,8:1 sobre --color-bg. */
   --color-brass-text: #7a5200;
 
-  --color-tomate: #c93a1a;
-  /* Hover do bloco tomate: no papel a tinta é branca, então o "forte" escurece. */
-  --color-tomate-strong: #b23015;
+  --color-tomato: #c93a1a;
+  --color-tomato-strong: #b23015;
 
   --color-live: #d32f22;
   --color-ok: #14703d;
@@ -99,26 +85,13 @@
   );
 }
 
-/* ============================================================
-   Tinta no papel. Fora de @layer de propósito: regra sem camada vence as
-   utilities, então vale em cima de `text-brass`/`text-night` sem trocar classe
-   em tela nenhuma.
-   ============================================================ */
-/* Bloco de status/ação (bg-ok, bg-warn, bg-bad, bg-live, bg-tomate) com tinta
-   `night`: no breu a night (#0b0805) passa de 6:1; no papel a night é #241a0d e
-   sobre esses fundos mais fundos fica em 3–3,7:1 — o branco chega a 5–6:1. Vale
-   pra Badge, StatePill, chip da LiveBar, BORA AO VIVO e qualquer chip que copie a
-   receita `bg-X text-night`. Dentro das ilhas escuras (abaixo) segue o breu. */
+/* Keep these rules unlayered so they override Tailwind text utilities. */
 [data-theme="light"]
-  :is(.bg-ok, .bg-warn, .bg-bad, .bg-live, .bg-tomate).text-night:not(
+  :is(.bg-ok, .bg-warn, .bg-bad, .bg-live, .bg-tomato).text-night:not(
     :is(.bg-night, .bg-brass-ink) *
   ) {
   color: #fff;
 }
-/* Latão como tinta (links "Colar a chave →", kicker do SectionTitle, ação do
-   toast, StatePill JÁ VOLTO…): escurece pelo token --color-brass-text. Cobre
-   também os estados que pintam de latão (hover, group-hover, aba ativa, opção
-   marcada); `bg-brass` não muda. Variante nova de `text-brass` entra aqui. */
 [data-theme="light"]
   :is(
     .text-brass,
@@ -129,12 +102,10 @@
   ) {
   color: var(--color-brass-text);
 }
-/* Ilhas que continuam escuras no papel — o palco do replay (bg-night) e os chips
-   de ícone em chocolate (bg-brass-ink) — recebem de volta as tintas do breu:
-   latão e âmbar escurecidos somem sobre o preto. Mesmos valores do @theme. */
+/* Restore dark-theme ink inside dark replay and icon surfaces. */
 [data-theme="light"] :is(.bg-night, .bg-brass-ink, [class*="bg-brass-ink/"]) {
   --color-brass-text: var(--color-brass);
-  --color-tomate: #ff5a36;
+  --color-tomato: #ff5a36;
   --color-live: #ff4733;
   --color-ok: #56e39b;
   --color-warn: #ffc23d;
@@ -152,7 +123,6 @@
     color: var(--color-ink);
     font-family: var(--font-sans);
     background-color: var(--color-bg);
-    /* Só textura de meio-tom (print), sem glow de canto */
     background-image: radial-gradient(
       rgba(255, 179, 35, 0.045) 1px,
       transparent 1.5px
@@ -194,7 +164,6 @@
 }
 
 @layer utilities {
-  /* Sombra dura estilo adesivo/quadrinho — o oposto do glow */
   .pop {
     box-shadow: 4px 4px 0 0 var(--color-night);
   }
@@ -205,7 +174,6 @@
     box-shadow: 4px 4px 0 0 var(--color-brass-ink);
   }
 
-  /* Marca-texto: bloco de latão atrás do texto (highlighter) */
   .marker {
     background-image: linear-gradient(
       transparent 58%,
@@ -214,15 +182,14 @@
     );
     padding: 0 0.12em;
   }
-  .marker-tomate {
+  .marker-tomato {
     background-image: linear-gradient(
       transparent 58%,
-      var(--color-tomate) 58% 94%,
+      var(--color-tomato) 58% 94%,
       transparent 94%
     );
   }
 
-  /* Listra de acento (barra de latão à esquerda) */
   .accent-l {
     border-left: 4px solid var(--color-brass);
   }
@@ -249,7 +216,6 @@
     }
   }
 
-  /* Ticker "AO VIVO" */
   .marquee {
     animation: marquee 14s linear infinite;
   }
@@ -284,9 +250,7 @@
     opacity: 1;
   }
 }
-/* A centralização vem da propriedade `translate` do Tailwind v4 (translate: -50% -50%).
-   Aqui SÓ animamos `transform` (pop + subidinha) pra não somar outro -50% e jogar o
-   modal pro canto durante a animação. */
+/* Tailwind translate centers the modal; animate transform only to avoid applying the centering offset twice. */
 @keyframes modal-in {
   from {
     opacity: 0;
@@ -298,27 +262,18 @@
   }
 }
 
-/* ============================================================
-   Foco visível on-brand (teclado). FORA de @layer de propósito: estilos
-   sem camada vencem as utilities do Tailwind (ex.: `outline-none` dos inputs),
-   então o anel aparece mesmo onde o componente zera o outline. Traço seco de
-   latão, no espírito das sombras .pop — nada de glow. Só :focus-visible, então
-   clique de mouse não dispara.
-   ============================================================ */
+/* Unlayered focus-visible rules override outline-none utilities without adding rings to mouse clicks. */
 :focus-visible {
   outline: 3px solid var(--color-brass);
   outline-offset: 2px;
   border-radius: 2px;
 }
-/* Sobre fundo latão (item ativo da sidebar, botões primários) o anel de latão
-   some — ali ele vira tinta escura. */
+/* Brass backgrounds require dark focus rings. */
 [data-on-brass]:focus-visible,
 [data-on-brass] :focus-visible {
   outline-color: var(--color-brass-ink);
 }
-/* No papel o anel de latão também some (1,5:1 sobre o creme): vira tinta (>10:1).
-   Sobre latão a tinta e o brass-ink são praticamente a mesma cor, então a regra
-   de cima segue de pé. Nas ilhas escuras (palco do replay) volta o latão. */
+/* Use dark focus rings on light surfaces and brass rings inside dark surfaces. */
 :root[data-theme="light"] :focus-visible {
   outline-color: var(--color-ink);
 }
@@ -326,9 +281,7 @@
   outline-color: var(--color-brass);
 }
 
-/* Respeita quem pede menos movimento: corta as animações infinitas (pulso AO
-   VIVO, marquee, mascote) e encurta transições. O Framer Motion é tratado via
-   <MotionConfig reducedMotion="user"> no App. */
+/* Disable CSS motion here; MotionConfig handles Framer Motion's reduced-motion behavior. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -345,11 +298,6 @@
   }
 }
 
-/* ============================================================
-   Troca de tema: a corneta SOPRA o tema novo — um sopro de latão (.wash) + ondas
-   sonoras concêntricas (.ring) blastando do ponto do clique. Latão sólido, sem glow,
-   no espírito megafone/pôster. Disparado em src/lib/theme.ts.
-   ============================================================ */
 .theme-blast {
   position: fixed;
   inset: 0;
@@ -400,9 +348,7 @@
   }
 }
 
-/* Enquanto `.theme-anim` está no <html> (só durante a troca), as cores DERRETEM pro
-   tema novo em vez de pular seco — é o que tira o "brusco". Fora dessa janela, os
-   hovers/estados normais seguem rápidos. Desligado pra quem pede menos movimento. */
+/* Limit global color transitions to theme changes; normal hover states remain immediate. */
 @media (prefers-reduced-motion: no-preference) {
   html.theme-anim,
   html.theme-anim *,

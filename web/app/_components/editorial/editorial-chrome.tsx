@@ -8,7 +8,6 @@ import type { SiteCtaId } from "@/lib/telemetry-schema";
 export interface EditorialChromeLink {
   href: string;
   label: string;
-  /** Texto mais descritivo quando o rótulo visual não basta para a marca. */
   ariaLabel?: string;
   hrefLang?: string;
   ctaId?: SiteCtaId;
@@ -19,7 +18,6 @@ export interface EditorialChromeLinks {
   help: EditorialChromeLink;
   guides: EditorialChromeLink;
   search: EditorialChromeLink;
-  /** Link já resolvido para a versão equivalente no outro idioma. */
   language?: EditorialChromeLink;
 }
 
@@ -30,10 +28,6 @@ export interface EditorialHeaderProps {
   navLabel: string;
 }
 
-/**
- * Cabeçalho editorial sem estado no cliente. Os três destinos permanecem
- * visíveis em telas estreitas e com zoom alto; não há menu escondido por JS.
- */
 export function EditorialHeader({
   locale,
   links,
@@ -98,7 +92,6 @@ export interface EditorialChromeProps extends EditorialHeaderProps {
   mainId?: string;
 }
 
-/** Casca compartilhada pelos hubs e artigos. Continua sendo Server Component. */
 export function EditorialChrome({
   children,
   footer,

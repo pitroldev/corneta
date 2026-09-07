@@ -40,13 +40,13 @@ describe("editorial search", () => {
     ),
   ];
 
-  it("ignora caixa, acentos e pontuação", () => {
+  it("ignores case, accents, and punctuation", () => {
     expect(normalizeEditorialSearch("  TRANSMISSÃO, estável! ")).toBe(
       "transmissao estavel",
     );
   });
 
-  it("exige todos os termos e ordena pelo campo mais relevante", () => {
+  it("requires all terms and ranks by the most relevant field", () => {
     expect(searchPublishedEditorial(documents, "upload multistream")).toEqual([
       documents[0],
     ]);
@@ -55,7 +55,7 @@ describe("editorial search", () => {
     ]);
   });
 
-  it("aceita somente o primeiro valor e limita o tamanho da consulta", () => {
+  it("accepts only the first value and bounds query length", () => {
     expect(sanitizeEditorialSearchQuery(["  OBS  ", "upload"])).toBe("OBS");
     expect(sanitizeEditorialSearchQuery("x".repeat(200))).toHaveLength(120);
   });

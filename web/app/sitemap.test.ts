@@ -4,8 +4,8 @@ vi.mock("server-only", () => ({}));
 
 import sitemap from "./sitemap";
 
-describe("sitemap editorial", () => {
-  it("publica as Fases 1, 2 e 3 completas sem inventar traduções", async () => {
+describe("editorial sitemap", () => {
+  it("publishes the complete editorial catalog without inventing translations", async () => {
     const entries = await sitemap();
     const paths = entries.map((entry) => new URL(entry.url).pathname);
 

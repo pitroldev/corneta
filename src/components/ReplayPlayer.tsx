@@ -1,14 +1,3 @@
-// ============================================================
-// Player do replay: o vídeo da live tocando COM o relatório correndo junto.
-//
-// A ideia inteira cabe numa frase: existe UM cursor, em epoch ms, e tudo se pendura nele.
-// O vídeo tocando move o cursor; clicar num evento, numa janela problemática ou no gráfico
-// move o cursor; o chat mostra o que tinha sido dito até o cursor. Nenhuma das pontas sabe
-// da outra — todas falam com o mesmo número.
-//
-// A matemática de epoch ↔ tempo de vídeo NÃO mora aqui: está em lib/replay.ts, que é núcleo
-// puro e testado. Aqui é só o pedaço que precisa de DOM.
-// ============================================================
 import {
   useCallback,
   useEffect,
@@ -61,15 +50,12 @@ import {
 import { Select } from "./Select";
 import { Button } from "./ui";
 
-/** Pedido de salto vindo de FORA (um clique num evento do relatório). O `nonce` existe
- *  porque clicar duas vezes no MESMO evento tem que saltar as duas vezes — comparar só o
- *  instante faria o segundo clique não fazer nada. */
+/** The nonce makes repeated seeks to the same timestamp observable. */
 export interface SeekRequest {
   epoch: number;
   nonce: number;
 }
 
-/** Marca na régua do tempo (evento, janela problemática, destaque). */
 export interface ReplayTick {
   t: number;
   color: string;
@@ -112,7 +98,6 @@ export function ReplayPlayer({
   );
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
-  /** Vídeo + régua juntos — é este bloco que vai pra tela cheia. */
   const stageRef = useRef<HTMLDivElement>(null);
 
   const idx: ReplayIndex = useMemo(
@@ -143,19 +128,15 @@ export function ReplayPlayer({
   const [showDeleted, setShowDeleted] = useState(false);
   const [clipFrom, setClipFrom] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  // Apagar é irreversível e são dezenas de GB — dois toques, como o resto do app.
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
-  // O ajuste de sincronia é ferramenta de conserto, não de uso diário: fica guardado e
-  // abre sozinho quando a âncora foi estimada, que é exatamente quando ele é necessário.
   const [showOffset, setShowOffset] = useState(false);
   const [previewOk, setPreviewOk] = useState(false);
   const [loadedPath, setLoadedPath] = useState<string | null>(null);
   const [failedPath, setFailedPath] = useState<string | null>(null);
 
-  // O offset entra no índice sem reparsear a sessão: arrastar o ajuste tem que responder
-  // na hora, senão o streamer não consegue calibrar olhando.
+  // Apply offset changes without reparsing the session to keep calibration responsive.
   const tuned = useMemo(() => ({ ...idx, offsetMs: offset }), [idx, offset]);
 
   const segment = tuned.segments[segIndex];
@@ -176,13 +157,9 @@ export function ReplayPlayer({
     (r) => r.reason && r.reason !== "stopped",
   );
 
-  // Cada arquivo é liberado no escopo do asset UM a UM, na hora em que vai tocar — não a
-  // pasta inteira do streamer.
+  // Grant asset access per recording file, never to the entire directory.
   useEffect(() => {
-    // `in`, e NÃO `urls[path]` truthy. O caminho de falha guarda "" pra marcar "já tentei
-    // e não deu" — com o teste de verdade, esse "" seria falsy, o efeito tentaria de novo,
-    // guardaria "" de novo, e o arquivo apagado na mão viraria um laço infinito de
-    // chamadas ao backend em vez de um aviso.
+    // An empty cached URL marks a failed attempt; truthiness would cause an infinite retry loop.
     if (!segment || codecUnsupported || segment.path in urls) return;
     let alive = true;
     void api
@@ -191,7 +168,6 @@ export function ReplayPlayer({
         if (alive) setUrls((prev) => ({ ...prev, [segment.path]: u }));
       })
       .catch(() => {
-        // Arquivo apagado na mão: vira aviso, não erro vermelho.
         if (alive) setUrls((prev) => ({ ...prev, [segment.path]: "" }));
       });
     return () => {
@@ -206,9 +182,7 @@ export function ReplayPlayer({
     [onPlayhead, tuned],
   );
 
-  /** Único caminho de salto. Tudo (teclado, clique na régua, evento do relatório,
-   *  fim de segmento) passa por aqui, e por isso não há dois jeitos de a posição
-   *  ficar dessincronizada do vídeo. */
+  /** Route all seek inputs through this function to keep video and cursor positions synchronized. */
   const seekGlobal = useCallback(
     (g: number, keepPlaying = playing) => {
       const clamped = Math.max(0, Math.min(tuned.totalMs, g));
@@ -217,10 +191,7 @@ export function ReplayPlayer({
       setGlobalMs(clamped);
       emitPlayhead(clamped);
       const v = videoRef.current;
-      // Só dá pra mexer no `currentTime` DEPOIS que os metadados carregaram; antes disso
-      // a atribuição é engolida em silêncio. Isso acontece de verdade no primeiro clique
-      // de um relatório recém-aberto (arquivo grande, disco lento) — e o sintoma seria o
-      // pior: o clique "não faz nada" e o streamer conclui que o replay está quebrado.
+      // Defer currentTime assignment until metadata loads; earlier seeks can be discarded.
       if (p.index !== segIndex || !v || v.readyState < 1) {
         if (p.index !== segIndex) setSegIndex(p.index);
         pendingSeek.current = { sec: p.localSec, play: keepPlaying };
@@ -233,7 +204,6 @@ export function ReplayPlayer({
 
   const pendingSeek = useRef<{ sec: number; play: boolean } | null>(null);
 
-  // Salto pedido de fora (clique num evento/janela/destaque do relatório).
   useEffect(() => {
     if (!seek) return;
     const g = globalAtEpoch(tuned, seek.epoch);
@@ -252,8 +222,7 @@ export function ReplayPlayer({
     else v.pause();
   }, []);
 
-  // Teclado. Os atalhos só ficam ativos quando o palco do replay tem foco: a barra de
-  // espaço continua acionando normalmente qualquer botão do relatório.
+  // Scope shortcuts to the replay stage so Space still activates other report buttons.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
@@ -308,9 +277,7 @@ export function ReplayPlayer({
     if (videoRef.current) videoRef.current.muted = next;
   };
 
-  /** Tela cheia no CONTÊINER, não no `<video>`: em tela cheia do elemento o Chromium
-   *  desenha os controles nativos dele por cima, e a régua sincronizada — que é a razão
-   *  de este player existir — sumiria justo na hora de olhar de perto. */
+  /** Fullscreen the container so custom controls and the synchronized timeline remain visible. */
   const toggleFullscreen = () => {
     const box = stageRef.current;
     if (!box) return;
@@ -326,8 +293,6 @@ export function ReplayPlayer({
     emitPlayhead(g);
   };
 
-  /** Fim de um arquivo não é fim do replay: emenda no próximo segmento. Uma sessão tem N
-   *  arquivos porque o gravador pode ter morrido e retomado no meio da live. */
   const onEnded = () => {
     if (segIndex + 1 < tuned.segments.length) {
       setSegIndex(segIndex + 1);
@@ -342,8 +307,7 @@ export function ReplayPlayer({
     if (!v || !segment) return;
     setLoadedPath(segment.path);
     setFailedPath(null);
-    // Trocar o `src` zera velocidade e volume do elemento. Sem reaplicar, emendar no
-    // segmento seguinte devolvia o vídeo pra 1× e volume cheio no meio da revisão.
+    // Changing src resets playback rate and volume; restore both for the next segment.
     v.playbackRate = rate;
     v.volume = volume;
     v.muted = muted;
@@ -360,7 +324,7 @@ export function ReplayPlayer({
     try {
       await api.setSessionOffset(sessionId, clamped);
     } catch {
-      // Ajuste é conforto: falhar em persistir não tira o replay do ar.
+      // An offset persistence failure must not interrupt playback.
     }
   };
 
@@ -380,8 +344,6 @@ export function ReplayPlayer({
     }
   };
 
-  /** Exporta o trecho entre a marca e o cursor. Corta com cópia de bitstream — é rápido e
-   *  não recodifica, então o clipe sai com a qualidade que foi ao ar. */
   const exportClip = async () => {
     if (clipFrom == null) {
       setClipFrom(globalMs);
@@ -396,8 +358,7 @@ export function ReplayPlayer({
     const pa = pointAtGlobal(tuned, a);
     const pb = pointAtGlobal(tuned, b);
     if (!pa || !pb || pa.index !== pb.index) {
-      // Trecho que atravessa a emenda de dois arquivos exigiria concat; não vale a
-      // complexidade pra um caso que só acontece quando o gravador morreu no meio.
+      // Cross-segment clips require concatenation and are not supported.
       toast.error(t("replay.clip.crossSegment"));
       setClipFrom(null);
       return;
@@ -437,7 +398,6 @@ export function ReplayPlayer({
     }
   };
 
-  // Mensagens até o cursor. `deleted` sai por padrão: o replay respeita a moderação.
   const cursorEpoch = epochAtGlobal(tuned, globalMs);
   const [chatPage, setChatPage] = useState<ChatPage | null>(null);
   const chat = chatPage?.messages ?? initialChat;
@@ -464,10 +424,7 @@ export function ReplayPlayer({
     cursorEpoch == null ? 0 : upperBoundChat(chat, cursorEpoch);
   const visibleChat = useMemo(() => {
     if (chatCursor === 0 || !chat.length) return [];
-    // BUSCA BINÁRIA, não `filter`. O array já vem ordenado por tempo, e isto roda a cada
-    // `timeupdate` (~4×/s): varrer 40 mil mensagens nessa cadência travaria a tela
-    // exatamente durante o replay, que é a hora em que ela precisa estar lisa.
-    // Só a cauda: renderizar a live inteira a cada quadro seria o mesmo problema de novo.
+    // Binary search plus a bounded tail avoids scanning or rendering the entire chat on every timeupdate.
     const tail = chat.slice(Math.max(0, chatCursor - 300), chatCursor);
     return (showDeleted ? tail : tail.filter((m) => !m.deleted)).slice(-120);
   }, [chat, chatCursor, showDeleted]);
@@ -506,23 +463,15 @@ export function ReplayPlayer({
     );
     const g = k * tuned.totalMs;
     setHoverMs(g);
-    // Miniatura de verdade, sem FFmpeg: um segundo <video> escondido buscando o
-    // instante sob o mouse. Sai de graça e mostra o quadro real.
     const p = pointAtGlobal(tuned, g);
     const v = previewRef.current;
-    // Só busca dentro do segmento que já está carregado. Passando o mouse por cima de
-    // OUTRO segmento, a miniatura mostraria o quadro do arquivo errado — pior que não
-    // mostrar nada, porque parece informação.
+    // Only seek thumbnails within the loaded segment to avoid showing a frame from another file.
     setPreviewOk(!!p && p.index === segIndex);
     if (p && v && p.index === segIndex) v.currentTime = p.localSec;
   };
 
   return (
     <>
-      {/* O título mora AQUI dentro, e não na tela que chama, porque quem decide se há
-          replay é este componente: com todos os segmentos vazios (o FFmpeg morreu antes
-          do primeiro quadro) ele devolve null, e um título sozinho na tela anunciaria
-          um player que não existe. */}
       <h3 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
         <Play className="size-4" /> {t("replay.title")}
       </h3>
@@ -535,8 +484,6 @@ export function ReplayPlayer({
           )}
         >
           <div className="min-w-0 bg-night">
-            {/* Tela cheia usa o palco inteiro. O teto normal de altura não pode deixar a
-                imagem pequena no meio do preto quando o usuário expande o replay. */}
             <div
               ref={stageRef}
               className="bg-night outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass [&:fullscreen]:flex [&:fullscreen]:h-screen [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:bg-night [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[calc(100vh-9rem)]"
@@ -593,7 +540,6 @@ export function ReplayPlayer({
                 </div>
               )}
 
-              {/* Régua do tempo: posição + marcas dos eventos que o relatório já conhece. */}
               <div
                 className={cn(
                   "group relative h-10 px-4",
@@ -604,8 +550,6 @@ export function ReplayPlayer({
                 onClick={canControl ? onScrub : undefined}
                 onMouseMove={canControl ? onScrubHover : undefined}
                 onMouseLeave={() => setHoverMs(null)}
-                // A régua É um slider: com foco, as setas movem. Sem isso ela só existiria
-                // pro mouse — e quem revisa uma live inteira navega no teclado.
                 onKeyDown={(e) => {
                   if (!canControl) return;
                   const step = e.shiftKey ? 60_000 : 10_000;
@@ -722,9 +666,6 @@ export function ReplayPlayer({
                 className="w-[4.75rem] shrink-0"
                 aria-label={t("replay.rate.aria")}
               />
-              {/* Volume e tela cheia. Sem eles, revisar uma live seria assistir no volume
-                  que o sistema deixou e numa janelinha — o `<video>` aqui não tem os
-                  controles nativos, porque a régua sincronizada é que manda. */}
               <button
                 onClick={toggleMute}
                 disabled={!canControl}
@@ -787,8 +728,6 @@ export function ReplayPlayer({
                     : t("replay.clip.pending")}
                 </span>
               </Button>
-              {/* Sair do corte sem exportar. Sem isto, quem marcou o início por engano
-                ficava preso: qualquer clique seguinte viraria um clipe. */}
               {clipFrom != null && (
                 <button
                   onClick={() => setClipFrom(null)}
@@ -822,13 +761,8 @@ export function ReplayPlayer({
               </Button>
             </div>
 
-            {/* Atalhos. Quem revisa uma live de 4h caçando o instante do travamento vai
-              usar o teclado muito mais que o mouse — mas só se souber que ele existe. */}
             <div className="flex flex-wrap items-center gap-x-3 border-t border-border-soft bg-surface px-4 py-2 text-[11px] text-ink-faint">
               <span>{t("replay.shortcuts")}</span>
-              {/* O ajuste é ferramenta de CONSERTO. Deixá-lo sempre à vista sugeriria que
-                  a sincronia precisa de supervisão — e ela não precisa em 95% dos casos.
-                  Fica atrás de um link, e abre sozinho quando a âncora foi estimada. */}
               {!showOffset && !hasEstimatedAnchor(tuned) && offset === 0 && (
                 <button
                   onClick={() => setShowOffset(true)}
@@ -839,8 +773,6 @@ export function ReplayPlayer({
               )}
             </div>
 
-            {/* Ajuste manual: a válvula de escape de TODA a classe de erro de sincronia.
-              O que a automação errar, o streamer arrasta. */}
             <div
               className={cn(
                 "items-center gap-2 bg-surface px-4 pb-3 text-xs text-ink-faint",
@@ -860,8 +792,6 @@ export function ReplayPlayer({
                 className="h-1 flex-1 accent-brass"
                 aria-label={t("replay.offset.label")}
               />
-              {/* `fmt.dec` e não `toFixed`: em pt-BR o separador decimal é vírgula, e um
-                "1.5s" no meio de uma tela que mostra "1,5 GB" em toda parte destoa. */}
               <span className="w-16 text-right font-mono">
                 {offset > 0 ? "+" : ""}
                 {fmt.dec(offset / 1000, 1)}s
@@ -890,7 +820,6 @@ export function ReplayPlayer({
             )}
           </div>
 
-          {/* Chat do momento. Só existe se a sessão gravou chat. */}
           {chat.length > 0 ? (
             <ReplayChatPanel
               messages={visibleChat}
@@ -905,8 +834,7 @@ export function ReplayPlayer({
   );
 }
 
-/** `H:MM:SS` a partir de ms. Não usa `fmt.duration` porque aqui a leitura é de player
- *  (posição num vídeo), não de duração por extenso. */
+/** Format video positions as H:MM:SS rather than localized prose durations. */
 function clock(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(total / 3600);

@@ -8,12 +8,7 @@ import type {
   PublishedEditorialDocument,
 } from "./editorial/types";
 
-// Dados estruturados (schema.org / JSON-LD).
-//
-// Regra que vale mais que qualquer ganho de ranking: **nada aqui pode ser
-// invenção**. Sem `aggregateRating` (não existe avaliação), sem `downloadUrl`
-// enquanto o instalador for placeholder, sem versão anunciada para um binário
-// que ninguém consegue baixar. Marcação falsa é penalidade, não otimização.
+// Structured data must describe published content and available releases only.
 
 const abs = (path: string) => new URL(path, siteUrl).toString();
 
@@ -39,14 +34,11 @@ const website = {
   "@id": abs("/#site"),
   url: siteUrl.toString(),
   name: "Corneta",
-  // O site é bilíngue: declarar só português mentiria sobre a versão inglesa.
-  // Quem é por-idioma são os nós de FAQ/HowTo/app, não a entidade "site".
   inLanguage: ["pt-BR", "en"],
   publisher: { "@id": abs("/#empresa") },
 };
 
-/** O app é UM só, então o `@id` não muda por idioma — o que muda é a prosa que
- *  o buscador cita (descrição, lista de recursos, requisitos). */
+// Translations share the application identity; only prose varies by locale.
 function softwareApplication(locale: Locale) {
   const release = downloadMetadata(process.env.NEXT_PUBLIC_PRIMARY_CTA_URL);
   const download = release?.url;
@@ -77,7 +69,6 @@ function softwareApplication(locale: Locale) {
       availability: "https://schema.org/InStock",
       ...(download ? { url: download } : {}),
     },
-    // Só anuncia download quando existir instalador público de verdade.
     ...(download ? { downloadUrl: download } : {}),
     ...(release?.version ? { softwareVersion: release.version } : {}),
   };
@@ -87,8 +78,7 @@ const faqPageFor = (locale: Locale) => {
   const t = translator(locale);
   return {
     "@type": "FAQPage",
-    // O @id inclui o idioma: dois FAQs diferentes no mesmo @id seria o mesmo nó
-    // declarado duas vezes com conteúdo distinto.
+    // Each localized FAQ needs its own entity identity.
     "@id": abs(`${localePath(locale)}#faq`),
     inLanguage: locale,
     isPartOf: { "@id": abs("/#site") },
@@ -124,11 +114,6 @@ const howToFor = (locale: Locale) => {
   };
 };
 
-/** Grafo único da home: uma tag `<script>` só, tudo referenciado por @id.
- *
- *  O que muda por idioma: FAQ, HowTo e a descrição do app — o texto que o
- *  buscador cita. O que NÃO muda: `organization` e os `@id` de empresa/site.
- *  A empresa é uma só; declarar duas quebraria a identidade da entidade. */
 export function homeJsonLd(locale: Locale = DEFAULT_LOCALE) {
   return {
     "@context": "https://schema.org",
@@ -142,7 +127,6 @@ export function homeJsonLd(locale: Locale = DEFAULT_LOCALE) {
   };
 }
 
-/** Trilha das páginas legais + identificação da página. */
 const LEGAL_NAME: Record<Locale, Record<"privacy" | "terms", string>> = {
   "pt-BR": { privacy: "Política de privacidade", terms: "Termos de uso" },
   en: { privacy: "Privacy policy", terms: "Terms of use" },
@@ -150,8 +134,7 @@ const LEGAL_NAME: Record<Locale, Record<"privacy" | "terms", string>> = {
 
 export function legalJsonLd(kind: "privacy" | "terms", locale: Locale) {
   const isPrivacy = kind === "privacy";
-  // O `@id` e a URL carregam o idioma: dois documentos, duas páginas — declarar
-  // o mesmo `@id` pros dois faria o buscador tratar a tradução como duplicata.
+  // Localized legal pages need distinct entity identities.
   const path = legalHref(locale, isPrivacy ? "privacy" : "terms");
   const name = LEGAL_NAME[locale][kind];
   return {
@@ -202,8 +185,7 @@ function breadcrumbList(path: string, items: readonly EditorialBreadcrumb[]) {
   };
 }
 
-/** Hub ou categoria editorial. Só deve ser emitido em páginas com itens
- * publicados; páginas vazias usam noindex e não precisam fingir uma coleção. */
+// Include published articles only.
 export function editorialCollectionJsonLd({
   locale,
   path,
@@ -248,8 +230,7 @@ export function editorialCollectionJsonLd({
   };
 }
 
-/** Marcação factual do conteúdo: datas e autoria vêm exclusivamente do
- * frontmatter validado, e a imagem é o asset editorial realmente publicado. */
+// Provenance comes from validated frontmatter, not arbitrary document text.
 export function editorialArticleJsonLd({
   document,
   breadcrumbs,
@@ -314,7 +295,7 @@ export function editorialArticleJsonLd({
   };
 }
 
-/** `<` escapado para o JSON não conseguir fechar a tag `<script>`. */
+// Escape '<' so serialized data cannot close the script element.
 export function jsonLdScript(data: unknown) {
   return JSON.stringify(data).replace(/</g, "\\u003c");
 }

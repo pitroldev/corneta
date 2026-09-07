@@ -11,7 +11,7 @@ export class EditorialValidationError extends Error {
 
   constructor(relativePath: string, details: string[], cause?: unknown) {
     super(
-      `Conteúdo editorial inválido em ${relativePath}:\n${details.join("\n")}`,
+      `Invalid editorial content in ${relativePath}:\n${details.join("\n")}`,
       {
         cause,
       },
@@ -40,7 +40,7 @@ export function parseEditorialSource(
   } catch (error) {
     throw new EditorialValidationError(
       relativePath,
-      ["não foi possível interpretar o YAML frontmatter"],
+      ["could not parse YAML frontmatter"],
       error,
     );
   }

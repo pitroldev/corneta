@@ -26,7 +26,7 @@ mod studio;
 mod telemetry;
 mod updater;
 
-// O harness da lib precisa do mesmo manifesto Common Controls v6 gerado pelo Tauri.
+// The library test harness also needs Tauri's Common Controls v6 manifest.
 #[cfg(all(test, target_os = "windows", target_env = "msvc"))]
 #[link(name = "resource", kind = "static", modifiers = "-bundle")]
 extern "C" {}
@@ -42,7 +42,7 @@ struct NativeMenu {
     quit: MenuItem<tauri::Wry>,
 }
 
-/// Apply a persisted preference to native UI without waiting for another engine transition.
+/// Apply language changes to native UI without waiting for an engine transition.
 pub(crate) fn apply_native_language(app: &tauri::AppHandle, setting: &str) {
     let before = i18n::generation();
     let locale = i18n::apply_setting(setting);
@@ -65,7 +65,6 @@ pub(crate) fn apply_native_language(app: &tauri::AppHandle, setting: &str) {
     }
 }
 
-/// Estado global: runtime do motor (handle do sidecar + último snapshot) + chat + Mesa.
 pub struct AppState {
     pub engine: Mutex<engine::EngineRuntime>,
     pub chat: Mutex<chat::ChatRuntime>,
@@ -84,16 +83,13 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
-/// A transmissão está de pé? Checa a trava REAL da sessão (`eng.live`) — o snapshot pode
-/// ficar em "error" com o motor já morto, e "Você está AO VIVO" falso é pior que nada.
+/// Use actual engine liveness; a cached error snapshot does not imply an active stream.
 fn engine_live(app: &tauri::AppHandle) -> bool {
     let st = app.state::<AppState>();
     let eng = st.engine.lock().unwrap();
     eng.live
 }
 
-/// Diálogo bloqueante "encerrar a live?" — compartilhado pelo "Sair" da bandeja e pelo X
-/// da janela (o X era o único caminho que derrubava a live SEM perguntar).
 fn confirm_end_live(app: &tauri::AppHandle) -> bool {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
     app.dialog()
@@ -106,12 +102,9 @@ fn confirm_end_live(app: &tauri::AppHandle) -> bool {
         .blocking_show()
 }
 
-/// Sequência única de encerramento (Mesa + broadcast do YouTube + motor).
 fn shutdown_engine(app: &tauri::AppHandle) {
     let generation = app.state::<AppState>().engine.lock().unwrap().start_gen;
-    // Memoriza o estado ANTES de derrubar o motor; o evento/marker e o flush
-    // acontecem apenas no RunEvent::ExitRequested (fechar uma janela nem sempre
-    // encerra um app que também possui tray icon).
+    // Capture liveness before shutdown; the exit marker and flush run only on ExitRequested.
     app.state::<AppState>()
         .telemetry
         .note_exit_live(engine_live(app));
@@ -123,8 +116,7 @@ fn shutdown_engine(app: &tauri::AppHandle) {
     }
 }
 
-/// Feedback da ida pra bandeja: na primeira vez avisa que o app NÃO fechou (o botão se
-/// chama "Fechar"…); com live no ar avisa SEMPRE que ela continua de pé.
+/// Explain the first tray hide, and always confirm that an active stream continues.
 fn tray_hide_hint(app: &tauri::AppHandle, live: bool) {
     let marker = app
         .path()
@@ -152,10 +144,7 @@ fn tray_hide_hint(app: &tauri::AppHandle, live: bool) {
     }
 }
 
-/// Garante que a janela caiba na tela. Se a altura (vinda do config ou de um tamanho
-/// salvo pelo window-state) passar da área útil do monitor atual — descontando a barra
-/// de tarefas —, reduz e recentraliza. Em telas grandes não mexe; em 720p/768p evita
-/// que a janela sem bordas (`decorations: false`) fique cortada embaixo.
+/// Keep the borderless window reachable on small displays, allowing space for the taskbar.
 fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
     let Ok(Some(monitor)) = w.current_monitor() else {
         return;
@@ -164,8 +153,8 @@ fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
     if scale <= 0.0 {
         return;
     }
-    let mon_h = monitor.size().height as f64 / scale; // altura lógica do monitor
-    let max_h = (mon_h - 72.0).max(480.0); // folga pra barra de tarefas
+    let mon_h = monitor.size().height as f64 / scale;
+    let max_h = (mon_h - 72.0).max(480.0); // Reserve taskbar space in logical pixels.
     let Ok(size) = w.inner_size() else {
         return;
     };
@@ -181,12 +170,10 @@ fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
 pub fn run() {
     let startup_started = std::time::Instant::now();
     let builder = tauri::Builder::default()
-        // single-instance DEVE ser o primeiro plugin: evita duas Cornetas
-        // disputando a porta de ingestão / subindo motores duplicados.
+        // Register first to prevent competing ingest listeners or duplicate engines.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main(app);
         }))
-        // Log em arquivo (app log dir) + stdout — útil para diagnosticar transmissões.
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -204,15 +191,12 @@ pub fn run() {
         )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        // Autostart (abrir com o sistema) — controlado pela tela de Configurações.
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
-        // Notificações nativas + memória de tamanho/posição da janela.
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        // Atalho global: dispara um evento que o frontend trata (começar/parar).
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -223,8 +207,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init());
-    // A contributor binary must never install an official update over itself.
-    // The plugin is absent, not merely hidden behind a frontend condition.
+    // Contributor builds omit the updater plugin so they cannot install official releases over themselves.
     #[cfg(not(corneta_contributor))]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     builder
@@ -342,10 +325,7 @@ pub fn run() {
             telemetry::install_panic_hook(app.handle().clone());
             telemetry_state.capture_app_started(&previous_exit, startup_started.elapsed());
             session::recover_incomplete_sessions(app.handle());
-            // Varredura de gravações órfãs + poda por espaço. Roda no boot porque é aqui
-            // que dá pra recolher o que uma queda (ou uma versão anterior) deixou pra
-            // trás: sem isto, vídeo de sessão já podada ficaria ocupando dezenas de GB
-            // sem nada na interface explicando de onde veio.
+            // Collect orphaned recordings after interrupted sessions, without blocking startup on disk I/O.
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
@@ -358,14 +338,11 @@ pub fn run() {
                     );
                 });
             }
-            // Mesa: auto-concede câmera/mic no WebView2 (getUserMedia sem prompt/lock).
             if let Some(w) = app.get_webview_window("main") {
                 permissions::grant_av_permissions(&w);
-                // Nunca deixa a janela mais alta que a tela (720p/768p incluídos).
                 clamp_window_to_screen(&w);
             }
-            // Overlay de alertas: se ligado, sobe o servidor local já no boot pra a Browser
-            // Source do OBS conectar assim que o streamer abre a cena (porta fixa → URL estável).
+            // Start enabled overlays at boot so persisted OBS sources reconnect before a stream begins.
             {
                 let cfg = config::load(app.handle());
                 if cfg.settings.overlay_enabled {
@@ -379,9 +356,7 @@ pub fn run() {
                     });
                 }
             }
-            // O atalho global é registrado pelo frontend no boot (App.tsx → register_shortcut),
-            // que MOSTRA o erro quando a combinação já está em uso — aqui era um `let _ =` mudo.
-            // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.
+            // The frontend registers shortcuts so registration errors can be shown to the user.
             if let Some(icon) = app.default_window_icon().cloned() {
                 let show = MenuItem::with_id(app, "show", Msg::TrayOpen.now(), true, None::<&str>)?;
                 let quit = MenuItem::with_id(app, "quit", Msg::TrayQuit.now(), true, None::<&str>)?;
@@ -420,7 +395,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // A janela flutuante do chat fecha normalmente; só a principal vai pra bandeja.
+                // Only the main window hides to the tray; the floating chat closes normally.
                 if window.label() != "main" {
                     return;
                 }
@@ -428,28 +403,23 @@ pub fn run() {
                 let cfg = config::load(app);
                 let live = engine_live(app);
                 if cfg.settings.minimize_to_tray {
-                    // Esconde na bandeja em vez de fechar — a transmissão continua.
-                    // Com feedback: sem ele, o app "sumia" num botão chamado "Fechar".
                     api.prevent_close();
                     let _ = window.hide();
                     tray_hide_hint(app, live);
                 } else if live {
-                    // X com a live NO AR: confirma antes — um clique acidental derrubava a
-                    // transmissão em todas as plataformas (o "Sair" da bandeja já perguntava).
                     api.prevent_close();
                     if confirm_end_live(app) {
                         shutdown_engine(app);
-                        // prevent_close já cancelou o fechamento — encerra explicitamente.
+                        // Close was prevented above; exit explicitly after confirmation.
                         app.exit(0);
                     }
                 } else {
-                    // Fechar de verdade: mata FFmpeg para não deixar processo órfão.
                     shutdown_engine(app);
                 }
             }
         })
         .build(tauri::generate_context!())
-        .expect("erro ao iniciar a Corneta")
+        .expect("failed to start Corneta")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 let telemetry = &app.state::<AppState>().telemetry;

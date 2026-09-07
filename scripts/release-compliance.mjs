@@ -1,5 +1,4 @@
-// Keep these notices/instructions alongside the exact source archives. This list
-// is packaging metadata, never evidence that the source review is complete.
+// Packaging metadata does not prove that the corresponding-source review is complete.
 export const compliancePackageFiles = [
   "LICENSE",
   "THIRD_PARTY_NOTICES.md",
@@ -14,7 +13,7 @@ export function complianceErrors(manifest, sidecars) {
   const errors = [];
   if (manifest?.schemaVersion !== 1 || manifest.reviewed !== true)
     errors.push(
-      "A correspondência das fontes GPL ainda precisa de revisão explícita em compliance/ffmpeg-sources.json.",
+      "GPL corresponding sources still require explicit review in compliance/ffmpeg-sources.json.",
     );
   if (
     sidecars?.ffmpeg?.verified !== true ||
@@ -26,18 +25,18 @@ export function complianceErrors(manifest, sidecars) {
       sidecars.ffmpeg.archiveSha256.toLowerCase()
   )
     errors.push(
-      "O pacote de fontes não identifica o arquivo FFmpeg verificado deste build.",
+      "The source package does not identify this build's verified FFmpeg archive.",
     );
   if (!Array.isArray(manifest?.sources) || !manifest.sources.length) {
     errors.push(
-      "Cadastre os arquivos de fontes correspondentes (FFmpeg, bibliotecas GPL, scripts e patches de build).",
+      "Register the corresponding source archives (FFmpeg, GPL libraries, build scripts, and patches).",
     );
     return errors;
   }
   const names = new Set();
   for (const source of manifest.sources) {
     if (!source || typeof source !== "object") {
-      errors.push("Entrada de fonte inválida.");
+      errors.push("Invalid source entry.");
       continue;
     }
     const file = source.file;
@@ -48,10 +47,10 @@ export function complianceErrors(manifest, sidecars) {
       ) ||
       names.has(file.toLowerCase())
     )
-      errors.push("Nome de arquivo de fontes inválido ou duplicado.");
+      errors.push("Invalid or duplicate source filename.");
     else names.add(file.toLowerCase());
     if (!/^[a-f0-9]{64}$/i.test(source.sha256 ?? ""))
-      errors.push("Cada arquivo de fontes exige SHA-256 fixado.");
+      errors.push("Each source archive requires a pinned SHA-256.");
     try {
       const url = new URL(source.url);
       if (
@@ -65,7 +64,7 @@ export function complianceErrors(manifest, sidecars) {
         throw new Error();
     } catch {
       errors.push(
-        "URL de fontes deve ser HTTPS e versionada, sem credenciais nem branch/tag rolante.",
+        "Source URLs must use HTTPS and a fixed version, without credentials or rolling branches/tags.",
       );
     }
   }

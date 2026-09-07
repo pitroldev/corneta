@@ -14,18 +14,7 @@ import {
   legalHref,
 } from "@/lib/legal";
 
-// Termos de uso — TRADUÇÃO. O texto que vincula é o `terms.pt.tsx`, e a página
-// diz isso em destaque antes do documento.
-//
-// Três decisões de tradução que valem registro:
-//  • os `id` das seções são os MESMOS do português (`aceitacao`, `oque-e`…).
-//    São âncora de URL: alguém pode ter linkado `#garantia`, e o link tem que
-//    cair no mesmo lugar nos dois idiomas;
-//  • "Código de Defesa do Consumidor" e "LGPD" ficam com o nome brasileiro e a
-//    glosa em inglês ao lado — é o nome da lei, não um conceito genérico. Quem
-//    for procurar precisa do termo que existe;
-//  • os links internos usam `legalHref("en", …)`: apontar pro documento em
-//    português a partir daqui seria mandar o leitor de volta pro problema.
+// English translation; terms.pt.tsx is binding. Preserve published anchors and legal names.
 
 const L = "en" as const;
 

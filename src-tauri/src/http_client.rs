@@ -1,8 +1,5 @@
-//! Camada de compatibilidade mínima sobre `ureq` 3.
-//!
-//! Centraliza a API tipada do ureq 3 e, principalmente, preserva o corpo de
-//! respostas HTTP 4xx/5xx. Os fluxos OAuth usam esses corpos para traduzir o
-//! erro localmente, mas nunca os escrevem em telemetria ou logs.
+//! ureq compatibility layer preserving error bodies for local OAuth classification.
+//! Callers must not forward provider bodies to logs or telemetry.
 
 use std::fmt;
 use std::io::Read;

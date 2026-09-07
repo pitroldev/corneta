@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { normalizeChatChannel } from "./chatChannel";
 
 const cases: [Parameters<typeof normalizeChatChannel>[0], string, string][] = [
-  // Twitch → login
   ["twitch", "Pitrol", "pitrol"],
   ["twitch", "@Pitrol", "pitrol"],
   ["twitch", "#pitrol", "pitrol"],
@@ -12,23 +11,19 @@ const cases: [Parameters<typeof normalizeChatChannel>[0], string, string][] = [
   ["twitch", "twitch.tv/pitrol/clip/FunnyName", "pitrol"],
   ["twitch", "João_Silva", "joao_silva"],
   ["twitch", "player.twitch.tv/?channel=pitrol&parent=x", "pitrol"],
-  // Twitch — cagadas que viram "" (não conectar no canal errado)
   ["twitch", "https://www.twitch.tv/videos/123456789", ""],
   ["twitch", "https://clips.twitch.tv/AbstractSlipperyPancake-a1", ""],
   ["twitch", "https://www.twitch.tv/directory/game/x", ""],
-  // Kick → slug
   ["kick", "@Pitrol", "pitrol"],
   ["kick", "https://kick.com/pitrol/videos", "pitrol"],
   ["kick", "https://kick.com", ""],
   ["kick", "kick.com", ""],
-  // Cinefy → slug (integração experimental)
   ["cinefy", "@Kett", "kett"],
   ["cinefy", "https://cinefy.gg/popout/kett/chat?type=overlay", "kett"],
   ["cinefy", "https://cinefy.gg/kett", "kett"],
   ["cinefy", "https://cinefy.gg/watch", ""],
   ["cinefy", "https://cinefy.gg", ""],
   ["cinefy", "a".repeat(65), ""],
-  // YouTube
   ["youtube", "@Pitrol?si=x", "@Pitrol"],
   ["youtube", "https://www.youtube.com/@Pitrol/live", "@Pitrol"],
   ["youtube", "@Fulano/live", "@Fulano"],
@@ -57,14 +52,13 @@ const cases: [Parameters<typeof normalizeChatChannel>[0], string, string][] = [
   ["youtube", "https://www.youtube.com/playlist?list=PLabc", ""],
   ["youtube", "Pitrol", "@Pitrol"],
   ["youtube", "fulano.tv", "@fulano.tv"],
-  ["youtube", "dQw4w9WgXcQ", "dQw4w9WgXcQ"], // 11-char cru = vídeo (idempotente com a URL)
+  ["youtube", "dQw4w9WgXcQ", "dQw4w9WgXcQ"],
 ];
 
 describe("normalizeChatChannel", () => {
   it.each(cases)("[%s] %s → %s", (p, input, want) => {
     const got = normalizeChatChannel(p, input);
     expect(got).toBe(want);
-    // idempotência: normalizar o resultado dá o mesmo.
     expect(normalizeChatChannel(p, got)).toBe(got);
   });
 });

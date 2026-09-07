@@ -31,8 +31,8 @@ function snapshot(
   };
 }
 
-describe("política de revisão editorial", () => {
-  it("cobra updatedAt quando o corpo muda", () => {
+describe("editorial revision policy", () => {
+  it("requires updatedAt when the body changes", () => {
     const previous = snapshot();
     const current = snapshot();
     current.source = "## Passo\n\nFaça isto de outro jeito.";
@@ -45,7 +45,7 @@ describe("política de revisão editorial", () => {
     ]);
   });
 
-  it("rejeita frescor artificial e aceita revisão sem mudança", () => {
+  it("rejects artificial freshness and accepts review-only updates", () => {
     const previous = snapshot();
     const artificial = snapshot({
       updatedAt: "2026-02-01",
@@ -65,7 +65,7 @@ describe("política de revisão editorial", () => {
     expect(validateEditorialRevision(previous, reviewOnly)).toEqual([]);
   });
 
-  it("ignora a ordem das chaves serializadas no YAML", () => {
+  it("ignores serialized YAML key order", () => {
     const previous = snapshot();
     const current = snapshot();
     previous.frontmatter = {
@@ -80,7 +80,7 @@ describe("política de revisão editorial", () => {
     expect(hasSubstantiveEditorialChange(previous, current)).toBe(false);
   });
 
-  it("cobra revisão quando uma fonte interna muda", () => {
+  it("requires a review when an internal source changes", () => {
     const previous = snapshot();
     const current = snapshot();
     const changed = new Set(["src/screens/Example.tsx"]);
@@ -96,7 +96,7 @@ describe("política de revisão editorial", () => {
     ]);
   });
 
-  it("aceita a revisão técnica na versão nova sem exigir updatedAt", () => {
+  it("accepts technical review against a new version without requiring updatedAt", () => {
     const previous = snapshot();
     const current = snapshot({
       reviewedAt: "2026-02-01",

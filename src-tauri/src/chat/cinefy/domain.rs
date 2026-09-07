@@ -1,7 +1,3 @@
-//! Tipos do domínio do conector Cinefy.
-//!
-//! Eles não conhecem Tauri, WebSocket, HTTP nem o formato de eventos da interface.
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Badge {
     pub label: String,

@@ -36,7 +36,7 @@ ${body}`;
 }
 
 describe("editorial frontmatter", () => {
-  it("normaliza um draft e deriva URL, TOC e tempo de leitura", () => {
+  it("normalizes a draft and derives its URL, TOC, and reading time", () => {
     const document = parseEditorialSource(
       draftSource("title: Um guia editorial de teste\n"),
       "pt-BR/guides/multistream/test-article.mdx",
@@ -49,7 +49,7 @@ describe("editorial frontmatter", () => {
     expect(document.readingTime.minutes).toBe(1);
   });
 
-  it("rejeita contentId fora do contrato fechado de telemetria", () => {
+  it("rejects contentId outside the closed telemetry contract", () => {
     expect(() =>
       parseEditorialSource(
         draftSource().replace("guide_test_article", "artigo-em-portugues"),
@@ -58,7 +58,7 @@ describe("editorial frontmatter", () => {
     ).toThrow(EditorialValidationError);
   });
 
-  it("não permite publicar com os campos completos ausentes", () => {
+  it("requires all publication fields before publishing", () => {
     expect(() =>
       parseEditorialSource(
         draftSource().replace("status: draft", "status: published"),
@@ -69,7 +69,7 @@ describe("editorial frontmatter", () => {
 });
 
 describe("editorial navigation metadata", () => {
-  it("mantém URL em inglês e prefixa somente o locale en", () => {
+  it("keeps English URLs and prefixes only the English locale", () => {
     expect(
       buildEditorialHref({
         locale: "pt-BR",
@@ -90,7 +90,7 @@ describe("editorial navigation metadata", () => {
     expect(editorialSearchHref("en")).toBe("/en/search");
   });
 
-  it("gera TOC hierárquico e ignora headings dentro de code fences", () => {
+  it("builds a hierarchical TOC and ignores fenced-code headings", () => {
     const toc = buildTableOfContents(`
 ## Setup
 ### Windows
@@ -111,7 +111,7 @@ describe("editorial navigation metadata", () => {
     ]);
   });
 
-  it("localiza o label de leitura sem expor o corpo", () => {
+  it("localizes the reading-time label without exposing the body", () => {
     expect(calculateReadingTime("texto curto", "pt-BR").label).toBe(
       "1 min de leitura",
     );
@@ -120,7 +120,7 @@ describe("editorial navigation metadata", () => {
 });
 
 describe("editorial catalog", () => {
-  it("rejeita H1 Markdown e HTML/JSX, mas ignora exemplos em código", () => {
+  it("rejects Markdown and HTML/JSX H1 headings while ignoring code examples", () => {
     const liveHtml = parseEditorialSource(
       draftSource("", "<h1>Duplicate title</h1>\n\n## Start"),
       "pt-BR/guides/multistream/test-article.mdx",
@@ -163,7 +163,7 @@ Setext example
     ).toEqual([]);
   });
 
-  it("exige aprovação humana versionada para cada path editorial em inglês", () => {
+  it("requires versioned human approval for each English editorial path", () => {
     const approved = parseEditorialSource(
       draftSource("").replace("test-article", "obs-multistream"),
       "pt-BR/guides/multistream/obs-multistream.mdx",
@@ -182,7 +182,7 @@ Setext example
     ).toContain("unapproved-editorial-path");
   });
 
-  it("detecta links absolutos internos inexistentes fora do editorial", () => {
+  it("detects missing absolute internal links outside editorial routes", () => {
     const document = parseEditorialSource(
       draftSource("", "## Start\n\n[Missing route](/account/settings)"),
       "pt-BR/guides/multistream/test-article.mdx",
@@ -193,7 +193,7 @@ Setext example
     ).toContain("broken-internal-link");
   });
 
-  it("não trata assets, endpoints especiais ou links externos seguros como artigos", () => {
+  it("does not treat assets, special endpoints, or safe external links as articles", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -212,7 +212,7 @@ Setext example
     expect(linkIssues).toEqual([]);
   });
 
-  it("recusa namespaces internos de API/framework em links editoriais", () => {
+  it("rejects internal API and framework namespaces in editorial links", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -228,7 +228,7 @@ Setext example
     ).toHaveLength(2);
   });
 
-  it("valida query sensível também em links internos", () => {
+  it("validates sensitive query parameters in internal links too", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -244,7 +244,7 @@ Setext example
     ).toHaveLength(1);
   });
 
-  it("valida links relativos, referências GFM e âncoras H2–H6", () => {
+  it("validates relative links, GFM references, and H2-H6 anchors", () => {
     const source = parseEditorialSource(
       draftSource(
         "",
@@ -283,7 +283,7 @@ Setext example
     ).toHaveLength(1);
   });
 
-  it("audita links HTML sem depender de caixa e recusa href dinâmico", () => {
+  it("audits HTML links case-insensitively and rejects dynamic href values", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -297,7 +297,7 @@ Setext example
     expect(codes).toContain("dynamic-link-href");
   });
 
-  it("rejeita esquemas inseguros, credenciais e query sensível em links do corpo", () => {
+  it("rejects unsafe schemes, credentials, and sensitive queries in body links", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -322,7 +322,7 @@ Setext example
     expect(codes).toContain("sensitive-link-query");
   });
 
-  it("exige que imagens inline passem por ContentImage e pelo frontmatter", () => {
+  it("requires inline images to use ContentImage and frontmatter", () => {
     const document = parseEditorialSource(
       draftSource("", "## Visual\n\n![bypass](/image.png)"),
       "pt-BR/guides/multistream/test-article.mdx",
@@ -334,7 +334,7 @@ Setext example
     expect(codes).toContain("raw-markdown-image");
   });
 
-  it("rejeita imagem Markdown por referência GFM", () => {
+  it("rejects GFM reference-style Markdown images", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -348,7 +348,7 @@ Setext example
     ).toContain("raw-markdown-image");
   });
 
-  it("aceita ContentImage literal declarado exatamente uma vez", () => {
+  it("accepts literal ContentImage declared exactly once", () => {
     const document = parseEditorialSource(
       draftSource(
         `images:
@@ -374,7 +374,7 @@ Setext example
     expect(imageIssues).toEqual([]);
   });
 
-  it("exige aprovação humana do path completo usado pelo asset", () => {
+  it("requires human approval of the complete asset path", () => {
     const document = parseEditorialSource(
       draftSource(
         `images:
@@ -399,7 +399,7 @@ Setext example
     ).toContain("unapproved-asset-path");
   });
 
-  it("não deixa um baseName inglês aprovar diretórios públicos/originais em português", () => {
+  it("does not let an English baseName approve Portuguese public or original directories", () => {
     const approvals = [
       {
         baseName: "status-connected",
@@ -430,7 +430,7 @@ Setext example
     ).toBe(false);
   });
 
-  it("exige proveniência completa também no manifesto", () => {
+  it("requires complete provenance in the manifest too", () => {
     const parsed = editorialAssetManifestSchema.safeParse({
       version: 1,
       assets: [
@@ -456,7 +456,7 @@ Setext example
     expect(parsed.success).toBe(false);
   });
 
-  it("exige versão do OBS e igualdade entre frontmatter e manifesto", () => {
+  it("requires the OBS version and matching frontmatter and manifest metadata", () => {
     const imageInput = {
       src: "/images/editorial/tests/obs-settings.webp",
       originalPath: "assets/originals/tests/obs-settings.png",
@@ -513,7 +513,7 @@ Setext example
     ).toBe(false);
   });
 
-  it("rejeita credenciais e parâmetros sensíveis em URLs de fonte e autoria", () => {
+  it("rejects credentials and sensitive parameters in source and author URLs", () => {
     const source = (url: string) => ({
       title: "Official documentation",
       kind: "official" as const,
@@ -557,7 +557,7 @@ Setext example
     ).toBe(true);
   });
 
-  it("audita query sensível em autolinks e URLs bare do GFM", () => {
+  it("audits sensitive queries in autolinks and GFM bare URLs", () => {
     const document = parseEditorialSource(
       draftSource(
         "",
@@ -573,7 +573,7 @@ Setext example
     ).toHaveLength(2);
   });
 
-  it("exige que recursos públicos linkados existam sob publicRoot", async () => {
+  it("requires linked public resources to exist within publicRoot", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "corneta-editorial-"));
     const contentRoot = path.join(root, "content");
     const publicRoot = path.join(root, "public");
@@ -619,7 +619,7 @@ Setext example
     }
   });
 
-  it("detecta arquivo em caminho diferente do frontmatter", () => {
+  it("detects a file path that differs from frontmatter", () => {
     const document = parseEditorialSource(
       draftSource(),
       "pt-BR/guides/quality/wrong-file.mdx",

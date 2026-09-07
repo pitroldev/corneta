@@ -22,22 +22,12 @@ import { Button } from "./ui";
 
 const FLAG = "corneta.welcomed";
 
-/**
- * Plataformas oferecidas no passo 2.
- *
- * Filtro derivado, não lista fixa: só entram as que têm endereço de ingest real
- * e página de chave — ou seja, aquelas em que "marcar e colar a chave" basta. As
- * experimentais (TikTok, X, Instagram) exigem que o usuário descubra e informe a
- * própria URL RTMP, o que é conversa pra tela Plataformas, com as ressalvas que
- * ela já mostra. Se um preset amadurecer em platforms.ts, aparece aqui sozinho.
- */
+/** Offer only presets with a complete ingest URL and a stream-key page. */
 const PICKABLE = Object.values(PLATFORMS).filter(
   (p) => !p.experimental && p.keyUrl && INGEST_URL_RE.test(p.ingestUrl),
 );
 const PICKER_STEP = 1;
 
-// A lista guarda CHAVES, não texto: o passo é estrutura (ordem, arte, contagem)
-// e a frase vem do dicionário na hora de desenhar.
 const STEPS: { title: MessageKey; text: MessageKey }[] = [
   {
     title: "components.onboarding.step1.title",
@@ -61,7 +51,6 @@ const STEPS: { title: MessageKey; text: MessageKey }[] = [
   },
 ];
 
-/** Qual modal está na tela: o tour de boas-vindas, o reaviso dos termos, ou nada. */
 type Flow = "tour" | "reaccept" | null;
 
 function initialFlow(): Flow {
@@ -69,10 +58,9 @@ function initialFlow(): Flow {
   try {
     welcomed = localStorage.getItem(FLAG) === "1";
   } catch {
-    // Na dúvida, mostra: inofensivo pro veterano, essencial pro novato.
+    // If storage is unavailable, show onboarding rather than assuming it was completed.
   }
   if (!welcomed) return "tour";
-  // Já viu o tour, mas os termos mudaram de forma material desde então.
   return acceptedCurrent() ? null : "reaccept";
 }
 
@@ -84,8 +72,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   const tourStartedAt = useRef(Date.now());
   const tourRun = useRef(0);
   const capturedRun = useRef(-1);
-  // Foco inicial no título, não no X "Pular o tour" (primeiro focável do DOM):
-  // um Enter por reflexo na primeira abertura pulava o tour inteiro.
+  // Initial heading focus prevents an accidental Enter from skipping the tour.
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -99,9 +86,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     });
   }, [flow]);
 
-  // O seletor só aparece com a config intocada. Quem já colou uma chave (ou
-  // voltou pelo "Rever o tour") vê o passo 2 explicativo de sempre, e nada na
-  // config dele é mexido.
+  // Only an untouched configuration may be changed by the onboarding picker.
   const config = useStore((s) => s.config);
   const setPlatforms = useStore((s) => s.setPlatforms);
   const pristine = !!config && config.targets.every((t) => !t.hasKey);
@@ -109,7 +94,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     () => new Set<PlatformId>(["twitch", "youtube"]),
   );
   const touched = useRef(false);
-  // Enquanto o usuário não mexer, o seletor espelha a config (que chega async).
   useEffect(() => {
     if (touched.current || !config) return;
     const ids = config.targets
@@ -122,7 +106,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     touched.current = true;
     setSelected((prev) => {
       const next = new Set(prev);
-      // Sempre pelo menos uma: sem destino nenhum a tela seguinte não faz sentido.
       if (next.has(id)) {
         if (next.size === 1) return prev;
         next.delete(id);
@@ -131,7 +114,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
     });
   };
 
-  // "Rever o tour" (a partir de Sobre): reabre no passo 1.
   const replayNonce = useStore((s) => s.tourNonce);
   useEffect(() => {
     if (replayNonce > 0) {
@@ -148,21 +130,16 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
       firstTime = localStorage.getItem(FLAG) !== "1";
       localStorage.setItem(FLAG, "1");
     } catch {
-      /* ignore */
+      /* Storage may be unavailable; in-memory dismissal still works. */
     }
-    // Dispensar este modal É entrar no app, e o aviso de aceite esteve na tela
-    // o tempo todo — em qualquer caminho de saída. Por isso registra aqui, e não
-    // só no "Bora começar".
+    // Every dismissal enters the app, so record acceptance for every exit path.
     recordAcceptance();
-    // Vale também pra quem pulou: a seleção começa espelhando a config, então
-    // sem mexer no seletor isso não muda nada. A ordem sai de PICKABLE pra os
-    // destinos nascerem sempre na mesma sequência.
+    // Use catalog order to create selected destinations deterministically.
     if (pristine)
       setPlatforms(PICKABLE.filter((p) => selected.has(p.id)).map((p) => p.id));
     setFlow(null);
     window.dispatchEvent(new Event(TELEMETRY_DECISION_READY_EVENT));
     if (start) onStart();
-    // Só na primeira dispensa — quem reabriu via Sobre já sabe o caminho.
     else if (firstTime && replayNonce === 0)
       toast.info(t("components.onboarding.dismissed.toast"));
   };
@@ -269,7 +246,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
           </motion.div>
         </div>
 
-        {/* A bolinha é só desenho: o alvo clicável é o botão de 24×24 em volta dela. */}
         <div className="my-4 flex justify-center gap-0.5">
           {STEPS.map((_, i) => (
             <button
@@ -323,7 +299,6 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
   );
 }
 
-/** Grade de plataformas do passo 2 — o único passo do tour que MUDA alguma coisa. */
 function PlatformPicker({
   selected,
   onToggle,
@@ -377,11 +352,6 @@ function PlatformPicker({
   );
 }
 
-/**
- * Os termos mudaram de forma material (`LEGAL_ACCEPT_VERSION` subiu) e este
- * usuário já tinha aceitado uma versão anterior. Avisa UMA vez, sem arrastar o
- * veterano pelos cinco passos do tour de novo.
- */
 function LegalUpdate({ onClose }: { onClose: () => void }) {
   const t = useT();
   return (
@@ -418,15 +388,10 @@ function LegalUpdate({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ---------------- Ilustrações dos passos (mini-painéis de quadrinho) ----------------
-// Vocabulário: latão = seu sinal/destinos, tomate = ação/destaque, brass-ink = contorno
-// duro. Passo 1 (leque 1→muitos) e passo 5 (funil muitos→1) são imagem espelhada.
-
 const BRASS = "var(--color-brass)";
-const TOMATE = "var(--color-tomate)";
+const TOMATO = "var(--color-tomato)";
 const INK = "var(--color-brass-ink)";
 
-/** Chip de plataforma (círculo de latão com a letra). */
 function PChip({ cx, cy, label }: { cx: number; cy: number; label: string }) {
   return (
     <>
@@ -485,7 +450,7 @@ function ArtFanout() {
         cx="78"
         cy="36"
         r="10"
-        fill={TOMATE}
+        fill={TOMATO}
         stroke={INK}
         strokeWidth="1.5"
       />
@@ -542,7 +507,7 @@ function ArtKeyVault() {
         {t("components.onboarding.art.key.label")}
       </text>
       <g
-        stroke={TOMATE}
+        stroke={TOMATO}
         strokeWidth="4"
         fill="none"
         strokeLinecap="round"
@@ -589,7 +554,7 @@ function ArtObsSetup() {
         <circle cx="120" cy="52" r="7" />
         <circle cx="120" cy="68" r="7" />
       </g>
-      <g stroke={TOMATE} strokeWidth="3" strokeLinecap="round">
+      <g stroke={TOMATO} strokeWidth="3" strokeLinecap="round">
         <path d="M210 26 v16" />
         <path d="M202 34 h16" />
         <path d="M205 29 l10 10" />
@@ -634,7 +599,7 @@ function ArtOnAir() {
         width="96"
         height="28"
         rx="6"
-        fill={TOMATE}
+        fill={TOMATO}
         stroke={INK}
         strokeWidth="2"
       />
@@ -674,7 +639,7 @@ function ArtOnAir() {
 function ArtFunnel() {
   const bubbles: [number, number, string][] = [
     [26, 84, BRASS],
-    [46, 72, TOMATE],
+    [46, 72, TOMATO],
     [66, 80, BRASS],
   ];
   return (

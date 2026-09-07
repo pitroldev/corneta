@@ -25,11 +25,10 @@ export function createNavigationSlice({
     unseenReport: false,
     markReportSeen() {
       set({ unseenReport: false });
-      // Persistido: o selo não deve reacender ao reabrir o app pra um relatório já visto.
       try {
         localStorage.setItem("corneta.lastSeenReportAt", String(Date.now()));
       } catch {
-        /* ignore */
+        /* Unavailable storage may repeat the unread badge but must not block navigation. */
       }
     },
     tourNonce: 0,

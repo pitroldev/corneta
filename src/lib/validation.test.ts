@@ -7,26 +7,26 @@ import {
   sanitizeHost,
 } from "./validation";
 
-const KEY = "AIza" + "B".repeat(35); // formato de chave do YouTube (39 chars)
+const KEY = "AIza" + "B".repeat(35);
 
 describe("sanitizeStreamKey", () => {
-  it("chave pura só é trimada", () => {
+  it("trims a plain key", () => {
     expect(sanitizeStreamKey("  live_123  ")).toEqual({
       key: "live_123",
       strippedUrl: false,
     });
   });
-  it("recorta a chave de uma URL colada inteira", () => {
+  it("extracts a key from a complete pasted URL", () => {
     expect(sanitizeStreamKey("rtmp://live.twitch.tv/app/live_123").key).toBe(
       "live_123",
     );
   });
-  it("preserva a querystring (bandwidthtest da Twitch)", () => {
+  it("preserves query parameters such as Twitch bandwidth tests", () => {
     expect(
       sanitizeStreamKey("rtmp://live.twitch.tv/app/live_9?bwtest=true").key,
     ).toBe("live_9?bwtest=true");
   });
-  it("só o servidor (== ingestUrl) → sem chave, strippedUrl", () => {
+  it("rejects server-only URLs and reports strippedUrl", () => {
     const r = sanitizeStreamKey(
       "rtmp://live.twitch.tv/app",
       "rtmp://live.twitch.tv/app",
@@ -36,7 +36,7 @@ describe("sanitizeStreamKey", () => {
 });
 
 describe("sanitizeApiKey", () => {
-  it("extrai a AIza… de qualquer sujeira", () => {
+  it("extracts fixed-format API keys from pasted content", () => {
     expect(sanitizeApiKey(KEY)).toBe(KEY);
     expect(sanitizeApiKey("key=" + KEY + "&x")).toBe(KEY);
     expect(sanitizeApiKey(`"${KEY}"`)).toBe(KEY);
@@ -44,13 +44,13 @@ describe("sanitizeApiKey", () => {
       sanitizeApiKey("https://console.cloud.google.com/x?key=" + KEY),
     ).toBe(KEY);
   });
-  it("sem AIza: tira aspas e espaços", () => {
+  it("strips quotes and whitespace when no API key matches", () => {
     expect(sanitizeApiKey('  "abc def"  ')).toBe("abcdef");
   });
 });
 
 describe("sanitizeToken", () => {
-  it("tira Bearer, aspas, rótulo e query", () => {
+  it("strips Bearer prefixes, quotes, labels and query wrappers", () => {
     expect(sanitizeToken("Bearer eyJ.a.b")).toBe("eyJ.a.b");
     expect(sanitizeToken('"abc123"')).toBe("abc123");
     expect(sanitizeToken("Your Socket API Token: abc123")).toBe("abc123");
@@ -61,11 +61,11 @@ describe("sanitizeToken", () => {
 });
 
 describe("sanitizeIngestUrl / sanitizeHost", () => {
-  it("ingest: tira espaços/aspas; esquema só → vazio", () => {
+  it("strips ingest whitespace and quotes and rejects bare schemes", () => {
     expect(sanitizeIngestUrl("  rtmp://x/app  ")).toBe("rtmp://x/app");
     expect(sanitizeIngestUrl("rtmp://")).toBe("");
   });
-  it("host: URL inteira no campo de host → só o host", () => {
+  it("extracts only the hostname from a pasted URL", () => {
     expect(sanitizeHost("localhost")).toBe("localhost");
     expect(sanitizeHost("rtmp://localhost:1935/live")).toBe("localhost");
     expect(sanitizeHost("127.0.0.1:1935")).toBe("127.0.0.1");

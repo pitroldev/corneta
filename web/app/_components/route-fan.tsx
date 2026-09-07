@@ -5,26 +5,10 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ObsMark, PlatformGlyph } from "./decor";
 import { cn, State } from "./ui";
 
-// ============================================================
-// O leque de rotas: uma entrada, três saídas — e agora dá pra CORTAR uma.
-// ============================================================
-// O título desta linha é uma afirmação: "Se a Kick cair, a Twitch nem fica
-// sabendo". O painel ao lado provava isso com uma pastilha âmbar impressa na
-// Kick — ou seja, pedia pra acreditar.
-//
-// Agora cada destino é um botão. Derruba a Twitch e olha as outras duas: elas
-// não piscam, o leque continua latão nelas, e só o ramo da que caiu fica âmbar.
-// A alegação vira uma coisa que a pessoa testa em dois segundos, com a mão.
-//
-// A Kick começa caída porque é o exemplo que o título usa — e porque um painel
-// que abre com tudo verde não mostra a diferença que ele existe pra mostrar.
-
 type PlatId = "twitch" | "youtube" | "kick";
 
-/** As três saídas, na ordem em que o leque as encontra. */
 const OUT: { id: PlatId; name: string; branch: string }[] = [
-  // Os `d` saem do SVG original: em porcentagem da altura, os centros das três
-  // linhas caem em 14,79% / 50% / 85,21% de um quadro de 100.
+  // Path endpoints match the three destination centers in the adjacent grid.
   { id: "twitch", name: "Twitch", branch: "M0 50H12V14.79H34" },
   { id: "youtube", name: "YouTube", branch: "M0 50H34" },
   { id: "kick", name: "Kick", branch: "M0 50H12V85.21H34" },
@@ -49,28 +33,19 @@ export function RouteFan({ copy }: { copy: RouteFanCopy }) {
   return (
     <div>
       <div className="grid grid-cols-[62px_34px_1fr] items-center max-[760px]:grid-cols-[54px_26px_1fr]">
-        {/* "OBS" não tem letra com descendente, mas a caixa de linha da Baloo 2
-            reserva o espaço dela assim mesmo — quase 7px vazios abaixo da tinta.
-            O grid centraliza CAIXAS, não tinta, então essa sobra empurrava o
-            conjunto pra cima e o logo encostava na borda de topo. `leading-none`
-            tira boa parte do fantasma. O que sobra é a assimetria da própria
-            fonte, e aí não tem cálculo: o `pt` é correção ÓPTICA medida na tela. */}
+        {/* Optical padding compensates for Baloo's unused descender space. */}
         <span className="grid size-[62px] place-items-center gap-1 rounded-md bg-brass pt-[5px] font-display text-[1.05rem] font-extrabold text-brass-ink shadow-pop-sm max-[760px]:size-[54px] max-[760px]:text-[0.92rem] [&>svg]:h-5 [&>svg]:w-5 [&>svg]:fill-current">
           <ObsMark />
           <span className="leading-none">OBS</span>
         </span>
 
-        {/* O `self-stretch` importa: sem ele o SVG tinha altura própria e o grid
-            centralizava a diferença, desalinhando ~5px. */}
+        {/* Stretch the SVG with the destination grid so branch endpoints stay aligned. */}
         <span
           className="self-stretch [&>svg]:block [&>svg]:h-full [&>svg]:w-[34px]"
           aria-hidden="true"
         >
           <svg viewBox="0 0 34 100" preserveAspectRatio="none">
             {OUT.map((o) => (
-              // O ramo acompanha o destino: quem caiu fica âmbar, e é a única
-              // coisa que muda no desenho. As outras duas seguem latão — que é
-              // exatamente o que o título afirma.
               <motion.path
                 key={o.id}
                 d={o.branch}
@@ -96,7 +71,9 @@ export function RouteFan({ copy }: { copy: RouteFanCopy }) {
                 key={o.id}
                 type="button"
                 aria-pressed={!off}
-                onClick={() => setDown((cur) => ({ ...cur, [o.id]: !cur[o.id] }))}
+                onClick={() =>
+                  setDown((cur) => ({ ...cur, [o.id]: !cur[o.id] }))
+                }
                 className={cn(
                   ROW,
                   "cursor-pointer outline-offset-2 transition-colors duration-150",

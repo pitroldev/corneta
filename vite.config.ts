@@ -4,7 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import pkg from "./package.json" with { type: "json" };
 
-// Porta padrão do Tauri para o dev server.
 const host = process.env.TAURI_DEV_HOST;
 const posthogPersonalApiKey =
   process.env.POSTHOG_API_KEY ?? process.env.POSTHOG_CLI_API_KEY;
@@ -22,19 +21,16 @@ const sourceMapCredentialsValid =
   /^\d+$/.test(posthogProjectId ?? "");
 if (sourceMapsRequired && !sourceMapCredentialsValid) {
   throw new Error(
-    "Release com telemetria ativa exige Personal API Key e project ID válidos para os source maps.",
+    "Telemetry-enabled releases require a valid Personal API Key and project ID for source maps.",
   );
 }
 if (sourceMapsRequired && sourceMapDryRun) {
-  throw new Error(
-    "Release com telemetria ativa não permite POSTHOG_CLI_DRY_RUN.",
-  );
+  throw new Error("Telemetry-enabled releases cannot use POSTHOG_CLI_DRY_RUN.");
 }
 const shouldUploadSourceMaps = Boolean(
   !telemetryBuildDisabled && sourceMapCredentialsValid,
 );
 
-// https://vitejs.dev/config/
 export default defineConfig(async () => ({
   // The explicit contributor profile must never compile the maintainer's .env.
   envDir: process.env.CORNETA_CONTRIBUTOR === "1" ? false : undefined,
@@ -66,7 +62,6 @@ export default defineConfig(async () => ({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
 
-  // Tauri espera um esquema de erros consistente; não limpamos a tela.
   clearScreen: false,
   server: {
     port: 1420,
@@ -74,18 +69,14 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
     watch: {
-      // Não observar a pasta do Rust.
       ignored: ["**/src-tauri/**"],
     },
   },
 
-  // Variáveis de ambiente do Tauri ficam disponíveis no front com este prefixo.
   envPrefix: ["VITE_", "TAURI_ENV_"],
 
   test: {
-    // `.claude/worktrees` guarda CÓPIAS inteiras do repositório (worktrees de
-    // sessão). Sem excluir, o Vitest roda a suíte duas vezes — e a segunda é uma
-    // versão ANTIGA do código, que pode passar ou quebrar por conta própria.
+    // Nested worktrees and generated snapshots contain independent, potentially stale suites.
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
@@ -96,16 +87,13 @@ export default defineConfig(async () => ({
   worker: { format: "es" },
   build: {
     manifest: true,
-    // Alvo do WebView2 (Windows) / WKWebView; ES2021 é seguro.
     target: "es2021",
     minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,
-    // Em release, mapas só existem durante o upload autenticado do PostHog. O plugin os apaga
-    // antes de o Tauri empacotar o `dist`; builds locais/PRs continuam sem credenciais.
+    // Delete authenticated-upload maps before Tauri packages dist; never ship them.
     sourcemap: shouldUploadSourceMaps
       ? "hidden"
       : !!process.env.TAURI_ENV_DEBUG,
     rolldownOptions: {
-      // Duas páginas: o app principal e a janela flutuante do chat (entry próprio).
       input: {
         main: "index.html",
         chat: "chat.html",

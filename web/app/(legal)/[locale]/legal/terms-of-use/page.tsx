@@ -65,9 +65,6 @@ export async function generateMetadata({
     metadataBase: siteUrl,
     title: meta.title,
     description: meta.description,
-    // Par recíproco completo: cada idioma aponta pro outro E pra si mesmo, que é
-    // o que o Google exige pra aceitar o hreflang. O x-default é o português —
-    // é a versão que vincula e a URL já indexada.
     alternates: {
       canonical: legalHref(locale, "terms"),
       languages: {

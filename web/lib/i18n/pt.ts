@@ -1,16 +1,6 @@
-// ============================================================
-// Dicionário pt-BR da LP — a fonte da verdade da copy.
-//
-// Gerado a partir das strings que já estavam nos componentes; daqui pra frente
-// é AQUI que se escreve. Chave em dot.case, prefixada pela seção.
-//
-// O tipo `Dict` sai deste arquivo, então o TypeScript recusa build se o inglês
-// esquecer uma chave — que é o jeito de a tradução não apodrecer em silêncio.
-// Ver docs/TOM-DE-VOZ.md antes de mexer em qualquer frase.
-// ============================================================
+// Message keys define Dict; keep copy changes aligned with docs/TOM-DE-VOZ.md.
 
 export const pt = {
-  // ---- seo (não aparece na tela; é o que o buscador cita) ----
   "seo.howto.name":
     "Como transmitir para várias plataformas ao mesmo tempo com a Corneta",
   "seo.howto.description":
@@ -22,7 +12,6 @@ export const pt = {
   "seo.app.requirements":
     "OBS Studio ou qualquer programa de transmissão compatível com RTMP",
 
-  // ---- replica (a réplica do app na LP) ----
   "replica.live.label": "painel ao vivo · 01:42:08",
   "replica.live.tag": "números ilustrativos",
   "replica.report.label": "relatório da live · 3h12",
@@ -30,7 +19,6 @@ export const pt = {
   "replica.crop.caption":
     "Escolha um lado do quadro: é assim que você define o que vai pro vertical.",
 
-  // ---- benefits ----
   "benefits.chat.body":
     "Twitch, YouTube e Kick descem juntas, na ordem em que aconteceram, e você responde de lá mesmo. O alerta de sub entra no meio, junto com a mensagem que veio depois.",
   "benefits.chat.demo.input.placeholder": "Responde de uma vez…",
@@ -58,7 +46,6 @@ export const pt = {
   "benefits.routes.note": "Dá pra pausar uma sem derrubar o resto",
   "benefits.routes.title": "Se a Kick cair, a Twitch nem fica sabendo",
 
-  // ---- chrome ----
   "chrome.html.lang": "pt-BR",
   "chrome.llms.contact.label": "contato:",
   "chrome.llms.heading.faq": "## Perguntas frequentes",
@@ -116,7 +103,6 @@ export const pt = {
     "Uma live em várias plataformas ao mesmo tempo — e um app que segura a transmissão e guarda os números de cada uma.",
   "chrome.twitter.title": "Corneta — uma live, três plataformas, um só chat",
 
-  // ---- closing ----
   "closing.cta.note": "Windows 10/11 · sem cadastro · sem assinatura",
   "closing.cta.title": "Sua próxima live já podia estar em três lugares.",
   "closing.faq.cta": "Baixar grátis",
@@ -142,7 +128,6 @@ export const pt = {
   "closing.tiny.kicker": "As miudezas",
   "closing.tiny.title": "Coisa pequena que você só nota na terceira live.",
 
-  // ---- content ----
   "content.faq.free.answer":
     "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC — multistream, chat, alertas, relatórios e proteções — é de código aberto e vai continuar assim. Se um dia existir algo pago, será um serviço opcional na nuvem, e você vai saber antes de instalar qualquer coisa.",
   "content.faq.free.question": "É grátis mesmo? Vai virar assinatura depois?",
@@ -240,7 +225,6 @@ export const pt = {
     "O painel mostra cada plataforma entrando no ar, uma por uma, e você volta pro jogo. Se quiser, a Corneta manda o OBS começar junto.",
   "content.steps.3.title": "Aperte BORA AO VIVO",
 
-  // ---- hero ----
   "hero.cta.footnote":
     "Corneta para Windows 10/11 · sem cadastro · sem assinatura",
   "hero.download.aria": "Baixar a Corneta grátis para Windows",
@@ -261,13 +245,8 @@ export const pt = {
   "hero.nav.help": "Ajuda",
   "hero.nav.platforms": "Plataformas",
   "hero.nav.why": "Por que",
-  // Sem buraco de propósito: são DOIS idiomas, então "o outro" é sempre o mesmo
-  // dentro de cada dicionário. Com `{language}` a frase saía "Ver em English" —
-  // português com o endônimo inglês no meio. (O nome próprio continua sendo o
-  // que APARECE no menu do celular; só a frase é traduzida.)
   "hero.nav.lang": "Ver em inglês",
 
-  // ---- knowledge ----
   "knowledge.kicker": "Aprenda no seu ritmo",
   "knowledge.title": "Da primeira configuração ao diagnóstico da live.",
   "knowledge.description":
@@ -293,7 +272,6 @@ export const pt = {
   "hero.trust.free": "Grátis pra sempre",
   "hero.trust.opensource": "Código aberto",
 
-  // ---- page-data ----
   "journey.live.back": "voltando",
   "journey.live.cpu": "CPU",
   "journey.live.gpu": "Placa",
@@ -356,8 +334,6 @@ export const pt = {
     "Com a conta conectada, a Corneta cria a transmissão e injeta a chave no BORA. Sem abrir o Studio.",
   "page-data.tiny.youtube.title": "YouTube automático",
 
-  // ---- protection ----
-  // ---- depois da live: relatório + replay ----
   "after.kicker": "Depois da live",
   "after.badge": "novo",
   "after.title": "O corte que você ia caçar na mão, já marcado.",
@@ -425,9 +401,7 @@ export const pt = {
   "after.moment.brb.chat.4": "achei que tinha caído",
   "after.moment.brb.chat.5": "continuou tocando aqui",
 
-  // ---- Prévia do app no hero ----
-  // Réplica da tela "Ao vivo": os rótulos têm que bater com os da Sidebar do app
-  // (sidebar.nav.*), senão a LP promete uma tela que não existe.
+  // Preview labels must match the desktop sidebar's localized labels.
   "preview.badge": "PRÉVIA ILUSTRATIVA",
   "preview.chat.compose": "Responde de uma vez…",
   "preview.chat.compose.send": "enviar",
@@ -467,8 +441,6 @@ export const pt = {
   "preview.stat.upload": "seu upload",
   "preview.state.onAir": "No ar · 3 plataformas",
   "preview.state.offAir": "Fora do ar",
-  // Rótulo da coluna de qualidade em cada destino ("Cópia" = passa o vídeo do OBS
-  // sem recodificar). Mesma palavra da tela Qualidade do app.
   "preview.target.copy": "Cópia",
   "preview.target.metrics": "{kbps} kbps · 60 fps · {drops} quedas",
   "preview.state.live": "no ar",
@@ -515,7 +487,7 @@ export const pt = {
     "Quatro redes que você liga (ou não) nas Configurações. Cada uma tem um custo — e a Corneta conta ele antes, não no meio da live.",
   "protection.brb.art.aria": "Tela JÁ VOLTO que a Corneta coloca no ar",
   "protection.brb.art.brand": "CORNETA · MULTI-STREAM",
-  // Igual a `brb.slate.subtitle` do app — esta arte retrata o cartão real.
+  // Match the desktop brb.slate.subtitle; this illustration reproduces the transmitted card.
   "protection.brb.art.line": "já já tô de volta — segura a corneta 📣",
   "protection.brb.art.title": "JÁ VOLTO",
   "protection.brb.body":
@@ -601,7 +573,6 @@ export const pt = {
   "protection.overlay.url.copy": "copiar",
   "protection.title": "Sua live não devia acabar porque o OBS travou.",
 
-  // ---- quality ----
   "quality.desk.demolabel.estimate": "estimativa do app",
   "quality.desk.demolabel.platforms": "4 plataformas ligadas",
   "quality.desk.summary.encodes": "conversões",
@@ -671,7 +642,6 @@ export const pt = {
     "TikTok e Instagram seguem experimentais: entrar neles depende de liberação da própria plataforma.",
   "quality.vertical.title": "Sua live deitada virando vídeo em pé",
 
-  // ---- steps ----
   "steps.accounts.kicker": "Entrar com a sua conta",
   "steps.accounts.label.never": "O que não acontece:",
   "steps.accounts.label.why": "Pra quê:",

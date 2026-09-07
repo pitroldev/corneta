@@ -162,7 +162,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "unapproved-asset-path",
-          `asset sem aprovação humana do path completo (registro v${EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS.version}): ${image.src} | ${image.originalPath}`,
+          `asset lacks human approval for its complete path (registry v${EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS.version}): ${image.src} | ${image.originalPath}`,
           "images",
         ),
       );
@@ -174,7 +174,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
       issue(
         document,
         "raw-markdown-image",
-        'use <ContentImage baseName="..." /> em vez de imagem Markdown',
+        'use <ContentImage baseName="..." /> instead of a Markdown image',
       ),
     );
   }
@@ -185,7 +185,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
       issue(
         document,
         "raw-markdown-image",
-        'use <ContentImage baseName="..." /> em vez de imagem Markdown por referência',
+        'use <ContentImage baseName="..." /> instead of a reference-style Markdown image',
       ),
     );
   }
@@ -200,7 +200,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "raw-markdown-image",
-          'use <ContentImage baseName="..." /> em vez de imagem Markdown por referência curta',
+          'use <ContentImage baseName="..." /> instead of a shortcut-reference Markdown image',
         ),
       );
       break;
@@ -213,7 +213,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
       issue(
         document,
         "raw-image-component",
-        "use ContentImage; img e EditorialImage contornam o manifesto editorial",
+        "use ContentImage; img and EditorialImage bypass the editorial manifest",
       ),
     );
   }
@@ -232,7 +232,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "ambiguous-content-image",
-          `images contém mais de um item com baseName ${baseName}`,
+          `images contains multiple entries with baseName ${baseName}`,
           "images",
         ),
       );
@@ -248,7 +248,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "invalid-content-image",
-          "ContentImage precisa de baseName literal em inglês e kebab-case",
+          "ContentImage requires a literal English kebab-case baseName",
         ),
       );
       continue;
@@ -261,7 +261,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "undeclared-content-image",
-          `ContentImage não existe em frontmatter.images: ${baseName}`,
+          `ContentImage is missing from frontmatter.images: ${baseName}`,
         ),
       );
     }
@@ -275,7 +275,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "unused-content-image",
-          `frontmatter.images não é usado no corpo: ${baseName}`,
+          `frontmatter.images is unused in the body: ${baseName}`,
           "images",
         ),
       );
@@ -284,7 +284,7 @@ function validateContentImages(document: EditorialDocument): EditorialIssue[] {
         issue(
           document,
           "duplicate-content-image-use",
-          `ContentImage deve aparecer uma vez: ${baseName} aparece ${usages}`,
+          `ContentImage must appear once: ${baseName} aparece ${usages}`,
         ),
       );
     }
@@ -378,7 +378,7 @@ function validateAbsoluteBodyLink(
         issue(
           document,
           "unsafe-link-scheme",
-          `link absoluto precisa declarar um esquema seguro: ${rawHref}`,
+          `absolute link must declare a safe scheme: ${rawHref}`,
         ),
       ],
     };
@@ -395,7 +395,7 @@ function validateAbsoluteBodyLink(
         issue(
           document,
           "unsafe-link-scheme",
-          `esquema não permitido em link: ${protocol}`,
+          `link scheme is not allowed: ${protocol}`,
         ),
       ],
     };
@@ -409,7 +409,7 @@ function validateAbsoluteBodyLink(
         issue(
           document,
           "invalid-absolute-link",
-          `URL absoluta inválida: ${rawHref}`,
+          `invalid absolute URL: ${rawHref}`,
         ),
       ],
     };
@@ -421,7 +421,7 @@ function validateAbsoluteBodyLink(
       issue(
         document,
         "unsafe-link-credentials",
-        `link absoluto não pode conter usuário ou senha: ${rawHref}`,
+        `absolute link cannot contain a username or password: ${rawHref}`,
       ),
     );
   }
@@ -431,7 +431,7 @@ function validateAbsoluteBodyLink(
       issue(
         document,
         "sensitive-link-query",
-        `link absoluto contém parâmetro sensível (${sensitiveKeys.join(", ")}): ${rawHref}`,
+        `absolute link contains a sensitive parameter (${sensitiveKeys.join(", ")}): ${rawHref}`,
       ),
     );
   }
@@ -473,7 +473,7 @@ function validateBodyLinks(
         issue(
           document,
           "dynamic-link-href",
-          "href dinâmico não é auditável; use uma string literal",
+          "dynamic href cannot be audited; use a string literal",
         ),
       );
     }
@@ -489,7 +489,7 @@ function validateBodyLinks(
           issue(
             document,
             "sensitive-link-query",
-            `link interno contém parâmetro sensível (${internalSensitiveKeys.join(", ")}): ${rawHref}`,
+            `internal link contains a sensitive parameter (${internalSensitiveKeys.join(", ")}): ${rawHref}`,
           ),
         );
         continue;
@@ -502,7 +502,7 @@ function validateBodyLinks(
             issue(
               document,
               "broken-anchor",
-              `âncora interna inexistente: ${rawHref}`,
+              `internal anchor does not exist: ${rawHref}`,
             ),
           );
         }
@@ -524,7 +524,7 @@ function validateBodyLinks(
             issue(
               document,
               "broken-relative-link",
-              `arquivo não encontrado: ${rawHref}`,
+              `file not found: ${rawHref}`,
             ),
           );
         } else if (
@@ -535,7 +535,7 @@ function validateBodyLinks(
             issue(
               document,
               "published-links-to-draft",
-              `conteúdo publicado aponta para draft: ${rawHref}`,
+              `published content links to a draft: ${rawHref}`,
             ),
           );
         }
@@ -544,7 +544,7 @@ function validateBodyLinks(
             issue(
               document,
               "broken-anchor",
-              `âncora editorial inexistente: ${rawHref}`,
+              `editorial anchor does not exist: ${rawHref}`,
             ),
           );
         }
@@ -564,7 +564,7 @@ function validateBodyLinks(
             issue(
               document,
               "unverifiable-relative-link",
-              `link relativo não verificável: ${rawHref}`,
+              `relative link cannot be verified: ${rawHref}`,
             ),
           );
           continue;
@@ -587,7 +587,7 @@ function validateBodyLinks(
           issue(
             document,
             "disallowed-internal-endpoint",
-            `endpoint interno não pode ser linkado no conteúdo: ${rawHref}`,
+            `content cannot link to an internal endpoint: ${rawHref}`,
           ),
         );
         continue;
@@ -597,7 +597,7 @@ function validateBodyLinks(
           issue(
             document,
             "broken-internal-link",
-            `URL interna inexistente: ${rawHref}`,
+            `internal URL does not exist: ${rawHref}`,
           ),
         );
         continue;
@@ -610,7 +610,7 @@ function validateBodyLinks(
           issue(
             document,
             "broken-editorial-link",
-            `URL editorial inexistente: ${rawHref}`,
+            `editorial URL does not exist: ${rawHref}`,
           ),
         );
         continue;
@@ -623,7 +623,7 @@ function validateBodyLinks(
           issue(
             document,
             "published-links-to-draft",
-            `conteúdo publicado aponta para draft: ${rawHref}`,
+            `published content links to a draft: ${rawHref}`,
           ),
         );
       }
@@ -632,7 +632,7 @@ function validateBodyLinks(
           issue(
             document,
             "broken-anchor",
-            `âncora editorial inexistente: ${rawHref}`,
+            `editorial anchor does not exist: ${rawHref}`,
           ),
         );
       }
@@ -661,7 +661,7 @@ export function validateEditorialCatalog(
         issue(
           document,
           "frontmatter-path-mismatch",
-          `o arquivo deve estar em ${expectedRelativePath(document)}`,
+          `file must be located at ${expectedRelativePath(document)}`,
         ),
       );
     }
@@ -671,7 +671,7 @@ export function validateEditorialCatalog(
         issue(
           document,
           "unapproved-editorial-path",
-          `path sem aprovação humana de idioma (registro v${EDITORIAL_ENGLISH_PATH_APPROVALS.version}): ${document.href}`,
+          `path lacks human language approval (registry v${EDITORIAL_ENGLISH_PATH_APPROVALS.version}): ${document.href}`,
           "slug",
         ),
       );
@@ -683,7 +683,7 @@ export function validateEditorialCatalog(
         issue(
           document,
           "duplicate-content-id",
-          `contentId também usado em ${existingId.relativePath}`,
+          `contentId is also used in ${existingId.relativePath}`,
           "contentId",
         ),
       );
@@ -697,7 +697,7 @@ export function validateEditorialCatalog(
         issue(
           document,
           "duplicate-href",
-          `URL também usada em ${existingHref.relativePath}`,
+          `URL is also used in ${existingHref.relativePath}`,
           "slug",
         ),
       );
@@ -720,7 +720,7 @@ export function validateEditorialCatalog(
         issue(
           document,
           "body-h1",
-          "não use H1 no MDX; o template renderiza title como H1",
+          "do not use H1 in MDX; the template renders title as H1",
         ),
       );
     }
@@ -735,7 +735,7 @@ export function validateEditorialCatalog(
         issue(
           document,
           "published-placeholder",
-          "conteúdo publicado contém placeholder editorial",
+          "published content contains an editorial placeholder",
         ),
       );
     }
@@ -748,7 +748,7 @@ export function validateEditorialCatalog(
     for (const relatedId of document.frontmatter.related) {
       if (relatedId === document.frontmatter.contentId) {
         issues.push(
-          issue(document, "self-related", "related não pode apontar para si"),
+          issue(document, "self-related", "related cannot reference itself"),
         );
         continue;
       }
@@ -757,7 +757,7 @@ export function validateEditorialCatalog(
           issue(
             document,
             "duplicate-related",
-            `related duplicado: ${relatedId}`,
+            `duplicate related entry: ${relatedId}`,
           ),
         );
         continue;
@@ -770,7 +770,7 @@ export function validateEditorialCatalog(
           issue(
             document,
             "missing-related",
-            `contentId relacionado não existe: ${relatedId}`,
+            `related contentId does not exist: ${relatedId}`,
           ),
         );
       } else if (
@@ -781,7 +781,7 @@ export function validateEditorialCatalog(
           issue(
             document,
             "published-related-draft",
-            `conteúdo publicado relaciona um draft: ${relatedId}`,
+            `published content relates to a draft: ${relatedId}`,
           ),
         );
       }
@@ -797,7 +797,7 @@ export function validateEditorialCatalog(
           issue(
             document,
             "duplicate-translation-locale",
-            `${translationKey} já possui ${document.frontmatter.locale} em ${existingLocale.relativePath}`,
+            `${translationKey} already has ${document.frontmatter.locale} at ${existingLocale.relativePath}`,
             "translationKey",
           ),
         );
@@ -816,7 +816,7 @@ export function validateEditorialCatalog(
           issue(
             document,
             "incomplete-published-translation",
-            `translationKey ${translationKey} precisa das versões pt-BR e en publicadas`,
+            `translationKey ${translationKey} requires published pt-BR and en versions`,
             "translationKey",
           ),
         );
@@ -843,7 +843,7 @@ export function validateEditorialCatalog(
             issue(
               document,
               "non-reciprocal-translation",
-              "traduções publicadas devem usar pt-BR/en e o mesmo caminho semântico",
+              "published translations must use pt-BR/en and the same semantic path",
               "translationKey",
             ),
           );
@@ -865,7 +865,8 @@ export function assertValidEditorialCatalog(
   if (errors.length === 0) return;
 
   const details = errors
-    .map((item) => `${item.file ?? "conteúdo"} [${item.code}] ${item.message}`)
+    .map((item) => `${item.file ?? "content"} [${item.code}] ${item.message}`)
     .join("\n");
-  throw new Error(`Catálogo editorial inválido:\n${details}`);
+  throw new Error(`Invalid editorial catalog:
+${details}`);
 }

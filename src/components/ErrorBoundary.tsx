@@ -4,15 +4,7 @@ import { resolveLocale, type Locale } from "../lib/i18n/locale";
 import { captureException } from "../lib/telemetry";
 import { redactTelemetryText, type ScreenId } from "../lib/telemetry-schema";
 
-// Esta é a ÚNICA tela do app que não pode depender do dicionário.
-//
-// O boundary de fora (main.tsx) envolve o próprio `I18nFromConfig`: se o
-// dicionário falhar ao carregar, é ESTA tela que aparece — e chamar `t()` aqui
-// devolveria "error.crash.title" cru pro usuário ver. Então as seis frases da
-// tela de erro moram aqui dentro, ao lado do código que as usa, e o idioma sai
-// do mesmo lugar de sempre (config → sistema) sem esperar chunk nenhum.
-//
-// Mexeu no tom de voz? Mexe aqui também — o linter não avisa.
+// Keep fallback copy independent of lazy dictionaries: this boundary also catches provider loading failures.
 const CRASH: Record<Locale, Record<string, string>> = {
   "pt-BR": {
     title: "Essa tela deu pau",
@@ -36,10 +28,7 @@ const CRASH: Record<Locale, Record<string, string>> = {
   },
 };
 
-/** Idioma sem passar pelo provider — `getState` não é hook e não quebra se o
- *  store ainda não subiu. Exportado porque o popout do chat tem o próprio
- *  boundary (com estilo inline, caso o CSS também não tenha carregado) e as
- *  frases têm que sair do mesmo lugar. */
+/** Resolve the fallback locale without hooks or dictionary chunks, including in the chat webview. */
 export function crashText(): Record<string, string> {
   try {
     return CRASH[resolveLocale(useStore.getState().config?.settings.language)];
@@ -48,10 +37,7 @@ export function crashText(): Record<string, string> {
   }
 }
 
-/** Captura erros de render de um pedaço da UI pra não derrubar o app inteiro.
- *
- *  `app`: é o boundary de fora, o que pega o app INTEIRO caindo — o título
- *  muda porque "essa tela deu pau" mentiria quando não sobrou tela nenhuma. */
+/** The outer app boundary uses a distinct title when no screen remains available. */
 export class ErrorBoundary extends Component<
   { children: ReactNode; app?: boolean; screenId?: ScreenId },
   { error: Error | null; errorId: string | null }
@@ -63,8 +49,7 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
-    // Fica no console pra diagnóstico (e some ao trocar de tela / "tentar de novo").
-    console.error("[Corneta] erro de render:", error);
+    console.error("[Corneta] render error:", error);
     const errorId = captureException(error, {
       handled: false,
       severity: this.props.app ? "fatal" : "error",

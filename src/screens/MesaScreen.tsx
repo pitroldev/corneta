@@ -31,7 +31,6 @@ import {
 } from "../components/ui";
 import { Select } from "../components/Select";
 
-// Tile de vídeo: anexa a MediaStream via ref. Sem stream, mostra o slate "JÁ VOLTO".
 function VideoTile({
   stream,
   muted,
@@ -53,7 +52,7 @@ function VideoTile({
   const empty = !stream || down;
   return (
     <div className="relative aspect-video overflow-hidden rounded-lg bg-night pop">
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- Prévia de MediaStream ao vivo; a fonte não fornece uma faixa de legendas. */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- The live MediaStream source provides no caption track. */}
       <video
         ref={ref}
         aria-label={label}
@@ -85,8 +84,6 @@ function VideoTile({
   );
 }
 
-// As CHAVES são ids de estado do WebRTC — só o rótulo é texto, e ele sai do
-// dicionário na hora de renderizar.
 const CONN_LABEL: Record<string, { key: MessageKey; down: boolean }> = {
   new: { key: "platforms.mesa.conn.connecting", down: true },
   connecting: { key: "platforms.mesa.conn.connecting", down: true },
@@ -96,7 +93,6 @@ const CONN_LABEL: Record<string, { key: MessageKey; down: boolean }> = {
   closed: { key: "platforms.mesa.conn.left", down: true },
 };
 
-// MesaStatus traduzido (o badge do topo — senão vaza "connecting"/"offline" cru).
 const STATUS_LABEL: Record<string, MessageKey> = {
   idle: "platforms.mesa.status.idle",
   connecting: "platforms.mesa.status.connecting",
@@ -105,13 +101,10 @@ const STATUS_LABEL: Record<string, MessageKey> = {
   error: "platforms.mesa.status.error",
 };
 
-// ---- Ilustrações da Mesa: tudo em "tiles" de webcam (moldura + busto) ----
-// Latão = você / a Mesa; tomate = a galera / o destaque; brass-ink = contorno duro.
 const BRASS = "var(--color-brass)";
-const TOMATE = "var(--color-tomate)";
+const TOMATO = "var(--color-tomato)";
 const INK = "var(--color-brass-ink)";
 
-/** Tile de webcam: moldura + silhueta (cabeça + ombros), recortada na própria moldura. */
 function Cam({
   x,
   y,
@@ -156,7 +149,7 @@ function Cam({
           cx={x + w - 8}
           cy={y + 8}
           r="3.5"
-          fill={TOMATE}
+          fill={TOMATO}
           stroke="var(--color-surface)"
           strokeWidth="1.2"
         />
@@ -165,7 +158,6 @@ function Cam({
   );
 }
 
-// Criar: as câmeras da galera (tomate) convergem na SUA (latão, ao vivo) — você é o host.
 function HostHubArt() {
   const t = useT();
   const guests: [number, number][] = [
@@ -191,7 +183,7 @@ function HostHubArt() {
         <path d="M156 41 L170 48 L156 55" />
       </g>
       {guests.map(([gx, gy]) => (
-        <Cam key={gy} x={gx} y={gy} w={40} h={22} frame={TOMATE} />
+        <Cam key={gy} x={gx} y={gy} w={40} h={22} frame={TOMATO} />
       ))}
       <Cam x={172} y={24} w={70} h={48} frame={BRASS} live />
       <rect x={180} y={56} width={54} height={13} rx={3} fill={INK} />
@@ -210,7 +202,6 @@ function HostHubArt() {
   );
 }
 
-// Entrar: seu convite (ingresso MESA) entra numa Mesa já formada (cluster de câmeras).
 function GuestTicketArt() {
   const t = useT();
   return (
@@ -263,7 +254,7 @@ function GuestTicketArt() {
         </g>
       </g>
       <g
-        stroke={TOMATE}
+        stroke={TOMATO}
         strokeWidth="3.5"
         fill="none"
         strokeLinecap="round"
@@ -274,13 +265,11 @@ function GuestTicketArt() {
       </g>
       <Cam x={182} y={9} w={40} h={28} frame={BRASS} live />
       <Cam x={182} y={50} w={40} h={28} frame={BRASS} />
-      <Cam x={226} y={30} w={30} h={34} frame={TOMATE} />
+      <Cam x={226} y={30} w={30} h={34} frame={TOMATO} />
     </svg>
   );
 }
 
-// Mesa cheia: webcams de todo mundo ligadas a todo mundo (mesh P2P). A teia tomate fica
-// densa demais — é o que pesa no upload acima de ~5.
 function MeshArt() {
   const n = 5;
   const cx = 70;
@@ -295,7 +284,7 @@ function MeshArt() {
     for (let j = i + 1; j < n; j++) edges.push([i, j]);
   return (
     <svg viewBox="0 0 140 140" className="size-full" aria-hidden>
-      <g stroke={TOMATE} strokeWidth="1.6" opacity="0.6">
+      <g stroke={TOMATO} strokeWidth="1.6" opacity="0.6">
         {edges.map(([i, j]) => (
           <line
             key={`${i}-${j}`}
@@ -313,7 +302,7 @@ function MeshArt() {
           y={y - 12}
           w={32}
           h={24}
-          frame={i === 0 ? BRASS : TOMATE}
+          frame={i === 0 ? BRASS : TOMATO}
           live={i === 0}
         />
       ))}
@@ -337,18 +326,17 @@ export function MesaScreen() {
     try {
       localStorage.setItem("corneta.mesa.name", name);
     } catch {
-      /* ignore */
+      /* Storage may be unavailable; keep the name for this visit. */
     }
   }, [name]);
 
-  // Tenta listar dispositivos ao abrir (rótulos só aparecem após permissão).
   useEffect(() => {
     void mesa.refreshDevices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const online = mesa.status === "online";
-  // Só "control" são participantes; "studio" são as páginas do OBS (infra), não entram na grade.
+  // Only control peers are participants; studio peers are OBS infrastructure.
   const participants = mesa.peers.filter((p) => p.role === "control");
 
   return (
@@ -383,7 +371,6 @@ export function MesaScreen() {
         </Card>
       )}
 
-      {/* Falha do servidor local — card próprio (não é problema de câmera/privacidade) */}
       {mesa.serverError && (
         <Card className="mb-6 border-l-4 border-bad bg-bad/10">
           <div className="flex items-center gap-2 text-sm font-bold text-bad">
@@ -392,7 +379,6 @@ export function MesaScreen() {
         </Card>
       )}
 
-      {/* Câmera + dispositivos (sempre visível) */}
       <Card className="mb-6" accent>
         <div className="grid gap-5 md:grid-cols-[280px_1fr]">
           <div>
@@ -477,8 +463,6 @@ export function MesaScreen() {
               </div>
             )}
 
-            {/* Nome fora dos cards Criar/Entrar: vale pros DOIS fluxos (o convidado também
-                aparece com ele na grade — antes ele entrava como "Convidado" sem saber). */}
             {!mesa.active && (
               <div>
                 <label
@@ -557,7 +541,6 @@ export function MesaScreen() {
       </Card>
 
       {!mesa.active ? (
-        // -------------------- Lobby --------------------
         <div className="grid gap-5 md:grid-cols-2">
           <Card pop className="flex flex-col">
             <div className="mb-3 h-24 w-full overflow-hidden rounded-md bg-surface-2 ring-1 ring-border">
@@ -611,7 +594,7 @@ export function MesaScreen() {
               />
             </label>
             <Button
-              variant="tomate"
+              variant="tomato"
               className="mt-auto"
               disabled={!joinCode.trim()}
               onClick={() =>
@@ -627,9 +610,7 @@ export function MesaScreen() {
           </Card>
         </div>
       ) : (
-        // -------------------- Mesa ativa --------------------
         <div className="flex flex-col gap-6">
-          {/* Erro de conexão/sala: destacado, com saída — antes morria no console */}
           {mesa.lastError && (
             <Card className="border-l-4 border-bad bg-bad/10">
               <div className="flex items-center gap-2 text-sm font-bold text-bad">
@@ -670,7 +651,6 @@ export function MesaScreen() {
             </Card>
           )}
 
-          {/* Grade de participantes */}
           <div>
             <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-faint">
               <Users className="size-4" />{" "}
@@ -704,7 +684,6 @@ export function MesaScreen() {
             )}
           </div>
 
-          {/* OBS + opções */}
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -785,7 +764,7 @@ export function MesaScreen() {
                         key={i}
                         className={cn(
                           "h-3 flex-1 rounded-[1px]",
-                          i < 8 ? "bg-brass" : "bg-tomate",
+                          i < 8 ? "bg-brass" : "bg-tomato",
                         )}
                       />
                     ))}

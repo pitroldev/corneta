@@ -15,7 +15,7 @@ export async function performAccountAction(
   }
 }
 
-/** Keep failures visible and block duplicate clicks/Enter while the vault is working. */
+/** Keep failures visible and block duplicate clicks or Enter while the vault is working. */
 export function useAccountAction() {
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);

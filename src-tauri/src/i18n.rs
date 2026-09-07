@@ -1,65 +1,21 @@
-// ============================================================
-// Idioma do backend: catálogo de mensagens, resolução do "automático" e o
-// locale ativo do processo.
-//
-// Espelho do `src/lib/i18n/locale.ts` do frontend. Lá o contrato é
-// `Record<MessageKey, string>` — o TypeScript não deixa faltar tradução. Aqui o
-// contrato é ENUM + `match` exaustivo: falta de tradução é
-// `error[E0004]: non-exhaustive patterns`, não uma string vazia na cara do
-// streamer no meio da live.
-//
-// ------------------------------------------------------------
-// AS DUAS LEIS DESTE ARQUIVO
-// ------------------------------------------------------------
-//
-// 1. PROIBIDO `_ =>` no `match` de `Msg::text`. O braço curinga mata a
-//    exaustividade e devolve a este arquivo exatamente o buraco que ele existe
-//    pra fechar. (`#[deny(clippy::wildcard_enum_match_arm)]` na impl.)
-//
-// 2. PROIBIDO `#[non_exhaustive]` no `Msg`. Mesmo motivo.
-//
-// ------------------------------------------------------------
-// O QUE ENTRA AQUI
-// ------------------------------------------------------------
-//
-// Se o valor atravessa a fronteira Rust↔TS, Rust↔disco ou Rust↔OBS e alguém o
-// compara com `==`, ele é ASCII e NÃO entra neste arquivo. Se um humano lê e
-// reage, entra.
-//
-// Fora, por serem PROTOCOLO: `EngineSnapshot.state` (stopped/starting/live/
-// error), `TargetStatus.state` (live/reconnecting/error/signal-lost/paused/
-// waiting/brb/connecting), `chat://status`, `alert://status`, os enums de
-// `AppConfig`, o `kind` das linhas do NDJSON de sessão, os nomes de fonte do
-// OBS ("Corneta · Mesa", "Corneta · Alertas") e a assinatura de cache dos
-// encoders ("gpu-desconhecida", "ffmpeg-indisponível").
-//
-// Fora também: `log::{info,warn,error,debug}!`, `expect` e `panic`. Log é
-// diagnóstico e continua em português — quem lê log é quem escreveu o código.
-// ============================================================
+// Localize user-facing messages only; persisted identifiers and IPC values remain stable.
+// Keep Msg exhaustive: no wildcard match arms or non_exhaustive attribute.
 
 use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 
-// ---------------------------------------------------------------------------
-// Locale
-// ---------------------------------------------------------------------------
-
-/// Os idiomas que existem. Mesma lista do `LOCALES` do TS.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Locale {
     PtBr,
     En,
 }
 
-/// Nada casando (um Windows em espanhol, por exemplo) cai aqui — igual ao
-/// `DEFAULT_LOCALE` do TS.
+/// Match the frontend DEFAULT_LOCALE when no supported OS language is found.
 pub const DEFAULT_LOCALE: Locale = Locale::PtBr;
 
 impl Locale {
-    /// Para varrer os dois idiomas em teste.
     #[cfg(test)]
     pub const ALL: [Locale; 2] = [Locale::PtBr, Locale::En];
 
-    /// Tag BCP-47 como o TS grava em `settings.language`.
     #[cfg(test)]
     pub fn tag(self) -> &'static str {
         match self {
@@ -68,8 +24,7 @@ impl Locale {
         }
     }
 
-    /// Tag exata (`"pt-BR"` | `"en"`) → idioma. Espelha o `isLocale` do TS:
-    /// só aceita o que está no catálogo, sem casamento por prefixo.
+    /// Accept only exact catalog tags, matching the frontend's isLocale contract.
     pub fn from_tag(tag: &str) -> Option<Locale> {
         match tag {
             "pt-BR" => Some(Locale::PtBr),
@@ -79,27 +34,7 @@ impl Locale {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Locale ativo do processo
-// ---------------------------------------------------------------------------
-//
-// O idioma é UM valor por processo, imutável em 99,99% do tempo e lido no hot
-// path: o supervisor do FFmpeg formata mensagem por linha de stderr, por
-// destino. Um `Mutex`/`RwLock` ali seria contenção pura por um `u8`; um
-// `AtomicU8` em `Relaxed` compila pra um `mov`, sem barreira. Um leitor
-// atrasado em ~µs no instante exato da troca de idioma é irrelevante.
-//
-// Por que global e não `AppHandle` como parâmetro: as mensagens nascem em
-// threads que não têm `AppHandle` nenhum — supervisor do FFmpeg
-// (`std::thread::spawn` em `commands.rs`), leitores de chat (`chat.rs`),
-// sockets de alerta (`alerts.rs`) e o servidor HTTP do callback de OAuth
-// (`auth.rs`, que serve HTML pro navegador do usuário). Passar handle por dez
-// camadas pra buscar um `u8` é plumbing que ninguém mantém.
-//
-// Por que não `thread_local!`: essas threads nascem espalhadas em
-// `tauri::async_runtime::spawn_blocking` e `std::thread::spawn`; cada uma
-// precisaria lembrar de inicializar o seu, e uma esquecida volta pro padrão
-// calada.
+// A process-wide atomic avoids locking or per-thread initialization in diagnostic hot paths.
 
 struct ActiveLocale {
     value: AtomicU8,
@@ -132,41 +67,32 @@ impl ActiveLocale {
 
 static ACTIVE: ActiveLocale = ActiveLocale::new();
 
-/// Idioma ativo. Chame UMA vez no topo do adapter e passe adiante — não é caro,
-/// mas duas leituras na mesma função podem divergir se o idioma mudar no meio.
+/// Read once per operation to avoid mixed-language messages during a locale change.
 pub fn locale() -> Locale {
     ACTIVE.get()
 }
 
-/// Troca o idioma ativo. Chamado no boot (`lib.rs` `.setup()`) e sempre que a
-/// config muda (`save_config` / `import_config`).
 pub fn set_locale(l: Locale) {
     ACTIVE.set(l);
 }
 
-/// Quantas vezes o idioma foi trocado.
-///
-/// `apply_native_language` atualiza menus/tooltip apenas quando a preferência efetiva muda.
+/// Invalidate native menus and tooltips only when the effective language changes.
 pub fn generation() -> u32 {
     ACTIVE.generation.load(Ordering::Relaxed)
 }
 
-/// `settings.language` → idioma efetivo. Único lugar que sabe o que "auto"
-/// significa do lado Rust. Espelha o `resolveLocale` do TS.
+/// Resolve settings.language using the same fallback policy as the frontend.
 pub fn resolve(setting: &str) -> Locale {
     Locale::from_tag(setting).unwrap_or_else(system_locale)
 }
 
-/// `resolve` + `set_locale`, que é sempre como os dois aparecem juntos.
-/// Devolve o idioma que passou a valer.
 pub fn apply_setting(setting: &str) -> Locale {
     let l = resolve(setting);
     set_locale(l);
     l
 }
 
-/// Casa uma tag BCP-47 com um idioma que a gente tem, PELO IDIOMA BASE:
-/// `pt-PT` cai no pt-BR e `en-GB` no inglês. Igual ao `matchLocale` do TS.
+/// Match OS language preferences by base language, like the frontend's matchLocale.
 fn match_tag(tag: &str) -> Option<Locale> {
     let base = tag
         .split(['-', '_'])
@@ -180,21 +106,13 @@ fn match_tag(tag: &str) -> Option<Locale> {
     }
 }
 
-/// Primeiro idioma de EXIBIÇÃO do Windows que a gente conhece.
-///
-/// `GetUserPreferredUILanguages`, não `GetUserDefaultLocaleName`: o segundo
-/// devolve o FORMATO REGIONAL, e um brasileiro com Windows em inglês receberia
-/// `pt-BR` aqui enquanto o `navigator.languages` do WebView2 (a fonte do
-/// `detectSystemLocale` do TS) devolve `en-US` — app em inglês, erro do backend
-/// em português. `GetUserPreferredUILanguages` é a mesma fonte que o WebView2
-/// lê, então os dois lados concordam.
+/// Use display-language preferences, not regional formatting, to agree with WebView2.
 #[cfg(windows)]
 pub fn system_locale() -> Locale {
     use windows::core::PWSTR;
     use windows::Win32::Globalization::{GetUserPreferredUILanguages, MUI_LANGUAGE_NAME};
 
-    // Buffer: lista de tags terminadas em NUL, com um NUL extra no fim
-    // ("en-US\0pt-BR\0\0"). A primeira chamada só mede.
+    // Query the size first; Windows returns a double-NUL-terminated list of UTF-16 tags.
     unsafe {
         let mut count: u32 = 0;
         let mut len: u32 = 0;
@@ -227,42 +145,19 @@ pub fn system_locale() -> Locale {
     DEFAULT_LOCALE
 }
 
-/// Fora do Windows a Corneta só roda em teste/CI; o padrão basta.
+/// Non-Windows test builds use the shared default.
 #[cfg(not(windows))]
 pub fn system_locale() -> Locale {
     DEFAULT_LOCALE
 }
 
-// ---------------------------------------------------------------------------
-// O catálogo
-// ---------------------------------------------------------------------------
-
-/// Gera o `Msg`, o `text()` exaustivo e o `key()`.
-///
-/// Forma de cada entrada:
-///
-/// ```text
-/// Variante { campo: tipo, … } = "chave.no.dicionario.TS" =>
-///     pt: "texto com {campo}",
-///     en: "text with {campo}";
-/// ```
-///
-/// Os campos da variante são validados pelo compilador contra os buracos do
-/// literal nos DOIS idiomas: `{nome}` numa variante sem campo `nome` é
-/// `error: cannot find value 'nome'`, e um campo que o literal não usa é
-/// `error: named argument never used`. É a garantia que o `interpolate()` do TS
-/// não tem.
+/// Exhaustive variants and format arguments validate both locales at compile time.
 macro_rules! messages {
     ($(
         $variant:ident $({ $($field:ident : $ty:ty),* $(,)? })? = $key:literal =>
             pt: $pt:literal,
             en: $en:literal;
     )*) => {
-        /// Toda string que o USUÁRIO lê. Fora daqui, `&str` de texto humano é
-        /// bug — o compilador não pega, a revisão pega.
-        //
-        // NÃO adicione `#[non_exhaustive]`: ele desliga a checagem que este
-        // arquivo inteiro existe pra ter.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         pub enum Msg<'a> {
             $( $variant $({ $($field: $ty),* })? ),*
@@ -270,9 +165,6 @@ macro_rules! messages {
 
         #[deny(clippy::wildcard_enum_match_arm)]
         impl Msg<'_> {
-            /// Renderiza no idioma pedido. NÚCLEO PURO: recebe o `Locale` como
-            /// parâmetro e nunca lê o global, pra continuar testável nos dois
-            /// idiomas.
             pub fn text(&self, l: Locale) -> String {
                 match self {
                     $(
@@ -284,18 +176,11 @@ macro_rules! messages {
                 }
             }
 
-            /// Renderiza no idioma ATIVO do processo. Atalho pros ADAPTERS
-            /// (`commands.rs`, `chat.rs`, `auth.rs`, `alerts.rs`, `obs.rs`),
-            /// onde a mensagem nasce e é consumida na mesma linha:
-            /// `Err(Msg::TargetNotFound.now())`.
-            ///
-            /// No núcleo puro (`engine_policy.rs`) NÃO use isto — lá o `Locale`
-            /// entra por parâmetro, pra continuar testável nos dois idiomas.
+            /// Pure policies must call text with an explicit Locale instead of reading global state.
             pub fn now(&self) -> String {
                 self.text(locale())
             }
 
-            /// Identificador estável para validar o catálogo nos testes.
             #[cfg(test)]
             pub fn key(&self) -> &'static str {
                 match self {
@@ -314,7 +199,6 @@ macro_rules! messages {
 }
 
 messages! {
-    // ---- config ------------------------------------------------------------
     ConfigSaveStaleRevision = "rust.config.save.staleRevision" =>
         pt: "configuração mudou em outra janela; tente novamente",
         en: "your settings changed in another window — try again";
@@ -394,7 +278,6 @@ messages! {
         pt: "porta do overlay inválida",
         en: "that overlay port isn't valid";
 
-    // ---- vault -------------------------------------------------------------
     VaultNamespaceNotInConfig = "rust.vault.namespaceNotInConfig" =>
         pt: "esse lugar do cofre não está na sua configuração atual",
         en: "that secret slot isn't in your current setup";
@@ -414,12 +297,10 @@ messages! {
         pt: "não consegui apagar {failed} de {total} credenciais. A exclusão pode estar incompleta; tente desconectar novamente.",
         en: "I couldn't delete {failed} of {total} credentials. Deletion may be incomplete; try disconnecting again.";
 
-    // ---- upload ------------------------------------------------------------
     UploadMeasureFailed = "rust.upload.measureFailed" =>
         pt: "Não consegui medir o upload — sem internet?",
         en: "Couldn't measure your upload — no internet?";
 
-    // ---- window ------------------------------------------------------------
     WindowTitleLive = "rust.window.title.live" =>
         pt: "Corneta — NO AR",
         en: "Corneta — LIVE";
@@ -436,7 +317,6 @@ messages! {
         pt: "Corneta — Chat",
         en: "Corneta — Chat";
 
-    // ---- brb ---------------------------------------------------------------
     BrbFilePickerFilter = "rust.brb.filePicker.filter" =>
         pt: "Imagem ou vídeo",
         en: "Image or video";
@@ -453,7 +333,6 @@ messages! {
         pt: "o JÁ VOLTO não está armado nesta live — arme nas Configurações e recomece.",
         en: "BE RIGHT BACK isn't armed on this stream — turn it on in Settings and start over.";
 
-    // ---- frame -------------------------------------------------------------
     FrameNoSignal = "rust.frame.noSignal" =>
         pt: "sem sinal — entre ao vivo no OBS pra capturar o frame",
         en: "no signal — go live in OBS so I can grab the frame";
@@ -461,7 +340,6 @@ messages! {
         pt: "não consegui capturar o frame (sinal instável?)",
         en: "Couldn't grab the frame — signal acting up?";
 
-    // ---- notify ------------------------------------------------------------
     NotifyTargetDownTitle = "rust.notify.targetDown.title" =>
         pt: "Plataforma caiu",
         en: "A platform went down";
@@ -471,7 +349,6 @@ messages! {
     NotifySignalLostTitle = "rust.notify.signalLost.title" =>
         pt: "O sinal do OBS caiu",
         en: "OBS dropped the signal";
-    // CAPS só em BORA AO VIVO e JÁ VOLTO — são nomes, não ênfase (TOM-DE-VOZ.md §6).
     NotifySignalLostBody = "rust.notify.signalLost.body" =>
         pt: "Sua live está sem imagem — confira o OBS.",
         en: "Your stream has no picture — check OBS.";
@@ -512,7 +389,6 @@ messages! {
         pt: "{name}: {msg}",
         en: "{name}: {msg}";
 
-    // ---- target ------------------------------------------------------------
     TargetErrorKeyRejected = "rust.target.error.keyRejected" =>
         pt: "Chave recusada — cole a chave nova em Plataformas e clique em Tentar de novo.",
         en: "The platform turned down your stream key — paste the new one in Platforms and hit Try again.";
@@ -544,7 +420,6 @@ messages! {
         pt: "Instabilidade no envio — reconectando.",
         en: "Something's shaky on the way out — reconnecting.";
 
-    // ---- engine ------------------------------------------------------------
     EngineAlreadyLive = "rust.engine.alreadyLive" =>
         pt: "já está no ar.",
         en: "you're already live.";
@@ -575,16 +450,17 @@ messages! {
     EngineIngestPortInUse = "rust.engine.ingestPortInUse" =>
         pt: "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.",
         en: "Something else is already on port 1935. Close whatever's using it.";
+    EngineInvalidIngestUrl = "rust.engine.invalidIngestUrl" =>
+        pt: "URL de ingestão inválida",
+        en: "Invalid ingest URL";
     EngineMediamtxDied = "rust.engine.mediamtxDied" =>
         pt: "O servidor de ingestão caiu — tenta de novo.",
         en: "The ingest server crashed — try again.";
 
-    // ---- youtube -----------------------------------------------------------
     YoutubeDefaultBroadcastTitle = "rust.youtube.defaultBroadcastTitle" =>
         pt: "Ao vivo",
         en: "Live";
 
-    // ---- session -----------------------------------------------------------
     SessionNotFound = "rust.session.notFound" =>
         pt: "não achei o relatório dessa live",
         en: "couldn't find that stream's report";
@@ -616,7 +492,6 @@ messages! {
         pt: "essa live começou sem gravação, então não tenho o que retomar",
         en: "this stream started without recording, so there's nothing to restart";
 
-    // ---- open --------------------------------------------------------------
     OpenExternalRefused = "rust.open.externalRefused" =>
         pt: "Não vou abrir esse link — só abro endereço que começa com https://",
         en: "I won't open that link — it has to be a plain https:// address";
@@ -624,9 +499,6 @@ messages! {
         pt: "não consegui abrir o link — abre no navegador na mão: {e}",
         en: "Couldn't open the link — open it in your browser by hand: {e}";
 
-    // ---- test --------------------------------------------------------------
-    // "resolver" é vocabulário de DNS: "não resolvi twitch.tv" não diz nada pra
-    // quem só colou uma URL no teste de conexão.
     TestHostUnresolved { host: &'a str } = "rust.test.hostUnresolved" =>
         pt: "não achei {host} — confira o endereço",
         en: "Couldn't find {host} — check the address";
@@ -640,7 +512,6 @@ messages! {
         pt: "sem resposta de {host}:{port} — confira a URL/rede",
         en: "No answer from {host}:{port} — check the URL and your connection";
 
-    // ---- alertSource -------------------------------------------------------
     AlertSourceNotFound = "rust.alertSource.notFound" =>
         pt: "fonte não encontrada",
         en: "source not found";
@@ -651,7 +522,6 @@ messages! {
         pt: "token válido",
         en: "token works";
 
-    // ---- diag --------------------------------------------------------------
     DiagReportHeader { version: &'a str, os: &'a str, arch: &'a str, config: &'a str } = "rust.diag.reportHeader" =>
         pt: "Corneta {version}\nSO: {os} {arch}\n\nRESUMO DA CONFIGURAÇÃO (somente campos técnicos permitidos)\n{config}\n",
         en: "Corneta {version}\nOS: {os} {arch}\n\nCONFIGURATION SUMMARY (allowlisted technical fields only)\n{config}\n";
@@ -659,7 +529,15 @@ messages! {
         pt: "Diagnóstico da Corneta",
         en: "Corneta diagnostics";
 
-    // ---- overlay -----------------------------------------------------------
+    BrbFileNameFallback = "rust.brb.fileNameFallback" =>
+        pt: "arquivo",
+        en: "file";
+    MesaServerOpenFailed { e: &'a str } = "rust.mesa.serverOpenFailed" =>
+        pt: "falha ao abrir o servidor da Mesa: {e}",
+        en: "couldn't start the Mesa server: {e}";
+    OverlayPortOpenFailed { port: u16, e: &'a str } = "rust.overlay.portOpenFailed" =>
+        pt: "não consegui abrir o overlay na porta {port} — parece ocupada por outro programa ({e}). Feche o que estiver usando essa porta e ligue o overlay de novo.",
+        en: "couldn't open the overlay on port {port} — another program may be using it ({e}). Close whatever is using that port and start the overlay again.";
     OverlayDemoAlertMessage = "rust.overlay.demo.alertMessage" =>
         pt: "bora cornetar! 📣",
         en: "let's gooo!! 📣";
@@ -673,12 +551,10 @@ messages! {
         pt: "teste",
         en: "test";
 
-    // ---- privacySettings ---------------------------------------------------
     PrivacySettingsUnknown = "rust.privacySettings.unknown" =>
         pt: "configuração desconhecida",
         en: "I don't know that setting";
 
-    // ---- tray --------------------------------------------------------------
     TrayOpen = "rust.tray.open" =>
         pt: "Abrir Corneta",
         en: "Open Corneta";
@@ -743,7 +619,6 @@ messages! {
         pt: "conectando",
         en: "connecting";
 
-    // ---- obs ---------------------------------------------------------------
     ObsConnectionClosed = "rust.obs.connectionClosed" =>
         pt: "o OBS fechou a conexão",
         en: "OBS closed the connection";
@@ -778,16 +653,16 @@ messages! {
         pt: "o OBS recusou remover a fonte da Mesa: {resp}",
         en: "OBS wouldn't remove the Table source: {resp}";
 
-    // ---- chat --------------------------------------------------------------
+    ChatGiftRecipient { recipient: &'a str } = "rust.chat.giftRecipient" =>
+        pt: "🎁 para {recipient}",
+        en: "🎁 for {recipient}";
     ChatUnknownUser = "rust.chat.unknownUser" =>
         pt: "alguém",
         en: "someone";
     ChatEmptyMessage = "rust.chat.emptyMessage" =>
         pt: "mensagem vazia",
         en: "nothing to send";
-    // Nasce de um `Mutex::lock()` envenenado: outra thread entrou em pânico segurando
-    // a trava, e o processo não se recupera sozinho. Por isso a saída é reabrir, não
-    // "tenta de novo" — tentar de novo daria o mesmo erro pra sempre.
+    // A poisoned mutex cannot recover by retrying; the message asks for a process restart.
     ChatStateLocked = "rust.chat.stateLocked" =>
         pt: "Não consegui enviar a mensagem — feche e abra a Corneta.",
         en: "Couldn't send your message — close and reopen Corneta.";
@@ -816,7 +691,6 @@ messages! {
         pt: "O YouTube está indisponível ou limitou os pedidos (HTTP {c}; código {reason}). Aguarde e tente novamente.",
         en: "YouTube is unavailable or limiting requests (HTTP {c}; code {reason}). Wait and try again.";
 
-    // ---- alerts ------------------------------------------------------------
     AlertsTokenInvalidOrExpired = "rust.alerts.tokenInvalidOrExpired" =>
         pt: "token inválido ou expirado",
         en: "that token is invalid or expired";
@@ -836,7 +710,6 @@ messages! {
         pt: "sem resposta a tempo — tente de novo",
         en: "No answer in time — try again";
 
-    // ---- youtubeKey --------------------------------------------------------
     YoutubeKeyPasteFirst = "rust.youtubeKey.pasteFirst" =>
         pt: "cole a API key primeiro",
         en: "paste the API key first";
@@ -865,7 +738,6 @@ messages! {
         pt: "sem conexão com o YouTube (rede/proxy?)",
         en: "No connection to YouTube — network or proxy?";
 
-    // ---- auth --------------------------------------------------------------
     AuthBrokerDown = "rust.auth.brokerDown" =>
         pt: "Não consegui falar com o serviço de login — sem internet?",
         en: "Couldn't reach the login service — no internet?";
@@ -938,8 +810,6 @@ messages! {
     AuthYoutubeOfficialNotConfigured = "rust.auth.youtube.officialNotConfigured" =>
         pt: "Login oficial do YouTube não configurado",
         en: "The official YouTube login isn't set up";
-    // "callback" não aparece em lugar nenhum da tela — o que falhou de verdade é o
-    // bind de uma porta local, e "porta" o app já usa com o streamer.
     AuthYoutubeCallbackOpenFailed = "rust.auth.youtube.callbackOpenFailed" =>
         pt: "Não consegui abrir a porta local pro login do YouTube",
         en: "Couldn't open the local port for the YouTube login";
@@ -1037,7 +907,6 @@ messages! {
         pt: "A criação automática no YouTube foi cancelada.",
         en: "Automatic YouTube broadcast creation was cancelled.";
 
-    // ---- moderate ----------------------------------------------------------
     ModeratePlatformUnsupported = "rust.moderate.platformUnsupported" =>
         pt: "ainda não sei moderar nessa plataforma",
         en: "I can't moderate on that platform yet";
@@ -1069,7 +938,6 @@ messages! {
         pt: "na Kick, por enquanto só dá pra apagar a mensagem",
         en: "on Kick, deleting the message is all I can do for now";
 
-    // ---- streamInfo --------------------------------------------------------
     StreamInfoEmptyTitle = "rust.streamInfo.emptyTitle" =>
         pt: "digite um título",
         en: "type a title";
@@ -1102,12 +970,6 @@ messages! {
         en: "sign in to Kick again (the channel:write permission is missing)";
 }
 
-// ---------------------------------------------------------------------------
-// Testes
-// ---------------------------------------------------------------------------
-
-/// Valor de exemplo por tipo de campo, só pra varrer o catálogo em teste.
-/// Campo de tipo novo = mais uma impl aqui; o compilador cobra.
 #[cfg(test)]
 trait Sample {
     fn sample() -> Self;
@@ -1145,51 +1007,40 @@ impl Sample for usize {
 mod tests {
     use super::*;
 
-    /// O compilador garante que existe UM texto por idioma. Não garante que
-    /// alguém não colou o português no slot do inglês — isso é aqui.
     #[test]
-    fn toda_mensagem_foi_de_fato_traduzida() {
-        // Não há mais exceção: o inglês diz BE RIGHT BACK, GO LIVE e Table.
-        // O único nome que atravessa os dois idiomas é "Corneta", sem acento.
-        const NOMES_PROPRIOS: [&str; 0] = [];
-        const ACENTOS: &str = "áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ";
+    fn english_messages_do_not_contain_portuguese_diacritics() {
+        const DIACRITICS: &str = "áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ";
         for m in all_samples() {
             let pt = m.text(Locale::PtBr);
             let en = m.text(Locale::En);
-            assert!(!pt.trim().is_empty(), "{} sem pt", m.key());
-            assert!(!en.trim().is_empty(), "{} sem en", m.key());
+            assert!(!pt.trim().is_empty(), "{} has no Portuguese text", m.key());
+            assert!(!en.trim().is_empty(), "{} has no English text", m.key());
             if pt == en {
-                continue; // "Corneta — Chat", "{name}: {msg}" e afins
-            }
-            let mut limpo = en.clone();
-            for nome in NOMES_PROPRIOS {
-                limpo = limpo.replace(nome, "");
+                continue;
             }
             assert!(
-                !limpo.chars().any(|c| ACENTOS.contains(c)),
-                "{}: o texto em inglês parece português — {en}",
+                !en.chars().any(|c| DIACRITICS.contains(c)),
+                "{}: English text contains Portuguese diacritics: {en}",
                 m.key()
             );
         }
     }
 
-    /// Chave duplicada = duas variantes apontando pro mesmo texto do TS, que é
-    /// sempre engano de copiar-colar.
     #[test]
-    fn as_chaves_do_dicionario_sao_unicas() {
-        let mut chaves: Vec<&str> = all_samples().iter().map(|m| m.key()).collect();
-        chaves.sort_unstable();
-        let total = chaves.len();
-        chaves.dedup();
-        assert_eq!(total, chaves.len(), "chave repetida no catálogo");
+    fn dictionary_keys_are_unique() {
+        let mut keys: Vec<&str> = all_samples().iter().map(|m| m.key()).collect();
+        keys.sort_unstable();
+        let total = keys.len();
+        keys.dedup();
+        assert_eq!(total, keys.len(), "duplicate catalog key");
         assert!(
             all_samples().iter().all(|m| m.key().starts_with("rust.")),
-            "chave fora do namespace rust.*"
+            "catalog key outside the rust.* namespace"
         );
     }
 
     #[test]
-    fn interpolacao_entra_nos_dois_idiomas() {
+    fn interpolation_preserves_values_in_both_locales() {
         let m = Msg::NotifyTargetErrorBody {
             name: "Twitch",
             msg: "sem conexão",
@@ -1203,19 +1054,17 @@ mod tests {
     }
 
     #[test]
-    fn resolve_espelha_o_ts() {
+    fn locale_resolution_matches_the_frontend() {
         assert_eq!(resolve("en"), Locale::En);
         assert_eq!(resolve("pt-BR"), Locale::PtBr);
-        // "auto" e qualquer lixo caem no sistema — que em teste é o padrão.
         assert_eq!(resolve("auto"), system_locale());
         assert_eq!(resolve(""), system_locale());
         assert_eq!(resolve("klingon"), system_locale());
-        // Tag inteira só casa exata; o casamento por base é do sistema.
         assert_eq!(resolve("pt-PT"), system_locale());
     }
 
     #[test]
-    fn tag_do_sistema_casa_pelo_idioma_base() {
+    fn system_tags_match_by_base_language() {
         assert_eq!(match_tag("pt-BR"), Some(Locale::PtBr));
         assert_eq!(match_tag("pt-PT"), Some(Locale::PtBr));
         assert_eq!(match_tag("en-GB"), Some(Locale::En));
@@ -1226,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    fn tag_ida_e_volta() {
+    fn locale_tags_round_trip() {
         for l in Locale::ALL {
             assert_eq!(Locale::from_tag(l.tag()), Some(l));
         }
@@ -1234,8 +1083,8 @@ mod tests {
     }
 
     #[test]
-    fn locale_ativo_troca_e_marca_a_generation() {
-        // Instância isolada: nenhum teste paralelo observa uma troca de idioma global.
+    fn active_locale_changes_increment_the_generation() {
+        // Use an isolated locale so parallel tests cannot observe a global language change.
         let active = ActiveLocale::new();
         active.set(Locale::En);
         assert_eq!(active.get(), Locale::En);

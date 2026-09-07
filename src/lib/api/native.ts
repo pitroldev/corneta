@@ -15,24 +15,18 @@ import type {
 } from "../types";
 import { CornetaApi, MesaServerInfo, OverlayInfo } from "./types";
 
-/** O serde do Tauri não converte JSON float para inteiros Rust (`u64`/`i64`).
- *  Tempos vindos de `<video>` e de interpolação carregam frações de milissegundo,
- *  então a normalização precisa acontecer nesta última fronteira antes do IPC. */
+/** Rust integer timestamps reject JSON floats; normalize interpolated milliseconds at the IPC boundary. */
 function integerArg(value: number, name: string, unsigned = false): number {
   const rounded = Math.round(value);
   if (!Number.isSafeInteger(rounded) || (unsigned && rounded < 0)) {
     throw new TypeError(
-      `${name} precisa ser um inteiro seguro${unsigned ? " não negativo" : ""}`,
+      `${name} must be a safe${unsigned ? " non-negative" : ""} integer`,
     );
   }
   return rounded;
 }
 
-// ---------------------------------------------------------------------------
-// Implementação real (Tauri)
-// ---------------------------------------------------------------------------
 export function tauriApi(): CornetaApi {
-  // Imports dinâmicos: só carregam dentro do Tauri.
   const core = () => import("@tauri-apps/api/core");
   const event = () => import("@tauri-apps/api/event");
 
@@ -159,8 +153,7 @@ export function tauriApi(): CornetaApi {
     },
     async recordVideoUrl(path) {
       const { invoke, convertFileSrc } = await core();
-      // Duas etapas de propósito: o Rust confere que o arquivo é NOSSO e o libera no
-      // escopo; a URL é montada pelo próprio Tauri, que é quem sabe o escape do handler.
+      // Validate and scope the file in Rust before Tauri constructs its correctly escaped asset URL.
       await invoke("record_allow_file", { path });
       return convertFileSrc(path);
     },
@@ -364,9 +357,7 @@ export function tauriApi(): CornetaApi {
       await invoke("open_chat_window");
     },
     subscribeChat(onMsg, onStatus, onDelete) {
-      // StrictMode (dev) monta→desmonta→monta. Como `listen` é async, o cleanup pode
-      // rodar antes de resolver; o flag `cancelled` garante que ele desregistre mesmo
-      // assim (senão sobram 2 listeners → mensagens duplicadas).
+      // Async listeners may resolve after effect cleanup; unregister late subscriptions to avoid duplicates.
       let cancelled = false;
       const uns: Array<() => void> = [];
       const add = (u: () => void) => (cancelled ? u() : uns.push(u));
@@ -467,8 +458,7 @@ export function tauriApi(): CornetaApi {
     },
     async telemetrySetConsent(input) {
       const { invoke } = await core();
-      // O command Rust recebe um argumento nomeado `input`; Tauri não agrupa
-      // automaticamente os campos do objeto interno.
+      // The Rust command expects a named input argument; Tauri does not group these fields automatically.
       return invoke<TelemetryStatus>("telemetry_set_consent", { input });
     },
     async telemetryRegenerateId() {

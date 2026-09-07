@@ -132,8 +132,6 @@ export function ChatScreen() {
     cinefy: true,
   });
 
-  // Deep-link de outra tela (ex.: teaser "Título da live" no Ao vivo) → abre o modal
-  // já na aba pedida, e consome o pedido (mesmo padrão do settingsTab).
   useEffect(() => {
     if (chatConfigRequest) {
       setConfigTab(chatConfigRequest as ConfigTab);
@@ -142,9 +140,8 @@ export function ChatScreen() {
     }
   }, [chatConfigRequest, requestChatConfig]);
 
-  // Painel de Alertas: preferência persistida (antes era estado local, esquecia toda visita).
   const showAlerts = config?.settings.chatShowAlertsPanel ?? false;
-  // Alerta novo com o painel fechado → pulsa o botão (sem abrir sozinho: reflow no meio da live).
+  // Do not auto-open on new alerts: reflow would interrupt reading during a live stream.
   const prevAlerts = useRef(alerts.length);
   useEffect(() => {
     if (alerts.length > prevAlerts.current && !showAlerts) setAlertPulse(true);
@@ -154,7 +151,6 @@ export function ChatScreen() {
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
-  // 2+ fontes da mesma plataforma (ex.: 2 Twitches) → mostra o nome do canal por padrão.
   const hasDup = (() => {
     const seen = new Set<string>();
     for (const x of sources)
@@ -176,13 +172,9 @@ export function ChatScreen() {
   const configured =
     sources.some((x) => x.enabled && x.value.trim()) ||
     alertSources.some((x) => x.enabled && x.hasToken);
-  // Fonte de alerta caída no meio da live parece "ninguém doou" — o painel avisa
-  // em vez de só ficar vazio. As chaves são o rótulo da fonte (nome ou kind).
   const downAlertSources = Object.entries(alertStatuses)
     .filter(([, x]) => x.status === "error" || x.status === "disconnected")
     .map(([name]) => alertSourceLabel(name));
-  // Plataformas que de fato entram no feed (fonte ligada e nomeada). Os chips de filtro
-  // só fazem sentido com 2+ — com 1 só viram ruído (e o risco de filtrar sem religar).
   const feedPlatforms = [
     ...new Set(
       sources.filter((x) => x.enabled && x.value.trim()).map((x) => x.platform),
@@ -243,7 +235,6 @@ export function ChatScreen() {
     }
   };
 
-  // Envio: fontes capazes (token colado, conta Twitch logada, YouTube ou Kick logado).
   const twitchReady = chatLogin.twitch.state === "connected";
   const youtubeReady = chatLogin.youtube.state === "connected";
   const kickReady = chatLogin.kick.state === "connected";
@@ -256,13 +247,11 @@ export function ChatScreen() {
   const hasTwitchChannel = sources.some((x) => x.platform === "twitch");
   const hasYoutubeChannel = sources.some((x) => x.platform === "youtube");
   const hasKickChannel = sources.some((x) => x.platform === "kick");
-  // YouTube e Kick podem receber configuração oficial pelo bootstrap ou credenciais próprias;
-  // por isso continuam acessíveis mesmo quando o fallback público não veio no build.
+  // Bootstrap or user-supplied credentials may enable YouTube and Kick without build-time fallbacks.
   const canLoginSomewhere =
     (hasTwitchChannel && HAS_TWITCH_OAUTH) ||
     hasYoutubeChannel ||
     hasKickChannel;
-  // Alvo efetivo do envio (guarda contra id morto no seletor).
   const sendValid =
     sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
   const effectiveSendTo = sendValid ? sendTo : "all";
@@ -270,7 +259,7 @@ export function ChatScreen() {
     effectiveSendTo === "all"
       ? sendableSources
       : sendableSources.filter((x) => x.id === effectiveSendTo);
-  // Twitch só envia DEPOIS que o IRC autentica (chatAuth.ok); YouTube/Kick mandam via HTTP na hora.
+  // Twitch requires IRC authentication before sending; YouTube and Kick send over HTTP.
   const canSend = sendTargets.some((x) =>
     x.platform === "youtube"
       ? youtubeReady
@@ -301,9 +290,6 @@ export function ChatScreen() {
     t,
   );
 
-  // Troca de modo de OAuth (oficial ↔ credenciais próprias) e o "esquecer". Fecha as opções
-  // avançadas quando dá certo e MOSTRA o motivo quando a Corneta recusa — a recusa (ex.: login
-  // oficial fora do ar) é justamente a informação que o streamer precisa ver.
   const modeAction =
     (close: (open: boolean) => void) =>
     async (action: Promise<void>, ok?: string) => {
@@ -326,7 +312,6 @@ export function ChatScreen() {
     setShowKickByok(false);
   };
 
-  // Conectar (botão do topo e do estado vazio). Sem canal configurado, abre a config.
   const doConnect = async () => {
     if (IS_TAURI && !configured) {
       setConfigTab("canais");
@@ -342,10 +327,7 @@ export function ChatScreen() {
       setConnecting(false);
     }
   };
-  // Religa as fontes do zero SEM apagar o histórico (o backend descarta a geração antiga).
-  // Usa connectChat: limpa os status/auth antigos (senão uma fonte corrigida/removida fica
-  // pra sempre com bolinha vermelha fantasma) e religa também os ALERTAS (token trocado
-  // do Streamlabs/StreamElements só vale com o alerts_start de novo).
+  // Restart source generations and alerts without clearing message history.
   const hasErrored = Object.values(statuses).some((x) => x.status === "error");
   const reconnect = async () => {
     setReconnecting(true);
@@ -358,14 +340,12 @@ export function ChatScreen() {
     }
   };
 
-  // Moderação: acha a fonte de uma mensagem (rótulo+plataforma) e o nível permitido.
   const sourceForMessage = (m: ChatMessage) =>
     sources.find((x) => x.platform === m.platform && srcLabel(x) === m.source);
   const modLevel = (m: ChatMessage): "full" | "delete" | "none" => {
     const src = sourceForMessage(m);
     if (!src) return "none";
     const myLogin = chatLogin.twitch.login?.toLowerCase();
-    // Não modera as próprias mensagens (eco / sua conta).
     if (m.author === "você" || (myLogin && m.author.toLowerCase() === myLogin))
       return "none";
     if (src.platform === "twitch" && twitchReady) return "full";
@@ -393,8 +373,6 @@ export function ChatScreen() {
     );
   };
 
-  // A frase da privacidade tem um LINK no meio: o dicionário guarda a frase
-  // inteira com {link}, e aqui ela é partida pra caber o componente.
   const [privacyBefore, privacyAfter] = splitAt(
     t("chat.account.privacy.text"),
     "{link}",
@@ -461,8 +439,6 @@ export function ChatScreen() {
                     : t("chat.status.empty")}
               </span>
             ) : (
-              // Gatilho focável: o porquê do status abre no hover E no foco; "no ar"
-              // vai em sr-only pra bolinha verde não ser a única pista.
               Object.entries(statuses).map(([source, st]) => (
                 <Tooltip
                   key={source}
@@ -589,7 +565,6 @@ export function ChatScreen() {
             </RTabs.List>
 
             <RTabs.Content value="canais">
-              {/* Canais */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
@@ -652,8 +627,7 @@ export function ChatScreen() {
                   </div>
                 )}
 
-                {/* Também com setup só-de-alertas: o auto-connect dispara com alertSources
-                  (bindEngine), então o toggle pra desligar precisa aparecer nesse caso. */}
+                {/* Alert-only setups also auto-connect, so they must expose this toggle. */}
                 {(sources.length > 0 || alertSources.length > 0) && (
                   <div className="mt-3 border-t border-border-soft pt-3">
                     <ToggleRow
@@ -676,7 +650,6 @@ export function ChatScreen() {
             </RTabs.Content>
 
             <RTabs.Content value="alertas">
-              {/* Fontes de alerta (Streamlabs / StreamElements) */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
@@ -746,7 +719,6 @@ export function ChatScreen() {
             </RTabs.Content>
 
             <RTabs.Content value="overlays">
-              {/* Overlays pro OBS: alertas + chat como Browser Source (com emotes). */}
               <OverlayCard settings={s} setSettings={setSettings} />
             </RTabs.Content>
 
@@ -761,8 +733,6 @@ export function ChatScreen() {
                 </p>
               ) : (
                 <>
-                  {/* Quando a nossa setup API não responde, o login oficial simplesmente não
-                      aparece. Dizer o motivo evita o streamer achar que o app está quebrado. */}
                   {oauthBrokerError && (
                     <p className="mb-2 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
                       {t("chat.account.brokerError", {
@@ -770,10 +740,7 @@ export function ChatScreen() {
                       })}
                     </p>
                   )}
-                  {/* Divulgação NO MOMENTO da autorização. A Limited Use do Google exige
-                      que o uso dos dados esteja claro antes ou durante o consentimento —
-                      a política publicada satisfaz o "antes", isto satisfaz o "durante", e
-                      é o que o revisor vê no vídeo de verificação. */}
+                  {/* Keep data-use disclosure visible during authorization. */}
                   <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
                     {privacyBefore}
                     <LegalLink href={legalUrl(locale, "privacy")}>
@@ -915,7 +882,6 @@ export function ChatScreen() {
             </RTabs.Content>
 
             <RTabs.Content value="exibicao">
-              {/* Exibição */}
               <div>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink-faint">
                   {t("chat.display.section")}
@@ -1109,8 +1075,6 @@ export function ChatScreen() {
                     ? t("chat.alerts.clear.confirmTitle")
                     : t("chat.alerts.clear.title")
                 }
-                // Com o "Limpar?" na tela, o texto é o nome do botão; o aria-label
-                // só cobre o estado em que sobra o ícone.
                 aria-label={
                   confirmClearAlerts ? undefined : t("chat.alerts.clear.title")
                 }

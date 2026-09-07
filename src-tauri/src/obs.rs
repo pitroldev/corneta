@@ -1,5 +1,4 @@
-//! obs-websocket v5: auto-config do serviço de transmissão + coleta de stats
-//! (render/encode lag, congestionamento) para o relatório pós-live.
+//! obs-websocket v5 configuration and post-stream render/encode statistics.
 use base64::Engine;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -19,8 +18,7 @@ fn sha256_b64(input: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(h.finalize())
 }
 
-/// Resposta de autenticação do obs-websocket v5 (pura, testável):
-/// `base64(sha256( base64(sha256(password + salt)) + challenge ))`.
+/// Authentication: base64(sha256(base64(sha256(password + salt)) + challenge)).
 fn obs_auth_response(password: &str, salt: &str, challenge: &str) -> String {
     let secret = sha256_b64(&format!("{password}{salt}"));
     sha256_b64(&format!("{secret}{challenge}"))
@@ -31,7 +29,7 @@ fn read_json(socket: &mut Socket) -> Result<Value, String> {
         match socket.read().map_err(|e| e.to_string())? {
             Message::Text(t) => return serde_json::from_str(&t).map_err(|e| e.to_string()),
             Message::Close(_) => return Err(Msg::ObsConnectionClosed.now()),
-            _ => continue, // ping/pong/binário → ignora
+            _ => continue,
         }
     }
 }
@@ -42,19 +40,41 @@ fn send_json(socket: &mut Socket, v: &Value) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Erro de conexão que lembra se a causa foi SENHA.
-///
-/// Tipo próprio em vez de tupla pra o `?` continuar funcionando dos dois lados:
-/// as falhas comuns chegam como `String` e viram `auth: false`, e quem chama
-/// `connect_identify` em função que devolve `String` recebe só a mensagem.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ConnFailure {
+    Connect,
+    Exchange,
+    PasswordRequired,
+    Identification,
+}
+
+impl ConnFailure {
+    fn code(self) -> &'static str {
+        match self {
+            Self::Connect => "connection_failed",
+            Self::Exchange => "exchange_failed",
+            Self::PasswordRequired => "password_required",
+            Self::Identification => "identification_failed",
+        }
+    }
+
+    fn is_auth(self) -> bool {
+        matches!(self, Self::PasswordRequired | Self::Identification)
+    }
+}
+
+// Display is diagnostic-only; IPC conversion preserves the localized message.
 struct ConnErr {
-    auth: bool,
+    failure: ConnFailure,
     msg: String,
 }
 
 impl From<String> for ConnErr {
     fn from(msg: String) -> Self {
-        Self { auth: false, msg }
+        Self {
+            failure: ConnFailure::Exchange,
+            msg,
+        }
     }
 }
 
@@ -66,22 +86,19 @@ impl From<ConnErr> for String {
 
 impl std::fmt::Display for ConnErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.msg)
+        f.write_str(self.failure.code())
     }
 }
 
-/// Conecta no obs-websocket, faz Hello→Identify (com auth SHA256 se houver senha)
-/// e devolve o socket pronto para enviar requests.
-///
-/// Falha com `ConnErr`, que carrega a mensagem E se ela foi por senha.
 fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, ConnErr> {
     let url = format!("ws://{host}:{port}");
-    let (mut socket, _resp) = tungstenite::connect(url.as_str()).map_err(|e| {
-        Msg::ObsConnectFailed {
+    let (mut socket, _resp) = tungstenite::connect(url.as_str()).map_err(|e| ConnErr {
+        failure: ConnFailure::Connect,
+        msg: Msg::ObsConnectFailed {
             url: &url,
             e: &e.to_string(),
         }
-        .now()
+        .now(),
     })?;
 
     if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
@@ -94,7 +111,7 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Con
     if let Some(auth) = hello.get("d").and_then(|d| d.get("authentication")) {
         if password.is_empty() {
             return Err(ConnErr {
-                auth: true,
+                failure: ConnFailure::PasswordRequired,
                 msg: Msg::ObsPasswordRequired.now(),
             });
         }
@@ -109,7 +126,7 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Con
     if identified.get("op").and_then(|v| v.as_i64()) != Some(2) {
         let _ = socket.close(None);
         return Err(ConnErr {
-            auth: true,
+            failure: ConnFailure::Identification,
             msg: Msg::ObsIdentifyFailed {
                 identified: &identified.to_string(),
             }
@@ -119,7 +136,6 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Con
     Ok(socket)
 }
 
-/// Define o serviço de transmissão "personalizado" (servidor + chave).
 pub fn autoconfigure(
     host: &str,
     port: u16,
@@ -158,7 +174,6 @@ pub fn autoconfigure(
     }
 }
 
-/// Liga (start=true) ou desliga a transmissão no OBS.
 pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<(), String> {
     let mut socket = connect_identify(host, port, password)?;
     let req_type = if start { "StartStream" } else { "StopStream" };
@@ -177,7 +192,7 @@ pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
     let _ = socket.close(None);
-    // 500 = OutputRunning (já transmitindo) / 501 = OutputNotRunning (não estava) → já no estado desejado.
+    // OutputRunning (500) and OutputNotRunning (501) acknowledge an already satisfied request.
     let already = if start { 500 } else { 501 };
     if ok || code == already {
         Ok(())
@@ -190,7 +205,6 @@ pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<
     }
 }
 
-/// Resultado da checagem pré-live do OBS.
 #[derive(serde::Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ObsCheck {
@@ -201,23 +215,17 @@ pub struct ObsCheck {
     pub fps: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// A conexão falhou por SENHA (faltando ou recusada)?
-    ///
-    /// Existe porque o front precisa distinguir "senha errada" de "OBS fechado"
-    /// pra dar o conselho certo. Ele fazia isso procurando as palavras "senha",
-    /// "identificar" e "autentic" na mensagem — o que parou de funcionar assim
-    /// que estas mensagens ganharam tradução. Estado é dado, não texto.
+    /// Distinguish authentication failure from an unreachable OBS without parsing translated text.
     #[serde(default)]
     pub auth_failed: bool,
 }
 
-/// Verifica se o OBS está acessível, apontando pra Corneta e em qual resolução/fps.
 pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> ObsCheck {
     let mut socket = match connect_identify(host, port, password) {
         Ok(s) => s,
         Err(e) => {
             return ObsCheck {
-                auth_failed: e.auth,
+                auth_failed: e.failure.is_auth(),
                 error: Some(e.msg),
                 ..Default::default()
             };
@@ -260,7 +268,6 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
     }
 }
 
-/// Envia um request e devolve o `responseData`.
 fn request(socket: &mut Socket, req_type: &str, id: &str) -> Result<Value, String> {
     send_json(
         socket,
@@ -273,7 +280,6 @@ fn request(socket: &mut Socket, req_type: &str, id: &str) -> Result<Value, Strin
         .unwrap_or(Value::Null))
 }
 
-/// Envia um request COM `requestData` e devolve a resposta inteira (pra inspecionar o status).
 fn request_with(
     socket: &mut Socket,
     req_type: &str,
@@ -293,11 +299,7 @@ fn req_ok(resp: &Value) -> bool {
         .unwrap_or(false)
 }
 
-// --------------------- Mesa: Browser Source no OBS ---------------------
-
-/// Cria (ou atualiza) um Browser Source apontando pra `url`, na cena atual do OBS.
-/// Idempotente: checa o GetInputList primeiro (sem depender de código de erro) — se o
-/// input já existe, só atualiza a URL/tamanho (preserva a posição que o usuário ajustou).
+/// Updating an existing source preserves its user-adjusted position.
 pub fn add_or_update_browser_source(
     host: &str,
     port: u16,
@@ -313,12 +315,11 @@ pub fn add_or_update_browser_source(
         "url": url,
         "width": width,
         "height": height,
-        // Roteia o áudio dos convidados pela mesa de som do OBS (vai pra live).
+        // Route guest audio through OBS's mixer so it reaches the stream.
         "reroute_audio": true,
     });
 
-    // Já existe um input com esse nome? Nomes são GLOBAIS no OBS (entre cenas E tipos),
-    // então também conferimos o tipo: se existir com OUTRO tipo, é colisão de nome.
+    // OBS input names are global across scenes and types; reject collisions with non-browser inputs.
     let list = request(&mut socket, "GetInputList", "corneta-inputs")?;
     let existing_kind = list
         .get("inputs")
@@ -340,7 +341,6 @@ pub fn add_or_update_browser_source(
         }
     }
 
-    // Cena atual (program) — os dois ramos precisam dela.
     let scene_resp = request(&mut socket, "GetCurrentProgramScene", "corneta-scene")?;
     let scene = scene_resp
         .get("currentProgramSceneName")
@@ -350,9 +350,7 @@ pub fn add_or_update_browser_source(
         .to_string();
 
     let resp = if existing_kind.is_some() {
-        // O input existe globalmente, mas o scene item é POR-CENA: pode ter sobrado de uma
-        // sessão anterior em OUTRA cena. Garante que ele está na cena atual (senão a Mesa
-        // "soma" — atualiza a fonte numa cena que o streamer não está usando).
+        // Inputs are global but scene items are not; attach an existing input to the current scene.
         let item = request_with(
             &mut socket,
             "GetSceneItemId",
@@ -410,7 +408,7 @@ pub fn add_or_update_browser_source(
     }
 }
 
-/// Remove um input da Mesa (limpeza ao encerrar). Tolera "não encontrado".
+/// Removing a Mesa input is idempotent when it is already missing.
 pub fn remove_input(host: &str, port: u16, password: &str, input_name: &str) -> Result<(), String> {
     let mut socket = connect_identify(host, port, password)?;
     let resp = request_with(
@@ -420,7 +418,6 @@ pub fn remove_input(host: &str, port: u16, password: &str, input_name: &str) -> 
         json!({ "inputName": input_name }),
     )?;
     let _ = socket.close(None);
-    // Se já não existe, o objetivo (não estar lá) já foi alcançado.
     let not_found = resp
         .pointer("/d/requestStatus/code")
         .and_then(|v| v.as_u64())
@@ -435,8 +432,7 @@ pub fn remove_input(host: &str, port: u16, password: &str, input_name: &str) -> 
     }
 }
 
-/// Coleta stats do OBS a cada ~2s enquanto `running`, chamando `on_stats`.
-/// Melhor-esforço: se o OBS não estiver acessível, sai em silêncio.
+/// Stats are best-effort; unavailable OBS must not interrupt streaming.
 pub fn poll_stats(
     host: &str,
     port: u16,
@@ -447,15 +443,15 @@ pub fn poll_stats(
     let mut socket = match connect_identify(host, port, password) {
         Ok(s) => s,
         Err(e) => {
-            log::info!("OBS stats indisponível: {e}");
+            log::info!("OBS stats unavailable: {e}");
             return;
         }
     };
-    // Timeout de leitura para não travar o coletor se o OBS engasgar.
+    // Bound reads so stalled OBS cannot retain the polling worker indefinitely.
     if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
         let _ = tcp.set_read_timeout(Some(Duration::from_secs(5)));
     }
-    log::info!("OBS stats: conectado, coletando render/encode lag");
+    log::info!("OBS stats: connected; collecting render and encode lag");
 
     let num = |v: &Value, k: &str| v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0);
     while running.load(Ordering::Relaxed) {
@@ -469,7 +465,7 @@ pub fn poll_stats(
                 output_skipped: num(&ss, "outputSkippedFrames") as u32,
                 congestion: num(&ss, "outputCongestion"),
             }),
-            _ => break, // erro/desconexão → encerra (best-effort)
+            _ => break,
         }
         for _ in 0..20 {
             if !running.load(Ordering::Relaxed) {
@@ -486,14 +482,68 @@ mod tests {
     use super::*;
 
     #[test]
+    fn connection_diagnostics_and_ipc_messages_have_separate_contracts() {
+        for locale in [crate::i18n::Locale::PtBr, crate::i18n::Locale::En] {
+            for (failure, message, code, auth) in [
+                (
+                    ConnFailure::Connect,
+                    Msg::ObsConnectFailed {
+                        url: "ws://private-fixture.invalid:4455",
+                        e: "private-fixture",
+                    },
+                    "connection_failed",
+                    false,
+                ),
+                (
+                    ConnFailure::PasswordRequired,
+                    Msg::ObsPasswordRequired,
+                    "password_required",
+                    true,
+                ),
+                (
+                    ConnFailure::Identification,
+                    Msg::ObsIdentifyFailed {
+                        identified: "private-fixture",
+                    },
+                    "identification_failed",
+                    true,
+                ),
+            ] {
+                let text = message.text(locale);
+                let error = ConnErr {
+                    failure,
+                    msg: text.clone(),
+                };
+                assert_eq!(error.to_string(), code);
+                assert_eq!(error.failure.is_auth(), auth);
+                assert!(!error.to_string().contains("private-fixture"));
+                assert_eq!(String::from(error), text);
+            }
+            let text = Msg::ObsConnectionClosed.text(locale);
+            let error = ConnErr::from(text.clone());
+            assert_eq!(error.to_string(), "exchange_failed");
+            assert!(!error.failure.is_auth());
+            assert_eq!(String::from(error), text);
+        }
+    }
+
+    #[test]
+    fn provider_exchange_text_cannot_enter_connection_diagnostics() {
+        let private = "falha privada https://example.invalid/private-fixture";
+        let error = ConnErr::from(private.to_string());
+        assert_eq!(
+            format!("OBS stats unavailable: {error}"),
+            "OBS stats unavailable: exchange_failed"
+        );
+        assert_eq!(String::from(error), private);
+    }
+
+    #[test]
     fn obs_auth_is_deterministic_and_input_sensitive() {
         let (p, s, c) = ("senha", "c2FsdA==", "Y2hhbGxlbmdl");
         let a = obs_auth_response(p, s, c);
-        // base64 de um sha256 (32 bytes) = 44 chars com padding.
         assert_eq!(a.len(), 44);
-        // determinístico.
         assert_eq!(a, obs_auth_response(p, s, c));
-        // sensível a CADA entrada (senão o handshake autenticaria errado sem avisar).
         assert_ne!(a, obs_auth_response("outra", s, c));
         assert_ne!(a, obs_auth_response(p, "b3V0cm8=", c));
         assert_ne!(a, obs_auth_response(p, s, "b3V0cm8="));
@@ -501,8 +551,7 @@ mod tests {
 
     #[test]
     fn obs_auth_matches_known_vector() {
-        // KAT computado INDEPENDENTE (Python): fixa a ordem de concatenação + o hash do
-        // handshake v5. base64(sha256( base64(sha256("senha"+"c2FsdA==")) + "Y2hhbGxlbmdl" )).
+        // Independently computed known-answer vector verifies the v5 hash and concatenation order.
         assert_eq!(
             obs_auth_response("senha", "c2FsdA==", "Y2hhbGxlbmdl"),
             "+8Ytw+UBaCto3PZWaabX3QK0lhU/2NwTnVBbh4BAt80="

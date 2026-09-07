@@ -1,11 +1,4 @@
-// URL canônica do site. Tudo que é SEO depende dela: canonical, sitemap,
-// Open Graph e os `@id` do JSON-LD.
-//
-// O fallback de localhost existe pro `pnpm web:dev` funcionar sem configurar
-// nada. Em produção ele é um desastre silencioso — o sitemap inteiro sai
-// apontando pra `http://localhost:3000` e ninguém descobre até o tráfego não
-// chegar. Por isso todo build de produção QUEBRA sem a variável, em
-// vez de publicar um site que se declara hospedado na sua máquina.
+// Production requires an explicit canonical origin; localhost is development-only.
 
 const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 const canonicalProductionOrigin = "https://www.corneta.live";
@@ -13,9 +6,9 @@ const requiresCanonicalUrl = process.env.NODE_ENV === "production";
 
 if (!raw && requiresCanonicalUrl) {
   throw new Error(
-    "NEXT_PUBLIC_SITE_URL não definida. Sem ela, sitemap, canonical e dados " +
-      "estruturados sairiam apontando para http://localhost:3000. Defina a URL " +
-      "canônica (https://www.corneta.live) nas variáveis de ambiente do deploy.",
+    "NEXT_PUBLIC_SITE_URL is missing. Sitemap, canonical URLs, and structured data " +
+      "would point to http://localhost:3000. Set the canonical URL " +
+      "(https://www.corneta.live) in the deployment environment.",
   );
 }
 
@@ -24,8 +17,8 @@ try {
   configuredSiteUrl = new URL(raw || "http://localhost:3000");
 } catch {
   throw new Error(
-    "NEXT_PUBLIC_SITE_URL inválida. Informe somente a origem do site, por " +
-      "exemplo https://www.corneta.live.",
+    "NEXT_PUBLIC_SITE_URL is invalid. Provide only the site origin, for " +
+      "example https://www.corneta.live.",
   );
 }
 
@@ -37,8 +30,8 @@ if (
   configuredSiteUrl.hash
 ) {
   throw new Error(
-    "NEXT_PUBLIC_SITE_URL deve conter somente protocolo e host, sem " +
-      "credenciais, caminho, query ou fragmento.",
+    "NEXT_PUBLIC_SITE_URL must contain only protocol and host, without " +
+      "credentials, path, query, or fragment.",
   );
 }
 
@@ -47,7 +40,7 @@ if (
   configuredSiteUrl.origin !== canonicalProductionOrigin
 ) {
   throw new Error(
-    `NEXT_PUBLIC_SITE_URL de produção deve ser ${canonicalProductionOrigin}.`,
+    `Production NEXT_PUBLIC_SITE_URL must be ${canonicalProductionOrigin}.`,
   );
 }
 

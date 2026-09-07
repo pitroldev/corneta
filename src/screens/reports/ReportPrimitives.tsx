@@ -273,8 +273,6 @@ export function WindowCard({
         <CopyTimeButton time={time} className="ml-auto" />
       </div>
       {window.signals.length > 0 ? (
-        // Só o primeiro passo da história (a evidência mais forte): o grupo acima já conta
-        // a sequência inteira, e repetir três frases por trecho viraria parede de texto.
         <div className="mt-0.5 text-xs text-ink-muted">{window.signals[0]}</div>
       ) : null}
     </div>

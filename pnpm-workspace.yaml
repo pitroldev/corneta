@@ -1,25 +1,21 @@
 packages:
   - web
 
-# Autoriza somente os build-scripts nativos necessários e revisados (pnpm 11).
 allowBuilds:
-  # O postinstall nativo é deliberadamente bloqueado: a release baixa o CLI
-  # versionado e verifica seu SHA-256 em scripts/fetch-posthog-cli.ps1.
+  # Release tooling downloads and verifies the pinned CLI instead of running postinstall.
   "@posthog/cli": false
-  # Só imprime a mensagem de apoio do projeto; não é necessário para o runtime.
+  # The funding-message postinstall is not needed at runtime.
   core-js: false
-  # Necessário ao runner TypeScript usado pelo gate editorial e já transitivo
-  # de Vite/Vitest; o script instala apenas o binário da plataforma.
+  # Installs the platform binary used by the TypeScript runner.
   esbuild: true
   sharp: true
   unrs-resolver: true
 
 minimumReleaseAgeExclude:
-  # Versão fixada e revisada neste rollout; necessária ao suporte do Next.js 16.
+  # Reviewed pin required for Next.js 16 support.
   - posthog-node@5.47.3
 
-# Patches de segurança transitivos. Remover cada override assim que o pacote pai
-# declarar uma faixa que já resolva para a versão corrigida.
+# Remove each security override once its parent resolves a patched version.
 overrides:
   "sharp": "0.35.3"
   "postcss": "8.5.25"

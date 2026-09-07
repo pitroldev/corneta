@@ -1,7 +1,4 @@
-/** TanStack Virtual keeps measurements by key across rotations of a bounded feed.
- * Prune only AFTER compensating the scroll anchor. Removing keys absent from the
- * current measurements does not invalidate any current row's geometry.
- * Keep this adapter covered against the installed virtualizer on upgrades. */
+/** Prune evicted virtualizer measurements only after scroll-anchor compensation. Keep this adapter tested against virtualizer upgrades. */
 export function pruneChatMeasurements(
   sizes: Map<string | number | bigint, number>,
   messages: readonly { id: string }[],

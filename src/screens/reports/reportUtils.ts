@@ -25,7 +25,6 @@ function lighten(hex: string, amount: number): string {
     .join("")}`;
 }
 
-/** Diferencia contas da mesma plataforma sem abandonar a cor da marca. */
 export function channelColors(
   channels: ChannelStats[],
 ): Record<string, string> {
@@ -63,7 +62,6 @@ export interface LivePortrait {
   detail: string;
 }
 
-/** Resume a live pelo que aconteceu nela, sem promover a saúde técnica a manchete. */
 export function buildLivePortrait(
   data: SessionData,
   analysis: ReportAnalysis,

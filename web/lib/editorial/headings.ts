@@ -76,10 +76,7 @@ function maskInlineCode(source: string): string {
   return result;
 }
 
-/**
- * Masks fenced and inline Markdown code while preserving line boundaries.
- * Validators can inspect MDX syntax without flagging examples as live markup.
- */
+// Mask code without changing line positions so example markup is not treated as live content.
 export function sourceWithoutMarkdownCode(source: string): string {
   const parts = source.split(/(\r?\n)/);
   let fence: { marker: string; length: number } | null = null;

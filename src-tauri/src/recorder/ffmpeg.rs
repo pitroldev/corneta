@@ -1,9 +1,3 @@
-//! Adaptador do ENCODER: sobe o FFmpeg sidecar, lê o `-progress`, remuxa e mata a árvore.
-//!
-//! Este arquivo não decide nada. Ele traduz evento do processo em pergunta pro
-//! [`super::domain`] e obedece a resposta — quem manda em ancorar, desistir ou retomar é
-//! o núcleo puro.
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -22,10 +16,7 @@ use crate::session;
 use crate::telemetry::AppError;
 use crate::AppState;
 
-/// `#[track_caller]` OBRIGATÓRIO: sem ele o `Location::caller()` lá dentro resolve
-/// para ESTE wrapper, e todo erro de gravação chega com
-/// `top_app_frame = recorder.rs:<linha daqui>` — foi o que aconteceu com o primeiro
-/// `recording_gave_up` reportado por um beta, que apontou pro helper em vez do laço.
+/// Preserve the recording failure's call site rather than attributing every error to this wrapper.
 #[track_caller]
 fn capture_recording_error(app: &AppHandle, code: &str, retryable: bool) {
     let state = app.state::<AppState>();
@@ -52,10 +43,7 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Sobe o gravador e supervisiona até `running` cair. Um segmento por vida do FFmpeg.
-///
-/// Roda numa task própria: nada aqui bloqueia o motor, e um erro aqui não tem caminho
-/// nenhum de volta pro estado da transmissão.
+/// Recording failures must not change the live stream's state.
 pub async fn run(
     app: AppHandle,
     source: String,
@@ -65,12 +53,10 @@ pub async fn run(
     running: Arc<AtomicBool>,
     _activity: crate::engine::EngineActivityGuard,
 ) {
-    // Continua de onde a pasta parou. O gravador pode subir duas vezes na mesma live (o
-    // "tentar de novo" depois de desistir) e recomeçar do 1 apagaria o já gravado.
+    // A retry in the same session must not overwrite earlier segments.
     let mut seg: u32 = domain::next_segment(&disk::file_names(&dir), &id);
     let mut budget = RestartBudget::default();
-    // Relógio da PACIÊNCIA com o OBS: conta desde que o gravador subiu, não desde o
-    // segmento. Enquanto a fonte não aparece, morrer não gasta orçamento.
+    // Source waiting is measured across attempts, not reset by each encoder spawn.
     let started_at = Instant::now();
     let mut warned_waiting = false;
 
@@ -78,7 +64,7 @@ pub async fn run(
         let free = disk::free_bytes(&dir);
         if domain::blocks_start(free) {
             log::warn!(
-                "gravação: espaço insuficiente ({} bytes) — não vou começar",
+                "recording: insufficient free space ({} bytes); refusing to start",
                 free.unwrap_or(0)
             );
             capture_recording_error(&app, "recording_disk_low", true);
@@ -94,7 +80,7 @@ pub async fn run(
         let (mut rx, child) = match spawned {
             Ok(v) => v,
             Err(e) => {
-                log::error!("gravação: sidecar ffmpeg indisponível: {e}");
+                log::error!("recording: ffmpeg sidecar unavailable: {e}");
                 capture_recording_error(&app, "recording_ffmpeg_spawn_failed", true);
                 session::record_rec_end(&session_path, seg, REASON_GIVEUP);
                 toast(&app, "failed", Some(e.to_string()));
@@ -109,9 +95,7 @@ pub async fn run(
                 .ffmpegs
                 .insert(RECORDER_KEY.into(), child);
         }
-        // Mesma corrida do supervisor de destino: o stop pode ter drenado o mapa entre o
-        // spawn e o insert. Como o stop grava running=false sob o mesmo lock antes de
-        // drenar, aqui já vemos a flag — mata o recém-inserido e sai.
+        // Stop may drain the child map between spawn and insert; kill a child inserted after cancellation.
         if !running.load(Ordering::Relaxed) {
             take_and_kill(&app);
             break;
@@ -145,7 +129,7 @@ pub async fn run(
                                 "h264",
                                 false,
                             );
-                            budget.earned(); // gravou de verdade: o orçamento volta
+                            budget.earned();
                         }
                         if let Some(sync_out) = act.sync_out_ms {
                             session::record_rec_sync(&session_path, seg, sync_out);
@@ -156,20 +140,19 @@ pub async fn run(
                     let raw = String::from_utf8_lossy(&b);
                     let t = raw.trim();
                     if !t.is_empty() {
-                        log::warn!("gravação/ffmpeg: {t}");
+                        log::warn!("recording/ffmpeg: {t}");
                     }
                 }
                 Ok(Some(CommandEvent::Terminated(_))) | Ok(None) => break,
                 Ok(Some(_)) => {}
                 Err(_) => {
-                    // Sem evento nesta janela: hora de olhar o relógio e o disco.
                     if !running.load(Ordering::Relaxed) {
                         reason = domain::REASON_STOP;
                         break;
                     }
                     if domain::is_stalled(progress.anchored(), last_advance.elapsed().as_millis()) {
                         log::warn!(
-                            "gravação: sem progresso há {}ms — considerando morta",
+                            "recording: no progress for {}ms; treating encoder as stalled",
                             domain::STALL_MS
                         );
                         break;
@@ -193,7 +176,7 @@ pub async fn run(
                     if last_disk.elapsed() >= DISK_CHECK_EVERY {
                         last_disk = Instant::now();
                         if domain::hit_floor(disk::free_bytes(&dir)) {
-                            log::warn!("gravação: disco no piso — encerrando limpo");
+                            log::warn!("recording: free space reached the floor; stopping cleanly");
                             reason = REASON_DISK;
                             break;
                         }
@@ -209,14 +192,11 @@ pub async fn run(
             budget.after_segment(seg, stopping, closed_with, started_at.elapsed().as_millis());
 
         if let AfterSegment::WaitingForSource { .. } = outcome {
-            // Não houve segmento: o FFmpeg morreu porque não havia o que ler. Escrever
-            // `recEnd` aqui encheria o NDJSON de pares vazios que o replay teria que
-            // aprender a ignorar — e o arquivo, se chegou a existir, está vazio.
+            // A missing source produces no segment: omit empty replay entries.
             let _ = std::fs::remove_file(&out);
         } else {
             session::record_rec_end(&session_path, seg, closed_with);
-            // Finaliza ESTE segmento agora, não no fim da live: se o app morrer daqui a
-            // duas horas, o que já foi gravado continua navegável.
+            // Finalize each segment now so earlier footage remains seekable after a later crash.
             finalize(&app, &session_path, seg, &out).await;
         }
 
@@ -228,7 +208,7 @@ pub async fn run(
             }
             AfterSegment::GiveUp => {
                 log::error!(
-                    "gravação: {} retomadas sem sucesso — desistindo",
+                    "recording: giving up after {} unsuccessful restarts",
                     domain::MAX_RESTARTS
                 );
                 capture_recording_error(&app, "recording_gave_up", false);
@@ -240,11 +220,10 @@ pub async fn run(
                 seg: same,
                 backoff_ms,
             } => {
-                // Um aviso só, e não já no primeiro segundo: o caso comum é o OBS subir
-                // em dois piscares, e um toast a cada tentativa viraria spam.
+                // Warn only once after a grace period to avoid noise during normal OBS startup.
                 if !warned_waiting && started_at.elapsed().as_secs() >= 10 {
                     warned_waiting = true;
-                    log::info!("gravação: esperando a fonte subir — o OBS ainda não empurrou");
+                    log::info!("recording: waiting for OBS to start sending");
                     toast(&app, "waitingSource", None);
                 }
                 tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
@@ -262,7 +241,6 @@ pub async fn run(
     }
 }
 
-/// Tira o gravador do mapa de filhos e mata a árvore dele.
 fn take_and_kill(app: &AppHandle) {
     let child = {
         let st = app.state::<AppState>();
@@ -274,8 +252,7 @@ fn take_and_kill(app: &AppHandle) {
     }
 }
 
-/// Remux de finalização. Falhar aqui não perde nada: o fMP4 continua tocando,
-/// só navega pior.
+/// A failed remux leaves the fragmented MP4 playable, with less reliable seeking.
 async fn finalize(app: &AppHandle, session_path: &Path, seg: u32, src: &Path) {
     if disk::file_len(src) == 0 {
         let _ = std::fs::remove_file(src);
@@ -295,19 +272,18 @@ async fn finalize(app: &AppHandle, session_path: &Path, seg: u32, src: &Path) {
         }
         Ok(o) => {
             log::warn!(
-                "gravação: remux falhou ({}) — o fMP4 segue tocável",
+                "recording: remux failed ({}); fragmented MP4 remains playable",
                 String::from_utf8_lossy(&o.stderr).trim()
             );
             let _ = std::fs::remove_file(&tmp);
         }
         Err(e) => {
-            log::warn!("gravação: remux não rodou: {e}");
+            log::warn!("recording: remux could not run: {e}");
             let _ = std::fs::remove_file(&tmp);
         }
     }
 }
 
-/// Grava 5s de barras e devolve o caminho para testar a gravação.
 pub async fn test_record(app: &AppHandle, dir: &Path) -> Result<String, String> {
     let out = dir.join("corneta-teste.mp4");
     let cmd = app

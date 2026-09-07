@@ -32,18 +32,18 @@ export const isoDateSchema = z.preprocess(
   parseYamlDate,
   z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "use a data no formato YYYY-MM-DD")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "use a date in YYYY-MM-DD format")
     .refine((value) => {
       const parsed = new Date(`${value}T00:00:00.000Z`);
       return (
         !Number.isNaN(parsed.getTime()) &&
         parsed.toISOString().startsWith(value)
       );
-    }, "use uma data real"),
+    }, "use a real date"),
 );
 
 const httpsUrlSchema = z
-  .url("use uma URL absoluta válida")
+  .url("use a valid absolute URL")
   .superRefine((value, context) => {
     const url = parseAbsoluteUrl(value);
     if (!url || url.protocol !== "https:") {
@@ -53,14 +53,14 @@ const httpsUrlSchema = z
     if (hasUrlUserInfo(url)) {
       context.addIssue({
         code: "custom",
-        message: "a URL não pode conter usuário ou senha",
+        message: "the URL cannot contain a username or password",
       });
     }
     const sensitiveKeys = sensitiveQueryKeys(url);
     if (sensitiveKeys.length > 0) {
       context.addIssue({
         code: "custom",
-        message: `remova parâmetros sensíveis da URL: ${sensitiveKeys.join(", ")}`,
+        message: `remove sensitive URL parameters: ${sensitiveKeys.join(", ")}`,
       });
     }
   });
@@ -69,14 +69,11 @@ const repositoryPathSchema = z
   .string()
   .min(1)
   .max(240)
-  .refine((value) => !value.includes("\\"), "use barras normais")
-  .refine(
-    (value) => !value.startsWith("/"),
-    "use um caminho relativo ao repositório",
-  )
+  .refine((value) => !value.includes("\\"), "use forward slashes")
+  .refine((value) => !value.startsWith("/"), "use a repository-relative path")
   .refine(
     (value) => !value.split("/").includes(".."),
-    "o caminho não pode sair do repositório",
+    "the path cannot escape the repository",
   );
 
 export const testedVersionSchema = z
@@ -100,14 +97,14 @@ export const editorialSourceSchema = z
     if (!source.url && !source.repoPath) {
       context.addIssue({
         code: "custom",
-        message: "informe url ou repoPath",
+        message: "provide url or repoPath",
         path: ["url"],
       });
     }
     if (source.url && source.repoPath) {
       context.addIssue({
         code: "custom",
-        message: "use url ou repoPath, não os dois",
+        message: "use either url or repoPath, not both",
         path: ["url"],
       });
     }
@@ -119,19 +116,19 @@ const editorialImageBaseSchema = z
       .string()
       .regex(
         EDITORIAL_PUBLIC_ASSET_PATTERN,
-        "use /images/editorial e nomes lowercase ASCII kebab-case; o idioma exige revisão humana",
+        "use /images/editorial and lowercase ASCII kebab-case names; language requires human review",
       ),
     originalPath: z
       .string()
       .regex(
         EDITORIAL_ORIGINAL_ASSET_PATTERN,
-        "use assets/originals e nomes lowercase ASCII kebab-case; o idioma exige revisão humana",
+        "use assets/originals and lowercase ASCII kebab-case names; language requires human review",
       ),
     baseName: z
       .string()
       .regex(
         LOWERCASE_ASCII_KEBAB_CASE_PATTERN,
-        "use um nome lowercase ASCII kebab-case; o idioma exige revisão humana",
+        "use a lowercase ASCII kebab-case name; language requires human review",
       ),
     alt: z.string().trim().min(8).max(240),
     caption: z.string().trim().min(3).max(320).optional(),
@@ -163,8 +160,7 @@ export const editorialImageSchema = editorialImageBaseSchema.superRefine(
     ) {
       context.addIssue({
         code: "custom",
-        message:
-          "baseName deve ser igual ao nome dos arquivos original e público",
+        message: "baseName must match the original and public filenames",
         path: ["baseName"],
       });
     }
@@ -172,7 +168,7 @@ export const editorialImageSchema = editorialImageBaseSchema.superRefine(
     if (image.kind === "screenshot" && !image.capturedAt) {
       context.addIssue({
         code: "custom",
-        message: "screenshot precisa de capturedAt",
+        message: "screenshot requires capturedAt",
         path: ["capturedAt"],
       });
     }
@@ -184,7 +180,7 @@ export const editorialImageSchema = editorialImageBaseSchema.superRefine(
     ) {
       context.addIssue({
         code: "custom",
-        message: "screenshot da Corneta precisa de productVersion",
+        message: "Corneta screenshot requires productVersion",
         path: ["productVersion"],
       });
     }
@@ -196,7 +192,7 @@ export const editorialImageSchema = editorialImageBaseSchema.superRefine(
     ) {
       context.addIssue({
         code: "custom",
-        message: "screenshot do OBS precisa de sourceVersion",
+        message: "OBS screenshot requires sourceVersion",
         path: ["sourceVersion"],
       });
     }
@@ -208,7 +204,7 @@ export const editorialImageSchema = editorialImageBaseSchema.superRefine(
     ) {
       context.addIssue({
         code: "custom",
-        message: "screenshot externo precisa de externalUiReviewedAt",
+        message: "external screenshot requires externalUiReviewedAt",
         path: ["externalUiReviewedAt"],
       });
     }
@@ -217,21 +213,21 @@ export const editorialImageSchema = editorialImageBaseSchema.superRefine(
       if (image.source !== "generated") {
         context.addIssue({
           code: "custom",
-          message: "imagem gerada deve declarar source: generated",
+          message: "generated image must declare source: generated",
           path: ["source"],
         });
       }
       if (!image.generatedAt || !image.generationModel) {
         context.addIssue({
           code: "custom",
-          message: "imagem gerada precisa de generatedAt e generationModel",
+          message: "generated image requires generatedAt and generationModel",
           path: ["generationModel"],
         });
       }
     } else if (image.source === "generated") {
       context.addIssue({
         code: "custom",
-        message: "source: generated só pode ser usado com kind: generated",
+        message: "source: generated requires kind: generated",
         path: ["source"],
       });
     }
@@ -245,7 +241,7 @@ const identityShape = {
     .max(64)
     .regex(
       EDITORIAL_CONTENT_ID_PATTERN,
-      "use help_... ou guide_..., com minúsculas, dígitos e underscores",
+      "use help_... or guide_... with lowercase letters, digits, and underscores",
     ),
   locale: z.enum(EDITORIAL_LOCALES),
   collection: z.enum(EDITORIAL_COLLECTIONS),
@@ -256,7 +252,7 @@ const identityShape = {
     .max(100)
     .regex(
       LOWERCASE_ASCII_KEBAB_CASE_PATTERN,
-      "use lowercase ASCII kebab-case; o catálogo exige aprovação humana do path em inglês",
+      "use lowercase ASCII kebab-case; the catalog requires human approval of the English path",
     ),
   translationKey: z.string().max(100).regex(TRANSLATION_KEY_PATTERN).optional(),
 };
@@ -281,7 +277,7 @@ const editorialPersonNameSchema = z
         normalized,
       )
     );
-  }, "informe a identidade registrada, não um placeholder");
+  }, "provide the registered identity, not a placeholder");
 
 const draftEditorialFrontmatterSchema = z
   .object({
@@ -347,7 +343,7 @@ export const editorialFrontmatterSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: `categoria inválida para ${frontmatter.collection}`,
+        message: `invalid category for ${frontmatter.collection}`,
         path: ["category"],
       });
     }
@@ -360,7 +356,7 @@ export const editorialFrontmatterSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "o prefixo de contentId deve corresponder à coleção",
+        message: "the contentId prefix must match the collection",
         path: ["contentId"],
       });
     }
@@ -374,7 +370,7 @@ export const editorialFrontmatterSchema = z
     if (!validKind) {
       context.addIssue({
         code: "custom",
-        message: `kind incompatível com a coleção ${frontmatter.collection}`,
+        message: `kind is incompatible with collection ${frontmatter.collection}`,
         path: ["kind"],
       });
     }
@@ -387,7 +383,7 @@ export const editorialFrontmatterSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "comparativos precisam usar um intervalo de 60 a 90 dias",
+        message: "comparisons require a review interval between 60 and 90 days",
         path: ["reviewIntervalDays"],
       });
     }
@@ -399,7 +395,7 @@ export const editorialFrontmatterSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "updatedAt não pode ser anterior a publishedAt",
+        message: "updatedAt cannot precede publishedAt",
         path: ["updatedAt"],
       });
     }
@@ -411,7 +407,7 @@ export const editorialFrontmatterSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "reviewedAt não pode ser anterior a updatedAt",
+        message: "reviewedAt cannot precede updatedAt",
         path: ["reviewedAt"],
       });
     }
@@ -421,7 +417,7 @@ export const editorialFrontmatterSchema = z
         if (!source.reviewedAt) {
           context.addIssue({
             code: "custom",
-            message: "fonte de conteúdo publicado precisa de reviewedAt",
+            message: "published content sources require reviewedAt",
             path: ["sources", index, "reviewedAt"],
           });
         }
@@ -429,7 +425,7 @@ export const editorialFrontmatterSchema = z
           context.addIssue({
             code: "custom",
             message:
-              "a revisão da fonte não pode ser posterior à revisão do artigo",
+              "the source review cannot be later than the article review",
             path: ["sources", index, "reviewedAt"],
           });
         }
@@ -441,7 +437,7 @@ export const editorialFrontmatterSchema = z
       if (seenSources.has(image.src)) {
         context.addIssue({
           code: "custom",
-          message: "o mesmo asset foi declarado mais de uma vez",
+          message: "the same asset was declared more than once",
           path: ["images", index, "src"],
         });
       }
@@ -484,7 +480,7 @@ export const editorialAssetManifestEntrySchema = z
     if (originalBaseName !== entry.baseName) {
       context.addIssue({
         code: "custom",
-        message: "baseName deve ser igual ao nome do master",
+        message: "baseName must match the master filename",
         path: ["originalPath"],
       });
     }
@@ -495,7 +491,7 @@ export const editorialAssetManifestEntrySchema = z
       if (derivativeBaseName !== entry.baseName) {
         context.addIssue({
           code: "custom",
-          message: "baseName deve ser igual ao nome da derivada",
+          message: "baseName must match the derivative filename",
           path: ["derivatives", index, "src"],
         });
       }
@@ -504,7 +500,7 @@ export const editorialAssetManifestEntrySchema = z
     if (entry.kind === "screenshot" && !entry.capturedAt) {
       context.addIssue({
         code: "custom",
-        message: "screenshot precisa de capturedAt",
+        message: "screenshot requires capturedAt",
         path: ["capturedAt"],
       });
     }
@@ -515,7 +511,7 @@ export const editorialAssetManifestEntrySchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "screenshot da Corneta precisa de productVersion",
+        message: "Corneta screenshot requires productVersion",
         path: ["productVersion"],
       });
     }
@@ -526,7 +522,7 @@ export const editorialAssetManifestEntrySchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "screenshot do OBS precisa de sourceVersion",
+        message: "OBS screenshot requires sourceVersion",
         path: ["sourceVersion"],
       });
     }
@@ -537,7 +533,7 @@ export const editorialAssetManifestEntrySchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "screenshot externo precisa de externalUiReviewedAt",
+        message: "external screenshot requires externalUiReviewedAt",
         path: ["externalUiReviewedAt"],
       });
     }
@@ -545,21 +541,21 @@ export const editorialAssetManifestEntrySchema = z
       if (entry.source !== "generated") {
         context.addIssue({
           code: "custom",
-          message: "imagem gerada deve declarar source: generated",
+          message: "generated image must declare source: generated",
           path: ["source"],
         });
       }
       if (!entry.generatedAt || !entry.generationModel) {
         context.addIssue({
           code: "custom",
-          message: "imagem gerada precisa de generatedAt e generationModel",
+          message: "generated image requires generatedAt and generationModel",
           path: ["generationModel"],
         });
       }
     } else if (entry.source === "generated") {
       context.addIssue({
         code: "custom",
-        message: "source: generated só pode ser usado com kind: generated",
+        message: "source: generated requires kind: generated",
         path: ["source"],
       });
     }

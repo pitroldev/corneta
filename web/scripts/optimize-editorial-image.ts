@@ -15,7 +15,9 @@ type Options = {
 
 function fail(message: string): never {
   throw new Error(
-    `${message}\n\nUso: pnpm content:image --input assets/originals/<path>.png --output images/editorial/<path>.webp [--width 1600] [--quality 82] [--force]`,
+    `${message}
+
+Usage: pnpm content:image --input assets/originals/<path>.png --output images/editorial/<path>.webp [--width 1600] [--quality 82] [--force]`,
   );
 }
 
@@ -30,17 +32,17 @@ export function parseArgs(args: string[]): Options {
       continue;
     }
     if (!["--input", "--output", "--width", "--quality"].includes(key)) {
-      fail(`Argumento desconhecido: ${key ?? ""}`);
+      fail(`Unknown argument: ${key ?? ""}`);
     }
     const value = argv[index + 1];
-    if (!value || value.startsWith("--")) fail(`Valor ausente para ${key}`);
+    if (!value || value.startsWith("--")) fail(`Missing value for ${key}`);
     values.set(key, value);
     index += 1;
   }
 
   const input = values.get("--input");
   const output = values.get("--output");
-  if (!input || !output) fail("Informe --input e --output.");
+  if (!input || !output) fail("Provide --input and --output.");
 
   const widthText = values.get("--width");
   const width = widthText ? Number(widthText) : undefined;
@@ -49,10 +51,10 @@ export function parseArgs(args: string[]): Options {
     width !== undefined &&
     (!Number.isInteger(width) || width < 320 || width > 4000)
   ) {
-    fail("--width deve ser um inteiro entre 320 e 4000.");
+    fail("--width must be an integer between 320 and 4000.");
   }
   if (!Number.isInteger(quality) || quality < 40 || quality > 95) {
-    fail("--quality deve ser um inteiro entre 40 e 95.");
+    fail("--quality must be an integer between 40 and 95.");
   }
 
   return { input, output, width, quality, force };
@@ -86,10 +88,10 @@ async function main() {
   const output = path.resolve(webRoot, "public", options.output);
 
   if (!inside(originalsRoot, input)) {
-    fail("O input precisa ficar dentro de content/assets/originals.");
+    fail("Input must remain within content/assets/originals.");
   }
   if (!inside(publicRoot, output)) {
-    fail("O output precisa ficar dentro de public/images/editorial.");
+    fail("Output must remain within public/images/editorial.");
   }
 
   const relativeOutput = path
@@ -101,18 +103,18 @@ async function main() {
     )
   ) {
     fail(
-      "O output deve usar diretórios e filename em lowercase ASCII kebab-case, com extensão WebP ou AVIF; a aprovação semântica em inglês acontece no registro editorial.",
+      "Output directories and filenames must use lowercase ASCII kebab-case with a WebP or AVIF extension; the editorial registry handles semantic English approval.",
     );
   }
   const inputBase = path.basename(input, path.extname(input));
   const outputBase = path.basename(output, path.extname(output));
   if (inputBase !== outputBase) {
-    fail("Master e derivada precisam usar o mesmo baseName.");
+    fail("The master and derivative must share the same baseName.");
   }
-  if (!(await exists(input))) fail(`Master não encontrado: ${input}`);
+  if (!(await exists(input))) fail(`Master not found: ${input}`);
   if (!options.force && (await exists(output))) {
     fail(
-      "A derivada já existe; revise o destino ou use --force conscientemente.",
+      "The derivative already exists; review the destination or explicitly use --force.",
     );
   }
 
@@ -131,7 +133,7 @@ async function main() {
   const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
   if (data.byteLength > EDITORIAL_ASSET_MAX_BYTES) {
     fail(
-      `A derivada teria ${data.byteLength} bytes; o limite editorial é ${EDITORIAL_ASSET_MAX_BYTES}. Reduza largura ou qualidade.`,
+      `The derivative would contain ${data.byteLength} bytes; the editorial limit is ${EDITORIAL_ASSET_MAX_BYTES}. Reduce width or quality.`,
     );
   }
 

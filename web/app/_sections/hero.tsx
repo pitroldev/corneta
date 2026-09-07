@@ -15,11 +15,6 @@ import {
   Sticker,
 } from "../_components/ui";
 
-// Topo da LP: pular-pro-conteúdo, cabeçalho fixo, herói e a faixa do mecanismo.
-// Separado do page.tsx porque ele passava de 900 linhas — cada seção agora é um
-// arquivo que cabe na cabeça.
-
-// Placeholder: substitua pela URL real do instalador ou da release.
 const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#download";
 
 export function DownloadButton({
@@ -55,7 +50,6 @@ export function DownloadButton({
   );
 }
 
-/** Só aparece no foco do teclado — o primeiro tab da página. */
 export function SkipLink({ t }: { t: T }) {
   return (
     <a
@@ -71,16 +65,7 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
   const langLabel = t("hero.nav.lang");
 
   return (
-    // `relative` porque a folha do menu se pendura no rodapé do cabeçalho.
     <header className="sticky top-0 z-60 relative border-b border-border-soft bg-night/95 backdrop-blur-[8px]">
-      {/* Três zonas: marca à esquerda, navegação ocupando o meio, e o botão de
-          baixar sozinho à direita. O `justify-between` saiu porque quem faz a
-          distribuição agora é o `flex-1` do bloco do meio — com ele, o vazio
-          que sobra fica dos DOIS lados dos links em vez de todo à esquerda.
-
-          O vão de 28px é generoso quando cabe a navegação inteira; em tela de
-          320px ele é o que faltava pro botão de baixar (a ação da página) não
-          ser cortado pelo `overflow-x: clip` do body. */}
       <Shell className="flex min-h-17 items-center gap-7 max-[980px]:gap-4 max-[420px]:gap-2.5">
         <a
           className="shrink-0"
@@ -117,8 +102,6 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
           locale={<LocaleSwitch current={locale} label={langLabel} />}
         />
 
-        {/* Sozinho na direita de propósito: é a única ação de conversão da
-            página, e agora nenhum controle de preferência encosta nele. */}
         <div className="ml-auto shrink-0">
           <DownloadButton
             t={t}
@@ -162,13 +145,6 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
           </div>
 
           <div className="animate-[copy-in_620ms_150ms_cubic-bezier(0.16,1,0.3,1)_both] pb-1.5">
-            {/* Dois tempos de propósito: o primeiro explica o mecanismo (sem
-                ele ninguém entende o produto), o segundo é o diferencial. O
-                texto antigo parava no mecanismo — que é justamente a parte
-                que a concorrência também entrega. */}
-            {/* O `<strong>` no nome saiu: em inglês a frase quebra em outro
-                ponto, e marcação no meio de texto traduzido é o que obriga a
-                fatiar a frase em pedaços que não sobrevivem à tradução. */}
             <p className="max-w-[46ch] text-[clamp(1.04rem,1.5vw,1.2rem)] leading-[1.62] font-medium text-muted">
               {t("hero.pitch")}
             </p>
@@ -199,8 +175,6 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
   );
 }
 
-// A seta entre as etapas é feita com borda girada: dois lados de um quadrado a
-// 45° viram a ponta, sem imagem nem SVG.
 const ARROW =
   "relative h-[3px] w-[30px] bg-brass-ink " +
   "after:absolute after:-top-1 after:right-0 after:h-[9px] after:w-[9px] after:rotate-45 after:border-t-[3px] after:border-r-[3px] after:border-brass-ink after:content-['']";

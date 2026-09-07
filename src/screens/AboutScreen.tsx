@@ -4,7 +4,7 @@ import { siGithub } from "simple-icons";
 import { IS_TAURI } from "../lib/api";
 import { useStore } from "../lib/store";
 
-// LinkedIn não está no simple-icons (removido por política de marca) — path oficial embutido.
+// LinkedIn has no simple-icons export; use the embedded official path.
 const LINKEDIN_PATH =
   "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z";
 import { openExternal, readableOn } from "../lib/utils";
@@ -23,7 +23,7 @@ function useAppVersion(): string {
       .then(({ getVersion }) => getVersion())
       .then(setVersion)
       .catch(() => {
-        /* fica na versão do build */
+        /* Keep the build version when native lookup is unavailable. */
       });
   }, []);
   return version;
@@ -38,7 +38,7 @@ interface LinkDef {
   sub: string;
   url: string;
   brand: string;
-  path?: string; // simple-icon path
+  path?: string;
 }
 
 const LINKS: LinkDef[] = [
@@ -62,8 +62,6 @@ export function AboutScreen() {
   const { t, locale } = useI18n();
   const replayTour = useStore((s) => s.replayTour);
   const appVersion = useAppVersion();
-  // O coração é um ícone NO MEIO da frase, e `t` devolve string: partimos o
-  // texto no buraco `{heart}` e costuramos o <Heart /> entre as metades.
   const made = t("platforms.about.footer.made").split("{heart}");
   return (
     <div className="mx-auto max-w-3xl">
@@ -72,7 +70,6 @@ export function AboutScreen() {
         title={t("platforms.about.title")}
       />
 
-      {/* Hero */}
       <div className="relative mb-4 overflow-hidden rounded-xl bg-brass p-6 text-brass-ink pop-brass">
         <SoundWaves className="pointer-events-none absolute -right-10 -top-8 size-52 text-brass-ink/10" />
         <div className="relative flex items-start gap-4">
@@ -109,7 +106,6 @@ export function AboutScreen() {
         />
       </button>
 
-      {/* CTA do autor */}
       <button
         onClick={() => openUrl("https://pitrol.dev")}
         className="group mb-4 flex w-full items-center gap-4 rounded-xl bg-surface p-5 pop transition-transform hover:translate-x-1 hover:-translate-y-1"
@@ -131,7 +127,6 @@ export function AboutScreen() {
         />
       </button>
 
-      {/* Redes */}
       <div className="grid grid-cols-2 gap-2">
         {LINKS.map((l) => (
           <button
@@ -167,7 +162,6 @@ export function AboutScreen() {
         ))}
       </div>
 
-      {/* Rever o tour */}
       <button
         onClick={replayTour}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-border bg-surface-2 px-4 py-3 text-sm font-semibold text-ink-muted transition-colors hover:border-brass hover:text-ink"
@@ -175,14 +169,11 @@ export function AboutScreen() {
         <RefreshCw className="size-4" /> {t("platforms.about.replayTour")}
       </button>
 
-      {/* Rodapé */}
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-ink-faint">
         {made[0]}
-        <Heart className="size-4 text-tomate" fill="currentColor" aria-hidden />
+        <Heart className="size-4 text-tomato" fill="currentColor" aria-hidden />
         {made[1]}
       </p>
-      {/* Os documentos precisam ser alcançáveis por quem só tem o app e nunca
-          visitou o site — é o "livre acesso" do art. 6º, IV da LGPD. */}
       <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-ink-faint">
         <LegalLink href={legalUrl(locale, "terms")}>
           {t("platforms.about.legal.terms")}
@@ -202,7 +193,7 @@ export function AboutScreen() {
   );
 }
 
-/** Ícone local: evita que a tela Sobre faça uma requisição externa só para buscar favicon. */
+/** Use local icons to avoid favicon requests from the About screen. */
 function BlogIcon() {
-  return <Globe className="size-6 text-tomate" strokeWidth={2.3} aria-hidden />;
+  return <Globe className="size-6 text-tomato" strokeWidth={2.3} aria-hidden />;
 }

@@ -13,7 +13,7 @@ import {
 } from "./telemetry-schema";
 
 describe("telemetry redaction", () => {
-  it("remove credenciais, PII, paths e parâmetros de URL", () => {
+  it("removes credentials, PII, paths, and URL parameters", () => {
     const fixture = [
       "Authorization: Bearer abc.def_123",
       "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature",
@@ -49,7 +49,7 @@ describe("telemetry redaction", () => {
     expect(result).not.toContain("/custom/customer/123");
   });
 
-  it("redige recursivamente sem alterar o fixture", () => {
+  it("redacts recursively without mutating the fixture", () => {
     const fixture = {
       safe: "ok",
       nested: {
@@ -67,7 +67,7 @@ describe("telemetry redaction", () => {
     expect(JSON.stringify(result)).not.toContain("name@example.com");
   });
 
-  it("redige credenciais serializadas como JSON, inclusive tokens curtos", () => {
+  it("redacts JSON-serialized credentials, including short tokens", () => {
     const raw =
       '{"access_token":"hunter2","Authorization":"Bearer short-token","client_secret":"tiny"}';
     const safe = redactTelemetryText(raw);
@@ -80,7 +80,7 @@ describe("telemetry redaction", () => {
 });
 
 describe("telemetry catalog", () => {
-  it("rejeita evento, surface e propriedade fora do catálogo", () => {
+  it("rejects events, surfaces, and properties outside the catalog", () => {
     expect(sanitizeTelemetryProperties("invented", {})).toBeNull();
     expect(
       sanitizeTelemetryProperties("site_page_viewed", {
@@ -99,7 +99,7 @@ describe("telemetry catalog", () => {
     ).toBeNull();
   });
 
-  it("mantém só campos de transporte validados para a ingestão", () => {
+  it("keeps only validated transport fields for ingestion", () => {
     const safe = redactPostHogMessage({
       event: "site_page_viewed",
       properties: {
@@ -155,7 +155,7 @@ describe("telemetry catalog", () => {
     ).toBeNull();
   });
 
-  it("aceita somente content_id editorial opaco e limitado", () => {
+  it("accepts only opaque and bounded editorial content_id values", () => {
     expect(normalizeContentId("guide_multistream_obs")).toBe(
       "guide_multistream_obs",
     );
@@ -216,7 +216,7 @@ describe("telemetry catalog", () => {
     }
   });
 
-  it("reconstrói um envelope mínimo e remove campos top-level livres", () => {
+  it("rebuilds a minimal envelope and removes arbitrary top-level fields", () => {
     const timestamp = new Date("2026-08-01T12:00:00.000Z");
     const safe = redactPostHogMessage({
       event: "site_page_viewed",
@@ -244,7 +244,7 @@ describe("telemetry catalog", () => {
     expect(JSON.stringify(safe)).not.toContain("person@example.com");
   });
 
-  it("mantém apenas frames seguros de exceção", () => {
+  it("keeps only safe exception frames", () => {
     const message = redactPostHogMessage({
       event: "$exception",
       properties: {
@@ -292,7 +292,7 @@ describe("telemetry catalog", () => {
 });
 
 describe("telemetry normalization", () => {
-  it("mantém nomes de exceção em uma dimensão técnica fechada", () => {
+  it("keeps exception names within a closed technical dimension", () => {
     expect(normalizeErrorType("TypeError")).toBe("TypeError");
     expect(normalizeErrorType("AbortError")).toBe("AbortError");
 
@@ -327,7 +327,7 @@ describe("telemetry normalization", () => {
     expect(serialized).not.toContain("account=maria");
   });
 
-  it("aceita somente uma origem PostHog HTTPS pura", () => {
+  it("accepts only a plain HTTPS PostHog origin", () => {
     expect(normalizePostHogHost("https://us.i.posthog.com/")).toBe(
       "https://us.i.posthog.com",
     );
@@ -340,7 +340,7 @@ describe("telemetry normalization", () => {
     expect(normalizePostHogHost("http://us.i.posthog.com")).toBeUndefined();
   });
 
-  it("converte URL em rota/idioma sem query nem hash", () => {
+  it("maps URLs to routes and locales without queries or hashes", () => {
     expect(siteRoute("https://corneta.live/?utm_source=private#hero")).toEqual({
       routeId: "home",
       locale: "pt-BR",
@@ -351,7 +351,7 @@ describe("telemetry normalization", () => {
     });
   });
 
-  it("classifica hubs, categorias, artigos e changelog sem expor o caminho", () => {
+  it("classifies hubs, categories, articles, and changelog without exposing paths", () => {
     const fixtures = [
       ["/help", "help_index", "pt-BR"],
       ["/help/obs", "help_category", "pt-BR"],
@@ -396,7 +396,7 @@ describe("telemetry normalization", () => {
     expect(JSON.stringify(safe)).not.toContain("a@b.com");
   });
 
-  it("usa buckets determinísticos", () => {
+  it("uses deterministic buckets", () => {
     expect(
       [99, 100, 499, 500, 1_999, 2_000, 9_999, 10_000].map(durationBucket),
     ).toEqual([

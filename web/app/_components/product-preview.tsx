@@ -14,12 +14,7 @@ import {
 import { cn } from "./ui";
 import { LiveChat, LivePanel, type LiveWindowCopy } from "./live-window";
 
-// Réplica da tela "Ao vivo" do app (titlebar + sidebar numerada + destinos +
-// chat reunido). Os números da navegação são os atalhos Alt+N do app; os valores
-// de banda e as mensagens são ilustrativos e estão marcados como prévia.
-
-// `id` é identificador de tela — o "está ativo?" e o selo "novo" olham pra ELE,
-// nunca pro rótulo. Comparar com o texto traduzido quebra no primeiro idioma novo.
+// Compare stable IDs, not translated labels.
 const nav = [
   { id: "platforms", n: "01", icon: "tv" },
   { id: "encoding", n: "02", icon: "sliders" },
@@ -28,12 +23,6 @@ const nav = [
   { id: "reports", n: "05", icon: "chart" },
 ] as const;
 
-// `n` é o índice da mensagem no dicionário (preview.chat.msg.N.*) — o texto e o
-// apelido de exemplo mudam com o idioma, o glifo da plataforma não.
-//
-// Oito falas, não três: a coluna mostra cinco e vai rodando, então a lista
-// precisa ser maior que a janela pra o chat não repetir a cada volta. Duas
-// plataformas se repetem de propósito — chat de verdade não reveza educadamente.
 const chat = [
   { platform: "twitch", who: "Twitch", n: 1 },
   { platform: "youtube", who: "YouTube", n: 2 },
@@ -45,8 +34,7 @@ const chat = [
   { platform: "youtube", who: "YouTube", n: 8 },
 ] as const;
 
-/** Copy do miolo vivo, resolvida no SERVIDOR: função não atravessa a fronteira
- *  servidor→cliente do Next, então o componente animado recebe texto pronto. */
+// Pass resolved copy across the server/client boundary; translation functions are not serializable.
 const liveCopy = (t: T, locale: Locale): LiveWindowCopy => ({
   kicker: t("preview.panel.title"),
   title: t("preview.nav.golive.label"),
@@ -70,9 +58,6 @@ const liveCopy = (t: T, locale: Locale): LiveWindowCopy => ({
   })),
 });
 
-/** Os ícones da navegação são os MESMOS do app — que também usa lucide. Antes
- *  eram traçados desenhados aqui "parecidos com" os de lá; parecido não é igual,
- *  e a réplica só vale enquanto for fiel. */
 const NAV_ICON = {
   tv: MonitorIcon,
   sliders: SlidersIcon,
@@ -127,7 +112,6 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
           )}
           aria-hidden="true"
         >
-          {/* Minimizar, maximizar, fechar — os controles de janela do Windows. */}
           <i>
             <MinimizeIcon />
           </i>
@@ -173,7 +157,7 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
                   <small>{t(`preview.nav.${item.id}.hint`)}</small>
                 </span>
                 {item.id === "reports" ? (
-                  <b className="ml-auto -rotate-3 rounded-sm bg-tomate px-[5px] py-0.5 text-[0.54rem] font-extrabold tracking-[0.06em] text-brass-ink uppercase">
+                  <b className="ml-auto -rotate-3 rounded-sm bg-tomato px-[5px] py-0.5 text-[0.54rem] font-extrabold tracking-[0.06em] text-brass-ink uppercase">
                     {t("preview.nav.reports.badge")}
                   </b>
                 ) : (
@@ -195,9 +179,6 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
               {t("preview.settings")}
               <b>06</b>
             </span>
-            {/* O rodapé da barra lateral é o estado GLOBAL do app. Com o painel
-                no ar ele tinha que virar junto: "Fora do ar" ao lado de um
-                painel transmitindo é contradição, não detalhe. */}
             <span className="flex items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-[0.76rem] font-semibold text-ok [&>i]:size-[9px] [&>i]:rounded-full [&>i]:bg-ok">
               <i />
               {t("preview.state.onAir")}

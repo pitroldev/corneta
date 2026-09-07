@@ -1,57 +1,31 @@
-//! Núcleo PURO do gravador: nomes, argumentos do FFmpeg, leitura do `-progress`,
-//! validação de pasta e a POLÍTICA de supervisão do segmento.
-//!
-//! Nada aqui toca disco, processo, relógio ou Tauri. O laço de verdade (`ffmpeg.rs`) só
-//! traduz evento em pergunta pra este arquivo e obedece a resposta — o que faz a decisão
-//! que desiste da gravação ser testável sem subir um FFmpeg.
+//! Recording arguments, replay anchors, and restart policy without process or filesystem access.
 
 use std::path::{Path, PathBuf};
 
-// ---------------------------------------------------------------------------
-// Limites
-// ---------------------------------------------------------------------------
-
-/// Sem notícia do `-progress` por este tempo = FFmpeg morto (mesmo sem `Terminated`).
+/// Missing progress is treated as a stalled encoder even without a termination event.
 pub const STALL_MS: u128 = 10_000;
-/// Reancoragem periódica: sem ela a deriva de relógio se acumula até o fim da live.
+/// Periodic anchors bound wall-clock drift over long streams.
 pub const SYNC_EVERY_MS: u64 = 5 * 60_000;
-/// Piso de disco. Parar ANTES de zerar não é preciosismo: disco em zero trava a escrita do
-/// NDJSON da sessão, do config.json e do que o Windows estiver fazendo — reagir depois é tarde.
+/// Stop before exhausting space needed by session logs, configuration, and the OS.
 pub const DISK_FLOOR: u64 = 2 * 1024 * 1024 * 1024;
-/// Espaço mínimo pra sequer começar a gravar.
 pub const DISK_START_FLOOR: u64 = 5 * 1024 * 1024 * 1024;
-/// De quanto em quanto tempo olhar o disco durante a gravação.
 pub const DISK_CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(30);
-/// Teto de retomadas. Sem ele, um erro permanente vira laço infinito de spawn.
+/// Bound repeated spawns after persistent failures.
 pub const MAX_RESTARTS: u32 = 5;
-/// Quanto tempo esperar a FONTE aparecer antes de tratar a morte do FFmpeg como falha.
-///
-/// O streamer aperta BORA na Corneta e só DEPOIS o OBS começa a empurrar. Até o programa
-/// existir, o FFmpeg morre na hora — e gastar orçamento nisso fazia a gravação desistir em
-/// menos de 15 segundos, antes de a live sequer ter começado. Os destinos, que leem a MESMA
-/// URL, já esperam indefinidamente (estado `waiting`); o gravador era o único impaciente.
+/// Allow OBS to start sending before failed encoder attempts consume the restart budget.
 pub const WAIT_FOR_SOURCE_MS: u128 = 2 * 60_000;
-/// Intervalo entre tentativas enquanto a fonte não subiu. Fixo e folgado: é espera, não
-/// erro, e cada tentativa custa um spawn.
+/// Poll a missing source slowly because each attempt spawns a process.
 pub const SOURCE_RETRY_MS: u64 = 2_000;
-/// Depois disto sem `-progress`, a âncora é chutada (marcada como estimada) pra não perder
-/// o replay inteiro por causa de um formato que não reportou.
+/// Estimate the replay anchor if the file grows without reporting progress.
 pub const ANCHOR_TIMEOUT_MS: u128 = 15_000;
 
-/// Motivo do fim de um segmento. ASCII de protocolo — o front traduz.
+/// Persisted protocol codes translated by the frontend.
 pub const REASON_STOP: &str = "stopped";
 pub const REASON_DISK: &str = "disk";
 pub const REASON_DIED: &str = "died";
 pub const REASON_GIVEUP: &str = "giveup";
 
-// ---------------------------------------------------------------------------
-// Nomes e argumentos
-// ---------------------------------------------------------------------------
-
-/// `<dir>/<id>.mp4` no primeiro segmento, `<dir>/<id>.pN.mp4` nos seguintes.
-///
-/// O padrão de nome é a TRAVA da poda (`session::parse_video_name`): só o que casa com ele
-/// é candidato a exclusão, porque a pasta pode ser a mesma onde o OBS grava.
+/// Keep this naming contract aligned with session::parse_video_name: pruning must never delete OBS recordings.
 pub fn video_path(dir: &Path, id: &str, seg: u32) -> PathBuf {
     if seg <= 1 {
         dir.join(format!("{id}.mp4"))
@@ -60,8 +34,7 @@ pub fn video_path(dir: &Path, id: &str, seg: u32) -> PathBuf {
     }
 }
 
-/// Cópia de bitstream do programa pro disco. Zero re-encode: o feed JÁ está codificado
-/// pra ir às plataformas, então gravar custa I/O e nada de CPU.
+/// Reuse the encoded program stream without another encode.
 pub fn record_args(source: &str, out: &Path) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -71,22 +44,21 @@ pub fn record_args(source: &str, out: &Path) -> Vec<String> {
         source.into(),
         "-c".into(),
         "copy".into(),
-        // fMP4: cada fragmento é reproduzível sozinho (ver cabeçalho do módulo).
+        // Fragmented MP4 remains playable after an interrupted recording.
         "-movflags".into(),
         "+frag_keyframe+empty_moov+default_base_moof".into(),
         "-f".into(),
         "mp4".into(),
         "-y".into(),
         out.to_string_lossy().to_string(),
-        // O `-progress` é o batimento cardíaco: é dele que saem a âncora, as reancoragens
-        // e a detecção de morte silenciosa.
+        // Progress drives replay anchors and stalled-encoder detection.
         "-progress".into(),
         "pipe:1".into(),
         "-nostats".into(),
     ]
 }
 
-/// Remux de finalização: fMP4 → MP4 indexado, sem re-encode.
+/// Build a seekable MP4 index without re-encoding.
 pub fn remux_args(src: &Path, dst: &Path) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -103,11 +75,7 @@ pub fn remux_args(src: &Path, dst: &Path) -> Vec<String> {
     ]
 }
 
-/// 5 segundos de barras de teste — usado por "testar gravação".
-///
-/// Fonte SINTÉTICA de propósito: assim o teste funciona ANTES da primeira live e valida o
-/// que realmente costuma quebrar (pasta, escrita, remux, escopo do asset, CSP, player).
-/// A fonte RTMP é a única parte não coberta — e é a que a própria live valida.
+/// Synthetic input lets the user check recording and playback before starting OBS.
 pub fn test_args(out: &Path) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -138,18 +106,7 @@ pub fn test_args(out: &Path) -> Vec<String> {
     ]
 }
 
-/// Extrai os ms já gravados de uma linha do `-progress`.
-///
-/// Lê `out_time=HH:MM:SS.uuuuuu` e NÃO `out_time_ms`: apesar do nome, o FFmpeg emite
-/// microssegundos nesse campo há anos. Confiar no nome dele daria um replay 1000× fora
-/// de escala — e um erro que só apareceria em produção.
-/// Primeiro número de segmento LIVRE desta sessão, dada a lista de nomes da pasta.
-///
-/// O gravador pode subir mais de uma vez na mesma live — é o "tentar de novo" depois de
-/// desistir. Recomeçar sempre do 1 sobrescreveria o que já tinha sido gravado, que é
-/// exatamente o oposto do que o botão promete.
-/// Usa o reconhecedor da PODA de propósito: se o gravador tivesse o seu próprio, os dois
-/// poderiam divergir e a numeração pularia por cima de arquivo que a poda enxerga.
+/// Share pruning's filename parser so retries cannot overwrite an existing segment.
 pub fn next_segment(file_names: &[String], id: &str) -> u32 {
     file_names
         .iter()
@@ -157,13 +114,14 @@ pub fn next_segment(file_names: &[String], id: &str) -> u32 {
         .filter(|(video_id, _)| video_id == id)
         .map(|(_, seg)| seg)
         .max()
-        .map_or(1, |maior| maior + 1)
+        .map_or(1, |largest| largest + 1)
 }
 
+// FFmpeg's out_time_ms is in microseconds; parse the formatted out_time instead.
 pub fn parse_out_time_ms(line: &str) -> Option<u64> {
     let raw = line.trim().strip_prefix("out_time=")?;
     if raw.starts_with('N') {
-        return None; // "N/A" antes do primeiro pacote
+        return None; // No timestamp is available before the first packet.
     }
     let mut parts = raw.split(':');
     let h: u64 = parts.next()?.trim().parse().ok()?;
@@ -172,17 +130,11 @@ pub fn parse_out_time_ms(line: &str) -> Option<u64> {
     Some((h * 3600 + m * 60) * 1000 + (s * 1000.0) as u64)
 }
 
-// ---------------------------------------------------------------------------
-// Validação da pasta
-// ---------------------------------------------------------------------------
-
-/// O que a validação da pasta encontrou. Só as duas primeiras impedem gravar — o resto
-/// avisa e deixa seguir, porque a máquina é do streamer.
 #[derive(serde::Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DirCheck {
     pub ok: bool,
-    /// Chave ASCII de protocolo (o front traduz): "missing" | "notDir" | "readonly".
+    /// Frontend protocol values: missing, notDir, or readonly.
     pub error: Option<String>,
     pub free_bytes: Option<u64>,
     pub low_space: bool,
@@ -190,12 +142,10 @@ pub struct DirCheck {
     pub long_path: bool,
 }
 
-/// O que IMPEDE gravar. Tudo o mais é aviso.
 pub enum DirProblem {
     Missing,
     NotDir,
-    /// No Windows a permissão MENTE: atributo somente-leitura, ACL negando, pasta
-    /// sincronizada por serviço de nuvem — só escrever de verdade responde.
+    /// ACLs and cloud-sync folders require a write probe; permission attributes are insufficient.
     ReadOnly,
 }
 
@@ -217,7 +167,6 @@ impl DirCheck {
         }
     }
 
-    /// A pasta serve. Os avisos saem daqui — nenhum deles impede gravar.
     pub fn healthy(path: &str, free: Option<u64>) -> Self {
         DirCheck {
             ok: true,
@@ -230,39 +179,23 @@ impl DirCheck {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Disco
-// ---------------------------------------------------------------------------
-
-/// Espaço insuficiente pra COMEÇAR. `None` (plataforma que não sabe medir) não bloqueia:
-/// recusar gravação por não saber medir seria pior do que tentar.
+/// Unknown free space does not block recording on unsupported platforms.
 pub fn blocks_start(free: Option<u64>) -> bool {
     free.is_some_and(|f| f < DISK_START_FLOOR)
 }
 
-/// Chegou no piso DURANTE a gravação — encerra limpo em vez de escrever até travar a máquina.
 pub fn hit_floor(free: Option<u64>) -> bool {
     free.is_some_and(|f| f < DISK_FLOOR)
 }
 
-// ---------------------------------------------------------------------------
-// Supervisão de um segmento
-// ---------------------------------------------------------------------------
-
-/// O que fazer com uma linha de `-progress`.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ProgressActions {
-    /// Ancorar. O epoch do segundo 0 do arquivo é `agora - out_ms`: NÃO é "quando
-    /// spawnei", porque com `-c copy` o arquivo só começa no keyframe seguinte, e o
-    /// atraso até ele chega a um GOP.
+    /// File time zero is now minus out_ms, not spawn time: stream copy waits for a keyframe.
     pub anchor_out_ms: Option<u64>,
-    /// Reancorar (mapeia relógio de parede → ms já gravados).
     pub sync_out_ms: Option<u64>,
-    /// O vídeo andou — o watchdog de morte silenciosa reinicia a contagem.
     pub advanced: bool,
 }
 
-/// Progresso de UM segmento (uma vida do FFmpeg).
 #[derive(Default)]
 pub struct SegmentProgress {
     anchored: bool,
@@ -275,8 +208,6 @@ impl SegmentProgress {
         self.anchored
     }
 
-    /// Âncora CHUTADA: o `-progress` não deu as caras a tempo, mas o arquivo cresce.
-    /// Melhor um replay com aviso de sincronia do que replay nenhum.
     pub fn estimate_anchor(&mut self) {
         self.anchored = true;
     }
@@ -306,22 +237,16 @@ impl SegmentProgress {
     }
 }
 
-/// Morte silenciosa: o processo existe mas parou de produzir. Sem este watchdog, a UI diria
-/// "gravando" a live inteira e no fim haveria 4 minutos de vídeo.
-///
-/// Só vale depois de ancorado: antes do primeiro pacote não há "parou de andar", há
-/// "ainda não começou" — e essa espera tem prazo próprio (`should_estimate_anchor`).
+/// Stall detection starts after the first anchor; initial source waiting has its own timeout.
 pub fn is_stalled(anchored: bool, since_advance_ms: u128) -> bool {
     anchored && since_advance_ms > STALL_MS
 }
 
-/// Hora de chutar a âncora: passou do prazo sem `-progress`, mas o arquivo tem bytes.
 pub fn should_estimate_anchor(anchored: bool, since_spawn_ms: u128, bytes_written: u64) -> bool {
     !anchored && since_spawn_ms > ANCHOR_TIMEOUT_MS && bytes_written > 0
 }
 
-/// O motivo que vai pra sessão. Parada pedida pelo streamer vence qualquer diagnóstico:
-/// encerrar a live não é "o gravador morreu".
+/// A requested stop takes precedence over failure diagnostics.
 pub fn final_reason(stopping: bool, reason: &'static str) -> &'static str {
     if stopping {
         REASON_STOP
@@ -330,52 +255,43 @@ pub fn final_reason(stopping: bool, reason: &'static str) -> &'static str {
     }
 }
 
-/// O que fazer depois que um segmento fecha.
 #[derive(Debug, PartialEq, Eq)]
 pub enum AfterSegment {
-    /// A live acabou (ou o streamer parou).
     Stop,
-    /// Disco no piso: retomar só encheria de novo.
     DiskFull,
-    /// A fonte ainda não subiu (o OBS não começou a empurrar). Tenta de novo com o MESMO
-    /// número de segmento e sem gastar orçamento: não houve segmento nenhum pra fechar.
-    WaitingForSource { seg: u32, backoff_ms: u64 },
-    /// Sobe o segmento seguinte depois de esperar. O backoff cresce porque retomada
-    /// imediata em erro permanente vira laço de spawn.
-    Resume { seg: u32, backoff_ms: u64 },
-    /// Estourou o orçamento de retomadas: desiste e avisa.
+    /// Reuse the segment number and restart budget until the source first produces video.
+    WaitingForSource {
+        seg: u32,
+        backoff_ms: u64,
+    },
+    /// Increasing backoff prevents a spawn loop on persistent failures.
+    Resume {
+        seg: u32,
+        backoff_ms: u64,
+    },
     GiveUp,
 }
 
-/// Orçamento de retomadas.
-///
-/// É esta política que decide o `recording_gave_up` que chega na telemetria. O orçamento
-/// zera a cada segmento que GRAVOU DE VERDADE (ancorou): sem isso, uma live de 6h com uma
-/// queda de rede por hora desistiria na sexta — mesmo tendo gravado tudo entre elas.
+/// Successful recording resets the budget so independent outages do not accumulate.
 #[derive(Default)]
 pub struct RestartBudget {
     used: u32,
-    /// Este gravador chegou a gravar ALGUMA COISA nesta live? Enquanto não chegou, morte
-    /// do FFmpeg é "a fonte não subiu ainda", não "a gravação falhou".
+    /// Before any recorded packet, encoder exits may mean OBS has not started sending yet.
     ever_recorded: bool,
 }
 
 impl RestartBudget {
-    /// Ancorou: gravou de verdade, o orçamento volta ao começo.
     pub fn earned(&mut self) {
         self.used = 0;
         self.ever_recorded = true;
     }
 
-    /// Quantas retomadas já foram gastas. Existe pro teste conseguir afirmar que parar a
-    /// live e encher o disco NÃO consomem orçamento.
     #[cfg(test)]
     pub fn used(&self) -> u32 {
         self.used
     }
 
-    /// `since_start_ms` é o tempo desde que o GRAVADOR subiu (não desde o segmento) — é o
-    /// relógio da paciência com o OBS.
+    /// since_start_ms measures this recorder run, not the current segment.
     pub fn after_segment(
         &mut self,
         seg: u32,
@@ -389,9 +305,6 @@ impl RestartBudget {
         if reason == REASON_DISK {
             return AfterSegment::DiskFull;
         }
-        // Nunca gravou nada e ainda estamos na janela de espera: o OBS não começou a
-        // empurrar. Não é falha e não gasta orçamento — inclusive o `seg` não avança,
-        // porque não houve segmento nenhum.
         if !self.ever_recorded && since_start_ms < WAIT_FOR_SOURCE_MS {
             return AfterSegment::WaitingForSource {
                 seg,

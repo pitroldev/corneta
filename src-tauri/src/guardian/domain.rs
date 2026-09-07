@@ -1,20 +1,9 @@
-//! Núcleo de domínio do guardião de privacidade — **PURO** (sem tauri/ffmpeg/ort/windows/image).
-//!
-//! A feature: quando um termo que o usuário DEFINIU EXPLICITAMENTE aparece na tela, a transmissão
-//! (atrasada por um buffer) mostra a tela "JÁ VOLTO" ANTES daquele instante ir ao ar — preventivo.
-//! Sem regiões/tarjas: a censura é binária (slate na tela toda), o que torna a feature viável (não
-//! precisa de OCR preciso de posição, só saber SE o termo está na tela).
-//!
-//! Três responsabilidades puras:
-//! 1. **Regras**: casa os termos da watchlist no texto do OCR (só o que o usuário listou).
-//! 2. **Diff**: decide se a tela MUDOU o bastante pra valer um novo OCR (senão reusa — barato).
-//! 3. **Linha do tempo binária** (`Timeline`): "tinha segredo no quadro X?" → a máquina do tempo,
-//!    agora binária: o buffer segura o quadro N s, então quando ele sai já se sabe se dá slate.
+//! Explicit watchlist matching and frame-indexed privacy coverage.
 
 use serde::Serialize;
 use std::collections::VecDeque;
 
-/// Um vazamento: o termo (mascarado) do usuário que apareceu na tela (vira toast/log).
+/// Only masked snippets may cross the UI boundary.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Leak {
@@ -22,7 +11,7 @@ pub struct Leak {
     pub snippet: String,
 }
 
-/// Mascara um termo pra não repetir o segredo no toast/log (mostra só o começo).
+/// Never repeat the full matched term in UI events.
 fn mask(s: &str) -> String {
     let n = s.chars().count();
     if n <= 2 {
@@ -32,8 +21,7 @@ fn mask(s: &str) -> String {
     format!("{head}{}", "•".repeat((n - 2).min(6)))
 }
 
-/// Minúsculas + troca tudo que não é alfanumérico por espaço (junta espaços). Assim "joao@email.com"
-/// e "joao @ emaiI . com" (jeito que o OCR às vezes lê) viram comparáveis por TOKEN.
+/// Normalize case and punctuation so OCR-separated tokens remain comparable.
 fn normalize(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut prev_space = true;
@@ -52,7 +40,7 @@ fn normalize(s: &str) -> String {
     out
 }
 
-/// Distância de edição ≤ `max_d`? (Levenshtein com saída antecipada — tolera erro do OCR.)
+/// Bounded Levenshtein distance tolerates OCR errors.
 fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
@@ -70,24 +58,22 @@ fn within_edit(a: &str, b: &str, max_d: usize) -> bool {
             row_min = row_min.min(cur[j + 1]);
         }
         if row_min > max_d {
-            return false; // nenhuma continuação cabe no orçamento
+            return false; // No continuation can fit the edit budget.
         }
         std::mem::swap(&mut prev, &mut cur);
     }
     prev[b.len()] <= max_d
 }
 
-/// O `needle` aparece no `hay` como SUBSTRING dentro de `max_k` edições, começando em QUALQUER
-/// posição? (Levenshtein com a 1ª linha zerada → o casamento pode começar em qualquer ponto do
-/// hay.) Pega o nome/endereço lido com 1-2 erros de OCR em qualquer lugar, na ordem.
+/// A zero first row allows the match to begin at any haystack position.
 fn fuzzy_contains(needle: &[char], hay: &[char], max_k: usize) -> bool {
     if needle.is_empty() {
         return true;
     }
-    let mut prev = vec![0usize; hay.len() + 1]; // i=0: casar needle vazio = 0 em qualquer coluna
+    let mut prev = vec![0usize; hay.len() + 1];
     let mut cur = vec![0usize; hay.len() + 1];
     for (i, &nc) in needle.iter().enumerate() {
-        cur[0] = i + 1; // needle[..i+1] vs hay vazio = i+1 inserções
+        cur[0] = i + 1;
         let mut row_min = cur[0];
         for (j, &hc) in hay.iter().enumerate() {
             let cost = usize::from(nc != hc);
@@ -95,18 +81,16 @@ fn fuzzy_contains(needle: &[char], hay: &[char], max_k: usize) -> bool {
             row_min = row_min.min(cur[j + 1]);
         }
         if row_min > max_k {
-            return false; // nenhuma continuação cabe no orçamento
+            return false;
         }
         std::mem::swap(&mut prev, &mut cur);
     }
     prev.iter().any(|&c| c <= max_k)
 }
 
-/// O termo aparece no texto do OCR? (1) frase inteira por substring FUZZY (pega erro de OCR em
-/// qualquer ponto, na ordem — caso comum: nome/endereço); (2) fallback por TOKEN (reordenado/
-/// separado). Recall alto de propósito — é dado do usuário.
+/// Prefer recall: match a fuzzy phrase or distinctive tokens, even if OCR reorders them.
 fn matches_term(term: &PreparedTerm, hay: &str, hay_chars: &[char], hay_words: &[&str]) -> bool {
-    // Orçamento de erro ∝ tamanho (≥6 chars). Termo curto exige exato (senão casa qualquer coisa).
+    // Short terms require exact matching to avoid broad false positives.
     let max_k = if term.char_len >= 6 {
         (term.char_len / 6).clamp(1, 3)
     } else {
@@ -124,10 +108,10 @@ fn matches_term(term: &PreparedTerm, hay: &str, hay_chars: &[char], hay_words: &
         if hay.contains(tok) {
             return true;
         }
-        // Fuzzy só em tokens distintivos (≥5) — tolera 1 erro de OCR sem virar falso-positivo.
+        // Limit fuzzy token matching to distinctive words.
         tok.chars().count() >= 5 && hay_words.iter().any(|w| within_edit(tok, w, 1))
     };
-    // Um token DISTINTIVO (≥6) sozinho já casa (ex.: "growthedge", "cardoso").
+    // One distinctive token is enough to cover a potentially exposed secret.
     if term
         .tokens
         .iter()
@@ -135,7 +119,7 @@ fn matches_term(term: &PreparedTerm, hay: &str, hay_chars: &[char], hay_words: &
     {
         return true;
     }
-    // Senão, a MAIORIA (~60%) dos tokens precisa casar.
+    // Otherwise require at least 60% of tokens.
     let matched = term.tokens.iter().filter(|tok| token_hit(tok)).count();
     matched * 5 >= term.tokens.len() * 3
 }
@@ -148,7 +132,7 @@ pub(crate) struct PreparedTerm {
     tokens: Vec<String>,
 }
 
-/// Normaliza e tokeniza a watchlist uma vez por sessão, não uma vez por resultado do OCR.
+/// Prepare once per session rather than per OCR result.
 pub(crate) fn prepare_watchlist(watchlist: &[String]) -> Vec<PreparedTerm> {
     let mut seen = std::collections::HashSet::new();
     watchlist
@@ -191,16 +175,12 @@ pub(crate) fn find_prepared_watchlist(text: &str, watchlist: &[PreparedTerm]) ->
         .collect()
 }
 
-/// Casa os termos EXPLÍCITOS da watchlist no texto do OCR. Devolve os termos achados (pra
-/// avisar/logar). Vazio = nada do usuário na tela → não dá slate.
 #[cfg(test)]
 pub fn find_watchlist(text: &str, watchlist: &[String]) -> Vec<Leak> {
     find_prepared_watchlist(text, &prepare_watchlist(watchlist))
 }
 
-/// Mudou o suficiente entre dois quadros cinza reduzidos (mesmas dims) pra valer um novo OCR?
-/// Conta pixels que mudaram além de `pix_thresh`; muda se passar de `frac` da área. Sensível de
-/// propósito (um termo aparecendo = mudança local pequena, mas tem que pegar) → erra pra MAIS OCR.
+/// Rescan if enough pixels exceed the noise threshold.
 pub fn frames_differ(prev: &[u8], cur: &[u8], pix_thresh: u8, frac: f32) -> bool {
     if prev.len() != cur.len() || prev.is_empty() {
         return true;
@@ -218,14 +198,11 @@ pub fn frames_differ(prev: &[u8], cur: &[u8], pix_thresh: u8, frac: f32) -> bool
     false
 }
 
-/// Uma amostra: tinha segredo no quadro `index`?
 struct Mark {
     index: u64,
     secret: bool,
 }
 
-/// **A máquina do tempo (binária).** Guarda "tinha segredo no quadro X?" por índice. Como o quadro
-/// fica N s no buffer, quando ele sai a gente já sabe se dá slate — no momento certo, preventivo.
 #[derive(Default)]
 pub struct Timeline {
     marks: VecDeque<Mark>,
@@ -268,7 +245,7 @@ impl Timeline {
         self.last_verified.is_some()
     }
 
-    /// Registra o resultado do quadro `index` (índices chegam ~crescentes).
+    /// Results usually arrive in frame order; late results remain sorted.
     pub fn record(&mut self, index: u64, secret: bool) {
         if self.last_verified.is_none_or(|last| index >= last) {
             self.last_verified = Some(index);
@@ -290,7 +267,6 @@ impl Timeline {
         }
     }
 
-    /// Descarta amostras já airadas (índice < min_keep).
     pub fn prune(&mut self, min_keep: u64) {
         while self
             .unknown
@@ -304,9 +280,7 @@ impl Timeline {
         }
     }
 
-    /// Cobrir (slate) o quadro `index`? Sim se a amostra vizinha mais próxima (≤ ou >), dentro de
-    /// `max_gap`, tinha segredo. Bracket → cobre todo o intervalo entre amostras (sem buraco mesmo
-    /// com OCR lento), aparece um tico ANTES (preventivo) e some um tico depois (seguro).
+    /// Either neighboring positive sample within max_gap covers the frame; unverified frames stay covered.
     pub fn should_censor(&self, index: u64, max_gap: u64) -> bool {
         if self.unverified(index, max_gap) {
             return true;
@@ -379,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn casa_termo_da_watchlist() {
+    fn matches_explicit_watchlist_terms() {
         let wl = vec!["Rua das Flores".into(), "meu@email.com".into()];
         let leaks = find_watchlist("moro na rua das FLORES, 42", &wl);
         assert_eq!(leaks.len(), 1);
@@ -387,30 +361,26 @@ mod tests {
     }
 
     #[test]
-    fn casa_com_erro_de_ocr_fuzzy() {
-        // OCR leu "Cardozo" (s→z) — fuzzy ≤1 ainda casa "Cardoso" (token distintivo).
+    fn matches_single_character_ocr_errors() {
         let leaks = find_watchlist("usuario: Petro Cardozo, online", &["Petro Cardoso".into()]);
         assert_eq!(leaks.len(), 1);
     }
 
     #[test]
-    fn casa_nome_com_dois_erros_de_ocr() {
-        // OCR leu "Cordosa" (2 erros: a→o, o→a) — a frase fuzzy ainda casa "Petro Cardoso".
+    fn matches_two_character_name_errors_without_unrelated_matches() {
         let leaks = find_watchlist("perfil de Petro Cordosa no feed", &["Petro Cardoso".into()]);
         assert_eq!(leaks.len(), 1);
-        // Mas um nome totalmente diferente NÃO casa (sem falso-positivo).
         assert!(find_watchlist("perfil de Joana Ferreira", &["Petro Cardoso".into()]).is_empty());
     }
 
     #[test]
-    fn casa_com_espacos_e_pontuacao_do_ocr() {
-        // OCR às vezes separa o e-mail com espaços/pontuação — o casamento por token pega.
+    fn matches_ocr_separated_email_tokens() {
         let leaks = find_watchlist("contato joao @ email . com br", &["joao@email.com".into()]);
         assert_eq!(leaks.len(), 1);
     }
 
     #[test]
-    fn nao_casa_texto_qualquer() {
+    fn ignores_unrelated_text() {
         let leaks = find_watchlist(
             "resultados da busca sobre receitas de bolo",
             &["Petro Cardoso".into()],
@@ -419,62 +389,65 @@ mod tests {
     }
 
     #[test]
-    fn ignora_termo_curto_e_fora() {
+    fn ignores_terms_below_minimum_length() {
         let wl = vec!["ab".into(), "Petro Cardoso".into()];
-        assert!(find_watchlist("texto qualquer ab ab", &wl).is_empty()); // "ab" curto demais
+        assert!(find_watchlist("texto qualquer ab ab", &wl).is_empty());
     }
 
     #[test]
-    fn so_termos_explicitos_nao_pega_email_generico() {
-        // Sem watchlist → NADA dispara (a feature só age no que o usuário definiu).
+    fn empty_watchlist_does_not_detect_generic_secrets() {
         assert!(find_watchlist("contato: alguem@empresa.com chave sk-ABCDEF", &[]).is_empty());
     }
 
     #[test]
-    fn diff_pega_mudanca_e_pula_igual() {
+    fn diff_detects_changed_frames_and_skips_identical_frames() {
         let a = vec![100u8; 1000];
-        assert!(!frames_differ(&a, &a, 24, 0.002), "igual → não re-OCR");
+        assert!(
+            !frames_differ(&a, &a, 24, 0.002),
+            "identical frames should not trigger OCR"
+        );
         let mut b = a.clone();
         for p in b.iter_mut().take(50) {
             *p = 0;
-        } // 5% mudou
-        assert!(frames_differ(&a, &b, 24, 0.002), "mudou → re-OCR");
+        }
+        assert!(
+            frames_differ(&a, &b, 24, 0.002),
+            "changed frames should trigger OCR"
+        );
     }
 
     #[test]
-    fn timeline_cobre_antes_e_depois_some_fora() {
+    fn timeline_covers_adjacent_frames_within_the_gap() {
         let mut t = Timeline::new();
         t.record(100, true);
-        assert!(t.should_censor(90, 15)); // antes (preventivo)
-        assert!(t.should_censor(110, 15)); // depois (seguro)
-        assert!(!t.should_censor(60, 15)); // longe
+        assert!(t.should_censor(90, 15));
+        assert!(t.should_censor(110, 15));
+        assert!(!t.should_censor(60, 15));
         assert!(!t.should_censor(130, 15));
     }
 
     #[test]
-    fn timeline_sem_buraco_entre_amostras_lentas() {
+    fn timeline_preserves_coverage_between_slow_samples() {
         let mut t = Timeline::new();
         t.record(100, true);
-        t.record(160, true); // OCR lento: 60 quadros depois
+        t.record(160, true);
         for idx in 100..=160 {
-            assert!(t.should_censor(idx, 90), "quadro {idx} sem slate (vazaria)");
+            assert!(t.should_censor(idx, 90), "frame {idx} must remain covered");
         }
     }
 
     #[test]
-    fn timeline_false_perto_nao_mascara_true_dentro_do_gap() {
-        // O bracket é OR (vizinha ≤ OU vizinha >). Uma detecção FALSE perto NÃO mascara a TRUE
-        // seguinte (dentro do max_gap) → o slate dispara. (Era o bug: pulos gravavam false perto.)
+    fn nearby_clear_sample_does_not_mask_a_positive_neighbor() {
         let mut t = Timeline::new();
-        t.record(100, false); // último OCR antes do termo aparecer
-        t.record(160, true); // detecção (diff/rede de segurança) depois
+        t.record(100, false);
+        t.record(160, true);
         assert!(
             t.should_censor(130, 90),
-            "false perto não pode mascarar a true dentro do gap"
+            "a nearby clear sample must not hide a positive within the gap"
         );
         assert!(
             t.should_censor(105, 90),
-            "logo após o false, a true seguinte cobre"
+            "the next positive sample covers frames after the clear sample"
         );
     }
 

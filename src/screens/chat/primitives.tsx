@@ -4,8 +4,7 @@ import { PlatformGlyph, Toggle } from "../../components/ui";
 import type { ChatPlatform } from "../../lib/types";
 import { cn } from "../../lib/utils";
 
-/** Parte a frase traduzida no ponto marcado (um `{buraco}` ou um nome de produto)
- *  pra encaixar um link no meio dela sem picar a chave em duas. */
+/** Insert rich content into a complete translated sentence to preserve word order. */
 export function splitAt(text: string, mark: string): [string, string] {
   const i = text.indexOf(mark);
   return i < 0 ? [text, ""] : [text.slice(0, i), text.slice(i + mark.length)];
@@ -39,7 +38,6 @@ export function FilterChip({
   );
 }
 
-/** Linha de opção: rótulo à esquerda, controle à direita. */
 export function OptRow({
   label,
   children,
@@ -70,7 +68,6 @@ export function ToggleRow({
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
-  // A dica é texto visível (não `title`): teclado e leitor de tela também recebem.
   return (
     <div className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-2.5 py-2">
       <span className="flex min-w-0 items-center gap-2">
@@ -91,8 +88,6 @@ export function ToggleRow({
   );
 }
 
-// Linha de login OAuth: abre o navegador e acompanha device flow ou callback loopback.
-/** Passo numerado do fluxo de login (bolinha com o número). */
 export function StepNum({ n }: { n: number }) {
   return (
     <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brass text-[11px] font-extrabold text-brass-ink">

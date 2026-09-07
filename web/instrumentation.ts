@@ -1,9 +1,7 @@
 import type { Instrumentation } from "next";
 import type { ApiRouteId, TelemetryProvider } from "./lib/telemetry-schema";
 
-export function register() {
-  // O cliente Node é criado sob demanda; Edge e builds sem token ficam em no-op.
-}
+export function register() {}
 
 function routeContext(routePath: string): {
   routeId: ApiRouteId;
@@ -54,6 +52,6 @@ export const onRequestError: Instrumentation.onRequestError = async (
       handled: false,
     });
   } catch {
-    // O hook de diagnóstico nunca pode mascarar o erro original do Next.js.
+    // Reporting must not mask the original Next failure.
   }
 };

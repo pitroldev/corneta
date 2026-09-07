@@ -10,12 +10,10 @@ import {
 import { GlobeIcon } from "./icons";
 import { cn } from "./ui";
 
-// Grave a preferência antes de navegar: o proxy usa o cookie para não
-// redirecionar a pessoa de volta ao idioma de Accept-Language.
+// Save the preference before navigation so the proxy cannot redirect it back.
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-/** Efeito do clique; não executar durante renderização. */
 function remember(locale: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
 }
@@ -23,11 +21,9 @@ function remember(locale: Locale) {
 export function LocaleSwitch({
   current,
   label,
-  /** Na folha do celular ele vira alvo de dedo: mesma frase, caixa maior. */
   full = false,
 }: {
   current: Locale;
-  /** "Ver em {idioma}" já resolvido pro idioma de DESTINO. */
   label: string;
   full?: boolean;
 }) {

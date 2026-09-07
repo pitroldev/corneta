@@ -51,7 +51,7 @@ describe("release configuration", () => {
         NEXT_PUBLIC_TELEMETRY_DISABLED: "0",
       }),
     ).toContain(
-      "Telemetria: site e API precisam do mesmo project token público phc_ válido",
+      "Telemetry: site and API require the same valid public phc_ project token",
     );
   });
   it("uses the Git SHA when public build identity is omitted", () =>
@@ -76,6 +76,6 @@ describe("release configuration", () => {
         BUILD_SHA: sha,
         NEXT_PUBLIC_BUILD_SHA: "f".repeat(40),
       }),
-    ).toThrow("mesmo commit");
+    ).toThrow("same full commit");
   });
 });

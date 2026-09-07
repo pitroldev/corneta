@@ -37,7 +37,7 @@ export function useReportSummaries(
       read: (id) => api.readSessionBytes(id),
       client: new ReportClient(),
       receive(id, result) {
-        // An estimated end time from the listing is not a persisted end record.
+        // An estimated listing end time is not a persisted end record.
         if (result?.complete) setCachedSummary(id, result.summary);
         cache.remember(id, revisions.get(id), result?.summary ?? null);
         setSummaries((current) => ({

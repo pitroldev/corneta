@@ -1,13 +1,4 @@
-// ============================================================
-// Geometria de série temporal → caminho SVG.
-//
-// Vive fora do LineChart porque o relatório exportado em HTML desenha os MESMOS
-// gráficos sem React nenhum. Duplicar a matemática deixaria os dois desenhos
-// divergindo em silêncio na primeira correção de borda.
-// ============================================================
-
-/** Acima disso a série é subamostrada: 600 pontos já saturam a largura do gráfico,
- *  e uma live de 4h tem ~7.200 amostras. */
+/** Bound plotted points independently of session length. */
 export const MAX_POINTS = 600;
 
 export function sampleIndices(len: number): number[] {
@@ -16,8 +7,7 @@ export function sampleIndices(len: number): number[] {
   return Array.from({ length: MAX_POINTS }, (_, k) => Math.floor(k * step));
 }
 
-/** A bounded min/max envelope retains short spikes and endpoints. Gaps are
- * checked on the original series in buildPath, never interpolated away. */
+/** A bounded min/max envelope preserves spikes and endpoints; check gaps against the original series. */
 export function envelopeIndices(values: readonly (number | null)[]): number[] {
   if (values.length <= MAX_POINTS) return sampleIndices(values.length);
   const buckets = Math.floor((MAX_POINTS - 2) / 2);
@@ -42,8 +32,7 @@ export function envelopeIndices(values: readonly (number | null)[]): number[] {
 }
 
 export interface PathGeometry {
-  /** Comprimento do eixo X em amostras (não é o tamanho de `values`: séries de
-   *  eixos diferentes — audiência a cada 30s — compartilham o mesmo desenho). */
+  /** X-axis length in samples, which may differ from values for independently sampled series. */
   n: number;
   yMax: number;
   padL: number;
@@ -58,7 +47,6 @@ export const xAt = (i: number, g: PathGeometry): number =>
 export const yAt = (v: number, g: PathGeometry): number =>
   g.padT + (1 - Math.min(v, g.yMax) / g.yMax) * g.innerH;
 
-/** Maior valor de todas as séries, com 10% de folga no topo. */
 export function peakOf(series: { values: (number | null)[] }[]): number {
   let peak = 1;
   for (const s of series)
@@ -66,11 +54,7 @@ export function peakOf(series: { values: (number | null)[] }[]): number {
   return peak * 1.1;
 }
 
-/** Caminho SVG de uma série, levantando a caneta nos buracos.
- *
- *  O trecho pulado entre dois pontos SUBAMOSTRADOS também conta: se qualquer amostra
- *  entre eles for nula, a linha não pode ser contínua ali — senão a subamostragem
- *  esconderia justamente a queda que o relatório existe pra mostrar. */
+/** Break the path when any original sample between downsampled points is missing. */
 export function buildPath(values: (number | null)[], g: PathGeometry): string {
   let d = "";
   let pen = false;

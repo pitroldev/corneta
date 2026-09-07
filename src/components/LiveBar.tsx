@@ -4,19 +4,12 @@ import { downTargets, useStore } from "../lib/store";
 import { fmtUptime } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
 
-/**
- * Faixa de status global ao vivo — viaja com o streamer em qualquer tela.
- * Reaproveita o visual da barra "JÁ VOLTO" (bloco sólido latão, borda grossa).
- * Aparece só quando `live`/`starting` (inclusive com o JÁ VOLTO do Guardião no ar,
- * empilhada abaixo da faixa vermelha); o estado também é anunciado pelo
- * `aria-live` do shell (App), então aqui o foco é o relance visual.
- */
 export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const { t, fmt } = useI18n();
   const state = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const startedAt = useStore((s) => s.snapshot.startedAt);
-  // Mesmo filtro do aria-live do App: o chip e o anúncio contam as mesmas plataformas.
+  // Keep destination counts consistent with the App live-region announcement.
   const down = useStore((s) => downTargets(s.snapshot));
   const viewersTotal = useStore((s) => s.viewers.total);
   const guardianOn = useStore((s) => s.snapshot.guardianStatus === "ready");
@@ -36,18 +29,12 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
     return () => clearInterval(id);
   }, [live]);
 
-  // Dispensa da faixa de erro: volta a valer quando o estado muda (nova live/novo erro).
   const [errDismissed, setErrDismissed] = useState(false);
   useEffect(() => {
     if (state !== "error") setErrDismissed(false);
   }, [state]);
 
-  // A faixa de ERRO viaja junto: sem ela, a transmissão caía enquanto o streamer estava
-  // no Chat/Mesa e o único sinal era uma pill minúscula no rodapé da sidebar.
-  // Dispensável (X) — o erro persiste no snapshot até a próxima live, e a faixa em toda
-  // tela pra sempre viraria ruído; a pill da sidebar continua contando a história.
-  // Sem aria-label no botão: ele substituiria o conteúdo visível (título, dica) no nome
-  // acessível. O que o clique faz vai num sr-only no fim, depois do que a faixa mostra.
+  // An aria-label would replace the visible status; append the action as sr-only text instead.
   if (error && !errDismissed) {
     return (
       <div className="flex items-center border-b-2 border-bad bg-bad text-white">
@@ -148,8 +135,6 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
           {t("golive.bar.panel")} <ChevronRight className="size-4" />
         </span>
       </span>
-      {/* Nome acessível = o conteúdo (cronômetro, viewers, plataformas fora) + o que o
-          clique faz. Um aria-label aqui apagaria tudo isso pro leitor de tela. */}
       <span className="sr-only">{t("golive.bar.open.aria")}</span>
     </button>
   );

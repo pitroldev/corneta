@@ -1,23 +1,4 @@
-# Arte do instalador NSIS: header.bmp (150x57) e sidebar.bmp (164x314).
-#
-# Mesmo vocabulário visual do app — latão, tomate, breu, sombra dura sem blur,
-# meio-tom — e o mascote com a MESMA geometria do <Mascot> em
-# src/components/decor.tsx. Rodar: `pnpm installer:art`.
-#
-# POR QUE GERAR EM VEZ DE VERSIONAR UM ARQUIVO DE DESIGN: o mascote e as cores
-# moram no código (decor.tsx e index.css). Arte desenhada por script não
-# desencontra da identidade quando um token muda — é só rodar de novo. Foi o
-# mesmo raciocínio de scripts/make-icons.ps1.
-#
-# A fonte é a Baloo 2 de verdade, a mesma do app. O @fontsource só distribui
-# .woff, que o GDI+ não lê, então o script converte WOFF -> TTF em memória: WOFF
-# é um sfnt com cada tabela comprimida em zlib, e o .NET descomprime sem
-# dependência nova. Sem a fonte, cai no Segoe UI Black e avisa.
-#
-# O NSIS exige BMP sem alfa; por isso o canvas é Format24bppRgb desde o começo.
-# Os .png ao lado são previews versionados para revisar os mesmos pixels dos .bmp.
-# O bundle usa somente BMP; preserve os pares e atualize o inventário de materiais
-# públicos após revisar uma mudança (docs/MATERIAIS-PUBLICOS.md).
+
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
@@ -26,9 +7,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $outDir = Join-Path $root 'src-tauri\installer'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-# ============================================================== WOFF -> TTF ==
-
-# Multiplicação em vez de -shl: evita a promoção pra Int32 com sinal do PowerShell.
+# Multiplication avoids PowerShell's signed Int32 promotion with -shl.
 function Get-U32BE([byte[]]$b, [int]$o) {
   [uint32](([long]$b[$o] * 16777216) + ([long]$b[$o + 1] * 65536) + ([long]$b[$o + 2] * 256) + [long]$b[$o + 3])
 }
@@ -45,8 +24,7 @@ function Set-U16BE([byte[]]$b, [int]$o, [int]$v) {
 }
 
 function Expand-Zlib([byte[]]$data, [int]$offset, [int]$length) {
-  # Pula os 2 bytes de cabeçalho zlib e deixa o DeflateStream parar sozinho no
-  # fim do fluxo. O adler32 do rodapé não precisa ser conferido aqui.
+  # DeflateStream expects raw DEFLATE, without the two-byte zlib header.
   $ms = [System.IO.MemoryStream]::new($data, $offset + 2, $length - 2)
   $ds = [System.IO.Compression.DeflateStream]::new($ms, [System.IO.Compression.CompressionMode]::Decompress)
   $out = [System.IO.MemoryStream]::new()
@@ -58,7 +36,7 @@ function Expand-Zlib([byte[]]$data, [int]$offset, [int]$length) {
 
 function ConvertTo-Ttf([string]$woffPath, [string]$ttfPath) {
   $w = [System.IO.File]::ReadAllBytes($woffPath)
-  if ((Get-U32BE $w 0) -ne 0x774F4646) { throw "assinatura wOFF ausente em $woffPath" }
+  if ((Get-U32BE $w 0) -ne 0x774F4646) { throw "Missing wOFF signature in $woffPath" }
   $flavor = Get-U32BE $w 4
   $n = Get-U16BE $w 12
 
@@ -84,7 +62,7 @@ function ConvertTo-Ttf([string]$woffPath, [string]$ttfPath) {
       $t.Data = $slice
     }
   }
-  # O sfnt exige o diretório ordenado por tag.
+  # sfnt requires a tag-sorted table directory.
   $tables = @($tables | Sort-Object Tag)
 
   $maxPow2 = 1; $entrySelector = 0
@@ -113,8 +91,7 @@ function ConvertTo-Ttf([string]$woffPath, [string]$ttfPath) {
     $pos += (($t.Orig + 3) -band (-bnot 3))
   }
 
-  # head.checkSumAdjustment: zera o campo, soma o arquivo inteiro em uint32 e
-  # grava 0xB1B0AFBA - soma. Alguns carregadores do Windows recusam sem isso.
+  # Windows font loaders may reject an incorrect head.checkSumAdjustment.
   for ($i = 0; $i -lt $n; $i++) {
     if ($tables[$i].Tag -eq 0x68656164) {
       $headOff = [int](Get-U32BE $out (12 + ($i * 16) + 8))
@@ -128,7 +105,7 @@ function ConvertTo-Ttf([string]$woffPath, [string]$ttfPath) {
   [System.IO.File]::WriteAllBytes($ttfPath, $out)
 }
 
-# Baloo 2 ExtraBold (800) — o mesmo peso do `font-display` no app.
+# GDI+ cannot load @fontsource's WOFF directly; convert it before registration.
 $fonts = New-Object System.Drawing.Text.PrivateFontCollection
 $family = $null
 $woff = Get-ChildItem -Path (Join-Path $root 'node_modules\.pnpm') -Filter 'baloo-2-latin-800-normal.woff' -Recurse -ErrorAction SilentlyContinue |
@@ -138,23 +115,20 @@ if ($woff) {
   ConvertTo-Ttf $woff.FullName $ttf
   $fonts.AddFontFile($ttf)
   $family = $fonts.Families[0]
-  Write-Host "Fonte: $($family.Name) (WOFF convertido de $($woff.Name))"
+  Write-Host "Font: $($family.Name) (WOFF converted from $($woff.Name))"
 }
 if (-not $family) {
   $family = New-Object System.Drawing.FontFamily('Segoe UI Black')
-  Write-Warning 'Baloo 2 nao encontrada em node_modules — usando Segoe UI Black. Rode `pnpm install` e gere de novo.'
+  Write-Warning 'Baloo 2 not found in node_modules — using Segoe UI Black. Run `pnpm install` and regenerate.'
 }
 
-# =================================================================== paleta ==
-# Espelha os tokens de src/index.css (tema escuro).
+# Keep these values in sync with the dark-theme tokens in src/index.css.
 $BRASS = [System.Drawing.Color]::FromArgb(0xFF, 0xB3, 0x23)
 $INK = [System.Drawing.Color]::FromArgb(0x2A, 0x1C, 0x00)
-$TOMATE = [System.Drawing.Color]::FromArgb(0xFF, 0x5A, 0x36)
+$TOMATO = [System.Drawing.Color]::FromArgb(0xFF, 0x5A, 0x36)
 $NIGHT = [System.Drawing.Color]::FromArgb(0x0B, 0x08, 0x05)
 
 $TIGHT = [System.Drawing.StringFormat]::GenericTypographic
-
-# =================================================================== helpers ==
 
 function New-RoundRect([single]$x, [single]$y, [single]$w, [single]$h, [single]$r) {
   $d = $r * 2
@@ -167,24 +141,20 @@ function New-RoundRect([single]$x, [single]$y, [single]$w, [single]$h, [single]$
   return $p
 }
 
-# Mascote: MESMA geometria do <Mascot> em src/components/decor.tsx (viewBox 24x24).
+# Keep the 24x24 geometry in sync with Mascot in src/components/decor.tsx.
 function Draw-Mascot($g, [single]$x, [single]$y, [single]$size, $color) {
   $s = $size / 24.0
   $pt = { param($a, $b) New-Object System.Drawing.PointF([single]($x + $a * $s), [single]($y + $b * $s)) }
   $brush = New-Object System.Drawing.SolidBrush($color)
 
-  # Corpo do megafone: M3.4 9.1 L13 5.9 V18.1 L3.4 14.9 Z
-  # O cast é necessário: sem ele o PowerShell não escolhe entre Point[] e PointF[].
+  # The explicit cast disambiguates the Point[] and PointF[] overloads.
   $g.FillPolygon($brush, [System.Drawing.PointF[]]@(
       (& $pt 3.4 9.1), (& $pt 13 5.9), (& $pt 13 18.1), (& $pt 3.4 14.9)))
 
-  # Cabo: rect x=4.7 y=13.9 w=2.5 h=4.6 rx=1.1
   $rr = New-RoundRect ($x + 4.7 * $s) ($y + 13.9 * $s) (2.5 * $s) (4.6 * $s) (1.1 * $s)
   $g.FillPath($brush, $rr)
   $rr.Dispose()
 
-  # Ondas: arcos de corda vertical abrindo pra direita (a5 5 0 0 1 / a8 8 0 0 1).
-  # Do ponto inicial, do raio e da corda saem centro e ângulos — mesma curva do SVG.
   $pen = New-Object System.Drawing.Pen($color, [single](1.9 * $s))
   $pen.StartCap = 'Round'; $pen.EndCap = 'Round'
   foreach ($a in @(@(15.6, 8.4, 15.6, 5.0), @(17.8, 6.4, 17.6, 8.0))) {
@@ -199,7 +169,6 @@ function Draw-Mascot($g, [single]$x, [single]$y, [single]$size, $color) {
   $pen.Dispose(); $brush.Dispose()
 }
 
-# Meio-tom do app: malha alternada de pontos que rareia conforme desce.
 function Draw-Halftone($g, [int]$w, [int]$h, $color, [int]$step, [single]$rMax, [single]$fade) {
   $row = 0
   for ($yy = 0; $yy -lt $h; $yy += $step) {
@@ -220,7 +189,6 @@ function Draw-Halftone($g, [int]$w, [int]$h, $color, [int]$step, [single]$rMax, 
   }
 }
 
-# Encolhe a fonte até o texto caber na largura — o wordmark nunca estoura a arte.
 function Get-FittedFont($g, [string]$text, $family, [single]$startPx, [single]$maxWidth) {
   for ($px = $startPx; $px -gt 6; $px -= 0.5) {
     $f = New-Object System.Drawing.Font($family, [single]$px, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
@@ -231,7 +199,7 @@ function Get-FittedFont($g, [string]$text, $family, [single]$startPx, [single]$m
 }
 
 function New-Canvas([int]$w, [int]$h) {
-  # 24bpp desde o começo: o NSIS não lida com BMP com canal alfa.
+  # NSIS does not support BMP alpha channels.
   $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = 'AntiAlias'
@@ -250,10 +218,6 @@ function Save-Art($canvas, [string]$name) {
   Write-Host ("  {0,-12} {1,7:N0} bytes" -f "$name.bmp", (Get-Item $bmpPath).Length) -ForegroundColor DarkGray
 }
 
-# ================================================================== SIDEBAR ==
-# 164x314, aparece nas páginas de boas-vindas e de conclusão. É a peça grande:
-# pôster escuro, bloco de latão torto com o mascote e o wordmark.
-
 $W = 164; $H = 314
 $c = New-Canvas $W $H
 $g = $c.G
@@ -261,7 +225,6 @@ $g.Clear($NIGHT)
 
 Draw-Halftone $g $W $H $BRASS 13 3.1 1.15
 
-# Faixa de latão no rodapé, cortada na diagonal — a "banda" dos pôsteres do app.
 $band = New-Object System.Drawing.Drawing2D.GraphicsPath
 $band.AddPolygon([System.Drawing.PointF[]]@(
     (New-Object System.Drawing.PointF(0, 250)),
@@ -271,14 +234,12 @@ $band.AddPolygon([System.Drawing.PointF[]]@(
 $g.FillPath((New-Object System.Drawing.SolidBrush($BRASS)), $band)
 $band.Dispose()
 
-# Bloco do mascote: sombra dura de tomate + tile de latão girado -4°, igual ao
-# hero da tela Sobre (rotate-[-4deg] + pop).
 $tile = 88.0
 $cx = $W / 2.0; $cy = 96.0
 $g.TranslateTransform($cx, $cy)
 $g.RotateTransform(-4)
 $shadow = New-RoundRect (-$tile / 2 + 5) (-$tile / 2 + 6) $tile $tile 15
-$g.FillPath((New-Object System.Drawing.SolidBrush($TOMATE)), $shadow)
+$g.FillPath((New-Object System.Drawing.SolidBrush($TOMATO)), $shadow)
 $shadow.Dispose()
 $face = New-RoundRect (-$tile / 2) (-$tile / 2) $tile $tile 15
 $g.FillPath((New-Object System.Drawing.SolidBrush($BRASS)), $face)
@@ -286,21 +247,18 @@ $face.Dispose()
 Draw-Mascot $g (-27.0) (-27.0) 54.0 $INK
 $g.ResetTransform()
 
-# Wordmark sobre o breu, e a régua de tomate ancorada na medida REAL do texto —
-# a Baloo 2 é bem mais alta que o corpo da fonte, então posição fixa atravessaria
-# as letras.
+# Measure the wordmark: Baloo's tall glyphs would overlap a fixed-position underline.
+
 $wmTop = 168.0
 $wm = Get-FittedFont $g 'CORNETA' $family 32 ($W - 22)
 $wmSize = $g.MeasureString('CORNETA', $wm, [System.Drawing.PointF]::Empty, $TIGHT)
 $wmLeft = ($W - $wmSize.Width) / 2
 $g.DrawString('CORNETA', $wm, (New-Object System.Drawing.SolidBrush($BRASS)), [single]$wmLeft, [single]$wmTop)
 
-# Régua de tomate: o sublinhado duro do app, na largura exata do wordmark.
-$g.FillRectangle((New-Object System.Drawing.SolidBrush($TOMATE)),
+$g.FillRectangle((New-Object System.Drawing.SolidBrush($TOMATO)),
   [single]$wmLeft, [single]($wmTop + $wmSize.Height + 3), [single]$wmSize.Width, 6)
 $wm.Dispose()
 
-# Assinatura sobre a faixa de latão, na tinta escura.
 $tag = New-Object System.Drawing.Font($family, 15, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
 foreach ($line in @(@('UMA LIVE,', 272), @('TODO LUGAR', 290))) {
   $sz = $g.MeasureString($line[0], $tag, [System.Drawing.PointF]::Empty, $TIGHT)
@@ -310,10 +268,6 @@ foreach ($line in @(@('UMA LIVE,', 272), @('TODO LUGAR', 290))) {
 $tag.Dispose()
 
 Save-Art $c 'sidebar'
-
-# =================================================================== HEADER ==
-# 150x57, canto do cabeçalho nas páginas internas. Um lockup fechado: bloco de
-# latão com mascote e wordmark, faixa de tomate embaixo.
 
 $W = 150; $H = 57
 $c = New-Canvas $W $H
@@ -330,9 +284,9 @@ $g.DrawString('CORNETA', $hw, (New-Object System.Drawing.SolidBrush($INK)),
   50, [single](($H - 6 - $hwSize.Height) / 2))
 $hw.Dispose()
 
-$g.FillRectangle((New-Object System.Drawing.SolidBrush($TOMATE)), 0, ($H - 5), $W, 5)
+$g.FillRectangle((New-Object System.Drawing.SolidBrush($TOMATO)), 0, ($H - 5), $W, 5)
 
 Save-Art $c 'header'
 
 $fonts.Dispose()
-Write-Host "Arte do instalador em $outDir" -ForegroundColor Green
+Write-Host "Installer artwork in $outDir" -ForegroundColor Green

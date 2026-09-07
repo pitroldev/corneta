@@ -8,8 +8,6 @@ import { ObsConfigSaveError } from "../../lib/obsCoordinator";
 import type { ObsCheck } from "../../lib/types";
 import { cn } from "../../lib/utils";
 
-/** Testa o obs-websocket ali mesmo. Quatro desfechos, não dois: não achei /
- *  senha recusada / conectado mas apontando pra outro lugar / conectado de verdade. */
 export function ObsTestButton() {
   const t = useT();
   const checkObs = useStore((s) => s.checkObs);

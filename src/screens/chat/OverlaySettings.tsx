@@ -11,7 +11,6 @@ import { errMsg } from "../../lib/utils";
 import { chatPosOpts, overlayPosOpts, scaleOpts } from "./constants";
 import { OptRow } from "./primitives";
 
-/** Um overlay (alertas ou chat): URL + copiar + adicionar no OBS + testar + opções. */
 function OverlayBlock({
   title,
   url,
@@ -33,7 +32,7 @@ function OverlayBlock({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* clipboard indisponível */
+      /* Clipboard access may be denied; manual copying remains available. */
     }
   };
   const addToObs = () =>
@@ -87,7 +86,6 @@ function OverlayBlock({
   );
 }
 
-/** Overlays pro OBS: um servidor local serve alertas e chat (Browser Source), com emotes. */
 export function OverlayCard({
   settings,
   setSettings,
@@ -102,7 +100,6 @@ export function OverlayCard({
   const [fetching, setFetching] = useState(false);
   const [fetchFailed, setFetchFailed] = useState(false);
 
-  // O backend sobe o servidor no boot quando ligado; aqui só buscamos as URLs pra exibir.
   const fetchInfo = useCallback(async () => {
     if (!IS_TAURI) return;
     setFetching(true);
@@ -116,9 +113,7 @@ export function OverlayCard({
       setFetching(false);
     }
   }, []);
-  // Busca quando o overlay liga e de novo quando a janela volta ao foco — a
-  // chamada pode ter falhado com o servidor ainda subindo, e a saída tem que
-  // ser um botão aqui, não "reabra a aba".
+  // Retry on enable and focus because the local server may still be starting.
   useEffect(() => {
     if (!IS_TAURI || !enabled) return;
     void fetchInfo();
@@ -158,7 +153,7 @@ export function OverlayCard({
       }
     } catch (e) {
       toast.error(errMsg(e));
-      setSettings({ overlayEnabled: !on }); // reverte se não subiu (porta ocupada etc.)
+      setSettings({ overlayEnabled: !on });
     } finally {
       setBusy(false);
     }

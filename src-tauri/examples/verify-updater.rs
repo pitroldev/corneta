@@ -51,11 +51,11 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn main() {
     if run().is_err() {
         eprintln!(
-            "Assinatura do updater inválida, incompatível ou artefato ilegível. Release bloqueada."
+            "Invalid updater signature, incompatible key or unreadable artifact. Release blocked."
         );
         std::process::exit(1);
     }
-    println!("Assinatura do instalador validada com a chave pública do aplicativo.");
+    println!("Installer signature verified with the application's public key.");
 }
 
 #[cfg(test)]

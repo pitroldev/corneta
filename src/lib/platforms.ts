@@ -1,14 +1,6 @@
 import type { I18n, MessageKey } from "./i18n";
 import type { PlatformId, PlatformPreset, VideoPreset } from "./types";
 
-// ============================================================
-// Catálogo de plataformas com valores de referência.
-//
-// Aqui fica IDENTIDADE e NÚMERO: id, cor de marca, protocolo, URL de ingestão,
-// preset recomendado. A copy (observação didática, frase do picker) vive no
-// dicionário — o catálogo guarda só o ENDEREÇO dela, ver NOTE_KEYS/TAGLINE_KEYS.
-// ============================================================
-
 const p = (
   width: number,
   height: number,
@@ -71,9 +63,9 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
     name: "TikTok",
     color: "#25F4EE",
     protocol: "rtmp",
-    ingestUrl: "rtmp://", // fornecido pelo painel (varia)
+    ingestUrl: "rtmp://",
     recommended: p(720, 1280, 30, 3000, 128),
-    // Raiz do LIVE Center — o path interno pode 404 pra quem não tem LIVE liberado.
+    // Use the LIVE Center root; account-restricted internal paths may not resolve.
     keyUrl: "https://livecenter.tiktok.com/",
     experimental: true,
   },
@@ -98,9 +90,7 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
   },
   custom: {
     id: "custom",
-    // DADO, não copy da tela: é o nome padrão que o destino recebe ao nascer
-    // (factory.ts) e que o streamer pode reescrever. Pra EXIBIR o rótulo da
-    // plataforma no idioma ativo use platformName() — ver core.platform.custom.name.
+    // Persisted default name, editable by the user; display platformName() for localized labels.
     name: "Personalizado",
     color: "#8b93a7",
     protocol: "rtmp",
@@ -120,8 +110,6 @@ export const PLATFORM_LIST: PlatformPreset[] = [
   PLATFORMS.custom,
 ];
 
-// Endereço da copy de cada plataforma no dicionário. É um Record fechado de
-// propósito: se um id novo entrar no catálogo, o TypeScript cobra a frase aqui.
 const NOTE_KEYS: Record<PlatformId, MessageKey> = {
   twitch: "core.platform.twitch.note",
   youtube: "core.platform.youtube.note",
@@ -144,19 +132,11 @@ const TAGLINE_KEYS: Record<PlatformId, MessageKey> = {
   custom: "core.platform.tagline.custom",
 };
 
-/** Observação didática exibida embaixo do card do destino, no idioma ativo. */
 export const platformNote = (id: PlatformId, t: I18n["t"]): string =>
   t(NOTE_KEYS[id]);
 
-/** Descrição curta e humana pro picker — o pré-requisito aparece ANTES do clique
- *  (protocolo em caixa alta não diz nada pra quem não é técnico). */
 export const platformTagline = (id: PlatformId, t: I18n["t"]): string =>
   t(TAGLINE_KEYS[id]);
 
-/** Nome exibido da plataforma. Marca não se traduz (Twitch é Twitch em toda
- *  língua); só o RTMP fora da lista é copy — e essa vem do dicionário.
- *
- *  `PLATFORMS[id].name` continua valendo como DADO (o padrão gravado no
- *  destino); pra mostrar na tela, use esta função. */
 export const platformName = (id: PlatformId, t: I18n["t"]): string =>
   id === "custom" ? t("core.platform.custom.name") : PLATFORMS[id].name;

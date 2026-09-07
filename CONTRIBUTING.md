@@ -1,6 +1,6 @@
 # Como contribuir com a Corneta
 
-Contribuições pequenas, correções de documentação e relatos reproduzíveis são bem-vindos. Pode escrever em português ou inglês. O projeto está em fase experimental: não há promessa de prazo de revisão ou suporte contínuo.
+Contribuições pequenas, correções de documentação e relatos reproduzíveis são bem-vindos. Issues, discussões e documentação podem ser escritas em português ou inglês; **o código é sempre em inglês**. O projeto está em fase experimental: não há promessa de prazo de revisão ou suporte contínuo.
 
 ## Primeiro passo
 
@@ -18,6 +18,14 @@ pnpm contrib:check
 ```
 
 Use um clone limpo para essa validação. Não copie seu `.env`, cofre, configuração pessoal, banco de relatórios ou chave do updater para o projeto de teste. Não teste a contribuição durante sua live de produção.
+
+## Idioma e comentários no código
+
+Use inglês nos identificadores, comentários, docstrings, descrições de testes, mensagens de asserção, logs e diagnósticos das ferramentas. Textos da interface continuam nas traduções correspondentes; entradas multilíngues de testes, nomes próprios e contratos de integração ou persistência não devem ser alterados só para traduzir sua grafia.
+
+Mantenha comentários curtos apenas para explicar uma restrição não óbvia, um risco, uma decisão de compatibilidade ou o motivo de uma implementação. Remova narração do código, separadores decorativos, histórico de mudanças e repetição de nomes ou tipos. Arquitetura, tutoriais e instruções de uso pertencem à documentação. Preserve avisos de licença, diretivas de ferramentas, justificativas de segurança e contratos úteis de APIs públicas. Essas regras também estão em [AGENTS.md](AGENTS.md).
+
+`pnpm source:check` verifica padrões conhecidos de português técnico e comentários decorativos em JS/TS, Rust, CSS e HTML, sem executar as fontes. A mesma regra JS/TS integra o ESLint do app e do site; o check completo também roda no CI por `scripts:check`. Textos localizados e fixtures não são tratados como prosa técnica. A detecção é heurística, não prova que todo texto esteja em inglês ou que todo comentário seja útil; comentários, formatos não cobertos e mensagens que circulam entre funções ainda precisam de revisão humana. Logs devem usar diagnósticos em inglês ou códigos estáveis, separados da tradução exibida ao usuário; não altere mensagens externas do sistema operacional ou de provedores só para mudar o idioma.
 
 ## Escolha uma mudança delimitada
 

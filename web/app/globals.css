@@ -1,15 +1,7 @@
 @import "tailwindcss";
 
-/* ============================================================
-   CORNETA — LP · mundo visual herdado do app (pôster/quadrinho)
-   Blocos sólidos, sombras DURAS (offset, sem blur), cantos secos,
-   tipografia chunky, meio-tom impresso. Espelha src/index.css:
-   mexer nos tokens do app é mexer aqui.
-   ============================================================ */
-
 :root {
-  /* Palco — tema escuro do app */
-  --breu: #100b07;
+  --charcoal: #100b07;
   --surface: #1a130c;
   --surface-2: #221a10;
   --surface-3: #2e2314;
@@ -20,11 +12,9 @@
   --ink-on-dark: #fcf3e3;
   --muted-on-dark: #c6b69b;
   --faint-on-dark: #8c7a60;
-  /* O mesmo creme apagado, um passo mais claro: sobre superfície elevada
-     (#1a130c/#221a10) o tom do app fica em 4.1:1 e não passa AA. */
+  /* Raised surfaces need a lighter muted token to maintain text contrast. */
   --faint-on-raised: #a08d70;
 
-  /* Papel — tema claro do app */
   --paper: #f3ead7;
   --paper-raised: #fffaf0;
   --paper-sunk: #efe4cd;
@@ -33,20 +23,18 @@
   --ink-muted: #5f4e36;
   --ink-faint: #6f5d3f;
 
-  /* Marca e estados */
   --brass: #ffb323;
   --brass-strong: #ffc857;
   --brass-ink: #2a1c00;
-  --tomate: #ff5a36;
-  --tomate-strong: #ff7a55;
-  --tomate-ink: #b83218;
+  --tomato: #ff5a36;
+  --tomato-strong: #ff7a55;
+  --tomato-ink: #b83218;
   --live: #ff4733;
   --ok: #56e39b;
   --ok-ink: #1f9d57;
   --warn: #ffc23d;
   --bad: #ff5e57;
 
-  /* Marcas das plataformas (mesmos hex do app) */
   --twitch: #9146ff;
   --youtube: #ff0000;
   --kick: #53fc18;
@@ -56,13 +44,11 @@
   --instagram: #e1306c;
   --custom: #8b93a7;
 
-  /* Cantos secos */
   --r-sm: 4px;
   --r-md: 7px;
   --r-lg: 10px;
   --r-xl: 14px;
 
-  /* Sombras duras — adesivo de gibi, o oposto do glow */
   --pop: 4px 4px 0 0 var(--night);
   --pop-sm: 3px 3px 0 0 var(--night);
   --pop-lg: 8px 8px 0 0 var(--night);
@@ -71,22 +57,15 @@
   --pop-ink-lg: 7px 7px 0 0 var(--ink);
   --pop-cream: 4px 4px 0 0 var(--ink-on-dark);
 
-  /* Meio-tom impresso */
   --halftone-dark: radial-gradient(rgb(255 179 35 / 5%) 1px, transparent 1.5px);
   --halftone-light: radial-gradient(rgb(42 28 10 / 6%) 1px, transparent 1.5px);
 }
 
-/* Ponte tokens → utilitários do Tailwind.
-   Tudo que o :root define precisa aparecer aqui, senão não existe classe pra
-   escrever e a folha volta a crescer com CSS à mão. É a base da migração: os
-   componentes só conseguem largar as classes próprias depois que o utilitário
-   equivalente existe. */
 @theme inline {
   --font-display: var(--font-baloo);
   --font-sans: var(--font-inter);
 
-  /* Palco escuro */
-  --color-breu: var(--breu);
+  --color-charcoal: var(--charcoal);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
@@ -99,7 +78,6 @@
   --color-faint: var(--faint-on-dark);
   --color-faint-raised: var(--faint-on-raised);
 
-  /* Papel */
   --color-paper: var(--paper);
   --color-paper-raised: var(--paper-raised);
   --color-paper-sunk: var(--paper-sunk);
@@ -108,20 +86,18 @@
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
 
-  /* Marca e estados */
   --color-brass: var(--brass);
   --color-brass-strong: var(--brass-strong);
   --color-brass-ink: var(--brass-ink);
-  --color-tomate: var(--tomate);
-  --color-tomate-strong: var(--tomate-strong);
-  --color-tomate-ink: var(--tomate-ink);
+  --color-tomato: var(--tomato);
+  --color-tomato-strong: var(--tomato-strong);
+  --color-tomato-ink: var(--tomato-ink);
   --color-live: var(--live);
   --color-ok: var(--ok);
   --color-ok-ink: var(--ok-ink);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
 
-  /* Plataformas */
   --color-twitch: var(--twitch);
   --color-youtube: var(--youtube);
   --color-kick: var(--kick);
@@ -130,13 +106,11 @@
   --color-x: var(--x);
   --color-instagram: var(--instagram);
 
-  /* Cantos secos */
   --radius-sm: var(--r-sm);
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --radius-xl: var(--r-xl);
 
-  /* Sombras duras — offset sem blur, o oposto do glow */
   --shadow-pop: var(--pop);
   --shadow-pop-sm: var(--pop-sm);
   --shadow-pop-lg: var(--pop-lg);
@@ -146,11 +120,7 @@
   --shadow-pop-cream: var(--pop-cream);
 }
 
-/* Tudo aqui vai em @layer base de propósito.
-   CSS SEM camada vence CSS EM camada, sempre — então estas regras de elemento
-   estavam ganhando de todo utilitário do Tailwind. Foi assim que `a { color:
-   inherit }` apagou o `text-brass-ink` do skip link e dos botões de download,
-   deixando creme sobre latão (1.63:1) e creme sobre tomate (2.82:1). */
+/* Base-layer rules must not override Tailwind utilities. */
 @layer base {
   * {
     box-sizing: border-box;
@@ -158,14 +128,14 @@
 
   html {
     scroll-behavior: smooth;
-    background: var(--breu);
+    background: var(--charcoal);
   }
 
   body {
     margin: 0;
     overflow-x: clip;
     color: var(--ink-on-dark);
-    background-color: var(--breu);
+    background-color: var(--charcoal);
     background-image: var(--halftone-dark);
     background-size: 20px 20px;
     font-family: var(--font-inter), "Segoe UI", system-ui, sans-serif;
@@ -210,7 +180,6 @@
     background: var(--brass);
   }
 
-  /* Foco on-brand: traço seco de latão, nada de glow. */
   :focus-visible {
     outline: 3px solid var(--brass);
     outline-offset: 3px;
@@ -221,205 +190,6 @@
     outline-color: var(--brass-ink);
   }
 }
-/* ============================================================
-   Peças recorrentes do mundo: adesivo, bloco de latão, faixa
-   ============================================================ */
-
-/* Adesivo torto com sombra dura — o "selo" do app. */
-
-/* Chip de estado sólido (bg = cor, tinta = escura) — o Badge do app. */
-
-/* Kicker: uma listra de latão + rótulo. Sem eyebrow em toda seção. */
-
-/* Ponto AO VIVO com pulso (idem app) */
-
-/* ============================================================
-   Botões
-   ============================================================ */
-
-/* ============================================================
-   Header
-   ============================================================ */
-
-/* ============================================================
-   Herói — palco escuro, laje de latão, janela do app
-   ============================================================ */
-
-/* Laje de latão com tinta escura — a mesma peça do slate JÁ VOLTO. */
-
-/* ============================================================
-   Faixa do mecanismo — latão sólido, igual à barra AO VIVO do app
-   ============================================================ */
-
-/* ============================================================
-   Seções: papel e palco
-   ============================================================ */
-
-/* Em px de propósito: `ch` aqui mede na fonte de CORPO do container e esganava
-   o título de exibição numa tira de ~375px. */
-
-/* Título de seção em coluna estreita (layouts de duas colunas) não pode virar
-   uma tira de 6 linhas — desce um degrau da escala. */
-
-/* ---- Benefícios: linhas largas, nunca grade de cards ---- */
-
-/* Alinha com a primeira linha, não com o centro do bloco: em nota de duas
-   linhas o ícone centralizado flutuava entre elas. */
-
-/* Linha de benefício sobre o palco escuro */
-
-/* Painel de demonstração: bloco escuro do app pousado no papel. */
-
-/* Roteamento OBS → destinos */
-
-/* Estica junto com a lista: com min-height fixo o leque ficava mais curto que
-   as linhas e o grid centralizava a diferença — daí o desalinho de ~5px. */
-
-/* Glifo em coluna de grid precisa de altura própria — sem ela o quadrado da
-   marca vira retângulo, porque o SVG interno é 56% de uma altura indefinida. */
-
-/* Lista de checks sobre papel */
-
-/* Glifo de plataforma — chip de marca com sombra dura (app: PlatformGlyph) */
-
-/* Chat reunido */
-
-/* Slate JÁ VOLTO — a mesma arte que o app coloca no ar */
-
-/* ---- Jornada da live (palco escuro) ---- */
-
-/* Jornada sobre papel: réguas e texto em tinta */
-
-/* Linha com demonstração larga: rótulo + painel, sem a coluna do meio */
-
-/* Blocos-demo da jornada (cara de "Stat" do app: topo de latão) */
-/* Mesmo bloco "Stat" do app: régua de latão no topo, canto seco.
-   A cor é declarada aqui porque o bloco pousa em seção de papel — sem isso o
-   número herda a tinta escura e some no fundo escuro. */
-
-/* Barra AO VIVO do app, recortada */
-
-/* ---- Três passos ---- */
-
-/* ---- Local de verdade + conta honesta ---- */
-
-/* Prova honesta perto da decisão: sem depoimento inventado, o que existe é o
-   código aberto. */
-
-/* ---- Plataformas ---- */
-
-/* Painel de destinos: o mesmo picker da tela Plataformas do app — cada destino
-   com a frase que o app usa pra ele, sem classificar por status interno. */
-
-/* ---- Contas conectadas: o que cada permissão faz ---- */
-
-/* ---- FAQ ---- */
-
-/* CTA no meio do caminho: a página é longa e o botão do topo é o único até aqui. */
-
-/* ---- Ticker + CTA final ---- */
-
-/* ---- Footer ---- */
-
-/* Identificação da pessoa jurídica que opera o site — letra miúda, mas presente.
-   Dupla classe porque `.site-footer p` vence o seletor simples e o max-width
-   herdado quebrava o CNPJ em duas linhas. */
-
-/* ============================================================
-   404
-   ============================================================ */
-
-/* ============================================================
-   Janela do app — réplica da tela "Ao vivo" (prévia ilustrativa)
-   ============================================================ */
-
-/* --- sidebar --- */
-
-/* --- painel principal --- */
-
-/* Título dentro da réplica: não é heading do documento (é figura de UI), então
-   vive num div e só herda a escala de exibição. */
-
-/* Toggle do app: canto seco, latão, polegar de tinta */
-
-/* --- coluna de chat --- */
-
-/* ============================================================
-   Mesa de qualidade — o que cada modo faz com cada destino
-   ============================================================ */
-
-/* Mesmo motivo do .guard-cost: ícone fora do fluxo, texto livre pra ter
-   <strong> no meio sem colapsar. */
-
-/* ============================================================
-   Vertical ao vivo — recorte 9:16 do sinal deitado
-   ============================================================ */
-
-/* Dá a entender que os lados são clicáveis antes do clique acontecer. */
-
-/* ============================================================
-   Sala de guerra — métricas reais por destino
-   ============================================================ */
-
-/* ============================================================
-   Relatório — curva de audiência com marcadores
-   ============================================================ */
-
-/* ============================================================
-   Chat / alertas / overlay
-   ============================================================ */
-
-/* mensagem de chat com emote, selo e ações de moderação */
-
-/* feed de alertas */
-
-/* cena do OBS com o overlay */
-
-/* ============================================================
-   Rede de proteção
-   ============================================================ */
-
-/* Bloco com ícone absoluto em vez de flex: assim um <strong> no meio do texto
-   não vira item de flex e não se espreme numa coluna. */
-
-/* ============================================================
-   Miudezas que salvam a live
-   ============================================================ */
-
-/* A caixa do ícone tem a altura da PRIMEIRA LINHA do título, não 30px: assim o
-   centro óptico do ícone bate com o centro do texto ao lado em vez de flutuar
-   entre o título e a descrição. */
-
-/* ============================================================
-   Páginas legais — leitura longa sobre papel
-   ============================================================ */
-
-/* Resumo em bloco de latão — não substitui o texto, e diz isso */
-
-/* Sumário */
-
-/* Corpo do documento */
-
-/* Bloco, não flex: com `display: flex` um <strong> no início do item virava um
-   item de flex próprio e se espremia numa coluna de duas palavras. */
-
-/* Host/URL no meio do texto é um token que não quebra: sem isto ele empurra a
-   página inteira e cria rolagem horizontal no celular. */
-
-/* Tabela de dados/finalidade */
-
-/* Na tabela a rota tem coluna própria e o wrapper rola: deixa o token inteiro
-   em vez de picar no meio da palavra. */
-
-/* Bloco de destaque dentro do texto */
-
-/* Valor que o dono do site precisa preencher antes de publicar */
-
-/* Precisa da dupla classe: `.legal-body p` venceria a cor no seletor simples. */
-
-/* ============================================================
-   Animação — uma entrada orquestrada + os "idles" do app
-   ============================================================ */
 
 @keyframes copy-in {
   from {
@@ -445,8 +215,6 @@
   }
 }
 
-/* Fala nova chegando no chat reunido da réplica. Curta e sem bounce: mensagem
-   que quica lê como notificação de brinquedo, não como chat rolando. */
 @keyframes chat-in {
   from {
     opacity: 0;
@@ -458,8 +226,6 @@
   }
 }
 
-/* A janela "liga": cada região pinta na ordem de leitura do app. É o momento
-   autoral da página — o resto do movimento é dado em tempo real, não entrada. */
 @keyframes boot-in {
   from {
     opacity: 0;
@@ -471,8 +237,6 @@
   }
 }
 
-/* Pulso discreto do ponto de estado — o AO VIVO tem o seu (live-pulse, com
-   halo); este é o da linha que está TENTANDO algo: só a opacidade respira. */
 @keyframes soft-pulse {
   0%,
   100% {
@@ -514,10 +278,6 @@
   }
 }
 
-/* ============================================================
-   Responsivo
-   ============================================================ */
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -532,14 +292,6 @@
     transition-duration: 0.001ms !important;
   }
 }
-
-/* ============================================================
-   Editorial — Guias e Ajuda
-
-   O mundo continua sendo o pôster da Corneta, mas em modo de leitura: o palco
-   escuro orienta e o papel fica plano onde o texto precisa durar. Todas as
-   classes são prefixadas para a tipografia de artigo não vazar para a LP.
-   ============================================================ */
 
 .editorial-chrome {
   min-height: 100svh;
@@ -577,8 +329,6 @@
   outline-color: var(--ink-on-dark);
   transform: translateY(0);
 }
-
-/* ---- Cabeçalho: simples de propósito; nada some atrás de JavaScript. ---- */
 
 .editorial-header {
   position: sticky;
@@ -691,11 +441,9 @@
   transform: translate(3px, 3px);
 }
 
-/* ---- Pesquisa editorial: uma consulta, uma lista, nenhum painel extra. ---- */
-
 .editorial-search-hero {
   color: var(--ink-on-dark);
-  background-color: var(--breu);
+  background-color: var(--charcoal);
   background-image: var(--halftone-dark);
   background-size: 20px 20px;
   border-bottom: 8px solid var(--brass);
@@ -806,7 +554,7 @@
   min-height: 50px;
   padding: 0 22px;
   color: var(--brass-ink);
-  background: var(--tomate);
+  background: var(--tomato);
   border: 0;
   border-radius: var(--r-sm);
   box-shadow: var(--pop-ink);
@@ -817,7 +565,7 @@
 }
 
 .editorial-search-form button:hover {
-  background: var(--tomate-strong);
+  background: var(--tomato-strong);
 }
 
 .editorial-search-form button:active {
@@ -837,7 +585,7 @@
 }
 
 .editorial-search-results__header > p {
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
 }
 
 .editorial-search-results__header h2,
@@ -864,8 +612,6 @@
   color: var(--ink-muted);
   line-height: 1.68;
 }
-
-/* ---- Breadcrumbs ---- */
 
 .editorial-breadcrumbs {
   width: min(calc(100% - 3rem), 1220px);
@@ -906,7 +652,7 @@
   display: inline-flex;
   min-height: 32px;
   align-items: center;
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   text-decoration: none;
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
@@ -920,11 +666,9 @@
   color: var(--ink-muted);
 }
 
-/* ---- Home das coleções: capa curta + sumário editorial. ---- */
-
 .editorial-collection-hero {
   color: var(--ink-on-dark);
-  background-color: var(--breu);
+  background-color: var(--charcoal);
   background-image: var(--halftone-dark);
   background-size: 20px 20px;
   border-bottom: 8px solid var(--brass);
@@ -1027,7 +771,7 @@
 }
 
 .editorial-topic-directory__eyebrow {
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   font-size: 0.73rem;
   font-weight: 850;
   letter-spacing: 0.1em;
@@ -1078,7 +822,7 @@
 .editorial-topic-directory__number {
   align-self: start;
   padding-top: 5px;
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   font-size: 0.72rem;
   font-weight: 850;
   letter-spacing: 0.08em;
@@ -1141,13 +885,11 @@
   transform: translateX(5px);
 }
 
-/* ---- Hub de categoria: masthead de guia, não dashboard. ---- */
-
 .editorial-hub-hero {
   position: relative;
   overflow: clip;
   color: var(--ink-on-dark);
-  background-color: var(--breu);
+  background-color: var(--charcoal);
   background-image: var(--halftone-dark);
   background-size: 20px 20px;
   border-bottom: 8px solid var(--brass);
@@ -1289,7 +1031,7 @@
   color: var(--brass-ink);
   background: var(--brass);
   border-radius: var(--r-lg);
-  box-shadow: 7px 7px 0 var(--tomate);
+  box-shadow: 7px 7px 0 var(--tomato);
   transform: rotate(1deg);
 }
 
@@ -1345,7 +1087,7 @@
   padding: 25px 20px;
   background: var(--paper-raised);
   border-radius: var(--r-md);
-  box-shadow: 9px 9px 0 var(--tomate);
+  box-shadow: 9px 9px 0 var(--tomato);
   transform: rotate(4deg);
 }
 
@@ -1372,8 +1114,6 @@
 .editorial-hub-hero__sheet i:nth-child(3) {
   width: 60%;
 }
-
-/* ---- Seções e índices ---- */
 
 .editorial-category-section {
   width: min(calc(100% - 3rem), 1220px);
@@ -1419,7 +1159,7 @@
   display: inline-flex;
   min-height: 40px;
   align-items: center;
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
   font-weight: 800;
   text-decoration: underline;
@@ -1428,7 +1168,7 @@
 }
 
 .editorial-card__label {
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   font-size: 0.7rem;
   font-weight: 850;
   letter-spacing: 0.09em;
@@ -1545,7 +1285,7 @@
   min-height: 38px;
   align-items: center;
   gap: 7px;
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
   font-size: 0.95rem;
   font-weight: 800;
@@ -1567,13 +1307,11 @@
   transform: translateX(4px);
 }
 
-/* ---- Cabeçalho e metadados de artigo ---- */
-
 .editorial-article-header {
   padding-bottom: clamp(58px, 7vw, 92px);
   overflow: clip;
   color: var(--ink-on-dark);
-  background-color: var(--breu);
+  background-color: var(--charcoal);
   background-image: var(--halftone-dark);
   background-size: 20px 20px;
   border-bottom: 8px solid var(--brass);
@@ -1612,7 +1350,7 @@
 .editorial-article-header__label::before {
   width: 28px;
   height: 4px;
-  background: var(--tomate);
+  background: var(--tomato);
   content: "";
 }
 
@@ -1719,8 +1457,6 @@
   overflow-wrap: anywhere;
 }
 
-/* ---- Corpo: sumário primeiro no DOM, rail à direita na tela larga. ---- */
-
 .editorial-article-shell {
   display: grid;
   grid-template-areas: "article sidebar";
@@ -1753,8 +1489,6 @@
 .editorial-article-after {
   margin-top: clamp(58px, 8vw, 88px);
 }
-
-/* ---- Sumário nativo: details dá colapso por teclado sem hidratação. ---- */
 
 .editorial-toc {
   color: var(--ink-on-dark);
@@ -1840,8 +1574,6 @@
   background: var(--surface-2);
 }
 
-/* ---- Prosa MDX: 65–75ch, ritmo longo e alvos reais. ---- */
-
 .editorial-prose {
   max-width: 72ch;
   color: var(--ink-muted);
@@ -1917,7 +1649,7 @@
   left: 0.15rem;
   width: 0.72rem;
   height: 0.38rem;
-  background: var(--tomate);
+  background: var(--tomato);
   box-shadow: 2px 2px 0 var(--ink);
   content: "";
   transform: rotate(-3deg);
@@ -1944,7 +1676,7 @@
   color: var(--paper-raised);
   background: var(--ink);
   border-radius: var(--r-sm);
-  box-shadow: 2px 2px 0 var(--tomate);
+  box-shadow: 2px 2px 0 var(--tomato);
   content: counter(editorial-step);
   font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
   font-size: 0.78rem;
@@ -1964,7 +1696,7 @@
   width: 1.1rem;
   height: 1.1rem;
   margin: 0 0.65rem 0 -2rem;
-  accent-color: var(--tomate-ink);
+  accent-color: var(--tomato-ink);
   opacity: 1;
   vertical-align: -0.16rem;
 }
@@ -1975,7 +1707,7 @@
 }
 
 .editorial-prose a:not(.editorial-image__frame) {
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   font-weight: 720;
   text-decoration: underline;
   text-decoration-color: currentcolor;
@@ -2075,8 +1807,6 @@
   background: var(--paper-line);
   border: 0;
 }
-
-/* ---- Calculadora editorial: conta simples, sem parecer formulário do app. ---- */
 
 .editorial-upload-calculator {
   padding: clamp(22px, 4vw, 38px);
@@ -2241,7 +1971,7 @@
   color: var(--ink-on-dark);
   background: var(--surface);
   border-radius: var(--r-sm);
-  box-shadow: 2px 2px 0 var(--tomate-ink);
+  box-shadow: 2px 2px 0 var(--tomato-ink);
   font-family: ui-monospace, "Cascadia Mono", monospace;
   font-size: 0.78em;
   font-weight: 700;
@@ -2279,8 +2009,6 @@
   margin-bottom: 0;
 }
 
-/* ---- Callout: a listra de acento autorizada pelo sistema. ---- */
-
 .editorial-callout {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
@@ -2308,7 +2036,7 @@
   width: 21px;
   height: 21px;
   margin-top: 1px;
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   fill: none;
   stroke: currentcolor;
   stroke-linecap: round;
@@ -2345,17 +2073,15 @@
 .editorial-callout[data-tone="important"] ul > li::before,
 .editorial-callout[data-tone="limit"] ul > li::before {
   background: var(--brass);
-  box-shadow: 2px 2px 0 var(--tomate);
+  box-shadow: 2px 2px 0 var(--tomato);
 }
 
 .editorial-callout[data-tone="important"] ol > li::before,
 .editorial-callout[data-tone="limit"] ol > li::before {
   color: var(--brass-ink);
   background: var(--brass);
-  box-shadow: 2px 2px 0 var(--tomate);
+  box-shadow: 2px 2px 0 var(--tomato);
 }
-
-/* ---- Relacionados: uma sequência, não uma grade de cards clones. ---- */
 
 .editorial-related {
   padding: clamp(24px, 3.5vw, 38px);
@@ -2439,8 +2165,6 @@
   transform: translateX(4px);
 }
 
-/* ---- Estado vazio ---- */
-
 .editorial-empty-state {
   display: grid;
   grid-template-columns: minmax(150px, 0.34fr) minmax(0, 1fr);
@@ -2512,7 +2236,7 @@
   align-items: center;
   padding: 9px 15px;
   color: var(--brass-ink);
-  background: var(--tomate);
+  background: var(--tomato);
   border-radius: var(--r-md);
   box-shadow: var(--pop-cream);
   font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
@@ -2524,15 +2248,13 @@
 }
 
 .editorial-empty-state__action a:hover {
-  background: var(--tomate-strong);
+  background: var(--tomato-strong);
 }
 
 .editorial-empty-state__action a:active {
   box-shadow: none;
   transform: translate(4px, 4px);
 }
-
-/* ---- Imagem editorial ---- */
 
 .editorial-image {
   max-width: 100%;
@@ -2574,7 +2296,7 @@
   gap: 7px;
   padding: 7px 10px;
   color: var(--brass-ink);
-  background: var(--tomate);
+  background: var(--tomato);
   border-radius: var(--r-sm);
   box-shadow: var(--pop);
   font-size: 0.75rem;
@@ -2593,7 +2315,7 @@
 }
 
 .editorial-image__frame:hover .editorial-image__zoom {
-  background: var(--tomate-strong);
+  background: var(--tomato-strong);
 }
 
 .editorial-image__frame:active .editorial-image__zoom {
@@ -2633,13 +2355,11 @@
 }
 
 .editorial-image__details a {
-  color: var(--tomate-ink);
+  color: var(--tomato-ink);
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
-
-/* ---- Lightbox: zoom sem perder a página ou abrir outra aba. ---- */
 
 .editorial-lightbox {
   width: 100vw;
@@ -2743,13 +2463,13 @@
 
 .editorial-lightbox__close {
   color: var(--brass-ink);
-  background: var(--tomate);
+  background: var(--tomato);
   border-radius: var(--r-md);
   box-shadow: var(--pop-cream);
 }
 
 .editorial-lightbox__close:hover {
-  background: var(--tomate-strong);
+  background: var(--tomato-strong);
 }
 
 .editorial-lightbox__close:active {
@@ -2829,8 +2549,6 @@
   transform: translateX(-50%);
   white-space: nowrap;
 }
-
-/* ---- Colapso responsivo; os mesmos pontos cobrem zoom de 200%. ---- */
 
 @media (max-width: 980px) {
   .editorial-collection-hero__heading {

@@ -8,9 +8,9 @@ foreach ($file in $files) {
     $parseErrors = $null
     $null = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)
     foreach ($failure in $parseErrors) {
-        Write-Error -ErrorAction Continue "$($file.Name):$($failure.Extent.StartLineNumber): erro de sintaxe ($($failure.ErrorId))."
+        Write-Error -ErrorAction Continue "$($file.Name):$($failure.Extent.StartLineNumber): syntax error ($($failure.ErrorId))."
         $failures++
     }
 }
 if ($failures -gt 0) { exit 1 }
-Write-Host "Sintaxe PowerShell: $($files.Count) scripts válidos (não executados)."
+Write-Host "PowerShell syntax: $($files.Count) valid scripts (not executed)."

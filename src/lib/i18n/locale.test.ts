@@ -7,86 +7,80 @@ import {
 } from "./locale";
 
 describe("detectSystemLocale", () => {
-  it("casa pelo idioma base, não pela tag inteira", () => {
-    // Português de Portugal lê a versão brasileira melhor que a inglesa.
+  it("matches the base language rather than the complete tag", () => {
     expect(detectSystemLocale(["pt-PT"])).toBe("pt-BR");
     expect(detectSystemLocale(["en-GB", "en"])).toBe("en");
   });
 
-  it("respeita a ordem de preferência do sistema", () => {
+  it("respects system preference order", () => {
     expect(detectSystemLocale(["es-AR", "en-US", "pt-BR"])).toBe("en");
   });
 
-  it("idioma que não temos cai no padrão", () => {
+  it("falls back for unsupported languages", () => {
     expect(detectSystemLocale(["ja", "ko"])).toBe("pt-BR");
     expect(detectSystemLocale([])).toBe("pt-BR");
   });
 });
 
-/** Sem argumento, a função lê `navigator.languages` — é assim que o "automático"
- *  funciona no WebView2. Aqui o navigator é FIXADO de propósito: passar
- *  `undefined` aciona o parâmetro padrão, e sem fixar o teste passaria a medir o
- *  idioma de quem está rodando (verde no Windows em pt-BR, vermelho no CI em
- *  inglês) em vez de medir a função. */
-describe("detectSystemLocale sem argumento", () => {
+/** Stub navigator.languages: undefined activates the default parameter and would otherwise depend on the test machine. */
+describe("detectSystemLocale without arguments", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("segue o idioma do sistema quando é um que a gente tem", () => {
+  it("uses a supported system language", () => {
     vi.stubGlobal("navigator", { languages: ["en-US", "en"] });
     expect(detectSystemLocale()).toBe("en");
   });
 
-  it("cai no padrão num sistema que a gente não fala", () => {
+  it("falls back for an unsupported system language", () => {
     vi.stubGlobal("navigator", { languages: ["ja-JP", "ko"] });
     expect(detectSystemLocale()).toBe("pt-BR");
   });
 
-  it("cai no padrão quando não há navigator nenhum", () => {
+  it("falls back without navigator", () => {
     vi.stubGlobal("navigator", undefined);
     expect(detectSystemLocale()).toBe("pt-BR");
   });
 });
 
 describe("resolveLocale", () => {
-  it("escolha explícita ganha do sistema", () => {
+  it("explicit choices override the system", () => {
     expect(resolveLocale("en", "pt-BR")).toBe("en");
     expect(resolveLocale("pt-BR", "en")).toBe("pt-BR");
   });
 
-  it("'auto' segue o sistema", () => {
+  it("auto follows the system", () => {
     expect(resolveLocale("auto", "en")).toBe("en");
     expect(resolveLocale("auto", "pt-BR")).toBe("pt-BR");
   });
 
-  it("config ausente ou lixo cai no sistema", () => {
+  it("missing or invalid config falls back to the system", () => {
     expect(resolveLocale(undefined, "en")).toBe("en");
     expect(resolveLocale("klingon" as never, "en")).toBe("en");
   });
 });
 
 describe("interpolate", () => {
-  it("troca o buraco pelo valor", () => {
+  it("replaces placeholders with values", () => {
     expect(interpolate("{n} plataformas", { n: 3 })).toBe("3 plataformas");
     expect(interpolate("{a} e {b}", { a: "Twitch", b: "Kick" })).toBe(
       "Twitch e Kick",
     );
   });
 
-  it("buraco sem valor fica VISÍVEL em vez de sumir", () => {
-    // Frase que perde o número em silêncio parece certa e está errada.
+  it("keeps unresolved placeholders visible", () => {
     expect(interpolate("{n} trechos", {})).toBe("{n} trechos");
     expect(interpolate("{n} trechos")).toBe("{n} trechos");
   });
 
-  it("não mexe em chave que não é buraco", () => {
+  it("does not change text without placeholders", () => {
     expect(interpolate("uso de {cpu}% e { espaço }", { cpu: 90 })).toBe(
       "uso de 90% e { espaço }",
     );
   });
 
-  it("aceita o mesmo buraco duas vezes", () => {
+  it("supports repeated placeholders", () => {
     expect(interpolate("{p} caiu, {p} voltou", { p: "Kick" })).toBe(
       "Kick caiu, Kick voltou",
     );
@@ -94,7 +88,7 @@ describe("interpolate", () => {
 });
 
 describe("pluralSuffix", () => {
-  it("só 1 é singular — zero é plural nos dois idiomas", () => {
+  it("uses singular only for one and plural for zero in both locales", () => {
     expect(pluralSuffix(1)).toBe("one");
     expect(pluralSuffix(-1)).toBe("one");
     expect(pluralSuffix(0)).toBe("other");

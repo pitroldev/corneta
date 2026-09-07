@@ -53,8 +53,7 @@ export const CONFIG_TABS: {
   { id: "exibicao", labelKey: "chat.config.tab.display", icon: Eye },
 ];
 
-// Os `value` viajam crus na query string do overlay (?pos=, &scale=) — só o
-// rótulo é texto de tela.
+// Values are overlay query parameters; only labels may be localized.
 export const overlayPosOpts = (t: Translate) => [
   { value: "top", label: t("chat.overlay.pos.top") },
   { value: "bottom", label: t("chat.overlay.pos.bottom") },
@@ -94,8 +93,6 @@ export const statusLabel = (t: Translate, status: string) =>
         ? t("chat.status.label.waiting")
         : t("chat.status.label.connecting");
 
-// Tooltip com o PORQUÊ do status (o label sozinho parece travado/quebrado).
-// O supervisor do backend já re-tenta sozinho com backoff — a dica avisa isso.
 export const statusExplain = (
   t: Translate,
   platform: string,
@@ -115,8 +112,6 @@ export const statusExplain = (
   return t("chat.status.explain.connecting");
 };
 
-// label e placeholder são nomes de produto e de campo dessas plataformas — só a
-// dica é texto de tela.
 export const ALERT_META: Record<
   AlertSourceKind,
   { label: string; placeholder: string; hintKey: MessageKey }
@@ -133,12 +128,10 @@ export const ALERT_META: Record<
   },
 };
 
-// O status vem indexado por nome ou, sem apelido, pelo kind (ex.: "streamlabs") —
-// na tela sai o nome do produto.
+// Status keys use the source name, falling back to its backend kind.
 export const alertSourceLabel = (name: string) =>
   name in ALERT_META ? ALERT_META[name as AlertSourceKind].label : name;
 
-// As chaves vêm do backend (alert://status) — só os rótulos são copy.
 export const ALERT_STATUS: Record<string, MessageKey> = {
   connected: "chat.alertsrc.status.live",
   error: "chat.alertsrc.status.error",

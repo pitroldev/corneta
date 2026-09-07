@@ -1,4 +1,4 @@
-//! Offline F16 policy prototype. NOT a publisher and NOT used by the app.
+//! Offline policy prototype; not a publisher and not used by the app.
 //!
 //! The future demux/decoder adapter must prove these inputs: complete CLOSED
 //! IDR GOPs, both A/V tracks, exact PTS/DTS inspection coverage and codec epochs.

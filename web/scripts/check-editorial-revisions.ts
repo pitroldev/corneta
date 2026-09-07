@@ -25,7 +25,7 @@ interface Options {
 function readValue(args: string[], index: number, option: string): string {
   const value = args[index + 1];
   if (!value || value.startsWith("--")) {
-    throw new Error(`${option} exige um valor.`);
+    throw new Error(`${option} requires a value.`);
   }
   return value;
 }
@@ -48,11 +48,11 @@ export function parseOptions(argv: string[]): Options {
       productVersion = readValue(args, index, argument);
       index += 1;
     } else {
-      throw new Error(`Opção desconhecida: ${argument}`);
+      throw new Error(`Unknown option: ${argument}`);
     }
   }
 
-  if (!base) throw new Error("--base é obrigatório.");
+  if (!base) throw new Error("--base is required.");
   return { base, head, productVersion };
 }
 
@@ -102,19 +102,20 @@ function asFrontmatter(
   relativePath: string,
 ): EditorialRevisionFrontmatter {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${relativePath}: frontmatter ausente.`);
+    throw new Error(`${relativePath}: missing frontmatter.`);
   }
   const raw = normalizeYamlValue(value) as Record<string, unknown>;
   if (typeof raw.updatedAt !== "string") {
-    throw new Error(`${relativePath}: updatedAt anterior ausente ou inválido.`);
+    throw new Error(
+      `${relativePath}: previous updatedAt is missing or invalid.`,
+    );
   }
 
   return {
     ...raw,
     contentId: typeof raw.contentId === "string" ? raw.contentId : undefined,
     updatedAt: raw.updatedAt,
-    // Compatibilidade com o contrato anterior à Fase 4: a última atualização
-    // é a melhor evidência disponível para a revisão histórica.
+    // Older frontmatter used updatedAt as its only review timestamp.
     reviewedAt:
       typeof raw.reviewedAt === "string" ? raw.reviewedAt : raw.updatedAt,
     productVersion:
@@ -196,7 +197,7 @@ async function main(): Promise<void> {
   });
   if (audit.errorCount > 0) {
     throw new Error(
-      `O conteúdo atual tem ${audit.errorCount} erro(s); rode content:check primeiro.`,
+      `Current content has ${audit.errorCount} error(s); run content:check first.`,
     );
   }
 
@@ -253,7 +254,8 @@ async function main(): Promise<void> {
 
   if (issues.length > 0) {
     process.stderr.write(
-      `A política editorial encontrou ${issues.length} problema(s):\n`,
+      `Editorial policy found ${issues.length} issue(s):
+`,
     );
     for (const issue of issues) {
       process.stderr.write(
@@ -265,14 +267,15 @@ async function main(): Promise<void> {
   }
 
   process.stdout.write(
-    `Política editorial aprovada: ${comparedArticles} artigo(s) comparado(s), ${sourceAffectedArticles} afetado(s) por fontes internas.\n`,
+    `Editorial policy passed: ${comparedArticles} article(s) compared, ${sourceAffectedArticles} affected by internal sources.
+`,
   );
 }
 
 if (isEditorialCliEntrypoint(import.meta.url)) {
   main().catch((error: unknown) => {
     process.stderr.write(
-      `Falha ao verificar revisões editoriais: ${
+      `Editorial revision check failed: ${
         error instanceof Error ? error.message : String(error)
       }\n`,
     );

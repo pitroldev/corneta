@@ -10,7 +10,7 @@ type IdleCapableWindow = Window &
     cancelIdleCallback?: (handle: number) => void;
   };
 
-/** Agenda trabalho não crítico depois do primeiro paint, com fallback determinístico no WebView. */
+/** Schedule non-critical work after first paint, with a deterministic WebView fallback. */
 export function runWhenIdle(task: () => void, timeout = 1500): () => void {
   const idleWindow = window as IdleCapableWindow;
   if (idleWindow.requestIdleCallback) {

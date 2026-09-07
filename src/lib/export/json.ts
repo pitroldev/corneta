@@ -1,14 +1,10 @@
-// ============================================================
-// JSON — o relatório ANALISADO, pra quem quer plugar numa ferramenta própria.
-// O NDJSON cru já está em "Abrir pasta"; o valor daqui é a análise pronta.
-// ============================================================
 import type { SessionData } from "../types";
 import type { ReportAnalysis } from "../report";
 
-/** Sobe quando um campo muda de significado (não quando um campo NOVO aparece).
- *  Quem consome de fora precisa de um sinal pra saber que tem de reler o contrato. */
+/** Increment when an existing field changes meaning, not for additive fields. */
 export const REPORT_JSON_VERSION = 1;
 
+// Version 1 field names are a public export contract; preserve their spelling.
 export function reportJson(d: SessionData, a: ReportAnalysis): string {
   return JSON.stringify(
     {
@@ -38,8 +34,6 @@ export function reportJson(d: SessionData, a: ReportAnalysis): string {
       },
       trechosComProblema: a.windows,
       momentos: a.highlights,
-      // Instantes em ISO: um `t` em epoch-ms obrigaria quem consome a saber que a
-      // referência é o relógio local da máquina que gravou.
       eventos: a.events.map((e) => ({
         instante: new Date(e.t).toISOString(),
         segundosDoInicio: Math.round((e.t - d.meta.startedAt) / 1000),

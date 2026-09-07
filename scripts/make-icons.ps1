@@ -1,5 +1,3 @@
-# Gera os ícones versionados da Corneta: megafone âmbar sobre fundo escuro.
-# Mudanças exigem revisão visual e atualização do inventário em docs/MATERIAIS-PUBLICOS.md.
 Add-Type -AssemblyName System.Drawing
 
 $outDir = Join-Path $PSScriptRoot '..\src-tauri\icons'
@@ -15,7 +13,6 @@ function New-Glyph([int]$size) {
   $ink = [System.Drawing.Color]::FromArgb(26, 18, 4)
   $f = { param($x) [float]($x * $size) }
 
-  # Fundo arredondado âmbar
   $r = & $f 0.22
   $path = New-Object System.Drawing.Drawing2D.GraphicsPath
   $path.AddArc(0, 0, $r, $r, 180, 90)
@@ -29,7 +26,6 @@ function New-Glyph([int]$size) {
   $pen = New-Object System.Drawing.Pen($ink, (& $f 0.05))
   $pen.StartCap = 'Round'; $pen.EndCap = 'Round'
 
-  # Corpo do megafone (trapézio: estreito à esquerda, boca à direita)
   $horn = @(
     (New-Object System.Drawing.PointF((& $f 0.26), (& $f 0.40))),
     (New-Object System.Drawing.PointF((& $f 0.55), (& $f 0.29))),
@@ -38,10 +34,8 @@ function New-Glyph([int]$size) {
   )
   $g.FillPolygon($brush, $horn)
 
-  # Cabo
   $g.FillRectangle($brush, (& $f 0.30), (& $f 0.58), (& $f 0.07), (& $f 0.16))
 
-  # Ondas sonoras (arcos à direita da boca)
   $g.DrawArc($pen, (& $f 0.56), (& $f 0.34), (& $f 0.20), (& $f 0.32), -55, 110)
   $g.DrawArc($pen, (& $f 0.62), (& $f 0.27), (& $f 0.24), (& $f 0.46), -55, 110)
 
@@ -60,7 +54,7 @@ Save-Png 128 '128x128.png'
 Save-Png 256 '128x128@2x.png'
 Save-Png 512 'icon.png'
 
-# icon.ico com um PNG 256 embutido (suportado no Windows Vista+)
+# Windows Vista+ supports a PNG payload in ICO; zero dimensions encode 256x256.
 $png256 = New-Glyph 256
 $ms = New-Object System.IO.MemoryStream
 $png256.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
@@ -71,11 +65,11 @@ $ico = [System.IO.File]::Create((Join-Path $outDir 'icon.ico'))
 $bw = New-Object System.IO.BinaryWriter($ico)
 $bw.Write([UInt16]0); $bw.Write([UInt16]1); $bw.Write([UInt16]1)      # ICONDIR
 $bw.Write([Byte]0); $bw.Write([Byte]0)                               # 256x256
-$bw.Write([Byte]0); $bw.Write([Byte]0)                               # cores/reserv
+$bw.Write([Byte]0); $bw.Write([Byte]0)                               # palette/reserved
 $bw.Write([UInt16]1); $bw.Write([UInt16]32)                          # planes/bpp
-$bw.Write([UInt32]$pngBytes.Length); $bw.Write([UInt32]22)           # tamanho/offset
+$bw.Write([UInt32]$pngBytes.Length); $bw.Write([UInt32]22)           # size/offset
 $bw.Write($pngBytes)
 $bw.Flush(); $bw.Dispose(); $ico.Dispose()
 
-Write-Host "Ícones gerados em $outDir"
+Write-Host "Icons generated in $outDir"
 Get-ChildItem $outDir | Select-Object Name, Length | Format-Table -AutoSize
