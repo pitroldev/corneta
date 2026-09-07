@@ -2,26 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 import { buildReplayIndex } from "../../lib/replay";
-import {
-  getCachedSummary,
-  setCachedSummary,
-  withReportMarkers,
-  type ReportAnalysis,
-} from "../../lib/report";
+import { withReportMarkers } from "../../lib/report";
+import { getCachedSummary, setCachedSummary } from "../../lib/summaryCache";
 import { ReportClient } from "../../lib/reportClient";
-import type { ReportSummaryResult } from "../../lib/reportTasks";
+import type { ReportDetailResult } from "../../lib/reportTasks";
 import type { ChatPage } from "../../lib/replayChatPage";
-import type {
-  SessionData,
-  SessionMarker,
-  SessionSummary,
-} from "../../lib/types";
+import type { SessionMarker, SessionSummary } from "../../lib/types";
 
-interface LoadedReport {
-  data: SessionData;
-  analysis: ReportAnalysis;
-  summary: SessionSummary;
-}
 const EMPTY_CHAT: ChatPage = {
   messages: [],
   gaps: [],
@@ -34,7 +21,7 @@ const EMPTY_CHAT: ChatPage = {
 
 export function useReportDetailData(id: string, previousId: string | null) {
   const { t, locale } = useI18n();
-  const [loaded, setLoaded] = useState<LoadedReport | null | "loading">(
+  const [loaded, setLoaded] = useState<ReportDetailResult | null | "loading">(
     "loading",
   );
   const [previousSummary, setPreviousSummary] = useState<SessionSummary | null>(
@@ -46,7 +33,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
   const clientRef = useRef<ReportClient | null>(null);
   const readChatPage = useCallback(
     (epoch: number) =>
-      clientRef.current?.run<ChatPage>({ kind: "chatPage", epoch }) ??
+      clientRef.current?.run({ kind: "chatPage", epoch }) ??
       Promise.resolve(EMPTY_CHAT),
     [],
   );
@@ -90,7 +77,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
       try {
         const raw = await api.readSessionBytes(id);
         if (!alive) return;
-        const result = await client.run<LoadedReport | null>({
+        const result = await client.run({
           kind: "analyze",
           raw,
           locale,
@@ -105,7 +92,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
         try {
           const raw = await api.readSessionBytes(id, true);
           if (alive && raw.byteLength > 0) {
-            const next = await client.run<ChatPage>({
+            const next = await client.run({
               kind: "chat",
               raw,
               epoch: result.data.meta.startedAt,
@@ -124,7 +111,7 @@ export function useReportDetailData(id: string, previousId: string | null) {
         try {
           const raw = await api.readSessionBytes(previousId);
           if (!alive) return;
-          const next = await client.run<ReportSummaryResult | null>({
+          const next = await client.run({
             kind: "summary",
             raw,
             locale,

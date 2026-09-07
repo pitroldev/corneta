@@ -15,7 +15,9 @@
 # dependência nova. Sem a fonte, cai no Segoe UI Black e avisa.
 #
 # O NSIS exige BMP sem alfa; por isso o canvas é Format24bppRgb desde o começo.
-# Os .png ao lado são só pra conferência visual — o bundle usa os .bmp.
+# Os .png ao lado são previews versionados para revisar os mesmos pixels dos .bmp.
+# O bundle usa somente BMP; preserve os pares e atualize o inventário de materiais
+# públicos após revisar uma mudança (docs/MATERIAIS-PUBLICOS.md).
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing

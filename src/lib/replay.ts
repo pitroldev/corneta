@@ -1,5 +1,5 @@
 // ============================================================
-// Mapeamento epoch ↔ tempo de vídeo do replay. Ver docs/FEATURE-GRAVACAO-E-REPLAY.md §9.4.
+// Mapeamento epoch ↔ tempo de vídeo do replay.
 //
 // NÚCLEO PURO: nada de React, nada de I/O, nada de Tauri. É aqui que moram os bugs
 // sutis da feature (âncora faltando, segmento fora de ordem, relógio andando pra trás),

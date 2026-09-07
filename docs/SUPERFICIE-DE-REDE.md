@@ -1,6 +1,6 @@
 # Superfície de rede e limites das integrações
 
-Inventário do código em 2026-09-06. Esta referência descreve capacidades implementadas, não uma auditoria externa, autorização dos provedores ou promessa de disponibilidade. Configuração e responsabilidades: [CONFIGURACAO.md](CONFIGURACAO.md). Vulnerabilidades: [SECURITY.md](../SECURITY.md).
+Referência da linha 0.7.0. Este guia descreve capacidades implementadas, não autorização dos provedores ou promessa de disponibilidade. Configuração e responsabilidades: [CONFIGURACAO.md](CONFIGURACAO.md). Vulnerabilidades: [SECURITY.md](../SECURITY.md).
 
 ## As três funções são independentes
 
@@ -16,7 +16,7 @@ Inventário do código em 2026-09-06. Esta referência descreve capacidades impl
 | TikTok, X e Instagram | Presets experimentais; acesso à ingestão e URL/chave dependem da conta/provedor | Não implementada                                                                            | Não                                                     | Não                          | Não                                                         |
 | Personalizado         | URL/chave RTMP/RTMPS configurada pelo usuário                                   | Não implica OAuth                                                                           | Não implica chat                                        | Não                          | Não                                                         |
 
-Evidência: [`platforms.ts`](../src/lib/platforms.ts), [`chat.rs`](../src-tauri/src/chat.rs), [`auth.rs`](../src-tauri/src/auth.rs), [adaptador Cinefy](../src-tauri/src/chat/cinefy/adapter.rs). Os presets são referências: o usuário deve usar o destino que o provedor atribuiu à sua conta. Não atribuímos a RTMP a confidencialidade de RTMPS; URL/chave e mídia em RTMP não têm TLS.
+Implementação: [`platforms.ts`](../src/lib/platforms.ts), [`chat.rs`](../src-tauri/src/chat.rs), [`auth.rs`](../src-tauri/src/auth.rs), [adaptador Cinefy](../src-tauri/src/chat/cinefy/adapter.rs). Os presets são referências: o usuário deve usar o destino que o provedor atribuiu à sua conta. Não atribuímos a RTMP a confidencialidade de RTMPS; URL/chave e mídia em RTMP não têm TLS.
 
 ## Serviços que escutam no computador
 
@@ -77,9 +77,15 @@ Evidências e regressões: [handlers Kick](../web/app/api/v1/oauth/kick/exchange
 
 Stream keys, tokens OAuth e credenciais avançadas usam [`keys.rs`](../src-tauri/src/keys.rs). O namespace oficial é diferente do contributor. O cofre não protege contra todo programa executado sob a conta do usuário nem transforma um secret BYOK em segredo inacessível ao dono do computador.
 
-Os comandos de logout apagam credenciais locais e caches pertinentes. **Não há revogação remota garantida pelo logout atual**: para remover a autorização no provedor, use também a área de aplicativos/conexões da própria conta. A expiração/renovação segue o provedor; falha de refresh pode exigir novo login. Não prometer que desconectar localmente invalida cópias já comprometidas de um token.
+Os comandos de logout tentam remover as credenciais locais e caches pertinentes; falha do cofre deve ser apresentada como limpeza incompleta, não como sucesso. Desinstalar não garante remover essas entradas. **Não há revogação remota garantida pelo logout atual**: para remover a autorização no provedor, use também a área de aplicativos/conexões da própria conta. A expiração/renovação segue o provedor; falha de refresh pode exigir novo login. Não prometer que desconectar localmente invalida cópias já comprometidas de um token.
 
 Relatórios/chat/gravações são arquivos locais que podem conter nomes, mensagens, títulos, eventos e imagem/áudio da live. Não são automaticamente seguros para anexar numa issue porque a stream key está no cofre. Use fixtures artificiais ou revisão/redação antes de compartilhar; nunca publicar um arquivo `.ndjson`, vídeo, convite Mesa ou screenshot real sem verificar dados pessoais e credenciais.
+
+## Recuperação de transmissões automáticas do YouTube
+
+O fluxo em [`auth/youtube_broadcast.rs`](../src-tauri/src/auth/youtube_broadcast.rs) preserva a pendência no cofre até confirmar o estado remoto e a limpeza local. Ao parar, tenta concluir transmissões em `live`/`testing`; não usa exclusão automática, inclusive depois de erros de rede, quota ou autenticação. Estados `created`/`ready` ou ainda em transição ficam pendentes: confira a transmissão correspondente no YouTube Studio e cancele o agendamento se não for utilizá-lo. Uma observação antiga do estado não autoriza apagar um vídeo.
+
+Se a resposta de criação se perder antes de devolver o ID, o app bloqueia outra criação automática até a revisão no Studio e a confirmação explícita pelo fluxo **Recuperar YouTube**. Quando o ID é conhecido, essa confirmação não o descarta: o app precisa consultar novamente ou concluir a transmissão. Parar o envio local não prova que a transmissão remota foi encerrada. As credenciais manuais continuam sendo um caminho separado; confira o canal antes de assumir que está no ar.
 
 ## Integrações experimentais e revisão de mudanças
 
@@ -87,4 +93,4 @@ Leitura por endpoints web internos/públicos (incluindo Cinefy e partes de YouTu
 
 Mudanças de rede/OAuth precisam incluir testes proporcionais: callbacks com state incorreto/expirado, ocupação de porta, refresh inválido, callbacks fora da allowlist, bodies grandes/lentos, Redis indisponível, origem forjada, logout local e separação de credenciais oficiais/BYOK/contributor. Não executar testes de envio/moderação em canais reais sem autorização do responsável.
 
-Este inventário não afirma que todos esses cenários tiveram teste manual nesta revisão. Testes automatizados existentes são uma base; fluxos reais e alterações de contrato precisam continuar na matriz de release. Não abrir portas, transmitir ou publicar para “verificar” uma documentação.
+Testes automatizados não substituem a validação de fluxos reais da [matriz de publicação](PUBLICACAO.md). Mudanças de contrato exigem nova verificação proporcional ao risco. Não abra portas, transmita ou publique apenas para conferir a documentação.

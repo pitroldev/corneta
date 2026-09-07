@@ -10,19 +10,25 @@ Tailwind CSS 4. São duas coisas no mesmo app:
   exchange/refresh do OAuth da Kick, a única plataforma que exige Client Secret. O app desktop
   depende dela para o login oficial da Kick.
 
-## Desenvolvimento
+## Contribuir sem credenciais oficiais
 
-Da raiz do repositório:
+Use as versões de Node/pnpm e a instalação descritas no [README principal](../README.md). Da raiz do repositório, sem criar `.env`:
 
 ```bash
-pnpm web:dev      # site + API em http://localhost:7390
-pnpm web:check    # lint + tipos + build de produção
-pnpm test         # inclui os testes puros de schema/redator/facades do web
+pnpm contrib:web        # site + API em http://localhost:7390
+pnpm contrib:web:check  # integridade, lint, tipos e build do site
+pnpm test               # inclui os testes puros do workspace web
 ```
 
-## Variáveis
+Execute o servidor e o build em momentos diferentes ou em cópias separadas. O perfil de contribuição fornece a origem canônica de build e desliga telemetria; não usa credenciais OAuth oficiais nem valida login real. Se houver arquivos reais `web/.env*`, ele recusa continuar: use outro clone limpo, sem apagar suas credenciais. Veja [desenvolvimento](../docs/DESENVOLVIMENTO.md).
 
-Copie `.env.example` para `.env.local` quando necessário:
+## Operação configurada e variáveis
+
+Para testar integrações próprias, o exemplo pertinente é [web/.env.example](.env.example), e o arquivo local é `web/.env.local` — ambos relativos à raiz do repositório. Não sobrescreva um arquivo existente. Os comandos `pnpm web:dev` e `pnpm web:check`, também na raiz, usam essa configuração e não têm o isolamento do perfil de contribuição.
+
+O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, Redis, proxy, precedência e distinção entre segredos e valores públicos. O [guia de publicação](../docs/PUBLICACAO.md) reúne os procedimentos e as evidências adicionais exigidas para distribuir o produto.
+
+Resumo das variáveis do site:
 
 - `NEXT_PUBLIC_SITE_URL`: URL canônica usada em metadata, sitemap e robots;
 - `NEXT_PUBLIC_PRIMARY_CTA_URL`: URL pública do instalador/release. Enquanto a URL real não
@@ -47,7 +53,9 @@ mesmo project token, `https://us.i.posthog.com` e o SHA completo do mesmo commit
 
 ## Telemetria e diagnóstico
 
-Sem configuração válida, todos os facades são no-op. Quando habilitada:
+Sem configuração válida ou com o kill switch pertinente, o envio fica desativado. Na distribuição configurada, as finalidades de uso e falhas do desktop são independentes, ativas por padrão e desativáveis: `unset` não é consentimento pendente. O site também oferece opt-out, DNT/GPC e kill switch. O contrato completo está na [política de telemetria](../docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e no [runbook](../docs/RUNBOOK-POSTHOG.md); esta descrição não substitui revisão jurídica.
+
+Quando o envio aplicável está habilitado:
 
 - o site usa PostHog em modo cookieless, sem persistência de identidade, perfil de pessoa,
   autocapture, replay, heatmap, texto da página, performance, surveys, feature flags ou
@@ -62,10 +70,7 @@ Sem configuração válida, todos os facades são no-op. Quando habilitada:
 - a Setup API envia somente falhas: erros operacionais conhecidos viram evento com rota,
   código, classe HTTP e duração em bucket; falhas inesperadas viram exceção redigida. Corpo,
   resposta de provedor, query, tokens e cabeçalhos de autenticação não são passados ao facade;
-- cada resposta da API inclui `X-Request-Id`. O desktop envia UUID, `operation_id` e a finalidade
-  fechada em `X-Corneta-Telemetry-Purposes` somente com consentimento. A API reutiliza o UUID em
-  evento operacional apenas com consentimento de uso e em exceção apenas com consentimento de
-  erros; nos demais casos usa uma identidade efêmera do pedido;
+- cada resposta da API inclui `X-Request-Id`. O desktop envia a correlação de UUID, `operation_id` opcional e finalidades fechadas em `X-Corneta-Telemetry-Purposes` somente quando alguma finalidade está efetivamente habilitada. A API reutiliza essa correlação em eventos operacionais apenas com uso habilitado e em exceções apenas com falhas habilitadas. Sem correlação autorizada para aquela finalidade, usa uma identidade efêmera do pedido; isso não contorna o kill switch ou a configuração de envio da API;
 - o envio server-side roda no `after()` do Next.js e falha silenciosamente: PostHog nunca muda
   status, corpo ou latência necessária da resposta.
 
@@ -75,8 +80,7 @@ metadata com o desktop antes de criar o draft; nenhuma Personal API Key ou token
 resposta.
 
 No projeto PostHog de produção, configure retenção de 90 dias, **Discard client IP data**,
-Cloud US (Virginia), DPA, MFA e acesso por função. O runbook completo está em
-`../docs/RUNBOOK-POSTHOG.md`.
+Cloud US (Virginia), DPA, MFA e acesso por função. O [runbook completo](../docs/RUNBOOK-POSTHOG.md) separa esses requisitos das verificações locais.
 
 ### Páginas legais
 
@@ -98,7 +102,7 @@ revisão e `LEGAL_ACCEPT_VERSION`, espelhado no workspace desktop.
 
 Os hubs públicos usam caminhos sempre em inglês: `/help`, `/guides`, `/en/help` e
 `/en/guides`. O texto continua localizado. Artigos vivem em `content/`, passam pelo gate
-`pnpm content:check` e só entram em sitemap, hreflang e llms.txt quando estão publicados.
+`pnpm --dir web content:check` (executado da raiz) e só entram em sitemap, hreflang e llms.txt quando estão publicados. Consulte o [guia editorial](content/README.md).
 
 Para concluir a verificação externa depois do deploy:
 

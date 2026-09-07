@@ -1,4 +1,8 @@
-import type { ReportTask, ReportTaskResult } from "./reportTasks";
+import type {
+  ReportTask,
+  ReportTaskResult,
+  ReportResultByKind,
+} from "./reportTasks";
 
 /** One bounded, cancellable worker per consumer. It loads only when requested. */
 export class ReportClient {
@@ -13,7 +17,10 @@ export class ReportClient {
     }
   >();
 
-  run<T extends ReportTaskResult>(task: ReportTask): Promise<T> {
+  run<Task extends ReportTask>(
+    task: Task,
+  ): Promise<ReportResultByKind[Task["kind"]]>;
+  run(task: ReportTask): Promise<ReportTaskResult> {
     if (this.disposed)
       return Promise.reject(new DOMException("Cancelled", "AbortError"));
     if (this.pending.size >= 4)
@@ -39,8 +46,8 @@ export class ReportClient {
         this.dispose(new Error("report_worker_failed"));
     }
     const id = ++this.serial;
-    return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: (value) => resolve(value as T), reject });
+    return new Promise<ReportTaskResult>((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
       try {
         const transfer =
           "raw" in task && task.raw instanceof ArrayBuffer ? [task.raw] : [];

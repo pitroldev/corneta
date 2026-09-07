@@ -11,6 +11,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { gzipSync } from "node:zlib";
 import { entryFiles } from "./entry-budget.mjs";
+import { detectedSecretNames, dotenvSecretValues } from "./bundle-secrets.mjs";
 
 const root = process.cwd();
 const dist = join(root, "dist");
@@ -177,13 +178,7 @@ if (sourceMaps.length) {
   );
 }
 
-// 3) Nenhum segredo no bundle. Apenas nomes de variável são reportados; valores nunca saem.
-// Client IDs, URLs, tokens phc_ de ingestão e metadados de build são públicos por projeto.
-// O allowlist é intencionalmente exato: um nome acidental como VITE_CLIENT_SECRET continua sendo
-// tratado como segredo e derruba o gate.
-const PUBLICO =
-  /_CLIENT_ID$|_REDIRECT_URIS?$|^(VITE_(POSTHOG_TOKEN|POSTHOG_HOST|BUILD_SHA|SETUP_API_URL|TELEMETRY_DISABLED)|NEXT_PUBLIC_(POSTHOG_PROJECT_TOKEN|POSTHOG_HOST|BUILD_SHA|TELEMETRY_DISABLED|DEPLOYMENT_ENV|SITE_URL|PRIMARY_CTA_URL)|POSTHOG_(DESKTOP_TOKEN|PROJECT_TOKEN|HOST|PROJECT_ID|ENVIRONMENT)|CORNETA_BUILD_SHA|BUILD_SHA|TELEMETRY_DISABLED|TELEMETRY_POLICY_PUBLISHED_VERSION)$/;
-
+// 3) Detect known dotenv values and fixed secret markers. Report names only.
 const envValues = [];
 const envPaths = [
   ".env",
@@ -194,18 +189,7 @@ const envPaths = [
   .map((name) => join(root, name))
   .filter(existsSync);
 for (const envPath of envPaths) {
-  for (const raw of readFileSync(envPath, "utf8").split(/\r?\n/)) {
-    // Linha comentada também conta: pode ter sido usada num build anterior desta árvore.
-    const line = raw.replace(/^\s*#\s*/, "").trim();
-    const match = /^([A-Z0-9_]+)\s*=\s*(.*)$/.exec(line);
-    if (!match) continue;
-    const [, name, rawValue] = match;
-    const value = rawValue.trim().replace(/^["']|["']$/g, "");
-    if (PUBLICO.test(name) || value.length < 12 || /^https?:\/\//.test(value)) {
-      continue;
-    }
-    envValues.push({ name, bytes: Buffer.from(value) });
-  }
+  envValues.push(...dotenvSecretValues(readFileSync(envPath, "utf8")));
 }
 
 // Quando o gate for executado manualmente com secrets no ambiente, compare-os sem imprimi-los.
@@ -274,10 +258,8 @@ const containsPosthogPersonalApiKey = (bytes) => {
 const leaks = [];
 for (const path of files) {
   const bytes = readFileSync(path);
-  for (const secret of envValues) {
-    if (bytes.includes(secret.bytes))
-      leaks.push(`${secret.name} em ${onde(path)}`);
-  }
+  for (const name of detectedSecretNames(bytes, envValues))
+    leaks.push(`${name} em ${onde(path)}`);
   for (const [marker, label] of fixedSecretMarkers) {
     if (bytes.includes(marker)) leaks.push(`${label} em ${onde(path)}`);
   }
@@ -302,6 +284,6 @@ if (leaks.length) {
 
 console.log(
   artifactMode
-    ? "Artefatos e conteúdo extraível do NSIS sem source maps/segredos; chunks JS dentro do budget de 110 KiB gzip."
-    : "Bundle sem source maps/segredos; chunks JS dentro do budget de 110 KiB gzip.",
+    ? "Artefatos e conteúdo extraível do NSIS: nenhum source map/segredo detectado pelas verificações; chunks JS dentro do budget de 110 KiB gzip."
+    : "Bundle: nenhum source map/segredo detectado pelas verificações; chunks JS dentro do budget de 110 KiB gzip.",
 );

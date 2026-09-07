@@ -27,6 +27,19 @@ fn now_ms() -> u128 {
         .unwrap_or(0)
 }
 
+/// A cancelled session must not continue into retry work after its timer completes.
+async fn supervisor_wait(
+    running: &std::sync::atomic::AtomicBool,
+    duration: std::time::Duration,
+) -> bool {
+    use std::sync::atomic::Ordering;
+    if !running.load(Ordering::Relaxed) {
+        return false;
+    }
+    tokio::time::sleep(duration).await;
+    running.load(Ordering::Relaxed)
+}
+
 fn build_diagnostic_report(
     version: &str,
     os: &str,
@@ -193,8 +206,8 @@ fn capture_target_transition(
     }
 }
 
-/// Mata um sidecar (FFmpeg/MediaMTX) e seus netos órfãos — `taskkill /T /F` no Windows, onde
-/// `child.kill()` sozinho não leva a árvore junto. Fonte ÚNICA do encerramento de processo.
+/// Encerramento dos sidecars Tauri e sua árvore. O compositor possui handles `std::process`
+/// próprios e também precisa esperar (`wait`) seus filhos.
 pub(crate) fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) {
     let pid = child.pid();
     let _ = child.kill();
@@ -289,6 +302,7 @@ pub fn save_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, Strin
     }
     config.revision = disk_revision.saturating_add(1);
     config::save(&app, &config)?;
+    crate::apply_native_language(&app, &config.settings.language);
     // O arquivo continua com os indicadores zerados; somente a cópia devolvida às webviews
     // recebe a presença real das credenciais guardadas no cofre.
     refresh_secret_presence(&app, &mut config);
@@ -725,7 +739,7 @@ pub(crate) fn notify(app: &AppHandle, title: &str, body: &str) {
 }
 
 /// Atualiza o ícone (só quando a qualidade muda) e o tooltip da bandeja.
-fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
+pub(crate) fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
     // Título da janela espelha o estado — na taskbar (ou minimizado) dá pra ver a live de pé.
     // A memoização compara o texto JÁ RENDERIZADO: assim uma troca de idioma no meio da live
     // (estado do motor idêntico, texto diferente) também dispara o set_title.
@@ -777,7 +791,7 @@ fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
             let _ = tray.set_icon(Some(img));
         }
     }
-    let _ = tray.set_tooltip(Some(tray_tooltip(snap)));
+    let _ = tray.set_tooltip(Some(tray_tooltip(snap, crate::i18n::locale())));
 }
 
 /// Estado dos paths no MediaMTX: (ingestão pronta, bytes recebidos na ingestão, programa
@@ -1279,15 +1293,15 @@ async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
 /// YouTube automático falhou (token expirado, quota): avisa e anota no destino — a live
 /// segue com a URL/chave manual do usuário, mas ele PRECISA saber que o canal pode estar
 /// sem live nenhuma enquanto a Corneta parece "no ar".
-fn yt_auto_fallback(app: &AppHandle, target_id: &str, err: &str) {
-    log::warn!("YouTube auto-broadcast: {err}");
-    let error_id = capture_native_error(
-        app,
-        "youtube_auto_provision_failed",
-        "oauth",
-        true,
-        Some(err.to_string()),
-    );
+fn yt_auto_fallback(app: &AppHandle, target_id: &str, generation: u64, err: &str) {
+    let state = app.state::<AppState>();
+    {
+        let engine = state.engine.lock().unwrap();
+        if !engine.live || engine.start_gen != generation {
+            return;
+        }
+    }
+    let error_id = capture_native_error(app, "youtube_auto_provision_failed", "oauth", true, None);
     log::warn!("YouTube auto-broadcast: error_id={error_id}");
     notify(
         app,
@@ -1296,9 +1310,12 @@ fn yt_auto_fallback(app: &AppHandle, target_id: &str, err: &str) {
     );
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
+    if !eng.live || eng.start_gen != generation {
+        return;
+    }
     if let Some(snap) = eng.snapshot.as_mut() {
         if let Some(st) = snap.targets.get_mut(target_id) {
-            st.message = Some(Msg::TargetYoutubeAutoFallback.now());
+            st.message = Some(format!("{} {err}", Msg::TargetYoutubeAutoFallback.now()));
         }
         let out = snap.clone();
         drop(eng);
@@ -1331,6 +1348,14 @@ pub async fn start_engine(
     let operation_id = telemetry::normalize_or_new_id(operation_id);
 
     let result = start_engine_inner(app.clone(), state, operation_id.clone()).await;
+    if result
+        .as_ref()
+        .err()
+        .is_some_and(|error| error == crate::updater::START_UPDATE_BLOCKED)
+    {
+        // An expected refusal must not replace the current snapshot with an error.
+        return Err(Msg::UpdateInProgress.now());
+    }
     if let Err(error) = &result {
         let cancelled = error == START_CANCELLED;
         let mut properties = serde_json::Map::new();
@@ -1415,18 +1440,15 @@ async fn start_engine_inner(
     // (kill_orphan/keyring/spawn). Sem isto, dois cliques em BORA (ou dois disparos do atalho)
     // passavam ambos pela checagem e subiam dois MediaMTX + dois conjuntos de supervisores no
     // mesmo mapa (TOCTOU → FFmpeg vazado, publish duplicado, supervisor imortal).
-    let my_gen = {
+    let (my_gen, _startup_activity) = {
         let mut eng = state.engine.lock().unwrap();
-        if eng.live {
-            return Err(Msg::EngineAlreadyLive.now());
-        }
-        eng.live = true;
+        crate::updater::claim_start(&mut eng)?;
         eng.start_gen = eng.start_gen.wrapping_add(1);
         eng.operation_id = Some(operation_id.clone());
         eng.telemetry_reconnect_count = 0;
         eng.telemetry_last_error_id = None;
         eng.telemetry_last_error_operation_id = None;
-        eng.start_gen
+        (eng.start_gen, eng.begin_pending_activity())
     };
     // Daqui pra frente qualquer saída por erro solta a trava e limpa parciais (Drop). Só o
     // sucesso desarma a guarda (no fim da função).
@@ -1602,7 +1624,7 @@ async fn start_engine_inner(
             };
             let app2 = app.clone();
             match tauri::async_runtime::spawn_blocking(move || {
-                crate::auth::youtube_provision_broadcast(&app2, &title)
+                crate::auth::youtube_provision_broadcast(&app2, &title, my_gen)
             })
             .await
             {
@@ -1612,8 +1634,8 @@ async fn start_engine_inner(
                 }
                 // Falha (token expirado, quota): cai pra config manual — mas AVISA, senão o
                 // streamer acha que está no ar no YouTube e o canal não tem live nenhuma.
-                Ok(Err(e)) => yt_auto_fallback(&app, &yid, &e),
-                Err(e) => yt_auto_fallback(&app, &yid, &e.to_string()),
+                Ok(Err(e)) => yt_auto_fallback(&app, &yid, my_gen, &e),
+                Err(_) => yt_auto_fallback(&app, &yid, my_gen, &Msg::AuthYoutubeBadResponse.now()),
             }
         }
     }
@@ -1770,7 +1792,11 @@ async fn start_engine_inner(
                         session_path: sp,
                         id,
                     };
-                    state.engine.lock().unwrap().recorder_launch = Some(launch.clone());
+                    let activity = {
+                        let mut eng = state.engine.lock().unwrap();
+                        eng.recorder_launch = Some(launch.clone());
+                        eng.begin_pending_activity()
+                    };
                     let (a, run) = (app.clone(), running.clone());
                     tauri::async_runtime::spawn(recorder::run(
                         a,
@@ -1779,6 +1805,7 @@ async fn start_engine_inner(
                         launch.session_path,
                         launch.id,
                         run,
+                        activity,
                     ));
                 }
             }
@@ -1933,14 +1960,13 @@ async fn start_engine_inner(
             let mut drop_notified = false;
             let mut gpu_pipeline = crate::gpu_pipeline::enabled();
             while run_flag.load(Ordering::Relaxed) {
-                // (A censura agora é feita pelo "protetor" via zmq — sem trocar este FFmpeg.)
+                // A censura entra no feed de programa, no compositor, sem trocar este destino.
                 // Pausado: não sobe FFmpeg, mantém o estado "paused" e espera.
                 if pause_flag.load(Ordering::Relaxed) {
                     set_target_state(&app_t, &target_id, "paused");
-                    let _ = tauri::async_runtime::spawn_blocking(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(300))
-                    })
-                    .await;
+                    if !supervisor_wait(&run_flag, std::time::Duration::from_millis(300)).await {
+                        break;
+                    }
                     continue;
                 }
 
@@ -1951,10 +1977,9 @@ async fn start_engine_inner(
                 // e o "Tentar de novo" sumia — beco sem saída.
                 if auth_flag.load(Ordering::Relaxed) {
                     reaffirm_auth_error(&app_t, &target_id);
-                    let _ = tauri::async_runtime::spawn_blocking(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(300))
-                    })
-                    .await;
+                    if !supervisor_wait(&run_flag, std::time::Duration::from_millis(300)).await {
+                        break;
+                    }
                     // Saiu do parque (retry_target): relê a chave do cofre — o caso nº 1 é o
                     // streamer ter colado a chave nova em Plataformas no meio da live.
                     if !auth_flag.load(Ordering::Relaxed) && !has_yt_override {
@@ -1973,10 +1998,9 @@ async fn start_engine_inner(
                 // a queda do OBS NÃO passa por aqui (o programa segue publicando o slate).
                 if !signal.load(Ordering::Relaxed) {
                     set_target_waiting(&app_t, &target_id);
-                    let _ = tauri::async_runtime::spawn_blocking(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(700))
-                    })
-                    .await;
+                    if !supervisor_wait(&run_flag, std::time::Duration::from_millis(700)).await {
+                        break;
+                    }
                     continue;
                 }
 
@@ -2179,10 +2203,9 @@ async fn start_engine_inner(
                 // Sinal presente, mas o FFmpeg caiu → reconexão real.
                 log::warn!("FFmpeg de um destino caiu — reconectando em 2s");
                 set_target_reconnecting(&app_t, &target_id);
-                let _ = tauri::async_runtime::spawn_blocking(|| {
-                    std::thread::sleep(std::time::Duration::from_secs(2))
-                })
-                .await;
+                if !supervisor_wait(&run_flag, std::time::Duration::from_secs(2)).await {
+                    break;
+                }
             }
         });
     }
@@ -2247,6 +2270,11 @@ async fn start_engine_inner(
 // kill_engine, então a UI responde na hora mesmo com o taskkill ainda rolando.
 #[tauri::command]
 pub async fn stop_engine(app: AppHandle, operation_id: Option<String>) -> Result<(), String> {
+    let (youtube_generation, youtube_activity) = {
+        let state = app.state::<AppState>();
+        let engine = state.engine.lock().unwrap();
+        (engine.start_gen, engine.begin_pending_activity())
+    };
     if operation_id
         .as_deref()
         .is_some_and(|value| uuid::Uuid::parse_str(value).is_err())
@@ -2266,10 +2294,19 @@ pub async fn stop_engine(app: AppHandle, operation_id: Option<String>) -> Result
     tauri::async_runtime::spawn_blocking(move || kill_engine(&app2))
         .await
         .map_err(|e| e.to_string())?;
-    // Encerra na hora o broadcast automático do YouTube (best-effort — o enableAutoStop também
-    // encerraria sozinho ~1min depois).
+    // O autostop é desativado para permitir reconexão; uma falha fica pendente para recuperação.
     let app3 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || crate::auth::youtube_complete_active(&app3));
+    tauri::async_runtime::spawn_blocking(move || {
+        let _activity = youtube_activity;
+        if crate::auth::youtube_complete_active(&app3, youtube_generation).is_err() {
+            log::warn!("YouTube auto-broadcast: cleanup_pending");
+            notify(
+                &app3,
+                &Msg::NotifyYoutubeCleanupFailedTitle.now(),
+                &Msg::NotifyYoutubeCleanupFailedBody.now(),
+            );
+        }
+    });
     Ok(())
 }
 
@@ -2471,7 +2508,7 @@ fn update_target_metrics(
             st.message = None;
         }
     } else {
-        let (estate, msg) = friendly_error(&low);
+        let (estate, msg) = friendly_error(&low, crate::i18n::locale());
         st.state = estate.into();
         if estate == "error" {
             err_msg = Some(msg.clone());
@@ -2657,7 +2694,7 @@ fn update_obs_stats(app: &AppHandle, stats: engine::ObsStats) {
     }
 }
 
-/// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado (§14.2).
+/// Para o supervisor e mata FFmpeg + MediaMTX (e suas árvores), zerando o estado.
 pub fn kill_engine(app: &AppHandle) {
     stop_engine_internal(app, None, "user");
 }
@@ -2674,11 +2711,12 @@ pub fn kill_engine_for_shutdown(app: &AppHandle) {
 fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
     use std::sync::atomic::Ordering;
     let state = app.state::<AppState>();
-    let (children, session_path, out, telemetry_end, target_transitions) = {
+    let (children, session_path, out, telemetry_end, target_transitions, _cleanup_activity) = {
         let mut eng = state.engine.lock().unwrap();
         if !eng.live {
             return;
         }
+        let cleanup_activity = eng.begin_pending_activity();
         eng.live = false;
         log::info!(
             "motor: encerrando{}",
@@ -2756,6 +2794,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
             out,
             (was_live, operation_id, duration, reconnect_count),
             target_transitions,
+            cleanup_activity,
         )
     };
     // Emite o estado final JÁ (a UI responde na hora), ANTES do taskkill pesado.
@@ -2933,7 +2972,7 @@ pub async fn record_pick_dir(app: AppHandle) -> Option<String> {
 /// da numeração onde a pasta parou, então retomar nunca sobrescreve o que já foi gravado.
 #[tauri::command]
 pub fn record_retry(app: AppHandle, state: State<AppState>) -> Result<(), String> {
-    let (launch, running) = {
+    let (launch, running, activity) = {
         let eng = state.engine.lock().unwrap();
         if !eng.live {
             return Err(Msg::RecordRetryNotLive.now());
@@ -2943,7 +2982,11 @@ pub fn record_retry(app: AppHandle, state: State<AppState>) -> Result<(), String
         if eng.ffmpegs.contains_key(recorder::RECORDER_KEY) {
             return Err(Msg::RecordRetryAlreadyRunning.now());
         }
-        (eng.recorder_launch.clone(), eng.running.clone())
+        (
+            eng.recorder_launch.clone(),
+            eng.running.clone(),
+            eng.begin_pending_activity(),
+        )
     };
     let launch = launch.ok_or_else(|| Msg::RecordRetryUnavailable.now())?;
     log::info!("gravação: retomada manual pedida pelo streamer");
@@ -2954,11 +2997,12 @@ pub fn record_retry(app: AppHandle, state: State<AppState>) -> Result<(), String
         launch.session_path,
         launch.id,
         running,
+        activity,
     ));
     Ok(())
 }
 
-/// Grava 5s de barras e devolve o caminho — o teste do §9.2 do doc.
+/// Grava cinco segundos de barras para testar a captura e devolve o caminho.
 ///
 /// Vale mais que qualquer outra mitigação: em um clique valida pasta, escrita, espaço,
 /// FFmpeg, remux, escopo do asset, CSP, codec e player. Converte quase toda falha de
@@ -3401,15 +3445,11 @@ pub fn export_diagnostics(
 
 /// (Re)registra o atalho global de começar/parar.
 #[tauri::command]
-pub fn register_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-    let gs = app.global_shortcut();
-    let _ = gs.unregister_all();
-    let sc = shortcut.trim();
-    if !sc.is_empty() {
-        gs.register(sc).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+pub fn register_shortcut(
+    app: AppHandle,
+    shortcut: String,
+) -> Result<(), crate::shortcut::ShortcutError> {
+    crate::shortcut::register(&app, &shortcut)
 }
 
 /// Check-up do OBS (acessível? apontando pra Corneta? resolução/fps).
@@ -3697,11 +3737,7 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
         return Ok(false);
     };
     let pb = p.into_path().map_err(|e| e.to_string())?;
-    const MAX_IMPORT_BYTES: u64 = 2 * 1024 * 1024;
-    if std::fs::metadata(&pb).map_err(|e| e.to_string())?.len() > MAX_IMPORT_BYTES {
-        return Err(Msg::ConfigImportTooBig.now());
-    }
-    let content = std::fs::read_to_string(pb).map_err(|e| e.to_string())?;
+    let content = config::read_config_file(&pb).map_err(|e| e.to_string())?;
     let cfg: AppConfig = serde_json::from_str(&content)
         .map_err(|e| Msg::ConfigImportInvalidJson { e: &e.to_string() }.now())?;
     let mut cfg = cfg.validate_and_normalize()?;
@@ -3715,9 +3751,45 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     }
     cfg.revision = config::load(&app).revision.saturating_add(1);
     config::save(&app, &cfg)?;
+    crate::apply_native_language(&app, &cfg.settings.language);
     refresh_secret_presence(&app, &mut cfg);
     let _ = app.emit("config://changed", &cfg);
     Ok(true)
+}
+
+#[cfg(test)]
+mod supervisor_wait_tests {
+    use super::supervisor_wait;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn stopped_supervisors_do_not_resume_retry_work() {
+        let running = AtomicBool::new(false);
+        assert!(!supervisor_wait(&running, Duration::from_secs(60)).await);
+        running.store(true, Ordering::Relaxed);
+        let (resumed, ()) =
+            tokio::join!(supervisor_wait(&running, Duration::from_millis(5)), async {
+                tokio::task::yield_now().await;
+                running.store(false, Ordering::Relaxed);
+            });
+        assert!(!resumed);
+    }
+
+    #[tokio::test]
+    async fn independent_timers_keep_runtime_free_and_allow_retry() {
+        let running = AtomicBool::new(true);
+        let retry = AtomicBool::new(false);
+        let (first, second, ()) = tokio::join!(
+            supervisor_wait(&running, Duration::from_millis(2)),
+            supervisor_wait(&running, Duration::from_millis(2)),
+            async {
+                tokio::task::yield_now().await;
+                retry.store(true, Ordering::Relaxed);
+            }
+        );
+        assert!(first && second && retry.load(Ordering::Relaxed));
+    }
 }
 
 #[cfg(test)]

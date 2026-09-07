@@ -75,10 +75,9 @@ ${STEPS.map((s, i) => `${i + 1}. **${s.title}** — ${s.text}`).join("\n")}
 
 ## Plataformas
 
-Prontas no app: Twitch, YouTube, Kick, Facebook e qualquer servidor RTMP ou
-RTMPS personalizado. Experimentais, porque dependem de liberação da própria
-plataforma: TikTok, Instagram e X. Até agora, a Twitch é a plataforma com
-transmissão real documentada de ponta a ponta.
+${t("chrome.llms.platforms.body")}
+
+${t("steps.platforms.note.validation")}
 
 ## Perguntas frequentes
 

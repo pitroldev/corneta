@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   BarChart3,
-  Bell,
   Check,
   CircleDollarSign,
   Crop,
@@ -15,7 +14,6 @@ import {
   Layers,
   Loader2,
   Lock,
-  Menu,
   MessageSquare,
   Minimize2,
   Minus,
@@ -39,37 +37,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// ============================================================
-// Os ícones da LP são os MESMOS do app: lucide-react.
-// ============================================================
-// Antes eram trinta `<path>` desenhados à mão "no espírito dos lucide". Isso
-// tem três problemas que nenhum deles é estética:
-//
-//  1. Desenho à mão não tem grade. Cada ícone nascia com peso de traço, raio de
-//     canto e área ótica um pouquinho diferentes — e é exatamente essa diferença
-//     que faz um conjunto parecer amador quando os ícones se encontram na mesma
-//     linha.
-//  2. O app já usa lucide (`src/`, mesma versão). Duas linguagens de ícone entre
-//     o produto e a página que vende o produto é a mesma inconsistência que a
-//     gente evita nos tokens de cor.
-//  3. Ícone novo virava desenho novo. Agora é um import.
-//
-// MARCA CONTINUA SENDO MARCA: o logo do Windows, os das plataformas, o do OBS e
-// o megafone da Corneta NÃO vêm daqui — lucide não tem (nem deve ter) logotipo.
-// Esses moram em `decor.tsx` com os traçados oficiais do simple-icons, que é a
-// fonte de verdade dessas marcas.
-//
-// CONTRATO DE PINTURA: ícone de interface na LP é TRAÇO, nunca preenchido.
-// Lucide é desenhado assim; um `fill` por cima transforma o "i" do Info numa
-// bolinha sólida e o cifrão da moeda em disco.
-//
-// Duas exceções, e as duas têm motivo: LOGOTIPO (que é forma cheia por
-// definição) e o par PLAY/PAUSA — são formas fechadas, e num botão de transporte
-// o triângulo vazado lê como controle desligado.
-//
-// Todos entram decorativos (`aria-hidden`): quem carrega o significado é o texto
-// ao lado. E nenhum define tamanho — quem dimensiona é o bloco que o usa, pelo
-// CSS, como já era antes.
+// Ícones de interface usam Lucide, sem fill e com tamanho definido pelo consumidor.
+// Marcas mantêm seus traçados próprios; transporte pode usar formas preenchidas.
+// Ícones são decorativos: texto/controle externo fornece o nome acessível.
 
 function wrap(Base: LucideIcon) {
   return function Icon() {
@@ -77,9 +47,7 @@ function wrap(Base: LucideIcon) {
   };
 }
 
-/** Logo do Windows — marca, não ícone de interface. Traçado do simple-icons
- *  (CC0), o mesmo catálogo que o app usa pras plataformas. Preenchido, e é o
- *  único lugar da LP onde `fill-current` num ícone continua certo. */
+/** Marca Windows: traçado do catálogo simple-icons (CC0), com preenchimento. */
 export function WindowsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -89,7 +57,6 @@ export function WindowsIcon() {
 }
 
 export const ArrowIcon = wrap(ArrowRight);
-export const BellIcon = wrap(Bell);
 export const BoltIcon = wrap(Zap);
 export const ChatIcon = wrap(MessageSquare);
 export const CheckIcon = wrap(Check);
@@ -107,7 +74,6 @@ export const LayersIcon = wrap(Layers);
 export const LoaderIcon = wrap(Loader2);
 export const LockIcon = wrap(Lock);
 export const MaximizeIcon = wrap(Square);
-export const MenuIcon = wrap(Menu);
 export const MinimizeIcon = wrap(Minus);
 export const MonitorIcon = wrap(MonitorPlay);
 export const PauseIcon = wrap(Pause);
@@ -115,8 +81,6 @@ export const PlayIcon = wrap(Play);
 export const PopoutIcon = wrap(PictureInPicture2);
 export const PowerIcon = wrap(Power);
 export const RadioIcon = wrap(Radio);
-/** Raid é gente chegando de uma vez — o desenho anterior era uma seta batendo
- *  numa parede, que lê como "importar". */
 export const RaidIcon = wrap(Users);
 export const ReportIcon = wrap(BarChart3);
 export const SaveIcon = wrap(Save);

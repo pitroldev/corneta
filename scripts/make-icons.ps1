@@ -1,5 +1,5 @@
-# Gera os ícones da Corneta (placeholder: megafone âmbar sobre fundo escuro).
-# Substitua depois por um logo definitivo (ex.: `pnpm tauri icon logo.png`).
+# Gera os ícones versionados da Corneta: megafone âmbar sobre fundo escuro.
+# Mudanças exigem revisão visual e atualização do inventário em docs/MATERIAIS-PUBLICOS.md.
 Add-Type -AssemblyName System.Drawing
 
 $outDir = Join-Path $PSScriptRoot '..\src-tauri\icons'

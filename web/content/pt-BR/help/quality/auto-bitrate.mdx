@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta auto-bitrate controller
     kind: internal
     repoPath: src-tauri/src/engine.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: Corneta auto-bitrate setting
     kind: internal
     repoPath: src-tauri/src/config.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/operations/corneta-live-safety-settings.webp
     originalPath: assets/originals/operations/corneta-live-safety-settings.png
@@ -65,14 +65,11 @@ Quando o envio aperta, a Corneta desce o bitrate de uma saída recodificada e te
 
 ## Quando não atua
 
-- destino em **Na lata** ou em cópia dentro do **Esperto**;
-- falta total de internet;
-- problema de renderização no OBS;
-- encoder sobrecarregado;
-- chave ou URL inválida;
-- plataforma fora do ar.
+O ajuste não atua em destinos no modo **Na lata** nem em cópia dentro do **Esperto**. Neles, o vídeo já chega codificado. Para reduzir essa saída, baixe o bitrate no software de transmissão ou mude o destino para recodificação.
 
-Na cópia, os pacotes já chegam prontos. Para reduzir essa saída, baixe o bitrate no software de transmissão ou mude o destino para recodificação.
+## O que o ajuste não resolve sozinho
+
+O controlador observa se a saída acompanha o ritmo da live; uma saída lenta não prova que a causa seja a internet. Reduzir o bitrate não corrige chave ou URL inválida, não recupera uma plataforma fora do ar nem restabelece uma conexão perdida. Também não garante resolver sobrecarga do encoder ou problemas de renderização no OBS: nesses casos, confira a carga e as configurações da máquina.
 
 ## Como confirmar
 

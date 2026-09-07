@@ -19,7 +19,6 @@ pub const KEEP: usize = 50;
 pub const MAX_SESSION_BYTES: u64 = 32 * 1024 * 1024;
 /// Teto PRÓPRIO do arquivo de chat (~100 mil mensagens). Separado do teto das métricas de
 /// propósito: uma live movimentada não pode gastar o orçamento do relatório com texto.
-/// Ver docs/FEATURE-GRAVACAO-E-REPLAY.md §3.3.
 pub const MAX_CHAT_BYTES: u64 = 16 * 1024 * 1024;
 /// v2: amostra ganhou `chatBy` (chat por canal) e o alerta ganhou `source`.
 /// v3: gravação de vídeo (`recording`/`recSync`/`recEnd`), chat em arquivo irmão,
@@ -65,7 +64,7 @@ pub fn is_session_file(path: &Path) -> bool {
 
 /// Nome de arquivo de gravação → (id da sessão, nº do segmento).
 ///
-/// Este reconhecedor é a TRAVA DE SEGURANÇA da poda (§7 do doc): a pasta de vídeo é
+/// Este reconhecedor é a TRAVA DE SEGURANÇA da poda: a pasta de vídeo é
 /// escolhida pelo streamer e pode ser a mesma onde o OBS grava, ou a raiz de um HD com
 /// dez anos de coisa. Só o que casa `<13+ dígitos>.mp4` ou `<13+ dígitos>.pN.mp4` é
 /// candidato — nada de varrer por extensão, nada de "apagar o mais antigo da pasta".

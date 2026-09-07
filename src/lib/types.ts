@@ -17,7 +17,7 @@ export type Protocol = "rtmp" | "rtmps";
 /** O que o relay faz com cada destino. */
 export type EncodingAction = "copy" | "transcode";
 
-/** Modo global de encoding (ver PLANEJAMENTO.md §8). */
+/** Modo global de encoding. */
 export type EncodingMode = "per-platform" | "passthrough" | "hybrid";
 
 /** Encoders de hardware suportados. */
@@ -401,6 +401,7 @@ export interface EngineSnapshot {
   obs?: ObsStats;
   /** "JÁ VOLTO agora" manual acionado pelo streamer (botão na sala de guerra). */
   forcedBrb?: boolean;
+  guardianStatus?: "starting" | "ready" | "unavailable";
 }
 
 export interface EncoderInfo {

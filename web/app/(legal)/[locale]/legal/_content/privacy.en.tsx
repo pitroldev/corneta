@@ -386,11 +386,20 @@ export function PrivacyBodyEn() {
           flight.
         </p>
         <p>
-          Uninstalling the app, deleting the config file and removing the
-          credentials from the system vault erases local data. Telemetry events
+          Uninstalling the app does not guarantee removal of credentials or all
+          local data. Before uninstalling, disconnect your accounts in Corneta
+          and revoke access on the platforms. To check remaining credentials,
+          open Windows Credential Manager and remove only entries identified as
+          Corneta (service <code>br.com.pitroldev.corneta</code>); do not delete
+          other apps’ credentials. If the app reports a failure when
+          disconnecting, cleanup may be incomplete.
+        </p>
+        <p>
+          Settings, reports, recordings and exported copies are separate data:
+          review the locations you use before removing them. Telemetry events
           sent before then follow the period in section 11; to request earlier
-          deletion, use the UUID shown in Settings and the channel in section
-          13.
+          deletion, note the UUID shown in Settings before removing local data
+          and use the channel in section 13.
         </p>
       </LegalSection>
 
@@ -506,8 +515,10 @@ export function PrivacyBodyEn() {
           >
             myaccount.google.com/permissions
           </a>
-          . Revocation takes effect immediately; whatever is in your machine’s
-          vault goes away when you uninstall the app.
+          . Revoking platform access and deleting local credentials are separate
+          actions. Also disconnect the account in Corneta; uninstalling does not
+          guarantee that vault entries are deleted. See section 6 for local
+          cleanup guidance.
         </Callout>
       </LegalSection>
 

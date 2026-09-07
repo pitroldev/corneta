@@ -14,8 +14,8 @@ intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -38,7 +38,7 @@ sources:
   - title: Corneta encoder detection
     kind: internal
     repoPath: src-tauri/src/commands.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -57,12 +57,12 @@ images:
 
 ## Escolha pelo hardware que existe
 
-| Encoder | Onde roda | Quando começar por ele |
-| --- | --- | --- |
-| NVENC | bloco dedicado de GPUs NVIDIA | máquina com NVIDIA compatível |
-| QSV | vídeo integrado Intel | Intel com Quick Sync exposto ao sistema |
-| AMF | encoder de GPUs AMD | máquina com AMD compatível |
-| x264 | CPU | sem hardware disponível ou CPU com folga medida |
+| Encoder | Onde roda                     | Quando começar por ele                          |
+| ------- | ----------------------------- | ----------------------------------------------- |
+| NVENC   | bloco dedicado de GPUs NVIDIA | máquina com NVIDIA compatível                   |
+| QSV     | vídeo integrado Intel         | Intel com Quick Sync exposto ao sistema         |
+| AMF     | encoder de GPUs AMD           | máquina com AMD compatível                      |
+| x264    | CPU                           | sem hardware disponível ou CPU com folga medida |
 
 O OBS recomenda hardware encoder em máquinas modernas porque tira trabalho da CPU e usa um bloco feito para vídeo. Gerações antigas podem entregar imagem pior no mesmo bitrate; teste a placa real, não apenas o nome da família.
 

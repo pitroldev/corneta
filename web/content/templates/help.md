@@ -1,6 +1,8 @@
 # Template: help
 
-Copie para `{locale}/help/{english-category}/{english-slug}.mdx`.
+Crie `{locale}/help/{english-category}/{english-slug}.mdx` com o conteúdo do
+bloco YAML abaixo, sem as cercas de código, começando por `---`. Escreva o corpo
+depois do segundo `---`; não copie o título e as instruções deste template.
 
 ```yaml
 ---
@@ -15,9 +17,8 @@ category: getting-started
 slug: english-slug
 status: draft
 intent: support
-author: Petro Cardoso
-reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
+reviewedAt: 2026-08-01
 productVersion: 0.6.0
 testedWith: []
 reviewIntervalDays: 90
@@ -28,6 +29,11 @@ sources: []
 images: []
 ---
 ```
+
+As datas e versões são exemplos. Antes de publicar, substitua-as por evidência
+real e preencha `publishedAt`, `author` e `reviewedBy`, seguindo o
+[contrato de autoria](../README.md#identidade-e-autoria). Não atribua uma revisão
+antes que ela aconteça.
 
 Ordem do corpo:
 

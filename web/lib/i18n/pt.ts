@@ -83,7 +83,7 @@ export const pt = {
   "chrome.llms.notis.4":
     "- Não tem versão para macOS ou Linux até agora, e não há data pública.",
   "chrome.llms.platforms.body":
-    "Prontas no app: Twitch, YouTube, Kick, Facebook e qualquer servidor RTMP ou\nRTMPS personalizado. Experimentais, porque dependem de liberação da própria\nplataforma: TikTok, Instagram e X. Até agora, a Twitch é a plataforma com\ntransmissão real documentada de ponta a ponta.",
+    "Disponíveis no app: Twitch, YouTube, Kick, Facebook e destinos RTMP ou\nRTMPS personalizados. TikTok, Instagram e X são experimentais: o acesso depende\nda liberação da própria plataforma.",
   "chrome.manifest.description":
     "Multistream local para streamers, com saídas independentes e controle no seu PC.",
   "chrome.manifest.lang": "pt-BR",
@@ -200,7 +200,7 @@ export const pt = {
   "content.features.post_live_report":
     "Relatório pós-live com audiência, chat, alertas e seguidores por canal, comparação com a live anterior e exportação em HTML, CSV e JSON",
   "content.features.privacy_guard":
-    "Guardião de privacidade: lê o que está indo ao ar e corta para o “JÁ VOLTO” se um dado seu aparecer na tela",
+    "Guardião experimental: procura os termos que você listou e cobre o vídeo com “JÁ VOLTO” ao detectar um deles ou quando a leitura falha; não censura o áudio",
   "content.features.quality_modes":
     "Três modos de qualidade — copiar o sinal, converter só o que precisa ou converter tudo",
   "content.features.report_per_channel":
@@ -581,9 +581,9 @@ export const pt = {
   "protection.guard.bitrate.switch": "ligado por padrão",
   "protection.guard.bitrate.title": "Auto-bitrate",
   "protection.guard.privacy.body":
-    "Você lista os termos que não podem vazar — e-mail, nome real, endereço. Se um deles aparece na tela, a Corneta corta pro “JÁ VOLTO” antes de ir ao ar.",
+    "Você lista os termos que não podem vazar — e-mail, nome real, endereço. Ao detectar um deles, a Corneta cobre o vídeo com “JÁ VOLTO”. Durante a preparação, ou se a leitura falhar ou ficar atrasada, as imagens não verificadas também ficam cobertas. O vídeo volta automaticamente quando a leitura se recupera e não encontra um termo listado.",
   "protection.guard.privacy.cost":
-    "Custa 12s de atraso na live inteira (o chat também). Rede de segurança, não garantia.",
+    "Adiciona 12s de atraso à transmissão. É experimental: pode deixar passar termos e não censura o áudio, que continua sendo transmitido.",
   "protection.guard.privacy.switch": "experimental",
   "protection.guard.privacy.title": "Guardião de privacidade",
   "protection.kicker": "Rede de proteção",
@@ -679,7 +679,7 @@ export const pt = {
     "Dá pra usar só colando a chave de transmissão. Mas se você conectar a conta, o app faz o trabalho chato sozinho: cria a live, pega a chave e traz o chat. Aqui está exatamente o que cada permissão serve.",
   "steps.accounts.privacy.link": "política de privacidade",
   "steps.accounts.privacy.text":
-    "Os tokens de acesso ficam no cofre de credenciais do Windows, na sua máquina — não em servidor nosso, porque não existe conta Corneta nem banco de dados de usuário. Dá pra revogar o acesso a qualquer momento na própria plataforma, e desinstalar o app apaga o que ficou no cofre. Os detalhes estão na",
+    "Os tokens de acesso ficam guardados no cofre de credenciais do Windows, na sua máquina. Antes de remover o app, desconecte suas contas na Corneta e revogue o acesso nas plataformas. Desinstalar não garante apagar o cofre. Veja como conferir as credenciais locais e os detalhes de cada fluxo na",
   "steps.accounts.title": "O que a Corneta pede — e o que ela faz com isso.",
   "steps.badge.golive": "BORA AO VIVO",
   "steps.golive.connecting": "conectando",
@@ -711,7 +711,7 @@ export const pt = {
   "steps.platforms.note.experimental.text":
     "A entrada depende de liberação e de fluxos das próprias plataformas, então podem simplesmente não funcionar para a sua conta.",
   "steps.platforms.note.validation":
-    "Até aqui, a Twitch é a plataforma com transmissão real documentada de ponta a ponta. As outras estão implementadas no app e seguem em validação pública.",
+    "Teste cada destino com a sua conta e configuração antes de uma live importante. Ter a plataforma no app não garante que ela aceite a transmissão.",
   "steps.platforms.title":
     "As quatro grandes prontas, e o resto por sua conta.",
   "steps.title": "Você entra ao vivo em três passos.",

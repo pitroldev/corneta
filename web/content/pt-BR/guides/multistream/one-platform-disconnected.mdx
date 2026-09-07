@@ -14,8 +14,8 @@ intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta independent target engine
     kind: internal
     repoPath: src-tauri/src/engine.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: Corneta target controls
     kind: internal
     repoPath: src/screens/GoLiveScreen.tsx
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/multistream/corneta-platform-destinations.webp
     originalPath: assets/originals/multistream/corneta-platform-destinations.png
@@ -69,15 +69,16 @@ Na tela **Ao vivo**, veja se Twitch, YouTube ou Kick continuam em **NO AR** enqu
 
 ## Como ler o resultado
 
-| Resultado | Causa provável | Próxima ação |
-| --- | --- | --- |
-| Servidor não responde | rota, DNS, firewall ou indisponibilidade | tente o ingest oficial alternativo |
-| Conecta e cai em seguida | chave, codec ou limite da plataforma | revise credenciais e preset |
-| Bitrate oscila só ali | rota até aquele ingest | troque o servidor do destino |
-| Todas começam a perder juntas | upload local saturado | reduza soma dos bitrates |
+| Resultado                     | Causa provável                           | Próxima ação                       |
+| ----------------------------- | ---------------------------------------- | ---------------------------------- |
+| Servidor não responde         | rota, DNS, firewall ou indisponibilidade | tente o ingest oficial alternativo |
+| Conecta e cai em seguida      | chave, codec ou limite da plataforma     | revise credenciais e preset        |
+| Bitrate oscila só ali         | rota até aquele ingest                   | troque o servidor do destino       |
+| Todas começam a perder juntas | upload local saturado                    | reduza soma dos bitrates           |
 
 <Callout label="Não cole chave em chamado" tone="important">
-  Se a plataforma mandou resetar a stream key, atualize o cofre da Corneta. Não envie a chave por print, chat ou diagnóstico.
+  Se a plataforma mandou resetar a stream key, atualize o cofre da Corneta. Não
+  envie a chave por print, chat ou diagnóstico.
 </Callout>
 
 O passo a passo operacional está em [uma plataforma vive reconectando](/help/troubleshooting/platform-reconnecting).

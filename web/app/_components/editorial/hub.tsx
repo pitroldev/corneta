@@ -216,42 +216,6 @@ export function EditorialCategorySection({
   );
 }
 
-export function EditorialCategoryGrid({ children }: { children: ReactNode }) {
-  return <div className="editorial-category-grid">{children}</div>;
-}
-
-export function EditorialCategoryCard({
-  href,
-  title,
-  description,
-  label,
-  countLabel,
-}: {
-  href: string;
-  title: string;
-  description: string;
-  label?: string;
-  countLabel?: string;
-}) {
-  return (
-    <article className="editorial-category-card">
-      <Link href={href} className="editorial-category-card__link">
-        {label ? (
-          <span className="editorial-category-card__label">{label}</span>
-        ) : null}
-        <h3>{title}</h3>
-        <p>{description}</p>
-        {countLabel ? (
-          <span className="editorial-category-card__count">{countLabel}</span>
-        ) : null}
-        <span className="editorial-category-card__arrow" aria-hidden="true">
-          →
-        </span>
-      </Link>
-    </article>
-  );
-}
-
 export function EditorialCardGrid({ children }: { children: ReactNode }) {
   return <div className="editorial-card-grid">{children}</div>;
 }

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { EDITORIAL_ASSET_MAX_BYTES } from "../lib/editorial/constants";
+import { editorialArguments, isEditorialCliEntrypoint } from "./editorial-cli";
 
 type Options = {
   input: string;
@@ -14,11 +15,12 @@ type Options = {
 
 function fail(message: string): never {
   throw new Error(
-    `${message}\n\nUso: pnpm content:image -- --input assets/originals/<path>.png --output images/editorial/<path>.webp [--width 1600] [--quality 82] [--force]`,
+    `${message}\n\nUso: pnpm content:image --input assets/originals/<path>.png --output images/editorial/<path>.webp [--width 1600] [--quality 82] [--force]`,
   );
 }
 
-function parseArgs(argv: string[]): Options {
+export function parseArgs(args: string[]): Options {
+  const argv = editorialArguments(args);
   const values = new Map<string, string>();
   let force = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -27,7 +29,9 @@ function parseArgs(argv: string[]): Options {
       force = true;
       continue;
     }
-    if (!key?.startsWith("--")) fail(`Argumento desconhecido: ${key ?? ""}`);
+    if (!["--input", "--output", "--width", "--quality"].includes(key)) {
+      fail(`Argumento desconhecido: ${key ?? ""}`);
+    }
     const value = argv[index + 1];
     if (!value || value.startsWith("--")) fail(`Valor ausente para ${key}`);
     values.set(key, value);
@@ -147,9 +151,11 @@ async function main() {
   );
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  );
-  process.exitCode = 1;
-});
+if (isEditorialCliEntrypoint(import.meta.url)) {
+  main().catch((error: unknown) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}

@@ -1,5 +1,5 @@
 //! Motor de relay: monta o comando FFmpeg a partir da config (decode-once → encode-N),
-//! supervisiona o sidecar e emite status para a UI. Ver PLANEJAMENTO.md §8 e §14.2/§14.3.
+//! supervisiona o sidecar e emite status para a UI.
 use crate::config::{AppConfig, Reframe, Target, VideoPreset};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -377,7 +377,6 @@ pub const GUARD_DELAY_SEC: u32 = 12;
 // O vídeo passa CRU por uma bomba no nosso processo e a saída (encoder → `_program`) nunca
 // para: sinal caiu → a bomba injeta o slate "JÁ VOLTO" + silêncio NO MESMO fluxo, sem trocar
 // processo — a conexão com as plataformas não cai. O guardião roda em cima disto (delay+OCR).
-// Ver docs/FEATURE-PROTETOR-BUFFER.md.
 
 /// Áudio do programa: sempre s16le 48 kHz estéreo (a bomba alinha vídeo e áudio por tick).
 pub const PROG_AUDIO_HZ: u32 = 48_000;
@@ -725,6 +724,8 @@ pub struct EngineSnapshot {
     pub obs: Option<ObsStats>,
     /// "JÁ VOLTO agora" acionado pelo streamer (slate manual, sem queda de sinal).
     pub forced_brb: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardian_status: Option<crate::guardian::GuardianStatus>,
 }
 
 /// Estatísticas do OBS via obs-websocket `GetStats`/`GetStreamStatus`.
@@ -754,6 +755,7 @@ impl EngineSnapshot {
             memory_pct: None,
             obs: None,
             forced_brb: false,
+            guardian_status: None,
         }
     }
 
@@ -796,6 +798,13 @@ impl EngineSnapshot {
             memory_pct: None,
             obs: None,
             forced_brb: false,
+            guardian_status: (config.settings.guardian_enabled
+                && config
+                    .settings
+                    .guardian_watchlist
+                    .iter()
+                    .any(|term| term.trim().chars().count() >= 3))
+            .then_some(crate::guardian::GuardianStatus::Starting),
         }
     }
 }
@@ -924,6 +933,12 @@ pub struct EngineRuntime {
     /// ATOMICAMENTE sob o lock no topo do start (antes de qualquer trabalho lento) e solta por
     /// kill_engine/erro fatal — impede TOCTOU (dois cliques em BORA subindo dois motores).
     pub live: bool,
+    /// Held by the native updater from download through installer/restart.
+    /// Startup checks this under the same engine mutex, before any side effects.
+    pub update_in_progress: bool,
+    /// Cleanup/setup/recording tasks may outlive `live` and the registered children.
+    /// Reserve under the engine mutex before exposing stopped state or spawning work.
+    pub pending_activity: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     /// Liga/desliga os supervisores de respawn (reconexão).
     pub running: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub snapshot: Option<EngineSnapshot>,
@@ -973,10 +988,105 @@ pub struct EngineRuntime {
     pub telemetry_last_error_operation_id: Option<String>,
 }
 
+/// Keeps native installation excluded until background work (including remux) ends.
+/// Dropping a cancelled or unpolled task releases its reservation without engine locking.
+#[must_use = "Keep the activity guard alive until all reserved work finishes"]
+pub struct EngineActivityGuard {
+    pending: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl EngineRuntime {
+    /// Call only while holding the engine mutex, before releasing/spawning the work.
+    pub fn begin_pending_activity(&self) -> EngineActivityGuard {
+        self.pending_activity
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        EngineActivityGuard {
+            pending: self.pending_activity.clone(),
+        }
+    }
+}
+
+impl Drop for EngineActivityGuard {
+    fn drop(&mut self) {
+        self.pending
+            .fetch_sub(1, std::sync::atomic::Ordering::Release);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::{IngestConfig, Settings, TargetEncoding};
+
+    #[test]
+    fn pending_activity_outlives_stopped_state_until_every_owner_finishes() {
+        use std::sync::atomic::Ordering;
+        use std::sync::Mutex;
+
+        let engine = Mutex::new(EngineRuntime::default());
+        let (cleanup, recording, pending) = {
+            let mut runtime = engine.lock().unwrap();
+            runtime.live = true;
+            let cleanup = runtime.begin_pending_activity();
+            let recording = runtime.begin_pending_activity();
+            runtime.live = false;
+            runtime.snapshot = Some(EngineSnapshot::stopped());
+            (cleanup, recording, runtime.pending_activity.clone())
+        };
+        assert_eq!(pending.load(Ordering::Acquire), 2);
+        drop(cleanup);
+        assert_eq!(pending.load(Ordering::Acquire), 1);
+        drop(recording);
+        assert_eq!(pending.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn unpolled_activity_is_reserved_and_released_when_cancelled() {
+        use std::sync::atomic::Ordering;
+        use std::sync::Mutex;
+
+        let engine = Mutex::new(EngineRuntime::default());
+        let (activity, pending) = {
+            let runtime = engine.lock().unwrap();
+            (
+                runtime.begin_pending_activity(),
+                runtime.pending_activity.clone(),
+            )
+        };
+        let task = async move {
+            let _activity = activity;
+            std::future::pending::<()>().await;
+        };
+        assert_eq!(pending.load(Ordering::Acquire), 1);
+        drop(task);
+        assert_eq!(pending.load(Ordering::Acquire), 0);
+    }
+
+    #[tokio::test]
+    async fn aborting_pending_activity_releases_its_reservation() {
+        use std::sync::atomic::Ordering;
+        use std::sync::Mutex;
+
+        let engine = Mutex::new(EngineRuntime::default());
+        let (activity, pending) = {
+            let runtime = engine.lock().unwrap();
+            (
+                runtime.begin_pending_activity(),
+                runtime.pending_activity.clone(),
+            )
+        };
+        let (ready, waiting) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            let _activity = activity;
+            ready.send(()).unwrap();
+            std::future::pending::<()>().await;
+        });
+        waiting.await.unwrap();
+        assert_eq!(pending.load(Ordering::Acquire), 1);
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert_eq!(pending.load(Ordering::Acquire), 0);
+    }
 
     fn preset(w: u32, h: u32, fps: u32, vb: u32) -> VideoPreset {
         VideoPreset {

@@ -49,30 +49,6 @@ export default tseslint.config(
     },
   },
   {
-    // These callbacks execute through CDP in the disposable browser, not Node.
-    files: ["scripts/smoke-reports.mjs"],
-    languageOptions: {
-      globals: Object.fromEntries(
-        [
-          "window",
-          "document",
-          "location",
-          "localStorage",
-          "requestAnimationFrame",
-          "cancelAnimationFrame",
-          "navigator",
-          "getComputedStyle",
-          "Worker",
-          "Event",
-          "KeyboardEvent",
-          "MouseEvent",
-          "HTMLElement",
-          "HTMLInputElement",
-        ].map((name) => [name, "readonly"]),
-      ),
-    },
-  },
-  {
     files: ["src/**/*.{ts,tsx}"],
     languageOptions: {
       globals: {

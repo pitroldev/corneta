@@ -19,9 +19,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   // Mesmo filtro do aria-live do App: o chip e o anúncio contam as mesmas plataformas.
   const down = useStore((s) => downTargets(s.snapshot));
   const viewersTotal = useStore((s) => s.viewers.total);
-  const guardianOn = useStore(
-    (s) => s.config?.settings.guardianEnabled ?? false,
-  );
+  const guardianOn = useStore((s) => s.snapshot.guardianStatus === "ready");
   const brbOn = useStore((s) => s.config?.settings.brbEnabled ?? false);
   const autoBitrateOn = useStore(
     (s) => s.config?.settings.autoBitrate ?? false,

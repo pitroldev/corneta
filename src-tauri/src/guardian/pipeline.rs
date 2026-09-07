@@ -7,15 +7,15 @@
 //! sai (N s depois), o compositor já sabe se dá slate → preventivo. O atraso do OCR fica
 //! escondido pelo buffer, e o diff pula quadros que não mudaram (barato em tela estática).
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use super::domain::{self, Timeline};
 use super::ocr::build_ocr;
-use super::Ocr;
+use super::{GuardianStatus, Ocr};
 
 // Diff (pra pular OCR): resolução pequena + limiares. Sensível de propósito (erra pra MAIS OCR) —
 // pega até um termo curto aparecendo, pra não depender da rede de segurança.
@@ -38,16 +38,72 @@ pub(crate) struct Shared {
     scan_pool: Mutex<Option<Vec<u8>>>,
     /// Linha do tempo binária "tinha segredo no quadro X?".
     pub(crate) timeline: Mutex<Timeline>,
+    failed: AtomicBool,
+    status: AtomicU8,
 }
 
 impl Shared {
     pub(crate) fn new() -> Self {
+        let mut timeline = Timeline::new();
+        timeline.start_verification();
         Shared {
             scan_slot: Mutex::new(None),
             scan_ready: Condvar::new(),
             scan_pool: Mutex::new(None),
-            timeline: Mutex::new(Timeline::new()),
+            timeline: Mutex::new(timeline),
+            failed: AtomicBool::new(false),
+            status: AtomicU8::new(GuardianStatus::Starting as u8),
         }
+    }
+
+    pub(crate) fn publish_status(
+        &self,
+        app: &AppHandle,
+        running: &Arc<AtomicBool>,
+        status: GuardianStatus,
+    ) {
+        if self.status.load(Ordering::Relaxed) == status as u8 {
+            return;
+        }
+        let state = app.state::<crate::AppState>();
+        let mut engine = state.engine.lock().unwrap();
+        // A worker can finish after Stop or after a replacement session starts.
+        if !engine.live
+            || !running.load(Ordering::Relaxed)
+            || !Arc::ptr_eq(&engine.running, running)
+        {
+            return;
+        }
+        if let Some(snapshot) = engine.snapshot.as_mut() {
+            // Serialize the cached value and IPC publication with the same engine lock.
+            // A worker and compositor publishing opposite transitions must not reorder them.
+            if self.status.swap(status as u8, Ordering::Relaxed) == status as u8 {
+                return;
+            }
+            snapshot.guardian_status = Some(status);
+            let _ = app.emit("engine://status", &*snapshot);
+        }
+    }
+
+    pub(crate) fn coverage(&self, index: u64, max_gap: u64) -> (bool, GuardianStatus) {
+        let mut timeline = self.timeline.lock().unwrap();
+        let status = if self.failed.load(Ordering::Relaxed)
+            || (timeline.has_verified() && timeline.unverified(index, max_gap))
+        {
+            GuardianStatus::Unavailable
+        } else if !timeline.has_verified() {
+            GuardianStatus::Starting
+        } else {
+            GuardianStatus::Ready
+        };
+        let censor = timeline.should_censor(index, max_gap);
+        timeline.prune(index.saturating_sub(max_gap + 2));
+        (censor, status)
+    }
+
+    fn mark_failed(&self) {
+        self.timeline.lock().unwrap().record_unavailable();
+        self.failed.store(true, Ordering::Relaxed);
     }
 
     pub(crate) fn offer_scan(&self, idx: u64, gray: &[u8]) {
@@ -101,14 +157,27 @@ pub(crate) fn spawn_ocr(
     h: usize,
 ) {
     tauri::async_runtime::spawn(async move {
-        let app_b = app.clone();
-        match tauri::async_runtime::spawn_blocking(move || build_ocr(&app_b)).await {
-            Ok(ocr) => {
-                tauri::async_runtime::spawn_blocking(move || {
-                    ocr_worker(app, running, shared, watchlist, ocr, w, h)
-                });
-            }
-            Err(e) => log::error!("guardião/OCR: build falhou ({e}) — sem detecção nesta sessão"),
+        let (worker_app, worker_running, worker_shared) =
+            (app.clone(), running.clone(), shared.clone());
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            let ocr = build_ocr(&worker_app);
+            ocr_worker(
+                worker_app,
+                worker_running,
+                worker_shared,
+                watchlist,
+                ocr,
+                w,
+                h,
+            );
+        })
+        .await;
+        if result.is_err() {
+            shared.mark_failed();
+            shared.publish_status(&app, &running, GuardianStatus::Unavailable);
+            log::error!(
+                "guardião/OCR: worker indisponível; imagens não verificadas serão cobertas"
+            );
         }
     });
 }
@@ -164,22 +233,32 @@ fn ocr_worker(
     h: usize,
 ) {
     log::info!("guardião/OCR: {}", ocr.name());
-    let _ = ocr.read_text(&vec![16u8; w * h], w, h); // warmup (paga o JIT)
+    if ocr.read_text(&vec![16u8; w * h], w, h).is_err() {
+        shared.mark_failed();
+        shared.publish_status(&app, &running, GuardianStatus::Unavailable);
+    }
     let watchlist = domain::prepare_watchlist(&watchlist);
     let mut last_small: Vec<u8> = vec![];
     let mut small: Vec<u8> = vec![];
     let mut had_secret = false;
     let mut last_ocr = Instant::now();
     let mut last_diag = Instant::now();
+    let mut last_failure: Option<Instant> = None;
     while running.load(Ordering::Relaxed) {
         let iter = Instant::now();
         let job = shared.take_scan(&running);
         let Some((idx, gray)) = job else {
             continue;
         };
+        // Failure retry is bounded even when every incoming frame changes.
+        if last_failure.is_some_and(|at| at.elapsed() < Duration::from_millis(FORCE_MS)) {
+            shared.recycle_scan(gray);
+            std::thread::sleep(Duration::from_millis(THROTTLE_MS));
+            continue;
+        }
         diff_small_into(&gray, w, h, &mut small);
         // Faz OCR se a tela MUDOU OU se faz tempo demais sem OCR (rede de segurança por tempo).
-        let force = last_ocr.elapsed() >= Duration::from_millis(FORCE_MS);
+        let force = last_failure.is_some() || last_ocr.elapsed() >= Duration::from_millis(FORCE_MS);
         let changed = force || domain::frames_differ(&last_small, &small, DIFF_PIX, DIFF_FRAC);
         std::mem::swap(&mut last_small, &mut small);
         if !changed {
@@ -192,7 +271,22 @@ fn ocr_worker(
             continue;
         }
         let t = Instant::now();
-        let text = ocr.read_text(&gray, w, h);
+        let text = match ocr.read_text(&gray, w, h) {
+            Ok(text) => {
+                last_failure = None;
+                text
+            }
+            Err(error) => {
+                if last_failure.is_none() {
+                    log::warn!("guardião/OCR: leitura indisponível ({error:?})");
+                }
+                last_failure = Some(Instant::now());
+                shared.mark_failed();
+                shared.publish_status(&app, &running, GuardianStatus::Unavailable);
+                shared.recycle_scan(gray);
+                continue;
+            }
+        };
         let leaks = domain::find_prepared_watchlist(&text, &watchlist);
         let secret = !leaks.is_empty();
         last_ocr = Instant::now();
@@ -212,9 +306,17 @@ fn ocr_worker(
             );
         }
         shared.timeline.lock().unwrap().record(idx, secret);
+        shared.failed.store(false, Ordering::Relaxed);
         if secret && !had_secret {
-            for l in &leaks {
-                let _ = app.emit("leak://alert", l.clone());
+            let state = app.state::<crate::AppState>();
+            let engine = state.engine.lock().unwrap();
+            if engine.live
+                && running.load(Ordering::Relaxed)
+                && Arc::ptr_eq(&engine.running, &running)
+            {
+                for l in &leaks {
+                    let _ = app.emit("leak://alert", l.clone());
+                }
             }
         }
         had_secret = secret;
@@ -229,7 +331,34 @@ fn ocr_worker(
 
 #[cfg(test)]
 mod tests {
-    use super::diff_small_into;
+    use super::{diff_small_into, Shared};
+    use crate::guardian::GuardianStatus;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn failed_scan_does_not_clear_a_positive_and_coverage_recovers_by_frame() {
+        let shared = Shared::new();
+        assert_eq!(shared.coverage(0, 90), (true, GuardianStatus::Starting));
+        shared.timeline.lock().unwrap().record(10, true);
+        shared.mark_failed();
+        assert_eq!(shared.coverage(20, 90), (true, GuardianStatus::Unavailable));
+        assert_eq!(
+            shared.coverage(500, 90),
+            (true, GuardianStatus::Unavailable)
+        );
+        // Successful empty OCR is a valid result, but only for the newly verified frame.
+        shared.timeline.lock().unwrap().record(600, false);
+        shared.failed.store(false, Ordering::Relaxed);
+        assert_eq!(
+            shared.coverage(599, 90),
+            (true, GuardianStatus::Unavailable)
+        );
+        assert_eq!(shared.coverage(600, 90), (false, GuardianStatus::Ready));
+        assert_eq!(
+            shared.coverage(691, 90),
+            (true, GuardianStatus::Unavailable)
+        );
+    }
 
     #[test]
     fn diff_resize_preserves_uniform_frame_and_reuses_buffer() {

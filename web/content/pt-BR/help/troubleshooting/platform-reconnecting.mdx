@@ -14,8 +14,8 @@ intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,7 +31,7 @@ sources:
   - title: Corneta independent target reconnect
     kind: internal
     repoPath: src-tauri/src/engine.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: KICK OBS or Streamlabs not connecting
     kind: official
     url: https://help.kick.com/en/articles/14994318-obs-or-streamlabs-not-connecting-to-kick
@@ -66,13 +66,13 @@ images:
 
 ## Escolha o ramo
 
-| Confirmação | Causa provável | Correção |
-| --- | --- | --- |
-| teste do servidor falha | rota, DNS, firewall ou ingest | use endereço oficial alternativo |
-| autentica e cai | chave ou regra da plataforma | resete a chave e revise o preset |
-| bitrate passa do limite | configuração incompatível | reduza apenas aquele destino |
-| painel oficial mostra incidente | plataforma indisponível | mantenha pausado e espere |
-| todas começam a cair | upload local | reduza a soma e teste a rede |
+| Confirmação                     | Causa provável                | Correção                         |
+| ------------------------------- | ----------------------------- | -------------------------------- |
+| teste do servidor falha         | rota, DNS, firewall ou ingest | use endereço oficial alternativo |
+| autentica e cai                 | chave ou regra da plataforma  | resete a chave e revise o preset |
+| bitrate passa do limite         | configuração incompatível     | reduza apenas aquele destino     |
+| painel oficial mostra incidente | plataforma indisponível       | mantenha pausado e espere        |
+| todas começam a cair            | upload local                  | reduza a soma e teste a rede     |
 
 O conector tenta voltar sozinho, mas tentativa repetida não corrige credencial inválida. Se a chave foi resetada, troque também na Corneta.
 

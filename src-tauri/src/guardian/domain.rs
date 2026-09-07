@@ -229,19 +229,56 @@ struct Mark {
 #[derive(Default)]
 pub struct Timeline {
     marks: VecDeque<Mark>,
+    unknown: VecDeque<(u64, Option<u64>)>,
+    verifying: bool,
+    last_verified: Option<u64>,
 }
 
 impl Timeline {
     pub fn new() -> Self {
-        Self {
-            marks: VecDeque::new(),
+        Self::default()
+    }
+
+    /// Until a real frame is read, there is no evidence that its image is safe.
+    pub fn start_verification(&mut self) {
+        self.verifying = true;
+        self.record_unavailable();
+    }
+
+    pub fn record_unavailable(&mut self) {
+        if self.unknown.back().is_none_or(|(_, end)| end.is_some()) {
+            self.unknown
+                .push_back((self.last_verified.map_or(0, |i| i.saturating_add(1)), None));
         }
     }
 
+    pub fn unverified(&self, index: u64, max_gap: u64) -> bool {
+        (self.verifying
+            && !self
+                .marks
+                .iter()
+                .any(|mark| mark.index.abs_diff(index) <= max_gap))
+            || self
+                .unknown
+                .iter()
+                .any(|(start, end)| index >= *start && end.is_none_or(|end| index < end))
+    }
+
+    pub fn has_verified(&self) -> bool {
+        self.last_verified.is_some()
+    }
+
     /// Registra o resultado do quadro `index` (índices chegam ~crescentes).
-    #[allow(clippy::unnecessary_map_or)] // `map_or` (não `is_none_or`): compat Rust < 1.82.
     pub fn record(&mut self, index: u64, secret: bool) {
-        if self.marks.back().map_or(true, |m| index >= m.index) {
+        if self.last_verified.is_none_or(|last| index >= last) {
+            self.last_verified = Some(index);
+            if let Some((_, end)) = self.unknown.back_mut() {
+                if end.is_none() {
+                    *end = Some(index);
+                }
+            }
+        }
+        if self.marks.back().is_none_or(|m| index >= m.index) {
             self.marks.push_back(Mark { index, secret });
         } else {
             let pos = self
@@ -254,9 +291,15 @@ impl Timeline {
     }
 
     /// Descarta amostras já airadas (índice < min_keep).
-    #[allow(clippy::unnecessary_map_or)]
     pub fn prune(&mut self, min_keep: u64) {
-        while self.marks.front().map_or(false, |m| m.index < min_keep) {
+        while self
+            .unknown
+            .front()
+            .is_some_and(|(_, end)| end.is_some_and(|end| end <= min_keep))
+        {
+            self.unknown.pop_front();
+        }
+        while self.marks.front().is_some_and(|m| m.index < min_keep) {
             self.marks.pop_front();
         }
     }
@@ -265,6 +308,9 @@ impl Timeline {
     /// `max_gap`, tinha segredo. Bracket → cobre todo o intervalo entre amostras (sem buraco mesmo
     /// com OCR lento), aparece um tico ANTES (preventivo) e some um tico depois (seguro).
     pub fn should_censor(&self, index: u64, max_gap: u64) -> bool {
+        if self.unverified(index, max_gap) {
+            return true;
+        }
         if let Some(m) = self.marks.iter().rev().find(|m| m.index <= index) {
             if index - m.index <= max_gap && m.secret {
                 return true;
@@ -282,6 +328,55 @@ impl Timeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_ocr_never_marks_frames_safe_and_recovers_at_verified_frame() {
+        let mut t = Timeline::new();
+        t.start_verification();
+        assert!(t.should_censor(0, 90));
+        t.record(10, false);
+        assert!(t.should_censor(9, 90));
+        assert!(!t.should_censor(10, 90));
+        t.record(20, true);
+        t.record_unavailable();
+        for i in [20, 21, 500, 10_000] {
+            assert!(t.should_censor(i, 90));
+        }
+        t.prune(200);
+        assert!(t.should_censor(500, 90));
+        t.record(600, false);
+        assert!(t.should_censor(599, 90));
+        assert!(!t.should_censor(600, 90));
+        assert!(
+            t.should_censor(691, 90),
+            "stalled worker must not leave coverage green forever"
+        );
+    }
+
+    #[test]
+    fn repeated_failures_are_bounded_and_closed_ranges_are_pruned() {
+        let mut t = Timeline::new();
+        t.start_verification();
+        for _ in 0..10_000 {
+            t.record_unavailable();
+        }
+        assert_eq!(t.unknown.len(), 1);
+        t.record(100, false);
+        t.prune(101);
+        assert!(t.unknown.is_empty());
+    }
+
+    #[test]
+    fn resumed_worker_does_not_retroactively_verify_a_long_gap() {
+        let mut t = Timeline::new();
+        t.start_verification();
+        t.record(10, false);
+        assert!(t.unverified(500, 90));
+        t.record(600, false);
+        assert!(t.unverified(500, 90));
+        assert!(t.should_censor(500, 90));
+        assert!(!t.unverified(600, 90));
+    }
 
     #[test]
     fn casa_termo_da_watchlist() {

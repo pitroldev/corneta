@@ -40,8 +40,10 @@ testes juntos.
 
 ## Contrato do frontmatter
 
-Use um arquivo de `templates/` como ponto de partida. Um artigo publicado precisa
-de todos os campos abaixo; drafts podem omitir os campos ainda não validados.
+Use um arquivo de `templates/` como ponto de partida. O exemplo abaixo é um
+rascunho: não atribui autoria nem revisão a ninguém. Drafts podem omitir campos
+ainda não validados; para publicar, preencha também `author`, `reviewedBy` e
+`publishedAt`.
 
 ```yaml
 contentId: guide_obs_multistream
@@ -56,9 +58,8 @@ slug: obs-multistream
 translationKey: obs-multistream
 status: draft
 intent: informational
-author: Petro Cardoso
-reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
+reviewedAt: 2026-08-01
 productVersion: 0.6.0
 testedWith:
   - name: Corneta
@@ -76,10 +77,17 @@ sources:
 images: []
 ```
 
-Ao publicar, acrescente `publishedAt`. O auditor exige uma fonte revisada,
+As datas e versões do exemplo são ilustrativas: substitua-as pela revisão e pelos
+testes realmente feitos. Ao publicar, acrescente as identidades e `publishedAt`. O auditor exige uma fonte revisada,
 versão testada e autor e revisor registrados em `people.json`. Artigos não usam
 imagem de capa; screenshots úteis entram no corpo, perto do passo que explicam.
 Datas usam `YYYY-MM-DD`; não atualize `updatedAt` sem uma revisão substancial.
+
+Uma revisão restrita a uma fonte interna pode avançar `reviewedAt` do artigo e daquela fonte após conferir as alegações dependentes. Descreva o escopo na revisão do PR; preserve `updatedAt` se o corpo não mudou, as datas das fontes externas não revisitadas, `testedWith` e as versões/datas reais das capturas. `productVersion` informa contra qual versão a documentação foi revisada, não declara um novo teste de live. O gate de revisão não substitui essa conferência.
+
+O gate compara os corpos depois de normalizar ambos com o Prettier do lockfile, usando as mesmas opções fixas. Alinhar tabelas ou quebrar linhas de JSX não deve criar uma data de atualização editorial. Mudanças de texto, tags, propriedades e metadados substantivos continuam exigindo `updatedAt`; alterações de fontes internas continuam exigindo a revisão correspondente. Esse normalizador é ferramenta de contribuição, não parte do bundle público.
+
+### Identidade e autoria
 
 O `contentId` é um identificador estável de telemetria, não uma URL. Use
 `help_...` ou `guide_...`, apenas com minúsculas, dígitos e underscores, e nunca
@@ -88,6 +96,12 @@ reaproveite um ID removido para outro assunto.
 `people.json` registra o tipo factual (`person` ou `organization`) e a URL de cada
 assinatura. Conteúdo publicado exige autor e revisor do tipo `person`, com URL;
 não represente uma equipe ou empresa como `Person` nos dados estruturados.
+Preencha `author` com quem escreveu e `reviewedBy` somente depois da revisão
+efetiva e com a concordância da pessoa indicada. Use o nome exato do registro;
+cadastre a pessoa com seu perfil público quando necessário. Não use nomes de
+exemplo nem atribua automaticamente a revisão ao mantenedor. O auditor rejeita
+campos ausentes, placeholders conhecidos e identidades não registradas, mas
+não comprova que a revisão aconteceu: essa confirmação faz parte do PR.
 
 O template da página já renderiza o `title` como H1. Portanto, o corpo MDX começa
 em H2 (`##`). H2 e H3 formam o sumário automaticamente. Markdown GFM é aceito;
@@ -167,7 +181,7 @@ public/images/editorial/multistream/obs-multistream-flow.webp
 Exemplo executado a partir de `web/`:
 
 ```powershell
-pnpm content:image -- --input assets/originals/multistream/obs-multistream-flow.png --output images/editorial/multistream/obs-multistream-flow.webp --width 1600 --quality 82
+pnpm content:image --input assets/originals/multistream/obs-multistream-flow.png --output images/editorial/multistream/obs-multistream-flow.webp --width 1600 --quality 82
 ```
 
 O comando lê somente dentro de `content/assets/originals`, grava somente dentro

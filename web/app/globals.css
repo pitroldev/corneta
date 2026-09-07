@@ -1427,78 +1427,6 @@
   text-underline-offset: 5px;
 }
 
-.editorial-category-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: clamp(20px, 2.6vw, 34px);
-}
-
-.editorial-category-card {
-  grid-column: span 4;
-  min-width: 0;
-}
-
-.editorial-category-card__link {
-  position: relative;
-  display: flex;
-  height: 100%;
-  min-height: 270px;
-  flex-direction: column;
-  padding: clamp(23px, 2.7vw, 34px);
-  color: var(--ink);
-  background: var(--paper-raised);
-  border-radius: var(--r-lg);
-  box-shadow: var(--pop-ink-lg);
-  transition:
-    background-color 130ms ease-out,
-    transform 130ms ease-out,
-    box-shadow 130ms ease-out;
-}
-
-.editorial-category-card__link::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 4px;
-  background: var(--ink);
-  content: "";
-}
-
-.editorial-category-card:first-child {
-  grid-column: span 7;
-}
-
-.editorial-category-card:nth-child(2) {
-  grid-column: span 5;
-}
-
-.editorial-category-card:nth-last-child(2):nth-child(3n + 1),
-.editorial-category-card:last-child:nth-child(3n + 2) {
-  grid-column: span 6;
-}
-
-.editorial-category-card:first-child .editorial-category-card__link {
-  min-height: 310px;
-  color: var(--brass-ink);
-  background: var(--brass);
-}
-
-.editorial-category-card:first-child .editorial-category-card__link::before {
-  background: var(--brass-ink);
-}
-
-.editorial-category-card__link:hover {
-  background: var(--paper-sunk);
-  box-shadow: 10px 10px 0 var(--ink);
-  transform: translate(-3px, -3px);
-}
-
-.editorial-category-card:first-child .editorial-category-card__link:hover {
-  background: var(--brass-strong);
-}
-
-.editorial-category-card__label,
 .editorial-card__label {
   color: var(--tomate-ink);
   font-size: 0.7rem;
@@ -1506,64 +1434,6 @@
   letter-spacing: 0.09em;
   line-height: 1.2;
   text-transform: uppercase;
-}
-
-.editorial-category-card:first-child .editorial-category-card__label {
-  color: var(--brass-ink);
-  opacity: 0.72;
-}
-
-.editorial-category-card h3 {
-  max-width: 18ch;
-  margin-top: 14px;
-  font-size: clamp(1.45rem, 2.3vw, 2rem);
-  line-height: 1.04;
-}
-
-.editorial-category-card p {
-  max-width: 54ch;
-  margin-top: 15px;
-  color: var(--ink-muted);
-  font-size: 0.95rem;
-  font-weight: 500;
-  line-height: 1.58;
-}
-
-.editorial-category-card:first-child p {
-  color: var(--brass-ink);
-  opacity: 0.82;
-}
-
-.editorial-category-card__count {
-  align-self: flex-start;
-  padding: 5px 8px;
-  margin-top: auto;
-  margin-right: 50px;
-  color: var(--ink-muted);
-  background: var(--paper-sunk);
-  border-radius: var(--r-sm);
-  font-size: 0.72rem;
-  font-weight: 750;
-}
-
-.editorial-category-card:first-child .editorial-category-card__count {
-  color: var(--ink-on-dark);
-  background: var(--surface);
-}
-
-.editorial-category-card__arrow {
-  position: absolute;
-  right: clamp(23px, 2.7vw, 34px);
-  bottom: clamp(20px, 2.5vw, 30px);
-  font-family: var(--font-baloo), "Segoe UI", system-ui, sans-serif;
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1;
-  transition: transform 120ms ease-out;
-}
-
-.editorial-category-card__link:hover .editorial-category-card__arrow {
-  transform: translateX(5px);
 }
 
 .editorial-card-grid {
@@ -2978,21 +2848,6 @@
     gap: 40px;
   }
 
-  .editorial-category-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .editorial-category-card,
-  .editorial-category-card:nth-child(2),
-  .editorial-category-card:nth-last-child(2):nth-child(3n + 1),
-  .editorial-category-card:last-child:nth-child(3n + 2) {
-    grid-column: auto;
-  }
-
-  .editorial-category-card:first-child {
-    grid-column: 1 / -1;
-  }
-
   .editorial-article-shell {
     grid-template-areas:
       "sidebar"
@@ -3173,19 +3028,6 @@
     padding: 0;
   }
 
-  .editorial-category-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .editorial-category-card:first-child {
-    grid-column: auto;
-  }
-
-  .editorial-category-card__link,
-  .editorial-category-card:first-child .editorial-category-card__link {
-    min-height: 245px;
-  }
-
   .editorial-card,
   .editorial-card--featured {
     grid-column: 1 / -1;
@@ -3351,7 +3193,6 @@
 }
 
 @media (forced-colors: active) {
-  .editorial-category-card__link,
   .editorial-card,
   .editorial-related,
   .editorial-toc,

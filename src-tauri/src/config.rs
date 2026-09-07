@@ -1,12 +1,48 @@
 //! Modelo de configuração (espelha src/lib/types.ts) e persistência em disco.
 use crate::i18n::{self, Locale, Msg};
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 pub const CURRENT_SCHEMA_VERSION: u32 = 1;
 const MAX_TARGETS: usize = 32;
 const MAX_PROFILES: usize = 20;
+pub(crate) const MAX_CONFIG_BYTES: u64 = 2 * 1024 * 1024;
+
+#[derive(Debug)]
+pub(crate) enum ConfigReadError {
+    TooLarge,
+    Io(std::io::Error),
+}
+
+impl std::fmt::Display for ConfigReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TooLarge => f.write_str(&Msg::ConfigImportTooBig.now()),
+            Self::Io(error) => error.fmt(f),
+        }
+    }
+}
+
+/// Bounds the bytes actually read, including files that grow after being opened.
+fn read_config_bytes(reader: impl Read) -> Result<String, ConfigReadError> {
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_CONFIG_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(ConfigReadError::Io)?;
+    if bytes.len() as u64 > MAX_CONFIG_BYTES {
+        return Err(ConfigReadError::TooLarge);
+    }
+    String::from_utf8(bytes).map_err(|error| {
+        ConfigReadError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+    })
+}
+
+pub(crate) fn read_config_file(path: &std::path::Path) -> Result<String, ConfigReadError> {
+    read_config_bytes(std::fs::File::open(path).map_err(ConfigReadError::Io)?)
+}
 
 fn default_schema_version() -> u32 {
     CURRENT_SCHEMA_VERSION
@@ -262,7 +298,7 @@ pub struct Settings {
     ///
     /// Padrão DESLIGADO, e é uma decisão de produto, não de implementação: a 6000 kbps são
     /// ~2,7 GB/hora. Ligar isso sem o streamer pedir encheria o SSD de alguém em duas
-    /// semanas. Ver docs/FEATURE-GRAVACAO-E-REPLAY.md §2.
+    /// semanas.
     #[serde(default)]
     pub record_video: bool,
     /// Pasta das gravações. VAZIO = pasta de sessões, resolvida na hora.
@@ -676,50 +712,47 @@ pub fn load(app: &AppHandle) -> AppConfig {
         Ok(p) => p,
         Err(_) => return AppConfig::default(),
     };
-    match std::fs::read_to_string(&path) {
-        Ok(raw) if raw.len() <= 2 * 1024 * 1024 => {
-            match serde_json::from_str::<serde_json::Value>(&raw) {
-                Ok(value) => {
-                    let old_schema = value
-                        .get("schemaVersion")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
-                    match serde_json::from_value::<AppConfig>(value)
-                        .map_err(|e| e.to_string())
-                        .and_then(AppConfig::validate_and_normalize)
-                    {
-                        Ok(cfg) => {
-                            if old_schema < CURRENT_SCHEMA_VERSION {
-                                let backup =
-                                    path.with_extension(format!("schema-{old_schema}.json.bak"));
-                                let _ = std::fs::copy(&path, backup);
-                                if let Err(e) = save(app, &cfg) {
-                                    log::warn!("não foi possível persistir a migração: {e}");
-                                }
+    match read_config_file(&path) {
+        Ok(raw) => match serde_json::from_str::<serde_json::Value>(&raw) {
+            Ok(value) => {
+                let old_schema = value
+                    .get("schemaVersion")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                match serde_json::from_value::<AppConfig>(value)
+                    .map_err(|e| e.to_string())
+                    .and_then(AppConfig::validate_and_normalize)
+                {
+                    Ok(cfg) => {
+                        if old_schema < CURRENT_SCHEMA_VERSION {
+                            let backup =
+                                path.with_extension(format!("schema-{old_schema}.json.bak"));
+                            let _ = std::fs::copy(&path, backup);
+                            if let Err(e) = save(app, &cfg) {
+                                log::warn!("não foi possível persistir a migração: {e}");
                             }
-                            cfg
                         }
-                        Err(e) => {
-                            log::error!("config.json rejeitado: {e}");
-                            AppConfig::default()
-                        }
+                        cfg
+                    }
+                    Err(e) => {
+                        log::error!("config.json rejeitado: {e}");
+                        AppConfig::default()
                     }
                 }
-                Err(e) => {
-                    log::error!(
-                        "config.json inválido ({e}); preservando como .corrupt e usando o padrão"
-                    );
-                    let ts = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0);
-                    let _ =
-                        std::fs::rename(&path, path.with_extension(format!("corrupt-{ts}.json")));
-                    AppConfig::default()
-                }
             }
-        }
-        Ok(_) => {
+            Err(e) => {
+                log::error!(
+                    "config.json inválido ({e}); preservando como .corrupt e usando o padrão"
+                );
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let _ = std::fs::rename(&path, path.with_extension(format!("corrupt-{ts}.json")));
+                AppConfig::default()
+            }
+        },
+        Err(ConfigReadError::TooLarge) => {
             log::error!("config.json excede o limite de 2 MiB");
             AppConfig::default()
         }
@@ -738,6 +771,42 @@ pub fn save(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn config_read_limits_actual_bytes_and_rejects_invalid_utf8() {
+        assert_eq!(read_config_bytes(&b"{}"[..]).unwrap(), "{}");
+        let exact = vec![b' '; MAX_CONFIG_BYTES as usize];
+        assert_eq!(
+            read_config_bytes(exact.as_slice()).unwrap().len(),
+            exact.len()
+        );
+        assert!(matches!(
+            read_config_bytes(std::io::repeat(b' ')),
+            Err(ConfigReadError::TooLarge)
+        ));
+        assert!(matches!(
+            read_config_bytes(&[0xff][..]),
+            Err(ConfigReadError::Io(error)) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+    }
+
+    #[test]
+    fn config_reader_never_consumes_more_than_limit_plus_one() {
+        struct GrowingReader(u64);
+        impl Read for GrowingReader {
+            fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+                output.fill(b' ');
+                self.0 += output.len() as u64;
+                Ok(output.len())
+            }
+        }
+        let mut reader = GrowingReader(0);
+        assert!(matches!(
+            read_config_bytes(&mut reader),
+            Err(ConfigReadError::TooLarge)
+        ));
+        assert_eq!(reader.0, MAX_CONFIG_BYTES + 1);
+    }
 
     #[test]
     fn rejects_network_listener_and_unsupported_protocol() {

@@ -16,7 +16,7 @@ _Captura do modo de demonstração da versão 0.6.0, com dados fictícios. O có
 
 Consulte o [site oficial](https://www.corneta.live) e as [releases do projeto](https://github.com/pitroldev/corneta/releases). A existência deste repositório não significa que já exista um instalador público aprovado. Não use artefatos de desenvolvimento como se fossem uma release estável.
 
-Antes de uma distribuição, precisam estar concluídos o pacote de fontes/avisos dos componentes incluídos e a validação real de instalação, atualização e plataformas. Veja os [gates de release](docs/GATES-DE-RELEASE.md) e o [runbook beta](docs/RUNBOOK-BETA.md). O lançamento inicial pode não ter Authenticode, conforme a [política de assinatura](docs/ASSINATURA.md); a assinatura criptográfica do updater continua obrigatória.
+Para preparar uma distribuição, siga o [guia de publicação](docs/PUBLICACAO.md), com procedimentos, checklist e evidências exigidas. A [política de assinatura](docs/ASSINATURA.md) distingue Authenticode da assinatura criptográfica obrigatória do updater. Código disponível e testes locais aprovados não significam que um instalador esteja pronto para publicação.
 
 ## O que já existe
 
@@ -40,7 +40,7 @@ pnpm install --frozen-lockfile
 pnpm contrib:demo
 ```
 
-Abra `http://localhost:1420`. O perfil de contribuição não carrega o `.env` pessoal e desativa a telemetria; não é necessário copiar exemplos de ambiente ou fornecer credenciais. Em repositório ainda privado, o clone naturalmente exige acesso.
+Abra `http://localhost:1420`. O perfil de contribuição não carrega o `.env` pessoal e desativa a telemetria; não é necessário copiar exemplos de ambiente ou fornecer credenciais.
 
 Para validar app e site sem os segredos da operação oficial:
 
@@ -60,7 +60,7 @@ Abra `http://localhost:7390`. O site pode ser desenvolvido sem configurar OAuth.
 
 O perfil de contribuição recusa arquivos reais `web/.env*`, para que o carregamento automático do Next.js não introduza segredos; use um clone limpo se já tiver uma operação local configurada. Não mova nem apague suas credenciais para experimentar o projeto.
 
-O build de contribuição fornece a origem pública esperada para validar o site. Isso **não** anuncia suporte pronto a qualquer domínio de fork nem desativa as validações da produção oficial. Configuração de hospedagem própria e operação do OAuth: [guia de desenvolvimento](docs/DESENVOLVIMENTO.md) e [decisão de OAuth](docs/DECISAO-OAUTH-VIA-API.md).
+O build de contribuição fornece a origem pública esperada para validar o site. Isso **não** anuncia suporte pronto a qualquer domínio de fork nem desativa as validações da produção oficial. Para configurar hospedagem própria e OAuth, consulte a [matriz de configuração](docs/CONFIGURACAO.md) e os [contratos de rede e integrações](docs/SUPERFICIE-DE-REDE.md).
 
 ## Desktop nativo — Windows x64
 
@@ -106,7 +106,7 @@ src-tauri/              backend Rust, capabilities e configuração Tauri
 web/                    site, conteúdo e API Next.js
 scripts/                desenvolvimento, testes e preparação de release
 compliance/             manifestos de conformidade
-docs/                   guias, decisões, runbooks e planos
+docs/                   guias de desenvolvimento, contratos e operação
 ```
 
 ## Privacidade e segurança

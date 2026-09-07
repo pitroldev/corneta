@@ -7,25 +7,8 @@ import { PlatformGlyph } from "./decor";
 import { RadioIcon } from "./icons";
 import { cn, State } from "./ui";
 
-// ============================================================
-// O BORA que funciona.
-// ============================================================
-// A página inteira gira em volta de um verbo — "apertar o BORA" — e em lugar
-// nenhum dava pra apertar. O passo 3 até descrevia o que acontece ("o painel
-// mostra cada plataforma entrando no ar, uma por uma") e mostrava um adesivo
-// inerte com essa frase escrita.
-//
-// Agora o adesivo é botão, e a frase acontece: os destinos escolhidos sobem UM
-// POR UM, com o estado de conexão no meio do caminho. Cortar volta tudo pro
-// chão.
-//
-// E, de quebra, resolve a outra promessa que estava só escrita: "escolha onde
-// quer aparecer". Antes de apertar, cada destino liga e desliga no clique — o
-// contador do selo acompanha. É a mesma tela de Plataformas do app, reduzida ao
-// que cabe aqui.
-//
-// Com `prefers-reduced-motion` a subida é instantânea: o que some é a
-// encenação, não a função.
+// Prévia ilustrativa: conecta destinos em sequência, sem iniciar transmissão real.
+// Com movimento reduzido, a mudança de estado é imediata.
 
 type PlatId = "twitch" | "youtube" | "kick";
 

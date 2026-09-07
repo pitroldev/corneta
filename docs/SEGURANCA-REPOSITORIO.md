@@ -1,11 +1,12 @@
 # Segurança do repositório
 
-Verificação em 6 de setembro de 2026 (horário de Brasília). Este registro cobre a
-abertura do código, não certifica o aplicativo e não aprova uma release.
+Procedimentos para revisar o código publicável e os controles do repositório.
+Este guia não comprova o estado atual do GitHub, não certifica o aplicativo e não
+aprova uma distribuição. Os critérios de publicação estão em [PUBLICACAO](PUBLICACAO.md).
 
-## Histórico e arquivos publicáveis
+## Varredura do histórico e dos arquivos publicáveis
 
-Execute com Node 24, Git e `tar` disponíveis, em Windows ou Linux x64:
+Use a versão de Node fixada pelo projeto, Git e `tar`, em Windows ou Linux x64:
 
 ```sh
 git fetch --all --tags
@@ -13,72 +14,70 @@ node --test scripts/audit-secrets.check.mjs
 node scripts/audit-secrets.mjs
 ```
 
-O script baixa **Gitleaks 8.30.1** da release oficial, verifica o SHA-256 fixado no
-código, recusa clones rasos e analisa todas as refs locais com `--all --full-history`.
-Também cria um snapshot dos arquivos rastreados e dos novos arquivos não ignorados;
-arquivos privados ignorados não entram nele. Não carrega `.env`, publica resultados
-ou usa credenciais de provedores. [Release e documentação do scanner](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1).
+O [scanner](../scripts/audit-secrets.mjs) baixa Gitleaks 8.30.1 da release oficial,
+confere o SHA-256 fixado, recusa clones rasos e analisa todas as refs locais com
+`--all --full-history`. Em um clone raso, obtenha o histórico completo antes da
+varredura. O snapshot inclui arquivos rastreados e novos arquivos não ignorados;
+arquivos privados ignorados ficam fora. O processo não carrega dotenv como
+configuração, não usa credenciais de provedores e não publica resultados.
 
-O resultado sanitizado fica em `.artifacts/secret-audit/summary.json`: versão do
-scanner, HEAD, refs, total de commits, hash do inventário do snapshot, hash da
-configuração e achados sem valores, trechos de código, autores ou e-mails. Os
-relatórios locais ficam ignorados pelo Git. Não anexe relatórios brutos a issues.
+Consulte o resumo sanitizado em `.artifacts/secret-audit/summary.json`: ele
+identifica HEAD, refs, inventário, configuração e achados sem reproduzir valores,
+trechos de código, autores ou e-mails. Mantenha os relatórios locais ignorados e
+não anexe saídas brutas a issues. Execute novamente após as últimas alterações,
+o commit final e a atualização das refs; um resultado anterior não valida bytes
+novos.
 
-A primeira varredura integral do HEAD `add1e3bd9503ab80554130525e4b09f53f42d7ed`
-encontrou quatro ocorrências em fixtures sintéticas dos redatores de telemetria,
-introduzidas no commit `2031d2199d20dbd1075270bb624e0ef8dee02a4a`:
+A varredura não cobre anexos remotos, OCR de imagens nem validade de credenciais.
+Revise também textos, comentários e anexos de PRs/issues que serão expostos,
+sem enviar dados privados a serviços externos. Siga o procedimento de
+[materiais públicos](MATERIAIS-PUBLICOS.md) para imagens.
 
-| Regra             | Arquivo                            | Ocorrências | Justificativa                                  |
-| ----------------- | ---------------------------------- | ----------- | ---------------------------------------------- |
-| `jwt`             | `src/lib/telemetry-schema.test.ts` | 1           | Assinatura fictícia do teste de redação.       |
-| `generic-api-key` | `web/lib/telemetry-schema.test.ts` | 2           | Placeholder numérico de token público PostHog. |
-| `generic-api-key` | `src-tauri/src/telemetry.rs`       | 1           | JWT inválido no teste do redator Rust.         |
+### Exceções de fixtures
 
-As três exceções em [`.gitleaks.toml`](../.gitleaks.toml) exigem simultaneamente
-regra, caminho completo e valor exato. Não ignoram arquivos inteiros nem commits.
-Os testes provam que trocar o valor ou o caminho volta a gerar achado. Nenhuma
-credencial foi rotacionada e nenhum histórico foi reescrito: não foi identificada
-credencial real nesses achados. A execução com exceções passou com zero achados no
-histórico e no snapshot. Reexecutar depois das **últimas alterações e do commit
-final**; um resultado de um snapshot anterior não atesta o próximo.
+As exceções de [`.gitleaks.toml`](../.gitleaks.toml) são restritas a entradas
+sintéticas dos testes de redação:
 
-Também foram consultados, sem publicação, os textos de PRs/issues e comentários
-de issues/revisões disponíveis pela API: 38 PRs, nenhuma issue comum e nenhuma
-release existente. Esses textos passaram no scanner sem achados e sem referências
-de anexos `user-attachments`/`assets` detectadas. Isso não substitui a revisão
-humana de imagens, direitos, dados pessoais, links externos ou material novo.
+| Regra             | Arquivo                            | Entrada permitida                                                     |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| `jwt`             | `src/lib/telemetry-schema.test.ts` | JWT com assinatura fictícia, no valor exato fixado pela configuração. |
+| `generic-api-key` | `web/lib/telemetry-schema.test.ts` | Placeholder numérico de transporte PostHog, no valor exato fixado.    |
+| `generic-api-key` | `src-tauri/src/telemetry.rs`       | JWT inválido usado pelo teste do redator Rust, no valor exato fixado. |
 
-Se uma credencial real surgir, revogue/rotacione primeiro e só depois planeje
-a limpeza coordenada. Não publique seu valor no diagnóstico nem tente validá-lo
-contra um provedor. [Procedimento do GitHub para dados sensíveis](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
+Cada exceção exige simultaneamente regra, caminho ancorado e valor exato. Não
+ignore arquivos inteiros, commits ou prefixos genéricos de tokens. O teste
+`audit-secrets.check.mjs` verifica as fixtures permitidas e exige achados quando
+seus valores ou caminhos mudam. Não amplie a configuração apenas para obter uma
+varredura verde.
 
-## Configurações verificadas no GitHub
+Se surgir uma credencial real, interrompa a publicação, revogue/rotacione primeiro
+e coordene a limpeza do histórico. Não publique seu valor nem tente validá-lo
+contra um provedor. Consulte o [procedimento de remoção de dados sensíveis do GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
 
-Repositório `pitroldev/corneta`, ainda **privado**. Não foi alterada a visibilidade,
-não foram criados PRs/issues/releases e não foram concedidas permissões novas.
+## Controles a conferir no GitHub
 
-| Controle                                  | Resultado                                                                                                                              |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Branch principal                          | `main`, anteriormente sem proteção; proteção aplicada e conferida por GET.                                                             |
-| Force push e deleção de `main`            | Proibidos.                                                                                                                             |
-| Administradores                           | Também sujeitos à proteção.                                                                                                            |
-| Checks obrigatórios                       | `resolve`, `secrets`, `frontend`, `rust`, `media-integration`.                                                                         |
-| Atualização da branch                     | Exige branch atualizada antes de integrar.                                                                                             |
-| Revisores obrigatórios                    | Nenhum mínimo imposto; não há equipe fictícia de dois mantenedores.                                                                    |
-| Contextos dos checks                      | Confirmados em execução real do CI; associados ao GitHub Actions.                                                                      |
-| Colaboradores                             | Apenas o proprietário, administrador.                                                                                                  |
-| Permissão padrão de workflow              | Somente leitura.                                                                                                                       |
-| Workflow aprovar PR                       | Desabilitado.                                                                                                                          |
-| Actions permitidas                        | Todas; não foi imposta exigência global de SHA que quebraria actions ainda fixadas por versão.                                         |
-| Relato privado nativo                     | GET e tentativa de habilitação por PUT retornaram HTTP 404. **Não está validado como canal utilizável.**                               |
-| Aprovação de execuções de forks           | API retornou HTTP 422: recurso não aplicável enquanto o repositório é privado. Reavaliar na abertura.                                  |
-| Secret scanning/push protection do GitHub | Não informados por `security_and_analysis`; disponibilidade/ativação ainda não comprovadas. O scanner local/CI não é o mesmo controle. |
+Revise os controles no repositório e na branch que serão publicados. O estado
+depende das permissões, do plano e da visibilidade; ausência de um campo ou
+resposta de erro não comprova que um controle está ativo.
 
-Os cinco checks já existem no workflow. Exigi-los não significa que suas execuções
-anteriores passaram: o SHA final precisa passar depois de enviado pelo mantenedor.
-Mantenha seus nomes estáveis ou atualize a proteção junto com eventual renomeação.
+- Proteja a branch principal contra force push e deleção, incluindo administradores.
+- Exija branch atualizada e os checks `resolve`, `secrets`, `frontend`, `rust` e
+  `media-integration` do [CI](../.github/workflows/ci.yml), vinculados à aplicação
+  que realmente os publica. O job `frontend` exige que `browser-smoke` tenha
+  sucesso; job pulado não deve ser tratado como aprovação.
+- Confira os nomes reais em uma execução antes de alterar a proteção. Renomear
+  jobs exige atualizar os checks obrigatórios junto; não imponha revisores que
+  o projeto não possui.
+- Mantenha o token padrão de Actions com leitura e sem permissão de aprovar PRs.
+  Revise aprovação de execuções de forks e evite fornecer segredos a código não
+  confiável.
+- Verifique a disponibilidade e ativação de secret scanning e push protection.
+  O scanner local/CI não é equivalente a esses controles do GitHub.
+- Confirme o recebimento do canal privado de [SECURITY.md](../SECURITY.md), sem
+  usar segredos como teste. Não anuncie o relato privado nativo como utilizável
+  sem verificar sua habilitação e acesso.
 
-### Rechecagem sem alterações externas
+### Consultas sem alteração externa
 
 ```sh
 gh api repos/pitroldev/corneta --jq '{visibility,default_branch,security_and_analysis}'
@@ -88,37 +87,23 @@ gh api repos/pitroldev/corneta/private-vulnerability-reporting
 gh api repos/pitroldev/corneta/actions/permissions/fork-pr-contributor-approval
 ```
 
-### Ações ainda dependentes do mantenedor/da visibilidade
+Em forks, substitua proprietário, repositório e branch pelos seus. Registre
+somente os campos necessários, junto do SHA/contexto verificado; não publique
+tokens, dados de colaboradores ou respostas brutas contendo informações privadas.
 
-1. Confirmar o recebimento do canal privado descrito em [SECURITY.md](../SECURITY.md),
-   sem enviar segredos como teste. O arquivo sozinho não comprova entrega.
-2. Quando o recurso estiver disponível, habilitar o relato nativo com
-   `gh api --method PUT repos/pitroldev/corneta/private-vulnerability-reporting` e
-   conferir `enabled: true` no GET. Isso não muda a visibilidade por si só.
-3. Na abertura, revisar Settings → Actions → General para exigir aprovação de
-   execuções de contribuidores externos novos; verificar as opções disponíveis
-   de secret scanning e push protection em Settings → Code security.
-4. Conferir todos os novos textos/anexos e repetir o scanner no SHA final.
+Para habilitar o relato privado nativo, o mantenedor autorizado pode executar:
 
-Nenhum desses passos autoriza tornar o repositório público automaticamente.
+```sh
+gh api --method PUT repos/pitroldev/corneta/private-vulnerability-reporting
+gh api repos/pitroldev/corneta/private-vulnerability-reporting
+```
 
-## Rechecagem no segundo lote
+Confirme `enabled: true` na consulta. Se o recurso não estiver disponível, registre
+a limitação e mantenha um canal privado efetivamente testado. Revise também
+Settings → Actions → General e Settings → Code security, especialmente ao mudar
+a visibilidade. Nenhum comando deste guia autoriza publicar o repositório,
+conceder acessos ou criar relatos de teste externos automaticamente.
 
-Em 6 de setembro de 2026 (Brasília), o HEAD local passou a `8a2815d` após o commit
-das correções anteriores. A nova varredura cobre 270 commits/40 refs e o snapshot
-das mudanças seguintes; os números/hash exatos ficam no resumo ignorado de cada
-execução. Três achados novos eram digests da baseline de formatação associados a
-nomes de documentos sobre OAuth/chaves, não credenciais. Os digests passaram a
-usar o tipo explícito `sha256:`; comparação de bytes mantida e nenhuma nova
-allowlist foi criada. A varredura com esse formato passou sem achados.
-
-As consultas externas confirmaram novamente repositório privado, relato privado
-404 e aprovação de forks 422; secret protection continua sem estado informado.
-Não houve novas mudanças de configuração no GitHub. O novo smoke do navegador é
-pré-requisito do check `frontend`, que falha explicitamente se ele não passar;
-isso preserva os cinco contextos já exigidos, sem tratar job pulado como aprovação.
-Ainda é necessário executar os workflows remotos do SHA final após o envio pelo
-mantenedor e confirmar recebimento do canal privado.
-
-Referências: [proteção de branches](https://docs.github.com/en/rest/branches/branch-protection),
+Referências: [release do Gitleaks](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1),
+[proteção de branches](https://docs.github.com/en/rest/branches/branch-protection) e
 [relato privado](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).

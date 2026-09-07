@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { auditEditorialContent } from "../lib/editorial/audit";
+import { editorialArguments, isEditorialCliEntrypoint } from "./editorial-cli";
 import {
   buildEditorialReviewQueue,
   renderEditorialReviewMarkdown,
@@ -58,7 +59,8 @@ function readValue(args: string[], index: number, option: string): string {
   return value;
 }
 
-function parseOptions(args: string[]): Options {
+export function parseOptions(argv: string[]): Options {
+  const args = editorialArguments(argv);
   const options: Options = {
     asOf: todayUtc(),
     warningDays: 28,
@@ -140,11 +142,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(
-    `Falha ao verificar manutenção editorial: ${
-      error instanceof Error ? error.message : String(error)
-    }\n`,
-  );
-  process.exitCode = 1;
-});
+if (isEditorialCliEntrypoint(import.meta.url)) {
+  main().catch((error: unknown) => {
+    process.stderr.write(
+      `Falha ao verificar manutenção editorial: ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    process.exitCode = 1;
+  });
+}

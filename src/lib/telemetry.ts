@@ -117,7 +117,6 @@ const DURATION_BUCKETS = new Set([
 const MAX_BUFFERED_ONBOARDING_EVENTS = 16;
 const POSTHOG_CONSENT_PREFIX = "__ph_opt_in_out_";
 
-const bootAt = Date.now();
 const listeners = new Set<() => void>();
 const pending = new Set<Promise<void>>();
 const seenErrors = new WeakMap<object, string>();
@@ -876,10 +875,6 @@ export async function flushTelemetry(timeoutMs = 300): Promise<void> {
     work,
     new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
   ]);
-}
-
-export function telemetryBootDuration(): number {
-  return Date.now() - bootAt;
 }
 
 /** Injeção isolada para testes; não é chamada pelo aplicativo. */

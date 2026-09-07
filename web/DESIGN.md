@@ -165,6 +165,14 @@ components:
 
 # Design System: Corneta
 
+## Política dos arquivos de design
+
+Este documento orienta o trabalho visual do site; os estilos/componentes em `app/` implementam a interface. [PRODUCT.md](PRODUCT.md) delimita o que o produto pode afirmar. O [snapshot `.impeccable/design.json`](.impeccable/design.json), schema 2 e data registrada em `generatedAt`, é preservado como material de intercâmbio/referência da ferramenta de design, não como configuração do Next.js nem fonte automática de CSS.
+
+O snapshot guarda a composição documentada na sua data, incluindo exemplos HTML/CSS. Ele não certifica que esses exemplos estejam idênticos à interface atual. Para implementar mudanças, confira primeiro este documento e o código; não copie o export antigo sobre os componentes. A ferramenta de design não é requisito para contribuir, testar ou compilar, e não existe comando no build que regenere esse arquivo.
+
+Ao atualizar o snapshot pela ferramenta ou manualmente, revise schema, exemplos e narrativa contra este documento, mantenha a data verdadeira da atualização e envie o diff no mesmo PR da decisão visual correspondente. Não atualize a data apenas por formatar JSON. Somente `web/.impeccable/design.json` é fonte compartilhada: os outros arquivos de estado da ferramenta são ignorados. O inventário de fontes preserva esse arquivo tanto em Git quanto em snapshots sem `.git`, sem seguir links simbólicos/junctions.
+
 ## Overview
 
 **Creative North Star: "O pôster do megafone"**
@@ -178,12 +186,11 @@ O palco é o breu quente do app (`#100b07`) com meio-tom impresso, cortado por f
 (`#f3ead7`, o tema claro do app) onde há leitura longa. O latão manda: é o bloco de destaque,
 o item ativo, o adesivo torto e a régua sobre os números. O tomate é o pedido de ação — baixar
 e entrar no ar. Menta reporta saúde, âmbar reporta reconexão. Nada de azul, nada de glow, nada
-de sombra difusa decorativa: essas foram as marcas do mundo anterior ("creator live room") e
-são a anti-referência declarada deste sistema.
+de sombra difusa decorativa: esses efeitos não pertencem à linguagem visual do site.
 
 A voz é brasileira e direta, sem virar infantil. Baloo 2 fala; Inter explica e opera. Toda
 demonstração de produto é rotulada como prévia ilustrativa, porque a honestidade é parte do
-tom da marca.
+tom da marca. Os textos seguem o [guia de tom de voz](../docs/TOM-DE-VOZ.md).
 
 **Key Characteristics:**
 
@@ -242,7 +249,7 @@ não abre um download nem entra no ar, ele está errado. Menta reporta saúde, �
 ressalva — nunca o contrário.
 
 **A Regra do Sem Azul.** O sistema não tem azul. Roteamento, links e estados usam latão, menta
-ou âmbar. Azul era o mundo descartado.
+ou âmbar.
 
 **A Regra da Tinta sobre Cor.** Todo bloco saturado (latão, tomate, menta, âmbar) recebe texto
 em tinta escura (`#2a1c00` ou `#0b0805`), não branco. A única exceção é o BORA AO VIVO dentro da

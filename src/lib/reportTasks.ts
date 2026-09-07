@@ -10,9 +10,11 @@ import {
 import type { SessionData, SessionSummary } from "./types";
 import { selectedReportExport, type DownloadFormat } from "./export/selected";
 import { replayChatPage } from "./replayChatPage";
+import type { ChatPage } from "./replayChatPage";
 
 export type ReportTask =
-  | { kind: "analyze" | "summary"; raw: string | ArrayBuffer; locale: Locale }
+  | { kind: "analyze"; raw: string | ArrayBuffer; locale: Locale }
+  | { kind: "summary"; raw: string | ArrayBuffer; locale: Locale }
   | { kind: "chat"; raw: string | ArrayBuffer; epoch: number }
   | { kind: "chatPage"; epoch: number }
   | {
@@ -29,12 +31,31 @@ export interface ReportSummaryResult {
   complete: boolean;
 }
 
+export interface ReportDetailResult {
+  data: SessionData;
+  analysis: ReportAnalysis;
+  summary: SessionSummary;
+}
+
+export interface ReportResultByKind {
+  analyze: ReportDetailResult | null;
+  summary: ReportSummaryResult | null;
+  chat: ChatPage;
+  chatPage: ChatPage;
+  export: Awaited<ReturnType<typeof selectedReportExport>>;
+}
+
+export type ReportTaskResult = ReportResultByKind[ReportTask["kind"]];
+
 const decode = (raw: string | ArrayBuffer) =>
   typeof raw === "string" ? raw : new TextDecoder().decode(raw);
 
 export function createReportTaskRunner() {
   let chat: ReturnType<typeof parseChatSession> = { messages: [], gaps: [] };
-  return async function runReportTask(task: ReportTask) {
+  function runReportTask<Task extends ReportTask>(
+    task: Task,
+  ): Promise<ReportResultByKind[Task["kind"]]>;
+  async function runReportTask(task: ReportTask): Promise<ReportTaskResult> {
     if (task.kind === "chat") {
       chat = parseChatSession(decode(task.raw));
       chat.gaps.sort((a, b) => a.t - b.t);
@@ -60,9 +81,6 @@ export function createReportTaskRunner() {
           complete: data.meta.endedAt != null,
         } satisfies ReportSummaryResult)
       : { data, analysis, summary };
-  };
+  }
+  return runReportTask;
 }
-
-export type ReportTaskResult = Awaited<
-  ReturnType<ReturnType<typeof createReportTaskRunner>>
->;

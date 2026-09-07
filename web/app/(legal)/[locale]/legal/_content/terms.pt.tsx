@@ -241,9 +241,14 @@ export function TermsBodyPt() {
           </li>
           <li>
             <strong>Guardião de privacidade</strong> é uma rede de segurança que
-            observa termos definidos por você e corta para a tela “JÁ VOLTO”.
-            Não é garantia de que nada vazará, e custa atraso na transmissão
-            inteira.
+            procura termos definidos por você e cobre o vídeo com “JÁ VOLTO” ao
+            detectar um deles. Durante a preparação, ou se a leitura falhar ou
+            ficar atrasada, as imagens não verificadas também ficam cobertas,
+            sem encerrar a conexão. O vídeo pode retornar automaticamente quando
+            a leitura se recupera e não encontra um termo listado. O recurso
+            adiciona atraso à transmissão, pode deixar passar termos e não
+            censura o áudio, que continua sendo transmitido. Não é garantia de
+            que nada vazará.
           </li>
           <li>
             <strong>Proteções automáticas</strong> como “JÁ VOLTO” e
@@ -252,19 +257,21 @@ export function TermsBodyPt() {
           </li>
         </ul>
         <p>
-          A matriz completa de plataformas ainda está em validação pública. Só a
-          Twitch tem transmissão real documentada até esta versão dos termos.
+          A presença de uma plataforma no app não garante que ela aceite a
+          transmissão da sua conta. Faça um teste prévio com cada destino e com
+          a configuração que pretende usar.
         </p>
       </LegalSection>
 
       <LegalSection id="requisitos" n={9} title="Requisitos e desempenho">
         <p>
           Hoje o instalador é para <strong>Windows</strong> e o aplicativo
-          depende do OBS para produzir a transmissão. Cada destino consome parte
-          do seu upload, e recodificar vídeo consome CPU ou GPU. O aplicativo
-          estima essas contas antes de você entrar ao vivo, mas estimativas são
-          estimativas: o resultado depende da sua máquina, da sua rede e das
-          próprias plataformas.
+          recebe o sinal do OBS ou de outro programa compatível com RTMP. A
+          configuração automática e as estatísticas integradas são específicas
+          do OBS. Cada destino consome parte do seu upload, e recodificar vídeo
+          consome CPU ou GPU. O aplicativo estima essas contas antes de você
+          entrar ao vivo, mas estimativas são estimativas: o resultado depende
+          da sua máquina, da sua rede e das próprias plataformas.
         </p>
       </LegalSection>
 

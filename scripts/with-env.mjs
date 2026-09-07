@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parseEnv } from "node:util";
+import { parseEnvironment } from "./environment-contract.mjs";
 
 const require = createRequire(import.meta.url);
 const rootEnv = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env");
@@ -23,7 +23,7 @@ export function mergeEnvironment(
   // Native Node dotenv semantics: quoted multiline values, comments, export,
   // empty strings and no shell/$VARIABLE interpolation. A present but EMPTY
   // inherited value still wins (notably TAURI_SIGNING_PRIVATE_KEY_PASSWORD).
-  for (const [key, value] of Object.entries(parseEnv(source))) {
+  for (const [key, value] of Object.entries(parseEnvironment(source))) {
     if (existing.has(normalize(key))) continue;
     Object.defineProperty(env, key, {
       value,

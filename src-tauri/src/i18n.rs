@@ -56,9 +56,11 @@ pub const DEFAULT_LOCALE: Locale = Locale::PtBr;
 
 impl Locale {
     /// Para varrer os dois idiomas em teste.
+    #[cfg(test)]
     pub const ALL: [Locale; 2] = [Locale::PtBr, Locale::En];
 
     /// Tag BCP-47 como o TS grava em `settings.language`.
+    #[cfg(test)]
     pub fn tag(self) -> &'static str {
         match self {
             Locale::PtBr => "pt-BR",
@@ -99,34 +101,54 @@ impl Locale {
 // precisaria lembrar de inicializar o seu, e uma esquecida volta pro padrão
 // calada.
 
-static ACTIVE: AtomicU8 = AtomicU8::new(0); // 0 = pt-BR, 1 = en
-static GENERATION: AtomicU32 = AtomicU32::new(0);
+struct ActiveLocale {
+    value: AtomicU8,
+    generation: AtomicU32,
+}
+
+impl ActiveLocale {
+    const fn new() -> Self {
+        Self {
+            value: AtomicU8::new(0),
+            generation: AtomicU32::new(0),
+        }
+    }
+
+    fn get(&self) -> Locale {
+        if self.value.load(Ordering::Relaxed) == 1 {
+            Locale::En
+        } else {
+            Locale::PtBr
+        }
+    }
+
+    fn set(&self, locale: Locale) {
+        let value = u8::from(locale == Locale::En);
+        if self.value.swap(value, Ordering::Relaxed) != value {
+            self.generation.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+static ACTIVE: ActiveLocale = ActiveLocale::new();
 
 /// Idioma ativo. Chame UMA vez no topo do adapter e passe adiante — não é caro,
 /// mas duas leituras na mesma função podem divergir se o idioma mudar no meio.
 pub fn locale() -> Locale {
-    if ACTIVE.load(Ordering::Relaxed) == 1 {
-        Locale::En
-    } else {
-        Locale::PtBr
-    }
+    ACTIVE.get()
 }
 
 /// Troca o idioma ativo. Chamado no boot (`lib.rs` `.setup()`) e sempre que a
-/// config muda (`save_config` / `import_config` / comando `set_locale`).
+/// config muda (`save_config` / `import_config`).
 pub fn set_locale(l: Locale) {
-    ACTIVE.store(u8::from(l == Locale::En), Ordering::Relaxed);
-    GENERATION.fetch_add(1, Ordering::Relaxed);
+    ACTIVE.set(l);
 }
 
 /// Quantas vezes o idioma foi trocado.
 ///
-/// Serve pra INVALIDAR CACHE de texto já renderizado. O caso concreto é o
-/// `update_tray`, que só reescreve o título da janela quando ele muda: com a
-/// live no ar, o estado do motor não muda na troca de idioma, então sem esta
-/// generation o título fica em português até a próxima transição de estado.
+/// `apply_native_language` atualiza menus/tooltip apenas quando a preferência efetiva muda.
 pub fn generation() -> u32 {
-    GENERATION.load(Ordering::Relaxed)
+    ACTIVE.generation.load(Ordering::Relaxed)
 }
 
 /// `settings.language` → idioma efetivo. Único lugar que sabe o que "auto"
@@ -273,9 +295,8 @@ macro_rules! messages {
                 self.text(locale())
             }
 
-            /// Chave desta mensagem no dicionário do frontend
-            /// (`src/lib/i18n/*.ts`). Serve pra cruzar os dois catálogos por
-            /// script — não use em runtime.
+            /// Identificador estável para validar o catálogo nos testes.
+            #[cfg(test)]
             pub fn key(&self) -> &'static str {
                 match self {
                     $( Msg::$variant { .. } => $key ),*
@@ -380,6 +401,18 @@ messages! {
     VaultSecretTooBig = "rust.vault.secretTooBig" =>
         pt: "segredo excede o limite de 8 KiB",
         en: "that secret is over the 8 KiB limit";
+    VaultDeleteAccessDenied = "rust.vault.deleteAccessDenied" =>
+        pt: "o Windows não permitiu apagar a credencial; desbloqueie o cofre e tente novamente",
+        en: "Windows did not allow deleting the credential; unlock the vault and try again";
+    VaultDeleteFailed = "rust.vault.deleteFailed" =>
+        pt: "não consegui confirmar a exclusão da credencial; tente novamente",
+        en: "I couldn't confirm that the credential was deleted; try again";
+    VaultReadFailed = "rust.vault.readFailed" =>
+        pt: "não consegui consultar o cofre; desbloqueie-o e tente novamente",
+        en: "I couldn't read the vault; unlock it and try again";
+    VaultDeleteIncomplete { failed: usize, total: usize } = "rust.vault.deleteIncomplete" =>
+        pt: "não consegui apagar {failed} de {total} credenciais. A exclusão pode estar incompleta; tente desconectar novamente.",
+        en: "I couldn't delete {failed} of {total} credentials. Deletion may be incomplete; try disconnecting again.";
 
     // ---- upload ------------------------------------------------------------
     UploadMeasureFailed = "rust.upload.measureFailed" =>
@@ -448,6 +481,12 @@ messages! {
     NotifyYoutubeAutoFailedBody = "rust.notify.youtubeAutoFailed.body" =>
         pt: "Vou usar sua configuração manual — confira se a live apareceu no seu canal.",
         en: "I'll use your manual setup — check that the stream showed up on your channel.";
+    NotifyYoutubeCleanupFailedTitle = "rust.notify.youtubeCleanupFailed.title" =>
+        pt: "Confira sua live no YouTube",
+        en: "Check your YouTube stream";
+    NotifyYoutubeCleanupFailedBody = "rust.notify.youtubeCleanupFailed.body" =>
+        pt: "Não consegui confirmar o encerramento. Confira o YouTube Studio; mantive a pendência para tentar novamente.",
+        en: "I couldn't confirm that it ended. Check YouTube Studio; the pending broadcast was kept for another attempt.";
     NotifyBitrateDownTitle = "rust.notify.bitrateDown.title" =>
         pt: "Internet apertou",
         en: "Your internet choked";
@@ -495,6 +534,9 @@ messages! {
     TargetErrorNoConnection = "rust.target.error.noConnection" =>
         pt: "Sem conexão com a plataforma — tentando de novo.",
         en: "No connection to the platform — trying again.";
+    TargetErrorDestinationRefused = "rust.target.error.destinationRefused" =>
+        pt: "Endereço ou chave recusados — confira o destino em Plataformas e clique em Tentar de novo.",
+        en: "Address or key rejected — check the destination in Platforms and click Try again.";
     TargetErrorConnectionDropped = "rust.target.error.connectionDropped" =>
         pt: "A conexão caiu — reconectando.",
         en: "The connection dropped — reconnecting.";
@@ -506,6 +548,21 @@ messages! {
     EngineAlreadyLive = "rust.engine.alreadyLive" =>
         pt: "já está no ar.",
         en: "you're already live.";
+    UpdateInProgress = "rust.update.inProgress" =>
+        pt: "A Corneta está atualizando. Espere ela reabrir antes de começar a live.",
+        en: "Corneta is updating. Wait for it to reopen before starting your stream.";
+    UpdateRequiresStopped = "rust.update.requiresStopped" =>
+        pt: "Encerre a live e espere a gravação terminar antes de atualizar.",
+        en: "End your stream and wait for the recording to finish before updating.";
+    UpdateUnavailable = "rust.update.unavailable" =>
+        pt: "A atualização não está disponível nesta janela ou versão da Corneta.",
+        en: "Updates are not available in this Corneta window or build.";
+    UpdateCheckAgain = "rust.update.checkAgain" =>
+        pt: "Procure atualizações novamente na tela Sobre e tente de novo.",
+        en: "Check for updates again on the About screen, then retry.";
+    UpdateFailed = "rust.update.failed" =>
+        pt: "Não consegui concluir a atualização. Confira sua conexão e tente de novo.",
+        en: "Couldn't complete the update. Check your connection and try again.";
     EngineNoPlatformEnabled = "rust.engine.noPlatformEnabled" =>
         pt: "Nenhuma plataforma ativa.",
         en: "No platforms are turned on.";
@@ -595,9 +652,6 @@ messages! {
         en: "token works";
 
     // ---- diag --------------------------------------------------------------
-    DiagWatchlistOmitted { n: usize } = "rust.diag.watchlistOmitted" =>
-        pt: "<{n} termos omitidos>",
-        en: "<{n} term(s) left out>";
     DiagReportHeader { version: &'a str, os: &'a str, arch: &'a str, config: &'a str } = "rust.diag.reportHeader" =>
         pt: "Corneta {version}\nSO: {os} {arch}\n\nRESUMO DA CONFIGURAÇÃO (somente campos técnicos permitidos)\n{config}\n",
         en: "Corneta {version}\nOS: {os} {arch}\n\nCONFIGURATION SUMMARY (allowlisted technical fields only)\n{config}\n";
@@ -625,6 +679,36 @@ messages! {
         en: "I don't know that setting";
 
     // ---- tray --------------------------------------------------------------
+    TrayOpen = "rust.tray.open" =>
+        pt: "Abrir Corneta",
+        en: "Open Corneta";
+    TrayQuit = "rust.tray.quit" =>
+        pt: "Sair",
+        en: "Quit";
+    ExitTitle = "rust.exit.title" =>
+        pt: "Sair da Corneta?",
+        en: "Quit Corneta?";
+    ExitConfirm = "rust.exit.confirm" =>
+        pt: "Encerrar e sair",
+        en: "End stream and quit";
+    ExitCancel = "rust.exit.cancel" =>
+        pt: "Cancelar",
+        en: "Cancel";
+    ExitLiveWarning = "rust.exit.liveWarning" =>
+        pt: "Você está AO VIVO. Sair encerra a transmissão.",
+        en: "You are LIVE. Quitting ends the stream.";
+    TrayLiveHintTitle = "rust.tray.liveHintTitle" =>
+        pt: "Sua live continua no ar",
+        en: "Your stream is still live";
+    TrayLiveHintBody = "rust.tray.liveHintBody" =>
+        pt: "A Corneta ficou na bandeja, perto do relógio. Pra sair de vez, use o menu da bandeja.",
+        en: "Corneta is in the system tray, near the clock. To quit, use its tray menu.";
+    TrayIdleHintTitle = "rust.tray.idleHintTitle" =>
+        pt: "A Corneta continua aqui",
+        en: "Corneta is still running";
+    TrayIdleHintBody = "rust.tray.idleHintBody" =>
+        pt: "Ela ficou na bandeja, perto do relógio — não fechou. Pra sair de vez, use o menu da bandeja.",
+        en: "It's in the system tray, near the clock — it hasn't closed. To quit, use its tray menu.";
     TrayTooltipIdle = "rust.tray.tooltip.idle" =>
         pt: "Corneta",
         en: "Corneta";
@@ -722,12 +806,15 @@ messages! {
     ChatYoutubeNoActiveLive = "rust.chat.youtube.noActiveLive" =>
         pt: "Nenhuma live ativa no YouTube agora",
         en: "No live stream running on YouTube right now";
-    ChatYoutubeApiError { c: u16, body: &'a str } = "rust.chat.youtube.apiError" =>
-        pt: "YouTube {c}: {body}",
-        en: "YouTube {c}: {body}";
-    ChatYoutubeTransportError { e: &'a str } = "rust.chat.youtube.transportError" =>
-        pt: "YouTube: {e}",
-        en: "YouTube: {e}";
+    ChatYoutubeApiError { c: u16, reason: &'a str } = "rust.chat.youtube.apiError" =>
+        pt: "O YouTube recusou a solicitação (HTTP {c}; código {reason}). Confira sua conta e tente novamente.",
+        en: "YouTube rejected the request (HTTP {c}; code {reason}). Check your account and try again.";
+    ChatYoutubeTransportError = "rust.chat.youtube.transportError" =>
+        pt: "Não consegui conectar ao YouTube. Confira sua conexão e tente novamente.",
+        en: "I couldn't connect to YouTube. Check your connection and try again.";
+    ChatYoutubeApiTemporary { c: u16, reason: &'a str } = "rust.chat.youtube.apiTemporary" =>
+        pt: "O YouTube está indisponível ou limitou os pedidos (HTTP {c}; código {reason}). Aguarde e tente novamente.",
+        en: "YouTube is unavailable or limiting requests (HTTP {c}; code {reason}). Wait and try again.";
 
     // ---- alerts ------------------------------------------------------------
     AlertsTokenInvalidOrExpired = "rust.alerts.tokenInvalidOrExpired" =>
@@ -803,9 +890,6 @@ messages! {
     AuthGoogleNoConnection = "rust.auth.google.noConnection" =>
         pt: "sem conexão com o Google (rede/proxy?)",
         en: "No connection to Google — network or proxy?";
-    AuthGoogleErrorPassthrough { desc: &'a str } = "rust.auth.google.errorPassthrough" =>
-        pt: "Google: {desc}",
-        en: "Google: {desc}";
     AuthGoogleStatus { code: u16 } = "rust.auth.google.status" =>
         pt: "Google respondeu {code}",
         en: "Google answered {code}";
@@ -865,9 +949,6 @@ messages! {
     AuthGoogleWrongDesktopClient = "rust.auth.google.wrongDesktopClient" =>
         pt: "O Client ID do Google precisa ser do tipo Aplicativo para computador",
         en: "That Google Client ID has to be the Desktop app type";
-    AuthGoogleLoginRefused { status: u16 } = "rust.auth.google.loginRefused" =>
-        pt: "Google recusou o login ({status})",
-        en: "Google turned down the login ({status})";
     AuthGoogleNoRefreshableSession = "rust.auth.google.noRefreshableSession" =>
         pt: "O Google não retornou uma sessão renovável",
         en: "Google didn't send back a session I can renew";
@@ -943,21 +1024,18 @@ messages! {
     AuthYoutubeBadResponse = "rust.auth.youtube.badResponse" =>
         pt: "YouTube: resposta inválida",
         en: "YouTube: I couldn't read that answer";
-    AuthYoutubeStreamNoId = "rust.auth.youtube.streamNoId" =>
-        pt: "YouTube: stream sem id",
-        en: "YouTube: the stream came back with no id";
-    AuthYoutubeNoIngestionInfo = "rust.auth.youtube.noIngestionInfo" =>
-        pt: "YouTube: sem ingestionInfo",
-        en: "YouTube: no ingestionInfo came back";
-    AuthYoutubeNoIngestionAddress = "rust.auth.youtube.noIngestionAddress" =>
-        pt: "YouTube: sem ingestionAddress",
-        en: "YouTube: no ingestionAddress came back";
-    AuthYoutubeNoStreamName = "rust.auth.youtube.noStreamName" =>
-        pt: "YouTube: sem streamName",
-        en: "YouTube: no streamName came back";
-    AuthYoutubeBroadcastNoId = "rust.auth.youtube.broadcastNoId" =>
-        pt: "YouTube: broadcast sem id",
-        en: "YouTube: the broadcast came back with no id";
+    YoutubeRecoveryVaultFailed = "rust.youtubeRecovery.vaultFailed" =>
+        pt: "Não consegui salvar ou consultar a recuperação da live no cofre. O YouTube automático não vai continuar; confira o YouTube Studio e tente novamente.",
+        en: "I couldn't save or read stream recovery in the vault. YouTube autopilot will not continue; check YouTube Studio and try again.";
+    YoutubeRecoveryPending = "rust.youtubeRecovery.pending" =>
+        pt: "Ainda há uma transmissão do YouTube pendente. Se ela não começou, cancele o agendamento no YouTube Studio; depois use Recuperar YouTube em Chat > Contas.",
+        en: "A YouTube broadcast is still pending. If it hasn't started, cancel it in YouTube Studio, then use Recover YouTube in Chat > Accounts.";
+    YoutubeCreationUnknown = "rust.youtubeRecovery.creationUnknown" =>
+        pt: "O YouTube não confirmou se criou a transmissão. Confira e encerre qualquer live pendente no YouTube Studio; depois use Recuperar YouTube em Chat > Contas.",
+        en: "YouTube didn't confirm whether it created the broadcast. Check and end any pending stream in YouTube Studio, then use Recover YouTube in Chat > Accounts.";
+    YoutubeCreationCancelled = "rust.youtubeRecovery.cancelled" =>
+        pt: "A criação automática no YouTube foi cancelada.",
+        en: "Automatic YouTube broadcast creation was cancelled.";
 
     // ---- moderate ----------------------------------------------------------
     ModeratePlatformUnsupported = "rust.moderate.platformUnsupported" =>
@@ -1155,17 +1233,17 @@ mod tests {
         assert_eq!(Locale::from_tag("auto"), None);
     }
 
-    /// O global é do processo inteiro; o teste devolve como estava pra não
-    /// contaminar quem rodar em paralelo.
     #[test]
     fn locale_ativo_troca_e_marca_a_generation() {
-        let antes = locale();
-        let g = generation();
-        set_locale(Locale::En);
-        assert_eq!(locale(), Locale::En);
-        set_locale(Locale::PtBr);
-        assert_eq!(locale(), Locale::PtBr);
-        assert!(generation() > g);
-        set_locale(antes);
+        // Instância isolada: nenhum teste paralelo observa uma troca de idioma global.
+        let active = ActiveLocale::new();
+        active.set(Locale::En);
+        assert_eq!(active.get(), Locale::En);
+        assert_eq!(active.generation.load(Ordering::Relaxed), 1);
+        active.set(Locale::En);
+        assert_eq!(active.generation.load(Ordering::Relaxed), 1);
+        active.set(Locale::PtBr);
+        assert_eq!(active.get(), Locale::PtBr);
+        assert_eq!(active.generation.load(Ordering::Relaxed), 2);
     }
 }

@@ -1,5 +1,4 @@
 //! Gravação do PROGRAMA em disco — o vídeo que alimenta o replay do relatório.
-//! Ver docs/FEATURE-GRAVACAO-E-REPLAY.md.
 //!
 //! ------------------------------------------------------------
 //! A REGRA QUE MANDA NO DESENHO
@@ -9,7 +8,7 @@
 //! morre, escreve o motivo na sessão, avisa por toast, e a transmissão não sente nada.
 //! Nenhum erro daqui sobe pro caminho que decide o estado do motor.
 //!
-//! A hierarquia de sacrifício (§9.1 do doc), quando duas coisas não cabem:
+//! A hierarquia de sacrifício, quando duas coisas não cabem:
 //!   1. a transmissão · 2. o relatório · 3. o chat gravado · 4. o vídeo (o primeiro a cair)
 //!
 //! ------------------------------------------------------------

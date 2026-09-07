@@ -1,7 +1,19 @@
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const eslint = new ESLint();
+// Loading the TypeScript/React plugins is setup, not the behavior under test.
+beforeAll(async () => {
+  await eslint.calculateConfigForFile("scripts/smoke-reports.mjs");
+}, 30_000);
+it("rejects browser globals accidentally used in the Node smoke harness", async () => {
+  const [result] = await eslint.lintText("console.log(document.title);", {
+    filePath: "scripts/smoke-reports.mjs",
+  });
+  expect(result.messages.some((message) => message.ruleId === "no-undef")).toBe(
+    true,
+  );
+});
 describe("lint contract for new desktop code", () => {
   it.each([
     ["@typescript-eslint/no-explicit-any", "export const value: any = 1;"],

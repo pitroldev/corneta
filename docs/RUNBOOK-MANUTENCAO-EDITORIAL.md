@@ -12,8 +12,7 @@ links ainda ajudam alguém a resolver a tarefa descrita.
 - `sources[].reviewedAt`: última vez em que aquela fonte específica foi
   conferida.
 - `reviewIntervalDays`: prazo máximo entre revisões. Comparativos usam de 60 a
-  90 dias; conteúdo volátil usa no máximo 90; conceitos estáveis podem usar
-  180.
+  90 dias; conteúdo volátil usa no máximo 90; conceitos estáveis podem usar 180.
 
 Alterar uma instrução, conclusão, recomendação, screenshot ou dado relevante
 exige avanço de `updatedAt`. Conferir tudo e concluir que continua correto
@@ -26,14 +25,15 @@ Na raiz de `web`, rode:
 
 ```powershell
 pnpm content:maintenance
-pnpm content:maintenance -- --as-of 2026-08-02 --warning-days 28
+pnpm content:maintenance --as-of 2026-08-02 --warning-days 28
 pnpm content:maintenance:check
 ```
 
 O último comando falha quando existe artigo vencido. O workflow
-`Editorial maintenance` roda toda segunda-feira, publica o resumo na execução e
+`Editorial maintenance` está agendado para segunda-feira, publica o resumo na execução e
 mantém uma issue com a label `editorial-maintenance`. Um novo ciclo só começa
-28 dias depois do encerramento do anterior.
+28 dias depois do encerramento do anterior. Em forks, essa automação externa fica
+desligada até configurar `ENABLE_EDITORIAL_AUTOMATION=true`; os checks locais continuam disponíveis.
 
 ## Como revisar um artigo
 
@@ -48,6 +48,11 @@ mantém uma issue com a label `editorial-maintenance`. Um novo ciclo só começa
    apenas `reviewedAt`.
 6. Rode `pnpm content:check` e os testes do site antes de enviar.
 
+Se a revisão se limitar a uma fonte interna alterada, confira suas alegações dependentes e
+descreva esse escopo no PR. Avance somente as datas realmente justificadas; não atualize
+`testedWith`, fontes externas ou capturas que não foram revalidados. A distinção entre
+revisão documental e teste do produto está no [contrato editorial](../web/content/README.md).
+
 ## Mudanças de produto e releases
 
 Artigos podem declarar arquivos internos em `sources[].repoPath`. Em pull
@@ -55,12 +60,17 @@ requests, o CI cruza esses caminhos com o diff e exige nova revisão do artigo e
 da fonte afetada. Na release, o mesmo gate compara a tag atual com a tag
 anterior e também exige que `productVersion` corresponda à versão publicada.
 
-Para reproduzir localmente:
+Para reproduzir, execute da raiz do repositório. Substitua `BASE_REF` pela tag ou pelo
+commit de referência disponível localmente; use a versão do produto que está revisando:
 
 ```powershell
-pnpm --dir web content:revision:check -- --base origin/main --head HEAD
-pnpm --dir web content:revision:check -- --base v0.6.0 --head HEAD --product-version 0.7.0
+pnpm --dir web content:revision:check --base origin/main --head HEAD
+pnpm --dir web content:revision:check --base BASE_REF --head HEAD --product-version 0.7.0
 ```
+
+O diff de fontes usado pelo comando compara as referências Git, não alterações ainda sem
+commit. A comparação de conteúdo normaliza formatação nos dois corpos com o Prettier
+fixado no lockfile; apenas alinhar tabelas ou quebrar linhas não exige `updatedAt` novo.
 
 Se uma mudança relevante não acionar o gate, adicione ao artigo o `repoPath`
 mais próximo do comportamento documentado. Não use um diretório amplo como

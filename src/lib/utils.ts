@@ -11,9 +11,6 @@ export function errMsg(e: unknown): string {
   return String(e).replace(/^Error:\s*/, "");
 }
 
-// Bitrate mudou de casa: virou `fmt.bitrate` (src/lib/i18n/format.ts). Aqui ele
-// cravava a vírgula decimal do português na mão, e em inglês saía "8,5 Mbps".
-
 /** Resolução em linguagem de gente ("1080p 60fps"; vertical: "720p vertical 30fps"). */
 export function fmtResolution(w: number, h: number, fps: number): string {
   const vertical = h > w;

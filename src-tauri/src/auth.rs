@@ -20,6 +20,11 @@ use crate::keys;
 use crate::telemetry::TelemetryCorrelation;
 use crate::AppState;
 
+mod youtube_broadcast;
+mod youtube_error;
+use youtube_broadcast::{Error as BroadcastError, Recovery as YoutubeRecovery, RemoteState};
+use youtube_error::GoogleError;
+
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast";
 // O escopo `youtube` cobre criar/encerrar broadcast e ler/enviar no chat ao vivo. O fallback
@@ -349,29 +354,19 @@ fn refresh_broker_config(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Mensagem legível de um erro do endpoint OAuth do Google (device/token). Evita o genérico
-/// "não consegui iniciar o login" — mostra a causa real (o caso comum é cliente do tipo errado,
-/// que o Google recusa com `invalid_client`). Seguro: o pedido de device_code só manda o
-/// client_id (público) + escopo, então a resposta de erro não carrega segredo.
+/// Traduz apenas códigos conhecidos; descrições do provedor podem refletir dados do pedido.
 fn google_oauth_err(code: u16, e: &Value, l: Locale) -> String {
     let err = e.get("error").and_then(|x| x.as_str()).unwrap_or("");
-    let desc = e
-        .get("error_description")
-        .and_then(|x| x.as_str())
-        .unwrap_or("");
     match err {
         "invalid_client" | "unauthorized_client" => Msg::AuthGoogleWrongClientType.text(l),
         _ if code == 0 => Msg::AuthGoogleNoConnection.text(l),
-        _ if !desc.is_empty() => Msg::AuthGoogleErrorPassthrough { desc }.text(l),
-        _ if !err.is_empty() => Msg::AuthGoogleErrorPassthrough { desc: err }.text(l),
         _ => Msg::AuthGoogleStatus { code }.text(l),
     }
 }
 
 // ---- Forms de token do YouTube -------------------------------------
-// Extraídos em funções puras porque a decisão Y1 (docs/DECISAO-OAUTH-VIA-API.md) vive exatamente
-// aqui: o fluxo oficial NÃO manda `client_secret`, e é isso que o mantém sem segredo no binário.
-// Um teste trava cada um desses forms pra ninguém "consertar" o oficial acrescentando o secret.
+// O fluxo oficial não manda `client_secret`, evitando embutir esse segredo no binário.
+// Os forms puros têm testes que preservam essa diferença em relação ao BYOK.
 
 /// Troca do fluxo OFICIAL (Authorization Code + PKCE, cliente Desktop). Sem `client_secret` de
 /// propósito: o Google marca o campo como opcional aqui e o `code_verifier` faz a prova de posse.
@@ -484,12 +479,31 @@ pub fn set_oauth_config(
 }
 
 /// Sessão do YouTube fora: tokens do cofre + caches em memória. Não toca em credenciais.
-fn forget_youtube_session() {
-    let _ = keys::clear_key("youtube_oauth");
-    let _ = keys::clear_key("youtube_refresh");
-    let _ = keys::clear_key("youtube_oauth_mode");
-    *YT_TOKEN.lock().unwrap() = None;
-    *YT_CHAT.lock().unwrap() = None;
+fn forget_youtube_session() -> Result<(), String> {
+    let _guard = YT_REFRESH_LOCK
+        .lock()
+        .map_err(|_| Msg::VaultDeleteFailed.now())?;
+    finish_local_logout(
+        || keys::clear_keys(&["youtube_refresh", "youtube_oauth", "youtube_oauth_mode"]),
+        || {
+            *YT_TOKEN.lock().unwrap() = None;
+            *YT_CHAT.lock().unwrap() = None;
+        },
+        || {},
+    )
+}
+
+/// Invalidate volatile tokens even on partial deletion, but announce completion only on success.
+fn finish_local_logout(
+    delete: impl FnOnce() -> Result<(), String>,
+    invalidate_cache: impl FnOnce(),
+    completed: impl FnOnce(),
+) -> Result<(), String> {
+    let result = delete();
+    invalidate_cache();
+    result?;
+    completed();
+    Ok(())
 }
 
 /// Reaplica o modo do YouTube na config ativa e avisa a UI que a sessão caiu.
@@ -511,10 +525,10 @@ pub fn set_youtube_oauth(
     if id.is_empty() || secret.is_empty() {
         return Err(Msg::AuthByokFillClientIdAndSecret.now());
     }
+    forget_youtube_session()?;
     keys::set_key("youtube_client_id", id)?;
     keys::set_key("youtube_client_secret", secret)?;
     keys::set_key("youtube_oauth_preference", "byok")?;
-    forget_youtube_session();
     youtube_mode_changed(&app);
     Ok(())
 }
@@ -531,8 +545,8 @@ pub fn youtube_use_official(app: AppHandle) -> Result<(), String> {
             Ok(()) => Msg::AuthYoutubeOfficialNotEnabled.now(),
         });
     }
+    forget_youtube_session()?;
     keys::set_key("youtube_oauth_preference", "official")?;
-    forget_youtube_session();
     youtube_mode_changed(&app);
     Ok(())
 }
@@ -543,8 +557,8 @@ pub fn youtube_use_own_creds(app: AppHandle) -> Result<(), String> {
     if own_creds("youtube_client_id", "youtube_client_secret").is_none() {
         return Err(Msg::AuthByokNoSavedCreds.now());
     }
+    forget_youtube_session()?;
     keys::set_key("youtube_oauth_preference", "byok")?;
-    forget_youtube_session();
     youtube_mode_changed(&app);
     Ok(())
 }
@@ -552,23 +566,28 @@ pub fn youtube_use_own_creds(app: AppHandle) -> Result<(), String> {
 /// Esquece as credenciais do Google e desloga (pra trocar de conta/projeto). Ação destrutiva de
 /// verdade: a UI só oferece quando o login oficial está pronto pra assumir.
 #[tauri::command]
-pub fn clear_youtube_oauth(app: AppHandle) {
-    for k in [
+pub fn clear_youtube_oauth(app: AppHandle) -> Result<(), String> {
+    let credentials = keys::clear_keys(&[
         "youtube_client_id",
         "youtube_client_secret",
         "youtube_oauth_preference",
-    ] {
-        let _ = keys::clear_key(k);
-    }
-    forget_youtube_session();
+    ]);
+    let session = forget_youtube_session();
+    credentials?;
+    session?;
     youtube_mode_changed(&app);
+    Ok(())
 }
 
-fn forget_kick_session() {
-    let _ = keys::clear_key("kick_oauth");
-    let _ = keys::clear_key("kick_refresh");
-    let _ = keys::clear_key("kick_oauth_mode");
-    KICK_IDS.lock().unwrap().clear();
+fn forget_kick_session() -> Result<(), String> {
+    let _guard = KICK_REFRESH_LOCK
+        .lock()
+        .map_err(|_| Msg::VaultDeleteFailed.now())?;
+    finish_local_logout(
+        || keys::clear_keys(&["kick_refresh", "kick_oauth", "kick_oauth_mode"]),
+        || KICK_IDS.lock().unwrap().clear(),
+        || {},
+    )
 }
 
 fn kick_mode_changed(app: &AppHandle) {
@@ -587,10 +606,10 @@ pub fn set_kick_oauth(
     if id.is_empty() || secret.is_empty() || id.len() > 512 || secret.len() > 512 {
         return Err(Msg::AuthKickFillValidCreds.now());
     }
+    forget_kick_session()?;
     keys::set_key("kick_client_id", id)?;
     keys::set_key("kick_client_secret", secret)?;
     keys::set_key("kick_oauth_preference", "byok")?;
-    forget_kick_session();
     kick_mode_changed(&app);
     Ok(())
 }
@@ -607,8 +626,8 @@ pub fn kick_use_official(app: AppHandle) -> Result<(), String> {
             Ok(()) => Msg::AuthKickOfficialNotEnabled.now(),
         });
     }
+    forget_kick_session()?;
     keys::set_key("kick_oauth_preference", "official")?;
-    forget_kick_session();
     kick_mode_changed(&app);
     Ok(())
 }
@@ -618,23 +637,24 @@ pub fn kick_use_own_creds(app: AppHandle) -> Result<(), String> {
     if own_creds("kick_client_id", "kick_client_secret").is_none() {
         return Err(Msg::AuthByokNoSavedCreds.now());
     }
+    forget_kick_session()?;
     keys::set_key("kick_oauth_preference", "byok")?;
-    forget_kick_session();
     kick_mode_changed(&app);
     Ok(())
 }
 
 #[tauri::command]
-pub fn clear_kick_oauth(app: AppHandle) {
-    for key in [
+pub fn clear_kick_oauth(app: AppHandle) -> Result<(), String> {
+    let credentials = keys::clear_keys(&[
         "kick_client_id",
         "kick_client_secret",
         "kick_oauth_preference",
-    ] {
-        let _ = keys::clear_key(key);
-    }
-    forget_kick_session();
+    ]);
+    let session = forget_kick_session();
+    credentials?;
+    session?;
     kick_mode_changed(&app);
+    Ok(())
 }
 
 /// Estado de login das plataformas (pro frontend semear no boot). Renova se preciso.
@@ -815,10 +835,19 @@ pub fn twitch_login_start(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn twitch_logout(app: AppHandle) {
-    let _ = keys::clear_key("twitch_oauth");
-    let _ = keys::clear_key("twitch_refresh");
-    auth_event(&app, "twitch", "loggedout", "", "", "");
+pub async fn twitch_logout(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = TWITCH_REFRESH_LOCK
+            .lock()
+            .map_err(|_| Msg::VaultDeleteFailed.now())?;
+        finish_local_logout(
+            || keys::clear_keys(&["twitch_refresh", "twitch_oauth"]),
+            || {},
+            || auth_event(&app, "twitch", "loggedout", "", "", ""),
+        )
+    })
+    .await
+    .map_err(|_| Msg::VaultDeleteFailed.now())?
 }
 
 /// Access token Twitch da conta válido (refresh se preciso). None = não logado.
@@ -984,7 +1013,7 @@ pub fn youtube_login_start(app: AppHandle) {
                     let _ = keys::set_key("youtube_oauth_mode", "byok");
                     return auth_event(&app, "youtube", "connected", "", "", "");
                 }
-                Err((_, e)) => {
+                Err((status, e)) => {
                     let err = e.get("error").and_then(|x| x.as_str()).unwrap_or("");
                     if err == "authorization_pending" || err.is_empty() {
                         continue;
@@ -993,7 +1022,14 @@ pub fn youtube_login_start(app: AppHandle) {
                         std::thread::sleep(Duration::from_secs(interval));
                         continue;
                     }
-                    return auth_event(&app, "youtube", "error", "", "", err);
+                    return auth_event(
+                        &app,
+                        "youtube",
+                        "error",
+                        "",
+                        "",
+                        &google_oauth_err(status, &e, i18n::locale()),
+                    );
                 }
             }
         }
@@ -1075,18 +1111,10 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
     ) {
         Ok(value) => value,
         Err((status, body)) => {
-            let description = body
-                .get("error_description")
-                .and_then(|value| value.as_str())
-                .or_else(|| body.get("error").and_then(|value| value.as_str()));
-            let message = if matches!(description, Some("invalid_client")) {
+            let message = if body.get("error").and_then(Value::as_str) == Some("invalid_client") {
                 Msg::AuthGoogleWrongDesktopClient.now()
-            } else if status == 0 {
-                Msg::AuthGoogleNoConnection.now()
-            } else if let Some(description) = description {
-                Msg::AuthGoogleErrorPassthrough { desc: description }.now()
             } else {
-                Msg::AuthGoogleLoginRefused { status }.now()
+                google_oauth_err(status, &body, i18n::locale())
             };
             return auth_event(app, "youtube", "error", "", "", &message);
         }
@@ -1126,21 +1154,27 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
 }
 
 #[tauri::command]
-pub fn youtube_logout(app: AppHandle) {
-    let _ = keys::clear_key("youtube_oauth");
-    let _ = keys::clear_key("youtube_refresh");
-    let _ = keys::clear_key("youtube_oauth_mode");
-    *YT_TOKEN.lock().unwrap() = None;
-    *YT_CHAT.lock().unwrap() = None;
-    auth_event(&app, "youtube", "loggedout", "", "", "");
+pub async fn youtube_logout(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        finish_local_logout(
+            forget_youtube_session,
+            || {},
+            || auth_event(&app, "youtube", "loggedout", "", "", ""),
+        )
+    })
+    .await
+    .map_err(|_| Msg::VaultDeleteFailed.now())?
 }
 
 // Cache do access token (Google expira em ~1h) e do liveChatId (resolve é quota).
 static YT_TOKEN: Mutex<Option<(String, u64)>> = Mutex::new(None);
 static YT_CHAT: Mutex<Option<(String, u64)>> = Mutex::new(None);
+static YT_REFRESH_LOCK: Mutex<()> = Mutex::new(());
 
 /// Access token YouTube válido (refresh quando perto de expirar). None = não logado.
 pub fn youtube_token(app: &AppHandle) -> Option<String> {
+    // Serialize refresh and logout so an in-flight refresh cannot recreate deleted tokens.
+    let _guard = YT_REFRESH_LOCK.lock().ok()?;
     let now = now_ms();
     if let Some((t, exp)) = &*YT_TOKEN.lock().unwrap() {
         if *exp > now + 30_000 {
@@ -1225,13 +1259,22 @@ pub fn youtube_send(app: &AppHandle, text: &str) -> Result<(), String> {
 
 // ----------------------------- HTTP helpers ------------------------
 
-/// Chamada JSON ao Google (Bearer). Retorna o corpo ou um erro legível.
+/// Chamada JSON ao Google (Bearer). O erro público nunca contém corpo/URL do provedor.
 fn google_json(
     method: &str,
     url: &str,
     token: &str,
     body: Option<&Value>,
 ) -> Result<String, String> {
+    google_json_typed(method, url, token, body).map_err(GoogleError::message)
+}
+
+fn google_json_typed(
+    method: &str,
+    url: &str,
+    token: &str,
+    body: Option<&Value>,
+) -> Result<String, GoogleError> {
     let req = match method {
         "POST" => ureq::post(url),
         "PUT" => ureq::request("PUT", url),
@@ -1247,13 +1290,9 @@ fn google_json(
         None => req.call(),
     };
     match res {
-        Ok(r) => Ok(r.into_string().unwrap_or_default()),
-        Err(ureq::Error::Status(c, r)) => Err(Msg::ChatYoutubeApiError {
-            c,
-            body: &r.into_string().unwrap_or_default(),
-        }
-        .now()),
-        Err(e) => Err(Msg::ChatYoutubeTransportError { e: &e.to_string() }.now()),
+        Ok(r) => r.into_string().map_err(|_| GoogleError::InvalidResponse),
+        Err(ureq::Error::Status(c, r)) => Err(GoogleError::response(c, r.into_reader())),
+        Err(_) => Err(GoogleError::Transport),
     }
 }
 
@@ -1556,9 +1595,21 @@ pub fn kick_login_start(app: AppHandle) {
     });
 }
 
-/// Servidor loopback (IPv4+IPv6) de uso único: espera o GET /callback?code=...&state=..., confere
-/// o state (CSRF), trata negação (`error`, só com state correto) e IGNORA conexões espúrias ou
-/// forjadas (preconnect/favicon/state errado) em vez de matar o login. Timeout de 5 min.
+fn oauth_callback_error(provider: &str, detail: &str) -> String {
+    // Google callbacks can reflect request data in error_description, too.
+    let safe_detail = if provider == "YouTube" {
+        "authorization_failed"
+    } else {
+        detail
+    };
+    Msg::AuthAuthorizationDenied {
+        provider,
+        err: safe_detail,
+    }
+    .now()
+}
+
+/// Servidor loopback de uso único: confere state e ignora callbacks forjados. Timeout de 5 min.
 fn oauth_wait(
     listeners: &[TcpListener],
     expected_state: &str,
@@ -1642,11 +1693,7 @@ fn oauth_wait(
             }
             // `error` só é definitivo se veio com o state correto (senão pode ser forjado).
             if state_ok && !err.is_empty() {
-                return Err(Msg::AuthAuthorizationDenied {
-                    provider,
-                    err: &err,
-                }
-                .now());
+                return Err(oauth_callback_error(provider, &err));
             }
             // conexão espúria ou state errado/ausente → ignora e segue esperando o callback real.
         }
@@ -1720,12 +1767,16 @@ fn kick_exchange(
 }
 
 #[tauri::command]
-pub fn kick_logout(app: AppHandle) {
-    let _ = keys::clear_key("kick_oauth");
-    let _ = keys::clear_key("kick_refresh");
-    let _ = keys::clear_key("kick_oauth_mode");
-    KICK_IDS.lock().unwrap().clear();
-    auth_event(&app, "kick", "loggedout", "", "", "");
+pub async fn kick_logout(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        finish_local_logout(
+            forget_kick_session,
+            || {},
+            || auth_event(&app, "kick", "loggedout", "", "", ""),
+        )
+    })
+    .await
+    .map_err(|_| Msg::VaultDeleteFailed.now())?
 }
 
 // Serializa o refresh: o Kick rotaciona o refresh token, então duas threads renovando juntas
@@ -1774,11 +1825,12 @@ fn kick_refresh(app: &AppHandle) -> Option<String> {
             // Só apaga se o refresh que falhou ainda for o gravado — senão apagaria tokens
             // recém-renovados por outro fluxo (ex.: re-login concluído nesse meio-tempo).
             if dead && keys::get_key("kick_refresh").as_deref() == Some(atual.as_str()) {
-                let _ = keys::clear_key("kick_oauth");
-                let _ = keys::clear_key("kick_refresh");
-                let _ = keys::clear_key("kick_oauth_mode");
+                let deleted = keys::clear_keys(&["kick_refresh", "kick_oauth", "kick_oauth_mode"]);
                 KICK_IDS.lock().unwrap().clear();
-                auth_event(app, "kick", "loggedout", "", "", "");
+                match deleted {
+                    Ok(()) => auth_event(app, "kick", "loggedout", "", "", ""),
+                    Err(error) => auth_event(app, "kick", "error", "", "", &error),
+                }
             }
             return None;
         }
@@ -2178,11 +2230,11 @@ fn rfc3339_utc(secs: u64) -> String {
 }
 
 /// liveStream reutilizável (chave RTMP fixa). Reusa o do cofre; cria se faltar.
-fn youtube_reusable_stream(token: &str) -> Result<(String, String, String), String> {
+fn youtube_reusable_stream(token: &str) -> Result<(String, String, String), BroadcastError> {
     if let (Some(id), Some(addr), Some(key)) = (
-        keys::get_key("youtube_stream_id"),
-        keys::get_key("youtube_ingest_addr"),
-        keys::get_key("youtube_stream_key"),
+        keys::read_key("youtube_stream_id").map_err(|_| BroadcastError::Vault)?,
+        keys::read_key("youtube_ingest_addr").map_err(|_| BroadcastError::Vault)?,
+        keys::read_key("youtube_stream_key").map_err(|_| BroadcastError::Vault)?,
     ) {
         if !id.is_empty() && !addr.is_empty() && !key.is_empty() {
             return Ok((id, addr, key));
@@ -2193,127 +2245,353 @@ fn youtube_reusable_stream(token: &str) -> Result<(String, String, String), Stri
         "cdn": { "ingestionType": "rtmp", "resolution": "variable", "frameRate": "variable" },
         "contentDetails": { "isReusable": true }
     });
-    let resp = google_json(
+    let resp = google_json_typed(
         "POST",
         "https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn,contentDetails",
         token,
         Some(&body),
     )?;
-    let v: Value = serde_json::from_str(&resp).map_err(|_| Msg::AuthYoutubeBadResponse.now())?;
+    let v: Value = serde_json::from_str(&resp).map_err(|_| GoogleError::InvalidResponse)?;
     let id = v
         .get("id")
         .and_then(|x| x.as_str())
-        .ok_or_else(|| Msg::AuthYoutubeStreamNoId.now())?
+        .filter(|id| youtube_broadcast::valid_id(id))
+        .ok_or(GoogleError::InvalidResponse)?
         .to_string();
     let info = v
         .get("cdn")
         .and_then(|c| c.get("ingestionInfo"))
-        .ok_or_else(|| Msg::AuthYoutubeNoIngestionInfo.now())?;
+        .ok_or(GoogleError::InvalidResponse)?;
     let addr = info
         .get("ingestionAddress")
         .and_then(|x| x.as_str())
-        .ok_or_else(|| Msg::AuthYoutubeNoIngestionAddress.now())?
+        .ok_or(GoogleError::InvalidResponse)?
         .to_string();
     let key = info
         .get("streamName")
         .and_then(|x| x.as_str())
-        .ok_or_else(|| Msg::AuthYoutubeNoStreamName.now())?
+        .ok_or(GoogleError::InvalidResponse)?
         .to_string();
-    let _ = keys::set_key("youtube_stream_id", &id);
-    let _ = keys::set_key("youtube_ingest_addr", &addr);
-    let _ = keys::set_key("youtube_stream_key", &key);
+    // ID is the commit marker for the three legacy cache slots; never pair a new key with an old ID.
+    keys::clear_key("youtube_stream_id").map_err(|_| BroadcastError::Vault)?;
+    keys::set_key("youtube_ingest_addr", &addr).map_err(|_| BroadcastError::Vault)?;
+    keys::set_key("youtube_stream_key", &key).map_err(|_| BroadcastError::Vault)?;
+    keys::set_key("youtube_stream_id", &id).map_err(|_| BroadcastError::Vault)?;
     Ok((id, addr, key))
 }
 
-fn youtube_bind(token: &str, broadcast_id: &str, stream_id: &str) -> Result<(), String> {
+fn youtube_bind(token: &str, broadcast_id: &str, stream_id: &str) -> Result<(), GoogleError> {
     let url = format!(
-        "https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id={broadcast_id}&streamId={stream_id}&part=id,contentDetails"
+        "https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id={}&streamId={}&part=id,contentDetails", pct(broadcast_id), pct(stream_id)
     );
-    google_json("POST", &url, token, None).map(|_| ())
+    google_json_typed("POST", &url, token, None).map(|_| ())
 }
 
-/// Cria a transmissão pública do YouTube (autostart) e amarra ao ingest reutilizável.
-/// Retorna (ingestionAddress, streamKey); guarda o broadcastId no cofre pra encerrar no corte.
+static YT_BROADCAST: Mutex<YoutubeRecovery> = Mutex::new(YoutubeRecovery::new());
+
+struct YoutubeBroadcastStore;
+impl youtube_broadcast::Store for YoutubeBroadcastStore {
+    fn read(&mut self) -> Result<Option<String>, ()> {
+        keys::read_key("youtube_live_broadcast").map_err(|_| ())
+    }
+    fn write(&mut self, value: &str) -> Result<(), ()> {
+        keys::set_key("youtube_live_broadcast", value).map_err(|_| ())
+    }
+    fn clear(&mut self) -> Result<(), ()> {
+        keys::clear_key("youtube_live_broadcast").map_err(|_| ())
+    }
+}
+
+struct YoutubeBroadcastRemote {
+    token: Option<String>,
+}
+impl YoutubeBroadcastRemote {
+    fn token(&self) -> Result<&str, BroadcastError> {
+        self.token.as_deref().ok_or(BroadcastError::SignIn)
+    }
+}
+
+fn youtube_remote_state(value: &Value, expected_id: &str) -> Result<RemoteState, GoogleError> {
+    if value.get("id").and_then(Value::as_str) != Some(expected_id) {
+        return Err(GoogleError::InvalidResponse);
+    }
+    match value
+        .pointer("/status/lifeCycleStatus")
+        .and_then(Value::as_str)
+    {
+        Some("created") => Ok(RemoteState::Created),
+        Some("ready") => Ok(RemoteState::Ready),
+        Some("live") => Ok(RemoteState::Live),
+        Some("testing") => Ok(RemoteState::Testing),
+        Some("complete") => Ok(RemoteState::Complete),
+        Some("revoked") => Ok(RemoteState::Revoked),
+        Some("liveStarting" | "testStarting") => Ok(RemoteState::Starting),
+        _ => Err(GoogleError::InvalidResponse),
+    }
+}
+
+impl youtube_broadcast::Remote for YoutubeBroadcastRemote {
+    fn create(&mut self, title: &str) -> Result<String, BroadcastError> {
+        let token = self.token()?;
+        let start = rfc3339_utc(now_ms() / 1000 + 60); // ISO 8601 no futuro (obrigatório)
+        let title: String = title.chars().take(100).collect();
+        // autoStop=false: numa queda longa (sem o slate BRB), o autostop ENCERRARIA a live de vez e a
+        // reconexão não a reviveria. Encerramos explicitamente no corte (e limpamos pendência no start).
+        let body = json!({
+            "snippet": { "title": title, "scheduledStartTime": start },
+            "status": { "privacyStatus": "public", "selfDeclaredMadeForKids": false },
+            "contentDetails": {
+                "enableAutoStart": true,
+                "enableAutoStop": false,
+                "monitorStream": { "enableMonitorStream": false }
+            }
+        });
+        let resp = google_json_typed(
+        "POST",
+        "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails",
+        token,
+        Some(&body),
+    )?;
+        let v: Value = serde_json::from_str(&resp).map_err(|_| GoogleError::InvalidResponse)?;
+        let broadcast_id = v
+            .get("id")
+            .and_then(|x| x.as_str())
+            .filter(|id| youtube_broadcast::valid_id(id))
+            .ok_or(GoogleError::InvalidResponse)?
+            .to_string();
+        Ok(broadcast_id)
+    }
+
+    fn status(&mut self, id: &str) -> Result<RemoteState, BroadcastError> {
+        let url = format!(
+            "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,status&id={}",
+            pct(id)
+        );
+        let body = match google_json_typed("GET", &url, self.token()?, None) {
+            Ok(body) => body,
+            Err(error) if error.is_missing_broadcast() => return Ok(RemoteState::Missing),
+            Err(error) => return Err(error.into()),
+        };
+        let value: Value = serde_json::from_str(&body).map_err(|_| GoogleError::InvalidResponse)?;
+        let items = value
+            .get("items")
+            .and_then(Value::as_array)
+            .ok_or(GoogleError::InvalidResponse)?;
+        match items.as_slice() {
+            [] => Ok(RemoteState::Missing),
+            [item] => youtube_remote_state(item, id).map_err(Into::into),
+            _ => Err(GoogleError::InvalidResponse.into()),
+        }
+    }
+
+    fn complete(&mut self, id: &str) -> Result<RemoteState, BroadcastError> {
+        let url = format!("https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id={}&part=id,status", pct(id));
+        let body = match google_json_typed("POST", &url, self.token()?, None) {
+            Ok(body) => body,
+            Err(error) if error.is_missing_broadcast() => return Ok(RemoteState::Missing),
+            Err(error) => return Err(error.into()),
+        };
+        let value: Value = serde_json::from_str(&body).map_err(|_| GoogleError::InvalidResponse)?;
+        youtube_remote_state(&value, id).map_err(Into::into)
+    }
+
+    fn connect(&mut self, broadcast_id: &str) -> Result<(String, String), BroadcastError> {
+        let token = self.token()?;
+        // stream reutilizável + bind (recria o stream SÓ se ele sumiu na conta — não em erro transitório).
+        let (mut sid, mut addr, mut key) = youtube_reusable_stream(token)?;
+        if let Err(e) = youtube_bind(token, broadcast_id, &sid) {
+            if !e.is_missing_stream() {
+                return Err(e.into());
+            }
+            keys::clear_keys(&[
+                "youtube_stream_id",
+                "youtube_ingest_addr",
+                "youtube_stream_key",
+            ])
+            .map_err(|_| BroadcastError::Vault)?;
+            let s = youtube_reusable_stream(token)?;
+            sid = s.0;
+            addr = s.1;
+            key = s.2;
+            youtube_bind(token, broadcast_id, &sid)?;
+        }
+        Ok((addr, key))
+    }
+}
+
+/// Serializa criação/recuperação; o ID só é esquecido após confirmação remota e do cofre.
 pub fn youtube_provision_broadcast(
     app: &AppHandle,
     title: &str,
+    generation: u64,
 ) -> Result<(String, String), String> {
-    // Encerra qualquer transmissão pendente de uma sessão anterior (app fechou/crashou no ar).
-    youtube_complete_active(app);
-    let token = youtube_token(app).ok_or_else(|| Msg::StreamInfoYoutubeSignIn.now())?;
-    let start = rfc3339_utc(now_ms() / 1000 + 60); // ISO 8601 no futuro (obrigatório)
-    let title: String = title.chars().take(100).collect();
-    // autoStop=false: numa queda longa (sem o slate BRB), o autostop ENCERRARIA a live de vez e a
-    // reconexão não a reviveria. Encerramos explicitamente no corte (e limpamos pendência no start).
-    let body = json!({
-        "snippet": { "title": title, "scheduledStartTime": start },
-        "status": { "privacyStatus": "public", "selfDeclaredMadeForKids": false },
-        "contentDetails": {
-            "enableAutoStart": true,
-            "enableAutoStop": false,
-            "monitorStream": { "enableMonitorStream": false }
-        }
-    });
-    let resp = google_json(
-        "POST",
-        "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails",
-        &token,
-        Some(&body),
-    )?;
-    let v: Value = serde_json::from_str(&resp).map_err(|_| Msg::AuthYoutubeBadResponse.now())?;
-    let broadcast_id = v
-        .get("id")
-        .and_then(|x| x.as_str())
-        .ok_or_else(|| Msg::AuthYoutubeBroadcastNoId.now())?
-        .to_string();
-    // Grava o id JÁ — se o stream/bind falhar depois, ainda dá pra encerrar (sem broadcast órfão).
-    let _ = keys::set_key("youtube_live_broadcast", &broadcast_id);
-    // stream reutilizável + bind (recria o stream SÓ se ele sumiu na conta — não em erro transitório).
-    let (mut sid, mut addr, mut key) = youtube_reusable_stream(&token)?;
-    if let Err(e) = youtube_bind(&token, &broadcast_id, &sid) {
-        let missing =
-            e.contains("YouTube 404") || e.contains("streamNotFound") || e.contains("notFound");
-        if !missing {
-            return Err(e); // rede/5xx/401/cota: mantém o stream cacheado e propaga
-        }
-        for k in [
-            "youtube_stream_id",
-            "youtube_ingest_addr",
-            "youtube_stream_key",
-        ] {
-            let _ = keys::clear_key(k);
-        }
-        let s = youtube_reusable_stream(&token)?;
-        sid = s.0;
-        addr = s.1;
-        key = s.2;
-        youtube_bind(&token, &broadcast_id, &sid)?;
+    let mut recovery = YT_BROADCAST
+        .lock()
+        .map_err(|_| BroadcastError::Pending.message())?;
+    let current = || {
+        let state = app.state::<AppState>();
+        let engine = state.engine.lock().unwrap();
+        engine.live && engine.start_gen == generation
+    };
+    if !current() {
+        return Err(BroadcastError::Cancelled.message());
     }
-    Ok((addr, key))
+    let mut remote = YoutubeBroadcastRemote {
+        token: youtube_token(app),
+    };
+    recovery
+        .provision(
+            generation,
+            current,
+            &mut YoutubeBroadcastStore,
+            &mut remote,
+            title,
+        )
+        .map_err(BroadcastError::message)
 }
 
-/// Encerra na hora o broadcast ativo (se houver). Best-effort. Se ele nunca foi ao ar
-/// (estado created/ready), o transition falha → deleta pra não deixar transmissão fantasma.
-pub fn youtube_complete_active(app: &AppHandle) {
-    let bid = match keys::get_key("youtube_live_broadcast") {
-        Some(b) if !b.is_empty() => b,
-        _ => return,
-    };
-    let _ = keys::clear_key("youtube_live_broadcast");
-    if let Some(token) = youtube_token(app) {
-        let transition = format!(
-            "https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id={bid}&part=status"
-        );
-        if google_json("POST", &transition, &token, None).is_err() {
-            let del = format!("https://www.googleapis.com/youtube/v3/liveBroadcasts?id={bid}");
-            let _ = google_json("DELETE", &del, &token, None);
-        }
+pub fn youtube_complete_active(app: &AppHandle, generation: u64) -> Result<(), String> {
+    let mut recovery = YT_BROADCAST
+        .lock()
+        .map_err(|_| BroadcastError::Pending.message())?;
+    // A stop queued behind a newer start must never finish the new broadcast.
+    if app.state::<AppState>().engine.lock().unwrap().start_gen != generation {
+        return Ok(());
     }
+    match recovery
+        .status(&mut YoutubeBroadcastStore)
+        .map_err(BroadcastError::message)?
+    {
+        "none" => return Ok(()),
+        "unknown" => return Err(BroadcastError::CreationUnknown.message()),
+        _ => {}
+    }
+    let mut remote = YoutubeBroadcastRemote {
+        token: youtube_token(app),
+    };
+    recovery
+        .stop(generation, &mut YoutubeBroadcastStore, &mut remote)
+        .map_err(BroadcastError::message)
+}
+
+#[tauri::command]
+pub async fn youtube_acknowledge_unknown_broadcast(
+    app: AppHandle,
+    confirmed: bool,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut recovery = YT_BROADCAST
+            .lock()
+            .map_err(|_| BroadcastError::Pending.message())?;
+        let state = app.state::<AppState>();
+        let engine = state.engine.lock().unwrap();
+        recovery
+            .acknowledge_unknown(confirmed, !engine.live, &mut YoutubeBroadcastStore)
+            .map_err(BroadcastError::message)
+    })
+    .await
+    .map_err(|_| BroadcastError::Pending.message())?
+}
+
+#[tauri::command]
+pub async fn youtube_broadcast_recovery_status() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        YT_BROADCAST
+            .lock()
+            .map_err(|_| BroadcastError::Pending.message())?
+            .status(&mut YoutubeBroadcastStore)
+            .map(str::to_string)
+            .map_err(BroadcastError::message)
+    })
+    .await
+    .map_err(|_| BroadcastError::Pending.message())?
+}
+
+#[tauri::command]
+pub async fn youtube_retry_broadcast_cleanup(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut recovery = YT_BROADCAST
+            .lock()
+            .map_err(|_| BroadcastError::Pending.message())?;
+        match recovery
+            .status(&mut YoutubeBroadcastStore)
+            .map_err(BroadcastError::message)?
+        {
+            "none" => return Ok(()),
+            "unknown" => return Err(BroadcastError::CreationUnknown.message()),
+            _ => {}
+        }
+        let state = app.state::<AppState>();
+        let activity = {
+            let engine = state.engine.lock().unwrap();
+            if engine.live {
+                return Err(BroadcastError::Pending.message());
+            }
+            engine.begin_pending_activity()
+        };
+        let mut remote = YoutubeBroadcastRemote {
+            token: youtube_token(&app),
+        };
+        // A concurrent start waits on YT_BROADCAST before it can create or bind anything.
+        let result = recovery
+            .retry_stopped(true, &mut YoutubeBroadcastStore, &mut remote)
+            .map_err(BroadcastError::message);
+        drop(activity);
+        result
+    })
+    .await
+    .map_err(|_| BroadcastError::Pending.message())?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn youtube_callback_error_never_echoes_provider_text() {
+        let message = oauth_callback_error(
+            "YouTube",
+            "https://user:private-fixture@example.invalid?token=private-fixture",
+        );
+        assert!(!message.contains("private-fixture"));
+        assert!(!message.contains("https://"));
+        assert!(message.contains("authorization_failed"));
+    }
+
+    #[test]
+    fn youtube_status_requires_matching_identity_and_known_lifecycle() {
+        assert_eq!(
+            youtube_remote_state(
+                &json!({"id": "old-id", "status": {"lifeCycleStatus": "complete"}}),
+                "old-id"
+            ),
+            Ok(RemoteState::Complete)
+        );
+        for value in [
+            json!({}),
+            json!({"id": "new-id", "status": {"lifeCycleStatus": "complete"}}),
+            json!({"id": "old-id", "status": {"lifeCycleStatus": "private-fixture"}}),
+        ] {
+            assert_eq!(
+                youtube_remote_state(&value, "old-id"),
+                Err(GoogleError::InvalidResponse)
+            );
+        }
+    }
+
+    #[test]
+    fn logout_invalidates_volatile_state_but_only_announces_confirmed_deletion() {
+        for deletion in [Ok(()), Err("partial deletion".to_string())] {
+            let expected_success = deletion.is_ok();
+            let mut invalidated = false;
+            let mut announced = false;
+            let result =
+                finish_local_logout(|| deletion, || invalidated = true, || announced = true);
+            assert_eq!(result.is_ok(), expected_success);
+            assert!(invalidated);
+            assert_eq!(announced, expected_success);
+        }
+    }
 
     #[test]
     fn pkce_matches_rfc7636_vector() {
@@ -2374,8 +2652,13 @@ mod tests {
         assert!(google_oauth_err(401, &e, pt).contains("cliente OAuth"));
         assert!(google_oauth_err(401, &e, Locale::En).contains("OAuth client"));
         assert!(google_oauth_err(0, &serde_json::json!({}), pt).contains("sem conexão"));
-        let e2 = serde_json::json!({ "error_description": "bad scope" });
-        assert_eq!(google_oauth_err(400, &e2, pt), "Google: bad scope");
+        let e2 = serde_json::json!({ "error": "token=private-fixture", "error_description": "https://user:private-fixture@example.invalid" });
+        for locale in [Locale::PtBr, Locale::En] {
+            let message = google_oauth_err(400, &e2, locale);
+            assert!(!message.contains("private-fixture"));
+            assert!(!message.contains("https://"));
+            assert!(message.contains("400"));
+        }
     }
 
     #[test]

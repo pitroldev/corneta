@@ -1,11 +1,11 @@
 # Teste de balanceamento — telemetria da Corneta (LGPD art. 7º, IX)
 
 > Legitimate Interest Assessment (LIA) das duas finalidades de telemetria do aplicativo,
-> que passaram a rodar **ligadas por padrão**. Este rascunho reúne evidências técnicas para
+> **ligadas por padrão**. Este rascunho reúne evidências técnicas para
 > avaliar a hipótese de legítimo interesse; não comprova a adequação jurídica do tratamento.
 
 - **Status:** ⚠️ Rascunho de engenharia · precisa de revisão jurídica antes do lançamento
-- **Revisão técnica:** 2026-09-06 · nenhuma aprovação jurídica ou configuração externa é atestada aqui
+- **Escopo:** nenhuma aprovação jurídica ou configuração externa é atestada aqui
 - **Controlador:** ver `LEGAL_OPERATOR`/`LEGAL_CNPJ` em `web/lib/legal.ts`
 - **Versão do aviso:** `TELEMETRY_NOTICE_VERSION` em `src/lib/telemetry-schema.ts`
 - **Relacionado:** política de privacidade (`web/app/(legal)/[locale]/legal/_content/privacy.*.tsx`),
@@ -17,11 +17,10 @@
 
 ---
 
-## 0. O que mudou, e por quê isto existe
+## 0. Modelo de tratamento avaliado
 
-Até a versão anterior do aviso, as duas finalidades rodavam por **consentimento** (art. 7º, I) e
-vinham desligadas. A decisão de produto passou a ser: **vir ligadas**, com aviso no primeiro uso e
-desligamento em um clique.
+As duas finalidades vêm ligadas por padrão, com aviso no primeiro uso e controles independentes
+para desligá-las. Esse é o comportamento técnico avaliado neste documento.
 
 A intenção registrada é usar **legítimo interesse** (art. 7º, IX), não apresentar o padrão
 ativo como consentimento. Mudar um default no software não valida automaticamente uma base
@@ -65,11 +64,19 @@ O que **nunca** sai, e é barrado por allowlist e não por filtro de saída:
 Salvaguardas técnicas relevantes para a necessidade:
 
 - `disable_geoip(true)` — sem inferência de localização
-- `person_profiles: "identified_only"` com bootstrap **não identificado** — o perfil nunca é criado
+- no cliente JavaScript, `person_profiles: "identified_only"` com bootstrap **não identificado** e sem chamadas de identificação
+- no Rust, `final_before_send` fixa `$process_person_profile=false`, inclusive em exceções e quando o SDK recebe `true`
 - `mask_all_text`, sem autocapture, sem session recording, sem heatmap, sem surveys
 - `$device_id`/`$session_id` do SDK **não atravessam** a allowlist
 - exceções passam por redator de mensagem e de stack antes de sair
 - retenção inicial planejada de 90 dias no operador, cuja configuração precisa ser comprovada
+
+Essas opções não solicitam a criação de perfis para novos identificadores. Não apagam perfis
+anteriores: segundo a [documentação do PostHog](https://posthog.com/docs/data/anonymous-vs-identified-events),
+um `distinct_id` já identificado continua associado ao perfil existente. O código preserva o
+UUID de instalação; versões anteriores e dados já recebidos precisam ser avaliados pelo
+operador antes de afirmar ausência de perfis no projeto. Isso não transforma o UUID em dado
+anônimo nem substitui a revisão jurídica.
 
 **Avaliação técnica preliminar:** versão, etapa e código ajudam a diagnosticar falhas. O
 catálogo também inclui as categorias e identificadores acima; sua necessidade e retenção devem
@@ -110,7 +117,7 @@ de uso. Este é o ponto mais atacável do teste, e está aqui explicitamente.
 | reidentificação       | o UUID é um identificador pseudônimo, não anonimização; não deriva de hardware, hostname ou conta, mas permite correlacionar eventos |
 | localização           | geoip desligado; IP não é gravado como propriedade                                                                                   |
 | exposição de conteúdo | conteúdo da live nunca entra no evento, por allowlist                                                                                |
-| perfil comportamental | não há perfil identificado nem cruzamento com outra base                                                                             |
+| perfil comportamental | o código não solicita criação de perfil nem cruza outras bases; perfis anteriormente associados ao UUID exigem revisão no operador   |
 | decisão automatizada  | não existe (art. 20 não é acionado)                                                                                                  |
 
 | direito do titular                     | como é exercido                                                                                                                                 |
@@ -128,14 +135,15 @@ registrar sua conclusão e decidir se o padrão ativo é adequado para cada fina
 
 ## 5. Salvaguardas que o código garante (e os testes travam)
 
-| garantia                                                | onde                                                                              |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| oposição atravessa troca de versão do aviso             | `Consent::active` (Rust) e `telemetryPurposeActive` (TS); testes nos dois lados   |
-| arquivo de estado ilegível **não** religa quem desligou | `TelemetryStatus::opposed()`; teste `instalacao_nova_liga_e_arquivo_ilegivel_nao` |
-| desligar fecha o portão antes de qualquer I/O           | `set_consent` fecha o gate e troca o epoch antes de persistir                     |
-| instância antiga do SDK não revive após revogação       | `sdkEpoch` + `before_send` preso à identidade da instalação                       |
-| propriedade fora do catálogo não sai                    | allowlist por evento + `match` exaustivo no Rust                                  |
-| kill switch de release                                  | `TELEMETRY_DISABLED` / `VITE_TELEMETRY_DISABLED`, conferidos pelo gate de release |
+| garantia                                                | onde                                                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| oposição atravessa troca de versão do aviso             | `Consent::active` (Rust) e `telemetryPurposeActive` (TS); testes nos dois lados                               |
+| arquivo de estado ilegível **não** religa quem desligou | `TelemetryStatus::opposed()`; teste `instalacao_nova_liga_e_arquivo_ilegivel_nao`                             |
+| desligar fecha o portão antes de qualquer I/O           | `set_consent` fecha o gate e troca o epoch antes de persistir                                                 |
+| instância antiga do SDK não revive após revogação       | `sdkEpoch` + `before_send` preso à identidade da instalação                                                   |
+| propriedade fora do catálogo não sai                    | allowlist por evento + `match` exaustivo no Rust                                                              |
+| evento nativo não solicita processamento de perfil      | `final_before_send` sobrescreve `$process_person_profile=false`; testes do envelope serializado e do SDK real |
+| kill switch de release                                  | `TELEMETRY_DISABLED` / `VITE_TELEMETRY_DISABLED`, conferidos pelo gate de release                             |
 
 ---
 
@@ -144,7 +152,7 @@ registrar sua conclusão e decidir se o padrão ativo é adequado para cada fina
 Publicar este rascunho junto do código é transparência, não aprovação do tratamento. Não
 confundir abertura do repositório com autorização para coletar dados de usuários em produção.
 
-- [ ] **Revisão jurídica** deste documento e do texto novo da política — a base legal mudou
+- [ ] **Revisão jurídica** deste documento e da política, incluindo a base legal por finalidade
 - [ ] Ligar **"Discard client IP data"** no projeto do PostHog: o app desliga o geoip, mas o IP
       ainda chega pela requisição; descartar na ingestão fecha a lacuna e reforça a §2
 - [ ] Revisar se o contrato com o operador (PostHog) cobre o art. 39 e a transferência

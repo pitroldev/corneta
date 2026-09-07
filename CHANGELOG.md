@@ -2,7 +2,7 @@
 
 ## Não lançado — linha 0.7.0
 
-Este é o estado do código em preparação, não uma release estável nem um instalador aprovado. O projeto não reconstrói notas completas de versões antigas a partir de suposições.
+Este é o estado do código em preparação, não uma release estável nem um instalador aprovado.
 
 ### Para quem usa
 

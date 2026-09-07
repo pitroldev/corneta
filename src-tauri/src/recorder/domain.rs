@@ -103,7 +103,7 @@ pub fn remux_args(src: &Path, dst: &Path) -> Vec<String> {
     ]
 }
 
-/// 5 segundos de barras de teste — o "testar gravação" do §9.2.
+/// 5 segundos de barras de teste — usado por "testar gravação".
 ///
 /// Fonte SINTÉTICA de propósito: assim o teste funciona ANTES da primeira live e valida o
 /// que realmente costuma quebrar (pasta, escrita, remux, escopo do asset, CSP, player).

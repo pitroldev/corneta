@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MotionConfig, motion } from "framer-motion";
-import { FileText, RefreshCw } from "lucide-react";
+import { FileText, RefreshCw, Shield } from "lucide-react";
 import { downTargets, useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
 import { MESA_ENABLED } from "./lib/flags";
@@ -34,6 +34,8 @@ const SCREENS: Screen[] = [
 import { TitleBar } from "./components/TitleBar";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { LiveBar } from "./components/LiveBar";
+import { GuardianStatus } from "./components/GuardianStatus";
+import { shortcutErrorKey } from "./lib/shortcuts";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
 import { TelemetryConsentNotice } from "./components/TelemetryConsent";
@@ -114,6 +116,7 @@ export default function App() {
   const setupOauth = useStore((s) => s.setupOauth);
   const leaks = useStore((s) => s.leaks);
   const censored = useStore((s) => s.censored);
+  const guardianStatus = useStore((s) => s.snapshot.guardianStatus);
   const liveState = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const down = useStore((s) => downTargets(s.snapshot));
@@ -393,13 +396,8 @@ export default function App() {
     if (!IS_TAURI || !loaded || shortcutBootDone.current) return;
     shortcutBootDone.current = true;
     if (!liveShortcut) return;
-    api.registerShortcut(liveShortcut).catch(() => {
-      toast.error(
-        t("components.app.shortcut.taken", {
-          // "CommandOrControl" é token do Tauri; na tela a pessoa lê "Ctrl".
-          shortcut: liveShortcut.replace("CommandOrControl", "Ctrl"),
-        }),
-      );
+    api.registerShortcut(liveShortcut).catch((error: unknown) => {
+      toast.error(t(shortcutErrorKey(error)));
     });
   }, [loaded, liveShortcut, t]);
 
@@ -412,19 +410,25 @@ export default function App() {
           {liveLabel}
         </div>
 
-        {censored && (
-          <div className="flex items-center gap-3 border-b-2 border-bad bg-bad px-4 py-2 text-white">
-            <span className="animate-pulse text-lg">🛑</span>
-            <div className="min-w-0 flex-1">
-              <div className="font-display text-sm font-extrabold leading-tight">
-                {t("components.app.censored.title")}
-              </div>
-              <div className="truncate text-xs text-white/85">
-                {t("components.app.censored.body")}
+        <GuardianStatus status={guardianStatus} />
+        {censored &&
+          guardianStatus !== "unavailable" &&
+          guardianStatus !== "starting" && (
+            <div className="flex items-start gap-3 border-b border-border bg-surface-2 px-4 py-2 text-ink">
+              <Shield
+                aria-hidden="true"
+                className="size-5 shrink-0 text-warn"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-extrabold leading-tight">
+                  {t("components.app.censored.title")}
+                </div>
+                <div className="mt-1 max-w-[72ch] text-sm leading-relaxed text-ink-muted">
+                  {t("components.app.censored.body")}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         <UpdateBanner />
 

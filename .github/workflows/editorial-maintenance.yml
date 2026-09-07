@@ -37,7 +37,7 @@ jobs:
       - name: Gerar fila de revisão
         working-directory: web
         run: >-
-          pnpm content:maintenance --
+          pnpm content:maintenance
           --warning-days 28
           --format github
           --output ../editorial-maintenance.md

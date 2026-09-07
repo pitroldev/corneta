@@ -261,6 +261,28 @@ const identityShape = {
   translationKey: z.string().max(100).regex(TRANSLATION_KEY_PATTERN).optional(),
 };
 
+// Reject common template markers; registry checks and human review establish
+// attribution. A plausible name alone cannot prove authorship or review.
+const editorialPersonNameSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(100)
+  .refine((value) => {
+    const normalized = value
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase()
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ");
+    return (
+      !/[<>{}]/.test(value) &&
+      !/^(?:todo|tbd|placeholder|change me|your name|author name|reviewer name|seu nome|nome do autor|nome da autora|nome do revisor|nome da revisora|nome da pessoa)$/.test(
+        normalized,
+      )
+    );
+  }, "informe a identidade registrada, não um placeholder");
+
 const draftEditorialFrontmatterSchema = z
   .object({
     ...identityShape,
@@ -269,8 +291,8 @@ const draftEditorialFrontmatterSchema = z
     description: z.string().trim().min(40).max(180).optional(),
     summary: z.string().trim().min(20).max(500).optional(),
     intent: z.enum(EDITORIAL_INTENTS).optional(),
-    author: z.string().trim().min(2).max(100).optional(),
-    reviewedBy: z.string().trim().min(2).max(100).optional(),
+    author: editorialPersonNameSchema.optional(),
+    reviewedBy: editorialPersonNameSchema.optional(),
     publishedAt: isoDateSchema.optional(),
     updatedAt: isoDateSchema.optional(),
     reviewedAt: isoDateSchema.optional(),
@@ -295,8 +317,8 @@ export const publishedEditorialFrontmatterSchema = z
     description: z.string().trim().min(40).max(180),
     summary: z.string().trim().min(20).max(500),
     intent: z.enum(EDITORIAL_INTENTS),
-    author: z.string().trim().min(2).max(100),
-    reviewedBy: z.string().trim().min(2).max(100),
+    author: editorialPersonNameSchema,
+    reviewedBy: editorialPersonNameSchema,
     publishedAt: isoDateSchema,
     updatedAt: isoDateSchema,
     reviewedAt: isoDateSchema,
@@ -557,7 +579,7 @@ export const editorialPeopleRegistrySchema = z
       .array(
         z
           .object({
-            name: z.string().trim().min(2).max(100),
+            name: editorialPersonNameSchema,
             role: z.string().trim().min(2).max(120),
             type: z.enum(["person", "organization"]),
             url: httpsUrlSchema.optional(),

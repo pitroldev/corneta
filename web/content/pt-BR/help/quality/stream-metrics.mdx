@@ -14,8 +14,8 @@ intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -38,7 +38,7 @@ sources:
   - title: Corneta runtime metrics
     kind: internal
     repoPath: src-tauri/src/engine.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -57,13 +57,13 @@ images:
 
 ## Leia em conjunto
 
-| Métrica | O que responde | O que não prova sozinha |
-| --- | --- | --- |
-| bitrate | quantos dados saem por segundo | qualidade percebida ou estabilidade futura |
-| FPS | quantos quadros chegam na saída | se o jogo está rodando no mesmo FPS |
-| quadros perdidos | parte do fluxo não acompanhou | a causa sem separar rede, render e encoder |
-| CPU | pressão geral de processamento | qual processo é o culpado |
-| GPU | pressão geral da placa | se faltou renderização ou sessão de encoder |
+| Métrica          | O que responde                  | O que não prova sozinha                     |
+| ---------------- | ------------------------------- | ------------------------------------------- |
+| bitrate          | quantos dados saem por segundo  | qualidade percebida ou estabilidade futura  |
+| FPS              | quantos quadros chegam na saída | se o jogo está rodando no mesmo FPS         |
+| quadros perdidos | parte do fluxo não acompanhou   | a causa sem separar rede, render e encoder  |
+| CPU              | pressão geral de processamento  | qual processo é o culpado                   |
+| GPU              | pressão geral da placa          | se faltou renderização ou sessão de encoder |
 
 <ContentImage baseName="corneta-quality-modes" />
 
@@ -79,11 +79,11 @@ CPU alta com live lisa não é erro. GPU abaixo de 100% também não garante fol
 
 ## Se ainda estiver confuso
 
-| Sintoma | Confirme | Próximo passo |
-| --- | --- | --- |
-| bitrate cai em todas | quadros perdidos de rede | teste upload e cabo |
-| FPS cai com render skipped | jogo ou cena usa GPU | limite FPS e simplifique fontes |
-| output skipped aumenta | encoder atrasou | reduza FPS, resolução ou transcodes |
-| só um destino reconecta | estado das outras plataformas | revise aquele ingest |
+| Sintoma                    | Confirme                      | Próximo passo                       |
+| -------------------------- | ----------------------------- | ----------------------------------- |
+| bitrate cai em todas       | quadros perdidos de rede      | teste upload e cabo                 |
+| FPS cai com render skipped | jogo ou cena usa GPU          | limite FPS e simplifique fontes     |
+| output skipped aumenta     | encoder atrasou               | reduza FPS, resolução ou transcodes |
+| só um destino reconecta    | estado das outras plataformas | revise aquele ingest                |
 
 Exporte o relatório ou diagnóstico, nunca credenciais e logs crus.

@@ -1,6 +1,6 @@
 // ============================================================
 // Relatório pós-live: parse do NDJSON + análise (eventos, janelas
-// problemáticas, veredito). Ver docs/RELATORIO-POS-LIVE.md.
+// problemáticas, veredito).
 // ============================================================
 import type { I18n, MessageKey } from "./i18n";
 import { pluralSuffix } from "./i18n/locale";
@@ -307,8 +307,6 @@ export function bitrateSeries(
 }
 export const hasObs = (d: SessionData): boolean =>
   d.samples.some((s) => s.obs != null);
-export const obsCongestionSeries = (d: SessionData): (number | null)[] =>
-  d.samples.map((s) => (s.obs ? Math.round(s.obs.congestion * 100) : null));
 export const obsRenderSeries = (d: SessionData): (number | null)[] =>
   d.samples.map((s) => (s.obs ? s.obs.avgRenderMs : null));
 
@@ -1961,11 +1959,3 @@ export function summarize(
     verdictTone: a.verdict.tone,
   };
 }
-
-// Cache do resumo em localStorage (adapter de I/O) — extraído pra summaryCache.ts e re-exportado
-// aqui pra não mexer nos callers, deixando o report.ts 100% puro (só parse/análise).
-export {
-  getCachedSummary,
-  setCachedSummary,
-  dropCachedSummary,
-} from "./summaryCache";

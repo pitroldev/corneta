@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
-import { dropCachedSummary } from "../../lib/report";
+import { dropCachedSummary } from "../../lib/summaryCache";
 import { toast } from "../../lib/toast";
 import { cn } from "../../lib/utils";
 import { ReportCommunitySection } from "./ReportCommunitySection";

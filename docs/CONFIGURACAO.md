@@ -1,6 +1,6 @@
 # Configuração: desenvolvimento, distribuição oficial e forks
 
-Referência do comportamento implementado em 2026-09-06. Não é necessário possuir credenciais do mantenedor para contribuir. Exemplos sem valores reais: [raiz](../.env.example) e [site/API](../web/.env.example). Superfícies e limitações: [rede e integrações](SUPERFICIE-DE-REDE.md).
+Referência da linha 0.7.0. Não é necessário possuir credenciais do mantenedor para contribuir. Exemplos sem valores reais: [raiz](../.env.example) e [site/API](../web/.env.example). Superfícies e limitações: [rede e integrações](SUPERFICIE-DE-REDE.md).
 
 ## Escolha o perfil antes de configurar
 
@@ -112,7 +112,7 @@ A política desktop implementada é **opt-out**: `unset` está ativo quando há 
 | `CARGO_TARGET_DIR`, `NEXT_DIST_DIR`       | Compilação                        | Caminhos locais                  | Contributor separa artefatos Rust; diretórios de saída não devem apontar para arquivos pessoais.           |
 | `TAURI_DEV_HOST`, `TAURI_ENV_*`           | Tauri/Vite, desenvolvimento/build | Controles públicos da ferramenta | Prefixo `TAURI_ENV_*` também é exposto no frontend. Alterar host de dev pode expor o servidor à rede.      |
 
-Assinatura do updater e certificado Authenticode são mecanismos distintos. Consulte [assinatura e decisão de distribuição](ASSINATURA.md) e [gates de release](GATES-DE-RELEASE.md), sem compartilhar chaves do mantenedor com um fork.
+Assinatura do updater e certificado Authenticode são mecanismos distintos. Consulte a [política de assinatura](ASSINATURA.md) e os [gates de release](GATES-DE-RELEASE.md), sem compartilhar chaves do mantenedor com um fork.
 
 ## Fork/self-host: limite declarado, não atalho de segurança
 

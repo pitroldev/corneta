@@ -1,27 +1,11 @@
 import { create } from "zustand";
-import type { I18n } from "./i18n";
-import type {
-  Alert,
-  AppConfig,
-  AppSettings,
-  ChatMessage,
-  EncoderInfo,
-  EncodingMode,
-  EngineSnapshot,
-  IngestConfig,
-  Leak,
-  ObsCheck,
-  PlatformId,
-  Target,
-  Viewers,
-} from "./types";
 import { api, IS_TAURI, START_CANCELLED } from "./api";
-import { toast } from "./toast";
-import { OAUTH } from "./oauth";
 import * as cfgOps from "./configOps";
-import { openExternal, uid } from "./utils";
+import { createChatSlice } from "./store/chat";
+import { createNavigationSlice } from "./store/navigation";
+import { createOauthSlice } from "./store/oauth";
+import type { State, T } from "./store/types";
 import { addStep, capture } from "./telemetry";
-import { applyChatBatch, type ChatEvent } from "./chatBatch";
 import {
   createTelemetryId,
   fpsBucket,
@@ -30,197 +14,17 @@ import {
   resolutionBucket,
   type SafePlatform,
 } from "./telemetry-schema";
-
-interface LoginState {
-  state: string; // out | code | connected | error
-  login?: string;
-  userCode?: string;
-  verifyUri?: string;
-  /** URL completa de autorização, quando o provedor oferece — abre direto no navegador. */
-  verifyUriComplete?: string;
-  message?: string;
-}
-
-/** Quais caminhos de login existem numa plataforma, e qual está em uso. */
-interface OauthModes {
-  officialReady: boolean;
-  ownCreds: boolean;
-  usingOwnCreds: boolean;
-}
-
-const NO_OAUTH_MODES: OauthModes = {
-  officialReady: false,
-  ownCreds: false,
-  usingOwnCreds: false,
-};
+import { toast } from "./toast";
+import type { AppConfig, EncoderInfo, EngineSnapshot, Target } from "./types";
+import { uid } from "./utils";
+import { createObsCoordinator, ObsConfigSaveError } from "./obsCoordinator";
 
 // Última remoção de destino (para o "desfazer").
 let pendingRemoval: { target: Target; index: number } | null = null;
 
-// Momento da última consulta ao OBS (cache curto do runObsCheck).
-let lastObsCheckAt = 0;
 // Uma única sonda por WebView. Encoding/Ao vivo podem montar quase juntos; ambas aguardam
 // a mesma Promise em vez de abrir processos FFmpeg duplicados.
 let encoderLoadPromise: Promise<EncoderInfo[]> | null = null;
-
-// O store não é componente: não pode usar `useT()`. As ações que escrevem pra
-// tela (toast, nome de perfil, mensagem de erro) recebem `t` de quem as chama —
-// idioma global aqui viraria corrida entre a janela principal e o popout do chat.
-type T = I18n["t"];
-
-interface State {
-  loaded: boolean;
-  /** `load()` não conseguiu ler a config: a tela de boot mostra o erro com saída (tentar de novo / logs). */
-  bootError: string | null;
-  config: AppConfig | null;
-  snapshot: EngineSnapshot;
-  encoders: EncoderInfo[];
-  /** A sonda de encoders falhou (FFmpeg não respondeu) — lista vazia por erro, não por falta. */
-  encodersError: boolean;
-  uploadMbps: number | null;
-  /** Última operação longa; fica visível após falha para copiar ao suporte. */
-  lastOperationId: string | null;
-
-  load: (t: T) => Promise<void>;
-  bindEngine: (t: T) => () => void;
-  /** Sincroniza a config quando OUTRA janela (ex.: popout do chat) a salva. */
-  bindConfigSync: () => () => void;
-
-  /** Adiciona um destino e devolve o id (pra tela rolar/focar no card novo). */
-  addTarget: (platformId: PlatformId) => string | undefined;
-  /** Boas-vindas: alinha os destinos às plataformas escolhidas, numa gravação só. */
-  setPlatforms: (ids: PlatformId[]) => void;
-  updateTarget: (id: string, patch: Partial<Target>) => void;
-  removeTarget: (id: string) => void;
-  toggleTarget: (id: string) => void;
-  reorderTargets: (ordered: Target[]) => void;
-  duplicateTarget: (id: string) => void;
-  moveTarget: (id: string, dir: -1 | 1) => void;
-  undoRemoveTarget: () => void;
-
-  setMode: (mode: EncodingMode) => void;
-  setIngest: (patch: Partial<IngestConfig>) => void;
-  setSettings: (patch: Partial<AppSettings>) => void;
-
-  loadProfile: (id: string) => void;
-  addProfile: (label: (n: number) => string) => void;
-  removeProfile: (id: string) => void;
-  renameProfile: (id: string, name: string) => void;
-
-  setKey: (id: string, key: string) => Promise<void>;
-  clearKey: (id: string) => Promise<void>;
-
-  refreshEncoders: () => Promise<void>;
-  runUploadTest: () => Promise<void>;
-
-  /** Estado do OBS compartilhado entre telas (Ao vivo, Configurações, checklist). */
-  obs: ObsCheck | "loading" | null;
-  /** Consulta o OBS via obs-websocket (com cache curto; force=true ignora o cache). */
-  runObsCheck: (force?: boolean) => Promise<void>;
-
-  /** Devolve como o OBS reagiu ao BORA: ligado junto, falhou ou é manual. */
-  start: () => Promise<"obs-ok" | "obs-failed" | "manual">;
-  stop: () => Promise<void>;
-
-  // Chat unificado
-  chatMessages: ChatMessage[];
-  chatConnected: boolean;
-  chatStatuses: Record<string, { platform: string; status: string }>;
-  bindChat: () => () => void;
-  /** Espelha o estado "conectado" do chat entre janelas (é global no backend). */
-  bindChatRunning: () => () => void;
-  connectChat: (t: T) => Promise<void>;
-  disconnectChat: () => Promise<void>;
-
-  // Alertas externos (Streamlabs/StreamElements)
-  alertStatuses: Record<string, { status: string }>;
-  bindAlertStatus: () => () => void;
-  setAlertToken: (id: string, token: string) => Promise<void>;
-  clearAlertToken: (id: string) => Promise<void>;
-
-  // Envio de mensagens (Twitch via token de envio)
-  chatAuth: Record<string, { login: string; ok: boolean }>;
-  bindChatAuth: () => () => void;
-  sendChat: (text: string, sources?: string[]) => Promise<void>;
-  setChatSendToken: (id: string, token: string) => Promise<void>;
-  clearChatSendToken: (id: string) => Promise<void>;
-
-  // OAuth (login no navegador) — envio/moderação por conta
-  chatLogin: { twitch: LoginState; youtube: LoginState; kick: LoginState };
-  /** YouTube tem Client ID oficial ou credenciais próprias configuradas. */
-  youtubeOauthReady: boolean;
-  /** Modos disponíveis — a UI só oferece a troca que não deixa a plataforma sem login. */
-  youtubeOauthModes: OauthModes;
-  kickOauthModes: OauthModes;
-  /** Por que a setup API não respondeu, quando falhou. Null = nossa API respondeu. */
-  oauthBrokerError: string | null;
-  setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
-  clearYoutubeOauth: () => Promise<void>;
-  youtubeUseOfficial: () => Promise<void>;
-  youtubeUseOwnCreds: () => Promise<void>;
-  kickOauthReady: boolean;
-  setKickOauth: (clientId: string, clientSecret: string) => Promise<void>;
-  clearKickOauth: () => Promise<void>;
-  kickUseOfficial: () => Promise<void>;
-  kickUseOwnCreds: () => Promise<void>;
-  setupOauth: () => Promise<void>;
-  bindAuthFlow: (t: T) => () => void;
-  twitchLogin: () => Promise<void>;
-  twitchLogout: () => Promise<void>;
-  youtubeLogin: () => Promise<void>;
-  youtubeLogout: () => Promise<void>;
-  kickLogin: () => Promise<void>;
-  kickLogout: () => Promise<void>;
-  moderate: (
-    sourceId: string,
-    action: string,
-    opts?: {
-      nativeId?: string;
-      author?: string;
-      authorId?: string;
-      seconds?: number;
-    },
-  ) => Promise<void>;
-  clearChat: () => void;
-
-  // Alertas centralizados
-  alerts: Alert[];
-  bindAlerts: () => () => void;
-  clearAlerts: () => void;
-
-  // Viewers unificados (todas as plataformas)
-  viewers: Viewers;
-  bindViewers: () => () => void;
-
-  // Guardião anti-vazamento
-  leaks: Leak[];
-  censored: boolean;
-  bindGuardian: () => () => void;
-
-  // UI: pedido de foco no botão de ir ao vivo (vindo da sidebar)
-  goLiveFocus: boolean;
-  setGoLiveFocus: (v: boolean) => void;
-
-  // UI: relatório novo (não visto) — selo "NOVO" na sidebar após encerrar uma live.
-  unseenReport: boolean;
-  markReportSeen: () => void;
-
-  // UI: rever o tour (onboarding) sob demanda (a partir de Sobre).
-  tourNonce: number;
-  replayTour: () => void;
-
-  // UI: aba pedida ao abrir Configurações (deep-link do "Ajustar").
-  settingsTab: string | null;
-  setSettingsTab: (v: string | null) => void;
-
-  // UI: navegação global (qualquer tela pede, o App executa) — deep-links entre telas.
-  navRequest: string | null;
-  requestNavigate: (screen: string | null) => void;
-
-  // UI: pedido pra abrir o modal "Configurar o chat" numa aba (deep-link de outras telas).
-  chatConfigRequest: string | null;
-  requestChatConfig: (tab: string | null) => void;
-}
 
 const EMPTY_SNAPSHOT: EngineSnapshot = {
   state: "stopped",
@@ -228,8 +32,6 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
   ingestLive: false,
   targets: {},
 };
-const CHAT_CAP = 400;
-const ALERT_CAP = 100;
 
 /** Quantas plataformas estão "fora" na live: em erro, reconectando ou sem o sinal do OBS.
  *  Um filtro só pra LiveBar (chip vermelho) e pro aria-live do App — antes cada um tinha
@@ -281,7 +83,7 @@ export const useStore = create<State>((set, get) => {
   let saveChain: Promise<void> = Promise.resolve();
   let saveRevision = 0;
   let pendingSaves = 0;
-  let discardPendingChat = () => {};
+  let saveFailed = false;
   let liveOperation: { id: string } | null = null;
   const flushSave = () => saveChain;
   const persist = (config: AppConfig) => {
@@ -297,17 +99,41 @@ export const useStore = create<State>((set, get) => {
       .catch(() => undefined)
       .then(async () => {
         const saved = await api.saveConfig({ ...next, revision: saveRevision });
+        saveFailed = false;
         saveRevision = saved.revision;
         pendingSaves -= 1;
         if (pendingSaves === 0) set({ config: saved });
       })
       .catch((error) => {
+        saveFailed = true;
         pendingSaves = Math.max(0, pendingSaves - 1);
         console.error("Falha ao salvar configuração", error);
       });
   };
 
+  const obs = createObsCoordinator({
+    async flushSave() {
+      // New edits can be queued while we wait; OBS must see the latest saved value.
+      let pending: Promise<void>;
+      do {
+        pending = saveChain;
+        await pending;
+      } while (pending !== saveChain);
+      if (saveFailed) throw new ObsConfigSaveError();
+    },
+    configKey() {
+      const config = get().config;
+      // In-memory only: never log/cache this key outside this coordinator.
+      return JSON.stringify([config?.ingest, config?.settings.obsPassword]);
+    },
+    check: () => api.obsCheck(),
+    configure: () => api.obsAutoconfigure(),
+  });
+
   return {
+    ...createOauthSlice({ set, get, persist, flushSave }),
+    ...createChatSlice({ set, get, persist, flushSave }),
+    ...createNavigationSlice({ set, get, persist, flushSave }),
     loaded: false,
     bootError: null,
     config: null,
@@ -316,7 +142,6 @@ export const useStore = create<State>((set, get) => {
     encodersError: false,
     uploadMbps: null,
     lastOperationId: null,
-
     async load(t) {
       // A configuração é tudo de que a primeira tela precisa. A sonda real dos encoders abre
       // processos FFmpeg e agora é lazy (Qualidade/Ao vivo/BORA), fora do caminho crítico do boot.
@@ -332,6 +157,7 @@ export const useStore = create<State>((set, get) => {
         return;
       }
       saveRevision = config.revision;
+      saveFailed = false;
       set({ config, loaded: true });
       // Semeia o estado de conexão do chat: a janela pode ter aberto (ou o popout montado)
       // com o chat já no ar — sem isto o botão nasceria em "Conectar" com o chat rodando.
@@ -359,7 +185,6 @@ export const useStore = create<State>((set, get) => {
         /* sem sessões ainda */
       }
     },
-
     bindEngine(t) {
       return api.subscribe((snapshot) => {
         const previousSnapshot = get().snapshot;
@@ -394,17 +219,18 @@ export const useStore = create<State>((set, get) => {
         }
       });
     },
-
     bindConfigSync() {
       // Config salva por outra janela → atualiza a base local SEM re-persistir (senão as
       // janelas entrariam em loop sobrescrevendo o disco uma da outra). Fecha o clobber em
       // que o popout revertia um destino/perfil criado na janela principal (e vice-versa).
       return api.subscribeConfigChanged((config) => {
         saveRevision = Math.max(saveRevision, config.revision);
-        if (pendingSaves === 0) set({ config });
+        if (pendingSaves === 0) {
+          saveFailed = false;
+          set({ config });
+        }
       });
     },
-
     // Coordenadores finos: lê a config, chama o reducer PURO (configOps), persiste se mudou.
     addTarget(platformId) {
       const config = get().config;
@@ -413,19 +239,16 @@ export const useStore = create<State>((set, get) => {
       persist(next);
       return id;
     },
-
     setPlatforms(ids) {
       const config = get().config;
       if (!config) return;
       persist(cfgOps.syncTargetsToPlatforms(config, ids));
     },
-
     updateTarget(id, patch) {
       const config = get().config;
       if (!config) return;
       persist(cfgOps.updateTarget(config, id, patch));
     },
-
     removeTarget(id) {
       const config = get().config;
       if (!config) return;
@@ -434,33 +257,28 @@ export const useStore = create<State>((set, get) => {
       if (removed) pendingRemoval = removed;
       persist(next);
     },
-
     toggleTarget(id) {
       const config = get().config;
       if (!config) return;
       persist(cfgOps.toggleTarget(config, id));
     },
-
     reorderTargets(ordered) {
       const config = get().config;
       if (!config) return;
       persist(cfgOps.reorderTargets(config, ordered));
     },
-
     duplicateTarget(id) {
       const config = get().config;
       if (!config) return;
       const next = cfgOps.duplicateTarget(config, id, uid("tgt"));
       if (next !== config) persist(next);
     },
-
     moveTarget(id, dir) {
       const config = get().config;
       if (!config) return;
       const next = cfgOps.moveTarget(config, id, dir);
       if (next !== config) persist(next);
     },
-
     undoRemoveTarget() {
       const config = get().config;
       if (!config || !pendingRemoval) return;
@@ -468,19 +286,16 @@ export const useStore = create<State>((set, get) => {
       pendingRemoval = null;
       persist(cfgOps.insertTarget(config, target, index));
     },
-
     setMode(mode) {
       const config = get().config;
       if (!config) return;
       persist({ ...config, mode });
     },
-
     setIngest(patch) {
       const config = get().config;
       if (!config) return;
       persist({ ...config, ingest: { ...config.ingest, ...patch } });
     },
-
     setSettings(patch) {
       const config = get().config;
       if (!config) return;
@@ -488,7 +303,6 @@ export const useStore = create<State>((set, get) => {
       // Efeito colateral: ligar/desligar o autostart no nível do SO.
       if (patch.autostart !== undefined) void api.setAutostart(patch.autostart);
     },
-
     loadProfile(id) {
       pendingRemoval = null;
       const config = get().config;
@@ -496,14 +310,12 @@ export const useStore = create<State>((set, get) => {
       const next = cfgOps.loadProfile(config, id);
       if (next !== config) persist(next);
     },
-
     addProfile(label) {
       pendingRemoval = null;
       const config = get().config;
       if (!config) return;
       persist(cfgOps.addProfile(config, uid("prof"), label));
     },
-
     removeProfile(id) {
       pendingRemoval = null;
       const config = get().config;
@@ -511,13 +323,11 @@ export const useStore = create<State>((set, get) => {
       const next = cfgOps.removeProfile(config, id);
       if (next !== config) persist(next);
     },
-
     renameProfile(id, name) {
       const config = get().config;
       if (!config) return;
       persist(cfgOps.renameProfile(config, id, name));
     },
-
     async setKey(id, key) {
       // O backend só aceita gravar em namespaces que já existem na config persistida. Um destino
       // recém-adicionado aparece na UI antes do save assíncrono terminar; como colar a chave salva
@@ -526,13 +336,11 @@ export const useStore = create<State>((set, get) => {
       await api.setKey(id, key);
       get().updateTarget(id, { hasKey: true });
     },
-
     async clearKey(id) {
       await flushSave();
       await api.clearKey(id);
       get().updateTarget(id, { hasKey: false });
     },
-
     async refreshEncoders() {
       if (get().encoders.length > 0) return;
       set({ encodersError: false });
@@ -546,25 +354,13 @@ export const useStore = create<State>((set, get) => {
         encoderLoadPromise = null;
       }
     },
-
     obs: null,
-    async runObsCheck(force = false) {
-      // Cache curto: várias telas consultam (Ao vivo, checklist, Configurações) sem
-      // martelar o obs-websocket a cada troca de tela.
-      if (
-        !force &&
-        Date.now() - lastObsCheckAt < 5000 &&
-        get().obs !== null &&
-        get().obs !== "loading"
-      )
-        return;
-      if (get().obs === "loading") return;
+    async checkObs(force = false) {
       // force = clique explícito em "Verificar OBS" → feedback visível (spinner);
       // polls de fundo trocam o resultado em silêncio pra não piscar a tela.
       if (force || get().obs === null) set({ obs: "loading" });
       try {
-        const r = await api.obsCheck();
-        lastObsCheckAt = Date.now();
+        const r = await obs.check(force);
         set({ obs: r });
         if (force)
           capture("obs_check_completed", {
@@ -583,8 +379,8 @@ export const useStore = create<State>((set, get) => {
             resolution_bucket: resolutionBucket(r.width, r.height),
             fps_bucket: fpsBucket(r.fps),
           });
+        return r;
       } catch (e) {
-        lastObsCheckAt = Date.now();
         set({
           obs: {
             reachable: false,
@@ -602,14 +398,24 @@ export const useStore = create<State>((set, get) => {
             resolution_bucket: "unknown",
             fps_bucket: "unknown",
           });
+        throw e;
       }
     },
-
+    async runObsCheck(force = false) {
+      // Background polls are fire-and-forget. Explicit actions use checkObs and
+      // receive failures; both paths publish the same shared connection state.
+      await get()
+        .checkObs(force)
+        .catch(() => {});
+    },
+    async configureObs() {
+      await obs.configure();
+      set({ obs: null });
+    },
     async runUploadTest() {
       // Propaga o erro pra a tela mostrar um toast (ex.: sem internet).
       set({ uploadMbps: await api.testUpload() });
     },
-
     async start() {
       const config = get().config;
       const operation = {
@@ -679,7 +485,6 @@ export const useStore = create<State>((set, get) => {
       }
       return "manual";
     },
-
     async stop() {
       await flushSave();
       // Só marca relatório novo se chegou a ficar AO VIVO (cancelar no "starting" não gera live).
@@ -704,431 +509,6 @@ export const useStore = create<State>((set, get) => {
       await api.stop(operationId);
       if (liveOperation?.id === operationId) liveOperation = null;
       if (wasLive) set({ unseenReport: true });
-    },
-
-    chatMessages: [],
-    chatConnected: false,
-    chatStatuses: {},
-    alertStatuses: {},
-    chatAuth: {},
-    chatLogin: {
-      twitch: { state: "out" },
-      youtube: { state: "out" },
-      kick: { state: "out" },
-    },
-    youtubeOauthReady: false,
-    kickOauthReady: false,
-    youtubeOauthModes: NO_OAUTH_MODES,
-    kickOauthModes: NO_OAUTH_MODES,
-    oauthBrokerError: null,
-
-    bindChat() {
-      let queue: ChatEvent[] = [];
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const discard = () => {
-        if (timer) clearTimeout(timer);
-        timer = undefined;
-        queue = [];
-      };
-      discardPendingChat = discard;
-      const flush = () => {
-        if (timer) clearTimeout(timer);
-        timer = undefined;
-        const events = queue;
-        queue = [];
-        if (events.length)
-          set((state) => {
-            const chatMessages = applyChatBatch(
-              state.chatMessages,
-              events,
-              CHAT_CAP,
-            );
-            return chatMessages === state.chatMessages
-              ? state
-              : { chatMessages };
-          });
-      };
-      const enqueue = (event: ChatEvent) => {
-        queue.push(event);
-        if (queue.length >= 128) flush();
-        else if (!timer)
-          timer = setTimeout(
-            flush,
-            typeof document !== "undefined" && document.hidden ? 100 : 16,
-          );
-      };
-      const unsubscribe = api.subscribeChat(
-        (message) => enqueue({ kind: "message", message }),
-        (status) => {
-          flush();
-          set((state) => ({
-            chatStatuses: {
-              ...state.chatStatuses,
-              [status.source || status.platform]: {
-                platform: status.platform,
-                status: status.status,
-              },
-            },
-          }));
-        },
-        (deletion) => enqueue({ kind: "delete", deletion }),
-      );
-      return () => {
-        unsubscribe();
-        flush();
-        if (discardPendingChat === discard) discardPendingChat = () => {};
-      };
-    },
-
-    bindChatRunning() {
-      // "Conectado" é estado global do backend: start/stop de qualquer janela reflete na outra
-      // (sem isto, desconectar pelo popout deixava a principal presa em "conectado", e o popout
-      // nascia mostrando "Conectar" com o chat já no ar). Não mexe nas mensagens.
-      return api.subscribeChatRunning((running) =>
-        set({ chatConnected: running }),
-      );
-    },
-
-    async connectChat(t) {
-      // NÃO zera chatMessages: reconectar (ex.: pra ressuscitar uma fonte que caiu)
-      // não pode apagar o histórico das outras. Limpar é só no botão "Limpar" (clearChat).
-      set({ chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
-      await api.chatStart(t);
-      await api.alertsStart();
-      set({ chatConnected: true });
-    },
-
-    async disconnectChat() {
-      await api.chatStop();
-      await api.alertsStop();
-      set({
-        chatConnected: false,
-        chatStatuses: {},
-        alertStatuses: {},
-        chatAuth: {},
-      });
-    },
-
-    bindAlertStatus() {
-      return api.subscribeAlertStatus((st) =>
-        set((s) => ({
-          alertStatuses: {
-            ...s.alertStatuses,
-            [st.source]: { status: st.status },
-          },
-        })),
-      );
-    },
-
-    async setAlertToken(id, token) {
-      await flushSave();
-      await api.setKey(`alert_${id}`, token);
-      const config = get().config;
-      if (!config) return;
-      persist({
-        ...config,
-        settings: {
-          ...config.settings,
-          alertSources: (config.settings.alertSources ?? []).map((a) =>
-            a.id === id ? { ...a, hasToken: true } : a,
-          ),
-        },
-      });
-    },
-
-    async clearAlertToken(id) {
-      await flushSave();
-      await api.clearKey(`alert_${id}`);
-      const config = get().config;
-      if (!config) return;
-      persist({
-        ...config,
-        settings: {
-          ...config.settings,
-          alertSources: (config.settings.alertSources ?? []).map((a) =>
-            a.id === id ? { ...a, hasToken: false } : a,
-          ),
-        },
-      });
-    },
-
-    bindChatAuth() {
-      return api.subscribeChatAuth((a) =>
-        set((s) => ({
-          chatAuth: { ...s.chatAuth, [a.source]: { login: a.login, ok: a.ok } },
-        })),
-      );
-    },
-
-    async sendChat(text, sources) {
-      await api.chatSend(text, sources);
-    },
-
-    async setChatSendToken(id, token) {
-      await flushSave();
-      await api.setKey(`chat_send_${id}`, token);
-      const config = get().config;
-      if (!config) return;
-      persist({
-        ...config,
-        settings: {
-          ...config.settings,
-          chatSources: (config.settings.chatSources ?? []).map((c) =>
-            c.id === id ? { ...c, hasSendToken: true } : c,
-          ),
-        },
-      });
-    },
-
-    async clearChatSendToken(id) {
-      await flushSave();
-      await api.clearKey(`chat_send_${id}`);
-      const config = get().config;
-      if (!config) return;
-      persist({
-        ...config,
-        settings: {
-          ...config.settings,
-          chatSources: (config.settings.chatSources ?? []).map((c) =>
-            c.id === id ? { ...c, hasSendToken: false } : c,
-          ),
-        },
-      });
-    },
-
-    async setupOauth() {
-      await api.setOauthConfig({
-        twitchClientId: OAUTH.twitchClientId,
-        googleClientId: OAUTH.googleClientId,
-        kickClientId: OAUTH.kickClientId,
-        setupApiUrl: OAUTH.setupApiUrl,
-      });
-      try {
-        const a = await api.authStatus();
-        set({
-          chatLogin: {
-            twitch: a.twitchLogin
-              ? { state: "connected", login: a.twitchLogin }
-              : { state: "out" },
-            youtube: a.youtube ? { state: "connected" } : { state: "out" },
-            kick: a.kick ? { state: "connected" } : { state: "out" },
-          },
-          youtubeOauthReady: a.youtubeConfigured,
-          kickOauthReady: a.kickConfigured,
-          youtubeOauthModes: {
-            officialReady: a.youtubeOfficialReady,
-            ownCreds: a.youtubeOwnCreds,
-            usingOwnCreds: a.youtubeUsingOwnCreds,
-          },
-          kickOauthModes: {
-            officialReady: a.kickOfficialReady,
-            ownCreds: a.kickOwnCreds,
-            usingOwnCreds: a.kickUsingOwnCreds,
-          },
-          oauthBrokerError: a.brokerError,
-        });
-      } catch {
-        /* sem login ainda */
-      }
-    },
-
-    async setYoutubeOauth(clientId, clientSecret) {
-      await api.setYoutubeOauth(clientId, clientSecret);
-      set((s) => ({
-        youtubeOauthReady: true,
-        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
-      }));
-      await get().setupOauth();
-    },
-    // Só apaga as credenciais do cofre. Trocar de modo NÃO passa por aqui: a troca é
-    // `youtubeUseOfficial`, que mantém tudo salvo — apagar era o que fazia o login do YouTube
-    // desaparecer de vez quando o fluxo oficial não estava disponível pra assumir.
-    async clearYoutubeOauth() {
-      await api.clearYoutubeOauth();
-      await get().setupOauth();
-    },
-    async youtubeUseOfficial() {
-      await api.youtubeUseOfficial();
-      await get().setupOauth();
-    },
-    async youtubeUseOwnCreds() {
-      await api.youtubeUseOwnCreds();
-      await get().setupOauth();
-    },
-    async setKickOauth(clientId, clientSecret) {
-      await api.setKickOauth(clientId, clientSecret);
-      set((s) => ({
-        kickOauthReady: true,
-        chatLogin: { ...s.chatLogin, kick: { state: "out" } },
-      }));
-      await get().setupOauth();
-    },
-    async clearKickOauth() {
-      await api.clearKickOauth();
-      await get().setupOauth();
-    },
-    async kickUseOfficial() {
-      await api.kickUseOfficial();
-      await get().setupOauth();
-    },
-    async kickUseOwnCreds() {
-      await api.kickUseOwnCreds();
-      await get().setupOauth();
-    },
-
-    bindAuthFlow(t) {
-      return api.subscribeAuthFlow((who, a) => {
-        set((s) => {
-          const k = who as "twitch" | "youtube" | "kick";
-          let next: LoginState = s.chatLogin[k];
-          if (a.state === "code")
-            next = {
-              state: "code",
-              userCode: a.userCode,
-              verifyUri: a.verifyUri,
-              verifyUriComplete: a.verifyUriComplete,
-            };
-          else if (a.state === "connected")
-            next = { state: "connected", login: a.login || undefined };
-          else if (a.state === "error")
-            next = {
-              state: "error",
-              message: a.login || t("core.auth.login.error.fallback"),
-            };
-          else if (a.state === "loggedout") next = { state: "out" };
-          return { chatLogin: { ...s.chatLogin, [k]: next } };
-        });
-        // Código chegou → abre o navegador direto na autorização (a URL completa, quando existe,
-        // já pré-preenche o código). O link no app continua como plano B.
-        if (a.state === "code") {
-          // No fallback BYOK por device flow, copia o código antes de abrir o navegador. Twitch e
-          // o fluxo oficial PKCE do YouTube já levam tudo na URL e não entram neste bloco.
-          if (a.userCode) {
-            try {
-              void navigator.clipboard.writeText(a.userCode);
-            } catch {
-              /* clipboard indisponível */
-            }
-          }
-          const url = a.verifyUriComplete || a.verifyUri;
-          if (url) void openExternal(url);
-        }
-        // Twitch logou e o chat está no ar → reconecta pra o IRC autenticar (mantém o histórico).
-        if (
-          who === "twitch" &&
-          a.state === "connected" &&
-          get().chatConnected
-        ) {
-          void api.chatStart(t);
-        }
-      });
-    },
-
-    async twitchLogin() {
-      set((s) => ({
-        chatLogin: { ...s.chatLogin, twitch: { state: "code" } },
-      }));
-      await api.twitchLoginStart();
-    },
-    async twitchLogout() {
-      await api.twitchLogout();
-      set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "out" } } }));
-    },
-    async youtubeLogin() {
-      set((s) => ({
-        chatLogin: { ...s.chatLogin, youtube: { state: "code" } },
-      }));
-      await api.youtubeLoginStart();
-    },
-    async youtubeLogout() {
-      await api.youtubeLogout();
-      set((s) => ({
-        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
-      }));
-    },
-    async kickLogin() {
-      set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
-      await api.kickLoginStart();
-    },
-    async kickLogout() {
-      await api.kickLogout();
-      set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "out" } } }));
-    },
-
-    async moderate(sourceId, action, opts) {
-      await api.chatModerate(sourceId, action, opts);
-    },
-
-    clearChat() {
-      discardPendingChat();
-      set({ chatMessages: [] });
-    },
-
-    alerts: [],
-    bindAlerts() {
-      return api.subscribeAlerts((a) =>
-        set((s) => {
-          if (s.alerts.length < ALERT_CAP) {
-            return { alerts: [...s.alerts, a] };
-          }
-          const next = s.alerts.slice(-(ALERT_CAP - 1));
-          next.push(a);
-          return { alerts: next };
-        }),
-      );
-    },
-    clearAlerts() {
-      set({ alerts: [] });
-    },
-
-    viewers: { total: 0, anyLive: false, items: [] },
-    bindViewers() {
-      return api.subscribeViewers((v) => set({ viewers: v }));
-    },
-
-    leaks: [],
-    censored: false,
-    bindGuardian() {
-      return api.subscribeGuardian(
-        (l) => set((s) => ({ leaks: [...s.leaks, l].slice(-20) })),
-        (on) => set({ censored: on }),
-      );
-    },
-
-    goLiveFocus: false,
-    setGoLiveFocus(v) {
-      set({ goLiveFocus: v });
-    },
-
-    unseenReport: false,
-    markReportSeen() {
-      set({ unseenReport: false });
-      // Persistido: o selo não deve reacender ao reabrir o app pra um relatório já visto.
-      try {
-        localStorage.setItem("corneta.lastSeenReportAt", String(Date.now()));
-      } catch {
-        /* ignore */
-      }
-    },
-
-    tourNonce: 0,
-    replayTour() {
-      set((s) => ({ tourNonce: s.tourNonce + 1 }));
-    },
-
-    settingsTab: null,
-    setSettingsTab(v) {
-      set({ settingsTab: v });
-    },
-
-    navRequest: null,
-    requestNavigate(screen) {
-      set({ navRequest: screen });
-    },
-
-    chatConfigRequest: null,
-    requestChatConfig(tab) {
-      set({ chatConfigRequest: tab });
     },
   };
 });

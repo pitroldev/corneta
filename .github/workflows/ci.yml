@@ -104,7 +104,7 @@ jobs:
       - name: Verificar revisões dos artigos alterados
         if: github.event_name == 'pull_request'
         run: >-
-          pnpm --dir web content:revision:check --
+          pnpm --dir web content:revision:check
           --base "${{ github.event.pull_request.base.sha }}"
           --head "${{ needs.resolve.outputs.sha }}"
       - run: pnpm lint

@@ -5,5 +5,5 @@ out/
 .vercel/
 *.tsbuildinfo
 
-# capturas do scripts/shot.mjs (comparação visual, não é fonte)
+# Capturas locais de comparação visual, não são fonte.
 .shots/

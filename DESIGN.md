@@ -164,6 +164,8 @@ components:
 
 ## Overview
 
+Textos de interface seguem o [guia de tom de voz](docs/TOM-DE-VOZ.md), compartilhado com o site e o conteúdo editorial. Este documento define a linguagem visual, sem duplicar as regras de escrita.
+
 **Creative North Star: "Pôster de Corneta em Operação"**
 
 A Corneta é uma ferramenta desktop em modo **Operate** com voz autoral de pôster e quadrinho: tinta escura, papel quente, latão, tomate, blocos sólidos, tipografia robusta e sombras secas. A expressão visual serve à leitura rápida de uma operação de live; a marca aparece em detalhes precisos, sem competir com estado, conteúdo ou próxima ação.

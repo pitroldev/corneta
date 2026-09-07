@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
   createReadStream,
-  createWriteStream,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -13,8 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import { Readable, Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { downloadReleaseSources } from "./release-source-download.mjs";
 import {
   complianceErrors,
   compliancePackageFiles,
@@ -81,40 +79,7 @@ try {
     ].join("\n"),
   );
 
-  for (const source of manifest.sources) {
-    const response = await fetch(source.url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(180_000),
-    });
-    if (
-      !response.ok ||
-      !response.body ||
-      new URL(response.url).protocol !== "https:"
-    )
-      throw new Error("Não foi possível baixar uma fonte aprovada.");
-    let size = 0;
-    const hash = createHash("sha256");
-    const guard = new Transform({
-      transform(chunk, _encoding, callback) {
-        size += chunk.length;
-        if (size > 1_073_741_824) {
-          callback(new Error("Arquivo de fontes excede 1 GiB."));
-          return;
-        }
-        hash.update(chunk);
-        callback(null, chunk);
-      },
-    });
-    await pipeline(
-      Readable.fromWeb(response.body),
-      guard,
-      createWriteStream(join(staging, source.file), { flags: "wx" }),
-    );
-    if (hash.digest("hex") !== source.sha256.toLowerCase())
-      throw new Error(
-        "SHA-256 das fontes diverge. Nenhum pacote será aprovado.",
-      );
-  }
+  await downloadReleaseSources(manifest.sources, staging);
 
   // Inventory contains only package identity/license, never machine paths or env.
   const metadata = JSON.parse(

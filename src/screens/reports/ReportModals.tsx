@@ -3,10 +3,7 @@ import { Braces, Copy, Download, FileText, Table2, X } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/ui";
 import { api } from "../../lib/api";
-import type {
-  DownloadFormat,
-  selectedReportExport,
-} from "../../lib/export/selected";
+import type { DownloadFormat } from "../../lib/export/selected";
 import { ReportClient } from "../../lib/reportClient";
 import { fileStamp, useI18n, type Fmt, type I18n } from "../../lib/i18n";
 import { PLATFORMS } from "../../lib/platforms";
@@ -300,9 +297,7 @@ export function DownloadModal({
     client.current = worker;
     setBusy(true);
     try {
-      const file = await worker.run<
-        Awaited<ReturnType<typeof selectedReportExport>>
-      >({
+      const file = await worker.run({
         kind: "export",
         data,
         analysis,

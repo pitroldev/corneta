@@ -63,6 +63,7 @@ pub async fn run(
     session_path: PathBuf,
     id: String,
     running: Arc<AtomicBool>,
+    _activity: crate::engine::EngineActivityGuard,
 ) {
     // Continua de onde a pasta parou. O gravador pode subir duas vezes na mesma live (o
     // "tentar de novo" depois de desistir) e recomeçar do 1 apagaria o já gravado.
@@ -273,7 +274,7 @@ fn take_and_kill(app: &AppHandle) {
     }
 }
 
-/// Remux de finalização (§9.5). Falhar aqui não perde nada: o fMP4 continua tocando,
+/// Remux de finalização. Falhar aqui não perde nada: o fMP4 continua tocando,
 /// só navega pior.
 async fn finalize(app: &AppHandle, session_path: &Path, seg: u32, src: &Path) {
     if disk::file_len(src) == 0 {
@@ -306,7 +307,7 @@ async fn finalize(app: &AppHandle, session_path: &Path, seg: u32, src: &Path) {
     }
 }
 
-/// Grava 5s de barras e devolve o caminho — o teste do §9.2.
+/// Grava 5s de barras e devolve o caminho para testar a gravação.
 pub async fn test_record(app: &AppHandle, dir: &Path) -> Result<String, String> {
     let out = dir.join("corneta-teste.mp4");
     let cmd = app

@@ -14,8 +14,8 @@ intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,7 +31,7 @@ sources:
   - title: Corneta engine state policy
     kind: internal
     repoPath: src-tauri/src/engine_policy.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/getting-started/corneta-first-live-checklist.webp
     originalPath: assets/originals/getting-started/corneta-first-live-checklist.png
@@ -50,15 +50,15 @@ images:
 
 ## O mapa dos estados
 
-| Estado | O que está acontecendo | O que fazer |
-| --- | --- | --- |
-| **Aguardando** | a Corneta ainda não recebeu sinal | confira o endereço e inicie a transmissão no software de transmissão |
-| **Conectando** | a saída está abrindo sessão com a plataforma | aguarde; se não mudar, teste chave e servidor |
-| **NO AR** | a plataforma está recebendo mídia | acompanhe bitrate e quadros perdidos |
-| **Reconectando** | a saída caiu e tenta voltar | investigue apenas o destino afetado |
-| **Pausado** | você interrompeu aquele destino | use **Retomar** quando quiser voltar |
-| **JÁ VOLTO** | a tela de proteção substituiu o sinal | confira se foi pausa manual ou falta do OBS |
-| **Erro** | a tentativa parou com uma causa conhecida | abra a mensagem e use **Tentar de novo** depois da correção |
+| Estado           | O que está acontecendo                       | O que fazer                                                          |
+| ---------------- | -------------------------------------------- | -------------------------------------------------------------------- |
+| **Aguardando**   | a Corneta ainda não recebeu sinal            | confira o endereço e inicie a transmissão no software de transmissão |
+| **Conectando**   | a saída está abrindo sessão com a plataforma | aguarde; se não mudar, teste chave e servidor                        |
+| **NO AR**        | a plataforma está recebendo mídia            | acompanhe bitrate e quadros perdidos                                 |
+| **Reconectando** | a saída caiu e tenta voltar                  | investigue apenas o destino afetado                                  |
+| **Pausado**      | você interrompeu aquele destino              | use **Retomar** quando quiser voltar                                 |
+| **JÁ VOLTO**     | a tela de proteção substituiu o sinal        | confira se foi pausa manual ou falta do OBS                          |
+| **Erro**         | a tentativa parou com uma causa conhecida    | abra a mensagem e use **Tentar de novo** depois da correção          |
 
 <ContentImage baseName="corneta-first-live-checklist" />
 

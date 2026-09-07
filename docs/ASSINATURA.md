@@ -1,13 +1,13 @@
 # Assinatura e confiança na distribuição
 
-Atualizado em 2026-09-06. A decisão registrada em 2026-07-30 permanece: lançamento inicial
-sem compra de certificado Authenticode. Isso **não** dispensa a assinatura do updater.
+A política de distribuição permite instalador sem Authenticode, com aviso explícito.
+A assinatura criptográfica do updater é obrigatória e independente do certificado Windows.
 
-| Proteção | O que comprova | Política atual |
-| --- | --- | --- |
-| Assinatura do updater | O instalador corresponde à chave pública embutida no app | Obrigatória; verificada criptograficamente antes de gerar a release |
-| Authenticode | Identidade do publicador e integridade do executável Windows | Adiada por decisão de orçamento; assinatura existente inválida bloqueia |
-| SHA-256 | O arquivo baixado tem os bytes publicados | Gerado em SHA256SUMS.txt; não substitui assinatura |
+| Proteção              | O que comprova                                               | Política atual                                                                                      |
+| --------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Assinatura do updater | O instalador corresponde à chave pública embutida no app     | Obrigatória; verificada criptograficamente antes de gerar a release                                 |
+| Authenticode          | Identidade do publicador e integridade do executável Windows | Opcional enquanto `REQUIRE_WINDOWS_CODE_SIGNING` não exigir; assinatura existente inválida bloqueia |
+| SHA-256               | O arquivo baixado tem os bytes publicados                    | Gerado em SHA256SUMS.txt; não substitui assinatura                                                  |
 
 ## SmartScreen: sem promessas falsas
 
@@ -21,14 +21,14 @@ Antes de baixar, o usuário deve encontrar o domínio/repositório oficial, a ex
 o certificado e o SHA-256. Não orientar a desativar o antivírus ou a ignorar detecções de malware.
 Uma análise antivírus sem detecções não é garantia de segurança.
 
-## Verificação implementada
+## Verificar o instalador
 
 ```powershell
 pwsh -NoProfile -File scripts/check-windows-signature.ps1 -InstallerPath CAMINHO_DO_INSTALADOR.exe
 ```
 
 O workflow executa essa verificação no artefato que será anexado. Por padrão aceita
-`NotSigned` com aviso, conforme a decisão de orçamento, ou `Valid`. Outros estados bloqueiam.
+`NotSigned` com aviso ou `Valid`. Outros estados bloqueiam.
 
 Quando houver certificado, configure o mecanismo de assinatura do Tauri e a variável de
 Environment `REQUIRE_WINDOWS_CODE_SIGNING=1`. O mesmo script aceita `-RequireSigned` localmente.
@@ -40,12 +40,12 @@ Consulte a [documentação oficial de assinatura Windows](https://v2.tauri.app/d
 ao escolher o fornecedor e confirme elegibilidade, preços e proteção da chave naquele momento.
 Não guardar certificado, chave privada ou senha no repositório.
 
-## O que ainda exige validação
+## Conferir antes de distribuir
 
 - Publicar o aviso no fluxo real de download e conferir o instalador baixado, não só o arquivo local.
 - Testar instalação em Windows limpo com as políticas de segurança normais.
 - Confirmar backup seguro da chave do updater e ensaiar N-1 → N.
-- Reavaliar Authenticode quando houver orçamento, sem tratar compra de EV como solução garantida.
+- Ao adotar Authenticode, exigir assinatura válida no gate, sem tratar compra de EV como solução garantida.
 
 Veja [ATUALIZACAO-AUTOMATICA.md](./ATUALIZACAO-AUTOMATICA.md) e
 [GATES-DE-RELEASE.md](./GATES-DE-RELEASE.md).

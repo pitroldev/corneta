@@ -1,5 +1,5 @@
 //! Cofre de chaves — usa o keychain nativo do SO via crate `keyring`.
-//! As stream keys NUNCA são gravadas no config.json (ver §14.6).
+//! Stream keys ficam no cofre, não no config.json.
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
 
@@ -24,13 +24,68 @@ pub fn get_key(target_id: &str) -> Option<String> {
     entry(target_id).ok()?.get_password().ok()
 }
 
+/// Recovery journals must distinguish a missing entry from an unavailable vault.
+pub(crate) fn read_key(target_id: &str) -> Result<Option<String>, String> {
+    read_key_with(|| Entry::new(SERVICE, target_id)?.get_password())
+}
+
+fn read_key_with(read: impl FnOnce() -> keyring::Result<String>) -> Result<Option<String>, String> {
+    match read() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(_) => Err(crate::i18n::Msg::VaultReadFailed.now()),
+    }
+}
+
 pub fn clear_key(target_id: &str) -> Result<(), String> {
-    // O streamer MANDOU apagar: some da memória de presença antes, senão o sumiço
-    // esperado seria denunciado como o bug do §sumiço-de-chave.
-    forget_present(target_id);
-    // Ignorar erro de "não existe": limpar uma credencial ausente é idempotente.
-    let _ = entry(target_id)?.delete_credential();
-    Ok(())
+    clear_key_with(
+        || Entry::new(SERVICE, target_id)?.delete_credential(),
+        || forget_present(target_id),
+    )
+}
+
+fn clear_key_with(
+    delete: impl FnOnce() -> keyring::Result<()>,
+    forget: impl FnOnce(),
+) -> Result<(), String> {
+    match delete() {
+        Ok(()) | Err(keyring::Error::NoEntry) => {
+            // Só esquecer após ausência confirmada; falha não é uma exclusão intencional.
+            forget();
+            Ok(())
+        }
+        Err(keyring::Error::NoStorageAccess(_)) => {
+            Err(crate::i18n::Msg::VaultDeleteAccessDenied.now())
+        }
+        // Não interpolar detalhes do provider: alguns erros carregam dados da credencial.
+        Err(_) => Err(crate::i18n::Msg::VaultDeleteFailed.now()),
+    }
+}
+
+/// Tenta todos os slots; conjuntos de credenciais não têm transação no cofre do SO.
+pub(crate) fn clear_keys(target_ids: &[&str]) -> Result<(), String> {
+    clear_keys_with(target_ids, clear_key)
+}
+
+fn clear_keys_with(
+    target_ids: &[&str],
+    mut delete: impl FnMut(&str) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut failed = 0;
+    for id in target_ids {
+        if delete(id).is_err() {
+            failed += 1;
+        }
+    }
+    if failed == 0 {
+        Ok(())
+    } else {
+        Err(crate::i18n::Msg::VaultDeleteIncomplete {
+            failed,
+            total: target_ids.len(),
+        }
+        .now())
+    }
 }
 
 pub fn has_key(target_id: &str) -> bool {
@@ -97,6 +152,56 @@ fn vanished_ids(seen: &HashSet<String>, current: &[(String, bool)]) -> Vec<Strin
 mod tests {
     use super::*;
 
+    #[test]
+    fn checked_read_distinguishes_absence_from_failure_without_echoing_provider_data() {
+        assert_eq!(
+            read_key_with(|| Ok("fixture".into())),
+            Ok(Some("fixture".into()))
+        );
+        assert_eq!(read_key_with(|| Err(keyring::Error::NoEntry)), Ok(None));
+        let error = read_key_with(|| Err(keyring::Error::BadEncoding(b"private-fixture".to_vec())))
+            .unwrap_err();
+        assert!(!error.contains("private-fixture"));
+    }
+
+    #[test]
+    fn deletion_only_forgets_confirmed_absence_without_accessing_the_os_store() {
+        for result in [Ok(()), Err(keyring::Error::NoEntry)] {
+            let mut forgotten = false;
+            assert!(clear_key_with(|| result, || forgotten = true).is_ok());
+            assert!(forgotten);
+        }
+        for error in [
+            keyring::Error::NoStorageAccess(Box::new(std::io::Error::from(
+                std::io::ErrorKind::PermissionDenied,
+            ))),
+            keyring::Error::PlatformFailure(Box::new(std::io::Error::other("store unavailable"))),
+            keyring::Error::NoDefaultStore,
+            keyring::Error::BadEncoding(b"sensitive-test-payload".to_vec()),
+        ] {
+            let mut forgotten = false;
+            let error = clear_key_with(|| Err(error), || forgotten = true).unwrap_err();
+            assert!(!forgotten);
+            assert!(!error.contains("sensitive-test-payload"));
+        }
+    }
+
+    #[test]
+    fn partial_deletion_tries_every_slot_and_never_reports_success() {
+        let mut attempted = Vec::new();
+        let result = clear_keys_with(&["access", "refresh", "mode"], |id| {
+            attempted.push(id.to_string());
+            if id == "refresh" {
+                Err("unavailable".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(result.is_err());
+        assert_eq!(attempted, ["access", "refresh", "mode"]);
+        assert!(clear_keys_with(&["access", "refresh"], |_| Ok(())).is_ok());
+    }
+
     fn conjunto(ids: &[&str]) -> HashSet<String> {
         ids.iter().map(|s| (*s).to_string()).collect()
     }
@@ -128,7 +233,7 @@ mod tests {
         assert!(vanished_ids(&seen, &agora).is_empty());
     }
 
-    /// `clear_key` esquece antes de apagar — apagar a chave na mão é sumiço esperado.
+    /// Ausência confirmada após exclusão intencional não é sumiço inesperado.
     #[test]
     fn apagar_na_mao_nao_denuncia() {
         remember_present(["apagada-na-mao"].into_iter());

@@ -118,7 +118,7 @@ jobs:
             exit 0
           }
 
-          pnpm --dir web content:revision:check -- `
+          pnpm --dir web content:revision:check `
             --base $previousTag `
             --head $env:RELEASE_SHA `
             --product-version $config.version

@@ -44,6 +44,33 @@ use crate::queue_probe::{QueueProbe, Timed};
 use crate::telemetry::AppError;
 use crate::AppState;
 
+#[derive(Debug, PartialEq, Eq)]
+enum FrameMode {
+    ManualPause,
+    CoveredImage,
+    Live,
+}
+
+fn frame_mode(forced: bool, censor: bool) -> FrameMode {
+    if forced {
+        FrameMode::ManualPause
+    } else if censor {
+        FrameMode::CoveredImage
+    } else {
+        FrameMode::Live
+    }
+}
+
+fn emit_censor(app: &AppHandle, running: &Arc<AtomicBool>, censor: bool) {
+    let state = app.state::<AppState>();
+    let engine = state.engine.lock().unwrap();
+    if Arc::ptr_eq(&engine.running, running)
+        && (!censor || (engine.live && running.load(Ordering::Relaxed)))
+    {
+        let _ = app.emit("leak://censor", censor);
+    }
+}
+
 fn capture_compositor_error(app: &AppHandle, code: &str, retryable: bool) {
     let state = app.state::<AppState>();
     let operation_id = state.engine.lock().unwrap().operation_id.clone();
@@ -472,7 +499,7 @@ pub async fn run(
             }
         }
         if censoring {
-            let _ = app.emit("leak://censor", false);
+            emit_censor(&app, &running, false);
         }
         slate_on.store(false, Ordering::Relaxed);
         log::info!("compositor: encerrado");
@@ -847,38 +874,37 @@ fn generation(
                     // Censura do guardião (só com watchlist): troca o QUADRO, áudio segue.
                     let censor_now = shared
                         .map(|sh| {
-                            let mut tl = sh.timeline.lock().unwrap();
-                            let s = tl.should_censor(*idx, max_gap);
-                            tl.prune(idx.saturating_sub(max_gap + 2));
+                            let (s, status) = sh.coverage(*idx, max_gap);
+                            sh.publish_status(app, running, status);
                             s
                         })
                         .unwrap_or(false);
                     if censor_now != *censoring {
                         *censoring = censor_now;
-                        let _ = app.emit("leak://censor", censor_now);
+                        emit_censor(app, running, censor_now);
                     }
                     let audio = take_audio(&mut afifo, abpf);
-                    if censor_now {
-                        (slate_frame.clone(), audio, false)
-                    } else if forced {
-                        // "JÁ VOLTO agora" manual: slate no ar, áudio real DESCARTADO (consumido
-                        // acima pra manter o pareamento) e trocado pelo do slate/silêncio — o mic
-                        // do streamer não vaza na pausa. Os pops continuam: ao voltar, o conteúdo
-                        // é o ATUAL, não um replay da pausa.
-                        let slate_audio = if matches!(
-                            &opts.slate,
-                            Slate::Video {
-                                has_audio: true,
-                                ..
-                            }
-                        ) {
-                            take_audio(&mut slate_afifo, abpf)
-                        } else {
-                            vec![0u8; abpf]
-                        };
-                        (slate_frame.clone(), slate_audio, true)
-                    } else {
-                        (f.clone(), audio, false)
+                    match frame_mode(forced, censor_now) {
+                        FrameMode::ManualPause => {
+                            // "JÁ VOLTO agora" manual: slate no ar, áudio real DESCARTADO (consumido
+                            // acima pra manter o pareamento) e trocado pelo do slate/silêncio — o mic
+                            // do streamer não vaza na pausa. Os pops continuam: ao voltar, o conteúdo
+                            // é o ATUAL, não um replay da pausa.
+                            let slate_audio = if matches!(
+                                &opts.slate,
+                                Slate::Video {
+                                    has_audio: true,
+                                    ..
+                                }
+                            ) {
+                                take_audio(&mut slate_afifo, abpf)
+                            } else {
+                                vec![0u8; abpf]
+                            };
+                            (slate_frame.clone(), slate_audio, true)
+                        }
+                        FrameMode::CoveredImage => (slate_frame.clone(), audio, false),
+                        FrameMode::Live => (f.clone(), audio, false),
                     }
                 }
                 // JÁ VOLTO — GRUDENTO: uma vez no slate, fica nele até conteúdo REAL voltar a
@@ -990,8 +1016,16 @@ fn offer_scan(shared: Option<&guardian::Shared>, idx: u64, frame: &[u8], ysize: 
 
 #[cfg(test)]
 mod tests {
-    use super::take_audio;
+    use super::{frame_mode, take_audio, FrameMode};
     use std::collections::VecDeque;
+
+    #[test]
+    fn manual_pause_always_selects_slate_audio_even_when_guardian_covers_video() {
+        assert_eq!(frame_mode(true, true), FrameMode::ManualPause);
+        assert_eq!(frame_mode(true, false), FrameMode::ManualPause);
+        assert_eq!(frame_mode(false, true), FrameMode::CoveredImage);
+        assert_eq!(frame_mode(false, false), FrameMode::Live);
+    }
 
     #[test]
     fn take_audio_copies_wrapped_fifo_and_pads_silence() {

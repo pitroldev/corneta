@@ -46,7 +46,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 ```
 
-Esses comandos podem ler a configuração pública de build do workspace; execute-os no clone limpo de contribuição, não reutilizando um `.env` oficial. Testes `ignored` incluem mídia/OCR e dependem das ferramentas descritas no [runbook](docs/RUNBOOK-BETA.md). Não informe que foram executados se rodou apenas testes unitários.
+Esses comandos podem ler a configuração pública de build do workspace; execute-os no clone limpo de contribuição, não reutilizando um `.env` oficial. Para os testes `ignored` de mídia/OCR, siga a [preparação e execução dos testes nativos de integração](docs/DESENVOLVIMENTO.md#testes-nativos-de-integração). Não informe que foram executados se rodou apenas testes unitários; OCR pode ser ignorado por falta de pacote de idioma mesmo quando o comando termina com sucesso.
 
 ## Invariantes que uma contribuição deve preservar
 
@@ -66,4 +66,4 @@ Você deve ter direito de contribuir com código e materiais enviados, mantendo 
 
 Seja respeitoso, discuta decisões técnicas com evidências e evite ataques pessoais. O mantenedor pode pedir ajustes ou recusar uma mudança por escopo, segurança, manutenção ou prioridade do produto.
 
-Consulte também [conduta](CODE_OF_CONDUCT.md), [suporte](SUPPORT.md), [arquitetura](docs/ARQUITETURA.md) e [performance](docs/PERFORMANCE.md). A indicação em CODEOWNERS corresponde ao mantenedor atual; não existe uma equipe fictícia nem aprovação automática.
+Consulte também [conduta](CODE_OF_CONDUCT.md), [suporte](SUPPORT.md), [arquitetura](docs/ARQUITETURA.md) e [performance](docs/PERFORMANCE.md). CODEOWNERS identifica responsáveis pela revisão, mas não substitui a aprovação do PR.

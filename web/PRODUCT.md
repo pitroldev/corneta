@@ -8,11 +8,11 @@ web
 
 ## Users
 
-Streamers brasileiros que usam OBS e querem transmitir para mais de uma plataforma sem manter servidores ou depender de uma assinatura de relay. O público inclui iniciantes que precisam de um fluxo guiado e streamers experientes que valorizam controle por destino, resiliência e privacidade.
+Streamers brasileiros que usam OBS ou outro programa de transmissão compatível com RTMP e querem transmitir para mais de uma plataforma sem manter servidores ou depender de uma assinatura de relay. O público inclui iniciantes que precisam de um fluxo guiado e streamers experientes que valorizam controle por destino, resiliência e privacidade.
 
 ## Product Purpose
 
-O site público apresenta e distribui a Corneta, um app desktop que recebe um único sinal do OBS e o envia para múltiplos destinos. O sucesso da superfície pública é fazer o visitante entender o benefício em poucos segundos e baixar o app para Windows.
+O site público apresenta e distribui a Corneta, um app desktop que recebe um único sinal RTMP local e o envia para múltiplos destinos. O OBS é o programa recomendado por ter integração de configuração, controle e estatísticas. O sucesso da superfície pública é fazer o visitante entender o benefício em poucos segundos e baixar o app para Windows.
 
 ## Positioning
 
@@ -20,12 +20,12 @@ A Corneta faz o multistream rodar localmente e mantém cada destino independente
 
 ## Operating Context
 
-O streamer prepara cenas, câmera e áudio no OBS. A Corneta entra depois dele: configura a conexão, mede o upload disponível, distribui o sinal, acompanha os destinos e reúne informações úteis durante e depois da transmissão.
+O streamer prepara cenas, câmera e áudio no OBS ou em outro programa compatível com RTMP. A Corneta entra depois dele: recebe o sinal local, mede o upload disponível, distribui a transmissão, acompanha os destinos e reúne informações úteis durante e depois da live. A configuração automática, o controle de início/parada e as estatísticas integradas são específicos do OBS; outras fontes exigem apontar manualmente o servidor e a chave locais.
 
 ## Capabilities and Constraints
 
 - App atual Windows-first; não há builds públicos confirmados para macOS ou Linux.
-- Requer OBS para produzir a transmissão.
+- Requer uma fonte de vídeo/áudio compatível com RTMP. O OBS é recomendado, mas não obrigatório; aceitar o sinal de outro programa não implica oferecer a mesma integração de configuração, controle e estatísticas.
 - Multistream, configuração do OBS, teste de upload, destinos independentes, chat, alertas, audiência agregada e relatórios existem no produto.
 - Chaves de transmissão ficam no cofre nativo do sistema.
 - Três modos de qualidade existem e têm estes nomes na interface: “Na lata” (copia o sinal do OBS para todos), “Esperto” (copia o que já serve e recodifica só o que precisa) e “Caprichado” (recodifica cada destino com o preset da plataforma). O app estima upload somado, número de recodificações e carga antes da live.
@@ -39,10 +39,10 @@ O streamer prepara cenas, câmera e áudio no OBS. A Corneta entra depois dele: 
 - Atalho global, bandeja, iniciar com o Windows, tema claro/escuro, perfis de destino e backup da configuração existem.
 - Métricas por destino durante a live existem: bitrate, fps, quadros perdidos, tempo no ar, além de CPU, GPU e estatísticas do OBS.
 - Co-stream com convidados (“Mesa”) existe no código, mas está desligado por feature flag e não deve ser divulgado.
-- Twitch possui validação real documentada. A matriz multiplataforma completa ainda precisa de validação pública.
+- A implementação de Twitch não é uma certificação de operação real. Esta fonte não apresenta um ensaio verificável de live por plataforma; a matriz externa deve ser registrada e aprovada antes da distribuição.
 - TikTok, Instagram e X são experimentais.
 - Proteção por tela “JÁ VOLTO” em queda do OBS existe.
-- O Guardião de termos é experimental e depende de configuração explícita do usuário.
+- O Guardião de termos é experimental e depende de configuração explícita do usuário. Adiciona 12 s de atraso e procura apenas os termos listados; pode deixar passar texto. Durante preparação, falha ou atraso excessivo da leitura, cobre imagens não verificadas com JÁ VOLTO, sem encerrar a conexão. O vídeo pode retornar automaticamente após uma leitura válida sem termo listado. Essa proteção não censura o áudio, que continua sendo transmitido.
 - Detecção de tela preta ou congelada não deve ser apresentada como concluída.
 - Cada destino consome upload; transcode também pode consumir CPU ou GPU.
 - O núcleo local é gratuito e o projeto usa licença MIT.
@@ -61,7 +61,7 @@ O streamer prepara cenas, câmera e áudio no OBS. A Corneta entra depois dele: 
 - Preview visual em `app/_components/product-preview.tsx`.
 - Conta de banda e carga da LP espelha `../src/lib/estimates.ts` com os presets de `../src/lib/platforms.ts`; qualquer número exibido deve continuar saindo dessa conta.
 - Copy dos recursos e das ressalvas espelha os rótulos do app (`../src/screens/SettingsScreen.tsx`, `EncodingScreen.tsx`, `ChatScreen.tsx`).
-- Transmissão real para Twitch documentada em `../docs/PENDENCIAS.md`.
+- [Checklist de publicação](../docs/PUBLICACAO.md) e [critérios de validação real](../docs/GATES-DE-RELEASE.md). São requisitos, não evidência de que um ensaio ocorreu. Ao documentar um ensaio, registrar plataforma, versão/commit, data, cenário, ambiente e resultado verificável antes de anunciar validação.
 - Arquitetura e funcionalidades documentadas em `../README.md` e `../docs/`.
 - Licença MIT em `../LICENSE`.
 - Não há depoimentos, números públicos de usuários, benchmarks comerciais ou logos de clientes; não devem ser fabricados.

@@ -1,5 +1,3 @@
-import { cn } from "../lib/utils";
-
 /** Mascote da Corneta — o megafone. Herda a cor via currentColor. */
 export function Mascot({ className }: { className?: string }) {
   return (
@@ -60,17 +58,5 @@ export function SoundWaves({
         );
       })}
     </svg>
-  );
-}
-
-/** Faixa decorativa de ondas no canto de uma seção/herói. */
-export function WaveCorner({ className }: { className?: string }) {
-  return (
-    <SoundWaves
-      className={cn(
-        "pointer-events-none absolute select-none text-brass",
-        className,
-      )}
-    />
   );
 }

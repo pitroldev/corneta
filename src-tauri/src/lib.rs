@@ -10,10 +10,7 @@ mod frame_pool;
 mod gpu_pipeline;
 mod guardian;
 mod http_client;
-// `pub` de propósito: o catálogo de mensagens é a fundação do i18n e precisa
-// ficar alcançável a partir da raiz do crate — senão as 220 variantes ainda não
-// fiadas viram um muro de `dead_code` que esconde aviso de verdade.
-pub mod i18n;
+mod i18n;
 mod keys;
 mod obs;
 mod overlay;
@@ -23,14 +20,50 @@ mod recorder;
 mod renditions;
 mod resources;
 mod session;
+mod shortcut;
 mod splicer;
 mod studio;
 mod telemetry;
+mod updater;
 
+// O harness da lib precisa do mesmo manifesto Common Controls v6 gerado pelo Tauri.
+#[cfg(all(test, target_os = "windows", target_env = "msvc"))]
+#[link(name = "resource", kind = "static", modifiers = "-bundle")]
+extern "C" {}
+
+use crate::i18n::Msg;
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
+
+struct NativeMenu {
+    show: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
+}
+
+/// Apply a persisted preference to native UI without waiting for another engine transition.
+pub(crate) fn apply_native_language(app: &tauri::AppHandle, setting: &str) {
+    let before = i18n::generation();
+    let locale = i18n::apply_setting(setting);
+    if before == i18n::generation() {
+        return;
+    }
+    if let Some(menu) = app.try_state::<NativeMenu>() {
+        let _ = menu.show.set_text(Msg::TrayOpen.text(locale));
+        let _ = menu.quit.set_text(Msg::TrayQuit.text(locale));
+    }
+    let snapshot = app
+        .state::<AppState>()
+        .engine
+        .lock()
+        .unwrap()
+        .snapshot
+        .clone();
+    if let Some(snapshot) = snapshot {
+        commands::update_tray(app, &snapshot);
+    }
+}
 
 /// Estado global: runtime do motor (handle do sidecar + último snapshot) + chat + Mesa.
 pub struct AppState {
@@ -61,20 +94,21 @@ fn engine_live(app: &tauri::AppHandle) -> bool {
 
 /// Diálogo bloqueante "encerrar a live?" — compartilhado pelo "Sair" da bandeja e pelo X
 /// da janela (o X era o único caminho que derrubava a live SEM perguntar).
-fn confirm_end_live(app: &tauri::AppHandle, msg: &str) -> bool {
+fn confirm_end_live(app: &tauri::AppHandle) -> bool {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
     app.dialog()
-        .message(msg)
-        .title("Sair da Corneta?")
+        .message(Msg::ExitLiveWarning.now())
+        .title(Msg::ExitTitle.now())
         .buttons(MessageDialogButtons::OkCancelCustom(
-            "Encerrar e sair".into(),
-            "Cancelar".into(),
+            Msg::ExitConfirm.now(),
+            Msg::ExitCancel.now(),
         ))
         .blocking_show()
 }
 
 /// Sequência única de encerramento (Mesa + broadcast do YouTube + motor).
 fn shutdown_engine(app: &tauri::AppHandle) {
+    let generation = app.state::<AppState>().engine.lock().unwrap().start_gen;
     // Memoriza o estado ANTES de derrubar o motor; o evento/marker e o flush
     // acontecem apenas no RunEvent::ExitRequested (fechar uma janela nem sempre
     // encerra um app que também possui tray icon).
@@ -83,8 +117,10 @@ fn shutdown_engine(app: &tauri::AppHandle) {
         .note_exit_live(engine_live(app));
     studio::stop(&app.state::<AppState>().studio);
     overlay::stop(&app.state::<AppState>().overlay);
-    auth::youtube_complete_active(app); // encerra o broadcast do YouTube
     commands::kill_engine_for_shutdown(app);
+    if auth::youtube_complete_active(app, generation).is_err() {
+        log::warn!("YouTube auto-broadcast: cleanup_pending_at_shutdown");
+    }
 }
 
 /// Feedback da ida pra bandeja: na primeira vez avisa que o app NÃO fechou (o botão se
@@ -99,14 +135,14 @@ fn tray_hide_hint(app: &tauri::AppHandle, live: bool) {
     if live {
         commands::notify(
             app,
-            "Sua live continua no ar",
-            "A Corneta ficou na bandeja, perto do relógio. Pra sair de vez, use o menu da bandeja.",
+            &Msg::TrayLiveHintTitle.now(),
+            &Msg::TrayLiveHintBody.now(),
         );
     } else if first {
         commands::notify(
             app,
-            "A Corneta continua aqui",
-            "Ela ficou na bandeja, perto do relógio — não fechou. Pra sair de vez, use o menu da bandeja.",
+            &Msg::TrayIdleHintTitle.now(),
+            &Msg::TrayIdleHintBody.now(),
         );
     }
     if first {
@@ -145,7 +181,7 @@ fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
 pub fn run() {
     let startup_started = std::time::Instant::now();
     let builder = tauri::Builder::default()
-        // single-instance DEVE ser o primeiro plugin (§14.2): evita duas Cornetas
+        // single-instance DEVE ser o primeiro plugin: evita duas Cornetas
         // disputando a porta de ingestão / subindo motores duplicados.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main(app);
@@ -192,7 +228,6 @@ pub fn run() {
     #[cfg(not(corneta_contributor))]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     builder
-        .plugin(tauri_plugin_process::init())
         .manage(AppState {
             engine: Mutex::new(engine::EngineRuntime::default()),
             chat: Mutex::new(chat::ChatRuntime::default()),
@@ -214,6 +249,8 @@ pub fn run() {
             commands::obs_autoconfigure,
             commands::start_engine,
             commands::stop_engine,
+            updater::install_update,
+            updater::update_installing,
             commands::set_target_paused,
             commands::retry_target,
             commands::set_force_brb,
@@ -252,6 +289,9 @@ pub fn run() {
             auth::twitch_logout,
             auth::youtube_login_start,
             auth::youtube_logout,
+            auth::youtube_broadcast_recovery_status,
+            auth::youtube_retry_broadcast_cleanup,
+            auth::youtube_acknowledge_unknown_broadcast,
             auth::kick_login_start,
             auth::kick_logout,
             auth::set_stream_info,
@@ -295,6 +335,7 @@ pub fn run() {
             telemetry::telemetry_capture_exception,
         ])
         .setup(move |app| {
+            i18n::apply_setting(&config::load(app.handle()).settings.language);
             let previous_exit = telemetry::mark_boot_started(app.handle());
             let telemetry_state = &app.state::<AppState>().telemetry;
             telemetry_state.initialize(app.handle());
@@ -342,9 +383,10 @@ pub fn run() {
             // que MOSTRA o erro quando a combinação já está em uso — aqui era um `let _ =` mudo.
             // Ícone na bandeja: clique esquerdo abre a janela; menu com Abrir/Sair.
             if let Some(icon) = app.default_window_icon().cloned() {
-                let show = MenuItem::with_id(app, "show", "Abrir Corneta", true, None::<&str>)?;
-                let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
+                let show = MenuItem::with_id(app, "show", Msg::TrayOpen.now(), true, None::<&str>)?;
+                let quit = MenuItem::with_id(app, "quit", Msg::TrayQuit.now(), true, None::<&str>)?;
                 let menu = Menu::with_items(app, &[&show, &quit])?;
+                app.manage(NativeMenu { show, quit });
 
                 TrayIconBuilder::with_id("corneta-tray")
                     .icon(icon)
@@ -354,11 +396,7 @@ pub fn run() {
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "show" => show_main(app),
                         "quit" => {
-                            let ok = !engine_live(app)
-                                || confirm_end_live(
-                                    app,
-                                    "Você está AO VIVO. Sair encerra a transmissão.",
-                                );
+                            let ok = !engine_live(app) || confirm_end_live(app);
                             if ok {
                                 shutdown_engine(app);
                                 app.exit(0);
@@ -390,7 +428,7 @@ pub fn run() {
                 let cfg = config::load(app);
                 let live = engine_live(app);
                 if cfg.settings.minimize_to_tray {
-                    // Esconde na bandeja em vez de fechar — a transmissão continua (§14.8).
+                    // Esconde na bandeja em vez de fechar — a transmissão continua.
                     // Com feedback: sem ele, o app "sumia" num botão chamado "Fechar".
                     api.prevent_close();
                     let _ = window.hide();
@@ -399,14 +437,13 @@ pub fn run() {
                     // X com a live NO AR: confirma antes — um clique acidental derrubava a
                     // transmissão em todas as plataformas (o "Sair" da bandeja já perguntava).
                     api.prevent_close();
-                    if confirm_end_live(app, "Você está AO VIVO. Fechar encerra a transmissão.")
-                    {
+                    if confirm_end_live(app) {
                         shutdown_engine(app);
                         // prevent_close já cancelou o fechamento — encerra explicitamente.
                         app.exit(0);
                     }
                 } else {
-                    // Fechar de verdade: mata FFmpeg para não deixar processo órfão (§14.2).
+                    // Fechar de verdade: mata FFmpeg para não deixar processo órfão.
                     shutdown_engine(app);
                 }
             }

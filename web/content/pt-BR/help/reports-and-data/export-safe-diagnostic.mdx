@@ -2,7 +2,7 @@
 contentId: help_export_safe_diagnostic
 title: "Como exportar um diagnóstico seguro para o suporte"
 description: "Gere o arquivo de diagnóstico da Corneta, confira o que ele inclui e compartilhe sem mandar stream keys, chat ou logs crus."
-summary: "Abra Configurações → Dados & diagnóstico e use Exportar diagnóstico. O arquivo leva versões, configuração resumida e eventos técnicos; chaves, chat, caminhos e logs crus ficam fora."
+summary: "Abra Configurações → Geral, encontre Dados & diagnóstico e use Exportar diagnóstico. O arquivo leva versões, configuração resumida e eventos técnicos; chaves, chat, caminhos e logs crus ficam fora."
 locale: pt-BR
 collection: help
 kind: help
@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -30,24 +30,25 @@ sources:
   - title: Corneta diagnostic export command
     kind: internal
     repoPath: src-tauri/src/commands.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: Corneta telemetry and diagnostics runbook
     kind: internal
     repoPath: docs/RUNBOOK-POSTHOG.md
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images: []
 ---
 
 ## Exporte o arquivo
 
 1. Abra **Configurações**.
-2. Entre na aba **Dados & diagnóstico**.
+2. Na aba **Geral**, encontre a seção **Dados & diagnóstico**.
 3. Clique em **Exportar diagnóstico**.
 4. Escolha onde salvar `corneta-diagnostico.txt`.
 5. Abra o arquivo e confira o conteúdo antes de anexar ao chamado.
 
-Cancelar a janela de salvamento não cria arquivo nem envia nada. A Corneta
-também não anexa diagnóstico automaticamente.
+Cancelar a janela de salvamento não cria nem envia um arquivo de diagnóstico.
+A Corneta também não anexa o diagnóstico automaticamente. Eventos técnicos
+sobre a operação seguem as preferências de telemetria, sem incluir o arquivo.
 
 ## O que entra
 

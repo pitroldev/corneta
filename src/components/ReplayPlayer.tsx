@@ -1,6 +1,5 @@
 // ============================================================
 // Player do replay: o vídeo da live tocando COM o relatório correndo junto.
-// Ver docs/FEATURE-GRAVACAO-E-REPLAY.md §4.
 //
 // A ideia inteira cabe numa frase: existe UM cursor, em epoch ms, e tudo se pendura nele.
 // O vídeo tocando move o cursor; clicar num evento, numa janela problemática ou no gráfico
@@ -20,7 +19,6 @@ import {
 } from "react";
 import {
   AlertTriangle,
-  Download,
   Flag,
   FolderOpen,
   LoaderCircle,
@@ -179,7 +177,7 @@ export function ReplayPlayer({
   );
 
   // Cada arquivo é liberado no escopo do asset UM a UM, na hora em que vai tocar — não a
-  // pasta inteira do streamer. Ver §5 do doc.
+  // pasta inteira do streamer.
   useEffect(() => {
     // `in`, e NÃO `urls[path]` truthy. O caminho de falha guarda "" pra marcar "já tentei
     // e não deu" — com o teste de verdade, esse "" seria falsy, o efeito tentaria de novo,
@@ -936,18 +934,5 @@ function Note({
       <AlertTriangle className="mt-px size-3.5 shrink-0" />
       {children}
     </p>
-  );
-}
-
-/** Botão "baixar a gravação" da lista — atalho pra pasta, sem abrir o replay. */
-export function OpenRecordingsButton({ label }: { label: string }) {
-  return (
-    <Button
-      size="sm"
-      variant="ghost"
-      onClick={() => void api.openRecordingFolder()}
-    >
-      <Download className="size-4" /> {label}
-    </Button>
   );
 }

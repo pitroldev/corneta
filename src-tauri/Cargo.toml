@@ -55,7 +55,7 @@ base64 = "0.23.0"
 bytes = "1.12.1"
 # Aleatoriedade do SO (PKCE verifier/state do login do Kick). Já está no lock (transitivo).
 getrandom = "0.4.3"
-# Regras do guardião anti-vazamento (email/chave/CPF/cartão/JWT no texto do OCR).
+# Validação e redação de dados sensíveis na telemetria; OCR usa watchlist explícita.
 regex = "1.13.1"
 # Guardião: encolhe o quadro antes do OCR (resize), diff de quadros e renderiza o slate "JÁ VOLTO"
 # (PNG) → yuv420p pro compositor.
@@ -67,8 +67,8 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 # removeu `CPUExecutionProvider`. O pin é o máximo compatível até o upstream adaptar.
 oar-ocr = "0.8.1"
 ort = "=2.0.0-rc.12"
-# windows-native ativa o Credential Manager (sem feature, o keyring v3 vira no-op em memória).
-# Para macOS/Linux depois: features = ["apple-native"] / ["sync-secret-service"].
+# A API v1 do keyring 4 seleciona o Credential Manager com windows-native-keyring-store.
+# Outros sistemas requerem configurar e validar seu provider antes de oferecer suporte.
 keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 # Mesa (co-stream P2P): servidor local HTTP (página de estúdio pro OBS) + relay de
 # sinalização WebRTC. axum 0.8 reusa o stack hyper1/http1/tower
@@ -76,7 +76,6 @@ keyring = { version = "4.1.6", default-features = false, features = ["v1", "wind
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
 tokio = { version = "1.53.1", features = ["net", "sync", "macros", "time"] }
 tauri-plugin-updater = "2.10.1"
-tauri-plugin-process = "2.3.1"
 
 # Hotfix transitivo de segurança: notify-rust 4.18 ainda fixa
 # tauri-winrt-notification 0.7 (quick-xml vulnerável). Este commit imutável é o PR

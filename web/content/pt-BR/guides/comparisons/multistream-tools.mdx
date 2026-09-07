@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: commercial
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -56,7 +56,7 @@ sources:
   - title: Corneta product reference
     kind: internal
     repoPath: web/PRODUCT.md
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/multistream/corneta-platform-destinations.webp
     originalPath: assets/originals/multistream/corneta-platform-destinations.png
@@ -108,7 +108,7 @@ O Restream exige conta para executar uma saída. Revisamos o fluxo público, o p
 | Arquitetura          | plugin local                  | plugin local                 | relay na nuvem                     | aplicativo local                  |
 | Onde controla        | dentro do OBS                 | dentro do OBS                | navegador                          | app separado                      |
 | Upload local         | soma das saídas               | soma das saídas              | uma saída até a nuvem              | soma das saídas                   |
-| Instalação           | plugin compatível com OBS     | plugin compatível com OBS    | conta e configuração web           | app Windows + OBS                 |
+| Instalação           | plugin compatível com OBS     | plugin compatível com OBS    | conta e configuração web           | app Windows + fonte RTMP          |
 | Ajuste por destino   | sim                           | sim                          | depende do plano e fluxo           | copiar ou recodificar por destino |
 | Vertical             | integra com ecossistema Aitum | depende da composição do OBS | recursos variam por plano          | recorte 9:16 manual por destino   |
 | Chat e alertas       | fora do núcleo do plugin      | fora do núcleo do plugin     | recursos próprios                  | unificados no app                 |
@@ -136,6 +136,8 @@ Resolve o gargalo estrutural do upload: uma transmissão sai da sua casa e o ser
 <ContentImage baseName="corneta-platform-destinations" />
 
 Separa distribuição da interface do OBS e mostra cada destino como uma conexão independente. Além do vídeo, reúne chat, alertas, estados e relatório. O preço dessa visibilidade é abrir outro aplicativo e consumir upload por saída.
+
+O OBS é recomendado pela configuração automática, controle de início/parada e estatísticas integradas. A Corneta também recebe o sinal de outros programas compatíveis com RTMP, configurados manualmente; isso não oferece a mesma integração com esses programas.
 
 <ContentImage baseName="corneta-quality-modes" />
 

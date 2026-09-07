@@ -105,15 +105,3 @@ function getReporter() {
 export function reportApiFailure(failure: ApiFailure) {
   return getReporter().reportApiFailure(failure);
 }
-
-export async function shutdownPostHog() {
-  const client = globalThis.cornetaPostHogClient;
-  globalThis.cornetaPostHogClient = undefined;
-  globalThis.cornetaTelemetryReporter = undefined;
-  if (!client) return;
-  try {
-    await client.shutdown();
-  } catch {
-    // Encerramento do processo não depende do provedor.
-  }
-}

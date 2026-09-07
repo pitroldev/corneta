@@ -5,6 +5,10 @@ import { dirname, resolve } from "node:path";
 import { analyze, parseSession } from "../src/lib/report";
 import { interpolate, type Vars } from "../src/lib/i18n/locale";
 import { pt, type MessageKey } from "../src/lib/i18n/pt";
+import { sha256, sourceIdentity } from "./benchmark-source.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const source = sourceIdentity(root);
 
 const t = (key: MessageKey, vars?: Vars) => interpolate(pt[key], vars);
 const sampleCount = 14_400;
@@ -59,7 +63,9 @@ samples.sort((a, b) => a - b);
 const percentile = (p: number) =>
   Number(samples[Math.ceil(p * samples.length) - 1].toFixed(2));
 const result = {
-  schemaVersion: 1,
+  schemaVersion: 2,
+  source,
+  inputSha256: sha256(input),
   scenario: "report-8h-4-targets-v1",
   measuredAt: new Date().toISOString(),
   runtime: {
@@ -83,6 +89,10 @@ const result = {
   scope:
     "JSON parse, normalização e análise no Node; exclui serialização da fixture, disco, React, GPU e IPC. Não mede startup, RSS da live ou vazamento de memória.",
 };
+if (sourceIdentity(root).sourceTreeSha256 !== source.sourceTreeSha256)
+  throw new Error(
+    "Os fontes mudaram durante o benchmark. Execute novamente após concluir as edições.",
+  );
 const destination = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../.artifacts/performance",

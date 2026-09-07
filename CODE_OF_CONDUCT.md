@@ -10,6 +10,6 @@ O responsável atual pelos espaços do projeto é o mantenedor [@pitroldev](http
 
 O mantenedor deve confirmar que recebeu quando puder, examinar o contexto, ouvir as pessoas envolvidas quando apropriado e comunicar uma decisão. Pode orientar, pedir correção, remover conteúdo ofensivo, advertir ou restringir temporária/permanentemente a participação, conforme gravidade e repetição. Relatos são tratados com discrição, mas não há promessa de sigilo absoluto diante de risco ou obrigação aplicável.
 
-É possível pedir reconsideração pelo mesmo canal, trazendo informação nova. Se o relato envolver o próprio mantenedor, não existe comitê independente no projeto: violações das regras da plataforma também podem ser reportadas ao GitHub pelos seus canais. Não inventamos uma equipe de mediação que não existe.
+É possível pedir reconsideração pelo mesmo canal, trazendo informação nova. Se o relato envolver o próprio mantenedor, não existe comitê independente no projeto: violações das regras da plataforma também podem ser reportadas ao GitHub pelos seus canais.
 
 Suspeitas técnicas de vulnerabilidade seguem [SECURITY.md](SECURITY.md). Este documento não substitui ajuda emergencial nem atendimento profissional.

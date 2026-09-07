@@ -3,6 +3,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import matter from "gray-matter";
 import { auditEditorialContent } from "../lib/editorial/audit";
+import { normalizeEditorialRevisionSource } from "./editorial-revision-source";
+import { editorialArguments, isEditorialCliEntrypoint } from "./editorial-cli";
 import {
   validateChangedInternalSources,
   validateEditorialRevision,
@@ -28,7 +30,8 @@ function readValue(args: string[], index: number, option: string): string {
   return value;
 }
 
-function parseOptions(args: string[]): Options {
+export function parseOptions(argv: string[]): Options {
+  const args = editorialArguments(argv);
   let base: string | undefined;
   let head = "HEAD";
   let productVersion: string | undefined;
@@ -220,7 +223,13 @@ async function main(): Promise<void> {
     };
 
     if (changedPaths.has(repositoryPath)) {
-      issues.push(...validateEditorialRevision(previous, current));
+      const [normalizedPrevious, normalizedCurrent] = await Promise.all([
+        normalizeEditorialRevisionSource(previous),
+        normalizeEditorialRevisionSource(current),
+      ]);
+      issues.push(
+        ...validateEditorialRevision(normalizedPrevious, normalizedCurrent),
+      );
     }
 
     const affected = (current.frontmatter.sources ?? []).some(
@@ -260,11 +269,13 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(
-    `Falha ao verificar revisões editoriais: ${
-      error instanceof Error ? error.message : String(error)
-    }\n`,
-  );
-  process.exitCode = 1;
-});
+if (isEditorialCliEntrypoint(import.meta.url)) {
+  main().catch((error: unknown) => {
+    process.stderr.write(
+      `Falha ao verificar revisões editoriais: ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    process.exitCode = 1;
+  });
+}

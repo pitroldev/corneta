@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
@@ -8,7 +8,10 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
-import { IS_TAURI } from "../lib/api";
+import {
+  ObsConfigChangedError,
+  ObsConfigSaveError,
+} from "../lib/obsCoordinator";
 import { obsIngestUrl } from "../lib/factory";
 import { bold, useT, type I18n } from "../lib/i18n";
 import { cn } from "../lib/utils";
@@ -79,31 +82,46 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   const settings = useStore((s) => s.config!.settings);
   const ingest = useStore((s) => s.config!.ingest);
   const setSettings = useStore((s) => s.setSettings);
+  const configureObs = useStore((s) => s.configureObs);
   const t = useT();
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
+  const [configError, setConfigError] = useState<"save" | "changed" | null>(
+    null,
+  );
+  const active = useRef(true);
+  const connecting = useRef(false);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   // Foco inicial no título: o primeiro focável do DOM é o X de fechar.
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   const help = error ? obsErrorHelp(t, error) : null;
 
   const connect = async () => {
+    if (connecting.current) return;
+    connecting.current = true;
     setStatus("connecting");
     setError("");
-    if (!IS_TAURI) {
-      // Demonstração no navegador: simula sucesso.
-      setTimeout(() => setStatus("ok"), 900);
-      return;
-    }
+    setConfigError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("obs_autoconfigure");
+      await configureObs();
+      if (!active.current) return;
       setStatus("ok");
     } catch (e) {
-      setError(String(e));
+      if (!active.current) return;
+      if (e instanceof ObsConfigSaveError) setConfigError("save");
+      else if (e instanceof ObsConfigChangedError) setConfigError("changed");
+      else setError(String(e));
       setStatus("error");
       setManualOpen(true); // erro → já oferece o plano B na mão
+    } finally {
+      connecting.current = false;
     }
   };
 
@@ -155,6 +173,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             placeholder={t("encoding.wizard.step2.placeholder")}
             className="mt-2"
             value={settings.obsPassword}
+            disabled={status === "connecting"}
             onChange={(e) => setSettings({ obsPassword: e.target.value })}
           />
         </Step>
@@ -179,6 +198,18 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
               ? bold(t, "encoding.wizard.ok.autostart")
               : bold(t, "encoding.wizard.ok.manual")}
           </div>
+        )}
+        {status === "error" && configError && (
+          <p
+            role="alert"
+            className="rounded-md bg-bad/10 p-3 text-sm font-semibold text-bad"
+          >
+            {t(
+              configError === "save"
+                ? "settings.obs.test.saveFailed"
+                : "settings.obs.test.settingsChanged",
+            )}
+          </p>
         )}
         {status === "error" && help && (
           <div

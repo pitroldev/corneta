@@ -14,8 +14,8 @@ intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
 updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,7 +31,7 @@ sources:
   - title: Corneta report analysis
     kind: internal
     repoPath: src/lib/report.ts
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/reports-and-data/corneta-post-live-report.webp
     originalPath: assets/originals/reports-and-data/corneta-post-live-report.png
@@ -56,12 +56,12 @@ Se alguém disse “travou perto de 1h58”, anote esse ponto antes de abrir o r
 
 ## Cruze os gráficos no mesmo minuto
 
-| O que mudou junto | Leitura provável |
-| --- | --- |
-| bitrate caiu em todos os destinos | entrada ou upload local |
-| só uma plataforma reconectou | chave, ingest ou rota daquela saída |
-| CPU/GPU subiu e encoding atrasou | máquina sem folga |
-| render skipped subiu no OBS | cena ou jogo ocupou a GPU |
+| O que mudou junto                  | Leitura provável                              |
+| ---------------------------------- | --------------------------------------------- |
+| bitrate caiu em todos os destinos  | entrada ou upload local                       |
+| só uma plataforma reconectou       | chave, ingest ou rota daquela saída           |
+| CPU/GPU subiu e encoding atrasou   | máquina sem folga                             |
+| render skipped subiu no OBS        | cena ou jogo ocupou a GPU                     |
 | audiência caiu sem métrica técnica | conteúdo, atraso do player ou dado incompleto |
 
 Correlação não prova causa. Um pico de CPU no mesmo minuto é pista; o relatório chama de causa provável porque não vê roteador, servidor da plataforma nem o player de cada pessoa.

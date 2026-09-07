@@ -15,7 +15,7 @@ export function makeTarget(platformId: PlatformId): Target {
     ingestUrl: INGEST_URL_RE.test(preset.ingestUrl) ? preset.ingestUrl : "",
     hasKey: false,
     encoding: {
-      // MVP lidera com encoding por plataforma (PLANEJAMENTO.md §12.1).
+      // Cada destino começa com a codificação recomendada da plataforma.
       action: "transcode",
       preset: { ...preset.recommended },
       encoder: "auto",

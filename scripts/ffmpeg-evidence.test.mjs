@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { gzipSync } from "node:zlib";
 import { collectionOptions } from "./collect-ffmpeg-evidence.mjs";
+import { downloadReleaseSources } from "./release-source-download.mjs";
 import {
   imageEvidence,
   packageFields,
@@ -116,6 +117,31 @@ describe("FFmpeg evidence download boundary", () => {
       }),
     ).rejects.toThrow("archive format");
     expect(readdirSync(directory)).toEqual([]);
+  });
+
+  it("blocks the packaging download path on HTML before any source can be packaged", async () => {
+    const directory = temporary();
+    const bytes = Buffer.from("<!doctype html><title>Challenge</title>");
+    await expect(
+      downloadReleaseSources([artifact(bytes)], directory, {
+        fetchImpl: async () => new Response(bytes),
+      }),
+    ).rejects.toThrow("archive format");
+    expect(readdirSync(directory)).toEqual([]);
+  });
+
+  it("packages only verified archives and normalizes approved uppercase digests", async () => {
+    const directory = temporary();
+    const bytes = gzipSync(tarMember(pc, packageText));
+    const source = artifact(bytes);
+    await downloadReleaseSources(
+      [{ ...source, sha256: source.sha256.toUpperCase() }],
+      directory,
+      {
+        fetchImpl: async () => new Response(bytes),
+      },
+    );
+    expect(readFileSync(join(directory, source.file))).toEqual(bytes);
   });
 
   it("rejects oversized responses, streams, total budgets, and wrong hashes", async () => {

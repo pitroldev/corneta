@@ -1,5 +1,5 @@
 //! Gravação da sessão de transmissão em NDJSON (uma linha por amostra/evento)
-//! para o relatório pós-live. Ver docs/RELATORIO-POS-LIVE.md.
+//! para o relatório pós-live.
 //!
 //! # Estrutura do código (arquitetura hexagonal)
 //!
@@ -280,7 +280,7 @@ pub fn record_marker_at(path: &Path, t: u64, label: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// Gravação de vídeo: âncoras de sincronia (ver docs/FEATURE-GRAVACAO-E-REPLAY.md §3.4)
+// Gravação de vídeo: âncoras de sincronia
 // ---------------------------------------------------------------------------
 
 pub fn record_recording(

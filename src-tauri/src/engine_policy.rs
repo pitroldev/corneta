@@ -4,6 +4,7 @@
 //! e a URL de ingestão são lidos. Espelha o formato de `guardian/domain.rs` (núcleo puro + testes).
 
 use crate::engine::{EngineSnapshot, TargetStatus};
+use crate::i18n::{Locale, Msg};
 use std::path::Path;
 
 /// Bitrate em Mbps (ou kbps abaixo de 1 Mbps) pra exibição.
@@ -43,28 +44,31 @@ pub(crate) fn quality_of(snap: &EngineSnapshot) -> &'static str {
 }
 
 /// Tooltip da bandeja: cabeçalho + uma linha por plataforma (métrica/estado).
-pub(crate) fn tray_tooltip(snap: &EngineSnapshot) -> String {
+pub(crate) fn tray_tooltip(snap: &EngineSnapshot, locale: Locale) -> String {
     if snap.state == "stopped" {
-        return "Corneta".into();
+        return Msg::TrayTooltipIdle.text(locale);
     }
     let header = match snap.state.as_str() {
-        "starting" => "Corneta · aguardando OBS".to_string(),
-        "error" => "Corneta · erro".to_string(),
-        _ => format!("Corneta · no ar ({})", snap.targets.len()),
-    };
+        "starting" => Msg::TrayTooltipStarting,
+        "error" => Msg::TrayTooltipError,
+        _ => Msg::TrayTooltipLive {
+            n: snap.targets.len(),
+        },
+    }
+    .text(locale);
     let mut items: Vec<&TargetStatus> = snap.targets.values().collect();
     items.sort_by(|a, b| a.name.cmp(&b.name));
     let mut lines = vec![header];
     for st in items {
         let (mark, detail) = match st.state.as_str() {
             "live" => ("✓", fmt_mbps(st.bitrate_kbps)),
-            "reconnecting" => ("⚠", "reconectando".to_string()),
-            "error" => ("✕", "erro".to_string()),
-            "signal-lost" => ("✕", "sem sinal do OBS".to_string()),
-            "paused" => ("⏸", "pausado".to_string()),
-            "waiting" => ("◌", "aguardando sinal".to_string()),
-            "brb" => ("◷", "JÁ VOLTO no ar".to_string()),
-            _ => ("…", "conectando".to_string()),
+            "reconnecting" => ("⚠", Msg::TrayTargetReconnecting.text(locale)),
+            "error" => ("✕", Msg::TrayTargetError.text(locale)),
+            "signal-lost" => ("✕", Msg::TrayTargetSignalLost.text(locale)),
+            "paused" => ("⏸", Msg::TrayTargetPaused.text(locale)),
+            "waiting" => ("◌", Msg::TrayTargetWaiting.text(locale)),
+            "brb" => ("◷", Msg::TrayTargetBrb.text(locale)),
+            _ => ("…", Msg::TrayTargetConnecting.text(locale)),
         };
         lines.push(format!("{mark} {} · {detail}", st.name));
     }
@@ -83,7 +87,7 @@ pub(crate) fn parse_kv(line: &str, key: &str) -> Option<f64> {
 }
 
 /// Traduz uma linha de erro do FFmpeg para (estado, mensagem amigável).
-pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
+pub(crate) fn friendly_error(low: &str, locale: Locale) -> (&'static str, String) {
     if low.contains("403")
         || low.contains("forbidden")
         || low.contains("unauthorized")
@@ -96,32 +100,25 @@ pub(crate) fn friendly_error(low: &str) -> (&'static str, String) {
         || low.contains("invalid key")
         || low.contains("stream key")
     {
-        (
-            "error",
-            "Endereço ou chave recusados — confira o destino em Plataformas e clique em Tentar de novo."
-                .into(),
-        )
+        ("error", Msg::TargetErrorDestinationRefused.text(locale))
     } else if low.contains("connection refused")
         || low.contains("cannot open")
         || low.contains("failed to connect")
         || low.contains("no route")
         || low.contains("name or service not known")
     {
-        (
-            "reconnecting",
-            "Sem conexão com a plataforma — tentando de novo.".into(),
-        )
+        ("reconnecting", Msg::TargetErrorNoConnection.text(locale))
     } else if low.contains("broken pipe")
         || low.contains("connection reset")
         || low.contains("end of file")
         || low.contains("timed out")
     {
-        ("reconnecting", "A conexão caiu — reconectando.".into())
-    } else {
         (
             "reconnecting",
-            "Instabilidade no envio — reconectando.".into(),
+            Msg::TargetErrorConnectionDropped.text(locale),
         )
+    } else {
+        ("reconnecting", Msg::TargetErrorShaky.text(locale))
     }
 }
 
@@ -296,6 +293,7 @@ mod tests {
             memory_pct: None,
             obs: None,
             forced_brb: false,
+            guardian_status: None,
         }
     }
 
@@ -353,15 +351,22 @@ mod tests {
             "live",
             vec![target("YouTube", "live", 9000), target("Twitch", "brb", 0)],
         );
-        let t = tray_tooltip(&s);
+        let t = tray_tooltip(&s, Locale::PtBr);
         assert!(t.starts_with("Corneta · no ar (2)"));
         assert!(t.contains("✓ YouTube · 9.0 Mbps"));
         assert!(t.contains("◷ Twitch · JÁ VOLTO no ar"));
-        assert_eq!(tray_tooltip(&snap("stopped", vec![])), "Corneta");
+        assert_eq!(
+            tray_tooltip(&snap("stopped", vec![]), Locale::PtBr),
+            "Corneta"
+        );
+        let english = tray_tooltip(&s, Locale::En);
+        assert!(english.starts_with("Corneta · live (2)"));
+        assert!(english.contains("BE RIGHT BACK on air"));
     }
 
     #[test]
     fn friendly_error_classifies() {
+        let friendly_error = |line| super::friendly_error(line, Locale::PtBr);
         assert_eq!(
             friendly_error("stream key rejected: 403 forbidden").0,
             "error"
@@ -389,6 +394,40 @@ mod tests {
             friendly_error("algo estranho").1,
             "Instabilidade no envio — reconectando."
         );
+    }
+
+    #[test]
+    fn error_classification_is_locale_independent_and_messages_are_translated() {
+        for (line, state, english) in [
+            ("403 forbidden", "error", "Address or key rejected"),
+            (
+                "connection refused",
+                "reconnecting",
+                "No connection to the platform",
+            ),
+            ("broken pipe", "reconnecting", "The connection dropped"),
+            ("unknown failure", "reconnecting", "Something's shaky"),
+        ] {
+            let pt = friendly_error(line, Locale::PtBr);
+            let en = friendly_error(line, Locale::En);
+            assert_eq!(pt.0, state);
+            assert_eq!(en.0, state);
+            assert_ne!(pt.1, en.1);
+            assert!(en.1.starts_with(english));
+        }
+        for (state, expected) in [
+            ("reconnecting", "reconnecting"),
+            ("error", "error"),
+            ("signal-lost", "no signal from OBS"),
+            ("paused", "paused"),
+            ("waiting", "waiting for signal"),
+            ("connecting", "connecting"),
+        ] {
+            assert!(
+                tray_tooltip(&snap("live", vec![target("x", state, 0)]), Locale::En)
+                    .contains(expected)
+            );
+        }
     }
 
     #[test]

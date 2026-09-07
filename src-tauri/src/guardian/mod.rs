@@ -21,7 +21,7 @@
 //!   (buffer de delay, slate, encoder contínuo) mora no `compositor` — o guardião é o feed de
 //!   programa com delay + esta detecção pendurada.
 //!
-//! **Por que é viável (ao contrário do OCR-tarja anterior):** só vigia os termos EXPLÍCITOS do
+//! Só vigia os termos EXPLÍCITOS do
 //! usuário (não lê "qualquer segredo"), a censura é binária (slate, sem precisão de posição), e o
 //! OCR pula quadros que não mudaram (diff). O atraso do OCR fica escondido pelo buffer fixo.
 
@@ -31,10 +31,25 @@ mod pipeline;
 
 pub(crate) use pipeline::{spawn_ocr, Shared};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OcrError {
+    InvalidFrame,
+    Unavailable,
+    RecognitionFailed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GuardianStatus {
+    Starting,
+    Ready,
+    Unavailable,
+}
+
 /// **Porta de OCR** (a fronteira do hexágono pra ler o texto da tela). Recebe um quadro em escala
 /// de cinza e devolve TODO o texto reconhecido (a watchlist é casada no domínio). Implementada
 /// pelos adaptadores em `ocr.rs` (PaddleOCR na CPU, Windows OCR, ou nulo se nada disponível).
 pub(crate) trait Ocr: Send {
-    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> String;
+    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> Result<String, OcrError>;
     fn name(&self) -> &'static str;
 }

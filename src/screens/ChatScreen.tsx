@@ -1,25 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import * as Collapsible from "@radix-ui/react-collapsible";
+import * as RTabs from "@radix-ui/react-tabs";
 import {
   AtSign,
   BadgeCheck,
   Bell,
-  Check,
-  ChevronDown,
-  ClipboardPaste,
   Clock,
-  Copy,
-  ExternalLink,
   Eye,
   LogIn,
-  MonitorPlay,
-  Pencil,
   PictureInPicture2,
   Plus,
   RefreshCw,
@@ -33,26 +19,14 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { api, IS_TAURI, type OverlayInfo } from "../lib/api";
-import { useStore } from "../lib/store";
-import { sendStatusLine, srcLabel, type Translate } from "../lib/chatSend";
-import { bold, useI18n, useT, type MessageKey } from "../lib/i18n";
-import { toast } from "../lib/toast";
-import { cn, errMsg, openExternal, uid } from "../lib/utils";
-import { normalizeChatChannel } from "../lib/chatChannel";
-import { sanitizeApiKey, sanitizeToken } from "../lib/validation";
-import * as RTabs from "@radix-ui/react-tabs";
-import { HAS_TWITCH_OAUTH } from "../lib/oauth";
-import { legalUrl } from "../lib/legal";
+import { useEffect, useRef, useState } from "react";
+import { AlertsFeed } from "../components/AlertsFeed";
+import { ChatFeed, type ChatView } from "../components/ChatFeed";
 import { LegalLink } from "../components/legal";
-import type {
-  AlertSource,
-  AlertSourceKind,
-  AppSettings,
-  ChatMessage,
-  ChatPlatform,
-  ChatSource,
-} from "../lib/types";
+import { Modal } from "../components/Modal";
+import { Select } from "../components/Select";
+import { Slider } from "../components/Slider";
+import { Tooltip } from "../components/Tooltip";
 import {
   Button,
   Card,
@@ -60,62 +34,41 @@ import {
   Input,
   PlatformGlyph,
   SectionTitle,
-  Toggle,
 } from "../components/ui";
-import { Select } from "../components/Select";
-import { Slider } from "../components/Slider";
-import { Tooltip } from "../components/Tooltip";
-import { ChatFeed, type ChatView } from "../components/ChatFeed";
-import { AlertsFeed } from "../components/AlertsFeed";
-import { Modal } from "../components/Modal";
-
-const PLATFORM_OPTS: { value: ChatPlatform; label: string }[] = [
-  { value: "twitch", label: "Twitch" },
-  { value: "kick", label: "Kick" },
-  { value: "youtube", label: "YouTube" },
-  { value: "cinefy", label: "Cinefy · experimental" },
-];
-const CHAT_PLATFORM_LABEL: Record<ChatPlatform, string> = {
-  twitch: "Twitch",
-  kick: "Kick",
-  youtube: "YouTube",
-  cinefy: "Cinefy",
-};
-const VALUE_LABEL: Record<ChatPlatform, MessageKey> = {
-  twitch: "chat.source.value.twitch",
-  kick: "chat.source.value.kick",
-  youtube: "chat.source.value.youtube",
-  cinefy: "chat.source.value.cinefy",
-};
-const PLACEHOLDER: Record<ChatPlatform, MessageKey> = {
-  twitch: "chat.source.placeholder.twitch",
-  kick: "chat.source.placeholder.kick",
-  youtube: "chat.source.placeholder.youtube",
-  cinefy: "chat.source.placeholder.cinefy",
-};
-const HINT: Record<ChatPlatform, MessageKey> = {
-  twitch: "chat.source.hint.twitch",
-  kick: "chat.source.hint.kick",
-  youtube: "chat.source.hint.youtube",
-  cinefy: "chat.source.hint.cinefy",
-};
-
-type ConfigTab = "canais" | "conta" | "alertas" | "overlays" | "exibicao";
-const CONFIG_TABS: { id: ConfigTab; labelKey: MessageKey; icon: typeof Tv2 }[] =
-  [
-    { id: "canais", labelKey: "chat.config.tab.channels", icon: Tv2 },
-    { id: "conta", labelKey: "chat.config.tab.account", icon: LogIn },
-    { id: "alertas", labelKey: "chat.config.tab.alerts", icon: Bell },
-    { id: "overlays", labelKey: "chat.config.tab.overlays", icon: MonitorPlay },
-    { id: "exibicao", labelKey: "chat.config.tab.display", icon: Eye },
-  ];
-
-/** Parte a frase traduzida no ponto marcado (um `{buraco}` ou um nome de produto)
- *  pra encaixar um link no meio dela sem picar a chave em duas. */
-function splitAt(text: string, mark: string): [string, string] {
-  const i = text.indexOf(mark);
-  return i < 0 ? [text, ""] : [text.slice(0, i), text.slice(i + mark.length)];
-}
+import { api, IS_TAURI } from "../lib/api";
+import { sendStatusLine, srcLabel } from "../lib/chatSend";
+import { bold, useI18n } from "../lib/i18n";
+import { legalUrl } from "../lib/legal";
+import { HAS_TWITCH_OAUTH } from "../lib/oauth";
+import { useStore } from "../lib/store";
+import { toast } from "../lib/toast";
+import type {
+  AlertSource,
+  AlertSourceKind,
+  ChatMessage,
+  ChatPlatform,
+  ChatSource,
+} from "../lib/types";
+import { cn, errMsg, uid } from "../lib/utils";
+import {
+  KickCredsForm,
+  LoginRow,
+  YoutubeCredsForm,
+} from "./chat/AccountSettings";
+import { AlertSourceCard } from "./chat/AlertSourceCard";
+import {
+  ALERT_META,
+  alertSourceLabel,
+  CHAT_PLATFORM_LABEL,
+  CONFIG_TABS,
+  ConfigTab,
+  statusDot,
+  statusExplain,
+  statusLabel,
+} from "./chat/constants";
+import { OverlayCard } from "./chat/OverlaySettings";
+import { FilterChip, splitAt, ToggleRow } from "./chat/primitives";
+import { SourceCard, YoutubeApiKeyField } from "./chat/SourceCard";
 
 export function ChatScreen() {
   const { t, fmt, locale } = useI18n();
@@ -253,8 +206,17 @@ export function ChatScreen() {
     setSettings({
       chatSources: sources.map((x) => (x.id === id ? { ...x, ...patch } : x)),
     });
-  const removeSource = (id: string) =>
-    setSettings({ chatSources: sources.filter((x) => x.id !== id) });
+  const removeSource = async (id: string) => {
+    try {
+      await useStore.getState().clearChatSendToken(id);
+      const current = useStore.getState().config?.settings.chatSources ?? [];
+      setSettings({
+        chatSources: current.filter((source) => source.id !== id),
+      });
+    } catch (error) {
+      toast.error(errMsg(error));
+    }
+  };
 
   const addAlertSource = (kind: AlertSourceKind) =>
     setSettings({
@@ -269,9 +231,16 @@ export function ChatScreen() {
         x.id === id ? { ...x, ...patch } : x,
       ),
     });
-  const removeAlertSource = (id: string) => {
-    void api.clearKey(`alert_${id}`);
-    setSettings({ alertSources: alertSources.filter((x) => x.id !== id) });
+  const removeAlertSource = async (id: string) => {
+    try {
+      await useStore.getState().clearAlertToken(id);
+      const current = useStore.getState().config?.settings.alertSources ?? [];
+      setSettings({
+        alertSources: current.filter((source) => source.id !== id),
+      });
+    } catch (error) {
+      toast.error(errMsg(error));
+    }
   };
 
   // Envio: fontes capazes (token colado, conta Twitch logada, YouTube ou Kick logado).
@@ -348,6 +317,14 @@ export function ChatScreen() {
     };
   const youtubeMode = modeAction(setShowYoutubeByok);
   const kickMode = modeAction(setShowKickByok);
+  const saveYoutubeOauth = async (id: string, secret: string) => {
+    await setYoutubeOauth(id, secret);
+    setShowYoutubeByok(false);
+  };
+  const saveKickOauth = async (id: string, secret: string) => {
+    await setKickOauth(id, secret);
+    setShowKickByok(false);
+  };
 
   // Conectar (botão do topo e do estado vazio). Sem canal configurado, abre a config.
   const doConnect = async () => {
@@ -811,8 +788,8 @@ export function ChatScreen() {
                         label="Twitch"
                         state={chatLogin.twitch}
                         enabled={HAS_TWITCH_OAUTH}
-                        onLogin={() => void twitchLogin()}
-                        onLogout={() => void twitchLogout()}
+                        onLogin={twitchLogin}
+                        onLogout={twitchLogout}
                       />
                     )}
                     {hasYoutubeChannel &&
@@ -823,8 +800,8 @@ export function ChatScreen() {
                             label="YouTube"
                             state={chatLogin.youtube}
                             enabled
-                            onLogin={() => void youtubeLogin()}
-                            onLogout={() => void youtubeLogout()}
+                            onLogin={youtubeLogin}
+                            onLogout={youtubeLogout}
                           />
                           <button
                             onClick={() =>
@@ -838,9 +815,7 @@ export function ChatScreen() {
                           </button>
                           {showYoutubeByok && (
                             <YoutubeCredsForm
-                              onSave={(id, secret) => {
-                                void youtubeMode(setYoutubeOauth(id, secret));
-                              }}
+                              onSave={saveYoutubeOauth}
                               modes={youtubeOauthModes}
                               onUseOfficial={() =>
                                 void youtubeMode(
@@ -865,9 +840,7 @@ export function ChatScreen() {
                         </div>
                       ) : (
                         <YoutubeCredsForm
-                          onSave={(id, sec) =>
-                            void youtubeMode(setYoutubeOauth(id, sec))
-                          }
+                          onSave={saveYoutubeOauth}
                           modes={youtubeOauthModes}
                           onUseSaved={() =>
                             void youtubeMode(
@@ -885,8 +858,8 @@ export function ChatScreen() {
                             label="Kick"
                             state={chatLogin.kick}
                             enabled={kickOauthReady}
-                            onLogin={() => void kickLogin()}
-                            onLogout={() => void kickLogout()}
+                            onLogin={kickLogin}
+                            onLogout={kickLogout}
                           />
                           <button
                             onClick={() => setShowKickByok((value) => !value)}
@@ -898,9 +871,7 @@ export function ChatScreen() {
                           </button>
                           {showKickByok && (
                             <KickCredsForm
-                              onSave={(id, secret) => {
-                                void kickMode(setKickOauth(id, secret));
-                              }}
+                              onSave={saveKickOauth}
                               modes={kickOauthModes}
                               onUseOfficial={() =>
                                 void kickMode(
@@ -925,9 +896,7 @@ export function ChatScreen() {
                         </div>
                       ) : (
                         <KickCredsForm
-                          onSave={(id, secret) =>
-                            void kickMode(setKickOauth(id, secret))
-                          }
+                          onSave={saveKickOauth}
                           modes={kickOauthModes}
                           onUseSaved={() =>
                             void kickMode(
@@ -1245,1366 +1214,6 @@ export function ChatScreen() {
           </span>
         </button>
       )}
-    </div>
-  );
-}
-
-function FilterChip({
-  label,
-  id,
-  on,
-  onClick,
-}: {
-  label: string;
-  id: ChatPlatform;
-  on: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1.5 rounded-md border-2 px-2.5 py-1 text-xs font-bold transition-colors",
-        on
-          ? "border-brass bg-brass/10 text-ink"
-          : "border-border bg-surface text-ink-faint hover:text-ink-muted",
-      )}
-    >
-      <PlatformGlyph id={id} size={14} /> {label}
-    </button>
-  );
-}
-
-// Os `value` viajam crus na query string do overlay (?pos=, &scale=) — só o
-// rótulo é texto de tela.
-const overlayPosOpts = (t: Translate) => [
-  { value: "top", label: t("chat.overlay.pos.top") },
-  { value: "bottom", label: t("chat.overlay.pos.bottom") },
-  { value: "center", label: t("chat.overlay.pos.center") },
-  { value: "top-left", label: t("chat.overlay.pos.topLeft") },
-  { value: "top-right", label: t("chat.overlay.pos.topRight") },
-  { value: "bottom-left", label: t("chat.overlay.pos.bottomLeft") },
-  { value: "bottom-right", label: t("chat.overlay.pos.bottomRight") },
-];
-
-const chatPosOpts = (t: Translate) => [
-  { value: "bottom", label: t("chat.overlay.chatPos.bottom") },
-  { value: "top", label: t("chat.overlay.chatPos.top") },
-];
-
-const scaleOpts = (t: Translate) => [
-  { value: "sm", label: t("chat.overlay.scale.sm") },
-  { value: "md", label: t("chat.overlay.scale.md") },
-  { value: "lg", label: t("chat.overlay.scale.lg") },
-];
-
-/** Linha de opção: rótulo à esquerda, controle à direita. */
-function OptRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="shrink-0 text-xs font-semibold text-ink-muted">
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-/** Um overlay (alertas ou chat): URL + copiar + adicionar no OBS + testar + opções. */
-function OverlayBlock({
-  title,
-  url,
-  onTest,
-  testMsg,
-  children,
-}: {
-  title: string;
-  url: string;
-  onTest: () => Promise<void>;
-  testMsg: string;
-  children?: ReactNode;
-}) {
-  const t = useT();
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard indisponível */
-    }
-  };
-  const addToObs = () =>
-    api
-      .overlayObsAddSource(url)
-      .then(() =>
-        toast.success(
-          t("chat.overlay.added.toast", { block: title.toLowerCase() }),
-        ),
-      )
-      .catch((e) => toast.error(errMsg(e)));
-  const test = () =>
-    onTest()
-      .then(() => toast.success(testMsg))
-      .catch((e) => toast.error(errMsg(e)));
-  return (
-    <div className="rounded-md bg-surface-2/60 p-2.5 ring-1 ring-border">
-      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-brass">
-        {title}
-      </div>
-      <div className="flex items-center gap-1.5">
-        <code className="min-w-0 flex-1 truncate rounded-md bg-surface px-2.5 py-2 text-[11px] text-ink-muted ring-1 ring-border">
-          {url}
-        </code>
-        <Button variant="subtle" size="sm" onClick={() => void copy()}>
-          {copied ? (
-            <Check className="size-3.5" />
-          ) : (
-            <Copy className="size-3.5" />
-          )}
-          {copied ? t("chat.common.copied") : t("chat.common.copy")}
-        </Button>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <Button variant="subtle" size="sm" onClick={() => void addToObs()}>
-          <Tv2 className="size-3.5" /> {t("chat.overlay.addToObs")}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => void test()}>
-          <Bell className="size-3.5" /> {t("chat.common.test")}
-        </Button>
-      </div>
-      {children && (
-        <div className="mt-2 flex flex-col gap-2 rounded-md bg-surface px-3 py-2">
-          {children}
-        </div>
-      )}
-      <p className="mt-1.5 text-[11px] text-ink-faint">
-        {bold(t, "chat.overlay.reAddNote")}
-      </p>
-    </div>
-  );
-}
-
-/** Overlays pro OBS: um servidor local serve alertas e chat (Browser Source), com emotes. */
-function OverlayCard({
-  settings,
-  setSettings,
-}: {
-  settings: AppSettings;
-  setSettings: (patch: Partial<AppSettings>) => void;
-}) {
-  const t = useT();
-  const enabled = settings.overlayEnabled ?? false;
-  const [info, setInfo] = useState<OverlayInfo | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [fetching, setFetching] = useState(false);
-  const [fetchFailed, setFetchFailed] = useState(false);
-
-  // O backend sobe o servidor no boot quando ligado; aqui só buscamos as URLs pra exibir.
-  const fetchInfo = useCallback(async () => {
-    if (!IS_TAURI) return;
-    setFetching(true);
-    try {
-      const i = await api.overlayStatus();
-      setInfo(i);
-      setFetchFailed(!i);
-    } catch {
-      setFetchFailed(true);
-    } finally {
-      setFetching(false);
-    }
-  }, []);
-  // Busca quando o overlay liga e de novo quando a janela volta ao foco — a
-  // chamada pode ter falhado com o servidor ainda subindo, e a saída tem que
-  // ser um botão aqui, não "reabra a aba".
-  useEffect(() => {
-    if (!IS_TAURI || !enabled) return;
-    void fetchInfo();
-    const onFocus = () => void fetchInfo();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [enabled, fetchInfo]);
-
-  const alertUrl = info
-    ? `${info.url}?sound=${(settings.overlaySound ?? true) ? 1 : 0}` +
-      `&pos=${settings.overlayPosition || "top"}` +
-      `&dur=${settings.overlayDurationSecs ?? 6}` +
-      `&scale=${settings.overlayScale || "md"}` +
-      `&follows=${(settings.overlayShowFollows ?? true) ? 1 : 0}`
-    : "";
-  const chatUrl = info
-    ? `${info.chatUrl}?pos=${settings.overlayChatPosition || "bottom"}` +
-      `&size=${settings.overlayChatSize ?? 22}` +
-      `&max=${settings.overlayChatMax ?? 12}` +
-      `&badges=${(settings.overlayChatBadges ?? true) ? 1 : 0}` +
-      `&platform=${(settings.overlayChatPlatform ?? true) ? 1 : 0}` +
-      `&nocmd=${(settings.overlayChatHideCommands ?? false) ? 1 : 0}` +
-      `&fade=${settings.overlayChatFadeSecs ?? 0}`
-    : "";
-
-  const toggle = async (on: boolean) => {
-    setSettings({ overlayEnabled: on });
-    if (!IS_TAURI) return;
-    setBusy(true);
-    try {
-      if (on) {
-        setInfo(await api.overlayStart());
-        setFetchFailed(false);
-      } else {
-        await api.overlayStop();
-        setInfo(null);
-      }
-    } catch (e) {
-      toast.error(errMsg(e));
-      setSettings({ overlayEnabled: !on }); // reverte se não subiu (porta ocupada etc.)
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MonitorPlay className="size-4 text-brass" />
-          <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-            {t("chat.overlay.section")}
-          </span>
-        </div>
-        <Toggle
-          checked={enabled}
-          onChange={(v) => void toggle(v)}
-          disabled={busy}
-          label={t("chat.overlay.section")}
-        />
-      </div>
-      <p className="mb-2 text-[11px] text-ink-faint">
-        {bold(t, "chat.overlay.lede")}
-      </p>
-
-      {enabled &&
-        (!IS_TAURI ? (
-          <p className="text-xs text-ink-muted">
-            {t("chat.account.desktopOnly")}
-          </p>
-        ) : !info ? (
-          <div className="flex flex-col items-center gap-2 rounded-md border-2 border-dashed border-border bg-surface-2 px-3 py-3 text-center text-xs text-ink-muted">
-            {busy || fetching || !fetchFailed ? (
-              t("chat.overlay.starting")
-            ) : (
-              <>
-                {t("chat.overlay.fetchError")}
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={() => void fetchInfo()}
-                >
-                  <RefreshCw className="size-3.5" /> {t("golive.error.retry")}
-                </Button>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <OverlayBlock
-              title={t("chat.overlay.block.alerts")}
-              url={alertUrl}
-              onTest={() => api.overlayTest()}
-              testMsg={t("chat.overlay.test.alerts")}
-            >
-              <OptRow label={t("chat.overlay.opt.position")}>
-                <Select
-                  className="w-40"
-                  value={settings.overlayPosition || "top"}
-                  options={overlayPosOpts(t)}
-                  onChange={(v) => setSettings({ overlayPosition: v })}
-                  aria-label={t("chat.overlay.aria.alertPosition")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.size")}>
-                <Select
-                  className="w-40"
-                  value={settings.overlayScale || "md"}
-                  options={scaleOpts(t)}
-                  onChange={(v) => setSettings({ overlayScale: v })}
-                  aria-label={t("chat.overlay.aria.alertSize")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.duration")}>
-                <Slider
-                  className="w-40"
-                  value={settings.overlayDurationSecs ?? 6}
-                  min={3}
-                  max={15}
-                  suffix="s"
-                  onChange={(v) => setSettings({ overlayDurationSecs: v })}
-                  aria-label={t("chat.overlay.opt.duration")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.sound")}>
-                <Toggle
-                  checked={settings.overlaySound ?? true}
-                  onChange={(v) => setSettings({ overlaySound: v })}
-                  label={t("chat.overlay.opt.sound")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.follows")}>
-                <Toggle
-                  checked={settings.overlayShowFollows ?? true}
-                  onChange={(v) => setSettings({ overlayShowFollows: v })}
-                  label={t("chat.overlay.opt.follows")}
-                />
-              </OptRow>
-            </OverlayBlock>
-
-            <OverlayBlock
-              title={t("chat.overlay.block.chat")}
-              url={chatUrl}
-              onTest={() => api.overlayChatTest()}
-              testMsg={t("chat.overlay.test.chat")}
-            >
-              <OptRow label={t("chat.overlay.opt.position")}>
-                <Select
-                  className="w-40"
-                  value={settings.overlayChatPosition || "bottom"}
-                  options={chatPosOpts(t)}
-                  onChange={(v) => setSettings({ overlayChatPosition: v })}
-                  aria-label={t("chat.overlay.aria.chatPosition")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.fontSize")}>
-                <Slider
-                  className="w-40"
-                  value={settings.overlayChatSize ?? 22}
-                  min={12}
-                  max={40}
-                  suffix="px"
-                  onChange={(v) => setSettings({ overlayChatSize: v })}
-                  aria-label={t("chat.display.chatFontSize")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.maxMessages")}>
-                <Slider
-                  className="w-40"
-                  value={settings.overlayChatMax ?? 12}
-                  min={3}
-                  max={30}
-                  onChange={(v) => setSettings({ overlayChatMax: v })}
-                  aria-label={t("chat.overlay.aria.maxMessages")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.fade")}>
-                <Slider
-                  className="w-40"
-                  value={settings.overlayChatFadeSecs ?? 0}
-                  min={0}
-                  max={60}
-                  suffix="s"
-                  onChange={(v) => setSettings({ overlayChatFadeSecs: v })}
-                  aria-label={t("chat.overlay.aria.fade")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.badges")}>
-                <Toggle
-                  checked={settings.overlayChatBadges ?? true}
-                  onChange={(v) => setSettings({ overlayChatBadges: v })}
-                  label={t("chat.overlay.aria.badges")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.platformIcon")}>
-                <Toggle
-                  checked={settings.overlayChatPlatform ?? true}
-                  onChange={(v) => setSettings({ overlayChatPlatform: v })}
-                  label={t("chat.overlay.opt.platformIcon")}
-                />
-              </OptRow>
-              <OptRow label={t("chat.overlay.opt.hideCommands")}>
-                <Toggle
-                  checked={settings.overlayChatHideCommands ?? false}
-                  onChange={(v) => setSettings({ overlayChatHideCommands: v })}
-                  label={t("chat.overlay.aria.hideCommands")}
-                />
-              </OptRow>
-            </OverlayBlock>
-          </div>
-        ))}
-    </div>
-  );
-}
-
-function ToggleRow({
-  icon: Icon,
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  icon: typeof Smile;
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  // A dica é texto visível (não `title`): teclado e leitor de tela também recebem.
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-2.5 py-2">
-      <span className="flex min-w-0 items-center gap-2">
-        <Icon className="size-4 shrink-0 text-brass" />
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold text-ink-muted">
-            {label}
-          </span>
-          {hint && (
-            <span className="text-[11px] leading-snug text-ink-faint">
-              {hint}
-            </span>
-          )}
-        </span>
-      </span>
-      <Toggle checked={checked} onChange={onChange} label={label} />
-    </div>
-  );
-}
-
-const statusDot = (status: string) =>
-  status === "connected"
-    ? "bg-ok"
-    : status === "error"
-      ? "bg-bad"
-      : status === "waiting"
-        ? "bg-warn animate-pulse"
-        : "bg-ink-faint";
-
-const statusLabel = (t: Translate, status: string) =>
-  status === "connected"
-    ? t("chat.status.label.live")
-    : status === "error"
-      ? t("chat.status.label.dropped")
-      : status === "waiting"
-        ? t("chat.status.label.waiting")
-        : t("chat.status.label.connecting");
-
-// Tooltip com o PORQUÊ do status (o label sozinho parece travado/quebrado).
-// O supervisor do backend já re-tenta sozinho com backoff — a dica avisa isso.
-const statusExplain = (t: Translate, platform: string, status: string) => {
-  if (status === "connected") return t("chat.status.explain.live");
-  if (status === "waiting")
-    return platform === "youtube"
-      ? t("chat.status.explain.waiting.youtube")
-      : t("chat.status.explain.waiting");
-  if (status === "error") {
-    if (platform === "kick") return t("chat.status.explain.error.kick");
-    if (platform === "youtube") return t("chat.status.explain.error.youtube");
-    if (platform === "cinefy") return t("chat.status.explain.error.cinefy");
-    return t("chat.status.explain.error");
-  }
-  return t("chat.status.explain.connecting");
-};
-
-function SourceCard({
-  src,
-  onChange,
-  onRemove,
-}: {
-  src: ChatSource;
-  onChange: (patch: Partial<ChatSource>) => void;
-  onRemove: () => void;
-}) {
-  const t = useT();
-  const [open, setOpen] = useState(() => !src.value.trim());
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const inputCls =
-    "h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass";
-  const platLabel = CHAT_PLATFORM_LABEL[src.platform];
-  return (
-    <div
-      className={cn(
-        "rounded-md border-2 transition-opacity",
-        src.enabled ? "bg-surface" : "bg-surface-2 opacity-60",
-        src.value.trim() ? "border-border-soft" : "border-bad/50",
-      )}
-    >
-      <Collapsible.Root open={open} onOpenChange={setOpen}>
-        <div className="flex items-center gap-2 p-2.5">
-          <PlatformGlyph id={src.platform} size={22} />
-          <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-            <span className="shrink-0 font-display text-sm font-bold">
-              {platLabel}
-            </span>
-            {src.platform === "cinefy" && (
-              <ExperimentalBadge className="ml-1 scale-90" />
-            )}
-            {src.value.trim() ? (
-              <span className="truncate text-xs text-ink-muted">
-                · {src.value}
-                {src.name ? ` (${src.name})` : ""}
-              </span>
-            ) : (
-              <span className="shrink-0 text-xs font-semibold text-bad">
-                · {t("chat.source.noChannel")}
-              </span>
-            )}
-          </div>
-          <Toggle
-            checked={src.enabled}
-            onChange={(v) => onChange({ enabled: v })}
-            label={t("chat.source.toggle", {
-              name: src.name.trim() || src.value.trim() || platLabel,
-            })}
-          />
-          <Collapsible.Trigger asChild>
-            <button
-              aria-label={
-                open ? t("chat.source.collapse") : t("chat.source.expand")
-              }
-              className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
-            >
-              <ChevronDown
-                className={cn(
-                  "size-5 transition-transform",
-                  open && "rotate-180",
-                )}
-              />
-            </button>
-          </Collapsible.Trigger>
-        </div>
-
-        <Collapsible.Content className="flex flex-col gap-2 px-2.5 pb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-              {t("chat.source.platformLabel")}
-            </span>
-            <Select
-              className="w-36"
-              value={src.platform}
-              options={PLATFORM_OPTS}
-              aria-label={t("chat.source.platformLabel")}
-              onChange={(v) =>
-                onChange({
-                  platform: v as ChatPlatform,
-                  // Re-limpa o valor pro formato da NOVA plataforma (ex.: @handle→login).
-                  value: normalizeChatChannel(v as ChatPlatform, src.value),
-                })
-              }
-            />
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_11rem]">
-            <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-              {t(VALUE_LABEL[src.platform])}
-              <input
-                value={src.value}
-                placeholder={t(PLACEHOLDER[src.platform])}
-                onChange={(e) => onChange({ value: e.target.value })}
-                onBlur={(e) => {
-                  // Ao sair do campo, limpa o que colou (URL/@/ID/subpágina) pro formato certo.
-                  const clean = normalizeChatChannel(
-                    src.platform,
-                    e.target.value,
-                  );
-                  if (clean !== e.target.value) onChange({ value: clean });
-                }}
-                className={inputCls}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-              <span>
-                {t("chat.source.nickname")}{" "}
-                <span className="font-medium normal-case text-ink-faint/60">
-                  {t("chat.source.nickname.optional")}
-                </span>
-              </span>
-              <input
-                value={src.name}
-                placeholder={t("chat.source.nickname.placeholder")}
-                onChange={(e) => onChange({ name: e.target.value })}
-                className={inputCls}
-              />
-            </label>
-          </div>
-          <p className="text-[11px] text-ink-faint">{t(HINT[src.platform])}</p>
-          <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
-            <Button
-              variant={confirmRemove ? "danger" : "ghost"}
-              size="sm"
-              onClick={() => {
-                if (confirmRemove) {
-                  onRemove();
-                  return;
-                }
-                setConfirmRemove(true);
-                setTimeout(() => setConfirmRemove(false), 3000);
-              }}
-            >
-              <Trash2 className="size-4" />
-              {confirmRemove
-                ? t("chat.common.removeConfirm")
-                : t("chat.source.remove")}
-            </Button>
-          </div>
-        </Collapsible.Content>
-      </Collapsible.Root>
-    </div>
-  );
-}
-
-// label e placeholder são nomes de produto e de campo dessas plataformas — só a
-// dica é texto de tela.
-const ALERT_META: Record<
-  AlertSourceKind,
-  { label: string; placeholder: string; hintKey: MessageKey }
-> = {
-  streamlabs: {
-    label: "Streamlabs",
-    placeholder: "Socket API Token",
-    hintKey: "chat.alertsrc.hint.streamlabs",
-  },
-  streamelements: {
-    label: "StreamElements",
-    placeholder: "JWT Token",
-    hintKey: "chat.alertsrc.hint.streamelements",
-  },
-};
-
-// O status vem indexado por nome ou, sem apelido, pelo kind (ex.: "streamlabs") —
-// na tela sai o nome do produto.
-const alertSourceLabel = (name: string) =>
-  name in ALERT_META ? ALERT_META[name as AlertSourceKind].label : name;
-
-// As chaves vêm do backend (alert://status) — só os rótulos são copy.
-const ALERT_STATUS: Record<string, MessageKey> = {
-  connected: "chat.alertsrc.status.live",
-  error: "chat.alertsrc.status.error",
-  disconnected: "chat.alertsrc.status.dropped",
-};
-
-// API key do YouTube: salva sozinha (onChange), mas ninguém saberia se presta — daí o
-// "Verificar", que faz uma chamada barata à Data API e mostra ✓/motivo real do Google.
-function YoutubeApiKeyField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const t = useT();
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(
-    null,
-  );
-  // Resultado envelhece: some ao editar a chave (senão um ✓ antigo fica mentindo).
-  useEffect(() => setResult(null), [value]);
-  const verify = async () => {
-    if (!value.trim()) return;
-    setTesting(true);
-    setResult(null);
-    try {
-      setResult({ ok: true, msg: await api.youtubeKeyCheck(value.trim(), t) });
-    } catch (e) {
-      setResult({ ok: false, msg: errMsg(e) });
-    } finally {
-      setTesting(false);
-    }
-  };
-  // Não é <label>: o gatilho do tooltip é um <button> e viria antes do input na
-  // ordem do DOM — o rótulo passaria a nomear o botão. O input recebe o nome direto.
-  return (
-    <div className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
-      <span className="flex flex-wrap items-center gap-1.5">
-        <PlatformGlyph id="youtube" size={14} />{" "}
-        {t("chat.youtube.apikey.label")}
-        <Tooltip content={t("chat.youtube.apikey.tooltip")}>
-          <button
-            type="button"
-            className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2"
-          >
-            {t("chat.youtube.apikey.optional")}
-          </button>
-        </Tooltip>
-      </span>
-      <div className="flex items-center gap-2">
-        <input
-          value={value}
-          aria-label={t("chat.youtube.apikey.label")}
-          placeholder={t("chat.youtube.apikey.placeholder")}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={(e) => {
-            const clean = sanitizeApiKey(e.target.value);
-            if (clean !== e.target.value) onChange(clean);
-          }}
-          className="h-9 flex-1 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
-        />
-        <Button
-          variant="subtle"
-          size="sm"
-          className="h-9 shrink-0"
-          disabled={!value.trim() || testing}
-          onClick={verify}
-        >
-          <Wifi className="size-3.5" />{" "}
-          {testing
-            ? t("chat.youtube.apikey.checking")
-            : t("chat.youtube.apikey.check")}
-        </Button>
-      </div>
-      {result && (
-        <span
-          className={cn(
-            "font-bold normal-case",
-            result.ok ? "text-ok" : "text-bad",
-          )}
-        >
-          {result.ok ? "✓" : "✕"} {result.msg}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function AlertSourceCard({
-  src,
-  status,
-  onChange,
-  onRemove,
-  onToken,
-}: {
-  src: AlertSource;
-  status?: string;
-  onChange: (patch: Partial<AlertSource>) => void;
-  onRemove: () => void;
-  onToken: (token: string) => Promise<void>;
-}) {
-  const t = useT();
-  const meta = ALERT_META[src.kind];
-  const [open, setOpen] = useState(() => !src.hasToken);
-  const [editing, setEditing] = useState(false);
-  const [token, setToken] = useState("");
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const showInput = !src.hasToken || editing;
-
-  const save = async () => {
-    const clean = sanitizeToken(token);
-    if (!clean) return;
-    await onToken(clean);
-    setToken("");
-    setEditing(false);
-    toast.success(t("chat.alertsrc.tokenStored.toast"));
-  };
-  const paste = async () => {
-    try {
-      const pasted = await navigator.clipboard.readText();
-      if (pasted) setToken(sanitizeToken(pasted));
-    } catch {
-      /* área de transferência bloqueada */
-    }
-  };
-
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    ok: boolean;
-    msg: string;
-  } | null>(null);
-  // O resultado do teste envelhece: some ao trocar o token (o card volta pro modo input).
-  useEffect(() => setTestResult(null), [src.hasToken, editing]);
-  const test = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      setTestResult({ ok: true, msg: await api.alertTest(src.id, t) });
-    } catch (e) {
-      setTestResult({ ok: false, msg: errMsg(e) });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  return (
-    <div
-      className={cn(
-        "rounded-md border-2 transition-opacity",
-        src.enabled ? "bg-surface" : "bg-surface-2 opacity-60",
-        src.hasToken ? "border-border-soft" : "border-bad/50",
-      )}
-    >
-      <Collapsible.Root open={open} onOpenChange={setOpen}>
-        <div className="flex items-center gap-2 p-2.5">
-          <div className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 text-brass">
-            <Bell className="size-4" />
-          </div>
-          <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-            <span className="shrink-0 font-display text-sm font-bold">
-              {meta.label}
-            </span>
-            {src.hasToken ? (
-              <span className="truncate text-xs text-ink-muted">
-                ·{" "}
-                {status
-                  ? ALERT_STATUS[status]
-                    ? t(ALERT_STATUS[status])
-                    : status
-                  : t("chat.alertsrc.tokenSaved")}
-              </span>
-            ) : (
-              <span className="shrink-0 text-xs font-semibold text-bad">
-                · {t("chat.alertsrc.noToken")}
-              </span>
-            )}
-          </div>
-          <Toggle
-            checked={src.enabled}
-            onChange={(v) => onChange({ enabled: v })}
-            label={t("chat.source.toggle", {
-              name: src.name.trim() || meta.label,
-            })}
-          />
-          <Collapsible.Trigger asChild>
-            <button
-              aria-label={
-                open ? t("chat.alertsrc.collapse") : t("chat.alertsrc.expand")
-              }
-              className="grid size-8 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
-            >
-              <ChevronDown
-                className={cn(
-                  "size-5 transition-transform",
-                  open && "rotate-180",
-                )}
-              />
-            </button>
-          </Collapsible.Trigger>
-        </div>
-
-        <Collapsible.Content className="flex flex-col gap-2 px-2.5 pb-2.5">
-          {showInput ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="password"
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- Foco apenas após a ação explícita de editar, nunca ao abrir a tela sem token.
-                autoFocus={editing}
-                placeholder={meta.placeholder}
-                aria-label={`${meta.label} — ${meta.placeholder}`}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && token.trim() && void save()
-                }
-                className="flex-1"
-              />
-              <Button variant="subtle" size="sm" onClick={paste}>
-                <ClipboardPaste className="size-4" /> {t("chat.common.paste")}
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!token.trim()}
-                onClick={save}
-              >
-                {t("chat.common.save")}
-              </Button>
-              {editing && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditing(false)}
-                >
-                  <X className="size-4" />
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2">
-              <Check className="size-4 text-ok" strokeWidth={2.6} />
-              <span className="text-sm font-semibold">
-                {t("chat.alertsrc.tokenStored.chip")}
-              </span>
-              <div className="ml-auto flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={test}
-                  disabled={testing}
-                >
-                  <Wifi className="size-3.5" />{" "}
-                  {testing ? t("chat.common.testing") : t("chat.common.test")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setToken("");
-                    setEditing(true);
-                  }}
-                >
-                  <Pencil className="size-3.5" /> {t("chat.alertsrc.replace")}
-                </Button>
-              </div>
-            </div>
-          )}
-          {testResult && (
-            <span
-              className={cn(
-                "text-[11px] font-bold",
-                testResult.ok ? "text-ok" : "text-bad",
-              )}
-            >
-              {testResult.ok ? "✓" : "✕"} {testResult.msg}
-            </span>
-          )}
-          <p className="text-[11px] text-ink-faint">{t(meta.hintKey)}</p>
-          <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
-            <Button
-              variant={confirmRemove ? "danger" : "ghost"}
-              size="sm"
-              onClick={() => {
-                if (confirmRemove) {
-                  onRemove();
-                  return;
-                }
-                setConfirmRemove(true);
-                setTimeout(() => setConfirmRemove(false), 3000);
-              }}
-            >
-              <Trash2 className="size-4" />
-              {confirmRemove
-                ? t("chat.common.removeConfirm")
-                : t("chat.alertsrc.remove")}
-            </Button>
-          </div>
-        </Collapsible.Content>
-      </Collapsible.Root>
-    </div>
-  );
-}
-
-// BYOK do YouTube: cada usuário cria as credenciais do Google dele e cola aqui (cofre).
-// Assim cada um tem a própria cota — sem limite/verificação compartilhados.
-/** Quais caminhos de login existem numa plataforma, e qual está em uso. */
-type ByokModes = {
-  officialReady: boolean;
-  ownCreds: boolean;
-  usingOwnCreds: boolean;
-};
-
-/**
- * Ações de modo do BYOK. Ficam separadas do "esquecer credenciais" de propósito: trocar pro
- * login oficial não apaga nada (e a Corneta recusa a troca se o oficial não estiver de pé), então
- * nenhum clique aqui consegue deixar a plataforma sem nenhum jeito de logar.
- */
-function ByokModeActions({
-  modes,
-  onUseOfficial,
-  onUseSaved,
-  onForget,
-}: {
-  modes?: ByokModes;
-  onUseOfficial?: () => void;
-  onUseSaved?: () => void;
-  onForget?: () => void;
-}) {
-  const t = useT();
-  if (!modes) return null;
-  const back = modes.ownCreds && !modes.usingOwnCreds;
-  return (
-    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-      {modes.usingOwnCreds && onUseOfficial && (
-        <button
-          onClick={onUseOfficial}
-          className="text-[11px] font-bold text-brass hover:underline"
-        >
-          {t("chat.byok.useOfficial")}
-        </button>
-      )}
-      {back && onUseSaved && (
-        <button
-          onClick={onUseSaved}
-          className="text-[11px] font-bold text-brass hover:underline"
-        >
-          {t("chat.byok.useSaved")}
-        </button>
-      )}
-      {/* Esquecer é destrutivo: só aparece quando o oficial pode assumir no lugar. */}
-      {modes.ownCreds && modes.officialReady && onForget && (
-        <button
-          onClick={onForget}
-          className="text-[11px] font-semibold text-ink-faint hover:text-danger hover:underline"
-        >
-          {t("chat.byok.forget")}
-        </button>
-      )}
-      {modes.usingOwnCreds && !modes.officialReady && (
-        <span className="text-[11px] text-ink-faint">
-          {t("chat.byok.officialDown")}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function YoutubeCredsForm({
-  onSave,
-  modes,
-  onUseOfficial,
-  onUseSaved,
-  onForget,
-}: {
-  onSave: (clientId: string, clientSecret: string) => void;
-  modes?: ByokModes;
-  onUseOfficial?: () => void;
-  onUseSaved?: () => void;
-  onForget?: () => void;
-}) {
-  const t = useT();
-  const [id, setId] = useState("");
-  const [secret, setSecret] = useState("");
-  const [guide, setGuide] = useState(false);
-  const can = id.trim() !== "" && secret.trim() !== "";
-  const save = () => {
-    if (!can) return;
-    onSave(sanitizeToken(id), sanitizeToken(secret));
-    setId("");
-    setSecret("");
-    toast.success(t("chat.youtube.creds.saved.toast"));
-  };
-  // O passo 1 tem um LINK no meio da frase; "Google Cloud Console" é nome de
-  // produto e sai igual nos dois idiomas, então dá pra cortar a frase nele.
-  const [step1Before, step1After] = splitAt(
-    t("chat.youtube.guide.step1"),
-    "Google Cloud Console",
-  );
-  return (
-    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
-      <div className="mb-2 flex items-center gap-2">
-        <PlatformGlyph id="youtube" size={20} />
-        <span className="font-display text-sm font-bold">YouTube</span>
-        <button
-          onClick={() => setGuide((v) => !v)}
-          className="ml-auto text-xs font-bold text-brass hover:underline"
-        >
-          {guide
-            ? t("chat.youtube.creds.guide.hide")
-            : t("chat.youtube.creds.guide.show")}
-        </button>
-      </div>
-
-      <ByokModeActions
-        modes={modes}
-        onUseOfficial={onUseOfficial}
-        onUseSaved={onUseSaved}
-        onForget={onForget}
-      />
-
-      {guide && (
-        <>
-          <ol className="mb-2.5 list-decimal space-y-2 rounded-md bg-surface px-5 py-3 text-[11px] leading-relaxed text-ink-muted marker:font-bold marker:text-brass">
-            <li>
-              {step1Before}
-              <button
-                onClick={() =>
-                  void openExternal(
-                    "https://console.cloud.google.com/projectcreate",
-                  )
-                }
-                className="font-bold text-brass hover:underline"
-              >
-                Google Cloud Console
-              </button>
-              {step1After}
-            </li>
-            {/* Os negritos são os rótulos que a pessoa vai caçar na tela do
-                Google — vêm marcados no dicionário porque em cada idioma o
-                rótulo é outro e cai em outro lugar da frase. */}
-            <li>{bold(t, "chat.youtube.guide.step2")}</li>
-            <li>{bold(t, "chat.youtube.guide.step3")}</li>
-            <li>{bold(t, "chat.youtube.guide.step4")}</li>
-            <li>{bold(t, "chat.youtube.guide.step5")}</li>
-            <li>{bold(t, "chat.youtube.guide.step6")}</li>
-            <li>{bold(t, "chat.youtube.guide.step7")}</li>
-          </ol>
-          <p className="mb-2.5 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
-            <strong className="text-ink">
-              {t("chat.youtube.guide.warn.label")}
-            </strong>{" "}
-            {bold(t, "chat.youtube.guide.warn.text")}
-          </p>
-        </>
-      )}
-
-      <div className="flex flex-col gap-2">
-        {/* Nomes acessíveis só com nome de produto e de campo — iguais nos dois idiomas. */}
-        <Input
-          name="youtube-client-id"
-          autoComplete="off"
-          placeholder="Client ID"
-          aria-label="YouTube — Client ID"
-          value={id}
-          onChange={(e) => setId(e.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            name="youtube-client-secret"
-            autoComplete="off"
-            placeholder="Client Secret"
-            aria-label="YouTube — Client Secret"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && can && save()}
-            className="flex-1"
-          />
-          <Button variant="primary" size="sm" disabled={!can} onClick={save}>
-            {t("chat.common.save")}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KickCredsForm({
-  onSave,
-  modes,
-  onUseOfficial,
-  onUseSaved,
-  onForget,
-}: {
-  onSave: (clientId: string, clientSecret: string) => void;
-  modes?: ByokModes;
-  onUseOfficial?: () => void;
-  onUseSaved?: () => void;
-  onForget?: () => void;
-}) {
-  const t = useT();
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const canSave = clientId.trim() !== "" && clientSecret.trim() !== "";
-  const save = () => {
-    if (!canSave) return;
-    onSave(sanitizeToken(clientId), sanitizeToken(clientSecret));
-    setClientId("");
-    setClientSecret("");
-    toast.success(t("chat.kick.creds.saved.toast"));
-  };
-  return (
-    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
-      <div className="mb-2 flex items-center gap-2">
-        <PlatformGlyph id="kick" size={20} />
-        <span className="font-display text-sm font-bold">Kick</span>
-        <button
-          className="ml-auto text-xs font-bold text-brass hover:underline"
-          onClick={() =>
-            void openExternal("https://kick.com/settings/developer")
-          }
-        >
-          {t("chat.kick.creds.openDeveloper")}
-        </button>
-      </div>
-      <p className="mb-2 text-[11px] text-ink-muted">
-        {bold(t, "chat.kick.creds.redirect")}
-      </p>
-      <ByokModeActions
-        modes={modes}
-        onUseOfficial={onUseOfficial}
-        onUseSaved={onUseSaved}
-        onForget={onForget}
-      />
-      <div className="flex flex-col gap-2">
-        <Input
-          name="kick-client-id"
-          autoComplete="off"
-          placeholder="Client ID"
-          aria-label="Kick — Client ID"
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <Input
-            name="kick-client-secret"
-            autoComplete="off"
-            type="password"
-            placeholder="Client Secret"
-            aria-label="Kick — Client Secret"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && canSave && save()}
-            className="flex-1"
-          />
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canSave}
-            onClick={save}
-          >
-            {t("chat.common.save")}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Linha de login OAuth: abre o navegador e acompanha device flow ou callback loopback.
-/** Passo numerado do fluxo de login (bolinha com o número). */
-function StepNum({ n }: { n: number }) {
-  return (
-    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brass text-[11px] font-extrabold text-brass-ink">
-      {n}
-    </span>
-  );
-}
-
-function LoginRow({
-  platform,
-  label,
-  state,
-  enabled,
-  onLogin,
-  onLogout,
-}: {
-  platform: ChatPlatform;
-  label: string;
-  state: {
-    state: string;
-    login?: string;
-    userCode?: string;
-    verifyUri?: string;
-    verifyUriComplete?: string;
-    message?: string;
-  };
-  enabled: boolean;
-  onLogin: () => void;
-  onLogout: () => void;
-}) {
-  const t = useT();
-  const [copied, setCopied] = useState(false);
-  const openPage = () => {
-    const url = state.verifyUriComplete || state.verifyUri;
-    if (url) void openExternal(url);
-  };
-  const copyCode = async () => {
-    if (!state.userCode) return;
-    try {
-      await navigator.clipboard.writeText(state.userCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard indisponível */
-    }
-  };
-  return (
-    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
-      <div className="flex items-center gap-2">
-        <PlatformGlyph id={platform} size={20} />
-        <span className="font-display text-sm font-bold">{label}</span>
-        {state.state === "connected" && (
-          <span className="truncate text-xs font-semibold text-ok">
-            ·{" "}
-            {state.login
-              ? t("chat.loginrow.signedInAs", { login: state.login })
-              : t("chat.loginrow.signedIn")}
-          </span>
-        )}
-        {state.state === "error" && (
-          <span className="truncate text-xs text-bad">· {state.message}</span>
-        )}
-        <div className="ml-auto shrink-0">
-          {!enabled ? (
-            <span className="text-[11px] text-ink-faint">
-              {t("chat.loginrow.unavailable")}
-            </span>
-          ) : state.state === "connected" ? (
-            <Button variant="ghost" size="sm" onClick={onLogout}>
-              {t("chat.loginrow.signout")}
-            </Button>
-          ) : (
-            <Button
-              variant="subtle"
-              size="sm"
-              loading={state.state === "code"}
-              disabled={state.state === "code"}
-              onClick={onLogin}
-            >
-              <LogIn className="size-3.5" /> {t("chat.loginrow.signin")}
-            </Button>
-          )}
-        </div>
-      </div>
-      {state.state === "code" &&
-        (state.userCode && !state.verifyUriComplete ? (
-          // Fallback BYOK do Google sem URL pré-preenchida: guiamos copiar → colar → autorizar.
-          <div className="mt-2 rounded-md bg-brass/5 px-3 py-2.5 ring-1 ring-brass/25">
-            <div className="mb-2 text-xs font-bold text-ink">
-              {t("chat.loginrow.device.title")}
-            </div>
-            <div className="flex flex-col gap-2 text-xs text-ink-muted">
-              <div className="flex flex-wrap items-center gap-2">
-                <StepNum n={1} />
-                <span className="shrink-0">
-                  {t("chat.loginrow.device.step1")}
-                </span>
-                <span className="select-all rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
-                  {state.userCode}
-                </span>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={() => void copyCode()}
-                >
-                  {copied ? (
-                    <Check className="size-3.5" />
-                  ) : (
-                    <Copy className="size-3.5" />
-                  )}
-                  {copied ? t("chat.common.copied") : t("chat.common.copy")}
-                </Button>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <StepNum n={2} />
-                <span className="shrink-0">
-                  {t("chat.loginrow.device.step2")}
-                </span>
-                <Button variant="subtle" size="sm" onClick={openPage}>
-                  <ExternalLink className="size-3.5" />{" "}
-                  {t("chat.loginrow.device.openPage")}
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <StepNum n={3} />
-                <span>
-                  {t("chat.loginrow.device.step3")}{" "}
-                  <span className="text-ink-faint">
-                    {t("chat.loginrow.device.waitingParens")}
-                  </span>
-                </span>
-              </div>
-            </div>
-            <p className="mt-2 text-[11px] text-ink-faint">
-              {t("chat.loginrow.device.note")}
-            </p>
-          </div>
-        ) : (
-          // Twitch, YouTube oficial ou Kick: abrir e autorizar. Mostra o código como referência
-          // quando houver (a Twitch pede para conferi-lo).
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-surface px-2.5 py-2 text-xs text-ink-muted">
-            <span>{t("chat.loginrow.browser.note")}</span>
-            {state.userCode && (
-              <span className="rounded bg-brass px-2 py-0.5 font-mono text-sm font-extrabold tracking-widest text-brass-ink">
-                {state.userCode}
-              </span>
-            )}
-            <Button
-              variant="subtle"
-              size="sm"
-              className="ml-auto"
-              onClick={openPage}
-            >
-              <ExternalLink className="size-3.5" />{" "}
-              {t("chat.loginrow.browser.openAgain")}
-            </Button>
-            <span className="text-ink-faint">{t("chat.loginrow.waiting")}</span>
-          </div>
-        ))}
     </div>
   );
 }

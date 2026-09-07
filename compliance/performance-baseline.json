@@ -1,7 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "source": {
+    "algorithm": "sha256-sorted-path-content-sha256-utf8-lf-v1",
+    "sourceTreeSha256": "ea79f6dedd668dd9672f5659fd5c839310a87a7a6d29b618f58b26f67bd7f9a6",
+    "fileCount": 179,
+    "gitHead": "7328eee3aaa65b3c15430a60e64fc99dd74d968a",
+    "scope": "src text sources, benchmark and enumeration scripts, package manifests, TypeScript configs and pnpm lockfile; includes working-tree changes, excludes credentials and generated files"
+  },
+  "inputSha256": "2ae471d919671acf090fb381c23fe1fe7487855412bbcd40781921f9ecbdbb55",
   "scenario": "report-8h-4-targets-v1",
-  "measuredAt": "2026-09-07T02:13:32.159Z",
+  "measuredAt": "2026-09-07T16:06:23.799Z",
   "runtime": {
     "node": "24.18.1",
     "platform": "win32",
@@ -16,10 +24,9 @@
   "warmup": 5,
   "iterations": 25,
   "milliseconds": {
-    "p50": 28.83,
-    "p95": 38.8,
-    "max": 40.05200000000002
+    "p50": 27.82,
+    "p95": 35.76,
+    "max": 37.09310000000005
   },
-  "scope": "JSON parse, normalização e análise no Node; exclui serialização da fixture, disco, React, GPU e IPC. Não mede startup, RSS da live ou vazamento de memória.",
-  "sourceCommit": "8a2815d (worktree desta implementação; benchmark novo)"
+  "scope": "JSON parse, normalização e análise no Node; exclui serialização da fixture, disco, React, GPU e IPC. Não mede startup, RSS da live ou vazamento de memória."
 }

@@ -1,12 +1,26 @@
 import { useCallback, useLayoutEffect, useState } from "react";
+import { ReportLibraryCache } from "../lib/reportLibraryCache";
 import { ReportDetail } from "./reports/ReportDetail";
 import { ReportsList } from "./reports/ReportsList";
 import { useReportSessions } from "./reports/useReportSessions";
+import { useReportSummaries } from "./reports/useReportSummaries";
+import type { ComponentProps } from "react";
+
+function ReportLibrary({
+  cache,
+  ...props
+}: Omit<ComponentProps<typeof ReportsList>, "summaries"> & {
+  cache: ReportLibraryCache;
+}) {
+  const summaries = useReportSummaries(props.sessions, cache);
+  return <ReportsList {...props} summaries={summaries} />;
+}
 
 /** Entry point da rota. Dados, lista e narrativa do detalhe vivem em módulos próprios. */
 export function ReportsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { sessions, summaries, error, refresh } = useReportSessions();
+  const [summaryCache] = useState(() => new ReportLibraryCache());
+  const { sessions, error, refresh } = useReportSessions();
   const selectReport = useCallback((id: string) => setSelectedId(id), []);
   const closeReport = useCallback(() => setSelectedId(null), []);
   const handleDeleted = useCallback(() => {
@@ -14,10 +28,7 @@ export function ReportsScreen() {
     void refresh();
   }, [refresh]);
 
-  // Lista e detalhe compartilham o scroll do shell. Sem este reset, trocar o
-  // conteúdo preserva a posição da lista e pode abrir a live no meio da história.
-  // O layout effect roda antes do paint, então não há um salto visível do fundo
-  // para o topo — inclusive ao voltar ou depois de excluir um relatório.
+  // Shared shell scroll must reset before painting a different report or the list.
   useLayoutEffect(() => {
     const scroller = document.getElementById("screen-scroll");
     if (!scroller) return;
@@ -41,9 +52,9 @@ export function ReportsScreen() {
   }
 
   return (
-    <ReportsList
+    <ReportLibrary
+      cache={summaryCache}
       sessions={sessions}
-      summaries={summaries}
       error={error}
       onRetry={() => void refresh()}
       onSelect={selectReport}

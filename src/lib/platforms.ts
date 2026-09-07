@@ -2,8 +2,7 @@ import type { I18n, MessageKey } from "./i18n";
 import type { PlatformId, PlatformPreset, VideoPreset } from "./types";
 
 // ============================================================
-// Catálogo de plataformas (valores de REFERÊNCIA — ver PLANEJAMENTO.md §8.5/§9).
-// Numa versão futura isto vira um JSON remoto versionado, validado pelo app.
+// Catálogo de plataformas com valores de referência.
 //
 // Aqui fica IDENTIDADE e NÚMERO: id, cor de marca, protocolo, URL de ingestão,
 // preset recomendado. A copy (observação didática, frase do picker) vive no
@@ -161,25 +160,3 @@ export const platformTagline = (id: PlatformId, t: I18n["t"]): string =>
  *  destino); pra mostrar na tela, use esta função. */
 export const platformName = (id: PlatformId, t: I18n["t"]): string =>
   id === "custom" ? t("core.platform.custom.name") : PLATFORMS[id].name;
-
-/** Iniciais para o "glifo" colorido da plataforma na UI. */
-export function platformInitials(id: PlatformId): string {
-  switch (id) {
-    case "twitch":
-      return "Tw";
-    case "youtube":
-      return "YT";
-    case "facebook":
-      return "Fb";
-    case "kick":
-      return "Ki";
-    case "tiktok":
-      return "Tk";
-    case "x":
-      return "X";
-    case "instagram":
-      return "Ig";
-    default:
-      return "•";
-  }
-}

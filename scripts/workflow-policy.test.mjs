@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertLockedWorkflows, workflowSteps } from "./workflow-policy.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workflow = (name) =>
@@ -11,25 +12,28 @@ describe("workflow safety contracts", () => {
   it.each(["ci", "release", "editorial-maintenance"])(
     "pins every external action implementation in %s",
     (name) => {
-      for (const [, action] of workflow(name).matchAll(
-        /\buses:\s*([^\s#]+)/g,
-      )) {
+      const actions = workflowSteps(workflow(name)).filter((step) => step.uses);
+      expect(actions.length).toBeGreaterThan(0);
+      for (const { uses: action } of actions) {
         if (action.startsWith("./")) continue;
         expect(action).toMatch(/^[\w-]+\/[\w./-]+@[a-f\d]{40}$/);
       }
     },
   );
   it("keeps Rust dependency resolution locked and its toolchain explicitly versioned", () => {
-    const all = workflow("ci") + workflow("release");
-    for (const line of all
-      .split("\n")
-      .filter((line) =>
-        /run: (?:cargo (?:test|clippy)|pnpm tauri build)/.test(line),
-      )) {
-      expect(line).toContain("--locked");
-    }
-    expect([...all.matchAll(/dtolnay\/rust-toolchain@/g)]).toHaveLength(3);
-    expect([...all.matchAll(/toolchain: 1\.97\.1/g)]).toHaveLength(3);
+    const sources = [workflow("ci"), workflow("release")];
+    expect(
+      assertLockedWorkflows(sources, {
+        "cargo clippy": 1,
+        "cargo test": 2,
+        "pnpm tauri build": 1,
+      }),
+    ).toEqual({ "cargo clippy": 1, "cargo test": 2, "pnpm tauri build": 1 });
+    const toolchains = sources
+      .flatMap(workflowSteps)
+      .filter((step) => step.uses?.startsWith("dtolnay/rust-toolchain@"));
+    expect(toolchains).toHaveLength(3);
+    for (const step of toolchains) expect(step.with.toolchain).toBe("1.97.1");
   });
   it("cancels superseded checks without sharing the release concurrency group", () => {
     const ci = workflow("ci");

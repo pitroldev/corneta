@@ -28,6 +28,7 @@ import { obsIngestUrl } from "../lib/factory";
 import { bandFit, effectiveAction, estimate } from "../lib/estimates";
 import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
+import { updateBusy, useUpdate } from "../lib/updater";
 import { cn, errMsg, fmtUptime, openExternal } from "../lib/utils";
 import type { EngineState, ObsCheck, TargetState } from "../lib/types";
 import { isUuid } from "../lib/telemetry-schema";
@@ -82,6 +83,7 @@ export function GoLiveScreen({
   };
 
   const state = snapshot.state;
+  const updating = useUpdate(updateBusy);
   const live = state === "live";
   const starting = state === "starting";
   const ingestLive = snapshot.ingestLive ?? false;
@@ -96,11 +98,12 @@ export function GoLiveScreen({
         .filter((p) => p.issues.length > 0),
     [enabled, t],
   );
-  const canStart = enabled.length > 0 && problems.length === 0;
+  const canStart = !updating && enabled.length > 0 && problems.length === 0;
   // Motivo do BORA estar travado (pra leitor de tela e legenda — o tooltip nativo
   // não dispara em botão desabilitado).
-  const blockReason =
-    enabled.length === 0
+  const blockReason = updating
+    ? t("golive.block.updating")
+    : enabled.length === 0
       ? t("golive.block.noPlatform")
       : problems.length > 0
         ? t("golive.block.fixTarget", {
@@ -1259,18 +1262,29 @@ function StreamInfoCard() {
 function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
   const t = useT();
   const settings = useStore((s) => s.config!.settings);
+  const guardianStatus = useStore((s) => s.snapshot.guardianStatus);
   const watchCount = settings.guardianWatchlist.filter(
     (term) => term.trim().length >= 3,
   ).length;
   const items = [
     {
-      on: settings.guardianEnabled && watchCount > 0,
+      on:
+        settings.guardianEnabled &&
+        watchCount > 0 &&
+        (!guardianStatus || guardianStatus === "ready"),
+      status:
+        guardianStatus && guardianStatus !== "ready"
+          ? t(`guardian.status.${guardianStatus}.short`)
+          : undefined,
       label: t("golive.security.guardian.label"),
-      desc: settings.guardianEnabled
-        ? watchCount > 0
-          ? t("golive.security.guardian.watching", { n: watchCount })
-          : t("golive.security.guardian.noTerms")
-        : t("golive.security.guardian.desc.off"),
+      desc:
+        guardianStatus && guardianStatus !== "ready"
+          ? t(`guardian.status.${guardianStatus}.body`)
+          : settings.guardianEnabled
+            ? watchCount > 0
+              ? t("golive.security.guardian.watching", { n: watchCount })
+              : t("golive.security.guardian.noTerms")
+            : t("golive.security.guardian.desc.off"),
       experimental: true,
       // Nasce desligado — fica visível pra a linha convidar a ligar (o escudo antes do
       // estrago), não só informar.
@@ -1314,9 +1328,13 @@ function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
       </div>
       <div className="flex flex-col gap-2">
         {items.map((it) => (
-          <div key={it.label} className="flex items-center gap-2 text-sm">
+          <div
+            key={it.label}
+            className="flex flex-wrap items-center gap-2 text-sm"
+          >
             <Badge tone={it.on ? "brass" : "neutral"}>
-              {it.on ? t("golive.security.armed") : t("golive.security.off")}
+              {it.status ??
+                (it.on ? t("golive.security.armed") : t("golive.security.off"))}
             </Badge>
             <span className="font-semibold">{it.label}</span>
             {it.experimental && <ExperimentalBadge size="icon" />}

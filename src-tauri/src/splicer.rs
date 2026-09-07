@@ -10,7 +10,7 @@
 //!   sinal caiu? slate H.264 pré-encodado (imagem) ───────┘   (nunca morre até o stop)
 //! ```
 //!
-//! **A sacada** (§ pedido do usuário): reusar o *sequence header* (SPS/PPS) do OBS — o
+//! Reusa o *sequence header* (SPS/PPS) do OBS — o
 //! `_program` anuncia o avcC do OBS uma única vez; o slate reafirma o SEU próprio SPS/PPS
 //! **in-band** (mesmo id, conteúdo do slate) antes de cada IDR do slate, e na volta a gente
 //! reafirma o SPS/PPS do OBS antes do IDR de retorno. Transições são sempre IDR→IDR (reset

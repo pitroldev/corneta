@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -32,7 +32,11 @@ sources:
   - title: Corneta product reference
     kind: internal
     repoPath: web/PRODUCT.md
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
+  - title: Corneta live start sequencing
+    kind: internal
+    repoPath: src/lib/store.ts
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
     originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
@@ -165,7 +169,10 @@ No OBS, escolha o serviço personalizado e use o endereço local mostrado pela
 Corneta. A chave desse destino local não é a stream key da Twitch, do YouTube ou
 da Kick.
 
-Confira cena, câmera e áudio. Tudo certo? Inicie a transmissão no OBS.
+Confira cena, câmera e áudio. Na Corneta, clique em **BORA AO VIVO** para preparar
+a entrada local e os destinos. Se o início automático estiver habilitado, ela
+tentará iniciar a transmissão no OBS. Caso o início seja manual ou essa tentativa
+falhe, clique em **Iniciar transmissão** no OBS depois do BORA.
 
 Quando o sinal chegar, a Corneta sai da espera e conecta os destinos habilitados.
 

@@ -1,4 +1,4 @@
-# Responsável real atual; não exige uma segunda pessoa fictícia nem autoaprova PRs.
+# Mantenedor responsável pela revisão do repositório.
 * @pitroldev
 # Áreas de atenção: OAuth/cofre, mídia, persistência, telemetria e release.
 /src-tauri/src/auth.rs @pitroldev

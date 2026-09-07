@@ -157,7 +157,9 @@ function Meter({
           initial={false}
           animate={{ scaleX: pct / 100 }}
           transition={
-            calm ? { duration: 0 } : { type: "spring", stiffness: 130, damping: 21 }
+            calm
+              ? { duration: 0 }
+              : { type: "spring", stiffness: 130, damping: 21 }
           }
         />
       </i>
@@ -188,14 +190,15 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
   // que a tela de Qualidade do app mostra, e é o que justifica o painel ter
   // CPU e placa em vez de só bitrate.
   const cpu = 6 + active * 4 + Math.round(Math.sin(tick * 0.9) * 2);
-  const gpu = 11 + Math.round(active * 6.7) + Math.round(Math.sin(tick * 0.6 + 1) * 2);
+  const gpu =
+    11 + Math.round(active * 6.7) + Math.round(Math.sin(tick * 0.6 + 1) * 2);
   const viewers = Math.round(
-    (1284 + Math.round(Math.sin(tick * 0.33) * 46 + Math.sin(tick * 0.11) * 28)) *
+    (1284 +
+      Math.round(Math.sin(tick * 0.33) * 46 + Math.sin(tick * 0.11) * 28)) *
       (active / 3),
   );
 
-  const toggle = (id: PlatId) =>
-    setOff((cur) => ({ ...cur, [id]: !cur[id] }));
+  const toggle = (id: PlatId) => setOff((cur) => ({ ...cur, [id]: !cur[id] }));
 
   return (
     <div ref={box} className={PANEL}>
@@ -250,7 +253,9 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
                 {/* Só a linha que está TENTANDO alguma coisa pulsa. */}
                 <i
                   className={cn(
-                    down && !calm && "animate-[soft-pulse_1.2s_ease-in-out_infinite]",
+                    down &&
+                      !calm &&
+                      "animate-[soft-pulse_1.2s_ease-in-out_infinite]",
                   )}
                 />{" "}
                 {down ? copy.back : isOff ? copy.pausedState : copy.onAir}
@@ -344,20 +349,8 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
    *  O passeio automático para: ninguém consegue ler um ponto que foge. */
   const [held, setHeld] = useState(false);
 
-  // ------------------------------------------------------------
-  // A POSIÇÃO NÃO É ESTADO DO REACT
-  // ------------------------------------------------------------
-  // A primeira versão empurrava `setPos` num `setInterval` de 90 ms. Isso não é
-  // "uma animação leve": é uma animação de ONZE QUADROS POR SEGUNDO — e foi
-  // exatamente assim que ela apareceu na tela, engasgada.
-  //
-  // Um `MotionValue` mora FORA do ciclo de render: o `useAnimationFrame` empurra
-  // o valor a cada quadro e o framer escreve direto no estilo de quem depende
-  // dele. Nenhum render do React por quadro, 60 fps.
-  //
-  // O que continua em estado do React é só o que muda em SALTOS — as pastilhas
-  // que acendem e o valor que o leitor de tela anuncia. Isso muda um punhado de
-  // vezes por passagem, não sessenta por segundo.
+  // MotionValue atualiza o cursor sem render React por quadro; estado React
+  // fica restrito aos indicadores discretos e ao anúncio acessível.
   const pos = useMotionValue(0);
 
   useAnimationFrame((_, delta) => {

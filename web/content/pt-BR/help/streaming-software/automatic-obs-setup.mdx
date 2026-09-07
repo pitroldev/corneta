@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -33,11 +33,11 @@ sources:
   - title: Corneta OBS wizard and live screen
     kind: internal
     repoPath: src/components/ObsWizard.tsx
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: Corneta OBS interface labels
     kind: internal
     repoPath: src/lib/i18n/pt.ts
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
     originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
@@ -70,8 +70,9 @@ mandar o OBS transmitir quando você der **BORA AO VIVO**.
 ## Configure em três passos
 
 1. No OBS, abra **Ferramentas → Configurações do Servidor WebSocket**.
-2. Marque **Ativar Servidor WebSocket**. A porta padrão é `4455`; só mude se
-   você já usa outra configuração.
+2. Marque **Ativar Servidor WebSocket** e mantenha a porta `4455`. A integração
+   automática da Corneta usa essa porta no mesmo computador. Se ela estiver
+   ocupada, resolva o conflito ou use a configuração manual abaixo.
 3. Na Corneta, abra **Ao vivo → Liga no OBS** e clique em **Configura pra mim**.
 
 Se **Ativar Autenticação** estiver ligado no OBS, clique em **Mostrar Chave de

@@ -40,3 +40,6 @@ Thumbs.db
 !.env.example
 
 .impeccable/*
+# Shared design snapshot is source; other web tool state is disposable.
+web/.impeccable/*
+!web/.impeccable/design.json

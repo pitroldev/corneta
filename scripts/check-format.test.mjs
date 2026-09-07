@@ -110,6 +110,51 @@ describe("formatting coverage and exact legacy baseline", () => {
       false,
     );
   });
+  it("keeps only the shared design snapshot in both Git and exported sources", () => {
+    const root = workspace();
+    writeFileSync(
+      join(root, ".gitignore"),
+      "/.impeccable/\n/web/.impeccable/*\n!/web/.impeccable/design.json\n",
+    );
+    for (const dir of [
+      ".impeccable",
+      "web/.impeccable",
+      "web/.impeccable/cache",
+    ]) {
+      mkdirSync(join(root, dir), { recursive: true });
+      writeFileSync(join(root, dir, "private.json"), "{}");
+    }
+    const snapshot = "web/.impeccable/design.json";
+    writeFileSync(join(root, snapshot), '{"schemaVersion":2}\n');
+    const exported = sourceFiles(root);
+    expect(exported).toContain(snapshot);
+    expect(exported.filter((file) => file.includes(".impeccable"))).toEqual([
+      snapshot,
+    ]);
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: root }).status).toBe(0);
+    expect(
+      spawnSync("git", ["add", "--", snapshot], { cwd: root }).status,
+    ).toBe(0);
+    expect(sourceFiles(root)).toEqual(exported);
+  });
+  it("does not follow a junction replacing the shared design directory", () => {
+    const root = workspace();
+    const external = workspace();
+    mkdirSync(join(root, "web"));
+    writeFileSync(join(external, "design.json"), "{}");
+    symlinkSync(external, join(root, "web/.impeccable"), "junction");
+    expect(sourceFiles(root).some((file) => file.includes(".impeccable"))).toBe(
+      false,
+    );
+  });
+  it("rejects a directory posing as the shared design file", () => {
+    const root = workspace();
+    mkdirSync(join(root, "web/.impeccable/design.json"), { recursive: true });
+    writeFileSync(join(root, "web/.impeccable/design.json/private.json"), "{}");
+    expect(sourceFiles(root).some((file) => file.includes(".impeccable"))).toBe(
+      false,
+    );
+  });
   it("refuses to format a tracked file redirected outside by its parent directory", async () => {
     const root = workspace();
     const external = workspace();

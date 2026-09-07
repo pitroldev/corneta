@@ -380,11 +380,21 @@ export function PrivacyBodyPt() {
           iniciada.
         </p>
         <p>
-          Desinstalar o aplicativo, apagar o arquivo de configuração e remover
-          as credenciais do cofre do sistema elimina os dados locais. Eventos de
-          telemetria enviados antes disso seguem o prazo da seção 11; para pedir
-          a exclusão antecipada, use o UUID mostrado nas Configurações e o canal
-          da seção 13.
+          Desinstalar o aplicativo não garante a remoção das credenciais nem de
+          todos os dados locais. Antes de desinstalar, desconecte suas contas na
+          Corneta e revogue o acesso nas plataformas. Para conferir credenciais
+          restantes, abra o Gerenciador de Credenciais do Windows e remova
+          apenas as entradas identificadas como Corneta (serviço{" "}
+          <code>br.com.pitroldev.corneta</code>); não apague credenciais de
+          outros aplicativos. Se o app informar falha ao desconectar, a limpeza
+          pode estar incompleta.
+        </p>
+        <p>
+          Configurações, relatórios, gravações e cópias exportadas são dados
+          separados: revise os locais usados por você antes de removê-los.
+          Eventos de telemetria enviados antes disso seguem o prazo da seção 11;
+          para pedir a exclusão antecipada, anote o UUID mostrado nas
+          Configurações antes de remover os dados e use o canal da seção 13.
         </p>
       </LegalSection>
 
@@ -503,8 +513,10 @@ export function PrivacyBodyPt() {
           >
             myaccount.google.com/permissions
           </a>
-          . A revogação vale imediatamente; o que estiver no cofre da sua
-          máquina some ao desinstalar o aplicativo.
+          . Revogar o acesso na plataforma e apagar credenciais locais são ações
+          distintas. Desconecte também a conta na Corneta; desinstalar não
+          garante apagar o cofre. Veja as orientações de limpeza local na seção
+          6.
         </Callout>
       </LegalSection>
 

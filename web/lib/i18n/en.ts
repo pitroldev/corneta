@@ -90,7 +90,7 @@ export const en: Dict = {
   "chrome.llms.notis.4":
     "- There's no macOS or Linux version so far, and no public date for one.",
   "chrome.llms.platforms.body":
-    "Ready to go in the app: Twitch, YouTube, Kick, Facebook and any custom RTMP or\nRTMPS server. Experimental, because they depend on the platform itself letting\nyou in: TikTok, Instagram and X. So far, Twitch is the one platform with a\ndocumented end-to-end stream.",
+    "Available in the app: Twitch, YouTube, Kick, Facebook and custom RTMP or\nRTMPS destinations. TikTok, Instagram and X are experimental: access depends\non approval from the platform itself.",
   // Troquei "controle" (substantivo abstrato proibido) por onde a coisa roda de verdade.
   "chrome.manifest.description":
     "Local multistream for streamers — one output per platform, all running on your PC.",
@@ -137,7 +137,7 @@ export const en: Dict = {
     "Your next stream could already be in three places at once.",
   "closing.faq.cta": "Download for free",
   "closing.faq.kicker": "Before you download",
-  // "não pegam bem pra gente" é auto-ironia; "don't make us look good" mantém a admissão do limite (§3.4) sem virar disclaimer formal.
+  // "don't make us look good" mantém a auto-ironia de "não pegam bem pra gente".
   "closing.faq.subtitle": "Including the ones that don't make us look good.",
   "closing.faq.title": "What everybody asks before installing.",
   "closing.footer.download": "Download for Windows",
@@ -222,7 +222,7 @@ export const en: Dict = {
   "content.features.post_live_report":
     "Post-stream report with audience, chat, alerts and followers per channel, comparison with your previous stream and export to HTML, CSV and JSON",
   "content.features.privacy_guard":
-    "Privacy guard: reads what's going out on air and cuts to BE RIGHT BACK if something private of yours shows up on screen",
+    "Experimental privacy guard: looks for the terms you listed and covers the video with BE RIGHT BACK when it detects one or reading fails; it does not censor audio",
   "content.features.quality_modes":
     "Three quality modes — copy the signal, convert only what needs it, or convert everything",
   "content.features.report_per_channel":
@@ -629,9 +629,9 @@ export const en: Dict = {
   "protection.guard.bitrate.switch": "on by default",
   "protection.guard.bitrate.title": "Auto-bitrate",
   "protection.guard.privacy.body":
-    "You list the words that can't leak — email, real name, address. If one of them shows up on screen, Corneta cuts to BE RIGHT BACK before it goes on air.",
+    "You list the words that can't leak — email, real name, address. When Corneta detects one, it covers the video with BE RIGHT BACK. Unverified images also stay covered while reading starts up, fails or falls behind. Video returns automatically once reading recovers and finds no listed term.",
   "protection.guard.privacy.cost":
-    "Costs 12s of delay on the whole stream (the chat too). Safety net, not a guarantee.",
+    "Adds 12s of stream delay. It's experimental: it can miss terms and does not censor audio, which keeps being transmitted.",
   "protection.guard.privacy.switch": "experimental",
   "protection.guard.privacy.title": "Privacy guard",
   "protection.kicker": "Safety nets",
@@ -740,7 +740,7 @@ export const en: Dict = {
     "You can just paste your stream key and be done. But connect your account and the app does the boring part for you: creates the stream, grabs the key and pulls the chat in. Here's exactly what each permission is for.",
   "steps.accounts.privacy.link": "privacy policy",
   "steps.accounts.privacy.text":
-    "Access tokens sit in Windows Credential Manager, on your machine — not on our servers, because there's no Corneta account and no database with your name in it. You can revoke access any time on the platform itself, and uninstalling the app wipes what it put there. The details are in the",
+    "Access tokens are stored in Windows Credential Manager, on your machine. Before removing the app, disconnect your accounts in Corneta and revoke access on the platforms. Uninstalling does not guarantee that vault entries are deleted. Learn how to check local credentials and how each sign-in flow works in the",
   "steps.accounts.title": "What Corneta asks for — and what it does with it.",
   // Rótulo do botão, igual ao que o app mostra na tela.
   "steps.badge.golive": "GO LIVE",
@@ -773,7 +773,7 @@ export const en: Dict = {
   "steps.platforms.note.experimental.text":
     "Whether you get in depends on each platform's approval and its own sign-up flow, so they might just not work for your account.",
   "steps.platforms.note.validation":
-    "So far, Twitch is the only platform where we've documented a real stream end to end. The others are built into the app and still being tested in the open.",
+    "Test each destination with your account and setup before an important stream. Having a platform in the app doesn't guarantee it will accept the stream.",
   "steps.platforms.title": "The big four ready to go — the rest is on you.",
   "steps.title": "You go live in three steps.",
 };

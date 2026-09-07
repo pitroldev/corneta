@@ -240,9 +240,13 @@ export function TermsBodyEn() {
           </li>
           <li>
             <strong>The privacy guard</strong> is a safety net that watches for
-            terms you define and cuts to the “BE RIGHT BACK” screen. It is not a
-            guarantee that nothing leaks, and it costs delay across your whole
-            stream.
+            terms you define and covers video with “BE RIGHT BACK” when it
+            detects one. Unverified images also stay covered while reading
+            starts up, fails or falls behind, without ending the connection.
+            Video can return automatically once reading recovers and finds no
+            listed term. The feature adds stream delay, can miss terms and does
+            not censor audio, which keeps being transmitted. It is not a
+            guarantee that nothing leaks.
           </li>
           <li>
             <strong>Automatic safety nets</strong> like “BE RIGHT BACK” and
@@ -251,19 +255,21 @@ export function TermsBodyEn() {
           </li>
         </ul>
         <p>
-          The full platform matrix is still in public validation. As of this
-          version of the terms, only Twitch has a documented real stream.
+          Having a platform in the app does not guarantee that it will accept a
+          stream from your account. Test each destination beforehand with the
+          setup you intend to use.
         </p>
       </LegalSection>
 
       <LegalSection id="requisitos" n={9} title="Requirements and performance">
         <p>
           Today the installer is for <strong>Windows</strong> and the app
-          depends on OBS to produce the stream. Each destination eats part of
-          your upload, and re-encoding video eats CPU or GPU. The app estimates
-          that arithmetic before you go live, but estimates are estimates: the
-          result depends on your machine, your network and the platforms
-          themselves.
+          receives a signal from OBS or another RTMP-compatible streaming app.
+          Automatic setup and integrated statistics are specific to OBS. Each
+          destination eats part of your upload, and re-encoding video eats CPU
+          or GPU. The app estimates that arithmetic before you go live, but
+          estimates are estimates: the result depends on your machine, your
+          network and the platforms themselves.
         </p>
       </LegalSection>
 

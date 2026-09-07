@@ -39,7 +39,7 @@ Não precisa criar `.env` para usar os comandos `contrib:*`.
 - O build do site usa `https://www.corneta.live` apenas para passar pela validação de metadados canônicos. Não utiliza secrets oficiais nem autoriza publicar um fork sob essa identidade.
 - Em ambiente explicitamente marcado como release/produção oficial, o wrapper recusa substituir os gates pelo perfil de contribuição.
 
-`pnpm dev`, `web:dev`, `web:check`, `app:dev` e `app:build` continuam caminhos de desenvolvimento/operação configurada, não equivalentes aos comandos isolados. `web:check` verifica qualidade e integridade; revisão vencida por calendário fica nos gates de publicação do site, não no check comum. Veja [configuração](CONFIGURACAO.md), [decisão OAuth](DECISAO-OAUTH-VIA-API.md) e [gates oficiais](GATES-DE-RELEASE.md) antes de operar com credenciais próprias.
+`pnpm dev`, `web:dev`, `web:check`, `app:dev` e `app:build` são caminhos de desenvolvimento/operação configurada, não equivalentes aos comandos isolados. `web:check` verifica qualidade e integridade; revisão vencida por calendário fica nos gates de publicação do site, não no check comum. Veja [configuração](CONFIGURACAO.md), [rede e OAuth](SUPERFICIE-DE-REDE.md) e [gates oficiais](GATES-DE-RELEASE.md) antes de operar com credenciais próprias.
 
 ## Desktop de contribuição
 
@@ -85,13 +85,53 @@ O [guia de contribuição](../CONTRIBUTING.md) descreve comandos por área e inv
 | `pwsh -NoProfile -File scripts/check-powershell.ps1` | Parser dos scripts PowerShell, sem executar downloads/instalação.                                                            |
 | `pnpm smoke:reports`                                 | Fluxos de relatório no Chromium; também executados no CI em PT/EN.                                                           |
 
-A baseline de formatação usa hashes exatos (normalizados somente quanto a LF/CRLF) e a versão fixada de Prettier. Ao modificar um arquivo legado, a exceção deixa de valer: formate-o. Não acrescente hashes para esconder erros novos. EditorConfig/Gitattributes orientam futuras edições/checkouts; esta implementação não executa `git add --renormalize`.
+A baseline de formatação usa hashes exatos (normalizados somente quanto a LF/CRLF) e a versão fixada de Prettier. Ao modificar um arquivo coberto pela baseline, a exceção deixa de valer: formate-o. Não acrescente hashes para esconder erros novos. EditorConfig/Gitattributes orientam edições e checkouts; mudanças de normalização devem ser deliberadas e separadas das alterações de comportamento.
 
 Builds escrevem artefatos locais em `dist/`, `web/.next/` e caches ignorados. Não rode `contrib:web:check` ou outro build Next ao mesmo tempo que `contrib:web` na mesma cópia. Para tarefas simultâneas, use cópias separadas. Não compartilhe `target` entre perfis de build oficiais e contributor.
 
-O primeiro build nativo pode levar vários minutos e usar bastante disco/memória. Não há ainda um requisito mínimo medido para todas as combinações de máquina. Mantenha os caches nas iterações e consulte os registros de [performance](IMPLEMENTACAO-PERFORMANCE-2026-09-06.md) sem tratar medições de uma máquina como garantia para outras.
+O primeiro build nativo pode levar vários minutos e usar bastante disco/memória. Não há um requisito mínimo medido para todas as combinações de máquina. Mantenha os caches nas iterações e consulte o [contrato de performance](PERFORMANCE.md), sem tratar medições de uma máquina como garantia para outras.
 
 O smoke existente pode ser executado após gerar o frontend: `pnpm smoke:reports`. Ele requer Chromium/Edge, usa perfil descartável e dados simulados. O caminho do navegador pode ser passado como argumento. Não confundir esse teste com prova de reprodução de vídeo nativo ou OAuth em conta real.
+
+### Testes nativos de integração
+
+Os testes de mídia `ignored` usam `ffmpeg` e `ffprobe` pelo `PATH`. O download
+padrão prepara sidecars com sufixo para o Tauri, mas não instala esses comandos.
+Para preparar as duas ferramentas a partir do mesmo arquivo verificado, execute
+este bloco em **PowerShell 7, na raiz de um clone limpo de contribuição**:
+
+```powershell
+$cornetaMediaTools = Join-Path (Get-Location) '.artifacts/media-tools'
+pwsh -NoProfile -File scripts/fetch-binaries.ps1 -ToolDirectory $cornetaMediaTools
+if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar ferramentas de mídia verificadas.' }
+$cornetaPreviousPath = $env:PATH
+try {
+    $env:PATH = "$cornetaMediaTools$([System.IO.Path]::PathSeparator)$cornetaPreviousPath"
+    cargo test --manifest-path src-tauri/Cargo.toml --locked --lib splicer -- --ignored --test-threads=1
+    if ($LASTEXITCODE -ne 0) { throw 'Falha nos testes de integração de mídia.' }
+} finally {
+    $env:PATH = $cornetaPreviousPath
+}
+```
+
+Não combine `-ToolDirectory` com `-AllowSystemFfmpeg`. As ferramentas ficam em
+`.artifacts/media-tools/`; o bloco restaura o `PATH` da sessão e não inicia o app
+ou uma live. Os testes geram mídia sintética em diretórios temporários.
+
+O teste de OCR é separado. Nas configurações de idioma do Windows, confira se há
+um pacote com reconhecimento óptico de caracteres instalado para um dos idiomas
+preferidos do usuário. Instalar apenas o idioma de exibição pode não fornecer a
+capacidade OCR. Execute, ainda na raiz:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml --locked --lib guardian::ocr::bitmap_tests::native_ocr_accepts_direct_gray_input -- --ignored --exact --nocapture
+```
+
+Confirme que o teste foi encontrado e leia a saída. Se aparecer
+`Skipping OCR integration: no Windows OCR language pack available`, registre OCR
+como **não validado**: esse caminho retorna sem exercitar o motor, mesmo com
+status final de sucesso. Não confunda esse teste do OCR nativo do Windows com
+validação dos modelos PaddleOCR, detecção em jogo ou proteção durante uma live.
 
 ## Se não funcionar
 
@@ -99,7 +139,7 @@ O smoke existente pode ser executado após gerar o frontend: `pnpm smoke:reports
 - **Arquivo `web/.env*` encontrado:** use clone limpo. O preflight não remove seus dados.
 - **Porta ocupada:** encerre o processo de teste correspondente; não mate OBS ou Corneta de produção indiscriminadamente. Demo usa 1420; Next dev usa 7390. Ingestão e callback dependem da configuração/fluxo mostrados no app.
 - **Compilador/linker ausente:** verifique C++/MSVC e Windows SDK, não apenas o editor Visual Studio.
-- **Erro de hash/download:** não desative a verificação. Consulte o [runbook](RUNBOOK-BETA.md) para o espelho verificado ou reporte a versão/URL pública do artefato, sem credenciais.
+- **Erro de hash/download:** não desative a verificação. Consulte o [guia de publicação](PUBLICACAO.md) para o espelho verificado ou reporte a versão/URL pública do artefato, sem credenciais.
 - **Teste falha:** registre comando, versão/commit e saída sanitizada. Não apague cofre, relatórios ou lockfiles como tentativa de reparo.
 
 O código pode ser estudado e alterado sem serviço hospedado. Hospedar e distribuir um fork completo ainda exige configurar identidade, domínios, provedores e atualizações próprios; não é uma capacidade automaticamente garantida pela demo ou por um build local bem-sucedido.

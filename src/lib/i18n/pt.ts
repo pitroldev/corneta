@@ -509,6 +509,25 @@ export const pt = {
   "chat.youtube.creds.guide.hide": "ocultar guia",
   "chat.youtube.creds.guide.show": "como conseguir?",
   "chat.youtube.creds.saved.toast": "Credenciais do YouTube no cofre 🔒",
+  "youtube.recovery.open": "Recuperar YouTube",
+  "youtube.recovery.loading": "Consultando a recuperação desta instalação…",
+  "youtube.recovery.loadFailed":
+    "Não consegui consultar a pendência. Tente novamente.",
+  "youtube.recovery.none":
+    "Nenhuma transmissão pendente nesta instalação. Você pode usar o YouTube automático novamente.",
+  "youtube.recovery.pending":
+    "A Corneta ainda não confirmou o encerramento da transmissão anterior. Tentar novamente encerra essa live se ela estiver ativa no YouTube. Se ela ainda não começou, cancele o agendamento no YouTube Studio e consulte novamente. A Corneta não exclui transmissões automaticamente.",
+  "youtube.recovery.unknown":
+    "A conexão caiu durante a criação e o YouTube não confirmou o resultado. Abra o YouTube Studio e encerre ou cancele qualquer transmissão pendente criada pela Corneta antes de liberar uma nova tentativa.",
+  "youtube.recovery.studio": "Abrir YouTube Studio",
+  "youtube.recovery.stopFirst":
+    "Pare a transmissão na Corneta antes de recuperar o YouTube.",
+  "youtube.recovery.confirm":
+    "Conferi o YouTube Studio e encerrei ou cancelei as transmissões pendentes criadas pela Corneta.",
+  "youtube.recovery.acknowledge":
+    "Confirmar conferência e liberar nova tentativa",
+  "youtube.recovery.retry": "Tentar encerrar a transmissão pendente",
+  "youtube.recovery.check": "Consultar novamente",
   "chat.youtube.guide.step1":
     "Abra o Google Cloud Console e crie um projeto (dê qualquer nome, ex.: “Corneta”). Quando terminar, confira lá no topo se o projeto novo é o que está selecionado.",
   // Cada **negrito** deste passo a passo é um rótulo REAL da tela do Google
@@ -532,12 +551,21 @@ export const pt = {
 
   // ---- components ----
   "components.app.censored.body":
-    "Um termo seu apareceu na tela — a live volta sozinha quando ele sumir.",
+    "O Guardião está cobrindo a imagem. A live volta quando o trecho estiver verificado e sem termos detectados. O Guardião não silencia o áudio.",
   "components.app.censored.title": "JÁ VOLTO no ar",
   "components.app.leak.toast":
     '🛡️ "{snippet}" apareceu na tela — cortei pro JÁ VOLTO',
   "components.app.live.aria.censored":
-    "JÁ VOLTO no ar — um termo seu apareceu na tela",
+    "JÁ VOLTO no ar — imagem coberta pelo Guardião",
+  "guardian.status.starting.title": "Preparando o Guardião",
+  "guardian.status.starting.body":
+    "A imagem fica coberta até a primeira leitura. O Guardião não silencia o áudio.",
+  "guardian.status.unavailable.title":
+    "O Guardião não conseguiu verificar a imagem",
+  "guardian.status.unavailable.body":
+    "Os trechos não verificados ficam cobertos pelo JÁ VOLTO. A imagem volta após uma leitura válida. O Guardião não silencia o áudio. Se persistir, encerre e inicie a live novamente.",
+  "guardian.status.starting.short": "Preparando",
+  "guardian.status.unavailable.short": "Leitura indisponível",
   "components.app.live.aria.error": "Erro na transmissão",
   "components.app.live.aria.live": "No ar em todas as plataformas",
   "components.app.live.aria.live.down.one":
@@ -552,8 +580,6 @@ export const pt = {
   "components.app.loading.error":
     "Não consegui ler a sua configuração. Tenta de novo — se continuar assim, abre os logs e me manda.",
   "components.app.loading.screen": "Afinando esta tela…",
-  "components.app.shortcut.taken":
-    "Não consegui ativar o seu atalho {shortcut} — outro programa já tá usando ele. Troque em Configurações → Atalho global.",
   "components.firstLive.dismiss.aria": "Dispensar o guia",
   "components.firstLive.dismiss.title": "Dispensar o guia da 1ª live",
   "components.firstLive.step.golive": "BORA AO VIVO",
@@ -649,6 +675,8 @@ export const pt = {
   "components.update.downloading": "Baixando…",
   "components.update.downloading.pct": "Baixando {pct}%",
   "components.update.headline": "Saiu a Corneta {version}",
+  "components.update.inProgress": "Corneta atualizando",
+  "components.update.installing": "Instalando e reiniciando…",
   "components.update.install.error": "Não consegui instalar: {error}",
   "components.update.installed.toast":
     "Instalei — feche e abra a Corneta pra terminar.",
@@ -985,6 +1013,8 @@ export const pt = {
   "golive.block.fixTarget":
     "Resolva {nome}: {problemas} — cole a chave ou desligue a plataforma.",
   "golive.block.noPlatform": "Ative ao menos uma plataforma em Plataformas.",
+  "golive.block.updating":
+    "A Corneta está atualizando. Espere ela reabrir antes de começar a live.",
   "golive.brb.armHint":
     "Quer pausa com um clique? Arme o {jaVolto} nas Configurações pra próxima live.",
   "golive.brb.back": "Voltei!",
@@ -1863,6 +1893,8 @@ export const pt = {
     "Como a Corneta conversa com o OBS e se comporta no ar.",
   "settings.header.title": "Configurações",
   "settings.hotkey.capture.idle": "definir atalho",
+  "settings.hotkey.capture.unsupported":
+    "essa tecla não serve como atalho — tente outra",
   "settings.hotkey.capture.needsModifier":
     "precisa de Ctrl, Alt ou Shift junto",
   "settings.hotkey.capture.prompt":
@@ -1872,9 +1904,15 @@ export const pt = {
     "Começa/para a transmissão de qualquer lugar — mesmo com a Corneta minimizada na bandeja.",
   "settings.hotkey.title": "Atalho global",
   "settings.hotkey.toast.inUse":
-    "Outro programa já tá usando esse atalho — mantive o anterior.",
-  "settings.hotkey.toast.restoreFailed":
-    "Não consegui restaurar o atalho anterior — defina um novo.",
+    "Esse atalho já está em uso — escolha outra combinação.",
+  "settings.hotkey.toast.invalid":
+    "Essa combinação não é válida — escolha outra tecla com Ctrl, Alt ou Shift.",
+  "settings.hotkey.toast.registerFailed":
+    "Não consegui ativar esse atalho — tente outra combinação.",
+  "settings.hotkey.toast.unregisterFailed":
+    "Não consegui remover o atalho anterior — tente novamente antes de trocar.",
+  "settings.hotkey.toast.cleanupFailed":
+    "Não consegui concluir a troca com segurança — reinicie a Corneta antes de definir outro atalho.",
   "settings.loading.body": "Já trago seus ajustes.",
   "settings.loading.title": "Carregando…",
   "settings.loudness.target.label": "Alvo de volume",
@@ -1883,6 +1921,10 @@ export const pt = {
   "settings.loudness.target.minus18": "-18 · podcast/voz",
   "settings.obs.advanced.desc":
     "Só mexa aqui se a porta padrão (1935) já estiver em uso por outro programa. Mudou aqui, muda no OBS também.",
+  "settings.obs.test.saveFailed":
+    "Não consegui salvar os ajustes. A conexão não foi verificada com esses valores. Edite o campo e tente novamente.",
+  "settings.obs.test.settingsChanged":
+    "Os ajustes mudaram durante a configuração do OBS. Confira os campos e tente novamente.",
   "settings.obs.advanced.field.app": "Aplicação (app)",
   "settings.obs.advanced.field.host": "Host",
   "settings.obs.advanced.field.localKey": "Chave local",

@@ -2,13 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Ferramentas de movimento compartilhadas pelas duas peças animadas da LP: a
-// janela do herói (dado em tempo real) e o replay do relatório (playback).
-//
-// Estavam dentro da janela do herói; saíram daqui porque a regra que elas
-// carregam vale pras duas — e mais ainda pra segunda, que fica no meio da
-// página e passa a maior parte do tempo fora da tela.
-
 /** `true` quando a pessoa pediu menos movimento no sistema.
  *
  *  Começa em `true`: o servidor não tem como saber a preferência, e nascer
@@ -29,9 +22,7 @@ export function useCalm() {
 /**
  * `true` enquanto o elemento está VISÍVEL na tela e a aba em primeiro plano.
  *
- * É o mesmo portão do `useHeartbeat`, exposto como valor — quem anima quadro a
- * quadro (`useAnimationFrame`) não pode ligar e desligar um efeito, só sair cedo
- * do laço. Um painel fora da tela não gasta bateria de ninguém.
+ * Animações por quadro devem retornar cedo quando este valor for falso.
  */
 export function useOnScreen(
   ref: React.RefObject<HTMLElement | null>,
@@ -43,10 +34,13 @@ export function useOnScreen(
     if (!el) return;
     let visible = false;
     const sync = () => setOn(visible && !document.hidden);
-    const io = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      sync();
-    }, { threshold: amount });
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        visible = entry.isIntersecting;
+        sync();
+      },
+      { threshold: amount },
+    );
     io.observe(el);
     document.addEventListener("visibilitychange", sync);
     return () => {
@@ -61,16 +55,8 @@ export function useOnScreen(
  * Roda `fn` a cada `ms` — mas só enquanto o elemento está VISÍVEL na tela e a
  * aba está em primeiro plano.
  *
- * Para conteúdo que muda em SALTOS (uma fala nova, um segundo no relógio, um
- * alerta chegando). Movimento CONTÍNUO não passa por aqui: um intervalo de
- * 100 ms empurrando estado do React é uma animação de 10 fps, e foi exatamente
- * assim que as duas linhas do tempo nasceram engasgadas. Para isso existe o
- * `useAnimationFrame` do framer com `MotionValue` — ver os dois gráficos.
- *
- * Um laço decorativo não pode gastar bateria de quem deixou a página aberta
- * numa segunda janela, e a peça do relatório fica fora da tela na maior parte
- * da visita. `paused` é o freio de mão: hover e foco usam ele pra não trocar o
- * conteúdo debaixo de quem está lendo.
+ * Para conteúdo discreto, não animação contínua; esta usa MotionValue.
+ * `paused` interrompe trocas durante hover/foco para preservar a leitura.
  */
 export function useHeartbeat(
   ref: React.RefObject<HTMLElement | null>,

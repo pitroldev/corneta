@@ -1,6 +1,6 @@
 # Gates de release
 
-Uma release só pode ser publicada quando todos os itens abaixo estiverem concluídos.
+Critérios de aprovação de uma distribuição oficial, para mantenedores, linha 0.7.0. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Os procedimentos e o checklist estão no [guia de publicação](PUBLICACAO.md). Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
 
 ## Automatizados
 
@@ -49,12 +49,12 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
 
 ## Manuais e externos
 
-- Authenticode continua adiado conforme decisão de orçamento em `ASSINATURA.md`. O gate aceita
+- Authenticode segue a [política de assinatura](ASSINATURA.md). O gate aceita
   `NotSigned` com aviso ou `Valid`, nunca assinatura inválida. `REQUIRE_WINDOWS_CODE_SIGNING=1`
   exige assinatura quando adotada. Conferir o aviso em Windows limpo; assinatura não garante
   ausência de SmartScreen.
 - Testar N-1 → N em endpoint HTTPS de teste e recuperação com snapshot/backup compatível.
-  Draft privado não é endpoint público; não presumir downgrade automático. Ver `RUNBOOK-BETA.md`.
+  Draft privado não é endpoint público; não presumir downgrade automático. Ver [publicação](PUBLICACAO.md).
 - Pacote de conformidade GPL do FFmpeg anexado à distribuição conforme
   `THIRD_PARTY_NOTICES.md`.
 - Matriz real aprovada: Windows 10 e 11; NVIDIA, Intel, AMD e software; OBS autenticado e sem
@@ -69,8 +69,8 @@ Uma release só pode ser publicada quando todos os itens abaixo estiverem conclu
   produção. A política técnica é opt-out; teste automatizado, aviso ou publicação do código não
   comprovam adequação da base legal nem configuração de retenção/descarte no operador.
 - Em uma instalação limpa, confirmar zero request ao PostHog com as duas finalidades
-  **desligadas** — elas agora vêm LIGADAS por legítimo interesse, então o teste é desligar e
-  conferir que parou, e não instalar e conferir que está mudo. Depois religar uma de cada vez,
+  **desligadas**. O padrão configurado é ativo para uso e falhas; desligue ambas para verificar
+  a interrupção do envio. Depois religar uma de cada vez,
   inspecionar payloads e validar uma stack React simbolicada conforme o
   [`RUNBOOK-POSTHOG.md`](./RUNBOOK-POSTHOG.md). Ver o teste de balanceamento em
   [`LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`](./LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md).

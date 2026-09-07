@@ -1,5 +1,5 @@
 # Baixa os sidecars (ffmpeg e mediamtx) e os coloca em src-tauri/binaries
-# com o sufixo do target-triple exigido pelo Tauri (§14.1 do PLANEJAMENTO.md).
+# com o sufixo do target-triple exigido pelo Tauri.
 #
 # As versões são FIXADAS (URLs versionadas + SHA-256 hardcoded abaixo) para
 # build reproduzível e defesa contra release adulterado/corrompido. Nada é

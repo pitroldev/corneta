@@ -1281,6 +1281,9 @@ fn final_before_send(
             return None;
         }
     }
+    // O SDK nativo usa eventos identificados por padrão. Nenhum chamador ou
+    // default pode habilitar perfis; preservar o UUID mantém a correlação dos eventos.
+    event.insert_prop("$process_person_profile", false).ok()?;
     if serde_json::to_vec(&event).ok()?.len() > MAX_EVENT_BYTES {
         return None;
     }
@@ -2182,6 +2185,91 @@ mod tests {
     }
 
     #[test]
+    fn final_hook_disables_person_profiles_for_each_purpose_and_preserves_identity() {
+        let installation_id = new_id();
+        let epoch = Mutex::new(ConsentEpoch {
+            generation: 7,
+            installation_id: Some(installation_id.clone()),
+        });
+        for (event_name, purpose, usage, crash) in [
+            ("app_closed", Purpose::Usage, true, false),
+            ("app_started", Purpose::StartupMinimal, false, true),
+            ("$exception", Purpose::CrashReports, false, true),
+        ] {
+            for incoming_profile_flag in [None, Some(false), Some(true)] {
+                let mut event = stamped_event(event_name, &installation_id, purpose, 7);
+                if let Some(flag) = incoming_profile_flag {
+                    event.insert_prop("$process_person_profile", flag).unwrap();
+                }
+                let safe = final_before_send(
+                    event,
+                    &AtomicBool::new(usage),
+                    &AtomicBool::new(crash),
+                    &epoch,
+                )
+                .expect("a finalidade ativa deve preservar o evento");
+                let payload = serde_json::to_value(safe).unwrap();
+                assert_eq!(payload["properties"]["$process_person_profile"], false);
+                assert_eq!(payload["distinct_id"], installation_id);
+                assert!(payload["properties"]
+                    .get(INTERNAL_PURPOSE_PROPERTY)
+                    .is_none());
+                assert!(payload["properties"].get(INTERNAL_EPOCH_PROPERTY).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn real_posthog_usage_and_startup_envelopes_disable_person_profiles() {
+        let installation_id = new_id();
+        let hook_installation_id = installation_id.clone();
+        let seen = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let hook_seen = seen.clone();
+        let client = posthog_rs::client(
+            ClientOptionsBuilder::default()
+                .api_key("phc_abcdefgh".to_string())
+                .host("http://127.0.0.1:1".to_string())
+                .disable_geoip(true)
+                .is_server(false)
+                .flush_at(1)
+                .max_capture_attempts(1u32)
+                .before_send(move |event| {
+                    let safe = final_before_send(
+                        event,
+                        &AtomicBool::new(true),
+                        &AtomicBool::new(true),
+                        &Mutex::new(ConsentEpoch {
+                            generation: 7,
+                            installation_id: Some(hook_installation_id.clone()),
+                        }),
+                    )
+                    .expect("o envelope real do SDK deve passar pelo hook");
+                    lock(&hook_seen).push(serde_json::to_value(safe).unwrap());
+                    // Inspeciona o payload serializável e descarta antes do transporte.
+                    None
+                })
+                .build()
+                .unwrap(),
+        );
+        for (event_name, purpose) in [
+            ("app_closed", Purpose::Usage),
+            ("app_started", Purpose::StartupMinimal),
+        ] {
+            let mut event = stamped_event(event_name, &installation_id, purpose, 7);
+            event.insert_prop("$process_person_profile", true).unwrap();
+            client.capture(event);
+        }
+        client.flush();
+        client.shutdown();
+        let payloads = lock(&seen);
+        assert_eq!(payloads.len(), 2);
+        for payload in payloads.iter() {
+            assert_eq!(payload["properties"]["$process_person_profile"], false);
+            assert_eq!(payload["distinct_id"], installation_id);
+        }
+    }
+
+    #[test]
     fn uninitialized_runtime_does_not_send() {
         let runtime = TelemetryRuntime::default();
         assert!(!runtime.should_send(Purpose::Usage));
@@ -2192,7 +2280,12 @@ mod tests {
     #[test]
     fn enabling_a_purpose_creates_and_persists_a_valid_v4_uuid() {
         let path = temp_file("telemetry-consent");
-        let runtime = TelemetryRuntime::default();
+        // Fixture local: testa consentimento, não a configuração do binário Contributor.
+        // Nenhum cliente SDK é inicializado nestes testes de persistência/gates.
+        let runtime = TelemetryRuntime {
+            build_disabled: false,
+            ..TelemetryRuntime::default()
+        };
         *lock(&runtime.path) = Some(path.clone());
         let status = runtime
             .set_consent(Consent::Enabled, Consent::Disabled, NOTICE_VERSION.into())
@@ -2209,7 +2302,10 @@ mod tests {
     #[test]
     fn correlation_reports_only_the_current_independent_purposes() {
         let path = temp_file("telemetry-correlation-purposes");
-        let runtime = TelemetryRuntime::default();
+        let runtime = TelemetryRuntime {
+            build_disabled: false,
+            ..TelemetryRuntime::default()
+        };
         *lock(&runtime.path) = Some(path.clone());
         assert!(runtime.correlation().is_none());
 
@@ -2442,6 +2538,8 @@ mod tests {
         let capture_options = CaptureExceptionOptions::new()
             .distinct_id(installation_id)
             .fingerprint("desktop_native:unknown_error:test")
+            .property("$process_person_profile", true)
+            .unwrap()
             .property(INTERNAL_PURPOSE_PROPERTY, Purpose::CrashReports.marker())
             .unwrap()
             .property(INTERNAL_EPOCH_PROPERTY, 11u64)
@@ -2469,6 +2567,8 @@ mod tests {
             )
         });
         assert!(properties.contains_key("$exception_list"));
+        assert_eq!(raw_properties["$process_person_profile"], true);
+        assert_eq!(properties["$process_person_profile"], false);
         assert!(!properties.contains_key(INTERNAL_PURPOSE_PROPERTY));
         assert!(!properties.contains_key(INTERNAL_EPOCH_PROPERTY));
         if let Some(images) = properties.get("$debug_images") {
@@ -2657,7 +2757,10 @@ mod tests {
     #[test]
     fn persistence_failure_never_opens_a_gate_and_revocation_stays_closed() {
         let valid_path = temp_file("telemetry-persist-valid");
-        let runtime = TelemetryRuntime::default();
+        let runtime = TelemetryRuntime {
+            build_disabled: false,
+            ..TelemetryRuntime::default()
+        };
         *lock(&runtime.path) = Some(valid_path.clone());
         runtime
             .set_consent(Consent::Enabled, Consent::Enabled, NOTICE_VERSION.into())

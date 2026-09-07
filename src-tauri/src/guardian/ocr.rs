@@ -3,11 +3,10 @@
 //! - **PaddleOCR** (PP-OCRv6 Tiny via ONNX Runtime na CPU) — preciso; a GPU fica pro codec.
 //! - **Windows.Media.Ocr** — nativo, leve, sem baixar modelo (fallback / 1ª sessão).
 //!
-//! Antes do OCR a gente ENCOLHE o quadro (1280w) e limita a detecção (640) — corta custo sem
-//! perder o texto que importa. O reconhecimento por linha domina, então o ganho real vem de OCR
-//! menos vezes (o diff no pipeline pula quadros iguais).
+//! Resolução e detecção são limitadas por `OCR_TARGET_W` e `DET_LIMIT`.
+//! O diff no pipeline evita repetir OCR em quadros iguais.
 
-use super::Ocr;
+use super::{Ocr, OcrError};
 use crate::http_client as ureq;
 use image::{DynamicImage, GrayImage};
 use sha2::{Digest, Sha256};
@@ -24,11 +23,15 @@ const DET_LIMIT: u32 = 1280;
 
 /// Encolhe o plano de cinza pra ~`OCR_TARGET_W` de largura (no-op se já for menor).
 fn downscale_gray(gray: &[u8], w: usize, h: usize) -> Option<GrayImage> {
-    let img = GrayImage::from_raw(w as u32, h as u32, gray.to_vec())?;
-    if w as u32 <= OCR_TARGET_W {
+    if w == 0 || h == 0 || gray.len() != w.checked_mul(h)? {
+        return None;
+    }
+    let (w, h) = (u32::try_from(w).ok()?, u32::try_from(h).ok()?);
+    let img = GrayImage::from_raw(w, h, gray.to_vec())?;
+    if w <= OCR_TARGET_W {
         return Some(img);
     }
-    let nh = (h as u32 * OCR_TARGET_W / w as u32).max(1);
+    let nh = ((h as u64 * OCR_TARGET_W as u64) / w as u64).max(1) as u32;
     Some(image::imageops::resize(
         &img,
         OCR_TARGET_W,
@@ -48,18 +51,14 @@ impl Ocr for PaddleOcr {
         "PaddleOCR (CPU)"
     }
 
-    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> String {
-        let Some(small) = downscale_gray(gray, w, h) else {
-            return String::new();
-        };
+    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> Result<String, OcrError> {
+        let small = downscale_gray(gray, w, h).ok_or(OcrError::InvalidFrame)?;
         let rgb = DynamicImage::ImageLuma8(small).into_rgb8();
-        let results = match self.inner.predict(vec![rgb]) {
-            Ok(r) => r,
-            Err(_) => return String::new(),
-        };
-        let Some(res) = results.first() else {
-            return String::new();
-        };
+        let results = self
+            .inner
+            .predict(vec![rgb])
+            .map_err(|_| OcrError::RecognitionFailed)?;
+        let res = results.first().ok_or(OcrError::RecognitionFailed)?;
         let mut full = String::new();
         for region in &res.text_regions {
             if let Some(text) = &region.text {
@@ -69,7 +68,7 @@ impl Ocr for PaddleOcr {
                 }
             }
         }
-        full
+        Ok(full)
     }
 }
 
@@ -233,25 +232,35 @@ impl Ocr for WindowsOcr {
         "Windows.Media.Ocr"
     }
 
-    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> String {
+    fn read_text(&self, gray: &[u8], w: usize, h: usize) -> Result<String, OcrError> {
         if w <= OCR_TARGET_W as usize {
-            return ocr_text_gray(gray, w as u32, h as u32).unwrap_or_default();
+            return ocr_text_gray(
+                gray,
+                u32::try_from(w).map_err(|_| OcrError::InvalidFrame)?,
+                u32::try_from(h).map_err(|_| OcrError::InvalidFrame)?,
+            );
         }
-        let Some(small) = downscale_gray(gray, w, h) else {
-            return String::new();
-        };
-        ocr_text_gray(small.as_raw(), small.width(), small.height()).unwrap_or_default()
+        let small = downscale_gray(gray, w, h).ok_or(OcrError::InvalidFrame)?;
+        ocr_text_gray(small.as_raw(), small.width(), small.height())
     }
 }
 
 /// Direct lossless Gray8 input: avoids JPEG encode/decode and its text artifacts.
 #[cfg(windows)]
-fn ocr_text_gray(bytes: &[u8], width: u32, height: u32) -> Option<String> {
+fn ocr_text_gray(bytes: &[u8], width: u32, height: u32) -> Result<String, OcrError> {
     use windows::Media::Ocr::OcrEngine;
-    let bitmap = gray_bitmap(bytes, width, height)?;
-    let engine = OcrEngine::TryCreateFromUserProfileLanguages().ok()?;
-    let result = engine.RecognizeAsync(&bitmap).ok()?.join().ok()?;
-    Some(result.Text().ok()?.to_string())
+    let bitmap = gray_bitmap(bytes, width, height).ok_or(OcrError::InvalidFrame)?;
+    let engine =
+        OcrEngine::TryCreateFromUserProfileLanguages().map_err(|_| OcrError::Unavailable)?;
+    let result = engine
+        .RecognizeAsync(&bitmap)
+        .map_err(|_| OcrError::RecognitionFailed)?
+        .join()
+        .map_err(|_| OcrError::RecognitionFailed)?;
+    Ok(result
+        .Text()
+        .map_err(|_| OcrError::RecognitionFailed)?
+        .to_string())
 }
 
 #[cfg(windows)]
@@ -282,6 +291,16 @@ mod bitmap_tests {
     use super::*;
 
     #[test]
+    fn invalid_frame_is_an_error_not_an_empty_read() {
+        assert_eq!(WindowsOcr.read_text(&[], 0, 0), Err(OcrError::InvalidFrame));
+        assert_eq!(
+            WindowsOcr.read_text(&[0; 3], 2, 2),
+            Err(OcrError::InvalidFrame)
+        );
+        assert!(downscale_gray(&[], usize::MAX, 2).is_none());
+    }
+
+    #[test]
     fn native_gray_bitmap_accepts_even_and_odd_widths() {
         for width in [64, 65, 1919, 1920] {
             let bitmap =
@@ -302,14 +321,14 @@ mod bitmap_tests {
         }
         assert_eq!(
             ocr_text_gray(&vec![255; 641 * 100], 641, 100),
-            Some(String::new())
+            Ok(String::new())
         );
     }
 }
 
 // -------------------------------- Fallback ---------------------------------
 
-/// OCR que não lê nada (degrada com elegância se nenhum motor está disponível).
+/// Adaptador indisponível: nunca equivale a uma leitura vazia bem-sucedida.
 /// Só usado fora do Windows, onde não há o motor nativo como fallback.
 #[cfg(not(windows))]
 struct NullOcr;
@@ -318,8 +337,8 @@ impl Ocr for NullOcr {
     fn name(&self) -> &'static str {
         "nenhum (OCR indisponível)"
     }
-    fn read_text(&self, _g: &[u8], _w: usize, _h: usize) -> String {
-        String::new()
+    fn read_text(&self, _g: &[u8], _w: usize, _h: usize) -> Result<String, OcrError> {
+        Err(OcrError::Unavailable)
     }
 }
 

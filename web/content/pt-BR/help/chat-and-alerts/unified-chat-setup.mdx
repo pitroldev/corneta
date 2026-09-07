@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta chat connectors
     kind: internal
     repoPath: src-tauri/src/chat.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: Corneta chat interface
     kind: internal
     repoPath: src/screens/ChatScreen.tsx
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/chat-and-alerts/corneta-unified-chat.webp
     originalPath: assets/originals/chat-and-alerts/corneta-unified-chat.png
@@ -57,7 +57,7 @@ images:
 1. Abra **Chat**.
 2. Clique em **Configurar**.
 3. Entre na aba **Canais**.
-4. Clique em **Adicionar** e escolha a plataforma.
+4. Clique em **Adicionar canal** e escolha a plataforma.
 5. Preencha o identificador pedido e deixe o canal ativado.
 6. Feche a configuração e clique em **Conectar**.
 
@@ -71,11 +71,11 @@ Leitura, emotes, selos e horário dependem do conector e do que a plataforma ent
 
 ## Se um canal não conecta
 
-| Sintoma | Como confirmar | Correção |
-| --- | --- | --- |
-| Twitch sem mensagens | confira nome do canal | remova `@` e use o nome exato |
-| YouTube esperando live | veja se a live já começou | aguarde ou informe o vídeo correto |
-| Kick reconectando | abra o canal no navegador | confira nome e tente de novo |
-| feed vazio com pontos verdes | mande mensagem de teste | confira filtros em **Exibição** |
+| Sintoma                      | Como confirmar            | Correção                           |
+| ---------------------------- | ------------------------- | ---------------------------------- |
+| Twitch sem mensagens         | confira nome do canal     | remova `@` e use o nome exato      |
+| YouTube esperando live       | veja se a live já começou | aguarde ou informe o vídeo correto |
+| Kick reconectando            | abra o canal no navegador | confira nome e tente de novo       |
+| feed vazio com pontos verdes | mande mensagem de teste   | confira filtros em **Exibição**    |
 
 Não cole token ou credencial de OAuth em chamado. O painel é privado por padrão; [overlay público é uma decisão separada](/guides/operations/unified-chat-rules).

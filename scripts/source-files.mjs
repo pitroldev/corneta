@@ -16,6 +16,7 @@ const generated = new Set([
   ".generated",
   "out",
 ]);
+const sharedDesignDirectory = "web/.impeccable";
 
 export function sourceFiles(root) {
   const top = spawnSync("git", ["rev-parse", "--show-toplevel"], {
@@ -39,14 +40,16 @@ export function sourceFiles(root) {
     for (const item of readdirSync(join(root, relative), {
       withFileTypes: true,
     })) {
+      const path = relative ? `${relative}/${item.name}` : item.name;
       if (
         item.isSymbolicLink() ||
-        generated.has(item.name) ||
+        (generated.has(item.name) && path !== sharedDesignDirectory) ||
+        (relative === sharedDesignDirectory &&
+          (item.name !== "design.json" || !item.isFile())) ||
         item.name.startsWith(".next") ||
         (item.name.startsWith(".env") && item.name !== ".env.example")
       )
         continue;
-      const path = relative ? `${relative}/${item.name}` : item.name;
       if (item.isDirectory()) visit(path);
       else if (item.isFile()) files.push(path);
     }

@@ -1658,8 +1658,8 @@ fn yt_alert(
 }
 
 // --------------------- YouTube via InnerTube (SEM API key) ---------------------
-// Lê o live chat pela API interna do YouTube (a mesma do navegador) — sem chave,
-// sem OAuth, sem quota. Ver docs/YOUTUBE-AUTO.md (§2.5).
+// Lê o live chat pela API interna do YouTube (a mesma do navegador), sem OAuth
+// nem chave da API oficial. Essa interface interna pode mudar sem aviso.
 
 /// Parseia o 1º objeto JSON logo após `marker` no HTML (ignora o resto do script).
 fn json_after(html: &str, marker: &str) -> Option<Value> {

@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-09-07
+reviewedAt: 2026-09-07
+productVersion: 0.7.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta encoding modes
     kind: internal
     repoPath: src-tauri/src/config.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
   - title: Corneta engine pipeline
     kind: internal
     repoPath: src-tauri/src/engine.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-09-07
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -54,17 +54,18 @@ images:
 
 ## Copiar preserva o que chegou
 
-Na cópia, a Corneta não recria os quadros. Ela encaminha o vídeo e o áudio recebidos para os destinos compatíveis. Isso reduz CPU, GPU e atraso, mas não muda resolução, FPS, bitrate ou enquadramento.
+Na cópia, a Corneta encaminha o vídeo recebido sem recriar seus quadros. Isso reduz o trabalho de CPU e GPU, mas não muda resolução, FPS, bitrate do vídeo ou enquadramento.
+
+O áudio pode ser convertido para o formato da saída ou tratado pelo normalizador, quando ativado. O modo de vídeo não determina, sozinho, se o áudio será recodificado.
 
 ## Recodificar cria outra saída
 
-Recodificação decodifica o sinal e produz outro arquivo ao vivo. É o caminho quando:
+Recodificação decodifica o vídeo e produz outra saída ao vivo. É o caminho quando:
 
 - uma plataforma aceita menos bitrate;
 - um destino precisa de resolução ou FPS diferente;
 - a live vertical exige recorte 9:16;
-- o codec recebido não cabe na plataforma;
-- o normalizador de áudio precisa atuar naquele fluxo.
+- o codec recebido não cabe na plataforma.
 
 <ContentImage baseName="corneta-quality-modes" />
 
@@ -77,7 +78,9 @@ Recodificação decodifica o sinal e produz outro arquivo ao vivo. É o caminho 
 Não escolha Caprichado só porque o nome parece melhor. Se três saídas já aceitam o mesmo 1080p60, recodificar três vezes pode gastar GPU sem entregar diferença visível.
 
 <Callout label="Cópia não corrige sinal ruim" tone="limit">
-  Se o software de transmissão já manda imagem borrada, áudio estourado ou keyframe errado, Na lata replica o problema. Corrija a origem ou recodifique com um objetivo claro.
+  Se o software de transmissão já manda imagem borrada, áudio estourado ou
+  keyframe errado, Na lata replica o problema. Corrija a origem ou recodifique
+  com um objetivo claro.
 </Callout>
 
 Veja os nomes e a estimativa na Ajuda: [qual modo de qualidade escolher](/help/quality/quality-modes).

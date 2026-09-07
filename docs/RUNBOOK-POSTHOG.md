@@ -1,11 +1,13 @@
 # Runbook de telemetria e diagnóstico — PostHog
 
-Este documento é o procedimento operacional da telemetria do Corneta. O contrato de dados,
-ameaças e decisões de arquitetura estão em
-[`PLANO-TELEMETRIA-E-DIAGNOSTICO-POSTHOG.md`](./PLANO-TELEMETRIA-E-DIAGNOSTICO-POSTHOG.md).
+Procedimento operacional da telemetria da Corneta. O tratamento dos dados e suas
+salvaguardas estão na [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md);
+variáveis e perfis ficam em [configuração](CONFIGURACAO.md), e os limites das
+integrações em [superfície de rede](SUPERFICIE-DE-REDE.md).
 
-Revisado em 2026-09-06. Este runbook descreve a política técnica **opt-out** vigente,
-não comprova que as configurações do operador ou a revisão jurídica foram concluídas.
+O padrão técnico é **opt-out**. Este procedimento não atesta configuração do
+operador nem aprovação jurídica; registre as verificações necessárias no
+[checklist de publicação](PUBLICACAO.md).
 
 ## 1. Responsáveis e princípios
 
@@ -45,7 +47,8 @@ Em **Project settings**, para os dois projetos:
 
 1. desative Session Replay, autocapture, surveys, heatmaps, dead clicks e Web Vitals;
 2. ative descarte do IP do cliente e não habilite enriquecimento GeoIP;
-3. limite os person profiles a eventos identificados e mantenha apenas o UUID pseudônimo;
+3. verifique que o cliente JavaScript não chama identificação e que o payload nativo contém
+   `$process_person_profile=false`, mantendo o UUID pseudônimo; não habilite enriquecimento de perfis;
 4. configure a retenção acima;
 5. não instale apps/destinations que repliquem eventos;
 6. restrinja a Personal API Key ao projeto e aos escopos mínimos para upload de Error Tracking e
@@ -56,6 +59,12 @@ Em **Project settings**, para os dois projetos:
 
 Antes do primeiro envio para produção, publique as políticas PT/EN presentes no site e confirme
 que a versão mostrada no app é a mesma do aviso publicado.
+
+Faça a verificação de ausência de criação de perfil com um UUID sintético novo. Um UUID
+previamente identificado pode continuar associado a um perfil, mesmo com a propriedade em
+`false`; a correção no app não remove dados já recebidos nem muda automaticamente a identidade.
+Revise esse legado no operador, conforme a [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md)
+e a [documentação do PostHog](https://posthog.com/docs/data/anonymous-vs-identified-events), antes de atestar ausência de perfis.
 
 ## 3. Configuração por ambiente
 
@@ -125,7 +134,7 @@ exige um único project token `phc_*`, host US em desktop/site/API e o mesmo SHA
 `VITE_BUILD_SHA`, `CORNETA_BUILD_SHA`, `NEXT_PUBLIC_BUILD_SHA` e `BUILD_SHA`. Nenhuma Personal
 API Key recebe prefixo `VITE_` ou `NEXT_PUBLIC_`.
 
-## 4. Gate da primeira release
+## 4. Gate de release
 
 Execute na ordem:
 
@@ -150,9 +159,10 @@ jobs de qualidade passarem.
 12. confirme que nenhum `.map`, `phx_`, token OAuth, título, mensagem, path ou query aparece no
     instalador, requests ou issue;
 13. confirme no log que o scan do mesmo NSIS terminou antes de `gh release create/upload` e que o
-    draft contém somente o `.exe`, `.exe.sig` e `latest.json` esperados; o workflow bloqueia o
-    reaproveitamento se encontrar outro basename, mas a revisão manual continua obrigatória;
-14. publique o draft somente depois de registrar o resultado no checklist da release.
+    draft contém exatamente os cinco assets descritos no [checklist de publicação](PUBLICACAO.md),
+    incluindo checksums e conformidade; o workflow bloqueia o reaproveitamento se encontrar outro
+    basename, mas a revisão manual continua obrigatória;
+14. publique o draft somente depois de registrar o resultado no [checklist de publicação](PUBLICACAO.md).
 
 O job Rust usa deliberadamente a toolchain 1.97.1, alinhada ao projeto e acima do MSRV 1.95
 exigido por `oar-ocr` 0.8.1.
@@ -185,10 +195,35 @@ Ao investigar uma operação individual, remova esse filtro e compare as superf�
 
 ### Saúde por release
 
-- instalações ativas: únicos `distinct_id` em `app_started`, por `app_version`;
-- sessões sem exceção: `1 - sessões com $exception / sessões com app_started`;
+- identificadores com inicialização observada: únicos `distinct_id` em `app_started`, por `app_version`;
+- identificadores com exceção nativa observada: contagem e incidência na amostra definida abaixo;
 - issues novos/regressões: Error Tracking, por `app_version` e `surface`;
 - encerramentos não limpos: `app_started` com `previous_exit=unclean`.
+
+Para **incidência observada de exceções nativas**, fixe a mesma janela, `app_version`,
+`environment` e `surface=desktop_native` nas duas contagens:
+
+- **N:** quantidade de `distinct_id` distintos com qualquer evento nativo recebido na janela,
+  incluindo `$exception`;
+- **E:** quantidade desses identificadores com pelo menos um `$exception` nativo recebido;
+- mostre **E de N identificadores observados**. Se útil, apresente `E / N` como incidência na
+  amostra; com `N=0`, mostre **sem dados**, nunca 0% de falhas.
+
+Agregue diretamente os eventos pelo `distinct_id`, sem exigir a existência de person profiles.
+Como exceções também entram em N, E é sempre um subconjunto de N. Não use apenas `app_started`
+como denominador: uma inicialização pode ocorrer fora da janela ou não chegar ao operador.
+
+Essa amostra não mede sessões, usuários reais, disponibilidade nem percentual sem crash. O
+UUID persiste entre reinicializações; regenerá-lo ou recriar o estado local pode contar outro
+identificador. Uso e erros têm opt-outs independentes: desligar uso ainda permite exceções e o
+boot mínimo quando erros estão ativos; desligar erros impede observá-los mesmo que haja uso.
+Perdas de entrega e versões com composição diferente de preferências também enviesam a amostra.
+Além disso, `$exception` inclui falhas tratadas, não apenas crashes; um encerramento abrupto pode
+nem gerar evento. Ausência de exceção recebida não comprova ausência de falha.
+
+Use a contagem para priorizar triagem e verificar recorrência por versão, sempre expondo N,
+janela e filtros. Não calcule `1 - E/N` como “sessões sem crash”, não derive SLA dessa medida e
+não compare percentuais entre amostras como se fossem uma medida de confiabilidade da população.
 
 ### Confiabilidade da live
 
@@ -223,15 +258,17 @@ Nunca adicione breakdown por UUID nem propriedades de cardinalidade livre.
 
 Configure notificações no canal operacional do projeto:
 
-| Alerta                                                               | Janela/volume mínimo                             | Severidade | Encerrar quando               |
-| -------------------------------------------------------------------- | ------------------------------------------------ | ---------- | ----------------------------- |
-| novo issue não tratado em produção                                   | imediato, ≥ 3 instalações                        | S2         | issue triado e owner definido |
-| sucesso no início da live < 95%                                      | 1 h, ≥ 20 tentativas                             | S1         | ≥ 95% por duas janelas        |
-| sessões sem crash < 99,5%                                            | 24 h, ≥ 100 sessões                              | S1         | ≥ 99,5% por dois dias         |
-| ≥ 5 falhas 5xx da setup API (`api_request_completed` + `$exception`) | 15 min; limiar provisório, validar após baseline | S1         | zero por duas janelas         |
-| regressão na versão mais recente                                     | 1 h, ≥ 5 ocorrências                             | S2         | rollback/fix confirmado       |
+| Alerta                                                               | Janela/volume mínimo                                         | Severidade | Encerrar quando                                                             |
+| -------------------------------------------------------------------- | ------------------------------------------------------------ | ---------- | --------------------------------------------------------------------------- |
+| novo issue não tratado em produção                                   | imediato, ≥ 3 instalações                                    | S2         | issue triado e owner definido                                               |
+| sucesso no início da live < 95%                                      | 1 h, ≥ 20 tentativas                                         | S1         | ≥ 95% por duas janelas                                                      |
+| exceção nativa em ≥ 5 identificadores observados na mesma versão     | 24 h; limiar provisório, validar após baseline; exibir E e N | S2         | causa triada e correção validada; silêncio isolado não comprova recuperação |
+| ≥ 5 falhas 5xx da setup API (`api_request_completed` + `$exception`) | 15 min; limiar provisório, validar após baseline             | S1         | zero por duas janelas                                                       |
+| regressão na versão mais recente                                     | 1 h, ≥ 5 ocorrências                                         | S2         | rollback/fix confirmado                                                     |
 
 Alertas de baixo volume são avaliados manualmente no review semanal, sem pager.
+O alerta de exceção nativa usa E da definição acima, não uma taxa de sessões sem crash. O limiar
+é de triagem e deve ser ajustado à amostra observada, sem prometer cobertura de quem desligou o envio.
 
 ## 7. Triagem de incidente
 
@@ -265,15 +302,27 @@ Procedimento de exclusão:
 
 1. valide a solicitação pelo canal publicado, sem pedir credenciais do app;
 2. solicite o UUID antigo, registre protocolo e data;
-3. nos projetos dev e prod, pesquise exatamente o `distinct_id`;
-4. use a exclusão da pessoa **incluindo eventos associados**; não apenas remova propriedades;
-5. verifique também eventos server-side correlacionados pelo mesmo UUID;
-6. aguarde a conclusão da tarefa de deleção do PostHog e registre evidência sem reter o UUID em
-   planilha permanente;
-7. confirme ao titular e recomende **Regenerar identificador**, com ambas as finalidades
-   desligadas, antes de reativar a coleta;
-8. no ensaio trimestral, use UUID sintético e confirme que nenhuma busca/evento o encontra após
-   o processamento.
+3. nos projetos dev e prod, pesquise eventos pelo `distinct_id` exato, inclusive eventos
+   server-side correlacionados; uma busca vazia em **Persons** não prova ausência de eventos;
+4. quando houver pessoa associada, confirme o escopo dos identificadores antes de usar a
+   [API administrativa de exclusão](https://posthog.com/docs/api/persons):
+   `POST /api/projects/:project_id/persons/bulk_delete/`, com `distinct_ids` contendo somente o
+   UUID solicitado, `delete_events=true` e `keep_person=false`. O UUID da Corneta é um
+   `distinct_id`, não o `id` interno de uma pessoa. Não basta remover propriedades;
+5. confira `persons_found`, `events_queued_for_deletion` e `deletion_errors`. HTTP 202 indica
+   aceitação, não conclusão; `persons_found=0` não comprova exclusão de eventos sem perfil;
+6. se não houver pessoa, se restarem eventos ou se o retorno não comprovar o enfileiramento
+   esperado, escale ao operador para a rota de exclusão de eventos sem perfil. Não crie um
+   perfil artificial nem declare o pedido concluído. A rota precisa ser comprovada com UUID
+   sintético antes de fechar esse requisito no [checklist de publicação](PUBLICACAO.md);
+7. acompanhe `GET /api/projects/:project_id/persons/deletion_status/` para tarefas enfileiradas
+   e confirme o resultado por nova busca de eventos, conforme a
+   [documentação de exclusão do PostHog](https://posthog.com/docs/privacy/data-storage).
+   Registre evidência sem manter o UUID em planilha permanente;
+8. só após a conclusão comprovada, confirme ao titular e recomende **Regenerar identificador**,
+   com ambas as finalidades desligadas, antes de reativar a coleta;
+9. no ensaio trimestral, cubra um UUID sintético novo sem perfil e um com perfil preexistente.
+   Confirme que nenhuma busca de eventos encontra cada identificador após o processamento.
 
 Personal API Keys de exclusão nunca entram no app, site, logs, respostas HTTP ou workflow de
 release.

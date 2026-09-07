@@ -9,6 +9,8 @@ import {
   checkForUpdate,
   installUpdate,
   scheduleBootCheck,
+  subscribeUpdateStatus,
+  updateBusy,
   useUpdate,
 } from "../lib/updater";
 
@@ -25,54 +27,65 @@ export function UpdateBanner() {
   const dismissed = useUpdate((s) => s.dismissed);
   const setInfo = useUpdate((s) => s.setInfo);
   const dismiss = useUpdate((s) => s.dismiss);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [installing, setInstalling] = useState(false);
-  const engineState = useStore((s) => s.snapshot.state);
+  const progress = useUpdate((s) => s.progress);
+  // After reload only the native lock is known, not the download's current phase.
+  const phase = useUpdate((s) => (s.installing ? s.phase : null));
+  const installing = useUpdate(updateBusy);
   // Qualquer estado que não seja "stopped" conta como no ar: em `starting` os
   // processos já subiram, e em `error` um destino pode continuar transmitindo.
-  const live = engineState !== "stopped";
+  const live = useStore((s) => s.snapshot.state !== "stopped");
 
   useEffect(() => scheduleBootCheck(setInfo), [setInfo]);
+  useEffect(subscribeUpdateStatus, []);
 
-  if (!info || dismissed) return null;
+  if ((!info || dismissed) && !installing) return null;
 
   const install = async () => {
-    setInstalling(true);
+    if (!info || installing || live) return;
     try {
-      await installUpdate(info, setProgress);
+      await installUpdate(info);
       // Só chega aqui se o relaunch não aconteceu.
       toast.info(t("components.update.installed.toast"));
     } catch (e) {
       toast.error(t("components.update.install.error", { error: errMsg(e) }));
-      setInstalling(false);
-      setProgress(null);
     }
   };
 
   const pct = progress == null ? null : Math.round(progress * 100);
 
   return (
-    <div className="flex items-center gap-3 border-b-2 border-brass/40 bg-brass/10 px-4 py-2 text-sm">
+    <div className="flex flex-wrap items-center gap-3 border-b-2 border-brass/40 bg-brass/10 px-4 py-2 text-sm">
       <Download className="size-4 shrink-0 text-brass" />
-      <span className="flex-1">
+      <span className="min-w-0 flex-1 basis-64">
         <strong className="font-display font-bold">
-          {t("components.update.headline", { version: info.version })}
+          {info
+            ? t("components.update.headline", { version: info.version })
+            : t("components.update.inProgress")}
         </strong>
         {/* No ar, a frase diz o MOTIVO de o botão estar morto. "Atualize depois"
             sozinho parece capricho; "derrubaria a live" a pessoa entende na hora. */}
         <span className="ml-2 text-ink-muted">
-          {live
-            ? t("components.update.blocked.live")
-            : t("components.update.ready")}
+          {installing
+            ? t("golive.block.updating")
+            : live
+              ? t("components.update.blocked.live")
+              : t("components.update.ready")}
         </span>
       </span>
 
       {installing ? (
-        <span className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+        <span
+          className="flex items-center gap-2 text-xs font-semibold text-ink-muted"
+          role="status"
+        >
           <Loader2 className="size-4 animate-spin" />
-          {pct == null
-            ? t("components.update.downloading")
-            : t("components.update.downloading.pct", { pct })}
+          {phase == null
+            ? t("components.update.inProgress")
+            : phase === "installing"
+              ? t("components.update.installing")
+              : pct == null
+                ? t("components.update.downloading")
+                : t("components.update.downloading.pct", { pct })}
         </span>
       ) : (
         <Button
@@ -105,6 +118,7 @@ export function UpdateBanner() {
 export function CheckUpdateButton({ version }: { version: string }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
+  const installing = useUpdate(updateBusy);
   const setInfo = useUpdate((s) => s.setInfo);
 
   const run = async () => {
@@ -129,7 +143,7 @@ export function CheckUpdateButton({ version }: { version: string }) {
   return (
     <button
       onClick={() => void run()}
-      disabled={busy}
+      disabled={busy || installing}
       className={cn(
         "inline-flex items-center gap-1.5 text-xs font-semibold text-ink-faint",
         "transition-colors hover:text-brass disabled:opacity-50",
