@@ -106,7 +106,7 @@ jobs:
           persist-credentials: false
       # Mesmo toolchain estável e exato usado na release. Mantê-lo fixo aqui
       # impede que `rust-version` vire apenas documentação não testada.
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt, clippy
       - name: Ativar cache de compilação Rust
@@ -148,7 +148,7 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.sha }}
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@1.100.0
       - name: Ativar cache de compilação Rust
         uses: mozilla-actions/sccache-action@fd02668681acd5f960e1372061bee5e3e987195c # v0.0.11
         with:
