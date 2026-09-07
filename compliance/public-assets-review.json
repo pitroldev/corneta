@@ -3,6 +3,7 @@
   "reviewedAt": "2026-09-06",
   "reviewScope": "Visible privacy review of editorial masters/derivatives and project artwork; not a legal certification or future approval.",
   "roots": [
+    "docs/images/readme",
     "src-tauri/icons",
     "src-tauri/installer",
     "web/content/assets/originals",
@@ -10,6 +11,66 @@
     "web/app/icon.svg"
   ],
   "files": [
+    {
+      "file": "docs/images/readme/live.webp",
+      "sha256": "7b7636a8020c1d0ca90e6b795352329f66e49c686e25e08a21ce3a6dd1dc1ff6",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of this final demo capture; not a human sign-off, legal approval, or native integration test.",
+      "provenance": {
+        "kind": "screenshot",
+        "source": "corneta-contributor-demo",
+        "data": "synthetic",
+        "capturedAt": "2026-09-07T18:00:32.024Z",
+        "sourceCommit": "c980cbf87fffe6589cde5cc524f7ebafe07995c8",
+        "productVersion": "0.7.0",
+        "language": "pt-BR",
+        "width": 1440,
+        "height": 960,
+        "scenario": "Offline pre-stream checklist with simulated OBS configuration, encoder availability and upload measurement; no native stream or connected account.",
+        "captureMethod": "Direct Microsoft Edge 153.0.4234.19 CDP Page.captureScreenshot, WebP quality 95, DPR 1; no crop or post-processing. Default Chromium ICC profile; no EXIF, XMP or comments.",
+        "rights": "Corneta UI capture; third-party names, logos and emotes retain their respective rights. This record is not a legal clearance."
+      }
+    },
+    {
+      "file": "docs/images/readme/chat.webp",
+      "sha256": "7427c8ff9cb50863dceaf5fec735bf81921917d48747aae97c8c073a4f396c7a",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of this final demo capture; not a human sign-off, legal approval, or native integration test.",
+      "provenance": {
+        "kind": "screenshot",
+        "source": "corneta-contributor-demo",
+        "data": "synthetic",
+        "capturedAt": "2026-09-07T18:01:05.404Z",
+        "sourceCommit": "c980cbf87fffe6589cde5cc524f7ebafe07995c8",
+        "productVersion": "0.7.0",
+        "language": "pt-BR",
+        "width": 1440,
+        "height": 960,
+        "scenario": "Unified demo chat with two Twitch channels, Kick and YouTube; generated viewer names, messages, alerts and audience counts, without provider connections.",
+        "captureMethod": "Direct Microsoft Edge 153.0.4234.19 CDP Page.captureScreenshot, WebP quality 95, DPR 1; no crop or post-processing. Default Chromium ICC profile; no EXIF, XMP or comments.",
+        "rights": "Corneta UI capture; third-party names, logos and emotes retain their respective rights. This record is not a legal clearance."
+      }
+    },
+    {
+      "file": "docs/images/readme/report.webp",
+      "sha256": "35be8db6c04ca5b59fb98e3ede2d2b2caeccd0e68e2e60ad5a4fd6a44c562e85",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of this final demo capture; not a human sign-off, legal approval, or native integration test.",
+      "provenance": {
+        "kind": "screenshot",
+        "source": "corneta-contributor-demo",
+        "data": "synthetic",
+        "capturedAt": "2026-09-07T18:01:31.369Z",
+        "sourceCommit": "c980cbf87fffe6589cde5cc524f7ebafe07995c8",
+        "productVersion": "0.7.0",
+        "language": "pt-BR",
+        "width": 1440,
+        "height": 1280,
+        "scenario": "Generated 48-minute report without a video recording, showing simulated Twitch/YouTube audience, community metrics and comparison; no personal report or recording was imported.",
+        "captureMethod": "Direct Microsoft Edge 153.0.4234.19 CDP Page.captureScreenshot, WebP quality 95, DPR 1; no crop or post-processing. Default Chromium ICC profile; no EXIF, XMP or comments.",
+        "rights": "Corneta UI capture; third-party names, logos and emotes retain their respective rights. This record is not a legal clearance."
+      }
+    },
     {
       "file": "src-tauri/icons/128x128.png",
       "sha256": "e7ff7b669cf0a54bbdad5671f70b6740dc4205794d7bae419ea3292cf9c39d4b"

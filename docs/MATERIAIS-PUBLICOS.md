@@ -7,11 +7,11 @@ o material nem comprova direitos de uso.
 
 ## Escopo e fontes de verdade
 
-- O inventário cobre ícones, arte do instalador, masters editoriais, imagens
-  públicas do site e seu ícone SVG. As raízes exatas são verificadas pelo
+- O inventário cobre capturas do README, ícones, arte do instalador, masters
+  editoriais, imagens públicas do site e seu ícone SVG. As raízes exatas são verificadas pelo
   [teste de materiais públicos](../scripts/public-assets.test.ts).
 - O [manifesto editorial](../web/content/assets/manifest.json) registra originais,
-  derivadas, procedência, direitos e metadados das capturas. Preserve a versão e
+  derivadas, procedência, direitos e metadados das capturas editoriais do site. Preserve a versão e
   a data reais de cada imagem; atualizar o aplicativo não atualiza uma captura.
 - Marcas e emotes de plataforma mostrados na interface não se tornam propriedade
   da Corneta. Uma revisão de exposição não concede direitos sobre esses elementos.
@@ -51,6 +51,33 @@ instaladas. O gerador usa a Baloo 2 instalada e avisa se recorrer à fonte do
 sistema; uma execução com fallback não prova reprodução idêntica. Para ícones,
 consulte o [gerador](../scripts/make-icons.ps1). Revise as saídas e o diff antes
 de atualizar o inventário. Não regenere assets apenas para limpar comentários.
+
+## Capturas do README
+
+As imagens `docs/images/readme/live.webp`, `chat.webp` e `report.webp` mostram
+o modo de demonstração com dados fictícios, não uma transmissão real. A legenda
+do README deve tornar essa distinção visível. Uma captura do navegador não
+comprova funcionamento de OBS, cofre, OAuth, encoder ou plataformas reais.
+
+A procedência dessas imagens fica em cada entrada do
+[inventário de revisão](../compliance/public-assets-review.json), no campo
+`provenance`: origem da demonstração, dados sintéticos, commit, data e versão capturadas,
+idioma, dimensões, cenário, método de captura e limites dos direitos de uso.
+Essas imagens não pertencem ao manifesto editorial do site, cujos originais e
+derivadas ficam em `web/content` e `web/public`.
+
+Cada print tem `reviewedAt` e `reviewScope` próprios, associados ao seu hash.
+Registre somente a inspeção realmente realizada e quem ou o que a realizou;
+uma revisão visual assistida não é assinatura humana nem aprovação jurídica.
+Não renove a revisão global dos assets antigos ao adicionar ou trocar um print.
+Marcas, logos e emotes de terceiros continuam com seus respectivos titulares.
+
+Para substituir uma captura, prepare uma demo descartável sem contas nem dados
+pessoais, inspecione a imagem final em resolução legível e confirme os metadados
+antes de atualizar somente sua entrada. Preserve a data e versão históricas das
+capturas que não mudaram. O teste exige os três nomes, procedência por imagem e
+os hashes correspondentes; ele não verifica visualmente os pixels nem comprova
+a veracidade dos metadados informados.
 
 ## Verificações antes de publicar
 

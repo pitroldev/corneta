@@ -1,37 +1,78 @@
-# 📣 Corneta
+<p align="center">
+  <img src="src-tauri/icons/128x128@2x.png" width="88" height="88" alt="">
+</p>
 
-Transmita do OBS para várias plataformas, acompanhe o chat e reveja a história da sua live em um só app.
+<a name="corneta"></a>
+<h1 align="center">Corneta</h1>
 
-Corneta é um aplicativo desktop feito com **Tauri 2, Rust, React e Tailwind CSS**. Recebe o sinal do OBS localmente e o distribui para os destinos configurados, com modos de qualidade, reconexão, gravação e relatórios. O site e a API de setup OAuth ficam em um workspace Next.js separado, em `web/`.
+<p align="center">
+  <strong>A sua live, do primeiro sinal ao último replay.</strong><br>
+  Transmita do OBS para várias plataformas, reúna o chat e reviva os melhores momentos.<br>
+  Um app no seu PC, com código aberto.
+</p>
 
-**Status: experimental, em preparação para beta público.** O código e a demonstração podem ser estudados e testados; isso não representa uma certificação de estabilidade para lives de produção. Windows x64 é o alvo atual. macOS, Linux e Windows ARM não têm distribuição validada pelo projeto.
+<p align="center">
+  <a href="#conheça-a-corneta">Conheça</a> ·
+  <a href="#testar-sem-rust-obs-ou-contas">Experimente</a> ·
+  <a href="#desenvolva-e-contribua">Contribua</a> ·
+  <a href="#documentação">Documentação</a>
+</p>
 
-[Testar a demonstração](#testar-sem-rust-obs-ou-contas) · [Contribuir](CONTRIBUTING.md) · [Suporte](SUPPORT.md) · [Relatar uma vulnerabilidade](SECURITY.md) · [Documentação](docs/README.md) · [Changelog](CHANGELOG.md)
+> **Experimental · Windows x64.** Em preparação para beta público. [Experimente a demo](#testar-sem-rust-obs-ou-contas) ou [acompanhe os instaladores](#quero-usar-na-minha-live). Teste fora de lives de produção.
 
-![Tela de preparação da live no modo de demonstração da Corneta](web/public/images/editorial/getting-started/corneta-first-live-checklist.webp)
+[![Preparação da live na Corneta: conexão com o OBS, teste de upload e checklist antes de entrar no ar.](docs/images/readme/live.webp)](docs/images/readme/live.webp)
 
-_Captura do modo de demonstração da versão 0.6.0, com dados fictícios. O código atual do desktop está na versão 0.7.0; alguns detalhes da interface evoluíram._
+_Interface real da versão 0.7.0 em modo de demonstração, com dados fictícios. Clique nos prints para ampliar._
 
-## Quero usar na minha live
+## Conheça a Corneta
 
-Consulte o [site oficial](https://www.corneta.live) e as [releases do projeto](https://github.com/pitroldev/corneta/releases). A existência deste repositório não significa que já exista um instalador público aprovado. Não use artefatos de desenvolvimento como se fossem uma release estável.
+Você continua criando suas cenas no OBS. A Corneta recebe esse sinal no seu computador e o envia aos destinos escolhidos, enquanto mantém a conversa e a história da transmissão por perto.
 
-Para preparar uma distribuição, siga o [guia de publicação](docs/PUBLICACAO.md), com procedimentos, checklist e evidências exigidas. A [política de assinatura](docs/ASSINATURA.md) distingue Authenticode da assinatura criptográfica obrigatória do updater. Código disponível e testes locais aprovados não significam que um instalador esteja pronto para publicação.
+**O vídeo vai do seu PC para as plataformas.** O site da Corneta ajuda na configuração e no login das integrações; não recebe nem retransmite a sua live.
 
-## O que já existe
+### Antes da live: prepare cada destino
 
-- Destinos de transmissão por URL/chave, incluindo serviços conhecidos e destinos personalizados. A disponibilidade de ingestão depende da sua conta e da plataforma.
-- Modos de cópia, reencodificação e combinação dos dois, com compartilhamento de processamento quando os destinos são compatíveis. Suporte a encoders de hardware depende da GPU e do driver.
-- Conexão com OBS, medição de upload, métricas durante a live e reconexão de destinos.
-- Cofre nativo para credenciais e fluxos de autenticação para as integrações implementadas.
-- Chat integrado, gravação local, relatórios com replay/chat, momentos e exportação.
-- Recursos de proteção de transmissão. Recursos marcados como experimentais exigem teste antes do uso real.
+Adicione plataformas por URL e chave de transmissão, conecte as contas com integração disponível e confira o OBS e o upload antes de entrar no ar. Destinos personalizados também têm lugar.
 
-Transmitir para uma plataforma **não implica** ter OAuth, moderação ou todas as funções de chat disponíveis nela. A demonstração usa um motor simulado: ela não testa o OBS, o cofre, o encoder nem o login real.
+Escolha como o sinal chega a cada plataforma:
+
+| Modo           | O que faz                                                            |
+| -------------- | -------------------------------------------------------------------- |
+| **Na lata**    | Repassa o sinal do OBS, sem reencodificar o vídeo.                   |
+| **Esperto**    | Repassa onde o sinal é compatível e adapta os destinos que precisam. |
+| **Caprichado** | Reencodifica conforme a qualidade escolhida para cada destino.       |
+
+Quando disponível, a aceleração da GPU ajuda no processamento. Cada destino consome upload; adaptar o vídeo também exige recursos do computador. A Corneta mostra estimativas antes da live — a capacidade real depende da sua conexão, máquina e configuração.
+
+### Durante a live: a conversa fica por perto
+
+Acompanhe o chat de **Twitch, YouTube e Kick** numa mesma interface, com identificação de plataforma, emotes e opções de moderação conforme a integração. Chat e alertas também podem abrir em janelas separadas.
+
+[![Chat integrado da Corneta com mensagens fictícias, identificação de plataforma e controles da conversa.](docs/images/readme/chat.webp)](docs/images/readme/chat.webp)
+
+_Conversa simulada, com fontes identificadas por plataforma._
+
+O painel da live acompanha o estado dos destinos e as métricas disponíveis do OBS. Reconexão por destino, gravação local opcional e marcação de momentos ajudam você a cuidar da transmissão sem perder o fio da conversa.
+
+> Transmissão, login e chat são capacidades diferentes. Enviar vídeo para uma plataforma não garante OAuth, chat, envio de mensagens ou moderação nela. Consulte a [matriz de integrações](docs/SUPERFICIE-DE-REDE.md#as-três-funções-são-independentes).
+
+### Depois da live: uma história para revisitar
+
+O relatório começa pela sua live: duração, audiência disponível, participação do chat e momentos marcados. Gráficos mostram como ela evoluiu; os detalhes técnicos ficam num capítulo próprio, para quando você quiser investigar.
+
+[![Relatório da Corneta com o retrato da live, estatísticas de participação e a história da transmissão.](docs/images/readme/report.webp)](docs/images/readme/report.webp)
+
+_Relatório de demonstração de 48 minutos, com dados fictícios e sem gravação de vídeo._
+
+**Gravou?** Reveja o vídeo local junto do chat registrado e navegue pelos momentos. **Não gravou?** O relatório continua com os dados que foram salvos, sem depender de um vídeo. Você também pode exportá-lo para consultar depois.
+
+Vídeo e histórico do chat são opcionais e vêm desligados. Ative o que quiser guardar antes da transmissão; o replay depende desses arquivos continuarem disponíveis no disco.
 
 ## Testar sem Rust, OBS ou contas
 
-Instale **Node.js 24.18.1** e **pnpm 11.18.0**, conforme `.node-version`, `engines` e `packageManager`.
+O caminho mais curto para conhecer a interface e começar a contribuir é a **demonstração no navegador**. Ela usa dados fictícios e não exige conectar nenhuma conta.
+
+Com **Node.js 24.18.1** e **pnpm 11.18.0** instalados:
 
 ```sh
 git clone https://github.com/pitroldev/corneta.git
@@ -40,81 +81,109 @@ pnpm install --frozen-lockfile
 pnpm contrib:demo
 ```
 
-Abra `http://localhost:1420`. O perfil de contribuição não carrega o `.env` pessoal e desativa a telemetria; não é necessário copiar exemplos de ambiente ou fornecer credenciais.
+Abra **http://127.0.0.1:1420**. Explore a preparação da live, o chat e os relatórios de exemplo pelo menu lateral.
 
-Para validar app e site sem os segredos da operação oficial:
+O perfil de contribuição não carrega seu `.env` pessoal e desativa a telemetria. Não copie credenciais nem configurações reais para experimentar. A demo simula a transmissão: ela não valida OBS, encoder, cofre ou login real.
+
+## Quero usar na minha live
+
+Acompanhe as [releases do projeto](https://github.com/pitroldev/corneta/releases) para saber quando houver um instalador público aprovado. Um build de desenvolvimento não é uma versão estável. **Windows x64 é o alvo atual**; macOS, Linux e Windows ARM ainda não têm distribuição validada.
+
+Para testar o aplicativo nativo a partir do código, siga o caminho de [desktop para desenvolvimento](#desktop-nativo--windows-x64) abaixo. Faça os testes fora de uma live real.
+
+## Desenvolva e contribua
+
+A interface desktop usa **React, TypeScript e Tailwind CSS**; o aplicativo nativo, **Tauri 2 e Rust**. O site e a API de configuração ficam no workspace **Next.js** em `web/`.
+
+Você não precisa configurar o projeto inteiro para ajudar. Comece pela área que quer melhorar e pelo [guia de contribuição](CONTRIBUTING.md). Documentação, relatos reproduzíveis e ajustes de interface também contam.
+
+### Validar uma contribuição
+
+Em um clone limpo, sem `.env`, contas ou arquivos pessoais:
 
 ```sh
 pnpm contrib:check
 ```
 
-Esse caminho é o indicado para um clone novo. Os comandos normais de desenvolvimento/release continuam disponíveis para quem configura a própria operação; leia [desenvolvimento](docs/DESENVOLVIMENTO.md) antes de usá-los com um `.env` real.
+Esse comando valida app e site sem os segredos da operação oficial. Os requisitos e testes nativos adicionais estão no [guia de desenvolvimento](docs/DESENVOLVIMENTO.md).
 
-## Site e API local — Next.js
+### Site e API local — Next.js
 
 ```sh
 pnpm contrib:web
 ```
 
-Abra `http://localhost:7390`. O site pode ser desenvolvido sem configurar OAuth. Endpoints que precisam de provedores não passam a autenticar contas por serem executados localmente.
+Abra **http://127.0.0.1:7390**. É possível trabalhar no site sem configurar OAuth; autenticar contas de verdade exige a configuração dos provedores.
 
-O perfil de contribuição recusa arquivos reais `web/.env*`, para que o carregamento automático do Next.js não introduza segredos; use um clone limpo se já tiver uma operação local configurada. Não mova nem apague suas credenciais para experimentar o projeto.
+O perfil recusa arquivos reais `web/.env*`. Se já tiver uma operação configurada, use um clone limpo — não mova nem apague suas credenciais. Para hospedagem própria e OAuth, consulte [configuração](docs/CONFIGURACAO.md) e [contratos de rede](docs/SUPERFICIE-DE-REDE.md).
 
-O build de contribuição fornece a origem pública esperada para validar o site. Isso **não** anuncia suporte pronto a qualquer domínio de fork nem desativa as validações da produção oficial. Para configurar hospedagem própria e OAuth, consulte a [matriz de configuração](docs/CONFIGURACAO.md) e os [contratos de rede e integrações](docs/SUPERFICIE-DE-REDE.md).
+### Desktop nativo — Windows x64
 
-## Desktop nativo — Windows x64
+<details>
+<summary><strong>Requisitos e comandos para rodar o app nativo</strong></summary>
 
-Além de Node/pnpm, instale **Rust 1.97.1** pelo rustup, **Visual Studio Build Tools com C++/MSVC e Windows SDK**, **PowerShell 7** (`pwsh`) e **WebView2 Runtime**. As versões estão fixadas no repositório. OBS com obs-websocket v5 é necessário apenas para testar sua integração real.
+Além de Node/pnpm, instale **Rust 1.97.1**, **Visual Studio Build Tools com C++/MSVC e Windows SDK**, **PowerShell 7** (`pwsh`) e **WebView2 Runtime**. OBS com obs-websocket v5 é necessário para testar a integração com ele.
 
 ```powershell
 pwsh -NoProfile -File scripts/fetch-binaries.ps1
 pnpm contrib:app:dev
 ```
 
-O download fixa e verifica FFmpeg e MediaMTX. O primeiro build nativo é significativamente mais pesado que a demo: baixa dependências e compila Rust/OCR. Tempo, memória e espaço em disco dependem da máquina e do cache; o projeto ainda não publica uma medição universal de requisitos mínimos.
+O script baixa e verifica as versões fixadas de FFmpeg e MediaMTX. O primeiro build compila dependências Rust/OCR e é mais pesado que a demo; tempo, memória e espaço necessários variam conforme máquina e cache.
 
-Para compilar o executável local, **sem gerar nem instalar um pacote de distribuição**:
+Para compilar somente o executável local, sem criar nem instalar um pacote de distribuição:
 
 ```sh
 pnpm contrib:app:build
 ```
 
-Esse perfil usa identidade e cofre de contribuição separados, com updater e telemetria desativados. Isso não torna o OBS e suas portas exclusivos de cada app: não rode testes nativos ao lado de uma live real. Consulte os limites de isolamento no [guia](docs/DESENVOLVIMENTO.md).
+O perfil usa identidade e cofre de contribuição separados, com updater e telemetria desativados. **OBS e portas de rede continuam compartilhados:** não teste durante uma live real. Não é necessário ter a chave privada oficial do updater.
 
-Não é necessário ter a chave privada oficial do updater. `pnpm app:build` é o caminho de empacotamento configurado pelo mantenedor, não um requisito de contribuição.
+Consulte [desenvolvimento](docs/DESENVOLVIMENTO.md) para os limites do perfil. Empacotamento e distribuição seguem os guias de [publicação](docs/PUBLICACAO.md) e [assinatura](docs/ASSINATURA.md), não o fluxo de contribuição.
 
-## Arquitetura em poucas linhas
+</details>
 
-```text
-OBS → MediaMTX local → pipeline de mídia Rust/FFmpeg → destinos
-                              ↕
-                        UI React via IPC
-                              ↘ relatórios, chat e gravações locais
+### Onde cada coisa vive
 
-Site/API Next.js → bootstrap de configuração pública e suporte ao OAuth
-                  (não recebe nem retransmite o vídeo da live)
-```
+| Diretório                    | Responsabilidade                                                       |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| [`src/`](src/)               | Interface desktop, design system, chat, relatórios e motor simulado.   |
+| [`src-tauri/`](src-tauri/)   | Motor nativo, OBS, processamento de mídia, cofre e persistência local. |
+| [`web/`](web/)               | Site, conteúdo e API de configuração/OAuth. Não retransmite vídeo.     |
+| [`scripts/`](scripts/)       | Ferramentas de desenvolvimento, validação e preparação de releases.    |
+| [`docs/`](docs/README.md)    | Guias e contratos mantidos do projeto.                                 |
+| [`compliance/`](compliance/) | Inventários e evidências de conformidade da distribuição.              |
 
-O modo de qualidade e a compatibilidade dos destinos determinam cópia, reencodificação e compartilhamento de rendições. Os processos de envio mantêm supervisão por destino; não existe uma regra universal de “decodificar uma vez” para todos os modos. Processamento auxiliar não deve comprometer a transmissão.
+O fluxo de mídia usa **MediaMTX local → processamento Rust/FFmpeg → destinos**, com supervisão por destino. Cópia, reencodificação e compartilhamento de processamento dependem do modo e da compatibilidade. Veja a [arquitetura](docs/ARQUITETURA.md) para os detalhes.
 
-```text
-src/                    frontend desktop e demonstração
-  components/           design system e componentes reutilizáveis
-  screens/reports/      componentes e hooks dos relatórios
-  lib/                  contratos IPC/mock, estado, análise e testes
-src-tauri/              backend Rust, capabilities e configuração Tauri
-web/                    site, conteúdo e API Next.js
-scripts/                desenvolvimento, testes e preparação de release
-compliance/             manifestos de conformidade
-docs/                   guias de desenvolvimento, contratos e operação
-```
+**Código e comentários são em inglês.** Issues e documentação podem ser em português ou inglês. Antes de mudanças maiores, abra uma conversa numa issue; para bugs, inclua passos de reprodução com dados fictícios. Siga o [código de conduta](CODE_OF_CONDUCT.md).
+
+## Documentação
+
+| Quero…                                       | Por onde começar                                                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Entender o que funciona e o que mudou        | [Compatibilidade](docs/COMPATIBILIDADE.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md)                              |
+| Preparar o ambiente e encontrar tarefas      | [Desenvolvimento](docs/DESENVOLVIMENTO.md) · [Contribuição](CONTRIBUTING.md)                                                     |
+| Entender o código e testar cenários          | [Arquitetura](docs/ARQUITETURA.md) · [Performance](docs/PERFORMANCE.md) · [Fixtures de relatórios](docs/RELATORIOS-FICTICIOS.md) |
+| Configurar integrações ou uma distribuição   | [Configuração](docs/CONFIGURACAO.md) · [Publicação](docs/PUBLICACAO.md)                                                          |
+| Pedir ajuda ou comunicar uma vulnerabilidade | [Suporte](SUPPORT.md) · [Canal de segurança](SECURITY.md)                                                                        |
+
+O [índice completo](docs/README.md) reúne os demais guias, incluindo design, conteúdo, privacidade e operação.
 
 ## Privacidade e segurança
 
-Na distribuição oficial com telemetria configurada, uso e falhas são finalidades independentes, **ativas por padrão e desativáveis**. A preferência `unset` não representa opt-in pendente. Builds de contribuição desativam o envio, e ausência de configuração também impede a inicialização pertinente. Veja a [política documentada](docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e o [runbook](docs/RUNBOOK-POSTHOG.md); isso não substitui revisão jurídica da operação.
+Credenciais usam o cofre nativo; gravações e relatórios ficam no computador. Os prints deste README foram feitos em perfil descartável, apenas com dados fictícios — [procedência e revisão das imagens](docs/MATERIAIS-PUBLICOS.md#capturas-do-readme).
 
-Não publique stream keys, tokens, `.env`, relatórios pessoais ou logs brutos em issues. Para vulnerabilidades, use [SECURITY.md](SECURITY.md).
+Na distribuição oficial com telemetria configurada, **uso e falhas são finalidades independentes, ativas por padrão e desativáveis**. Builds de contribuição desativam o envio. Veja a [política de telemetria](docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e o [runbook](docs/RUNBOOK-POSTHOG.md) para configuração, limites e operação.
+
+Nunca publique stream keys, tokens, `.env`, relatórios pessoais ou logs brutos em issues. Suspeitas de vulnerabilidade devem seguir o [canal privado de segurança](SECURITY.md).
 
 ## Licença
 
-O código próprio é [MIT](LICENSE). Dependências, fontes, ícones, modelos e sidecars mantêm suas licenças e avisos; consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Executar FFmpeg em processo separado não dispensa as obrigações relativas ao binário distribuído. Um fork não deve se apresentar como a distribuição oficial nem reutilizar suas chaves e serviços sem configuração apropriada.
+O código próprio da Corneta é [MIT](LICENSE). Dependências, fontes, ícones, modelos e sidecars mantêm suas licenças e avisos: consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). A distribuição do FFmpeg também exige cumprir as obrigações do binário utilizado.
+
+Forks são bem-vindos, mas não devem se apresentar como a distribuição oficial nem reutilizar suas chaves e serviços sem configuração própria.
+
+---
+
+[Experimentar a Corneta](#testar-sem-rust-obs-ou-contas) · [Contribuir com o projeto](CONTRIBUTING.md) · [Voltar ao início](#corneta)
