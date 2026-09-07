@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { readTelemetryDeploymentMetadata } from "./deployment-metadata";
-import { rateLimitConfiguration } from "./rate-limit-core";
 import { downloadMetadata } from "../download";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -55,10 +54,6 @@ export function releaseConfigErrors(env: Environment): string[] {
       "NEXT_PUBLIC_PRIMARY_CTA_URL: configure the HTTPS .exe installer URL at github.com/pitroldev/corneta/releases",
     );
   }
-  if (!rateLimitConfiguration(env))
-    errors.push(
-      "OAuth: configure UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, and OAUTH_RATE_LIMIT_SALT (a random secret of at least 32 characters)",
-    );
   if (
     env.VERCEL !== "1" &&
     !/^[a-z0-9-]+$/i.test(env.OAUTH_TRUSTED_IP_HEADER ?? "")

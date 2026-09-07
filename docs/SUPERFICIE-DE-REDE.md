@@ -62,12 +62,13 @@ Downloads de OCR em [`guardian/ocr.rs`](../src-tauri/src/guardian/ocr.rs) possue
 
 ## Setup API: fronteira de tokens
 
-O código atual oferece `GET /api/v1/bootstrap`, `GET /api/v1/health`, `POST /api/v1/oauth/kick/exchange` e `POST /api/v1/oauth/kick/refresh`. Não há armazenamento de tokens do usuário em Redis implementado nesses handlers: Redis é usado para rate limiting. Os tokens transitam pela memória/resposta do servidor; não afirmar que “o servidor nunca vê tokens”. Logs/proxies externos precisam manter a mesma restrição de não registrar bodies/credenciais.
+O código atual oferece `GET /api/v1/bootstrap`, `GET /api/v1/health`, `POST /api/v1/oauth/kick/exchange` e `POST /api/v1/oauth/kick/refresh`. Esses handlers não persistem tokens do usuário; os tokens transitam pela memória/resposta do servidor. Não afirmar que “o servidor nunca vê tokens”. Logs/proxies externos precisam manter a mesma restrição de não registrar bodies/credenciais.
 
-- Exchange: 20 tentativas/minuto por chave de origem; refresh: 60/minuto, com `Retry-After` ao limitar.
+- Exchange: 20 tentativas e refresh: 60 por origem, com contadores independentes por rota e janela fixa de 60 segundos **por instância**. Excesso retorna `429` com `Retry-After`; IPv6 é agrupado por /64 e requisições sem IP confiável compartilham a origem `unknown` de cada rota.
 - Corpo JSON padrão até 8 KiB; verifier PKCE de 43–128 caracteres válidos; callback comparado à allowlist exata.
 - Requisições ao token endpoint têm timeout de 12 s, `cache: no-store` e redirects recusados. Respostas da API têm `Cache-Control: no-store` e `nosniff`.
-- Produção requer limitador remoto. Redis usa contador/TTL atômicos e chave derivada por HMAC; falha retorna indisponibilidade, não acesso ilimitado. Fallback local fora da produção tem teto de 10.000 entradas.
+- O limitador usa cache local de até 10.000 entradas em todos os ambientes. Guarda contagem, expiração e chave HMAC-SHA256 derivada com segredo aleatório de 32 bytes gerado na inicialização, sem segredo configurável, IP bruto ou tokens no cache. Não consulta armazenamento remoto. Capacidade esgotada retorna `503`/`Retry-After` para novas entradas, sem remover contadores ativos.
+- Reinícios e novas instâncias têm contadores novos: o limite local não é global. Controle compartilhado antes das instâncias exige WAF/edge externo, com cobertura das duas rotas POST, hosts, aliases e caminhos normalizados; a origem não pode contornar essa borda. A [publicação](PUBLICACAO.md) exige verificar a configuração real e o escopo regional do provedor, sem prometer proteção já ativa ou quota global.
 - Fora da Vercel, o proxy deve sobrescrever o header de IP configurado e impedir acesso direto ao Next. Confiar em `X-Forwarded-For` enviado pelo cliente permite falsear a origem; não remova essa fronteira para “destravar” login.
 - O broker não cria uma conta Corneta: posse de code + verifier/refresh token é verificada pelo provedor. Rate limiting reduz abuso; não transforma o cliente desktop público em um cliente capaz de guardar um secret oficial.
 
@@ -91,6 +92,6 @@ Se a resposta de criação se perder antes de devolver o ID, o app bloqueia outr
 
 Leitura por endpoints web internos/públicos (incluindo Cinefy e partes de YouTube/Kick/Twitch) não deve ser apresentada como um contrato oficial estável. O adaptador Cinefy registra expressamente essa limitação. Isso não demonstra violação de termos, nem permite presumir suporte ilimitado: o mantenedor deve acompanhar documentação/requisitos do provedor e desabilitar ou adaptar um fluxo que deixe de ser suportável.
 
-Mudanças de rede/OAuth precisam incluir testes proporcionais: callbacks com state incorreto/expirado, ocupação de porta, refresh inválido, callbacks fora da allowlist, bodies grandes/lentos, Redis indisponível, origem forjada, logout local e separação de credenciais oficiais/BYOK/contributor. Não executar testes de envio/moderação em canais reais sem autorização do responsável.
+Mudanças de rede/OAuth precisam incluir testes proporcionais: callbacks com state incorreto/expirado, ocupação de porta, refresh inválido, callbacks fora da allowlist, bodies grandes/lentos, capacidade/TTL do cache local, contadores independentes entre instâncias, bloqueio do WAF/edge, origem forjada, logout local e separação de credenciais oficiais/BYOK/contributor. Não executar testes de envio/moderação em canais reais sem autorização do responsável.
 
 Testes automatizados não substituem a validação de fluxos reais da [matriz de publicação](PUBLICACAO.md). Mudanças de contrato exigem nova verificação proporcional ao risco. Não abra portas, transmita ou publique apenas para conferir a documentação.

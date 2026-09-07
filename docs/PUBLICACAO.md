@@ -19,23 +19,34 @@ Planos de implementação, brainstorms, auditorias pontuais e relatos de execuç
 Configure o host a partir de [web/.env.example](../web/.env.example) e do [contrato de configuração](CONFIGURACAO.md). Armazene segredos no mecanismo do host, nunca em código, logs ou artefatos. O `.env` do desktop não é fonte de configuração de produção do site.
 
 - Cadastre os clientes Twitch, Google e Kick, incluindo escopos e callbacks. A Kick usa `KICK_CLIENT_SECRET` somente no servidor; confira `KICK_REDIRECT_URIS` com o cadastro do provedor.
-- Configure Redis REST HTTPS com EVAL em `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`. `OAUTH_RATE_LIMIT_SALT` deve ser aleatório, estável, ter pelo menos 32 caracteres e ser igual entre instâncias; não reutilize um client secret.
+- O limitador local já funciona sem serviço de armazenamento ou segredo adicional. Antes de expor a API, configure e verifique a proteção WAF/edge descrita abaixo: os contadores locais não são compartilhados entre instâncias.
 - Na Vercel, a origem de IP é `x-vercel-forwarded-for`. Em self-host, defina `OAUTH_TRUSTED_IP_HEADER`, faça o proxy sobrescrever o header e impeça acesso público direto ao Next.
 - Confira domínio canônico, SHA e CTA HTTPS para um instalador aprovado. Uma URL com formato válido não comprova que o download existe.
 - Configure telemetria e kill switches coerentemente no desktop, site e API. Cumpra o [contrato operacional](RUNBOOK-POSTHOG.md) e a [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md), incluindo a revisão jurídica aplicável. Esta documentação não substitui essa revisão.
 
 Na raiz, `pnpm web:release:check` executa o gate configurado. Fora da Vercel, use `pnpm --dir web build:release` para o build de distribuição ou configure `CORNETA_RELEASE_CHECK=1`; Vercel production aplica o gate automaticamente. `pnpm contrib:web:check` é o caminho de contribuição sem credenciais, não uma aprovação da produção.
 
-Depois do deploy, confira `/api/v1/health`, identidade/SHA e o arquivo realmente baixado pelo CTA. `status: ok` informa que a API responde; não prova autenticação, Redis ou instalação.
+Depois do deploy, confira `/api/v1/health`, identidade/SHA e o arquivo realmente baixado pelo CTA. `status: ok` informa que a API responde; não prova autenticação, regras de WAF/edge ou instalação. O gate de build verifica a configuração disponível no código, não o estado dessas regras no provedor.
+
+### Proteção na borda antes de publicar
+
+- Cubra `POST /api/v1/oauth/kick/exchange` e `POST /api/v1/oauth/kick/refresh` com regra(s) de rate limiting compatíveis com o plano do host. Registre orçamento, janela, chave de contagem e escopo territorial; não presuma que o host reproduza os limites locais de 20/60 ou que permita duas regras no plano contratado.
+- Aplique a cobertura em todos os hosts e aliases públicos que atendam à API, inclusive domínios diretos de deployment, ou restrinja seu acesso. Inclua rewrites e variantes normalizadas de caminho que alcancem os handlers. Impeça acesso à origem que contorne a borda e revise exceções/bypass da configuração do host.
+- Use bloqueio com resposta `429`, não desafio de navegador: o cliente é o backend desktop e não pode resolver uma página interativa. Uma regra em modo de observação/log não bloqueia tráfego.
+- Na Vercel, os contadores de WAF são **por região**, não globais. Tráfego distribuído entre regiões pode superar o teto de uma região. Confira quantidade de regras, disponibilidade e cobrança no plano efetivamente contratado antes de definir a política. [Documentação de rate limiting da Vercel](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
+- Publique as regras no host e teste a cobertura antes de aprovar o deploy. Guarde evidências sanitizadas de bloqueio na borda, sem bodies OAuth, tokens ou IPs reais. Estes arquivos não configuram o WAF e não atestam que alguma regra esteja ativa.
+
+O WAF complementa os limites da aplicação; nenhum deles garante bloquear todo abuso, ataque distribuído ou custo. Alertas, quotas dos provedores e controles de orçamento continuam necessários.
 
 ### OAuth em ambiente de teste
 
 1. Em contas de teste novas, exercite Twitch/YouTube/Kick: login, cancelamento, renovação, revogação e reconexão. Aprovação, quotas e permissões nos consoles são verificações externas.
 2. Na Kick, confira exchange PKCE e refresh; recuse código reutilizado, verifier incorreto, callback diferente e refresh revogado.
-3. Exceda os limites de 20 exchanges/minuto e 60 refreshes/minuto por IP e confirme `429`/`Retry-After`. Alterne entre instâncias para confirmar o limite compartilhado.
-4. Indisponibilize Redis somente no ambiente de teste: espere `503`/`Retry-After`, sem fallback ilimitado, e confirme recuperação ao restaurar o serviço.
+3. Na mesma instância, exceda 20 exchanges e 60 refreshes por origem em janelas fixas de 60 segundos; confirme contadores independentes e `429`/`Retry-After`. Confira IPv6 /64 e a origem compartilhada `unknown` quando não houver IP confiável. Um header forjado pelo cliente não pode substituir aquele sobrescrito pelo proxy.
+4. Nos testes do limitador, exercite expiração/TTL e capacidade com relógio e identidades sintéticos. Uma tabela cheia deve recusar novas entradas com `503`/`Retry-After`, sem expulsar contadores ativos; após a expiração, deve voltar a admitir entradas. Não gere essa carga em produção.
+5. Alterne entre instâncias/reinícios em ambiente controlado: os contadores locais são independentes e reiniciam. Confirme separadamente que o WAF bloqueia antes das instâncias dentro do escopo configurado, inclusive em todos os hosts/caminhos cobertos e após o scale-out. Se houver múltiplas regiões, ensaie cada uma; não registre esse resultado como limite global.
 
-Redis recebe chave HMAC, contador e TTL de 60 segundos, não o IP bruto nem os corpos OAuth. IPv6 é agrupado por /64; pessoas no mesmo NAT compartilham limite. HMAC é pseudonimização, não anonimização. O limite por IP não substitui WAF, alertas e limites de orçamento. Consulte a [superfície de rede](SUPERFICIE-DE-REDE.md).
+O cache local guarda chaves HMAC, contadores e expiração, até 10.000 entradas por instância; não guarda IP bruto ou corpos OAuth. A chave HMAC é efêmera, sem configuração externa. A expiração da própria identidade é verificada a cada tentativa; a limpeza das demais entradas expiradas acontece sob demanda em requisições, no máximo uma vez por segundo. Não há exclusão física cronometrada ao completar 60 segundos sem tráfego. Pessoas no mesmo NAT compartilham limite. HMAC é pseudonimização, não anonimização; proxies/WAF têm seus próprios registros e controles de privacidade. Consulte a [superfície de rede](SUPERFICIE-DE-REDE.md).
 
 ## Distribuição do desktop
 

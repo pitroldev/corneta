@@ -73,16 +73,17 @@ Credenciais **BYOK** do Google/Kick são introduzidas nas configurações avanç
 
 ### Proteção da Setup API
 
-| Variável                                        | Consumidor/momento     | Classificação                                               | Quando configurar/exemplo seguro                                                                                                   |
-| ----------------------------------------------- | ---------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `UPSTASH_REDIS_REST_URL`                        | Rate limiter, servidor | Configuração de infraestrutura, não publicar dados privados | Origem HTTPS sem usuário/senha/query/path adicional. Produção exige storage remoto válido.                                         |
-| `UPSTASH_REDIS_REST_TOKEN`                      | Rate limiter, servidor | **Secreta**                                                 | Token restrito ao armazenamento utilizado; nunca frontend.                                                                         |
-| `OAUTH_RATE_LIMIT_SALT`                         | Rate limiter, servidor | **Secreta**                                                 | Segredo aleatório com pelo menos 32 caracteres; o mesmo entre instâncias. Usado para derivar chaves sem guardar IP em claro.       |
-| `OAUTH_TRUSTED_IP_HEADER`                       | Rate limiter, request  | Configuração de confiança                                   | Self-host: nome do header que o proxy **sobrescreve**, nunca concatena. O Next não pode estar acessível diretamente pela Internet. |
-| `CORNETA_RELEASE_CHECK`                         | Next build/gates       | Controle público                                            | `1` ativa os gates oficiais fora da Vercel; não usar `0` para fingir que um deploy incompleto está pronto.                         |
-| `VERCEL`, `VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA` | Infraestrutura/Next    | Metadados do deploy                                         | Fornecidos pela plataforma; produção ativa gates. Não simular esses valores para contornar segurança.                              |
+| Variável                                        | Consumidor/momento    | Classificação             | Quando configurar/exemplo seguro                                                                                                   |
+| ----------------------------------------------- | --------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `OAUTH_TRUSTED_IP_HEADER`                       | Rate limiter, request | Configuração de confiança | Self-host: nome do header que o proxy **sobrescreve**, nunca concatena. O Next não pode estar acessível diretamente pela Internet. |
+| `CORNETA_RELEASE_CHECK`                         | Next build/gates      | Controle público          | `1` ativa os gates oficiais fora da Vercel; não usar `0` para fingir que um deploy incompleto está pronto.                         |
+| `VERCEL`, `VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA` | Infraestrutura/Next   | Metadados do deploy       | Fornecidos pela plataforma; produção ativa gates. Não simular esses valores para contornar segurança.                              |
 
-Sem configuração remota, o rate limiter admite memória local limitada somente fora da produção. Configuração remota parcial ou falha do Redis não vira um bypass silencioso. A API não precisa guardar um banco de sessões OAuth do usuário: o broker manipula os tokens transitoriamente para responder ao desktop.
+O limitador usa memória local em todos os ambientes, com até 10.000 entradas por instância. Cada origem tem contadores independentes por rota: 20 exchanges e 60 refreshes por janela fixa de 60 segundos. IPv6 é agrupado por /64; sem IP confiável, as requisições compartilham a origem `unknown` da respectiva rota. Na Vercel, o header de origem é selecionado automaticamente; em self-host, preserve a fronteira de proxy descrita na tabela.
+
+As chaves do cache são derivadas por HMAC-SHA256 com uma chave aleatória de 32 bytes, criada na inicialização do limitador e mantida somente no processo. Não há segredo configurável nem armazenamento remoto para esses contadores. Tokens OAuth não entram no cache: o broker os manipula transitoriamente para responder ao desktop. Ao atingir o limite, responde `429`/`Retry-After`; sem espaço para uma nova entrada, responde `503`/`Retry-After`, sem expulsar contadores ativos.
+
+**O limite não é compartilhado entre instâncias.** Reiniciar ou escalar cria novos contadores; a memória local não estabelece uma quota global nem um teto de custo. Uma proteção compartilhada antes das instâncias depende de WAF/edge configurado no host, com escopo e comportamento verificados. O [guia de publicação](PUBLICACAO.md) descreve a cobertura das rotas Kick e os ensaios; nenhuma variável de ambiente comprova que essa proteção esteja ativa.
 
 ### Telemetria e identidade dos artefatos
 
@@ -125,7 +126,7 @@ Antes de distribuir um fork, o responsável precisa implementar/revisar em conju
 3. Apps OAuth próprios; Kick secret apenas no seu servidor. Google/Twitch usam IDs públicos, mas quotas, verificações e disponibilidade pertencem ao seu registro.
 4. Chave do updater e endpoint próprios; não deixar um fork buscar atualizações ou dados de telemetria do projeto original.
 5. Analytics inicialmente desligado no fork até haver configuração e informação adequadas ao seu público; tokens de testes não devem alimentar produção.
-6. Redis/rate limits, proxy HTTPS, política de privacidade, retenção, canal de segurança e licenças/source packs dos binários sob sua responsabilidade.
+6. Limites locais e proteção WAF/edge verificada, proxy HTTPS, política de privacidade, retenção, canal de segurança e licenças/source packs dos binários sob sua responsabilidade.
 
 Arquivos que delimitam isso: [`site.ts`](../web/lib/site.ts), [`download.ts`](../web/lib/download.ts), [`release-config.ts`](../web/lib/server/release-config.ts), [`tauri.conf.json`](../src-tauri/tauri.conf.json), [`keys.rs`](../src-tauri/src/keys.rs) e [`contributor.mjs`](../scripts/contributor.mjs). Não remova uma validação global nem troque o host oficial às escondidas para fazer um fork passar.
 

@@ -34,7 +34,7 @@ describe("credential-free contributor profile", () => {
       VITE_POSTHOG_TOKEN: "must-not-survive",
       NEXT_PUBLIC_POSTHOG_TOKEN: "must-not-survive",
       KICK_CLIENT_SECRET: "must-not-survive",
-      REDIS_REST_TOKEN: "must-not-survive",
+      DATABASE_PASSWORD: "must-not-survive",
       NODE_OPTIONS: "must-not-survive",
       RANDOM_FUTURE_SECRET: "must-not-survive",
       NEXT_PUBLIC_FUTURE_TOKEN: "must-not-survive",

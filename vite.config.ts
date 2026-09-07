@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -76,6 +77,11 @@ export default defineConfig(async () => ({
   envPrefix: ["VITE_", "TAURI_ENV_"],
 
   test: {
+    alias: {
+      "@/lib/server": fileURLToPath(
+        new URL("./web/lib/server", import.meta.url),
+      ),
+    },
     // Nested worktrees and generated snapshots contain independent, potentially stale suites.
     exclude: [
       "**/node_modules/**",

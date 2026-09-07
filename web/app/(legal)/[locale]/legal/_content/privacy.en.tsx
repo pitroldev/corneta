@@ -278,10 +278,13 @@ export function PrivacyBodyEn() {
 
         <h3>Abuse protection</h3>
         <p>
-          To stop anyone using the service as a springboard, there’s a per-IP
-          attempt limit (20 exchanges and 60 refreshes per minute). That control
-          uses the request’s IP in memory only, for a few minutes, purely to
-          count attempts in the current window.
+          To reduce abuse, each server instance limits attempts based on the IP
+          to 20 code exchanges and 60 token refreshes per 60-second window.
+          Counters are not shared between instances. In the limiter’s memory,
+          the key is an identifier derived from the IP with a temporary secret
+          (HMAC), not the IP itself. The limiter neither persists these counters
+          nor sends them to a remote database; hosting access logs are handled
+          separately.
         </p>
         <Callout>
           Twitch sign-in uses the device code flow and YouTube uses PKCE
@@ -602,7 +605,12 @@ export function PrivacyBodyEn() {
               </tr>
               <tr>
                 <td>Per-IP attempt counter</td>
-                <td>In memory, until the counting window ends (one minute).</td>
+                <td>
+                  In each instance’s memory. The count expires after 60 seconds;
+                  expired entries are removed during later requests or when the
+                  instance shuts down. Without new requests, they may remain in
+                  memory until that shutdown.
+                </td>
               </tr>
               <tr>
                 <td>Technical access records</td>

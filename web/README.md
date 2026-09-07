@@ -26,14 +26,14 @@ Execute o servidor e o build em momentos diferentes ou em cópias separadas. O p
 
 Para testar integrações próprias, o exemplo pertinente é [web/.env.example](.env.example), e o arquivo local é `web/.env.local` — ambos relativos à raiz do repositório. Não sobrescreva um arquivo existente. Os comandos `pnpm web:dev` e `pnpm web:check`, também na raiz, usam essa configuração e não têm o isolamento do perfil de contribuição.
 
-O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, Redis, proxy, precedência e distinção entre segredos e valores públicos. O [guia de publicação](../docs/PUBLICACAO.md) reúne os procedimentos e as evidências adicionais exigidas para distribuir o produto.
+O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, limites locais, proxy, precedência e distinção entre segredos e valores públicos. O [guia de publicação](../docs/PUBLICACAO.md) reúne os procedimentos e as evidências adicionais exigidas para distribuir o produto, incluindo proteção WAF/edge no host.
 
 Resumo das variáveis do site:
 
 - `NEXT_PUBLIC_SITE_URL`: URL canônica usada em metadata, sitemap e robots;
-- `NEXT_PUBLIC_PRIMARY_CTA_URL`: URL pública do instalador/release. Enquanto a URL real não
-  estiver disponível, a página usa `https://example.com/corneta-download` como placeholder
-  explícito;
+- `NEXT_PUBLIC_PRIMARY_CTA_URL`: em release, URL HTTPS do instalador `.exe` oficial no
+  GitHub Releases. Quando a variável não está definida, a navegação usa `#download`; o
+  placeholder do exemplo não é um download publicado nem passa no gate oficial;
 - `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION`: tokens públicos fornecidos pelo
   Search Console e Bing Webmaster Tools. A metadata omite as tags quando eles estão vazios;
 - `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` e `NEXT_PUBLIC_POSTHOG_HOST`: Project API Key de
@@ -50,6 +50,14 @@ Use apenas a **Project API Key de ingestão** nessas variáveis. Uma PostHog Per
 nunca deve entrar no site, na API ou no repositório. Em produção, cliente e servidor usam o
 mesmo project token, `https://us.i.posthog.com` e o SHA completo do mesmo commit; o gate
 `pnpm telemetry:release:check` valida esse contrato junto com o desktop.
+
+A proteção das rotas Kick usa memória local limitada a 10.000 entradas por instância,
+sem serviço de armazenamento ou segredo adicional: 20 exchanges e 60 refreshes por
+origem em janelas fixas de 60 segundos. Reiniciar/escalar cria contadores novos; isso
+não é um limite global. Proteção compartilhada antes das instâncias depende de
+WAF/edge configurado e testado no host, com resposta `429` sem desafio interativo.
+O build não configura nem comprova essa proteção. Confira escopo, cobertura e
+ensaios no [guia de publicação](../docs/PUBLICACAO.md).
 
 ## Telemetria e diagnóstico
 

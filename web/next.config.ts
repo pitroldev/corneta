@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
   turbopack: { root: workspaceRoot },
   poweredByHeader: false,
   reactStrictMode: true,
-  // Only public metadata belongs in the browser bundle; never expose OAuth or Redis credentials.
+  // Only public metadata belongs in the browser bundle; never expose server credentials.
   env: { NEXT_PUBLIC_BUILD_SHA: buildSha, BUILD_SHA: buildSha },
   outputFileTracingIncludes: {
     "/*": ["./.generated/editorial.json", "./content/people.json"],

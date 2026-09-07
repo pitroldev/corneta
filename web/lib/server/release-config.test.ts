@@ -10,9 +10,6 @@ const valid = {
   NEXT_PUBLIC_SITE_URL: "https://www.corneta.live",
   NEXT_PUBLIC_PRIMARY_CTA_URL:
     "https://github.com/pitroldev/corneta/releases/download/v0.7.0/Corneta.exe",
-  UPSTASH_REDIS_REST_URL: "https://redis.example.test",
-  UPSTASH_REDIS_REST_TOKEN: "test",
-  OAUTH_RATE_LIMIT_SALT: "a".repeat(32),
   VERCEL: "1",
   KICK_REDIRECT_URIS: "http://localhost:7395/callback",
   NEXT_PUBLIC_BUILD_SHA: sha,
@@ -24,6 +21,42 @@ const valid = {
 describe("release configuration", () => {
   it("accepts explicit disabled telemetry without inventing credentials", () =>
     expect(releaseConfigErrors(valid)).toEqual([]));
+  it("does not require external rate-limit storage in production", () => {
+    expect(
+      releaseConfigErrors({
+        ...valid,
+        NODE_ENV: "production",
+        VERCEL_ENV: "production",
+      }),
+    ).toEqual([]);
+  });
+  it("accepts configured production telemetry without external rate-limit storage", () => {
+    expect(
+      releaseConfigErrors({
+        ...valid,
+        TELEMETRY_DISABLED: "0",
+        NEXT_PUBLIC_TELEMETRY_DISABLED: "0",
+        NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: "phc_test_public_project_token",
+        POSTHOG_PROJECT_TOKEN: "phc_test_public_project_token",
+        NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+        POSTHOG_HOST: "https://us.i.posthog.com",
+        NEXT_PUBLIC_DEPLOYMENT_ENV: "production",
+        POSTHOG_ENVIRONMENT: "production",
+      }),
+    ).toEqual([]);
+  });
+  it("still requires a trusted proxy header for self-hosted production", () => {
+    const selfHosted = { ...valid, VERCEL: undefined };
+    expect(releaseConfigErrors(selfHosted)).toEqual([
+      "OAUTH_TRUSTED_IP_HEADER: configure a header overwritten by the trusted proxy",
+    ]);
+    expect(
+      releaseConfigErrors({
+        ...selfHosted,
+        OAUTH_TRUSTED_IP_HEADER: "x-real-ip",
+      }),
+    ).toEqual([]);
+  });
   it("reports missing settings without exposing values", () => {
     const errors = releaseConfigErrors({
       KICK_CLIENT_SECRET: valid.KICK_CLIENT_SECRET,

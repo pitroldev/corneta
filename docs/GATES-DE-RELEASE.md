@@ -16,7 +16,8 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores, linh
 - O job Rust prepara seus próprios sidecars; espelho opcional via `CORNETA_FFMPEG_MIRROR_URL`
   mantém o mesmo hash fixado. O upstream remove builds antigos.
 - Next de produção exige `web:release:check` (automático na Vercel production): configuração
-  OAuth/Redis/proxy, download HTTPS e identidade/telemetria coerentes.
+  OAuth/proxy, download HTTPS e identidade/telemetria coerentes. O limitador local não exige
+  armazenamento remoto; o gate não verifica regras de WAF/edge no host.
 - O step shell de Vite envia os source maps ao projeto correto e os apaga; é o único que recebe
   `POSTHOG_API_KEY` e `POSTHOG_PROJECT_ID`. Gate, build Rust, scanner e upload não recebem a
   Personal API Key. Antes do build, um GET autenticado e sem redirects confirma no PostHog US que
@@ -49,6 +50,10 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores, linh
 
 ## Manuais e externos
 
+- WAF/edge configurado e verificado para ambas as rotas POST de OAuth Kick, cobrindo hosts,
+  aliases e caminhos normalizados, sem acesso direto à origem ou desafio interativo de
+  navegador. Validar bloqueio `429` antes de múltiplas instâncias e registrar o escopo regional
+  real do provedor; o cache local não impõe limite global. Ver [publicação](PUBLICACAO.md).
 - Authenticode segue a [política de assinatura](ASSINATURA.md). O gate aceita
   `NotSigned` com aviso ou `Valid`, nunca assinatura inválida. `REQUIRE_WINDOWS_CODE_SIGNING=1`
   exige assinatura quando adotada. Conferir o aviso em Windows limpo; assinatura não garante

@@ -21,7 +21,7 @@ A instalação precisa obter as dependências no registry ou em cache local já 
 | Comando na raiz          | Resultado                                                 | Não valida                                           |
 | ------------------------ | --------------------------------------------------------- | ---------------------------------------------------- |
 | `pnpm contrib:demo`      | UI React com motor simulado em `http://localhost:1420`    | OBS, cofre, encoder, contas reais                    |
-| `pnpm contrib:web`       | Site/API Next.js local em `http://localhost:7390`         | OAuth configurado, Redis e operação de produção      |
+| `pnpm contrib:web`       | Site/API Next.js local em `http://localhost:7390`         | OAuth configurado, WAF/edge e operação de produção   |
 | `pnpm contrib:check`     | Testes/checks do app e qualidade/build do site            | Testes nativos e publicação                          |
 | `pnpm contrib:web:check` | Qualidade/build do site sem gate editorial por calendário | Gates de release do site oficial                     |
 | `pnpm contrib:app:dev`   | App Tauri de contribuição                                 | Instalação ou live validada                          |

@@ -273,10 +273,13 @@ export function PrivacyBodyPt() {
 
         <h3>Proteção contra abuso</h3>
         <p>
-          Para evitar que alguém use o serviço como trampolim, existe um limite
-          de tentativas por endereço IP (20 trocas e 60 renovações por minuto).
-          Esse controle usa o IP da requisição apenas em memória e por poucos
-          minutos, exclusivamente para contar tentativas na janela vigente.
+          Para reduzir abuso, cada instância do servidor limita as tentativas
+          com base no IP a 20 trocas de código e 60 renovações de token por
+          janela de 60 segundos. Os contadores não são compartilhados entre
+          instâncias. Na memória do limitador, a chave é um identificador
+          derivado do IP com um segredo temporário (HMAC), não o IP em si. O
+          limitador não persiste nem envia esses contadores a um banco remoto;
+          os registros de acesso da hospedagem são tratados separadamente.
         </p>
         <Callout>
           O login da Twitch usa o fluxo de código de dispositivo e o do YouTube
@@ -610,7 +613,11 @@ export function PrivacyBodyPt() {
               <tr>
                 <td>Contador de tentativas por IP</td>
                 <td>
-                  Em memória, até o fim da janela de contagem (um minuto).
+                  Na memória de cada instância. A contagem expira em 60
+                  segundos; entradas expiradas são removidas durante requisições
+                  posteriores ou quando a instância encerra. Sem novas
+                  requisições, podem permanecer na memória até esse
+                  encerramento.
                 </td>
               </tr>
               <tr>
