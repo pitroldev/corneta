@@ -14,6 +14,8 @@ Streamers brasileiros que usam OBS ou outro programa de transmissão compatível
 
 O site público apresenta e distribui a Corneta, um app desktop que recebe um único sinal RTMP local e o envia para múltiplos destinos. O OBS é o programa recomendado por ter integração de configuração, controle e estatísticas. O sucesso da superfície pública é fazer o visitante entender o benefício em poucos segundos e baixar o app para Windows.
 
+A Corneta está pronta para uso em Windows x64. O app não deve ser apresentado como experimental ou em preparação para beta. Os rótulos experimentais se aplicam somente aos recursos e integrações específicos listados neste documento, não ao produto como um todo. A disponibilidade de instaladores acompanha as releases publicadas.
+
 ## Positioning
 
 A Corneta faz o multistream rodar localmente e mantém cada destino independente. Isso permite acompanhar, reconectar, pausar e ajustar saídas separadamente, sem mensalidade de relay e mantendo chaves, configurações e relatórios no computador do streamer.

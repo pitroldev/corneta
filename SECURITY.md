@@ -20,7 +20,7 @@ Se uma credencial sua vazou, revogue-a no provedor e gere outra. Apagar a mensag
 
 ## Versões e resposta
 
-O projeto ainda é experimental. A triagem se concentra na branch principal e na versão oficial mais recente quando houver release; não há compromisso de backport para versões antigas ou forks. Informe problemas encontrados em outras versões para avaliarmos o alcance.
+A triagem se concentra na branch principal e na versão oficial mais recente publicada; não há compromisso de backport para versões antigas ou forks. Informe problemas encontrados em outras versões para avaliarmos o alcance.
 
 Não há SLA, equipe de plantão, programa de recompensa ou certificação de segurança prometidos. A confirmação de recebimento, a avaliação e a divulgação serão coordenadas pelo mantenedor conforme disponibilidade e gravidade. Se não receber confirmação, repita o contato sem publicar detalhes sensíveis como forma de obter resposta.
 

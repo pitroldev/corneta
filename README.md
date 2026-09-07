@@ -18,7 +18,7 @@
   <a href="#documentação">Documentação</a>
 </p>
 
-> **Experimental · Windows x64.** Em preparação para beta público. [Experimente a demo](#testar-sem-rust-obs-ou-contas) ou [acompanhe os instaladores](#quero-usar-na-minha-live). Teste fora de lives de produção.
+> **Windows x64 · Código aberto.** [Experimente a demo](#testar-sem-rust-obs-ou-contas) ou veja [como usar na sua live](#quero-usar-na-minha-live).
 
 [![Preparação da live na Corneta: conexão com o OBS, teste de upload e checklist antes de entrar no ar.](docs/images/readme/live.webp)](docs/images/readme/live.webp)
 
@@ -87,7 +87,7 @@ O perfil de contribuição não carrega seu `.env` pessoal e desativa a telemetr
 
 ## Quero usar na minha live
 
-Acompanhe as [releases do projeto](https://github.com/pitroldev/corneta/releases) para saber quando houver um instalador público aprovado. Um build de desenvolvimento não é uma versão estável. **Windows x64 é o alvo atual**; macOS, Linux e Windows ARM ainda não têm distribuição validada.
+Consulte as [releases do projeto](https://github.com/pitroldev/corneta/releases) para instaladores e notas de versão. **Windows x64 é a plataforma atual**; macOS, Linux e Windows ARM ainda não têm distribuição validada. Builds de contribuição são destinados ao desenvolvimento e não substituem os instaladores de release.
 
 Para testar o aplicativo nativo a partir do código, siga o caminho de [desktop para desenvolvimento](#desktop-nativo--windows-x64) abaixo. Faça os testes fora de uma live real.
 

@@ -1,6 +1,6 @@
 # Suporte
 
-Corneta está em fase experimental, com alvo Windows x64. Português e inglês são aceitos. O suporte é comunitário, sem SLA ou garantia de prazo; evite depender de uma build não validada durante uma live importante.
+Corneta é um app desktop para Windows x64. Português e inglês são aceitos. O suporte é comunitário, sem SLA ou garantia de prazo. Para transmitir, use os instaladores de release; reserve builds de contribuição para desenvolvimento e testes.
 
 - Dúvidas de uso: comece pelo [README](README.md), pela [documentação](docs/README.md) e pela ajuda do [site oficial](https://www.corneta.live).
 - Bug reproduzível: use o formulário de bug nas [issues](https://github.com/pitroldev/corneta/issues).

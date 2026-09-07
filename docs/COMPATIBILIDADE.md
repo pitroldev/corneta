@@ -1,6 +1,6 @@
 # Compatibilidade e atualização
 
-Referência: linha desktop 0.7.0. Status experimental.
+Referência: linha desktop 0.7.0 para Windows x64.
 
 | Superfície         | Contrato atual                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -15,6 +15,6 @@ Referência: linha desktop 0.7.0. Status experimental.
 
 Antes de mudar um formato, adicione fixtures antigas, teste leitura/migração/ausência de campos e documente o que muda. Nunca corrija incompatibilidade apagando dados silenciosamente. Os catálogos de idioma ficam em `src/lib/i18n/` e `web/lib/i18n/`.
 
-Antes de um upgrade real, feche a live e preserve configuração, relatórios e vídeos por procedimento apropriado à sua instalação. Um backup de arquivos não garante portabilidade do cofre do Windows. Teste a atualização em conta/VM descartável e confira preservação de dados e encerramento de sidecars. Não execute builds experimentais contra o perfil de produção.
+Antes de um upgrade real, feche a live e preserve configuração, relatórios e vídeos por procedimento apropriado à sua instalação. Um backup de arquivos não garante portabilidade do cofre do Windows. Teste a atualização em conta/VM descartável e confira preservação de dados e encerramento de sidecars. Não execute builds de desenvolvimento contra o perfil de produção.
 
 Downgrade não é garantido: uma versão antiga pode não entender dados novos. A assinatura do updater autentica o artefato; checksum e Authenticode cumprem papéis diferentes. Consulte [assinaturas](ASSINATURA.md) e o [guia de publicação](PUBLICACAO.md).

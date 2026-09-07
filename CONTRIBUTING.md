@@ -1,6 +1,6 @@
 # Como contribuir com a Corneta
 
-Contribuições pequenas, correções de documentação e relatos reproduzíveis são bem-vindos. Issues, discussões e documentação podem ser escritas em português ou inglês; **o código é sempre em inglês**. O projeto está em fase experimental: não há promessa de prazo de revisão ou suporte contínuo.
+Contribuições pequenas, correções de documentação e relatos reproduzíveis são bem-vindos. Issues, discussões e documentação podem ser escritas em português ou inglês; **o código é sempre em inglês**. A revisão das contribuições segue a disponibilidade dos mantenedores, sem promessa de prazo ou suporte contínuo.
 
 ## Primeiro passo
 
