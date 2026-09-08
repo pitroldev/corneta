@@ -1,6 +1,6 @@
 # Gates de release
 
-Critérios de aprovação de uma distribuição oficial, para mantenedores, linha 0.7.0. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Os procedimentos e o checklist estão no [guia de publicação](PUBLICACAO.md). Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
+Critérios de aprovação de uma distribuição oficial, para mantenedores, linha 0.8.0. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Os procedimentos e o checklist estão no [guia de publicação](PUBLICACAO.md). Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
 
 ## Automatizados
 

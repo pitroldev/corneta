@@ -11,7 +11,11 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { gzipSync } from "node:zlib";
 import { entryFiles } from "./entry-budget.mjs";
-import { detectedSecretNames, dotenvSecretValues } from "./bundle-secrets.mjs";
+import {
+  containsPemPrivateKey,
+  detectedSecretNames,
+  dotenvSecretValues,
+} from "./bundle-secrets.mjs";
 
 const root = process.cwd();
 const dist = join(root, "dist");
@@ -261,10 +265,7 @@ for (const path of files) {
   if (containsPosthogPersonalApiKey(bytes)) {
     leaks.push(`PostHog Personal API Key (phx_…) in ${artifactLocation(path)}`);
   }
-  if (
-    bytes.includes(Buffer.from("-----BEGIN ")) &&
-    bytes.includes(Buffer.from("PRIVATE KEY-----"))
-  ) {
+  if (containsPemPrivateKey(bytes)) {
     leaks.push(`PEM private key in ${artifactLocation(path)}`);
   }
 }

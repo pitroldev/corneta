@@ -1,6 +1,6 @@
 # Histórico de mudanças
 
-## Não lançado — linha 0.7.0
+## Não lançado — linha 0.8.0
 
 Este é o estado do código em preparação, não uma release estável nem um instalador aprovado.
 
@@ -16,6 +16,7 @@ Este é o estado do código em preparação, não uma release estável nem um in
 - Perfil Contributor com identidade/cofre separados, telemetria desativada e updater ausente.
 - Guias de configuração, arquitetura, suporte, segurança, fixtures e performance; templates de contribuição.
 - Verificações de segredos, assets, scripts, documentação e regressões de interface no processo de validação.
+- Correção do falso positivo que confundia marcadores de formatos de chave do FFmpeg com chaves privadas no instalador.
 
 ### Compatibilidade e limites
 
