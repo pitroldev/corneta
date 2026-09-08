@@ -97,7 +97,7 @@ export function Sidebar({
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border-soft bg-panel p-4">
       <div className="mb-9 flex items-center gap-3 px-1 pt-2">
-        <div className="grid size-12 rotate-[-3deg] place-items-center rounded-lg bg-brass text-brass-ink pop-brass">
+        <div className="brand-tile grid size-12 place-items-center rounded-lg bg-brass text-brass-ink">
           <Mascot className="size-7" />
         </div>
         <div>

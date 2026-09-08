@@ -38,13 +38,22 @@ export function GET() {
               alignItems: "center",
               justifyContent: "center",
               borderRadius: 12,
+              border: "2px solid #2a1c00",
               background: "#ffb323",
               boxShadow: "5px 5px 0 0 #2a1c00",
-              transform: "rotate(-3deg)",
+              transform: "rotate(-6deg)",
             }}
           >
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
               <path d="M3.4 9.1 L13 5.9 V18.1 L3.4 14.9 Z" fill="#2a1c00" />
+              <rect
+                x="4.7"
+                y="13.9"
+                width="2.5"
+                height="4.6"
+                rx="1.1"
+                fill="#2a1c00"
+              />
               <path
                 d="M15.6 8.4a5 5 0 0 1 0 7.2M17.8 6.4a8 8 0 0 1 0 11.2"
                 stroke="#2a1c00"

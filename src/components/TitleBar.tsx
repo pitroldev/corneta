@@ -44,7 +44,7 @@ export function TitleBar() {
         data-tauri-drag-region
         className="pointer-events-none flex items-center gap-2"
       >
-        <div className="grid size-5 place-items-center rounded-[5px] bg-brass text-brass-ink">
+        <div className="brand-tile brand-tile--small grid size-5 place-items-center rounded-[5px] bg-brass text-brass-ink">
           <Mascot className="size-3.5" />
         </div>
         <span className="font-display text-sm font-bold leading-none">

@@ -120,6 +120,21 @@
   --shadow-pop-cream: var(--pop-cream);
 }
 
+@layer components {
+  .brand-tile {
+    flex-shrink: 0;
+    rotate: -6deg;
+    border: var(--brand-tile-border, 2px) solid var(--brass-ink);
+    box-shadow: var(--brand-tile-shadow, 4px) var(--brand-tile-shadow, 4px) 0
+      var(--brass-ink);
+  }
+
+  .brand-tile--small {
+    --brand-tile-border: 1px;
+    --brand-tile-shadow: 2px;
+  }
+}
+
 /* Base-layer rules must not override Tailwind utilities. */
 @layer base {
   * {

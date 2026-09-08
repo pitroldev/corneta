@@ -73,7 +73,7 @@ export function AboutScreen() {
       <div className="relative mb-4 overflow-hidden rounded-xl bg-brass p-6 text-brass-ink pop-brass">
         <SoundWaves className="pointer-events-none absolute -right-10 -top-8 size-52 text-brass-ink/10" />
         <div className="relative flex items-start gap-4">
-          <div className="grid size-16 shrink-0 rotate-[-4deg] place-items-center rounded-lg bg-brass-ink text-brass pop">
+          <div className="brand-tile grid size-16 shrink-0 place-items-center rounded-lg bg-brass-ink text-brass">
             <Mascot className="size-9" />
           </div>
           <div>
@@ -89,7 +89,7 @@ export function AboutScreen() {
         onClick={() => openUrl("https://www.corneta.live")}
         className="group mb-2 flex w-full items-center gap-4 rounded-xl bg-surface p-5 pop transition-transform hover:translate-x-1 hover:-translate-y-1"
       >
-        <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-brass text-brass-ink">
+        <span className="brand-tile grid size-12 shrink-0 place-items-center rounded-lg bg-brass text-brass-ink">
           <Mascot className="size-7" />
         </span>
         <span className="flex-1 text-left">

@@ -91,7 +91,7 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
 
       <div className="flex min-h-10 items-center gap-2.5 border-b border-border-soft bg-panel pl-[13px]">
         <span className="flex items-center gap-2 [&>i]:grid [&>i]:size-[21px] [&>i]:place-items-center [&>i]:rounded-[5px] [&>i]:bg-brass [&>i]:text-brass-ink [&>i>svg]:h-3.5 [&>i>svg]:w-3.5">
-          <i>
+          <i className="brand-tile brand-tile--small">
             <Mascot />
           </i>
           <strong className="font-display text-[0.88rem] leading-none font-bold">
@@ -130,7 +130,7 @@ export function ProductPreview({ t, locale }: { t: T; locale: Locale }) {
           aria-hidden="true"
         >
           <span className="mb-[22px] flex items-center gap-2.5 px-0.5 pt-1 max-[760px]:hidden">
-            <i className="grid size-[38px] -rotate-3 place-items-center rounded-lg bg-brass text-brass-ink shadow-pop-brass [&>svg]:h-[23px] [&>svg]:w-[23px]">
+            <i className="brand-tile grid size-[38px] place-items-center rounded-lg bg-brass text-brass-ink [&>svg]:h-[23px] [&>svg]:w-[23px]">
               <Mascot />
             </i>
             <span>

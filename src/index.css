@@ -163,6 +163,21 @@
   }
 }
 
+@layer components {
+  .brand-tile {
+    rotate: -6deg;
+    flex-shrink: 0;
+    border: var(--brand-tile-border, 2px) solid var(--color-brass-ink);
+    box-shadow: var(--brand-tile-shadow, 4px) var(--brand-tile-shadow, 4px) 0
+      var(--color-brass-ink);
+  }
+
+  .brand-tile--small {
+    --brand-tile-border: 1px;
+    --brand-tile-shadow: 2px;
+  }
+}
+
 @layer utilities {
   .pop {
     box-shadow: 4px 4px 0 0 var(--color-night);

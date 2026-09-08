@@ -350,8 +350,10 @@ de estado, polegar de interruptor e ondas sonoras. Bordas existem para separar z
 (1px `#3d301c` / `#281f12`) e para as réguas editoriais no papel (2–3px de tinta cheia); não
 existem para contornar cards.
 
-A inclinação é material do sistema: adesivos e blocos de marca giram entre -3° e +2°. Sempre em
-peça pequena e sólida — texto corrido nunca gira.
+A inclinação é material do sistema: adesivos giram entre -3° e +2°. A marca usa um quadrado
+de latão inclinado a -6°, contorno e sombra sólida em tinta de latão, sem desfoque. A corneta
+acompanha a inclinação; o nome permanece reto. Em ícones exportados, a margem transparente
+preserva os cantos e a sombra. Sempre em peça pequena e sólida — texto corrido nunca gira.
 
 **A Regra do Canto Seco.** Se o raio passou de 14px, o desenho saiu do mundo. Pílula é estado,
 não silhueta.

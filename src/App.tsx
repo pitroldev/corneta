@@ -413,8 +413,8 @@ export default function App() {
               <div
                 className={
                   bootError
-                    ? "grid size-16 place-items-center rounded-lg bg-brass text-brass-ink pop-brass"
-                    : "grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink pop-brass"
+                    ? "brand-tile grid size-16 place-items-center rounded-lg bg-brass text-brass-ink"
+                    : "brand-tile grid size-16 animate-shout place-items-center rounded-lg bg-brass text-brass-ink"
                 }
               >
                 <Mascot className="size-9" />

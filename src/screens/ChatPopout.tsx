@@ -447,7 +447,7 @@ export function ChatPopout() {
       >
         <div
           data-tauri-drag-region
-          className="pointer-events-none grid size-5 place-items-center rounded bg-brass text-brass-ink"
+          className="brand-tile brand-tile--small pointer-events-none grid size-5 place-items-center rounded bg-brass text-brass-ink"
         >
           <Mascot className="size-3.5" />
         </div>

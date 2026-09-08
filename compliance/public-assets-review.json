@@ -73,59 +73,87 @@
     },
     {
       "file": "src-tauri/icons/128x128.png",
-      "sha256": "e7ff7b669cf0a54bbdad5671f70b6740dc4205794d7bae419ea3292cf9c39d4b"
+      "sha256": "350aede0aa4dc2f00aa70fb4c0772666ad77dc08a4ad7eb57cdf929d3edbc6c6",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/128x128@2x.png",
-      "sha256": "dba809efe4f6c74fe8be3a2d78de6b3464b9eb21abd17164d11335e4135bd0fc"
+      "sha256": "a942b36bdead13c19c9cc429d4253b7f715c72b1de309d6906bb3c6028f578f8",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/32x32.png",
-      "sha256": "b36939dc0c2bfafd58c7ea99efc780ac10fd29280519b7e1968faadb078c5968"
+      "sha256": "2de42d10dff2cd517b2c3636af83ae595e0556fa6c8c12fff275bba7aca0e398",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/icon.ico",
-      "sha256": "a817794a155aaef62d1b1cc1cc53b6446edfb970e0124b8c29a79d9f0f2a7991"
+      "sha256": "8fd55ebd19ea6107d5f3727eb6269d09f5850f3058c0c1ee5daec5c3526e665a",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/icon.png",
-      "sha256": "4a2dbf9c2d77928b01434e8824db21e27f4850a99de7769311e69a8d283dea96"
+      "sha256": "330fae803674abcdae7482eaa5b7c1d48421d4338f572f560e23201430b8ab57",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/tray-bad.png",
-      "sha256": "974f30a99abba844ba7d6954bce8a45805225be96beba445b2a17f34231cf3a1"
+      "sha256": "a9917e83d51f3a4d6dea144dd56417165afefac83d7593c3455bac2a1f1ebf7d",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/tray-good.png",
-      "sha256": "7ed6453bfa771b4c37eda8b78968db7ed250a46393968cf988ff212bd17a720c"
+      "sha256": "8caca7df940c9b071a4928081e9697af105b3c29972b75299fdde5c704924a2b",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/tray-idle.png",
-      "sha256": "078f7910359dc5e70c38a875bf657a3ba9f62ba0edd9be1c76352c801f9f65f2"
+      "sha256": "a936e5ae829b000cd977efabc1677fee21f4cdd7370aafd9fda3ddf3e0da3e6c",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/icons/tray-warn.png",
-      "sha256": "e8e65a028069a3307b9410872aafdc0e9161bb26e40df4a0a91285d9ea8f94be"
+      "sha256": "0a75eb4b01694ae704bfd3fe031e5cdfad28879e4800b261697c16368ad2521a",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/installer/header.bmp",
-      "sha256": "5cf4ada596ad9572b55a3d65d6385eeb78dd9162b8ba09bfba776620e3e5fe7b"
+      "sha256": "d2f82f67c6e9557e0391928b4ab6d1f211ddc36469d6b61c1f9876c1e193c22e",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/installer/header.png",
-      "sha256": "15cf5e09ae3610638c95de6b07d7ae66e13e85634c88ec15099d0816f8a78070"
+      "sha256": "de6fd610df46af067818d5e37900c1118e1e8bfdd4377073f1b04000f85c43c1",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/installer/sidebar.bmp",
-      "sha256": "8f3f2d9a0a879d7724aad7957236e2d02435e4d1bd07168b91f1c8dbf14714b6"
+      "sha256": "88e6c4f2c489a71adc77c223c4abef15da9b1172947f729e951ae0bc35748495",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "src-tauri/installer/sidebar.png",
-      "sha256": "f104bc2d7506afb32c138c8718ee99ac8151de2fc81f0b2aeea70251598f07b0"
+      "sha256": "0071f44335918107f9d09ce1a6f9dc4b8d34f5430b0a10303c3ee40f75d1dd94",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "web/app/icon.svg",
-      "sha256": "d623f30cd3aa2917c29706087d409f4a8783bb68ffc2f259bf5eacc0d064e6cf"
+      "sha256": "52e4434ae0c78bec17833c3d1998ae3c416ff302fcaab6e7c2c68900035a3f63",
+      "reviewedAt": "2026-09-07",
+      "reviewScope": "Visual privacy inspection by coding agents of regenerated project branding at multiple sizes on light and dark surfaces; no personal data or third-party artwork added. Not a human sign-off or legal approval."
     },
     {
       "file": "web/content/assets/originals/README.md",

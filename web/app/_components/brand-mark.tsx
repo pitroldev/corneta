@@ -16,7 +16,7 @@ export function BrandMark({
 }: BrandMarkProps) {
   return (
     <span className={`flex items-center gap-2.5 ${className}`.trim()}>
-      <span className="grid size-10 -rotate-3 place-items-center rounded-lg bg-brass text-brass-ink shadow-pop-brass [&>svg]:size-[25px]">
+      <span className="brand-tile grid size-10 place-items-center rounded-lg bg-brass text-brass-ink [&>svg]:size-[25px]">
         <Mascot />
       </span>
       {showName && (

@@ -1,7 +1,7 @@
 
 
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Drawing
+. (Join-Path $PSScriptRoot 'icon-drawing.ps1')
 
 $root = Split-Path -Parent $PSScriptRoot
 $outDir = Join-Path $root 'src-tauri\installer'
@@ -130,44 +130,6 @@ $NIGHT = [System.Drawing.Color]::FromArgb(0x0B, 0x08, 0x05)
 
 $TIGHT = [System.Drawing.StringFormat]::GenericTypographic
 
-function New-RoundRect([single]$x, [single]$y, [single]$w, [single]$h, [single]$r) {
-  $d = $r * 2
-  $p = New-Object System.Drawing.Drawing2D.GraphicsPath
-  $p.AddArc($x, $y, $d, $d, 180, 90)
-  $p.AddArc($x + $w - $d, $y, $d, $d, 270, 90)
-  $p.AddArc($x + $w - $d, $y + $h - $d, $d, $d, 0, 90)
-  $p.AddArc($x, $y + $h - $d, $d, $d, 90, 90)
-  $p.CloseFigure()
-  return $p
-}
-
-# Keep the 24x24 geometry in sync with Mascot in src/components/decor.tsx.
-function Draw-Mascot($g, [single]$x, [single]$y, [single]$size, $color) {
-  $s = $size / 24.0
-  $pt = { param($a, $b) New-Object System.Drawing.PointF([single]($x + $a * $s), [single]($y + $b * $s)) }
-  $brush = New-Object System.Drawing.SolidBrush($color)
-
-  # The explicit cast disambiguates the Point[] and PointF[] overloads.
-  $g.FillPolygon($brush, [System.Drawing.PointF[]]@(
-      (& $pt 3.4 9.1), (& $pt 13 5.9), (& $pt 13 18.1), (& $pt 3.4 14.9)))
-
-  $rr = New-RoundRect ($x + 4.7 * $s) ($y + 13.9 * $s) (2.5 * $s) (4.6 * $s) (1.1 * $s)
-  $g.FillPath($brush, $rr)
-  $rr.Dispose()
-
-  $pen = New-Object System.Drawing.Pen($color, [single](1.9 * $s))
-  $pen.StartCap = 'Round'; $pen.EndCap = 'Round'
-  foreach ($a in @(@(15.6, 8.4, 15.6, 5.0), @(17.8, 6.4, 17.6, 8.0))) {
-    $ax = $a[0]; $y0 = $a[1]; $y1 = $a[2]; $r = $a[3]
-    $cy = ($y0 + $y1) / 2.0
-    $half = ($y1 - $y0) / 2.0
-    $cx = $ax - [Math]::Sqrt(($r * $r) - ($half * $half))
-    $start = [Math]::Atan2($y0 - $cy, $ax - $cx) * 180.0 / [Math]::PI
-    $g.DrawArc($pen, [single]($x + ($cx - $r) * $s), [single]($y + ($cy - $r) * $s),
-      [single](2 * $r * $s), [single](2 * $r * $s), [single]$start, [single](-2 * $start))
-  }
-  $pen.Dispose(); $brush.Dispose()
-}
 
 function Draw-Halftone($g, [int]$w, [int]$h, $color, [int]$step, [single]$rMax, [single]$fade) {
   $row = 0
@@ -234,18 +196,12 @@ $band.AddPolygon([System.Drawing.PointF[]]@(
 $g.FillPath((New-Object System.Drawing.SolidBrush($BRASS)), $band)
 $band.Dispose()
 
-$tile = 88.0
-$cx = $W / 2.0; $cy = 96.0
-$g.TranslateTransform($cx, $cy)
-$g.RotateTransform(-4)
-$shadow = New-RoundRect (-$tile / 2 + 5) (-$tile / 2 + 6) $tile $tile 15
-$g.FillPath((New-Object System.Drawing.SolidBrush($TOMATO)), $shadow)
-$shadow.Dispose()
-$face = New-RoundRect (-$tile / 2) (-$tile / 2) $tile $tile 15
-$g.FillPath((New-Object System.Drawing.SolidBrush($BRASS)), $face)
-$face.Dispose()
-Draw-Mascot $g (-27.0) (-27.0) 54.0 $INK
-$g.ResetTransform()
+$tile = New-CornetaIconBitmap 104
+try {
+  $g.DrawImageUnscaled($tile, 30, 44)
+} finally {
+  $tile.Dispose()
+}
 
 # Measure the wordmark: Baloo's tall glyphs would overlap a fixed-position underline.
 
@@ -276,7 +232,12 @@ $g.Clear($BRASS)
 
 Draw-Halftone $g $W $H $INK 11 2.2 1.6
 
-Draw-Mascot $g 11 12 33 $INK
+$tile = New-CornetaIconBitmap 38
+try {
+  $g.DrawImageUnscaled($tile, 8, 7)
+} finally {
+  $tile.Dispose()
+}
 
 $hw = Get-FittedFont $g 'CORNETA' $family 24 ($W - 56)
 $hwSize = $g.MeasureString('CORNETA', $hw, [System.Drawing.PointF]::Empty, $TIGHT)

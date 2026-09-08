@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="88" height="88" alt="">
+  <img src="web/app/icon.svg" width="112" height="112" alt="">
 </p>
 
 <a name="corneta"></a>
