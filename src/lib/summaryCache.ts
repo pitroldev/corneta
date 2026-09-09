@@ -1,7 +1,7 @@
 import type { SessionMeta, SessionSummary } from "./types";
 
 const KEY = "corneta.session-summaries";
-const VERSION = 4;
+const VERSION = 5;
 const CAP = 50;
 interface Entry {
   summary: SessionSummary;

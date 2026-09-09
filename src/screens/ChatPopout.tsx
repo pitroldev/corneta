@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { IS_TAURI } from "../lib/api";
+import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { useStore } from "../lib/store";
 import { sendStatusLine, srcLabel, type Translate } from "../lib/chatSend";
 import { useI18n } from "../lib/i18n";
@@ -33,6 +34,7 @@ import { Button, Input, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
+import { CinefyAudience } from "../components/CinefyAudience";
 import { AlertsFeed } from "../components/AlertsFeed";
 
 // Keep Tailwind classes literal so the compiler discovers both layouts.
@@ -499,27 +501,19 @@ export function ChatPopout() {
           </TabBtn>
         </div>
         <div className="ml-auto flex items-center gap-1">
-          {viewers.total > 0 && (st?.chatShowViewers ?? true) && (
+          {showAudience(viewers) && (st?.chatShowViewers ?? true) && (
             <button
               type="button"
               onClick={() => setSettings({ chatShowViewers: false })}
               className="flex items-center gap-1 px-0.5 text-xs font-bold text-ink-muted transition-colors hover:text-ink"
               title={
-                viewers.items
-                  .filter((i) => i.live)
-                  .map((i) =>
-                    t("chat.viewers.tooltip.row", {
-                      source: i.source,
-                      n: fmt.num(i.viewers ?? 0),
-                    }),
-                  )
-                  .join("\n") +
+                audienceTooltip(viewers.items, { t, fmt }) +
                 "\n" +
                 t("chat.viewers.tooltip.hide")
               }
             >
               <Eye className="size-3.5 text-brass" />
-              {fmt.num(viewers.total)}
+              {audienceTotal(viewers, fmt)}
             </button>
           )}
           {connected ? (
@@ -591,6 +585,10 @@ export function ChatPopout() {
           </button>
         </div>
       </div>
+
+      {(st?.chatShowViewers ?? true) && (
+        <CinefyAudience items={viewers.items} />
+      )}
 
       {showConfig && (
         <div className="flex flex-col gap-3 border-b-2 border-border-soft bg-surface-2 px-2.5 py-2.5 text-xs">

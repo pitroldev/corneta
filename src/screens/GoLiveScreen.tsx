@@ -23,6 +23,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import { useStore } from "../lib/store";
+import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { api, START_CANCELLED } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
 import { bandFit, effectiveAction, estimate } from "../lib/estimates";
@@ -550,11 +551,14 @@ export function GoLiveScreen({
                 live={live}
                 ingestLive={ingestLive}
               />
-              {viewers.total > 0 && (
-                <span className="flex items-center gap-1.5">
+              {showAudience(viewers) && (
+                <span
+                  className="flex items-center gap-1.5"
+                  title={audienceTooltip(viewers.items, { t, fmt })}
+                >
                   <Eye className="size-4 text-ink-faint" />
                   <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
-                    {fmt.num(viewers.total)}
+                    {audienceTotal(viewers, fmt)}
                   </span>
                   <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
                     {t("golive.viewers.label")}

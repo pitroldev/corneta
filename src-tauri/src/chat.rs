@@ -407,7 +407,9 @@ pub fn start_chat(app: &AppHandle) {
         .collect();
     if !vsources.is_empty() {
         let (app_v, run_v, key_v) = (app.clone(), running.clone(), api_key.clone());
-        tauri::async_runtime::spawn_blocking(move || run_viewers(vsources, key_v, run_v, app_v));
+        tauri::async_runtime::spawn_blocking(move || {
+            run_viewers(vsources, key_v, run_v, app_v, gen)
+        });
     }
 }
 
@@ -2427,12 +2429,107 @@ fn kick_fragments(content: &str) -> Vec<ChatFragment> {
 
 // Fetch audience and followers together when the provider returns both in one response.
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default)]
 struct ChannelCounts {
     /// None means offline or unavailable, not zero viewers.
     viewers: Option<u64>,
     /// None means unsupported or unavailable, not zero followers.
     followers: Option<u64>,
+    audience: Option<cinefy::AudienceSnapshot>,
+}
+
+impl ChannelCounts {
+    fn cinefy(audience: cinefy::AudienceSnapshot) -> Self {
+        // Embedded counts belong to the upstream platform and must not be counted twice.
+        let viewers = match audience.audience_status {
+            cinefy::AudienceStatus::Live if audience.live => audience.viewers,
+            cinefy::AudienceStatus::Offline => Some(0),
+            _ => None,
+        };
+        Self {
+            viewers,
+            followers: None,
+            audience: Some(audience),
+        }
+    }
+}
+
+#[derive(Default)]
+struct ViewerSample {
+    total: u64,
+    any_live: bool,
+    items: Vec<Value>,
+    followers: Vec<Value>,
+}
+
+fn collect_viewer_sample(
+    sources: &[crate::config::ChatSource],
+    is_current: impl Fn() -> bool,
+    mut fetch: impl FnMut(&crate::config::ChatSource) -> ChannelCounts,
+) -> Option<ViewerSample> {
+    let mut sample = ViewerSample::default();
+    let mut cinefy_channels = HashSet::new();
+    for src in sources {
+        if !is_current() {
+            return None;
+        }
+        if src.platform == "cinefy"
+            && cinefy::normalize_slug(&src.value).is_some_and(|slug| !cinefy_channels.insert(slug))
+        {
+            continue;
+        }
+        let counts = fetch(src);
+        if !is_current() {
+            return None;
+        }
+        let label = if src.name.trim().is_empty() {
+            &src.value
+        } else {
+            &src.name
+        };
+        let live = counts
+            .audience
+            .as_ref()
+            .map_or(counts.viewers.is_some(), |audience| audience.live);
+        sample.total = sample.total.saturating_add(counts.viewers.unwrap_or(0));
+        sample.any_live |= live;
+        if let Some(total) = counts.followers {
+            sample.followers.push(json!({
+                "platform": src.platform,
+                "source": label,
+                "total": total,
+            }));
+        }
+        let mut item = json!({
+            "platform": src.platform,
+            "source": label,
+            "viewers": counts.viewers,
+            "live": live,
+        });
+        if let Some(audience) = counts.audience {
+            item["audienceStatus"] = json!(audience.audience_status);
+            if let Some(origin) = audience
+                .audience_origin
+                .filter(|_| matches!(audience.audience_status, cinefy::AudienceStatus::Embedded))
+            {
+                item["audienceOrigin"] = json!(origin);
+            }
+            if let Some(viewers) = audience
+                .embedded_viewers
+                .filter(|_| matches!(audience.audience_status, cinefy::AudienceStatus::Embedded))
+            {
+                item["embeddedViewers"] = json!(viewers);
+            }
+            if let Some(title) = audience.title {
+                item["title"] = json!(title);
+            }
+            if let Some(started_at) = audience.started_at {
+                item["startedAt"] = json!(started_at);
+            }
+        }
+        sample.items.push(item);
+    }
+    is_current().then_some(sample)
 }
 
 fn twitch_counts(channel: &str) -> ChannelCounts {
@@ -2467,6 +2564,7 @@ fn twitch_counts(channel: &str) -> ChannelCounts {
         followers: v
             .pointer("/data/user/followers/totalCount")
             .and_then(|x| x.as_u64()),
+        ..Default::default()
     }
 }
 
@@ -2542,6 +2640,7 @@ fn kick_counts(slug: &str) -> ChannelCounts {
             .pointer("/livestream/viewer_count")
             .and_then(|x| x.as_u64()),
         followers,
+        ..Default::default()
     }
 }
 
@@ -2550,64 +2649,51 @@ fn run_viewers(
     api_key: String,
     running: Arc<AtomicBool>,
     app: AppHandle,
+    gen: u64,
 ) {
     let mut yt_cache: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    while running.load(Ordering::Relaxed) {
-        let mut items = vec![];
-        // Followers are report-only; keep them out of the live viewers IPC payload.
-
-        let mut followers = vec![];
-        let mut total: u64 = 0;
-        let mut any_live = false;
-        for src in &sources {
-            if !running.load(Ordering::Relaxed) {
-                return;
-            }
-            let label = if src.name.trim().is_empty() {
-                src.value.clone()
-            } else {
-                src.name.clone()
-            };
-            let counts = match src.platform.as_str() {
+    let mut cinefy = cinefy::AudiencePoller::new(
+        sources
+            .iter()
+            .filter(|src| src.platform == "cinefy")
+            .map(|src| src.value.as_str()),
+    );
+    let is_current = || running.load(Ordering::Relaxed) && CHAT_GEN.load(Ordering::SeqCst) == gen;
+    while is_current() {
+        cinefy.begin_cycle();
+        let Some(sample) = collect_viewer_sample(&sources, is_current, |src| {
+            match src.platform.as_str() {
                 "twitch" => twitch_counts(&src.value),
                 // Rounded YouTube subscriber counts cannot reliably measure per-stream gains.
                 "youtube" => ChannelCounts {
                     viewers: youtube_viewers(&api_key, &src.value, &mut yt_cache),
-                    followers: None,
+                    ..Default::default()
                 },
                 "kick" => kick_counts(&src.value),
+                "cinefy" => ChannelCounts::cinefy(cinefy.poll(&src.value, running.as_ref())),
                 _ => ChannelCounts::default(),
-            };
-            let count = counts.viewers;
-            if let Some(v) = count {
-                total += v;
-                any_live = true;
             }
-            if let Some(f) = counts.followers {
-                followers.push(json!({
-                    "platform": src.platform,
-                    "source": label,
-                    "total": f,
-                }));
-            }
-            items.push(json!({
-                "platform": src.platform,
-                "source": label,
-                "viewers": count,
-                "live": count.is_some(),
-            }));
-        }
+        }) else {
+            return;
+        };
         if let Some(p) = session_path(&app) {
-            crate::session::record_viewers(&p, total, &items);
-            crate::session::record_followers(&p, &followers);
+            if !is_current() {
+                return;
+            }
+            crate::session::record_viewers(&p, sample.total, &sample.items);
+            // Followers are report-only; keep them out of the live viewers IPC payload.
+            crate::session::record_followers(&p, &sample.followers);
+        }
+        if !is_current() {
+            return;
         }
         let _ = app.emit(
             "viewers://update",
-            json!({ "total": total, "anyLive": any_live, "items": items }),
+            json!({ "total": sample.total, "anyLive": sample.any_live, "items": sample.items }),
         );
 
         for _ in 0..150 {
-            if !running.load(Ordering::Relaxed) {
+            if !is_current() {
                 return;
             }
             thread::sleep(Duration::from_millis(200));
@@ -2646,6 +2732,261 @@ fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn viewer_source(platform: &str, value: &str, name: &str) -> crate::config::ChatSource {
+        crate::config::ChatSource {
+            id: format!("{platform}:{value}:{name}"),
+            platform: platform.into(),
+            value: value.into(),
+            name: name.into(),
+            enabled: true,
+            has_send_token: false,
+        }
+    }
+
+    fn cinefy_audience(
+        audience_status: cinefy::AudienceStatus,
+        live: bool,
+        viewers: Option<u64>,
+    ) -> cinefy::AudienceSnapshot {
+        cinefy::AudienceSnapshot {
+            audience_status,
+            live,
+            viewers,
+            embedded_viewers: None,
+            audience_origin: None,
+            title: None,
+            started_at: None,
+        }
+    }
+
+    #[test]
+    fn viewers_sum_native_counts_without_attributing_embedded_audience_to_cinefy() {
+        let sources = [
+            viewer_source("cinefy", "native", "Native channel"),
+            viewer_source("cinefy", "embedded", "Embedded channel"),
+            viewer_source("twitch", "upstream", "Upstream channel"),
+        ];
+        let sample = collect_viewer_sample(
+            &sources,
+            || true,
+            |source| match source.value.as_str() {
+                "native" => {
+                    let mut audience =
+                        cinefy_audience(cinefy::AudienceStatus::Live, true, Some(12));
+                    audience.title = Some("Synthetic live".into());
+                    audience.started_at = Some("2026-09-09T10:00:00Z".into());
+                    audience.audience_origin = Some(cinefy::AudienceOrigin::Kick);
+                    ChannelCounts::cinefy(audience)
+                }
+                "embedded" => {
+                    let mut audience =
+                        cinefy_audience(cinefy::AudienceStatus::Embedded, true, Some(900));
+                    audience.audience_origin = Some(cinefy::AudienceOrigin::Twitch);
+                    audience.embedded_viewers = Some(900);
+                    ChannelCounts::cinefy(audience)
+                }
+                _ => ChannelCounts {
+                    viewers: Some(30),
+                    ..Default::default()
+                },
+            },
+        )
+        .expect("current viewer sample");
+        assert_eq!(sample.total, 42);
+        assert!(sample.any_live);
+        assert_eq!(sample.items[0]["viewers"], 12);
+        assert_eq!(sample.items[0]["audienceStatus"], "live");
+        assert!(sample.items[0].get("audienceOrigin").is_none());
+        assert!(sample.items[0].get("embeddedViewers").is_none());
+        assert_eq!(sample.items[1]["viewers"], Value::Null);
+        assert_eq!(sample.items[1]["live"], true);
+        assert_eq!(sample.items[1]["audienceOrigin"], "twitch");
+        assert_eq!(sample.items[1]["embeddedViewers"], 900);
+        let recorded = crate::session::domain::viewers_line(1, sample.total, &sample.items);
+        assert_eq!(recorded["items"], json!(sample.items));
+        assert_eq!(recorded["items"][0]["title"], "Synthetic live");
+        assert_eq!(recorded["items"][0]["startedAt"], "2026-09-09T10:00:00Z");
+    }
+
+    #[test]
+    fn cinefy_live_state_does_not_depend_on_viewer_count_availability() {
+        for (status, live, count, expected_count) in [
+            (cinefy::AudienceStatus::Live, true, Some(0), json!(0)),
+            (cinefy::AudienceStatus::Offline, false, Some(0), json!(0)),
+            (cinefy::AudienceStatus::Unavailable, true, None, Value::Null),
+            (
+                cinefy::AudienceStatus::Unavailable,
+                false,
+                None,
+                Value::Null,
+            ),
+            (cinefy::AudienceStatus::Embedded, true, None, Value::Null),
+        ] {
+            let sample = collect_viewer_sample(
+                &[viewer_source("cinefy", "channel", "")],
+                || true,
+                |_| ChannelCounts::cinefy(cinefy_audience(status, live, count)),
+            )
+            .expect("current viewer sample");
+            assert_eq!(sample.total, 0);
+            assert_eq!(sample.any_live, live);
+            assert_eq!(sample.items[0]["live"], live);
+            assert_eq!(sample.items[0]["viewers"], expected_count);
+            assert!(sample.items[0].get("title").is_none());
+            assert!(sample.items[0].get("startedAt").is_none());
+        }
+    }
+
+    #[test]
+    fn viewers_preserve_legacy_platform_payloads_and_report_only_followers() {
+        let sources = [
+            viewer_source("twitch", "channel", "Named channel"),
+            viewer_source("kick", "channel", ""),
+            viewer_source("youtube", "video", ""),
+        ];
+        let sample = collect_viewer_sample(
+            &sources,
+            || true,
+            |source| match source.platform.as_str() {
+                "twitch" => ChannelCounts {
+                    viewers: None,
+                    followers: Some(100),
+                    ..Default::default()
+                },
+                "kick" => ChannelCounts {
+                    viewers: Some(0),
+                    ..Default::default()
+                },
+                _ => ChannelCounts {
+                    viewers: Some(5),
+                    ..Default::default()
+                },
+            },
+        )
+        .expect("current viewer sample");
+        assert_eq!(sample.total, 5);
+        assert!(sample.any_live);
+        assert_eq!(
+            sample.items,
+            vec![
+                json!({ "platform": "twitch", "source": "Named channel", "viewers": null, "live": false }),
+                json!({ "platform": "kick", "source": "channel", "viewers": 0, "live": true }),
+                json!({ "platform": "youtube", "source": "video", "viewers": 5, "live": true }),
+            ]
+        );
+        assert_eq!(
+            sample.followers,
+            vec![json!({ "platform": "twitch", "source": "Named channel", "total": 100 })]
+        );
+    }
+
+    #[test]
+    fn viewers_deduplicate_cinefy_aliases_without_changing_other_platforms() {
+        let sources = [
+            viewer_source("cinefy", "@Example", "First label"),
+            viewer_source("cinefy", "https://cinefy.gg/example", "Second label"),
+            viewer_source(
+                "cinefy",
+                "https://cinefy.gg/popout/example/chat",
+                "Third label",
+            ),
+            viewer_source("twitch", "example", "Twitch first"),
+            viewer_source("twitch", "example", "Twitch second"),
+        ];
+        let mut calls = 0;
+        let sample = collect_viewer_sample(
+            &sources,
+            || true,
+            |source| {
+                calls += 1;
+                if source.platform == "cinefy" {
+                    ChannelCounts::cinefy(cinefy_audience(
+                        cinefy::AudienceStatus::Live,
+                        true,
+                        Some(10),
+                    ))
+                } else {
+                    ChannelCounts {
+                        viewers: Some(20),
+                        ..Default::default()
+                    }
+                }
+            },
+        )
+        .expect("current viewer sample");
+        assert_eq!(calls, 3);
+        assert_eq!(sample.items.len(), 3);
+        assert_eq!(sample.items[0]["source"], "First label");
+        assert_eq!(sample.total, 50);
+    }
+
+    #[test]
+    fn viewers_discard_partial_samples_when_cancelled_during_a_fetch() {
+        let sources = [
+            viewer_source("twitch", "first", ""),
+            viewer_source("cinefy", "second", ""),
+        ];
+        let running = AtomicBool::new(true);
+        let mut calls = 0;
+        let sample = collect_viewer_sample(
+            &sources,
+            || running.load(Ordering::Relaxed),
+            |_| {
+                calls += 1;
+                if calls == 2 {
+                    running.store(false, Ordering::Relaxed);
+                }
+                ChannelCounts {
+                    viewers: Some(5),
+                    ..Default::default()
+                }
+            },
+        );
+        assert_eq!(calls, 2);
+        assert!(
+            sample.is_none(),
+            "a partial sample must not reach the journal or IPC"
+        );
+        let sample = collect_viewer_sample(
+            &sources,
+            || false,
+            |_| panic!("stopped collection must not fetch"),
+        );
+        assert!(sample.is_none());
+    }
+
+    #[test]
+    fn viewers_discard_results_from_a_superseded_generation() {
+        let generation = AtomicU64::new(1);
+        let sample = collect_viewer_sample(
+            &[viewer_source("cinefy", "channel", "")],
+            || generation.load(Ordering::SeqCst) == 1,
+            |_| {
+                generation.store(2, Ordering::SeqCst);
+                ChannelCounts::cinefy(cinefy_audience(cinefy::AudienceStatus::Live, true, Some(5)))
+            },
+        );
+        assert!(sample.is_none());
+    }
+
+    #[test]
+    fn viewers_total_saturates_instead_of_overflowing_on_hostile_counts() {
+        let sources = [
+            viewer_source("twitch", "first", ""),
+            viewer_source("kick", "second", ""),
+        ];
+        let sample = collect_viewer_sample(
+            &sources,
+            || true,
+            |_| ChannelCounts {
+                viewers: Some(u64::MAX),
+                ..Default::default()
+            },
+        )
+        .expect("current viewer sample");
+        assert_eq!(sample.total, u64::MAX);
+    }
 
     fn native_message(source: &str, native_id: Option<&str>) -> ChatMessage {
         ChatMessage {

@@ -83,7 +83,7 @@ fn decode_runtime_config(body: &str) -> Option<RuntimeConfig> {
     })
 }
 
-fn normalize_slug(input: &str) -> Option<String> {
+pub(super) fn normalize_slug(input: &str) -> Option<String> {
     let without_query = input.trim().split(['?', '#']).next()?.trim_end_matches('/');
     let path = if let Some((_, rest)) = without_query.split_once("://") {
         let rest = rest.strip_prefix("www.").unwrap_or(rest);

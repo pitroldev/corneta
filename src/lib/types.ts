@@ -227,7 +227,19 @@ export interface ChatStatus {
   status: string;
 }
 
-export interface ViewerItem {
+export type ViewerAudienceStatus =
+  "live" | "offline" | "unavailable" | "embedded";
+export type ViewerAudienceOrigin = "twitch" | "youtube" | "kick" | "external";
+
+export interface ViewerAudienceMetadata {
+  audienceStatus?: ViewerAudienceStatus;
+  audienceOrigin?: ViewerAudienceOrigin;
+  embeddedViewers?: number;
+  title?: string;
+  startedAt?: string;
+}
+
+export interface ViewerItem extends ViewerAudienceMetadata {
   platform: ChatPlatform;
   source: string;
   viewers: number | null;
@@ -414,8 +426,8 @@ export interface SessionMarker {
 
 export interface SessionViewerSample {
   t: number;
-  total: number;
-  items: { platform: ChatPlatform; source: string; viewers: number | null }[];
+  total: number | null;
+  items: (Omit<ViewerItem, "live"> & { live?: boolean })[];
 }
 
 /** Absolute follower totals; gains require differences between samples. */

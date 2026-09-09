@@ -22,6 +22,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { AlertsFeed } from "../components/AlertsFeed";
 import { ChatFeed, type ChatView } from "../components/ChatFeed";
+import { CinefyAudience } from "../components/CinefyAudience";
 import { LegalLink } from "../components/legal";
 import { Modal } from "../components/Modal";
 import { Select } from "../components/Select";
@@ -36,6 +37,7 @@ import {
   SectionTitle,
 } from "../components/ui";
 import { api, IS_TAURI } from "../lib/api";
+import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { sendStatusLine, srcLabel } from "../lib/chatSend";
 import { bold, useI18n } from "../lib/i18n";
 import { legalUrl } from "../lib/legal";
@@ -487,27 +489,19 @@ export function ChatScreen() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            {viewers.total > 0 && (s.chatShowViewers ?? true) && (
+            {showAudience(viewers) && (s.chatShowViewers ?? true) && (
               <button
                 type="button"
                 onClick={() => setSettings({ chatShowViewers: false })}
                 className="flex items-center gap-1.5 text-sm font-bold text-ink-muted transition-colors hover:text-ink"
                 title={
-                  viewers.items
-                    .filter((i) => i.live)
-                    .map((i) =>
-                      t("chat.viewers.tooltip.row", {
-                        source: i.source,
-                        n: fmt.num(i.viewers ?? 0),
-                      }),
-                    )
-                    .join("\n") +
+                  audienceTooltip(viewers.items, { t, fmt }) +
                   "\n" +
                   t("chat.viewers.tooltip.hide")
                 }
               >
                 <Eye className="size-4 text-brass" />
-                {t("chat.viewers.count", { n: fmt.num(viewers.total) })}
+                {t("chat.viewers.count", { n: audienceTotal(viewers, fmt) })}
               </button>
             )}
             <Button
@@ -519,6 +513,9 @@ export function ChatScreen() {
             </Button>
           </div>
         </div>
+        {(s.chatShowViewers ?? true) && (
+          <CinefyAudience items={viewers.items} />
+        )}
       </Card>
 
       {showConfig && (

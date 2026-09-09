@@ -430,7 +430,22 @@ export const pt = {
   "chat.source.hint.kick":
     "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
   "chat.source.hint.cinefy":
-    "O nome no link da Cinefy. Experimental e somente leitura: depende de endpoints não documentados e pode mudar sem aviso.",
+    "O nome no link da Cinefy. Chat e audiência de lives próprias, somente leitura. Players de outras plataformas não entram no total. A integração depende de endpoints não documentados e pode mudar sem aviso.",
+  "audience.cinefy": "Audiência da Cinefy",
+  "audience.partial": "Total parcial: inclui apenas as audiências disponíveis.",
+  "audience.external": "outra plataforma",
+  "audience.embeddedCount":
+    "Player incorporado ({platform}): {n} espectadores; audiência não somada.",
+  "audience.live": "Ao vivo",
+  "audience.offline": "Fora do ar",
+  "audience.unavailable": "Audiência indisponível — vou consultar de novo.",
+  "audience.embedded": "Live incorporada da {platform}; audiência não somada.",
+  "audience.embedded.unknown":
+    "Live de outra plataforma; audiência não somada.",
+  "audience.startedAt": "Início informado: {date}, às {time}",
+  "reports.channel.audienceLatest": "Última leitura: {status}",
+  "reports.channel.audienceUnavailable":
+    "audiência indisponível nessa consulta",
   "chat.source.hint.twitch":
     "Só o nome do canal — o que vem depois de twitch.tv/.",
   "chat.source.hint.youtube": "Seu canal (@handle, URL ou ID).",

@@ -16,6 +16,8 @@ import type {
   SessionSample,
   SessionSummary,
   SessionViewerSample,
+  ViewerAudienceOrigin,
+  ViewerAudienceStatus,
 } from "./types";
 
 /** Inject translation to avoid shared locale state between webviews. */
@@ -62,6 +64,129 @@ function parseResourceApps(value: unknown): SessionResourceApp[] | undefined {
     });
   }
   return apps.length ? apps : undefined;
+}
+
+const audienceCount = (value: unknown): number | null =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
+const AUDIENCE_STATUSES = [
+  "live",
+  "offline",
+  "unavailable",
+  "embedded",
+] as const;
+const AUDIENCE_ORIGINS = ["twitch", "youtube", "kick", "external"] as const;
+
+function parseAudienceStartedAt(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 40) return undefined;
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
+      value,
+    );
+  if (!match || !Number.isFinite(Date.parse(value))) return undefined;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const monthDays = [
+    31,
+    leap ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  return month >= 1 && month <= 12 && day >= 1 && day <= monthDays[month - 1]
+    ? value
+    : undefined;
+}
+
+function parseViewerItems(value: unknown): SessionViewerSample["items"] {
+  if (!Array.isArray(value)) return [];
+  const items: SessionViewerSample["items"] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    if (
+      typeof item.platform !== "string" ||
+      !isChatPlatform(item.platform) ||
+      typeof item.source !== "string"
+    )
+      continue;
+    const audienceStatus = AUDIENCE_STATUSES.find(
+      (status) => status === item.audienceStatus,
+    );
+    const audienceOrigin = AUDIENCE_ORIGINS.find(
+      (origin) => origin === item.audienceOrigin,
+    );
+    const title =
+      typeof item.title === "string"
+        ? item.title
+            .replace(/[\p{Cc}]/gu, "")
+            .trim()
+            .slice(0, 512) || undefined
+        : undefined;
+    const startedAt = parseAudienceStartedAt(item.startedAt);
+    const embeddedViewers =
+      audienceStatus === "embedded"
+        ? audienceCount(item.embeddedViewers)
+        : null;
+    items.push({
+      platform: item.platform,
+      source: item.source,
+      viewers:
+        audienceStatus === "embedded" ||
+        audienceStatus === "unavailable" ||
+        (item.platform === "cinefy" && audienceOrigin !== undefined)
+          ? null
+          : audienceCount(item.viewers),
+      ...(typeof item.live === "boolean" ? { live: item.live } : {}),
+      ...(audienceStatus ? { audienceStatus } : {}),
+      ...(audienceOrigin ? { audienceOrigin } : {}),
+      ...(embeddedViewers !== null ? { embeddedViewers } : {}),
+      ...(title ? { title } : {}),
+      ...(startedAt ? { startedAt } : {}),
+    });
+  }
+  return items;
+}
+
+const hasCinefyAudience = (item: SessionViewerSample["items"][number]) =>
+  item.platform === "cinefy" &&
+  (item.audienceStatus !== undefined || item.audienceOrigin !== undefined);
+
+function viewerTotal(
+  rawTotal: unknown,
+  items: SessionViewerSample["items"],
+): number | null {
+  if (!items.some(hasCinefyAudience)) return audienceCount(rawTotal);
+  // A partial total would invent a drop and a recovery spike during a native counter outage.
+  if (
+    items.some(
+      (item) =>
+        item.platform === "cinefy" &&
+        (item.audienceStatus === "unavailable" ||
+          (item.audienceStatus === "live" &&
+            item.audienceOrigin === undefined &&
+            item.viewers === null)),
+    )
+  )
+    return null;
+  // The native journal uses zero for an unknown total; only measured counters can establish it.
+  const counts = items.flatMap((item) =>
+    item.viewers === null ? [] : [item.viewers],
+  );
+  return counts.length
+    ? audienceCount(counts.reduce((sum, count) => sum + count, 0))
+    : null;
 }
 
 export function parseSession(ndjson: string, t: Translate): SessionData | null {
@@ -113,10 +238,11 @@ export function parseSession(ndjson: string, t: Translate): SessionData | null {
     } else if (o.kind === "viewers") {
       const ts = Number(o.t);
       if (!Number.isFinite(ts)) continue;
+      const items = parseViewerItems(o.items);
       viewerSamples.push({
         t: ts,
-        total: Number(o.total) || 0,
-        items: (o.items ?? []) as SessionViewerSample["items"],
+        total: viewerTotal(o.total, items),
+        items,
       });
     } else if (o.kind === "followers") {
       const ts = Number(o.t);
@@ -381,6 +507,14 @@ export interface ChannelStats {
   platform: ChatPlatform;
   source: string;
   viewers: { peak: number; avg: number; last: number; hasData: boolean };
+  audience?: {
+    status?: ViewerAudienceStatus;
+    origin?: ViewerAudienceOrigin;
+    embeddedViewers?: number;
+    title?: string;
+    startedAt?: string;
+    live?: boolean;
+  };
   /** Share of concurrent audience, 0–100; null when audience was not measured. */
   sharePct: number | null;
   followers: {
@@ -1455,9 +1589,11 @@ function buildVerdict(
 }
 
 function viewerStats(d: SessionData): ViewerStats {
-  const vs = d.viewerSamples;
-  if (!vs.length) return { peak: 0, avg: 0, start: 0, end: 0, hasData: false };
-  const totals = vs.map((v) => v.total);
+  const totals = d.viewerSamples
+    .map((v) => v.total)
+    .filter((total): total is number => total !== null);
+  if (!totals.length)
+    return { peak: 0, avg: 0, start: 0, end: 0, hasData: false };
   return {
     peak: maxOf(totals),
     avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
@@ -1481,6 +1617,10 @@ interface ChannelAcc {
   viewerPeak: number;
   viewerLast: number;
   viewerSeen: boolean;
+  viewerCount: number;
+  measuredCinefy: boolean;
+  audience?: ChannelStats["audience"];
+  audienceAt: number;
   chat: number;
   /** At least two follower samples are required for a measured gain; one sample only establishes the total. */
   followFirst: number | null;
@@ -1503,6 +1643,9 @@ function newAcc(platform: ChatPlatform, source: string): ChannelAcc {
     viewerPeak: 0,
     viewerLast: 0,
     viewerSeen: false,
+    viewerCount: 0,
+    measuredCinefy: false,
+    audienceAt: -Infinity,
     chat: 0,
     followFirst: null,
     followLast: null,
@@ -1525,12 +1668,32 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
   for (const v of d.viewerSamples)
     for (const it of v.items) {
       const c = get(it.platform, it.source);
+      if (hasCinefyAudience(it)) c.measuredCinefy = true;
+      if (
+        (it.audienceStatus !== undefined ||
+          it.audienceOrigin !== undefined ||
+          it.title !== undefined ||
+          it.startedAt !== undefined) &&
+        v.t >= c.audienceAt
+      ) {
+        c.audience = {
+          status: it.audienceStatus,
+          origin: it.audienceOrigin,
+          ...(it.embeddedViewers !== undefined
+            ? { embeddedViewers: it.embeddedViewers }
+            : {}),
+          title: it.title,
+          startedAt: it.startedAt,
+          live: it.live,
+        };
+        c.audienceAt = v.t;
+      }
       if (it.viewers == null) continue;
-      // Offline channels count as zero so channel averages sum to the total audience.
       c.viewerSum += it.viewers;
       c.viewerPeak = Math.max(c.viewerPeak, it.viewers);
       c.viewerLast = it.viewers;
       c.viewerSeen = true;
+      c.viewerCount++;
     }
   const vN = d.viewerSamples.length;
 
@@ -1596,15 +1759,24 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
     key,
     platform: c.platform,
     source: c.source,
+    ...(c.audience ? { audience: c.audience } : {}),
     viewers: {
       peak: c.viewerPeak,
-      avg: vN ? Math.round(c.viewerSum / vN) : 0,
+      // Preserve legacy denominators; explicit Cinefy gaps are not measured zeroes.
+      avg: c.measuredCinefy
+        ? c.viewerCount
+          ? Math.round(c.viewerSum / c.viewerCount)
+          : 0
+        : vN
+          ? Math.round(c.viewerSum / vN)
+          : 0,
       last: c.viewerLast,
       hasData: c.viewerSeen,
     },
-    sharePct: totalViewerSum
-      ? Math.round((c.viewerSum / totalViewerSum) * 1000) / 10
-      : null,
+    sharePct:
+      totalViewerSum && (!c.measuredCinefy || c.viewerSeen)
+        ? Math.round((c.viewerSum / totalViewerSum) * 1000) / 10
+        : null,
     chat: {
       total: c.chat,
       perMin: Math.round(c.chat / durMin),
@@ -1774,8 +1946,11 @@ function highlights(d: SessionData, t: Translate): Highlight[] {
   }
   const vs = d.viewerSamples;
   for (let i = 1; i < vs.length; i++) {
-    const delta = vs[i].total - vs[i - 1].total;
-    if (delta >= 15 && delta >= vs[i - 1].total * 0.2)
+    const current = vs[i].total;
+    const previous = vs[i - 1].total;
+    if (current === null || previous === null) continue;
+    const delta = current - previous;
+    if (delta >= 15 && delta >= previous * 0.2)
       out.push({
         t: vs[i].t,
         kind: "viewers",

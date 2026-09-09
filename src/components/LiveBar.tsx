@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronRight, Eye, Shield, X } from "lucide-react";
 import { downTargets, useStore } from "../lib/store";
 import { fmtUptime } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
+import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 
 export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const { t, fmt } = useI18n();
@@ -11,7 +12,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   const startedAt = useStore((s) => s.snapshot.startedAt);
   // Keep destination counts consistent with the App live-region announcement.
   const down = useStore((s) => downTargets(s.snapshot));
-  const viewersTotal = useStore((s) => s.viewers.total);
+  const viewers = useStore((s) => s.viewers);
   const guardianOn = useStore((s) => s.snapshot.guardianStatus === "ready");
   const brbOn = useStore((s) => s.config?.settings.brbEnabled ?? false);
   const autoBitrateOn = useStore(
@@ -104,11 +105,14 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
         </span>
       )}
 
-      {viewersTotal > 0 && (
-        <span className="flex items-center gap-1.5">
+      {showAudience(viewers) && (
+        <span
+          className="flex items-center gap-1.5"
+          title={audienceTooltip(viewers.items, { t, fmt })}
+        >
           <Eye className="size-4" />
           <span className="font-display text-lg font-extrabold leading-none tabular-nums">
-            {fmt.num(viewersTotal)}
+            {audienceTotal(viewers, fmt)}
           </span>
           <span className="text-[11px] font-bold uppercase tracking-wide">
             {t("golive.bar.watching")}

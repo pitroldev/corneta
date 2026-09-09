@@ -86,4 +86,25 @@ describe("summaryCache", () => {
     );
     expect(getCachedSummary("s1")).toBeNull();
   });
+
+  it("invalidates pre-nullable-audience summaries even when the source revision matches", () => {
+    const session = { id: "s1", sourceRevision: "1024:123" } as SessionMeta;
+    localStorage.setItem(
+      "corneta.session-summaries",
+      JSON.stringify({
+        version: 4,
+        entries: { s1: { summary: fake, revision: session.sourceRevision } },
+      }),
+    );
+    reconcileSummaryCache([session]);
+    expect(getCachedSummary("s1")).toBeNull();
+    setCachedSummary("s1", fake);
+    flushSummaryCache();
+    expect(
+      JSON.parse(localStorage.getItem("corneta.session-summaries")!),
+    ).toMatchObject({
+      version: 5,
+      entries: { s1: { summary: fake, revision: session.sourceRevision } },
+    });
+  });
 });

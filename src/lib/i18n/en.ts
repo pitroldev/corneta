@@ -437,7 +437,24 @@ export const en: Dict = {
   "chat.source.hint.kick":
     "The name in the link: kick.com/YOURNAME. Kick sometimes blocks reading the chat and it won't connect.",
   "chat.source.hint.cinefy":
-    "The name in the Cinefy link. Experimental and read-only: it relies on undocumented endpoints that may change without notice.",
+    "The name in the Cinefy link. Read-only chat and audience for streams hosted on Cinefy. Embedded players from other platforms are excluded from the total. The integration relies on undocumented endpoints that may change without notice.",
+  "audience.cinefy": "Cinefy audience",
+  "audience.partial": "Partial total: includes only available audience counts.",
+  "audience.external": "another platform",
+  "audience.embeddedCount":
+    "Embedded player ({platform}): {n} viewers; excluded from the total.",
+  "audience.live": "Live",
+  "audience.offline": "Offline",
+  "audience.unavailable":
+    "Audience unavailable — checking again automatically.",
+  "audience.embedded":
+    "Stream embedded from {platform}; audience excluded from the total.",
+  "audience.embedded.unknown":
+    "Stream from another platform; audience excluded from the total.",
+  "audience.startedAt": "Reported start: {date}, {time}",
+  "reports.channel.audienceLatest": "Last reading: {status}",
+  "reports.channel.audienceUnavailable":
+    "audience unavailable for this reading",
   "chat.source.hint.twitch":
     "Just the channel name — whatever comes after twitch.tv/.",
   "chat.source.hint.youtube": "Your channel (@handle, URL or ID).",

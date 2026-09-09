@@ -12,6 +12,7 @@ import {
 import { cn } from "../lib/utils";
 import { useI18n, type MessageKey } from "../lib/i18n";
 import { useStore } from "../lib/store";
+import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { MESA_ENABLED } from "../lib/flags";
 import { Mascot } from "./decor";
 
@@ -264,17 +265,14 @@ export function Sidebar({
           </button>
         )}
 
-        {viewers.total > 0 && (
+        {showAudience(viewers) && (
           <div
             className="flex items-center justify-center gap-1.5 pt-0.5 text-xs text-ink-faint"
-            title={viewers.items
-              .filter((i) => i.live)
-              .map((i) => `${i.source}: ${fmt.num(i.viewers ?? 0)}`)
-              .join("\n")}
+            title={audienceTooltip(viewers.items, { t, fmt })}
           >
             <Eye className="size-3.5" />
             <span className="font-display font-extrabold text-ink-muted">
-              {fmt.num(viewers.total)}
+              {audienceTotal(viewers, fmt)}
             </span>
             {t("sidebar.viewers")}
           </div>

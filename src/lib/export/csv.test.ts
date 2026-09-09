@@ -177,4 +177,52 @@ describe("seriesCsv", () => {
     expect(out[1].split(";")[col]).toBe("");
     expect(out[2].split(";")[col]).toBe("120");
   });
+
+  it("clears Cinefy audience during unavailable, embedded and missing samples", () => {
+    const audience = (
+      offset: number,
+      viewers: number | null,
+      audienceStatus: string,
+      extra = {},
+    ) => ({
+      kind: "viewers",
+      t: start + offset,
+      total: viewers ?? 0,
+      items: [
+        {
+          platform: "cinefy",
+          source: "Cinefy",
+          viewers,
+          audienceStatus,
+          ...extra,
+        },
+      ],
+    });
+    const data = sessionData([
+      audience(1000, 120, "live"),
+      audience(3000, null, "unavailable"),
+      audience(5000, 80, "live"),
+      audience(7000, null, "embedded", { audienceOrigin: "youtube" }),
+      audience(9000, 0, "live"),
+      { kind: "viewers", t: start + 11000, total: 0, items: [] },
+      ...[2000, 4000, 6000, 8000, 10000, 12000].map((offset) => ({
+        kind: "sample",
+        t: start + offset,
+        targets: [],
+      })),
+    ]);
+    const out = rows(seriesCsv(data, analyze(data, t), i18n));
+    const column = out[0]
+      .split(";")
+      .indexOf("assistindo_ultimo_conhecido_Cinefy");
+    expect(column).toBeGreaterThan(-1);
+    expect(out.slice(1).map((row) => row.split(";")[column])).toEqual([
+      "120",
+      "",
+      "80",
+      "",
+      "0",
+      "",
+    ]);
+  });
 });

@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import { Card, Button, PlatformGlyph } from "../../components/ui";
 import { useI18n, useT } from "../../lib/i18n";
+import {
+  audienceStartedAt,
+  audienceStatusText,
+  embeddedAudienceText,
+} from "../../lib/audience";
 import type {
   ChannelBreakdown,
   ChannelStats,
@@ -143,6 +148,8 @@ function ChannelRow({
   color: string;
 }) {
   const { t, fmt } = useI18n();
+  const audience = channel.audience;
+  const startedAt = audienceStartedAt(audience?.startedAt, { t, fmt });
   const chips: { Icon: Icon; value: string }[] = [];
   if (channel.followers.hasData && channel.followers.gained !== 0)
     chips.push({
@@ -201,6 +208,40 @@ function ChannelRow({
           </span>
         ) : null}
       </div>
+      {audience ? (
+        <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ink-muted">
+          {audience.title ? (
+            <p className="truncate" title={audience.title}>
+              {audience.title}
+            </p>
+          ) : null}
+          {audience.status ? (
+            <p>
+              {t("reports.channel.audienceLatest", {
+                status:
+                  audience.status === "unavailable"
+                    ? t("reports.channel.audienceUnavailable")
+                    : (embeddedAudienceText(
+                        {
+                          audienceStatus: audience.status,
+                          audienceOrigin: audience.origin,
+                          embeddedViewers: audience.embeddedViewers,
+                        },
+                        { t, fmt },
+                      ) ??
+                      audienceStatusText(
+                        {
+                          audienceStatus: audience.status,
+                          audienceOrigin: audience.origin,
+                        },
+                        t,
+                      )),
+              })}
+            </p>
+          ) : null}
+          {startedAt ? <p>{startedAt}</p> : null}
+        </div>
+      ) : null}
       {channel.sharePct != null ? (
         <div className="mt-1.5 flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
