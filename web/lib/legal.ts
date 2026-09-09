@@ -11,9 +11,9 @@ export const LEGAL_VENUE = "Rio de Janeiro, RJ";
 export const LEGAL_HOST = "Vercel Inc.";
 
 // Informational revision date, not an acceptance reset. Keep labels static for SSR.
-export const LEGAL_UPDATED_ISO = "2026-09-07";
-export const LEGAL_UPDATED_LABEL_PT = "7 de setembro de 2026";
-export const LEGAL_UPDATED_LABEL_EN = "September 7, 2026";
+export const LEGAL_UPDATED_ISO = "2026-09-09";
+export const LEGAL_UPDATED_LABEL_PT = "9 de setembro de 2026";
+export const LEGAL_UPDATED_LABEL_EN = "September 9, 2026";
 
 // Mirror src/lib/legal.ts; change only for material terms that require renewed acceptance.
 export const LEGAL_ACCEPT_VERSION = "2026-08-01";

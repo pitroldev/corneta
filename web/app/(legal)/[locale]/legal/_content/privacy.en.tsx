@@ -49,7 +49,7 @@ export const privacySectionsEn = [
 
 export const privacyTldrEn = {
   points: [
-    "Corneta creates no account and needs no sign-up. In the app, usage data and crash reports start on by default when collection is configured; you can turn each purpose off separately.",
+    "Corneta creates no account and needs no sign-up. In the app, usage data is sent only if you enable it. Crash reports start on without a previous choice and can be turned off. Your previous choices are kept.",
     "Stream keys and tokens live in your operating system’s credential vault, never on our servers.",
     "Settings, chat, alerts and stream reports live in files on your computer.",
     "Only the Kick sign-in passes through our servers — in transit, never stored. Twitch and YouTube talk straight to your app.",
@@ -135,16 +135,22 @@ export function PrivacyBodyEn() {
           us.
         </p>
         <Callout>
-          App telemetry <strong>starts on</strong> and runs under legitimate
-          interest (art. 7º, IX): usage data and crash reports exist to find and
-          fix problems. You can <strong>turn each one off at any time</strong>{" "}
-          in Settings — that is your right to object (art. 18, §2), it takes
-          effect immediately, and it changes nothing about how Corneta works. A
-          random installation UUID is created on first use with an active
-          purpose. Turning both off stops new events but does not delete data
-          already received by the processor. Copy the UUID before regenerating
-          it or restarting the app with both purposes off if you want to request
-          deletion. You can verify this behaviour in the source code.
+          In the app,{" "}
+          <strong>usage data requires your explicit activation</strong>,
+          separate from accepting the terms. Without a previous choice, this
+          purpose is off. Crash reports start on without a previous choice and
+          can be turned off. The intended basis for usage data is consent (art.
+          7º, I); for crash reports, the proposed basis is legitimate interest
+          (art. 7º, IX), subject to the controller’s assessment, not automatic
+          approval by the software. You can withdraw usage activation or object
+          to crash reporting in Settings without losing Corneta features. Your
+          previous choices are kept; closing the notice does not enable usage
+          data. A random installation UUID is created on first use with an
+          active purpose. Turning both off stops new events but does not delete
+          data already received by the processor. Copy the UUID before
+          regenerating it or restarting the app with both purposes off if you
+          want to request deletion. You can verify this behaviour in the source
+          code.
         </Callout>
       </LegalSection>
 
@@ -298,8 +304,9 @@ export function PrivacyBodyEn() {
           The app keeps, on your machine, what it needs to do its job. None of
           the content described below is sent to us. Only the technical data
           expressly listed further down may be sent when collection is
-          configured and the corresponding purpose is active, including before a
-          choice on first use.
+          configured and the corresponding purpose is active. Before a choice on
+          first use, only crash reports and their minimal startup marker may be
+          sent, never usage data.
         </p>
         <ul>
           <li>
@@ -340,15 +347,18 @@ export function PrivacyBodyEn() {
             and to whom to send the diagnostic file.
           </li>
           <li>
-            <strong>Telemetry you can turn off</strong> — “usage data” may send
-            the version, language, categorised system family, architecture and
-            GPU, operation stages and outcomes, enumerated platforms,
-            destination count and bucketed durations. “Crash reports” may send
-            the error code and stage, type, redacted stack and random
-            error/operation identifiers, plus a minimal startup marker with the
-            version and whether the previous exit was clean, needed to measure
-            stability without enabling usage metrics. These are two independent
-            preferences and both start on. Even when active, we never send
+            <strong>Telemetry with independent controls</strong> — “usage data”
+            sends only after explicit activation: version, language, categorised
+            system family, architecture and GPU, operation stages and outcomes,
+            enumerated platforms, destination count and bucketed durations.
+            “Crash reports” may send the error code and stage, type, redacted
+            stack and random error/operation identifiers, plus a minimal startup
+            marker with the version and whether the previous exit was clean, to
+            contextualise failures without enabling usage metrics. Without a
+            previous choice, usage is off and crash reports are on. Enabling
+            usage does not send events from before activation, including
+            onboarding stages. Previous explicit choices, on or off, are
+            preserved when the notice changes. Even when active, we never send
             video, audio, chat, alerts, stream title, channel, keys, tokens,
             RTMP URL, hostname, full local path, raw logs or configuration.
           </li>
@@ -356,8 +366,9 @@ export function PrivacyBodyEn() {
             <strong>Telemetry preference and UUID</strong> — these live in a
             separate local file that does not travel with configuration exports
             or imports. The UUID is created on first use with an active purpose,
-            even before you make a choice. Turning both off stops new events and
-            clears SDK persistence. The ID remains available in the current
+            including before a choice on first use if crash reports are active.
+            This does not enable usage data. Turning both off stops new events
+            and clears SDK persistence. The ID remains available in the current
             session so you can copy it and request deletion of previous events;
             copy it before restarting or regenerating it. Regenerating the ID
             does not delete data held by the processor.
@@ -420,14 +431,25 @@ export function PrivacyBodyEn() {
             privacy signals.
           </li>
           <li>
-            <strong>Legitimate interest</strong> (art. 7º, IX) — app usage data
-            and automatic crash reports start on and exist to find defects,
-            measure stability, and prioritise fixes. Processing is kept to the
-            minimum necessary (art. 10, §1): a closed list of technical
-            properties, no stream content, no geolocation, and no identified
-            profile. You can object to each purpose at any time in Settings
-            (art. 18, §2), with immediate effect and without affecting how
-            Corneta works. The balancing test is published in the repository.
+            <strong>Consent for usage data</strong> (art. 7º, I) — this purpose
+            sends only after explicit activation and can be turned off at any
+            time without affecting Corneta features. It helps understand usage
+            stages and outcomes to guide improvements. We do not recover events
+            from before activation. Accepting the terms or closing the notice
+            does not replace this choice.
+          </li>
+          <li>
+            <strong>Legitimate interest for crash reports</strong> (art. 7º, IX)
+            — the proposed basis for automatic failure reporting is to find
+            defects and guide fixes. Without a previous choice, this purpose
+            starts on. Processing must be limited to what is necessary (art. 10,
+            §1): a closed list of technical properties, no stream content, no
+            geolocation, and no request for an identified profile. You can
+            object to crash reporting at any time in Settings (art. 18, §2),
+            with immediate effect and without affecting how Corneta works. The
+            draft balancing assessment is published in the repository; the
+            suitability of the legal basis depends on legal review, not on the
+            existence of the switch.
           </li>
           <li>
             <strong>Compliance with a legal or regulatory obligation</strong>{" "}
@@ -691,8 +713,8 @@ export function PrivacyBodyEn() {
         <p>
           To exercise any of them, write to <Contact locale={L} />. We’ll answer
           within the statutory deadline. Since we keep no account, most data
-          concerning you is already under your direct control. If you enabled
-          app telemetry, include the UUID you can copy from Settings so we can
+          concerning you is already under your direct control. For telemetry
+          sent by the app, include the UUID you can copy from Settings so we can
           locate and delete the events. Cookieless site telemetry creates no
           persistent identifier with which to isolate a past visit; the control
           below prevents new sends in this browser.

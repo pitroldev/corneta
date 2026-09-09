@@ -33,6 +33,31 @@ Registre modelo CPU/GPU, RAM, Windows, driver, Node/Rust/WebView2/OBS, energia, 
 
 Para uma comparação, use ao menos três execuções equivalentes. Uma piora reproduzível de p95 superior a 20% merece investigação, mesmo abaixo do teto absoluto; esse percentual é um critério de revisão, não falha automática em runner compartilhado. Para memória, avalie inclinação após aquecimento e limites de retenção, não só memória alocada no fim.
 
+## Benchmark isolado de telemetria
+
+Em um clone descartável, com dependências instaladas e sem arquivos `.env` reais, execute:
+
+```sh
+pnpm benchmark:telemetry
+```
+
+O padrão usa Microsoft Edge no Windows e três repetições. Para outro Chromium ou outra quantidade entre 1 e 10, passe o executável e a quantidade como argumentos: `pnpm benchmark:telemetry CAMINHO_DO_CHROMIUM 3`. O processo usa ambiente de contribuição, perfil temporário, build próprio sem configuração Vite do app e sem source maps; não abre a Corneta, OBS ou contas. Requisições do SDK são direcionadas a um coletor em `127.0.0.1`, que descarta os corpos. Requisições não locais são bloqueadas, e qualquer tentativa invalida o resultado.
+
+Cada cenário compara as duas finalidades explicitamente desligadas com ambas ligadas, usando somente identificação e eventos fictícios:
+
+| Cenário              | Carga                                                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Normal               | 24 eventos espaçados em 30 ms, mais uma exceção sintética a cada dez eventos                                                 |
+| Rajada               | 5.000 eventos em sequência, mais 500 exceções sintéticas                                                                     |
+| Coletor indisponível | A mesma rajada, com respostas HTTP 503 locais e observação por pelo menos 3,5 s; não é uma interrupção da rede do computador |
+| SDK atrasado         | A mesma rajada antes da liberação do carregamento do SDK, atrasado artificialmente em 400 ms                                 |
+
+O JSON em `.artifacts/performance/telemetry.json` registra versões, hardware sem hostname, hashes dos fontes, tempo de importação/inicialização, custo das chamadas, atrasos de timer e intervalos de `requestAnimationFrame`, tarefas longas, heap JavaScript antes/depois de GC explícito, descartes e picos das filas. O cronômetro das chamadas exclui a criação dos dados fictícios e a amostragem dos diagnósticos; a responsividade inclui a carga inteira. Não há limite temporal universal: compare pelo menos três execuções equivalentes. O comando falha por invariantes verificáveis — importação/envio com tudo desligado, fila da facade acima de 64, mais de uma entrega pendente, trabalho local não encerrado, retries retidos no SDK ou tentativa de tráfego externo — e não por variação de milissegundos em máquina compartilhada.
+
+O SDK real é `posthog-js/dist/module.no-external`, com suas opções da aplicação, exceto o destino local. No documento sintético, `webdriver` fica desligado, o marcador `HeadlessChrome` é removido do user agent, `userAgentData` fica ausente e DNT é `0`: isso representa uma WebView comum e impede que a filtragem de automação do SDK transforme a medição em chamadas descartadas antes do envio. As condições ligadas precisam enviar ao coletor local, inclusive no cenário 503. Essa simulação não testa políticas reais de DNT ou de automação.
+
+A fila de retries do SDK é medida separadamente e deve permanecer vazia, coerente com a política de tentativa única do transporte. Isso não permite recolher uma requisição já enviada nem prova a revogação de consentimento em todos os caminhos; testes próprios cobrem esse contrato. O cache HTTP fica desligado e cada medição usa outro documento, mas o processo do navegador e caches do sistema permanecem quentes. Esses números **não medem o startup completo do app**, o IPC, CPU/GPU da transmissão, RSS nativo nem provam ausência de vazamentos. As recomendações de carregamento condicional orientam a separação entre importar a facade, carregar o SDK e processar eventos; não autorizam concluir que toda a interface ficou mais rápida.
+
 ## Invariantes de implementação
 
 Não bloquear a transmissão com coleta, disco, relatórios ou telemetria. Preserve filas limitadas, descarte planejado, cancelamento, reuso de rendições, pools de frames e isolamento do gravador. No React, preserve lazy loading, imports condicionais, worker, chat virtualizado/paginado e assinaturas de estado estreitas. Menos código não prova menos CPU; um cache sem teto pode trocar tempo por vazamento.

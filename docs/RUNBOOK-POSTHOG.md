@@ -5,7 +5,7 @@ salvaguardas estão na [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMET
 variáveis e perfis ficam em [configuração](CONFIGURACAO.md), e os limites das
 integrações em [superfície de rede](SUPERFICIE-DE-REDE.md).
 
-O padrão técnico é **opt-out**. Este procedimento não atesta configuração do
+No desktop, **uso é opt-in e falhas são opt-out**. Este procedimento não atesta configuração do
 operador nem aprovação jurídica; registre as verificações necessárias no
 [checklist de publicação](PUBLICACAO.md).
 
@@ -20,9 +20,14 @@ operador nem aprovação jurídica; registre as verificações necessárias no
 
 Regras invariantes:
 
-- as duas preferências do app começam ativas (`unset`) e são independentes; não são opt-ins;
-- com configuração válida, pode haver envio desde o primeiro uso, antes da escolha; o aviso
-  informa esse estado e permite desligar as duas;
+- uso só envia em `enabled`; `unset` e `disabled` não permitem eventos de uso;
+- falhas ficam ativas em `unset` e `enabled`, mas nunca em `disabled`. Com configuração
+  válida, exceções e o marcador mínimo de abertura podem sair antes da primeira escolha;
+- os controles são independentes. Escolhas explícitas anteriores são preservadas na versão
+  de aviso `2026-09-09`; não são substituídas pelos defaults nem consideradas consentimento
+  juridicamente validado só porque a migração as preservou;
+- fechar o aviso ou aceitar termos não ativa uso. Ativar uso só permite eventos futuros,
+  sem guardar etapas anteriores para enviá-las após a adesão;
 - uma finalidade desligada não pode produzir evento daquela finalidade;
 - texto livre, conteúdo de chat/live, credenciais, tokens, paths e URLs não entram no PostHog;
 - logs permanecem locais e separados; o diagnóstico exportável contém somente resumo técnico e eventos estruturados allowlisted, e nunca é anexado automaticamente;
@@ -38,10 +43,10 @@ misture token de uma região com host da outra.
 
 Crie dois projetos sem copiar dados entre eles:
 
-| Projeto        | Dados                                                           | Quem acessa              | Retenção |
-| -------------- | --------------------------------------------------------------- | ------------------------ | -------- |
-| `corneta-dev`  | sintéticos/dogfood                                              | engenharia               | 30 dias  |
-| `corneta-prod` | dados técnicos de produção, respeitando oposição por finalidade | engenharia + controlador | 90 dias  |
+| Projeto        | Dados                                                                    | Quem acessa              | Retenção |
+| -------------- | ------------------------------------------------------------------------ | ------------------------ | -------- |
+| `corneta-dev`  | sintéticos/dogfood                                                       | engenharia               | 30 dias  |
+| `corneta-prod` | dados técnicos de produção, respeitando adesão a uso e oposição a falhas | engenharia + controlador | 90 dias  |
 
 Em **Project settings**, para os dois projetos:
 
@@ -59,6 +64,10 @@ Em **Project settings**, para os dois projetos:
 
 Antes do primeiro envio para produção, publique as políticas PT/EN presentes no site e confirme
 que a versão mostrada no app é a mesma do aviso publicado.
+
+Somente depois dessa publicação e das revisões exigidas, atualize a variável do Environment
+`TELEMETRY_POLICY_PUBLISHED_VERSION` para `2026-09-09`. O gate exige essa versão do aviso;
+preencher a variável não publica a política, não aprova a base legal e não configura o operador.
 
 Faça a verificação de ausência de criação de perfil com um UUID sintético novo. Um UUID
 previamente identificado pode continuar associado a um perfil, mesmo com a propriedade em
@@ -80,6 +89,16 @@ e a [documentação do PostHog](https://posthog.com/docs/data/anonymous-vs-ident
 | `CORNETA_BUILD_SHA`         | build Rust               | público | correlação da release           |
 | `VITE_TELEMETRY_DISABLED=1` | build do WebView         | público | kill switch emergencial         |
 | `TELEMETRY_DISABLED=1`      | build Rust               | público | kill switch emergencial         |
+
+O WebView desktop fixa `posthog-js` em **1.409.5**: o adaptador em
+`src/lib/telemetry-transport.ts` usa APIs internas dessa versão para fazer uma única
+tentativa por envio, sem fila de retries HTTP, compressão assíncrona ou `sendBeacon`.
+A entrega é best-effort: eventos podem ser descartados e uma requisição em voo não pode
+ser desfeita. Captura automática e replay continuam desligados. Uma nova tentativa de
+carregar o SDK após falha não recupera eventos descartados. Antes de atualizar o pacote,
+revise a compatibilidade do adaptador e execute testes com o SDK real e o benchmark de
+telemetria, incluindo indisponibilidade de rede, revogação e callbacks tardios. Esse
+contrato do WebView não altera os transportes do Rust ou do site/API.
 
 ### API e site Next.js
 
@@ -103,7 +122,9 @@ e a [documentação do PostHog](https://posthog.com/docs/data/anonymous-vs-ident
 | `POSTHOG_HOST`       | variable | deve ter a mesma região do token                                                                                                            |
 
 Sem token/host válidos, com kill switch ou com as duas finalidades desligadas, o desktop não
-envia telemetria. `unset` não bloqueia envio: significa ausência de escolha, com o padrão ativo.
+envia telemetria. `unset` significa ausência de escolha: **desativa uso e mantém falhas ativas**.
+O site conserva um controle único de opt-out e DNT/GPC, sem compartilhar as escolhas do app.
+A API preserva o tratamento de falhas e só recebe o UUID do desktop para as finalidades ativas.
 Builds locais e de PR não exigem credenciais. Na release habilitada, um step shell executa o build Vite, gera mapas ocultos, faz
 upload associado a `corneta-desktop@<versão>` e os apaga. Esse é o único step que recebe a
 Personal API Key e o Project ID de upload; o gate de configuração, o build Tauri, o scanner e o
@@ -151,10 +172,14 @@ jobs de qualidade passarem.
    `cargo deny --manifest-path src-tauri/Cargo.toml --config deny.toml check`;
 7. confirme DPA, MFA, IP discard, retenção e política publicada;
 8. produza um draft release pelo workflow `Release`;
-9. no draft, execute uma instalação limpa, confirme o aviso e os dois controles ligados;
-   desligue ambos e confirme ausência de novos requests para o PostHog. Não espere silêncio
-   antes da escolha em um build com coleta configurada. Repita com token ausente e kill switch;
-10. habilite apenas uso, depois apenas erros, e inspecione os payloads;
+9. no draft, execute uma instalação limpa e confirme uso desligado e falhas ligadas. Antes de
+   escolher, não pode haver evento de uso; exceções e o marcador mínimo de abertura continuam
+   permitidos. Desligue ambos e confirme ausência de novos requests. Repita com token ausente
+   e kill switch;
+10. habilite apenas uso, depois apenas erros, e inspecione os payloads. Ativar uso não pode
+    recuperar eventos anteriores, inclusive etapas do onboarding. Fechar o aviso ou aceitar
+    os termos não pode ativá-lo. Repita o upgrade de aviso com `unset`, `enabled` e `disabled`
+    em cada finalidade, preservando as escolhas explícitas e testando estado local ilegível;
 11. provoque uma exceção React sintética e confira stack TypeScript, `error_id`, versão e SHA;
 12. confirme que nenhum `.map`, `phx_`, token OAuth, título, mensagem, path ou query aparece no
     instalador, requests ou issue;
@@ -215,7 +240,7 @@ como denominador: uma inicialização pode ocorrer fora da janela ou não chegar
 
 Essa amostra não mede sessões, usuários reais, disponibilidade nem percentual sem crash. O
 UUID persiste entre reinicializações; regenerá-lo ou recriar o estado local pode contar outro
-identificador. Uso e erros têm opt-outs independentes: desligar uso ainda permite exceções e o
+identificador. Os controles são independentes: não aderir a uso ainda permite exceções e o
 boot mínimo quando erros estão ativos; desligar erros impede observá-los mesmo que haja uso.
 Perdas de entrega e versões com composição diferente de preferências também enviesam a amostra.
 Além disso, `$exception` inclui falhas tratadas, não apenas crashes; um encerramento abrupto pode
@@ -227,6 +252,11 @@ não compare percentuais entre amostras como se fossem uma medida de confiabilid
 
 ### Confiabilidade da live
 
+Eventos de uso descrevem somente a amostra que ativou essa finalidade. Não representam todas
+as instalações e não podem ser reconstruídos com dados anteriores à adesão. Mostre volume,
+janela e critérios de inclusão junto dos indicadores; não compare com a população de falhas
+como se as duas amostras fossem iguais.
+
 - funil `live_start_requested` → `live_start_completed` por `app_version`;
 - `live_start_requested` por `platforms` e `mode`;
 - `live_start_completed` por `encoder_kind`;
@@ -236,6 +266,10 @@ não compare percentuais entre amostras como se fossem uma medida de confiabilid
 - duração até a primeira falha, sempre em buckets.
 
 ### Setup e ativação
+
+O funil pode começar depois das primeiras etapas do onboarding, dependendo de quando houve
+adesão. Ausência de uma etapa anterior não prova abandono. Não use exceções ou o marcador
+mínimo de boot para reconstruir a navegação de quem não ativou uso.
 
 - funil `onboarding_started` → `onboarding_completed` → `obs_check_completed(outcome=ok)` →
   `live_start_completed`;
@@ -330,7 +364,7 @@ release.
 ## 9. Rollout, revisão e rollback
 
 - **dogfood:** projeto dev, equipe, dados sintéticos;
-- **beta:** aviso explícito do padrão ativo e opt-out por finalidade, até duas semanas de
+- **beta:** aviso explícito de uso opt-in, falhas opt-out e preservação das escolhas anteriores, até duas semanas de
   inspeção de payload e impacto, somente após revisão jurídica e configuração do operador;
 - **produção:** somente após gate legal/técnico e dashboards úteis;
 - **30 dias:** remover eventos sem decisão associada, revisar custo/cardinalidade e retenção;

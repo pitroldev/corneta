@@ -100,7 +100,7 @@ As chaves do cache são derivadas por HMAC-SHA256 com uma chave aleatória de 32
 | `REQUIRE_POSTHOG_SOURCE_MAPS`, `POSTHOG_CLI_DRY_RUN`, `POSTHOG_CLI_BINARY_PATH`   | Vite/plugin, build                                  | Controles da ferramenta                     | Gate oficial exige upload real quando ativo; caminho do CLI deve apontar para ferramenta confiável. Não são opções para usuários do app. |
 | `NEXT_TELEMETRY_DISABLED`                                                         | Ferramenta Next                                     | Controle da ferramenta                      | `1` desliga telemetria da ferramenta Next; não substitui os kill switches da Corneta.                                                    |
 
-A política desktop implementada é **opt-out**: `unset` está ativo quando há configuração válida, separadamente para uso e falhas. Não chamar isso de opt-in. Consulte [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e [runbook PostHog](RUNBOOK-POSTHOG.md); a documentação técnica não certifica base legal.
+A política desktop separa **uso opt-in** (`unset` desativado, somente `enabled` permite envio) e **falhas opt-out** (`unset` ativo, `disabled` impede envio). As escolhas explícitas `enabled`/`disabled` são preservadas na troca do aviso, sem novo schema de persistência. Ativar uso permite somente eventos futuros, sem recuperar etapas anteriores à adesão. O site mantém um controle único de opt-out, independente do desktop. Consulte [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e [runbook PostHog](RUNBOOK-POSTHOG.md); a documentação técnica não certifica base legal nem a validade jurídica de escolhas antigas.
 
 ### Build e assinatura
 

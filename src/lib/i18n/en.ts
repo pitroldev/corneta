@@ -607,14 +607,14 @@ export const en: Dict = {
   "components.onboarding.subtitle": "{n} steps, from OBS to the report.",
   "components.onboarding.title": "Hey! Ready to sound the horn?",
   "components.telemetry.crashes.body":
-    "Sends what broke — the stage, error code and message — with your names, paths and text scrubbed out before it leaves.",
+    "On when you have not made a choice. Sends the failure stage and code, with names, paths and your text removed before leaving.",
   "components.telemetry.crashes.title": "Send crash reports",
   "components.telemetry.notice.allowed":
     "May be sent: version, screen/stage, outcome, enumerated platform, system categories, and random correlation IDs.",
   "components.telemetry.notice.details":
     "What may be sent — and what never leaves",
   "components.telemetry.notice.error":
-    "Couldn't save your choice. Nothing new was sent.",
+    "Couldn't save your choice. Check the options and try again.",
   "components.telemetry.notice.forbidden":
     "Never included in an event: stream keys, tokens, chat, title/category, OCR, images, audio, video, local paths, hostname, IP as a property, or raw logs.",
   "components.telemetry.notice.none": "Turn both off",
@@ -624,10 +624,10 @@ export const en: Dict = {
   "components.telemetry.notice.save": "Save my choices",
   "components.telemetry.notice.saved": "Saved your choice.",
   "components.telemetry.notice.subtitle":
-    "It starts on so I can catch bugs before you do. Turn it off here or later, in Settings.",
-  "components.telemetry.notice.title": "I'm already sending technical data",
+    "Without a previous choice, usage data is off and crash reports are on. Your previous choices are kept. You can change them here or in Settings.",
+  "components.telemetry.notice.title": "Your telemetry choices",
   "components.telemetry.usage.body":
-    "Sends completed stages, version, system categories, and operation outcomes — never stream content.",
+    "Only if you enable it: future stages, version, system categories and outcomes — never stream content or events from before you enabled it.",
   "components.telemetry.usage.title": "Send usage data",
   "components.toaster.dismiss.aria": "Close notice",
   "components.toaster.region.aria": "Notices",
@@ -1772,15 +1772,15 @@ export const en: Dict = {
   "settings.telemetry.buildDisabled":
     "Collection is disabled in this build; your choice stays saved for a configured version.",
   "settings.telemetry.crashes.desc":
-    "What broke, with your data scrubbed out and no logs attached.",
+    "On without a previous choice. Reports failures with your data scrubbed out and no logs attached.",
   "settings.telemetry.deletion.cta": "How to request deletion",
   "settings.telemetry.deletion.desc":
     "With both options off, copy the ID above and use the channel listed in the policy to delete data already sent.",
   "settings.telemetry.explainer":
-    "Both start on, under legitimate interest — they exist so I can find and fix problems. Only pseudonymized technical data from the catalog goes out; PostHog processes collection, with an initial 90-day retention. Turning a switch off is your right to object and takes effect immediately.",
+    "Usage data is sent only if you enable it. Crash reports start on without a previous choice; you can turn them off. Your previous choices are kept. PostHog receives only pseudonymized technical data from the catalog, with planned retention of up to 90 days. Turning collection off stops new sends but does not delete data already received.",
   "settings.telemetry.id": "Telemetry ID",
   "settings.telemetry.id.pending":
-    "The ID is only created after you turn on at least one option.",
+    "No telemetry ID is available in this session.",
   "settings.telemetry.loading": "Reading your telemetry choices…",
   "settings.telemetry.privacy": "Privacy policy and collected data",
   "settings.telemetry.regenerate.confirm": "Change the ID now?",
@@ -1789,12 +1789,12 @@ export const en: Dict = {
   "settings.telemetry.regenerate.ok":
     "Previous ID unlinked. A new one will be created if you enable telemetry again.",
   "settings.telemetry.saveError":
-    "Couldn't save that. Your previous choice still applies.",
+    "Couldn't save your choice. Check the options and try again.",
   "settings.telemetry.saved": "Saved your choice.",
   "settings.telemetry.unavailable":
     "Telemetry isn't working in this version of Corneta — I didn't send anything.",
   "settings.telemetry.usage.desc":
-    "Stages and outcomes in categories, without text or stream content.",
+    "Only if you enable it: future stages and outcomes in categories, without text or stream content.",
   "settings.guardian.cost.chat":
     "Chat and alerts reach you with that same delay.",
   "settings.guardian.cost.delay": "Your stream runs {delay} real time.",

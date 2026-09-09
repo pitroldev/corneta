@@ -60,7 +60,7 @@ importers:
         specifier: ^1.28.0
         version: 1.28.0(react@19.2.8)
       posthog-js:
-        specifier: ^1.409.5
+        specifier: 1.409.5
         version: 1.409.5
       react:
         specifier: ^19.2.8

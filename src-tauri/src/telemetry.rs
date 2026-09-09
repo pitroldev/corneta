@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 pub const TELEMETRY_SCHEMA_VERSION: u32 = 1;
 // Keep synchronized with the frontend TELEMETRY_NOTICE_VERSION.
-pub const NOTICE_VERSION: &str = "2026-08-02";
+pub const NOTICE_VERSION: &str = "2026-09-09";
 const TELEMETRY_FILE: &str = "telemetry.json";
 const EXIT_MARKER_FILE: &str = "telemetry-exit.json";
 const MAX_TELEMETRY_FILE_BYTES: u64 = 64 * 1024;
@@ -54,13 +54,6 @@ pub enum Consent {
     Unset,
     Disabled,
     Enabled,
-}
-
-impl Consent {
-    // Under the opt-out policy, Unset is active; notice updates must never clear Disabled.
-    fn active(self) -> bool {
-        self != Self::Disabled
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -118,7 +111,7 @@ impl TelemetryStatus {
             .installation_id
             .filter(|value| Uuid::parse_str(value).is_ok());
         // Clear identity when no purpose remains active.
-        if !self.usage.active() && !self.crash_reports.active() {
+        if effective_gates(&self) == (false, false) {
             self.installation_id = None;
         }
         self
@@ -133,9 +126,12 @@ pub struct TelemetryConsentInput {
     pub notice_version: String,
 }
 
-// New purposes must migrate existing installations to Disabled, not active Unset.
+// Usage requires opt-in; crash reports retain their independent opt-out default.
 fn effective_gates(status: &TelemetryStatus) -> (bool, bool) {
-    (status.usage.active(), status.crash_reports.active())
+    (
+        status.usage == Consent::Enabled,
+        status.crash_reports != Consent::Disabled,
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -328,7 +324,7 @@ impl TelemetryRuntime {
         let path = config_dir.join(TELEMETRY_FILE);
         let mut status = load_status_file(&path);
         let (usage_enabled, crash_enabled) = effective_gates(&status);
-        // Active opt-out purposes need an identity before the first settings interaction.
+        // Crash reports may need an identity before the first settings interaction.
         if (usage_enabled || crash_enabled) && status.installation_id.is_none() {
             status.installation_id = Some(new_id());
             if let Err(error) = save_status_file(&path, &status) {
@@ -470,10 +466,10 @@ impl TelemetryRuntime {
         next.crash_reports = crash_reports;
         next.notice_version = notice_version;
         next.decided_at = Some(now_iso());
-        if (usage.active() || crash_reports.active()) && next.installation_id.is_none() {
+        let (next_usage, next_crash) = effective_gates(&next);
+        if (next_usage || next_crash) && next.installation_id.is_none() {
             next.installation_id = Some(new_id());
         }
-        let (next_usage, next_crash) = effective_gates(&next);
 
         // Revoke before I/O and invalidate queued epochs; open new gates only after persistence.
         if !next_usage {
@@ -518,7 +514,7 @@ impl TelemetryRuntime {
 
     pub fn regenerate_id(&self) -> Result<TelemetryStatus, String> {
         let mut status = lock(&self.status);
-        if status.usage.active() || status.crash_reports.active() {
+        if effective_gates(&status) != (false, false) {
             return Err("disable usage data and crash reports before regenerating the ID".into());
         }
         let mut next = status.clone();
@@ -2082,6 +2078,21 @@ mod tests {
         std::env::temp_dir().join(format!("corneta-{name}-{}.json", new_id()))
     }
 
+    fn consent_cases() -> [(Consent, Consent, (bool, bool)); 9] {
+        use Consent::{Disabled, Enabled, Unset};
+        [
+            (Unset, Unset, (false, true)),
+            (Unset, Disabled, (false, false)),
+            (Unset, Enabled, (false, true)),
+            (Disabled, Unset, (false, true)),
+            (Disabled, Disabled, (false, false)),
+            (Disabled, Enabled, (false, true)),
+            (Enabled, Unset, (true, true)),
+            (Enabled, Disabled, (true, false)),
+            (Enabled, Enabled, (true, true)),
+        ]
+    }
+
     fn stamped_event(
         event_name: &str,
         installation_id: &str,
@@ -2495,91 +2506,246 @@ mod tests {
     }
 
     #[test]
-    fn outdated_notice_preserves_collection_but_opt_out_stops_it() {
-        let active = TelemetryStatus {
-            notice_version: "2025-01-01".into(),
-            usage: Consent::Enabled,
-            crash_reports: Consent::Enabled,
-            installation_id: Some(new_id()),
-            ..TelemetryStatus::default()
-        };
-        assert_eq!(effective_gates(&active), (true, true));
+    fn notice_updates_preserve_choices_and_existing_active_identity() {
+        for (usage, crash_reports, gates) in consent_cases() {
+            let path = temp_file("telemetry-old-notice");
+            let id = new_id();
+            let old_status = TelemetryStatus {
+                notice_version: "2026-08-02".into(),
+                usage,
+                crash_reports,
+                installation_id: Some(id.clone()),
+                decided_at: Some("2026-08-03T12:00:00.000Z".into()),
+                ..TelemetryStatus::default()
+            };
+            save_status_file(&path, &old_status).unwrap();
+            let loaded = load_status_file(&path);
+            assert_eq!(loaded.usage, usage);
+            assert_eq!(loaded.crash_reports, crash_reports);
+            assert_eq!(loaded.notice_version, old_status.notice_version);
+            assert_eq!(loaded.decided_at, old_status.decided_at);
+            assert_eq!(effective_gates(&loaded), gates);
+            let expected_id = (gates.0 || gates.1).then_some(id);
+            assert_eq!(loaded.installation_id, expected_id);
 
-        let opposed = TelemetryStatus {
-            notice_version: "2025-01-01".into(),
-            usage: Consent::Disabled,
-            crash_reports: Consent::Disabled,
-            ..TelemetryStatus::default()
-        };
-        assert_eq!(effective_gates(&opposed), (false, false));
+            let runtime = TelemetryRuntime::default();
+            *lock(&runtime.path) = Some(path.clone());
+            *lock(&runtime.status) = loaded;
+            let updated = runtime
+                .set_consent(usage, crash_reports, NOTICE_VERSION.into())
+                .unwrap();
+            assert_eq!(updated.usage, usage);
+            assert_eq!(updated.crash_reports, crash_reports);
+            assert_eq!(updated.notice_version, NOTICE_VERSION);
+            assert_eq!(updated.installation_id, expected_id);
+            assert_eq!(effective_gates(&updated), gates);
+            let _ = std::fs::remove_file(path);
+        }
     }
 
     #[test]
-    fn new_installation_is_active_but_unreadable_preferences_are_not() {
-        assert_eq!(effective_gates(&TelemetryStatus::default()), (true, true));
+    fn new_installation_is_crash_only_but_unreadable_preferences_are_not() {
+        assert_eq!(effective_gates(&TelemetryStatus::default()), (false, true));
         assert_eq!(effective_gates(&TelemetryStatus::opposed()), (false, false));
     }
 
     #[test]
-    fn preference_matrix_preserves_independent_opt_out_and_kill_switch() {
-        let choices = [Consent::Unset, Consent::Enabled, Consent::Disabled];
-        for usage in choices {
-            for crash_reports in choices {
-                let status = TelemetryStatus {
-                    usage,
-                    crash_reports,
-                    ..TelemetryStatus::default()
+    fn preference_matrix_preserves_purpose_defaults_identity_and_kill_switch() {
+        for (usage, crash_reports, gates) in consent_cases() {
+            for build_disabled in [false, true] {
+                let path = temp_file("telemetry-preference-matrix");
+                let runtime = TelemetryRuntime {
+                    build_disabled,
+                    ..TelemetryRuntime::default()
                 };
-                let gates = effective_gates(&status);
-                assert_eq!(gates, (usage.active(), crash_reports.active()));
-                for build_disabled in [false, true] {
-                    let runtime = TelemetryRuntime {
-                        build_disabled,
-                        ..TelemetryRuntime::default()
-                    };
-                    runtime.usage_enabled.store(gates.0, Ordering::Release);
-                    runtime.crash_enabled.store(gates.1, Ordering::Release);
+                *lock(&runtime.path) = Some(path.clone());
+                let status = runtime
+                    .set_consent(usage, crash_reports, NOTICE_VERSION.into())
+                    .unwrap();
+                assert_eq!(effective_gates(&status), gates);
+                assert_eq!(status.installation_id.is_some(), gates.0 || gates.1);
+                let loaded = load_status_file(&path);
+                assert_eq!(loaded.usage, usage);
+                assert_eq!(loaded.crash_reports, crash_reports);
+                assert_eq!(loaded.installation_id, status.installation_id);
+                for (purpose, enabled) in [
+                    (Purpose::Usage, gates.0),
+                    (Purpose::CrashReports, gates.1),
+                    (Purpose::StartupMinimal, gates.0 || gates.1),
+                ] {
+                    assert_eq!(runtime.should_send(purpose), enabled && !build_disabled);
                     assert_eq!(
-                        runtime.should_send(Purpose::Usage),
-                        gates.0 && !build_disabled
+                        runtime.capture_identity_for(purpose).is_some(),
+                        enabled && !build_disabled
                     );
-                    assert_eq!(
-                        runtime.should_send(Purpose::CrashReports),
-                        gates.1 && !build_disabled
-                    );
-                    assert_eq!(
-                        runtime.should_send(Purpose::StartupMinimal),
-                        (gates.0 || gates.1) && !build_disabled
-                    );
-
-                    runtime.sync_epoch_installation_id(Some(new_id()));
-                    assert!(runtime.client().is_none());
-                    assert!(!runtime.capture("app_started", Map::new()).unwrap());
                 }
+
+                let expected_purposes = match (gates, build_disabled) {
+                    ((true, true), false) => Some("usage,crash_reports"),
+                    ((true, false), false) => Some("usage"),
+                    ((false, true), false) => Some("crash_reports"),
+                    _ => None,
+                };
+                assert_eq!(
+                    runtime
+                        .correlation()
+                        .map(|correlation| correlation.purposes),
+                    expected_purposes
+                );
+                assert!(runtime.client().is_none());
+                assert!(!runtime.capture("app_started", Map::new()).unwrap());
+                if gates.0 || gates.1 {
+                    assert!(runtime.regenerate_id().is_err());
+                } else {
+                    assert!(runtime.regenerate_id().unwrap().installation_id.is_none());
+                }
+                let _ = std::fs::remove_file(path);
             }
         }
         assert!(!valid_posthog_token(""));
     }
 
     #[test]
-    fn unset_is_active_for_uuid_creation_and_regeneration_guard() {
+    fn unset_usage_does_not_create_identity_or_block_regeneration() {
         let path = temp_file("telemetry-unset-id");
         let runtime = TelemetryRuntime::default();
         *lock(&runtime.path) = Some(path.clone());
         let status = runtime
             .set_consent(Consent::Unset, Consent::Disabled, NOTICE_VERSION.into())
             .unwrap();
-        assert!(Uuid::parse_str(status.installation_id.as_deref().unwrap()).is_ok());
-        assert!(runtime.regenerate_id().is_err());
-        runtime
+        assert!(status.installation_id.is_none());
+        assert!(runtime.regenerate_id().unwrap().installation_id.is_none());
+        let crash_only = runtime
             .set_consent(Consent::Disabled, Consent::Unset, NOTICE_VERSION.into())
             .unwrap();
+        assert!(Uuid::parse_str(crash_only.installation_id.as_deref().unwrap()).is_ok());
         assert!(runtime.regenerate_id().is_err());
         runtime
-            .set_consent(Consent::Disabled, Consent::Disabled, NOTICE_VERSION.into())
+            .set_consent(Consent::Unset, Consent::Disabled, NOTICE_VERSION.into())
             .unwrap();
         assert!(runtime.regenerate_id().unwrap().installation_id.is_none());
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn unset_usage_revokes_queued_events_even_when_persistence_fails() {
+        for persist_fails in [false, true] {
+            let path = temp_file("telemetry-unset-revoke");
+            let runtime = TelemetryRuntime {
+                build_disabled: false,
+                ..TelemetryRuntime::default()
+            };
+            *lock(&runtime.path) = Some(path.clone());
+            let active = runtime
+                .set_consent(Consent::Enabled, Consent::Unset, NOTICE_VERSION.into())
+                .unwrap();
+            let queued_identity = runtime.capture_identity_for(Purpose::Usage).unwrap();
+            if persist_fails {
+                *lock(&runtime.path) = None;
+            }
+            let result = runtime.set_consent(Consent::Unset, Consent::Unset, NOTICE_VERSION.into());
+            assert_eq!(result.is_err(), persist_fails);
+            assert_eq!(runtime.status().usage, Consent::Unset);
+            assert_eq!(runtime.status().installation_id, active.installation_id);
+            assert!(!runtime.should_send(Purpose::Usage));
+            assert!(runtime.should_send(Purpose::CrashReports));
+            assert_eq!(runtime.correlation().unwrap().purposes, "crash_reports");
+            assert!(final_before_send(
+                stamped_event(
+                    "app_started",
+                    &queued_identity.installation_id,
+                    Purpose::Usage,
+                    queued_identity.generation,
+                ),
+                &runtime.usage_enabled,
+                &runtime.crash_enabled,
+                &runtime.consent_epoch,
+            )
+            .is_none());
+
+            *lock(&runtime.path) = Some(path.clone());
+            runtime
+                .set_consent(Consent::Enabled, Consent::Unset, NOTICE_VERSION.into())
+                .unwrap();
+            assert!(runtime.should_send(Purpose::Usage));
+            assert!(final_before_send(
+                stamped_event(
+                    "app_started",
+                    &queued_identity.installation_id,
+                    Purpose::Usage,
+                    queued_identity.generation,
+                ),
+                &runtime.usage_enabled,
+                &runtime.crash_enabled,
+                &runtime.consent_epoch,
+            )
+            .is_none());
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    #[test]
+    fn startup_envelope_respects_usage_opt_in_and_crash_only_defaults() {
+        for (usage, crash_reports) in [
+            (Consent::Unset, Consent::Unset),
+            (Consent::Disabled, Consent::Unset),
+            (Consent::Enabled, Consent::Unset),
+            (Consent::Unset, Consent::Disabled),
+        ] {
+            let path = temp_file("telemetry-startup-purposes");
+            let runtime = TelemetryRuntime {
+                build_disabled: false,
+                ..TelemetryRuntime::default()
+            };
+            *lock(&runtime.path) = Some(path.clone());
+            let status = runtime
+                .set_consent(usage, crash_reports, NOTICE_VERSION.into())
+                .unwrap();
+            let seen = Arc::new(Mutex::new(Vec::<Value>::new()));
+            let hook_seen = seen.clone();
+            let usage_gate = runtime.usage_enabled.clone();
+            let crash_gate = runtime.crash_enabled.clone();
+            let consent_epoch = runtime.consent_epoch.clone();
+            let client = Arc::new(posthog_rs::client(
+                ClientOptionsBuilder::default()
+                    .api_key("phc_abcdefgh".to_string())
+                    .host("http://127.0.0.1:1".to_string())
+                    .disable_geoip(true)
+                    .is_server(false)
+                    .flush_at(1)
+                    .max_capture_attempts(1u32)
+                    .before_send(move |event| {
+                        if let Some(safe) =
+                            final_before_send(event, &usage_gate, &crash_gate, &consent_epoch)
+                        {
+                            lock(&hook_seen).push(serde_json::to_value(safe).unwrap());
+                        }
+                        // Inspect the SDK envelope without sending network traffic.
+                        None
+                    })
+                    .build()
+                    .unwrap(),
+            ));
+            *lock(&runtime.client) = Some(client.clone());
+            runtime.capture_app_started("unclean", Duration::from_millis(1_500));
+            client.flush();
+            runtime.shutdown();
+            let payloads = lock(&seen);
+            let gates = effective_gates(&status);
+            assert_eq!(payloads.len(), usize::from(gates.0 || gates.1));
+            if let Some(payload) = payloads.first() {
+                assert_eq!(payload["event"], "app_started");
+                assert_eq!(payload["distinct_id"], status.installation_id.unwrap());
+                let props = &payload["properties"];
+                assert_eq!(props["previous_exit"], "unclean");
+                assert_eq!(props["$process_person_profile"], false);
+                for usage_dimension in ["startup_duration_bucket", "os_family", "arch"] {
+                    assert_eq!(props.get(usage_dimension).is_some(), gates.0);
+                }
+                assert!(props.get("app_version").is_some());
+            }
+            let _ = std::fs::remove_file(path);
+        }
     }
 
     #[test]

@@ -174,7 +174,7 @@ O [índice completo](docs/README.md) reúne os demais guias, incluindo design, c
 
 Credenciais usam o cofre nativo; gravações e relatórios ficam no computador. Os prints deste README foram feitos em perfil descartável, apenas com dados fictícios — [procedência e revisão das imagens](docs/MATERIAIS-PUBLICOS.md#capturas-do-readme).
 
-Na distribuição oficial com telemetria configurada, **uso e falhas são finalidades independentes, ativas por padrão e desativáveis**. Builds de contribuição desativam o envio. Veja a [política de telemetria](docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e o [runbook](docs/RUNBOOK-POSTHOG.md) para configuração, limites e operação.
+Na distribuição oficial com telemetria configurada, **dados de uso só são enviados após ativação explícita; relatos de falhas ficam ativos quando não há escolha anterior e podem ser desligados**. Os controles são independentes e as escolhas anteriores são preservadas. Ativar uso não envia eventos anteriores à ativação. Builds de contribuição desativam o envio. Veja a [política de telemetria](docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e o [runbook](docs/RUNBOOK-POSTHOG.md) para configuração, limites e operação.
 
 Nunca publique stream keys, tokens, `.env`, relatórios pessoais ou logs brutos em issues. Suspeitas de vulnerabilidade devem seguir o [canal privado de segurança](SECURITY.md).
 

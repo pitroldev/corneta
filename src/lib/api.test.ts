@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TELEMETRY_NOTICE_VERSION } from "./telemetry-schema";
+import {
+  TELEMETRY_NOTICE_VERSION,
+  telemetryConsentDraft,
+} from "./telemetry-schema";
 
 const { invoke } = vi.hoisted(() => ({
   invoke: vi.fn(async () => ({
@@ -77,5 +80,51 @@ describe("Tauri telemetry IPC", () => {
       api.addSessionMarker("1786151052661", Number.NaN, "Inválido"),
     ).rejects.toThrow("t must be a safe non-negative integer");
     expect(invoke).not.toHaveBeenCalled();
+  });
+});
+
+describe("demo telemetry preferences", () => {
+  beforeEach(() => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("matches fresh desktop purpose defaults without treating absence as corruption", async () => {
+    const { mockApi } = await import("./api/demo");
+    expect(telemetryConsentDraft(await mockApi().telemetryStatus())).toEqual({
+      usage: false,
+      crashReports: true,
+    });
+  });
+
+  it.each(["null", "{invalid"])(
+    "keeps malformed stored preferences inactive: %s",
+    async (stored) => {
+      const { mockApi } = await import("./api/demo");
+      localStorage.setItem("corneta.telemetry.v1", stored);
+      expect(telemetryConsentDraft(await mockApi().telemetryStatus())).toEqual({
+        usage: false,
+        crashReports: false,
+      });
+    },
+  );
+
+  it("does not allocate an identity or block rotation for unset usage alone", async () => {
+    const { mockApi } = await import("./api/demo");
+    const demo = mockApi();
+    const saved = await demo.telemetrySetConsent({
+      usage: "unset",
+      crashReports: "disabled",
+      noticeVersion: TELEMETRY_NOTICE_VERSION,
+    });
+    expect(saved.installationId).toBeNull();
+    await expect(demo.telemetryRegenerateId()).resolves.toMatchObject({
+      installationId: null,
+    });
   });
 });

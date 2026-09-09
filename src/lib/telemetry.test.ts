@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   __configureTelemetryForTests,
+  __getTelemetryDiagnosticsForTests,
+  TELEMETRY_MAX_QUEUED_EVENTS,
+  addStep,
   capture,
   captureException,
   captureOnboarding,
-  discardBufferedOnboardingTelemetry,
   flushTelemetry,
   getTelemetrySnapshot,
   initializeTelemetry,
@@ -21,7 +23,12 @@ import {
 const INSTALLATION_ID = "00000000-0000-4000-8000-000000000001";
 const POSTHOG_CONSENT_KEY = "__ph_opt_in_out_phc_public_test_token";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  __configureTelemetryForTests({ config: { disabled: true } });
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const values = new Map(Object.entries(initial));
@@ -57,9 +64,8 @@ function status(
     noticeVersion,
     usage,
     crashReports,
-    // Match the backend: any active purpose, including unset, retains an installation UUID.
     installationId:
-      usage !== "disabled" || crashReports !== "disabled"
+      usage === "enabled" || crashReports !== "disabled"
         ? INSTALLATION_ID
         : null,
     decidedAt: "2026-08-01T12:00:00.000Z",
@@ -118,6 +124,7 @@ function sdkHarness() {
       },
     ),
     addExceptionStep: vi.fn(),
+    closeTelemetryTransport: vi.fn(),
     opt_in_capturing: vi.fn(() => {
       if (typeof localStorage !== "undefined")
         localStorage.setItem(POSTHOG_CONSENT_KEY, "1");
@@ -169,7 +176,7 @@ describe("telemetry facade", () => {
       ),
     ),
   )(
-    "respects opt-out matrix: $usage / $crashReports / $configuration",
+    "respects the purpose matrix: $usage / $crashReports / $configuration",
     async ({ usage, crashReports, configuration }) => {
       const harness = sdkHarness();
       __configureTelemetryForTests({
@@ -195,13 +202,13 @@ describe("telemetry facade", () => {
       await flushTelemetry();
       const configured = configuration === "configured";
       expect(harness.captures).toHaveLength(
-        configured && usage !== "disabled" ? 1 : 0,
+        configured && usage === "enabled" ? 1 : 0,
       );
       expect(harness.exceptions).toHaveLength(
         configured && crashReports !== "disabled" ? 1 : 0,
       );
       expect(harness.loader).toHaveBeenCalledTimes(
-        configured && (usage !== "disabled" || crashReports !== "disabled")
+        configured && (usage === "enabled" || crashReports !== "disabled")
           ? 1
           : 0,
       );
@@ -298,13 +305,13 @@ describe("telemetry facade", () => {
     expect(harness.exceptions).toHaveLength(0);
   });
 
-  it("uses active defaults on a fresh installation", async () => {
+  it("does not send usage before opt-in on a fresh installation", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("unset", "unset")));
     capture("screen_viewed", { screen_id: "settings" });
     await flushTelemetry();
-    expect(harness.captures).toHaveLength(1);
+    expect(harness.captures).toHaveLength(0);
   });
 
   it("loads conditionally and captures only catalogued properties", async () => {
@@ -336,10 +343,14 @@ describe("telemetry facade", () => {
     });
   };
 
-  it("sends first-run funnel events under the active default", async () => {
+  it("sends only onboarding events observed after opt-in", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("unset", "unset")));
+    onboardingTrio();
+    await flushTelemetry();
+    expect(harness.captures).toHaveLength(0);
+    await setTelemetryConsent({ usage: "enabled", crashReports: "disabled" });
     onboardingTrio();
     await flushTelemetry();
     expect(harness.captures.map(({ event }) => event)).toEqual([
@@ -363,7 +374,7 @@ describe("telemetry facade", () => {
     expect(harness.captures).toHaveLength(0);
   });
 
-  it("discards deferred onboarding instead of replaying it later", async () => {
+  it("does not replay pre-opt-in onboarding later", async () => {
     const harness = sdkHarness();
     configure(harness.loader);
     await initializeTelemetry(backend(status("unset", "unset")));
@@ -371,7 +382,6 @@ describe("telemetry facade", () => {
       event: "onboarding_started",
       properties: { entry_point: "first_run" },
     });
-    discardBufferedOnboardingTelemetry();
     await setTelemetryConsent({ usage: "enabled", crashReports: "disabled" });
     await flushTelemetry();
     expect(harness.captures).toHaveLength(0);
@@ -499,7 +509,7 @@ describe("telemetry facade", () => {
     });
   });
 
-  it("starts from a clean SDK when a revocation fails and consent is restored", async () => {
+  it("keeps the revoked purpose closed when persisting its choice fails", async () => {
     const first = sdkHarness();
     const second = sdkHarness();
     const clients = [first, second];
@@ -534,7 +544,8 @@ describe("telemetry facade", () => {
     expect(first.instance.reset).toHaveBeenCalledWith(true);
     expect(loader).toHaveBeenCalledTimes(2);
     expect(second.instance.init).toHaveBeenCalledOnce();
-    captureException(new Error("restored crash consent"), {
+    expect(getTelemetrySnapshot().status.crashReports).toBe("disabled");
+    captureException(new Error("revoked crash consent"), {
       handled: true,
       severity: "error",
       error_code: "screen_render_failed",
@@ -542,7 +553,7 @@ describe("telemetry facade", () => {
     });
     await flushTelemetry();
     expect(first.exceptions).toHaveLength(0);
-    expect(second.exceptions).toHaveLength(1);
+    expect(second.exceptions).toHaveLength(0);
   });
 
   it("reinitializes anonymously after opt-out instead of identifying a hidden device", async () => {
@@ -585,6 +596,12 @@ describe("telemetry facade", () => {
 
     await setTelemetryConsent({ usage: "disabled", crashReports: "disabled" });
     expect(storage.getItem(POSTHOG_CONSENT_KEY)).toBeNull();
+    expect(first.instance.closeTelemetryTransport).toHaveBeenCalledOnce();
+    expect(
+      first.instance.closeTelemetryTransport.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      first.instance.opt_out_capturing.mock.invocationCallOrder[0],
+    );
     expect(first.instance.clear_opt_in_out_capturing).toHaveBeenCalled();
 
     await setTelemetryConsent({ usage: "enabled", crashReports: "disabled" });
@@ -671,6 +688,206 @@ describe("telemetry facade", () => {
       bootstrap: { distinctID: secondId, isIdentifiedID: false },
       request_batching: false,
     });
+  });
+
+  it("bounds delayed delivery and reserves room for crash reports", async () => {
+    const harness = sdkHarness();
+    let release: (() => void) | undefined;
+    const loader = vi.fn(
+      () =>
+        new Promise<typeof harness.instance>((resolve) => {
+          release = () => resolve(harness.instance);
+        }),
+    );
+    configure(loader);
+    await initializeTelemetry(backend(status("enabled", "enabled")));
+    const operationId = (index: number) =>
+      `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}`;
+    for (let index = 0; index < 1000; index++) {
+      capture("live_start_completed", {
+        operation_id: operationId(index),
+        duration_bucket: "lt_1s",
+        encoder_kind: "copy",
+      });
+    }
+    expect(__getTelemetryDiagnosticsForTests()).toMatchObject({
+      queued: 48,
+      recentEvents: 48,
+      dropped: 952,
+    });
+    for (let index = 0; index < 1000; index++) {
+      const error = new Error("synthetic failure");
+      error.stack = `Error: synthetic failure\n    at run (http://tauri.localhost/assets/index.js:${index + 1}:1)`;
+      captureException(error, {
+        handled: true,
+        severity: "error",
+        error_code: "screen_render_failed",
+        stage: "screen_render",
+      });
+    }
+    expect(__getTelemetryDiagnosticsForTests()).toMatchObject({
+      queued: TELEMETRY_MAX_QUEUED_EVENTS,
+      recentErrors: 64,
+    });
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce());
+    expect(__getTelemetryDiagnosticsForTests().pending).toBe(1);
+    release?.();
+    await flushTelemetry();
+    expect(harness.captures).toHaveLength(48);
+    expect(harness.exceptions).toHaveLength(16);
+    expect(__getTelemetryDiagnosticsForTests()).toMatchObject({
+      queued: 0,
+      pending: 0,
+    });
+  });
+
+  it("yields between delivery batches instead of draining a burst in one turn", async () => {
+    vi.useFakeTimers();
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("enabled", "enabled")));
+    for (let index = 0; index < 12; index++) addStep("app_ready");
+    expect(harness.loader).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(16);
+    expect(harness.loader).toHaveBeenCalledOnce();
+    expect(harness.instance.addExceptionStep).toHaveBeenCalledTimes(4);
+    expect(__getTelemetryDiagnosticsForTests().queued).toBe(8);
+    await vi.advanceTimersByTimeAsync(16);
+    expect(harness.instance.addExceptionStep).toHaveBeenCalledTimes(8);
+    await vi.advanceTimersByTimeAsync(16);
+    expect(__getTelemetryDiagnosticsForTests().queued).toBe(0);
+  });
+
+  it("keeps both deduplication caches bounded across completed batches", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("enabled", "disabled")));
+    for (let index = 0; index < 256; index++) {
+      capture("live_start_completed", {
+        operation_id: `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}`,
+        duration_bucket: "lt_1s",
+        encoder_kind: "copy",
+      });
+      if (index % 32 === 31) await flushTelemetry();
+    }
+    expect(harness.captures).toHaveLength(256);
+    expect(__getTelemetryDiagnosticsForTests()).toMatchObject({
+      queued: 0,
+      recentEvents: 128,
+    });
+  });
+
+  it("drops offline work without loading the SDK and does not replay it on recovery", async () => {
+    vi.stubGlobal("navigator", {
+      onLine: false,
+      userAgent: "Synthetic Windows",
+    });
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("enabled", "enabled")));
+    capture("screen_viewed", { screen_id: "settings" });
+    addStep("app_ready");
+    await flushTelemetry();
+    expect(harness.loader).not.toHaveBeenCalled();
+    expect(__getTelemetryDiagnosticsForTests()).toMatchObject({
+      queued: 0,
+      dropped: 2,
+    });
+    vi.stubGlobal("navigator", {
+      onLine: true,
+      userAgent: "Synthetic Windows",
+    });
+    capture("screen_viewed", { screen_id: "about" });
+    await flushTelemetry();
+    expect(harness.captures.map((item) => item.properties?.screen_id)).toEqual([
+      "about",
+    ]);
+  });
+
+  it("cools down a failing SDK loader without retaining events", async () => {
+    const harness = sdkHarness();
+    let clock = 100_000;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    const loader = vi
+      .fn<typeof harness.loader>()
+      .mockImplementationOnce(() => {
+        throw new Error("synthetic load failure");
+      })
+      .mockResolvedValue(harness.instance);
+    configure(loader);
+    await initializeTelemetry(backend(status("enabled", "disabled")));
+    capture("screen_viewed", { screen_id: "settings" });
+    await flushTelemetry();
+    expect(__getTelemetryDiagnosticsForTests()).toMatchObject({
+      queued: 0,
+      dropped: 1,
+    });
+    capture("screen_viewed", { screen_id: "about" });
+    await flushTelemetry();
+    expect(loader).toHaveBeenCalledOnce();
+    clock += 30_001;
+    capture("screen_viewed", { screen_id: "about" });
+    await flushTelemetry();
+    expect(loader).toHaveBeenCalledTimes(2);
+    expect(harness.captures).toHaveLength(1);
+  });
+
+  it("does not allow overlapping preference mutations to restore an older choice", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    const initial = status("enabled", "enabled");
+    let persist: (() => void) | undefined;
+    const native = backend(initial);
+    native.telemetrySetConsent = vi.fn(
+      (input) =>
+        new Promise<TelemetryStatus>((resolve) => {
+          persist = () => resolve({ ...initial, ...input });
+        }),
+    );
+    await initializeTelemetry(native);
+    const saving = setTelemetryConsent({
+      usage: "disabled",
+      crashReports: "disabled",
+    });
+    await expect(
+      setTelemetryConsent({ usage: "enabled", crashReports: "enabled" }),
+    ).rejects.toThrow("telemetry_change_in_progress");
+    await expect(regenerateTelemetryId()).rejects.toThrow(
+      "telemetry_change_in_progress",
+    );
+    expect(native.telemetrySetConsent).toHaveBeenCalledOnce();
+    persist?.();
+    await saving;
+    expect(getTelemetrySnapshot().status).toMatchObject({
+      usage: "disabled",
+      crashReports: "disabled",
+    });
+  });
+
+  it("allows ID regeneration for unset usage when crash reporting is disabled", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(
+      backend({
+        ...status("unset", "disabled"),
+        installationId: INSTALLATION_ID,
+      }),
+    );
+    await regenerateTelemetryId();
+    expect(getTelemetrySnapshot().status.installationId).toBeNull();
+    expect(harness.loader).not.toHaveBeenCalled();
+  });
+
+  it("drops queued usage immediately when enabled is changed to unset", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("enabled", "disabled")));
+    capture("screen_viewed", { screen_id: "settings" });
+    expect(__getTelemetryDiagnosticsForTests().queued).toBe(1);
+    await setTelemetryConsent({ usage: "unset", crashReports: "disabled" });
+    await flushTelemetry();
+    expect(harness.captures).toHaveLength(0);
+    expect(__getTelemetryDiagnosticsForTests().queued).toBe(0);
   });
 
   it("redacts and deduplicates the same exception object", async () => {

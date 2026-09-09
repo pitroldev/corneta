@@ -23,6 +23,7 @@ Configure o host a partir de [web/.env.example](../web/.env.example) e do [contr
 - Na Vercel, a origem de IP é `x-vercel-forwarded-for`. Em self-host, defina `OAUTH_TRUSTED_IP_HEADER`, faça o proxy sobrescrever o header e impeça acesso público direto ao Next.
 - Confira domínio canônico, SHA e CTA HTTPS para um instalador aprovado. Uma URL com formato válido não comprova que o download existe.
 - Configure telemetria e kill switches coerentemente no desktop, site e API. Cumpra o [contrato operacional](RUNBOOK-POSTHOG.md) e a [política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md), incluindo a revisão jurídica aplicável. Esta documentação não substitui essa revisão.
+- No desktop sem escolha anterior, confirme uso desligado e falhas ligadas. Valide ativação de uso somente para eventos futuros, desligamento independente e preservação das escolhas explícitas anteriores ao aviso `2026-09-09`. O site conserva seu controle único; não trate um aceite dos termos ou o fechamento do aviso como ativação de uso. Confira os critérios completos nos [gates de release](GATES-DE-RELEASE.md).
 
 Na raiz, `pnpm web:release:check` executa o gate configurado. Fora da Vercel, use `pnpm --dir web build:release` para o build de distribuição ou configure `CORNETA_RELEASE_CHECK=1`; Vercel production aplica o gate automaticamente. `pnpm contrib:web:check` é o caminho de contribuição sem credenciais, não uma aprovação da produção.
 

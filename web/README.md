@@ -61,7 +61,7 @@ ensaios no [guia de publicação](../docs/PUBLICACAO.md).
 
 ## Telemetria e diagnóstico
 
-Sem configuração válida ou com o kill switch pertinente, o envio fica desativado. Na distribuição configurada, as finalidades de uso e falhas do desktop são independentes, ativas por padrão e desativáveis: `unset` não é consentimento pendente. O site também oferece opt-out, DNT/GPC e kill switch. O contrato completo está na [política de telemetria](../docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e no [runbook](../docs/RUNBOOK-POSTHOG.md); esta descrição não substitui revisão jurídica.
+Sem configuração válida ou com o kill switch pertinente, o envio fica desativado. No desktop, uso é opt-in (`unset` desativado) e falhas são opt-out (`unset` ativo); escolhas explícitas anteriores são preservadas e a ativação não recupera eventos de uso anteriores. O site mantém seu controle único de opt-out, DNT/GPC e kill switch; não compartilha as preferências do desktop. A API preserva a correlação conforme cada finalidade ativa no app. O contrato completo está na [política de telemetria](../docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e no [runbook](../docs/RUNBOOK-POSTHOG.md); esta descrição não substitui revisão jurídica.
 
 Quando o envio aplicável está habilitado:
 

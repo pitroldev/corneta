@@ -1,8 +1,8 @@
-# Teste de balanceamento — telemetria da Corneta (LGPD art. 7º, IX)
+# Telemetria da Corneta: consentimento de uso e balanceamento de falhas
 
-> Legitimate Interest Assessment (LIA) das duas finalidades de telemetria do aplicativo,
-> **ligadas por padrão**. Este rascunho reúne evidências técnicas para
-> avaliar a hipótese de legítimo interesse; não comprova a adequação jurídica do tratamento.
+> Dados de uso do aplicativo exigem ativação explícita; relatos de falhas ficam ativos
+> quando não há escolha anterior. Este rascunho separa o consentimento para uso da avaliação
+> de legítimo interesse para falhas; não comprova a adequação jurídica de nenhum tratamento.
 
 - **Status:** ⚠️ Rascunho de engenharia · precisa de revisão jurídica antes do lançamento
 - **Escopo:** nenhuma aprovação jurídica ou configuração externa é atestada aqui
@@ -19,26 +19,42 @@
 
 ## 0. Modelo de tratamento avaliado
 
-As duas finalidades vêm ligadas por padrão, com aviso no primeiro uso e controles independentes
-para desligá-las. Esse é o comportamento técnico avaliado neste documento.
+| Finalidade desktop  | Sem escolha (`unset`) | Condição de envio                            | Base a revisar                               |
+| ------------------- | --------------------- | -------------------------------------------- | -------------------------------------------- |
+| Dados de uso        | Desativada            | Ativação explícita (`enabled`)               | Consentimento específico (art. 7º, I)        |
+| Relatórios de falha | Ativa                 | Ausência de oposição (`disabled` interrompe) | Hipótese de legítimo interesse (art. 7º, IX) |
 
-A intenção registrada é usar **legítimo interesse** (art. 7º, IX), não apresentar o padrão
-ativo como consentimento. Mudar um default no software não valida automaticamente uma base
-legal: é necessário avaliar finalidade, necessidade, direitos, expectativas e salvaguardas no
-contexto real. A ANPD disponibiliza um [guia e modelo de teste de balanceamento](https://www.gov.br/anpd/pt-br/assuntos/noticias/anpd-lanca-guia-orientativo-sobre-legitimo-interesse)
-para essa avaliação. A conclusão abaixo permanece pendente de revisão.
+As escolhas explícitas anteriores, tanto `enabled` quanto `disabled`, permanecem válidas
+para o código ao mudar a versão do aviso. O formato local não muda. Isso **não comprova** que
+uma escolha antiga satisfaça os requisitos jurídicos de consentimento: sua informação, registro
+e finalidade precisam ser avaliados pelo controlador. Fechar o aviso ou aceitar os termos não
+ativa dados de uso. Ativar essa finalidade permite somente eventos futuros; não há envio
+posterior de etapas ou eventos de uso ocorridos antes da adesão.
+
+O [texto da LGPD](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm)
+exige avaliar cada base no contexto do tratamento. Um interruptor opt-in não certifica
+consentimento válido, assim como a possibilidade de oposição não certifica legítimo interesse.
+A ANPD disponibiliza um [guia e modelo de teste de balanceamento](https://www.gov.br/anpd/pt-br/assuntos/noticias/anpd-lanca-guia-orientativo-sobre-legitimo-interesse)
+para a segunda hipótese. Ambas as conclusões permanecem pendentes de revisão.
+
+Este default por finalidade é do **desktop**. O site mantém seu controle único de opt-out e
+respeita DNT/GPC, sem vincular navegação ao UUID do app. A API mantém suas falhas operacionais
+e correlação conforme as finalidades ativas no desktop. Esses tratamentos também precisam de
+avaliação própria; não herdam consentimento de uso do aplicativo.
 
 ---
 
-## 1. Finalidade legítima (art. 10, I)
+## 1. Finalidades e bases separadas
 
 | finalidade              | o que responde                                                           | por que é legítima                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | **Relatórios de falha** | em qual versão, tela e etapa a Corneta quebrou, e em quantas instalações | manter o produto funcionando é atividade-fim do controlador; uma falha não reportada derruba a live de quem paga o preço |
 | **Dados de uso**        | quantas instalações concluem o onboarding, chegam ao ar, usam cada tela  | priorizar correção e simplificação onde a evidência aponta, em vez de onde o autor imagina                               |
 
-A hipótese a avaliar é o enquadramento em "apoio e promoção das atividades do controlador"
-(art. 10, I). Conforme o catálogo técnico adotado, nenhuma
+A hipótese de legítimo interesse a avaliar para **relatórios de falha** é o enquadramento em
+"apoio e promoção das atividades do controlador" (art. 10, I). Dados de uso dependem da
+ativação específica, sem usar esse balanceamento como substituto de consentimento.
+Conforme o catálogo técnico adotado, nenhuma
 tem finalidade publicitária, de perfilamento comportamental, de enriquecimento de base, de venda ou
 de compartilhamento com terceiro além do operador.
 
@@ -90,7 +106,8 @@ A favor:
 
 - Relatórios técnicos podem ajudar a corrigir falhas, mas a expectativa do público quanto ao
   envio automático precisa ser avaliada, não presumida a partir de outros softwares.
-- O aviso aparece **no primeiro uso**, antes de qualquer uso real, e diz que está ligado.
+- O aviso informa os defaults separados e mantém escolhas anteriores visíveis. Relatos de
+  falha e um marcador mínimo de abertura podem sair antes da primeira escolha; uso não pode.
 - O desligamento é um clique, na mesma tela, e vale imediatamente.
 - O projeto é aberto: a afirmação é verificável, não é promessa.
 
@@ -98,15 +115,14 @@ Contra, e é preciso registrar:
 
 - A Corneta se posiciona como **"roda no seu PC, não na nuvem de ninguém"**. Uma parcela do público
   chega justamente por isso, e para essa pessoa a expectativa de "nada sai daqui" é real.
-- Dados de uso têm expectativa mais frágil que relatório de falha. A ANPD, no Guia Orientativo
-  sobre Cookies (2022), trata analytics como não essencial e puxa para o consentimento. O guia é
-  sobre cookies e não se aplica diretamente a aplicativo de desktop, mas indica a **postura** da
-  autoridade sobre a finalidade.
+- Não escolher não equivale a consentir. Mesmo para relatos de falha, ter um controle de
+  oposição e um aviso não demonstra, por si só, uma expectativa legítima de envio automático.
 
-**Mitigação adotada:** o aviso não pede permissão nem esconde o padrão — a primeira frase da tela é
-"Já estou mandando dados técnicos", e o botão de fechar diz "Fechar (segue enviando)". A
-transparência compensa parte da fragilidade da expectativa, mas **não a elimina** no caso de dados
-de uso. Este é o ponto mais atacável do teste, e está aqui explicitamente.
+**Mitigação adotada:** o aviso é neutro, não afirma estar enviando dados de uso e não confunde
+fechamento com adesão. Uso começa desligado quando não há escolha anterior; falhas têm seu
+próprio controle de oposição. O aviso atualizado não força novas escolhas nem reativa uma
+finalidade desligada. Isso reduz riscos técnicos, mas não encerra a análise jurídica das
+falhas automáticas ou das escolhas explícitas preservadas.
 
 ---
 
@@ -123,27 +139,30 @@ de uso. Este é o ponto mais atacável do teste, e está aqui explicitamente.
 | direito do titular                     | como é exercido                                                                                                                                 |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | oposição (art. 18, §2)                 | interruptor por finalidade em Configurações, efeito imediato                                                                                    |
+| revogação do consentimento de uso      | desligar dados de uso interrompe novos envios dessa finalidade, sem impedir o uso da Corneta                                                    |
 | confirmação e acesso (art. 18, I e II) | UUID copiável na tela, canal na política                                                                                                        |
 | eliminação (art. 18, IV)               | desativar ambas interrompe novos envios; copiar UUID antes de regenerar/reiniciar permite solicitar exclusão no operador pelo canal da política |
 | informação (art. 9º)                   | aviso no primeiro uso + seção dedicada na política                                                                                              |
 
 **Resultado: pendente.** Este documento descreve salvaguardas e riscos, não uma conclusão de
-conformidade. A revisão deve avaliar separadamente **relatórios de falha** e **dados de uso**,
-registrar sua conclusão e decidir se o padrão ativo é adequado para cada finalidade.
+conformidade. A revisão deve avaliar **legítimo interesse para relatos de falha** e
+**consentimento para dados de uso**, registrar as conclusões e examinar o tratamento de
+escolhas anteriores. O opt-in não autoriza automaticamente coletar categorias desnecessárias.
 
 ---
 
 ## 5. Salvaguardas que o código garante (e os testes travam)
 
-| garantia                                                | onde                                                                                                          |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| oposição atravessa troca de versão do aviso             | `Consent::active` (Rust) e `telemetryPurposeActive` (TS); testes nos dois lados                               |
-| arquivo de estado ilegível **não** religa quem desligou | `TelemetryStatus::opposed()`; teste `instalacao_nova_liga_e_arquivo_ilegivel_nao`                             |
-| desligar fecha o portão antes de qualquer I/O           | `set_consent` fecha o gate e troca o epoch antes de persistir                                                 |
-| instância antiga do SDK não revive após revogação       | `sdkEpoch` + `before_send` preso à identidade da instalação                                                   |
-| propriedade fora do catálogo não sai                    | allowlist por evento + `match` exaustivo no Rust                                                              |
-| evento nativo não solicita processamento de perfil      | `final_before_send` sobrescreve `$process_person_profile=false`; testes do envelope serializado e do SDK real |
-| kill switch de release                                  | `TELEMETRY_DISABLED` / `VITE_TELEMETRY_DISABLED`, conferidos pelo gate de release                             |
+| garantia                                                 | onde                                                                                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| escolhas explícitas atravessam troca de versão do aviso  | `src/lib/telemetry-schema.ts` e `src-tauri/src/telemetry.rs`; testes de preferências nos dois lados           |
+| uso sem adesão não envia nem recupera eventos anteriores | gate de uso e captura em `src/lib/telemetry.ts`; gate correspondente em `src-tauri/src/telemetry.rs`          |
+| arquivo de estado ilegível **não** religa quem desligou  | `TelemetryStatus::opposed()` e testes na mesma unidade                                                        |
+| desligar fecha o portão antes de qualquer I/O            | `set_consent` fecha o gate e troca o epoch antes de persistir                                                 |
+| instância antiga do SDK não revive após revogação        | `sdkEpoch` + `before_send` preso à identidade da instalação                                                   |
+| propriedade fora do catálogo não sai                     | allowlist por evento + `match` exaustivo no Rust                                                              |
+| evento nativo não solicita processamento de perfil       | `final_before_send` sobrescreve `$process_person_profile=false`; testes do envelope serializado e do SDK real |
+| kill switch de release                                   | `TELEMETRY_DISABLED` / `VITE_TELEMETRY_DISABLED`, conferidos pelo gate de release                             |
 
 ---
 
@@ -153,11 +172,13 @@ Publicar este rascunho junto do código é transparência, não aprovação do t
 confundir abertura do repositório com autorização para coletar dados de usuários em produção.
 
 - [ ] **Revisão jurídica** deste documento e da política, incluindo a base legal por finalidade
+- [ ] Validar informação, manifestação e registro das escolhas de uso, incluindo escolhas
+      `enabled` preservadas de avisos anteriores; a migração técnica não é uma aprovação
 - [ ] Ligar **"Discard client IP data"** no projeto do PostHog: o app desliga o geoip, mas o IP
       ainda chega pela requisição; descartar na ingestão fecha a lacuna e reforça a §2
 - [ ] Revisar se o contrato com o operador (PostHog) cobre o art. 39 e a transferência
       internacional (arts. 33 e ss.) — o processamento é fora do Brasil
-- [ ] Decidir se **dados de uso** continuam ligados por padrão ou voltam a opt-in. A §3 registra
-      por que este é o item frágil; a escolha é de negócio, mas tem que ser consciente
-- [ ] Reavaliar este teste a cada finalidade nova. Finalidade nova **não pode** entrar como
-      `Unset`, senão nasce ligada sem ninguém ter sido informado dela
+- [ ] Comprovar retenção, exclusão por UUID e revisão de identificadores já associados a perfis
+      no operador, usando dados sintéticos antes de declarar a configuração pronta
+- [ ] Reavaliar este teste a cada finalidade nova. Não herdar o default de falhas nem escolhas
+      existentes para outra finalidade sem migração, informação e avaliação específicas

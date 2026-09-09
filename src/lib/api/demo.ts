@@ -6,6 +6,7 @@ import {
   TELEMETRY_NOTICE_VERSION,
   createTelemetryId,
   normalizeTelemetryStatus,
+  telemetryPurposeActive,
   type TelemetryStatus,
 } from "../telemetry-schema";
 import type {
@@ -40,11 +41,11 @@ export function mockApi(): CornetaApi {
 
   const loadTelemetry = (): TelemetryStatus => {
     try {
-      return normalizeTelemetryStatus(
-        JSON.parse(localStorage.getItem(TELEMETRY_KEY) || "null"),
-      );
+      const stored = localStorage.getItem(TELEMETRY_KEY);
+      if (stored === null) return EMPTY_TELEMETRY_STATUS;
+      return normalizeTelemetryStatus(JSON.parse(stored));
     } catch {
-      return EMPTY_TELEMETRY_STATUS;
+      return normalizeTelemetryStatus(null);
     }
   };
   const saveTelemetry = (value: TelemetryStatus): TelemetryStatus => {
@@ -932,7 +933,8 @@ export function mockApi(): CornetaApi {
     async telemetrySetConsent(input) {
       const previous = loadTelemetry();
       const needsId =
-        input.usage === "enabled" || input.crashReports === "enabled";
+        telemetryPurposeActive(input.usage, "usage") ||
+        telemetryPurposeActive(input.crashReports, "crashReports");
       return saveTelemetry({
         schemaVersion: 1,
         noticeVersion: TELEMETRY_NOTICE_VERSION,
@@ -945,7 +947,10 @@ export function mockApi(): CornetaApi {
     },
     async telemetryRegenerateId() {
       const previous = loadTelemetry();
-      if (previous.usage === "enabled" || previous.crashReports === "enabled")
+      if (
+        telemetryPurposeActive(previous.usage, "usage") ||
+        telemetryPurposeActive(previous.crashReports, "crashReports")
+      )
         throw new Error("telemetry_disable_before_regenerate");
       return saveTelemetry({
         ...previous,

@@ -27,6 +27,8 @@ const labels =
   locale === "en"
     ? {
         consent: "Turn both off",
+        usage: "Send usage data",
+        crashes: "Send crash reports",
         reports: "Reports",
         story: "Open the stream story",
         download: "Download",
@@ -34,6 +36,8 @@ const labels =
       }
     : {
         consent: "Desligar as duas",
+        usage: "Enviar dados de uso",
+        crashes: "Enviar relatórios de falha",
         reports: "Relatórios",
         story: "Abrir a história da live",
         download: "Baixar",
@@ -173,6 +177,19 @@ try {
   await until(
     `[...document.querySelectorAll('button')].some(button => button.textContent.trim() === ${JSON.stringify(labels.consent)})`,
   );
+  const consentDefaults = await evaluate(
+    `(() => {
+      const switches = [...document.querySelectorAll('[role="dialog"] [role="switch"]')];
+      return ${JSON.stringify([labels.usage, labels.crashes])}.map(label =>
+        switches.find(toggle => toggle.getAttribute('aria-label') === label)?.getAttribute('aria-checked')
+      );
+    })()`,
+  );
+  assert.deepEqual(
+    consentDefaults,
+    ["false", "true"],
+    "Fresh desktop preferences must opt in to usage and opt out of crash reports",
+  );
   await evaluate(
     `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === ${JSON.stringify(labels.consent)}).click()`,
   );
@@ -311,6 +328,7 @@ try {
     noVideo: true,
     keyboardFocusRestored: true,
     largeTextNoOverflow: true,
+    telemetryDefaults: "usage-off-crashes-on",
   };
   await writeFile(reportFile, JSON.stringify(summary, null, 2) + "\n");
   console.log(JSON.stringify({ ...summary, screenshot }, null, 2));

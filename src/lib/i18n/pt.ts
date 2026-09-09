@@ -601,14 +601,14 @@ export const pt = {
   "components.onboarding.subtitle": "Em {n} passos, do OBS até o relatório.",
   "components.onboarding.title": "Opa! Bora cornetar?",
   "components.telemetry.crashes.body":
-    "Manda o que quebrou — a etapa, o código e a mensagem do erro — com nomes, caminhos e textos seus apagados antes de sair.",
+    "Sem escolha anterior, vem ligado. Manda a etapa e o código da falha, com nomes, caminhos e textos seus apagados antes de sair.",
   "components.telemetry.crashes.title": "Enviar relatórios de falha",
   "components.telemetry.notice.allowed":
     "Pode sair: versão, tela/etapa, resultado, plataforma em enum, categorias do sistema e IDs aleatórios de correlação.",
   "components.telemetry.notice.details":
     "O que pode — e o que nunca pode — ser enviado",
   "components.telemetry.notice.error":
-    "Não consegui salvar sua escolha. Nada novo foi enviado.",
+    "Não consegui salvar sua escolha. Confira as opções e tente novamente.",
   "components.telemetry.notice.forbidden":
     "Nunca entra no evento: chave de live, token, chat, título/categoria, OCR, imagem, áudio, vídeo, caminho local, hostname, IP como propriedade ou log cru.",
   "components.telemetry.notice.none": "Desligar as duas",
@@ -618,10 +618,10 @@ export const pt = {
   "components.telemetry.notice.save": "Salvar minhas escolhas",
   "components.telemetry.notice.saved": "Salvei sua escolha.",
   "components.telemetry.notice.subtitle":
-    "Vem ligado pra eu achar bug antes de você. Desliga aqui ou depois, em Configurações.",
-  "components.telemetry.notice.title": "Já estou mandando dados técnicos",
+    "Sem escolha anterior, dados de uso ficam desligados e relatos de falhas ficam ligados. Suas escolhas anteriores são mantidas. Você pode mudar aqui ou em Configurações.",
+  "components.telemetry.notice.title": "Suas escolhas de telemetria",
   "components.telemetry.usage.body":
-    "Envia etapas concluídas, versão, categorias do sistema e resultado das operações — nunca conteúdo da live.",
+    "Só envia se você ativar: etapas, versão, categorias do sistema e resultados futuros — nunca conteúdo da live nem eventos anteriores à ativação.",
   "components.telemetry.usage.title": "Enviar dados de uso",
   "components.toaster.dismiss.aria": "Fechar aviso",
   "components.toaster.region.aria": "Avisos",
@@ -1762,15 +1762,15 @@ export const pt = {
   "settings.telemetry.buildDisabled":
     "A coleta está desativada neste build; sua escolha fica guardada para uma versão configurada.",
   "settings.telemetry.crashes.desc":
-    "O que quebrou, com dados seus apagados e sem anexar logs.",
+    "Ligado quando não há escolha anterior. Relata falhas com dados seus apagados e sem anexar logs.",
   "settings.telemetry.deletion.cta": "Como pedir exclusão",
   "settings.telemetry.deletion.desc":
     "Com as duas opções desligadas, copie o ID acima e siga o canal indicado na política para excluir o que já foi enviado.",
   "settings.telemetry.explainer":
-    "As duas vêm ligadas, por legítimo interesse — existem pra eu achar e consertar problema. Sai só dado técnico pseudonimizado do catálogo; o PostHog opera a coleta, com retenção inicial de 90 dias. Desligar aqui é o seu direito de oposição e vale na hora.",
+    "Dados de uso só saem se você ativar. Relatos de falhas vêm ligados quando não há escolha anterior; você pode desligar. Suas escolhas anteriores são mantidas. O PostHog recebe só dados técnicos pseudonimizados do catálogo, com retenção prevista de até 90 dias. Desligar impede novos envios, mas não apaga o que já foi recebido.",
   "settings.telemetry.id": "ID de telemetria",
   "settings.telemetry.id.pending":
-    "O ID só é criado quando você liga pelo menos uma opção.",
+    "Nenhum ID de telemetria disponível nesta sessão.",
   "settings.telemetry.loading": "Lendo suas escolhas de telemetria…",
   "settings.telemetry.privacy": "Política de privacidade e dados coletados",
   "settings.telemetry.regenerate.confirm": "Trocar o ID agora?",
@@ -1779,12 +1779,12 @@ export const pt = {
   "settings.telemetry.regenerate.ok":
     "ID anterior desvinculado. Um novo será criado se você reativar a telemetria.",
   "settings.telemetry.saveError":
-    "Não consegui salvar. A escolha anterior continua valendo.",
+    "Não consegui salvar sua escolha. Confira as opções e tente novamente.",
   "settings.telemetry.saved": "Salvei sua escolha.",
   "settings.telemetry.unavailable":
     "A telemetria não tá funcionando nesta versão da Corneta — não mandei nada.",
   "settings.telemetry.usage.desc":
-    "Etapas e resultados em categorias, sem texto ou conteúdo da live.",
+    "Só com sua ativação: etapas e resultados futuros em categorias, sem texto ou conteúdo da live.",
   "settings.guardian.cost.chat":
     "O chat e a interação chegam até você com esse mesmo atraso.",
   "settings.guardian.cost.delay": "A transmissão fica {delay} do tempo real.",

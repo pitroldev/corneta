@@ -49,7 +49,7 @@ export const privacySectionsPt = [
 
 export const privacyTldrPt = {
   points: [
-    "A Corneta não cria conta nem exige cadastro. No aplicativo, dados de uso e relatórios de falha vêm ligados por padrão quando a coleta está configurada; você pode desligar cada finalidade separadamente.",
+    "A Corneta não cria conta nem exige cadastro. No app, dados de uso só são enviados se você ativar. Relatos de falhas vêm ligados quando não há escolha anterior e podem ser desligados. Suas escolhas anteriores são mantidas.",
     "Chaves de transmissão e tokens ficam no cofre de credenciais do seu sistema operacional, nunca nos nossos servidores.",
     "Configurações, chat, alertas e relatórios da live ficam em arquivos no seu computador.",
     "Só o login da Kick passa pelos nossos servidores — de passagem, sem ser armazenado. Twitch e YouTube falam direto com o seu app.",
@@ -127,13 +127,17 @@ export function PrivacyBodyPt() {
           porque eles nunca chegam até nós.
         </p>
         <Callout>
-          A telemetria do aplicativo <strong>vem ligada</strong> e roda por
-          legítimo interesse (art. 7º, IX): dados de uso e relatórios de falha
-          existem para encontrar e corrigir problemas. Você pode{" "}
-          <strong>desligar cada uma a qualquer momento</strong> em Configurações
-          — é o seu direito de oposição (art. 18, §2), vale na hora e não afeta
-          nada no funcionamento da Corneta. Um UUID aleatório de instalação é
-          criado no primeiro uso com alguma finalidade ativa. Desligar as duas
+          No aplicativo, <strong>dados de uso dependem da sua ativação</strong>,
+          separada do aceite dos termos. Sem escolha anterior, essa finalidade
+          fica desligada. Relatos de falhas ficam ligados quando não há escolha
+          anterior e podem ser desligados. A base prevista para uso é
+          consentimento (art. 7º, I); para falhas, a hipótese é legítimo
+          interesse (art. 7º, IX), sujeita à avaliação do controlador, não a uma
+          aprovação automática pelo software. Você pode revogar a ativação de
+          uso ou se opor ao envio de falhas em Configurações, sem perder
+          recursos da Corneta. Suas escolhas anteriores são mantidas; fechar o
+          aviso não ativa dados de uso. Um UUID aleatório de instalação é criado
+          no primeiro uso com alguma finalidade ativa. Desligar as duas
           interrompe novos envios, mas não apaga dados já recebidos pelo
           operador. Copie o UUID antes de regenerar o identificador ou reiniciar
           o app com ambas desligadas, caso queira solicitar exclusão. Você pode
@@ -294,7 +298,9 @@ export function PrivacyBodyPt() {
           O conteúdo descrito abaixo não é enviado para nós. Somente dados
           técnicos expressamente listados mais adiante podem ser enviados quando
           a coleta estiver configurada e a finalidade correspondente estiver
-          ativa, inclusive antes de uma escolha no primeiro uso.
+          ativa. Antes de uma escolha no primeiro uso, somente relatos de falhas
+          e seu marcador mínimo de abertura podem ser enviados, nunca dados de
+          uso.
         </p>
         <ul>
           <li>
@@ -337,25 +343,29 @@ export function PrivacyBodyPt() {
             computador; é você quem decide se e para quem enviar o diagnóstico.
           </li>
           <li>
-            <strong>Telemetria com opção de desligar</strong> — “dados de uso”
-            pode enviar versão, idioma, família do sistema, arquitetura e GPU em
-            categorias, etapas e resultado das operações, plataformas em enum,
-            quantidade de destinos e durações em faixas. “Relatórios de falha”
-            pode enviar código e etapa do erro, tipo, stack redigida e
-            identificadores aleatórios de erro/operação, além de um marcador
-            mínimo de abertura com versão e se a saída anterior foi limpa,
-            necessário para medir estabilidade sem ativar métricas de uso. São
-            duas preferências independentes, ligadas por padrão. Mesmo com elas
-            ativas, nunca enviamos vídeo, áudio, chat, alertas, título da live,
-            canal, chave, token, URL RTMP, hostname, caminho local completo, log
-            cru ou configuração.
+            <strong>Telemetria com controles independentes</strong> — “dados de
+            uso” só envia após ativação explícita: versão, idioma, família do
+            sistema, arquitetura e GPU em categorias, etapas e resultado das
+            operações, plataformas em enum, quantidade de destinos e durações em
+            faixas. “Relatórios de falha” pode enviar código e etapa do erro,
+            tipo, stack redigida e identificadores aleatórios de erro/operação,
+            além de um marcador mínimo de abertura com versão e se a saída
+            anterior foi limpa, para contextualizar falhas sem ativar métricas
+            de uso. Sem escolha anterior, uso fica desligado e falhas ficam
+            ligadas. Ativar uso não envia eventos anteriores à ativação,
+            inclusive etapas do onboarding. Escolhas explícitas anteriores,
+            ligadas ou desligadas, são preservadas quando o aviso muda. Mesmo
+            com elas ativas, nunca enviamos vídeo, áudio, chat, alertas, título
+            da live, canal, chave, token, URL RTMP, hostname, caminho local
+            completo, log cru ou configuração.
           </li>
           <li>
             <strong>Preferência e UUID de telemetria</strong> — ficam em um
             arquivo local próprio, que não acompanha exportação ou importação de
             configuração. O UUID nasce no primeiro uso com alguma finalidade
-            ativa, mesmo que você ainda não tenha escolhido. Desligar as duas
-            interrompe novos envios e limpa a persistência do SDK. O ID
+            ativa, inclusive antes de uma escolha no primeiro uso se relatos de
+            falhas estiverem ativos. Isso não ativa dados de uso. Desligar as
+            duas interrompe novos envios e limpa a persistência do SDK. O ID
             permanece disponível na sessão atual para copiar e solicitar
             exclusão do que já foi enviado; copie-o antes de reiniciar ou
             regenerar o identificador. Regenerar não exclui dados no operador.
@@ -420,15 +430,25 @@ export function PrivacyBodyPt() {
             privacidade do navegador.
           </li>
           <li>
-            <strong>Legítimo interesse</strong> (art. 7º, IX) — os dados de uso
-            e os relatórios automáticos de falha do aplicativo vêm ligados e
-            servem para encontrar defeito, medir estabilidade e priorizar
-            correção. O tratamento é reduzido ao mínimo necessário (art. 10,
+            <strong>Consentimento para dados de uso</strong> (art. 7º, I) — essa
+            finalidade só envia após ativação explícita e pode ser desligada a
+            qualquer momento, sem afetar os recursos da Corneta. Serve para
+            entender etapas e resultados de uso e orientar melhorias. Não
+            recuperamos eventos anteriores à ativação. O aceite dos termos e o
+            fechamento do aviso não substituem essa escolha.
+          </li>
+          <li>
+            <strong>Legítimo interesse para relatos de falhas</strong> (art. 7º,
+            IX) — a hipótese para o envio automático de falhas é encontrar
+            defeitos e orientar correções. Sem escolha anterior, essa finalidade
+            fica ligada. O tratamento deve se limitar ao necessário (art. 10,
             §1): uma lista fechada de propriedades técnicas, sem conteúdo da sua
-            live, sem geolocalização e sem perfil identificado. Você pode se
-            opor a cada finalidade a qualquer momento nas Configurações (art.
-            18, §2), com efeito imediato e sem afetar o funcionamento da
-            Corneta. O teste de balanceamento está publicado no repositório.
+            live, sem geolocalização e sem solicitar perfil identificado. Você
+            pode se opor ao envio de falhas a qualquer momento nas Configurações
+            (art. 18, §2), com efeito imediato e sem afetar o funcionamento da
+            Corneta. O rascunho de balanceamento está publicado no repositório;
+            a adequação da base legal depende de revisão jurídica, não da
+            existência do interruptor.
           </li>
           <li>
             <strong>Cumprimento de obrigação legal ou regulatória</strong> (art.

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { PostHogConfig } from "posthog-js/dist/module.no-external";
+import { createTelemetryTransport } from "./telemetry-transport";
 import {
   EMPTY_TELEMETRY_STATUS,
   REMOTE_DESKTOP_ERROR_MESSAGE,
@@ -9,7 +10,6 @@ import {
   isTelemetryErrorCode,
   isTelemetryStage,
   isUuid,
-  needsTelemetryDecision,
   telemetryPurposeActive,
   normalizeTelemetryExceptionName,
   normalizeTelemetryStatus,
@@ -69,9 +69,10 @@ interface PostHogSdk {
   clear_opt_in_out_capturing?: () => void;
   reset?: (resetDeviceId?: boolean) => void;
   flush?: () => Promise<void> | void;
+  closeTelemetryTransport?: () => void;
 }
 
-type SdkLoader = () => Promise<PostHogSdk>;
+type SdkLoader = () => Promise<Pick<PostHogSdk, "init">>;
 
 interface RuntimeConfig {
   token: string;
@@ -81,7 +82,7 @@ interface RuntimeConfig {
   environment: TelemetryContext["environment"];
 }
 
-export type BufferedOnboardingTelemetryEvent =
+export type OnboardingTelemetryEvent =
   | {
       event: "onboarding_started";
       properties: TelemetryEventMap["onboarding_started"];
@@ -114,15 +115,22 @@ const DURATION_BUCKETS = new Set([
   "30_120m",
   "gte_120m",
 ]);
-const MAX_BUFFERED_ONBOARDING_EVENTS = 16;
 const POSTHOG_CONSENT_PREFIX = "__ph_opt_in_out_";
+export const TELEMETRY_MAX_QUEUED_EVENTS = 64;
+const USAGE_QUEUE_LIMIT = 48;
+const DELIVERY_BATCH_SIZE = 4;
+const RECENT_EVENT_LIMIT = 128;
+const RECENT_ERROR_LIMIT = 64;
 
 const listeners = new Set<() => void>();
-const pending = new Set<Promise<void>>();
+const queued: Array<(client: PostHogSdk) => void> = [];
 const seenErrors = new WeakMap<object, string>();
 const recentErrors = new Map<string, { id: string; at: number }>();
 const recentEvents = new Map<string, number>();
-const bufferedOnboardingEvents: BufferedOnboardingTelemetryEvent[] = [];
+let delivery: { epoch: number; promise: Promise<void> } | null = null;
+let cancelScheduledDelivery: (() => void) | null = null;
+let dropped = 0;
+let sdkRetryAt = 0;
 
 let backend: TelemetryBackend | null = null;
 let initialization: Promise<void> | null = null;
@@ -245,7 +253,7 @@ export function useTelemetry(): TelemetrySnapshot {
 // Notice updates do not override opposition; see telemetryPurposeActive.
 function canCaptureUsage(): boolean {
   return (
-    telemetryPurposeActive(snapshot.status.usage) &&
+    telemetryPurposeActive(snapshot.status.usage, "usage") &&
     isUuid(snapshot.status.installationId) &&
     snapshot.configured
   );
@@ -253,7 +261,7 @@ function canCaptureUsage(): boolean {
 
 function canCaptureCrashes(): boolean {
   return (
-    telemetryPurposeActive(snapshot.status.crashReports) &&
+    telemetryPurposeActive(snapshot.status.crashReports, "crashReports") &&
     isUuid(snapshot.status.installationId) &&
     snapshot.configured
   );
@@ -261,8 +269,8 @@ function canCaptureCrashes(): boolean {
 
 function anyEnabledChoice(status = snapshot.status): boolean {
   return (
-    telemetryPurposeActive(status.usage) ||
-    telemetryPurposeActive(status.crashReports)
+    telemetryPurposeActive(status.usage, "usage") ||
+    telemetryPurposeActive(status.crashReports, "crashReports")
   );
 }
 
@@ -277,9 +285,9 @@ function onlyProperty(
   return Object.keys(properties).length === 1 && key in properties;
 }
 
-function safeBufferedOnboardingEvent(
-  input: BufferedOnboardingTelemetryEvent,
-): BufferedOnboardingTelemetryEvent | null {
+function safeOnboardingEvent(
+  input: OnboardingTelemetryEvent,
+): OnboardingTelemetryEvent | null {
   const properties = input.properties as Record<string, unknown>;
   if (input.event === "onboarding_started") {
     return onlyProperty(properties, "entry_point") &&
@@ -319,28 +327,18 @@ function safeBufferedOnboardingEvent(
   return null;
 }
 
-function replayBufferedOnboarding(): void {
-  const events = bufferedOnboardingEvents.splice(
-    0,
-    bufferedOnboardingEvents.length,
-  );
-  for (const item of events) {
-    if (item.event === "onboarding_started")
-      capture(item.event, item.properties);
-    else if (item.event === "onboarding_step_completed")
-      capture(item.event, item.properties);
-    else capture(item.event, item.properties);
-  }
-}
-
-function resolveBufferedOnboarding(status: TelemetryStatus): void {
-  if (telemetryPurposeActive(status.usage)) replayBufferedOnboarding();
-  else discardBufferedOnboardingTelemetry();
-}
-
-async function defaultSdkLoader(): Promise<PostHogSdk> {
+async function defaultSdkLoader(): ReturnType<SdkLoader> {
   const module = await import("posthog-js/dist/module.no-external");
-  return module.default as unknown as PostHogSdk;
+  return {
+    init(token, options) {
+      // Named singleton instances are retained globally after revocation.
+      const instance = new module.PostHog().init(token, options);
+      const transport = createTelemetryTransport(instance);
+      const current = instance as unknown as PostHogSdk;
+      current.closeTelemetryTransport = transport.close;
+      return current;
+    },
+  };
 }
 
 function beforeSend(
@@ -395,8 +393,8 @@ function clearSdkConsent(current: PostHogSdk | null): void {
   clearPostHogConsentStorage();
 }
 
-/** Invalidate in-flight loaders by epoch; clear their references so a fresh instance need not await stale work. */
 function retireSdk(current: PostHogSdk | null): void {
+  current?.closeTelemetryTransport?.();
   try {
     current?.opt_out_capturing?.();
   } catch {
@@ -412,6 +410,13 @@ function retireSdk(current: PostHogSdk | null): void {
 
 function invalidateSdk(): void {
   sdkEpoch += 1;
+  cancelScheduledDelivery?.();
+  cancelScheduledDelivery = null;
+  dropped += queued.length;
+  queued.length = 0;
+  delivery = null;
+  sdkRetryAt = 0;
+  recentEvents.clear();
   const current = sdk;
   sdk = null;
   sdkPromise = null;
@@ -423,7 +428,9 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
   if (
     !snapshot.configured ||
     !anyCurrentConsent() ||
-    !snapshot.status.installationId
+    !snapshot.status.installationId ||
+    !isOnline() ||
+    Date.now() < sdkRetryAt
   )
     return null;
 
@@ -432,7 +439,6 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
       // Bootstrap an anonymous installation ID; identify would create an identified profile and an auxiliary device ID.
       invalidateSdk();
     } else {
-      clearSdkConsent(sdk);
       return sdk;
     }
   }
@@ -440,7 +446,8 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
 
   const installationId = snapshot.status.installationId;
   const epoch = sdkEpoch;
-  const loading = sdkLoader()
+  const loading = Promise.resolve()
+    .then(sdkLoader)
     .then((root) => {
       if (
         sdkEpoch !== epoch ||
@@ -512,7 +519,10 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
       sdkInstallationId = installationId;
       return instance;
     })
-    .catch(() => null);
+    .catch(() => {
+      if (sdkEpoch === epoch) sdkRetryAt = Date.now() + 30_000;
+      return null;
+    });
   sdkPromise = loading;
   void loading.finally(() => {
     // An old loader must not clear the current promise.
@@ -521,13 +531,94 @@ async function ensureSdk(): Promise<PostHogSdk | null> {
   return loading;
 }
 
-function schedule(task: () => Promise<void>): void {
-  const promise = task()
+function isOnline(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function requestDelivery(): void {
+  if (cancelScheduledDelivery || delivery?.epoch === sdkEpoch) return;
+  const run = () => {
+    cancelScheduledDelivery = null;
+    void deliverBatch();
+  };
+  if (
+    typeof window !== "undefined" &&
+    typeof window.requestIdleCallback === "function" &&
+    typeof window.cancelIdleCallback === "function"
+  ) {
+    const browser = window;
+    const id = browser.requestIdleCallback(run, { timeout: 250 });
+    cancelScheduledDelivery = () => browser.cancelIdleCallback(id);
+  } else {
+    const id = setTimeout(run, 16);
+    cancelScheduledDelivery = () => clearTimeout(id);
+  }
+}
+
+function deliverBatch(): Promise<void> {
+  if (delivery?.epoch === sdkEpoch) return delivery.promise;
+  const epoch = sdkEpoch;
+  const promise = (async () => {
+    const client = await ensureSdk();
+    if (sdkEpoch !== epoch) return;
+    if (!client || sdk !== client) {
+      dropped += queued.length;
+      queued.length = 0;
+      return;
+    }
+    for (
+      let count = 0;
+      count < DELIVERY_BATCH_SIZE && sdkEpoch === epoch && sdk === client;
+      count++
+    ) {
+      const task = queued.shift();
+      if (!task) break;
+      try {
+        task(client);
+      } catch {
+        // SDK failures must not interrupt the UI or retry a potentially accepted event.
+        dropped++;
+      }
+    }
+  })()
     .catch(() => {
-      // Telemetry failures must not interrupt the UI or media pipeline.
+      if (sdkEpoch === epoch) {
+        dropped += queued.length;
+        queued.length = 0;
+      }
     })
-    .finally(() => pending.delete(promise));
-  pending.add(promise);
+    .finally(() => {
+      if (delivery?.promise !== promise) return;
+      delivery = null;
+      if (queued.length) requestDelivery();
+    });
+  delivery = { epoch, promise };
+  return promise;
+}
+
+function schedule(
+  task: (client: PostHogSdk) => void,
+  crashReport = false,
+): void {
+  // Reserve capacity for crash reports while a slow SDK load holds usage events.
+  if (
+    !isOnline() ||
+    queued.length >=
+      (crashReport ? TELEMETRY_MAX_QUEUED_EVENTS : USAGE_QUEUE_LIMIT)
+  ) {
+    dropped++;
+    return;
+  }
+  queued.push(task);
+  requestDelivery();
+}
+
+function trimOldest<T>(cache: Map<string, T>, limit: number): void {
+  while (cache.size > limit) {
+    const key = cache.keys().next().value;
+    if (key === undefined) break;
+    cache.delete(key);
+  }
 }
 
 export async function initializeTelemetry(
@@ -545,7 +636,7 @@ export async function initializeTelemetry(
       });
       clearPostHogConsentStorage();
       installGlobalErrorHandlers();
-      if (anyCurrentConsent()) schedule(async () => void (await ensureSdk()));
+      if (anyCurrentConsent() && snapshot.configured) requestDelivery();
     })
     .catch(() => {
       updateSnapshot({
@@ -567,16 +658,20 @@ export async function setTelemetryConsent(input: {
 }): Promise<TelemetryStatus> {
   if (!backend || !snapshot.available)
     throw new Error("telemetry_backend_unavailable");
+  if (snapshot.saving) throw new Error("telemetry_change_in_progress");
 
   const previous = snapshot.status;
-  // Revoking unset also closes an active purpose; checking enabled alone would miss fresh installations.
+  const usageActive = telemetryPurposeActive(input.usage, "usage");
+  const crashesActive = telemetryPurposeActive(
+    input.crashReports,
+    "crashReports",
+  );
   const revoked =
-    (telemetryPurposeActive(previous.usage) && input.usage === "disabled") ||
-    (telemetryPurposeActive(previous.crashReports) &&
-      input.crashReports === "disabled");
+    (telemetryPurposeActive(previous.usage, "usage") && !usageActive) ||
+    (telemetryPurposeActive(previous.crashReports, "crashReports") &&
+      !crashesActive);
   if (revoked) invalidateSdk();
-  const refusingBoth =
-    input.usage === "disabled" && input.crashReports === "disabled";
+  const refusingBoth = !usageActive && !crashesActive;
   const optimistic: TelemetryStatus = {
     ...previous,
     noticeVersion:
@@ -584,9 +679,8 @@ export async function setTelemetryConsent(input: {
         ? TELEMETRY_NOTICE_VERSION
         : previous.noticeVersion,
     // Disable immediately; enable only after the backend persists the decision.
-    usage: input.usage === "disabled" ? "disabled" : previous.usage,
-    crashReports:
-      input.crashReports === "disabled" ? "disabled" : previous.crashReports,
+    usage: !usageActive ? input.usage : previous.usage,
+    crashReports: !crashesActive ? input.crashReports : previous.crashReports,
     decidedAt: new Date().toISOString(),
   };
   updateSnapshot({ status: optimistic, saving: true });
@@ -598,17 +692,21 @@ export async function setTelemetryConsent(input: {
       }),
     );
     updateSnapshot({ status, saving: false });
-    resolveBufferedOnboarding(status);
     if (anyCurrentConsent(status)) {
-      schedule(async () => void (await ensureSdk()));
+      requestDelivery();
     } else {
       invalidateSdk();
     }
     return status;
   } catch (error) {
-    updateSnapshot({ status: previous, saving: false });
-    if (anyCurrentConsent(previous))
-      schedule(async () => void (await ensureSdk()));
+    // A failed write must not resume a purpose the user just revoked.
+    const status = {
+      ...previous,
+      usage: usageActive ? previous.usage : input.usage,
+      crashReports: crashesActive ? previous.crashReports : input.crashReports,
+    };
+    updateSnapshot({ status, saving: false });
+    if (anyCurrentConsent(status)) requestDelivery();
     throw error;
   }
 }
@@ -616,6 +714,7 @@ export async function setTelemetryConsent(input: {
 export async function regenerateTelemetryId(): Promise<TelemetryStatus> {
   if (!backend || !snapshot.available)
     throw new Error("telemetry_backend_unavailable");
+  if (snapshot.saving) throw new Error("telemetry_change_in_progress");
   if (anyEnabledChoice())
     throw new Error("telemetry_disable_before_regenerate");
   invalidateSdk();
@@ -644,6 +743,10 @@ export function capture<Name extends TelemetryEventName>(
   properties: TelemetryEventMap[Name],
 ): void {
   if (!canCaptureUsage()) return;
+  if (!isOnline() || queued.length >= USAGE_QUEUE_LIMIT) {
+    dropped++;
+    return;
+  }
   const safe = sanitizeTelemetryProperties(
     event,
     properties as Record<string, unknown>,
@@ -656,53 +759,27 @@ export function capture<Name extends TelemetryEventName>(
     properties as Record<string, unknown>,
   );
   const now = Date.now();
-  if (now - (recentEvents.get(signature) ?? 0) < 750) return;
+  const previous = recentEvents.get(signature);
+  if (previous !== undefined && now - previous < 750) return;
   recentEvents.set(signature, now);
-  if (recentEvents.size > 100) {
-    for (const [key, at] of recentEvents) {
-      if (now - at > 30_000) recentEvents.delete(key);
-    }
-  }
+  trimOldest(recentEvents, RECENT_EVENT_LIMIT);
 
   const epoch = sdkEpoch;
-  schedule(async () => {
-    const client = await ensureSdk();
+  schedule((client) => {
     if (!client || sdkEpoch !== epoch || sdk !== client || !canCaptureUsage())
       return;
     client.capture(event, safe);
   });
 }
 
-export function captureOnboarding(
-  input: BufferedOnboardingTelemetryEvent,
-): void {
-  const safe = safeBufferedOnboardingEvent(input);
+export function captureOnboarding(input: OnboardingTelemetryEvent): void {
+  if (!canCaptureUsage()) return;
+  const safe = safeOnboardingEvent(input);
   if (!safe) return;
-  if (canCaptureUsage()) {
-    if (safe.event === "onboarding_started")
-      capture(safe.event, safe.properties);
-    else if (safe.event === "onboarding_step_completed")
-      capture(safe.event, safe.properties);
-    else capture(safe.event, safe.properties);
-    return;
-  }
-  if (
-    !snapshot.ready ||
-    !snapshot.available ||
-    !needsTelemetryDecision(snapshot.status) ||
-    bufferedOnboardingEvents.length >= MAX_BUFFERED_ONBOARDING_EVENTS
-  )
-    return;
-  const signature = JSON.stringify(safe);
-  if (
-    bufferedOnboardingEvents.some((item) => JSON.stringify(item) === signature)
-  )
-    return;
-  bufferedOnboardingEvents.push(safe);
-}
-
-export function discardBufferedOnboardingTelemetry(): void {
-  bufferedOnboardingEvents.splice(0, bufferedOnboardingEvents.length);
+  if (safe.event === "onboarding_started") capture(safe.event, safe.properties);
+  else if (safe.event === "onboarding_step_completed")
+    capture(safe.event, safe.properties);
+  else capture(safe.event, safe.properties);
 }
 
 function hash(value: string): string {
@@ -751,6 +828,7 @@ export function captureException(
   if (error && (typeof error === "object" || typeof error === "function"))
     seenErrors.set(error as object, errorId);
   recentErrors.set(signature, { id: errorId, at: now });
+  trimOldest(recentErrors, RECENT_ERROR_LIMIT);
 
   // Keep the error ID locally available even when SDK reporting is disabled.
   if (!canCaptureCrashes()) return errorId;
@@ -766,12 +844,11 @@ export function captureException(
   if (!safe) return errorId;
 
   const epoch = sdkEpoch;
-  schedule(async () => {
-    const client = await ensureSdk();
+  schedule((client) => {
     if (!client || sdkEpoch !== epoch || sdk !== client || !canCaptureCrashes())
       return;
     client.captureException(redactedError, safe);
-  });
+  }, true);
   return errorId;
 }
 
@@ -808,8 +885,7 @@ export function addStep(
     safe.error_code = properties.error_code;
 
   const epoch = sdkEpoch;
-  schedule(async () => {
-    const client = await ensureSdk();
+  schedule((client) => {
     if (!client || sdkEpoch !== epoch || sdk !== client || !canCaptureCrashes())
       return;
     client.addExceptionStep?.(name, safe);
@@ -844,13 +920,38 @@ export function installGlobalErrorHandlers(): void {
 }
 
 export async function flushTelemetry(timeoutMs = 300): Promise<void> {
-  const work = Promise.allSettled([...pending]).then(async () => {
-    await sdk?.flush?.();
-  });
-  await Promise.race([
-    work,
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
+  const epoch = sdkEpoch;
+  const deadline = Date.now() + timeoutMs;
+  const work = (async () => {
+    do {
+      cancelScheduledDelivery?.();
+      cancelScheduledDelivery = null;
+      await deliverBatch();
+    } while (queued.length && epoch === sdkEpoch && Date.now() < deadline);
+    if (epoch === sdkEpoch) await sdk?.flush?.();
+  })().catch(() => undefined);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work,
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Numeric diagnostics for isolated tests and benchmarks; never sent as events. */
+export function __getTelemetryDiagnosticsForTests() {
+  return {
+    queued: queued.length,
+    pending: delivery ? 1 : 0,
+    dropped,
+    recentEvents: recentEvents.size,
+    recentErrors: recentErrors.size,
+  };
 }
 
 /** Isolated test injection; never called by the application. */
@@ -873,6 +974,5 @@ export function __configureTelemetryForTests(input: {
   sdkInstanceSequence = 0;
   recentErrors.clear();
   recentEvents.clear();
-  discardBufferedOnboardingTelemetry();
-  pending.clear();
+  dropped = 0;
 }

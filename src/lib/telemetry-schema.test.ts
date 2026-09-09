@@ -16,6 +16,7 @@ import {
   sanitizeExceptionProperties,
   sanitizeTelemetryProperties,
   telemetryConsentDraft,
+  telemetryConsentChange,
   type TelemetryContext,
 } from "./telemetry-schema";
 
@@ -30,7 +31,6 @@ const context: TelemetryContext = {
 };
 
 describe("telemetry schema", () => {
-  // unset is active under the opt-out policy; switches must reflect the effective state.
   it("shows the notice with the effective preference state", () => {
     const base: Parameters<typeof telemetryConsentDraft>[0] = {
       schemaVersion: TELEMETRY_SCHEMA_VERSION,
@@ -42,13 +42,12 @@ describe("telemetry schema", () => {
     };
     expect(needsTelemetryDecision(base)).toBe(true);
     expect(telemetryConsentDraft(base)).toEqual({
-      usage: true,
+      usage: false,
       crashReports: true,
     });
   });
 
-  // This checks notice behavior, not legal adequacy.
-  it("shows the notice on a fresh installation to disclose the active defaults", () => {
+  it("shows the notice on a fresh installation to disclose separate defaults", () => {
     expect(
       needsTelemetryDecision({
         schemaVersion: TELEMETRY_SCHEMA_VERSION,
@@ -88,9 +87,43 @@ describe("telemetry schema", () => {
       usage: false,
       crashReports: false,
     });
-    expect(telemetryPurposeActive(opposed.usage)).toBe(false);
-    expect(telemetryPurposeActive(opposed.crashReports)).toBe(false);
+    expect(telemetryPurposeActive(opposed.usage, "usage")).toBe(false);
+    expect(telemetryPurposeActive(opposed.crashReports, "crashReports")).toBe(
+      false,
+    );
   });
+
+  it.each(["2026-08-02", TELEMETRY_NOTICE_VERSION])(
+    "keeps purpose-specific choices across notice %s",
+    (noticeVersion) => {
+      for (const usage of ["unset", "enabled", "disabled"] as const) {
+        for (const crashReports of ["unset", "enabled", "disabled"] as const) {
+          const status = normalizeTelemetryStatus({
+            schemaVersion: 1,
+            noticeVersion,
+            usage,
+            crashReports,
+            installationId: "00000000-0000-4000-8000-000000000001",
+            decidedAt: null,
+          });
+          expect(telemetryConsentDraft(status)).toEqual({
+            usage: usage === "enabled",
+            crashReports: crashReports !== "disabled",
+          });
+          expect(telemetryConsentChange(status, "crashReports", false)).toEqual(
+            {
+              usage: usage === "enabled" ? "enabled" : "disabled",
+              crashReports: "disabled",
+            },
+          );
+          expect(telemetryConsentChange(status, "usage", true)).toEqual({
+            usage: "enabled",
+            crashReports: crashReports === "disabled" ? "disabled" : "enabled",
+          });
+        }
+      }
+    },
+  );
 
   it("fails closed for malformed consent", () => {
     expect(

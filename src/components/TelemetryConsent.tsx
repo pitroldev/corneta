@@ -16,6 +16,7 @@ import {
 } from "../lib/telemetry";
 import {
   needsTelemetryDecision,
+  telemetryConsentChange,
   telemetryConsentDraft,
   telemetryPurposeActive,
 } from "../lib/telemetry-schema";
@@ -190,16 +191,10 @@ export function TelemetrySettingsPanel() {
     );
 
   const change = async (which: "usage" | "crashReports", enabled: boolean) => {
-    const other = which === "usage" ? "crashReports" : "usage";
-    const choices = {
-      usage: telemetry.status.usage,
-      crashReports: telemetry.status.crashReports,
-    };
-    choices[which] = enabled ? "enabled" : "disabled";
-    // Materialize unset as enabled so changing one purpose does not disable the other.
-    if (choices[other] === "unset") choices[other] = "enabled";
     try {
-      await setTelemetryConsent(choices);
+      await setTelemetryConsent(
+        telemetryConsentChange(telemetry.status, which, enabled),
+      );
       toast.success(t("settings.telemetry.saved"));
     } catch {
       toast.error(t("settings.telemetry.saveError"));
@@ -222,8 +217,8 @@ export function TelemetrySettingsPanel() {
   };
 
   const bothDisabled =
-    telemetry.status.usage !== "enabled" &&
-    telemetry.status.crashReports !== "enabled";
+    !telemetryPurposeActive(telemetry.status.usage, "usage") &&
+    !telemetryPurposeActive(telemetry.status.crashReports, "crashReports");
 
   return (
     <div className="border-b border-border-soft pb-4 pt-1">
@@ -234,7 +229,7 @@ export function TelemetrySettingsPanel() {
           body={t("settings.telemetry.usage.desc")}
         >
           <Toggle
-            checked={telemetryPurposeActive(telemetry.status.usage)}
+            checked={telemetryPurposeActive(telemetry.status.usage, "usage")}
             onChange={(enabled) => void change("usage", enabled)}
             disabled={telemetry.saving}
             label={t("components.telemetry.usage.title")}
@@ -246,7 +241,10 @@ export function TelemetrySettingsPanel() {
           body={t("settings.telemetry.crashes.desc")}
         >
           <Toggle
-            checked={telemetryPurposeActive(telemetry.status.crashReports)}
+            checked={telemetryPurposeActive(
+              telemetry.status.crashReports,
+              "crashReports",
+            )}
             onChange={(enabled) => void change("crashReports", enabled)}
             disabled={telemetry.saving}
             label={t("components.telemetry.crashes.title")}

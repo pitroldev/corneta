@@ -68,14 +68,18 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores, linh
 - Credenciais reais devem vir de contas de teste sem dados pessoais. Nunca anexar `.env`,
   chaves, tokens, logs crus ou certificados ao issue/artefato.
 - O Environment GitHub `production-telemetry` tem reviewer obrigatório; DPA/MFA, descarte de IP,
-  retenção de 90 dias e política PT/EN versão `2026-08-02` precisam estar ativos antes da
+  retenção de 90 dias e aviso de telemetria PT/EN versão `2026-09-09` precisam estar ativos antes da
   aprovação.
 - Registrar a revisão jurídica do balanceamento e dos textos PT/EN antes de ativar coleta de
-  produção. A política técnica é opt-out; teste automatizado, aviso ou publicação do código não
+  produção. Uso desktop é opt-in e falhas são opt-out; preservar escolhas explícitas antigas não
+  comprova consentimento válido. Teste automatizado, aviso ou publicação do código não
   comprovam adequação da base legal nem configuração de retenção/descarte no operador.
-- Em uma instalação limpa, confirmar zero request ao PostHog com as duas finalidades
-  **desligadas**. O padrão configurado é ativo para uso e falhas; desligue ambas para verificar
-  a interrupção do envio. Depois religar uma de cada vez,
+- Em uma instalação limpa, confirmar uso **desligado** e falhas **ligadas** antes de qualquer
+  escolha. Não deve haver evento de uso nesse estado; falhas e o marcador mínimo de abertura
+  podem ser enviados. Com ambas desligadas, confirmar zero novo request ao PostHog. Ativar uso
+  deve permitir apenas eventos futuros, sem recuperar o onboarding anterior. Preservar escolhas
+  explícitas `enabled` e `disabled` em upgrades de aviso; fechar o aviso ou aceitar termos não
+  pode ativar uso. Depois ligar uma finalidade de cada vez,
   inspecionar payloads e validar uma stack React simbolicada conforme o
   [`RUNBOOK-POSTHOG.md`](./RUNBOOK-POSTHOG.md). Ver o teste de balanceamento em
   [`LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`](./LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md).

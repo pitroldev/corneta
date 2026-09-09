@@ -2,9 +2,10 @@
 
 export const TELEMETRY_SCHEMA_VERSION = 1;
 // Must match NOTICE_VERSION in src-tauri/src/telemetry.rs.
-export const TELEMETRY_NOTICE_VERSION = "2026-08-02";
+export const TELEMETRY_NOTICE_VERSION = "2026-09-09";
 
 export type TelemetryChoice = "unset" | "enabled" | "disabled";
+export type TelemetryPurpose = "usage" | "crashReports";
 
 export interface TelemetryStatus {
   schemaVersion: number;
@@ -76,11 +77,14 @@ export function normalizeTelemetryStatus(value: unknown): TelemetryStatus {
   };
 }
 
-/** unset is active; disabled always wins, including after notice updates. Match Rust Consent::active. */
-export const telemetryPurposeActive = (choice: TelemetryChoice): boolean =>
-  choice !== "disabled";
+// Usage requires opt-in; crash reporting retains its opt-out default. Match Rust effective_gates.
+export const telemetryPurposeActive = (
+  choice: TelemetryChoice,
+  purpose: TelemetryPurpose,
+): boolean =>
+  choice === "enabled" || (purpose === "crashReports" && choice === "unset");
 
-/** Notice visibility depends on version; collection depends on the recorded opposition state. */
+/** Notice updates never override an existing choice. */
 export function needsTelemetryDecision(status: TelemetryStatus): boolean {
   return (
     status.noticeVersion !== TELEMETRY_NOTICE_VERSION ||
@@ -94,8 +98,21 @@ export function telemetryConsentDraft(status: TelemetryStatus): {
   crashReports: boolean;
 } {
   return {
-    usage: telemetryPurposeActive(status.usage),
-    crashReports: telemetryPurposeActive(status.crashReports),
+    usage: telemetryPurposeActive(status.usage, "usage"),
+    crashReports: telemetryPurposeActive(status.crashReports, "crashReports"),
+  };
+}
+
+export function telemetryConsentChange(
+  status: TelemetryStatus,
+  purpose: TelemetryPurpose,
+  enabled: boolean,
+): Pick<TelemetryStatus, "usage" | "crashReports"> {
+  const draft = telemetryConsentDraft(status);
+  draft[purpose] = enabled;
+  return {
+    usage: draft.usage ? "enabled" : "disabled",
+    crashReports: draft.crashReports ? "enabled" : "disabled",
   };
 }
 
