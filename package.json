@@ -1,7 +1,7 @@
 {
   "name": "corneta",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.8.1",
   "packageManager": "pnpm@11.18.0",
   "engines": {
     "node": ">=24.18.1 <25",

@@ -1,11 +1,13 @@
 # Histórico de mudanças
 
-## Não lançado — linha 0.8.0
+## Não lançado — linha 0.8.1
 
 Este é o estado do código em preparação, não uma release estável nem um instalador aprovado.
 
 ### Para quem usa
 
+- Audiência simultânea da Cinefy nos contadores e relatórios, com status, título e início informado da live.
+- Contagens de players incorporados identificadas como externas, sem duplicação nos totais; falhas de consulta não viram zero nem criam picos artificiais nos relatórios.
 - Relatórios organizados em torno da live, com replay, chat paginado, momentos, gráficos e detalhes técnicos secundários.
 - Processamento de relatórios em worker e limites de memória/filas para preservar a resposta do app.
 - Fluxos oficiais de conexão Twitch, YouTube e Kick via API de setup; URLs/chaves próprias continuam um caminho separado.
