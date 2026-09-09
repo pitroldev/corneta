@@ -155,21 +155,53 @@ describe("formatting coverage and exact legacy baseline", () => {
       false,
     );
   });
-  it("refuses to format a tracked file redirected outside by its parent directory", async () => {
-    const root = workspace();
-    const external = workspace();
-    const source = "const a={b:1};\n";
-    mkdirSync(join(root, "src"));
-    writeFileSync(join(root, "src/a.ts"), source);
-    expect(spawnSync("git", ["init", "--quiet"], { cwd: root }).status).toBe(0);
-    expect(
-      spawnSync("git", ["add", "--", "src/a.ts"], { cwd: root }).status,
-    ).toBe(0);
-    renameSync(join(root, "src"), join(external, "src"));
-    symlinkSync(join(external, "src"), join(root, "src"), "junction");
-    await expect(checkFormatting(root, { write: true })).rejects.toThrow(
-      "outside the workspace",
-    );
-    expect(readFileSync(join(external, "src/a.ts"), "utf8")).toBe(source);
-  });
+  it.each([false, true])(
+    "refuses a tracked file redirected outside by its parent directory (write=%s)",
+    async (write) => {
+      const root = workspace();
+      const external = workspace();
+      const source = "const a={b:1};\n";
+      mkdirSync(join(root, "src"));
+      writeFileSync(join(root, "src/a.ts"), source);
+      expect(spawnSync("git", ["init", "--quiet"], { cwd: root }).status).toBe(
+        0,
+      );
+      expect(
+        spawnSync("git", ["add", "--", "src/a.ts"], { cwd: root }).status,
+      ).toBe(0);
+      // Ignore the replacement link, not the indexed child, to reach the realpath guard on every OS.
+      writeFileSync(join(root, ".gitignore"), "/src\n");
+      renameSync(join(root, "src"), join(external, "src"));
+      symlinkSync(join(external, "src"), join(root, "src"), "junction");
+      const files = sourceFiles(root);
+      expect(files).toContain("src/a.ts");
+      expect(files).not.toContain("src");
+      await expect(checkFormatting(root, { write })).rejects.toThrow(
+        "outside the workspace",
+      );
+      expect(readFileSync(join(external, "src/a.ts"), "utf8")).toBe(source);
+    },
+  );
+  it.each([false, true])(
+    "refuses a tracked source replaced by a directory symlink (write=%s)",
+    async (write) => {
+      const root = workspace();
+      const external = workspace();
+      const source = "const a={b:1};\n";
+      writeFileSync(join(root, "linked.ts"), source);
+      expect(spawnSync("git", ["init", "--quiet"], { cwd: root }).status).toBe(
+        0,
+      );
+      expect(
+        spawnSync("git", ["add", "--", "linked.ts"], { cwd: root }).status,
+      ).toBe(0);
+      renameSync(join(root, "linked.ts"), join(external, "a.ts"));
+      symlinkSync(external, join(root, "linked.ts"), "junction");
+      expect(sourceFiles(root)).toContain("linked.ts");
+      await expect(checkFormatting(root, { write })).rejects.toThrow(
+        "Cannot format a symlink source: linked.ts",
+      );
+      expect(readFileSync(join(external, "a.ts"), "utf8")).toBe(source);
+    },
+  );
 });
