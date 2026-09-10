@@ -118,7 +118,6 @@ jobs:
       - name: Check website and Setup API
         env:
           NEXT_PUBLIC_SITE_URL: https://www.corneta.live
-          NEXT_PUBLIC_PRIMARY_CTA_URL: https://example.com/corneta-download
         run: pnpm web:check
       - name: Prevent incidental lockfile changes
         run: git diff --exit-code -- pnpm-lock.yaml src-tauri/Cargo.lock

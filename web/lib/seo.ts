@@ -2,7 +2,7 @@ import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "./content";
 import { DEFAULT_LOCALE, localePath, translator, type Locale } from "./i18n";
 import { LEGAL_CNPJ, LEGAL_CONTACT, LEGAL_OPERATOR, legalHref } from "./legal";
 import { siteUrl } from "./site";
-import { downloadMetadata } from "./download";
+import { DOWNLOAD_PATH } from "./download";
 import type {
   EditorialPerson,
   PublishedEditorialDocument,
@@ -40,8 +40,7 @@ const website = {
 
 // Translations share the application identity; only prose varies by locale.
 function softwareApplication(locale: Locale) {
-  const release = downloadMetadata(process.env.NEXT_PUBLIC_PRIMARY_CTA_URL);
-  const download = release?.url;
+  const download = abs(DOWNLOAD_PATH);
   const t = translator(locale);
   return {
     "@type": "SoftwareApplication",
@@ -67,10 +66,9 @@ function softwareApplication(locale: Locale) {
       price: "0",
       priceCurrency: "BRL",
       availability: "https://schema.org/InStock",
-      ...(download ? { url: download } : {}),
+      url: download,
     },
-    ...(download ? { downloadUrl: download } : {}),
-    ...(release?.version ? { softwareVersion: release.version } : {}),
+    downloadUrl: download,
   };
 }
 

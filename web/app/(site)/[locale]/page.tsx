@@ -31,8 +31,6 @@ import {
   TinyThings,
 } from "@/app/_sections/closing";
 
-const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#download";
-
 const DEST_IDS = [
   "twitch",
   "youtube",
@@ -107,12 +105,12 @@ export default async function Home({
         <Platforms t={t} locale={locale} destinations={destinations} />
         <TinyThings t={t} items={tinyThings} />
         <KnowledgeEntryPoints t={t} locale={locale} />
-        <Faq t={t} downloadUrl={downloadUrl} />
+        <Faq t={t} />
         <Ticker t={t} />
         <FinalCta t={t} />
       </main>
 
-      <SiteFooter t={t} locale={locale} downloadUrl={downloadUrl} />
+      <SiteFooter t={t} locale={locale} />
     </>
   );
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandMark } from "@/app/_components/brand-mark";
 import { SiteFooter } from "@/app/_sections/closing";
-import { localePath, translator, type Locale } from "@/lib/i18n";
+import { translator, type Locale } from "@/lib/i18n";
 import type { SiteCtaId } from "@/lib/telemetry-schema";
 
 export interface EditorialChromeLink {
@@ -100,14 +100,7 @@ export function EditorialChrome({
   ...header
 }: EditorialChromeProps) {
   const resolvedFooter = footer ?? (
-    <SiteFooter
-      t={translator(header.locale)}
-      locale={header.locale}
-      downloadUrl={
-        process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ??
-        localePath(header.locale, "/#download")
-      }
-    />
+    <SiteFooter t={translator(header.locale)} locale={header.locale} />
   );
 
   return (

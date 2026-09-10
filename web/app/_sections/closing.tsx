@@ -1,6 +1,7 @@
 import { localePath, type Locale, type T } from "@/lib/i18n";
 import Link from "next/link";
 import { faqsFor } from "@/lib/content";
+import { DOWNLOAD_PATH } from "@/lib/download";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, legalHref } from "@/lib/legal";
 import { BrandMark } from "../_components/brand-mark";
 import { Mascot, SoundWaves } from "../_components/decor";
@@ -64,7 +65,7 @@ const FAQ_LIST =
   "[&_details[open]_summary>i]:after:rotate-0 " +
   "[&_details>p]:mt-[-2px] [&_details>p]:mb-6 [&_details>p]:max-w-[68ch] [&_details>p]:pr-11 max-[760px]:[&_details>p]:pr-0 [&_details>p]:leading-[1.68] [&_details>p]:font-medium [&_details>p]:text-ink-muted";
 
-export function Faq({ t, downloadUrl }: { t: T; downloadUrl: string }) {
+export function Faq({ t }: { t: T }) {
   return (
     <Section id="duvidas" tone="paper-raised">
       <Shell>
@@ -85,8 +86,7 @@ export function Faq({ t, downloadUrl }: { t: T; downloadUrl: string }) {
                 downloadButton,
                 "mt-7 min-h-11 gap-[9px] rounded-sm px-[15px] text-[0.92rem] shadow-[4px_4px_0_0_var(--ink)] [&>svg]:h-[18px] [&>svg]:w-[18px]",
               )}
-              href={downloadUrl}
-              data-placeholder-link="replace-me"
+              href={DOWNLOAD_PATH}
               data-telemetry-cta="faq_download"
             >
               <WindowsIcon />
@@ -193,15 +193,7 @@ const FOOTER_LINK =
 const FOOTER_GROUP_TITLE =
   "mb-3 font-display text-[0.92rem] font-extrabold text-cream";
 
-export function SiteFooter({
-  t,
-  locale,
-  downloadUrl,
-}: {
-  t: T;
-  locale: Locale;
-  downloadUrl: string;
-}) {
+export function SiteFooter({ t, locale }: { t: T; locale: Locale }) {
   return (
     <footer className="border-t-2 border-border-soft bg-panel">
       <Shell>
@@ -225,8 +217,7 @@ export function SiteFooter({
                 <li>
                   <a
                     className={FOOTER_LINK}
-                    href={downloadUrl}
-                    data-placeholder-link="replace-me"
+                    href={DOWNLOAD_PATH}
                     data-telemetry-cta="footer_download"
                   >
                     {t("closing.footer.download")}

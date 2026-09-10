@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { readTelemetryDeploymentMetadata } from "./deployment-metadata";
-import { downloadMetadata } from "../download";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 const SHA_RE = /^[a-f0-9]{40}$/i;
@@ -49,11 +48,6 @@ export function releaseConfigErrors(env: Environment): string[] {
     env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") !== "https://www.corneta.live"
   )
     errors.push("NEXT_PUBLIC_SITE_URL: use the canonical HTTPS origin");
-  if (!downloadMetadata(env.NEXT_PUBLIC_PRIMARY_CTA_URL)) {
-    errors.push(
-      "NEXT_PUBLIC_PRIMARY_CTA_URL: configure the HTTPS .exe installer URL at github.com/pitroldev/corneta/releases",
-    );
-  }
   if (
     env.VERCEL !== "1" &&
     !/^[a-z0-9-]+$/i.test(env.OAUTH_TRUSTED_IP_HEADER ?? "")

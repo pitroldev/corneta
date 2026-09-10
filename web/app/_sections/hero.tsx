@@ -1,4 +1,5 @@
 import { localePath, type T, type Locale } from "@/lib/i18n";
+import { DOWNLOAD_PATH } from "@/lib/download";
 import type { SiteCtaId } from "@/lib/telemetry-schema";
 import { LocaleSwitch } from "../_components/locale-switch";
 import { SiteNav } from "../_components/site-nav";
@@ -14,8 +15,6 @@ import {
   Slab,
   Sticker,
 } from "../_components/ui";
-
-const downloadUrl = process.env.NEXT_PUBLIC_PRIMARY_CTA_URL ?? "#download";
 
 export function DownloadButton({
   t,
@@ -35,8 +34,7 @@ export function DownloadButton({
         compact &&
           "min-h-11 gap-[9px] rounded-sm px-[15px] text-[0.92rem] shadow-pop-brass active:shadow-none max-[420px]:min-h-[42px] max-[420px]:px-[11px] max-[420px]:text-[0.82rem] [&>svg]:h-[18px] [&>svg]:w-[18px]",
       )}
-      href={downloadUrl}
-      data-placeholder-link="replace-me"
+      href={DOWNLOAD_PATH}
       data-telemetry-cta={ctaId}
       aria-label={t("hero.download.aria")}
     >

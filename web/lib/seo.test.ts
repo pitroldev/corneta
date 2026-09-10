@@ -1,6 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PublishedEditorialDocument } from "./editorial/types";
+import { DOWNLOAD_PATH } from "./download";
 import { editorialArticleJsonLd } from "./seo";
+import { siteUrl } from "./site";
+
+describe("download structured data", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    undefined,
+    "#download",
+    "https://example.com/obsolete-installer.exe",
+    "https://github.com/pitroldev/corneta/releases/download/v0.1.0/Corneta_0.1.0_x64-setup.exe",
+  ])(
+    "ignores the obsolete download setting %s in both locales",
+    async (legacyUrl) => {
+      vi.stubEnv("NEXT_PUBLIC_PRIMARY_CTA_URL", legacyUrl);
+      vi.resetModules();
+      const { homeJsonLd } = await import("./seo");
+      const downloadUrl = new URL(DOWNLOAD_PATH, siteUrl).toString();
+
+      for (const locale of ["pt-BR", "en"] as const) {
+        const application = homeJsonLd(locale)["@graph"].find(
+          (node) => node["@type"] === "SoftwareApplication",
+        );
+        expect(application).toMatchObject({
+          downloadUrl,
+          offers: { url: downloadUrl },
+        });
+        expect(application).not.toHaveProperty("softwareVersion");
+      }
+    },
+  );
+});
 
 describe("editorial structured data", () => {
   it("assigns factual review to WebPage according to the reviewedBy domain", () => {

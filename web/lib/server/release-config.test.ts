@@ -8,8 +8,6 @@ const valid = {
   KICK_CLIENT_ID: "test",
   KICK_CLIENT_SECRET: "never-print-this-secret",
   NEXT_PUBLIC_SITE_URL: "https://www.corneta.live",
-  NEXT_PUBLIC_PRIMARY_CTA_URL:
-    "https://github.com/pitroldev/corneta/releases/download/v0.7.0/Corneta.exe",
   VERCEL: "1",
   KICK_REDIRECT_URIS: "http://localhost:7395/callback",
   NEXT_PUBLIC_BUILD_SHA: sha,
@@ -64,17 +62,20 @@ describe("release configuration", () => {
     expect(errors.length).toBeGreaterThan(5);
     expect(errors.join()).not.toContain(valid.KICK_CLIENT_SECRET);
   });
+  it("does not require a configurable installer URL", () => {
+    expect(releaseConfigErrors(valid)).toEqual([]);
+  });
   it.each([
+    "",
     "#download",
     "https://example.com/Corneta.exe",
     "https://github.com/pitroldev/corneta/releases",
     "https://secret@downloads.test/Corneta.exe",
-  ])("rejects a provisional download: %s", (url) => {
+    "https://github.com/pitroldev/corneta/releases/latest/download/Corneta-Setup.exe",
+  ])("ignores a stale download environment value: %s", (url) => {
     expect(
-      releaseConfigErrors({ ...valid, NEXT_PUBLIC_PRIMARY_CTA_URL: url }).some(
-        (e) => e.includes("PRIMARY_CTA"),
-      ),
-    ).toBe(true);
+      releaseConfigErrors({ ...valid, NEXT_PUBLIC_PRIMARY_CTA_URL: url }),
+    ).toEqual([]);
   });
   it("rejects active but unconfigured telemetry", () => {
     expect(

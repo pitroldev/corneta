@@ -28,12 +28,18 @@ Para testar integrações próprias, o exemplo pertinente é [web/.env.example](
 
 O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, limites locais, proxy, precedência e distinção entre segredos e valores públicos. O [guia de publicação](../docs/PUBLICACAO.md) reúne os procedimentos e as evidências adicionais exigidas para distribuir o produto, incluindo proteção WAF/edge no host.
 
+O download usa o endereço estável `/download`, sem variável de ambiente ou segredo.
+A rota consulta o `latest.json` público da release oficial no GitHub e redireciona
+para o instalador Windows `.exe` versionado indicado no manifesto, após validar
+repositório, plataforma e versão. A resposta válida pode ficar em cache no CDN por
+cinco minutos. Se o manifesto estiver inválido ou indisponível, a rota encaminha
+para a página `releases/latest` do repositório oficial, sem cache, em vez de inventar
+um nome de arquivo. Isso não modifica o [atualizador do desktop](../docs/ATUALIZACAO-AUTOMATICA.md),
+que continua usando seu próprio endpoint de manifesto e verificando a assinatura.
+
 Resumo das variáveis do site:
 
 - `NEXT_PUBLIC_SITE_URL`: URL canônica usada em metadata, sitemap e robots;
-- `NEXT_PUBLIC_PRIMARY_CTA_URL`: em release, URL HTTPS do instalador `.exe` oficial no
-  GitHub Releases. Quando a variável não está definida, a navegação usa `#download`; o
-  placeholder do exemplo não é um download publicado nem passa no gate oficial;
 - `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION`: tokens públicos fornecidos pelo
   Search Console e Bing Webmaster Tools. A metadata omite as tags quando eles estão vazios;
 - `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` e `NEXT_PUBLIC_POSTHOG_HOST`: Project API Key de
