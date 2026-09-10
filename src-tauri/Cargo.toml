@@ -48,7 +48,7 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 # CPU OCR avoids GPU contention with video codecs and a DirectML runtime dependency.
 # OAR-OCR 0.8.1 requires the execution-provider API removed in ort RC 13.
 oar-ocr = "0.8.1"
-ort = "=2.0.0-rc.12"
+ort = "=2.0.0-rc.13"
 # Other operating systems need an explicitly configured and validated credential provider.
 keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
