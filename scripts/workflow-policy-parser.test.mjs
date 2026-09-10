@@ -34,19 +34,31 @@ it.each([
   );
 });
 it("requires Tauri's cargo argument separator, not a lock buried in config or a CLI option", () => {
-  const minimum = { "pnpm tauri build": 1 };
+  const tauri = "node node_modules/@tauri-apps/cli/tauri.js build";
+  const minimum = { [tauri]: 1 };
   for (const run of [
-    "pnpm tauri build --locked",
-    "pnpm tauri build --config 'contains --locked'",
-    "pnpm tauri build -- -- --locked",
+    `${tauri} --locked`,
+    `${tauri} --locked --`,
+    `${tauri} --config 'contains --locked'`,
+    `${tauri} -- -- --locked`,
   ])
     expect(() => assertLockedWorkflows([fixture(run)], minimum)).toThrow(
       "--locked",
     );
   expect(
-    assertLockedWorkflows([fixture("pnpm tauri build -- --locked")], minimum),
+    assertLockedWorkflows([fixture(`${tauri} -- --locked`)], minimum),
   ).toEqual(minimum);
 });
+it.each(["pnpm tauri build", "pnpm exec tauri build"])(
+  "rejects %s in place of the direct Tauri invocation",
+  (command) => {
+    expect(() =>
+      assertLockedWorkflows([fixture(`${command} -- --locked`)], {
+        "node node_modules/@tauri-apps/cli/tauri.js build": 1,
+      }),
+    ).toThrow("not inspected");
+  },
+);
 it("rejects missing jobs/steps and duplicate YAML keys", () => {
   for (const source of ["name: Empty", "jobs: {}", "jobs: {}\njobs: {}"])
     expect(() => assertLockedWorkflows([source], required)).toThrow();

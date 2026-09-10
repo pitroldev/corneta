@@ -10,6 +10,29 @@ const workflow = (name) =>
   readFileSync(resolve(root, `.github/workflows/${name}.yml`), "utf8");
 
 describe("workflow safety contracts", () => {
+  it("passes the release override as a file without rebuilding the audited frontend", () => {
+    const steps = parse(workflow("release")).jobs.release.steps;
+    const build = steps.find(
+      (step) => step.name === "Build Tauri and sign updater",
+    );
+    expect(build.shell).toBe("pwsh");
+    expect(build.run).toBe(
+      "node node_modules/@tauri-apps/cli/tauri.js build --config src-tauri/tauri.release.conf.json -- --locked",
+    );
+    const override = JSON.parse(
+      readFileSync(resolve(root, "src-tauri/tauri.release.conf.json"), "utf8"),
+    );
+    expect(override).toEqual({
+      $schema: "https://schema.tauri.app/config/2",
+      build: { beforeBuildCommand: "pnpm --version" },
+    });
+    const base = JSON.parse(
+      readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8"),
+    );
+    expect(base.build.beforeBuildCommand).toBe("pnpm build:release");
+    expect(base.bundle.createUpdaterArtifacts).toBe(true);
+  });
+
   it("publishes only the approved build after a separate environment approval", () => {
     const release = parse(workflow("release"));
     const publish = release.jobs.publish;
@@ -104,9 +127,13 @@ describe("workflow safety contracts", () => {
       assertLockedWorkflows(sources, {
         "cargo clippy": 1,
         "cargo test": 2,
-        "pnpm tauri build": 1,
+        "node node_modules/@tauri-apps/cli/tauri.js build": 1,
       }),
-    ).toEqual({ "cargo clippy": 1, "cargo test": 2, "pnpm tauri build": 1 });
+    ).toEqual({
+      "cargo clippy": 1,
+      "cargo test": 2,
+      "node node_modules/@tauri-apps/cli/tauri.js build": 1,
+    });
     const toolchains = sources
       .flatMap(workflowSteps)
       .filter((step) => step.uses?.startsWith("dtolnay/rust-toolchain@"));

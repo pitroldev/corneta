@@ -64,13 +64,14 @@ export function assertLockedWorkflows(sources, minimum) {
       counts[key]++;
       const lock = tokens.indexOf("--locked");
       const separator = tokens.indexOf("--");
-      const cargoSeparator =
-        key === "pnpm tauri build"
-          ? tokens.indexOf("--", separator + 1)
-          : separator;
+      const isTauri =
+        key === "node node_modules/@tauri-apps/cli/tauri.js build";
+      const cargoSeparator = isTauri
+        ? tokens.indexOf("--", separator + 1)
+        : separator;
       if (
         lock < 0 ||
-        (key === "pnpm tauri build" && (separator < 0 || lock < separator)) ||
+        (isTauri && (separator < 0 || lock < separator)) ||
         (cargoSeparator >= 0 && lock > cargoSeparator)
       )
         throw new Error(`Missing effective --locked argument: ${key}`);

@@ -131,8 +131,12 @@ Personal API Key e o Project ID de upload; o gate de configuração, o build Tau
 upload do GitHub não recebem a chave. Antes do Vite, esse step consulta o projeto no PostHog US
 com timeout curto e redirects bloqueados e exige que `id`/`api_token` coincidam exatamente com o
 ID e project token da release. Rede, autenticação, schema ou divergência falham com mensagem
-estática, sem imprimir resposta ou segredo. O `pnpm tauri build` preserva esse `dist`, gera uma
+estática, sem imprimir resposta ou segredo. O CLI do Tauri preserva esse `dist`, gera uma
 única vez o EXE/NSIS e seu `.exe.sig`, e o `latest.json` v2 referencia exatamente esse instalador.
+O job passa [tauri.release.conf.json](../src-tauri/tauri.release.conf.json) por caminho, evitando
+perda de aspas do JSON entre PowerShell e os executáveis Windows. Esse override preserva o
+frontend já preparado e é exclusivo do CI; não substitui o build local completo. O job invoca
+o CLI diretamente pelo Node, preservando o separador `--` que encaminha `--locked` ao Cargo.
 O workflow também baixa o PostHog CLI oficial 0.9.4 em um step sem segredos, confere o SHA-256
 fixado em `scripts/fetch-posthog-cli.ps1` e entrega o caminho explícito ao plugin Vite; falha de
 download, integridade, extração ou versão bloqueia o build.
