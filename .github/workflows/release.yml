@@ -17,6 +17,7 @@ permissions:
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   quality:
@@ -37,6 +38,14 @@ jobs:
       contents: write
     # Required environment reviewers approve the DPA, published policy, and telemetry payload.
     environment: production-telemetry
+    outputs:
+      sha: ${{ steps.identity.outputs.sha }}
+      tag: ${{ steps.identity.outputs.tag }}
+      assets: ${{ steps.handoff.outputs.assets }}
+      installer: ${{ steps.handoff.outputs.installer }}
+      signature: ${{ steps.handoff.outputs.signature }}
+      artifact_id: ${{ steps.distribution.outputs.artifact-id }}
+      telemetry: ${{ steps.telemetry.outputs.configuration }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,10 +73,12 @@ jobs:
           cache-targets: true
 
       - name: Validate tag and pin release identity
+        id: identity
         shell: pwsh
         env:
           REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           QUALITY_SHA: ${{ needs.quality.outputs.validated_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           $config = Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json
           $expectedTag = "v$($config.version)"
@@ -86,6 +97,13 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $sha) {
             throw "HEAD does not match the exact tag $expectedTag."
           }
+          git merge-base --is-ancestor $sha "refs/remotes/origin/$env:DEFAULT_BRANCH"
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release tags must identify a commit already merged into the default branch.'
+          }
+
+          "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag=$expectedTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
           "RELEASE_TAG=$expectedTag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "RELEASE_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -129,6 +147,7 @@ jobs:
         run: pnpm compliance:prepare
 
       - name: Check telemetry privacy and configuration
+        id: telemetry
         shell: pwsh
         env:
           VITE_POSTHOG_TOKEN: ${{ vars.POSTHOG_DESKTOP_TOKEN }}
@@ -142,7 +161,7 @@ jobs:
           TELEMETRY_DISABLED: ${{ vars.TELEMETRY_DISABLED || '0' }}
           TELEMETRY_POLICY_PUBLISHED_VERSION: ${{ vars.TELEMETRY_POLICY_PUBLISHED_VERSION }}
           TELEMETRY_DEPLOYMENT_METADATA_URL: https://www.corneta.live/api/v1/health
-        run: pnpm telemetry:release:check
+        run: pnpm telemetry:release:check --wait-for-deployment --github-output
 
       # The npm installer varies by platform; execute only the pinned, hash-verified CLI.
       - name: Prepare verified PostHog CLI
@@ -243,15 +262,44 @@ jobs:
         shell: pwsh
         run: pnpm artifacts:check
 
-      - name: Create or update draft and upload approved artifacts
+      - name: Bind the publication handoff to the approved bytes
+        id: handoff
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
           INSTALLER_PATH: ${{ steps.updater.outputs.installer_path }}
           SIGNATURE_PATH: ${{ steps.updater.outputs.signature_path }}
           MANIFEST_PATH: ${{ steps.updater.outputs.manifest_path }}
           CHECKSUMS_PATH: ${{ steps.updater.outputs.checksums_path }}
           COMPLIANCE_PATH: ${{ steps.updater.outputs.compliance_path }}
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'corneta-release-handoff'
+          New-Item -ItemType Directory -Path $destination -ErrorAction Stop | Out-Null
+          $paths = @($env:INSTALLER_PATH, $env:SIGNATURE_PATH, $env:MANIFEST_PATH, $env:CHECKSUMS_PATH, $env:COMPLIANCE_PATH)
+          $inventory = @(
+            foreach ($path in $paths) {
+              $file = Get-Item -LiteralPath $path -ErrorAction Stop
+              if ($file.PSIsContainer -or $file.LinkType -or $file.Length -le 0) {
+                throw 'Publication requires nonempty regular artifact files.'
+              }
+              $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $destination $file.Name) -ErrorAction Stop
+              @{ name = $file.Name; size = $file.Length; sha256 = $hash }
+            }
+          )
+          if (($inventory.name | Select-Object -Unique).Count -ne 5) { throw 'Publication requires five distinct assets.' }
+          "assets=$($inventory | ConvertTo-Json -Compress)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "installer=$([System.IO.Path]::GetFileName($env:INSTALLER_PATH))" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "signature=$([System.IO.Path]::GetFileName($env:SIGNATURE_PATH))" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Create or update draft and upload approved artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALLER_PATH: ${{ runner.temp }}/corneta-release-handoff/${{ steps.handoff.outputs.installer }}
+          SIGNATURE_PATH: ${{ runner.temp }}/corneta-release-handoff/${{ steps.handoff.outputs.signature }}
+          MANIFEST_PATH: ${{ runner.temp }}/corneta-release-handoff/latest.json
+          CHECKSUMS_PATH: ${{ runner.temp }}/corneta-release-handoff/SHA256SUMS.txt
+          COMPLIANCE_PATH: ${{ runner.temp }}/corneta-release-handoff/corneta-third-party.zip
         run: |
           $expectedAssets = @(
             [System.IO.Path]::GetFileName($env:INSTALLER_PATH),
@@ -301,3 +349,58 @@ jobs:
             $env:COMPLIANCE_PATH `
             --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Failed to upload approved artifacts.' }
+
+      - name: Preserve only approved distribution files for publication
+        id: distribution
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-${{ steps.identity.outputs.tag }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/corneta-release-handoff/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    needs: [quality, release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    environment:
+      name: production-release
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag }}
+    # Latest has no compare-and-swap API; serialize promotions across all tags.
+    concurrency:
+      group: release-publication
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
+      - name: Download the exact artifact from this build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.release.outputs.artifact_id }}
+          path: .artifacts/release-publication
+          digest-mismatch: error
+      - name: Verify uploaded assets and publish the approved release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          QUALITY_SHA: ${{ needs.quality.outputs.validated_sha }}
+          RELEASE_ASSETS_JSON: ${{ needs.release.outputs.assets }}
+          RELEASE_TELEMETRY_JSON: ${{ needs.release.outputs.telemetry }}
+          INSTALLER_PATH: .artifacts/release-publication/${{ needs.release.outputs.installer }}
+          SIGNATURE_PATH: .artifacts/release-publication/${{ needs.release.outputs.signature }}
+          MANIFEST_PATH: .artifacts/release-publication/latest.json
+          CHECKSUMS_PATH: .artifacts/release-publication/SHA256SUMS.txt
+          COMPLIANCE_PATH: .artifacts/release-publication/corneta-third-party.zip
+        run: node scripts/promote-release.mjs

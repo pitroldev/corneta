@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 import { assertLockedWorkflows, workflowSteps } from "./workflow-policy.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -9,6 +10,83 @@ const workflow = (name) =>
   readFileSync(resolve(root, `.github/workflows/${name}.yml`), "utf8");
 
 describe("workflow safety contracts", () => {
+  it("publishes only the approved build after a separate environment approval", () => {
+    const release = parse(workflow("release"));
+    const publish = release.jobs.publish;
+    expect(publish.needs).toEqual(["quality", "release"]);
+    expect(publish.environment.name).toBe("production-release");
+    expect(publish.permissions).toEqual({ contents: "write", actions: "read" });
+    expect(publish.concurrency).toEqual({
+      group: "release-publication",
+      "cancel-in-progress": false,
+      queue: "max",
+    });
+    expect(publish.concurrency.group).not.toBe(release.concurrency.group);
+    expect(publish.steps[0].with.ref).toBe("${{ needs.release.outputs.sha }}");
+    const download = publish.steps.find((step) =>
+      step.uses?.startsWith("actions/download-artifact@"),
+    );
+    expect(download.with["artifact-ids"]).toBe(
+      "${{ needs.release.outputs.artifact_id }}",
+    );
+    expect(download.with["digest-mismatch"]).toBe("error");
+    const promotion = publish.steps.find(
+      (step) => step.run === "node scripts/promote-release.mjs",
+    );
+    expect(promotion.env.RELEASE_ASSETS_JSON).toBe(
+      "${{ needs.release.outputs.assets }}",
+    );
+    expect(promotion.env.RELEASE_TELEMETRY_JSON).toBe(
+      "${{ needs.release.outputs.telemetry }}",
+    );
+    expect(promotion.env.QUALITY_SHA).toBe(
+      "${{ needs.quality.outputs.validated_sha }}",
+    );
+    expect(JSON.stringify(publish)).not.toContain("secrets.");
+    expect(JSON.stringify(publish)).not.toContain("POSTHOG");
+  });
+
+  it("hands off only scanned assets and waits for the exact production deployment", () => {
+    const job = parse(workflow("release")).jobs.release;
+    const steps = job.steps;
+    const scan = steps.findIndex((step) => step.run === "pnpm artifacts:check");
+    const upload = steps.findIndex((step) =>
+      step.uses?.startsWith("actions/upload-artifact@"),
+    );
+    expect(scan).toBeGreaterThan(0);
+    expect(upload).toBeGreaterThan(scan);
+    expect(steps[upload].with["if-no-files-found"]).toBe("error");
+    expect(steps[upload].with.path).toBe(
+      "${{ runner.temp }}/corneta-release-handoff/",
+    );
+    expect(steps[upload].with["retention-days"]).toBe(14);
+    expect(
+      steps.some(
+        (step) =>
+          step.id === "telemetry" &&
+          step.run ===
+            "pnpm telemetry:release:check --wait-for-deployment --github-output",
+      ),
+    ).toBe(true);
+    expect(job.outputs.telemetry).toBe(
+      "${{ steps.telemetry.outputs.configuration }}",
+    );
+    const handoff = steps.findIndex((step) => step.id === "handoff");
+    const draft = steps.findIndex((step) =>
+      step.run?.includes("gh release upload"),
+    );
+    expect(handoff).toBeGreaterThan(scan);
+    expect(draft).toBeGreaterThan(handoff);
+    expect(upload).toBeGreaterThan(draft);
+    for (const [key, value] of Object.entries(steps[draft].env)) {
+      if (key.endsWith("_PATH"))
+        expect(value).toContain("${{ runner.temp }}/corneta-release-handoff/");
+    }
+    expect(steps.find((step) => step.id === "handoff").run).toContain(
+      "Get-FileHash",
+    );
+  });
+
   it.each(["ci", "release", "editorial-maintenance"])(
     "pins every external action implementation in %s",
     (name) => {

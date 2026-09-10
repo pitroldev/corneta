@@ -200,6 +200,52 @@ describe("passive TAR and pkg-config inspection", () => {
     });
   });
 
+  it("preserves repeated fields without inventing a resolved linker or dependency value", () => {
+    expect(
+      packageFields(
+        [
+          "Name: shaderc",
+          "Version: 2026.4.0",
+          "Libs: -L${libdir} -lshaderc_combined",
+          "Libs: -lstdc++",
+          "Libs: -lm",
+          "Requires.private:",
+          "Requires.private: spirv-tools",
+          "",
+        ].join("\n"),
+      ),
+    ).toEqual({
+      Name: "shaderc",
+      Version: "2026.4.0",
+      duplicateFields: {
+        Libs: ["-L${libdir} -lshaderc_combined", "-lstdc++", "-lm"],
+        "Requires.private": ["", "spirv-tools"],
+      },
+    });
+  });
+
+  it("marks repeated identity fields as ambiguous even when their values match", () => {
+    expect(
+      packageFields("Name: example\r\nVersion: 1.0\r\nVersion: 1.0\r\n"),
+    ).toEqual({
+      Name: "example",
+      duplicateFields: { Version: ["1.0", "1.0"] },
+    });
+  });
+
+  it("retains raw text and its hash alongside duplicate-field evidence", async () => {
+    const file = join(temporary(), "duplicate-fields.gz");
+    const text = `${packageText}Libs: -lstdc++\n`;
+    writeFileSync(file, gzipSync(tarMember(pc, text)));
+    const [entry] = await readPackageMetadata(file);
+    expect(entry).toMatchObject({
+      text,
+      sha256: sha256(Buffer.from(text)),
+      duplicateFields: { Libs: ["-lexample", "-lstdc++"] },
+    });
+    expect(entry).not.toHaveProperty("Libs");
+  });
+
   it("reads only regular metadata files without extracting symlinks or paths", async () => {
     const directory = temporary();
     const file = join(directory, "layer.gz");

@@ -1,6 +1,6 @@
 # Gates de release
 
-Critérios de aprovação de uma distribuição oficial, para mantenedores, linha 0.8.0. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Os procedimentos e o checklist estão no [guia de publicação](PUBLICACAO.md). Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
+Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Os procedimentos e o checklist estão no [guia de publicação](PUBLICACAO.md). Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
 
 ## Automatizados
 
@@ -41,10 +41,17 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores, linh
   draft. Um draft existente é recusado se contiver qualquer asset fora dos basenames exatos do
   `.exe`, `.exe.sig`, `latest.json`, `SHA256SUMS.txt` e `corneta-third-party.zip` aprovados; nenhuma action de release recebe os segredos de
   assinatura/telemetria.
+- Depois dos ensaios e da aprovação de `production-release`, o job `publish` valida a proteção
+  desse Environment, a tag remota, os cinco arquivos preservados pelo ID do artefato da execução,
+  seus hashes e a correspondência com os assets remotos. Só então promove o draft; não refaz o
+  build nem sobrescreve assets públicos. Promoções são serializadas e versões antigas não
+  substituem Latest. Falta de reviewer, bypass habilitado ou metadata inacessível bloqueiam.
 - O gate `telemetry:release:check` confirma região US e o mesmo project token público no
   desktop, site e Setup API, faz smoke da metadata publicada sem expor a Personal API Key e exige
   SHA idêntico entre React/Rust/Next.js e a versão publicada do aviso de telemetria.
-- A variável de Environment `TELEMETRY_DISABLED` alimenta os switches Vite e Rust com o mesmo
+- O gate aguarda até dez minutos pelo deployment da tag durante o build; a promoção reconfere
+  o deployment contra a configuração aprovada para evitar uma aprovação já desatualizada.
+- A variável de Actions do repositório `TELEMETRY_DISABLED` alimenta os switches Vite e Rust com o mesmo
   valor. O modo emergencial só é válido com ambos em `1` e não recebe credenciais de source maps;
   qualquer divergência bloqueia a release.
 
@@ -70,6 +77,10 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores, linh
 - O Environment GitHub `production-telemetry` tem reviewer obrigatório; DPA/MFA, descarte de IP,
   retenção de 90 dias e aviso de telemetria PT/EN versão `2026-09-09` precisam estar ativos antes da
   aprovação.
+- `production-release` tem reviewer obrigatório para os ensaios do draft. Ambos os Environments
+  recusam bypass de administradores e aceitam somente tags `v*`. O repositório/canal precisa
+  disponibilizar manifesto e instalador sem autenticação do mantenedor. Confira os requisitos
+  do host com `pnpm release:readiness`; o comando não substitui os gates de um artefato real.
 - Registrar a revisão jurídica do balanceamento e dos textos PT/EN antes de ativar coleta de
   produção. Uso desktop é opt-in e falhas são opt-out; preservar escolhas explícitas antigas não
   comprova consentimento válido. Teste automatizado, aviso ou publicação do código não

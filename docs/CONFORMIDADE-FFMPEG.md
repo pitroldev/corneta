@@ -33,7 +33,7 @@ A saída fica em `.artifacts/ffmpeg-evidence/<prefixo-do-hash>/`, ignorada pelo 
 - `sources/`: arquivos por commit/hash, incluindo receitas e patches;
 - `oci/`: manifesto, configuração e camada selecionada com digests verificados;
 - `recipe-candidates.json`: candidatos extraídos das receitas, não uma lista aprovada de dependências;
-- `pkg-config.json`: metadados instalados na imagem, quando a camada é inspecionada;
+- `pkg-config.json`: metadados instalados na imagem, quando a camada é inspecionada. Campos repetidos ficam em `duplicateFields`, com todas as ocorrências e sem escolher um valor efetivo; a resolução usada na build precisa ser conferida;
 - `binary/`: ZIP original, quando solicitado;
 - `evidence.json`: identidades, escopo e limitações, sem aprovação automática de distribuição.
 

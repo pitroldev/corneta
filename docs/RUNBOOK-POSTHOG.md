@@ -143,17 +143,19 @@ conteúdo extraído. Essa inspeção confirma a árvore que o 7-Zip consegue int
 conteúdo de bytes comprimidos em formatos opacos que ele não consiga abrir. Falha de listagem,
 extração ou ausência do 7-Zip bloqueia o draft.
 
-No Environment do GitHub, uma única variável `TELEMETRY_DISABLED` alimenta
+Nas variáveis de Actions do repositório GitHub, `TELEMETRY_DISABLED` alimenta
 `VITE_TELEMETRY_DISABLED` e `TELEMETRY_DISABLED`. Em `0`, o step de source maps exige
 `POSTHOG_API_KEY` no formato `phx_` e Project ID numérico. Em `1`, ambos os switches precisam ser
 `1` e o workflow usa o caminho emergencial sem expor essas credenciais.
 
-No Environment `production-telemetry`, mantenha também
+Nas mesmas variáveis de repositório, mantenha também
 `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST` e
 `POSTHOG_PROJECT_TOKEN` com os mesmos valores públicos configurados no deploy do Next.js. O gate
 exige um único project token `phc_*`, host US em desktop/site/API e o mesmo SHA completo em
 `VITE_BUILD_SHA`, `CORNETA_BUILD_SHA`, `NEXT_PUBLIC_BUILD_SHA` e `BUILD_SHA`. Nenhuma Personal
-API Key recebe prefixo `VITE_` ou `NEXT_PUBLIC_`.
+API Key recebe prefixo `VITE_` ou `NEXT_PUBLIC_`. Mantenha os secrets no Environment
+`production-telemetry` ou no repositório; não duplique variáveis com valores divergentes no
+Environment. A configuração completa e suas verificações estão em [PUBLICACAO.md](PUBLICACAO.md).
 
 ## 4. Gate de release
 
@@ -164,7 +166,8 @@ em disparo manual, e o job que recebe o Environment de produção só começa de
 jobs de qualidade passarem.
 
 1. `pnpm check`;
-2. execute `pnpm telemetry:release:check` com as variáveis do Environment de produção;
+2. execute `pnpm release:readiness` para conferir a configuração do GitHub e
+   `pnpm telemetry:release:check` com a configuração pública de produção;
 3. `cargo +1.97.1 fmt --manifest-path src-tauri/Cargo.toml -- --check`;
 4. `cargo +1.97.1 clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`;
 5. `cargo +1.97.1 test --manifest-path src-tauri/Cargo.toml`;
@@ -187,7 +190,9 @@ jobs de qualidade passarem.
     draft contém exatamente os cinco assets descritos no [checklist de publicação](PUBLICACAO.md),
     incluindo checksums e conformidade; o workflow bloqueia o reaproveitamento se encontrar outro
     basename, mas a revisão manual continua obrigatória;
-14. publique o draft somente depois de registrar o resultado no [checklist de publicação](PUBLICACAO.md).
+14. registre os resultados e aprove `production-release` conforme o [checklist de publicação](PUBLICACAO.md).
+    O job reconfere os arquivos e o deployment contra a configuração aprovada no build antes
+    de publicar. Não altere o draft ou o deployment durante a promoção.
 
 O job Rust usa deliberadamente a toolchain 1.97.1, alinhada ao projeto e acima do MSRV 1.95
 exigido por `oar-ocr` 0.8.1.

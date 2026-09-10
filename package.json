@@ -26,6 +26,7 @@
     "smoke:reports": "node scripts/smoke-reports.mjs",
     "artifacts:check": "node scripts/check-bundle.mjs dist src-tauri/target/release/corneta.exe src-tauri/target/release/bundle",
     "updater:manifest": "node scripts/create-updater-manifest.mjs",
+    "release:readiness": "node scripts/check-release-readiness.mjs",
     "compliance:check": "node scripts/prepare-release-compliance.mjs --check",
     "compliance:prepare": "node scripts/prepare-release-compliance.mjs",
     "compliance:collect": "node scripts/collect-ffmpeg-evidence.mjs",

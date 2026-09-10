@@ -19,7 +19,8 @@ O desktop oficial usa o plugin de updater do Tauri e um manifesto HTTPS publicad
 | [lib.rs](../src-tauri/src/lib.rs) e [capability principal](../src-tauri/capabilities/default.json) | Registro dos plugins e permissões; isolamento do Contributor                   |
 | [updater.ts](../src/lib/updater.ts)                                                                | Checagem, estado compartilhado, progresso e chamada ao instalador nativo       |
 | [updater.rs](../src-tauri/src/updater.rs) e [commands.rs](../src-tauri/src/commands.rs)            | Exclusão mútua com início da live, download assinado, instalação e reinício    |
-| [release.yml](../.github/workflows/release.yml)                                                    | Build único, gates, assinatura e preparação do draft                           |
+| [release.yml](../.github/workflows/release.yml)                                                    | Build único, assinatura, draft e promoção após aprovação                       |
+| [promote-release.mjs](../scripts/promote-release.mjs)                                              | Verificação dos arquivos aprovados e publicação sem regredir Latest            |
 | [create-updater-manifest.mjs](../scripts/create-updater-manifest.mjs)                              | Geração do `latest.json` a partir do instalador e de sua assinatura            |
 | [verify-updater.rs](../src-tauri/examples/verify-updater.rs)                                       | Verificação criptográfica do artefato com a chave pública                      |
 
@@ -39,7 +40,7 @@ O endpoint oficial está em `plugins.updater.endpoints`. Ele aponta ao `latest.j
 
 O gerador versionado produz a entrada `platforms.windows-x86_64`, com URL HTTPS do instalador e o **conteúdo** da assinatura `.exe.sig`, não seu caminho. Versão, tag e binário precisam corresponder. Não mantenha um manifesto editado manualmente em paralelo com o gerador.
 
-Siga [PUBLICACAO.md](PUBLICACAO.md) para criar a versão e ensaiar o draft. O workflow entrega instalador, assinatura, manifesto, checksums e pacote de terceiros; todos devem corresponder ao mesmo build aprovado. A publicação do draft é uma decisão do mantenedor depois dos [gates](GATES-DE-RELEASE.md).
+Siga [PUBLICACAO.md](PUBLICACAO.md) para configurar Actions, criar a versão e ensaiar o draft. O push de uma tag `vX.Y.Z` dispara o workflow, que entrega instalador, assinatura, manifesto, checksums e pacote de terceiros. Depois dos [gates](GATES-DE-RELEASE.md) e da aprovação do Environment `production-release`, o job de promoção verifica os mesmos arquivos e publica automaticamente. Versões antigas não substituem Latest; não é necessário editar o endpoint a cada versão. Enquanto o repositório estiver privado ou a release for draft, o canal atual não atende instalações sem login.
 
 ## Diagnóstico e recuperação
 

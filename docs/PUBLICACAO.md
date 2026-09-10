@@ -55,12 +55,39 @@ Os [gates de release](GATES-DE-RELEASE.md) são obrigatórios para o artefato di
 
 1. Revise as fontes correspondentes ao FFmpeg fixado conforme [CONFORMIDADE-FFMPEG.md](CONFORMIDADE-FFMPEG.md). Enquanto `compliance/ffmpeg-sources.json` contiver `reviewed: false`, o pacote deve continuar bloqueado. Arquivos coletados e hashes válidos não encerram essa revisão.
 2. Preserve os sidecars fixados em armazenamento durável. `CORNETA_FFMPEG_MIRROR_URL` pode substituir a origem de download, mas nunca o hash ou a build. Disponibilize os materiais de conformidade pertinentes, não apenas o espelho binário.
-3. Confira backups, secrets e reviewer do Environment `production-telemetry`, conforme [assinaturas](ASSINATURA.md), [updater](ATUALIZACAO-AUTOMATICA.md) e runbook de telemetria. Não gere outra chave para substituir um backup perdido em instalações já distribuídas.
+3. Confira backups, secrets e os dois Environments descritos abaixo, conforme [assinaturas](ASSINATURA.md), [updater](ATUALIZACAO-AUTOMATICA.md) e runbook de telemetria. Não gere outra chave para substituir um backup perdido em instalações já distribuídas.
 4. Atualize versões com `pnpm bump patch` (ou `minor`/`major`), revise o diff, atualize o changelog e faça o commit incluindo ambos. O script exige index sem alterações staged e alvos de versão intactos. Neste fluxo, não use `--commit`: essa opção faz commit somente dos alvos de versão e já cria a tag. Não misture trabalho alheio com a alteração de versão.
-5. Crie a tag `vX.Y.Z`, correspondente à versão exata do Tauri, no commit que contém as versões e o changelog revisados; depois envie a tag. O [workflow](../.github/workflows/release.yml) valida a mesma ref no CI, faz build/assinatura, confere conteúdo e prepara um **draft**, não uma aprovação automática.
-6. Execute os ensaios abaixo sobre o instalador desse draft. Só então publique a release e confira os downloads públicos.
+5. Envie esse commit à branch padrão e faça o deploy do mesmo SHA no site/API de produção. Crie a tag `vX.Y.Z`, correspondente à versão exata do Tauri, nesse commit; depois envie a tag. O [workflow](../.github/workflows/release.yml) recusa commits fora da branch padrão, valida a mesma ref no CI, faz build/assinatura, confere conteúdo e prepara um **draft**. O gate aguarda até dez minutos pela metadata do deployment exato; não faz deploy nem aceita outro SHA.
+6. Execute os ensaios abaixo sobre os cinco arquivos desse draft. Registre as evidências na execução e aprove `production-release`. O job `publish` confere novamente a tag remota, os arquivos aprovados, seus hashes, o manifesto e o deployment; então publica a release. Ela se torna **Latest** somente se for mais nova que todas as releases estáveis já publicadas. Confira os downloads públicos após a promoção.
 
 O draft admite cinco assets: instalador `.exe`, assinatura `.exe.sig`, `latest.json`, `SHA256SUMS.txt` e `corneta-third-party.zip`. Não adicione logs, dumps, mapas de código ou arquivos de ambiente ao pacote. Depois de preparar os sidecars, `pnpm compliance:prepare` gera o pacote de terceiros se o manifesto estiver aprovado; inspecione também seu conteúdo.
+
+### Configuração única do GitHub Actions
+
+O canal atual usa releases deste próprio repositório. Ele precisa estar público para que o desktop e o CTA baixem os arquivos sem login. Manter o código privado exige um canal público separado e a adaptação dos endpoints e do workflow; não coloque tokens GitHub no app para contornar essa restrição. Siga a revisão de segurança acima antes de mudar a visibilidade.
+
+Configure os Environments **antes** de enviar uma tag. O GitHub pode criar automaticamente um ambiente inexistente sem nenhuma proteção. Ambos precisam de reviewers obrigatórios, bypass de administradores desligado e política de deployment restrita a tags `v*`. Restrinja quem pode alterar os workflows e essas configurações. Se houver outro mantenedor habilitado, impeça também a autoaprovação. Confira se o plano contratado permite essas regras para a visibilidade escolhida.
+
+| Environment            | Aprovação                                                            | Configuração                                |
+| ---------------------- | -------------------------------------------------------------------- | ------------------------------------------- |
+| `production-telemetry` | Política, operador e configuração de produção antes do build oficial | Secrets abaixo                              |
+| `production-release`   | Ensaios do instalador e dos cinco arquivos do draft exato            | Não requer secrets de assinatura ou PostHog |
+
+No `production-telemetry`, configure os secrets `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` e, para telemetria ativa, `POSTHOG_API_KEY`. Secrets de repositório também são aceitos. Preserve o par de chaves do updater já distribuído. O secret PostHog é uma Personal API Key dedicada a source maps, não o token público do projeto.
+
+Nas **variáveis de Actions do repositório**, configure `POSTHOG_DESKTOP_TOKEN`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` e `POSTHOG_PROJECT_TOKEN` com o mesmo token público; `POSTHOG_PROJECT_ID` com o ID numérico; `POSTHOG_HOST` e `NEXT_PUBLIC_POSTHOG_HOST` com `https://us.i.posthog.com`; `TELEMETRY_DISABLED` com `0`; e `TELEMETRY_POLICY_PUBLISHED_VERSION` com `2026-09-09` somente após a revisão/publicação do aviso correspondente. Não mantenha valores divergentes nos Environments: variáveis de ambiente só ficam disponíveis no runner e não substituem contextos já avaliados. Veja a [precedência de variáveis do GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#configuration-variable-precedence).
+
+O modo emergencial `TELEMETRY_DISABLED=1` precisa ser aplicado também ao deployment; não é solução para credenciais ausentes. `CORNETA_FFMPEG_MIRROR_URL` e `REQUIRE_WINDOWS_CODE_SIGNING` seguem seus guias específicos.
+
+Antes da tag, execute `pnpm release:readiness` com o GitHub CLI autenticado como mantenedor. Para um fork, use `pnpm release:readiness --repo OWNER/REPOSITORY`. O comando é somente leitura: verifica metadados de Actions, ambientes, nomes dos secrets, variáveis e revisão local do FFmpeg; retorna JSON sem valores de credenciais e termina com erro se houver bloqueio ou acesso insuficiente. `configurationReady` não significa aprovação da publicação: o relatório sempre mantém `publicationVerified: false`, pois não comprova o conteúdo dos secrets, a correspondência das chaves, o deployment da futura tag nem os ensaios manuais. Ele não lê `.env` nem configura serviços.
+
+O job de promoção verifica a proteção de `production-release` via API e bloqueia se não puder confirmá-la. Depois de aprovado, baixa o artefato pelo ID da própria execução, valida o digest do transporte e compara cada arquivo com o inventário SHA-256 do build e os assets no draft. Reconfere a metadata pública usando a configuração aprovada no build, sem receber a chave privada do updater ou a Personal API Key. Promoções são serializadas entre tags para não fazer uma versão antiga substituir Latest. Não publique ou edite os mesmos assets manualmente enquanto esse job estiver ativo.
+
+### Repetir uma execução
+
+Se somente `publish` falhar, confira o estado remoto e repita **apenas esse job** na mesma execução. Os arquivos intermediários ficam disponíveis por 14 dias; o helper aceita uma release já pública somente se os cinco arquivos ainda forem idênticos, sem sobrescrevê-los. Uma execução completa recusa substituir arquivos de uma release pública. Se os intermediários expirarem enquanto a release ainda for draft, repita o build e os ensaios/aprovações para os novos bytes. Não mova uma tag publicada nem substitua o instalador de uma versão existente; faça uma nova versão.
+
+Ao usar `workflow_dispatch`, escolha a própria tag como ref da execução e informe a mesma tag no input; executar pela branch `main` não atende à política dos Environments restritos a tags.
 
 ### Instalação, atualização e recuperação
 

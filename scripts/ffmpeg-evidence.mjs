@@ -364,13 +364,24 @@ export async function readTarText(archive, limits = {}) {
 
 export function packageFields(text) {
   // Spaces, not \s: an empty Requires line must never consume Version below it.
-  return Object.fromEntries(
-    [
-      ...text.matchAll(
-        /^(Name|Version|Requires(?:\.private)?|Libs(?:\.private)?):[ \t]*(.*)$/gm,
-      ),
-    ].map((match) => [match[1], match[2].trim()]),
-  );
+  const occurrences = new Map();
+  for (const match of text.matchAll(
+    /^(Name|Version|Requires(?:\.private)?|Libs(?:\.private)?):[ \t]*(.*)$/gm,
+  )) {
+    const values = occurrences.get(match[1]) ?? [];
+    values.push(match[2].trim());
+    occurrences.set(match[1], values);
+  }
+  const fields = {};
+  const duplicateFields = {};
+  for (const [name, values] of occurrences) {
+    if (values.length === 1) fields[name] = values[0];
+    // Passive inspection must not guess how the build's pkg-config resolved duplicates.
+    else duplicateFields[name] = values;
+  }
+  return Object.keys(duplicateFields).length
+    ? { ...fields, duplicateFields }
+    : fields;
 }
 
 export async function readPackageMetadata(archive, limits) {
