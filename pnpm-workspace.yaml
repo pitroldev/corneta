@@ -2,8 +2,6 @@ packages:
   - web
 
 allowBuilds:
-  # Release tooling downloads and verifies the pinned CLI instead of running postinstall.
-  "@posthog/cli": false
   # The funding-message postinstall is not needed at runtime.
   core-js: false
   # Installs the platform binary used by the TypeScript runner.

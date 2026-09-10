@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import posthog from "@posthog/rollup-plugin";
+import { posthogSourceMaps } from "./scripts/posthog-source-maps.ts";
 import pkg from "./package.json" with { type: "json" };
 
 const host = process.env.TAURI_DEV_HOST;
@@ -32,15 +32,15 @@ const shouldUploadSourceMaps = Boolean(
   !telemetryBuildDisabled && sourceMapCredentialsValid,
 );
 
-export default defineConfig(async () => ({
+export default defineConfig(({ command }) => ({
   // The explicit contributor profile must never compile the maintainer's .env.
   envDir: process.env.CORNETA_CONTRIBUTOR === "1" ? false : undefined,
   plugins: [
     react(),
     tailwindcss(),
-    ...(shouldUploadSourceMaps
+    ...(command === "build" && shouldUploadSourceMaps
       ? [
-          posthog({
+          posthogSourceMaps({
             personalApiKey: posthogPersonalApiKey!,
             projectId: posthogProjectId!,
             host: process.env.POSTHOG_HOST,

@@ -26,6 +26,9 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma 
 - O PostHog CLI 0.9.4 é baixado em step sem segredos, conferido pelo SHA-256 fixado no
   repositório e passado ao Vite por caminho explícito; download, integridade, extração ou versão
   divergente bloqueiam o build.
+- O processamento inclui o worker e seus imports, além dos chunks principais. Pares inválidos
+  ou processamento incompleto bloqueiam o build; `pnpm bundle:check` confere o frontend antes
+  da compilação nativa, sem substituir a inspeção final do instalador.
 - Uma única execução do CLI do Tauri com Rust 1.97.1 produz o executável, o NSIS e a assinatura do updater.
   A tag precisa ser exatamente `v` + a versão do Tauri, e `create-updater-manifest.mjs` gera o
   `latest.json` v2 usando o conteúdo do `.exe.sig` e a URL desse mesmo instalador.

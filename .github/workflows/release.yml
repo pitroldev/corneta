@@ -230,6 +230,10 @@ jobs:
           }
           pnpm build
 
+      - name: Check frontend before native packaging
+        shell: pwsh
+        run: pnpm bundle:check
+
       # Preserve the audited frontend by preventing a second Vite build; uploads happen after scanning.
       - name: Build Tauri and sign updater
         shell: pwsh

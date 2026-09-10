@@ -126,7 +126,11 @@ envia telemetria. `unset` significa ausência de escolha: **desativa uso e mant�
 O site conserva um controle único de opt-out e DNT/GPC, sem compartilhar as escolhas do app.
 A API preserva o tratamento de falhas e só recebe o UUID do desktop para as finalidades ativas.
 Builds locais e de PR não exigem credenciais. Na release habilitada, um step shell executa o build Vite, gera mapas ocultos, faz
-upload associado a `corneta-desktop@<versão>` e os apaga. Esse é o único step que recebe a
+upload associado a `corneta-desktop@<versão>` e os apaga. O processamento inclui o JavaScript
+principal, o worker de relatórios e seus imports dinâmicos, que o Vite emite como assets.
+Antes do upload, cada arquivo precisa ter um mapa válido e não vazio; após o processamento,
+a ausência do identificador de diagnóstico ou a permanência de mapas bloqueia o build.
+Esse é o único step que recebe a
 Personal API Key e o Project ID de upload; o gate de configuração, o build Tauri, o scanner e o
 upload do GitHub não recebem a chave. Antes do Vite, esse step consulta o projeto no PostHog US
 com timeout curto e redirects bloqueados e exige que `id`/`api_token` coincidam exatamente com o
@@ -138,9 +142,22 @@ perda de aspas do JSON entre PowerShell e os executáveis Windows. Esse override
 frontend já preparado e é exclusivo do CI; não substitui o build local completo. O job invoca
 o CLI diretamente pelo Node, preservando o separador `--` que encaminha `--locked` ao Cargo.
 O workflow também baixa o PostHog CLI oficial 0.9.4 em um step sem segredos, confere o SHA-256
-fixado em `scripts/fetch-posthog-cli.ps1` e entrega o caminho explícito ao plugin Vite; falha de
+fixado em `scripts/fetch-posthog-cli.ps1` e entrega o caminho explícito ao adaptador Vite; falha de
 download, integridade, extração ou versão bloqueia o build.
 
+O servidor de desenvolvimento não carrega o CLI, mesmo que existam credenciais no ambiente.
+Para um build local deliberado com upload de source maps, prepare o mesmo CLI verificado no
+PowerShell antes de executar o build:
+
+```powershell
+$env:POSTHOG_CLI_BINARY_PATH = pwsh -NoProfile -File scripts/fetch-posthog-cli.ps1
+```
+
+Builds sem upload não exigem esse executável. O CLI de upload é preparado explicitamente,
+sem depender de um script `postinstall` do npm.
+
+`pnpm bundle:check` inspeciona o frontend antes de iniciar a compilação e assinatura nativas,
+tanto na release com telemetria quanto no modo emergencial.
 Antes de qualquer upload de artefato da release, `pnpm artifacts:check` exige o comando `7z`, lista e extrai o NSIS e
 procura `.map`, `phx_`, chaves minisign/PEM e segredos conhecidos no `dist`, binário, bundle e
 conteúdo extraído. Essa inspeção confirma a árvore que o 7-Zip consegue interpretar; não prova o

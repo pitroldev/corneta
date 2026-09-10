@@ -33,6 +33,26 @@ describe("workflow safety contracts", () => {
     expect(base.bundle.createUpdaterArtifacts).toBe(true);
   });
 
+  it("scans both frontend build paths before native packaging", () => {
+    const steps = parse(workflow("release")).jobs.release.steps;
+    const frontendScan = steps.findIndex(
+      (step) => step.run === "pnpm bundle:check",
+    );
+    const nativeBuild = steps.findIndex(
+      (step) => step.name === "Build Tauri and sign updater",
+    );
+    for (const name of [
+      "Build frontend and upload source maps",
+      "Build frontend with telemetry disabled",
+    ]) {
+      const build = steps.findIndex((step) => step.name === name);
+      expect(build).toBeGreaterThan(-1);
+      expect(frontendScan).toBeGreaterThan(build);
+    }
+    expect(steps[frontendScan].if).toBeUndefined();
+    expect(nativeBuild).toBeGreaterThan(frontendScan);
+  });
+
   it("publishes only the approved build after a separate environment approval", () => {
     const release = parse(workflow("release"));
     const publish = release.jobs.publish;
