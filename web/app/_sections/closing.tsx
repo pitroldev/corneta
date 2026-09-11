@@ -226,7 +226,7 @@ export function SiteFooter({ t, locale }: { t: T; locale: Locale }) {
                 <li>
                   <a
                     className={FOOTER_LINK}
-                    href="https://github.com/pitroldev"
+                    href="https://github.com/pitroldev/corneta"
                     rel="noreferrer noopener"
                     target="_blank"
                   >

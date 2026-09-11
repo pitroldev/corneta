@@ -153,9 +153,17 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
               <span className={TRUST}>
                 <CheckIcon /> {t("hero.trust.free")}
               </span>
-              <span className={TRUST}>
+              <a
+                className={cn(
+                  TRUST,
+                  "min-h-11 underline underline-offset-4 transition-colors hover:text-brass focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-brass",
+                )}
+                href="https://github.com/pitroldev/corneta"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
                 <CheckIcon /> {t("hero.trust.opensource")}
-              </span>
+              </a>
             </div>
           </div>
         </div>

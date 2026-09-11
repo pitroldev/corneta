@@ -91,3 +91,24 @@ describe("website download links", () => {
     }
   });
 });
+
+describe("website repository links", () => {
+  it.each(sources.slice(0, 2))(
+    "links the hero and footer to the project repository: $fileName",
+    (source) => {
+      const links = elements(source).filter(
+        (element) =>
+          attribute(element, "href") === "https://github.com/pitroldev/corneta",
+      );
+      expect(links).toHaveLength(1);
+      const [link] = links;
+      expect(link.tagName.getText()).toBe("a");
+      expect(attribute(link, "target")).toBe("_blank");
+      expect(attribute(link, "rel")?.split(/\s+/)).toEqual(
+        expect.arrayContaining(["noopener", "noreferrer"]),
+      );
+      expect(attribute(link, "onClick")).toBeUndefined();
+      expect(source.text).not.toContain('href="https://github.com/pitroldev"');
+    },
+  );
+});
