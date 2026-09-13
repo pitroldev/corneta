@@ -1405,7 +1405,53 @@ export const pt = {
   "replay.marker.action": "Marcar momento",
   "replay.marker.cta": "Marcar este momento",
   "replay.marker.default": "Momento marcado no replay",
-  "replay.loading": "Preparando a gravação…",
+  "replay.loading": "Abrindo o vídeo…",
+  "replay.slow": "O vídeo está demorando para abrir",
+  "replay.slowHint":
+    "O relatório continua disponível. Você pode tentar abrir o vídeo novamente ou usar outro player pela pasta da gravação.",
+  "replay.mediaError": "Não consegui reproduzir este vídeo aqui.",
+  "replay.retry": "Tentar novamente",
+  "replay.prepare.action": "Preparar gravação",
+  "replay.prepare.suggest": "Esta gravação pode abrir mais rápido",
+  "replay.prepare.hint":
+    "Prepare o vídeo uma vez para facilitar a reprodução. Isso usa o disco e precisa de espaço temporário; se falhar, o original é mantido.",
+  "replay.prepare.running": "Preparando a gravação para reprodução…",
+  "replay.prepare.runningHint":
+    "Em vídeos grandes, pode levar alguns minutos. Você pode continuar lendo o relatório; o vídeo será reaberto quando terminar.",
+  "replay.prepare.failed": "A preparação da gravação não foi concluída",
+  "replay.prepare.space":
+    "Falta espaço no disco para preparar uma cópia temporária. Libere espaço antes de tentar novamente.",
+  "replay.prepare.spaceDetails":
+    "Necessário: {required} GiB · Disponível: {available} GiB",
+  "replay.prepare.statusUnavailable":
+    "Não consegui verificar a preparação do vídeo",
+  "replay.prepare.statusHint":
+    "A reprodução ainda pode funcionar. Tente novamente para verificar o estado da gravação.",
+  "replay.prepare.invalidFile":
+    "Não consegui reconhecer a estrutura deste vídeo. Abra a pasta e confira o arquivo em outro player.",
+  "replay.prepare.unreadable":
+    "Não consegui acessar o vídeo. Confira se o disco está conectado e se o arquivo pode ser aberto.",
+  "replay.prepare.spaceUnavailable":
+    "Não consegui verificar o espaço livre. Confira se o disco está acessível antes de tentar novamente.",
+  "replay.prepare.busy":
+    "A gravação ainda está em uso ou outra gravação está sendo preparada. Aguarde e tente novamente.",
+  "replay.prepare.sourceChanged":
+    "O arquivo mudou durante a preparação. Confira se ele ainda está sendo gravado ou alterado e tente novamente depois.",
+  "replay.prepare.interrupted":
+    "A preparação foi interrompida. O vídeo original foi mantido; você pode tentar prepará-lo novamente.",
+  "replay.diagnostics": "Detalhes do carregamento",
+  "replay.diagnostics.metadata": "Metadados: {ms} ms",
+  "replay.diagnostics.frame": "Primeira imagem exibida: {ms} ms",
+  "replay.diagnostics.noFrame":
+    "Ainda sem confirmação da primeira imagem após {ms} ms.",
+  "replay.diagnostics.transport":
+    "Leitura do arquivo: {read} MiB de {total} GiB · {ranges} de {requests} pedidos por trecho",
+  "replay.diagnostics.buffer":
+    "Maior buffer por pedido: {size} KiB. Não representa a memória total do player.",
+  "replay.diagnostics.local":
+    "Dados locais desta abertura, sem envio automático.",
+  "replay.diagnostics.processMemory":
+    "Memória do processo nativo nesta amostra: {size} MiB. Inclui outras funções da Corneta, não os processos do player.",
   "replay.missing": "O arquivo desta gravação não está mais no disco.",
   "replay.mute": "Silenciar",
   "replay.offset.label": "Ajuste de sincronia",

@@ -1,5 +1,5 @@
 import { FolderOpen, FolderSearch, HardDrive, Play, Video } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "../../components/Modal";
 import { Button, Card, Toggle } from "../../components/ui";
 import { api } from "../../lib/api";
@@ -10,6 +10,7 @@ import { toast } from "../../lib/toast";
 import type { RecordDirCheck } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
 import { RecordGroup, SettingRow } from "./SettingPrimitives";
+import { RecordingPreview } from "./RecordingPreview";
 
 export function RecordingSettings() {
   const { t, fmt } = useI18n();
@@ -24,6 +25,13 @@ export function RecordingSettings() {
   } | null>(null);
   const [testing, setTesting] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const dir = settings.recordVideoDir;
 
@@ -54,12 +62,14 @@ export function RecordingSettings() {
     setTesting(true);
     try {
       const file = await api.recordTest(dir);
-      setPreview(await api.recordVideoUrl(file));
+      if (!mounted.current) return;
+      setPreview(file);
       toast.success(t("settings.record.test.ok"));
     } catch (e) {
-      toast.error(t("settings.record.test.fail", { error: errMsg(e) }));
+      if (mounted.current)
+        toast.error(t("settings.record.test.fail", { error: errMsg(e) }));
     } finally {
-      setTesting(false);
+      if (mounted.current) setTesting(false);
     }
   };
 
@@ -299,13 +309,7 @@ export function RecordingSettings() {
           title={t("settings.record.test.modal")}
           onClose={() => setPreview(null)}
         >
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            src={preview}
-            controls
-            autoPlay
-            className="w-full rounded-lg bg-black"
-          />
+          <RecordingPreview path={preview} />
           <p className="mt-2 text-xs text-ink-muted">
             {t("settings.record.test.modal.body")}
           </p>

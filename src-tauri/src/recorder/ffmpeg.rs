@@ -258,30 +258,7 @@ async fn finalize(app: &AppHandle, session_path: &Path, seg: u32, src: &Path) {
         let _ = std::fs::remove_file(src);
         return;
     }
-    let tmp = src.with_extension("fin.mp4");
-    let Ok(cmd) = app.shell().sidecar("ffmpeg") else {
-        return;
-    };
-    match cmd.args(domain::remux_args(src, &tmp)).output().await {
-        Ok(o) if o.status.success() => {
-            if std::fs::rename(&tmp, src).is_ok() {
-                session::record_rec_finalized(session_path, seg, &src.to_string_lossy());
-            } else {
-                let _ = std::fs::remove_file(&tmp);
-            }
-        }
-        Ok(o) => {
-            log::warn!(
-                "recording: remux failed ({}); fragmented MP4 remains playable",
-                String::from_utf8_lossy(&o.stderr).trim()
-            );
-            let _ = std::fs::remove_file(&tmp);
-        }
-        Err(e) => {
-            log::warn!("recording: remux could not run: {e}");
-            let _ = std::fs::remove_file(&tmp);
-        }
-    }
+    super::replay::finalize(app, session_path, seg, src).await;
 }
 
 pub async fn test_record(app: &AppHandle, dir: &Path) -> Result<String, String> {

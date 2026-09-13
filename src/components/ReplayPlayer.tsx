@@ -49,6 +49,9 @@ import {
 } from "../lib/replayChatPage";
 import { Select } from "./Select";
 import { Button } from "./ui";
+import { detachReplayVideo, useReplaySource } from "./replay/useReplaySource";
+import { ReplayPreparationNotice } from "./replay/ReplayPreparationNotice";
+import { ReplayLoadingDetails } from "./replay/ReplayLoadingDetails";
 
 /** The nonce makes repeated seeks to the same timestamp observable. */
 export interface SeekRequest {
@@ -122,7 +125,6 @@ export function ReplayPlayer({
   const [segIndex, setSegIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState<number>(1);
-  const [urls, setUrls] = useState<Record<string, string>>({});
   const [offset, setOffset] = useState(data.offsetMs);
   const [hoverMs, setHoverMs] = useState<number | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -132,48 +134,51 @@ export function ReplayPlayer({
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [showOffset, setShowOffset] = useState(false);
-  const [previewOk, setPreviewOk] = useState(false);
-  const [loadedPath, setLoadedPath] = useState<string | null>(null);
-  const [failedPath, setFailedPath] = useState<string | null>(null);
+  const [previewSource, setPreviewSource] = useState<string>();
+  const [loadedUrl, setLoadedUrl] = useState<string>();
+  const [failedUrl, setFailedUrl] = useState<string>();
+  const previewSeek = useRef(0);
+  const lastHover = useRef(0);
+  const lastPreviewSeek = useRef(0);
+  const pendingSeek = useRef<{ sec: number; play: boolean } | null>(null);
+  const bindPreview = useCallback((node: HTMLVideoElement | null) => {
+    if (previewRef.current !== node) detachReplayVideo(previewRef.current);
+    previewRef.current = node;
+  }, []);
 
   // Apply offset changes without reparsing the session to keep calibration responsive.
   const tuned = useMemo(() => ({ ...idx, offsetMs: offset }), [idx, offset]);
 
   const segment = tuned.segments[segIndex];
-  const src = segment ? urls[segment.path] : undefined;
   const codecUnsupported = segment ? !isPlayableCodec(segment.codec) : false;
-  const mediaState: "loading" | "ready" | "missing" | "unsupported" =
-    codecUnsupported
-      ? "unsupported"
-      : !segment || src === undefined
-        ? "loading"
-        : src === "" || failedPath === segment.path
-          ? "missing"
-          : loadedPath === segment.path
+  const source = useReplaySource(
+    sessionId,
+    codecUnsupported ? undefined : segment?.path,
+    videoRef,
+    previewRef,
+    () => {
+      const video = videoRef.current;
+      if (video && video.readyState >= 1 && video.getAttribute("src")) {
+        pendingSeek.current = { sec: video.currentTime, play: !video.paused };
+      }
+    },
+  );
+  const src = source.url;
+  const mediaState = codecUnsupported
+    ? "unsupported"
+    : source.status?.state === "preparing"
+      ? "preparing"
+      : source.status?.state === "missing"
+        ? "missing"
+        : source.sourceError || (!!src && failedUrl === src)
+          ? "error"
+          : src && loadedUrl === src
             ? "ready"
             : "loading";
   const canControl = mediaState === "ready";
   const truncated = data.recordings.some(
     (r) => r.reason && r.reason !== "stopped",
   );
-
-  // Grant asset access per recording file, never to the entire directory.
-  useEffect(() => {
-    // An empty cached URL marks a failed attempt; truthiness would cause an infinite retry loop.
-    if (!segment || codecUnsupported || segment.path in urls) return;
-    let alive = true;
-    void api
-      .recordVideoUrl(segment.path)
-      .then((u) => {
-        if (alive) setUrls((prev) => ({ ...prev, [segment.path]: u }));
-      })
-      .catch(() => {
-        if (alive) setUrls((prev) => ({ ...prev, [segment.path]: "" }));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [codecUnsupported, segment, urls]);
 
   const emitPlayhead = useCallback(
     (g: number) => {
@@ -202,7 +207,16 @@ export function ReplayPlayer({
     [emitPlayhead, playing, segIndex, tuned],
   );
 
-  const pendingSeek = useRef<{ sec: number; play: boolean } | null>(null);
+  const renewRecording = (prepare: boolean) => {
+    const video = videoRef.current;
+    if (video && video.readyState >= 1) {
+      pendingSeek.current = { sec: video.currentTime, play: !video.paused };
+    }
+    setPreviewSource(undefined);
+    setHoverMs(null);
+    if (prepare) void source.prepare();
+    else void source.retry();
+  };
 
   useEffect(() => {
     if (!seek) return;
@@ -304,9 +318,9 @@ export function ReplayPlayer({
 
   const onLoadedMetadata = () => {
     const v = videoRef.current;
-    if (!v || !segment) return;
-    setLoadedPath(segment.path);
-    setFailedPath(null);
+    if (!v || !segment || !src || v.getAttribute("src") !== src) return;
+    setLoadedUrl(src);
+    setFailedUrl(undefined);
     // Changing src resets playback rate and volume; restore both for the next segment.
     v.playbackRate = rate;
     v.volume = volume;
@@ -454,6 +468,9 @@ export function ReplayPlayer({
   };
 
   const onScrubHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    const now = performance.now();
+    if (now - lastHover.current < 80) return;
+    lastHover.current = now;
     const rect = e.currentTarget.getBoundingClientRect();
     const trackPadding = 16;
     const trackWidth = Math.max(1, rect.width - trackPadding * 2);
@@ -464,11 +481,28 @@ export function ReplayPlayer({
     const g = k * tuned.totalMs;
     setHoverMs(g);
     const p = pointAtGlobal(tuned, g);
-    const v = previewRef.current;
-    // Only seek thumbnails within the loaded segment to avoid showing a frame from another file.
-    setPreviewOk(!!p && p.index === segIndex);
-    if (p && v && p.index === segIndex) v.currentTime = p.localSec;
+    if (
+      !playing &&
+      source.diagnostic?.firstFrameMs != null &&
+      p?.index === segIndex &&
+      src
+    ) {
+      previewSeek.current = p.localSec;
+      setPreviewSource(src);
+      const v = previewRef.current;
+      if (
+        v &&
+        v.readyState >= 1 &&
+        !v.seeking &&
+        now - lastPreviewSeek.current >= 200
+      ) {
+        lastPreviewSeek.current = now;
+        v.currentTime = p.localSec;
+      }
+    }
   };
+
+  const previewAtHover = hoverMs == null ? null : pointAtGlobal(tuned, hoverMs);
 
   return (
     <>
@@ -488,9 +522,7 @@ export function ReplayPlayer({
               ref={stageRef}
               className="bg-night outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass [&:fullscreen]:flex [&:fullscreen]:h-screen [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:bg-night [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[calc(100vh-9rem)]"
             >
-              {mediaState === "missing" ? (
-                <Note tone="warn">{t("replay.missing")}</Note>
-              ) : mediaState === "unsupported" ? (
+              {mediaState === "unsupported" ? (
                 <Note tone="bad">{t("replay.warn.codec")}</Note>
               ) : (
                 <div className="relative flex min-h-48 items-center justify-center overflow-hidden bg-black xl:min-h-72">
@@ -505,36 +537,97 @@ export function ReplayPlayer({
                     onEnded={onEnded}
                     onLoadedMetadata={onLoadedMetadata}
                     onError={() => {
-                      if (segment) setFailedPath(segment.path);
+                      if (src && videoRef.current?.getAttribute("src") === src)
+                        setFailedUrl(src);
                     }}
-                    onPlay={() => setPlaying(true)}
+                    onPlay={() => {
+                      setPlaying(true);
+                      setPreviewSource(undefined);
+                    }}
                     onPause={() => setPlaying(false)}
                     onClick={togglePlay}
                     preload="metadata"
                   />
-                  {mediaState === "loading" && (
+                  {mediaState !== "ready" && (
                     <div
                       className="absolute inset-0 grid min-h-40 place-items-center bg-night/85 text-sm font-semibold text-ink-muted"
                       role="status"
                     >
-                      <span className="flex items-center gap-2">
-                        <LoaderCircle
-                          className="size-4 animate-spin text-brass"
-                          aria-hidden
-                        />
-                        {t("replay.loading")}
-                      </span>
+                      <div className="max-w-md px-6 py-8 text-center">
+                        <p className="flex items-center justify-center gap-2">
+                          {(mediaState === "loading" ||
+                            mediaState === "preparing") && (
+                            <LoaderCircle
+                              className="size-4 shrink-0 animate-spin text-brass"
+                              aria-hidden
+                            />
+                          )}
+                          {t(
+                            mediaState === "missing"
+                              ? "replay.missing"
+                              : mediaState === "error"
+                                ? "replay.mediaError"
+                                : mediaState === "preparing"
+                                  ? "replay.prepare.running"
+                                  : source.slow
+                                    ? "replay.slow"
+                                    : "replay.loading",
+                          )}
+                        </p>
+                        {(source.slow || mediaState === "error") && (
+                          <p className="mt-2 text-xs font-normal">
+                            {t("replay.slowHint")}
+                          </p>
+                        )}
+                        {(source.slow ||
+                          mediaState === "error" ||
+                          mediaState === "missing") &&
+                          mediaState !== "preparing" && (
+                            <Button
+                              size="sm"
+                              variant="subtle"
+                              className="mt-4"
+                              onClick={() => renewRecording(false)}
+                            >
+                              {t("replay.retry")}
+                            </Button>
+                          )}
+                      </div>
                     </div>
                   )}
-                  {hoverMs != null && previewOk && (
-                    <div className="pointer-events-none absolute right-2 bottom-2 w-40 overflow-hidden rounded border-2 border-border bg-black">
+                  {src && previewSource === src && canControl && !playing && (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute right-2 bottom-2 w-40 overflow-hidden rounded border-2 border-border bg-black",
+                        previewAtHover?.index !== segIndex && "hidden",
+                      )}
+                    >
                       <video
-                        ref={previewRef}
+                        ref={bindPreview}
                         src={src}
                         muted
                         preload="metadata"
                         className="w-full"
+                        onLoadedMetadata={() => {
+                          if (previewRef.current)
+                            previewRef.current.currentTime =
+                              previewSeek.current;
+                        }}
+                        onSeeked={() => {
+                          const video = previewRef.current;
+                          if (
+                            video &&
+                            Math.abs(video.currentTime - previewSeek.current) >
+                              0.2
+                          )
+                            video.currentTime = previewSeek.current;
+                        }}
                       />
+                      {hoverMs != null && (
+                        <p className="px-2 py-1 text-center text-xs tabular-nums text-white">
+                          {clock(hoverMs)}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -611,6 +704,23 @@ export function ReplayPlayer({
                 />
               </div>
             </div>
+
+            <ReplayPreparationNotice
+              status={source.status}
+              onPrepare={() => renewRecording(true)}
+              onRetry={() => renewRecording(false)}
+            />
+
+            <ReplayLoadingDetails diagnostic={source.diagnostic} />
+
+            {source.slow && canControl && (
+              <p
+                className="bg-surface px-4 py-2 text-xs text-ink-muted"
+                role="status"
+              >
+                {t("replay.slowHint")}
+              </p>
+            )}
 
             <div className="flex min-h-14 flex-wrap items-center gap-1.5 border-t border-border-soft bg-surface px-3 py-2 sm:px-4">
               <Button

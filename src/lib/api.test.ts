@@ -73,6 +73,40 @@ describe("Tauri telemetry IPC", () => {
     });
   });
 
+  it("uses native bounded playback capabilities instead of constructing asset URLs", async () => {
+    const { api } = await import("./api");
+    await api.recordVideoUrl("recording.mp4");
+    await api.releaseRecordVideo("local-playback-capability");
+    await api.recordVideoStats("local-playback-capability");
+    expect(invoke).toHaveBeenCalledWith("record_video_url", {
+      path: "recording.mp4",
+    });
+    expect(invoke).toHaveBeenCalledWith("release_record_video", {
+      url: "local-playback-capability",
+    });
+    expect(invoke).toHaveBeenCalledWith("record_video_stats", {
+      url: "local-playback-capability",
+    });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "record_allow_file",
+      expect.anything(),
+    );
+  });
+
+  it("scopes replay inspection and explicit preparation to the report and file", async () => {
+    const { api } = await import("./api");
+    await api.recordingReplayStatus("123", "recording.mp4");
+    await api.prepareRecordingReplay("123", "recording.mp4");
+    expect(invoke).toHaveBeenCalledWith("recording_replay_status", {
+      id: "123",
+      path: "recording.mp4",
+    });
+    expect(invoke).toHaveBeenCalledWith("prepare_recording_replay", {
+      id: "123",
+      path: "recording.mp4",
+    });
+  });
+
   it("rejects invalid unsigned times before invoking the backend", async () => {
     const { api } = await import("./api");
 

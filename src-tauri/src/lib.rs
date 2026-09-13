@@ -18,6 +18,8 @@ mod permissions;
 mod queue_probe;
 mod recorder;
 mod renditions;
+mod replay_commands;
+mod replay_media;
 mod resources;
 mod session;
 mod shortcut;
@@ -247,7 +249,11 @@ pub fn run() {
             commands::record_pick_dir,
             commands::record_test,
             commands::record_retry,
-            commands::record_allow_file,
+            replay_commands::record_video_url,
+            replay_commands::release_record_video,
+            replay_commands::record_video_stats,
+            replay_commands::recording_replay_status,
+            replay_commands::prepare_recording_replay,
             commands::set_session_offset,
             commands::delete_session_recordings,
             commands::open_recording_folder,

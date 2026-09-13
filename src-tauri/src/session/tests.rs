@@ -326,6 +326,61 @@ fn session_pruning_removes_the_oldest_sessions() {
 
 const GB: u64 = 1024 * 1024 * 1024;
 
+#[test]
+fn retention_preserves_the_report_and_chat_of_a_preparing_recording() {
+    let store = MemStore::default();
+    let protected = Path::new("/s/1000.ndjson");
+    let removed = Path::new("/s/2000.ndjson");
+    for path in [protected, removed] {
+        store.create(path, &json!({"synthetic": true}));
+        store.create(&chat_path(path), &json!({"synthetic": true}));
+    }
+    super::prune_sessions_with(&store, Path::new("/s"), 0, |path| path == protected);
+    assert!(store.read(protected).is_some());
+    assert!(store.read(&chat_path(protected)).is_some());
+    assert!(store.read(removed).is_none());
+    assert!(store.read(&chat_path(removed)).is_none());
+}
+
+#[test]
+fn retention_reports_the_budget_still_held_by_a_preparing_recording() {
+    let store = MemStore::default();
+    let protected = Path::new("/v/1000.mp4");
+    let removed = Path::new("/v/2000.mp4");
+    for path in [protected, removed] {
+        store.create(path, &json!({"synthetic": true}));
+    }
+    let bytes = store.len(protected);
+    let plan = domain::VideoPrunePlan {
+        orphans: vec![],
+        candidates: vec![(protected.into(), bytes), (removed.into(), bytes)],
+        total: 2 * bytes,
+        budget: 0,
+    };
+    assert_eq!(
+        super::apply_video_prune_with(&store, plan, |path| path == protected),
+        bytes
+    );
+    assert!(store.read(protected).is_some());
+    assert!(store.read(removed).is_none());
+}
+
+#[test]
+fn retention_does_not_remove_a_preparing_orphan() {
+    let store = MemStore::default();
+    let protected = Path::new("/v/1000.mp4");
+    store.create(protected, &json!({"synthetic": true}));
+    let bytes = store.len(protected);
+    let plan = domain::VideoPrunePlan {
+        orphans: vec![protected.into()],
+        candidates: vec![],
+        total: 0,
+        budget: 0,
+    };
+    assert_eq!(super::apply_video_prune_with(&store, plan, |_| true), bytes);
+    assert!(store.read(protected).is_some());
+}
+
 struct PruneWorkspace(PathBuf);
 
 impl PruneWorkspace {

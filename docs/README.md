@@ -18,7 +18,6 @@ Comece pelo [README do projeto](../README.md) para conhecer o app, os requisitos
 - [Performance](PERFORMANCE.md): limites, benchmarks e medições que exigem hardware real.
 - [Tom de voz](TOM-DE-VOZ.md): linguagem do app, tradução e mensagens de erro.
 - [Conteúdo editorial](../web/content/README.md) e [manutenção editorial](RUNBOOK-MANUTENCAO-EDITORIAL.md): escrever, revisar e publicar ajuda e guias.
-- [Roadmap](ROADMAP.md): prioridades para discutir novas contribuições.
 - [Segurança do repositório](SEGURANCA-REPOSITORIO.md): verificar segredos e revisar exceções de fixtures. Vulnerabilidades seguem o [canal privado](../SECURITY.md).
 - [Conduta](../CODE_OF_CONDUCT.md): expectativas para colaboração.
 

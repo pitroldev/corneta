@@ -1420,7 +1420,51 @@ export const en: Dict = {
   "replay.marker.action": "Mark moment",
   "replay.marker.cta": "Mark this moment",
   "replay.marker.default": "Marked during replay",
-  "replay.loading": "Preparing the recording…",
+  "replay.loading": "Opening the video…",
+  "replay.slow": "The video is taking a while to open",
+  "replay.slowHint":
+    "The report is still available. You can retry opening the video or use another player from the recording folder.",
+  "replay.mediaError": "This video could not be played here.",
+  "replay.retry": "Try again",
+  "replay.prepare.action": "Prepare recording",
+  "replay.prepare.suggest": "This recording could open faster",
+  "replay.prepare.hint":
+    "Prepare the video once for easier playback. This uses the disk and needs temporary space; the original is kept if preparation fails.",
+  "replay.prepare.running": "Preparing the recording for playback…",
+  "replay.prepare.runningHint":
+    "Large videos may take several minutes. You can keep reading the report; the video will reopen when preparation finishes.",
+  "replay.prepare.failed": "Recording preparation did not finish",
+  "replay.prepare.space":
+    "There is not enough disk space for a temporary copy. Free up space before trying again.",
+  "replay.prepare.spaceDetails":
+    "Required: {required} GiB · Available: {available} GiB",
+  "replay.prepare.statusUnavailable": "Could not check video preparation",
+  "replay.prepare.statusHint":
+    "Playback may still work. Try again to check the recording's status.",
+  "replay.prepare.invalidFile":
+    "This video's structure could not be recognized. Open the folder and check the file in another player.",
+  "replay.prepare.unreadable":
+    "The video could not be accessed. Check that the disk is connected and the file can be opened.",
+  "replay.prepare.spaceUnavailable":
+    "Free space could not be checked. Make sure the disk is accessible before trying again.",
+  "replay.prepare.busy":
+    "The recording is still in use or another recording is being prepared. Wait and try again.",
+  "replay.prepare.sourceChanged":
+    "The file changed during preparation. Check whether it is still being recorded or modified, then try again later.",
+  "replay.prepare.interrupted":
+    "Preparation was interrupted. The original video was kept; you can try preparing it again.",
+  "replay.diagnostics": "Loading details",
+  "replay.diagnostics.metadata": "Metadata: {ms} ms",
+  "replay.diagnostics.frame": "First presented frame: {ms} ms",
+  "replay.diagnostics.noFrame": "No first-frame confirmation after {ms} ms.",
+  "replay.diagnostics.transport":
+    "File read: {read} MiB of {total} GiB · {ranges} of {requests} requests used ranges",
+  "replay.diagnostics.buffer":
+    "Largest per-request buffer: {size} KiB. This is not the player's total memory usage.",
+  "replay.diagnostics.local":
+    "Local data for this opening, not sent automatically.",
+  "replay.diagnostics.processMemory":
+    "Native process memory in this sample: {size} MiB. Includes other Corneta functions, not the player's processes.",
   "replay.missing": "This recording's file isn't on disk anymore.",
   "replay.mute": "Mute",
   "replay.offset.label": "Sync nudge",

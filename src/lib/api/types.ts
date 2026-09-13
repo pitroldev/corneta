@@ -51,8 +51,22 @@ export interface CornetaApi {
   /** Record a five-second test clip and return its path. */
   recordTest(dir: string): Promise<string>;
   recordRetry(): Promise<void>;
-  /** Grant per-file asset access and return a playable URL. */
+  /** Acquire a per-file playback capability; release it after detaching media elements. */
   recordVideoUrl(path: string): Promise<string>;
+  releaseRecordVideo(url: string): Promise<void>;
+  recordVideoStats(url: string): Promise<RecordVideoStats>;
+  recordingReplayStatus(
+    id: string,
+    path: string,
+  ): Promise<RecordingReplayStatus>;
+  prepareRecordingReplay(
+    id: string,
+    path: string,
+  ): Promise<RecordingReplayStatus>;
+  subscribeRecordingReplay(
+    cb: (event: { id: string }) => void,
+    onReady?: () => void,
+  ): () => void;
   /** Replay offset in milliseconds, clamped to ±30 seconds by the backend. */
   setSessionOffset(id: string, ms: number): Promise<void>;
   /** Delete session videos only, preserving reports and chat. */
@@ -214,6 +228,24 @@ export interface CornetaApi {
   overlayChatTest(): Promise<void>;
   overlayObsAddSource(url: string): Promise<void>;
   openPrivacySettings(which: "camera" | "microphone"): Promise<void>;
+}
+
+export interface RecordingReplayStatus {
+  state: "ready" | "unprepared" | "preparing" | "failed" | "missing";
+  reason?: string;
+  requiredBytes?: number;
+  availableBytes?: number;
+}
+
+/** These counters measure native file transport, not browser or decoder memory. */
+export interface RecordVideoStats {
+  fileBytes: number;
+  bytesRead: number;
+  requests: number;
+  rangeRequests: number;
+  activeRequests: number;
+  peakBufferedBytes: number;
+  nativeProcessMemoryBytes?: number | null;
 }
 
 export interface MesaServerInfo {

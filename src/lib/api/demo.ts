@@ -691,6 +691,20 @@ export function mockApi(): CornetaApi {
     async recordVideoUrl() {
       throw new Error("Recording is unavailable in browser previews");
     },
+    async releaseRecordVideo() {},
+    async recordVideoStats() {
+      throw new Error("Recording is unavailable in browser previews");
+    },
+    async recordingReplayStatus() {
+      return { state: "missing" };
+    },
+    async prepareRecordingReplay() {
+      return { state: "missing" };
+    },
+    subscribeRecordingReplay(_cb, onReady) {
+      onReady?.();
+      return () => {};
+    },
     async setSessionOffset() {},
     async deleteSessionRecordings() {},
     async openRecordingFolder() {},

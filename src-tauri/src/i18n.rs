@@ -479,6 +479,9 @@ messages! {
     SessionDeleteFailed { e: &'a str } = "rust.session.deleteFailed" =>
         pt: "não consegui apagar o relatório dessa live: {e}",
         en: "Couldn't delete that stream's report: {e}";
+    RecordingPreparationBusy = "rust.record.preparationBusy" =>
+        pt: "a gravação ainda está sendo preparada — espere terminar antes de apagar",
+        en: "the recording is still being prepared — wait until it finishes before deleting";
     RecordDirUnusable = "rust.record.dirUnusable" =>
         pt: "não consigo gravar nessa pasta — confira se ela existe e se dá pra escrever nela",
         en: "I can't record to that folder — check that it exists and is writable";

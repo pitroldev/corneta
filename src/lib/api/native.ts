@@ -152,10 +152,46 @@ export function tauriApi(): CornetaApi {
       await invoke("record_retry");
     },
     async recordVideoUrl(path) {
-      const { invoke, convertFileSrc } = await core();
-      // Validate and scope the file in Rust before Tauri constructs its correctly escaped asset URL.
-      await invoke("record_allow_file", { path });
-      return convertFileSrc(path);
+      const { invoke } = await core();
+      return invoke("record_video_url", { path });
+    },
+    async releaseRecordVideo(url) {
+      const { invoke } = await core();
+      await invoke("release_record_video", { url });
+    },
+    async recordVideoStats(url) {
+      const { invoke } = await core();
+      return invoke("record_video_stats", { url });
+    },
+    async recordingReplayStatus(id, path) {
+      const { invoke } = await core();
+      return invoke("recording_replay_status", { id, path });
+    },
+    async prepareRecordingReplay(id, path) {
+      const { invoke } = await core();
+      return invoke("prepare_recording_replay", { id, path });
+    },
+    subscribeRecordingReplay(cb, onReady) {
+      let cancelled = false;
+      let unlisten: (() => void) | undefined;
+      void event()
+        .then(({ listen }) =>
+          listen<{ id: string }>("recorder://replay-preparation", (event) => {
+            if (!cancelled) cb(event.payload);
+          }),
+        )
+        .then((stop) => {
+          if (cancelled) stop();
+          else {
+            unlisten = stop;
+            onReady?.();
+          }
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+        unlisten?.();
+      };
     },
     async setSessionOffset(id, ms) {
       const { invoke } = await core();

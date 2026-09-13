@@ -403,6 +403,7 @@ pub fn delete_recordings(
     for dir in video_dirs(app, video_dir) {
         for f in video_files(&DiskStore, &dir) {
             if f.id == id {
+                crate::replay_media::revoke_path(&f.path);
                 DiskStore.remove(&f.path);
             }
         }
@@ -447,7 +448,24 @@ fn known_ids(store: &dyn SessionStore, dir: &Path) -> Vec<String> {
 }
 
 fn prune_sessions(store: &dyn SessionStore, dir: &Path, keep: usize) {
+    let _mutation = crate::replay_commands::mutation_guard();
+    prune_sessions_with(store, dir, keep, |path| {
+        path.file_stem()
+            .and_then(|name| name.to_str())
+            .is_some_and(crate::recorder::preparing_session)
+    });
+}
+
+fn prune_sessions_with(
+    store: &dyn SessionStore,
+    dir: &Path,
+    keep: usize,
+    protected: impl Fn(&Path) -> bool,
+) {
     for path in domain::plan_session_prune(&store.list(dir), keep) {
+        if protected(&path) {
+            continue;
+        }
         store.remove(&chat_path(&path));
         store.remove(&path);
     }
@@ -475,6 +493,7 @@ fn prune_videos_in(
     keep_gb: u64,
     contributor: bool,
 ) -> u64 {
+    let _mutation = crate::replay_commands::mutation_guard();
     let ids = known_ids(store, sessions);
     let mut all = video_files(store, sessions);
     // Contributor builds may prune only their own session directory, not imported recording folders.
@@ -489,19 +508,39 @@ fn prune_videos_in(
 }
 
 fn apply_video_prune(store: &dyn SessionStore, plan: domain::VideoPrunePlan) -> u64 {
+    apply_video_prune_with(store, plan, |path| {
+        domain::video_id_of(path).is_some_and(|id| crate::recorder::preparing_session(&id))
+    })
+}
+
+fn apply_video_prune_with(
+    store: &dyn SessionStore,
+    plan: domain::VideoPrunePlan,
+    protected: impl Fn(&Path) -> bool,
+) -> u64 {
+    let mut retained_orphans = 0_u64;
     for path in &plan.orphans {
+        if protected(path) {
+            retained_orphans = retained_orphans.saturating_add(store.len(path));
+            continue;
+        }
         log::info!("removing orphaned recording: {}", path.display());
+        crate::replay_media::revoke_path(path);
         store.remove(path);
     }
-    let mut total = plan.total;
+    let mut total = plan.total.saturating_add(retained_orphans);
     for (path, len) in plan.candidates {
         if total <= plan.budget {
             break;
+        }
+        if protected(&path) {
+            continue;
         }
         log::info!(
             "pruning recording to satisfy space budget: {}",
             path.display()
         );
+        crate::replay_media::revoke_path(&path);
         if store.remove(&path) {
             total = total.saturating_sub(len);
         }

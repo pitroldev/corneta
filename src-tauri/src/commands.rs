@@ -2712,6 +2712,10 @@ pub async fn read_session_bytes(
 
 #[tauri::command]
 pub fn delete_session(app: AppHandle, id: String) -> Result<(), String> {
+    let _mutation = crate::replay_commands::mutation_guard();
+    if recorder::preparing_session(&id) {
+        return Err(Msg::RecordingPreparationBusy.now());
+    }
     let dir = recording_dir(&app);
     session::delete_session(&app, &id, dir.as_deref())
 }
@@ -2785,29 +2789,7 @@ pub async fn record_test(app: AppHandle, dir: String) -> Result<String, String> 
     if !check.ok {
         return Err(Msg::RecordDirUnusable.now());
     }
-    let file = recorder::test_record(&app, &path).await?;
-    allow_asset(&app, &file);
-    Ok(file)
-}
-
-/// Grant access to one recording, not its directory; the frontend uses convertFileSrc for its URL.
-#[tauri::command]
-pub fn record_allow_file(app: AppHandle, path: String) -> Result<(), String> {
-    let p = std::path::PathBuf::from(&path);
-    // Accept recognized recording filenames, including the recording-test file.
-    let named = p
-        .file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| session::parse_video_name(n).is_some() || n == "corneta-teste.mp4");
-    if !named || !p.is_file() {
-        return Err(Msg::SessionNotFound.now());
-    }
-    allow_asset(&app, &path);
-    Ok(())
-}
-
-fn allow_asset(app: &AppHandle, path: &str) {
-    app.asset_protocol_scope().allow_file(path).ok();
+    recorder::test_record(&app, &path).await
 }
 
 /// Persist the manual replay offset in milliseconds, bounded to +/-30 seconds.
@@ -2824,6 +2806,10 @@ pub fn set_session_offset(app: AppHandle, id: String, ms: i64) -> Result<(), Str
 /// Delete recordings only; preserve the report and chat.
 #[tauri::command]
 pub fn delete_session_recordings(app: AppHandle, id: String) -> Result<(), String> {
+    let _mutation = crate::replay_commands::mutation_guard();
+    if recorder::preparing_session(&id) {
+        return Err(Msg::RecordingPreparationBusy.now());
+    }
     let dir = recording_dir(&app);
     session::delete_recordings(&app, &id, dir.as_deref())
 }

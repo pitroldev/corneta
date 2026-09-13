@@ -17,7 +17,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-# Asset access starts empty; commands::record_allow_file grants individual recordings.
+# Asset access starts empty; replay media uses separately authorized streaming URLs.
 tauri = { version = "2.11.5", features = ["tray-icon", "image-png", "protocol-asset"] }
 tauri-plugin-shell = "2.3.5"
 tauri-plugin-opener = "2.5.4"
@@ -42,6 +42,7 @@ sha2 = "0.11.0"
 base64 = "0.23.0"
 # Share immutable decoded frames across delay, freeze and encoding without large copies.
 bytes = "1.12.1"
+futures-core = "0.3.33"
 getrandom = "0.4.3"
 regex = "1.13.1"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
@@ -52,7 +53,7 @@ ort = "=2.0.0-rc.12"
 # Other operating systems need an explicitly configured and validated credential provider.
 keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
-tokio = { version = "1.53.1", features = ["net", "sync", "macros", "time"] }
+tokio = { version = "1.53.1", features = ["net", "sync", "macros", "time", "io-util"] }
 tauri-plugin-updater = "2.10.1"
 
 # Security backport: notify-rust 4.18 pins a vulnerable quick-xml through winrt-notification.
@@ -61,7 +62,7 @@ tauri-plugin-updater = "2.10.1"
 notify-rust = { git = "https://github.com/hoodie/notify-rust", rev = "a733009b2c52c6605443b287ae5348a6c4879a3e" }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Performance"] }
+windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Performance", "Win32_System_IO", "Win32_System_Ioctl"] }
 # Keep COM bindings aligned with Wry; mixing versions produces incompatible interfaces.
 webview2-com = "=0.38.2"
 
