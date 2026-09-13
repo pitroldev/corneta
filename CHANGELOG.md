@@ -1,11 +1,14 @@
 # Histórico de mudanças
 
-## Não lançado — linha 0.8.1
+## Não lançado — linha 0.8.2
 
 Este é o estado do código em preparação, não uma release estável nem um instalador aprovado.
 
 ### Para quem usa
 
+- Reprodução de gravações grandes com leitura progressiva e limitada, sem carregar o vídeo inteiro na memória.
+- Preparação opcional de gravações antigas para facilitar a reprodução, sem reencodar e preservando o original em caso de falha.
+- Novas opções de recuperação quando o vídeo demora ou falha ao abrir, com liberação de recursos ao trocar de gravação ou sair do relatório.
 - Audiência simultânea da Cinefy nos contadores e relatórios, com status, título e início informado da live.
 - Contagens de players incorporados identificadas como externas, sem duplicação nos totais; falhas de consulta não viram zero nem criam picos artificiais nos relatórios.
 - Relatórios organizados em torno da live, com replay, chat paginado, momentos, gráficos e detalhes técnicos secundários.
@@ -15,6 +18,7 @@ Este é o estado do código em preparação, não uma release estável nem um in
 
 ### Para quem contribui
 
+- Diagnósticos locais de abertura do replay, benchmark com mídia sintética e testes de leitura, cancelamento e preparação de MP4.
 - Perfil Contributor com identidade/cofre separados, telemetria desativada e updater ausente.
 - Guias de configuração, arquitetura, suporte, segurança, fixtures e performance; templates de contribuição.
 - Verificações de segredos, assets, scripts, documentação e regressões de interface no processo de validação.
