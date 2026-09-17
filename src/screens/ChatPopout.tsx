@@ -211,13 +211,19 @@ export function ChatPopout() {
     "rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink";
   const winApi = async () =>
     (await import("@tauri-apps/api/window")).getCurrentWindow();
-  const minimize = () => void winApi().then((w) => w.minimize());
-  const closeWin = () => void winApi().then((w) => w.close());
-  const toggleMaximize = () =>
-    void winApi().then(async (w) => {
-      await w.toggleMaximize();
-      setMaximized(await w.isMaximized());
-    });
+  // A window permission the capability does not grant rejects here, so without a
+  // catch the button would simply do nothing and leave no trace.
+  const winAction =
+    (run: (w: Awaited<ReturnType<typeof winApi>>) => Promise<void>) => () =>
+      void winApi()
+        .then(run)
+        .catch((error) => toast.error(errMsg(error)));
+  const minimize = winAction((w) => w.minimize());
+  const closeWin = winAction((w) => w.close());
+  const toggleMaximize = winAction(async (w) => {
+    await w.toggleMaximize();
+    setMaximized(await w.isMaximized());
+  });
 
   const pickTab = (next: "chat" | "alerts" | "both") => {
     setTab(next);
