@@ -775,6 +775,17 @@ export function redactTelemetryText(value: string, maxLength = 1_000): string {
 
 export const REMOTE_DESKTOP_ERROR_MESSAGE = "Unexpected desktop UI error";
 
+export function errorFromWindowEvent(event: ErrorEvent): unknown {
+  if (event.error !== null && event.error !== undefined) return event.error;
+  const error = new Error(event.message || "Unknown UI error");
+  if (event.filename)
+    error.stack = [
+      `${error.name}: ${error.message}`,
+      `    at ${event.filename}:${event.lineno ?? 0}:${event.colno ?? 0}`,
+    ].join("\n");
+  return error;
+}
+
 const SAFE_EXCEPTION_NAMES: ReadonlySet<string> = new Set([
   "AbortError",
   "AggregateError",
@@ -975,7 +986,10 @@ function redactStacktrace(value: unknown): UnknownRecord | null {
   };
 }
 
-export function redactExceptionList(value: unknown): UnknownRecord[] | null {
+export function redactExceptionList(
+  value: unknown,
+  handled?: boolean,
+): UnknownRecord[] | null {
   if (!Array.isArray(value)) return null;
   const safe: UnknownRecord[] = [];
   for (const item of value.slice(0, 5)) {
@@ -1000,8 +1014,10 @@ export function redactExceptionList(value: unknown): UnknownRecord[] | null {
     if (raw.mechanism && typeof raw.mechanism === "object") {
       const mechanism = raw.mechanism as UnknownRecord;
       exception.mechanism = {
+        // The SDK marks every captureException call handled; our own flag decides.
         handled:
-          typeof mechanism.handled === "boolean" ? mechanism.handled : false,
+          handled ??
+          (typeof mechanism.handled === "boolean" ? mechanism.handled : false),
         synthetic:
           typeof mechanism.synthetic === "boolean"
             ? mechanism.synthetic
@@ -1132,7 +1148,10 @@ export function sanitizePostHogEvent(
     ]) {
       if (!(key in safe)) return null;
     }
-    const list = redactExceptionList(input.properties.$exception_list);
+    const list = redactExceptionList(
+      input.properties.$exception_list,
+      typeof safe.handled === "boolean" ? safe.handled : undefined,
+    );
     if (!list) return null;
     safe.$exception_list = list;
     const steps = redactExceptionSteps(input.properties.$exception_steps);

@@ -1183,6 +1183,17 @@ fn final_before_send(
             return None;
         }
         let value = event.remove_prop(&key)?;
+        // A commit SHA is shaped like a long opaque token; keep the release identity.
+        if key == "build_sha" {
+            let safe = match value.as_str() {
+                Some(sha) if valid_build_sha(sha) => Value::String(sha.to_owned()),
+                _ => Value::String("<redacted>".into()),
+            };
+            if event.insert_prop(key, safe).is_err() {
+                return None;
+            }
+            continue;
+        }
         if key == "$debug_images" {
             // Allow only the symbolication envelope; omit local paths and future SDK fields.
             if let Some(safe) = sanitize_debug_images(value) {
@@ -1242,6 +1253,11 @@ fn event_purpose(event: &str) -> Option<Purpose> {
         | "update_completed" => Some(Purpose::Usage),
         _ => None,
     }
+}
+
+/// Accept only the shapes we set ourselves, so no other value can bypass redaction.
+fn valid_build_sha(value: &str) -> bool {
+    value == "dev" || (value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
 fn common_property(key: &str) -> bool {
@@ -2358,6 +2374,41 @@ mod tests {
             &epoch,
         )
         .is_none());
+    }
+
+    #[test]
+    fn release_sha_survives_long_token_redaction() {
+        let installation_id = new_id();
+        let usage_gate = AtomicBool::new(true);
+        let crash_gate = AtomicBool::new(false);
+        let epoch = Mutex::new(ConsentEpoch {
+            generation: 4,
+            installation_id: Some(installation_id.clone()),
+        });
+        let sha = "75e54041761ee472930228c0c151fd36fdfe00cf";
+        // A 40-character SHA matches the long-token rule, so it needs its own carve-out.
+        assert_eq!(redact_text(sha), "<redacted-token>");
+
+        let mut event = stamped_event("app_started", &installation_id, Purpose::Usage, 4);
+        event
+            .insert_prop("build_sha", Value::String(sha.into()))
+            .unwrap();
+        let safe = final_before_send(event, &usage_gate, &crash_gate, &epoch)
+            .expect("a valid envelope must not be discarded");
+        assert_eq!(safe.properties()["build_sha"], Value::String(sha.into()));
+
+        let mut odd = stamped_event("app_started", &installation_id, Purpose::Usage, 4);
+        odd.insert_prop(
+            "build_sha",
+            Value::String("phx_abcdefghijklmnopqrstuvwxyz0123456789".into()),
+        )
+        .unwrap();
+        let safe = final_before_send(odd, &usage_gate, &crash_gate, &epoch)
+            .expect("a valid envelope must not be discarded");
+        assert_eq!(
+            safe.properties()["build_sha"],
+            Value::String("<redacted>".into())
+        );
     }
 
     #[test]

@@ -3,6 +3,7 @@ import type { PostHogConfig } from "posthog-js/dist/module.no-external";
 import { createTelemetryTransport } from "./telemetry-transport";
 import {
   EMPTY_TELEMETRY_STATUS,
+  errorFromWindowEvent,
   REMOTE_DESKTOP_ERROR_MESSAGE,
   TELEMETRY_NOTICE_VERSION,
   TELEMETRY_SCHEMA_VERSION,
@@ -900,7 +901,7 @@ export function installGlobalErrorHandlers(): void {
     ? ("chat_popout" as const)
     : undefined;
   window.addEventListener("error", (event) => {
-    captureException(event.error ?? new Error(event.message), {
+    captureException(errorFromWindowEvent(event), {
       handled: false,
       severity: "fatal",
       error_code: "unhandled_error",

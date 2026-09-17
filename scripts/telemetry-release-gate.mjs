@@ -5,6 +5,9 @@ const HOST = "https://us.i.posthog.com";
 const METADATA_URL = "https://www.corneta.live/api/v1/health";
 const TOKEN = /^phc_[A-Za-z0-9_-]{8,}$/;
 const SHA = /^[a-f0-9]{40}$/i;
+const PERSONAL_KEY = /^phx_[A-Za-z0-9_-]{20,}$/;
+const NUMERIC = /^\d+$/;
+const TRUTHY = /^(?:1|true|yes|on)$/i;
 const MAX_METADATA_BYTES = 32_768;
 const object = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -74,6 +77,25 @@ export function releaseTelemetryConfig(env, noticeVersion) {
     ])
       if (env[name]?.replace(/\/+$/, "") !== HOST)
         errors.push(`${name} must use the approved US PostHog host`);
+    // Without an uploaded symbol set every desktop stack arrives minified.
+    if (
+      !PERSONAL_KEY.test(env.POSTHOG_API_KEY ?? env.POSTHOG_CLI_API_KEY ?? "")
+    )
+      errors.push(
+        "POSTHOG_API_KEY must be a phx_ personal key so release source maps upload",
+      );
+    if (!NUMERIC.test(env.POSTHOG_PROJECT_ID ?? ""))
+      errors.push(
+        "POSTHOG_PROJECT_ID must be the numeric project ID so release source maps upload",
+      );
+    if (TRUTHY.test(env.POSTHOG_CLI_DRY_RUN ?? ""))
+      errors.push(
+        "POSTHOG_CLI_DRY_RUN must be off so release source maps really upload",
+      );
+    if (env.REQUIRE_POSTHOG_SOURCE_MAPS !== "1")
+      errors.push(
+        "REQUIRE_POSTHOG_SOURCE_MAPS must be 1 so the desktop build fails when source maps cannot upload",
+      );
   }
   if (env.TELEMETRY_POLICY_PUBLISHED_VERSION !== noticeVersion)
     errors.push(`the published policy must declare notice ${noticeVersion}`);

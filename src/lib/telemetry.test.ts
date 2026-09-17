@@ -15,6 +15,7 @@ import {
   type TelemetryBackend,
 } from "./telemetry";
 import {
+  errorFromWindowEvent,
   REMOTE_DESKTOP_ERROR_MESSAGE,
   TELEMETRY_NOTICE_VERSION,
   type TelemetryStatus,
@@ -1001,6 +1002,67 @@ describe("telemetry facade", () => {
     } | null;
     expect(safeResult?.properties?.$exception_list?.[0]?.stacktrace?.type).toBe(
       "raw",
+    );
+  });
+
+  it("keeps the failing location when a window error carries no Error object", () => {
+    const event = {
+      error: null,
+      message: "Script error.",
+      filename: "http://tauri.localhost/assets/src-C3LjdMmh.js",
+      lineno: 10,
+      colno: 1093,
+    } as unknown as ErrorEvent;
+
+    const result = errorFromWindowEvent(event);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).stack).toContain(
+      "http://tauri.localhost/assets/src-C3LjdMmh.js:10:1093",
+    );
+  });
+
+  it("returns the original error when the window event provides one", () => {
+    const original = new TypeError("boom");
+    const event = { error: original, message: "boom" } as unknown as ErrorEvent;
+    expect(errorFromWindowEvent(event)).toBe(original);
+  });
+
+  it("reports unhandled crashes as unhandled in the exception mechanism", async () => {
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("disabled", "enabled")));
+    captureException(new Error("boom"), {
+      handled: false,
+      severity: "fatal",
+      error_code: "unhandled_error",
+      stage: "window_error",
+      screen_id: "chat_popout",
+    });
+    await flushTelemetry();
+
+    const beforeSend = harness.instance.init.mock.calls[0]?.[1].before_send as
+      ((value: unknown) => unknown) | undefined;
+    // The SDK marks every captureException call handled; before_send must correct it.
+    const result = beforeSend?.({
+      event: "$exception",
+      properties: {
+        ...harness.exceptions[0]?.properties,
+        $exception_list: [
+          {
+            type: "Error",
+            value: "boom",
+            mechanism: { handled: true, synthetic: false, type: "generic" },
+          },
+        ],
+      },
+    }) as {
+      properties?: {
+        $exception_list?: Array<{ mechanism?: { handled?: boolean } }>;
+      };
+    } | null;
+
+    expect(result?.properties?.$exception_list?.[0]?.mechanism?.handled).toBe(
+      false,
     );
   });
 });
