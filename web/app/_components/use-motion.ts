@@ -1,5 +1,6 @@
 "use client";
 
+import { cancelFrame, frame } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 // Start motion-free until the client's reduced-motion preference is known.
@@ -41,6 +42,24 @@ export function useOnScreen(
     };
   }, [ref, amount]);
   return on;
+}
+
+// useAnimationFrame keeps a frame callback, and so the frame loop, alive for the whole visit.
+// Register one only while the animation can actually be seen.
+export function useFrameLoop(
+  active: boolean,
+  onFrame: (delta: number) => void,
+) {
+  const saved = useRef(onFrame);
+  useEffect(() => {
+    saved.current = onFrame;
+  });
+  useEffect(() => {
+    if (!active) return;
+    const tick = ({ delta }: { delta: number }) => saved.current(delta);
+    frame.update(tick, true);
+    return () => cancelFrame(tick);
+  }, [active]);
 }
 
 // Use discrete ticks for content; per-frame visuals belong in MotionValues.
