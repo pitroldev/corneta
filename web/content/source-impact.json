@@ -34,20 +34,20 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "0c5380641c1222af61e47465abf9af3af313de0b",
-      "reason": "Um destino recém-adicionado pode ser salvo antes de ter URL, e URL malformada continua recusada; modos, cópia e transcodificação citados não mudaram."
+      "sourceBlob": "d2d496dfebe5577dc8fb674f0f8c9f27e2a270a2",
+      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; modos, cópia e transcodificação citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "ff675a6fb5ea18fe82db89211ee86a0e01deec4e",
-      "reason": "Só acrescenta os padrões de privacidade e de conteúdo para crianças do YouTube automático; padrões de bitrate, encoder e qualidade citados não mudaram."
+      "sourceBlob": "cba0f28d618579cb834ec2e76e587421bcd9c620",
+      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; padrões de bitrate, encoder e qualidade citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "17b72253f685608c88fa164e9ec7c6f71b762648",
-      "reason": "MediaMTX e os encoders de cada destino entram num job object e saem junto com o app; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "05a7aa71468e4b1f32b33b4e6e3c75793fa5a81d",
+      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -88,8 +88,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "0c5380641c1222af61e47465abf9af3af313de0b",
-      "reason": "Um destino recém-adicionado pode ser salvo antes de ter URL, e URL malformada continua recusada; o auto-bitrate e os limites citados não mudaram."
+      "sourceBlob": "d2d496dfebe5577dc8fb674f0f8c9f27e2a270a2",
+      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o auto-bitrate e os limites citados não mudaram."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -100,14 +100,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "17b72253f685608c88fa164e9ec7c6f71b762648",
-      "reason": "MediaMTX e os encoders de cada destino entram num job object e saem junto com o app; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "05a7aa71468e4b1f32b33b4e6e3c75793fa5a81d",
+      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "17b72253f685608c88fa164e9ec7c6f71b762648",
-      "reason": "MediaMTX e os encoders de cada destino entram num job object e saem junto com o app; o que o diagnóstico exporta e omite não mudou."
+      "sourceBlob": "05a7aa71468e4b1f32b33b4e6e3c75793fa5a81d",
+      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o que o diagnóstico exporta e omite não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "2cfc8fcdd8fe5beceb56b277e70c67494fba7e03",
-      "reason": "Só acrescenta os textos da exportação de momentos nos relatórios; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "a7175eb91d164506d298745ab1d3f539fa108dda",
+      "reason": "Só acrescenta os textos dos atalhos globais; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -130,8 +130,8 @@
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "20d908a9d34c65c30562a291b67add149549ace2",
-      "reason": "Host, app, chave local e senha do OBS gravam ao sair do campo e a importação mantém a confirmação; o fluxo do JÁ VOLTO e suas opções não mudaram."
+      "sourceBlob": "0cd619629f79b4b7f53e9f5b7c73b20ea678ca35",
+      "reason": "Só acrescenta, no cartão de atalhos, um atalho opcional para o JÁ VOLTO; os passos em Segurança ao vivo, o selo ARMADO e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
