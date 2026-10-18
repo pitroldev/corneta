@@ -78,6 +78,7 @@ export function ReplayPlayer({
   seek,
   onPlayhead,
   onMarkerAdded,
+  onOffsetChange,
   onRecordingsDeleted,
 }: {
   data: SessionData;
@@ -89,6 +90,7 @@ export function ReplayPlayer({
   seek: SeekRequest | null;
   onPlayhead: (epoch: number | null) => void;
   onMarkerAdded: (marker: SessionMarker) => void;
+  onOffsetChange: (offsetMs: number) => void;
   onRecordingsDeleted: () => void;
 }) {
   const { t, fmt } = useI18n();
@@ -342,6 +344,8 @@ export function ReplayPlayer({
     setOffset(clamped);
     if (clamped === savedOffset.current) return;
     savedOffset.current = clamped;
+    // Report exports follow the offset this player uses, even if persisting it fails.
+    onOffsetChange(clamped);
     try {
       await api.setSessionOffset(sessionId, clamped);
     } catch {

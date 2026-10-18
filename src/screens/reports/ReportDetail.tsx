@@ -140,10 +140,13 @@ export function ReportDetail({
         seek={timeline.seek}
         onPlayhead={timeline.setPlayhead}
         onMarkerAdded={detail.addMarker}
+        onOffsetChange={detail.setOffset}
         onRecordingsDeleted={detail.clearRecordings}
       />
       <ReportTimelineSection
+        data={detail.data}
         analysis={detail.analysis}
+        replayIndex={detail.replayIndex}
         story={story}
         timeline={timeline}
         splitMode={viewerSplit}

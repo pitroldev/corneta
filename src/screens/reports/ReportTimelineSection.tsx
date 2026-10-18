@@ -2,6 +2,9 @@ import { ChevronDown, Eye, Scissors, TrendingUp } from "lucide-react";
 import { LineChart } from "../../components/LineChart";
 import { useI18n } from "../../lib/i18n";
 import type { ReportAnalysis } from "../../lib/report";
+import type { ReplayIndex } from "../../lib/replay";
+import type { SessionData } from "../../lib/types";
+import { ReportMomentsExport } from "./ReportMomentsExport";
 import {
   HighlightRow,
   SplitToggle,
@@ -11,13 +14,17 @@ import {
 import type { ReportStoryModel, ReportTimelineModel } from "./useReportModels";
 
 export function ReportTimelineSection({
+  data,
   analysis,
+  replayIndex,
   story,
   timeline,
   splitMode,
   onSplitModeChange,
 }: {
+  data: SessionData;
   analysis: ReportAnalysis;
+  replayIndex: ReplayIndex | null;
   story: ReportStoryModel;
   timeline: ReportTimelineModel;
   splitMode: SplitMode;
@@ -26,8 +33,9 @@ export function ReportTimelineSection({
   const { t, tp, fmt } = useI18n();
   const seekTo = story.replayState === "ready" ? timeline.seekTo : undefined;
   const hasViewerChart = analysis.viewers.hasData && story.viewerCount > 1;
-  if (!analysis.viewers.hasData && analysis.highlights.length === 0)
-    return null;
+  const hasHighlights = analysis.highlights.length > 0;
+  const hasMoments = hasHighlights || data.markers.length > 0;
+  if (!analysis.viewers.hasData && !hasMoments) return null;
 
   return (
     <section className="mt-12" aria-labelledby="report-story-heading">
@@ -92,56 +100,72 @@ export function ReportTimelineSection({
           </div>
         ) : null}
 
-        {analysis.highlights.length > 0 ? (
+        {hasMoments ? (
           <div className="border-t border-border-soft bg-surface-2/45 p-5 sm:p-6">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-base">
-                <Scissors className="size-4 text-brass" aria-hidden />
-                {t("reports.highlights.title")}
-              </h3>
-              {hasViewerChart ? (
-                <p className="text-[11px] text-ink-faint">
-                  {t("reports.highlights.chartHint")}
-                </p>
-              ) : null}
-            </div>
-            <div className="grid border-t border-border-soft 2xl:grid-cols-2">
-              {analysis.highlights.slice(0, 4).map((highlight, index) => (
-                <HighlightRow
-                  key={index}
-                  highlight={highlight}
-                  time={timeline.relative(highlight.t)}
-                  onSeek={seekTo ? () => seekTo(highlight.t) : undefined}
-                />
-              ))}
-            </div>
-            {analysis.highlights.length > 4 ? (
-              <details className="group mt-3">
-                <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-xs font-bold text-brass hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass [&::-webkit-details-marker]:hidden">
-                  <ChevronDown
-                    className="size-4 transition-transform group-open:rotate-180"
-                    aria-hidden
-                  />
-                  {tp(
-                    "reports.highlights.more",
-                    analysis.highlights.length - 4,
-                  )}
-                </summary>
-                <div className="mt-2 grid border-t border-border-soft 2xl:grid-cols-2">
-                  {analysis.highlights.slice(4).map((highlight, index) => (
+            {hasHighlights ? (
+              <>
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                  <h3 className="flex items-center gap-2 text-base">
+                    <Scissors className="size-4 text-brass" aria-hidden />
+                    {t("reports.highlights.title")}
+                  </h3>
+                  {hasViewerChart ? (
+                    <p className="text-[11px] text-ink-faint">
+                      {t("reports.highlights.chartHint")}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid border-t border-border-soft 2xl:grid-cols-2">
+                  {analysis.highlights.slice(0, 4).map((highlight, index) => (
                     <HighlightRow
-                      key={index + 4}
+                      key={index}
                       highlight={highlight}
                       time={timeline.relative(highlight.t)}
                       onSeek={seekTo ? () => seekTo(highlight.t) : undefined}
                     />
                   ))}
                 </div>
-              </details>
+                {analysis.highlights.length > 4 ? (
+                  <details className="group mt-3">
+                    <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-xs font-bold text-brass hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass [&::-webkit-details-marker]:hidden">
+                      <ChevronDown
+                        className="size-4 transition-transform group-open:rotate-180"
+                        aria-hidden
+                      />
+                      {tp(
+                        "reports.highlights.more",
+                        analysis.highlights.length - 4,
+                      )}
+                    </summary>
+                    <div className="mt-2 grid border-t border-border-soft 2xl:grid-cols-2">
+                      {analysis.highlights.slice(4).map((highlight, index) => (
+                        <HighlightRow
+                          key={index + 4}
+                          highlight={highlight}
+                          time={timeline.relative(highlight.t)}
+                          onSeek={
+                            seekTo ? () => seekTo(highlight.t) : undefined
+                          }
+                        />
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+                <p className="mt-4 text-[11px] text-ink-faint">
+                  {t("reports.highlights.note")}
+                </p>
+              </>
             ) : null}
-            <p className="mt-4 text-[11px] text-ink-faint">
-              {t("reports.highlights.note")}
-            </p>
+            <ReportMomentsExport
+              data={data}
+              highlights={analysis.highlights}
+              replayIndex={replayIndex}
+              className={
+                hasHighlights
+                  ? "mt-5 border-t border-border-soft pt-5"
+                  : undefined
+              }
+            />
           </div>
         ) : null}
       </div>

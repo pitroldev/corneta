@@ -65,6 +65,14 @@ export function useReportDetailData(id: string, previousId: string | null) {
     );
   }, []);
 
+  const setOffset = useCallback((offsetMs: number) => {
+    setLoaded((current) =>
+      !current || current === "loading" || current.data.offsetMs === offsetMs
+        ? current
+        : { ...current, data: { ...current.data, offsetMs } },
+    );
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const client = new ReportClient();
@@ -155,5 +163,6 @@ export function useReportDetailData(id: string, previousId: string | null) {
     reload,
     addMarker,
     clearRecordings,
+    setOffset,
   };
 }
