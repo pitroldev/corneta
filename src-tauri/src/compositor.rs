@@ -855,7 +855,6 @@ fn generation(
             if brb_now != brb_active {
                 brb_active = brb_now;
                 slate_on.store(brb_active || *censoring, Ordering::Relaxed);
-                let _ = app.emit("brb://active", brb_active);
                 log::info!(
                     "compositor: BRB {}",
                     if brb_active {

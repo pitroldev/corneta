@@ -444,6 +444,7 @@ fn forget_youtube_session() -> Result<(), String> {
         .lock()
         .map_err(|_| Msg::VaultDeleteFailed.now())?;
     finish_local_logout(
+        // "youtube_oauth" held access tokens written by older versions; logout still purges it.
         || keys::clear_keys(&["youtube_refresh", "youtube_oauth", "youtube_oauth_mode"]),
         || {
             *YT_TOKEN.lock().unwrap() = None;
@@ -943,14 +944,24 @@ pub fn youtube_login_start(app: AppHandle) {
                     if access.is_empty() {
                         continue;
                     }
+                    // The refresh token is the persisted session; access tokens stay in memory.
+                    let Some(refresh) = v
+                        .get("refresh_token")
+                        .and_then(|x| x.as_str())
+                        .filter(|r| !r.is_empty())
+                    else {
+                        return auth_event(
+                            &app,
+                            "youtube",
+                            "error",
+                            "",
+                            "",
+                            &Msg::AuthGoogleNoRefreshableSession.now(),
+                        );
+                    };
                     // Announce success only after the vault has persisted the session.
-                    if let Err(e) = keys::set_key("youtube_oauth", access) {
+                    if let Err(e) = keys::set_key("youtube_refresh", refresh) {
                         return auth_event(&app, "youtube", "error", "", "", &e);
-                    }
-                    if let Some(r) = v.get("refresh_token").and_then(|x| x.as_str()) {
-                        if let Err(e) = keys::set_key("youtube_refresh", r) {
-                            return auth_event(&app, "youtube", "error", "", "", &e);
-                        }
                     }
                     let _ = keys::set_key("youtube_oauth_mode", "byok");
                     return auth_event(&app, "youtube", "connected", "", "", "");
@@ -1078,11 +1089,7 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
             &Msg::AuthGoogleNoRefreshableSession.now(),
         );
     }
-    if let Err(error) = keys::set_key("youtube_oauth", access) {
-        return auth_event(app, "youtube", "error", "", "", &error);
-    }
     if let Err(error) = keys::set_key("youtube_refresh", refresh) {
-        let _ = keys::clear_key("youtube_oauth");
         return auth_event(app, "youtube", "error", "", "", &error);
     }
     let _ = keys::set_key("youtube_oauth_mode", "official");
@@ -1140,7 +1147,6 @@ pub fn youtube_token(app: &AppHandle) -> Option<String> {
         }
     }
     *YT_TOKEN.lock().unwrap() = Some((access.clone(), now + exp * 1000));
-    let _ = keys::set_key("youtube_oauth", &access);
     Some(access)
 }
 
