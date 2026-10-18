@@ -51,6 +51,24 @@ it("enables uploads only in builds with an explicit CLI path", async () => {
   expect((await configFor("build")).build?.sourcemap).toBe("hidden");
 });
 
+it.each([
+  ["a missing Personal API Key", { POSTHOG_API_KEY: "" }],
+  ["a project token as the API key", { POSTHOG_API_KEY: "phc_project_token" }],
+  ["a non-numeric project ID", { POSTHOG_PROJECT_ID: "not-numeric" }],
+])("refuses a release build with %s", async (_, changes) => {
+  vi.stubEnv("REQUIRE_POSTHOG_SOURCE_MAPS", "1");
+  for (const [name, value] of Object.entries(changes)) vi.stubEnv(name, value);
+  await expect(configFor("build")).rejects.toThrow(
+    "valid Personal API Key and project ID",
+  );
+});
+
+it("refuses a release build that would only simulate the upload", async () => {
+  vi.stubEnv("REQUIRE_POSTHOG_SOURCE_MAPS", "1");
+  vi.stubEnv("POSTHOG_CLI_DRY_RUN", "1");
+  await expect(configFor("build")).rejects.toThrow("POSTHOG_CLI_DRY_RUN");
+});
+
 it("does not require the upload CLI for telemetry-disabled builds", async () => {
   vi.stubEnv("VITE_TELEMETRY_DISABLED", "1");
   vi.stubEnv("TELEMETRY_DISABLED", "1");

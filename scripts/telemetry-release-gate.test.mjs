@@ -11,7 +11,6 @@ const noticeVersion = "2026-09-09";
 const token = "phc_synthetic_release_test";
 const host = "https://us.i.posthog.com";
 const sha = "a".repeat(40);
-const personalKey = `phx_${"b".repeat(32)}`;
 const env = {
   VITE_BUILD_SHA: sha,
   CORNETA_BUILD_SHA: sha,
@@ -28,9 +27,6 @@ const env = {
   VITE_POSTHOG_HOST: host,
   POSTHOG_HOST: host,
   NEXT_PUBLIC_POSTHOG_HOST: host,
-  POSTHOG_API_KEY: personalKey,
-  POSTHOG_PROJECT_ID: "539471",
-  REQUIRE_POSTHOG_SOURCE_MAPS: "1",
 };
 const surface = {
   disabled: false,
@@ -254,35 +250,19 @@ describe("release telemetry deployment gate", () => {
     },
   );
 
-  it("blocks a telemetry release that cannot upload source maps", () => {
-    const cases = [
-      ["POSTHOG_API_KEY", { POSTHOG_API_KEY: "" }],
-      ["POSTHOG_API_KEY", { POSTHOG_API_KEY: "phc_not_a_personal_key" }],
-      ["POSTHOG_PROJECT_ID", { POSTHOG_PROJECT_ID: "not-numeric" }],
-      ["POSTHOG_CLI_DRY_RUN", { POSTHOG_CLI_DRY_RUN: "1" }],
-      ["REQUIRE_POSTHOG_SOURCE_MAPS", { REQUIRE_POSTHOG_SOURCE_MAPS: "0" }],
-    ];
-    for (const [name, changes] of cases) {
+  // The release workflow gives the Personal API Key only to the Vite build step.
+  it.each(["0", "1"])(
+    "passes without source-map credentials when the kill switch is %s",
+    (disabled) => {
       const result = releaseTelemetryConfig(
-        { ...env, ...changes },
+        {
+          ...env,
+          VITE_TELEMETRY_DISABLED: disabled,
+          TELEMETRY_DISABLED: disabled,
+        },
         noticeVersion,
       );
-      expect(result.errors.join(" ")).toContain(name);
-    }
-  });
-
-  it("does not require source map credentials when telemetry ships disabled", () => {
-    const result = releaseTelemetryConfig(
-      {
-        ...env,
-        VITE_TELEMETRY_DISABLED: "1",
-        TELEMETRY_DISABLED: "1",
-        POSTHOG_API_KEY: "",
-        POSTHOG_PROJECT_ID: "",
-        REQUIRE_POSTHOG_SOURCE_MAPS: "",
-      },
-      noticeVersion,
-    );
-    expect(result.errors).toEqual([]);
-  });
+      expect(result.errors).toEqual([]);
+    },
+  );
 });
