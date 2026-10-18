@@ -34,8 +34,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "9412a4610e872ca5a645be8295047e37b6d52319",
-      "reason": "Mudanças internas em commands.rs (config do início da live, regra de linha do FFmpeg movida para engine_policy); encoders, detecção e modos citados não mudaram."
+      "sourceBlob": "7207ccd2d09136ed5ba7094e4b6b69c239de4be5",
+      "reason": "Só o obs_autoconfigure passa a rejeitar com código e mensagem, para o assistente do OBS escolher a ajuda; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -82,14 +82,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "9412a4610e872ca5a645be8295047e37b6d52319",
-      "reason": "O teste de upload não mudou; as alterações em commands.rs são internas (config do início da live e regra de linha do FFmpeg movida para engine_policy)."
+      "sourceBlob": "7207ccd2d09136ed5ba7094e4b6b69c239de4be5",
+      "reason": "Só o obs_autoconfigure passa a rejeitar com código e mensagem, para o assistente do OBS escolher a ajuda; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "9412a4610e872ca5a645be8295047e37b6d52319",
-      "reason": "A exportação do diagnóstico não mudou; as alterações em commands.rs são internas (config do início da live e regra de linha do FFmpeg movida para engine_policy)."
+      "sourceBlob": "7207ccd2d09136ed5ba7094e4b6b69c239de4be5",
+      "reason": "Só o obs_autoconfigure passa a rejeitar com código e mensagem, para o assistente do OBS escolher a ajuda; o que o diagnóstico exporta e omite, inclusive a senha do WebSocket, não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
