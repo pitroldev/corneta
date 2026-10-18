@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ConfigEnv } from "vite";
+import {
+  buildCliEnv,
+  buildSourcemapCliArgs,
+  resolveConfig,
+  type PluginConfig,
+} from "@posthog/plugin-utils";
 
 beforeEach(() => {
   vi.resetModules();
@@ -43,6 +49,34 @@ it("serves with source-map credentials without requiring or loading the upload C
 
 it("requires an explicitly prepared CLI for authenticated builds", async () => {
   await expect(configFor("build")).rejects.toThrow("POSTHOG_CLI_BINARY_PATH");
+});
+
+it("keeps the CLI arguments the pinned posthog-cli accepts", async () => {
+  vi.stubEnv("POSTHOG_CLI_BINARY_PATH", "synthetic-cli-never-executed");
+  vi.stubEnv("VITE_BUILD_SHA", "b".repeat(40));
+  const options: PluginConfig[] = [];
+  vi.doMock("./posthog-source-maps", () => ({
+    posthogSourceMaps: (config: PluginConfig) => {
+      options.push(config);
+      return { name: "corneta-posthog-source-maps" };
+    },
+  }));
+  await configFor("build");
+  const config = resolveConfig(options[0]!);
+
+  expect(buildSourcemapCliArgs(config, { stdin: true })).toEqual([
+    "sourcemap",
+    "process",
+    "--stdin",
+    "--release-name",
+    "corneta-desktop",
+    "--release-version",
+    config.sourcemaps.releaseVersion,
+    "--build",
+    "b".repeat(40),
+    "--delete-after",
+  ]);
+  expect(buildCliEnv(config).POSTHOG_RELEASE_MODE).toBe("symbol-set");
 });
 
 it("enables uploads only in builds with an explicit CLI path", async () => {

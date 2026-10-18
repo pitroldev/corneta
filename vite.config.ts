@@ -53,6 +53,8 @@ export default defineConfig(({ command }) => ({
               releaseVersion: pkg.version,
               build: process.env.VITE_BUILD_SHA,
               deleteAfterUpload: true,
+              // plugin-utils 2 defaults to event mode, which passes --release-mode; posthog-cli 0.9.4 rejects it.
+              releaseMode: "symbol-set",
             },
           }),
         ]
