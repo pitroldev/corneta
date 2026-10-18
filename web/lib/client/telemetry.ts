@@ -40,6 +40,8 @@ type BrowserTelemetryOptions = {
   environment?: string;
   buildSha?: string;
   loadSdk: () => Promise<BrowserPostHog>;
+  /** Page views wait for this before downloading the SDK; user actions such as CTAs never wait. */
+  whenIdle?: () => Promise<void>;
   storage?: () => StorageLike | undefined;
   doNotTrack?: () => boolean;
   randomUuid?: () => string;
@@ -187,6 +189,7 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
       ...(safeContentId ? { content_id: safeContentId } : {}),
     });
     if (!safe) return;
+    if (options.whenIdle) await options.whenIdle();
     const client = await ensureSdk();
     if (!client || isOptedOut() || lastPage === pageKey) return;
     lastPage = pageKey;
@@ -308,6 +311,21 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
   };
 }
 
+let idle: Promise<void> | undefined;
+
+// Keep the analytics SDK off the critical path: wait for the load event, then an idle period.
+function afterLoadAndIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    const whenIdle = () => {
+      if (typeof window.requestIdleCallback === "function")
+        window.requestIdleCallback(() => resolve(), { timeout: 3_000 });
+      else window.setTimeout(resolve, 1_000);
+    };
+    if (document.readyState === "complete") whenIdle();
+    else window.addEventListener("load", whenIdle, { once: true });
+  });
+}
+
 const browserTelemetry = createBrowserTelemetry({
   token: process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
   host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
@@ -320,6 +338,7 @@ const browserTelemetry = createBrowserTelemetry({
     const posthogModule = await import("posthog-js/dist/module.no-external");
     return posthogModule.default as unknown as BrowserPostHog;
   },
+  whenIdle: () => (idle ??= afterLoadAndIdle()),
   storage: () => window.localStorage,
   doNotTrack: () => {
     const privacyNavigator = navigator as Navigator & {
@@ -332,10 +351,6 @@ const browserTelemetry = createBrowserTelemetry({
   },
   randomUuid: () => crypto.randomUUID(),
 });
-
-export function initializeSiteTelemetry() {
-  return browserTelemetry.initialize();
-}
 
 export function captureSitePageView(pathOrUrl: string, contentId?: string) {
   return browserTelemetry.capturePageView(pathOrUrl, contentId);

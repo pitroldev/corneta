@@ -380,3 +380,52 @@ describe("browser telemetry facade", () => {
     vi.stubGlobal("window", originalWindow);
   });
 });
+
+describe("site telemetry loading", () => {
+  it("waits for an idle page before loading the SDK for a page view", async () => {
+    const sdk = fakeSdk();
+    let release!: () => void;
+    const idle = new Promise<void>((resolve) => (release = resolve));
+    const loadSdk = vi.fn(async () => sdk);
+    const telemetry = createBrowserTelemetry({
+      token: "phc_project123",
+      host: "https://us.i.posthog.com",
+      environment: "test",
+      loadSdk,
+      whenIdle: () => idle,
+      storage: () => fakeStorage(),
+      randomUuid: () => UUID,
+    });
+
+    const pageView = telemetry.capturePageView("/en");
+    await Promise.resolve();
+    expect(loadSdk).not.toHaveBeenCalled();
+    release();
+    await pageView;
+    expect(loadSdk).toHaveBeenCalledOnce();
+    expect(sdk.capture).toHaveBeenCalledWith(
+      "site_page_viewed",
+      expect.objectContaining({ route_id: "home" }),
+    );
+  });
+
+  it("loads the SDK at once for a CTA click, which may leave the page", async () => {
+    const sdk = fakeSdk();
+    const telemetry = createBrowserTelemetry({
+      token: "phc_project123",
+      host: "https://us.i.posthog.com",
+      environment: "test",
+      loadSdk: async () => sdk,
+      whenIdle: () => new Promise<void>(() => {}),
+      storage: () => fakeStorage(),
+      randomUuid: () => UUID,
+    });
+
+    await telemetry.captureCta("hero_download", "/en");
+    expect(sdk.capture).toHaveBeenCalledWith(
+      "site_cta_clicked",
+      expect.objectContaining({ cta_id: "hero_download" }),
+      { transport: "sendBeacon", send_instantly: true },
+    );
+  });
+});
