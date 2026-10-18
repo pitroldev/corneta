@@ -34,8 +34,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "1bb58ba0f459eafe2c64e855e38a40793e6e19ed",
-      "reason": "Só acrescenta dois campos do YouTube automático (privacidade e conteúdo para crianças); modos, cópia e transcodificação citados não mudaram."
+      "sourceBlob": "0c5380641c1222af61e47465abf9af3af313de0b",
+      "reason": "Um destino recém-adicionado pode ser salvo antes de ter URL, e URL malformada continua recusada; modos, cópia e transcodificação citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -46,8 +46,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "0a2d9a05b13e38248a1a2bca3125fc7164fd2209",
-      "reason": "Só repassa a privacidade e o conteúdo para crianças à criação automática da live no YouTube; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "b0ba0f1b44d47c5cb2000769407121644e9ae5cc",
+      "reason": "O motor deixa de iniciar destino sem URL, o que a tela já bloqueava; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -88,8 +88,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "1bb58ba0f459eafe2c64e855e38a40793e6e19ed",
-      "reason": "Só acrescenta dois campos do YouTube automático (privacidade e conteúdo para crianças); o auto-bitrate e os limites citados não mudaram."
+      "sourceBlob": "0c5380641c1222af61e47465abf9af3af313de0b",
+      "reason": "Um destino recém-adicionado pode ser salvo antes de ter URL, e URL malformada continua recusada; o auto-bitrate e os limites citados não mudaram."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -100,14 +100,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "0a2d9a05b13e38248a1a2bca3125fc7164fd2209",
-      "reason": "Só repassa a privacidade e o conteúdo para crianças à criação automática da live no YouTube; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "b0ba0f1b44d47c5cb2000769407121644e9ae5cc",
+      "reason": "O motor deixa de iniciar destino sem URL, o que a tela já bloqueava; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "0a2d9a05b13e38248a1a2bca3125fc7164fd2209",
-      "reason": "Só repassa a privacidade e o conteúdo para crianças à criação automática da live no YouTube; o que o diagnóstico exporta e omite não mudou."
+      "sourceBlob": "b0ba0f1b44d47c5cb2000769407121644e9ae5cc",
+      "reason": "O motor deixa de iniciar destino sem URL, o que a tela já bloqueava; o que o diagnóstico exporta e omite não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
