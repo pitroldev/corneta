@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
-  motion,
+  m,
   useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
@@ -139,13 +139,16 @@ function yAt(pts: [number, number][], min: number) {
 }
 
 // Place chat reactions after the event within each playback window.
-const EVENTS = MOMENTS.flatMap((m) =>
-  m.who.map((w, k) => ({
-    moment: m.id,
+const EVENTS = MOMENTS.flatMap((moment) =>
+  moment.who.map((w, k) => ({
+    moment: moment.id,
     k,
     name: w.name,
     platform: w.platform,
-    at: m.from + (m.to - m.from) * (0.32 + (0.62 * (k + 0.5)) / m.who.length),
+    at:
+      moment.from +
+      (moment.to - moment.from) *
+        (0.32 + (0.62 * (k + 0.5)) / moment.who.length),
   })),
 );
 
@@ -221,7 +224,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
 
   useFrameLoop(playing && !hover && !reduce && onScreen, (delta) => {
     const t = tour.current;
-    const m = MOMENTS[t.i];
+    const moment = MOMENTS[t.i];
     // Clamp the first frame after backgrounding so it cannot skip an entire playback window.
     t.el += Math.min(delta, 64);
 
@@ -229,10 +232,10 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
       if (t.el >= SEEK_MS) {
         t.kind = "play";
         t.el = 0;
-        pos.set(m.from);
+        pos.set(moment.from);
         return;
       }
-      pos.set(t.from + (m.from - t.from) * easeInOut(t.el / SEEK_MS));
+      pos.set(t.from + (moment.from - t.from) * easeInOut(t.el / SEEK_MS));
       return;
     }
     if (t.el >= PLAY_MS) {
@@ -242,7 +245,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
       t.el = 0;
       return;
     }
-    pos.set(m.from + (m.to - m.from) * (t.el / PLAY_MS));
+    pos.set(moment.from + (moment.to - moment.from) * (t.el / PLAY_MS));
   });
 
   const [at, setAt] = useState(START);
@@ -283,16 +286,16 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     if (playing) return setPlaying(false);
     const p = pos.get();
     const i = nearest(p);
-    const m = MOMENTS[i];
+    const moment = MOMENTS[i];
     const t = tour.current;
     t.i = i;
     t.from = p;
-    if (p < m.from || p > m.to) {
+    if (p < moment.from || p > moment.to) {
       t.kind = "seek";
       t.el = 0;
     } else {
       t.kind = "play";
-      t.el = ((p - m.from) / (m.to - m.from)) * PLAY_MS;
+      t.el = ((p - moment.from) / (moment.to - moment.from)) * PLAY_MS;
     }
     setPlaying(true);
   };
@@ -360,9 +363,9 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
           <span className="text-[0.62rem] font-extrabold tracking-[0.12em] text-faint-raised uppercase">
             {copy.axis}
           </span>
-          <motion.span className="ml-auto font-display text-[0.8rem] font-extrabold text-cream tabular-nums">
+          <m.span className="ml-auto font-display text-[0.8rem] font-extrabold text-cream tabular-nums">
             {clock}
-          </motion.span>
+          </m.span>
         </div>
 
         <p className="sr-only">{copy.chartAria}</p>
@@ -396,7 +399,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             }}
           />
           {/* Scale a fixed-width element to avoid layout work on every frame. */}
-          <motion.span
+          <m.span
             className="pointer-events-none absolute inset-y-0 left-0 w-full origin-left bg-cream/5"
             style={{ scaleX: played }}
           />
@@ -418,38 +421,38 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             reduce={reduce}
           />
 
-          {MOMENTS.map((m) => (
+          {MOMENTS.map((moment) => (
             <span
-              key={m.id}
+              key={moment.id}
               className={cn(
                 "pointer-events-none absolute inset-y-0 w-0.5 transition-opacity duration-200",
-                m.tone === "warn"
+                moment.tone === "warn"
                   ? "bg-warn"
-                  : m.tone === "ok"
+                  : moment.tone === "ok"
                     ? "bg-ok"
                     : "bg-brass",
-                m.id === active.id ? "opacity-0" : "opacity-45",
+                moment.id === active.id ? "opacity-0" : "opacity-45",
               )}
-              style={{ left: `${pctAt(m.min)}%` }}
+              style={{ left: `${pctAt(moment.min)}%` }}
             />
           ))}
 
-          <motion.span
+          <m.span
             className="pointer-events-none absolute inset-y-0 w-0.5 bg-cream"
             style={{ left: cursor }}
           >
             <i className="absolute -top-0.5 -left-[3px] size-2 rounded-full bg-cream" />
-          </motion.span>
+          </m.span>
         </div>
 
         <div className="relative mt-2 h-8 max-[620px]:flex max-[620px]:h-auto max-[620px]:flex-wrap max-[620px]:gap-1.5">
-          {MOMENTS.map((m, i) => (
+          {MOMENTS.map((moment, i) => (
             <button
-              key={m.id}
+              key={moment.id}
               type="button"
               onClick={() => chapter(i)}
-              aria-pressed={m.id === active.id}
-              style={{ left: `${pctAt(m.min)}%` }}
+              aria-pressed={moment.id === active.id}
+              style={{ left: `${pctAt(moment.min)}%` }}
               className={cn(
                 "absolute top-0 max-[620px]:static max-[620px]:translate-x-0",
                 i === 0
@@ -460,13 +463,16 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
                 "cursor-pointer rounded-sm px-2 py-1 text-[0.64rem] leading-[1.25] font-extrabold tracking-[0.02em] whitespace-nowrap uppercase",
                 "[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2.5",
                 "outline-offset-2 transition-colors duration-150 focus-visible:outline-[3px] focus-visible:outline-brass",
-                m.id === active.id
+                moment.id === active.id
                   ? "bg-brass text-brass-ink shadow-pop-brass"
                   : "text-faint-raised hover:text-cream",
               )}
             >
-              {copy.moments[m.id].tab}
-              <span className="sr-only"> — {copy.moments[m.id].title}</span>
+              {copy.moments[moment.id].tab}
+              <span className="sr-only">
+                {" "}
+                — {copy.moments[moment.id].title}
+              </span>
             </button>
           ))}
         </div>
@@ -474,7 +480,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
 
       <p className="mt-3 flex items-start gap-2.5 rounded-lg bg-surface-2 px-3.5 py-3 text-[0.84rem] leading-[1.5] font-[550] text-muted [&>svg]:mt-px [&>svg]:h-[17px] [&>svg]:w-[17px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-brass">
         <InfoIcon />
-        <motion.span
+        <m.span
           key={active.id}
           initial={reduce ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -484,7 +490,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
             {copy.moments[active.id].finding}
           </b>{" "}
           {copy.moments[active.id].reading}
-        </motion.span>
+        </m.span>
       </p>
 
       <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
@@ -548,7 +554,7 @@ function Lane({
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <motion.i
+      <m.i
         aria-hidden="true"
         className={cn(
           "pointer-events-none absolute z-2 -mt-[5px] -ml-[5px] block size-2.5 rounded-full border-2 border-surface",
@@ -581,7 +587,7 @@ function Frame({
   return (
     <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-border-dry bg-surface bg-[image:var(--halftone-dark)] bg-[length:16px_16px]">
       {/* Remount only when the transmitted frame state changes, not when its moment changes. */}
-      <motion.div
+      <m.div
         key={state}
         initial={reduce ? false : { opacity: 0, scale: 1.015 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -599,28 +605,28 @@ function Frame({
           </div>
         ) : state === "reconnect" ? (
           <>
-            <motion.span
+            <m.span
               className="grid place-items-center text-warn [&>svg]:h-11 [&>svg]:w-11 [&>svg]:[stroke-width:2.4]"
               animate={reduce ? undefined : { rotate: 360 }}
               transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
             >
               <LoaderIcon />
-            </motion.span>
+            </m.span>
             <strong className="mt-3 font-display text-[clamp(1.1rem,2.4vw,1.5rem)] leading-none font-extrabold text-warn">
               {copy.frameReconnect}
             </strong>
           </>
         ) : (
           <>
-            <motion.strong className="font-display text-[clamp(1.4rem,3vw,2.1rem)] leading-none font-extrabold text-cream tabular-nums">
+            <m.strong className="font-display text-[clamp(1.4rem,3vw,2.1rem)] leading-none font-extrabold text-cream tabular-nums">
               {clock}
-            </motion.strong>
+            </m.strong>
             <span className="mt-2 text-[0.72rem] font-[550] text-faint-raised">
               {copy.frameNote}
             </span>
           </>
         )}
-      </motion.div>
+      </m.div>
 
       <span className="absolute top-2 right-2.5 text-[0.54rem] font-extrabold tracking-[0.1em] text-faint-raised uppercase">
         {copy.preview}
@@ -669,7 +675,7 @@ function ChatColumn({
       </span>
       <div className="flex flex-1 flex-col justify-end gap-[7px] overflow-hidden">
         {lines.map((line) => (
-          <motion.p
+          <m.p
             key={`${line.moment}-${line.k}`}
             initial={reduce ? false : { opacity: 0, y: 9 }}
             animate={{ opacity: 1, y: 0 }}
@@ -687,7 +693,7 @@ function ChatColumn({
                 {copy.moments[line.moment].lines[line.k]}
               </span>
             </span>
-          </motion.p>
+          </m.p>
         ))}
       </div>
     </div>

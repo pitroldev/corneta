@@ -17,6 +17,7 @@ import {
   SiteHeader,
   SkipLink,
 } from "@/app/_sections/hero";
+import { MotionProvider } from "@/app/_components/motion-provider";
 import { AfterLive } from "@/app/_sections/afterlive";
 import { Benefits } from "@/app/_sections/benefits";
 import { Journey, Quality } from "@/app/_sections/quality";
@@ -88,26 +89,28 @@ export default async function Home({
       <SiteHeader t={t} locale={locale} />
 
       <main id="conteudo" tabIndex={-1}>
-        <Hero t={t} locale={locale} />
-        <MechanismStrip t={t} />
+        <MotionProvider>
+          <Hero t={t} locale={locale} />
+          <MechanismStrip t={t} />
 
-        <Benefits t={t} />
+          <Benefits t={t} />
 
-        <Quality t={t} />
-        <Journey t={t} locale={locale} />
+          <Quality t={t} />
+          <Journey t={t} locale={locale} />
 
-        <ChatSection t={t} />
-        <Protection t={t} />
-        <AfterLive t={t} />
+          <ChatSection t={t} />
+          <Protection t={t} />
+          <AfterLive t={t} />
 
-        <Steps t={t} />
-        <Local t={t} />
-        <Platforms t={t} locale={locale} destinations={destinations} />
-        <TinyThings t={t} items={tinyThings} />
-        <KnowledgeEntryPoints t={t} locale={locale} />
-        <Faq t={t} />
-        <Ticker t={t} />
-        <FinalCta t={t} />
+          <Steps t={t} />
+          <Local t={t} />
+          <Platforms t={t} locale={locale} destinations={destinations} />
+          <TinyThings t={t} items={tinyThings} />
+          <KnowledgeEntryPoints t={t} locale={locale} />
+          <Faq t={t} />
+          <Ticker t={t} />
+          <FinalCta t={t} />
+        </MotionProvider>
       </main>
 
       <SiteFooter t={t} locale={locale} />

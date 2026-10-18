@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 export interface SwitchItem {
   id: string;
@@ -85,7 +85,7 @@ export function Switch({
       </div>
 
       {/* Keep content mounted during transitions to prevent the container from collapsing. */}
-      <motion.div
+      <m.div
         key={current.id}
         role="tabpanel"
         id={`${group}-panel-${current.id}`}
@@ -95,7 +95,7 @@ export function Switch({
         transition={{ duration: 0.14, ease: "easeOut" }}
       >
         {current.panel}
-      </motion.div>
+      </m.div>
     </div>
   );
 }

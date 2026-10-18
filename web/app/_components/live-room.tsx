@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  motion,
+  m,
   useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
@@ -93,7 +93,7 @@ function Meter({
     <span className="flex items-center gap-[7px] text-[0.66rem] font-extrabold tracking-[0.04em] whitespace-nowrap text-muted uppercase">
       {label}
       <i className="block h-[7px] w-14 overflow-hidden bg-surface-3">
-        <motion.b
+        <m.b
           className={cn(
             "block h-full w-full origin-left",
             ok ? "bg-ok" : "bg-brass",
@@ -179,7 +179,7 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
               </small>
             </div>
             {/* Remount the status badge to replay its transition when the state changes. */}
-            <motion.span
+            <m.span
               key={state}
               initial={calm ? false : { scale: 0.72, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -195,7 +195,7 @@ export function LiveRoom({ copy }: { copy: LiveRoomCopy }) {
                 />{" "}
                 {down ? copy.back : isOff ? copy.pausedState : copy.onAir}
               </State>
-            </motion.span>
+            </m.span>
           </button>
         );
       })}
@@ -375,7 +375,7 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         </svg>
 
         {/* Draw the veil before markers so they remain legible in the unread region. */}
-        <motion.span
+        <m.span
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 origin-right bg-surface/65"
           style={{ scaleX: veil }}
@@ -385,14 +385,14 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         <Marker at={RAID} tone="brass" pos={pos} reduce={reduce} />
         <Marker at={DROP} tone="warn" pos={pos} reduce={reduce} />
 
-        <motion.span
+        <m.span
           className="pointer-events-none absolute inset-y-0 w-px bg-cream/70"
           style={{ left }}
           aria-hidden="true"
         >
           <i className="absolute -top-1 -left-[3.5px] size-[7px] rounded-full bg-cream" />
-        </motion.span>
-        <motion.span
+        </m.span>
+        <m.span
           className="pointer-events-none absolute z-2 -mt-[6px] -ml-[6px] size-3 rounded-full border-2 border-surface bg-cream"
           style={{ left, top: dotTop }}
           aria-hidden="true"
@@ -401,9 +401,9 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
 
       <div className="flex items-center justify-between gap-2 text-[0.6rem] font-bold tabular-nums text-faint-raised">
         <span>{clockAt(0)}</span>
-        <motion.strong className="rounded-sm bg-surface-2 px-2 py-1 text-[0.66rem] font-extrabold text-cream">
+        <m.strong className="rounded-sm bg-surface-2 px-2 py-1 text-[0.66rem] font-extrabold text-cream">
           {readout}
-        </motion.strong>
+        </m.strong>
         <span>{clockAt(1)}</span>
       </div>
 
@@ -411,14 +411,14 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
         <Chip tone="ok">{copy.peak}</Chip>
         <Chip quiet>{copy.average}</Chip>
         <Chip quiet>{copy.messages}</Chip>
-        <motion.span
+        <m.span
           animate={{ scale: mark.raid ? 1.07 : 1 }}
           transition={{ duration: reduce ? 0 : 0.2 }}
           className="origin-left"
         >
           <Chip className={cn(!mark.raid && "opacity-55")}>{copy.raid}</Chip>
-        </motion.span>
-        <motion.span
+        </m.span>
+        <m.span
           animate={{ scale: mark.drop ? 1.07 : 1 }}
           transition={{ duration: reduce ? 0 : 0.2 }}
           className="origin-left"
@@ -426,7 +426,7 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
           <Chip tone="warn" className={cn(!mark.drop && "opacity-55")}>
             {copy.drop}
           </Chip>
-        </motion.span>
+        </m.span>
       </div>
 
       <p className="mt-2.5 text-[0.62rem] font-bold tracking-[0.04em] text-faint-raised">
@@ -453,7 +453,7 @@ function Marker({
   );
   const scale = useSpring(target, { stiffness: 320, damping: 26 });
   return (
-    <motion.span
+    <m.span
       aria-hidden="true"
       className={cn(
         "pointer-events-none absolute z-2 -mt-[5px] -ml-[5px] size-2.5 rounded-full border-2 border-surface",

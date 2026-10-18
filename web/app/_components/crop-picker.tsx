@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { CropIcon } from "./icons";
 
 const SPOTS = [
@@ -21,14 +21,14 @@ export function VerticalCrop({ caption }: { caption: string }) {
           seu sinal do OBS · 1920×1080
         </span>
 
-        <motion.div
+        <m.div
           className="absolute top-[6%] bottom-[6%] grid aspect-9/16 content-end justify-items-center border-[3px] border-brass bg-brass/15 pb-[7px] [&>span]:rounded-sm [&>span]:bg-brass [&>span]:px-1.5 [&>span]:py-0.5 [&>span]:text-[0.56rem] [&>span]:font-extrabold [&>span]:tracking-[0.06em] [&>span]:text-brass-ink"
           animate={active.at}
           initial={false}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
           <span>720×1280</span>
-        </motion.div>
+        </m.div>
 
         {SPOTS.map((s, i) => (
           <button
