@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { lowestCommonDenominator } from "../../lib/estimates";
 import { useI18n, type MessageKey } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
+import { useDraft } from "../../lib/useDraft";
 import { toast } from "../../lib/toast";
 import type { RecordDirCheck } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
@@ -17,6 +18,9 @@ export function RecordingSettings() {
   const config = useStore((s) => s.config!);
   const settings = config.settings;
   const setSettings = useStore((s) => s.setSettings);
+  const keepDraft = useDraft(settings.recordVideoKeepGb, (recordVideoKeepGb) =>
+    setSettings({ recordVideoKeepGb }),
+  );
   const [check, setCheck] = useState<RecordDirCheck | null>(null);
   // Keep rejected folders separate: check describes the active recording directory.
   const [rejected, setRejected] = useState<{
@@ -102,7 +106,7 @@ export function RecordingSettings() {
   };
 
   const freeGb = check?.freeBytes != null ? check.freeBytes / 1024 ** 3 : null;
-  const keepGb = settings.recordVideoKeepGb;
+  const keepGb = keepDraft.value;
   // Warn before the recording limit exceeds free space; retention cleanup runs afterward.
   const keepOverFree = freeGb != null && keepGb > freeGb;
 
@@ -242,9 +246,10 @@ export function RecordingSettings() {
                   max={500}
                   step={5}
                   value={keepGb}
-                  onChange={(e) =>
-                    setSettings({ recordVideoKeepGb: Number(e.target.value) })
-                  }
+                  onChange={(e) => keepDraft.change(Number(e.target.value))}
+                  onPointerUp={keepDraft.flush}
+                  onKeyUp={keepDraft.flush}
+                  onBlur={keepDraft.flush}
                   className="h-1 min-w-40 flex-1 accent-brass"
                   aria-label={t("settings.record.keep.label")}
                 />

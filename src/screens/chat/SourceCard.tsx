@@ -15,6 +15,7 @@ import { useT } from "../../lib/i18n";
 import type { ChatPlatform, ChatSource } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
 import { sanitizeApiKey } from "../../lib/validation";
+import { draftInputProps, useDraft } from "../../lib/useDraft";
 import {
   CHAT_PLATFORM_LABEL,
   HINT,
@@ -35,6 +36,12 @@ export function SourceCard({
   const t = useT();
   const [open, setOpen] = useState(() => !src.value.trim());
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const valueDraft = useDraft(
+    src.value,
+    (value) => onChange({ value }),
+    (value) => normalizeChatChannel(src.platform, value),
+  );
+  const nameDraft = useDraft(src.name, (name) => onChange({ name }));
   const inputCls =
     "h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass";
   const platLabel = CHAT_PLATFORM_LABEL[src.platform];
@@ -43,7 +50,7 @@ export function SourceCard({
       className={cn(
         "rounded-md border-2 transition-opacity",
         src.enabled ? "bg-surface" : "bg-surface-2 opacity-60",
-        src.value.trim() ? "border-border-soft" : "border-bad/50",
+        valueDraft.value.trim() ? "border-border-soft" : "border-bad/50",
       )}
     >
       <Collapsible.Root open={open} onOpenChange={setOpen}>
@@ -56,10 +63,10 @@ export function SourceCard({
             {src.platform === "cinefy" && (
               <ExperimentalBadge className="ml-1 scale-90" />
             )}
-            {src.value.trim() ? (
+            {valueDraft.value.trim() ? (
               <span className="truncate text-xs text-ink-muted">
-                · {src.value}
-                {src.name ? ` (${src.name})` : ""}
+                · {valueDraft.value}
+                {nameDraft.value ? ` (${nameDraft.value})` : ""}
               </span>
             ) : (
               <span className="shrink-0 text-xs font-semibold text-bad">
@@ -71,7 +78,8 @@ export function SourceCard({
             checked={src.enabled}
             onChange={(v) => onChange({ enabled: v })}
             label={t("chat.source.toggle", {
-              name: src.name.trim() || src.value.trim() || platLabel,
+              name:
+                nameDraft.value.trim() || valueDraft.value.trim() || platLabel,
             })}
           />
           <Collapsible.Trigger asChild>
@@ -113,16 +121,8 @@ export function SourceCard({
             <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
               {t(VALUE_LABEL[src.platform])}
               <input
-                value={src.value}
+                {...draftInputProps(valueDraft)}
                 placeholder={t(PLACEHOLDER[src.platform])}
-                onChange={(e) => onChange({ value: e.target.value })}
-                onBlur={(e) => {
-                  const clean = normalizeChatChannel(
-                    src.platform,
-                    e.target.value,
-                  );
-                  if (clean !== e.target.value) onChange({ value: clean });
-                }}
                 className={inputCls}
               />
             </label>
@@ -134,9 +134,8 @@ export function SourceCard({
                 </span>
               </span>
               <input
-                value={src.name}
+                {...draftInputProps(nameDraft)}
                 placeholder={t("chat.source.nickname.placeholder")}
-                onChange={(e) => onChange({ name: e.target.value })}
                 className={inputCls}
               />
             </label>
@@ -179,13 +178,15 @@ export function YoutubeApiKeyField({
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(
     null,
   );
-  useEffect(() => setResult(null), [value]);
+  const draft = useDraft(value, onChange, sanitizeApiKey);
+  useEffect(() => setResult(null), [draft.value]);
   const verify = async () => {
-    if (!value.trim()) return;
+    const key = sanitizeApiKey(draft.value).trim();
+    if (!key) return;
     setTesting(true);
     setResult(null);
     try {
-      setResult({ ok: true, msg: await api.youtubeKeyCheck(value.trim(), t) });
+      setResult({ ok: true, msg: await api.youtubeKeyCheck(key, t) });
     } catch (e) {
       setResult({ ok: false, msg: errMsg(e) });
     } finally {
@@ -209,21 +210,16 @@ export function YoutubeApiKeyField({
       </span>
       <div className="flex items-center gap-2">
         <input
-          value={value}
+          {...draftInputProps(draft)}
           aria-label={t("chat.youtube.apikey.label")}
           placeholder={t("chat.youtube.apikey.placeholder")}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={(e) => {
-            const clean = sanitizeApiKey(e.target.value);
-            if (clean !== e.target.value) onChange(clean);
-          }}
           className="h-9 flex-1 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
         />
         <Button
           variant="subtle"
           size="sm"
           className="h-9 shrink-0"
-          disabled={!value.trim() || testing}
+          disabled={!draft.value.trim() || testing}
           onClick={verify}
         >
           <Wifi className="size-3.5" />{" "}

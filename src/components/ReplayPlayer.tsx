@@ -332,9 +332,15 @@ export function ReplayPlayer({
     if (want.play) void v.play().catch(() => setPlaying(false));
   };
 
+  // The range previews every step; the session file is written once when the drag ends.
+  const savedOffset = useRef(data.offsetMs);
+  const previewOffset = (ms: number) =>
+    setOffset(Math.max(-30_000, Math.min(30_000, ms)));
   const applyOffset = async (ms: number) => {
     const clamped = Math.max(-30_000, Math.min(30_000, ms));
     setOffset(clamped);
+    if (clamped === savedOffset.current) return;
+    savedOffset.current = clamped;
     try {
       await api.setSessionOffset(sessionId, clamped);
     } catch {
@@ -898,7 +904,12 @@ export function ReplayPlayer({
                 max={30000}
                 step={100}
                 value={offset}
-                onChange={(e) => void applyOffset(Number(e.target.value))}
+                onChange={(e) => previewOffset(Number(e.target.value))}
+                onPointerUp={(e) =>
+                  void applyOffset(Number(e.currentTarget.value))
+                }
+                onKeyUp={(e) => void applyOffset(Number(e.currentTarget.value))}
+                onBlur={(e) => void applyOffset(Number(e.currentTarget.value))}
                 className="h-1 flex-1 accent-brass"
                 aria-label={t("replay.offset.label")}
               />

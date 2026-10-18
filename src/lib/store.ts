@@ -71,12 +71,31 @@ async function readConfig(t: T): Promise<AppConfig> {
 
 export const useStore = create<State>((set, get) => {
   // Queue writes immediately and in order; asynchronous beforeunload is not reliable in WebView.
+  // Edits made while a save is in flight collapse into one follow-up save of the latest config.
   let saveChain: Promise<void> = Promise.resolve();
   let saveRevision = 0;
-  let pendingSaves = 0;
+  let queuedConfig: AppConfig | null = null;
+  let saving = false;
   let saveFailed = false;
   let liveOperation: { id: string } | null = null;
   const flushSave = () => saveChain;
+  const saveQueued = async () => {
+    const next = queuedConfig;
+    if (!next) return;
+    queuedConfig = null;
+    saving = true;
+    try {
+      const saved = await api.saveConfig({ ...next, revision: saveRevision });
+      saveFailed = false;
+      saveRevision = saved.revision;
+      if (!queuedConfig) set({ config: saved });
+    } catch (error) {
+      saveFailed = true;
+      console.error("Failed to save configuration", error);
+    } finally {
+      saving = false;
+    }
+  };
   const persist = (config: AppConfig) => {
     const profiles = config.profiles.map((p) =>
       p.id === config.activeProfileId
@@ -85,21 +104,9 @@ export const useStore = create<State>((set, get) => {
     );
     const next = { ...config, profiles };
     set({ config: next });
-    pendingSaves += 1;
-    saveChain = saveChain
-      .catch(() => undefined)
-      .then(async () => {
-        const saved = await api.saveConfig({ ...next, revision: saveRevision });
-        saveFailed = false;
-        saveRevision = saved.revision;
-        pendingSaves -= 1;
-        if (pendingSaves === 0) set({ config: saved });
-      })
-      .catch((error) => {
-        saveFailed = true;
-        pendingSaves = Math.max(0, pendingSaves - 1);
-        console.error("Failed to save configuration", error);
-      });
+    const scheduled = queuedConfig !== null;
+    queuedConfig = next;
+    if (!scheduled) saveChain = saveChain.then(saveQueued);
   };
 
   const obs = createObsCoordinator({
@@ -205,7 +212,7 @@ export const useStore = create<State>((set, get) => {
       // Apply other-window saves without persisting again to avoid write loops.
       return api.subscribeConfigChanged((config) => {
         saveRevision = Math.max(saveRevision, config.revision);
-        if (pendingSaves === 0) {
+        if (!queuedConfig && !saving) {
           saveFailed = false;
           set({ config });
         }

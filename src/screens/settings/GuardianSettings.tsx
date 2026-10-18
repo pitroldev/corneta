@@ -1,16 +1,32 @@
 import { ScanEye } from "lucide-react";
 import { rich, useI18n } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
+import { useDraft } from "../../lib/useDraft";
+
+function uniqueTerms(text: string): string {
+  return Array.from(
+    new Set(
+      text
+        .split("\n")
+        .map((term) => term.trim())
+        .filter(Boolean),
+    ),
+  ).join("\n");
+}
 
 export function GuardianEditor() {
   const { t, tp } = useI18n();
   const settings = useStore((s) => s.config!.settings);
   const setSettings = useStore((s) => s.setSettings);
-  const watchCount = settings.guardianWatchlist.filter(
-    (term) => term.trim().length >= 3,
-  ).length;
+  const watchlist = useDraft(
+    settings.guardianWatchlist.join("\n"),
+    (text) => setSettings({ guardianWatchlist: text ? text.split("\n") : [] }),
+    uniqueTerms,
+  );
+  const terms = watchlist.value.split("\n");
+  const watchCount = terms.filter((term) => term.trim().length >= 3).length;
   // The engine ignores terms shorter than three characters.
-  const shortTerms = settings.guardianWatchlist
+  const shortTerms = terms
     .map((term) => term.trim())
     .filter((term) => term.length > 0 && term.length < 3);
 
@@ -58,21 +74,9 @@ export function GuardianEditor() {
           </span>
         </span>
         <textarea
-          value={settings.guardianWatchlist.join("\n")}
-          onChange={(e) =>
-            setSettings({ guardianWatchlist: e.target.value.split("\n") })
-          }
-          onBlur={() =>
-            setSettings({
-              guardianWatchlist: Array.from(
-                new Set(
-                  settings.guardianWatchlist
-                    .map((term) => term.trim())
-                    .filter(Boolean),
-                ),
-              ),
-            })
-          }
+          value={watchlist.value}
+          onChange={(e) => watchlist.change(e.target.value)}
+          onBlur={watchlist.flush}
           rows={4}
           placeholder={t("settings.guardian.list.placeholder")}
           className="resize-y rounded-md border-2 border-border bg-surface px-2 py-1.5 text-sm font-medium text-ink outline-none focus:border-brass"
