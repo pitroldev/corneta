@@ -206,6 +206,20 @@ function updateApprovedFile(test, path, text, { checksums = true } = {}) {
   }
 }
 
+// Mirrors GitHub: a draft lists its assets under its untagged-<hash> page and moves them to the
+// tag path only in the publication response.
+function serveFromDraftPath(test, path = "untagged-e53fb99a8a72337cacf4") {
+  const published = structuredClone(test.state.release);
+  test.state.release.html_url = `https://github.com/${repository}/releases/tag/${path}`;
+  for (const asset of test.state.release.assets)
+    asset.browser_download_url = `https://github.com/${repository}/releases/download/${path}/${encodeURIComponent(asset.name)}`;
+  test.state.patchResponse = {
+    ...published,
+    draft: false,
+    html_url: `https://github.com/${repository}/releases/tag/${tag}`,
+  };
+}
+
 describe("release promotion", () => {
   it("rechecks deployment after final asset validation and immediately before publication", async () => {
     const test = fixture();
@@ -465,6 +479,28 @@ describe("release promotion", () => {
       assets[0].browser_download_url = "https://example.invalid/installer.exe";
     await expect(test.run()).rejects.toThrow(/asset/);
     expect(test.writes()).toEqual([]);
+  });
+
+  it("accepts the private path GitHub gives draft assets", async () => {
+    const test = fixture();
+    serveFromDraftPath(test);
+    expect((await test.run()).status).toBe("published");
+  });
+
+  it("refuses a draft asset served from another draft's path", async () => {
+    const test = fixture();
+    serveFromDraftPath(test);
+    const [asset] = test.state.release.assets;
+    asset.browser_download_url = `https://github.com/${repository}/releases/download/untagged-0000/${encodeURIComponent(asset.name)}`;
+    await expect(test.run()).rejects.toThrow(/asset/);
+    expect(test.writes()).toEqual([]);
+  });
+
+  it("requires the tag path that latest.json uses once the release is published", async () => {
+    const test = fixture();
+    serveFromDraftPath(test);
+    test.state.patchResponse = { ...test.state.release, draft: false };
+    await expect(test.run()).rejects.toThrow(/asset/);
   });
 
   it("rechecks draft assets immediately before publication", async () => {

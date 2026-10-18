@@ -297,6 +297,7 @@ function validateRelease(release, id, tag, artifacts, repository) {
   );
   const expected = new Map(artifacts.map((item) => [item.name, item]));
   const seenIds = new Set();
+  const draftPath = draftDownloadPath(release, repository);
   for (const asset of release.assets) {
     const local = expected.get(asset?.name);
     requireCondition(
@@ -307,7 +308,10 @@ function validateRelease(release, id, tag, artifacts, repository) {
         asset.state === "uploaded" &&
         asset.size === local.size &&
         asset.digest === local.digest &&
-        asset.browser_download_url === assetUrl(repository, tag, local.name),
+        (asset.browser_download_url === assetUrl(repository, tag, local.name) ||
+          (draftPath !== null &&
+            asset.browser_download_url ===
+              assetUrl(repository, draftPath, local.name))),
       "A remote release asset is missing, incomplete, or different from the verified local file.",
     );
     seenIds.add(asset.id);
@@ -319,8 +323,25 @@ function validateRelease(release, id, tag, artifacts, repository) {
   );
 }
 
+function repositoryUrl(repository) {
+  return `https://github.com/${repository.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 function assetUrl(repository, tag, name) {
-  return `https://github.com/${repository.split("/").map(encodeURIComponent).join("/")}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`;
+  return `${repositoryUrl(repository)}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`;
+}
+
+// GitHub serves a draft's assets from its private untagged-<hash> path, never from the tag path.
+function draftDownloadPath(release, repository) {
+  const prefix = `${repositoryUrl(repository)}/releases/tag/`;
+  if (
+    release.draft !== true ||
+    typeof release.html_url !== "string" ||
+    !release.html_url.startsWith(prefix)
+  )
+    return null;
+  const path = release.html_url.slice(prefix.length);
+  return /^untagged-[0-9a-f]+$/.test(path) ? path : null;
 }
 
 function validateManifest(root, options, artifacts, version) {
