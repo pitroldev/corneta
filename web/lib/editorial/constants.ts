@@ -6,7 +6,6 @@ export const EDITORIAL_KINDS = [
   "comparison",
   "troubleshooting",
 ] as const;
-export const EDITORIAL_STATUSES = ["draft", "published"] as const;
 export const EDITORIAL_INTENTS = [
   "informational",
   "support",

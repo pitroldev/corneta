@@ -117,17 +117,6 @@ function comparePublishedDocuments(
   );
 }
 
-async function resolvePublishedDocument(
-  documentOrContentId: PublishedEditorialDocument | string,
-): Promise<PublishedEditorialDocument | null> {
-  if (typeof documentOrContentId !== "string") {
-    return documentOrContentId.frontmatter.status === "published"
-      ? documentOrContentId
-      : null;
-  }
-  return getPublishedEditorialByContentId(documentOrContentId);
-}
-
 export async function listPublishedEditorial(
   options: EditorialListOptions = {},
 ): Promise<PublishedEditorialDocument[]> {
@@ -159,23 +148,11 @@ export async function getPublishedEditorial(
   );
 }
 
-export async function getPublishedEditorialByContentId(
-  contentId: string,
+async function getPublishedTranslation(
+  document: PublishedEditorialDocument,
 ): Promise<PublishedEditorialDocument | null> {
-  const documents = await listPublishedEditorial();
-  return (
-    documents.find(
-      (document) => document.frontmatter.contentId === contentId,
-    ) ?? null
-  );
-}
-
-export async function getPublishedTranslation(
-  documentOrContentId: PublishedEditorialDocument | string,
-): Promise<PublishedEditorialDocument | null> {
-  const document = await resolvePublishedDocument(documentOrContentId);
-  const translationKey = document?.frontmatter.translationKey;
-  if (!document || !translationKey) return null;
+  const translationKey = document.frontmatter.translationKey;
+  if (!translationKey) return null;
 
   const documents = await listPublishedEditorial({
     collection: document.frontmatter.collection,
@@ -191,10 +168,8 @@ export async function getPublishedTranslation(
 }
 
 export async function getPublishedEditorialAlternates(
-  documentOrContentId: PublishedEditorialDocument | string,
+  document: PublishedEditorialDocument,
 ): Promise<EditorialAlternates> {
-  const document = await resolvePublishedDocument(documentOrContentId);
-  if (!document) return {};
   const translation = await getPublishedTranslation(document);
   if (!translation) return {};
 
@@ -205,10 +180,9 @@ export async function getPublishedEditorialAlternates(
 }
 
 export async function getPublishedRelated(
-  documentOrContentId: PublishedEditorialDocument | string,
+  document: PublishedEditorialDocument,
 ): Promise<PublishedEditorialDocument[]> {
-  const document = await resolvePublishedDocument(documentOrContentId);
-  if (!document || document.frontmatter.related.length === 0) return [];
+  if (document.frontmatter.related.length === 0) return [];
 
   const byId = new Map(
     (await listPublishedEditorial()).map((candidate) => [
@@ -222,22 +196,6 @@ export async function getPublishedRelated(
       (candidate): candidate is PublishedEditorialDocument =>
         candidate !== undefined,
     );
-}
-
-export async function listPublishedEditorialParams(): Promise<
-  EditorialRouteKey[]
-> {
-  const documents = await listPublishedEditorial();
-  return documents.map(({ frontmatter }) => ({
-    locale: frontmatter.locale,
-    collection: frontmatter.collection,
-    category: frontmatter.category,
-    slug: frontmatter.slug,
-  }));
-}
-
-export async function getEditorialPeople(): Promise<EditorialPerson[]> {
-  return readEditorialPeople();
 }
 
 export async function getEditorialPerson(

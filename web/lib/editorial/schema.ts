@@ -585,7 +585,3 @@ export const editorialPeopleRegistrySchema = z
       .min(1),
   })
   .strict();
-
-export type EditorialFrontmatterInput = z.input<
-  typeof editorialFrontmatterSchema
->;
