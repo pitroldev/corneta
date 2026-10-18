@@ -16,14 +16,14 @@
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/compositor.rs",
-      "sourceBlob": "4b5028414b0993bff65ac0cef1b9d921a43fd9aa",
-      "reason": "O compositor usa a config capturada no início da live e deixa de emitir o evento brb://active, que nada ouvia; o JÁ VOLTO e o fluxo citados não mudaram."
+      "sourceBlob": "4a661ba66e118f84da3fccb54c427f63eaf6151c",
+      "reason": "Os processos do compositor entram num job object e o vigia mata o encoder travado pelo handle, sem taskkill; o JÁ VOLTO, o que a proteção cobre e o teste citados não mudaram."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
-      "sourceBlob": "b8b6e1ff2426f4b85a30d984665a5e4f706d3373",
-      "reason": "O splicer usa a config capturada no início da live em vez de reler o disco; a cobertura do JÁ VOLTO e o teste descritos no artigo não mudaram."
+      "sourceBlob": "c291d26e80c13ce5f4fbd2490521418eec48af47",
+      "reason": "Os processos do splicer entram num job object e o vigia mata a saída travada pelo handle, sem taskkill; o JÁ VOLTO, o que a proteção cobre e o teste citados não mudaram."
     },
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
@@ -46,8 +46,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b0ba0f1b44d47c5cb2000769407121644e9ae5cc",
-      "reason": "O motor deixa de iniciar destino sem URL, o que a tela já bloqueava; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "17b72253f685608c88fa164e9ec7c6f71b762648",
+      "reason": "MediaMTX e os encoders de cada destino entram num job object e saem junto com o app; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -100,14 +100,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b0ba0f1b44d47c5cb2000769407121644e9ae5cc",
-      "reason": "O motor deixa de iniciar destino sem URL, o que a tela já bloqueava; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "17b72253f685608c88fa164e9ec7c6f71b762648",
+      "reason": "MediaMTX e os encoders de cada destino entram num job object e saem junto com o app; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b0ba0f1b44d47c5cb2000769407121644e9ae5cc",
-      "reason": "O motor deixa de iniciar destino sem URL, o que a tela já bloqueava; o que o diagnóstico exporta e omite não mudou."
+      "sourceBlob": "17b72253f685608c88fa164e9ec7c6f71b762648",
+      "reason": "MediaMTX e os encoders de cada destino entram num job object e saem junto com o app; o que o diagnóstico exporta e omite não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -124,8 +124,8 @@
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src-tauri/src/compositor.rs",
-      "sourceBlob": "4b5028414b0993bff65ac0cef1b9d921a43fd9aa",
-      "reason": "Remove o evento brb://active, que nenhuma tela ouvia; JÁ VOLTO no ar vem do estado do destino, e o fluxo e as opções citados não mudaram."
+      "sourceBlob": "4a661ba66e118f84da3fccb54c427f63eaf6151c",
+      "reason": "Os processos do compositor entram num job object e o vigia mata o encoder travado pelo handle; os passos, o selo ARMADO, o teste e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
