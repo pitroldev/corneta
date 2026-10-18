@@ -3,10 +3,14 @@ import type { ChatDelete, ChatMessage } from "./types";
 export type ChatEvent =
   | { kind: "message"; message: ChatMessage }
   | { kind: "delete"; deletion: ChatDelete };
-const keyOf = (message: ChatMessage) =>
-  message.nativeId
-    ? JSON.stringify([message.platform, message.source, message.nativeId])
+// Length prefixes keep the key unambiguous without serializing every kept message per batch.
+const keyOf = ({ platform, source, nativeId }: ChatMessage) =>
+  nativeId
+    ? `${platform.length}:${platform}${source.length}:${source}${nativeId}`
     : null;
+
+// Duplicate keys of each array this module returned, handed to the next batch instead of rebuilt.
+const keysByBatch = new WeakMap<readonly ChatMessage[], Set<string>>();
 
 function deletedBy(message: ChatMessage, deletion: ChatDelete): boolean {
   if (message.platform !== deletion.platform) return false;
@@ -29,9 +33,11 @@ export function applyChatBatch(
 ): ChatMessage[] {
   if (!events.length) return current;
   const next = current.slice(-cap);
-  const ids = new Set(
-    next.map(keyOf).filter((key): key is string => key !== null),
-  );
+  let ids = next.length === current.length ? keysByBatch.get(current) : null;
+  // The set is updated in place, so it stops describing `current` once it is reused.
+  if (ids) keysByBatch.delete(current);
+  else
+    ids = new Set(next.map(keyOf).filter((key): key is string => key !== null));
   let head = 0;
   let changed = false;
   for (const event of events) {
@@ -54,5 +60,7 @@ export function applyChatBatch(
     if (key !== null) ids.add(key);
     changed = true;
   }
-  return changed ? next.slice(head) : current;
+  const result = changed ? next.slice(head) : current;
+  keysByBatch.set(result, ids);
+  return result;
 }
