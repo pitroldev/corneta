@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as prettier from "prettier";
 import {
   checkFormatting,
   grandfathered,
@@ -29,7 +30,7 @@ function workspace() {
   writeFileSync(
     join(root, ".format-baseline.json"),
     JSON.stringify(
-      { schemaVersion: 1, prettierVersion: "3.9.6", files: {} },
+      { schemaVersion: 1, prettierVersion: prettier.version, files: {} },
       null,
       2,
     ) + "\n",
@@ -82,6 +83,27 @@ describe("formatting coverage and exact legacy baseline", () => {
     writeFileSync(path, JSON.stringify(baseline));
     await expect(checkFormatting(root)).rejects.toThrow(
       "Invalid formatting baseline",
+    );
+  });
+  it("lets Prettier upgrade when no legacy exceptions remain", async () => {
+    const root = workspace();
+    const path = join(root, ".format-baseline.json");
+    const baseline = JSON.parse(readFileSync(path, "utf8"));
+    baseline.prettierVersion = "0.0.0";
+    writeFileSync(path, JSON.stringify(baseline, null, 2) + "\n");
+    await expect(checkFormatting(root)).resolves.toMatchObject({
+      failures: [],
+    });
+  });
+  it("requires an explicit migration while legacy exceptions depend on another Prettier version", async () => {
+    const root = workspace();
+    const path = join(root, ".format-baseline.json");
+    const baseline = JSON.parse(readFileSync(path, "utf8"));
+    baseline.prettierVersion = "0.0.0";
+    baseline.files["old.md"] = normalizedHash("#   old\n");
+    writeFileSync(path, JSON.stringify(baseline, null, 2) + "\n");
+    await expect(checkFormatting(root)).rejects.toThrow(
+      "mismatched Prettier version",
     );
   });
   it("formats changed files without rewriting untouched historical prose", async () => {

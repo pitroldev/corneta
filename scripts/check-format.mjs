@@ -28,10 +28,12 @@ export async function checkFormatting(
   );
   if (
     baseline.schemaVersion !== 1 ||
-    baseline.prettierVersion !== prettier.version ||
     !baseline.files ||
     typeof baseline.files !== "object" ||
     Array.isArray(baseline.files) ||
+    // Hashes only describe the output of one Prettier version; an empty list pins nothing.
+    (Object.keys(baseline.files).length > 0 &&
+      baseline.prettierVersion !== prettier.version) ||
     Object.values(baseline.files).some(
       (hash) => typeof hash !== "string" || !/^sha256:[a-f\d]{64}$/.test(hash),
     )
