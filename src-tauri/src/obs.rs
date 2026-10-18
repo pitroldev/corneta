@@ -34,18 +34,46 @@ fn read_json(socket: &mut Socket) -> Result<Value, String> {
     }
 }
 
+/// obs-websocket v5 rejects an Identify by closing the socket; 4009 means a wrong password.
+fn read_identified(socket: &mut Socket) -> Result<Value, ConnErr> {
+    loop {
+        match socket.read().map_err(|e| ConnErr::from(e.to_string()))? {
+            Message::Text(t) => {
+                return serde_json::from_str(&t).map_err(|e| ConnErr::from(e.to_string()))
+            }
+            Message::Close(Some(frame)) if u16::from(frame.code) == 4009 => {
+                return Err(ConnErr {
+                    failure: ConnFailure::AuthenticationFailed,
+                    msg: Msg::ObsPasswordRejected.now(),
+                })
+            }
+            Message::Close(_) => return Err(ConnErr::from(Msg::ObsConnectionClosed.now())),
+            _ => continue,
+        }
+    }
+}
+
 fn send_json(socket: &mut Socket, v: &Value) -> Result<(), String> {
     socket
         .send(Message::Text(v.to_string().into()))
         .map_err(|e| e.to_string())
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ConnFailure {
+/// Stable failure kinds; the UI classifies OBS errors by these, never by translated text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+pub enum ConnFailure {
+    #[serde(rename = "connectionFailed")]
     Connect,
+    #[serde(rename = "exchangeFailed")]
     Exchange,
+    #[serde(rename = "passwordRequired")]
     PasswordRequired,
+    #[serde(rename = "authenticationFailed")]
+    AuthenticationFailed,
+    #[serde(rename = "identificationFailed")]
     Identification,
+    #[serde(rename = "requestRefused")]
+    RequestRefused,
 }
 
 impl ConnFailure {
@@ -54,17 +82,47 @@ impl ConnFailure {
             Self::Connect => "connection_failed",
             Self::Exchange => "exchange_failed",
             Self::PasswordRequired => "password_required",
+            Self::AuthenticationFailed => "authentication_failed",
             Self::Identification => "identification_failed",
+            Self::RequestRefused => "request_refused",
         }
     }
 
     fn is_auth(self) -> bool {
-        matches!(self, Self::PasswordRequired | Self::Identification)
+        matches!(
+            self,
+            Self::PasswordRequired | Self::AuthenticationFailed | Self::Identification
+        )
+    }
+}
+
+/// IPC error for OBS actions: the stable code plus the localized message.
+#[derive(Debug, serde::Serialize)]
+pub struct ObsFailure {
+    pub code: ConnFailure,
+    pub message: String,
+}
+
+impl ObsFailure {
+    pub fn exchange(message: String) -> Self {
+        Self {
+            code: ConnFailure::Exchange,
+            message,
+        }
+    }
+}
+
+impl From<ConnErr> for ObsFailure {
+    fn from(e: ConnErr) -> Self {
+        Self {
+            code: e.failure,
+            message: e.msg,
+        }
     }
 }
 
 // Display is diagnostic-only; IPC conversion preserves the localized message.
-struct ConnErr {
+pub(crate) struct ConnErr {
     failure: ConnFailure,
     msg: String,
 }
@@ -122,7 +180,7 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Con
     }
 
     send_json(&mut socket, &identify)?;
-    let identified = read_json(&mut socket)?;
+    let identified = read_identified(&mut socket)?;
     if identified.get("op").and_then(|v| v.as_i64()) != Some(2) {
         let _ = socket.close(None);
         return Err(ConnErr {
@@ -142,7 +200,7 @@ pub fn autoconfigure(
     password: &str,
     server: &str,
     key: &str,
-) -> Result<(), String> {
+) -> Result<(), ConnErr> {
     let mut socket = connect_identify(host, port, password)?;
 
     let request = json!({
@@ -167,10 +225,13 @@ pub fn autoconfigure(
     if ok {
         Ok(())
     } else {
-        Err(Msg::ObsRefusedConfig {
-            response: &response.to_string(),
-        }
-        .now())
+        Err(ConnErr {
+            failure: ConnFailure::RequestRefused,
+            msg: Msg::ObsRefusedConfig {
+                response: &response.to_string(),
+            }
+            .now(),
+        })
     }
 }
 
@@ -218,6 +279,8 @@ pub struct ObsCheck {
     /// Distinguish authentication failure from an unreachable OBS without parsing translated text.
     #[serde(default)]
     pub auth_failed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<ConnFailure>,
 }
 
 pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> ObsCheck {
@@ -226,6 +289,7 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
         Err(e) => {
             return ObsCheck {
                 auth_failed: e.failure.is_auth(),
+                error_code: Some(e.failure),
                 error: Some(e.msg),
                 ..Default::default()
             };
@@ -265,6 +329,7 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
         fps,
         error: None,
         auth_failed: false,
+        error_code: None,
     }
 }
 
@@ -508,6 +573,12 @@ mod tests {
                     "identification_failed",
                     true,
                 ),
+                (
+                    ConnFailure::AuthenticationFailed,
+                    Msg::ObsPasswordRejected,
+                    "authentication_failed",
+                    true,
+                ),
             ] {
                 let text = message.text(locale);
                 let error = ConnErr {
@@ -525,6 +596,57 @@ mod tests {
             assert!(!error.failure.is_auth());
             assert_eq!(String::from(error), text);
         }
+    }
+
+    #[test]
+    fn failures_reach_the_ui_as_stable_codes_with_their_message() {
+        let failure = ObsFailure::from(ConnErr {
+            failure: ConnFailure::AuthenticationFailed,
+            msg: "senha recusada".into(),
+        });
+        assert_eq!(
+            serde_json::to_value(&failure).unwrap(),
+            json!({ "code": "authenticationFailed", "message": "senha recusada" })
+        );
+        for (failure, code) in [
+            (ConnFailure::Connect, "connectionFailed"),
+            (ConnFailure::Exchange, "exchangeFailed"),
+            (ConnFailure::PasswordRequired, "passwordRequired"),
+            (ConnFailure::Identification, "identificationFailed"),
+            (ConnFailure::RequestRefused, "requestRefused"),
+        ] {
+            assert_eq!(serde_json::to_value(failure).unwrap(), json!(code));
+        }
+    }
+
+    #[test]
+    fn a_rejected_password_is_an_authentication_failure_not_a_missing_obs() {
+        use tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut ws = tungstenite::accept(stream).unwrap();
+            let hello = json!({
+                "op": 0,
+                "d": { "rpcVersion": 1, "authentication": { "challenge": "Y2g=", "salt": "c2FsdA==" } }
+            });
+            ws.send(Message::Text(hello.to_string().into())).unwrap();
+            let _identify = ws.read().unwrap();
+            ws.close(Some(CloseFrame {
+                code: CloseCode::from(4009),
+                reason: "".into(),
+            }))
+            .unwrap();
+            while ws.read().is_ok() {}
+        });
+        let error = match connect_identify("127.0.0.1", port, "wrong-password") {
+            Err(error) => error,
+            Ok(_) => panic!("a rejected password must not connect"),
+        };
+        server.join().unwrap();
+        assert_eq!(error.failure, ConnFailure::AuthenticationFailed);
+        assert!(error.failure.is_auth());
     }
 
     #[test]
