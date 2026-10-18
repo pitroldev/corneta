@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import {
   motion,
-  useAnimationFrame,
   useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
@@ -11,7 +10,7 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import { useOnScreen } from "./use-motion";
+import { useFrameLoop, useOnScreen } from "./use-motion";
 import { PlatformGlyph } from "./decor";
 import { InfoIcon, LoaderIcon, PauseIcon, PlayIcon } from "./icons";
 import { cn } from "./ui";
@@ -220,8 +219,7 @@ export function ReplayScope({ copy }: { copy: ReplayCopy }) {
     from: START,
   });
 
-  useAnimationFrame((_, delta) => {
-    if (!playing || hover || reduce || !onScreen) return;
+  useFrameLoop(playing && !hover && !reduce && onScreen, (delta) => {
     const t = tour.current;
     const m = MOMENTS[t.i];
     // Clamp the first frame after backgrounding so it cannot skip an entire playback window.

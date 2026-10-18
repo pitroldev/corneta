@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   motion,
-  useAnimationFrame,
   useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
@@ -14,7 +13,7 @@ import {
 import { PlatformGlyph } from "./decor";
 import { EyeIcon } from "./icons";
 import { Chip, cn, DemoLabel, State } from "./ui";
-import { useCalm, useHeartbeat, useOnScreen } from "./use-motion";
+import { useCalm, useFrameLoop, useHeartbeat, useOnScreen } from "./use-motion";
 import { fill, group } from "@/lib/i18n";
 
 // Avoid pathLength on stretched SVG viewBoxes with non-scaling strokes; animate position or opacity instead.
@@ -265,8 +264,7 @@ export function ReportChart({ copy }: { copy: ReportChartCopy }) {
   // MotionValues update visuals per frame; React state tracks only discrete indicators and announcements.
   const pos = useMotionValue(0);
 
-  useAnimationFrame((_, delta) => {
-    if (!onScreen || held || reduce) return;
+  useFrameLoop(onScreen && !held && !reduce, (delta) => {
     // Clamp the first frame after backgrounding so the cursor cannot skip across the session.
     const next = pos.get() + Math.min(delta, 64) / SWEEP_MS;
     pos.set(next >= 1 ? 0 : next);
