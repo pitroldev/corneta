@@ -261,11 +261,33 @@ fn reserve(path: &Path) -> Result<Reservation, ReplayPreparation> {
     })
 }
 
+const TEMPORARY_PREFIX: &str = ".corneta-replay-";
+
+/// A crash leaves the hidden playback remux next to the recording, and nothing resumes it.
+pub fn remove_orphan_temporaries(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if name.starts_with(TEMPORARY_PREFIX)
+            && name.ends_with(".mp4")
+            && entry.file_type().is_ok_and(|kind| kind.is_file())
+        {
+            // A remux that is still writing keeps the file open, and Windows refuses the delete.
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 struct TemporaryFile(PathBuf);
 
 impl TemporaryFile {
     fn new(source: &Path) -> Result<Self, ReplayPreparation> {
-        let path = source.with_file_name(format!(".corneta-replay-{}.mp4", uuid::Uuid::new_v4()));
+        let path = source.with_file_name(format!("{TEMPORARY_PREFIX}{}.mp4", uuid::Uuid::new_v4()));
         OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -431,6 +453,31 @@ pub(super) async fn finalize(app: &AppHandle, session_path: &Path, seg: u32, pat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn boot_cleanup_removes_only_orphaned_replay_temporaries() {
+        let dir = std::env::temp_dir().join(format!("corneta-orphans-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        let orphan = dir.join(format!("{TEMPORARY_PREFIX}abc.mp4"));
+        let kept = [
+            dir.join("2026-10-18_live.mp4"),
+            dir.join(format!("{TEMPORARY_PREFIX}abc.txt")),
+            dir.join(".corneta-write-test"),
+        ];
+        for path in std::iter::once(&orphan).chain(&kept) {
+            std::fs::write(path, b"fixture").unwrap();
+        }
+        let folder = dir.join(format!("{TEMPORARY_PREFIX}folder.mp4"));
+        std::fs::create_dir(&folder).unwrap();
+
+        remove_orphan_temporaries(&dir);
+
+        assert!(!orphan.exists());
+        for path in kept.iter().chain([&folder]) {
+            assert!(path.exists(), "{} must stay", path.display());
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     struct FixtureDirectory(PathBuf);
 

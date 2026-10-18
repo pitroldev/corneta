@@ -11,7 +11,8 @@ pub use disk::{check_dir, free_bytes, resolve_dir};
 pub use domain::{DirCheck, DISK_START_FLOOR};
 pub use ffmpeg::{run, test_record};
 pub use replay::{
-    is_preparing, prepare_replay, preparing_session, replay_status, ReplayPreparation,
+    is_preparing, prepare_replay, preparing_session, remove_orphan_temporaries, replay_status,
+    ReplayPreparation,
 };
 
 /// Register under this key so every engine shutdown also stops the recorder.
