@@ -32,7 +32,8 @@ updates:
       - dependency-name: ort
       # Signature tests must use the minisign-verify release that tauri-plugin-updater uses.
       - dependency-name: minisign-verify
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+        update-types:
+          ["version-update:semver-minor", "version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
