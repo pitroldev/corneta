@@ -33,9 +33,13 @@ import { Mascot } from "../components/decor";
 import { Button, Input, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
-import { ChatFeed, type ChatView } from "../components/ChatFeed";
+import { type ChatView } from "../components/ChatFeed";
 import { CinefyAudience } from "../components/CinefyAudience";
-import { AlertsFeed } from "../components/AlertsFeed";
+import {
+  AlertCountLabel,
+  LiveAlertsFeed,
+  LiveChatFeed,
+} from "./chat/LiveFeeds";
 
 // Keep Tailwind classes literal so the compiler discovers both layouts.
 const BOTH_DIR: Record<string, string> = {
@@ -58,8 +62,6 @@ export function ChatPopout() {
   const { t, fmt } = useI18n();
   const config = useStore((s) => s.config);
   const loaded = useStore((s) => s.loaded);
-  const messages = useStore((s) => s.chatMessages);
-  const alerts = useStore((s) => s.alerts);
   const viewers = useStore((s) => s.viewers);
   const connected = useStore((s) => s.chatConnected);
   const connectChat = useStore((s) => s.connectChat);
@@ -359,9 +361,13 @@ export function ChatPopout() {
       <div className="flex shrink-0 items-center justify-between border-b-2 border-border-soft px-2.5 py-1.5">
         <span className="flex items-center gap-1.5 font-display text-xs font-extrabold">
           <Bell className="size-3.5 text-brass" />{" "}
-          {alerts.length > 0
-            ? t("chat.popout.tab.alerts.count", { n: alerts.length })
-            : t("chat.popout.tab.alerts")}
+          <AlertCountLabel>
+            {(n) =>
+              n > 0
+                ? t("chat.popout.tab.alerts.count", { n })
+                : t("chat.popout.tab.alerts")
+            }
+          </AlertCountLabel>
         </span>
         <button
           onClick={() => {
@@ -395,17 +401,16 @@ export function ChatPopout() {
           )}
         </button>
       </div>
-      <AlertsFeed
-        alerts={alerts}
+      <LiveAlertsFeed
         className="min-h-0 flex-1"
         fontSize={alertFontPreview ?? st?.alertFontSize ?? 14}
       />
     </div>
   );
   const chatPanel = (
-    <ChatFeed
+    <LiveChatFeed
       key="chat"
-      messages={messages}
+      platformFilter={null}
       view={view}
       connected={connected}
       className="min-h-0 min-w-0 flex-1"
@@ -505,9 +510,13 @@ export function ChatPopout() {
             {t("chat.popout.tab.chat")}
           </TabBtn>
           <TabBtn active={tab === "alerts"} onClick={() => pickTab("alerts")}>
-            {alerts.length > 0
-              ? t("chat.popout.tab.alerts.count", { n: alerts.length })
-              : t("chat.popout.tab.alerts")}
+            <AlertCountLabel>
+              {(n) =>
+                n > 0
+                  ? t("chat.popout.tab.alerts.count", { n })
+                  : t("chat.popout.tab.alerts")
+              }
+            </AlertCountLabel>
           </TabBtn>
         </div>
         <div className="ml-auto flex items-center gap-1">
@@ -712,8 +721,7 @@ export function ChatPopout() {
       ) : tab === "chat" ? (
         chatPanel
       ) : (
-        <AlertsFeed
-          alerts={alerts}
+        <LiveAlertsFeed
           className="flex-1"
           fontSize={alertFontPreview ?? st?.alertFontSize ?? 14}
         />
