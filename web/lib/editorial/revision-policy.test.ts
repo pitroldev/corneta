@@ -96,6 +96,46 @@ describe("editorial revision policy", () => {
     ]);
   });
 
+  it("lets a second revision on the same day advance with a time", () => {
+    const previous = snapshot({
+      updatedAt: "2026-10-18",
+      reviewedAt: "2026-10-18",
+    });
+    previous.frontmatter.sources = [
+      { ...previous.frontmatter.sources?.[0], reviewedAt: "2026-10-18" },
+    ];
+    const current = snapshot({
+      updatedAt: "2026-10-18T21:30",
+      reviewedAt: "2026-10-18T21:30",
+    });
+    current.frontmatter.sources = [
+      { ...current.frontmatter.sources?.[0], reviewedAt: "2026-10-18T21:30" },
+    ];
+    current.source = "## Passo\n\nFaça isto de outro jeito.";
+
+    expect(validateEditorialRevision(previous, current)).toEqual([]);
+    expect(
+      validateChangedInternalSources(
+        previous,
+        current,
+        new Set(["src/screens/Example.tsx"]),
+      ),
+    ).toEqual([]);
+
+    const later = snapshot({
+      updatedAt: "2026-10-18T22:05",
+      reviewedAt: "2026-10-18T22:05",
+    });
+    later.source = "## Passo\n\nFaça isto de um terceiro jeito.";
+    expect(validateEditorialRevision(current, later)).toEqual([]);
+    expect(validateEditorialRevision(later, current)).toEqual([
+      expect.objectContaining({
+        code: "substantive-change-without-updated-at",
+      }),
+      expect.objectContaining({ code: "review-date-regression" }),
+    ]);
+  });
+
   it("accepts technical review against a new version without requiring updatedAt", () => {
     const previous = snapshot();
     const current = snapshot({

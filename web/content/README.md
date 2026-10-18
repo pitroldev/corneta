@@ -81,7 +81,7 @@ As datas e versões do exemplo são ilustrativas: substitua-as pela revisão e p
 testes realmente feitos. Ao publicar, acrescente as identidades e `publishedAt`. O auditor exige uma fonte revisada,
 versão testada e autor e revisor registrados em `people.json`. Artigos não usam
 imagem de capa; screenshots úteis entram no corpo, perto do passo que explicam.
-Datas usam `YYYY-MM-DD`; não atualize `updatedAt` sem uma revisão substancial.
+Datas usam `YYYY-MM-DD`; não atualize `updatedAt` sem uma revisão substancial. Numa segunda revisão do mesmo artigo no mesmo dia, `updatedAt`, `reviewedAt` e `sources[].reviewedAt` aceitam a hora local (`YYYY-MM-DDTHH:MM`); ela só ordena as revisões, e o site mostra o dia.
 
 Uma revisão restrita a uma fonte interna pode avançar `reviewedAt` do artigo e daquela fonte após conferir as alegações dependentes. Descreva o escopo na revisão do PR; preserve `updatedAt` se o corpo não mudou, as datas das fontes externas não revisitadas, `testedWith` e as versões/datas reais das capturas. `productVersion` informa contra qual versão a documentação foi revisada, não declara um novo teste de live. O gate de revisão não substitui essa conferência.
 

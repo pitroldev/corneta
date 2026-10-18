@@ -24,22 +24,40 @@ import {
   parseAbsoluteUrl,
   sensitiveQueryKeys,
 } from "./url-security";
+import { REVISION_DATE_PATTERN, revisionDay } from "./revision-date";
 
-const parseYamlDate = (value: unknown) =>
-  value instanceof Date ? value.toISOString().slice(0, 10) : value;
+// YAML reads unquoted timestamps as Dates; keep any time so the format check rejects it.
+const parseYamlDate = (value: unknown) => {
+  if (!(value instanceof Date)) return value;
+  const iso = value.toISOString();
+  return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) : iso;
+};
+
+function isRealDate(value: string): boolean {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value)
+  );
+}
 
 export const isoDateSchema = z.preprocess(
   parseYamlDate,
   z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "use a date in YYYY-MM-DD format")
-    .refine((value) => {
-      const parsed = new Date(`${value}T00:00:00.000Z`);
-      return (
-        !Number.isNaN(parsed.getTime()) &&
-        parsed.toISOString().startsWith(value)
-      );
-    }, "use a real date"),
+    .refine(isRealDate, "use a real date"),
+);
+
+/** Review and update dates compare as strings, so a same-day time still orders after the day. */
+export const revisionDateSchema = z.preprocess(
+  parseYamlDate,
+  z
+    .string()
+    .regex(
+      REVISION_DATE_PATTERN,
+      "use YYYY-MM-DD, or YYYY-MM-DDTHH:MM for another revision on the same day",
+    )
+    .refine((value) => isRealDate(revisionDay(value)), "use a real date"),
 );
 
 const httpsUrlSchema = z
@@ -90,7 +108,7 @@ export const editorialSourceSchema = z
     kind: z.enum(EDITORIAL_SOURCE_KINDS),
     url: httpsUrlSchema.optional(),
     repoPath: repositoryPathSchema.optional(),
-    reviewedAt: isoDateSchema.optional(),
+    reviewedAt: revisionDateSchema.optional(),
   })
   .strict()
   .superRefine((source, context) => {
@@ -290,8 +308,8 @@ const draftEditorialFrontmatterSchema = z
     author: editorialPersonNameSchema.optional(),
     reviewedBy: editorialPersonNameSchema.optional(),
     publishedAt: isoDateSchema.optional(),
-    updatedAt: isoDateSchema.optional(),
-    reviewedAt: isoDateSchema.optional(),
+    updatedAt: revisionDateSchema.optional(),
+    reviewedAt: revisionDateSchema.optional(),
     productVersion: z.string().trim().min(1).max(80).optional(),
     testedWith: z.array(testedVersionSchema).default([]),
     reviewIntervalDays: z.number().int().min(1).max(730).optional(),
@@ -316,8 +334,8 @@ export const publishedEditorialFrontmatterSchema = z
     author: editorialPersonNameSchema,
     reviewedBy: editorialPersonNameSchema,
     publishedAt: isoDateSchema,
-    updatedAt: isoDateSchema,
-    reviewedAt: isoDateSchema,
+    updatedAt: revisionDateSchema,
+    reviewedAt: revisionDateSchema,
     productVersion: z.string().trim().min(1).max(80),
     testedWith: z.array(testedVersionSchema).min(1),
     reviewIntervalDays: z.number().int().min(1).max(730),

@@ -49,6 +49,35 @@ describe("editorial frontmatter", () => {
     expect(document.readingTime.minutes).toBe(1);
   });
 
+  it("accepts a time only on revision dates, for a second revision on the same day", () => {
+    const parse = (fields: string) =>
+      parseEditorialSource(
+        draftSource(fields),
+        "pt-BR/guides/multistream/test-article.mdx",
+      );
+
+    expect(
+      parse("updatedAt: 2026-10-18T21:30\nreviewedAt: 2026-10-18T21:30\n")
+        .frontmatter,
+    ).toMatchObject({
+      updatedAt: "2026-10-18T21:30",
+      reviewedAt: "2026-10-18T21:30",
+    });
+    expect(() => parse("reviewedAt: 2026-10-18T24:00\n")).toThrow(
+      EditorialValidationError,
+    );
+    expect(() => parse("reviewedAt: 2026-02-30T10:00\n")).toThrow(
+      EditorialValidationError,
+    );
+    // An unquoted YAML timestamp with seconds must fail instead of losing its time.
+    expect(() => parse("reviewedAt: 2026-10-18T21:30:00\n")).toThrow(
+      EditorialValidationError,
+    );
+    expect(() => parse("publishedAt: 2026-10-18T21:30\n")).toThrow(
+      EditorialValidationError,
+    );
+  });
+
   it("rejects contentId outside the closed telemetry contract", () => {
     expect(() =>
       parseEditorialSource(

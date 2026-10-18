@@ -7,6 +7,7 @@ import type {
   EditorialPerson,
   PublishedEditorialDocument,
 } from "./editorial/types";
+import { revisionDay } from "./editorial/revision-date";
 
 // Structured data must describe published content and available releases only.
 
@@ -262,7 +263,7 @@ export function editorialArticleJsonLd({
         articleSection: categoryName,
         inLanguage: frontmatter.locale,
         datePublished: frontmatter.publishedAt,
-        dateModified: frontmatter.updatedAt,
+        dateModified: revisionDay(frontmatter.updatedAt),
         author: {
           "@type": author.type === "person" ? "Person" : "Organization",
           name: author.name,

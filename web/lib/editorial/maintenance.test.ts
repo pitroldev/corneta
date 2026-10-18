@@ -92,6 +92,19 @@ describe("editorial maintenance", () => {
     });
   });
 
+  it("schedules the next review from the day of a timed revision", () => {
+    const queue = buildEditorialReviewQueue(
+      [document("timed-review", "2026-01-01T21:30", 90)],
+      { asOf: "2026-03-15", warningDays: 28 },
+    );
+
+    expect(queue.items[0]).toMatchObject({
+      reviewedAt: "2026-01-01T21:30",
+      dueAt: "2026-04-01",
+      status: "due-soon",
+    });
+  });
+
   it("measures substantive change cadence separately", () => {
     const item = document("recent-change", "2026-03-01", 90);
     item.frontmatter.updatedAt = "2026-03-01";

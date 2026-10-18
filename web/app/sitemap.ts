@@ -11,6 +11,7 @@ import {
   editorialCategoryHref,
   editorialCollectionHref,
 } from "../lib/editorial/urls";
+import { revisionDay } from "../lib/editorial/revision-date";
 import type {
   EditorialCollection,
   EditorialLocale,
@@ -19,7 +20,7 @@ import type {
 
 // Include indexable HTML pages only, using content revision dates.
 
-const at = (iso: string) => new Date(`${iso}T00:00:00Z`);
+const at = (iso: string) => new Date(`${revisionDay(iso)}T00:00:00Z`);
 const abs = (path: string) => new URL(path, siteUrl).toString();
 
 function editorialLanguages(paths: Partial<Record<EditorialLocale, string>>) {
@@ -34,14 +35,14 @@ function editorialLanguages(paths: Partial<Record<EditorialLocale, string>>) {
 }
 
 function latestUpdate(documents: readonly PublishedEditorialDocument[]) {
-  return new Date(
-    `${documents.reduce(
+  return at(
+    documents.reduce(
       (latest, document) =>
         document.frontmatter.updatedAt > latest
           ? document.frontmatter.updatedAt
           : latest,
       documents[0].frontmatter.updatedAt,
-    )}T00:00:00Z`,
+    ),
   );
 }
 

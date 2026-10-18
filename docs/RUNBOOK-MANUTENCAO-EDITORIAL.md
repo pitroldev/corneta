@@ -19,6 +19,11 @@ exige avanço de `updatedAt`. Conferir tudo e concluir que continua correto
 avança apenas `reviewedAt` e as datas das fontes realmente verificadas. Nunca
 se muda `updatedAt` só para aparentar frescor.
 
+As datas são só o dia (`2026-10-18`). Se o mesmo artigo for revisado de novo
+no mesmo dia, essas três datas aceitam a hora local (`2026-10-18T21:30`) para
+que o gate veja o avanço. A página, o sitemap e o JSON-LD continuam mostrando
+só o dia.
+
 ## Fila automática
 
 Na raiz de `web`, rode:
