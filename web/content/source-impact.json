@@ -4,8 +4,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "bec7471e83e7576383e639d6acf75b08a88b10a5",
-      "reason": "As linhas dos destinos passam a usar m.div, com a animação carregada sob demanda; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
+      "sourceBlob": "c95a330b25bef231cf5ce54fa325148d85b3a74f",
+      "reason": "Só acrescenta, sob o YouTube automático, a escolha de quem vê a live e de conteúdo para crianças; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
@@ -32,10 +32,22 @@
       "reason": "O envio passa a excluir fontes desligadas ou sem canal de Todas, o que continua coerente com 'canais disponíveis para envio'; popout, overlay e moderação não mudaram."
     },
     {
+      "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
+      "source": "src-tauri/src/config.rs",
+      "sourceBlob": "1bb58ba0f459eafe2c64e855e38a40793e6e19ed",
+      "reason": "Só acrescenta dois campos do YouTube automático (privacidade e conteúdo para crianças); modos, cópia e transcodificação citados não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/quality/dropped-frames.mdx",
+      "source": "src/lib/factory.ts",
+      "sourceBlob": "ff675a6fb5ea18fe82db89211ee86a0e01deec4e",
+      "reason": "Só acrescenta os padrões de privacidade e de conteúdo para crianças do YouTube automático; padrões de bitrate, encoder e qualidade citados não mudaram."
+    },
+    {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "7207ccd2d09136ed5ba7094e4b6b69c239de4be5",
-      "reason": "Só o obs_autoconfigure passa a rejeitar com código e mensagem, para o assistente do OBS escolher a ajuda; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "0a2d9a05b13e38248a1a2bca3125fc7164fd2209",
+      "reason": "Só repassa a privacidade e o conteúdo para crianças à criação automática da live no YouTube; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -74,6 +86,12 @@
       "reason": "Nome e URL gravam ao sair do campo ou com Enter, e badges e validação seguem o que é digitado; testes, pausa, remoção e confirmações citados não mudaram."
     },
     {
+      "article": "pt-BR/help/quality/auto-bitrate.mdx",
+      "source": "src-tauri/src/config.rs",
+      "sourceBlob": "1bb58ba0f459eafe2c64e855e38a40793e6e19ed",
+      "reason": "Só acrescenta dois campos do YouTube automático (privacidade e conteúdo para crianças); o auto-bitrate e os limites citados não mudaram."
+    },
+    {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
       "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
@@ -82,14 +100,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "7207ccd2d09136ed5ba7094e4b6b69c239de4be5",
-      "reason": "Só o obs_autoconfigure passa a rejeitar com código e mensagem, para o assistente do OBS escolher a ajuda; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "0a2d9a05b13e38248a1a2bca3125fc7164fd2209",
+      "reason": "Só repassa a privacidade e o conteúdo para crianças à criação automática da live no YouTube; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "7207ccd2d09136ed5ba7094e4b6b69c239de4be5",
-      "reason": "Só o obs_autoconfigure passa a rejeitar com código e mensagem, para o assistente do OBS escolher a ajuda; o que o diagnóstico exporta e omite, inclusive a senha do WebSocket, não mudou."
+      "sourceBlob": "0a2d9a05b13e38248a1a2bca3125fc7164fd2209",
+      "reason": "Só repassa a privacidade e o conteúdo para crianças à criação automática da live no YouTube; o que o diagnóstico exporta e omite não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -100,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "002fb1dfbf009496b26cfdb393fb85d39ccb6277",
-      "reason": "pt.ts ganhou apenas o aviso de RAM do Guardião; nenhum texto do assistente do OBS que o artigo cita mudou."
+      "sourceBlob": "cd77cc094ec5b82109b6aafd2881256e593135ae",
+      "reason": "Só acrescenta os textos de privacidade e de conteúdo para crianças do YouTube automático; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
