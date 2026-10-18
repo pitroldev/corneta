@@ -1749,6 +1749,7 @@ async fn start_engine_inner(
             watchlist: if guard { guard_watchlist } else { Vec::new() },
             slate,
             force_slate: force_brb,
+            config: config.clone(),
         };
         let (app_c, run_c, sig_c, slate_c) = (
             app.clone(),

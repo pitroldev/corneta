@@ -970,7 +970,7 @@ fn write_ops<W: Write>(w: &mut W, ops: &[WriteOp]) -> bool {
 }
 
 enum SetupOutcome {
-    Fallback(CompositorOpts),
+    Fallback(Box<CompositorOpts>),
     Done,
 }
 
@@ -1002,7 +1002,7 @@ pub async fn run(
     if let SetupOutcome::Fallback(opts) = outcome {
         log::warn!("splicer: setup incomplete; falling back to the compositor");
         capture_splicer_error(&app, "splicer_setup_fallback");
-        crate::compositor::run(app, running, has_signal, slate_on, opts).await;
+        crate::compositor::run(app, running, has_signal, slate_on, *opts).await;
     }
 }
 
@@ -1015,9 +1015,9 @@ fn setup_and_pump(
 ) -> SetupOutcome {
     let Some(ffmpeg) = ffmpeg_path() else {
         log::error!("splicer: ffmpeg sidecar not found");
-        return SetupOutcome::Fallback(opts);
+        return SetupOutcome::Fallback(Box::new(opts));
     };
-    let cfg = crate::config::load(app);
+    let cfg = opts.config.clone();
     let ingest = engine::ingest_url(&cfg);
     let program = engine::program_url(&cfg);
 
@@ -1034,7 +1034,7 @@ fn setup_and_pump(
         Ok(c) => c,
         Err(e) => {
             log::error!("splicer: input ffmpeg could not start: {e}");
-            return SetupOutcome::Fallback(opts);
+            return SetupOutcome::Fallback(Box::new(opts));
         }
     };
     let (mut rx, reader) = spawn_reader(&mut in_child, gen);
@@ -1065,7 +1065,7 @@ fn setup_and_pump(
             );
             kill(&mut in_child);
             drain_and_join(&rx, Some(reader));
-            return SetupOutcome::Fallback(opts);
+            return SetupOutcome::Fallback(Box::new(opts));
         }
         match rx.try_recv() {
             Ok((_, tag)) => {
@@ -1547,7 +1547,7 @@ fn fail_setup(
     log::warn!("splicer: setup failed ({why}); falling back to compositor");
     kill(in_child);
     drain_and_join(rx, Some(reader));
-    SetupOutcome::Fallback(opts)
+    SetupOutcome::Fallback(Box::new(opts))
 }
 
 fn spawn_output_watchdog(running: Arc<AtomicBool>, gen_done: Arc<AtomicBool>, pid: u32) {
