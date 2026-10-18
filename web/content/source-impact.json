@@ -4,8 +4,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "a0633e28303be9072c4960b6fe6043c5b4275bac",
-      "reason": "Separa a assinatura das métricas por destino e deixa estáticos os pontos de estado; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
+      "sourceBlob": "bec7471e83e7576383e639d6acf75b08a88b10a5",
+      "reason": "As linhas dos destinos passam a usar m.div, com a animação carregada sob demanda; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
@@ -40,8 +40,8 @@
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "0f22b3825a5d9219d35d6c61036779af555b54a6",
-      "reason": "Calcula as estimativas de cada modo uma vez por mudança de config e lê só o estado do motor; modos, padrões de bitrate e cards citados não mudaram."
+      "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
+      "reason": "Os cards de modo e a barra de carga passam a usar m, com a animação carregada sob demanda, e uma variável foi renomeada; modos, padrões de bitrate e cards citados não mudaram."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
@@ -76,8 +76,8 @@
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "0f22b3825a5d9219d35d6c61036779af555b54a6",
-      "reason": "Memoiza as estimativas e extrai o painel Máquina com o mesmo rótulo e conteúdo; modos, ajuste fino, cards e métricas ao vivo citados não mudaram."
+      "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
+      "reason": "Os cards de modo e a barra de carga passam a usar m, com a animação carregada sob demanda; modos, ajuste fino, cards e métricas ao vivo citados não mudaram."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
