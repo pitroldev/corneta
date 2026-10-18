@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BOM, toCsv, historyCsv, seriesCsv } from "./csv";
+import { BOM, toCsv, historyCells, historyCsv, seriesCsv } from "./csv";
 import { analyze, parseSession } from "../report";
 import { interpolate, type Vars } from "../i18n/locale";
 import { makeFmt } from "../i18n/format";
@@ -94,7 +94,10 @@ describe("historyCsv", () => {
       },
     ]);
     const out = rows(
-      historyCsv([{ meta: meta(), analysis: analyze(d, t) }], i18n),
+      historyCsv(
+        [historyCells({ meta: meta(), analysis: analyze(d, t) })],
+        i18n,
+      ),
     );
     expect(out).toHaveLength(2);
     expect(out[0].startsWith("data;inicio;duracao_min")).toBe(true);
@@ -109,7 +112,7 @@ describe("historyCsv", () => {
   it("leaves missing audience empty instead of inventing zero", () => {
     const out = rows(
       historyCsv(
-        [{ meta: meta(), analysis: analyze(sessionData([]), t) }],
+        [historyCells({ meta: meta(), analysis: analyze(sessionData([]), t) })],
         i18n,
       ),
     );
