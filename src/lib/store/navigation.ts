@@ -4,8 +4,6 @@ export function createNavigationSlice({
   set,
 }: SliceContext): Pick<
   State,
-  | "goLiveFocus"
-  | "setGoLiveFocus"
   | "unseenReport"
   | "markReportSeen"
   | "tourNonce"
@@ -18,10 +16,6 @@ export function createNavigationSlice({
   | "requestChatConfig"
 > {
   return {
-    goLiveFocus: false,
-    setGoLiveFocus(v) {
-      set({ goLiveFocus: v });
-    },
     unseenReport: false,
     markReportSeen() {
       set({ unseenReport: false });

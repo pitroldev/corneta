@@ -22,6 +22,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { useConfirm } from "../lib/useConfirm";
 import { useI18n } from "../lib/i18n";
 import { toast } from "../lib/toast";
 import { cn, errMsg } from "../lib/utils";
@@ -130,7 +131,7 @@ export function ReplayPlayer({
   const [showDeleted, setShowDeleted] = useState(false);
   const [clipFrom, setClipFrom] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteStep = useConfirm();
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [showOffset, setShowOffset] = useState(false);
@@ -400,12 +401,7 @@ export function ReplayPlayer({
   };
 
   const removeRecordings = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      setTimeout(() => setConfirmDelete(false), 3000);
-      return;
-    }
-    setConfirmDelete(false);
+    if (!deleteStep.confirm()) return;
     setBusy(true);
     try {
       await api.deleteSessionRecordings(sessionId);
@@ -863,13 +859,13 @@ export function ReplayPlayer({
               </Button>
               <Button
                 size="sm"
-                variant={confirmDelete ? "danger" : "ghost"}
+                variant={deleteStep.armed ? "danger" : "ghost"}
                 disabled={busy}
                 onClick={() => void removeRecordings()}
                 title={t("replay.delete.cta")}
               >
                 <Trash2 className="size-4" />
-                {confirmDelete && (
+                {deleteStep.armed && (
                   <span className="text-[11px]">
                     {t("replay.delete.confirm")}
                   </span>

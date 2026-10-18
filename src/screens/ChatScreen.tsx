@@ -1,4 +1,5 @@
 import * as RTabs from "@radix-ui/react-tabs";
+import { useConfirm } from "../lib/useConfirm";
 import {
   AtSign,
   BadgeCheck,
@@ -37,7 +38,7 @@ import {
 } from "../components/ui";
 import { api, IS_TAURI } from "../lib/api";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
-import { sendStatusLine, srcLabel } from "../lib/chatSend";
+import { resolveSendTargets, sendStatusLine, srcLabel } from "../lib/chatSend";
 import { bold, useI18n } from "../lib/i18n";
 import { legalUrl } from "../lib/legal";
 import { HAS_TWITCH_OAUTH } from "../lib/oauth";
@@ -126,8 +127,8 @@ export function ChatScreen() {
   const [sendTo, setSendTo] = useState("all");
   const [connecting, setConnecting] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  const [confirmClearChat, setConfirmClearChat] = useState(false);
-  const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
+  const clearChatStep = useConfirm();
+  const clearAlertsStep = useConfirm();
   const [alertPulse, setAlertPulse] = useState(false);
   const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
     twitch: true,
@@ -256,12 +257,17 @@ export function ChatScreen() {
   const twitchReady = chatLogin.twitch.state === "connected";
   const youtubeReady = chatLogin.youtube.state === "connected";
   const kickReady = chatLogin.kick.state === "connected";
-  const sendableSources = sources.filter(
-    (x) =>
-      (x.platform === "twitch" && (x.hasSendToken || twitchReady)) ||
-      (x.platform === "youtube" && youtubeReady) ||
-      (x.platform === "kick" && kickReady),
-  );
+  const sendReady = {
+    twitch: twitchReady,
+    youtube: youtubeReady,
+    kick: kickReady,
+  };
+  const {
+    sendable: sendableSources,
+    effectiveSendTo,
+    targets: sendTargets,
+    canSend,
+  } = resolveSendTargets(sources, sendTo, sendReady, chatAuth);
   const hasTwitchChannel = sources.some((x) => x.platform === "twitch");
   const hasYoutubeChannel = sources.some((x) => x.platform === "youtube");
   const hasKickChannel = sources.some((x) => x.platform === "kick");
@@ -270,24 +276,10 @@ export function ChatScreen() {
     (hasTwitchChannel && HAS_TWITCH_OAUTH) ||
     hasYoutubeChannel ||
     hasKickChannel;
-  const sendValid =
-    sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
-  const effectiveSendTo = sendValid ? sendTo : "all";
-  const sendTargets =
-    effectiveSendTo === "all"
-      ? sendableSources
-      : sendableSources.filter((x) => x.id === effectiveSendTo);
-  // Twitch requires IRC authentication before sending; YouTube and Kick send over HTTP.
-  const canSend = sendTargets.some((x) =>
-    x.platform === "youtube"
-      ? youtubeReady
-      : x.platform === "kick"
-        ? kickReady
-        : !!chatAuth[x.id]?.ok,
-  );
+
   const doSend = async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || sending || !canSend) return;
     setSending(true);
     try {
       await sendChat(
@@ -301,12 +293,7 @@ export function ChatScreen() {
       setSending(false);
     }
   };
-  const sendStatus = sendStatusLine(
-    sendTargets,
-    chatAuth,
-    { twitch: twitchReady, youtube: youtubeReady, kick: kickReady },
-    t,
-  );
+  const sendStatus = sendStatusLine(sendTargets, chatAuth, sendReady, t);
 
   const modeAction =
     (close: (open: boolean) => void) =>
@@ -1010,20 +997,15 @@ export function ChatScreen() {
           </AlertCountLabel>
         </Button>
         <Button
-          variant={confirmClearChat ? "danger" : "ghost"}
+          variant={clearChatStep.armed ? "danger" : "ghost"}
           size="sm"
           onClick={() => {
-            if (!confirmClearChat) {
-              setConfirmClearChat(true);
-              setTimeout(() => setConfirmClearChat(false), 3000);
-              return;
-            }
-            setConfirmClearChat(false);
+            if (!clearChatStep.confirm()) return;
             clearChat();
           }}
         >
           <Trash2 className="size-4" />{" "}
-          {confirmClearChat ? t("chat.clear.confirm") : t("chat.clear")}
+          {clearChatStep.armed ? t("chat.clear.confirm") : t("chat.clear")}
         </Button>
       </div>
 
@@ -1074,30 +1056,27 @@ export function ChatScreen() {
               </span>
               <button
                 onClick={() => {
-                  if (!confirmClearAlerts) {
-                    setConfirmClearAlerts(true);
-                    setTimeout(() => setConfirmClearAlerts(false), 3000);
-                    return;
-                  }
-                  setConfirmClearAlerts(false);
+                  if (!clearAlertsStep.confirm()) return;
                   clearAlerts();
                 }}
                 className={cn(
                   "grid h-8 min-w-8 place-items-center rounded px-1 text-xs font-bold transition-colors",
-                  confirmClearAlerts
+                  clearAlertsStep.armed
                     ? "text-bad"
                     : "text-ink-faint hover:text-bad",
                 )}
                 title={
-                  confirmClearAlerts
+                  clearAlertsStep.armed
                     ? t("chat.alerts.clear.confirmTitle")
                     : t("chat.alerts.clear.title")
                 }
                 aria-label={
-                  confirmClearAlerts ? undefined : t("chat.alerts.clear.title")
+                  clearAlertsStep.armed
+                    ? undefined
+                    : t("chat.alerts.clear.title")
                 }
               >
-                {confirmClearAlerts ? (
+                {clearAlertsStep.armed ? (
                   t("chat.alerts.clear.confirmLabel")
                 ) : (
                   <Trash2 className="size-3.5" />

@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
+import { useConfirm } from "../lib/useConfirm";
 import {
   Activity,
   Bug,
@@ -175,7 +176,7 @@ function ConsentChoice({
 export function TelemetrySettingsPanel() {
   const { t, locale } = useI18n();
   const telemetry = useTelemetry();
-  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const regenerateStep = useConfirm(4000);
 
   if (!telemetry.ready)
     return (
@@ -202,12 +203,7 @@ export function TelemetrySettingsPanel() {
   };
 
   const regenerate = async () => {
-    if (!confirmRegenerate) {
-      setConfirmRegenerate(true);
-      setTimeout(() => setConfirmRegenerate(false), 4_000);
-      return;
-    }
-    setConfirmRegenerate(false);
+    if (!regenerateStep.confirm()) return;
     try {
       await regenerateTelemetryId();
       toast.success(t("settings.telemetry.regenerate.ok"));
@@ -290,13 +286,13 @@ export function TelemetrySettingsPanel() {
                   {t("settings.telemetry.deletion.cta")}
                 </Button>
                 <Button
-                  variant={confirmRegenerate ? "danger" : "subtle"}
+                  variant={regenerateStep.armed ? "danger" : "subtle"}
                   size="sm"
                   onClick={() => void regenerate()}
                   disabled={telemetry.saving}
                 >
                   <RotateCcw className="size-3.5" aria-hidden />
-                  {confirmRegenerate
+                  {regenerateStep.armed
                     ? t("settings.telemetry.regenerate.confirm")
                     : t("settings.telemetry.regenerate.cta")}
                 </Button>
