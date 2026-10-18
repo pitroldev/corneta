@@ -54,7 +54,8 @@ ort = "=2.0.0-rc.12"
 keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
 tokio = { version = "1.53.1", features = ["net", "sync", "macros", "time", "io-util"] }
-tauri-plugin-updater = "2.10.1"
+# Updater artifacts are plain NSIS installers; the default zip feature only adds vulnerable archive extraction.
+tauri-plugin-updater = { version = "2.10.1", default-features = false, features = ["rustls-tls"] }
 
 # Security backport: notify-rust 4.18 pins a vulnerable quick-xml through winrt-notification.
 # Remove this upstream commit pin when a release includes winrt-notification 0.8.1.
