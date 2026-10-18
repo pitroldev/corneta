@@ -9,7 +9,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { githubTransport, promoteRelease } from "./promote-release.mjs";
+import {
+  githubTransport,
+  promoteRelease,
+  runPromotionCommand,
+} from "./promote-release.mjs";
 import { RELEASE_NOTICE_VERSION } from "./release-readiness.mjs";
 
 const directories = [];
@@ -674,5 +678,44 @@ describe("GitHub transport", () => {
       api({ method: "GET", path: "https://example.invalid/releases/41" }),
     ).rejects.toThrow(/Invalid release API request/);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("promotion command output", () => {
+  function capture() {
+    const lines = [];
+    return {
+      lines,
+      output: {
+        log: (line) => lines.push(line),
+        error: (line) => lines.push(line),
+      },
+    };
+  }
+
+  it("explains a failed release condition", async () => {
+    const { lines, output } = capture();
+    await expect(runPromotionCommand(["unexpected"], {}, output)).resolves.toBe(
+      1,
+    );
+    expect(lines).toContain(
+      "Usage: node scripts/promote-release.mjs (configured by release workflow environment).",
+    );
+    expect(lines.join("\n")).toContain("No assets were overwritten");
+  });
+
+  it("keeps unexpected errors generic so tool output cannot leak", async () => {
+    const { lines, output } = capture();
+    await expect(
+      runPromotionCommand(
+        [],
+        { RELEASE_ASSETS_JSON: "{synthetic-sensitive-value" },
+        output,
+      ),
+    ).resolves.toBe(1);
+    const printed = lines.join("\n");
+    expect(printed).toContain("No assets were overwritten");
+    expect(printed).not.toContain("synthetic-sensitive-value");
+    expect(printed).not.toContain("JSON");
   });
 });

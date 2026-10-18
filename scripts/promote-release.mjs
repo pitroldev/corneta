@@ -24,8 +24,10 @@ const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const MAX_PAGES = 20;
 const MAX_JSON_BYTES = 2 * 1024 * 1024;
 
+class ReleaseConditionError extends Error {}
+
 function requireCondition(condition, message) {
-  if (!condition) throw new Error(message);
+  if (!condition) throw new ReleaseConditionError(message);
 }
 
 function versionParts(version) {
@@ -536,16 +538,16 @@ export async function promoteRelease(
   return { status: "published", tag: options.tag, latest: makeLatest };
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+export async function runPromotionCommand(
+  args = process.argv.slice(2),
+  env = process.env,
+  output = console,
 ) {
   try {
     requireCondition(
-      process.argv.length === 2,
+      args.length === 0,
       "Usage: node scripts/promote-release.mjs (configured by release workflow environment).",
     );
-    const env = process.env;
     const result = await promoteRelease({
       root: resolve(dirname(fileURLToPath(import.meta.url)), ".."),
       repository: env.GITHUB_REPOSITORY,
@@ -560,11 +562,21 @@ if (
       checksumsPath: env.CHECKSUMS_PATH,
       compliancePath: env.COMPLIANCE_PATH,
     });
-    console.log(`Release ${result.tag}: ${result.status}.`);
-  } catch {
-    console.error(
+    output.log(`Release ${result.tag}: ${result.status}.`);
+    return 0;
+  } catch (error) {
+    // Condition messages are fixed text; tool and API errors may echo sensitive output.
+    if (error instanceof ReleaseConditionError) output.error(error.message);
+    output.error(
       "Release promotion failed. No assets were overwritten; inspect the release and workflow checks before retrying.",
     );
-    process.exitCode = 1;
+    return 1;
   }
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  process.exitCode = await runPromotionCommand();
 }
