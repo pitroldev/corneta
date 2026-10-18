@@ -14,10 +14,28 @@
       "reason": "O feed e os alertas assinam o store em componentes próprios e os sliders do overlay gravam ao soltar; telas, URLs, Testar e Adicionar no OBS citados não mudaram."
     },
     {
+      "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
+      "source": "src-tauri/src/compositor.rs",
+      "sourceBlob": "4b5028414b0993bff65ac0cef1b9d921a43fd9aa",
+      "reason": "O compositor usa a config capturada no início da live e deixa de emitir o evento brb://active, que nada ouvia; o JÁ VOLTO e o fluxo citados não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
+      "source": "src-tauri/src/splicer.rs",
+      "sourceBlob": "b8b6e1ff2426f4b85a30d984665a5e4f706d3373",
+      "reason": "O splicer usa a config capturada no início da live em vez de reler o disco; a cobertura do JÁ VOLTO e o teste descritos no artigo não mudaram."
+    },
+    {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
       "reason": "O envio passa a excluir fontes desligadas ou sem canal de Todas, o que continua coerente com 'canais disponíveis para envio'; popout, overlay e moderação não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
+      "source": "src-tauri/src/commands.rs",
+      "sourceBlob": "9412a4610e872ca5a645be8295047e37b6d52319",
+      "reason": "Mudanças internas em commands.rs (config do início da live, regra de linha do FFmpeg movida para engine_policy); encoders, detecção e modos citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -30,6 +48,12 @@
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
       "reason": "Os sliders do overlay gravam ao soltar e o feed assina o store à parte; passos, opções do overlay, endereço local e tabela de problemas citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
+      "source": "src-tauri/src/chat.rs",
+      "sourceBlob": "75c7fb5083f946220cc5f5fa101cd1458f3a091f",
+      "reason": "Os parsers do YouTube viram funções puras e eventos de sistema deixam de virar mensagem, o que o artigo não descreve; passos, ponto verde e tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -56,16 +80,46 @@
       "reason": "Memoiza as estimativas e extrai o painel Máquina com o mesmo rótulo e conteúdo; modos, ajuste fino, cards e métricas ao vivo citados não mudaram."
     },
     {
+      "article": "pt-BR/help/quality/test-upload.mdx",
+      "source": "src-tauri/src/commands.rs",
+      "sourceBlob": "9412a4610e872ca5a645be8295047e37b6d52319",
+      "reason": "O teste de upload não mudou; as alterações em commands.rs são internas (config do início da live e regra de linha do FFmpeg movida para engine_policy)."
+    },
+    {
+      "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
+      "source": "src-tauri/src/commands.rs",
+      "sourceBlob": "9412a4610e872ca5a645be8295047e37b6d52319",
+      "reason": "A exportação do diagnóstico não mudou; as alterações em commands.rs são internas (config do início da live e regra de linha do FFmpeg movida para engine_policy)."
+    },
+    {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/components/ObsWizard.tsx",
       "sourceBlob": "165aeab169d4edd6410c1491d28dcb55c08f8854",
       "reason": "O campo de senha do assistente grava ao sair do campo ou com Enter; clicar em Conectar e configurar sai do campo e grava, como o artigo descreve."
     },
     {
+      "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src/lib/i18n/pt.ts",
+      "sourceBlob": "002fb1dfbf009496b26cfdb393fb85d39ccb6277",
+      "reason": "pt.ts ganhou apenas o aviso de RAM do Guardião; nenhum texto do assistente do OBS que o artigo cita mudou."
+    },
+    {
+      "article": "pt-BR/help/streaming-software/brb-screen.mdx",
+      "source": "src-tauri/src/compositor.rs",
+      "sourceBlob": "4b5028414b0993bff65ac0cef1b9d921a43fd9aa",
+      "reason": "Remove o evento brb://active, que nenhuma tela ouvia; JÁ VOLTO no ar vem do estado do destino, e o fluxo e as opções citados não mudaram."
+    },
+    {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
       "sourceBlob": "20d908a9d34c65c30562a291b67add149549ace2",
       "reason": "Host, app, chave local e senha do OBS gravam ao sair do campo e a importação mantém a confirmação; o fluxo do JÁ VOLTO e suas opções não mudaram."
+    },
+    {
+      "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
+      "source": "src-tauri/src/engine_policy.rs",
+      "sourceBlob": "8f3bd079f9a0f509bca851b1b71de6790a976d6d",
+      "reason": "A regra de linha do FFmpeg foi movida para engine_policy com o mesmo comportamento; nomes de estado, mensagens e Tentar de novo citados não mudaram."
     }
   ]
 }
