@@ -141,7 +141,9 @@ export function contributorPlan(task) {
       return [
         {
           tool: "next",
-          args: ["dev", "--port", "7390", "--hostname", "127.0.0.1"],
+          // Next dev builds proxy rewrite URLs on localhost; any other bind name turns the
+          // root rewrite into an external request that re-enters the /pt-BR redirect.
+          args: ["dev", "--port", "7390", "--hostname", "localhost"],
           cwd: "web",
         },
       ];

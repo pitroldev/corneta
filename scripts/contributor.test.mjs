@@ -92,6 +92,16 @@ describe("credential-free contributor profile", () => {
     expect(() => contributorPlan("release")).toThrow("Usage:");
   });
 
+  it("serves the site on loopback under the name Next uses for proxy rewrites", () => {
+    expect(contributorPlan("web")).toEqual([
+      {
+        tool: "next",
+        args: ["dev", "--port", "7390", "--hostname", "localhost"],
+        cwd: "web",
+      },
+    ]);
+  });
+
   it("preserves official updater settings while giving the contributor its own identity", () => {
     const official = JSON.parse(
       readFileSync(join(root, "src-tauri/tauri.conf.json"), "utf8"),

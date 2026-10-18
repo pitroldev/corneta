@@ -113,7 +113,7 @@ Esse comando valida app e site sem os segredos da operação oficial. Os requisi
 pnpm contrib:web
 ```
 
-Abra **http://127.0.0.1:7390**. É possível trabalhar no site sem configurar OAuth; autenticar contas de verdade exige a configuração dos provedores.
+Abra **http://localhost:7390**. É possível trabalhar no site sem configurar OAuth; autenticar contas de verdade exige a configuração dos provedores.
 
 O perfil recusa arquivos reais `web/.env*`. Se já tiver uma operação configurada, use um clone limpo — não mova nem apague suas credenciais. Para hospedagem própria e OAuth, consulte [configuração](docs/CONFIGURACAO.md) e [contratos de rede](docs/SUPERFICIE-DE-REDE.md).
 
