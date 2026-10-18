@@ -1146,8 +1146,16 @@ export const pt = {
   "golive.streamInfo.youtubeAuto.desc":
     " — a Corneta cria a transmissão no BORA AO VIVO, sem abrir o Studio.",
   "golive.streamInfo.youtubeAuto.title": "YouTube automático",
+  "golive.streamInfo.youtubeKids.desc":
+    " — o YouTube desliga o chat da live. Marque só se for feito para crianças.",
+  "golive.streamInfo.youtubeKids.title": "É conteúdo para crianças",
   "golive.streamInfo.youtubeNote":
     "No YouTube dá pra mudar só o {titulo} (não o jogo).",
+  "golive.streamInfo.youtubePrivacy.label": "Quem vê a live",
+  "golive.streamInfo.youtubePrivacy.private": "Privada (só você)",
+  "golive.streamInfo.youtubePrivacy.public": "Pública",
+  "golive.streamInfo.youtubePrivacy.unlisted":
+    "Não listada (só quem tem o link)",
   "golive.target.noName": "(sem nome)",
   "golive.target.openChannel.aria": "Abrir o canal de {nome}",
   "golive.target.openChannel.title": "Abrir o canal na plataforma",

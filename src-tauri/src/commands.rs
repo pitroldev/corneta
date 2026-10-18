@@ -1527,9 +1527,17 @@ async fn start_engine_inner(
                     t.to_string()
                 }
             };
+            let privacy = config.settings.youtube_privacy.clone();
+            let made_for_kids = config.settings.youtube_made_for_kids;
             let app2 = app.clone();
             match tauri::async_runtime::spawn_blocking(move || {
-                crate::auth::youtube_provision_broadcast(&app2, &title, my_gen)
+                crate::auth::youtube_provision_broadcast(
+                    &app2,
+                    &title,
+                    &privacy,
+                    made_for_kids,
+                    my_gen,
+                )
             })
             .await
             {

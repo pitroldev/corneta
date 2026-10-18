@@ -78,6 +78,8 @@ export interface IngestConfig {
   key: string;
 }
 
+export type YoutubePrivacy = "public" | "unlisted" | "private";
+
 export interface AppSettings {
   minimizeToTray: boolean;
   autostart: boolean;
@@ -126,6 +128,9 @@ export interface AppSettings {
   recordChat: boolean;
   autoBitrate: boolean;
   youtubeAutoLive: boolean;
+  youtubePrivacy: YoutubePrivacy;
+  /** YouTube turns the live chat off for content made for kids. */
+  youtubeMadeForKids: boolean;
   /** Persisted across sessions and used for automatic YouTube broadcasts. */
   streamTitle: string;
   chatAutoConnect: boolean;

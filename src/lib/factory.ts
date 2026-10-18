@@ -66,6 +66,8 @@ export function defaultConfig(): AppConfig {
       loudnessNormalize: false,
       loudnessTargetLufs: -14,
       youtubeAutoLive: true,
+      youtubePrivacy: "public",
+      youtubeMadeForKids: false,
       streamTitle: "",
       chatAutoConnect: true,
       chatPopoutTab: "both",

@@ -55,6 +55,7 @@ import {
   SectionTitle,
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
+import { Select } from "../components/Select";
 import { ObsQualityGuide } from "../components/ObsQualityGuide";
 import { FirstLiveChecklist } from "../components/FirstLiveChecklist";
 
@@ -1015,35 +1016,53 @@ function StreamInfoCard() {
       )}
       {ready.youtube && (
         <>
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={settings.youtubeAutoLive}
-            onClick={() =>
+          <OptionCheck
+            checked={settings.youtubeAutoLive}
+            onToggle={() =>
               setSettings({ youtubeAutoLive: !settings.youtubeAutoLive })
             }
-            className="mt-2.5 flex w-full items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-left"
-          >
-            <span
-              aria-hidden
-              className={cn(
-                "grid size-5 shrink-0 place-items-center rounded border-2 transition-colors",
-                settings.youtubeAutoLive
-                  ? "border-brass bg-brass text-brass-ink"
-                  : "border-border text-transparent",
-              )}
-            >
-              <Check className="size-3.5" strokeWidth={3} />
-            </span>
-            <span className="text-xs leading-snug">
-              <strong className="text-ink">
-                {t("golive.streamInfo.youtubeAuto.title")}
-              </strong>
-              <span className="text-ink-faint">
-                {t("golive.streamInfo.youtubeAuto.desc")}
-              </span>
-            </span>
-          </button>
+            title={t("golive.streamInfo.youtubeAuto.title")}
+            desc={t("golive.streamInfo.youtubeAuto.desc")}
+          />
+          {settings.youtubeAutoLive && (
+            <div className="mt-1.5 space-y-1.5 pl-7">
+              <label className="flex items-center justify-between gap-3 text-xs">
+                <span className="text-ink-muted">
+                  {t("golive.streamInfo.youtubePrivacy.label")}
+                </span>
+                <Select
+                  className="w-56 shrink-0"
+                  value={settings.youtubePrivacy}
+                  options={[
+                    {
+                      value: "public",
+                      label: t("golive.streamInfo.youtubePrivacy.public"),
+                    },
+                    {
+                      value: "unlisted",
+                      label: t("golive.streamInfo.youtubePrivacy.unlisted"),
+                    },
+                    {
+                      value: "private",
+                      label: t("golive.streamInfo.youtubePrivacy.private"),
+                    },
+                  ]}
+                  onChange={(youtubePrivacy) => setSettings({ youtubePrivacy })}
+                />
+              </label>
+              <OptionCheck
+                className="mt-0"
+                checked={settings.youtubeMadeForKids}
+                onToggle={() =>
+                  setSettings({
+                    youtubeMadeForKids: !settings.youtubeMadeForKids,
+                  })
+                }
+                title={t("golive.streamInfo.youtubeKids.title")}
+                desc={t("golive.streamInfo.youtubeKids.desc")}
+              />
+            </div>
+          )}
           <p className="mt-1.5 text-[11px] text-ink-faint">
             {rich(t, "golive.streamInfo.youtubeNote", {
               titulo: (
@@ -1056,6 +1075,49 @@ function StreamInfoCard() {
         </>
       )}
     </Card>
+  );
+}
+
+function OptionCheck({
+  checked,
+  onToggle,
+  title,
+  desc,
+  className,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  title: string;
+  desc: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      onClick={onToggle}
+      className={cn(
+        "mt-2.5 flex w-full items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-left",
+        className,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-5 shrink-0 place-items-center rounded border-2 transition-colors",
+          checked
+            ? "border-brass bg-brass text-brass-ink"
+            : "border-border text-transparent",
+        )}
+      >
+        <Check className="size-3.5" strokeWidth={3} />
+      </span>
+      <span className="text-xs leading-snug">
+        <strong className="text-ink">{title}</strong>
+        <span className="text-ink-faint">{desc}</span>
+      </span>
+    </button>
   );
 }
 
