@@ -150,6 +150,10 @@ export function ChatScreen() {
     prevAlerts.current = alerts.length;
   }, [alerts.length, showAlerts]);
 
+  // Preview the font size while dragging; the setting is saved once when the drag ends.
+  const [fontPreview, setFontPreview] = useState<number | null>(null);
+  const [alertFontPreview, setAlertFontPreview] = useState<number | null>(null);
+
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
@@ -168,7 +172,7 @@ export function ChatScreen() {
     platform: s.chatShowPlatform ?? true,
     source: (s.chatShowSource ?? false) || hasDup,
     timestamps: s.chatShowTimestamps ?? false,
-    fontSize: s.chatFontSize ?? 14,
+    fontSize: fontPreview ?? s.chatFontSize ?? 14,
   };
   const alertSources = s.alertSources ?? [];
   const configured =
@@ -933,10 +937,11 @@ export function ChatScreen() {
                   </span>
                   <Slider
                     className="ml-auto max-w-52 flex-1"
-                    value={view.fontSize}
+                    value={s.chatFontSize ?? 14}
                     min={8}
                     max={44}
                     onChange={(v) => setSettings({ chatFontSize: v })}
+                    onPreview={setFontPreview}
                     suffix="px"
                     aria-label={t("chat.display.chatFontSize")}
                   />
@@ -951,6 +956,7 @@ export function ChatScreen() {
                     min={8}
                     max={44}
                     onChange={(v) => setSettings({ alertFontSize: v })}
+                    onPreview={setAlertFontPreview}
                     suffix="px"
                     aria-label={t("chat.display.alertFontSize")}
                   />
@@ -1107,7 +1113,7 @@ export function ChatScreen() {
             <AlertsFeed
               alerts={alerts}
               className="flex-1"
-              fontSize={s.alertFontSize ?? 14}
+              fontSize={alertFontPreview ?? s.alertFontSize ?? 14}
             />
           </Card>
         )}

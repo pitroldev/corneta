@@ -32,7 +32,8 @@ import {
 import { toast } from "../lib/toast";
 import { cn, openExternal, uid } from "../lib/utils";
 import { useI18n, useT, type I18n, type Locale } from "../lib/i18n";
-import type { ChatPlatform, PlatformId, Target } from "../lib/types";
+import type { AppConfig, ChatPlatform, PlatformId, Target } from "../lib/types";
+import { draftInputProps, useDraft } from "../lib/useDraft";
 import {
   INGEST_URL_RE,
   sanitizeIngestUrl,
@@ -138,7 +139,6 @@ function ProfileBar() {
   const loadProfile = useStore((s) => s.loadProfile);
   const addProfile = useStore((s) => s.addProfile);
   const removeProfile = useStore((s) => s.removeProfile);
-  const renameProfile = useStore((s) => s.renameProfile);
   const [editing, setEditing] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -161,19 +161,10 @@ function ProfileBar() {
           const on = p.id === active.id;
           if (on && editing) {
             return (
-              <input
+              <ProfileNameInput
                 key={p.id}
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- Renaming replaces the activated button and preserves keyboard flow.
-                autoFocus
-                value={active.name}
-                onChange={(e) => renameProfile(active.id, e.target.value)}
-                onBlur={() => setEditing(false)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "Escape")
-                    setEditing(false);
-                }}
-                aria-label={t("platforms.profile.nameAria")}
-                className="h-9 min-w-0 max-w-[14rem] rounded-md border-2 border-brass bg-surface px-2.5 font-display text-sm font-bold text-ink outline-none [field-sizing:content]"
+                profile={active}
+                onDone={() => setEditing(false)}
               />
             );
           }
@@ -270,6 +261,35 @@ function ProfileBar() {
   );
 }
 
+function ProfileNameInput({
+  profile,
+  onDone,
+}: {
+  profile: AppConfig["profiles"][number];
+  onDone: () => void;
+}) {
+  const t = useT();
+  const renameProfile = useStore((s) => s.renameProfile);
+  // Leaving the field unmounts it, which commits the pending name.
+  const draft = useDraft(profile.name, (name) =>
+    renameProfile(profile.id, name),
+  );
+  return (
+    <input
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- Renaming replaces the activated button and preserves keyboard flow.
+      autoFocus
+      value={draft.value}
+      onChange={(e) => draft.change(e.target.value)}
+      onBlur={onDone}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === "Escape") onDone();
+      }}
+      aria-label={t("platforms.profile.nameAria")}
+      className="h-9 min-w-0 max-w-[14rem] rounded-md border-2 border-brass bg-surface px-2.5 font-display text-sm font-bold text-ink outline-none [field-sizing:content]"
+    />
+  );
+}
+
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   const t = useT();
   return (
@@ -356,8 +376,24 @@ function TargetRow({
   const presetUrlIncomplete = !INGEST_URL_RE.test(preset.ingestUrl.trim());
   const showUrlField =
     isCustom || presetUrlIncomplete || target.platformId === "kick";
-  const urlInvalid = isUrlInvalid(target);
-  const urlOk = hasValidUrl(target);
+  const nameDraft = useDraft(target.name, (name) =>
+    updateTarget(target.id, { name }),
+  );
+  const urlDraft = useDraft(
+    INGEST_URL_RE.test(target.ingestUrl)
+      ? target.ingestUrl
+      : target.ingestUrl.replace(/^(rtmps?):\/\/$/i, ""),
+    (ingestUrl) => updateTarget(target.id, { ingestUrl }),
+    sanitizeIngestUrl,
+  );
+  // Validate what is being typed; the store receives it only when the edit ends.
+  const edited = {
+    ...target,
+    name: nameDraft.value,
+    ingestUrl: urlDraft.value,
+  };
+  const urlInvalid = isUrlInvalid(edited);
+  const urlOk = hasValidUrl(edited);
   const readiness = !urlOk
     ? {
         tone: "bad" as const,
@@ -367,13 +403,13 @@ function TargetRow({
       }
     : !target.hasKey
       ? { tone: "warn" as const, label: t("platforms.target.badge.pasteKey") }
-      : !target.name.trim()
+      : !edited.name.trim()
         ? { tone: "warn" as const, label: t("platforms.target.badge.noName") }
         : { tone: "ok" as const, label: t("platforms.target.badge.ready") };
 
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
-  const blocking = blockingIssues(target, t);
+  const blocking = blockingIssues(edited, t);
   const keyOnlyPending = blocking.length > 0 && urlOk;
   const [open, setOpen] = useState(() => blocking.length > 0);
 
@@ -453,10 +489,7 @@ function TargetRow({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <input
-                  value={target.name}
-                  onChange={(e) =>
-                    updateTarget(target.id, { name: e.target.value })
-                  }
+                  {...draftInputProps(nameDraft)}
                   aria-label={t("platforms.target.nameAria")}
                   className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
                 />
@@ -525,20 +558,8 @@ function TargetRow({
                   )}
                 </span>
                 <Input
-                  value={
-                    INGEST_URL_RE.test(target.ingestUrl)
-                      ? target.ingestUrl
-                      : target.ingestUrl.replace(/^(rtmps?):\/\/$/i, "")
-                  }
+                  {...draftInputProps(urlDraft)}
                   placeholder={t("platforms.target.url.placeholder")}
-                  onChange={(e) =>
-                    updateTarget(target.id, { ingestUrl: e.target.value })
-                  }
-                  onBlur={(e) => {
-                    const clean = sanitizeIngestUrl(e.target.value);
-                    if (clean !== e.target.value)
-                      updateTarget(target.id, { ingestUrl: clean });
-                  }}
                   invalid={urlInvalid}
                 />
                 {urlInvalid && (

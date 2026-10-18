@@ -44,6 +44,7 @@ import { toast } from "../lib/toast";
 import type { AppSettings } from "../lib/types";
 import { cn } from "../lib/utils";
 import { sanitizeHost } from "../lib/validation";
+import { draftInputProps, useDraft } from "../lib/useDraft";
 import { BrbPreview, BrbSlateChooser } from "./settings/BrbSettings";
 import { GuardianEditor, GuardianPreview } from "./settings/GuardianSettings";
 import { ObsTestButton } from "./settings/ObsTestButton";
@@ -104,6 +105,21 @@ export function SettingsScreen() {
     }
   };
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const hostDraft = useDraft(
+    config?.ingest.host ?? "",
+    (host) => setIngest({ host }),
+    sanitizeHost,
+  );
+  const appDraft = useDraft(config?.ingest.app ?? "", (app) =>
+    setIngest({ app }),
+  );
+  const ingestKeyDraft = useDraft(config?.ingest.key ?? "", (key) =>
+    setIngest({ key }),
+  );
+  const obsPasswordDraft = useDraft(
+    config?.settings.obsPassword ?? "",
+    (obsPassword) => setSettings({ obsPassword }),
+  );
 
   useEffect(() => {
     if (requestedTab) {
@@ -247,16 +263,7 @@ export function SettingsScreen() {
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label={t("settings.obs.advanced.field.host")}>
-                    <Input
-                      value={ingest.host}
-                      disabled={live}
-                      onChange={(e) => setIngest({ host: e.target.value })}
-                      onBlur={(e) => {
-                        const clean = sanitizeHost(e.target.value);
-                        if (clean !== e.target.value)
-                          setIngest({ host: clean });
-                      }}
-                    />
+                    <Input {...draftInputProps(hostDraft)} disabled={live} />
                   </Field>
                   <Field label={t("settings.obs.advanced.field.port")}>
                     <Input
@@ -282,17 +289,12 @@ export function SettingsScreen() {
                     )}
                   </Field>
                   <Field label={t("settings.obs.advanced.field.app")}>
-                    <Input
-                      value={ingest.app}
-                      disabled={live}
-                      onChange={(e) => setIngest({ app: e.target.value })}
-                    />
+                    <Input {...draftInputProps(appDraft)} disabled={live} />
                   </Field>
                   <Field label={t("settings.obs.advanced.field.localKey")}>
                     <Input
-                      value={ingest.key}
+                      {...draftInputProps(ingestKeyDraft)}
                       disabled={live}
-                      onChange={(e) => setIngest({ key: e.target.value })}
                     />
                   </Field>
                 </div>
@@ -330,10 +332,7 @@ export function SettingsScreen() {
                     aria-label={t("settings.obs.password.title")}
                     placeholder={t("settings.obs.password.placeholder")}
                     className="w-48"
-                    value={settings.obsPassword}
-                    onChange={(e) =>
-                      setSettings({ obsPassword: e.target.value })
-                    }
+                    {...draftInputProps(obsPasswordDraft)}
                   />
                   <ObsTestButton />
                 </div>

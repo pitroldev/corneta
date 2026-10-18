@@ -160,6 +160,9 @@ export function ChatPopout() {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  // Preview the font size while dragging; the setting is saved once when the drag ends.
+  const [fontPreview, setFontPreview] = useState<number | null>(null);
+  const [alertFontPreview, setAlertFontPreview] = useState<number | null>(null);
   const st = config?.settings;
   const view: ChatView = useMemo(
     () => ({
@@ -168,7 +171,7 @@ export function ChatPopout() {
       platform: st?.chatShowPlatform ?? true,
       source: st?.chatShowSource ?? false,
       timestamps: st?.chatShowTimestamps ?? false,
-      fontSize: st?.chatFontSize ?? 14,
+      fontSize: fontPreview ?? st?.chatFontSize ?? 14,
     }),
     [
       st?.chatShowEmotes,
@@ -177,6 +180,7 @@ export function ChatPopout() {
       st?.chatShowSource,
       st?.chatShowTimestamps,
       st?.chatFontSize,
+      fontPreview,
     ],
   );
   const bothLayout = st?.chatBothLayout ?? "auto";
@@ -394,7 +398,7 @@ export function ChatPopout() {
       <AlertsFeed
         alerts={alerts}
         className="min-h-0 flex-1"
-        fontSize={st?.alertFontSize ?? 14}
+        fontSize={alertFontPreview ?? st?.alertFontSize ?? 14}
       />
     </div>
   );
@@ -641,10 +645,11 @@ export function ChatPopout() {
             </span>
             <Slider
               className="ml-auto max-w-44 flex-1"
-              value={view.fontSize}
+              value={st?.chatFontSize ?? 14}
               min={8}
               max={44}
               onChange={(v) => setSettings({ chatFontSize: v })}
+              onPreview={setFontPreview}
               suffix="px"
               aria-label={t("chat.display.chatFontSize")}
             />
@@ -659,6 +664,7 @@ export function ChatPopout() {
               min={8}
               max={44}
               onChange={(v) => setSettings({ alertFontSize: v })}
+              onPreview={setAlertFontPreview}
               suffix="px"
               aria-label={t("chat.display.alertFontSize")}
             />
@@ -709,7 +715,7 @@ export function ChatPopout() {
         <AlertsFeed
           alerts={alerts}
           className="flex-1"
-          fontSize={st?.alertFontSize ?? 14}
+          fontSize={alertFontPreview ?? st?.alertFontSize ?? 14}
         />
       )}
 
