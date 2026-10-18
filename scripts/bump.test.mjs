@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   mkdtempSync,
   mkdirSync,
@@ -12,6 +12,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { bumpOptions, bumpVersion } from "./bump.mjs";
+
+// Each case spawns many Git processes; on Windows that alone nears the 5 s default under parallel load.
+vi.setConfig({ testTimeout: 30_000 });
 
 const directories = [];
 afterEach(() => {
