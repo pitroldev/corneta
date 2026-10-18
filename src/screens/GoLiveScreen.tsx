@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useShallow } from "zustand/react/shallow";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
@@ -31,7 +39,7 @@ import { PLATFORMS } from "../lib/platforms";
 import { toast } from "../lib/toast";
 import { updateBusy, useUpdate } from "../lib/updater";
 import { cn, errMsg, fmtUptime, openExternal } from "../lib/utils";
-import type { EngineState, ObsCheck, TargetState } from "../lib/types";
+import type { EngineState, ObsCheck, Target, TargetState } from "../lib/types";
 import { isUuid } from "../lib/telemetry-schema";
 import type { Screen } from "../components/Sidebar";
 import { blockingIssues } from "../lib/validation";
@@ -62,7 +70,12 @@ export function GoLiveScreen({
 }) {
   const { t, fmt } = useI18n();
   const config = useStore((s) => s.config)!;
-  const snapshot = useStore((s) => s.snapshot);
+  // Narrow subscriptions: per-target metrics arrive up to four times a second while live.
+  const state = useStore((s) => s.snapshot.state);
+  const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
+  const engineMessage = useStore((s) => s.snapshot.message);
+  const errorId = useStore((s) => s.snapshot.errorId);
+  const startedAt = useStore((s) => s.snapshot.startedAt);
   const viewers = useStore((s) => s.viewers);
   const start = useStore((s) => s.start);
   const stop = useStore((s) => s.stop);
@@ -80,14 +93,17 @@ export function GoLiveScreen({
     onNavigate?.("settings");
   };
 
-  const state = snapshot.state;
   const updating = useUpdate(updateBusy);
   const live = state === "live";
   const starting = state === "starting";
-  const ingestLive = snapshot.ingestLive ?? false;
   const enabled = useMemo(
     () => config.targets.filter((target) => target.enabled),
     [config.targets],
+  );
+  const signalLost = useStore((s) =>
+    enabled.some(
+      (target) => s.snapshot.targets[target.id]?.state === "signal-lost",
+    ),
   );
   const problems = useMemo(
     () =>
@@ -326,7 +342,7 @@ export function GoLiveScreen({
                 {t("golive.error.title")}
               </div>
               <div className="text-sm text-ink-muted" data-selectable>
-                {snapshot.message || t("golive.error.body")}
+                {engineMessage || t("golive.error.body")}
               </div>
             </div>
           </div>
@@ -360,11 +376,11 @@ export function GoLiveScreen({
               mono
             />
           )}
-          {isUuid(snapshot.errorId) && (
+          {isUuid(errorId) && (
             <CopyField
               className="mt-2"
               label={t("golive.error.errorId")}
-              value={snapshot.errorId}
+              value={errorId}
               mono
             />
           )}
@@ -547,7 +563,7 @@ export function GoLiveScreen({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4">
               <LiveTimer
-                startedAt={snapshot.startedAt}
+                startedAt={startedAt}
                 live={live}
                 ingestLive={ingestLive}
               />
@@ -582,49 +598,46 @@ export function GoLiveScreen({
             </div>
           </div>
 
-          {live &&
-            enabled.some(
-              (t) => snapshot.targets[t.id]?.state === "signal-lost",
-            ) && (
-              <Card
-                role="alert"
-                className="mb-2 border-2 border-bad/40 bg-bad/10"
-              >
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-display font-bold text-bad">
-                      {t("golive.signalLost.title")}
-                    </div>
-                    <div className="text-sm text-ink-muted">
-                      {t("golive.signalLost.body")}
-                    </div>
+          {live && signalLost && (
+            <Card
+              role="alert"
+              className="mb-2 border-2 border-bad/40 bg-bad/10"
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-display font-bold text-bad">
+                    {t("golive.signalLost.title")}
+                  </div>
+                  <div className="text-sm text-ink-muted">
+                    {t("golive.signalLost.body")}
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setShowObs(true)}
-                  >
-                    <Zap className="size-4" /> {t("golive.obs.fixForMe")}
-                  </Button>
-                  <Button
-                    variant="subtle"
-                    size="sm"
-                    onClick={runObs}
-                    loading={obs === "loading"}
-                    disabled={obs === "loading"}
-                  >
-                    {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
-                    {t("golive.obs.check")}
-                  </Button>
-                  <Badge tone={obsStatus.tone}>
-                    {t("golive.obs.badge", { status: obsStatus.label })}
-                  </Badge>
-                </div>
-              </Card>
-            )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowObs(true)}
+                >
+                  <Zap className="size-4" /> {t("golive.obs.fixForMe")}
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={runObs}
+                  loading={obs === "loading"}
+                  disabled={obs === "loading"}
+                >
+                  {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
+                  {t("golive.obs.check")}
+                </Button>
+                <Badge tone={obsStatus.tone}>
+                  {t("golive.obs.badge", { status: obsStatus.label })}
+                </Badge>
+              </div>
+            </Card>
+          )}
 
           {starting && !ingestLive && rescue && (
             <Card className="mb-2 border-2 border-warn/40 bg-warn/10">
@@ -667,159 +680,11 @@ export function GoLiveScreen({
             </Card>
           )}
 
-          <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
-            <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-              {t("golive.machine.label")}
-            </span>
-            <Usage label="CPU" value={snapshot.cpu} />
-            <Usage label="GPU" value={snapshot.gpu} />
-          </Card>
+          <MachineUsage />
 
           <SecurityPanel onAdjust={openSecurity} />
 
-          <div className="mb-4 flex flex-col gap-2">
-            <AnimatePresence>
-              {enabled.map((target, i) => {
-                const st = snapshot.targets[target.id];
-                const paused = st?.state === "paused";
-                // Show only observed metrics, never preset values for a destination that is not transmitting.
-                const flowing = st?.state === "live" || st?.state === "brb";
-                return (
-                  <motion.div
-                    key={target.id}
-                    layout
-                    initial={{ opacity: 0, x: -16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      delay: i * 0.05,
-                      type: "spring",
-                      stiffness: 320,
-                      damping: 28,
-                    }}
-                  >
-                    <Card className="flex items-center gap-4 bg-surface-2 py-3">
-                      <PlatformGlyph id={target.platformId} size={36} />
-                      <div className="min-w-32 flex-1">
-                        <div className="font-display font-bold">
-                          {target.name}
-                        </div>
-                        <StatePill state={st?.state ?? "idle"} />
-                        {st?.message && (
-                          <div className="mt-0.5 text-[11px] text-bad">
-                            {st.message}
-                          </div>
-                        )}
-                        {st?.state === "error" && (
-                          <div className="mt-0.5 flex flex-wrap gap-x-3">
-                            <button
-                              onClick={() =>
-                                void api
-                                  .retryTarget(target.id)
-                                  .catch((e) => toast.error(errMsg(e)))
-                              }
-                              className="text-[11px] font-bold text-brass hover:underline"
-                            >
-                              {t("golive.target.retry")}
-                            </button>
-                            <button
-                              onClick={() => onNavigate?.("platforms")}
-                              className="text-[11px] font-bold text-brass hover:underline"
-                            >
-                              {t("golive.target.swapKey")}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="hidden gap-6 sm:flex">
-                        <MiniStat
-                          label={t("golive.stat.bitrate")}
-                          value={
-                            flowing ? fmt.bitrate(st?.bitrateKbps ?? 0) : "—"
-                          }
-                        />
-                        <MiniStat
-                          label={t("golive.stat.fps")}
-                          value={flowing ? String(st?.fps ?? 0) : "—"}
-                        />
-                        <MiniStat
-                          label={t("golive.stat.drops")}
-                          value={flowing ? String(st?.droppedFrames ?? 0) : "—"}
-                          tone={
-                            flowing && st && st.droppedFrames > 0
-                              ? "warn"
-                              : "default"
-                          }
-                        />
-                        <MiniStat
-                          label={t("golive.stat.uptime")}
-                          value={flowing ? fmtUptime(st?.uptimeSec ?? 0) : "—"}
-                        />
-                      </div>
-                      <div className="flex gap-4 sm:hidden">
-                        <MiniStat
-                          label={t("golive.stat.bitrate")}
-                          value={
-                            flowing ? fmt.bitrate(st?.bitrateKbps ?? 0) : "—"
-                          }
-                        />
-                        <MiniStat
-                          label={t("golive.stat.drops")}
-                          value={flowing ? String(st?.droppedFrames ?? 0) : "—"}
-                          tone={
-                            flowing && st && st.droppedFrames > 0
-                              ? "warn"
-                              : "default"
-                          }
-                        />
-                      </div>
-                      {PLATFORMS[target.platformId].liveUrl && (
-                        <button
-                          onClick={() =>
-                            void openExternal(
-                              PLATFORMS[target.platformId].liveUrl!,
-                            )
-                          }
-                          className="grid size-9 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-                          title={t("golive.target.openChannel.title")}
-                          aria-label={t("golive.target.openChannel.aria", {
-                            nome: target.name,
-                          })}
-                        >
-                          <ExternalLink className="size-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() =>
-                          void api.setTargetPaused(target.id, !paused)
-                        }
-                        className={cn(
-                          "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold uppercase tracking-wide transition-colors",
-                          paused
-                            ? "bg-brass/15 text-brass hover:bg-brass/25"
-                            : "bg-surface-3 text-ink-muted hover:text-ink",
-                        )}
-                        title={
-                          paused
-                            ? t("golive.target.resume.title")
-                            : t("golive.target.pause.title")
-                        }
-                      >
-                        {paused ? (
-                          <Play className="size-3.5" />
-                        ) : (
-                          <Pause className="size-3.5" />
-                        )}
-                        {paused
-                          ? t("golive.target.resume")
-                          : t("golive.target.pause")}
-                      </button>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
+          <LiveTargetList targets={enabled} onNavigate={onNavigate} />
         </>
       )}
 
@@ -1517,6 +1382,178 @@ function CheckRow({
     </div>
   );
 }
+
+function MachineUsage() {
+  const t = useT();
+  const cpu = useStore((s) => s.snapshot.cpu);
+  const gpu = useStore((s) => s.snapshot.gpu);
+  return (
+    <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
+      <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+        {t("golive.machine.label")}
+      </span>
+      <Usage label="CPU" value={cpu} />
+      <Usage label="GPU" value={gpu} />
+    </Card>
+  );
+}
+
+// Rows read their own metrics, so a stats update re-renders one row and never re-measures the list.
+const LiveTargetList = memo(function LiveTargetList({
+  targets,
+  onNavigate,
+}: {
+  targets: Target[];
+  onNavigate?: (s: Screen) => void;
+}) {
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      <AnimatePresence>
+        {targets.map((target, i) => (
+          <motion.div
+            key={target.id}
+            layout
+            layoutDependency={i}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              delay: i * 0.05,
+              type: "spring",
+              stiffness: 320,
+              damping: 28,
+            }}
+          >
+            <LiveTargetRow target={target} onNavigate={onNavigate} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+});
+
+const LiveTargetRow = memo(function LiveTargetRow({
+  target,
+  onNavigate,
+}: {
+  target: Target;
+  onNavigate?: (s: Screen) => void;
+}) {
+  const { t, fmt } = useI18n();
+  const st = useStore(
+    useShallow((s) => {
+      const metrics = s.snapshot.targets[target.id];
+      return {
+        state: metrics?.state,
+        message: metrics?.message,
+        bitrateKbps: metrics?.bitrateKbps,
+        fps: metrics?.fps,
+        droppedFrames: metrics?.droppedFrames,
+        uptimeSec: metrics?.uptimeSec,
+      };
+    }),
+  );
+  const paused = st.state === "paused";
+  // Show only observed metrics, never preset values for a destination that is not transmitting.
+  const flowing = st.state === "live" || st.state === "brb";
+  return (
+    <Card className="flex items-center gap-4 bg-surface-2 py-3">
+      <PlatformGlyph id={target.platformId} size={36} />
+      <div className="min-w-32 flex-1">
+        <div className="font-display font-bold">{target.name}</div>
+        <StatePill state={st.state ?? "idle"} />
+        {st.message && (
+          <div className="mt-0.5 text-[11px] text-bad">{st.message}</div>
+        )}
+        {st.state === "error" && (
+          <div className="mt-0.5 flex flex-wrap gap-x-3">
+            <button
+              onClick={() =>
+                void api
+                  .retryTarget(target.id)
+                  .catch((e) => toast.error(errMsg(e)))
+              }
+              className="text-[11px] font-bold text-brass hover:underline"
+            >
+              {t("golive.target.retry")}
+            </button>
+            <button
+              onClick={() => onNavigate?.("platforms")}
+              className="text-[11px] font-bold text-brass hover:underline"
+            >
+              {t("golive.target.swapKey")}
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="hidden gap-6 sm:flex">
+        <MiniStat
+          label={t("golive.stat.bitrate")}
+          value={flowing ? fmt.bitrate(st.bitrateKbps ?? 0) : "—"}
+        />
+        <MiniStat
+          label={t("golive.stat.fps")}
+          value={flowing ? String(st.fps ?? 0) : "—"}
+        />
+        <MiniStat
+          label={t("golive.stat.drops")}
+          value={flowing ? String(st.droppedFrames ?? 0) : "—"}
+          tone={flowing && (st.droppedFrames ?? 0) > 0 ? "warn" : "default"}
+        />
+        <MiniStat
+          label={t("golive.stat.uptime")}
+          value={flowing ? fmtUptime(st.uptimeSec ?? 0) : "—"}
+        />
+      </div>
+      <div className="flex gap-4 sm:hidden">
+        <MiniStat
+          label={t("golive.stat.bitrate")}
+          value={flowing ? fmt.bitrate(st.bitrateKbps ?? 0) : "—"}
+        />
+        <MiniStat
+          label={t("golive.stat.drops")}
+          value={flowing ? String(st.droppedFrames ?? 0) : "—"}
+          tone={flowing && (st.droppedFrames ?? 0) > 0 ? "warn" : "default"}
+        />
+      </div>
+      {PLATFORMS[target.platformId].liveUrl && (
+        <button
+          onClick={() =>
+            void openExternal(PLATFORMS[target.platformId].liveUrl!)
+          }
+          className="grid size-9 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+          title={t("golive.target.openChannel.title")}
+          aria-label={t("golive.target.openChannel.aria", {
+            nome: target.name,
+          })}
+        >
+          <ExternalLink className="size-4" />
+        </button>
+      )}
+      <button
+        onClick={() => void api.setTargetPaused(target.id, !paused)}
+        className={cn(
+          "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold uppercase tracking-wide transition-colors",
+          paused
+            ? "bg-brass/15 text-brass hover:bg-brass/25"
+            : "bg-surface-3 text-ink-muted hover:text-ink",
+        )}
+        title={
+          paused
+            ? t("golive.target.resume.title")
+            : t("golive.target.pause.title")
+        }
+      >
+        {paused ? (
+          <Play className="size-3.5" />
+        ) : (
+          <Pause className="size-3.5" />
+        )}
+        {paused ? t("golive.target.resume") : t("golive.target.pause")}
+      </button>
+    </Card>
+  );
+});
 
 function StatePill({ state }: { state: TargetState }) {
   const t = useT();
