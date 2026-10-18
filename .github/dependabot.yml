@@ -4,17 +4,32 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Fresh releases wait a few days; security updates are not delayed.
+    cooldown:
+      default-days: 3
     groups:
       frontend-minor:
         update-types: [minor, patch]
+    ignore:
+      # Types must follow the Node 24 runtime pinned by .node-version and engines.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       rust-minor:
         update-types: [minor, patch]
+    ignore:
+      # COM bindings must match the version Wry uses; update together with Tauri.
+      - dependency-name: webview2-com
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
