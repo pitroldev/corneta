@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -34,15 +34,19 @@ sources:
   - title: Twitch Broadcasting Guidelines
     kind: official
     url: https://help.twitch.tv/s/article/broadcasting-guidelines?language=en_US
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: YouTube live encoder settings
     kind: official
     url: https://support.google.com/youtube/answer/2853702?hl=en
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: OBS Encoding Performance Troubleshooting
     kind: official
     url: https://obsproject.com/kb/encoding-performance-troubleshooting
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
+  - title: Corneta quality modes
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -72,7 +76,7 @@ Não escolha 1080p60 porque o monitor é Full HD. A saída precisa sobreviver ao
 
 ## O bitrate muda o resultado
 
-Na Twitch, a referência oficial usa 3.000 kbps para 720p30, 4.500 para 720p60 e 6.000 para 1080p60. No YouTube, as recomendações H.264 são mais altas: 4, 6 e 12 Mbps nesses mesmos perfis.
+Na Twitch, a referência oficial usa 3.000 kbps para 720p30, 4.500 para 720p60 e 6.000 para 1080p60. No YouTube, a tabela atual recomenda em H.264 8 Mbps para 720p30 e 720p60 e 17 Mbps para 1080p60, com mínimo de 3, 3 e 6 Mbps. Em AV1 ou HEVC, os recomendados caem para 6, 6 e 12 Mbps.
 
 Com bitrate curto, mais pixels podem piorar a imagem: o encoder divide a mesma quantidade de dados entre mais detalhes e mais quadros. Blocos em movimento são um sinal para reduzir resolução, FPS ou complexidade da cena.
 
@@ -83,6 +87,8 @@ Com bitrate curto, mais pixels podem piorar a imagem: o encoder divide a mesma q
 1. **Menor denominador comum:** configure o OBS num perfil aceito por todos e copie o sinal.
 2. **Uma exceção:** copie para destinos compatíveis e recodifique só o diferente.
 3. **Tudo separado:** recodifique cada plataforma quando qualidade por destino vale a carga.
+
+Na Corneta, esses caminhos são os modos da tela **Qualidade**: **Na lata** (1), **Esperto** (2, que copia as plataformas deitadas e recodifica só as em pé) e **Caprichado** (3). O **Configura pra mim** só aponta o OBS para a Corneta, com servidor e chave; resolução, FPS e bitrate você acerta no próprio OBS.
 
 Comece pelo primeiro. Só abra uma nova sessão de encoder quando o benefício for visível.
 

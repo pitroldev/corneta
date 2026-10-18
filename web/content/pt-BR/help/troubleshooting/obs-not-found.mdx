@@ -2,7 +2,7 @@
 contentId: help_obs_not_found
 title: "A Corneta não encontra o OBS: WebSocket, senha, porta e firewall"
 description: "Corrija conexão recusada, senha errada e porta diferente quando a configuração automática não encontra o OBS."
-summary: "Abra Ferramentas → Configurações do Servidor WebSocket no OBS, deixe o servidor ativo e copie a mesma senha para a Corneta. A porta padrão é 4455, mas a configuração precisa bater dos dois lados."
+summary: "Abra Ferramentas → Configurações do Servidor WebSocket no OBS, deixe o servidor ativo e copie a mesma senha para a Corneta. A Corneta sempre procura o OBS na porta 4455; se você mudou a porta no OBS, volte para 4455."
 locale: pt-BR
 collection: help
 kind: troubleshooting
@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -34,11 +34,11 @@ sources:
   - title: OBS Remote Control Guide
     kind: official
     url: https://obsproject.com/kb/remote-control-guide
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: Corneta OBS WebSocket client
     kind: internal
     repoPath: src-tauri/src/obs.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
     originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
@@ -60,22 +60,23 @@ images:
 No OBS 28 ou mais recente, abra **Ferramentas → Configurações do Servidor WebSocket**. O WebSocket já vem integrado; não instale plugin separado sem necessidade.
 
 1. Ative o servidor WebSocket.
-2. Confira a porta; o padrão é `4455`.
-3. Mantenha autenticação ligada.
-4. Copie a senha para **Configurações → OBS** na Corneta.
+2. Confira se a **Porta do servidor** está em `4455`. A Corneta não deixa trocar essa porta.
+3. Mantenha **Habilitar autenticação** ligado.
+4. Clique em **Mostrar informações da conexão**, copie a senha e cole em **Configurações → OBS** na Corneta.
 5. Clique em **Testar conexão** ou volte a **Liga no OBS**.
 
 <ContentImage baseName="corneta-obs-connection-details" />
 
 ## Pelo sintoma
 
-| Mensagem                        | Causa provável                           | Correção                                |
-| ------------------------------- | ---------------------------------------- | --------------------------------------- |
-| conexão recusada                | servidor desligado ou porta errada       | ative e iguale a porta                  |
-| senha necessária                | autenticação ligada sem senha na Corneta | cole a senha correta                    |
-| autenticação falhou             | senha diferente                          | gere ou copie novamente                 |
-| timeout                         | firewall ou processo travado             | libere na rede privada e reinicie o OBS |
-| conectado, mas Aguardando sinal | WebSocket está bem; RTMP não chegou      | inicie a transmissão no OBS             |
+| Mensagem na Corneta                               | Causa provável                                                            | Correção                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Não achei o OBS                                   | OBS fechado, WebSocket desligado, porta diferente de 4455 ou senha errada | abra o OBS, ative o servidor, volte a porta para 4455 e copie a senha de novo |
+| Senha recusada                                    | o OBS pede senha e a Corneta está sem nenhuma                             | cole a senha em **Configurações → OBS**                                       |
+| Conectado, mas o OBS não tá apontando pra Corneta | o OBS transmite para outro servidor                                       | clique em **Configura pra mim** na tela **Ao vivo**                           |
+| Conectado, mas **Aguardando sinal**               | o WebSocket está bem; o vídeo não chegou                                  | inicie a transmissão no OBS                                                   |
+
+Se o OBS travou, feche e abra de novo. Antivírus com firewall próprio também pode bloquear a conexão: libere o OBS e a Corneta nele.
 
 Não desligue a senha só para “ver se vai” numa rede compartilhada. A documentação do OBS recomenda proteger o WebSocket.
 

@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,13 +31,13 @@ sources:
   - title: Corneta platforms screen
     kind: internal
     repoPath: src/screens/PlatformsScreen.tsx
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
     originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
     baseName: corneta-platform-key-setup
     alt: "Destino Twitch aberto na tela Plataformas, com chave no cofre e botão Testar o servidor."
-    caption: "O teste pega chave ou servidor errado antes de você entrar no ar."
+    caption: "O teste confere se o servidor responde. A chave só se prova quando a live entra no ar."
     width: 1080
     height: 900
     kind: screenshot
@@ -64,25 +64,29 @@ images:
 ## Adicione uma plataforma
 
 1. Abra **Plataformas**.
-2. Clique em **Adicionar plataforma**.
-3. Escolha Twitch, YouTube, Kick ou **Personalizado**.
+2. Clique em **Adicionar**.
+3. Escolha a plataforma: Twitch, YouTube, Kick, Facebook, TikTok, X, Instagram
+   ou **Personalizado**. TikTok, X e Instagram ainda são experimentais.
 4. Cole a stream key e clique em **Colar e salvar**.
-5. Se o endereço não veio preenchido, cole a **URL de ingestão** mostrada pelo
-   painel da plataforma.
+5. Se aparecer o campo **URL do servidor**, cole o endereço `rtmp://` ou
+   `rtmps://` mostrado pelo painel da plataforma.
 
 A Corneta guarda a stream key no cofre do Windows. O arquivo de configuração não
 leva essa chave junto.
 
-## Teste antes da live
+## Teste o servidor antes da live
 
-Abra o destino e clique em **Testar o servidor**. Esse teste verifica se a
-Corneta consegue chegar ao endereço e usar a chave informada sem abrir uma live
-completa.
+Abra o destino e clique em **Testar o servidor**. O teste vê se o servidor da
+plataforma responde no endereço informado. Ele não confere a chave: chave errada
+ou vencida só aparece quando a live entra no ar.
 
 <ContentImage baseName="corneta-platform-key-setup" />
 
-Se o teste passar, o card fica **Pronto**. Se você trocar a chave, a URL ou
-desligar o destino, o resultado anterior deixa de valer — teste de novo.
+Se o resultado for **não achei** ou **sem resposta**, confira a URL do servidor
+no painel da plataforma e a sua rede.
+
+O selo **Pronto** não depende do teste. Ele aparece quando o destino tem nome,
+URL válida e chave no cofre.
 
 <ContentImage baseName="corneta-platform-destinations" />
 
@@ -92,27 +96,36 @@ Na tela **Ao vivo**, use **Pausar** no destino que precisa sair. A Twitch pode
 continuar no ar enquanto a Kick fica pausada, por exemplo. Use **Retomar** para
 abrir aquela saída novamente.
 
+Se a plataforma recusar a chave, aquele destino mostra **Chave recusada** e os
+outros seguem no ar. Cole a chave nova em **Plataformas** e clique em **Tentar de
+novo** na tela **Ao vivo**.
+
 Pausar não apaga chave nem configuração. Remover faz outra coisa: tira o destino
 do perfil ativo.
 
 ## Remova uma plataforma
 
-Na tela **Plataformas**, abra o destino, clique em **Remover** e confirme em
-**Remover mesmo?**. Faça isso fora da live. Se você só não vai usar a plataforma
-hoje, desligue o destino em vez de remover.
+Na tela **Plataformas**, abra o destino e clique em **Remover**. Ele sai na hora;
+se foi sem querer, clique em **Desfazer** no aviso que aparece. Faça isso fora da
+live. Se você só não vai usar a plataforma hoje, desligue o destino em vez de
+remover.
+
+Para apagar só a stream key, use o **Remover** ao lado de **Chave no cofre** e
+confirme em **Remover mesmo?**.
 
 ## Se o card não ficar pronto
 
-| Sinal          | O que costuma ser                              | Próxima ação                                  |
-| -------------- | ---------------------------------------------- | --------------------------------------------- |
-| Cole a chave   | Não há stream key guardada                     | Pegue uma chave nova no painel da plataforma  |
-| Sem URL        | O destino não tem servidor de ingestão         | Cole uma URL `rtmp://` ou `rtmps://` válida   |
-| URL inválida   | Foi colada uma página web no campo de ingestão | Copie o servidor RTMP/RTMPS, não o dashboard  |
-| Teste recusado | Chave expirada ou servidor errado              | Gere outra chave e confira o endereço oficial |
+| Sinal        | O que costuma ser                              | Próxima ação                                 |
+| ------------ | ---------------------------------------------- | -------------------------------------------- |
+| Cole a chave | Não há stream key guardada                     | Pegue uma chave nova no painel da plataforma |
+| Sem URL      | O destino não tem servidor de ingestão         | Cole uma URL `rtmp://` ou `rtmps://` válida  |
+| URL inválida | Foi colada uma página web no campo de ingestão | Copie o servidor RTMP/RTMPS, não o dashboard |
+| Sem nome     | O destino ficou sem nome                       | Dê um nome ao destino no próprio card        |
 
 <Callout label="Uma plataforma manda nas próprias regras" tone="limit">
-  O teste confirma a conexão, não libera sua conta para fazer live. O YouTube,
-  por exemplo, pode exigir ativação antecipada da primeira transmissão.
+  O teste confirma que o servidor responde. Ele não confere a chave nem libera
+  sua conta para fazer live. O YouTube, por exemplo, pode exigir ativação
+  antecipada da primeira transmissão.
 </Callout>
 
 Se os nomes dos campos ainda estão embolados, veja [stream key, URL de ingestão

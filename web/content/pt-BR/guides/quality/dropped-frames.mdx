@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: OBS Studio
     version: 32.x
@@ -34,11 +34,19 @@ sources:
   - title: OBS Stream Connection Troubleshooting
     kind: official
     url: https://obsproject.com/kb/stream-connection-troubleshooting
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: OBS Encoding Performance Troubleshooting
     kind: official
     url: https://obsproject.com/kb/encoding-performance-troubleshooting
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
+  - title: OBS Streaming with x264
+    kind: official
+    url: https://obsproject.com/blog/streaming-with-x264
+    reviewedAt: 2026-10-18
+  - title: Corneta local OBS ingest
+    kind: internal
+    repoPath: src/lib/factory.ts
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -57,25 +65,28 @@ images:
 
 ## Abra o contador certo
 
-No OBS, abra **Exibir → Estatísticas** durante a mesma cena que costuma travar. Não tire conclusão olhando só CPU ou o FPS do jogo.
+No OBS, abra **Visualizar → Estatísticas** durante a mesma cena que costuma travar. Não tire conclusão olhando só CPU ou o FPS do jogo.
 
-| O que subiu                                 | Gargalo provável                 | Primeiro teste                       |
-| ------------------------------------------- | -------------------------------- | ------------------------------------ |
-| Quadros perdidos pela rede                  | upload, Wi-Fi, rota ou ingest    | cabo, sem VPN e outro ingest oficial |
-| Quadros perdidos por atraso de renderização | GPU sem tempo para montar a cena | limite o FPS do jogo                 |
-| Quadros ignorados por atraso de codificação | encoder sem entregar a tempo     | reduza FPS, resolução ou preset      |
+| O que subiu                                      | Gargalo provável                                 | Primeiro teste                                        |
+| ------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------- |
+| Quadros perdidos (rede)                          | com a Corneta, gargalo local entre OBS e Corneta | feche programas pesados e reduza recodificações       |
+| Quadros perdidos devido à demora na renderização | GPU sem tempo para montar a cena                 | limite o FPS do jogo                                  |
+| Quadros ignorados devido à demora na codificação | encoder sem entregar a tempo                     | reduza resolução e FPS; depois, um preset mais rápido |
+| Quedas ou reconexão de uma plataforma na Corneta | upload, Wi-Fi, rota ou ingest                    | cabo, sem VPN e bitrate menor                         |
 
 ## Rede
 
-Perda de rede acontece depois que o quadro já foi produzido. Feche backup e sincronização, teste por cabo e compare outro servidor oficial. Se só uma saída da Corneta reconecta, investigue aquela plataforma antes de mexer no OBS inteiro.
+Quando o OBS manda direto para a plataforma, **Quadros perdidos (rede)** mede a sua internet. Com a Corneta, o OBS entrega o vídeo dentro do próprio PC (`127.0.0.1`), então esse contador aponta para um gargalo local, não para a sua internet.
+
+Problema de internet aparece na Corneta, plataforma por plataforma, como reconexão e quedas. Aí vale fechar backup e sincronização, testar por cabo, desligar a VPN e baixar o bitrate. Se só uma plataforma reconecta, investigue aquela plataforma antes de mexer no OBS inteiro. Não troque o servidor do OBS: ele precisa continuar apontando para a Corneta.
 
 ## Renderização
 
-O OBS usa GPU para montar cena mesmo quando o vídeo é codificado por CPU. Jogo com FPS destravado, Browser Sources pesadas e filtros podem ocupar o tempo que faltou. Limite o jogo e desative uma fonte por vez.
+O OBS usa GPU para montar cena mesmo quando o vídeo é codificado por CPU. Jogo com FPS destravado, Browser Sources pesadas e filtros podem ocupar o tempo que faltou. Limite o jogo, rode o OBS como administrador e desative uma fonte por vez.
 
 ## Codificação
 
-Aqui o quadro foi montado, mas o encoder atrasou. Hardware encoder costuma aliviar CPU; reduzir de 60 para 30 FPS corta pela metade o número de quadros a codificar. No multistream, diminuir recodificações também conta.
+Aqui o quadro foi montado, mas o encoder atrasou. Reduza resolução e FPS; se não bastar, use um preset mais rápido. Encoder por hardware da placa de vídeo costuma aliviar a CPU, e reduzir de 60 para 30 FPS corta pela metade o número de quadros a codificar. No multistream, diminuir recodificações também conta.
 
 <ContentImage baseName="corneta-quality-modes" />
 

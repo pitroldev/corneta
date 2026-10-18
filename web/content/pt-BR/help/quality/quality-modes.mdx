@@ -2,7 +2,7 @@
 contentId: help_quality_modes
 title: "Na lata, Esperto ou Caprichado: qual modo escolher?"
 description: "Compare os três modos de qualidade da Corneta pelo custo de upload, pela carga de recodificação e pela compatibilidade."
-summary: "Use Na lata quando o sinal do OBS já serve para todas as plataformas. Esperto adapta só o que não encaixa. Caprichado recodifica cada destino e exige mais da máquina."
+summary: "Use Na lata quando o sinal do OBS já serve para todas as plataformas. Esperto copia o OBS e recodifica só as plataformas em pé. Caprichado recodifica cada destino e exige mais da máquina."
 locale: pt-BR
 collection: help
 kind: help
@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta encoding screen
     kind: internal
     repoPath: src/screens/EncodingScreen.tsx
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: Corneta platform estimates
     kind: internal
     repoPath: src/lib/estimates.ts
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -56,55 +56,65 @@ images:
 
 - **Na lata:** quando o OBS já entrega uma resolução, FPS e bitrate que todas as
   plataformas aceitam.
-- **Esperto:** quando alguns destinos aceitam o sinal e outros precisam de
-  ajuste.
-- **Caprichado:** quando cada plataforma precisa receber um preset próprio e sua
-  GPU ou CPU aguenta as recodificações.
+- **Esperto:** quando as plataformas deitadas aceitam o sinal do OBS e só as em
+  pé, como TikTok e Instagram, precisam de outro formato.
+- **Caprichado:** quando cada plataforma precisa receber o preset dela e sua GPU
+  ou CPU aguenta uma recodificação por destino.
 
 <ContentImage baseName="corneta-quality-modes" />
 
 ## Na lata
 
-A Corneta copia o sinal comprimido do OBS para todos os destinos. Não abre uma
-nova recodificação por plataforma, então costuma ser o modo mais leve.
+A Corneta copia o vídeo comprimido do OBS para todos os destinos. Não abre uma
+nova recodificação de vídeo por plataforma, então é o modo mais leve.
 
 O limite aparece cedo: todas recebem o mesmo vídeo. Se a configuração boa para o
 YouTube ultrapassa o que outro destino aceita, ajuste o OBS pelo menor limite ou
-troque de modo.
+troque de modo. Plataforma em pé, como TikTok ou Instagram, sai torta em cópia.
 
 ## Esperto
 
-A Corneta copia o sinal onde ele já cabe e recodifica só os destinos
-incompatíveis. É a primeira tentativa quando você quer manter o sinal original
-em uma plataforma sem abrir encoder novo para todas.
+A Corneta copia o OBS para as plataformas deitadas, como Twitch, YouTube e Kick,
+e recodifica sozinha só as em pé. Ela não compara o sinal do OBS com o limite de
+cada plataforma: nas cópias, vale o bitrate do OBS. A tela **Qualidade** mostra
+o máximo que as plataformas em cópia aceitam.
 
-Confira a estimativa de sessões. O resultado depende da placa, do encoder
-disponível e do que cada destino pede naquele perfil.
+Só o Esperto deixa escolher, no **Ajuste fino por plataforma**, entre **Auto**,
+**Copiar** e **Recodificar** para cada destino.
+
+Confira os cards dos modos: eles mostram o **Upload** total e o **Peso no PC**
+estimado. Se as recodificações passarem do que a placa de vídeo aguenta, a tela
+avisa.
 
 ## Caprichado
 
-Cada destino recebe uma recodificação própria. Isso permite ajustar bitrate,
-resolução e FPS por plataforma, mas aumenta a carga de CPU ou GPU. Em placas com
-limite de sessões simultâneas, a conta pode não fechar.
+Cada destino recebe uma recodificação própria, no preset da plataforma. No
+**Ajuste fino por plataforma**, você escolhe a qualidade da imagem
+(**Econômico**, **Padrão** ou **Bonitão**), o bitrate e **Quem recodifica**:
+placa de vídeo ou processador. A resolução e o FPS seguem o preset de cada
+plataforma. É o modo que mais pesa na CPU ou na GPU. Em placas com limite de
+sessões simultâneas, a conta pode não fechar.
 
 ## Como decidir no seu PC
 
-1. Comece em **Na lata** se as plataformas aceitam a saída do OBS.
-2. Troque para **Esperto** quando só um destino precisa mudar.
+1. Comece em **Na lata** se todas as plataformas aceitam a saída do OBS.
+2. Troque para **Esperto** quando tiver plataforma em pé ou quando só um destino
+   precisa mudar. Nesse caso, marque **Recodificar** só nele.
 3. Use **Caprichado** quando o ajuste por plataforma compensa a carga extra.
 4. Faça uma live de teste com jogo, câmera, alertas e movimento reais.
-5. Veja CPU, GPU, FPS e quadros perdidos durante o trecho mais pesado.
+5. Na tela **Ao vivo**, acompanhe CPU e GPU no quadro **Máquina** e o **FPS** e
+   as **Quedas** de cada plataforma durante o trecho mais pesado.
 
-| Sintoma                        | Teste rápido                        | Próxima mudança                        |
-| ------------------------------ | ----------------------------------- | -------------------------------------- |
-| Encoder sobrecarregado         | Troque Caprichado por Esperto       | Reduza o número de recodificações      |
-| GPU no limite com o jogo       | Limite o FPS do jogo                | Deixe tempo de GPU para OBS e encoder  |
-| Upload no limite               | Some os bitrates de todas as saídas | Reduza bitrate ou use relay na nuvem   |
-| Uma plataforma rejeita o sinal | Compare o preset dela               | Recodifique só esse destino no Esperto |
+| Sintoma                        | Teste rápido                         | Próxima mudança                        |
+| ------------------------------ | ------------------------------------ | -------------------------------------- |
+| Encoder sobrecarregado         | Troque Caprichado por Esperto        | Reduza o número de recodificações      |
+| GPU no limite com o jogo       | Limite o FPS do jogo                 | Deixe tempo de GPU para OBS e encoder  |
+| Upload no limite               | Confira o **Upload** no card do modo | Reduza bitrate ou use relay na nuvem   |
+| Uma plataforma rejeita o sinal | Compare o preset dela                | Recodifique só esse destino no Esperto |
 
 <Callout label="A estimativa não substitui uma live de teste" tone="limit">
   Encoder disponível não quer dizer jogo estável. Teste a cena mais pesada e
-  deixe a tela de métricas aberta antes de chamar a galera.
+  deixe a tela **Ao vivo** aberta antes de chamar a galera.
 </Callout>
 
 Faça a conta no [guia de upload para

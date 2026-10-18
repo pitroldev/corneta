@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,15 +31,15 @@ sources:
   - title: YouTube Stream across platforms
     kind: official
     url: https://support.google.com/youtube/answer/16404722
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: OBS Stream Connection Troubleshooting
     kind: official
     url: https://obsproject.com/kb/stream-connection-troubleshooting
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
   - title: Corneta upload estimates
     kind: internal
     repoPath: src/lib/estimates.ts
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/quality/corneta-quality-modes.webp
     originalPath: assets/originals/quality/corneta-quality-modes.png
@@ -61,6 +61,9 @@ images:
 Some o bitrate de **vídeo e áudio** de cada saída local. Depois deixe margem
 para Wi-Fi, outras pessoas na rede e variações do provedor. O YouTube recomenda
 mirar entre 1,5 e 2 vezes o bitrate combinado em simulstream.
+
+A tela **Qualidade** da Corneta já diz **cabe folgado** com 20% de sobra. Em
+Wi-Fi ou rede compartilhada, mire na faixa de 1,5× a 2×.
 
 Se a Twitch usa 6 Mb/s e o YouTube usa 4 Mb/s, a soma é 10 Mb/s. A referência de
 upload estável fica entre 15 e 20 Mb/s. Isso não é promessa do seu provedor:
@@ -92,7 +95,8 @@ mesmo assim esconder perda, jitter ou queda curta.
 
 1. Feche backup, sincronização e download em outros aparelhos.
 2. Abra jogo, câmera, microfone, alertas e a cena mais pesada.
-3. Na Corneta, use **Banda de upload → Medir agora** fora da transmissão.
+3. Na tela **Ao vivo**, use **Banda de upload → Medir agora** fora da
+   transmissão.
 4. Faça uma live não listada ou de teste com todos os destinos.
 5. Observe bitrate e quadros perdidos por alguns minutos, principalmente nas
    cenas com movimento.
@@ -102,8 +106,10 @@ mesmo assim esconder perda, jitter ou queda curta.
 ## Se a conta não fechar
 
 Reduza primeiro o bitrate do destino menos exigente. Depois avalie FPS e
-resolução. Trocar de **Caprichado** para **Esperto** alivia recodificação, mas não
-reduz automaticamente a soma do upload se os bitrates continuam iguais.
+resolução. Trocar de **Caprichado** para **Esperto** alivia o PC: Twitch, YouTube
+e Kick passam a receber cópia do OBS, e só quem pede vídeo em pé é recodificado.
+O upload muda junto, porque cada cópia sobe no bitrate do OBS. Confira o número
+no card do modo antes de decidir.
 
 Se a conexão só sustenta uma boa saída, use um relay na nuvem. Brigar com um
 upload que já está no limite costuma virar quadros perdidos no pior momento.

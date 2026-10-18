@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-08-01
-productVersion: 0.6.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -30,11 +30,15 @@ sources:
   - title: Corneta target validation
     kind: internal
     repoPath: src/lib/validation.ts
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
+  - title: Corneta platform presets
+    kind: internal
+    repoPath: src/lib/platforms.ts
+    reviewedAt: 2026-10-18
   - title: Twitch Stream Key FAQ
     kind: official
     url: https://help.twitch.tv/s/article/twitch-stream-key-faq
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/getting-started/corneta-platform-key-setup.webp
     originalPath: assets/originals/getting-started/corneta-platform-key-setup.png
@@ -76,8 +80,9 @@ images:
 ## URL de ingestão
 
 Ela começa com `rtmp://` ou `rtmps://`. É um endereço de transmissão, não uma
-página que abre no navegador. Algumas plataformas já têm um servidor padrão na
-Corneta; em **Personalizado**, você informa o endereço completo.
+página que abre no navegador. Twitch, YouTube, Facebook e Kick já vêm com o
+servidor padrão na Corneta. Em TikTok, X, Instagram e **Personalizado**, você
+cola o endereço completo que a plataforma mostrar.
 
 ## Stream key
 
@@ -88,8 +93,9 @@ e gere outra — apagar a mensagem não desfaz o vazamento.
 <ContentImage baseName="corneta-platform-key-setup" />
 
 Se você colar uma URL completa no campo da chave, a Corneta tenta separar o
-endereço e guardar só a chave. Mesmo assim, confira os dois campos antes de
-testar.
+endereço e guardar só a chave. Mesmo assim, confira os dois campos. O botão
+**Testar o servidor** só vê se o endereço responde; ele não confere a chave. A
+chave só se prova certa quando a live entra no ar.
 
 ## A chave local mostrada em Liga no OBS
 
