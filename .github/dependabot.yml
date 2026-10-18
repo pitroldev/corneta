@@ -10,6 +10,8 @@ updates:
     groups:
       frontend-minor:
         update-types: [minor, patch]
+        # The telemetry transport adapter supports one exact SDK version; review it in its own PR.
+        exclude-patterns: ["posthog-js"]
     ignore:
       # Types must follow the Node 24 runtime pinned by .node-version and engines.
       - dependency-name: "@types/node"
@@ -26,6 +28,8 @@ updates:
     ignore:
       # COM bindings must match the version Wry uses; update together with Tauri.
       - dependency-name: webview2-com
+      # OAR-OCR 0.8.1 requires the execution-provider API removed in ort RC 13.
+      - dependency-name: ort
   - package-ecosystem: github-actions
     directory: /
     schedule:
