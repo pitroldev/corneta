@@ -202,7 +202,11 @@ export function contributorToolScript(tool, cwd) {
     vite: ["vite", "bin/vite.js"],
     tauri: ["@tauri-apps/cli", "tauri.js"],
     eslint: ["eslint", "bin/eslint.js"],
-    tsc: ["typescript", "bin/tsc"],
+    // The app type-checks with TypeScript 7; the site and lint tooling still need the TypeScript 6 API.
+    tsc:
+      cwd === "web"
+        ? ["typescript", "bin/tsc"]
+        : ["@typescript/native", "bin/tsc"],
     vitest: ["vitest", "vitest.mjs"],
     next: ["next", "dist/bin/next"],
     tsx: ["tsx", "dist/cli.mjs"],
