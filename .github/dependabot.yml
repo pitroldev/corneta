@@ -30,6 +30,9 @@ updates:
       - dependency-name: webview2-com
       # OAR-OCR 0.8.1 requires the execution-provider API removed in ort RC 13.
       - dependency-name: ort
+      # Signature tests must use the minisign-verify release that tauri-plugin-updater uses.
+      - dependency-name: minisign-verify
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
