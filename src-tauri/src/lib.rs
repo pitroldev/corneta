@@ -78,6 +78,9 @@ pub struct AppState {
     pub telemetry: telemetry::TelemetryRuntime,
 }
 
+/// Passed by the autostart entry, so a login start opens in the tray instead of on screen.
+const AUTOSTART_ARG: &str = "--autostart";
+
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -196,10 +199,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None::<Vec<&str>>,
+            Some(vec![AUTOSTART_ARG]),
         ))
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Visibility is decided at startup: a login start stays in the tray.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .build(),
+        )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -337,6 +348,9 @@ pub fn run() {
                 std::thread::spawn(move || {
                     let cfg = config::load(&handle);
                     let dir = recorder::resolve_dir(&handle, &cfg.settings.record_video_dir);
+                    if let Some(dir) = dir.as_deref() {
+                        recorder::remove_orphan_temporaries(dir);
+                    }
                     session::prune_videos(
                         &handle,
                         dir.as_deref(),
@@ -347,6 +361,16 @@ pub fn run() {
             if let Some(w) = app.get_webview_window("main") {
                 permissions::grant_av_permissions(&w);
                 clamp_window_to_screen(&w);
+            }
+            if !std::env::args().any(|arg| arg == AUTOSTART_ARG) {
+                show_main(app.handle());
+            }
+            // Entries registered by older versions lack the argument; enabling again rewrites them.
+            if config::load(app.handle()).settings.autostart {
+                use tauri_plugin_autostart::ManagerExt;
+                if let Err(error) = app.autolaunch().enable() {
+                    log::warn!("autostart: could not refresh the login entry: {error}");
+                }
             }
             // Start enabled overlays at boot so persisted OBS sources reconnect before a stream begins.
             {
