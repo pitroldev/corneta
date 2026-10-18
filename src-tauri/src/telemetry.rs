@@ -2048,44 +2048,6 @@ pub fn telemetry_regenerate_id(app: AppHandle) -> Result<TelemetryStatus, String
     app.state::<AppState>().telemetry.regenerate_id()
 }
 
-#[tauri::command]
-pub fn telemetry_capture(
-    app: AppHandle,
-    event: String,
-    properties: Option<Map<String, Value>>,
-) -> Result<bool, String> {
-    app.state::<AppState>()
-        .telemetry
-        .capture(&event, properties.unwrap_or_default())
-}
-
-#[tauri::command]
-pub fn telemetry_capture_exception(
-    app: AppHandle,
-    error_code: String,
-    stage: String,
-    retryable: bool,
-    operation_id: Option<String>,
-    handled: Option<bool>,
-    severity: Option<String>,
-) -> Result<String, String> {
-    if normalize_error_code(&error_code) != error_code || normalize_stage(&stage) != stage {
-        return Err("error code or stage is not in the catalog".into());
-    }
-    if operation_id
-        .as_deref()
-        .is_some_and(|value| Uuid::parse_str(value).is_err())
-    {
-        return Err("invalid operationId".into());
-    }
-    Ok(app.state::<AppState>().telemetry.capture_error(
-        AppError::new(&error_code, &stage, retryable, None),
-        operation_id.as_deref(),
-        handled.unwrap_or(true),
-        severity.as_deref().unwrap_or("error"),
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

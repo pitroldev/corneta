@@ -321,8 +321,6 @@ pub fn run() {
             telemetry::telemetry_status,
             telemetry::telemetry_set_consent,
             telemetry::telemetry_regenerate_id,
-            telemetry::telemetry_capture,
-            telemetry::telemetry_capture_exception,
         ])
         .setup(move |app| {
             i18n::apply_setting(&config::load(app.handle()).settings.language);
