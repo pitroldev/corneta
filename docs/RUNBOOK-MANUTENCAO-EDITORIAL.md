@@ -71,6 +71,20 @@ pnpm --dir web content:revision:check --base origin/main --head HEAD
 pnpm --dir web content:revision:check --base BASE_REF --head HEAD --product-version 0.7.0
 ```
 
+Quando a mudança na fonte não altera nada do que o artigo afirma, registre isso em vez de
+fingir uma revisão. Isso vale para refatoração, desempenho ou código sem efeito em rótulo,
+fluxo, mensagem, limite ou comportamento citado. Com a fonte já commitada, rode da raiz:
+
+```powershell
+pnpm --dir web content:impact:declare --article pt-BR/help/quality/quality-modes.mdx --source src/screens/EncodingScreen.tsx --reason "Memoização das estimativas; nenhum rótulo, limite ou fluxo citado mudou."
+```
+
+O comando grava em `web/content/source-impact.json` uma declaração por artigo e fonte. Ela
+guarda o motivo e o blob Git da fonte no `HEAD`. Vale só para aquele conteúdo exato: se a
+fonte mudar de novo, o gate volta a exigir revisão ou uma declaração nova. Leia as alegações
+do artigo que dependem da fonte antes de declarar. Se alguma delas mudou, revise o artigo. A
+declaração também vale para o gate da release.
+
 O diff de fontes usado pelo comando compara as referências Git, não alterações ainda sem
 commit. A comparação de conteúdo normaliza formatação nos dois corpos com o Prettier
 fixado no lockfile; apenas alinhar tabelas ou quebrar linhas não exige `updatedAt` novo.

@@ -22,6 +22,7 @@
     "content:maintenance": "tsx scripts/check-editorial-maintenance.ts",
     "content:maintenance:check": "tsx scripts/check-editorial-maintenance.ts --fail-on-overdue",
     "content:revision:check": "tsx scripts/check-editorial-revisions.ts",
+    "content:impact:declare": "tsx scripts/declare-source-impact.ts",
     "content:image": "tsx scripts/optimize-editorial-image.ts",
     "prebuild": "node scripts/check-build-content.mjs",
     "lint": "eslint .",

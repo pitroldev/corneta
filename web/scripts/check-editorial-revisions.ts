@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import matter from "gray-matter";
@@ -13,6 +14,13 @@ import {
   type EditorialRevisionSnapshot,
   type EditorialRevisionSource,
 } from "../lib/editorial/revision-policy";
+import {
+  invalidSourceImpactDeclarations,
+  SOURCE_IMPACT_FILE,
+  sourceImpactSchema,
+  sourcesWithoutImpact,
+  type SourceImpactDeclaration,
+} from "../lib/editorial/source-impact";
 
 const execFileAsync = promisify(execFile);
 
@@ -157,6 +165,19 @@ async function previousSnapshot(
   return snapshotFromRaw(raw, relativePath);
 }
 
+async function readSourceImpact(
+  repositoryRoot: string,
+): Promise<SourceImpactDeclaration[]> {
+  let raw: string;
+  try {
+    raw = await readFile(path.join(repositoryRoot, SOURCE_IMPACT_FILE), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+  return sourceImpactSchema.parse(JSON.parse(raw)).declarations;
+}
+
 async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   const repositoryRoot = (
@@ -201,9 +222,47 @@ async function main(): Promise<void> {
     );
   }
 
+  const declarations = await readSourceImpact(repositoryRoot);
+  const invalidDeclarations = invalidSourceImpactDeclarations(
+    declarations,
+    new Map(
+      audit.documents
+        .filter((document) => document.frontmatter.status === "published")
+        .map((document) => [
+          document.relativePath,
+          new Set(
+            (document.frontmatter.sources ?? [])
+              .filter((source) => source.kind === "internal" && source.repoPath)
+              .map((source) => normalizeRepositoryPath(source.repoPath!)),
+          ),
+        ]),
+    ),
+  );
+  if (invalidDeclarations.length > 0) {
+    throw new Error(
+      `${SOURCE_IMPACT_FILE} has invalid declarations:\n- ${invalidDeclarations.join("\n- ")}`,
+    );
+  }
+  const blobs = new Map<string, string>();
+  const blobAtHead = async (repositoryPath: string) => {
+    let blob = blobs.get(repositoryPath);
+    if (blob === undefined) {
+      blob = (
+        await git(repositoryRoot, [
+          "rev-parse",
+          "--verify",
+          `${options.head}:${repositoryPath}`,
+        ])
+      ).trim();
+      blobs.set(repositoryPath, blob);
+    }
+    return blob;
+  };
+
   const issues: EditorialRevisionIssue[] = [];
   let comparedArticles = 0;
   let sourceAffectedArticles = 0;
+  let declaredArticles = 0;
 
   for (const document of audit.documents) {
     if (document.frontmatter.status !== "published") continue;
@@ -233,22 +292,43 @@ async function main(): Promise<void> {
       );
     }
 
-    const affected = (current.frontmatter.sources ?? []).some(
-      (source) =>
-        source.kind === "internal" &&
-        source.repoPath &&
-        changedPaths.has(normalizeRepositoryPath(source.repoPath)),
-    );
-    if (affected) {
+    const affected = (current.frontmatter.sources ?? [])
+      .filter((source) => source.kind === "internal" && source.repoPath)
+      .map((source) => normalizeRepositoryPath(source.repoPath!))
+      .filter((repositoryPath) => changedPaths.has(repositoryPath));
+    if (affected.length > 0) {
       sourceAffectedArticles += 1;
-      issues.push(
-        ...validateChangedInternalSources(
-          previous,
-          current,
-          changedPaths,
-          options.productVersion,
+      // A declaration covers only the exact source blob it was written for.
+      const withoutImpact = sourcesWithoutImpact(
+        declarations,
+        document.relativePath,
+        new Map(
+          await Promise.all(
+            affected.map(
+              async (repositoryPath) =>
+                [repositoryPath, await blobAtHead(repositoryPath)] as const,
+            ),
+          ),
         ),
       );
+      if (
+        affected.every((repositoryPath) => withoutImpact.has(repositoryPath))
+      ) {
+        declaredArticles += 1;
+      } else {
+        issues.push(
+          ...validateChangedInternalSources(
+            previous,
+            current,
+            new Set(
+              [...changedPaths].filter(
+                (repositoryPath) => !withoutImpact.has(repositoryPath),
+              ),
+            ),
+            options.productVersion,
+          ),
+        );
+      }
     }
   }
 
@@ -267,7 +347,7 @@ async function main(): Promise<void> {
   }
 
   process.stdout.write(
-    `Editorial policy passed: ${comparedArticles} article(s) compared, ${sourceAffectedArticles} affected by internal sources.
+    `Editorial policy passed: ${comparedArticles} article(s) compared, ${sourceAffectedArticles} affected by internal sources, ${declaredArticles} declared without impact.
 `,
   );
 }
