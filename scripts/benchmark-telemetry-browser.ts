@@ -112,7 +112,7 @@ async function run(scenario: Scenario) {
   const longTasks: number[] = [];
   let previousTimer = performance.now();
   let previousFrame: number | undefined;
-  let frameHandle = 0;
+  let frameHandle: number;
   const timer = setInterval(() => {
     const now = performance.now();
     timerDelays.push(Math.max(0, now - previousTimer - 16));

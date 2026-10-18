@@ -9,6 +9,13 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+peerDependencyRules:
+  allowedVersions:
+    # eslint-config-next 16.4+ adapts these plugins to ESLint 10 at runtime (vercel/next.js#99628).
+    eslint-plugin-react>eslint: "10"
+    eslint-plugin-import>eslint: "10"
+    eslint-plugin-jsx-a11y>eslint: "10"
+
 minimumReleaseAgeExclude:
   # Reviewed pin required for Next.js 16 support.
   - posthog-node@5.47.3
