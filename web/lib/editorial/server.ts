@@ -5,7 +5,10 @@ import path from "node:path";
 import { cache } from "react";
 import { assertValidEditorialCatalog } from "./catalog";
 import { parseEditorialSource } from "./parse";
-import { editorialPeopleRegistrySchema } from "./schema";
+import {
+  editorialAssetManifestSchema,
+  editorialPeopleRegistrySchema,
+} from "./schema";
 import { readEditorialManifest } from "./manifest";
 import type {
   EditorialAlternates,
@@ -75,6 +78,11 @@ const readEditorialCatalog = cache(async (): Promise<EditorialDocument[]> => {
     return productionCatalog;
   }
   const contentRoot = await resolveContentRoot();
+  const { assets } = editorialAssetManifestSchema.parse(
+    JSON.parse(
+      await readFile(path.join(contentRoot, "assets", "manifest.json"), "utf8"),
+    ),
+  );
   const files = await findMdxFiles(contentRoot);
   const documents = await Promise.all(
     files.map(async (file) => {
@@ -82,7 +90,7 @@ const readEditorialCatalog = cache(async (): Promise<EditorialDocument[]> => {
       const relativePath = path
         .relative(contentRoot, file)
         .replaceAll("\\", "/");
-      return parseEditorialSource(source, relativePath);
+      return parseEditorialSource(source, relativePath, assets);
     }),
   );
 

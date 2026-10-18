@@ -156,8 +156,7 @@ mas nunca substituir, a revisão humana no arquivo original.
 Screenshots de Twitch, YouTube, Kick e OBS só entram quando a localização visual
 evita um erro real. Registre `capturedAt` e `externalUiReviewedAt`; para OBS,
 registre também `sourceVersion` com a versão capturada. `productVersion` continua
-reservado à versão da Corneta. Esses campos devem ser idênticos no frontmatter e
-no manifesto. Confira as regras de marca atuais e refaça a captura quando a
+reservado à versão da Corneta. Esses campos ficam só no manifesto. Confira as regras de marca atuais e refaça a captura quando a
 interface mudar. Não copie imagens de centrais de ajuda.
 
 ## Pipeline e manifesto de assets
@@ -175,7 +174,9 @@ public/images/editorial/multistream/obs-multistream-flow.webp
 3. mantenha cada derivada abaixo de **512 KiB**;
 4. preserve proporção, legibilidade mobile e dimensões declaradas;
 5. adicione master e todas as derivadas a `assets/manifest.json`;
-6. copie os mesmos metadados para o item de `images` do artigo;
+6. no artigo, cite a imagem em `images` só com `baseName`, `alt` e, se houver,
+   `caption`; arquivo, dimensões, procedência e datas vêm do manifesto, e a
+   primeira derivada é a que o artigo usa;
 7. execute `pnpm content:check` dentro de `web`.
 
 Exemplo executado a partir de `web/`:
@@ -207,12 +208,13 @@ separada do master.
 `baseName` deve ser idêntico ao nome, sem extensão, do master e da derivada. A
 validação automática de sintaxe garante apenas lowercase ASCII kebab-case. A
 revisão humana confirma que diretórios, filenames e `baseName` estão em inglês,
-adiciona a tripla exata (`baseName`, `src`, `originalPath`) a
-`EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS` e incrementa a versão desse registro
-antes de usá-la no frontmatter ou manifesto. Aprovar apenas o filename não aprova
-seus diretórios. O frontmatter funciona como uso localizado do asset (alt e
-legenda); o manifesto é a origem comum de procedência, direitos, datas, versão e
-variantes.
+adiciona o `src` exato a `EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS` e incrementa
+a versão desse registro antes de usá-lo no manifesto. O `baseName` e o master
+precisam espelhar esse caminho: mesmo nome e mesmos diretórios em
+`assets/originals`. Aprovar apenas o filename não aprova seus diretórios. O frontmatter funciona como uso localizado do asset (alt e
+legenda); o manifesto é a única origem de arquivo, procedência, direitos, datas,
+versão e variantes. Trocar uma captura no manifesto muda o que o leitor vê, então
+o gate de revisão exige `updatedAt` novo nos artigos que a usam.
 
 Imagens geradas por IA são permitidas apenas como apoio abstrato. Nunca podem
 simular a Corneta, OBS, uma plataforma, um erro, uma métrica ou prova de

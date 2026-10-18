@@ -3,6 +3,7 @@ import type {
   editorialFrontmatterSchema,
   editorialAssetManifestEntrySchema,
   editorialAssetManifestSchema,
+  editorialImageReferenceSchema,
   editorialImageSchema,
   editorialPeopleRegistrySchema,
   publishedEditorialFrontmatterSchema,
@@ -24,6 +25,9 @@ export type EditorialCategory =
   | "comparisons";
 
 export type EditorialImage = z.infer<typeof editorialImageSchema>;
+export type EditorialImageReference = z.infer<
+  typeof editorialImageReferenceSchema
+>;
 export type EditorialAssetManifestEntry = z.infer<
   typeof editorialAssetManifestEntrySchema
 >;
@@ -34,9 +38,15 @@ export type EditorialPeopleRegistry = z.infer<
   typeof editorialPeopleRegistrySchema
 >;
 export type EditorialPerson = EditorialPeopleRegistry["people"][number];
-export type EditorialFrontmatter = z.infer<typeof editorialFrontmatterSchema>;
-export type PublishedEditorialFrontmatter = z.infer<
-  typeof publishedEditorialFrontmatterSchema
+/** Parsed frontmatter carries images already completed from the asset manifest. */
+type WithResolvedImages<T> = T extends unknown
+  ? Omit<T, "images"> & { images: EditorialImage[] }
+  : never;
+export type EditorialFrontmatter = WithResolvedImages<
+  z.infer<typeof editorialFrontmatterSchema>
+>;
+export type PublishedEditorialFrontmatter = WithResolvedImages<
+  z.infer<typeof publishedEditorialFrontmatterSchema>
 >;
 
 export type TocLevel = 2 | 3;

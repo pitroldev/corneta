@@ -57,6 +57,17 @@ function canonicalValue(value: unknown): unknown {
   return value;
 }
 
+/** A new capture in the asset manifest changes what readers see even when the article file did not change. */
+export function sameEditorialImages(
+  previous: EditorialRevisionFrontmatter,
+  current: EditorialRevisionFrontmatter,
+): boolean {
+  return (
+    JSON.stringify(canonicalValue(previous.images ?? [])) ===
+    JSON.stringify(canonicalValue(current.images ?? []))
+  );
+}
+
 export function hasSubstantiveEditorialChange(
   previous: EditorialRevisionSnapshot,
   current: EditorialRevisionSnapshot,

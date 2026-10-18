@@ -110,16 +110,8 @@ async function auditSingleAsset(options: {
         status: "draft",
         images: [
           {
-            src,
-            originalPath,
             baseName: options.baseName,
             alt: "Synthetic connection diagram",
-            width: options.width ?? 4,
-            height: options.height ?? 4,
-            kind: "diagram",
-            source: "original",
-            rights: "owned",
-            language: options.article.imageLanguage,
           },
         ],
       })}\n---\n\n## Start\n\nTest article.\n`,
