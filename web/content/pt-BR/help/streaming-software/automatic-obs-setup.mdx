@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-09-07
-reviewedAt: 2026-09-07
-productVersion: 0.7.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -33,11 +33,11 @@ sources:
   - title: Corneta OBS wizard and live screen
     kind: internal
     repoPath: src/components/ObsWizard.tsx
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-18
   - title: Corneta OBS interface labels
     kind: internal
     repoPath: src/lib/i18n/pt.ts
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/getting-started/corneta-obs-connection-details.webp
     originalPath: assets/originals/getting-started/corneta-obs-connection-details.png
@@ -69,35 +69,36 @@ mandar o OBS transmitir quando você der **BORA AO VIVO**.
 
 ## Configure em três passos
 
-1. No OBS, abra **Ferramentas → Configurações do Servidor WebSocket**.
-2. Marque **Ativar Servidor WebSocket** e mantenha a porta `4455`. A integração
+1. No OBS, abra **Ferramentas → Configurações do servidor WebSocket**.
+2. Marque **Ativar servidor WebSocket** e mantenha a porta `4455`. A integração
    automática da Corneta usa essa porta no mesmo computador. Se ela estiver
    ocupada, resolva o conflito ou use a configuração manual abaixo.
 3. Na Corneta, abra **Ao vivo → Liga no OBS** e clique em **Configura pra mim**.
 
-Se **Ativar Autenticação** estiver ligado no OBS, clique em **Mostrar Chave de
-Conexão** e cole a senha pedida pela Corneta. Essa é a senha do WebSocket, não a
-stream key de uma plataforma.
+Se **Habilitar autenticação** estiver ligado no OBS, clique em **Mostrar
+informações da conexão** e cole a senha pedida pela Corneta. Essa é a senha do
+WebSocket, não a stream key de uma plataforma.
 
 <ContentImage baseName="corneta-obs-connection-details" />
 
 Quando o estado virar **configurado**, a Corneta já trocou o serviço do OBS para
-**Personalizado** e colocou o servidor e a chave locais nos campos certos.
+**Personalizado...** e colocou o servidor e a chave locais nos campos certos.
 
 ## Se não conectar
 
-| O que apareceu                        | Causa provável                                                    | Como confirmar                                   | O que fazer                                         |
-| ------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------- |
-| Não achei o OBS                       | OBS fechado ou WebSocket desligado                                | Abra a janela do OBS e volte ao menu Ferramentas | Ligue o servidor WebSocket e tente de novo          |
-| Senha recusada                        | Senha diferente da mostrada pelo OBS                              | Use Mostrar Chave de Conexão                     | Copie a senha atual e substitua na Corneta          |
-| Conectado, mas não aponta pra Corneta | O controle funciona, mas o serviço de transmissão não foi trocado | Abra Configurações → Transmissão no OBS          | Clique em Configura pra mim novamente               |
-| Porta ocupada                         | Outro processo usa a porta local da transmissão                   | A Corneta mostra a falha antes de iniciar        | Feche o processo ou altere a porta em Configurações |
+| O que apareceu                              | Causa provável                                                                     | Como confirmar                                               | O que fazer                                                                                                |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Não achei o OBS pra conectar                | OBS fechado, WebSocket desligado, porta diferente de 4455 ou firewall bloqueando   | Abra a janela do OBS e volte ao menu Ferramentas             | Ligue o servidor WebSocket e tente de novo                                                                 |
+| A senha do WebSocket não bateu              | Senha diferente da mostrada pelo OBS, ou a Corneta sem senha quando o OBS pede uma | Clique em **Mostrar informações da conexão** no OBS          | Copie a senha atual e cole na Corneta                                                                      |
+| Não consegui configurar o OBS sozinha       | A conexão caiu no meio ou o OBS recusou a troca de configuração                    | Veja o detalhe técnico na mesma janela                       | Tente de novo ou use o plano B abaixo                                                                      |
+| **falta apontar pra cá** em **Liga no OBS** | O controle funciona, mas o serviço de transmissão não foi trocado                  | Abra **Configurações → Transmissão** no OBS                  | Clique em **Configura pra mim** novamente                                                                  |
+| O servidor de ingestão caiu                 | Outro programa usa a porta local que recebe o vídeo do OBS                         | Feche outros apps de live ou servidores RTMP e tente de novo | Feche o programa ou troque a porta em **Configurações → OBS → Avançado** e clique em **Configura pra mim** |
 
 ## Plano B: configurar na mão
 
 Abra **Liga no OBS**, escolha **Prefiro configurar na mão** e copie os campos
 **Servidor** e **Chave de transmissão**. No OBS, vá em **Configurações →
-Transmissão**, escolha **Serviço: Personalizado** e cole os dois.
+Transmissão**, escolha **Serviço: Personalizado...** e cole os dois.
 
 Sem WebSocket, a Corneta não consegue dar play no OBS sozinha. Depois do **BORA
 AO VIVO**, clique em **Iniciar transmissão** no OBS.
