@@ -5,15 +5,11 @@ import type {
   editorialAssetManifestSchema,
   editorialImageSchema,
   editorialPeopleRegistrySchema,
-  editorialSourceSchema,
   publishedEditorialFrontmatterSchema,
-  testedVersionSchema,
 } from "./schema";
 
 export type EditorialLocale = "pt-BR" | "en";
 export type EditorialCollection = "help" | "guides";
-export type EditorialKind = "guide" | "help" | "comparison" | "troubleshooting";
-export type EditorialStatus = "draft" | "published";
 export type EditorialCategory =
   | "getting-started"
   | "streaming-software"
@@ -38,8 +34,6 @@ export type EditorialPeopleRegistry = z.infer<
   typeof editorialPeopleRegistrySchema
 >;
 export type EditorialPerson = EditorialPeopleRegistry["people"][number];
-export type EditorialSource = z.infer<typeof editorialSourceSchema>;
-export type TestedVersion = z.infer<typeof testedVersionSchema>;
 export type EditorialFrontmatter = z.infer<typeof editorialFrontmatterSchema>;
 export type PublishedEditorialFrontmatter = z.infer<
   typeof publishedEditorialFrontmatterSchema
