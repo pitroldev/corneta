@@ -32,6 +32,6 @@ Comece pelo [README do projeto](../README.md) para conhecer o app, os requisitos
 
 ## Manter a documentação
 
-Atualize o guia responsável pelo contrato alterado. Mudanças entregues pertencem ao [changelog](../CHANGELOG.md); prioridades futuras, ao roadmap; preparação de distribuição, ao guia de publicação. Registros de execução e relatórios de revisão não devem virar novas páginas permanentes de documentação.
+Atualize o guia responsável pelo contrato alterado. Mudanças entregues aparecem nas [notas de cada release](https://github.com/pitroldev/corneta/releases); preparação de distribuição pertence ao guia de publicação. Planos, prioridades futuras, registros de execução e relatórios de revisão não devem virar páginas permanentes de documentação.
 
 `pnpm docs:check` verifica destinos locais em arquivos Markdown rastreados e novos, incluindo imagens e referências, ignorando exemplos em código e comentários. O comando não consulta URLs externas nem valida âncoras; confira esses casos ao revisar links.

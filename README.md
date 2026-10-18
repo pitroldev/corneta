@@ -162,7 +162,7 @@ O fluxo de mídia usa **MediaMTX local → processamento Rust/FFmpeg → destino
 
 | Quero…                                       | Por onde começar                                                                                                                 |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Entender o que funciona e o que mudou        | [Compatibilidade](docs/COMPATIBILIDADE.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md)                              |
+| Entender o que funciona e o que mudou        | [Compatibilidade](docs/COMPATIBILIDADE.md) · [Notas de versão](https://github.com/pitroldev/corneta/releases)                    |
 | Preparar o ambiente e encontrar tarefas      | [Desenvolvimento](docs/DESENVOLVIMENTO.md) · [Contribuição](CONTRIBUTING.md)                                                     |
 | Entender o código e testar cenários          | [Arquitetura](docs/ARQUITETURA.md) · [Performance](docs/PERFORMANCE.md) · [Fixtures de relatórios](docs/RELATORIOS-FICTICIOS.md) |
 | Configurar integrações ou uma distribuição   | [Configuração](docs/CONFIGURACAO.md) · [Publicação](docs/PUBLICACAO.md)                                                          |

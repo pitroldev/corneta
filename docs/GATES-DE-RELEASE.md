@@ -13,8 +13,10 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma 
   exigem justificativa no `deny.toml`; vulnerabilidades não podem ser ignoradas.
 - Testes de integração de mídia ignorados executados com FFmpeg/FFprobe real.
 - Sidecars baixados pelo script versionado e com SHA-256 conferido.
-- O job Rust prepara seus próprios sidecars; espelho opcional via `CORNETA_FFMPEG_MIRROR_URL`
-  mantém o mesmo hash fixado. O upstream remove builds antigos.
+- O job Rust prepara seus próprios sidecars. O script tenta `CORNETA_FFMPEG_MIRROR_URL` (quando
+  configurada), a prerelease-espelho do repositório e o upstream, sempre com o mesmo hash fixado. O
+  upstream remove builds diários em cerca de duas semanas: a prerelease-espelho com o ZIP e o pacote
+  de fontes é obrigatória para cada build fixado.
 - Next de produção exige `web:release:check` (automático na Vercel production): configuração
   OAuth/proxy, download HTTPS e identidade/telemetria coerentes. O limitador local não exige
   armazenamento remoto; o gate não verifica regras de WAF/edge no host.

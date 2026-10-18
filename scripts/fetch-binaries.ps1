@@ -20,6 +20,8 @@ $ErrorActionPreference = 'Stop'
 $ffmpegVersion = 'n8.1.2-50-g1a748fe2cd (BtbN autobuild-2026-09-06-13-06)'
 $ffmpegUrl     = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-06-13-06/ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-8.1.zip'
 $ffmpegSha256  = 'E254995D48E6E9E88F5A05EB886A75E9AC33D7C6BB2E8A301E2EB65848A2D489'
+# Upstream daily builds expire; this prerelease keeps the same reviewed bytes and their sources available.
+$ffmpegDurableUrl = 'https://github.com/pitroldev/corneta/releases/download/ffmpeg-autobuild-2026-09-06-13-06/ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-8.1.zip'
 
 $mtxVersion = 'v1.19.3'
 $mtxUrl     = 'https://github.com/bluenviron/mediamtx/releases/download/v1.19.3/mediamtx_v1.19.3_windows_amd64.zip'
@@ -90,15 +92,28 @@ if ($sys) {
   if ($AllowSystemFfmpeg) { Write-Host "ffmpeg not found in PATH; downloading the pinned version." }
   Write-Host "Downloading FFmpeg $ffmpegVersion..."
   $zip = Join-Path $cacheDir "$ffmpegSha256.zip"
-  $downloadUrl = $ffmpegUrl
+  $sources = @()
   if ($FfmpegMirrorUrl) {
     $mirror = [uri]$FfmpegMirrorUrl
     if ($mirror.Scheme -ne 'https' -or $mirror.UserInfo -or $mirror.Query -or $mirror.Fragment) {
       throw 'FFmpeg mirror must use HTTPS without credentials, query, or fragment.'
     }
-    $downloadUrl = $mirror.AbsoluteUri
+    $sources += $mirror.AbsoluteUri
   }
-  Get-VerifiedFile -Url $downloadUrl -OutFile $zip -ExpectedSha256 $ffmpegSha256 -Label 'FFmpeg'
+  $sources += @($ffmpegDurableUrl, $ffmpegUrl)
+  $verified = $false
+  foreach ($source in $sources) {
+    try {
+      Get-VerifiedFile -Url $source -OutFile $zip -ExpectedSha256 $ffmpegSha256 -Label 'FFmpeg'
+      $verified = $true
+      break
+    } catch {
+      Write-Warning "FFmpeg source unavailable or rejected: $source ($($_.Exception.Message))"
+    }
+  }
+  if (-not $verified) {
+    throw 'No configured source provided the pinned FFmpeg archive.'
+  }
   $ffDir = Join-Path $tmp 'ffmpeg'
   Expand-Archive $zip -DestinationPath $ffDir -Force
   $exe = @(Get-ChildItem $ffDir -Recurse -File -Filter 'ffmpeg.exe')
