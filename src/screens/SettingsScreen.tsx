@@ -29,7 +29,7 @@ import {
   SectionTitle,
   Toggle,
 } from "../components/ui";
-import { api } from "../lib/api";
+import { api, type ShortcutAction } from "../lib/api";
 import { obsIngestUrl } from "../lib/factory";
 import {
   LOCALES,
@@ -72,6 +72,22 @@ const TABS: { id: SettingsTab; labelKey: MessageKey; icon: typeof Plug }[] = [
   { id: "obs", labelKey: "settings.tab.obs", icon: Plug },
 ];
 
+type ShortcutSetting = "liveShortcut" | "markMomentShortcut" | "brbShortcut";
+
+const SHORTCUTS: readonly {
+  action: ShortcutAction;
+  key: ShortcutSetting;
+  label: MessageKey;
+}[] = [
+  { action: "toggleLive", key: "liveShortcut", label: "settings.hotkey.live" },
+  {
+    action: "markMoment",
+    key: "markMomentShortcut",
+    label: "settings.hotkey.markMoment",
+  },
+  { action: "brb", key: "brbShortcut", label: "settings.hotkey.brb" },
+];
+
 export function SettingsScreen() {
   const t = useT();
   const config = useStore((s) => s.config);
@@ -91,13 +107,17 @@ export function SettingsScreen() {
   const [portDraft, setPortDraft] = useState<string | null>(null);
   const [shortcutBusy, setShortcutBusy] = useState(false);
   const shortcutPending = useRef(false);
-  const changeShortcut = async (value: string) => {
+  const changeShortcut = async (
+    action: ShortcutAction,
+    key: ShortcutSetting,
+    value: string,
+  ) => {
     if (shortcutPending.current) return;
     shortcutPending.current = true;
     setShortcutBusy(true);
     try {
-      await api.registerShortcut(value);
-      setSettings({ liveShortcut: value });
+      await api.registerShortcut(value, action);
+      setSettings({ [key]: value });
     } catch (error) {
       toast.error(t(shortcutErrorKey(error)));
     } finally {
@@ -446,22 +466,35 @@ export function SettingsScreen() {
             <p className="mb-3 text-xs text-ink-faint">
               {t("settings.hotkey.desc")}
             </p>
-            <div className="flex items-center gap-2">
-              <ShortcutCapture
-                value={settings.liveShortcut}
-                disabled={shortcutBusy}
-                onChange={(value) => void changeShortcut(value)}
-              />
-              {settings.liveShortcut && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={shortcutBusy}
-                  onClick={() => void changeShortcut("")}
-                >
-                  <X className="size-4" /> {t("settings.hotkey.clear")}
-                </Button>
-              )}
+            <div className="space-y-2.5">
+              {SHORTCUTS.map(({ action, key, label }) => (
+                <div key={action} className="flex flex-wrap items-center gap-2">
+                  <span
+                    id={`shortcut-${action}`}
+                    className="w-44 shrink-0 text-sm text-ink-muted"
+                  >
+                    {t(label)}
+                  </span>
+                  <ShortcutCapture
+                    labelledBy={`shortcut-${action}`}
+                    value={settings[key]}
+                    disabled={shortcutBusy}
+                    onChange={(value) =>
+                      void changeShortcut(action, key, value)
+                    }
+                  />
+                  {settings[key] && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={shortcutBusy}
+                      onClick={() => void changeShortcut(action, key, "")}
+                    >
+                      <X className="size-4" /> {t("settings.hotkey.clear")}
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           </Card>
 

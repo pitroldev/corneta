@@ -1976,9 +1976,12 @@ export const en: Dict = {
   "settings.hotkey.capture.prompt":
     "press Ctrl, Alt or Shift + a key… (Esc cancels)",
   "settings.hotkey.clear": "Clear",
+  "settings.hotkey.brb": "BE RIGHT BACK / I'm back",
   "settings.hotkey.desc":
-    "Starts and stops the stream from anywhere — even with Corneta tucked away in the tray.",
-  "settings.hotkey.title": "Global hotkey",
+    "They work from anywhere, even over a full-screen game or with Corneta in the tray. Mark moment and BE RIGHT BACK only act while you're live.",
+  "settings.hotkey.live": "Start or stop the stream",
+  "settings.hotkey.markMoment": "Mark moment",
+  "settings.hotkey.title": "Global hotkeys",
   "settings.hotkey.toast.inUse":
     "That hotkey is already in use — choose another combination.",
   "settings.hotkey.toast.invalid":

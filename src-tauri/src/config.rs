@@ -153,6 +153,11 @@ pub struct Settings {
     pub auto_start_obs: bool,
     #[serde(default = "default_live_shortcut")]
     pub live_shortcut: String,
+    /// Empty until chosen: an update must not grab global keys the user never asked for.
+    #[serde(default)]
+    pub mark_moment_shortcut: String,
+    #[serde(default)]
+    pub brb_shortcut: String,
     #[serde(default)]
     pub youtube_api_key: String,
     #[serde(default)]
@@ -379,6 +384,8 @@ impl Default for Settings {
             obs_password: String::new(),
             auto_start_obs: true,
             live_shortcut: default_live_shortcut(),
+            mark_moment_shortcut: String::new(),
+            brb_shortcut: String::new(),
             youtube_api_key: String::new(),
             chat_sources: Vec::new(),
             alert_sources: Vec::new(),

@@ -1,5 +1,5 @@
-//! Atomic-style replacement of the app's global shortcut, with typed IPC errors.
-use serde::Serialize;
+//! Atomic-style replacement of the app's global shortcuts, one per action, with typed IPC errors.
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
@@ -24,14 +24,39 @@ impl From<ErrorCode> for ShortcutError {
     }
 }
 
-// Normally one entry. Keep both tracked if rollback also fails, so a retry can recover.
-static ACTIVE: Mutex<Vec<Shortcut>> = Mutex::new(Vec::new());
+/// The OS refuses a combination that is already registered, so two actions never share one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Action {
+    ToggleLive,
+    MarkMoment,
+    Brb,
+}
 
-pub fn register(app: &tauri::AppHandle, value: &str) -> Result<(), ShortcutError> {
+impl Action {
+    const ALL: [Self; 3] = [Self::ToggleLive, Self::MarkMoment, Self::Brb];
+
+    fn slot(self) -> usize {
+        self as usize
+    }
+}
+
+// Normally one entry per action. Keep both tracked if rollback also fails, so a retry can recover.
+static ACTIVE: Mutex<[Vec<Shortcut>; 3]> = Mutex::new([Vec::new(), Vec::new(), Vec::new()]);
+
+/// The plugin hands every pressed shortcut to a single handler.
+pub fn action_for(pressed: &Shortcut) -> Option<Action> {
+    let active = ACTIVE.lock().ok()?;
+    Action::ALL
+        .into_iter()
+        .find(|action| active[action.slot()].contains(pressed))
+}
+
+pub fn register(app: &tauri::AppHandle, action: Action, value: &str) -> Result<(), ShortcutError> {
     let manager = app.global_shortcut();
     let mut active = ACTIVE.lock().map_err(|_| ErrorCode::CleanupFailed)?;
     replace(
-        &mut active,
+        &mut active[action.slot()],
         value,
         |shortcut| {
             manager.register(shortcut).map_err(|error| {
@@ -95,6 +120,16 @@ fn replace(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pressed_shortcut_resolves_to_the_action_that_owns_it() {
+        let mark: Shortcut = "Control+Alt+KeyM".parse().unwrap();
+        let unknown: Shortcut = "Control+Alt+KeyQ".parse().unwrap();
+        ACTIVE.lock().unwrap()[Action::MarkMoment.slot()].push(mark);
+        assert_eq!(action_for(&mark), Some(Action::MarkMoment));
+        assert_eq!(action_for(&unknown), None);
+        ACTIVE.lock().unwrap()[Action::MarkMoment.slot()].retain(|entry| *entry != mark);
+    }
     use std::cell::RefCell;
 
     fn old() -> Shortcut {

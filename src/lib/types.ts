@@ -87,6 +87,9 @@ export interface AppSettings {
   obsPassword: string;
   autoStartObs: boolean;
   liveShortcut: string;
+  /** Empty until chosen: an update must not grab global keys the user never asked for. */
+  markMomentShortcut: string;
+  brbShortcut: string;
   /** One YouTube Data API key shared by YouTube chat sources. */
   youtubeApiKey: string;
   chatSources: ChatSource[];

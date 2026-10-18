@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MotionConfig, m } from "framer-motion";
 import { FileText, RefreshCw, Shield } from "lucide-react";
 import { downTargets, useStore } from "./lib/store";
-import { api, IS_TAURI } from "./lib/api";
+import { api, IS_TAURI, type ShortcutAction } from "./lib/api";
+import { errMsg } from "./lib/utils";
 import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
 import { brbSlateGeneration, renderBrbSlatePng } from "./lib/brbSlate";
@@ -200,11 +201,31 @@ export default function App() {
     const unbindAlertStatus = bindAlertStatus();
     const unbindChatAuth = bindChatAuth();
     const unbindAuthFlow = bindAuthFlow(t);
-    const unbindShortcut = api.subscribeShortcut(() => {
+    const unbindShortcut = api.subscribeShortcut((action) => {
       const s = useStore.getState();
       const st = s.snapshot.state;
-      if (st === "live" || st === "starting") void s.stop();
-      else void s.start();
+      if (action === "toggleLive") {
+        if (st === "live" || st === "starting") void s.stop();
+        else void s.start();
+        return;
+      }
+      // Moment and BRB keys act only on a running live, like their buttons.
+      if (st !== "live") return;
+      if (action === "markMoment") {
+        api.markMoment().then(
+          () => toast.success(t("golive.toast.markerSaved")),
+          () => undefined,
+        );
+        return;
+      }
+      const forced = s.snapshot.forcedBrb ?? false;
+      api.setForceBrb(!forced).then(
+        () =>
+          toast.success(
+            t(forced ? "golive.brb.toast.back" : "golive.brb.toast.on"),
+          ),
+        (error: unknown) => toast.error(errMsg(error)),
+      );
     });
     return () => {
       unbind();
@@ -369,15 +390,26 @@ export default function App() {
   }, [navRequest]);
 
   const liveShortcut = useStore((s) => s.config?.settings.liveShortcut);
+  const markMomentShortcut = useStore(
+    (s) => s.config?.settings.markMomentShortcut,
+  );
+  const brbShortcut = useStore((s) => s.config?.settings.brbShortcut);
   const shortcutBootDone = useRef(false);
   useEffect(() => {
     if (!IS_TAURI || !loaded || shortcutBootDone.current) return;
     shortcutBootDone.current = true;
-    if (!liveShortcut) return;
-    api.registerShortcut(liveShortcut).catch((error: unknown) => {
-      toast.error(t(shortcutErrorKey(error)));
-    });
-  }, [loaded, liveShortcut, t]);
+    const boot: [string | undefined, ShortcutAction][] = [
+      [liveShortcut, "toggleLive"],
+      [markMomentShortcut, "markMoment"],
+      [brbShortcut, "brb"],
+    ];
+    for (const [shortcut, action] of boot) {
+      if (!shortcut) continue;
+      api.registerShortcut(shortcut, action).catch((error: unknown) => {
+        toast.error(t(shortcutErrorKey(error)));
+      });
+    }
+  }, [loaded, liveShortcut, markMomentShortcut, brbShortcut, t]);
 
   return (
     <MotionConfig reducedMotion="user">

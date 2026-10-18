@@ -213,9 +213,11 @@ pub fn run() {
         )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
+                .with_handler(|app, shortcut, event| {
                     if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        let _ = app.emit("shortcut://toggle-live", ());
+                        if let Some(action) = shortcut::action_for(shortcut) {
+                            let _ = app.emit("shortcut://action", action);
+                        }
                     }
                 })
                 .build(),
