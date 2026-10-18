@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-08-01
-reviewedAt: 2026-09-07
-productVersion: 0.7.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta JÁ VOLTO settings
     kind: internal
     repoPath: src/screens/SettingsScreen.tsx
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-18
   - title: Corneta continuity compositor
     kind: internal
     repoPath: src-tauri/src/compositor.rs
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-18
 images:
   - src: /images/editorial/operations/corneta-live-safety-settings.webp
     originalPath: assets/originals/operations/corneta-live-safety-settings.png
@@ -58,7 +58,7 @@ images:
 2. Entre em **Segurança ao vivo**.
 3. Ative **Proteção contra quedas (JÁ VOLTO)**.
 4. Confirme o selo **ARMADO**.
-5. Escolha **Padrão (gerada)** ou **Usar arquivo meu (imagem ou vídeo)**.
+5. Escolha **Usar a padrão da Corneta** ou **Escolher um arquivo meu** (imagem ou vídeo).
 
 <ContentImage baseName="corneta-live-safety-settings" />
 
@@ -70,11 +70,11 @@ Faça uma live não listada, espere o sinal entrar e feche o software de transmi
 
 ## Sintomas comuns
 
-| Sintoma                   | Causa provável                               | Correção                                    |
-| ------------------------- | -------------------------------------------- | ------------------------------------------- |
-| live começa em JÁ VOLTO   | ainda não chegou primeiro sinal real         | inicie a transmissão no software            |
-| tela não entra após queda | proteção não estava armada                   | encerre, arme e faça novo teste             |
-| arquivo próprio não abre  | formato ou arquivo inacessível               | volte à tela padrão e escolha outro arquivo |
-| conteúdo volta sem áudio  | áudio ainda não chegou ou pausa manual ativa | confira o software e clique em **Voltei!**  |
+| Sintoma                         | Causa provável                                                                     | Correção                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------- |
+| destino em **Aguardando sinal** | o software ainda não transmitiu; o JÁ VOLTO só entra depois do primeiro sinal real | inicie a transmissão no software            |
+| tela não entra após queda       | proteção não estava armada                                                         | encerre, arme e faça novo teste             |
+| arquivo próprio não abre        | formato ou arquivo inacessível                                                     | volte à tela padrão e escolha outro arquivo |
+| conteúdo volta sem áudio        | áudio ainda não chegou ou pausa manual ativa                                       | confira o software e clique em **Voltei!**  |
 
 JÁ VOLTO não cobre internet, energia ou PC inteiro. Não compartilhe arquivo com dados pessoais e não use segredo como parte da arte.
