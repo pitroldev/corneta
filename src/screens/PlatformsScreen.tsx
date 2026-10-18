@@ -20,6 +20,8 @@ import {
   Wifi,
   ExternalLink,
   Crop,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -31,7 +33,8 @@ import {
   platformTagline,
 } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn, openExternal, uid } from "../lib/utils";
+import { cn, errMsg, openExternal, uid } from "../lib/utils";
+import { LoginRow } from "./chat/AccountSettings";
 import { useI18n, useT, type I18n, type Locale } from "../lib/i18n";
 import type { AppConfig, ChatPlatform, PlatformId, Target } from "../lib/types";
 import { draftInputProps, useDraft } from "../lib/useDraft";
@@ -707,6 +710,31 @@ function KeyField({
   const { t, locale } = useI18n();
   const setKey = useStore((s) => s.setKey);
   const clearKey = useStore((s) => s.clearKey);
+  const fetchTwitchKey = useStore((s) => s.fetchTwitchKey);
+  const twitchAccount = useStore((s) => s.chatLogin.twitch);
+  const twitchLogin = useStore((s) => s.twitchLogin);
+  const twitchLogout = useStore((s) => s.twitchLogout);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const isTwitch = target.platformId === "twitch";
+  const twitchReady = isTwitch && twitchAccount.state === "connected";
+  const needsReconnect =
+    twitchReady &&
+    (twitchAccount.missingScopes ?? []).includes("channel:read:stream_key");
+  const fetchFromAccount = async () => {
+    setFetching(true);
+    try {
+      const login = await fetchTwitchKey(target.id);
+      setValue("");
+      setEditing(false);
+      toast.success(t("platforms.key.fetchedToast", { login }));
+      offerChatBridge(target.platformId, t, locale);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setFetching(false);
+    }
+  };
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [reveal, setReveal] = useState(false);
@@ -783,58 +811,101 @@ function KeyField({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative flex-1">
-        <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
-        <Input
-          type={reveal ? "text" : "password"}
-          // eslint-disable-next-line jsx-a11y/no-autofocus -- Only focus after editing or adding a destination, never on initial load.
-          autoFocus={editing || autoFocusKey}
-          aria-label={t("platforms.key.placeholder")}
-          className="pl-9 pr-9"
-          placeholder={t("platforms.key.placeholder")}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && value.trim() && void save()}
-        />
-        <button
-          type="button"
-          onClick={() => setReveal((v) => !v)}
-          className="absolute right-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-ink-faint hover:text-ink"
-          aria-label={
-            reveal ? t("platforms.key.hide") : t("platforms.key.show")
-          }
-          title={reveal ? t("platforms.key.hide") : t("platforms.key.show")}
-        >
-          {reveal ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-        </button>
-      </div>
-      <Button
-        variant="subtle"
-        size="sm"
-        onClick={paste}
-        title={t("platforms.key.pasteSaveTitle")}
-      >
-        <ClipboardPaste className="size-4" /> {t("platforms.key.pasteSave")}
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        disabled={!value.trim()}
-        onClick={() => void save()}
-      >
-        {t("platforms.key.save")}
-      </Button>
-      {editing && (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
+          <Input
+            type={reveal ? "text" : "password"}
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- Only focus after editing or adding a destination, never on initial load.
+            autoFocus={editing || autoFocusKey}
+            aria-label={t("platforms.key.placeholder")}
+            className="pl-9 pr-9"
+            placeholder={t("platforms.key.placeholder")}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && value.trim() && void save()}
+          />
+          <button
+            type="button"
+            onClick={() => setReveal((v) => !v)}
+            className="absolute right-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-ink-faint hover:text-ink"
+            aria-label={
+              reveal ? t("platforms.key.hide") : t("platforms.key.show")
+            }
+            title={reveal ? t("platforms.key.hide") : t("platforms.key.show")}
+          >
+            {reveal ? (
+              <EyeOff className="size-4" />
+            ) : (
+              <Eye className="size-4" />
+            )}
+          </button>
+        </div>
+        {twitchReady &&
+          (needsReconnect ? (
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => {
+                setReconnecting(true);
+                void twitchLogin();
+              }}
+              title={t("platforms.key.reconnectTwitchTitle")}
+            >
+              <RefreshCw className="size-4" />{" "}
+              {t("platforms.key.reconnectTwitch")}
+            </Button>
+          ) : (
+            <Button
+              variant="subtle"
+              size="sm"
+              disabled={fetching}
+              onClick={() => void fetchFromAccount()}
+              title={t("platforms.key.fetchTitle", {
+                login: twitchAccount.login ?? "",
+              })}
+            >
+              <Download className="size-4" /> {t("platforms.key.fetch")}
+            </Button>
+          ))}
         <Button
-          variant="ghost"
+          variant="subtle"
           size="sm"
-          onClick={() => setEditing(false)}
-          aria-label={t("platforms.key.cancelEdit")}
-          title={t("platforms.key.cancelEdit")}
+          onClick={paste}
+          title={t("platforms.key.pasteSaveTitle")}
         >
-          <X className="size-4" />
+          <ClipboardPaste className="size-4" /> {t("platforms.key.pasteSave")}
         </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={!value.trim()}
+          onClick={() => void save()}
+        >
+          {t("platforms.key.save")}
+        </Button>
+        {editing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setEditing(false)}
+            aria-label={t("platforms.key.cancelEdit")}
+            title={t("platforms.key.cancelEdit")}
+          >
+            <X className="size-4" />
+          </Button>
+        )}
+      </div>
+      {isTwitch && reconnecting && twitchAccount.state !== "connected" && (
+        <LoginRow
+          platform="twitch"
+          label="Twitch"
+          state={twitchAccount}
+          enabled
+          onLogin={twitchLogin}
+          onLogout={twitchLogout}
+        />
       )}
     </div>
   );

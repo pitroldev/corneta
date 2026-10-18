@@ -690,6 +690,21 @@ messages! {
     ChatYoutubeApiError { c: u16, reason: &'a str } = "rust.chat.youtube.apiError" =>
         pt: "O YouTube recusou a solicitação (HTTP {c}; código {reason}). Confira sua conta e tente novamente.",
         en: "YouTube rejected the request (HTTP {c}; code {reason}). Check your account and try again.";
+    TwitchStreamKeyWrongTarget = "rust.twitch.streamKey.wrongTarget" =>
+        pt: "Esse destino não é da Twitch.",
+        en: "That destination isn't a Twitch one.";
+    TwitchStreamKeyNeedsLogin = "rust.twitch.streamKey.needsLogin" =>
+        pt: "Entre com a Twitch na Corneta para pegar a chave pela conta.",
+        en: "Sign in with Twitch in Corneta to fetch the key from your account.";
+    TwitchStreamKeyReconnect = "rust.twitch.streamKey.reconnect" =>
+        pt: "Reconecte a Twitch para a Corneta poder ler sua chave de transmissão.",
+        en: "Reconnect Twitch so Corneta can read your stream key.";
+    TwitchStreamKeyRefused { reason: &'a str } = "rust.twitch.streamKey.refused" =>
+        pt: "A Twitch não liberou a chave: {reason}",
+        en: "Twitch didn't release the key: {reason}";
+    TwitchStreamKeyFailed = "rust.twitch.streamKey.failed" =>
+        pt: "Não consegui pegar a chave na Twitch. Tente de novo ou cole a chave à mão.",
+        en: "I couldn't fetch the key from Twitch. Try again or paste it by hand.";
     ChatYoutubeTransportError = "rust.chat.youtube.transportError" =>
         pt: "Não consegui conectar ao YouTube. Confira sua conexão e tente novamente.",
         en: "I couldn't connect to YouTube. Check your connection and try again.";

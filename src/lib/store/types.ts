@@ -24,6 +24,8 @@ export interface LoginState {
   /** Full authorization URL when the provider supports one. */
   verifyUriComplete?: string;
   message?: string;
+  /** Scopes this login lacks; the features that need them ask to reconnect. */
+  missingScopes?: string[];
 }
 export interface OauthModes {
   officialReady: boolean;
@@ -67,6 +69,8 @@ export interface State {
   renameProfile: (id: string, name: string) => void;
 
   setKey: (id: string, key: string) => Promise<void>;
+  /** Fetches the key through the Twitch login; resolves with the account's login. */
+  fetchTwitchKey: (id: string) => Promise<string>;
   clearKey: (id: string) => Promise<void>;
 
   refreshEncoders: () => Promise<void>;

@@ -319,6 +319,12 @@ export const useStore = create<State>((set, get) => {
       await api.setKey(id, key);
       get().updateTarget(id, { hasKey: true });
     },
+    async fetchTwitchKey(id) {
+      await flushSave();
+      const login = await api.twitchFetchStreamKey(id);
+      get().updateTarget(id, { hasKey: true });
+      return login;
+    },
     async clearKey(id) {
       await flushSave();
       await api.clearKey(id);

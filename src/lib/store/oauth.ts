@@ -58,7 +58,11 @@ export function createOauthSlice({
         set({
           chatLogin: {
             twitch: a.twitchLogin
-              ? { state: "connected", login: a.twitchLogin }
+              ? {
+                  state: "connected",
+                  login: a.twitchLogin,
+                  missingScopes: a.twitchMissingScopes,
+                }
               : { state: "out" },
             youtube: a.youtube ? { state: "connected" } : { state: "out" },
             kick: a.kick ? { state: "connected" } : { state: "out" },

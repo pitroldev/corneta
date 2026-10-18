@@ -22,7 +22,7 @@ use youtube_broadcast::{Error as BroadcastError, Recovery as YoutubeRecovery, Re
 use youtube_error::GoogleError;
 
 const TWITCH_SCOPES: &str =
-    "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast";
+    "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast channel:read:stream_key moderator:read:followers";
 // This scope supports broadcasts/chat and the BYOK limited-input device flow.
 const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
@@ -615,7 +615,11 @@ pub fn clear_kick_oauth(app: AppHandle) -> Result<(), String> {
 pub async fn auth_status(app: AppHandle) -> Value {
     tauri::async_runtime::spawn_blocking(move || {
         let broker = refresh_broker_config(&app);
-        let twitch = twitch_token(&app).and_then(|t| twitch_validate(&t)).map(|i| i.login);
+        let twitch = twitch_token(&app).and_then(|t| twitch_validate(&t));
+        let twitch_missing = twitch
+            .as_ref()
+            .map(|info| missing_twitch_scopes(&info.scopes))
+            .unwrap_or_default();
         let youtube = keys::has_key("youtube_refresh");
         let cfg = oauth(&app);
         let youtube_own = own_creds("youtube_client_id", "youtube_client_secret").is_some();
@@ -624,7 +628,8 @@ pub async fn auth_status(app: AppHandle) -> Value {
         let kick = keys::has_key("kick_refresh");
         let kick_configured = cfg.kick_brokered || !cfg.kick_client_secret.is_empty();
         json!({
-            "twitchLogin": twitch,
+            "twitchLogin": twitch.map(|info| info.login),
+            "twitchMissingScopes": twitch_missing,
             "youtube": youtube,
             "youtubeConfigured": youtube_configured,
             "youtubeOfficialReady": !cfg.youtube_official_id.is_empty(),
@@ -639,12 +644,21 @@ pub async fn auth_status(app: AppHandle) -> Value {
         })
     })
     .await
-    .unwrap_or_else(|_| json!({ "twitchLogin": null, "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "brokerError": null }))
+    .unwrap_or_else(|_| json!({ "twitchLogin": null, "twitchMissingScopes": [], "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "brokerError": null }))
 }
 
 pub struct TwitchInfo {
     pub user_id: String,
     pub login: String,
+    pub scopes: Vec<String>,
+}
+
+/// A grant keeps its scopes; logins from before a scope was added need to reconnect for it.
+fn missing_twitch_scopes(granted: &[String]) -> Vec<&'static str> {
+    TWITCH_SCOPES
+        .split(' ')
+        .filter(|scope| !granted.iter().any(|granted| granted == scope))
+        .collect()
 }
 
 pub fn twitch_validate(token: &str) -> Option<TwitchInfo> {
@@ -659,7 +673,106 @@ pub fn twitch_validate(token: &str) -> Option<TwitchInfo> {
     Some(TwitchInfo {
         user_id: v.get("user_id")?.as_str()?.to_string(),
         login: v.get("login")?.as_str()?.to_lowercase(),
+        scopes: v
+            .get("scopes")
+            .and_then(Value::as_array)
+            .map(|scopes| {
+                scopes
+                    .iter()
+                    .filter_map(|scope| scope.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default(),
     })
+}
+
+/// The key goes straight to the vault; only the account name returns to the webview.
+#[tauri::command]
+pub async fn twitch_fetch_stream_key(app: AppHandle, target_id: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::config::validate_secret_namespace(&target_id)?;
+        let config = crate::config::load(&app);
+        if !config
+            .targets
+            .iter()
+            .any(|target| target.id == target_id && target.platform_id == "twitch")
+        {
+            return Err(Msg::TwitchStreamKeyWrongTarget.now());
+        }
+        let token = twitch_token(&app).ok_or_else(|| Msg::TwitchStreamKeyNeedsLogin.now())?;
+        let info = twitch_validate(&token).ok_or_else(|| Msg::TwitchStreamKeyNeedsLogin.now())?;
+        if missing_twitch_scopes(&info.scopes).contains(&"channel:read:stream_key") {
+            return Err(Msg::TwitchStreamKeyReconnect.now());
+        }
+        let key = fetch_twitch_stream_key(&token, &oauth(&app).twitch_client_id, &info.user_id)?;
+        keys::set_key(&target_id, &key)?;
+        Ok(info.login)
+    })
+    .await
+    .map_err(|_| Msg::TwitchStreamKeyFailed.now())?
+}
+
+fn fetch_twitch_stream_key(
+    token: &str,
+    client_id: &str,
+    broadcaster_id: &str,
+) -> Result<String, String> {
+    // Twitch user IDs are numeric; anything else would be spliced into the query string.
+    if broadcaster_id.is_empty() || !broadcaster_id.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(Msg::TwitchStreamKeyFailed.now());
+    }
+    let response = ureq::get(format!(
+        "https://api.twitch.tv/helix/streams/key?broadcaster_id={broadcaster_id}"
+    ))
+    .set("Authorization", &format!("Bearer {token}"))
+    .set("Client-Id", client_id)
+    .timeout(Duration::from_secs(10))
+    .call();
+    match response {
+        Ok(response) => response
+            .into_string()
+            .ok()
+            .and_then(|body| serde_json::from_str::<Value>(&body).ok())
+            .and_then(|body| twitch_stream_key_from(&body))
+            .ok_or_else(|| Msg::TwitchStreamKeyFailed.now()),
+        Err(ureq::Error::Status(401, _)) => Err(Msg::TwitchStreamKeyReconnect.now()),
+        // Twitch asks clients to show this message: the account has steps left before streaming.
+        Err(ureq::Error::Status(403, response)) => {
+            let reason = (*response)
+                .into_string()
+                .ok()
+                .and_then(|body| serde_json::from_str::<Value>(&body).ok())
+                .and_then(|body| body.get("message")?.as_str().map(provider_reason));
+            Err(match reason {
+                Some(reason) if !reason.is_empty() => {
+                    Msg::TwitchStreamKeyRefused { reason: &reason }.now()
+                }
+                _ => Msg::TwitchStreamKeyFailed.now(),
+            })
+        }
+        Err(_) => Err(Msg::TwitchStreamKeyFailed.now()),
+    }
+}
+
+/// The key is the only field read from the success body, and it must look like one.
+fn twitch_stream_key_from(body: &Value) -> Option<String> {
+    let key = body
+        .get("data")?
+        .as_array()?
+        .first()?
+        .get("stream_key")?
+        .as_str()?;
+    (!key.is_empty() && key.len() <= 8 * 1024 && !key.chars().any(char::is_whitespace))
+        .then(|| key.to_string())
+}
+
+fn provider_reason(text: &str) -> String {
+    text.chars()
+        .filter(|character| !character.is_control())
+        .take(200)
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 #[tauri::command]
@@ -2453,6 +2566,43 @@ pub async fn youtube_retry_broadcast_cleanup(app: AppHandle) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn older_twitch_grants_report_the_scopes_they_lack() {
+        let old: Vec<String> = [
+            "chat:read",
+            "chat:edit",
+            "moderator:manage:chat_messages",
+            "moderator:manage:banned_users",
+            "channel:manage:broadcast",
+        ]
+        .map(str::to_string)
+        .to_vec();
+        assert_eq!(
+            missing_twitch_scopes(&old),
+            ["channel:read:stream_key", "moderator:read:followers"]
+        );
+        let full: Vec<String> = TWITCH_SCOPES.split(' ').map(str::to_string).collect();
+        assert!(missing_twitch_scopes(&full).is_empty());
+    }
+
+    #[test]
+    fn only_a_plausible_stream_key_is_read_from_helix() {
+        let body = |key: &str| json!({ "data": [{ "stream_key": key }] });
+        assert_eq!(
+            twitch_stream_key_from(&body("live_123_abc")).as_deref(),
+            Some("live_123_abc")
+        );
+        let oversized = "x".repeat(8 * 1024 + 1);
+        for invalid in ["", "live 123", oversized.as_str()] {
+            assert_eq!(twitch_stream_key_from(&body(invalid)), None);
+        }
+        assert_eq!(twitch_stream_key_from(&json!({ "data": [] })), None);
+        assert_eq!(
+            provider_reason("  Complete\u{7} the steps\n "),
+            "Complete the steps"
+        );
+    }
 
     #[test]
     fn youtube_broadcast_body_carries_the_chosen_audience() {

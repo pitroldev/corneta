@@ -1220,6 +1220,10 @@ export const en: Dict = {
   "platforms.empty.title": "So, no platforms yet?",
   "platforms.key.cancelEdit": "Cancel changing the key",
   "platforms.key.change": "Change",
+  "platforms.key.fetch": "Fetch from account",
+  "platforms.key.fetchTitle":
+    "Fetches @{login}'s key from Twitch and stores it in the vault",
+  "platforms.key.fetchedToast": "@{login}'s key stored in the vault 🔒",
   "platforms.key.hide": "Hide the stream key",
   "platforms.key.pasteSave": "Paste and save",
   "platforms.key.pasteSaveTitle":
@@ -1230,6 +1234,9 @@ export const en: Dict = {
   "platforms.key.remove": "Remove",
   "platforms.key.removeConfirm": "Remove it for real?",
   "platforms.key.removeFailed": "Couldn't remove the stream key — {err}",
+  "platforms.key.reconnectTwitch": "Reconnect Twitch",
+  "platforms.key.reconnectTwitchTitle":
+    "Corneta needs a new permission to read your account's key",
   "platforms.key.removed": "Removed your stream key",
   "platforms.key.save": "Save",
   "platforms.key.saveFailed": "Couldn't save the stream key — {err}",

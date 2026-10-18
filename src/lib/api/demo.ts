@@ -865,6 +865,7 @@ export function mockApi(): CornetaApi {
     async authStatus() {
       return {
         twitchLogin: null,
+        twitchMissingScopes: [],
         youtube: false,
         youtubeConfigured: false,
         youtubeOfficialReady: false,
@@ -879,6 +880,9 @@ export function mockApi(): CornetaApi {
       };
     },
     async twitchLoginStart() {},
+    async twitchFetchStreamKey() {
+      return "demo";
+    },
     async twitchLogout() {},
     async youtubeLoginStart() {},
     async youtubeLogout() {},

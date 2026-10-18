@@ -108,6 +108,8 @@ export interface CornetaApi {
   }): Promise<void>;
   authStatus(): Promise<{
     twitchLogin: string | null;
+    /** Required scopes the current Twitch grant lacks; empty when logged out. */
+    twitchMissingScopes: string[];
     youtube: boolean;
     /** At least one official or user-supplied login path exists. */
     youtubeConfigured: boolean;
@@ -124,6 +126,8 @@ export interface CornetaApi {
     brokerError: string | null;
   }>;
   twitchLoginStart(): Promise<void>;
+  /** Stores the logged-in account's stream key in the vault; resolves with that account's login. */
+  twitchFetchStreamKey(targetId: string): Promise<string>;
   twitchLogout(): Promise<void>;
   youtubeLoginStart(): Promise<void>;
   youtubeLogout(): Promise<void>;
