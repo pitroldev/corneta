@@ -76,14 +76,14 @@
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "50c2d04e6f81ff8f1d692d93a5495db2c6721bb1",
-      "reason": "A fila de gravação da config junta edições feitas durante um save em andamento; nenhum passo, rótulo ou sequência do primeiro live citado mudou."
+      "sourceBlob": "d564144627d770547728fda5a619e7408f99ac61",
+      "reason": "Só acrescenta a busca da chave da Twitch pela conta logada, que também grava no cofre; colar a chave e os passos citados continuam valendo."
     },
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
       "source": "src/screens/PlatformsScreen.tsx",
-      "sourceBlob": "8ca8faf5d93d2f723bf99a3c0916c5c56264eae4",
-      "reason": "Nome e URL gravam ao sair do campo ou com Enter, e badges e validação seguem o que é digitado; testes, pausa, remoção e confirmações citados não mudaram."
+      "sourceBlob": "f8c783ab4eabe79efd2337bf51b1fa006439919a",
+      "reason": "Acrescenta, nos destinos da Twitch, o botão Pegar da conta, que grava a chave no mesmo cofre; Colar e salvar e os demais passos citados continuam valendo."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "a7175eb91d164506d298745ab1d3f539fa108dda",
-      "reason": "Só acrescenta os textos dos atalhos globais; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "b9a25794f951b1499809265353b9ccd8821b3bb6",
+      "reason": "Só acrescenta os textos de buscar a chave da Twitch pela conta; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
