@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
+import { draftInputProps, useDraft } from "../lib/useDraft";
 import {
   ObsConfigChangedError,
   ObsConfigSaveError,
@@ -80,6 +81,9 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   const setSettings = useStore((s) => s.setSettings);
   const configureObs = useStore((s) => s.configureObs);
   const t = useT();
+  const passwordDraft = useDraft(settings.obsPassword, (obsPassword) =>
+    setSettings({ obsPassword }),
+  );
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
@@ -168,9 +172,8 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
             aria-label={t("encoding.wizard.step2.title")}
             placeholder={t("encoding.wizard.step2.placeholder")}
             className="mt-2"
-            value={settings.obsPassword}
+            {...draftInputProps(passwordDraft)}
             disabled={status === "connecting"}
-            onChange={(e) => setSettings({ obsPassword: e.target.value })}
           />
         </Step>
 
