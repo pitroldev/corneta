@@ -83,6 +83,8 @@ pub struct CompositorOpts {
     pub slate: Slate,
     /// Manual pause replaces program audio as well as video, preventing microphone exposure.
     pub force_slate: Arc<AtomicBool>,
+    /// The config the stream started with; a save during the stream must not move the ingest.
+    pub config: crate::config::AppConfig,
 }
 
 enum GenExit {
@@ -375,7 +377,7 @@ pub async fn run(
             capture_compositor_error(&app, "compositor_ffmpeg_missing", false);
             return;
         };
-        let cfg = crate::config::load(&app);
+        let cfg = opts.config.clone();
         let spec = opts.spec;
         let delay_frames = (opts.delay_sec as usize) * (spec.fps as usize);
         // Coverage spans nearly the full delay buffer; keep this aligned with Guardian sampling.
