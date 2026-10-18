@@ -69,7 +69,7 @@ webview2-com = "=0.39.1"
 
 [dev-dependencies]
 # Match the updater's signature verifier.
-minisign-verify = "=0.2.5"
+minisign-verify = "=0.3.0"
 
 [profile.release]
 # Isolate worker panics and allow buffered session writers to flush during unwinding.
