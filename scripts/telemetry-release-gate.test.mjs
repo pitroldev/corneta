@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { ReadableStream } from "node:stream/web";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// server-only resolves only in a Next build; the stubbed PostHog env must never reach a client.
+vi.mock("server-only", () => ({}));
+vi.mock("../web/lib/server/posthog.ts", () => ({ reportApiFailure: vi.fn() }));
+
+import { GET as healthRoute } from "../web/app/api/v1/health/route.ts";
 import {
   checkTelemetryRelease,
   deploymentErrors,
@@ -263,6 +269,63 @@ describe("release telemetry deployment gate", () => {
         noticeVersion,
       );
       expect(result.errors).toEqual([]);
+    },
+  );
+});
+
+describe("release gate against the Setup API health route", () => {
+  const deployed = {
+    NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: token,
+    NEXT_PUBLIC_POSTHOG_HOST: host,
+    NEXT_PUBLIC_BUILD_SHA: sha,
+    NEXT_PUBLIC_TELEMETRY_DISABLED: "0",
+    POSTHOG_PROJECT_TOKEN: token,
+    POSTHOG_HOST: host,
+    BUILD_SHA: sha,
+    VERCEL_GIT_COMMIT_SHA: undefined,
+    TELEMETRY_DISABLED: "0",
+  };
+  const otherSha = "b".repeat(40);
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    { deployment: "that matches the release", changes: {}, errors: [] },
+    {
+      deployment: "whose Setup API runs another commit",
+      changes: { BUILD_SHA: otherSha },
+      errors: ["deployed Setup API does not match the release SHA"],
+    },
+    {
+      deployment: "whose site runs another commit",
+      changes: { NEXT_PUBLIC_BUILD_SHA: otherSha },
+      errors: ["deployed site does not match the release SHA"],
+    },
+    {
+      deployment: "with the Setup API kill switch on",
+      changes: { TELEMETRY_DISABLED: "1" },
+      errors: ["deployed kill switch in Setup API differs from the release"],
+    },
+    {
+      deployment: "whose site sends to another PostHog host",
+      changes: { NEXT_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com" },
+      errors: ["deployed site uses a different PostHog host"],
+    },
+    {
+      deployment: "whose Setup API uses another project token",
+      changes: { POSTHOG_PROJECT_TOKEN: "phc_other_synthetic_project" },
+      errors: ["deployed Setup API uses a different project token"],
+    },
+  ])(
+    "checks the health route of a deployment $deployment",
+    async ({ changes, errors }) => {
+      for (const [name, value] of Object.entries({ ...deployed, ...changes }))
+        vi.stubEnv(name, value);
+      const result = await checkTelemetryRelease(env, {
+        noticeVersion,
+        fetch: async (url, init) => healthRoute(new Request(url, init)),
+      });
+      expect(result.errors).toEqual(errors);
     },
   );
 });

@@ -1,11 +1,14 @@
+import { inspect } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("./posthog", () => ({ reportApiFailure: vi.fn() }));
 
+import { after } from "next/server";
 import { POST as exchange } from "../../app/api/v1/oauth/kick/exchange/route";
 import { POST as refresh } from "../../app/api/v1/oauth/kick/refresh/route";
+import { reportApiFailure } from "./posthog";
 import { createRateLimiter } from "./rate-limit-core";
 
 const exchangeBody = {
@@ -169,5 +172,225 @@ describe("Kick OAuth routes with instance-local rate limits", () => {
       200,
     );
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
+
+const PROVIDER_DETAIL = "provider-detail-sentinel";
+const CREDENTIALS = [
+  exchangeBody.code,
+  exchangeBody.codeVerifier,
+  refreshBody.refreshToken,
+  "test-client-secret",
+];
+const send = {
+  exchange: () => exchange(request("exchange", exchangeBody)),
+  refresh: () => refresh(request("refresh", refreshBody)),
+};
+type ExpectedError = {
+  status: number;
+  code: string;
+  message: string;
+  retryable: boolean;
+};
+
+const loginRejected = (status: number): ExpectedError => ({
+  status,
+  code: "PROVIDER_REJECTED_REQUEST",
+  message: "A Kick recusou a conclusão do login.",
+  retryable: false,
+});
+const sessionExpired: ExpectedError = {
+  status: 401,
+  code: "OAUTH_SESSION_EXPIRED",
+  message: "A sessão da Kick expirou. Entre novamente.",
+  retryable: false,
+};
+const refreshRejected: ExpectedError = {
+  status: 502,
+  code: "PROVIDER_REJECTED_REQUEST",
+  message: "A Kick recusou a renovação.",
+  retryable: true,
+};
+const unreadableReply: ExpectedError = {
+  status: 502,
+  code: "INVALID_PROVIDER_RESPONSE",
+  message: "O provedor retornou uma resposta inválida.",
+  retryable: true,
+};
+const notConfigured: ExpectedError = {
+  status: 503,
+  code: "OAUTH_NOT_CONFIGURED",
+  message: "Kick OAuth ainda não está configurado no servidor.",
+  retryable: false,
+};
+
+// OAuth error descriptions can echo request data back to the caller.
+function providerError(status: number, error: string) {
+  return Response.json(
+    { error, error_description: `${PROVIDER_DETAIL} ${CREDENTIALS.join(" ")}` },
+    { status },
+  );
+}
+
+const CONSOLE_METHODS = ["debug", "error", "info", "log", "warn"] as const;
+
+function consoleCalls() {
+  return CONSOLE_METHODS.flatMap(
+    (method) => vi.mocked(console[method]).mock.calls,
+  );
+}
+
+async function reportedFailures() {
+  for (const [task] of vi.mocked(after).mock.calls)
+    await (typeof task === "function" ? task() : task);
+  return vi.mocked(reportApiFailure).mock.calls.map(([failure]) => failure);
+}
+
+async function expectSanitizedError(
+  response: Response,
+  route: keyof typeof send,
+  expected: ExpectedError,
+) {
+  const text = await response.text();
+  const requestId = response.headers.get("x-request-id");
+  expect(response.status).toBe(expected.status);
+  expect(response.headers.get("cache-control")).toContain("no-store");
+  expect(JSON.parse(text)).toEqual({
+    error: {
+      code: expected.code,
+      message: expected.message,
+      retryable: expected.retryable,
+      requestId,
+    },
+  });
+  for (const secret of [...CREDENTIALS, PROVIDER_DETAIL])
+    expect(text).not.toContain(secret);
+  expect(consoleCalls()).toEqual([]);
+  expect(await reportedFailures()).toEqual([
+    {
+      context: expect.objectContaining({
+        requestId,
+        routeId: `kick_${route}`,
+        provider: "kick",
+      }),
+      status: expected.status,
+      retryable: expected.retryable,
+      errorCode: expected.code,
+    },
+  ]);
+}
+
+describe("Kick OAuth provider failures", () => {
+  beforeEach(() => {
+    vi.mocked(after).mockClear();
+    vi.mocked(reportApiFailure).mockClear();
+    for (const method of CONSOLE_METHODS)
+      vi.spyOn(console, method).mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    { status: 400, error: "invalid_grant" },
+    { status: 401, error: "invalid_token" },
+  ])(
+    "maps refresh $error ($status) to the re-login response",
+    async ({ status, error }) => {
+      fetcher.mockResolvedValueOnce(providerError(status, error));
+      await expectSanitizedError(
+        await send.refresh(),
+        "refresh",
+        sessionExpired,
+      );
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  // The desktop deletes the stored session on any 400/401 from refresh, so these must stay 5xx.
+  it.each([
+    { status: 400, error: "invalid_request" },
+    { status: 500, error: "server_error" },
+    { status: 503, error: "temporarily_unavailable" },
+  ])(
+    "keeps the session retryable on refresh $error ($status)",
+    async ({ status, error }) => {
+      fetcher.mockResolvedValueOnce(providerError(status, error));
+      await expectSanitizedError(
+        await send.refresh(),
+        "refresh",
+        refreshRejected,
+      );
+    },
+  );
+
+  it.each([
+    { status: 400, error: "invalid_grant", expected: loginRejected(400) },
+    { status: 401, error: "invalid_client", expected: loginRejected(502) },
+    { status: 500, error: "server_error", expected: loginRejected(502) },
+    {
+      status: 503,
+      error: "temporarily_unavailable",
+      expected: loginRejected(502),
+    },
+  ])(
+    "rejects the login on exchange $error ($status) with HTTP $expected.status",
+    async ({ status, error, expected }) => {
+      fetcher.mockResolvedValueOnce(providerError(status, error));
+      await expectSanitizedError(await send.exchange(), "exchange", expected);
+    },
+  );
+
+  it.each(["exchange", "refresh"] as const)(
+    "treats an unreadable provider error page on %s as an invalid reply",
+    async (route) => {
+      fetcher.mockResolvedValueOnce(
+        new Response(`<h1>Bad gateway</h1><p>${PROVIDER_DETAIL}</p>`, {
+          status: 502,
+          headers: { "content-type": "text/html" },
+        }),
+      );
+      await expectSanitizedError(await send[route](), route, unreadableReply);
+    },
+  );
+
+  it.each([
+    { route: "exchange", missing: "KICK_CLIENT_ID" },
+    { route: "exchange", missing: "KICK_CLIENT_SECRET" },
+    { route: "refresh", missing: "KICK_CLIENT_ID" },
+    { route: "refresh", missing: "KICK_CLIENT_SECRET" },
+  ] as const)(
+    "answers $route with OAUTH_NOT_CONFIGURED when the server lacks $missing",
+    async ({ route, missing }) => {
+      vi.stubEnv("VITE_KICK_CLIENT_ID", undefined);
+      vi.stubEnv(missing, undefined);
+      await expectSanitizedError(await send[route](), route, notConfigured);
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it("answers an unexpected failure with a generic body and a redacted log", async () => {
+    globalThis.cornetaOAuthRateLimiter = async () => {
+      throw new Error(`limiter failed for ${CREDENTIALS.join(" ")}`);
+    };
+    const response = await send.refresh();
+    const text = await response.text();
+    expect(response.status).toBe(500);
+    expect(JSON.parse(text)).toEqual({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Não foi possível concluir a operação.",
+        retryable: true,
+        requestId: response.headers.get("x-request-id"),
+      },
+    });
+    expect(consoleCalls()).toHaveLength(1);
+    const logged = inspect(consoleCalls(), { depth: null });
+    for (const secret of CREDENTIALS) {
+      expect(text).not.toContain(secret);
+      expect(logged).not.toContain(secret);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
