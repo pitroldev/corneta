@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tungstenite::Message;
 
 use crate::http_client as ureq;
-use crate::i18n::Msg;
+use crate::i18n::{Locale, Msg};
 use crate::AppState;
 
 #[derive(Serialize, Clone, Debug)]
@@ -1555,35 +1555,59 @@ fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
         .map(String::from)
 }
 
-fn yt_author(item: &Value) -> String {
+fn yt_author(item: &Value, locale: Locale) -> String {
     item.pointer("/authorDetails/displayName")
         .and_then(|v| v.as_str())
         .map(String::from)
-        .unwrap_or_else(|| Msg::ChatUnknownUser.now())
+        .unwrap_or_else(|| Msg::ChatUnknownUser.text(locale))
 }
 
-#[allow(clippy::too_many_arguments)]
-fn yt_alert(
-    source: &str,
-    kind: &str,
-    user: String,
-    amount: Option<f64>,
-    currency: Option<String>,
-    tier: Option<String>,
-    message: Option<String>,
-) -> Alert {
+/// Identity and clock for one parsed YouTube item; tests inject fixed values.
+struct YtStamp {
+    id: String,
+    ts: u64,
+}
+
+impl YtStamp {
+    fn now() -> Self {
+        Self {
+            id: next_id(),
+            ts: now_ms(),
+        }
+    }
+}
+
+/// What one YouTube item means, decided without side effects.
+#[derive(Debug)]
+enum YtEvent {
+    Chat(ChatMessage),
+    Alert(Alert),
+    DeleteMessage(String),
+    DeleteUser(String),
+}
+
+fn yt_alert(stamp: YtStamp, source: &str, kind: &str, user: String) -> Alert {
     Alert {
-        id: next_id(),
+        id: stamp.id,
         platform: "youtube".into(),
         source: source.to_string(),
         kind: kind.into(),
         user,
-        amount,
-        currency,
-        tier,
-        message,
+        amount: None,
+        currency: None,
+        tier: None,
+        message: None,
         fragments: Vec::new(),
-        ts: now_ms(),
+        ts: stamp.ts,
+    }
+}
+
+fn dispatch_yt(app: &AppHandle, gen: u64, source: &str, event: YtEvent) {
+    match event {
+        YtEvent::Chat(message) => emit_chat_gen(app, gen, message),
+        YtEvent::Alert(alert) => emit_alert(app, alert),
+        YtEvent::DeleteMessage(id) => delete_message(app, "youtube", &id),
+        YtEvent::DeleteUser(author) => delete_user(app, "youtube", source, &author),
     }
 }
 
@@ -1670,10 +1694,16 @@ fn yt_message_fragments(message: &Value) -> (String, Vec<ChatFragment>) {
                 text.push_str(t);
                 frags.push(text_frag(t));
             } else if let Some(emoji) = run.get("emoji") {
-                let label = emoji
-                    .pointer("/shortcuts/0")
-                    .and_then(|x| x.as_str())
-                    .unwrap_or("");
+                // Channel emojis often have no shortcut; fall back to their search term or label.
+                let label = [
+                    "/shortcuts/0",
+                    "/searchTerms/0",
+                    "/image/accessibility/accessibilityData/label",
+                    "/emojiId",
+                ]
+                .iter()
+                .find_map(|path| emoji.pointer(path).and_then(|x| x.as_str()))
+                .unwrap_or("");
                 text.push_str(label);
                 match emoji
                     .pointer("/image/thumbnails/0/url")
@@ -1695,7 +1725,7 @@ fn yt_message_fragments(message: &Value) -> (String, Vec<ChatFragment>) {
     (text, frags)
 }
 
-fn yt_innertube_badges(renderer: &Value) -> Vec<ChatBadge> {
+fn yt_innertube_badges(renderer: &Value, locale: Locale) -> Vec<ChatBadge> {
     let mut out = vec![];
     if let Some(badges) = renderer.get("authorBadges").and_then(|b| b.as_array()) {
         for b in badges {
@@ -1717,7 +1747,7 @@ fn yt_innertube_badges(renderer: &Value) -> Vec<ChatBadge> {
                     kind: "verified".into(),
                 }),
                 _ if r.and_then(|x| x.get("customThumbnail")).is_some() => out.push(ChatBadge {
-                    label: Msg::ChatBadgeMember.now(),
+                    label: Msg::ChatBadgeMember.text(locale),
                     kind: "subscriber".into(),
                 }),
                 _ => {}
@@ -1758,102 +1788,99 @@ fn parse_amount(s: &str) -> Option<f64> {
 }
 
 fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u64) {
+    if let Some(event) =
+        parse_innertube_action(source, action, YtStamp::now(), crate::i18n::locale())
+    {
+        dispatch_yt(app, gen, source, event);
+    }
+}
+
+fn parse_innertube_action(
+    source: &str,
+    action: &Value,
+    stamp: YtStamp,
+    locale: Locale,
+) -> Option<YtEvent> {
     if let Some(id) = action
         .pointer("/markChatItemAsDeletedAction/targetItemId")
         .and_then(|v| v.as_str())
     {
-        delete_message(app, "youtube", id);
-        return;
+        return Some(YtEvent::DeleteMessage(id.to_string()));
     }
-    let Some(item) = action.pointer("/addChatItemAction/item") else {
-        return;
+    let item = action.pointer("/addChatItemAction/item")?;
+    let author_of = |r: &Value| {
+        r.pointer("/authorName/simpleText")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.text(locale))
     };
 
     if let Some(r) = item.get("liveChatTextMessageRenderer") {
         let (text, fragments) = yt_message_fragments(r.get("message").unwrap_or(&Value::Null));
-        if text.is_empty() {
-            return;
+        if fragments.is_empty() {
+            return None;
         }
-        let author = r
-            .pointer("/authorName/simpleText")
-            .and_then(|v| v.as_str())
-            .unwrap_or("anon")
-            .to_string();
-        emit_chat_gen(
-            app,
-            gen,
-            ChatMessage {
-                id: next_id(),
-                platform: "youtube".into(),
-                source: source.to_string(),
-                author,
-                author_id: None,
-                native_id: r.get("id").and_then(|v| v.as_str()).map(String::from),
-                color: None,
-                fragments,
-                badges: yt_innertube_badges(r),
-                text,
-                ts: now_ms(),
-            },
-        );
-        return;
+        return Some(YtEvent::Chat(ChatMessage {
+            id: stamp.id,
+            platform: "youtube".into(),
+            source: source.to_string(),
+            author: author_of(r),
+            author_id: None,
+            native_id: r.get("id").and_then(|v| v.as_str()).map(String::from),
+            color: None,
+            fragments,
+            badges: yt_innertube_badges(r, locale),
+            text,
+            ts: stamp.ts,
+        }));
     }
 
-    if let Some(r) = item.get("liveChatPaidMessageRenderer") {
-        let author = r
-            .pointer("/authorName/simpleText")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
+    // Super Chats and Super Stickers share the paid-message amount text.
+    for (renderer, sticker) in [
+        ("liveChatPaidMessageRenderer", false),
+        ("liveChatPaidStickerRenderer", true),
+    ] {
+        let Some(r) = item.get(renderer) else {
+            continue;
+        };
         let amount_text = r
             .pointer("/purchaseAmountText/simpleText")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let (msg, _) = yt_message_fragments(r.get("message").unwrap_or(&Value::Null));
+        let (msg, _) = if sticker {
+            (String::new(), Vec::new())
+        } else {
+            yt_message_fragments(r.get("message").unwrap_or(&Value::Null))
+        };
         let display = if msg.is_empty() {
             amount_text.to_string()
         } else {
             format!("{amount_text} — {msg}")
         };
-        emit_alert(
-            app,
-            yt_alert(
-                source,
-                "superchat",
-                author,
-                parse_amount(amount_text),
-                None,
-                None,
-                Some(display),
-            ),
-        );
-        return;
+        return Some(YtEvent::Alert(Alert {
+            amount: parse_amount(amount_text),
+            message: Some(display),
+            ..yt_alert(stamp, source, "superchat", author_of(r))
+        }));
     }
 
-    if item.get("liveChatMembershipItemRenderer").is_some() {
-        let author = item
-            .pointer("/liveChatMembershipItemRenderer/authorName/simpleText")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-        emit_alert(
-            app,
-            yt_alert(source, "member", author, None, None, None, None),
-        );
-        return;
+    if let Some(r) = item.get("liveChatMembershipItemRenderer") {
+        return Some(YtEvent::Alert(yt_alert(
+            stamp,
+            source,
+            "member",
+            author_of(r),
+        )));
     }
 
     if let Some(r) = item.get("liveChatSponsorshipsGiftPurchaseAnnouncementRenderer") {
         let author = r
-            .pointer("/header/liveChatSponsorshipsHeaderRenderer/authorName/simpleText")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-        emit_alert(
-            app,
-            yt_alert(source, "subgift", author, None, None, None, None),
-        );
+            .pointer("/header/liveChatSponsorshipsHeaderRenderer")
+            .map(&author_of)
+            .unwrap_or_else(|| Msg::ChatUnknownUser.text(locale));
+        return Some(YtEvent::Alert(yt_alert(stamp, source, "subgift", author)));
     }
+    None
 }
 
 /// False permits a Data API fallback only when InnerTube could not initialize.
@@ -1943,6 +1970,110 @@ fn run_youtube(
 }
 
 /// True means the connection succeeded at least once, allowing the supervisor to reset backoff.
+fn parse_dataapi_item(
+    source: &str,
+    item: &Value,
+    stamp: YtStamp,
+    locale: Locale,
+) -> Option<YtEvent> {
+    let text_at = |path: &str| {
+        item.pointer(path)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+    };
+    let micros_at = |path: &str| {
+        item.pointer(path)
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<f64>().ok())
+            .map(|m| m / 1_000_000.0)
+    };
+    let count_at = |path: &str| {
+        item.pointer(path)
+            .and_then(|v| v.as_u64())
+            .map(|n| n as f64)
+    };
+    let kind = item
+        .pointer("/snippet/type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("textMessageEvent");
+    match kind {
+        "messageDeletedEvent" => {
+            text_at("/snippet/messageDeletedDetails/deletedMessageId").map(YtEvent::DeleteMessage)
+        }
+        "userBannedEvent" => text_at("/snippet/userBannedDetails/bannedUserDetails/displayName")
+            .map(YtEvent::DeleteUser),
+        "superChatEvent" => Some(YtEvent::Alert(Alert {
+            amount: micros_at("/snippet/superChatDetails/amountMicros"),
+            currency: text_at("/snippet/superChatDetails/currency"),
+            message: text_at("/snippet/superChatDetails/userComment"),
+            ..yt_alert(stamp, source, "superchat", yt_author(item, locale))
+        })),
+        "superStickerEvent" => Some(YtEvent::Alert(Alert {
+            amount: micros_at("/snippet/superStickerDetails/amountMicros"),
+            currency: text_at("/snippet/superStickerDetails/currency"),
+            ..yt_alert(stamp, source, "superchat", yt_author(item, locale))
+        })),
+        "newSponsorEvent" => Some(YtEvent::Alert(Alert {
+            tier: text_at("/snippet/newSponsorDetails/memberLevelName"),
+            ..yt_alert(stamp, source, "member", yt_author(item, locale))
+        })),
+        "memberMilestoneChatEvent" => Some(YtEvent::Alert(Alert {
+            amount: count_at("/snippet/memberMilestoneChatDetails/memberMonth"),
+            tier: text_at("/snippet/memberMilestoneChatDetails/memberLevelName"),
+            message: text_at("/snippet/memberMilestoneChatDetails/userComment"),
+            ..yt_alert(stamp, source, "member", yt_author(item, locale))
+        })),
+        "membershipGiftingEvent" => Some(YtEvent::Alert(Alert {
+            amount: count_at("/snippet/membershipGiftingDetails/giftMembershipsCount"),
+            tier: text_at("/snippet/membershipGiftingDetails/giftMembershipsLevelName"),
+            ..yt_alert(stamp, source, "subgift", yt_author(item, locale))
+        })),
+        // Other event types (chat ended, gift received, mode changes) are not chat lines.
+        "textMessageEvent" => {
+            let text = text_at("/snippet/displayMessage")?;
+            let flag = |k: &str| {
+                item.pointer(&format!("/authorDetails/{k}"))
+                    .and_then(|v| v.as_bool())
+                    == Some(true)
+            };
+            let mut badges = vec![];
+            if flag("isChatOwner") {
+                badges.push(ChatBadge {
+                    label: "HOST".into(),
+                    kind: "broadcaster".into(),
+                });
+            }
+            if flag("isChatModerator") {
+                badges.push(ChatBadge {
+                    label: "MOD".into(),
+                    kind: "moderator".into(),
+                });
+            }
+            if flag("isChatSponsor") {
+                badges.push(ChatBadge {
+                    label: Msg::ChatBadgeMember.text(locale),
+                    kind: "subscriber".into(),
+                });
+            }
+            Some(YtEvent::Chat(ChatMessage {
+                id: stamp.id,
+                platform: "youtube".into(),
+                source: source.to_string(),
+                author: yt_author(item, locale),
+                author_id: None,
+                native_id: item.get("id").and_then(|v| v.as_str()).map(String::from),
+                color: None,
+                fragments: vec![text_frag(&text)],
+                badges,
+                text,
+                ts: stamp.ts,
+            }))
+        }
+        _ => None,
+    }
+}
+
 fn youtube_dataapi(
     api_key: &str,
     vid: &str,
@@ -1999,172 +2130,10 @@ fn youtube_dataapi(
 
         if !first {
             if let Some(items) = json.get("items").and_then(|v| v.as_array()) {
+                let locale = crate::i18n::locale();
                 for item in items {
-                    let kind = item
-                        .pointer("/snippet/type")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("textMessageEvent");
-                    match kind {
-                        "messageDeletedEvent" => {
-                            if let Some(id) = item
-                                .pointer("/snippet/messageDeletedDetails/deletedMessageId")
-                                .and_then(|v| v.as_str())
-                            {
-                                delete_message(&app, "youtube", id);
-                            }
-                        }
-                        "userBannedEvent" => {
-                            if let Some(name) = item
-                                .pointer("/snippet/userBannedDetails/bannedUserDetails/displayName")
-                                .and_then(|v| v.as_str())
-                            {
-                                delete_user(&app, "youtube", source, name);
-                            }
-                        }
-                        "superChatEvent" => {
-                            let amount = item
-                                .pointer("/snippet/superChatDetails/amountMicros")
-                                .and_then(|v| v.as_str())
-                                .and_then(|s| s.parse::<f64>().ok())
-                                .map(|m| m / 1_000_000.0);
-                            emit_alert(
-                                &app,
-                                yt_alert(
-                                    source,
-                                    "superchat",
-                                    yt_author(item),
-                                    amount,
-                                    item.pointer("/snippet/superChatDetails/currency")
-                                        .and_then(|v| v.as_str())
-                                        .map(String::from),
-                                    None,
-                                    item.pointer("/snippet/superChatDetails/userComment")
-                                        .and_then(|v| v.as_str())
-                                        .filter(|s| !s.is_empty())
-                                        .map(String::from),
-                                ),
-                            );
-                        }
-                        "newSponsorEvent" => {
-                            emit_alert(
-                                &app,
-                                yt_alert(
-                                    source,
-                                    "member",
-                                    yt_author(item),
-                                    None,
-                                    None,
-                                    item.pointer("/snippet/newSponsorDetails/memberLevelName")
-                                        .and_then(|v| v.as_str())
-                                        .map(String::from),
-                                    None,
-                                ),
-                            );
-                        }
-                        "memberMilestoneChatEvent" => {
-                            let months = item
-                                .pointer("/snippet/memberMilestoneChatDetails/memberMonth")
-                                .and_then(|v| v.as_u64())
-                                .map(|m| m as f64);
-                            emit_alert(
-                                &app,
-                                yt_alert(
-                                    source,
-                                    "member",
-                                    yt_author(item),
-                                    months,
-                                    None,
-                                    item.pointer(
-                                        "/snippet/memberMilestoneChatDetails/memberLevelName",
-                                    )
-                                    .and_then(|v| v.as_str())
-                                    .map(String::from),
-                                    item.pointer("/snippet/memberMilestoneChatDetails/userComment")
-                                        .and_then(|v| v.as_str())
-                                        .filter(|s| !s.is_empty())
-                                        .map(String::from),
-                                ),
-                            );
-                        }
-                        "membershipGiftingEvent" => {
-                            let count = item
-                                .pointer("/snippet/membershipGiftingDetails/giftMembershipsCount")
-                                .and_then(|v| v.as_u64())
-                                .map(|c| c as f64);
-                            emit_alert(
-                                &app,
-                                yt_alert(
-                                    source,
-                                    "subgift",
-                                    yt_author(item),
-                                    count,
-                                    None,
-                                    item.pointer("/snippet/membershipGiftingDetails/giftMembershipsLevelName")
-                                        .and_then(|v| v.as_str())
-                                        .map(String::from),
-                                    None,
-                                ),
-                            );
-                        }
-                        _ => {
-                            let text = item
-                                .pointer("/snippet/displayMessage")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            if text.is_empty() {
-                                continue;
-                            }
-                            let author = item
-                                .pointer("/authorDetails/displayName")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("anon")
-                                .to_string();
-                            let mut badges = vec![];
-                            let flag = |k: &str| {
-                                item.pointer(&format!("/authorDetails/{k}"))
-                                    .and_then(|v| v.as_bool())
-                                    == Some(true)
-                            };
-                            if flag("isChatOwner") {
-                                badges.push(ChatBadge {
-                                    label: "HOST".into(),
-                                    kind: "broadcaster".into(),
-                                });
-                            }
-                            if flag("isChatModerator") {
-                                badges.push(ChatBadge {
-                                    label: "MOD".into(),
-                                    kind: "moderator".into(),
-                                });
-                            }
-                            if flag("isChatSponsor") {
-                                badges.push(ChatBadge {
-                                    label: Msg::ChatBadgeMember.now(),
-                                    kind: "subscriber".into(),
-                                });
-                            }
-                            emit_chat_gen(
-                                &app,
-                                gen,
-                                ChatMessage {
-                                    id: next_id(),
-                                    platform: "youtube".into(),
-                                    source: source.to_string(),
-                                    author,
-                                    author_id: None,
-                                    native_id: item
-                                        .get("id")
-                                        .and_then(|v| v.as_str())
-                                        .map(String::from),
-                                    color: None,
-                                    fragments: vec![text_frag(&text)],
-                                    badges,
-                                    text,
-                                    ts: now_ms(),
-                                },
-                            );
-                        }
+                    if let Some(event) = parse_dataapi_item(source, item, YtStamp::now(), locale) {
+                        dispatch_yt(&app, gen, source, event);
                     }
                 }
             }
@@ -3178,5 +3147,186 @@ mod tests {
     #[test]
     fn parse_amount_mixed_separators() {
         assert_eq!(parse_amount("1,234.56"), Some(1234.56));
+    }
+
+    fn stamp() -> YtStamp {
+        YtStamp {
+            id: "fixed-id".into(),
+            ts: 1_700_000_000_000,
+        }
+    }
+
+    fn innertube(action: Value) -> Option<YtEvent> {
+        parse_innertube_action("Canal", &action, stamp(), Locale::PtBr)
+    }
+
+    fn data_api(item: Value) -> Option<YtEvent> {
+        parse_dataapi_item("Canal", &item, stamp(), Locale::PtBr)
+    }
+
+    fn chat(event: Option<YtEvent>) -> ChatMessage {
+        match event {
+            Some(YtEvent::Chat(message)) => message,
+            other => panic!("expected a chat message, got {other:?}"),
+        }
+    }
+
+    fn alert(event: Option<YtEvent>) -> Alert {
+        match event {
+            Some(YtEvent::Alert(alert)) => alert,
+            other => panic!("expected an alert, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn innertube_text_messages_use_the_injected_identity_and_clock() {
+        let message = chat(innertube(json!({ "addChatItemAction": { "item": {
+            "liveChatTextMessageRenderer": {
+                "id": "native-1",
+                "authorName": { "simpleText": "Ana" },
+                "message": { "runs": [{ "text": "oi " }, { "text": "galera" }] },
+                "authorBadges": [{ "liveChatAuthorBadgeRenderer": { "icon": { "iconType": "MODERATOR" } } }]
+            }
+        } } })));
+        assert_eq!(message.id, "fixed-id");
+        assert_eq!(message.ts, 1_700_000_000_000);
+        assert_eq!(message.source, "Canal");
+        assert_eq!(message.author, "Ana");
+        assert_eq!(message.native_id.as_deref(), Some("native-1"));
+        assert_eq!(message.text, "oi galera");
+        assert_eq!(message.badges[0].kind, "moderator");
+    }
+
+    #[test]
+    fn innertube_keeps_emoji_only_messages_from_channel_emojis() {
+        let message = chat(innertube(json!({ "addChatItemAction": { "item": {
+            "liveChatTextMessageRenderer": {
+                "message": { "runs": [{ "emoji": {
+                    "emojiId": "UC/custom",
+                    "searchTerms": ["corneta"],
+                    "image": { "thumbnails": [{ "url": "https://yt3.example.invalid/e.png" }] }
+                } }] }
+            }
+        } } })));
+        assert_eq!(message.text, "corneta");
+        assert_eq!(message.fragments[0].kind, "emote");
+        // Without an author name the localized fallback is used, not a hard-coded "anon".
+        assert_eq!(message.author, "alguém");
+    }
+
+    #[test]
+    fn innertube_deletions_paid_items_and_memberships() {
+        assert!(matches!(
+            innertube(json!({ "markChatItemAsDeletedAction": { "targetItemId": "native-9" } })),
+            Some(YtEvent::DeleteMessage(id)) if id == "native-9"
+        ));
+        let chat_alert = alert(innertube(json!({ "addChatItemAction": { "item": {
+            "liveChatPaidMessageRenderer": {
+                "authorName": { "simpleText": "Bia" },
+                "purchaseAmountText": { "simpleText": "R$ 10,00" },
+                "message": { "runs": [{ "text": "valeu" }] }
+            }
+        } } })));
+        assert_eq!(chat_alert.kind, "superchat");
+        assert_eq!(chat_alert.amount, Some(10.0));
+        assert_eq!(chat_alert.message.as_deref(), Some("R$ 10,00 — valeu"));
+        let sticker = alert(innertube(json!({ "addChatItemAction": { "item": {
+            "liveChatPaidStickerRenderer": {
+                "authorName": { "simpleText": "Caio" },
+                "purchaseAmountText": { "simpleText": "R$ 5,00" }
+            }
+        } } })));
+        assert_eq!(sticker.kind, "superchat");
+        assert_eq!(sticker.message.as_deref(), Some("R$ 5,00"));
+        let gift = alert(innertube(json!({ "addChatItemAction": { "item": {
+            "liveChatSponsorshipsGiftPurchaseAnnouncementRenderer": {
+                "header": { "liveChatSponsorshipsHeaderRenderer": { "authorName": { "simpleText": "Duda" } } }
+            }
+        } } })));
+        assert_eq!(
+            (gift.kind.as_str(), gift.user.as_str()),
+            ("subgift", "Duda")
+        );
+        assert!(innertube(json!({ "addChatItemAction": { "item": { "liveChatViewerEngagementMessageRenderer": {} } } })).is_none());
+    }
+
+    #[test]
+    fn data_api_text_messages_carry_role_badges() {
+        let message = chat(data_api(json!({
+            "id": "native-2",
+            "snippet": { "type": "textMessageEvent", "displayMessage": "boa noite" },
+            "authorDetails": { "displayName": "Eva", "isChatOwner": true, "isChatSponsor": true }
+        })));
+        assert_eq!(
+            (message.author.as_str(), message.text.as_str()),
+            ("Eva", "boa noite")
+        );
+        assert_eq!(message.native_id.as_deref(), Some("native-2"));
+        let kinds: Vec<_> = message.badges.iter().map(|b| b.kind.as_str()).collect();
+        assert_eq!(kinds, ["broadcaster", "subscriber"]);
+        assert_eq!(message.badges[1].label, "MEMBRO");
+    }
+
+    #[test]
+    fn data_api_paid_events_become_alerts() {
+        let super_chat = alert(data_api(json!({
+            "snippet": { "type": "superChatEvent", "superChatDetails": {
+                "amountMicros": "25000000", "currency": "BRL", "userComment": "manda salve"
+            } },
+            "authorDetails": { "displayName": "Fê" }
+        })));
+        assert_eq!(super_chat.amount, Some(25.0));
+        assert_eq!(super_chat.currency.as_deref(), Some("BRL"));
+        assert_eq!(super_chat.message.as_deref(), Some("manda salve"));
+        let sticker = alert(data_api(json!({
+            "snippet": { "type": "superStickerEvent", "superStickerDetails": {
+                "amountMicros": "5000000", "currency": "BRL"
+            } },
+            "authorDetails": { "displayName": "Gui" }
+        })));
+        assert_eq!(
+            (sticker.kind.as_str(), sticker.amount),
+            ("superchat", Some(5.0))
+        );
+        let gifts = alert(data_api(json!({
+            "snippet": { "type": "membershipGiftingEvent", "membershipGiftingDetails": {
+                "giftMembershipsCount": 5, "giftMembershipsLevelName": "Fã"
+            } },
+            "authorDetails": { "displayName": "Hugo" }
+        })));
+        assert_eq!((gifts.kind.as_str(), gifts.amount), ("subgift", Some(5.0)));
+        assert_eq!(gifts.tier.as_deref(), Some("Fã"));
+    }
+
+    #[test]
+    fn data_api_moderation_and_non_chat_events() {
+        assert!(matches!(
+            data_api(json!({ "snippet": { "type": "messageDeletedEvent",
+                "messageDeletedDetails": { "deletedMessageId": "native-3" } } })),
+            Some(YtEvent::DeleteMessage(id)) if id == "native-3"
+        ));
+        assert!(matches!(
+            data_api(json!({ "snippet": { "type": "userBannedEvent",
+                "userBannedDetails": { "bannedUserDetails": { "displayName": "Ivo" } } } })),
+            Some(YtEvent::DeleteUser(name)) if name == "Ivo"
+        ));
+        // These used to reach the feed as chat lines.
+        for kind in [
+            "chatEndedEvent",
+            "giftMembershipReceivedEvent",
+            "sponsorOnlyModeStartedEvent",
+        ] {
+            assert!(
+                data_api(
+                    json!({ "snippet": { "type": kind, "displayMessage": "texto do sistema" } })
+                )
+                .is_none(),
+                "{kind}"
+            );
+        }
+        assert!(data_api(
+            json!({ "snippet": { "type": "textMessageEvent", "displayMessage": "" } })
+        )
+        .is_none());
     }
 }
