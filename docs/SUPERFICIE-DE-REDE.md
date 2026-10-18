@@ -44,7 +44,7 @@ Fontes: [`engine.rs`](../src-tauri/src/engine.rs), [`config.rs`](../src-tauri/sr
 
 ### Mesa não deve ser apresentada como segura para exposição pública
 
-O relay usa salas e segredo por par para impedir a retomada indevida de um `peerId`, mas isso **não equivale a autenticação forte de entrada na sala, autorização de conta ou TLS da sinalização**. O servidor aceita novos participantes pela mensagem `join`; o limite por fila não constitui um limite global de conexões/salas.
+O relay usa salas e segredo por par para impedir a retomada indevida de um `peerId`, mas isso **não equivale a autenticação forte de entrada na sala, autorização de conta ou TLS da sinalização**. O servidor aceita novos participantes pela mensagem `join`; o limite por fila não constitui um limite global de conexões/salas. O app só aceita convites `MESA1` com `host:porta` (sem credenciais, caminho ou endereço desta máquina), recusa ocupar um lugar numa mesa que já tenha seis participantes e não abre conexões além desse limite, mais uma visão do OBS por lugar; o relay não impõe essas travas a um cliente modificado.
 
 A mídia WebRTC usa DTLS-SRTP; isso não cifra o HTTP/WS de sinalização. Os padrões incluem STUN `stun.l.google.com:19302` e `stun1.l.google.com:19302`; P2P/ICE pode revelar endereços de rede aos pares. Não há TURN gerenciado que garanta conectividade em qualquer NAT. Use apenas redes/participantes confiáveis, não publique convites reais, não encaminhe a porta no roteador e não exponha esse relay diretamente à Internet.
 

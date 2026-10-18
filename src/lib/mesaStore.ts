@@ -11,6 +11,8 @@ import {
   openCamera,
   encodeInvite,
   decodeInvite,
+  inviteHost,
+  isLoopback,
   newRoomKey,
   buildStudioUrl,
 } from "./mesa";
@@ -85,9 +87,6 @@ export const useMesa = create<MesaState>((set, get) => {
     if (localStream) client.setLocalStream(localStream);
     client.start();
   };
-
-  const isLoopback = (host: string) =>
-    host === "localhost" || host.startsWith("127.");
 
   // Stop local tracks on leave and every failed join/host path so device access cannot become orphaned.
   const closeLocal = () => {
@@ -266,7 +265,7 @@ export const useMesa = create<MesaState>((set, get) => {
         toast.error(t("core.mesa.invite.invalid"));
         return;
       }
-      if (isLoopback(inv.addr.split(":")[0])) {
+      if (isLoopback(inviteHost(inv))) {
         toast.error(t("core.mesa.invite.loopback"));
         return;
       }

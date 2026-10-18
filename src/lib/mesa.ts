@@ -30,6 +30,12 @@ interface SignalData {
   candidate?: RTCIceCandidateInit;
 }
 
+interface PeerInfo {
+  peerId: string;
+  role: MesaRole;
+  name: string;
+}
+
 interface PeerRec {
   pc: RTCPeerConnection;
   peer: MesaPeer;
@@ -47,6 +53,18 @@ const DEFAULT_ICE: RTCIceServer[] = [
 
 /** Bound consecutive retries so unreachable rooms eventually produce a recoverable error. */
 const MAX_ATTEMPTS = 6;
+
+/** Full-mesh P2P uploads every camera to every peer; the screen already calls a table this size full. */
+export const MESA_MAX_SEATS = 6;
+
+/** The relay forwards whatever peers claim; an unknown role would receive our camera without being listed. */
+function peerInfo(value: unknown): PeerInfo | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { peerId, role, name } = value as Record<string, unknown>;
+  if (typeof peerId !== "string" || !peerId) return null;
+  if (role !== "control" && role !== "studio") return null;
+  return { peerId, role, name: typeof name === "string" ? name : "" };
+}
 
 function randomId(prefix: string): string {
   return prefix + "-" + Math.random().toString(36).slice(2, 10);
@@ -66,6 +84,59 @@ export interface MesaInvite {
   title?: string;
 }
 
+const INVITE_PREFIX = "MESA1.";
+/** Generated invites stay far below this; the cap bounds the work spent on pasted text. */
+export const MAX_INVITE_LENGTH = 1024;
+/** Encoding clamps the title so every generated invite also passes decoding. */
+const MAX_INVITE_TITLE = 64;
+const ROOM_KEY = /^[\da-f]{5}\.[\da-f]{27}$/;
+/** Only host:port, so userinfo, schemes, paths and queries never reach the ws:// URL. */
+const SIGNAL_ADDR =
+  /^(\[[\da-f:.]+\]|[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?)*):([1-9]\d{0,4})$/i;
+
+/** Canonical host:port as the WebSocket will dial it, or null. */
+function signalAddr(addr: string): string | null {
+  const match = SIGNAL_ADDR.exec(addr);
+  if (!match || Number(match[2]) > 65535) return null;
+  let host: string;
+  try {
+    host = new URL(`ws://${match[1]}`).hostname;
+  } catch {
+    return null;
+  }
+  // 0.0.0.0/8 and :: are not destinations, and some systems route them to this machine.
+  if (/^0\.\d+\.\d+\.\d+$/.test(host) || host === "[::]") return null;
+  return `${host}:${match[2]}`;
+}
+
+/**
+ * Whether a bare host names this machine. Hosts go through the same URL parser that builds
+ * the ws:// address, so case, IPv4 shorthand and expanded IPv6 spellings cannot slip past.
+ */
+export function isLoopback(host: string): boolean {
+  const raw = host.trim();
+  const literal = /^[\da-f]*:[\da-f:.]*$/i.test(raw) ? `[${raw}]` : raw;
+  if (!/^(?:\[[\da-f:.]+\]|[a-z\d.-]+)$/i.test(literal)) return false;
+  let name: string;
+  try {
+    name = new URL(`ws://${literal}`).hostname;
+  } catch {
+    return false;
+  }
+  if (name.startsWith("["))
+    return (
+      name === "[::1]" || /^\[::ffff:7f[\da-f]{2}:[\da-f]{1,4}\]$/.test(name)
+    );
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(name)) return name.startsWith("127.");
+  // Chromium resolves localhost and every *.localhost name to loopback without DNS (RFC 6761).
+  return /(?:^|\.)localhost\.?$/.test(name);
+}
+
+/** Host part of a decoded invite address, keeping IPv6 brackets. */
+export function inviteHost(inv: MesaInvite): string {
+  return inv.addr.slice(0, inv.addr.lastIndexOf(":"));
+}
+
 function b64urlEncode(s: string): string {
   return btoa(unescape(encodeURIComponent(s)))
     .replace(/\+/g, "-")
@@ -81,19 +152,34 @@ function b64urlDecode(s: string): string {
 }
 
 export function encodeInvite(inv: MesaInvite): string {
-  return "MESA1." + b64urlEncode(JSON.stringify(inv));
+  const title =
+    inv.title === undefined
+      ? undefined
+      : [...inv.title].slice(0, MAX_INVITE_TITLE).join("");
+  return INVITE_PREFIX + b64urlEncode(JSON.stringify({ ...inv, title }));
 }
 
+/** Invites are untrusted pasted text; accept only what encodeInvite can produce. */
 export function decodeInvite(code: string): MesaInvite | null {
+  const raw = code.trim();
+  if (raw.length > MAX_INVITE_LENGTH || !raw.startsWith(INVITE_PREFIX))
+    return null;
+  const body = raw.slice(INVITE_PREFIX.length);
+  if (!/^[\w-]+$/.test(body)) return null;
+  let data: unknown;
   try {
-    const raw = code.trim();
-    const body = raw.startsWith("MESA1.") ? raw.slice("MESA1.".length) : raw;
-    const inv = JSON.parse(b64urlDecode(body)) as MesaInvite;
-    if (!inv.addr || !inv.room) return null;
-    return inv;
+    data = JSON.parse(b64urlDecode(body));
   } catch {
     return null;
   }
+  if (typeof data !== "object" || data === null) return null;
+  const { addr, room, title } = data as Record<string, unknown>;
+  const signal = typeof addr === "string" ? signalAddr(addr) : null;
+  if (!signal || typeof room !== "string" || !ROOM_KEY.test(room)) return null;
+  if (title === undefined) return { addr: signal, room };
+  if (typeof title !== "string" || [...title].length > MAX_INVITE_TITLE)
+    return null;
+  return { addr: signal, room, title };
 }
 
 /** Room keys grant access and must use cryptographically secure randomness. */
@@ -282,18 +368,31 @@ export class MesaClient {
   private async onMessage(m: Record<string, unknown>): Promise<void> {
     switch (m.t) {
       case "welcome": {
+        const others = (Array.isArray(m.peers) ? m.peers : [])
+          .map(peerInfo)
+          .filter((p): p is PeerInfo => p !== null && p.peerId !== this.myId);
+        if (
+          others.filter((p) => p.role === "control").length >= MESA_MAX_SEATS
+        ) {
+          console.warn("[mesa] room full");
+          this.refuse(
+            this.opts.t("core.mesa.error.roomFull", { max: MESA_MAX_SEATS }),
+          );
+          break;
+        }
         this.retry = 0;
         this.attempts = 0;
         this.wasOnline = true;
         this.opts.onStatus("online");
-        const list =
-          (m.peers as { peerId: string; role: MesaRole; name: string }[]) ?? [];
-        for (const p of list) this.connectTo(p.peerId, p.role, p.name);
+        // Peers missing from a fresh welcome left while signaling was down; keeping them would hold seats.
+        const present = new Set(others.map((p) => p.peerId));
+        for (const id of [...this.recs.keys()])
+          if (!present.has(id)) this.dropPeer(id);
+        for (const p of others) this.connectTo(p.peerId, p.role, p.name);
         break;
       }
       case "peer-join": {
-        const p = m.peer as
-          { peerId: string; role: MesaRole; name: string } | undefined;
+        const p = peerInfo(m.peer);
         if (p) this.connectTo(p.peerId, p.role, p.name);
         break;
       }
@@ -306,15 +405,7 @@ export class MesaClient {
       case "error": {
         const code = typeof m.code === "string" ? m.code : "";
         console.warn("[mesa] room rejected:", code || "(no code)");
-        // A rejected join may leave the socket open; preserve the rejection instead of reconnecting over it.
-        this.alive = false;
-        try {
-          this.ws?.close();
-        } catch {
-          /* Best-effort shutdown after a rejected join. */
-        }
-        this.opts.onStatus("error");
-        this.opts.onError?.(
+        this.refuse(
           this.opts.t(
             code === "peer-taken"
               ? "core.mesa.error.peerTaken"
@@ -326,6 +417,25 @@ export class MesaClient {
     }
   }
 
+  private refuse(message: string): void {
+    // A refused join may leave the socket open; preserve the refusal instead of reconnecting over it.
+    this.alive = false;
+    try {
+      this.ws?.close();
+    } catch {
+      /* Best-effort shutdown after a refused join. */
+    }
+    this.opts.onStatus("error");
+    this.opts.onError?.(message);
+  }
+
+  /** Our own seat counts against participants; each seat may add one OBS view. */
+  private hasSeat(role: MesaRole): boolean {
+    let taken = 0;
+    for (const rec of this.recs.values()) if (rec.peer.role === role) taken++;
+    return taken < (role === "control" ? MESA_MAX_SEATS - 1 : MESA_MAX_SEATS);
+  }
+
   private connectTo(
     remoteId: string,
     role: MesaRole,
@@ -334,6 +444,7 @@ export class MesaClient {
     if (remoteId === this.myId) return null;
     let rec = this.recs.get(remoteId);
     if (rec) return rec;
+    if (!this.hasSeat(role)) return null;
 
     const pc = new RTCPeerConnection({
       iceServers: this.ice,
