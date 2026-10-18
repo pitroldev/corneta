@@ -2,8 +2,9 @@ use crate::chat;
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
-    brb_slate_is_video, friendly_error, is_brb_slate_path, parse_ingest_hostport, parse_kv,
-    parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic, tray_tooltip,
+    brb_slate_is_video, classify_target_line, is_brb_slate_path, parse_ingest_hostport, parse_kv,
+    parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic, target_error_update, tray_tooltip,
+    TargetErrorUpdate, TargetLine,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -2231,30 +2232,11 @@ fn update_target_metrics(
     has_signal: bool,
     brb_on: bool,
 ) {
-    let is_stats = line.contains("frame=") || line.contains("bitrate=");
-    const ERR_KEYS: [&str; 8] = [
-        "error",
-        "failed",
-        "connection refused",
-        "broken pipe",
-        "unable to",
-        "connection reset",
-        "i/o error",
-        "end of file",
-    ];
-    let low = if is_stats {
-        String::new()
-    } else {
-        line.to_lowercase()
-    };
-    let is_error = !is_stats && ERR_KEYS.iter().any(|k| low.contains(k));
-    if !is_stats && !is_error {
+    let kind = classify_target_line(line);
+    if kind == TargetLine::Ignore {
         return;
     }
-
-    let fps = parse_kv(line, "fps=").map(|v| v as u32);
-    let bitrate = parse_kv(line, "bitrate=").map(|v| v as u32);
-    let dropped = parse_kv(line, "drop=").map(|v| v as u32);
+    let is_stats = matches!(kind, TargetLine::Stats { .. });
 
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
@@ -2287,39 +2269,53 @@ fn update_target_metrics(
     let name = st.name.clone();
     let mut err_msg = None;
 
-    if is_stats {
-        if was_starting {
-            snap.started_at = Some(started);
-        }
-        st.state = if brb_on { "brb" } else { "live" }.into();
-        st.message = None;
-        st.uptime_sec = (now_ms().saturating_sub(started) as f64) / 1000.0;
-        if let Some(f) = fps {
-            st.fps = f;
-        }
-        if let Some(b) = bitrate {
-            st.bitrate_kbps = b;
-        }
-        if let Some(d) = dropped {
-            st.dropped_frames = d;
-        }
-        snap.state = "live".into();
-    } else if !has_signal {
-        // Missing input is not an output failure; preserve the stronger signal-lost state.
-        if st.state != "signal-lost" {
-            st.state = "waiting".into();
+    match kind {
+        TargetLine::Stats {
+            fps,
+            bitrate_kbps,
+            dropped,
+        } => {
+            if was_starting {
+                snap.started_at = Some(started);
+            }
+            st.state = if brb_on { "brb" } else { "live" }.into();
             st.message = None;
+            st.uptime_sec = (now_ms().saturating_sub(started) as f64) / 1000.0;
+            if let Some(f) = fps {
+                st.fps = f;
+            }
+            if let Some(b) = bitrate_kbps {
+                st.bitrate_kbps = b;
+            }
+            if let Some(d) = dropped {
+                st.dropped_frames = d;
+            }
+            snap.state = "live".into();
         }
-    } else {
-        let (estate, msg) = friendly_error(&low, crate::i18n::locale());
-        st.state = estate.into();
-        if estate == "error" {
-            err_msg = Some(msg.clone());
-            if let Some(f) = &auth_flag {
-                f.store(true, std::sync::atomic::Ordering::Relaxed);
+        TargetLine::Error(low) => {
+            match target_error_update(&low, has_signal, &st.state, crate::i18n::locale()) {
+                TargetErrorUpdate::Keep => {}
+                TargetErrorUpdate::Waiting => {
+                    st.state = "waiting".into();
+                    st.message = None;
+                }
+                TargetErrorUpdate::Failed {
+                    state,
+                    message,
+                    park,
+                } => {
+                    st.state = state.into();
+                    if park {
+                        err_msg = Some(message.clone());
+                        if let Some(f) = &auth_flag {
+                            f.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+                    st.message = Some(message);
+                }
             }
         }
-        st.message = Some(msg);
+        TargetLine::Ignore => {}
     }
 
     let new_state = st.state.clone();
