@@ -203,12 +203,12 @@ export const pt = {
   "content.scopes.kick.why":
     "As mesmas coisas do chat unificado: ler, responder e moderar sem sair do app.",
   "content.scopes.twitch.never":
-    "Nada é postado no seu canal sem você pedir, e a Corneta não segue, não inscreve nem altera nada da sua conta.",
+    "Nada é postado no seu canal sem você pedir, a Corneta não segue, não inscreve nem altera nada da sua conta, e a chave de transmissão vai só para o cofre do seu PC.",
   "content.scopes.twitch.permission":
-    "Ler e enviar no chat, moderar e gerenciar a transmissão",
+    "Ler e enviar no chat, moderar, gerenciar a transmissão, ver novos seguidores e ler sua chave de transmissão",
   "content.scopes.twitch.title": "Conta da Twitch",
   "content.scopes.twitch.why":
-    "Mostrar o chat no app, responder por lá, apagar mensagem ou dar timeout quando você mandar, e acompanhar o estado da sua live.",
+    "Mostrar o chat no app, responder por lá, apagar mensagem ou dar timeout quando você mandar, acompanhar o estado da sua live, avisar quem acabou de seguir e preencher sua chave de transmissão quando você pedir.",
   "content.scopes.youtube.never":
     "A Corneta não envia vídeo gravado pro seu canal, não mexe nos vídeos que já estão lá, não lê seu histórico e não usa esses dados para anúncio ou treinamento de modelo.",
   "content.scopes.youtube.permission": "Gerenciar sua conta do YouTube",

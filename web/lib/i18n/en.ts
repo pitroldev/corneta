@@ -207,12 +207,12 @@ export const en: Dict = {
   "content.scopes.kick.why":
     "The same things as the unified chat: read, reply and moderate without leaving the app.",
   "content.scopes.twitch.never":
-    "Nothing is posted to your channel unless you ask for it, and Corneta does not follow, subscribe or change anything in your account.",
+    "Nothing is posted to your channel unless you ask for it, Corneta does not follow, subscribe or change anything in your account, and your stream key only goes into your PC's vault.",
   "content.scopes.twitch.permission":
-    "Read and send chat, moderate, and manage the stream",
+    "Read and send chat, moderate, manage the stream, see new followers and read your stream key",
   "content.scopes.twitch.title": "Twitch account",
   "content.scopes.twitch.why":
-    "Show the chat in the app, reply from there, delete a message or time someone out when you say so, and follow the state of your stream.",
+    "Show the chat in the app, reply from there, delete a message or time someone out when you say so, follow the state of your stream, announce new followers and fill in your stream key when you ask.",
   "content.scopes.youtube.never":
     "Corneta does not upload recorded video to your channel, does not touch the videos already there, does not read your history, and does not use this data for advertising or model training.",
   "content.scopes.youtube.permission": "Manage your YouTube account",
