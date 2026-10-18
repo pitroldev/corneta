@@ -8,10 +8,12 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma 
   recebem a mesma ref exata da tag, inclusive em `workflow_dispatch`, e o artefato não inicia se
   qualquer job de qualidade falhar.
 - CI verde: lint, testes e build do frontend.
-- `cargo fmt`, Clippy estrito, testes, `cargo audit` e `cargo deny` verdes.
+- `cargo fmt`, Clippy estrito, testes e `cargo deny` verdes. O `cargo deny` lê a mesma base de
+  advisories do `cargo audit`, limitada ao grafo do Windows.
 - Os ignores do `cargo deny` ficam restritos a advisories informativos sem correção disponível e
   exigem justificativa no `deny.toml`; vulnerabilidades não podem ser ignoradas.
-- Testes de integração de mídia ignorados executados com FFmpeg/FFprobe real.
+- Testes de integração de mídia ignorados executados com FFmpeg/FFprobe real, no mesmo job
+  `rust`, reaproveitando o build dos outros testes.
 - Sidecars baixados pelo script versionado e com SHA-256 conferido.
 - O job Rust prepara seus próprios sidecars. O script tenta `CORNETA_FFMPEG_MIRROR_URL` (quando
   configurada), a prerelease-espelho do repositório e o upstream, sempre com o mesmo hash fixado. O

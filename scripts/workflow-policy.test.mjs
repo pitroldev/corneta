@@ -157,7 +157,7 @@ describe("workflow safety contracts", () => {
     const toolchains = sources
       .flatMap(workflowSteps)
       .filter((step) => step.uses?.startsWith("dtolnay/rust-toolchain@"));
-    expect(toolchains).toHaveLength(3);
+    expect(toolchains).toHaveLength(2);
     for (const step of toolchains) expect(step.with.toolchain).toBe("1.97.1");
   });
   it("cancels superseded checks without sharing the release concurrency group", () => {
@@ -176,9 +176,25 @@ describe("workflow safety contracts", () => {
       .split(/^jobs:\s*$/m)[1]
       .split(/^ {2}[\w-]+:\s*$/m)
       .slice(1);
-    expect(jobs.length).toBeGreaterThanOrEqual(6);
+    expect(jobs.length).toBeGreaterThanOrEqual(5);
     for (const job of jobs) expect(job).toMatch(/timeout-minutes: \d+/);
     expect(workflow("release")).toContain("timeout-minutes: 90");
+  });
+  it("validates pushes only on main and each pull request once", () => {
+    const triggers = workflow("ci").split(/^jobs:\s*$/m)[0];
+    expect(triggers).toMatch(/push:\s+branches:\s+- main\s/);
+    expect(triggers).toContain("pull_request:");
+    expect(triggers).toContain("workflow_dispatch:");
+    expect(triggers).not.toContain('"**"');
+  });
+  it("runs the media integration tests on the rust build with verified tools on PATH", () => {
+    const rust = workflow("ci").split("  rust:\n")[1];
+    expect(rust).toContain("fetch-binaries.ps1 -ToolDirectory");
+    expect(rust).toContain(
+      "cargo test --locked --lib -- --ignored --test-threads=1",
+    );
+    expect(rust).toContain('$env:PATH = "$env:CORNETA_MEDIA_TOOLS;$env:PATH"');
+    expect(workflow("ci")).not.toContain("media-integration:");
   });
   it("runs both browser locales without app secrets and retains only smoke artifacts", () => {
     const ci = workflow("ci");

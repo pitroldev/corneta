@@ -61,8 +61,8 @@ depende das permissões, do plano e da visibilidade; ausência de um campo ou
 resposta de erro não comprova que um controle está ativo.
 
 - Proteja a branch principal contra force push e deleção, incluindo administradores.
-- Exija branch atualizada e os checks `resolve`, `secrets`, `frontend`, `rust` e
-  `media-integration` do [CI](../.github/workflows/ci.yml), vinculados à aplicação
+- Exija branch atualizada e os checks `resolve`, `secrets`, `frontend` e `rust` do
+  [CI](../.github/workflows/ci.yml), vinculados à aplicação
   que realmente os publica. O job `frontend` exige que `browser-smoke` tenha
   sucesso; job pulado não deve ser tratado como aprovação.
 - Confira os nomes reais em uma execução antes de alterar a proteção. Renomear
