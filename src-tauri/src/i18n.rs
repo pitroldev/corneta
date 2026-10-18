@@ -696,6 +696,9 @@ messages! {
     ChatYoutubeApiTemporary { c: u16, reason: &'a str } = "rust.chat.youtube.apiTemporary" =>
         pt: "O YouTube está indisponível ou limitou os pedidos (HTTP {c}; código {reason}). Aguarde e tente novamente.",
         en: "YouTube is unavailable or limiting requests (HTTP {c}; code {reason}). Wait and try again.";
+    YoutubeDailyQuota { at: &'a str } = "rust.youtube.dailyQuota" =>
+        pt: "A cota diária da API do YouTube acabou. Ela volta às {at} (meia-noite no horário do Pacífico); até lá, a live automática, o título e o chat pelo app no YouTube ficam parados.",
+        en: "The daily YouTube API quota is used up. It resets at {at} (midnight Pacific time); until then, automatic lives, title changes and app chat on YouTube are on hold.";
 
     AlertsTokenInvalidOrExpired = "rust.alerts.tokenInvalidOrExpired" =>
         pt: "token inválido ou expirado",
