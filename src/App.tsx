@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { MotionConfig, motion } from "framer-motion";
+import { MotionConfig, m } from "framer-motion";
 import { FileText, RefreshCw, Shield } from "lucide-react";
 import { downTargets, useStore } from "./lib/store";
 import { api, IS_TAURI } from "./lib/api";
@@ -39,7 +39,11 @@ import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
 import { TelemetryConsentNotice } from "./components/TelemetryConsent";
 import { Mascot, SoundWaves } from "./components/decor";
-import { PlatformsScreen } from "./screens/PlatformsScreen";
+const loadPlatformsScreen = () =>
+  import("./screens/PlatformsScreen").then((m) => ({
+    default: m.PlatformsScreen,
+  }));
+const PlatformsScreen = lazy(loadPlatformsScreen);
 const loadEncodingScreen = () =>
   import("./screens/EncodingScreen").then((m) => ({
     default: m.EncodingScreen,
@@ -67,6 +71,7 @@ const loadSettingsScreen = () =>
 const SettingsScreen = lazy(loadSettingsScreen);
 
 const SCREEN_PRELOADERS: Partial<Record<Screen, () => Promise<unknown>>> = {
+  platforms: loadPlatformsScreen,
   encoding: loadEncodingScreen,
   golive: loadGoLiveScreen,
   chat: loadChatScreen,
@@ -473,7 +478,7 @@ export default function App() {
                 id="screen-scroll"
                 className="h-full overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]"
               >
-                <motion.div
+                <m.div
                   key={screen}
                   ref={screenRef}
                   tabIndex={-1}
@@ -495,7 +500,7 @@ export default function App() {
                       {screen === "settings" && <SettingsScreen />}
                     </Suspense>
                   </ErrorBoundary>
-                </motion.div>
+                </m.div>
               </div>
             </main>
           </div>
