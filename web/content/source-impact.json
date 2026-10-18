@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "cd77cc094ec5b82109b6aafd2881256e593135ae",
-      "reason": "Só acrescenta os textos de privacidade e de conteúdo para crianças do YouTube automático; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "2cfc8fcdd8fe5beceb56b277e70c67494fba7e03",
+      "reason": "Só acrescenta os textos da exportação de momentos nos relatórios; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
