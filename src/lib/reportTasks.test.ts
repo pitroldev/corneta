@@ -10,7 +10,10 @@ const exporters = vi.hoisted(() => ({
   json: vi.fn((_data: unknown, _analysis: unknown) => "json"),
 }));
 vi.mock("./export/html", () => ({ reportHtml: exporters.html }));
-vi.mock("./export/csv", () => ({ seriesCsv: exporters.csv }));
+vi.mock("./export/csv", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./export/csv")>()),
+  seriesCsv: exporters.csv,
+}));
 vi.mock("./export/json", () => ({ reportJson: exporters.json }));
 const raw = [
   {
@@ -28,6 +31,42 @@ const raw = [
   .join("\n");
 
 describe("report tasks", () => {
+  it("returns only the history spreadsheet row, preferring the session's own metadata", async () => {
+    const cells = await createReportTaskRunner()({
+      kind: "historyRow",
+      raw: new TextEncoder().encode(raw).buffer,
+      locale: "pt-BR",
+      meta: {
+        id: "1786151052661",
+        startedAt: 1000,
+        durationSec: 3600,
+        mode: "hybrid",
+        platforms: [],
+      },
+    });
+    expect(cells).toHaveLength(15);
+    // The recorded session lasted 4 s and was per-platform, unlike the stale listing entry.
+    expect(cells?.[2]).toBe(0);
+    expect(cells?.[4]).toBe("per-platform");
+  });
+
+  it("reports an unreadable session as a missing history row", async () => {
+    await expect(
+      createReportTaskRunner()({
+        kind: "historyRow",
+        raw: "not a session",
+        locale: "pt-BR",
+        meta: {
+          id: "x",
+          startedAt: 0,
+          durationSec: 0,
+          mode: "per-platform",
+          platforms: [],
+        },
+      }),
+    ).resolves.toBeNull();
+  });
+
   it("uses the same analysis for the detail and its summary, including binary input", async () => {
     const run = createReportTaskRunner();
     const detail = await run({

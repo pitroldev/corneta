@@ -7,7 +7,8 @@ import {
   summarize,
   type ReportAnalysis,
 } from "./report";
-import type { SessionData, SessionSummary } from "./types";
+import type { SessionData, SessionMeta, SessionSummary } from "./types";
+import { historyCells, type Cell } from "./export/csv";
 import { selectedReportExport, type DownloadFormat } from "./export/selected";
 import { replayChatPage } from "./replayChatPage";
 import type { ChatPage } from "./replayChatPage";
@@ -15,6 +16,12 @@ import type { ChatPage } from "./replayChatPage";
 export type ReportTask =
   | { kind: "analyze"; raw: string | ArrayBuffer; locale: Locale }
   | { kind: "summary"; raw: string | ArrayBuffer; locale: Locale }
+  | {
+      kind: "historyRow";
+      raw: string | ArrayBuffer;
+      locale: Locale;
+      meta: SessionMeta;
+    }
   | { kind: "chat"; raw: string | ArrayBuffer; epoch: number }
   | { kind: "chatPage"; epoch: number }
   | {
@@ -40,6 +47,7 @@ export interface ReportDetailResult {
 export interface ReportResultByKind {
   analyze: ReportDetailResult | null;
   summary: ReportSummaryResult | null;
+  historyRow: Cell[] | null;
   chat: ChatPage;
   chatPage: ChatPage;
   export: Awaited<ReturnType<typeof selectedReportExport>>;
@@ -74,6 +82,8 @@ export function createReportTaskRunner() {
     const data = parseSession(decode(task.raw), i18n.t);
     if (!data) return null;
     const analysis = analyze(data, i18n.t);
+    if (task.kind === "historyRow")
+      return historyCells({ meta: { ...task.meta, ...data.meta }, analysis });
     const summary = summarize(data, analysis);
     return task.kind === "summary"
       ? ({

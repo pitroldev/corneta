@@ -10,9 +10,9 @@ import {
   Table2,
 } from "lucide-react";
 import { api } from "../../lib/api";
-import { historyCsv, type HistoryRow } from "../../lib/export/csv";
+import { historyCsv, type Cell } from "../../lib/export/csv";
 import { fileStamp, useI18n } from "../../lib/i18n";
-import { analyze, parseSession } from "../../lib/report";
+import { ReportClient } from "../../lib/reportClient";
 import { toast } from "../../lib/toast";
 import type { SessionMeta, SessionSummary } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
@@ -348,7 +348,7 @@ const SessionRow = memo(function SessionRow({
   );
 });
 
-/** Export one session at a time to bound peak memory. */
+/** Analyze one session at a time in the report worker, keeping the UI responsive and memory bounded. */
 function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -356,20 +356,20 @@ function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
 
   const run = async () => {
     setBusy(true);
+    const worker = new ReportClient();
     try {
-      const rows: HistoryRow[] = [];
+      const rows: Cell[][] = [];
       let unreadable = 0;
       for (const meta of sessions) {
         try {
-          const data = parseSession(await api.readSession(meta.id), t);
-          if (!data) {
-            unreadable++;
-            continue;
-          }
-          rows.push({
-            meta: { ...meta, ...data.meta },
-            analysis: analyze(data, t),
+          const cells = await worker.run({
+            kind: "historyRow",
+            raw: await api.readSessionBytes(meta.id),
+            locale: i18n.locale,
+            meta,
           });
+          if (cells) rows.push(cells);
+          else unreadable++;
         } catch {
           unreadable++;
         }
@@ -396,6 +396,7 @@ function HistoryCsvButton({ sessions }: { sessions: SessionMeta[] }) {
     } catch (error) {
       toast.error(t("reports.history.error.save", { err: errMsg(error) }));
     } finally {
+      worker.dispose();
       setBusy(false);
     }
   };
