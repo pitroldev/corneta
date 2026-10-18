@@ -121,7 +121,7 @@ describe("browser telemetry facade", () => {
     expect(loadSdk).not.toHaveBeenCalled();
   });
 
-  it("initializes in manual cookieless mode without content capture", async () => {
+  it("initializes without cookies, persistence or content capture", async () => {
     const sdk = fakeSdk();
     const telemetry = createBrowserTelemetry({
       token: "phc_project123",
@@ -155,11 +155,13 @@ describe("browser telemetry facade", () => {
       advanced_disable_flags: true,
       advanced_disable_feature_flags: true,
       advanced_disable_feature_flags_on_first_load: true,
-      cookieless_mode: "always",
       disable_persistence: true,
+      persistence: "memory",
       mask_all_text: true,
       mask_all_element_attributes: true,
     });
+    // PostHog drops cookieless events without $raw_user_agent and $host, which the sanitizer strips.
+    expect(config).not.toHaveProperty("cookieless_mode");
   });
 
   it("captures only the route, locale, and enumerated CTA", async () => {

@@ -71,9 +71,11 @@ Sem configuração válida ou com o kill switch pertinente, o envio fica desativ
 
 Quando o envio aplicável está habilitado:
 
-- o site usa PostHog em modo cookieless, sem persistência de identidade, perfil de pessoa,
-  autocapture, replay, heatmap, texto da página, performance, surveys, feature flags ou
-  configuração remota;
+- o site usa PostHog sem cookie: cada carregamento de página recebe um id aleatório que fica só
+  em memória. Não há persistência de identidade, perfil de pessoa, autocapture, replay, heatmap,
+  texto da página, performance, surveys, feature flags ou configuração remota. O `cookieless_mode`
+  do PostHog não serve aqui: ele descarta no servidor o evento sem `$raw_user_agent` e `$host`, e o
+  filtro do site remove os dois;
 - o site envia somente `site_page_viewed`, `site_cta_clicked` e exceções redigidas. Rotas são
   enums; query strings e fragments nunca entram no evento;
 - a preferência `corneta:site-telemetry:v1` guarda apenas um opt-out persistente no navegador.
