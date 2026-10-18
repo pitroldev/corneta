@@ -1383,7 +1383,12 @@ async fn start_engine_inner(
     };
 
     let config = get_config(app.clone());
-    let enabled: Vec<_> = config.targets.iter().filter(|t| t.enabled).collect();
+    // The frontend blocks going live with a destination that has no URL yet; never start one.
+    let enabled: Vec<_> = config
+        .targets
+        .iter()
+        .filter(|t| t.enabled && !t.ingest_url.is_empty())
+        .collect();
     {
         let mut eng = state.engine.lock().unwrap();
         eng.target_platforms = enabled

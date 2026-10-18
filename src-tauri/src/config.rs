@@ -552,28 +552,32 @@ impl AppConfig {
             if !matches!(target.protocol.as_str(), "rtmp" | "rtmps") {
                 return Err(Msg::ConfigUnsupportedProtocol.text(l));
             }
-            let protocol = if target
-                .ingest_url
-                .get(..8)
-                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmps://"))
-            {
-                "rtmps"
-            } else if target
-                .ingest_url
-                .get(..7)
-                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmp://"))
-            {
-                "rtmp"
-            } else {
-                return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
-            };
-            target.protocol = protocol.into();
-            let scheme_len = protocol.len() + 3;
-            if target.ingest_url.len() > 2_048
-                || target.ingest_url[scheme_len..].trim_matches('/').is_empty()
-                || target.ingest_url.chars().any(char::is_whitespace)
-            {
-                return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+            // A destination is saved as soon as it is added, before its URL is filled in. The
+            // frontend blocks going live with it, and the engine skips it.
+            if !target.ingest_url.is_empty() {
+                let protocol = if target
+                    .ingest_url
+                    .get(..8)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmps://"))
+                {
+                    "rtmps"
+                } else if target
+                    .ingest_url
+                    .get(..7)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmp://"))
+                {
+                    "rtmp"
+                } else {
+                    return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+                };
+                target.protocol = protocol.into();
+                let scheme_len = protocol.len() + 3;
+                if target.ingest_url.len() > 2_048
+                    || target.ingest_url[scheme_len..].trim_matches('/').is_empty()
+                    || target.ingest_url.chars().any(char::is_whitespace)
+                {
+                    return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+                }
             }
             if !matches!(target.encoding.action.as_str(), "copy" | "transcode")
                 || !matches!(
@@ -954,6 +958,81 @@ mod tests {
                 cfg.settings.youtube_privacy, expected,
                 "privacy {privacy:?}"
             );
+        }
+    }
+
+    fn missing_keys(
+        input: &serde_json::Value,
+        output: &serde_json::Value,
+        path: &str,
+        missing: &mut Vec<String>,
+    ) {
+        use serde_json::Value;
+        match (input, output) {
+            (Value::Object(input), Value::Object(output)) => {
+                for (key, value) in input {
+                    let field = format!("{path}.{key}");
+                    match output.get(key) {
+                        Some(kept) => missing_keys(value, kept, &field, missing),
+                        None if !value.is_null() => missing.push(field),
+                        None => {}
+                    }
+                }
+            }
+            (Value::Array(input), Value::Array(output)) => {
+                for (index, (value, kept)) in input.iter().zip(output).enumerate() {
+                    missing_keys(value, kept, &format!("{path}[{index}]"), missing);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn destinations_without_a_url_yet_are_saved_but_malformed_urls_are_not() {
+        let mut cfg = AppConfig::default();
+        let mut pending = target_fixture("target_1");
+        pending.ingest_url = String::new();
+        cfg.targets.push(pending);
+        assert!(cfg.validate_and_normalize().is_ok());
+
+        for url in [
+            "live.example.com/app",
+            "rtmp://",
+            "rtmp:// spaced.example.com/app",
+            " ",
+        ] {
+            let mut cfg = AppConfig::default();
+            let mut malformed = target_fixture("target_1");
+            malformed.ingest_url = url.into();
+            cfg.targets.push(malformed);
+            assert!(
+                cfg.validate_and_normalize().is_err(),
+                "{url:?} must be rejected"
+            );
+        }
+    }
+
+    /// scripts/config-contract.test.ts regenerates this fixture from the TS factory and config
+    /// operations, so a config the UI can produce must validate here without losing fields.
+    #[test]
+    fn ts_generated_configs_pass_validation_without_losing_fields() {
+        let scenarios: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../tests/fixtures/config-contract.json"))
+                .expect("valid fixture");
+        assert!(!scenarios.is_empty());
+        for scenario in scenarios {
+            let name = scenario["name"].as_str().unwrap_or("unnamed");
+            let input = &scenario["config"];
+            let config: AppConfig = serde_json::from_value(input.clone())
+                .unwrap_or_else(|error| panic!("{name}: Rust cannot read it: {error}"));
+            let normalized = config
+                .validate_and_normalize()
+                .unwrap_or_else(|error| panic!("{name}: rejected: {error}"));
+            let output = serde_json::to_value(&normalized).expect("serializable");
+            let mut missing = Vec::new();
+            missing_keys(input, &output, "", &mut missing);
+            assert!(missing.is_empty(), "{name}: Rust drops {missing:?}");
         }
     }
 

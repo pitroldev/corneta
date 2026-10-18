@@ -1,0 +1,2354 @@
+[
+  {
+    "name": "default",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0001",
+          "platformId": "twitch",
+          "name": "Twitch",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0002",
+          "platformId": "youtube",
+          "name": "YouTube",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": true,
+        "youtubePrivacy": "public",
+        "youtubeMadeForKids": false,
+        "streamTitle": "",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_0003"
+    }
+  },
+  {
+    "name": "every platform added",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0001",
+          "platformId": "twitch",
+          "name": "Twitch",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0002",
+          "platformId": "youtube",
+          "name": "YouTube",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0004",
+          "platformId": "twitch",
+          "name": "Twitch 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0005",
+          "platformId": "youtube",
+          "name": "YouTube 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0006",
+          "platformId": "facebook",
+          "name": "Facebook",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://live-api-s.facebook.com:443/rtmp",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 4000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0007",
+          "platformId": "kick",
+          "name": "Kick",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0008",
+          "platformId": "tiktok",
+          "name": "TikTok",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0009",
+          "platformId": "x",
+          "name": "X (Twitter)",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0010",
+          "platformId": "instagram",
+          "name": "Instagram",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 2500,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0011",
+          "platformId": "custom",
+          "name": "Personalizado",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 30,
+              "videoBitrateKbps": 4500,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": true,
+        "youtubePrivacy": "public",
+        "youtubeMadeForKids": false,
+        "streamTitle": "",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_0003"
+    }
+  },
+  {
+    "name": "duplicated, moved, toggled and edited",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0001",
+          "platformId": "twitch",
+          "name": "Twitch",
+          "enabled": false,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0002",
+          "platformId": "youtube",
+          "name": "YouTube",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_copy",
+          "platformId": "twitch",
+          "name": "Cópia editada",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://example.com/live",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0004",
+          "platformId": "twitch",
+          "name": "Twitch 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0005",
+          "platformId": "youtube",
+          "name": "YouTube 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0006",
+          "platformId": "facebook",
+          "name": "Facebook",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://live-api-s.facebook.com:443/rtmp",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 4000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0007",
+          "platformId": "kick",
+          "name": "Kick",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0008",
+          "platformId": "tiktok",
+          "name": "TikTok",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0009",
+          "platformId": "x",
+          "name": "X (Twitter)",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0010",
+          "platformId": "instagram",
+          "name": "Instagram",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 2500,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0011",
+          "platformId": "custom",
+          "name": "Personalizado",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 30,
+              "videoBitrateKbps": 4500,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": true,
+        "youtubePrivacy": "public",
+        "youtubeMadeForKids": false,
+        "streamTitle": "",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_0003"
+    }
+  },
+  {
+    "name": "second profile renamed",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0001",
+          "platformId": "twitch",
+          "name": "Twitch",
+          "enabled": false,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0002",
+          "platformId": "youtube",
+          "name": "YouTube",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_copy",
+          "platformId": "twitch",
+          "name": "Cópia editada",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://example.com/live",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0004",
+          "platformId": "twitch",
+          "name": "Twitch 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0005",
+          "platformId": "youtube",
+          "name": "YouTube 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0006",
+          "platformId": "facebook",
+          "name": "Facebook",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://live-api-s.facebook.com:443/rtmp",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 4000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0007",
+          "platformId": "kick",
+          "name": "Kick",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0008",
+          "platformId": "tiktok",
+          "name": "TikTok",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0009",
+          "platformId": "x",
+          "name": "X (Twitter)",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0010",
+          "platformId": "instagram",
+          "name": "Instagram",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 2500,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0011",
+          "platformId": "custom",
+          "name": "Personalizado",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 30,
+              "videoBitrateKbps": 4500,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": true,
+        "youtubePrivacy": "public",
+        "youtubeMadeForKids": false,
+        "streamTitle": "",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        },
+        {
+          "id": "prof_second",
+          "name": "Podcast",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": false,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_copy",
+              "platformId": "twitch",
+              "name": "Cópia editada",
+              "enabled": true,
+              "protocol": "rtmps",
+              "ingestUrl": "rtmps://example.com/live",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0004",
+              "platformId": "twitch",
+              "name": "Twitch 2",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0005",
+              "platformId": "youtube",
+              "name": "YouTube 2",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0006",
+              "platformId": "facebook",
+              "name": "Facebook",
+              "enabled": true,
+              "protocol": "rtmps",
+              "ingestUrl": "rtmps://live-api-s.facebook.com:443/rtmp",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1280,
+                  "height": 720,
+                  "fps": 30,
+                  "videoBitrateKbps": 4000,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0007",
+              "platformId": "kick",
+              "name": "Kick",
+              "enabled": true,
+              "protocol": "rtmps",
+              "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0008",
+              "platformId": "tiktok",
+              "name": "TikTok",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 720,
+                  "height": 1280,
+                  "fps": 30,
+                  "videoBitrateKbps": 3000,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0009",
+              "platformId": "x",
+              "name": "X (Twitter)",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1280,
+                  "height": 720,
+                  "fps": 30,
+                  "videoBitrateKbps": 3000,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0010",
+              "platformId": "instagram",
+              "name": "Instagram",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 720,
+                  "height": 1280,
+                  "fps": 30,
+                  "videoBitrateKbps": 2500,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0011",
+              "platformId": "custom",
+              "name": "Personalizado",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 30,
+                  "videoBitrateKbps": 4500,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_second"
+    }
+  },
+  {
+    "name": "target removed",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0002",
+          "platformId": "youtube",
+          "name": "YouTube",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_copy",
+          "platformId": "twitch",
+          "name": "Cópia editada",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://example.com/live",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0004",
+          "platformId": "twitch",
+          "name": "Twitch 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0005",
+          "platformId": "youtube",
+          "name": "YouTube 2",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0006",
+          "platformId": "facebook",
+          "name": "Facebook",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://live-api-s.facebook.com:443/rtmp",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 4000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0007",
+          "platformId": "kick",
+          "name": "Kick",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0008",
+          "platformId": "tiktok",
+          "name": "TikTok",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0009",
+          "platformId": "x",
+          "name": "X (Twitter)",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1280,
+              "height": 720,
+              "fps": 30,
+              "videoBitrateKbps": 3000,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0010",
+          "platformId": "instagram",
+          "name": "Instagram",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 720,
+              "height": 1280,
+              "fps": 30,
+              "videoBitrateKbps": 2500,
+              "audioBitrateKbps": 128,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0011",
+          "platformId": "custom",
+          "name": "Personalizado",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 30,
+              "videoBitrateKbps": 4500,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": true,
+        "youtubePrivacy": "public",
+        "youtubeMadeForKids": false,
+        "streamTitle": "",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        },
+        {
+          "id": "prof_second",
+          "name": "Podcast",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": false,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_copy",
+              "platformId": "twitch",
+              "name": "Cópia editada",
+              "enabled": true,
+              "protocol": "rtmps",
+              "ingestUrl": "rtmps://example.com/live",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0004",
+              "platformId": "twitch",
+              "name": "Twitch 2",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0005",
+              "platformId": "youtube",
+              "name": "YouTube 2",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0006",
+              "platformId": "facebook",
+              "name": "Facebook",
+              "enabled": true,
+              "protocol": "rtmps",
+              "ingestUrl": "rtmps://live-api-s.facebook.com:443/rtmp",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1280,
+                  "height": 720,
+                  "fps": 30,
+                  "videoBitrateKbps": 4000,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0007",
+              "platformId": "kick",
+              "name": "Kick",
+              "enabled": true,
+              "protocol": "rtmps",
+              "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0008",
+              "platformId": "tiktok",
+              "name": "TikTok",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 720,
+                  "height": 1280,
+                  "fps": 30,
+                  "videoBitrateKbps": 3000,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0009",
+              "platformId": "x",
+              "name": "X (Twitter)",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1280,
+                  "height": 720,
+                  "fps": 30,
+                  "videoBitrateKbps": 3000,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0010",
+              "platformId": "instagram",
+              "name": "Instagram",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 720,
+                  "height": 1280,
+                  "fps": 30,
+                  "videoBitrateKbps": 2500,
+                  "audioBitrateKbps": 128,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0011",
+              "platformId": "custom",
+              "name": "Personalizado",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 30,
+                  "videoBitrateKbps": 4500,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_second"
+    }
+  },
+  {
+    "name": "platforms synced from onboarding",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0012",
+          "platformId": "kick",
+          "name": "Kick",
+          "enabled": true,
+          "protocol": "rtmps",
+          "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0013",
+          "platformId": "custom",
+          "name": "Personalizado",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 30,
+              "videoBitrateKbps": 4500,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": true,
+        "youtubePrivacy": "public",
+        "youtubeMadeForKids": false,
+        "streamTitle": "",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_0003"
+    }
+  },
+  {
+    "name": "settings changed",
+    "config": {
+      "schemaVersion": 1,
+      "revision": 0,
+      "ingest": {
+        "protocol": "rtmp",
+        "host": "127.0.0.1",
+        "port": 1935,
+        "app": "live",
+        "key": "obs"
+      },
+      "mode": "hybrid",
+      "targets": [
+        {
+          "id": "tgt_0001",
+          "platformId": "twitch",
+          "name": "Twitch",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://live.twitch.tv/app",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 6000,
+              "audioBitrateKbps": 160,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        },
+        {
+          "id": "tgt_0002",
+          "platformId": "youtube",
+          "name": "YouTube",
+          "enabled": true,
+          "protocol": "rtmp",
+          "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+          "hasKey": false,
+          "encoding": {
+            "action": "transcode",
+            "preset": {
+              "width": 1920,
+              "height": 1080,
+              "fps": 60,
+              "videoBitrateKbps": 9000,
+              "audioBitrateKbps": 192,
+              "keyframeSec": 2
+            },
+            "encoder": "auto"
+          }
+        }
+      ],
+      "settings": {
+        "minimizeToTray": true,
+        "autostart": false,
+        "obsPassword": "",
+        "autoStartObs": true,
+        "liveShortcut": "CommandOrControl+Alt+L",
+        "youtubeApiKey": "",
+        "chatSources": [],
+        "alertSources": [],
+        "chatShowEmotes": true,
+        "chatShowBadges": true,
+        "chatShowPlatform": true,
+        "chatShowSource": false,
+        "chatShowTimestamps": false,
+        "chatShowViewers": true,
+        "theme": "dark",
+        "language": "auto",
+        "chatFontSize": 14,
+        "alertFontSize": 14,
+        "chatBothLayout": "auto",
+        "chatBothAlertsFirst": false,
+        "chatBothSplit": 35,
+        "brbEnabled": false,
+        "brbSlateKind": "auto",
+        "autoBitrate": true,
+        "guardianEnabled": false,
+        "guardianWatchlist": [],
+        "loudnessNormalize": false,
+        "loudnessTargetLufs": -14,
+        "youtubeAutoLive": false,
+        "youtubePrivacy": "unlisted",
+        "youtubeMadeForKids": true,
+        "streamTitle": "Live de teste",
+        "chatAutoConnect": true,
+        "chatPopoutTab": "both",
+        "chatShowAlertsPanel": false,
+        "overlayEnabled": false,
+        "overlaySound": true,
+        "overlayPosition": "top",
+        "overlayPort": 7393,
+        "overlayChatPosition": "bottom",
+        "overlayDurationSecs": 6,
+        "overlayScale": "md",
+        "overlayShowFollows": true,
+        "overlayChatSize": 22,
+        "overlayChatMax": 12,
+        "overlayChatBadges": true,
+        "overlayChatPlatform": true,
+        "overlayChatHideCommands": false,
+        "overlayChatFadeSecs": 0,
+        "recordVideo": false,
+        "recordVideoDir": "",
+        "recordVideoKeepGb": 20,
+        "recordChat": false
+      },
+      "profiles": [
+        {
+          "id": "prof_0003",
+          "name": "Padrão",
+          "mode": "hybrid",
+          "targets": [
+            {
+              "id": "tgt_0001",
+              "platformId": "twitch",
+              "name": "Twitch",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://live.twitch.tv/app",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 6000,
+                  "audioBitrateKbps": 160,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            },
+            {
+              "id": "tgt_0002",
+              "platformId": "youtube",
+              "name": "YouTube",
+              "enabled": true,
+              "protocol": "rtmp",
+              "ingestUrl": "rtmp://a.rtmp.youtube.com/live2",
+              "hasKey": false,
+              "encoding": {
+                "action": "transcode",
+                "preset": {
+                  "width": 1920,
+                  "height": 1080,
+                  "fps": 60,
+                  "videoBitrateKbps": 9000,
+                  "audioBitrateKbps": 192,
+                  "keyframeSec": 2
+                },
+                "encoder": "auto"
+              }
+            }
+          ]
+        }
+      ],
+      "activeProfileId": "prof_0003"
+    }
+  }
+]
