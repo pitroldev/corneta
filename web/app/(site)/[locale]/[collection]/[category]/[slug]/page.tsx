@@ -39,6 +39,7 @@ import {
   formatEditorialDate,
 } from "@/lib/editorial-copy";
 import { isLocale, localePath } from "@/lib/i18n";
+import { articleStaticParams } from "@/lib/editorial/static-params";
 import { editorialArticleJsonLd, jsonLdScript } from "@/lib/seo";
 import {
   buildEditorialMetadata,
@@ -68,14 +69,16 @@ export async function generateStaticParams({
     !isEditorialCollection(collection) ||
     !isCategoryForCollection(collection, category)
   ) {
-    return [];
+    return articleStaticParams([]);
   }
   const documents = await listPublishedEditorial({
     locale,
     collection,
     category,
   });
-  return documents.map((document) => ({ slug: document.frontmatter.slug }));
+  return articleStaticParams(
+    documents.map((document) => document.frontmatter.slug),
+  );
 }
 
 function resolveRoute({

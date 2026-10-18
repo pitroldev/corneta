@@ -27,7 +27,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:contributor": "node ../scripts/contributor.mjs web:check",
-    "check": "pnpm content:check && pnpm lint && pnpm typecheck && pnpm build"
+    "check": "pnpm content:check && pnpm lint && pnpm typecheck && pnpm build && node scripts/check-build-routes.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.43.0",
