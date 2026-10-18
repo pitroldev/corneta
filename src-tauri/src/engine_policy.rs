@@ -112,6 +112,82 @@ pub(crate) fn friendly_error(low: &str, locale: Locale) -> (&'static str, String
     }
 }
 
+/// What one FFmpeg output line means for its target, decided before taking the engine lock.
+#[derive(Debug, PartialEq)]
+pub(crate) enum TargetLine {
+    /// Progress output: the target is sending.
+    Stats {
+        fps: Option<u32>,
+        bitrate_kbps: Option<u32>,
+        dropped: Option<u32>,
+    },
+    /// An error-looking line, lowercased for classification.
+    Error(String),
+    /// Neither progress nor a known error keyword; it changes no state.
+    Ignore,
+}
+
+pub(crate) fn classify_target_line(line: &str) -> TargetLine {
+    if line.contains("frame=") || line.contains("bitrate=") {
+        return TargetLine::Stats {
+            fps: parse_kv(line, "fps=").map(|v| v as u32),
+            bitrate_kbps: parse_kv(line, "bitrate=").map(|v| v as u32),
+            dropped: parse_kv(line, "drop=").map(|v| v as u32),
+        };
+    }
+    const ERR_KEYS: [&str; 8] = [
+        "error",
+        "failed",
+        "connection refused",
+        "broken pipe",
+        "unable to",
+        "connection reset",
+        "i/o error",
+        "end of file",
+    ];
+    let low = line.to_lowercase();
+    if ERR_KEYS.iter().any(|k| low.contains(k)) {
+        TargetLine::Error(low)
+    } else {
+        TargetLine::Ignore
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum TargetErrorUpdate {
+    /// Keep the stronger signal-lost state.
+    Keep,
+    /// Missing input is not an output failure: the target waits for OBS.
+    Waiting,
+    /// A destination failure; `park` stops reconnecting after a refused key or authorization.
+    Failed {
+        state: &'static str,
+        message: String,
+        park: bool,
+    },
+}
+
+pub(crate) fn target_error_update(
+    low: &str,
+    has_signal: bool,
+    current: &str,
+    locale: Locale,
+) -> TargetErrorUpdate {
+    if !has_signal {
+        return if current == "signal-lost" {
+            TargetErrorUpdate::Keep
+        } else {
+            TargetErrorUpdate::Waiting
+        };
+    }
+    let (state, message) = friendly_error(low, locale);
+    TargetErrorUpdate::Failed {
+        state,
+        message,
+        park: state == "error",
+    }
+}
+
 /// Keep FFmpeg failure context while redacting stream keys and RTMP URLs.
 pub(crate) fn safe_ffmpeg_diagnostic(line: &str, stream_key: &str) -> Option<String> {
     const ERROR_MARKERS: [&str; 12] = [
@@ -336,6 +412,76 @@ mod tests {
         let english = tray_tooltip(&s, Locale::En);
         assert!(english.starts_with("Corneta · live (2)"));
         assert!(english.contains("BE RIGHT BACK on air"));
+    }
+
+    #[test]
+    fn target_lines_split_progress_errors_and_noise() {
+        assert_eq!(
+            classify_target_line(
+                "frame= 120 fps= 60 q=-1.0 size=  1024kB bitrate=6000.5kbits/s drop=3"
+            ),
+            TargetLine::Stats {
+                fps: Some(60),
+                bitrate_kbps: Some(6000),
+                dropped: Some(3),
+            }
+        );
+        assert_eq!(
+            classify_target_line("bitrate=N/A speed=1x"),
+            TargetLine::Stats {
+                fps: None,
+                bitrate_kbps: None,
+                dropped: None,
+            }
+        );
+        for line in [
+            "Error opening output",
+            "Connection refused",
+            "av_interleaved_write_frame(): Broken pipe",
+            "Unable to open resource",
+            "rtmp://x: I/O error",
+            "End of file",
+        ] {
+            assert_eq!(
+                classify_target_line(line),
+                TargetLine::Error(line.to_lowercase()),
+                "{line}"
+            );
+        }
+        // Logged without a keyword the rule knows, so the target state does not change.
+        for line in ["Press [q] to stop", "Operation timed out", "403 Forbidden"] {
+            assert_eq!(classify_target_line(line), TargetLine::Ignore, "{line}");
+        }
+    }
+
+    #[test]
+    fn target_errors_wait_without_input_and_park_only_refused_destinations() {
+        let update =
+            |low, has_signal, current| target_error_update(low, has_signal, current, Locale::PtBr);
+        assert_eq!(
+            update("error: connection refused", false, "live"),
+            TargetErrorUpdate::Waiting
+        );
+        assert_eq!(
+            update("error: connection refused", false, "signal-lost"),
+            TargetErrorUpdate::Keep
+        );
+        assert!(matches!(
+            update("error: publish denied (auth)", true, "live"),
+            TargetErrorUpdate::Failed {
+                state: "error",
+                park: true,
+                ..
+            }
+        ));
+        assert!(matches!(
+            update("error: connection refused", true, "live"),
+            TargetErrorUpdate::Failed {
+                state: "reconnecting",
+                park: false,
+                ..
+            }
+        ));
     }
 
     #[test]
