@@ -1966,9 +1966,12 @@ export const pt = {
   "settings.hotkey.capture.prompt":
     "pressione Ctrl, Alt ou Shift + tecla… (Esc cancela)",
   "settings.hotkey.clear": "Limpar",
+  "settings.hotkey.brb": "JÁ VOLTO / Voltei",
   "settings.hotkey.desc":
-    "Começa/para a transmissão de qualquer lugar — mesmo com a Corneta minimizada na bandeja.",
-  "settings.hotkey.title": "Atalho global",
+    "Funcionam de qualquer lugar, até com jogo em tela cheia ou a Corneta na bandeja. Marcar momento e JÁ VOLTO só agem com a live no ar.",
+  "settings.hotkey.live": "Começar ou parar a live",
+  "settings.hotkey.markMoment": "Marcar momento",
+  "settings.hotkey.title": "Atalhos globais",
   "settings.hotkey.toast.inUse":
     "Esse atalho já está em uso — escolha outra combinação.",
   "settings.hotkey.toast.invalid":

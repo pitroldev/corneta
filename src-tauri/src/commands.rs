@@ -3139,8 +3139,10 @@ pub fn export_diagnostics(
 pub fn register_shortcut(
     app: AppHandle,
     shortcut: String,
+    action: Option<crate::shortcut::Action>,
 ) -> Result<(), crate::shortcut::ShortcutError> {
-    crate::shortcut::register(&app, &shortcut)
+    let action = action.unwrap_or(crate::shortcut::Action::ToggleLive);
+    crate::shortcut::register(&app, action, &shortcut)
 }
 
 #[tauri::command]

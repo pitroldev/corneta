@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
 import { captureShortcut } from "../../lib/shortcuts";
@@ -7,12 +7,16 @@ export function ShortcutCapture({
   value,
   onChange,
   disabled = false,
+  labelledBy,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  /** Id of the action's label, read together with the current shortcut. */
+  labelledBy?: string;
 }) {
   const t = useT();
+  const id = useId();
   const [capturing, setCapturing] = useState(false);
   const [hint, setHint] = useState<"needsModifier" | "unsupported" | null>(
     null,
@@ -61,6 +65,8 @@ export function ShortcutCapture({
 
   return (
     <button
+      id={id}
+      aria-labelledby={labelledBy ? `${labelledBy} ${id}` : undefined}
       disabled={disabled}
       onClick={() => setCapturing(true)}
       onBlur={() => {

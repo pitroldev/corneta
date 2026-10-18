@@ -42,6 +42,8 @@ export function defaultConfig(): AppConfig {
       obsPassword: "",
       autoStartObs: true,
       liveShortcut: "CommandOrControl+Alt+L",
+      markMomentShortcut: "",
+      brbShortcut: "",
       youtubeApiKey: "",
       chatSources: [],
       alertSources: [],

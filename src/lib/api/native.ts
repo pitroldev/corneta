@@ -13,7 +13,12 @@ import type {
   SessionMeta,
   Viewers,
 } from "../types";
-import { CornetaApi, MesaServerInfo, OverlayInfo } from "./types";
+import {
+  CornetaApi,
+  MesaServerInfo,
+  OverlayInfo,
+  type ShortcutAction,
+} from "./types";
 
 /** Rust integer timestamps reject JSON floats; normalize interpolated milliseconds at the IPC boundary. */
 function integerArg(value: number, name: string, unsigned = false): number {
@@ -501,9 +506,9 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return invoke<TelemetryStatus>("telemetry_regenerate_id");
     },
-    async registerShortcut(shortcut) {
+    async registerShortcut(shortcut, action = "toggleLive") {
       const { invoke } = await core();
-      await invoke("register_shortcut", { shortcut });
+      await invoke("register_shortcut", { shortcut, action });
     },
     subscribeRecorder(cb) {
       let cancelled = false;
@@ -523,8 +528,8 @@ export function tauriApi(): CornetaApi {
       let cancelled = false;
       let unlisten: (() => void) | null = null;
       void event().then(({ listen }) =>
-        listen("shortcut://toggle-live", () => cb()).then((u) =>
-          cancelled ? u() : (unlisten = u),
+        listen<ShortcutAction>("shortcut://action", (e) => cb(e.payload)).then(
+          (u) => (cancelled ? u() : (unlisten = u)),
         ),
       );
       return () => {

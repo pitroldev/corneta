@@ -1,4 +1,7 @@
 import type { I18n } from "../i18n";
+
+/** Matches the native `shortcut::Action`. */
+export type ShortcutAction = "toggleLive" | "markMoment" | "brb";
 import {
   type TelemetryChoice,
   type TelemetryStatus,
@@ -194,8 +197,8 @@ export interface CornetaApi {
   }): Promise<TelemetryStatus>;
   /** Rotate the installation UUID only when both telemetry purposes are disabled. */
   telemetryRegenerateId(): Promise<TelemetryStatus>;
-  registerShortcut(shortcut: string): Promise<void>;
-  subscribeShortcut(cb: () => void): () => void;
+  registerShortcut(shortcut: string, action?: ShortcutAction): Promise<void>;
+  subscribeShortcut(cb: (action: ShortcutAction) => void): () => void;
   /** Recorder notice kinds are stable protocol values; translate only their display text. */
   subscribeRecorder(
     cb: (e: { kind: string; detail?: string | null }) => void,
