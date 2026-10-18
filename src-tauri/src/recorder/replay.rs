@@ -336,6 +336,7 @@ async fn remux(
     let Ok((mut events, child)) = spawned else {
         return ReplayPreparation::failed("failed");
     };
+    crate::job::adopt_pid(child.pid());
     let mut child = PreparationChild(Some(child));
     let mut checks = tokio::time::interval(Duration::from_millis(500));
     checks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
