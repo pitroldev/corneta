@@ -359,7 +359,7 @@ mod tests {
             }),
             Error::Api(GoogleError::Http {
                 status: 403,
-                reason: GoogleReason::Quota,
+                reason: GoogleReason::DailyQuota,
             }),
         ] {
             let mut store = pending_store();

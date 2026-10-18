@@ -1,6 +1,7 @@
 //! Only allowlisted Google error codes cross the HTTP boundary; never provider text or URLs.
 
 use crate::i18n::Msg;
+use chrono::{DateTime, Datelike, Local, NaiveDate, TimeDelta, Utc, Weekday};
 use serde_json::Value;
 use std::io::Read;
 
@@ -10,7 +11,8 @@ pub(super) enum GoogleReason {
     StreamMissing,
     InvalidTransition,
     RedundantTransition,
-    Quota,
+    DailyQuota,
+    RateLimit,
     Permission,
     StreamingDisabled,
     Backend,
@@ -24,7 +26,8 @@ impl GoogleReason {
             "liveStreamNotFound" => Self::StreamMissing,
             "invalidTransition" => Self::InvalidTransition,
             "redundantTransition" => Self::RedundantTransition,
-            "quotaExceeded" | "rateLimitExceeded" | "userRequestsExceedRateLimit" => Self::Quota,
+            "quotaExceeded" | "dailyLimitExceeded" => Self::DailyQuota,
+            "rateLimitExceeded" | "userRequestsExceedRateLimit" => Self::RateLimit,
             "insufficientPermissions" | "insufficientLivePermissions" | "forbidden" => {
                 Self::Permission
             }
@@ -40,7 +43,8 @@ impl GoogleReason {
             Self::StreamMissing => "liveStreamNotFound",
             Self::InvalidTransition => "invalidTransition",
             Self::RedundantTransition => "redundantTransition",
-            Self::Quota => "quotaExceeded",
+            Self::DailyQuota => "quotaExceeded",
+            Self::RateLimit => "rateLimitExceeded",
             Self::Permission => "insufficientPermissions",
             Self::StreamingDisabled => "liveStreamingNotEnabled",
             Self::Backend => "backendError",
@@ -97,7 +101,10 @@ impl GoogleError {
             Self::Transport | Self::InvalidResponse => true,
             Self::Http { status, reason } => {
                 matches!(status, 408 | 429 | 500..=599)
-                    || matches!(reason, GoogleReason::Quota | GoogleReason::Backend)
+                    || matches!(
+                        reason,
+                        GoogleReason::DailyQuota | GoogleReason::RateLimit | GoogleReason::Backend
+                    )
             }
         }
     }
@@ -116,6 +123,17 @@ impl GoogleError {
 
     pub(super) fn message(self) -> String {
         match self {
+            // Retrying cannot help before the reset, so say when it comes back.
+            Self::Http {
+                reason: GoogleReason::DailyQuota,
+                ..
+            } => Msg::YoutubeDailyQuota {
+                at: &next_quota_reset(Utc::now())
+                    .with_timezone(&Local)
+                    .format("%H:%M")
+                    .to_string(),
+            }
+            .now(),
             Self::Http { status, reason } if self.retryable() => Msg::ChatYoutubeApiTemporary {
                 c: status,
                 reason: reason.code(),
@@ -132,9 +150,96 @@ impl GoogleError {
     }
 }
 
+/// US daylight saving runs from 02:00 PST on the second Sunday of March to 02:00 PDT on the
+/// first Sunday of November.
+fn pacific_daylight_at(instant: DateTime<Utc>) -> bool {
+    let sunday = |month, nth| {
+        NaiveDate::from_weekday_of_month_opt(instant.year(), month, Weekday::Sun, nth)
+            .expect("every month has a second Sunday")
+    };
+    let starts = sunday(3, 2)
+        .and_hms_opt(10, 0, 0)
+        .expect("valid time")
+        .and_utc();
+    let ends = sunday(11, 1)
+        .and_hms_opt(9, 0, 0)
+        .expect("valid time")
+        .and_utc();
+    instant >= starts && instant < ends
+}
+
+/// The YouTube Data API quota resets at midnight Pacific time.
+fn next_quota_reset(now: DateTime<Utc>) -> DateTime<Utc> {
+    let hours_behind = |instant| if pacific_daylight_at(instant) { 7 } else { 8 };
+    let pacific_date = (now - TimeDelta::hours(hours_behind(now))).date_naive();
+    let midnight = pacific_date
+        .succ_opt()
+        .expect("date in range")
+        .and_hms_opt(0, 0, 0)
+        .expect("valid time")
+        .and_utc();
+    // Daylight saving switches at 02:00, so midnight itself is never ambiguous.
+    let daylight = midnight + TimeDelta::hours(7);
+    if pacific_daylight_at(daylight) {
+        daylight
+    } else {
+        midnight + TimeDelta::hours(8)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn daily_quota_is_told_apart_from_rate_limits() {
+        for (reason, expected, code) in [
+            ("quotaExceeded", GoogleReason::DailyQuota, "quotaExceeded"),
+            (
+                "dailyLimitExceeded",
+                GoogleReason::DailyQuota,
+                "quotaExceeded",
+            ),
+            (
+                "rateLimitExceeded",
+                GoogleReason::RateLimit,
+                "rateLimitExceeded",
+            ),
+            (
+                "userRequestsExceedRateLimit",
+                GoogleReason::RateLimit,
+                "rateLimitExceeded",
+            ),
+        ] {
+            assert_eq!(GoogleReason::parse(reason), expected, "{reason}");
+            assert_eq!(expected.code(), code);
+        }
+    }
+
+    #[test]
+    fn quota_resets_at_the_next_pacific_midnight() {
+        let utc = |text: &str| {
+            DateTime::parse_from_rfc3339(text)
+                .expect("valid fixture")
+                .with_timezone(&Utc)
+        };
+        for (now, reset) in [
+            // Daylight time: midnight PDT is 07:00 UTC.
+            ("2026-10-18T15:00:00Z", "2026-10-19T07:00:00Z"),
+            // Standard time: midnight PST is 08:00 UTC.
+            ("2026-12-01T12:00:00Z", "2026-12-02T08:00:00Z"),
+            // Saturday evening before daylight saving starts on 2027-03-14 at 02:00.
+            ("2027-03-14T06:00:00Z", "2027-03-14T08:00:00Z"),
+            ("2027-03-14T12:00:00Z", "2027-03-15T07:00:00Z"),
+            // Daylight saving ends on 2026-11-01 at 02:00 PDT.
+            ("2026-10-31T20:00:00Z", "2026-11-01T07:00:00Z"),
+            ("2026-11-01T12:00:00Z", "2026-11-02T08:00:00Z"),
+            // Exactly at the reset, the next one is a day later.
+            ("2026-10-19T07:00:00Z", "2026-10-20T07:00:00Z"),
+        ] {
+            assert_eq!(next_quota_reset(utc(now)), utc(reset), "now {now}");
+        }
+    }
 
     #[test]
     fn only_allowlisted_reasons_survive_provider_responses() {
@@ -168,7 +273,7 @@ mod tests {
         assert!(GoogleError::Transport.retryable());
         assert!(GoogleError::Http {
             status: 403,
-            reason: GoogleReason::Quota
+            reason: GoogleReason::DailyQuota
         }
         .retryable());
         assert!(!GoogleError::Http {
