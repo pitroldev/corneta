@@ -8,7 +8,10 @@ const steps = [
   {
     name: "typecheck",
     command: process.execPath,
-    args: [resolve(root, "node_modules/typescript/bin/tsc"), "--noEmit"],
+    args: [
+      resolve(root, "node_modules/@typescript/native/bin/tsc"),
+      "--noEmit",
+    ],
     cwd: root,
   },
   {
