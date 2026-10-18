@@ -216,18 +216,35 @@
     transform: rotate(2.2deg);
   }
 
+  /* Scale and fade a ring instead of animating box-shadow, which repaints every frame on the GPU
+     that is encoding the stream. */
   .live-dot {
+    position: relative;
+  }
+  .live-dot::before,
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .live-dot::before {
+    background: rgba(255, 71, 51, 0.65);
     animation: live-pulse 1.4s infinite;
+  }
+  /* Keep the dot's own color above its ring. */
+  .live-dot::after {
+    background: inherit;
   }
   @keyframes live-pulse {
     0% {
-      box-shadow: 0 0 0 0 rgba(255, 71, 51, 0.65);
+      transform: scale(1);
+      opacity: 1;
     }
-    70% {
-      box-shadow: 0 0 0 9px rgba(255, 71, 51, 0);
-    }
+    70%,
     100% {
-      box-shadow: 0 0 0 0 rgba(255, 71, 51, 0);
+      transform: scale(2.8);
+      opacity: 0;
     }
   }
 
@@ -306,7 +323,7 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  .live-dot,
+  .live-dot::before,
   .animate-shout,
   .marquee {
     animation: none !important;

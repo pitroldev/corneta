@@ -1190,7 +1190,7 @@ function LiveTimer({
   const secs = startedAt ? (now - startedAt) / 1000 : 0;
   return (
     <div className="flex items-center gap-2">
-      <span className="size-2.5 rounded-full bg-live live-dot" />
+      <span className="size-2.5 rounded-full bg-live" />
       <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
         {fmtUptime(secs)}
       </span>
@@ -1572,7 +1572,7 @@ function StatePill({ state }: { state: TargetState }) {
       live: {
         label: t("golive.state.live"),
         cls: "text-ok",
-        dot: "bg-live live-dot",
+        dot: "bg-live",
       },
       reconnecting: {
         label: t("golive.state.reconnecting"),
