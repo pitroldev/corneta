@@ -2,11 +2,5 @@
   "schemaVersion": 1,
   "prettierVersion": "3.9.6",
   "reason": "Historical formatting debt only. Exact LF-normalized source hashes; changed/new files must pass. Remove entries when formatted, never refresh a hash merely to bypass a failure. Use --all to inspect the entire debt.",
-  "files": {
-    "src-tauri/tauri.conf.json": "sha256:85adc847e5917cb4e836f2b403665ae32fc7000dcf01ec551762b8c9bd45c5d5",
-    "web/content/pt-BR/guides/multistream/simulcasting-rules.mdx": "sha256:300ea6ea94b2bf2393a78899916436cf29d8d879fe77fe2d7a4bb4bd6ee402ae",
-    "web/content/pt-BR/guides/quality/dropped-frames.mdx": "sha256:c2e023ee7b93760696210de88394fc0c0cdb9bc3738c81d42f8abce0e160fd88",
-    "web/content/pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx": "sha256:1cace19ff4719b74441f449e3d4c9057944eb39d741957c1851c968dcf936226",
-    "web/content/pt-BR/help/troubleshooting/obs-not-found.mdx": "sha256:e66f0fb869693ba28e22f0ff41d8ad5913ad9f326abac256e0fabf3c07975077"
-  }
+  "files": {}
 }
