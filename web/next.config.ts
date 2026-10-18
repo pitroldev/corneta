@@ -8,6 +8,9 @@ import {
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+// Portuguese collections keep unprefixed public URLs over the internal pt-BR routes.
+const PT_COLLECTIONS = "legal|help|guides|search";
+
 // Local development may reuse app configuration; contributor checks must never load it.
 try {
   if (
@@ -48,6 +51,13 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // The internal Portuguese prefix must redirect to the established public URL.
+      { source: "/pt-BR", destination: "/", permanent: true },
+      {
+        source: `/pt-BR/:collection(${PT_COLLECTIONS})/:path*`,
+        destination: "/:collection/:path*",
+        permanent: true,
+      },
       {
         source: "/help/obs/:path*",
         destination: "/help/streaming-software/:path*",
@@ -69,6 +79,19 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
     ];
+  },
+  async rewrites() {
+    return {
+      // Before the filesystem: [locale] pages are pre-generated only under their locale prefix.
+      beforeFiles: [
+        {
+          source: `/:collection(${PT_COLLECTIONS})/:path*`,
+          destination: "/pt-BR/:collection/:path*",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
