@@ -10,45 +10,6 @@ function request(path: string, acceptLanguage = "pt-BR") {
 }
 
 describe("site proxy", () => {
-  it("rewrites Portuguese Help and Guides routes to the internal locale", () => {
-    for (const path of [
-      "/help",
-      "/help/obs",
-      "/help/obs/first-live?from=search",
-      "/guides",
-      "/guides/multistream/obs-multistream",
-      "/search?q=obs",
-    ]) {
-      const response = proxy(request(path, "en-US"));
-      const expected = new URL(path, "https://www.corneta.live");
-      expected.pathname = `/pt-BR${expected.pathname}`;
-
-      expect(response.status).toBe(200);
-      expect(response.headers.get("x-middleware-rewrite")).toBe(
-        expected.toString(),
-      );
-      expect(response.headers.get("location")).toBeNull();
-    }
-  });
-
-  it("redirects internal pt-BR routes to public URLs with 308", () => {
-    for (const [internal, publicPath] of [
-      ["/pt-BR/help", "/help"],
-      ["/pt-BR/help/obs/first-live?from=old", "/help/obs/first-live?from=old"],
-      ["/pt-BR/guides", "/guides"],
-      ["/pt-BR/guides/quality/bitrate", "/guides/quality/bitrate"],
-      ["/pt-BR/search?q=upload", "/search?q=upload"],
-    ]) {
-      const response = proxy(request(internal));
-
-      expect(response.status).toBe(308);
-      expect(response.headers.get("location")).toBe(
-        `https://www.corneta.live${publicPath}`,
-      );
-      expect(response.headers.get("x-middleware-rewrite")).toBeNull();
-    }
-  });
-
   it("keeps English routes direct and negotiates language only at the root", () => {
     for (const path of [
       "/en/help",
@@ -69,19 +30,18 @@ describe("site proxy", () => {
     expect(root.headers.get("location")).toBe("https://www.corneta.live/en");
   });
 
-  it("limits the matcher to the root and Portuguese aliases", () => {
-    expect(config.matcher).toEqual([
-      "/",
-      "/pt-BR",
-      "/legal/:path*",
-      "/help/:path*",
-      "/guides/:path*",
-      "/search/:path*",
-      "/pt-BR/legal/:path*",
-      "/pt-BR/help/:path*",
-      "/pt-BR/guides/:path*",
-      "/pt-BR/search/:path*",
-    ]);
-    expect(config.matcher).not.toContain("/en/:path*");
+  it("runs only at the root; collection routing is static configuration", () => {
+    expect(config.matcher).toEqual(["/"]);
+  });
+
+  it("rewrites the root to Portuguese or redirects to the chosen locale, varying by preference", () => {
+    const pt = proxy(request("/", "pt-BR,pt;q=0.9"));
+    expect(pt.headers.get("x-middleware-rewrite")).toBe(
+      "https://www.corneta.live/pt-BR",
+    );
+    expect(pt.headers.get("vary")).toBe("Accept-Language, Cookie");
+    const en = proxy(request("/", "en-US,en;q=0.9"));
+    expect(en.status).toBe(307);
+    expect(en.headers.get("vary")).toBe("Accept-Language, Cookie");
   });
 });

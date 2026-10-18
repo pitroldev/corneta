@@ -33,4 +33,30 @@ describe("legacy editorial redirects", () => {
       ]),
     );
   });
+  it("redirects internal pt-BR collection URLs to their public paths", async () => {
+    const redirects = await nextConfig.redirects?.();
+    expect(redirects).toEqual(
+      expect.arrayContaining([
+        { source: "/pt-BR", destination: "/", permanent: true },
+        {
+          source: "/pt-BR/:collection(legal|help|guides|search)/:path*",
+          destination: "/:collection/:path*",
+          permanent: true,
+        },
+      ]),
+    );
+  });
+  it("serves Portuguese collections from the internal locale before the filesystem", async () => {
+    const rewrites = await nextConfig.rewrites?.();
+    expect(rewrites).toEqual({
+      beforeFiles: [
+        {
+          source: "/:collection(legal|help|guides|search)/:path*",
+          destination: "/pt-BR/:collection/:path*",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    });
+  });
 });
