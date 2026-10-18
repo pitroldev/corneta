@@ -626,7 +626,7 @@ messages! {
         pt: "o OBS fechou a conexão",
         en: "OBS closed the connection";
     ObsConnectFailed { url: &'a str, e: &'a str } = "rust.obs.connectFailed" =>
-        pt: "não consegui conectar no obs-websocket ({url}): {e}. No OBS, ative em Ferramentas → Configurações do Servidor WebSocket.",
+        pt: "não consegui conectar no obs-websocket ({url}): {e}. No OBS, ative em Ferramentas → Configurações do servidor WebSocket.",
         en: "Couldn't connect to obs-websocket ({url}): {e}. In OBS, turn it on under Tools → WebSocket Server Settings.";
     ObsPasswordRequired = "rust.obs.passwordRequired" =>
         pt: "O obs-websocket tá com senha — cola ela em Configurações → OBS.",

@@ -923,22 +923,22 @@ export const pt = {
   "encoding.wizard.cta.done": "Fechar o guia",
   "encoding.wizard.cta.retry": "Tentar de novo",
   "encoding.wizard.error.auth.tip1":
-    "Pegue a senha certa no OBS: Ferramentas → Configurações do Servidor WebSocket → Mostrar Chave de Conexão.",
+    "Pegue a senha certa no OBS: Ferramentas → Configurações do servidor WebSocket → Mostrar informações da conexão.",
   "encoding.wizard.error.auth.tip2":
     "Cole ela no passo 2 aqui em cima e tente de novo.",
   "encoding.wizard.error.auth.tip3":
-    "Se “Ativar Autenticação” estiver desmarcado no OBS, é porque não tem senha — deixe o campo vazio.",
+    "Se “Habilitar autenticação” estiver desmarcado no OBS, é porque não tem senha — deixe o campo vazio.",
   "encoding.wizard.error.auth.title": "A senha do WebSocket não bateu.",
   "encoding.wizard.error.details": "Ver detalhe técnico",
   "encoding.wizard.error.generic.tip1":
-    "Vê se o OBS tá aberto e com o WebSocket ligado (Ferramentas → Configurações do Servidor WebSocket).",
+    "Vê se o OBS tá aberto e com o WebSocket ligado (Ferramentas → Configurações do servidor WebSocket).",
   "encoding.wizard.error.generic.tip2":
     "Sem estresse: dá pra configurar na mão logo abaixo.",
   "encoding.wizard.error.generic.title":
     "Não consegui configurar o OBS sozinha.",
   "encoding.wizard.error.notfound.tip1": "O OBS tá aberto aí no seu PC?",
   "encoding.wizard.error.notfound.tip2":
-    "O WebSocket tá ligado? Ferramentas → Configurações do Servidor WebSocket → Ativar Servidor WebSocket.",
+    "O WebSocket tá ligado? Ferramentas → Configurações do servidor WebSocket → Ativar servidor WebSocket.",
   "encoding.wizard.error.notfound.tip3": "A porta continua a padrão, 4455?",
   "encoding.wizard.error.notfound.tip4":
     "Algum firewall pode estar barrando a conexão — libere o OBS pra mim.",
@@ -957,10 +957,10 @@ export const pt = {
   "encoding.wizard.ok.manual":
     "Conectado! O OBS já aponta pra Corneta. Na hora da live, é só clicar **Iniciar transmissão** no OBS.",
   "encoding.wizard.step1.body":
-    "No OBS: **Ferramentas → Configurações do Servidor WebSocket** e marque **Ativar Servidor WebSocket** (a porta já vem 4455, pode deixar).",
+    "No OBS: **Ferramentas → Configurações do servidor WebSocket** e marque **Ativar servidor WebSocket** (a porta já vem 4455, pode deixar).",
   "encoding.wizard.step1.title": "Ative o WebSocket no OBS",
   "encoding.wizard.step2.body":
-    "Se **Ativar Autenticação** estiver marcado, clique em **Mostrar Chave de Conexão**, copie e cole aqui. Sem senha? Deixe vazio.",
+    "Se **Habilitar autenticação** estiver marcado, clique em **Mostrar informações da conexão**, copie e cole aqui. Sem senha? Deixe vazio.",
   "encoding.wizard.step2.placeholder": "senha do WebSocket",
   "encoding.wizard.step2.title": "Senha (se tiver)",
   "encoding.wizard.step3.body.autostart":
@@ -1012,7 +1012,7 @@ export const pt = {
   "golive.checkup.keys.none": "nenhuma plataforma ativa",
   "golive.checkup.obsConnected": "OBS conectado",
   "golive.checkup.obsConnected.fix":
-    "ative em Ferramentas → Configurações do Servidor WebSocket (e a senha em Configurações, se houver)",
+    "ative em Ferramentas → Configurações do servidor WebSocket (e a senha em Configurações, se houver)",
   "golive.checkup.obsPointing": "OBS apontando pra Corneta",
   "golive.checkup.obsPointing.fix": "aponta o OBS pra cá com o botão ao lado",
   "golive.checkup.state.bad": "com problema",
@@ -1947,7 +1947,7 @@ export const pt = {
     "Pro botão {button} (na tela Ao vivo) funcionar, ative no OBS: {path}. Se tiver senha, cole aqui.",
   "settings.obs.autoconfig.desc.button": "“Configura pra mim”",
   "settings.obs.autoconfig.desc.path":
-    "Ferramentas → Configurações do Servidor WebSocket",
+    "Ferramentas → Configurações do servidor WebSocket",
   "settings.obs.autoconfig.title": "OBS — auto-config",
   "settings.obs.autostart.desc":
     "No BORA AO VIVO, a Corneta também manda o OBS começar a transmitir.",
@@ -1961,17 +1961,17 @@ export const pt = {
     "Você tá no ar — travei esse endereço pra não derrubar o OBS no meio da live.",
   "settings.obs.ingest.title": "Endereço pro OBS",
   "settings.obs.password.desc":
-    "A senha aparece nessa mesma janela do OBS, no botão “Mostrar Chave de Conexão”. Se “Ativar Autenticação” estiver desmarcado lá, deixe vazio.",
+    "A senha aparece nessa mesma janela do OBS, no botão “Mostrar informações da conexão”. Se “Habilitar autenticação” estiver desmarcado lá, deixe vazio.",
   "settings.obs.password.placeholder": "(opcional)",
   "settings.obs.password.title": "Senha do WebSocket",
   "settings.obs.paste.field.key": "Chave",
   "settings.obs.paste.field.server": "Servidor",
   "settings.obs.paste.label": "Cole no OBS",
   "settings.obs.test.authFail":
-    "Senha recusada — confira a senha do WebSocket no OBS (botão “Mostrar Chave de Conexão”).",
+    "Senha recusada — confira a senha do WebSocket no OBS (botão “Mostrar informações da conexão”).",
   "settings.obs.test.button": "Testar conexão",
   "settings.obs.test.notFound":
-    "Não achei o OBS — ele tá aberto? O WebSocket tá ligado em Ferramentas → Configurações do Servidor WebSocket?",
+    "Não achei o OBS — ele tá aberto? O WebSocket tá ligado em Ferramentas → Configurações do servidor WebSocket?",
   "settings.obs.test.ok": "Conectado",
   "settings.obs.test.okDetail": "Conectado · {width}×{height} · {fps}fps",
   "settings.obs.test.wrongTarget":
