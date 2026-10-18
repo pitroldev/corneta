@@ -647,7 +647,7 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), String> {
+pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), crate::obs::ObsFailure> {
     let cfg = get_config(app);
     // OBS expects the stream key separately from the server URL.
     let server = format!(
@@ -660,7 +660,8 @@ pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), String> {
         crate::obs::autoconfigure(OBS_WS_HOST, OBS_WS_PORT, &password, &server, &key)
     })
     .await
-    .map_err(|e| format!("join: {e}"))?
+    .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
+    .map_err(crate::obs::ObsFailure::from)
 }
 
 fn emit(app: &AppHandle, snap: &EngineSnapshot) {

@@ -15,6 +15,8 @@ import {
 } from "../lib/obsCoordinator";
 import { obsIngestUrl } from "../lib/factory";
 import { bold, useT, type I18n } from "../lib/i18n";
+import type { ObsErrorCode } from "../lib/types";
+import { obsFailure, obsHelpKind, type ObsFailure } from "../lib/obsErrors";
 import { cn } from "../lib/utils";
 import { Modal } from "./Modal";
 import { Button, CopyField, Input } from "./ui";
@@ -23,20 +25,10 @@ type Status = "idle" | "connecting" | "ok" | "error";
 
 function obsErrorHelp(
   t: I18n["t"],
-  raw: string,
+  code: ObsErrorCode | undefined,
 ): { title: string; tips: string[] } {
-  const e = raw.toLowerCase();
-  if (
-    e.includes("auth") ||
-    e.includes("password") ||
-    e.includes("senha") ||
-    e.includes("401") ||
-    e.includes("403") ||
-    e.includes("fechou") ||
-    e.includes("4009") ||
-    e.includes("closed") ||
-    e.includes("close")
-  ) {
+  const kind = obsHelpKind(code);
+  if (kind === "auth") {
     return {
       title: t("encoding.wizard.error.auth.title"),
       tips: [
@@ -46,16 +38,7 @@ function obsErrorHelp(
       ],
     };
   }
-  if (
-    e.includes("refus") ||
-    e.includes("connect") ||
-    e.includes("timed") ||
-    e.includes("timeout") ||
-    e.includes("econn") ||
-    e.includes("os error") ||
-    e.includes("websocket") ||
-    e.includes(" ws")
-  ) {
+  if (kind === "notFound") {
     return {
       title: t("encoding.wizard.error.notfound.title"),
       tips: [
@@ -85,7 +68,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
     setSettings({ obsPassword }),
   );
   const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ObsFailure | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [configError, setConfigError] = useState<"save" | "changed" | null>(
     null,
@@ -101,13 +84,13 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
   // Focus the heading rather than the close button, which is first in DOM order.
   const titleRef = useRef<HTMLHeadingElement>(null);
 
-  const help = error ? obsErrorHelp(t, error) : null;
+  const help = error ? obsErrorHelp(t, error.code) : null;
 
   const connect = async () => {
     if (connecting.current) return;
     connecting.current = true;
     setStatus("connecting");
-    setError("");
+    setError(null);
     setConfigError(null);
     try {
       await configureObs();
@@ -117,7 +100,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
       if (!active.current) return;
       if (e instanceof ObsConfigSaveError) setConfigError("save");
       else if (e instanceof ObsConfigChangedError) setConfigError("changed");
-      else setError(String(e));
+      else setError(obsFailure(e));
       setStatus("error");
       setManualOpen(true);
     } finally {
@@ -227,7 +210,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
                 data-selectable
                 className="mt-1 font-mono break-all text-ink-muted"
               >
-                {error}
+                {error?.message}
               </p>
             </details>
           </div>
