@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-09-07
-reviewedAt: 2026-09-07
-productVersion: 0.7.0
+updatedAt: 2026-10-18
+reviewedAt: 2026-10-18
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -30,11 +30,11 @@ sources:
   - title: Corneta diagnostic export command
     kind: internal
     repoPath: src-tauri/src/commands.rs
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-18
   - title: Corneta telemetry and diagnostics runbook
     kind: internal
     repoPath: docs/RUNBOOK-POSTHOG.md
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-18
 images: []
 ---
 
@@ -58,20 +58,21 @@ O arquivo é montado a partir de campos fechados:
 - resumo da configuração sem nomes nem credenciais;
 - estado das preferências de telemetria;
 - versão do schema e SHA do build;
-- eventos técnicos estruturados, com código e etapa da falha;
-- ID de instalação somente quando houver consentimento explícito.
-
-O ID ajuda a cruzar um evento técnico no PostHog. Ele não é necessário em cada
-pedido. Se você não autorizou a inclusão, o arquivo marca o campo como omitido.
+- eventos técnicos estruturados, com código e etapa da falha.
 
 ## O que fica fora
 
+- o ID de telemetria: o arquivo marca o campo como omitido;
 - stream keys, tokens e senha do WebSocket;
 - nomes de canal, título da live e mensagens de chat;
 - imagem, áudio, vídeo e texto lido da tela;
 - caminhos locais, nome do computador e IP como propriedade;
 - watchlist do Guardião;
 - logs crus.
+
+O ID de telemetria ajuda a cruzar um evento técnico no PostHog, mas não é
+necessário em cada pedido. Se o suporte pedir, copie o **ID de telemetria** na
+mesma seção **Dados & diagnóstico** e mande no chamado.
 
 Os logs continuam locais e têm um comando separado para abrir a pasta. Não mande
 a pasta inteira sem uma pessoa do suporte explicar qual arquivo precisa e por
