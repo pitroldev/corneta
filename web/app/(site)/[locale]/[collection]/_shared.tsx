@@ -14,6 +14,7 @@ import {
   editorialCollectionHref,
   editorialSearchHref,
 } from "@/lib/editorial/urls";
+import { revisionDay } from "@/lib/editorial/revision-date";
 import { editorialCopy, formatEditorialDate } from "@/lib/editorial-copy";
 import { localePath, type Locale } from "@/lib/i18n";
 
@@ -123,8 +124,11 @@ export function EditorialDocumentCards({
             headingAs="h3"
             meta={
               <>
-                <time dateTime={frontmatter.updatedAt}>
-                  {formatEditorialDate(locale, frontmatter.updatedAt)}
+                <time dateTime={revisionDay(frontmatter.updatedAt)}>
+                  {formatEditorialDate(
+                    locale,
+                    revisionDay(frontmatter.updatedAt),
+                  )}
                 </time>
                 {" · "}
                 <span>{readingTime.label}</span>

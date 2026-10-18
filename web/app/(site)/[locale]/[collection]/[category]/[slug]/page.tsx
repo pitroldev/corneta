@@ -40,6 +40,7 @@ import {
 } from "@/lib/editorial-copy";
 import { isLocale, localePath } from "@/lib/i18n";
 import { articleStaticParams } from "@/lib/editorial/static-params";
+import { revisionDay } from "@/lib/editorial/revision-date";
 import { editorialArticleJsonLd, jsonLdScript } from "@/lib/seo";
 import {
   buildEditorialMetadata,
@@ -149,7 +150,7 @@ export async function generateMetadata({
     alternates,
     article: {
       publishedTime: frontmatter.publishedAt,
-      modifiedTime: frontmatter.updatedAt,
+      modifiedTime: revisionDay(frontmatter.updatedAt),
       author: author.name,
       authorUrl: author.url,
       contentId: frontmatter.contentId,

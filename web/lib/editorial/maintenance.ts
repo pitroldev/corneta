@@ -1,4 +1,5 @@
 import type { EditorialDocument, PublishedEditorialDocument } from "./types";
+import { revisionDay } from "./revision-date";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -32,7 +33,7 @@ export interface EditorialReviewQueue {
 }
 
 function utcDate(value: string): Date {
-  return new Date(`${value}T00:00:00.000Z`);
+  return new Date(`${revisionDay(value)}T00:00:00.000Z`);
 }
 
 function isoDate(value: Date): string {
