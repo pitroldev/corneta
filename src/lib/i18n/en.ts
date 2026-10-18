@@ -701,6 +701,8 @@ export const en: Dict = {
     "The Table turned you away — check the invite or ask the host for a new one.",
   "core.mesa.error.peerTaken":
     "Somebody already took your seat at the Table — hang on a sec and try again.",
+  "core.mesa.error.roomFull":
+    "The Table is full — it seats {max}. Wait for someone to leave and try again.",
   "core.mesa.invite.invalid": "That invite isn't valid. Check the code.",
   "core.mesa.invite.loopback":
     "That invite points at a local address. Ask the host for a new one.",

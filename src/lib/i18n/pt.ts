@@ -692,6 +692,8 @@ export const pt = {
     "A Mesa recusou a entrada — confere o convite ou pede um novo pro host.",
   "core.mesa.error.peerTaken":
     "Alguém já tá no seu lugar na Mesa — espera um instante e tenta de novo.",
+  "core.mesa.error.roomFull":
+    "A Mesa tá cheia — cabem {max} pessoas. Espera alguém sair e tenta de novo.",
   "core.mesa.invite.invalid": "Convite inválido. Confere o código.",
   "core.mesa.invite.loopback":
     "Esse convite aponta pra um endereço local. Pede um convite novo pro host.",

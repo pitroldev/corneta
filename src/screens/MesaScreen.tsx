@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useMesa } from "../lib/mesaStore";
 import { IS_TAURI } from "../lib/api";
-import type { MesaPeer } from "../lib/mesa";
+import { MESA_MAX_SEATS, type MesaPeer } from "../lib/mesa";
 import { cn } from "../lib/utils";
 import { useT, type MessageKey } from "../lib/i18n";
 import {
@@ -737,7 +737,7 @@ export function MesaScreen() {
             </Button>
           </div>
 
-          {participants.length >= 5 && (
+          {participants.length >= MESA_MAX_SEATS - 1 && (
             <Card className="flex flex-col items-center gap-4 border-l-4 border-warn sm:flex-row sm:items-start">
               <div className="size-28 shrink-0">
                 <MeshArt />

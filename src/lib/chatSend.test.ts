@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { resolveSendTargets, type SendReady } from "./chatSend";
+import {
+  resolveSendTargets,
+  sendStatusLine,
+  srcLabel,
+  type SendReady,
+  type Translate,
+} from "./chatSend";
 import type { ChatPlatform, ChatSource } from "./types";
 
 const source = (
@@ -104,5 +110,62 @@ describe("resolveSendTargets", () => {
       canSend: false,
     });
     expect(() => resolveSendTargets(sources, "y", all, {})).not.toThrow();
+  });
+});
+
+const echo = ((key: string, vars?: Record<string, string | number>) =>
+  vars
+    ? `${key}(${Object.entries(vars)
+        .map(([name, value]) => `${name}=${value}`)
+        .join(",")})`
+    : key) as Translate;
+
+describe("srcLabel", () => {
+  it("prefers the source name and falls back to the channel when it is blank", () => {
+    expect(srcLabel(source("a", "twitch", { name: "Main" }))).toBe("Main");
+    expect(srcLabel(source("a", "twitch", { name: "  " }))).toBe("channel-a");
+  });
+});
+
+describe("sendStatusLine", () => {
+  it("asks YouTube and Kick sources to sign in until their login is ready", () => {
+    const sources = [
+      source("y", "youtube", { name: "Main YT" }),
+      source("k", "kick"),
+    ];
+    expect(sendStatusLine(sources, {}, none, echo)).toBe(
+      "chat.send.status.signIn(label=Main YT,platform=YouTube) · " +
+        "chat.send.status.signIn(label=channel-k,platform=Kick)",
+    );
+    expect(sendStatusLine(sources, {}, all, echo)).toBe(
+      "chat.send.status.signedIn(platform=YouTube) · " +
+        "chat.send.status.signedIn(platform=Kick)",
+    );
+  });
+
+  it("walks a Twitch source from connecting to signed in", () => {
+    const twitch = [source("t", "twitch")];
+    const ircReady = { ...none, twitch: true };
+    expect(sendStatusLine(twitch, {}, none, echo)).toBe(
+      "chat.send.status.connect(label=channel-t)",
+    );
+    expect(
+      sendStatusLine(twitch, { t: { login: "me", ok: false } }, none, echo),
+    ).toBe("chat.send.status.invalidToken(label=channel-t)");
+    expect(
+      sendStatusLine(twitch, { t: { login: "me", ok: false } }, ircReady, echo),
+    ).toBe("chat.send.status.reconnect(label=channel-t)");
+    expect(
+      sendStatusLine(twitch, { t: { login: "me", ok: true } }, none, echo),
+    ).toBe("chat.loginrow.signedInAs(login=me)");
+  });
+
+  it("reports each target in order and nothing when there are none", () => {
+    const sources = [source("k", "kick"), source("t", "twitch")];
+    expect(sendStatusLine(sources, {}, all, echo).split(" · ")).toEqual([
+      "chat.send.status.signedIn(platform=Kick)",
+      "chat.send.status.reconnect(label=channel-t)",
+    ]);
+    expect(sendStatusLine([], {}, all, echo)).toBe("");
   });
 });
