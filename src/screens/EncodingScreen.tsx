@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -88,7 +88,10 @@ export function EncodingScreen() {
   const setMode = useStore((s) => s.setMode);
   const updateTarget = useStore((s) => s.updateTarget);
   const uploadMbps = useStore((s) => s.uploadMbps);
-  const snapshot = useStore((s) => s.snapshot);
+  // Measuring upload during a stream would consume its bandwidth.
+  const onAir = useStore(
+    (s) => s.snapshot.state === "live" || s.snapshot.state === "starting",
+  );
   const runUploadTest = useStore((s) => s.runUploadTest);
   const refreshEncoders = useStore((s) => s.refreshEncoders);
   const encodersError = useStore((s) => s.encodersError);
@@ -109,7 +112,22 @@ export function EncodingScreen() {
     if (encoders.length === 0) void refreshEncoders();
   }, [encoders.length, refreshEncoders]);
 
-  if (!config) return null;
+  const anyHw = encoders.some((e) => e.available && e.kind !== "software");
+  // estimate() is pure: compute each mode once per config change, not several times per render.
+  const estimates = useMemo(
+    () =>
+      config
+        ? new Map(
+            MODES.map((m) => [
+              m.id,
+              estimate({ ...config, mode: m.id }, { anyHwAvailable: anyHw }),
+            ]),
+          )
+        : null,
+    [config, anyHw],
+  );
+
+  if (!config || !estimates) return null;
 
   const lcd = lowestCommonDenominator(config);
   const anyEnabled = config.targets.some((x) => x.enabled);
@@ -122,8 +140,8 @@ export function EncodingScreen() {
       )
       .map((e) => e.maxSessions!),
   );
-  const anyHw = encoders.some((e) => e.available && e.kind !== "software");
-  const activeEst = estimate(config, { anyHwAvailable: anyHw });
+  const activeEst =
+    estimates.get(config.mode) ?? estimate(config, { anyHwAvailable: anyHw });
   // Only GPU transcodes count against hardware session limits.
   const overSessions = maxHw > 0 && activeEst.hwTranscodeCount > maxHw;
 
@@ -140,16 +158,10 @@ export function EncodingScreen() {
   const activeFit = bandFit(activeEst.uploadKbps, uploadMbps);
   const hybridFit =
     config.mode !== "hybrid"
-      ? bandFit(
-          estimate({ ...config, mode: "hybrid" }, { anyHwAvailable: anyHw })
-            .uploadKbps,
-          uploadMbps,
-        )
+      ? bandFit(estimates.get("hybrid")!.uploadKbps, uploadMbps)
       : "bad";
   const hybridFits = hybridFit === "ok" || hybridFit === "warn";
 
-  // Measuring upload during a stream would consume its bandwidth.
-  const onAir = snapshot.state === "live" || snapshot.state === "starting";
   const measure = async () => {
     setMeasuring(true);
     try {
@@ -188,10 +200,7 @@ export function EncodingScreen() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {MODES.map((m) => {
-          const est = estimate(
-            { ...config, mode: m.id },
-            { anyHwAvailable: anyHw },
-          );
+          const est = estimates.get(m.id)!;
           const fit = bandFit(est.uploadKbps, uploadMbps);
           const active = config.mode === m.id;
           const Icon = m.icon;
