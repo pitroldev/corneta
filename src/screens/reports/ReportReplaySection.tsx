@@ -46,6 +46,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   seek,
   onPlayhead,
   onMarkerAdded,
+  onOffsetChange,
   onRecordingsDeleted,
   recordingsDeleted,
 }: {
@@ -60,6 +61,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
   seek: SeekRequest | null;
   onPlayhead: (timestamp: number | null) => void;
   onMarkerAdded: (marker: SessionMarker) => void;
+  onOffsetChange: (offsetMs: number) => void;
   onRecordingsDeleted: () => void;
 }) {
   const t = useI18n().t;
@@ -93,6 +95,7 @@ export const ReportReplaySection = memo(function ReportReplaySection({
             seek={seek}
             onPlayhead={onPlayhead}
             onMarkerAdded={onMarkerAdded}
+            onOffsetChange={onOffsetChange}
             onRecordingsDeleted={onRecordingsDeleted}
           />
         </div>

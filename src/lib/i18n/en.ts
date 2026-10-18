@@ -1547,6 +1547,10 @@ export const en: Dict = {
   "reports.csv.history.start": "start",
   "reports.csv.history.subs": "subs",
   "reports.csv.history.verdict": "verdict",
+  "reports.csv.moments.label": "label",
+  "reports.csv.moments.liveTime": "stream_time",
+  "reports.csv.moments.recordingTime": "recording_time",
+  "reports.csv.moments.type": "type",
   "reports.csv.series.bitrateKbpsFor": "bitrate_kbps_{target}",
   "reports.csv.series.chatPerMin": "chat_per_min",
   "reports.csv.series.chatPerMinFor": "chat_per_min_{source}",
@@ -1594,6 +1598,7 @@ export const en: Dict = {
   // Filename stems must not contain spaces or path separators; exporters append the date.
   "reports.file.history": "corneta-history",
   "reports.file.live": "corneta-live",
+  "reports.file.momentsSuffix": "-moments",
   "reports.file.seriesSuffix": "-series",
   "reports.dur.hours": "{h}h{m}",
   "reports.dur.minutes": "{m}min",
@@ -1656,6 +1661,47 @@ export const en: Dict = {
   "reports.mode.hybrid": "Smart",
   "reports.mode.passthrough": "Straight up",
   "reports.mode.perPlatform": "All out",
+  "reports.moments.chapters.action": "Copy YouTube chapters",
+  "reports.moments.chapters.copied":
+    "Copied {count} chapters — paste them into the video description.",
+  "reports.moments.chapters.copyError":
+    "Couldn't copy the chapters. Try again.",
+  "reports.moments.chapters.hint":
+    "A list ready to paste into the YouTube video description",
+  "reports.moments.chapters.markMore":
+    "You can mark more moments in the replay above.",
+  "reports.moments.chapters.opening": "Start",
+  "reports.moments.chapters.tooFew":
+    "YouTube only shows chapters when there are at least 3, each 10s or longer — these moments fall short.",
+  "reports.moments.csv.action": "Download spreadsheet (CSV)",
+  "reports.moments.csv.hint":
+    "One row per moment, with its time, type and description",
+  "reports.moments.edl.action": "Download for your editor (EDL)",
+  "reports.moments.edl.filter": "Edit decision list (EDL)",
+  "reports.moments.edl.hint":
+    "Turns the moments into markers in a video editor such as DaVinci Resolve",
+  "reports.moments.export.base.files":
+    "In the export, times count from the start of the recording, with its {n} files back to back.",
+  "reports.moments.export.base.live":
+    "This stream has no recording, so the export counts times from when it went live — to find them in the platform's VOD.",
+  "reports.moments.export.base.recording":
+    "In the export, times count from the start of the recording, the way the video opens in your editor.",
+  "reports.moments.export.highlights.one": "1 highlight",
+  "reports.moments.export.highlights.other": "{count} highlights",
+  "reports.moments.export.markers.one": "1 marker",
+  "reports.moments.export.markers.other": "{count} markers",
+  "reports.moments.export.outside.one":
+    "1 moment fell outside the recording and is left out of the export.",
+  "reports.moments.export.outside.other":
+    "{count} moments fell outside the recording and are left out of the export.",
+  "reports.moments.export.title": "Export moments",
+  "reports.moments.kind.alert": "alert",
+  "reports.moments.kind.chat": "chat",
+  "reports.moments.kind.marker": "marker",
+  "reports.moments.kind.raid": "raid",
+  "reports.moments.kind.viewers": "viewers",
+  "reports.moments.saveError": "Couldn't save the moments: {err}",
+  "reports.moments.saved": "Saved the moments.",
   "reports.obs.series": "Render lag",
   "reports.obs.title": "OBS — delay building each frame (ms)",
   "reports.perTarget.avgBitrate": "~{mbps} Mbps avg",

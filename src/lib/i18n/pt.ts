@@ -1536,6 +1536,10 @@ export const pt = {
   "reports.csv.history.start": "inicio",
   "reports.csv.history.subs": "inscricoes",
   "reports.csv.history.verdict": "veredito",
+  "reports.csv.moments.label": "descricao",
+  "reports.csv.moments.liveTime": "tempo_na_live",
+  "reports.csv.moments.recordingTime": "tempo_na_gravacao",
+  "reports.csv.moments.type": "tipo",
   "reports.csv.series.bitrateKbpsFor": "bitrate_kbps_{target}",
   "reports.csv.series.chatPerMin": "chat_por_min",
   "reports.csv.series.chatPerMinFor": "chat_por_min_{source}",
@@ -1584,6 +1588,7 @@ export const pt = {
   // Filename stems exclude accents, spaces and path separators; exporters append an ISO date.
   "reports.file.history": "corneta-historico",
   "reports.file.live": "corneta-live",
+  "reports.file.momentsSuffix": "-momentos",
   "reports.file.seriesSuffix": "-serie",
   "reports.dur.hours": "{h}h{m}",
   "reports.dur.minutes": "{m}min",
@@ -1646,6 +1651,47 @@ export const pt = {
   "reports.mode.hybrid": "Esperto",
   "reports.mode.passthrough": "Na lata",
   "reports.mode.perPlatform": "Caprichado",
+  "reports.moments.chapters.action": "Copiar capítulos do YouTube",
+  "reports.moments.chapters.copied":
+    "Copiei {count} capítulos — é só colar na descrição do vídeo.",
+  "reports.moments.chapters.copyError":
+    "Não consegui copiar os capítulos. Tenta de novo.",
+  "reports.moments.chapters.hint":
+    "Lista pronta pra colar na descrição do vídeo no YouTube",
+  "reports.moments.chapters.markMore":
+    "Dá pra marcar mais momentos no replay, aqui em cima.",
+  "reports.moments.chapters.opening": "Início",
+  "reports.moments.chapters.tooFew":
+    "O YouTube só mostra capítulos a partir de 3, com 10s ou mais cada — estes momentos não fecham a conta.",
+  "reports.moments.csv.action": "Baixar planilha (CSV)",
+  "reports.moments.csv.hint":
+    "Uma linha por momento, com tempo, tipo e descrição",
+  "reports.moments.edl.action": "Baixar pro editor (EDL)",
+  "reports.moments.edl.filter": "Lista de edição (EDL)",
+  "reports.moments.edl.hint":
+    "Os momentos viram marcadores no editor de vídeo, como o DaVinci Resolve",
+  "reports.moments.export.base.files":
+    "Na exportação, os tempos contam do começo da gravação, com os {n} arquivos dela em sequência.",
+  "reports.moments.export.base.live":
+    "Esta live não tem gravação, então a exportação conta os tempos do início da transmissão — pra achar no VOD da plataforma.",
+  "reports.moments.export.base.recording":
+    "Na exportação, os tempos contam do começo da gravação, do jeito que o vídeo abre no editor.",
+  "reports.moments.export.highlights.one": "1 destaque",
+  "reports.moments.export.highlights.other": "{count} destaques",
+  "reports.moments.export.markers.one": "1 marcador",
+  "reports.moments.export.markers.other": "{count} marcadores",
+  "reports.moments.export.outside.one":
+    "1 momento caiu fora da gravação e não entra na exportação.",
+  "reports.moments.export.outside.other":
+    "{count} momentos caíram fora da gravação e não entram na exportação.",
+  "reports.moments.export.title": "Exportar momentos",
+  "reports.moments.kind.alert": "alerta",
+  "reports.moments.kind.chat": "chat",
+  "reports.moments.kind.marker": "marcador",
+  "reports.moments.kind.raid": "raid",
+  "reports.moments.kind.viewers": "audiência",
+  "reports.moments.saveError": "Não consegui salvar os momentos: {err}",
+  "reports.moments.saved": "Salvei os momentos.",
   "reports.obs.series": "Render lag",
   "reports.obs.title": "OBS — atraso pra montar o quadro (ms)",
   "reports.perTarget.avgBitrate": "~{mbps} Mbps méd.",
