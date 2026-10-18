@@ -1,6 +1,6 @@
 import type { QueuedRequestWithOptions } from "posthog-js/dist/module.no-external";
 
-export const SUPPORTED_POSTHOG_TRANSPORT_VERSION = "1.409.5";
+export const SUPPORTED_POSTHOG_TRANSPORT_VERSION = "1.438.10";
 const REQUEST_TIMEOUT_MS = 1_000;
 
 export interface TelemetryTransport {
@@ -12,7 +12,11 @@ interface CompatibleSdk {
   config: { request_batching: boolean };
   _send_request(options: QueuedRequestWithOptions): void;
   _send_retriable_request(options: QueuedRequestWithOptions): void;
-  _retryQueue: { readonly length: number; unload(): void };
+  _retryQueue: {
+    readonly length: number;
+    retriableRequest(options: QueuedRequestWithOptions): void;
+    unload(): void;
+  };
   shutdown(): Promise<void> | void;
 }
 
@@ -27,6 +31,7 @@ function compatibleSdk(value: unknown): value is CompatibleSdk {
     typeof candidate._send_request === "function" &&
     typeof candidate._send_retriable_request === "function" &&
     candidate._retryQueue?.length === 0 &&
+    typeof candidate._retryQueue.retriableRequest === "function" &&
     typeof candidate._retryQueue.unload === "function" &&
     typeof candidate.shutdown === "function"
   );
@@ -34,9 +39,20 @@ function compatibleSdk(value: unknown): value is CompatibleSdk {
 
 function poisonSdk(instance: unknown): void {
   if (!instance || typeof instance !== "object") return;
-  for (const method of ["_send_request", "_send_retriable_request"]) {
+  const targets: [object, string][] = [
+    [instance, "_send_request"],
+    [instance, "_send_retriable_request"],
+  ];
+  try {
+    const retryQueue: unknown = Reflect.get(instance, "_retryQueue");
+    if (retryQueue && typeof retryQueue === "object")
+      targets.push([retryQueue, "retriableRequest"]);
+  } catch {
+    // A throwing accessor leaves only the instance methods to disable.
+  }
+  for (const [target, method] of targets) {
     try {
-      Reflect.set(instance, method, () => undefined);
+      Reflect.set(target, method, () => undefined);
     } catch {
       // Incompatible immutable instances must never be returned to a caller for capture.
     }
@@ -77,10 +93,12 @@ export function createTelemetryTransport(
     });
   };
 
-  // The SDK retries serialized requests without before_send; bypass that queue entirely.
+  // The SDK retries serialized requests without before_send, and its queue dispatches
+  // without _send_request; route every entry point through the single attempt.
   try {
     instance._send_request = sendOnce;
     instance._send_retriable_request = sendOnce;
+    retryQueue.retriableRequest = sendOnce;
   } catch {
     poisonSdk(instance);
     throw new Error("telemetry_transport_incompatible_sdk");

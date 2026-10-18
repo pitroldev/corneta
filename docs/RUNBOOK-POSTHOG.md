@@ -90,9 +90,13 @@ e a [documentação do PostHog](https://posthog.com/docs/data/anonymous-vs-ident
 | `VITE_TELEMETRY_DISABLED=1` | build do WebView         | público | kill switch emergencial         |
 | `TELEMETRY_DISABLED=1`      | build Rust               | público | kill switch emergencial         |
 
-O WebView desktop fixa `posthog-js` em **1.409.5**: o adaptador em
+O WebView desktop fixa `posthog-js` em **1.438.10**: o adaptador em
 `src/lib/telemetry-transport.ts` usa APIs internas dessa versão para fazer uma única
 tentativa por envio, sem fila de retries HTTP, compressão assíncrona ou `sendBeacon`.
+Ele substitui as três entradas de envio do SDK: `_send_request`,
+`_send_retriable_request` e o `retriableRequest` da fila de retries, que despacha sem
+passar pelo `_send_request`. Os testes interceptam o `sendRequest` de
+`posthog-js/lib/src/request-dispatch`, a fronteira de rede comum às três.
 A entrega é best-effort: eventos podem ser descartados e uma requisição em voo não pode
 ser desfeita. Captura automática e replay continuam desligados. Uma nova tentativa de
 carregar o SDK após falha não recupera eventos descartados. Antes de atualizar o pacote,
