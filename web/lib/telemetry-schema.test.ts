@@ -155,6 +155,41 @@ describe("telemetry catalog", () => {
     ).toBeNull();
   });
 
+  it("sends a site page view with an in-memory id and no browser details", () => {
+    const safe = redactPostHogMessage({
+      event: "site_page_viewed",
+      properties: {
+        surface: "marketing_site",
+        route_id: "home",
+        locale: "pt-BR",
+        token: "phc_12345678",
+        distinct_id: "0199F2B4-3C1E-7D2A-9B4C-5E6F7A8B9C0D",
+        $process_person_profile: false,
+        $geoip_disable: true,
+        $device_id: "0199f2b4-3c1e-7d2a-9b4c-5e6f7a8b9c0d",
+        $session_id: "0199f2b4-3c1f-7d2a-9b4c-5e6f7a8b9c0d",
+        $window_id: "0199f2b4-3c20-7d2a-9b4c-5e6f7a8b9c0d",
+        $raw_user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        $host: "www.corneta.live",
+      },
+    });
+
+    expect(safe?.properties).toMatchObject({
+      distinct_id: "0199f2b4-3c1e-7d2a-9b4c-5e6f7a8b9c0d",
+      $process_person_profile: false,
+      $geoip_disable: true,
+    });
+    for (const key of [
+      "$device_id",
+      "$session_id",
+      "$window_id",
+      "$raw_user_agent",
+      "$host",
+    ]) {
+      expect(safe?.properties).not.toHaveProperty(key);
+    }
+  });
+
   it("accepts only opaque and bounded editorial content_id values", () => {
     expect(normalizeContentId("guide_multistream_obs")).toBe(
       "guide_multistream_obs",

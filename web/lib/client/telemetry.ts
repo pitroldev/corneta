@@ -126,7 +126,9 @@ export function createBrowserTelemetry(options: BrowserTelemetryOptions) {
           advanced_disable_feature_flags_on_first_load: true,
           advanced_disable_toolbar_metrics: true,
           remote_config_refresh_interval_ms: 0,
-          cookieless_mode: "always",
+          // Not cookieless_mode: PostHog drops those events unless they carry $raw_user_agent and
+          // $host for its server-side hash, which the sanitizer strips. A random in-memory id per
+          // page load needs neither and still writes no cookie.
           disable_persistence: true,
           persistence: "memory",
           person_profiles: "identified_only",
