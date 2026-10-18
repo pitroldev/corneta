@@ -40,3 +40,49 @@ export function sendStatusLine(
     })
     .join(" · ");
 }
+
+export type ChatAuth = Record<
+  string,
+  { login: string; ok: boolean } | undefined
+>;
+
+export interface SendTargets {
+  /** Sources the composer can address, in configuration order. */
+  sendable: ChatSource[];
+  /** The chosen source id, or "all" when that source can no longer send. */
+  effectiveSendTo: string;
+  targets: ChatSource[];
+  canSend: boolean;
+}
+
+/** Resolve where a typed message goes; disabled sources and sources without a channel never receive it. */
+export function resolveSendTargets(
+  sources: readonly ChatSource[],
+  sendTo: string,
+  ready: SendReady,
+  chatAuth: ChatAuth,
+): SendTargets {
+  const sendable = sources.filter(
+    (x) =>
+      x.enabled &&
+      x.value.trim() !== "" &&
+      ((x.platform === "twitch" && (x.hasSendToken || ready.twitch)) ||
+        (x.platform === "youtube" && ready.youtube) ||
+        (x.platform === "kick" && ready.kick)),
+  );
+  const effectiveSendTo =
+    sendTo !== "all" && sendable.some((x) => x.id === sendTo) ? sendTo : "all";
+  const targets =
+    effectiveSendTo === "all"
+      ? sendable
+      : sendable.filter((x) => x.id === effectiveSendTo);
+  // Twitch requires IRC authentication before sending; YouTube and Kick send over HTTP.
+  const canSend = targets.some((x) =>
+    x.platform === "youtube"
+      ? ready.youtube
+      : x.platform === "kick"
+        ? ready.kick
+        : !!chatAuth[x.id]?.ok,
+  );
+  return { sendable, effectiveSendTo, targets, canSend };
+}

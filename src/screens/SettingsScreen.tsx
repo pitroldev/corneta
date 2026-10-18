@@ -1,4 +1,5 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
+import { useConfirm } from "../lib/useConfirm";
 import * as RTabs from "@radix-ui/react-tabs";
 import {
   AlertTriangle,
@@ -83,7 +84,7 @@ export function SettingsScreen() {
   const requestedTab = useStore((s) => s.settingsTab);
   const setSettingsTab = useStore((s) => s.setSettingsTab);
 
-  const [confirmImport, setConfirmImport] = useState(false);
+  const importStep = useConfirm();
   const [tab, setTab] = useState<SettingsTab>(
     () => (requestedTab as SettingsTab) || "geral",
   );
@@ -155,12 +156,7 @@ export function SettingsScreen() {
     }
   };
   const onImport = async () => {
-    if (!confirmImport) {
-      setConfirmImport(true);
-      setTimeout(() => setConfirmImport(false), 3000);
-      return;
-    }
-    setConfirmImport(false);
+    if (!importStep.confirm()) return;
     try {
       if (await api.importConfig()) {
         await load(t);
@@ -552,12 +548,12 @@ export function SettingsScreen() {
                     {t("settings.data.backup.export")}
                   </Button>
                   <Button
-                    variant={confirmImport ? "danger" : "subtle"}
+                    variant={importStep.armed ? "danger" : "subtle"}
                     size="sm"
                     onClick={onImport}
                   >
                     <Upload className="size-4" />{" "}
-                    {confirmImport
+                    {importStep.armed
                       ? t("settings.data.backup.import.confirm")
                       : t("settings.data.backup.import")}
                   </Button>

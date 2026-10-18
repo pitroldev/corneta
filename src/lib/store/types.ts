@@ -148,9 +148,6 @@ export interface State {
   censored: boolean;
   bindGuardian: () => () => void;
 
-  goLiveFocus: boolean;
-  setGoLiveFocus: (v: boolean) => void;
-
   unseenReport: boolean;
   markReportSeen: () => void;
 

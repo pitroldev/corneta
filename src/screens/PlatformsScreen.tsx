@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "../lib/useConfirm";
 import { Reorder, useDragControls } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { Modal } from "../components/Modal";
@@ -140,7 +141,9 @@ function ProfileBar() {
   const addProfile = useStore((s) => s.addProfile);
   const removeProfile = useStore((s) => s.removeProfile);
   const [editing, setEditing] = useState(false);
-  const [confirmDel, setConfirmDel] = useState(false);
+  const deleteProfileStep = useConfirm(3000, {
+    resetKey: config.activeProfileId,
+  });
 
   const active = config.profiles.find((p) => p.id === config.activeProfileId);
   if (!active) return null;
@@ -233,24 +236,18 @@ function ProfileBar() {
           )}
           {many && (
             <Button
-              variant={confirmDel ? "danger" : "ghost"}
+              variant={deleteProfileStep.armed ? "danger" : "ghost"}
               size="sm"
               className="h-9"
               onClick={() => {
-                if (confirmDel) {
-                  removeProfile(active.id);
-                  setConfirmDel(false);
-                } else {
-                  setConfirmDel(true);
-                  setTimeout(() => setConfirmDel(false), 3000);
-                }
+                if (deleteProfileStep.confirm()) removeProfile(active.id);
               }}
               title={t("platforms.profile.deleteTitle", {
                 name: active.name || t("platforms.profile.untitled"),
               })}
             >
               <Trash2 className="size-3.5" />{" "}
-              {confirmDel
+              {deleteProfileStep.armed
                 ? t("platforms.profile.deleteConfirm")
                 : t("platforms.profile.delete")}
             </Button>
@@ -713,7 +710,7 @@ function KeyField({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [reveal, setReveal] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
+  const clearKeyStep = useConfirm();
 
   const save = async (raw: string = value) => {
     try {
@@ -762,15 +759,10 @@ function KeyField({
             <Pencil className="size-3.5" /> {t("platforms.key.change")}
           </Button>
           <Button
-            variant={confirmClear ? "danger" : "ghost"}
+            variant={clearKeyStep.armed ? "danger" : "ghost"}
             size="sm"
             onClick={async () => {
-              if (!confirmClear) {
-                setConfirmClear(true);
-                setTimeout(() => setConfirmClear(false), 3000);
-                return;
-              }
-              setConfirmClear(false);
+              if (!clearKeyStep.confirm()) return;
               try {
                 await clearKey(target.id);
                 toast.info(t("platforms.key.removed"));
@@ -781,7 +773,7 @@ function KeyField({
               }
             }}
           >
-            {confirmClear
+            {clearKeyStep.armed
               ? t("platforms.key.removeConfirm")
               : t("platforms.key.remove")}
           </Button>

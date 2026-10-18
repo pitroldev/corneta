@@ -1,4 +1,5 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
+import { useConfirm } from "../../lib/useConfirm";
 import { ChevronDown, Trash2, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Select } from "../../components/Select";
@@ -35,7 +36,7 @@ export function SourceCard({
 }) {
   const t = useT();
   const [open, setOpen] = useState(() => !src.value.trim());
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  const removeStep = useConfirm();
   const valueDraft = useDraft(
     src.value,
     (value) => onChange({ value }),
@@ -143,19 +144,14 @@ export function SourceCard({
           <p className="text-[11px] text-ink-faint">{t(HINT[src.platform])}</p>
           <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
             <Button
-              variant={confirmRemove ? "danger" : "ghost"}
+              variant={removeStep.armed ? "danger" : "ghost"}
               size="sm"
               onClick={() => {
-                if (confirmRemove) {
-                  onRemove();
-                  return;
-                }
-                setConfirmRemove(true);
-                setTimeout(() => setConfirmRemove(false), 3000);
+                if (removeStep.confirm()) onRemove();
               }}
             >
               <Trash2 className="size-4" />
-              {confirmRemove
+              {removeStep.armed
                 ? t("chat.common.removeConfirm")
                 : t("chat.source.remove")}
             </Button>

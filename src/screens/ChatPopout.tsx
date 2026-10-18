@@ -22,10 +22,16 @@ import {
   X,
 } from "lucide-react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useConfirm } from "../lib/useConfirm";
 import { IS_TAURI } from "../lib/api";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { useStore } from "../lib/store";
-import { sendStatusLine, srcLabel, type Translate } from "../lib/chatSend";
+import {
+  resolveSendTargets,
+  sendStatusLine,
+  srcLabel,
+  type Translate,
+} from "../lib/chatSend";
 import { useI18n } from "../lib/i18n";
 import { toast } from "../lib/toast";
 import { cn, errMsg } from "../lib/utils";
@@ -84,8 +90,8 @@ export function ChatPopout() {
   const theme = useStore((s) => s.config?.settings.theme ?? "dark");
   const [tab, setTab] = useState<"chat" | "alerts" | "both">("both");
   const [showConfig, setShowConfig] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
-  const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
+  const clearStep = useConfirm(3000, { resetKey: tab });
+  const clearAlertsStep = useConfirm();
   const [maximized, setMaximized] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -273,36 +279,21 @@ export function ChatPopout() {
   const twitchReady = chatLogin.twitch.state === "connected";
   const youtubeReady = chatLogin.youtube.state === "connected";
   const kickReady = chatLogin.kick.state === "connected";
-  const sendableSources = sendSources.filter(
-    (x) =>
-      (x.platform === "twitch" && (x.hasSendToken || twitchReady)) ||
-      (x.platform === "youtube" && youtubeReady) ||
-      (x.platform === "kick" && kickReady),
-  );
-  const sendValid =
-    sendTo !== "all" && sendableSources.some((x) => x.id === sendTo);
-  const effectiveSendTo = sendValid ? sendTo : "all";
-  const sendTargets =
-    effectiveSendTo === "all"
-      ? sendableSources
-      : sendableSources.filter((x) => x.id === effectiveSendTo);
-  // Twitch requires IRC authentication before sending; YouTube and Kick send over HTTP.
-  const canSend = sendTargets.some((x) =>
-    x.platform === "youtube"
-      ? youtubeReady
-      : x.platform === "kick"
-        ? kickReady
-        : !!chatAuth[x.id]?.ok,
-  );
-  const sendStatus = sendStatusLine(
-    sendTargets,
-    chatAuth,
-    { twitch: twitchReady, youtube: youtubeReady, kick: kickReady },
-    t,
-  );
+  const sendReady = {
+    twitch: twitchReady,
+    youtube: youtubeReady,
+    kick: kickReady,
+  };
+  const {
+    sendable: sendableSources,
+    effectiveSendTo,
+    targets: sendTargets,
+    canSend,
+  } = resolveSendTargets(sendSources, sendTo, sendReady, chatAuth);
+  const sendStatus = sendStatusLine(sendTargets, chatAuth, sendReady, t);
   const doSend = async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || sending || !canSend) return;
     setSending(true);
     try {
       await sendChat(
@@ -371,30 +362,25 @@ export function ChatPopout() {
         </span>
         <button
           onClick={() => {
-            if (!confirmClearAlerts) {
-              setConfirmClearAlerts(true);
-              setTimeout(() => setConfirmClearAlerts(false), 3000);
-              return;
-            }
-            setConfirmClearAlerts(false);
+            if (!clearAlertsStep.confirm()) return;
             clearAlerts();
           }}
           title={
-            confirmClearAlerts
+            clearAlertsStep.armed
               ? t("chat.alerts.clear.confirmTitle")
               : t("chat.alerts.clear.title")
           }
           aria-label={
-            confirmClearAlerts ? undefined : t("chat.alerts.clear.title")
+            clearAlertsStep.armed ? undefined : t("chat.alerts.clear.title")
           }
           className={cn(
             "grid h-8 min-w-8 place-items-center rounded px-1 transition-colors",
-            confirmClearAlerts
+            clearAlertsStep.armed
               ? "text-xs font-bold text-bad"
               : "text-ink-faint hover:text-bad",
           )}
         >
-          {confirmClearAlerts ? (
+          {clearAlertsStep.armed ? (
             t("chat.alerts.clear.confirmLabel")
           ) : (
             <Trash2 className="size-3.5" />
@@ -563,24 +549,19 @@ export function ChatPopout() {
           )}
           <button
             onClick={() => {
-              if (!confirmClear) {
-                setConfirmClear(true);
-                setTimeout(() => setConfirmClear(false), 3000);
-                return;
-              }
-              setConfirmClear(false);
+              if (!clearStep.confirm()) return;
               if (tab === "alerts") clearAlerts();
               else clearChat();
             }}
             title={
-              confirmClear
+              clearStep.armed
                 ? t("chat.alerts.clear.confirmTitle")
                 : tab === "alerts"
                   ? t("chat.alerts.clear.title")
                   : t("chat.popout.clear.chat")
             }
             aria-label={
-              confirmClear
+              clearStep.armed
                 ? undefined
                 : tab === "alerts"
                   ? t("chat.alerts.clear.title")
@@ -588,12 +569,12 @@ export function ChatPopout() {
             }
             className={cn(
               iconBtn,
-              confirmClear &&
+              clearStep.armed &&
                 "flex items-center gap-1 text-xs font-bold text-bad",
             )}
           >
             <Trash2 className="size-4" />
-            {confirmClear && t("chat.clear.confirm")}
+            {clearStep.armed && t("chat.clear.confirm")}
           </button>
           <button
             onClick={() => setShowConfig((v) => !v)}

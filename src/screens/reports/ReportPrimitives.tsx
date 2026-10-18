@@ -1,4 +1,5 @@
-import { useState, type ComponentType } from "react";
+import { type ComponentType } from "react";
+import { useConfirm } from "../../lib/useConfirm";
 import {
   Copy,
   Gift,
@@ -266,22 +267,22 @@ function ChannelRow({
 
 export function DeleteButton({ onDelete }: { onDelete: () => void }) {
   const t = useT();
-  const [confirm, setConfirm] = useState(false);
+  const deleteStep = useConfirm();
   return (
     <Button
-      variant={confirm ? "danger" : "ghost"}
+      variant={deleteStep.armed ? "danger" : "ghost"}
       size="sm"
       onClick={() => {
-        if (!confirm) {
-          setConfirm(true);
-          setTimeout(() => setConfirm(false), 3000);
-          return;
-        }
+        if (!deleteStep.confirm()) return;
         onDelete();
       }}
     >
       <Trash2 className="size-4" />
-      {t(confirm ? "reports.detail.delete.confirm" : "reports.detail.delete")}
+      {t(
+        deleteStep.armed
+          ? "reports.detail.delete.confirm"
+          : "reports.detail.delete",
+      )}
     </Button>
   );
 }
