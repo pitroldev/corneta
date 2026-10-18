@@ -289,6 +289,7 @@ pub fn run() {
             auth::kick_use_own_creds,
             auth::auth_status,
             auth::twitch_login_start,
+            auth::twitch_fetch_stream_key,
             auth::twitch_logout,
             auth::youtube_login_start,
             auth::youtube_logout,

@@ -283,6 +283,10 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("twitch_login_start");
     },
+    async twitchFetchStreamKey(targetId) {
+      const { invoke } = await core();
+      return invoke<string>("twitch_fetch_stream_key", { targetId });
+    },
     async twitchLogout() {
       const { invoke } = await core();
       await invoke("twitch_logout");
