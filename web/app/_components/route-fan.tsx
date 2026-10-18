@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { ObsMark, PlatformGlyph } from "./decor";
 import { cn, State } from "./ui";
 
@@ -46,7 +46,7 @@ export function RouteFan({ copy }: { copy: RouteFanCopy }) {
         >
           <svg viewBox="0 0 34 100" preserveAspectRatio="none">
             {OUT.map((o) => (
-              <motion.path
+              <m.path
                 key={o.id}
                 d={o.branch}
                 fill="none"
@@ -83,7 +83,7 @@ export function RouteFan({ copy }: { copy: RouteFanCopy }) {
               >
                 <PlatformGlyph id={o.id} />
                 <span>{o.name}</span>
-                <motion.span
+                <m.span
                   key={off ? "off" : "on"}
                   initial={reduce ? false : { scale: 0.72, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -99,7 +99,7 @@ export function RouteFan({ copy }: { copy: RouteFanCopy }) {
                     />{" "}
                     {off ? copy.down : copy.live}
                   </State>
-                </motion.span>
+                </m.span>
               </button>
             );
           })}

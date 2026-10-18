@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { fill } from "@/lib/i18n";
 import { PlatformGlyph } from "./decor";
 import { RadioIcon } from "./icons";
@@ -107,7 +107,7 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
               <PlatformGlyph id={d.id} />
               <span>{d.name}</span>
               {/* Remount on state changes to replay the status transition. */}
-              <motion.span
+              <m.span
                 key={up ? "up" : connecting ? "conn" : "off"}
                 initial={reduce ? false : { scale: 0.72, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -123,7 +123,7 @@ export function GoLive({ copy }: { copy: GoLiveCopy }) {
                   />{" "}
                   {up ? copy.live : connecting ? copy.connecting : copy.off}
                 </State>
-              </motion.span>
+              </m.span>
             </button>
           );
         })}

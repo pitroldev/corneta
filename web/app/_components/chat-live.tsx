@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Mascot, PlatformGlyph } from "./decor";
 import { CoinIcon, HeartIcon, RaidIcon, StarIcon } from "./icons";
 import { cn } from "./ui";
@@ -129,7 +129,7 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
             const dead = line.status === "gone";
             const muted = line.status === "muted";
             return (
-              <motion.div
+              <m.div
                 key={line.key}
                 layout={!calm}
                 initial={calm ? false : { opacity: 0, y: 10 }}
@@ -184,7 +184,7 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                   >
                     {line.mine ?? msg.text}
                     {/* Keep the strike mounted: AnimatePresence initial={false} suppresses descendant entry animations. */}
-                    <motion.i
+                    <m.i
                       aria-hidden="true"
                       className="absolute top-1/2 left-0 block h-px w-full origin-left bg-current"
                       initial={false}
@@ -235,7 +235,7 @@ export function ChatFeed({ copy }: { copy: ChatFeedCopy }) {
                     </button>
                   </div>
                 )}
-              </motion.div>
+              </m.div>
             );
           })}
         </AnimatePresence>
@@ -332,7 +332,7 @@ export function AlertsFeed({ copy }: { copy: AlertsFeedCopy }) {
           {keys.map((key) => {
             const item = copy.pool[key % copy.pool.length];
             return (
-              <motion.div
+              <m.div
                 key={key}
                 layout={!calm}
                 initial={calm ? false : { opacity: 0, y: -12, scale: 0.97 }}
@@ -362,7 +362,7 @@ export function AlertsFeed({ copy }: { copy: AlertsFeedCopy }) {
                     {item.amount}
                   </span>
                 )}
-              </motion.div>
+              </m.div>
             );
           })}
         </AnimatePresence>
@@ -433,7 +433,7 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
         <div className="mt-3.5 flex h-[42px] items-center justify-center">
           <AnimatePresence>
             {on && (
-              <motion.div
+              <m.div
                 initial={
                   calm ? false : { opacity: 0, y: -14, scale: 0.9, rotate: -6 }
                 }
@@ -448,7 +448,7 @@ export function OverlayScene({ copy }: { copy: OverlayCopy }) {
               >
                 <StarIcon />
                 {copy.alert}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>

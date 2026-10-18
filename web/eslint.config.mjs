@@ -11,5 +11,23 @@ export default defineConfig([
     plugins: { "corneta-source": sourceLanguage },
     rules: { "corneta-source/english-source": "error" },
   },
+  {
+    files: ["app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "framer-motion",
+              importNames: ["motion"],
+              message:
+                "Render `m` components; MotionProvider loads the animation features on demand.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   globalIgnores([".next*/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);
