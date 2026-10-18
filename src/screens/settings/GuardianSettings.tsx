@@ -1,7 +1,30 @@
 import { ScanEye } from "lucide-react";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
 import { rich, useI18n } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
 import { useDraft } from "../../lib/useDraft";
+
+// The 12 s delay keeps about 360 raw 1080p frames (~1.2 GB) in memory. Windows reports slightly
+// under 16 GiB on a 16 GB machine, so warn below 15 GiB.
+const LOW_MEMORY_BYTES = 15 * 1024 ** 3;
+
+function useSystemMemoryBytes(): number | null {
+  const [bytes, setBytes] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    api.systemMemoryBytes().then(
+      (value) => {
+        if (active) setBytes(value);
+      },
+      () => undefined,
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+  return bytes;
+}
 
 function uniqueTerms(text: string): string {
   return Array.from(
@@ -15,7 +38,10 @@ function uniqueTerms(text: string): string {
 }
 
 export function GuardianEditor() {
-  const { t, tp } = useI18n();
+  const { t, tp, fmt } = useI18n();
+  const memoryBytes = useSystemMemoryBytes();
+  const lowMemory =
+    memoryBytes != null && memoryBytes > 0 && memoryBytes < LOW_MEMORY_BYTES;
   const settings = useStore((s) => s.config!.settings);
   const setSettings = useStore((s) => s.setSettings);
   const watchlist = useDraft(
@@ -64,6 +90,13 @@ export function GuardianEditor() {
             })}
           </li>
           <li>{t("settings.guardian.cost.smallText")}</li>
+          {lowMemory && (
+            <li className="font-semibold text-warn">
+              {t("settings.guardian.cost.memory", {
+                gb: fmt.num(Math.round(memoryBytes / 1024 ** 3)),
+              })}
+            </li>
+          )}
         </ul>
       </div>
       <label className="flex flex-col gap-1">

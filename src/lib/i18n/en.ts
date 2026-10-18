@@ -1865,6 +1865,8 @@ export const en: Dict = {
   "settings.guardian.cost.scope":
     "It only watches the terms you list — {no} “anything private”.",
   "settings.guardian.cost.scope.no": "not",
+  "settings.guardian.cost.memory":
+    "This PC has {gb} GB of RAM, and Guardian keeps about 1.2 GB of video in memory to cover the delay. With less than 16 GB, close heavy apps before going live.",
   "settings.guardian.cost.smallText":
     "Really small text can still slip through.",
   "settings.guardian.cost.title": "🛡️ What this protection costs",

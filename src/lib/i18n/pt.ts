@@ -1855,6 +1855,8 @@ export const pt = {
   "settings.guardian.cost.scope":
     "Só vigia os termos que você listar — {no} “qualquer segredo”.",
   "settings.guardian.cost.scope.no": "não",
+  "settings.guardian.cost.memory":
+    "Este PC tem {gb} GB de RAM, e o Guardião segura cerca de 1,2 GB de vídeo pra cobrir o atraso. Com menos de 16 GB, feche programas pesados antes da live.",
   "settings.guardian.cost.smallText": "Texto muito pequeno ainda pode escapar.",
   "settings.guardian.cost.title": "🛡️ O preço da proteção",
   "settings.guardian.list.empty":

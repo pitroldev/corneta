@@ -58,6 +58,12 @@ O SDK real é `posthog-js/dist/module.no-external`, com suas opções da aplica�
 
 A fila de retries do SDK é medida separadamente e deve permanecer vazia, coerente com a política de tentativa única do transporte. Isso não permite recolher uma requisição já enviada nem prova a revogação de consentimento em todos os caminhos; testes próprios cobrem esse contrato. O cache HTTP fica desligado e cada medição usa outro documento, mas o processo do navegador e caches do sistema permanecem quentes. Esses números **não medem o startup completo do app**, o IPC, CPU/GPU da transmissão, RSS nativo nem provam ausência de vazamentos. As recomendações de carregamento condicional orientam a separação entre importar a facade, carregar o SDK e processar eventos; não autorizam concluir que toda a interface ficou mais rápida.
 
+## Memória do Guardião
+
+O atraso de 12 s do Guardião guarda os quadros crus do programa em memória. O Guardião força 1080p30, então são 360 quadros yuv420p de cerca de 3,1 MB, uns 1,12 GB. Enquanto o ajuste de deriva recupera o atraso, o buffer chega a 390 quadros (1,21 GB). Filas, pool de quadros e áudio somam por volta de 70 MB. O custo vale enquanto o Guardião estiver ligado e não depende da resolução do OBS.
+
+Quando o Windows reporta menos de 15 GiB de RAM, o que corresponde a menos de 16 GB instalados, o editor do Guardião mostra esse custo e sugere fechar programas pesados antes da live. Reduzir o buffer, com quadros comprimidos ou resolução menor, continua em aberto. Não encurte o atraso sem rever a cobertura do OCR, que precisa enxergar o atraso inteiro.
+
 ## Invariantes de implementação
 
 Não bloquear a transmissão com coleta, disco, relatórios ou telemetria. Preserve filas limitadas, descarte planejado, cancelamento, reuso de rendições, pools de frames e isolamento do gravador. No React, preserve lazy loading, imports condicionais, worker, chat virtualizado/paginado e assinaturas de estado estreitas. Menos código não prova menos CPU; um cache sem teto pode trocar tempo por vazamento.
