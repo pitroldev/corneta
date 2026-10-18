@@ -90,8 +90,9 @@ const HISTORY_HEADER = [
   "reports.csv.history.verdict",
 ] as const;
 
-export function historyCsv(rows: HistoryRow[], i18n: ReportI18n): string {
-  const body = rows.map(({ meta, analysis: a }) => [
+/** One spreadsheet row per session, so the history export never holds every analysis at once. */
+export function historyCells({ meta, analysis: a }: HistoryRow): Cell[] {
+  return [
     isoDate(meta.startedAt),
     clock(meta.startedAt),
     Math.round(meta.durationSec / 60),
@@ -107,7 +108,10 @@ export function historyCsv(rows: HistoryRow[], i18n: ReportI18n): string {
     a.alerts.raidViewers,
     a.windows.length,
     a.verdict.title,
-  ]);
+  ];
+}
+
+export function historyCsv(body: Cell[][], i18n: ReportI18n): string {
   return toCsv([HISTORY_HEADER.map((k) => i18n.t(k)), ...body], i18n.locale);
 }
 
