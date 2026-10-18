@@ -47,7 +47,8 @@ getrandom = "0.4.3"
 regex = "1.13.1"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 # CPU OCR avoids GPU contention with video codecs and a DirectML runtime dependency.
-# OAR-OCR 0.8.1 requires the execution-provider API removed in ort RC 13.
+# OAR-OCR pins ort 2.0.0-rc.12; RC 13 removed the execution-provider API it uses.
+# OAR-OCR disables ort default features; this entry enables the ONNX Runtime download.
 oar-ocr = "0.9.0"
 ort = "=2.0.0-rc.12"
 # Other operating systems need an explicitly configured and validated credential provider.
