@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "declarations": [
+    {
+      "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
+      "source": "src/screens/GoLiveScreen.tsx",
+      "sourceBlob": "a0633e28303be9072c4960b6fe6043c5b4275bac",
+      "reason": "Separa a assinatura das métricas por destino e deixa estáticos os pontos de estado; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
+      "reason": "O feed e os alertas assinam o store em componentes próprios e os sliders do overlay gravam ao soltar; telas, URLs, Testar e Adicionar no OBS citados não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
+      "reason": "O envio passa a excluir fontes desligadas ou sem canal de Todas, o que continua coerente com 'canais disponíveis para envio'; popout, overlay e moderação não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
+      "source": "src/screens/EncodingScreen.tsx",
+      "sourceBlob": "0f22b3825a5d9219d35d6c61036779af555b54a6",
+      "reason": "Calcula as estimativas de cada modo uma vez por mudança de config e lê só o estado do motor; modos, padrões de bitrate e cards citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
+      "reason": "Os sliders do overlay gravam ao soltar e o feed assina o store à parte; passos, opções do overlay, endereço local e tabela de problemas citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
+      "reason": "Os campos da fonte gravam ao sair do campo, com Enter ou ao fechar a configuração, então 'feche a configuração e clique em Conectar' continua valendo."
+    },
+    {
+      "article": "pt-BR/help/getting-started/first-stream.mdx",
+      "source": "src/lib/store.ts",
+      "sourceBlob": "50c2d04e6f81ff8f1d692d93a5495db2c6721bb1",
+      "reason": "A fila de gravação da config junta edições feitas durante um save em andamento; nenhum passo, rótulo ou sequência do primeiro live citado mudou."
+    },
+    {
+      "article": "pt-BR/help/platforms/manage-platform.mdx",
+      "source": "src/screens/PlatformsScreen.tsx",
+      "sourceBlob": "8ca8faf5d93d2f723bf99a3c0916c5c56264eae4",
+      "reason": "Nome e URL gravam ao sair do campo ou com Enter, e badges e validação seguem o que é digitado; testes, pausa, remoção e confirmações citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/quality/quality-modes.mdx",
+      "source": "src/screens/EncodingScreen.tsx",
+      "sourceBlob": "0f22b3825a5d9219d35d6c61036779af555b54a6",
+      "reason": "Memoiza as estimativas e extrai o painel Máquina com o mesmo rótulo e conteúdo; modos, ajuste fino, cards e métricas ao vivo citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src/components/ObsWizard.tsx",
+      "sourceBlob": "165aeab169d4edd6410c1491d28dcb55c08f8854",
+      "reason": "O campo de senha do assistente grava ao sair do campo ou com Enter; clicar em Conectar e configurar sai do campo e grava, como o artigo descreve."
+    },
+    {
+      "article": "pt-BR/help/streaming-software/brb-screen.mdx",
+      "source": "src/screens/SettingsScreen.tsx",
+      "sourceBlob": "20d908a9d34c65c30562a291b67add149549ace2",
+      "reason": "Host, app, chave local e senha do OBS gravam ao sair do campo e a importação mantém a confirmação; o fluxo do JÁ VOLTO e suas opções não mudaram."
+    }
+  ]
+}
