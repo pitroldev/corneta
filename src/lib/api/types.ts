@@ -202,6 +202,7 @@ export interface CornetaApi {
   ): () => void;
   obsCheck(): Promise<ObsCheck>;
   obsAutoconfigure(): Promise<void>;
+  systemMemoryBytes(): Promise<number>;
   markMoment(label?: string): Promise<void>;
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;

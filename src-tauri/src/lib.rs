@@ -296,6 +296,7 @@ pub fn run() {
             commands::export_diagnostics,
             commands::register_shortcut,
             commands::obs_check,
+            resources::system_memory_bytes,
             commands::mark_moment,
             commands::export_config,
             commands::import_config,

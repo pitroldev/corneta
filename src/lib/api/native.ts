@@ -541,6 +541,10 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("obs_autoconfigure");
     },
+    async systemMemoryBytes() {
+      const { invoke } = await core();
+      return invoke<number>("system_memory_bytes");
+    },
     async markMoment(label) {
       const { invoke } = await core();
       await invoke("mark_moment", { label: label ?? null });

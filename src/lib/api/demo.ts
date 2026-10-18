@@ -989,6 +989,9 @@ export function mockApi(): CornetaApi {
       };
     },
     async obsAutoconfigure() {},
+    async systemMemoryBytes() {
+      return 16 * 1024 ** 3;
+    },
     async markMoment() {},
     async exportConfig() {
       return false;
