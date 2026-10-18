@@ -1,10 +1,12 @@
 name: CI
 
+# Branch pushes run through their pull request; push only validates main. Run other branches by hand.
 on:
   push:
     branches:
-      - "**"
+      - main
   pull_request:
+  workflow_dispatch:
   workflow_call:
     inputs:
       checkout_ref:
@@ -168,10 +170,7 @@ jobs:
   rust:
     needs: resolve
     runs-on: windows-2025
-    timeout-minutes: 45
-    env:
-      RUSTC_WRAPPER: sccache
-      SCCACHE_GHA_ENABLED: "true"
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: src-tauri
@@ -185,60 +184,12 @@ jobs:
         with:
           toolchain: 1.97.1
           components: rustfmt, clippy
-      - name: Enable Rust compilation cache
-        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-        with:
-          version: v0.16.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
           cache-targets: true
-      # Jobs do not share sidecars, and non-ignored Rust tests require media tools.
-      - name: Prepare verified sidecars for Rust tests
-        shell: pwsh
-        env:
-          CORNETA_FFMPEG_MIRROR_URL: ${{ vars.CORNETA_FFMPEG_MIRROR_URL }}
-        run: pwsh -NoProfile -File ../scripts/fetch-binaries.ps1
-
-      - run: pwsh -NoProfile -File ../scripts/check-powershell.ps1
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
-      - run: cargo test --locked --all-targets
-      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
-        with:
-          tool: cargo-audit@0.22.2,cargo-deny@0.20.2
-          fallback: none
-      - run: cargo audit
-      - run: cargo deny --locked --config ../deny.toml check
-      - run: git diff --exit-code -- Cargo.lock ../pnpm-lock.yaml
-
-  media-integration:
-    needs: resolve
-    runs-on: windows-2025
-    timeout-minutes: 45
-    env:
-      RUSTC_WRAPPER: sccache
-      SCCACHE_GHA_ENABLED: "true"
-    defaults:
-      run:
-        working-directory: src-tauri
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.resolve.outputs.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master; immutable implementation
-        with:
-          toolchain: 1.97.1
-      - name: Enable Rust compilation cache
-        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-        with:
-          version: v0.16.0
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
-          cache-targets: true
-      - name: Prepare the exact verified release FFmpeg
+      # Non-ignored Rust tests require the sidecars; media integration tests also need FFmpeg on PATH.
+      - name: Prepare verified sidecars and media tools
         shell: pwsh
         env:
           CORNETA_FFMPEG_MIRROR_URL: ${{ vars.CORNETA_FFMPEG_MIRROR_URL }}
@@ -246,8 +197,25 @@ jobs:
           $toolDirectory = Join-Path $env:RUNNER_TEMP 'corneta-media-tools'
           pwsh -NoProfile -File ../scripts/fetch-binaries.ps1 -ToolDirectory $toolDirectory
           if ($LASTEXITCODE -ne 0) { throw 'Failed to prepare verified media tools.' }
-          $toolDirectory | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          & (Join-Path $toolDirectory 'ffmpeg.exe') -version
-          & (Join-Path $toolDirectory 'ffprobe.exe') -version
-      - run: cargo test --locked --lib -- --ignored --test-threads=1
+          "CORNETA_MEDIA_TOOLS=$toolDirectory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - run: pwsh -NoProfile -File ../scripts/check-powershell.ps1
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - run: cargo test --locked --all-targets
+      # Reuse this build: only the media tests see the verified FFmpeg on PATH.
+      - name: Run media integration tests
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:CORNETA_MEDIA_TOOLS;$env:PATH"
+          & (Join-Path $env:CORNETA_MEDIA_TOOLS 'ffmpeg.exe') -version
+          & (Join-Path $env:CORNETA_MEDIA_TOOLS 'ffprobe.exe') -version
+          cargo test --locked --lib -- --ignored --test-threads=1
+          if ($LASTEXITCODE -ne 0) { throw 'Media integration tests failed.' }
+      # cargo-deny reads the same advisory database as cargo-audit, scoped to the Windows graph.
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-deny@0.20.2
+          fallback: none
+      - run: cargo deny --locked --config ../deny.toml check
       - run: git diff --exit-code -- Cargo.lock ../pnpm-lock.yaml
