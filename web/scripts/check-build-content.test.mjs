@@ -9,10 +9,16 @@ describe("editorial build gates", () => {
       ]);
     }
   });
-  it("fails closed on overdue content in official production and explicit release builds", () => {
+  it("reports overdue content without blocking automatic Vercel production deploys", () => {
+    expect(editorialBuildChecks({ VERCEL_ENV: "production" })).toEqual([
+      ["scripts/check-editorial-content.ts", "--manifest"],
+      ["scripts/check-editorial-maintenance.ts"],
+    ]);
+  });
+  it("fails closed on overdue content in explicit release builds", () => {
     for (const env of [
-      { VERCEL_ENV: "production" },
       { CORNETA_RELEASE_CHECK: "1" },
+      { CORNETA_RELEASE_CHECK: "1", VERCEL_ENV: "production" },
     ]) {
       expect(editorialBuildChecks(env)).toContainEqual([
         "scripts/check-editorial-maintenance.ts",

@@ -8,11 +8,14 @@ const require = createRequire(import.meta.url);
 
 export function editorialBuildChecks(env) {
   const checks = [["scripts/check-editorial-content.ts", "--manifest"]];
-  if (env.VERCEL_ENV === "production" || env.CORNETA_RELEASE_CHECK === "1") {
+  if (env.CORNETA_RELEASE_CHECK === "1") {
     checks.push([
       "scripts/check-editorial-maintenance.ts",
       "--fail-on-overdue",
     ]);
+  } else if (env.VERCEL_ENV === "production") {
+    // Overdue reviews are tracked by the editorial issue; they must not block API or security deploys.
+    checks.push(["scripts/check-editorial-maintenance.ts"]);
   }
   return checks;
 }

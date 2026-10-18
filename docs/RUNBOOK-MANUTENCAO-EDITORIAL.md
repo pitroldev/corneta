@@ -29,7 +29,10 @@ pnpm content:maintenance --as-of 2026-08-02 --warning-days 28
 pnpm content:maintenance:check
 ```
 
-O último comando falha quando existe artigo vencido. O workflow
+O último comando falha quando existe artigo vencido. O build automático de produção na Vercel só
+imprime essa fila: um artigo vencido não bloqueia o deploy, para não travar correções da API ou de
+segurança. Builds de release explícitos (`build:release` ou `CORNETA_RELEASE_CHECK=1`) continuam
+recusando artigo vencido. O controle do prazo fica com a issue editorial. O workflow
 `Editorial maintenance` está agendado para segunda-feira, publica o resumo na execução e
 mantém uma issue com a label `editorial-maintenance`. Um novo ciclo só começa
 28 dias depois do encerramento do anterior. Em forks, essa automação externa fica
