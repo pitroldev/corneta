@@ -1204,6 +1204,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed17f5901b6630b993ca003def43f2f8ef4014fc13b047b57aad617ff32bc2ec"
+dependencies = [
+ "darling_core 0.24.1",
+ "darling_macro 0.24.1",
+]
+
+[[package]]
 name = "darling_core"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1231,6 +1241,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6837e2cf7485aaae18f86181d2f0e9a7ed297a025e220aeabf63fdebd3a2ddff"
+dependencies = [
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1250,6 +1273,17 @@ dependencies = [
  "darling_core 0.23.0",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ac7135c3ef02b2f7833bbeb1be5ba7f966dcde8a87c6b87f65a778d71a02785"
+dependencies = [
+ "darling_core 0.24.1",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -3610,9 +3644,9 @@ dependencies = [
 
 [[package]]
 name = "oar-ocr"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3306a435bc68a10aa2bf868e0aee703b7492ad77acf109c0b72ebb75ef805b"
+checksum = "82564fb5b1e50400ab464f2e688040f26e665dd2cfbaa841f135b981c39dfb9b"
 dependencies = [
  "image",
  "imageproc",
@@ -3627,9 +3661,9 @@ dependencies = [
 
 [[package]]
 name = "oar-ocr-core"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9db97acbc2b1f88f72e439f15f03307320976c5bacf692a2c84907207255684"
+checksum = "28652173a4a514186ac109435e733d887430c5470355f7edcf49607679fd5d7f"
 dependencies = [
  "clipper2-rust",
  "image",
@@ -3653,14 +3687,14 @@ dependencies = [
 
 [[package]]
 name = "oar-ocr-derive"
-version = "0.8.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6e7396c9a50d0e0a6f31d36b9dc43cf6fc829aa29277c3d9f881ae1dc3492d3"
+checksum = "e1d868d12ee353e68e30d1edbf363f938a6f4e5195ddba43125acbe577971b3f"
 dependencies = [
- "darling 0.23.0",
+ "darling 0.24.1",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
