@@ -47,6 +47,7 @@ export function loadEnvironmentFile(
     }
     // Permission/I/O failures must not look like no .env. Do not echo paths,
     // file contents or low-level error messages: they can contain credentials.
+    // eslint-disable-next-line preserve-caught-error -- a cause would print them.
     throw new Error("with-env: could not read the configuration file.");
   }
   try {
