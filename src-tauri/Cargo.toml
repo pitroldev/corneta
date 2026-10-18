@@ -64,7 +64,7 @@ tauri-plugin-updater = { version = "2.10.1", default-features = false, features 
 notify-rust = { git = "https://github.com/hoodie/notify-rust", rev = "a733009b2c52c6605443b287ae5348a6c4879a3e" }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Performance", "Win32_System_IO", "Win32_System_Ioctl"] }
+windows = { version = "0.62.2", features = ["Media_Ocr", "Graphics_Imaging", "Storage_Streams", "Foundation", "Foundation_Collections", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Performance", "Win32_System_IO", "Win32_System_Ioctl", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
 # Keep COM bindings aligned with Wry; mixing versions produces incompatible interfaces.
 webview2-com = "=0.39.1"
 

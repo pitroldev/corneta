@@ -502,21 +502,8 @@ fn base_cmd(ffmpeg: &std::path::Path) -> Command {
 }
 
 fn kill(child: &mut Child) {
-    let pid = child.id();
     let _ = child.kill();
     let _ = child.wait();
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        let _ = Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .creation_flags(0x0800_0000)
-            .output();
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = pid;
-    }
 }
 
 fn spawn_input(ffmpeg: &std::path::Path, ingest: &str) -> std::io::Result<Child> {
@@ -539,6 +526,7 @@ fn spawn_input(ffmpeg: &std::path::Path, ingest: &str) -> std::io::Result<Child>
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
+        .inspect(crate::job::adopt)
 }
 
 fn spawn_output(ffmpeg: &std::path::Path, program_url: &str) -> std::io::Result<Child> {
@@ -561,6 +549,7 @@ fn spawn_output(ffmpeg: &std::path::Path, program_url: &str) -> std::io::Result<
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
+        .inspect(crate::job::adopt)
 }
 
 fn spawn_reader(
@@ -1163,7 +1152,11 @@ fn setup_and_pump(
         .expect("output ffmpeg has no stdin pipe");
     // A blocked stdin write cannot observe cancellation; the watchdog kills the publisher.
     let gen_done = Arc::new(AtomicBool::new(false));
-    spawn_output_watchdog(running.clone(), gen_done.clone(), out_child.id());
+    spawn_output_watchdog(
+        running.clone(),
+        gen_done.clone(),
+        crate::job::Killer::new(&out_child),
+    );
 
     if write_preamble(&mut out_stdin).is_err()
         || write_tag(&mut out_stdin, 9, 0, &seqhdr_video(&avcc)).is_err()
@@ -1550,24 +1543,19 @@ fn fail_setup(
     SetupOutcome::Fallback(Box::new(opts))
 }
 
-fn spawn_output_watchdog(running: Arc<AtomicBool>, gen_done: Arc<AtomicBool>, pid: u32) {
+fn spawn_output_watchdog(
+    running: Arc<AtomicBool>,
+    gen_done: Arc<AtomicBool>,
+    killer: Option<crate::job::Killer>,
+) {
     std::thread::spawn(move || {
         while running.load(Ordering::Relaxed) && !gen_done.load(Ordering::Relaxed) {
             std::thread::sleep(Duration::from_millis(200));
         }
         std::thread::sleep(Duration::from_millis(1200)); // Allow normal teardown to finish first.
         if !gen_done.load(Ordering::Relaxed) {
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                let _ = Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                    .creation_flags(0x0800_0000)
-                    .output();
-            }
-            #[cfg(not(windows))]
-            {
-                let _ = pid;
+            if let Some(killer) = &killer {
+                killer.kill();
             }
         }
     });

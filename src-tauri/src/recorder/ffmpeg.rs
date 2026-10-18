@@ -87,6 +87,7 @@ pub async fn run(
                 return;
             }
         };
+        crate::job::adopt_pid(child.pid());
         {
             let st = app.state::<AppState>();
             st.engine
@@ -248,7 +249,7 @@ fn take_and_kill(app: &AppHandle) {
         eng.ffmpegs.remove(RECORDER_KEY)
     };
     if let Some(c) = child {
-        crate::commands::kill_child_tree(c);
+        crate::commands::kill_sidecar(c);
     }
 }
 

@@ -286,7 +286,7 @@ struct PreparationChild(Option<CommandChild>);
 impl Drop for PreparationChild {
     fn drop(&mut self) {
         if let Some(child) = self.0.take() {
-            crate::commands::kill_child_tree(child);
+            crate::commands::kill_sidecar(child);
         }
     }
 }
