@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useConfirm } from "../lib/useConfirm";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
@@ -84,8 +85,6 @@ export function GoLiveScreen({
   const runUploadTest = useStore((s) => s.runUploadTest);
   const encoders = useStore((s) => s.encoders);
   const refreshEncoders = useStore((s) => s.refreshEncoders);
-  const goLiveFocus = useStore((s) => s.goLiveFocus);
-  const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const setSettingsTab = useStore((s) => s.setSettingsTab);
   const lastOperationId = useStore((s) => s.lastOperationId);
   const openSecurity = () => {
@@ -132,10 +131,6 @@ export function GoLiveScreen({
     }
     prevState.current = state;
   }, [state, t]);
-
-  useEffect(() => {
-    if (goLiveFocus) setGoLiveFocus(false);
-  }, [goLiveFocus, setGoLiveFocus]);
 
   const est = useMemo(() => estimate(config), [config]);
   const neededMbps = est.uploadKbps / 1000;
@@ -256,8 +251,7 @@ export function GoLiveScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingestLive, starting]);
 
-  const [confirmStop, setConfirmStop] = useState(false);
-  const confirmStopAt = useRef(0);
+  const stopStep = useConfirm(3000, { minDelayMs: 400 });
   const onStop = async () => {
     await stop();
     toast.action(
@@ -267,16 +261,8 @@ export function GoLiveScreen({
     );
   };
   const onStopClick = () => {
-    if (!confirmStop) {
-      setConfirmStop(true);
-      confirmStopAt.current = Date.now();
-      setTimeout(() => setConfirmStop(false), 3000);
-      return;
-    }
-    // Require a pause between confirmation clicks so an accidental double-click cannot stop the stream.
-    if (Date.now() - confirmStopAt.current < 400) return;
-    setConfirmStop(false);
-    void onStop();
+    // minDelayMs requires a pause between clicks, so an accidental double-click cannot stop the stream.
+    if (stopStep.confirm()) void onStop();
   };
   const onCancel = async () => {
     await stop();
@@ -744,7 +730,7 @@ export function GoLiveScreen({
             onClick={onStopClick}
           >
             <Square className="size-5" />{" "}
-            {confirmStop ? t("golive.stop.confirm") : t("golive.stop")}
+            {stopStep.armed ? t("golive.stop.confirm") : t("golive.stop")}
           </Button>
         ) : (
           <Button

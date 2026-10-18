@@ -1,4 +1,5 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
+import { useConfirm } from "../../lib/useConfirm";
 import {
   Bell,
   Check,
@@ -38,7 +39,7 @@ export function AlertSourceCard({
   const [open, setOpen] = useState(() => !src.hasToken);
   const [editing, setEditing] = useState(false);
   const [token, setToken] = useState("");
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  const removeStep = useConfirm();
   const { busy, run } = useAccountAction();
   const showInput = !src.hasToken || editing;
 
@@ -224,20 +225,15 @@ export function AlertSourceCard({
           <p className="text-[11px] text-ink-faint">{t(meta.hintKey)}</p>
           <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
             <Button
-              variant={confirmRemove ? "danger" : "ghost"}
+              variant={removeStep.armed ? "danger" : "ghost"}
               size="sm"
               disabled={busy}
               onClick={() => {
-                if (confirmRemove) {
-                  onRemove();
-                  return;
-                }
-                setConfirmRemove(true);
-                setTimeout(() => setConfirmRemove(false), 3000);
+                if (removeStep.confirm()) onRemove();
               }}
             >
               <Trash2 className="size-4" />
-              {confirmRemove
+              {removeStep.armed
                 ? t("chat.common.removeConfirm")
                 : t("chat.alertsrc.remove")}
             </Button>

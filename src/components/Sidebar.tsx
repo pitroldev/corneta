@@ -91,7 +91,6 @@ export function Sidebar({
   const { t, fmt } = useI18n();
   const state = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
-  const setGoLiveFocus = useStore((s) => s.setGoLiveFocus);
   const viewers = useStore((s) => s.viewers);
   const unseenReport = useStore((s) => s.unseenReport);
 
@@ -251,10 +250,7 @@ export function Sidebar({
           </button>
         ) : (
           <button
-            onClick={() => {
-              setGoLiveFocus(true);
-              onNavigate("golive");
-            }}
+            onClick={() => onNavigate("golive")}
             title={t("sidebar.start.title")}
             className="group flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2.5 text-left transition-transform hover:translate-x-0.5"
           >
