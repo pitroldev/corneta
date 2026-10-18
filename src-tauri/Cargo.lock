@@ -4294,9 +4294,9 @@ dependencies = [
 
 [[package]]
 name = "posthog-rs"
-version = "0.21.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dc5d94870b23655fceae57574d6741475b114be5a018b25d22dd2aa076fbe13"
+checksum = "e4bf3024d46115813aba6c8ca1aa95bb850a26cb7a36f6e03ca0c12c449c5925"
 dependencies = [
  "backtrace",
  "chrono",
@@ -4309,7 +4309,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "sha1 0.10.7",
+ "sha1 0.11.0",
  "tracing",
  "uuid",
 ]
@@ -6289,7 +6289,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
