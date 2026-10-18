@@ -218,7 +218,7 @@ export function Sidebar({
             title={t("sidebar.live.title")}
             className="flex w-full -rotate-1 items-center gap-2 rounded-md bg-tomato px-3 py-2.5 text-left text-white pop transition-transform hover:scale-[1.02]"
           >
-            <span className="size-2.5 rounded-full bg-white live-dot" />
+            <span className="size-2.5 rounded-full bg-white" />
             <span className="font-display text-sm font-extrabold uppercase tracking-wide">
               {t("sidebar.state.live")}
             </span>
