@@ -209,15 +209,15 @@ function updateApprovedFile(test, path, text, { checksums = true } = {}) {
 // Mirrors GitHub: a draft lists its assets under its untagged-<hash> page and moves them to the
 // tag path only in the publication response.
 function serveFromDraftPath(test, path = "untagged-e53fb99a8a72337cacf4") {
-  const published = structuredClone(test.state.release);
+  test.state.patchResponse = {
+    ...test.state.release,
+    draft: false,
+    html_url: `https://github.com/${repository}/releases/tag/${tag}`,
+    assets: test.state.release.assets.map((asset) => ({ ...asset })),
+  };
   test.state.release.html_url = `https://github.com/${repository}/releases/tag/${path}`;
   for (const asset of test.state.release.assets)
     asset.browser_download_url = `https://github.com/${repository}/releases/download/${path}/${encodeURIComponent(asset.name)}`;
-  test.state.patchResponse = {
-    ...published,
-    draft: false,
-    html_url: `https://github.com/${repository}/releases/tag/${tag}`,
-  };
 }
 
 describe("release promotion", () => {
