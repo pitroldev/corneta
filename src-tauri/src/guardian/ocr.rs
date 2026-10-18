@@ -202,8 +202,13 @@ fn build_paddle(app: &AppHandle, cache_already_verified: bool) -> Option<PaddleO
     Some(PaddleOcr { inner })
 }
 
+/// Creates the engine on the OCR worker thread at the first read and reuses it; a failure retries on
+/// the next scan.
 #[cfg(windows)]
-pub(super) struct WindowsOcr;
+#[derive(Default)]
+pub(super) struct WindowsOcr {
+    engine: std::cell::RefCell<Option<windows::Media::Ocr::OcrEngine>>,
+}
 
 #[cfg(windows)]
 impl Ocr for WindowsOcr {
@@ -213,26 +218,42 @@ impl Ocr for WindowsOcr {
 
     fn read_text(&self, gray: &[u8], w: usize, h: usize) -> Result<String, OcrError> {
         if w <= OCR_TARGET_W as usize {
-            return ocr_text_gray(
+            return self.ocr_text_gray(
                 gray,
                 u32::try_from(w).map_err(|_| OcrError::InvalidFrame)?,
                 u32::try_from(h).map_err(|_| OcrError::InvalidFrame)?,
             );
         }
         let small = downscale_gray(gray, w, h).ok_or(OcrError::InvalidFrame)?;
-        ocr_text_gray(small.as_raw(), small.width(), small.height())
+        self.ocr_text_gray(small.as_raw(), small.width(), small.height())
     }
 }
 
-/// Direct lossless Gray8 input: avoids JPEG encode/decode and its text artifacts.
 #[cfg(windows)]
-fn ocr_text_gray(bytes: &[u8], width: u32, height: u32) -> Result<String, OcrError> {
-    use windows::Media::Ocr::OcrEngine;
-    let bitmap = gray_bitmap(bytes, width, height).ok_or(OcrError::InvalidFrame)?;
-    let engine =
-        OcrEngine::TryCreateFromUserProfileLanguages().map_err(|_| OcrError::Unavailable)?;
+impl WindowsOcr {
+    /// Direct lossless Gray8 input: avoids JPEG encode/decode and its text artifacts.
+    fn ocr_text_gray(&self, bytes: &[u8], width: u32, height: u32) -> Result<String, OcrError> {
+        use windows::Media::Ocr::OcrEngine;
+        let bitmap = gray_bitmap(bytes, width, height).ok_or(OcrError::InvalidFrame)?;
+        let mut cached = self.engine.borrow_mut();
+        if cached.is_none() {
+            *cached = Some(
+                OcrEngine::TryCreateFromUserProfileLanguages()
+                    .map_err(|_| OcrError::Unavailable)?,
+            );
+        }
+        let engine = cached.as_ref().ok_or(OcrError::Unavailable)?;
+        recognize(engine, &bitmap)
+    }
+}
+
+#[cfg(windows)]
+fn recognize(
+    engine: &windows::Media::Ocr::OcrEngine,
+    bitmap: &windows::Graphics::Imaging::SoftwareBitmap,
+) -> Result<String, OcrError> {
     let result = engine
-        .RecognizeAsync(&bitmap)
+        .RecognizeAsync(bitmap)
         .map_err(|_| OcrError::RecognitionFailed)?
         .join()
         .map_err(|_| OcrError::RecognitionFailed)?;
@@ -271,9 +292,12 @@ mod bitmap_tests {
 
     #[test]
     fn invalid_frame_is_an_error_not_an_empty_read() {
-        assert_eq!(WindowsOcr.read_text(&[], 0, 0), Err(OcrError::InvalidFrame));
         assert_eq!(
-            WindowsOcr.read_text(&[0; 3], 2, 2),
+            WindowsOcr::default().read_text(&[], 0, 0),
+            Err(OcrError::InvalidFrame)
+        );
+        assert_eq!(
+            WindowsOcr::default().read_text(&[0; 3], 2, 2),
             Err(OcrError::InvalidFrame)
         );
         assert!(downscale_gray(&[], usize::MAX, 2).is_none());
@@ -298,10 +322,14 @@ mod bitmap_tests {
             eprintln!("Skipping OCR integration: no Windows OCR language pack available");
             return;
         }
-        assert_eq!(
-            ocr_text_gray(&vec![255; 641 * 100], 641, 100),
-            Ok(String::new())
-        );
+        let ocr = WindowsOcr::default();
+        for _ in 0..2 {
+            assert_eq!(
+                ocr.ocr_text_gray(&vec![255; 641 * 100], 641, 100),
+                Ok(String::new())
+            );
+        }
+        assert!(ocr.engine.borrow().is_some());
     }
 }
 
@@ -344,7 +372,7 @@ pub(super) fn build_ocr(app: &AppHandle) -> Box<dyn Ocr> {
     }
     #[cfg(windows)]
     {
-        Box::new(WindowsOcr)
+        Box::new(WindowsOcr::default())
     }
     #[cfg(not(windows))]
     {
