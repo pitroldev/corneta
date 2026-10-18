@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { LazyMotion } from "framer-motion";
 import "@fontsource/baloo-2/latin-500.css";
 import "@fontsource/baloo-2/latin-600.css";
 import "@fontsource/baloo-2/latin-700.css";
@@ -11,12 +12,17 @@ import { I18nFromConfig } from "./lib/i18n/provider";
 import { initializeTelemetry } from "./lib/telemetry";
 import "./index.css";
 
+const loadMotionFeatures = () =>
+  import("./lib/motionFeatures").then((features) => features.default);
+
 function render() {
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ErrorBoundary app>
         <I18nFromConfig>
-          <App />
+          <LazyMotion features={loadMotionFeatures}>
+            <App />
+          </LazyMotion>
         </I18nFromConfig>
       </ErrorBoundary>
     </React.StrictMode>,

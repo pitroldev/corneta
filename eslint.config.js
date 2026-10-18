@@ -105,6 +105,19 @@ export default tseslint.config(
         "error",
         { controlComponents: ["Select", "Input", "Switch"], depth: 3 },
       ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "framer-motion",
+              importNames: ["motion"],
+              message:
+                "Render `m` components; LazyMotion in src/main.tsx loads the animation features on demand.",
+            },
+          ],
+        },
+      ],
       "no-restricted-syntax": [
         "error",
         {

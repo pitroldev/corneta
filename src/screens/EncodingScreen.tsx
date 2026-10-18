@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import {
   AlertTriangle,
   ChevronDown,
@@ -118,9 +118,9 @@ export function EncodingScreen() {
     () =>
       config
         ? new Map(
-            MODES.map((m) => [
-              m.id,
-              estimate({ ...config, mode: m.id }, { anyHwAvailable: anyHw }),
+            MODES.map((mode) => [
+              mode.id,
+              estimate({ ...config, mode: mode.id }, { anyHwAvailable: anyHw }),
             ]),
           )
         : null,
@@ -199,15 +199,15 @@ export function EncodingScreen() {
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {MODES.map((m) => {
-          const est = estimates.get(m.id)!;
+        {MODES.map((mode) => {
+          const est = estimates.get(mode.id)!;
           const fit = bandFit(est.uploadKbps, uploadMbps);
-          const active = config.mode === m.id;
-          const Icon = m.icon;
+          const active = config.mode === mode.id;
+          const Icon = mode.icon;
           return (
-            <motion.button
-              key={m.id}
-              onClick={() => setMode(m.id)}
+            <m.button
+              key={mode.id}
+              onClick={() => setMode(mode.id)}
               whileTap={{ scale: 0.97 }}
               aria-pressed={active}
               className={cn(
@@ -217,8 +217,8 @@ export function EncodingScreen() {
                   : "border-2 border-transparent bg-surface-2 hover:bg-surface-3",
               )}
             >
-              <Badge tone={m.tone} className="mb-2 self-start">
-                {t(m.tagKey)}
+              <Badge tone={mode.tone} className="mb-2 self-start">
+                {t(mode.tagKey)}
               </Badge>
               <div className="flex items-center gap-2">
                 <span
@@ -232,11 +232,11 @@ export function EncodingScreen() {
                   <Icon className="size-4" strokeWidth={2.4} />
                 </span>
                 <span className="font-display text-lg font-bold">
-                  {t(m.titleKey)}
+                  {t(mode.titleKey)}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                {t(m.descKey)}
+                {t(mode.descKey)}
               </p>
               <div className="mt-auto space-y-2 pt-3">
                 <LoadBar load={est.load} />
@@ -269,7 +269,7 @@ export function EncodingScreen() {
                         : " "}
                 </div>
               </div>
-            </motion.button>
+            </m.button>
           );
         })}
       </div>
@@ -564,7 +564,7 @@ function LoadBar({ load }: { load: number }) {
         <span className="font-display font-bold text-ink-muted">{word}</span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-sm bg-surface">
-        <motion.div
+        <m.div
           className={cn("h-full rounded-sm", tone)}
           animate={{ width: `${Math.max(4, pct)}%` }}
           transition={{ type: "spring", stiffness: 200, damping: 26 }}

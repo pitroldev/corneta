@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, ScrollText, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { acceptedCurrent, recordAcceptance } from "../lib/legal";
@@ -216,7 +216,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
 
       <div className="p-6">
         <div className="min-h-56">
-          <motion.div
+          <m.div
             key={step}
             initial={{ opacity: 0, x: 24 }}
             animate={{ opacity: 1, x: 0 }}
@@ -243,7 +243,7 @@ export function Onboarding({ onStart }: { onStart: () => void }) {
                 </div>
               </>
             )}
-          </motion.div>
+          </m.div>
         </div>
 
         <div className="my-4 flex justify-center gap-0.5">

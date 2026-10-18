@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 import { useToasts, type ToastKind } from "../lib/toast";
 import { useT } from "../lib/i18n";
@@ -37,7 +37,7 @@ export function Toaster() {
         {toasts.map((item) => {
           const Icon = ICON[item.kind];
           return (
-            <motion.div
+            <m.div
               key={item.id}
               layout
               initial={{ opacity: 0, x: 40, scale: 0.9 }}
@@ -77,7 +77,7 @@ export function Toaster() {
               >
                 <X className="size-4" aria-hidden />
               </button>
-            </motion.div>
+            </m.div>
           );
         })}
       </AnimatePresence>

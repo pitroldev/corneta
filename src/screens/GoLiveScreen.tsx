@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useConfirm } from "../lib/useConfirm";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   Check,
@@ -1396,7 +1396,7 @@ const LiveTargetList = memo(function LiveTargetList({
     <div className="mb-4 flex flex-col gap-2">
       <AnimatePresence>
         {targets.map((target, i) => (
-          <motion.div
+          <m.div
             key={target.id}
             layout
             layoutDependency={i}
@@ -1411,7 +1411,7 @@ const LiveTargetList = memo(function LiveTargetList({
             }}
           >
             <LiveTargetRow target={target} onNavigate={onNavigate} />
-          </motion.div>
+          </m.div>
         ))}
       </AnimatePresence>
     </div>
