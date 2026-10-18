@@ -65,7 +65,7 @@ fn build_diagnostic_report(
     Ok(report)
 }
 
-// Hide console windows for blocking utilities such as taskkill and nvidia-smi.
+// Hide console windows for blocking utilities such as nvidia-smi.
 fn quiet_command(program: &str) -> std::process::Command {
     #[allow(unused_mut)]
     let mut cmd = std::process::Command::new(program);
@@ -194,19 +194,8 @@ fn capture_target_transition(
 }
 
 /// Tauri sidecars only; std::process children also require wait() to be reaped.
-pub(crate) fn kill_child_tree(child: tauri_plugin_shell::process::CommandChild) {
-    let pid = child.pid();
+pub(crate) fn kill_sidecar(child: tauri_plugin_shell::process::CommandChild) {
     let _ = child.kill();
-    #[cfg(windows)]
-    {
-        let _ = quiet_command("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .output();
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = pid;
-    }
 }
 
 #[tauri::command]
@@ -1189,37 +1178,6 @@ fn set_target_state(app: &AppHandle, target_id: &str, new_state: &str) {
     }
 }
 
-// Limit orphan cleanup to sidecars under this installation, not unrelated user processes.
-fn kill_orphan_sidecars() {
-    let Some(dir) = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-    else {
-        return;
-    };
-    #[cfg(windows)]
-    {
-        // Escape single quotes inside the PowerShell string literal.
-        let dir_s = dir.to_string_lossy().replace('\'', "''");
-        let script = format!(
-            "Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -like '{dir_s}\\*' -and ($_.Name -like 'ffmpeg*' -or $_.Name -like 'mediamtx*') }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
-        );
-        let _ = quiet_command("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .output();
-    }
-    #[cfg(not(windows))]
-    {
-        let base_dir = dir.to_string_lossy();
-        let base_dir = base_dir.trim_end_matches('/');
-        for base in ["ffmpeg", "mediamtx"] {
-            let _ = quiet_command("pkill")
-                .args(["-f", &format!("{base_dir}/{base}")])
-                .output();
-        }
-    }
-}
-
 async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
     let ok = probe_hw_encoders(app).await;
     HW_ENCODERS
@@ -1421,9 +1379,6 @@ async fn start_engine_inner(
     // Refresh without delaying startup to reduce mid-stream Kick token expiry.
     crate::auth::warm_kick_session(&app);
 
-    // PowerShell cleanup must stay off the event loop.
-    let _ = tauri::async_runtime::spawn_blocking(kill_orphan_sidecars).await;
-
     let mut keymap: HashMap<String, String> = HashMap::new();
     for t in &enabled {
         if let Some(k) = keys::get_key(&t.id) {
@@ -1478,6 +1433,7 @@ async fn start_engine_inner(
             );
             Msg::EngineMediamtxNoStart.now()
         })?;
+    crate::job::adopt_pid(mtx_child.pid());
 
     let running = Arc::new(AtomicBool::new(true));
     let has_signal = Arc::new(AtomicBool::new(false));
@@ -1908,6 +1864,7 @@ async fn start_engine_inner(
                         break;
                     }
                 };
+                crate::job::adopt_pid(child.pid());
                 {
                     let st = app_t.state::<AppState>();
                     st.engine
@@ -1925,7 +1882,7 @@ async fn start_engine_inner(
                         removed
                     };
                     if let Some(c) = leftover {
-                        kill_child_tree(c);
+                        kill_sidecar(c);
                     }
                     break;
                 }
@@ -2018,7 +1975,7 @@ async fn start_engine_inner(
                 };
                 if rebitrate || signal_lost || paused_kill {
                     if let Some(c) = leftover {
-                        kill_child_tree(c);
+                        kill_sidecar(c);
                     }
                 }
                 if !run_flag.load(Ordering::Relaxed) {
@@ -2182,7 +2139,7 @@ pub async fn set_target_paused(
 
     if let Some(child) = child {
         tauri::async_runtime::spawn_blocking(move || {
-            kill_child_tree(child);
+            kill_sidecar(child);
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -2643,7 +2600,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
     }
 
     for child in children {
-        kill_child_tree(child);
+        kill_sidecar(child);
     }
     session::set_chat_recording(false);
     if let Some(path) = session_path {

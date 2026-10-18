@@ -175,6 +175,7 @@ pub(crate) fn start(
                     rendition.failed.store(true, Ordering::Relaxed);
                     break;
                 };
+                crate::job::adopt_pid(child.pid());
                 app.state::<AppState>()
                     .engine
                     .lock()
@@ -218,7 +219,7 @@ pub(crate) fn start(
                     .remove(&id);
                 if let Some(child) = child {
                     let _ = tauri::async_runtime::spawn_blocking(move || {
-                        crate::commands::kill_child_tree(child)
+                        crate::commands::kill_sidecar(child)
                     })
                     .await;
                 }

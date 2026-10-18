@@ -11,6 +11,7 @@ mod gpu_pipeline;
 mod guardian;
 mod http_client;
 mod i18n;
+mod job;
 mod keys;
 mod obs;
 mod overlay;

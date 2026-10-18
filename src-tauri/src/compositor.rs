@@ -129,6 +129,7 @@ fn spawn_ff(
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     let mut child = cmd.spawn()?;
+    crate::job::adopt(&child);
     if let (Some(tag), Some(err)) = (tag, child.stderr.take()) {
         std::thread::spawn(move || {
             use std::io::BufRead;
@@ -144,21 +145,8 @@ fn spawn_ff(
 }
 
 fn kill(child: &mut Child) {
-    let pid = child.id();
     let _ = child.kill();
     let _ = child.wait();
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        let _ = Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .creation_flags(0x0800_0000)
-            .output();
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = pid;
-    }
 }
 
 struct FrameSource {
@@ -591,27 +579,21 @@ fn generation(
         }
     });
     // A blocked pipe write cannot observe cancellation; the watchdog kills a stalled encoder.
-    // Disarm after teardown so a recycled PID is not targeted.
     let gen_done = Arc::new(AtomicBool::new(false));
     {
-        let (run_w, done_w, enc_pid) = (running.clone(), gen_done.clone(), enc.id());
+        let (run_w, done_w, enc_killer) = (
+            running.clone(),
+            gen_done.clone(),
+            crate::job::Killer::new(&enc),
+        );
         std::thread::spawn(move || {
             while run_w.load(Ordering::Relaxed) && !done_w.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(200));
             }
             std::thread::sleep(Duration::from_millis(1200)); // Allow normal teardown to finish first.
             if !done_w.load(Ordering::Relaxed) {
-                #[cfg(windows)]
-                {
-                    use std::os::windows::process::CommandExt;
-                    let _ = Command::new("taskkill")
-                        .args(["/PID", &enc_pid.to_string(), "/T", "/F"])
-                        .creation_flags(0x0800_0000)
-                        .output();
-                }
-                #[cfg(not(windows))]
-                {
-                    let _ = enc_pid;
+                if let Some(killer) = &enc_killer {
+                    killer.kill();
                 }
             }
         });
