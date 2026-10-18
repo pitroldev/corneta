@@ -150,10 +150,20 @@ export interface AppSettings {
   overlayChatFadeSecs: number;
 }
 
+/** Stable OBS failure kinds from the native side; classify OBS errors by these, never by text. */
+export type ObsErrorCode =
+  | "connectionFailed"
+  | "exchangeFailed"
+  | "passwordRequired"
+  | "authenticationFailed"
+  | "identificationFailed"
+  | "requestRefused";
+
 export interface ObsCheck {
   reachable: boolean;
   /** Structured authentication failure flag; do not infer it from localized error text. */
   authFailed?: boolean;
+  errorCode?: ObsErrorCode;
   pointingAtCorneta: boolean;
   width: number;
   height: number;

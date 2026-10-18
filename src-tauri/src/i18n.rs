@@ -631,6 +631,9 @@ messages! {
     ObsPasswordRequired = "rust.obs.passwordRequired" =>
         pt: "O obs-websocket tá com senha — cola ela em Configurações → OBS.",
         en: "obs-websocket has a password — put it in Settings → OBS.";
+    ObsPasswordRejected = "rust.obs.passwordRejected" =>
+        pt: "O OBS recusou a senha do obs-websocket — confere ela em Configurações → OBS.",
+        en: "OBS rejected the obs-websocket password — check it in Settings → OBS.";
     ObsIdentifyFailed { identified: &'a str } = "rust.obs.identifyFailed" =>
         pt: "não consegui entrar no OBS (senha errada?): {identified}",
         en: "Couldn't sign in to OBS (wrong password?): {identified}";
