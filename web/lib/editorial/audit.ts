@@ -1,7 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { editorialImageMatchesManifest } from "./asset-provenance";
 import {
   embeddedRasterMetadata,
   imageFormatMatchesExtension,
@@ -24,7 +23,6 @@ import {
 } from "./schema";
 import type {
   EditorialAssetManifest,
-  EditorialAssetManifestEntry,
   EditorialAuditOptions,
   EditorialAuditResult,
   EditorialDocument,
@@ -94,7 +92,6 @@ async function validateImageFiles(
   image: EditorialImage,
   field: string,
   options: EditorialAuditOptions,
-  manifestBySrc: Map<string, EditorialAssetManifestEntry>,
 ): Promise<EditorialIssue[]> {
   const issues: EditorialIssue[] = [];
   const publicFile = path.resolve(options.publicRoot, image.src.slice(1));
@@ -166,48 +163,18 @@ async function validateImageFiles(
     );
   }
 
-  const manifestEntry = manifestBySrc.get(image.src);
-  if (!manifestEntry) {
-    issues.push(
-      assetIssue(
-        document,
-        "asset-missing-from-manifest",
-        `asset is not declared in assets/manifest.json: ${image.src}`,
-        field,
-      ),
-    );
-  } else {
-    if (!editorialImageMatchesManifest(image, manifestEntry)) {
-      issues.push(
-        assetIssue(
-          document,
-          "asset-manifest-mismatch",
-          `metadata differs from assets/manifest.json: ${image.src}`,
-          field,
-        ),
-      );
-    }
-  }
-
   return issues;
 }
 
 async function validateDocumentFiles(
   document: EditorialDocument,
   options: EditorialAuditOptions,
-  manifestBySrc: Map<string, EditorialAssetManifestEntry>,
   registeredPeople: Map<string, EditorialPerson>,
 ): Promise<EditorialIssue[]> {
   const checks: Promise<EditorialIssue[]>[] = [];
   document.frontmatter.images.forEach((image, index) => {
     checks.push(
-      validateImageFiles(
-        document,
-        image,
-        `images.${index}`,
-        options,
-        manifestBySrc,
-      ),
+      validateImageFiles(document, image, `images.${index}`, options),
     );
   });
 
@@ -601,12 +568,6 @@ export async function auditEditorialContent(
   const issues: EditorialIssue[] = [];
   const registries = await loadEditorialRegistries(options);
   issues.push(...registries.issues);
-  const manifestBySrc = new Map<string, EditorialAssetManifestEntry>();
-  registries.manifest.assets.forEach((entry) => {
-    entry.derivatives.forEach((derivative) =>
-      manifestBySrc.set(derivative.src, entry),
-    );
-  });
   const files = await findMdxFiles(options.contentRoot);
 
   for (const file of files) {
@@ -615,7 +576,9 @@ export async function auditEditorialContent(
       .replaceAll("\\", "/");
     try {
       const source = await readFile(file, "utf8");
-      documents.push(parseEditorialSource(source, relativePath));
+      documents.push(
+        parseEditorialSource(source, relativePath, registries.manifest.assets),
+      );
     } catch (error) {
       if (error instanceof EditorialValidationError) {
         error.details.forEach((detail) => {
@@ -640,12 +603,7 @@ export async function auditEditorialContent(
   issues.push(...validateEditorialCatalog(documents));
   const fileIssues = await Promise.all(
     documents.map((document) =>
-      validateDocumentFiles(
-        document,
-        options,
-        manifestBySrc,
-        registries.registeredPeople,
-      ),
+      validateDocumentFiles(document, options, registries.registeredPeople),
     ),
   );
   issues.push(...fileIssues.flat());

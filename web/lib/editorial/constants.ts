@@ -116,81 +116,24 @@ export const EDITORIAL_ENGLISH_PATH_APPROVALS = {
   ],
 } as const;
 
-export interface EditorialEnglishAssetPathApproval {
-  readonly baseName: string;
-  readonly src: string;
-  readonly originalPath: string;
-}
-
+/** Human-approved public asset paths; baseName and the original's directory must mirror each one. */
 export const EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS: {
   readonly version: number;
-  readonly paths: readonly EditorialEnglishAssetPathApproval[];
+  readonly paths: readonly string[];
 } = {
-  version: 10,
+  version: 11,
   paths: [
-    {
-      baseName: "corneta-obs-connection-details",
-      src: "/images/editorial/getting-started/corneta-obs-connection-details.webp",
-      originalPath:
-        "assets/originals/getting-started/corneta-obs-connection-details.png",
-    },
-    {
-      baseName: "corneta-platform-key-setup",
-      src: "/images/editorial/getting-started/corneta-platform-key-setup.webp",
-      originalPath:
-        "assets/originals/getting-started/corneta-platform-key-setup.png",
-    },
-    {
-      baseName: "corneta-quality-modes",
-      src: "/images/editorial/quality/corneta-quality-modes.webp",
-      originalPath: "assets/originals/quality/corneta-quality-modes.png",
-    },
-    {
-      baseName: "corneta-first-live-checklist",
-      src: "/images/editorial/getting-started/corneta-first-live-checklist.webp",
-      originalPath:
-        "assets/originals/getting-started/corneta-first-live-checklist.png",
-    },
-    {
-      baseName: "corneta-platform-destinations",
-      src: "/images/editorial/multistream/corneta-platform-destinations.webp",
-      originalPath:
-        "assets/originals/multistream/corneta-platform-destinations.png",
-    },
-    {
-      baseName: "corneta-live-safety-settings",
-      src: "/images/editorial/operations/corneta-live-safety-settings.webp",
-      originalPath:
-        "assets/originals/operations/corneta-live-safety-settings.png",
-    },
-    {
-      baseName: "corneta-upload-test-result",
-      src: "/images/editorial/quality/corneta-upload-test-result.webp",
-      originalPath: "assets/originals/quality/corneta-upload-test-result.png",
-    },
-    {
-      baseName: "corneta-unified-chat",
-      src: "/images/editorial/chat-and-alerts/corneta-unified-chat.webp",
-      originalPath: "assets/originals/chat-and-alerts/corneta-unified-chat.png",
-    },
-    {
-      baseName: "corneta-post-live-report",
-      src: "/images/editorial/reports-and-data/corneta-post-live-report.webp",
-      originalPath:
-        "assets/originals/reports-and-data/corneta-post-live-report.png",
-    },
-    {
-      baseName: "corneta-vertical-target-settings",
-      src: "/images/editorial/multistream/corneta-vertical-target-settings.webp",
-      originalPath:
-        "assets/originals/multistream/corneta-vertical-target-settings.png",
-    },
-    {
-      baseName: "corneta-vertical-reframe-editor",
-      src: "/images/editorial/multistream/corneta-vertical-reframe-editor.webp",
-      originalPath:
-        "assets/originals/multistream/corneta-vertical-reframe-editor.png",
-    },
+    "/images/editorial/getting-started/corneta-obs-connection-details.webp",
+    "/images/editorial/getting-started/corneta-platform-key-setup.webp",
+    "/images/editorial/quality/corneta-quality-modes.webp",
+    "/images/editorial/getting-started/corneta-first-live-checklist.webp",
+    "/images/editorial/multistream/corneta-platform-destinations.webp",
+    "/images/editorial/operations/corneta-live-safety-settings.webp",
+    "/images/editorial/quality/corneta-upload-test-result.webp",
+    "/images/editorial/chat-and-alerts/corneta-unified-chat.webp",
+    "/images/editorial/reports-and-data/corneta-post-live-report.webp",
+    "/images/editorial/multistream/corneta-vertical-target-settings.webp",
+    "/images/editorial/multistream/corneta-vertical-reframe-editor.webp",
   ],
 };
 

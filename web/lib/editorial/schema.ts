@@ -165,6 +165,11 @@ const editorialImageBaseSchema = z
   })
   .strict();
 
+/** Articles cite an asset by baseName; its file, size and provenance come from assets/manifest.json. */
+export const editorialImageReferenceSchema = editorialImageBaseSchema
+  .pick({ baseName: true, alt: true, caption: true })
+  .strict();
+
 export const editorialImageSchema = editorialImageBaseSchema.superRefine(
   (image, context) => {
     const publicFileName = image.src.split("/").at(-1) ?? "";
@@ -319,7 +324,7 @@ const draftEditorialFrontmatterSchema = z
       .array(z.string().regex(EDITORIAL_CONTENT_ID_PATTERN))
       .default([]),
     sources: z.array(editorialSourceSchema).default([]),
-    images: z.array(editorialImageSchema).default([]),
+    images: z.array(editorialImageReferenceSchema).default([]),
   })
   .strict();
 
@@ -343,7 +348,7 @@ export const publishedEditorialFrontmatterSchema = z
     primaryQuery: z.string().trim().min(3).max(180),
     related: z.array(z.string().regex(EDITORIAL_CONTENT_ID_PATTERN)),
     sources: z.array(editorialSourceSchema).min(1),
-    images: z.array(editorialImageSchema),
+    images: z.array(editorialImageReferenceSchema),
   })
   .strict();
 
@@ -450,16 +455,16 @@ export const editorialFrontmatterSchema = z
       });
     }
 
-    const seenSources = new Set<string>();
+    const seenImages = new Set<string>();
     frontmatter.images.forEach((image, index) => {
-      if (seenSources.has(image.src)) {
+      if (seenImages.has(image.baseName)) {
         context.addIssue({
           code: "custom",
           message: "the same asset was declared more than once",
-          path: ["images", index, "src"],
+          path: ["images", index, "baseName"],
         });
       }
-      seenSources.add(image.src);
+      seenImages.add(image.baseName);
     });
   });
 

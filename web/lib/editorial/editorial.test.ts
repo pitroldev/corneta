@@ -2,11 +2,11 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { editorialImageMatchesManifest } from "./asset-provenance";
 import { auditEditorialContent } from "./audit";
 import { extractEditorialBodyLinks, validateEditorialCatalog } from "./catalog";
 import { EDITORIAL_ENGLISH_PATH_APPROVALS } from "./constants";
 import { buildTableOfContents, calculateReadingTime } from "./headings";
+import { resolveEditorialImage } from "./images";
 import { isApprovedEnglishEditorialAssetPath } from "./language-approvals";
 import { EditorialValidationError, parseEditorialSource } from "./parse";
 import {
@@ -17,6 +17,25 @@ import {
   editorialSourceSchema,
 } from "./schema";
 import { buildEditorialHref, editorialSearchHref } from "./urls";
+
+function testAsset(baseName: string, directory = "tests") {
+  return editorialAssetManifestEntrySchema.parse({
+    baseName,
+    originalPath: `assets/originals/${directory}/${baseName}.png`,
+    derivatives: [
+      {
+        src: `/images/editorial/${directory}/${baseName}.webp`,
+        width: 1200,
+        height: 675,
+        bytes: 1_024,
+      },
+    ],
+    kind: "diagram",
+    source: "original",
+    rights: "owned",
+    language: "none",
+  });
+}
 
 function draftSource(
   overrides = "",
@@ -381,20 +400,13 @@ Setext example
     const document = parseEditorialSource(
       draftSource(
         `images:
-  - src: /images/editorial/tests/status-connected.webp
-    originalPath: assets/originals/tests/status-connected.png
-    baseName: status-connected
+  - baseName: status-connected
     alt: Estado conectado usado somente no teste editorial.
-    width: 1200
-    height: 675
-    kind: diagram
-    source: original
-    rights: owned
-    language: none
 `,
         '## Visual\n\n<ContentImage baseName="status-connected" />',
       ),
       "pt-BR/guides/multistream/test-article.mdx",
+      [testAsset("status-connected")],
     );
     const imageIssues = validateEditorialCatalog([document]).filter((issue) =>
       issue.code.includes("image"),
@@ -407,20 +419,13 @@ Setext example
     const document = parseEditorialSource(
       draftSource(
         `images:
-  - src: /images/editorial/tests/configuracao-transmissao.webp
-    originalPath: assets/originals/tests/configuracao-transmissao.png
-    baseName: configuracao-transmissao
+  - baseName: configuracao-transmissao
     alt: Configuração usada somente no teste editorial.
-    width: 1200
-    height: 675
-    kind: diagram
-    source: original
-    rights: owned
-    language: none
 `,
         '## Visual\n\n<ContentImage baseName="configuracao-transmissao" />',
       ),
       "pt-BR/guides/multistream/test-article.mdx",
+      [testAsset("configuracao-transmissao")],
     );
 
     expect(
@@ -429,13 +434,7 @@ Setext example
   });
 
   it("does not let an English baseName approve Portuguese public or original directories", () => {
-    const approvals = [
-      {
-        baseName: "status-connected",
-        src: "/images/editorial/status/status-connected.webp",
-        originalPath: "assets/originals/status/status-connected.png",
-      },
-    ];
+    const approvals = ["/images/editorial/status/status-connected.webp"];
 
     expect(
       isApprovedEnglishEditorialAssetPath(
@@ -457,6 +456,71 @@ Setext example
         approvals,
       ),
     ).toBe(false);
+    // An approved public path does not approve an original elsewhere or under another name.
+    expect(
+      isApprovedEnglishEditorialAssetPath(
+        {
+          baseName: "status-connected",
+          src: "/images/editorial/status/status-connected.webp",
+          originalPath: "assets/originals/configuracao/status-connected.png",
+        },
+        approvals,
+      ),
+    ).toBe(false);
+    expect(
+      isApprovedEnglishEditorialAssetPath(
+        {
+          baseName: "estado-conectado",
+          src: "/images/editorial/status/status-connected.webp",
+          originalPath: "assets/originals/status/estado-conectado.png",
+        },
+        approvals,
+      ),
+    ).toBe(false);
+  });
+
+  it("completes article images from the asset manifest and rejects copied fields", () => {
+    const document = parseEditorialSource(
+      draftSource(
+        `images:\n  - baseName: status-connected\n    alt: Estado conectado usado somente no teste editorial.\n    caption: Legenda do teste.\n`,
+        '## Visual\n\n<ContentImage baseName="status-connected" />',
+      ),
+      "pt-BR/guides/multistream/test-article.mdx",
+      [testAsset("status-connected")],
+    );
+
+    expect(document.frontmatter.images).toEqual([
+      {
+        src: "/images/editorial/tests/status-connected.webp",
+        originalPath: "assets/originals/tests/status-connected.png",
+        baseName: "status-connected",
+        alt: "Estado conectado usado somente no teste editorial.",
+        caption: "Legenda do teste.",
+        width: 1200,
+        height: 675,
+        kind: "diagram",
+        source: "original",
+        rights: "owned",
+        language: "none",
+      },
+    ]);
+    expect(() =>
+      parseEditorialSource(
+        draftSource(
+          `images:\n  - baseName: status-connected\n    alt: Estado conectado usado somente no teste editorial.\n`,
+        ),
+        "pt-BR/guides/multistream/test-article.mdx",
+      ),
+    ).toThrow(/not declared in assets\/manifest.json/);
+    expect(() =>
+      parseEditorialSource(
+        draftSource(
+          `images:\n  - baseName: status-connected\n    alt: Estado conectado usado somente no teste editorial.\n    width: 1200\n`,
+        ),
+        "pt-BR/guides/multistream/test-article.mdx",
+        [testAsset("status-connected")],
+      ),
+    ).toThrow(EditorialValidationError);
   });
 
   it("requires complete provenance in the manifest too", () => {
@@ -485,7 +549,7 @@ Setext example
     expect(parsed.success).toBe(false);
   });
 
-  it("requires the OBS version and matching frontmatter and manifest metadata", () => {
+  it("requires the OBS version and takes image metadata from the manifest", () => {
     const imageInput = {
       src: "/images/editorial/tests/obs-settings.webp",
       originalPath: "assets/originals/tests/obs-settings.png",
@@ -533,13 +597,16 @@ Setext example
       sourceVersion: "30.2.3",
     });
 
-    expect(editorialImageMatchesManifest(image, manifestEntry)).toBe(true);
     expect(
-      editorialImageMatchesManifest(image, {
-        ...manifestEntry,
-        sourceVersion: "31.0.0",
-      }),
-    ).toBe(false);
+      resolveEditorialImage({ baseName: image.baseName, alt: image.alt }, [
+        manifestEntry,
+      ]),
+    ).toEqual(image);
+    expect(
+      resolveEditorialImage({ baseName: image.baseName, alt: image.alt }, [
+        { ...manifestEntry, sourceVersion: "31.0.0" },
+      ])?.sourceVersion,
+    ).toBe("31.0.0");
   });
 
   it("rejects credentials and sensitive parameters in source and author URLs", () => {

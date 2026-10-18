@@ -4,9 +4,13 @@ import path from "node:path";
 import { promisify } from "node:util";
 import matter from "gray-matter";
 import { auditEditorialContent } from "../lib/editorial/audit";
+import { resolveEditorialImage } from "../lib/editorial/images";
+import { editorialAssetManifestSchema } from "../lib/editorial/schema";
+import type { EditorialAssetManifestEntry } from "../lib/editorial/types";
 import { normalizeEditorialRevisionSource } from "./editorial-revision-source";
 import { editorialArguments, isEditorialCliEntrypoint } from "./editorial-cli";
 import {
+  sameEditorialImages,
   validateChangedInternalSources,
   validateEditorialRevision,
   type EditorialRevisionFrontmatter,
@@ -23,6 +27,7 @@ import {
 } from "../lib/editorial/source-impact";
 
 const execFileAsync = promisify(execFile);
+const ASSET_MANIFEST_PATH = "web/content/assets/manifest.json";
 
 interface Options {
   base: string;
@@ -150,11 +155,53 @@ function snapshotFromRaw(
   };
 }
 
+async function assetsAt(
+  repositoryRoot: string,
+  revision: string,
+): Promise<EditorialAssetManifestEntry[]> {
+  try {
+    await git(repositoryRoot, [
+      "cat-file",
+      "-e",
+      `${revision}:${ASSET_MANIFEST_PATH}`,
+    ]);
+  } catch {
+    return [];
+  }
+  const raw = await git(repositoryRoot, [
+    "show",
+    `${revision}:${ASSET_MANIFEST_PATH}`,
+  ]);
+  return editorialAssetManifestSchema.parse(JSON.parse(raw)).assets;
+}
+
+/** Older revisions copied every asset field into the article; compare both sides as manifest-completed images. */
+function withResolvedImages(
+  snapshot: EditorialRevisionSnapshot,
+  assets: readonly EditorialAssetManifestEntry[],
+): EditorialRevisionSnapshot {
+  const images = snapshot.frontmatter.images;
+  if (!Array.isArray(images)) return snapshot;
+  snapshot.frontmatter.images = images.map((image: unknown) => {
+    if (!image || typeof image !== "object") return image;
+    const { baseName, alt, caption } = image as Record<string, unknown>;
+    if (typeof baseName !== "string" || typeof alt !== "string") return image;
+    return (
+      resolveEditorialImage(
+        { baseName, alt, ...(typeof caption === "string" ? { caption } : {}) },
+        assets,
+      ) ?? image
+    );
+  });
+  return snapshot;
+}
+
 async function previousSnapshot(
   repositoryRoot: string,
   base: string,
   repositoryPath: string,
   relativePath: string,
+  assets: readonly EditorialAssetManifestEntry[],
 ): Promise<EditorialRevisionSnapshot | null> {
   try {
     await git(repositoryRoot, ["cat-file", "-e", `${base}:${repositoryPath}`]);
@@ -162,7 +209,7 @@ async function previousSnapshot(
     return null;
   }
   const raw = await git(repositoryRoot, ["show", `${base}:${repositoryPath}`]);
-  return snapshotFromRaw(raw, relativePath);
+  return withResolvedImages(snapshotFromRaw(raw, relativePath), assets);
 }
 
 async function readSourceImpact(
@@ -259,6 +306,7 @@ async function main(): Promise<void> {
     return blob;
   };
 
+  const baseAssets = await assetsAt(repositoryRoot, options.base);
   const issues: EditorialRevisionIssue[] = [];
   let comparedArticles = 0;
   let sourceAffectedArticles = 0;
@@ -272,6 +320,7 @@ async function main(): Promise<void> {
       options.base,
       repositoryPath,
       document.relativePath,
+      baseAssets,
     );
     if (!previous) continue;
 
@@ -282,7 +331,10 @@ async function main(): Promise<void> {
       frontmatter: document.frontmatter,
     };
 
-    if (changedPaths.has(repositoryPath)) {
+    if (
+      changedPaths.has(repositoryPath) ||
+      !sameEditorialImages(previous.frontmatter, current.frontmatter)
+    ) {
       const [normalizedPrevious, normalizedCurrent] = await Promise.all([
         normalizeEditorialRevisionSource(previous),
         normalizeEditorialRevisionSource(current),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hasSubstantiveEditorialChange,
+  sameEditorialImages,
   validateChangedInternalSources,
   validateEditorialRevision,
   type EditorialRevisionSnapshot,
@@ -134,6 +135,36 @@ describe("editorial revision policy", () => {
       }),
       expect.objectContaining({ code: "review-date-regression" }),
     ]);
+  });
+
+  it("compares images by their resolved content, not by YAML key order", () => {
+    const image = {
+      baseName: "status-connected",
+      alt: "Estado conectado.",
+      src: "/images/editorial/tests/status-connected.webp",
+      capturedAt: "2026-08-01",
+    };
+    const previous = snapshot({ images: [image] });
+    const reordered = snapshot({
+      images: [
+        {
+          capturedAt: image.capturedAt,
+          src: image.src,
+          alt: image.alt,
+          baseName: image.baseName,
+        },
+      ],
+    });
+    const recaptured = snapshot({
+      images: [{ ...image, capturedAt: "2026-10-18" }],
+    });
+
+    expect(
+      sameEditorialImages(previous.frontmatter, reordered.frontmatter),
+    ).toBe(true);
+    expect(
+      sameEditorialImages(previous.frontmatter, recaptured.frontmatter),
+    ).toBe(false);
   });
 
   it("accepts technical review against a new version without requiring updatedAt", () => {

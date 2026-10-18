@@ -1,8 +1,14 @@
 import matter from "gray-matter";
 import { ZodError } from "zod";
 import { buildTableOfContents, calculateReadingTime } from "./headings";
-import { editorialFrontmatterSchema } from "./schema";
-import type { EditorialDocument } from "./types";
+import { resolveEditorialImage } from "./images";
+import { editorialFrontmatterSchema, editorialImageSchema } from "./schema";
+import type {
+  EditorialAssetManifestEntry,
+  EditorialDocument,
+  EditorialFrontmatter,
+  EditorialImage,
+} from "./types";
 import { buildEditorialHref } from "./urls";
 
 export class EditorialValidationError extends Error {
@@ -32,6 +38,7 @@ function formatZodError(error: ZodError): string[] {
 export function parseEditorialSource(
   rawSource: string,
   relativePath: string,
+  assets: readonly EditorialAssetManifestEntry[] = [],
 ): EditorialDocument {
   let parsedMatter: ReturnType<typeof matter>;
 
@@ -56,7 +63,35 @@ export function parseEditorialSource(
     );
   }
 
-  const frontmatter = parsedFrontmatter.data;
+  const images: EditorialImage[] = [];
+  const imageIssues: string[] = [];
+  parsedFrontmatter.data.images.forEach((reference, index) => {
+    const resolved = resolveEditorialImage(reference, assets);
+    if (!resolved) {
+      imageIssues.push(
+        `images.${index}.baseName: not declared in assets/manifest.json: ${reference.baseName}`,
+      );
+      return;
+    }
+    const checked = editorialImageSchema.safeParse(resolved);
+    if (!checked.success) {
+      imageIssues.push(
+        ...formatZodError(checked.error).map(
+          (detail) => `images.${index}.${detail}`,
+        ),
+      );
+      return;
+    }
+    images.push(checked.data);
+  });
+  if (imageIssues.length > 0) {
+    throw new EditorialValidationError(relativePath, imageIssues);
+  }
+
+  const frontmatter = {
+    ...parsedFrontmatter.data,
+    images,
+  } as EditorialFrontmatter;
   const route = {
     locale: frontmatter.locale,
     collection: frontmatter.collection,

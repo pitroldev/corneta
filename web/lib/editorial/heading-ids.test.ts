@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { describe, expect, it } from "vitest";
 import { extractMarkdownHeadingIds } from "./headings";
 import { parseEditorialSource } from "./parse";
+import { editorialAssetManifestSchema } from "./schema";
 
 const contentRoot = fileURLToPath(new URL("../../content", import.meta.url));
 
@@ -45,6 +46,14 @@ function collectHeadingIds(ids: string[]) {
 
 describe("article heading ids", () => {
   it("match the ids the article page renders with rehype-slug", async () => {
+    const { assets } = editorialAssetManifestSchema.parse(
+      JSON.parse(
+        await readFile(
+          path.join(contentRoot, "assets", "manifest.json"),
+          "utf8",
+        ),
+      ),
+    );
     const files = await mdxFiles(contentRoot);
     expect(files.length).toBeGreaterThan(0);
 
@@ -55,6 +64,7 @@ describe("article heading ids", () => {
       const document = parseEditorialSource(
         await readFile(file, "utf8"),
         relativePath,
+        assets,
       );
       const rendered: string[] = [];
       await serialize(document.source, {
