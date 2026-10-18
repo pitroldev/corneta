@@ -211,6 +211,12 @@ pub struct Settings {
     pub loudness_target_lufs: f64,
     #[serde(default = "default_true")]
     pub youtube_auto_live: bool,
+    /// Privacy of the broadcast the auto-live creates; one of `YOUTUBE_PRIVACY`.
+    #[serde(default = "default_youtube_privacy")]
+    pub youtube_privacy: String,
+    /// Sent as selfDeclaredMadeForKids; YouTube then turns the live chat off.
+    #[serde(default)]
+    pub youtube_made_for_kids: bool,
     #[serde(default)]
     pub stream_title: String,
     #[serde(default = "default_true")]
@@ -276,6 +282,10 @@ fn default_true() -> bool {
 }
 fn default_loudness_target() -> f64 {
     -14.0
+}
+pub const YOUTUBE_PRIVACY: [&str; 3] = ["public", "unlisted", "private"];
+fn default_youtube_privacy() -> String {
+    "public".to_string()
 }
 fn default_popout_tab() -> String {
     "both".to_string()
@@ -393,6 +403,8 @@ impl Default for Settings {
             loudness_normalize: false,
             loudness_target_lufs: -14.0,
             youtube_auto_live: true,
+            youtube_privacy: default_youtube_privacy(),
+            youtube_made_for_kids: false,
             stream_title: String::new(),
             chat_auto_connect: true,
             chat_popout_tab: default_popout_tab(),
@@ -611,6 +623,9 @@ impl AppConfig {
         s.obs_password = s.obs_password.chars().take(512).collect();
         s.youtube_api_key = s.youtube_api_key.chars().take(512).collect();
         s.stream_title = s.stream_title.chars().take(200).collect();
+        if !YOUTUBE_PRIVACY.contains(&s.youtube_privacy.as_str()) {
+            s.youtube_privacy = default_youtube_privacy();
+        }
         s.guardian_watchlist.truncate(100);
         for term in &mut s.guardian_watchlist {
             *term = term.trim().chars().take(200).collect();
@@ -919,6 +934,27 @@ mod tests {
             !cfg.profiles[0].targets[0].has_key,
             "profile credential presence must also be cleared"
         );
+    }
+
+    #[test]
+    fn youtube_audience_defaults_to_public_and_rejects_unknown_privacy() {
+        let defaults = AppConfig::default().settings;
+        assert_eq!(defaults.youtube_privacy, "public");
+        assert!(!defaults.youtube_made_for_kids);
+
+        for (privacy, expected) in [
+            ("unlisted", "unlisted"),
+            ("private", "private"),
+            ("friends", "public"),
+        ] {
+            let mut cfg = AppConfig::default();
+            cfg.settings.youtube_privacy = privacy.into();
+            let cfg = cfg.validate_and_normalize().expect("valid configuration");
+            assert_eq!(
+                cfg.settings.youtube_privacy, expected,
+                "privacy {privacy:?}"
+            );
+        }
     }
 
     /// Destination validation and vault lookup must accept the same identifier namespace.

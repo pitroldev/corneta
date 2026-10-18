@@ -1160,8 +1160,16 @@ export const en: Dict = {
   "golive.streamInfo.youtubeAuto.desc":
     " — Corneta creates the broadcast when you hit GO LIVE, so you never open YouTube Studio.",
   "golive.streamInfo.youtubeAuto.title": "YouTube on autopilot",
+  "golive.streamInfo.youtubeKids.desc":
+    " — YouTube turns the live chat off. Only tick it if the content is made for kids.",
+  "golive.streamInfo.youtubeKids.title": "Made for kids",
   "golive.streamInfo.youtubeNote":
     "On YouTube you can only change the {titulo} (not the game).",
+  "golive.streamInfo.youtubePrivacy.label": "Who can watch",
+  "golive.streamInfo.youtubePrivacy.private": "Private (just you)",
+  "golive.streamInfo.youtubePrivacy.public": "Public",
+  "golive.streamInfo.youtubePrivacy.unlisted":
+    "Unlisted (anyone with the link)",
   "golive.target.noName": "(no name)",
   "golive.target.openChannel.aria": "Open your {nome} channel",
   "golive.target.openChannel.title": "Open your channel on the platform",

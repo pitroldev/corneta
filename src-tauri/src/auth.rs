@@ -2198,8 +2198,18 @@ impl youtube_broadcast::Store for YoutubeBroadcastStore {
 
 struct YoutubeBroadcastRemote {
     token: Option<String>,
+    privacy: String,
+    made_for_kids: bool,
 }
 impl YoutubeBroadcastRemote {
+    /// Stop and recovery never create a broadcast, so they need no audience settings.
+    fn without_audience(token: Option<String>) -> Self {
+        Self {
+            token,
+            privacy: "public".to_string(),
+            made_for_kids: false,
+        }
+    }
     fn token(&self) -> Result<&str, BroadcastError> {
         self.token.as_deref().ok_or(BroadcastError::SignIn)
     }
@@ -2224,21 +2234,25 @@ fn youtube_remote_state(value: &Value, expected_id: &str) -> Result<RemoteState,
     }
 }
 
+fn youtube_broadcast_body(title: &str, start: &str, privacy: &str, made_for_kids: bool) -> Value {
+    let title: String = title.chars().take(100).collect();
+    // Disable auto-stop so a long interruption remains recoverable; stop explicitly instead.
+    json!({
+        "snippet": { "title": title, "scheduledStartTime": start },
+        "status": { "privacyStatus": privacy, "selfDeclaredMadeForKids": made_for_kids },
+        "contentDetails": {
+            "enableAutoStart": true,
+            "enableAutoStop": false,
+            "monitorStream": { "enableMonitorStream": false }
+        }
+    })
+}
+
 impl youtube_broadcast::Remote for YoutubeBroadcastRemote {
     fn create(&mut self, title: &str) -> Result<String, BroadcastError> {
         let token = self.token()?;
         let start = rfc3339_utc(now_ms() / 1000 + 60); // YouTube requires a future scheduled start.
-        let title: String = title.chars().take(100).collect();
-        // Disable auto-stop so a long interruption remains recoverable; stop explicitly instead.
-        let body = json!({
-            "snippet": { "title": title, "scheduledStartTime": start },
-            "status": { "privacyStatus": "public", "selfDeclaredMadeForKids": false },
-            "contentDetails": {
-                "enableAutoStart": true,
-                "enableAutoStop": false,
-                "monitorStream": { "enableMonitorStream": false }
-            }
-        });
+        let body = youtube_broadcast_body(title, &start, &self.privacy, self.made_for_kids);
         let resp = google_json_typed(
         "POST",
         "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails",
@@ -2316,6 +2330,8 @@ impl youtube_broadcast::Remote for YoutubeBroadcastRemote {
 pub fn youtube_provision_broadcast(
     app: &AppHandle,
     title: &str,
+    privacy: &str,
+    made_for_kids: bool,
     generation: u64,
 ) -> Result<(String, String), String> {
     let mut recovery = YT_BROADCAST
@@ -2331,6 +2347,8 @@ pub fn youtube_provision_broadcast(
     }
     let mut remote = YoutubeBroadcastRemote {
         token: youtube_token(app),
+        privacy: privacy.to_string(),
+        made_for_kids,
     };
     recovery
         .provision(
@@ -2359,9 +2377,7 @@ pub fn youtube_complete_active(app: &AppHandle, generation: u64) -> Result<(), S
         "unknown" => return Err(BroadcastError::CreationUnknown.message()),
         _ => {}
     }
-    let mut remote = YoutubeBroadcastRemote {
-        token: youtube_token(app),
-    };
+    let mut remote = YoutubeBroadcastRemote::without_audience(youtube_token(app));
     recovery
         .stop(generation, &mut YoutubeBroadcastStore, &mut remote)
         .map_err(BroadcastError::message)
@@ -2422,9 +2438,7 @@ pub async fn youtube_retry_broadcast_cleanup(app: AppHandle) -> Result<(), Strin
             }
             engine.begin_pending_activity()
         };
-        let mut remote = YoutubeBroadcastRemote {
-            token: youtube_token(&app),
-        };
+        let mut remote = YoutubeBroadcastRemote::without_audience(youtube_token(&app));
         // A concurrent start waits on YT_BROADCAST before it can create or bind anything.
         let result = recovery
             .retry_stopped(true, &mut YoutubeBroadcastStore, &mut remote)
@@ -2439,6 +2453,22 @@ pub async fn youtube_retry_broadcast_cleanup(app: AppHandle) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn youtube_broadcast_body_carries_the_chosen_audience() {
+        let body = youtube_broadcast_body("Live", "2026-10-18T22:00:00Z", "unlisted", true);
+        assert_eq!(body["status"]["privacyStatus"], "unlisted");
+        assert_eq!(body["status"]["selfDeclaredMadeForKids"], true);
+        assert_eq!(body["contentDetails"]["enableAutoStop"], false);
+
+        let long_title = "x".repeat(150);
+        let body = youtube_broadcast_body(&long_title, "2026-10-18T22:00:00Z", "public", false);
+        assert_eq!(
+            body["snippet"]["title"].as_str().map(|t| t.chars().count()),
+            Some(100)
+        );
+        assert_eq!(body["status"]["selfDeclaredMadeForKids"], false);
+    }
 
     #[test]
     fn youtube_callback_error_never_echoes_provider_text() {
