@@ -5,7 +5,7 @@ async function loadSiteModule() {
   return import("./site");
 }
 
-describe.sequential("canonical site URL", () => {
+describe("canonical site URL", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
