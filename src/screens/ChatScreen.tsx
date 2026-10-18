@@ -20,8 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { AlertsFeed } from "../components/AlertsFeed";
-import { ChatFeed, type ChatView } from "../components/ChatFeed";
+import { type ChatView } from "../components/ChatFeed";
 import { CinefyAudience } from "../components/CinefyAudience";
 import { LegalLink } from "../components/legal";
 import { Modal } from "../components/Modal";
@@ -71,18 +70,21 @@ import {
 import { OverlayCard } from "./chat/OverlaySettings";
 import { FilterChip, splitAt, ToggleRow } from "./chat/primitives";
 import { SourceCard, YoutubeApiKeyField } from "./chat/SourceCard";
+import {
+  AlertCountLabel,
+  LiveAlertsFeed,
+  LiveChatFeed,
+} from "./chat/LiveFeeds";
 
 export function ChatScreen() {
   const { t, fmt, locale } = useI18n();
   const config = useStore((s) => s.config);
   const setSettings = useStore((s) => s.setSettings);
-  const messages = useStore((s) => s.chatMessages);
   const connected = useStore((s) => s.chatConnected);
   const statuses = useStore((s) => s.chatStatuses);
   const connectChat = useStore((s) => s.connectChat);
   const disconnectChat = useStore((s) => s.disconnectChat);
   const clearChat = useStore((s) => s.clearChat);
-  const alerts = useStore((s) => s.alerts);
   const clearAlerts = useStore((s) => s.clearAlerts);
   const viewers = useStore((s) => s.viewers);
   const setAlertToken = useStore((s) => s.setAlertToken);
@@ -144,11 +146,22 @@ export function ChatScreen() {
 
   const showAlerts = config?.settings.chatShowAlertsPanel ?? false;
   // Do not auto-open on new alerts: reflow would interrupt reading during a live stream.
-  const prevAlerts = useRef(alerts.length);
+  // Watch the store directly so each alert does not re-render this whole screen.
+  const showAlertsRef = useRef(showAlerts);
   useEffect(() => {
-    if (alerts.length > prevAlerts.current && !showAlerts) setAlertPulse(true);
-    prevAlerts.current = alerts.length;
-  }, [alerts.length, showAlerts]);
+    showAlertsRef.current = showAlerts;
+  }, [showAlerts]);
+  useEffect(
+    () =>
+      useStore.subscribe((state, previous) => {
+        if (
+          state.alerts.length > previous.alerts.length &&
+          !showAlertsRef.current
+        )
+          setAlertPulse(true);
+      }),
+    [],
+  );
 
   // Preview the font size while dragging; the setting is saved once when the drag ends.
   const [fontPreview, setFontPreview] = useState<number | null>(null);
@@ -187,11 +200,10 @@ export function ChatScreen() {
     ),
   ];
   const showFilters = feedPlatforms.length > 1;
-  const shown =
+  const platformFilter =
     !showFilters || feedPlatforms.every((platform) => filter[platform])
-      ? messages
-      : messages.filter((m) => filter[m.platform]);
-  const allFilteredOut = messages.length > 0 && shown.length === 0;
+      ? null
+      : filter;
 
   const addSource = (platform: ChatPlatform) =>
     setSettings({
@@ -989,9 +1001,13 @@ export function ChatScreen() {
           title={alertPulse ? t("chat.alerts.newPulse") : undefined}
         >
           <Bell className="size-4" />{" "}
-          {alerts.length > 0
-            ? t("chat.alerts.button.count", { n: alerts.length })
-            : t("chat.alerts.button")}
+          <AlertCountLabel>
+            {(n) =>
+              n > 0
+                ? t("chat.alerts.button.count", { n })
+                : t("chat.alerts.button")
+            }
+          </AlertCountLabel>
         </Button>
         <Button
           variant={confirmClearChat ? "danger" : "ghost"}
@@ -1013,11 +1029,10 @@ export function ChatScreen() {
 
       <div className="flex gap-3">
         <Card className="flex h-[54vh] flex-1 flex-col overflow-hidden p-0">
-          <ChatFeed
-            messages={shown}
+          <LiveChatFeed
+            platformFilter={platformFilter}
             view={view}
             connected={connected}
-            allFilteredOut={allFilteredOut}
             className="flex-1"
             onFontSize={(n) => setSettings({ chatFontSize: n })}
             modLevel={modLevel}
@@ -1110,8 +1125,7 @@ export function ChatScreen() {
                 ))}
               </div>
             )}
-            <AlertsFeed
-              alerts={alerts}
+            <LiveAlertsFeed
               className="flex-1"
               fontSize={alertFontPreview ?? s.alertFontSize ?? 14}
             />
