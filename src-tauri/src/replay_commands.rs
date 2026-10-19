@@ -247,36 +247,43 @@ mod tests {
         }
     }
 
+    const ID: &str = "1721400000000";
+    const OTHER_ID: &str = "1721400000001";
+
     #[test]
     fn rejects_relative_paths_and_foreign_recording_names() {
-        assert!(recording_path("123.mp4").is_err());
-        assert!(session_recording("123", Path::new("124.mp4")).is_err());
-        assert!(session_recording("123", Path::new("123.p0.mp4")).is_err());
-        assert!(session_recording("123", Path::new("123.p2.mp4")).is_ok());
+        assert!(recording_path(&format!("{ID}.mp4")).is_err());
+        assert!(session_recording(ID, Path::new(&format!("{OTHER_ID}.mp4"))).is_err());
+        assert!(session_recording(ID, Path::new(&format!("{ID}.p0.mp4"))).is_err());
+        assert!(session_recording(ID, Path::new(&format!("{ID}.p2.mp4"))).is_ok());
+        assert!(session_recording("123", Path::new("123.p2.mp4")).is_err());
     }
 
     #[test]
     fn repair_requires_the_exact_recording_in_the_session() {
         let fixture = Fixture::new();
-        let recording = fixture.file("123.mp4", b"synthetic");
-        let journal = fixture.file("123.ndjson", b"{\"kind\":\"meta\"}\n");
-        assert!(authorize_repair(&journal, "123", &recording).is_err());
+        let recording = fixture.file(&format!("{ID}.mp4"), b"synthetic");
+        let journal = fixture.file(&format!("{ID}.ndjson"), b"{\"kind\":\"meta\"}\n");
+        assert!(authorize_repair(&journal, ID, &recording).is_err());
         let record = serde_json::json!({"kind":"recording", "seg":1,"path":recording});
         std::fs::write(&journal, serde_json::to_vec(&record).unwrap()).unwrap();
-        assert_eq!(authorize_repair(&journal, "123", &recording).unwrap().1, 1);
-        assert!(authorize_repair(&journal, "124", &recording).is_err());
+        assert_eq!(authorize_repair(&journal, ID, &recording).unwrap().1, 1);
+        assert!(authorize_repair(&journal, OTHER_ID, &recording).is_err());
         let other = fixture.0.join("other");
         std::fs::create_dir(&other).unwrap();
-        let impostor = other.join("123.mp4");
+        let impostor = other.join(format!("{ID}.mp4"));
         std::fs::write(&impostor, b"synthetic").unwrap();
-        assert!(authorize_repair(&journal, "123", &impostor).is_err());
+        assert!(authorize_repair(&journal, ID, &impostor).is_err());
     }
 
     #[test]
     fn repair_caps_malformed_journal_lines() {
         let fixture = Fixture::new();
-        let recording = fixture.file("123.mp4", b"synthetic");
-        let journal = fixture.file("123.ndjson", &vec![b'x'; JOURNAL_LINE_LIMIT as usize + 1]);
-        assert!(authorize_repair(&journal, "123", &recording).is_err());
+        let recording = fixture.file(&format!("{ID}.mp4"), b"synthetic");
+        let journal = fixture.file(
+            &format!("{ID}.ndjson"),
+            &vec![b'x'; JOURNAL_LINE_LIMIT as usize + 1],
+        );
+        assert!(authorize_repair(&journal, ID, &recording).is_err());
     }
 }

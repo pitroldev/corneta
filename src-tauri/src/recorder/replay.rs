@@ -496,6 +496,61 @@ mod tests {
         }
     }
 
+    /// A directory link that needs no symlink privilege on Windows.
+    fn link_dir(target: &Path, link: &Path) -> bool {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).is_ok()
+        }
+        #[cfg(windows)]
+        {
+            std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(link)
+                .arg(target)
+                .output()
+                .is_ok_and(|output| output.status.success())
+        }
+    }
+
+    #[test]
+    fn boot_cleanup_skips_links_and_lookalike_temporaries() {
+        let fixture = FixtureDirectory::new();
+        let dir = fixture.0.join("recordings");
+        let outside = fixture.0.join("outside");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        let victim = outside.join(format!("{TEMPORARY_PREFIX}inside.mp4"));
+        std::fs::write(&victim, b"fixture").unwrap();
+        let lookalikes = [
+            "corneta-replay-abc.mp4",
+            ".corneta-replays-abc.mp4",
+            ".corneta-replay-abc.mp4.part",
+            ".corneta-replay-abc.MP4",
+            "1721400000000.mp4",
+        ]
+        .map(|name| dir.join(name));
+        for path in &lookalikes {
+            std::fs::write(path, b"fixture").unwrap();
+        }
+        let link = dir.join(format!("{TEMPORARY_PREFIX}link.mp4"));
+        assert!(
+            link_dir(&outside, &link),
+            "could not create a directory link"
+        );
+
+        remove_orphan_temporaries(&dir);
+
+        assert!(
+            std::fs::symlink_metadata(&link).is_ok(),
+            "the link must stay"
+        );
+        assert_eq!(std::fs::read(&victim).unwrap(), b"fixture");
+        for path in &lookalikes {
+            assert!(path.exists(), "{} must stay", path.display());
+        }
+    }
+
     fn indexed_file() -> Vec<u8> {
         let mut bytes = vec![0, 0, 0, 24, b'm', b'o', b'o', b'v'];
         bytes.extend([0, 0, 0, 8, b'm', b'v', b'h', b'd']);

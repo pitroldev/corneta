@@ -51,6 +51,22 @@ fn video_name_rejects_foreign_files() {
         "1721400000000.pX.mp4",
         "../../1721400000000.mp4",
         "casamento-1721400000000.mp4",
+        // Digit-only names that are not a Corneta session timestamp.
+        "1.mp4",
+        "2024.mp4",
+        "20240115.mp4",
+        "20240115143022.mp4",
+        "0721400000000.mp4",
+        // Segment spellings that video_path never writes.
+        "1721400000000.p0.mp4",
+        "1721400000000.p1.mp4",
+        "1721400000000.p01.mp4",
+        "1721400000000.p+2.mp4",
+        "1721400000000.p-2.mp4",
+        "1721400000000.p 2.mp4",
+        "1721400000000.p99999999999.mp4",
+        "1721400000000.MP4",
+        "1721400000000.mp4.part",
     ] {
         assert_eq!(parse_video_name(foreign), None, "must not match: {foreign}");
     }
@@ -335,7 +351,8 @@ fn retention_preserves_the_report_and_chat_of_a_preparing_recording() {
         store.create(path, &json!({"synthetic": true}));
         store.create(&chat_path(path), &json!({"synthetic": true}));
     }
-    super::prune_sessions_with(&store, Path::new("/s"), 0, |path| path == protected);
+    let pruned = super::prune_sessions_with(&store, Path::new("/s"), 0, |path| path == protected);
+    assert_eq!(pruned, ["2000"]);
     assert!(store.read(protected).is_some());
     assert!(store.read(&chat_path(protected)).is_some());
     assert!(store.read(removed).is_none());
@@ -381,35 +398,83 @@ fn retention_does_not_remove_a_preparing_orphan() {
     assert!(store.read(protected).is_some());
 }
 
-struct PruneWorkspace(PathBuf);
+/// Session IDs as Corneta writes them: epoch milliseconds.
+const KEPT: &str = "1721400000000";
+const OLDER: &str = "1721300000000";
+const UNKNOWN: &str = "1721200000000";
+const SYNTHETIC: &[u8] = b"synthetic-video";
+
+/// A test-owned temporary tree with a session directory, a configured recording folder, and an
+/// unrelated folder that links may point into.
+struct PruneWorkspace {
+    root: PathBuf,
+    read_only: std::cell::RefCell<Vec<PathBuf>>,
+}
 
 impl PruneWorkspace {
     fn new() -> Self {
         let root =
             std::env::temp_dir().join(format!("corneta-prune-isolation-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir(&root).unwrap();
-        let workspace = Self(root);
-        std::fs::create_dir(workspace.0.join("sessions")).unwrap();
-        std::fs::create_dir(workspace.0.join("imported")).unwrap();
-        workspace
+        for dir in ["sessions", "imported", "elsewhere"] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        Self {
+            root,
+            read_only: Default::default(),
+        }
+    }
+
+    fn sessions(&self) -> PathBuf {
+        self.root.join("sessions")
+    }
+
+    fn imported(&self) -> PathBuf {
+        self.root.join("imported")
+    }
+
+    fn elsewhere(&self) -> PathBuf {
+        self.root.join("elsewhere")
+    }
+
+    fn file(&self, dir: &Path, name: &str) -> PathBuf {
+        let path = dir.join(name);
+        std::fs::write(&path, SYNTHETIC).unwrap();
+        path
+    }
+
+    fn journal(&self, id: &str) -> PathBuf {
+        let path = self.sessions().join(format!("{id}.ndjson"));
+        std::fs::write(&path, b"{\"kind\":\"meta\"}\n").unwrap();
+        path
+    }
+
+    fn read_only_file(&self, dir: &Path, name: &str) -> PathBuf {
+        let path = self.file(dir, name);
+        let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&path, permissions).unwrap();
+        self.read_only.borrow_mut().push(path.clone());
+        path
     }
 }
 
 impl Drop for PruneWorkspace {
     fn drop(&mut self) {
-        // Delete only fixed paths in this test-owned directory, never real recordings or configuration.
-        for file in [
-            "sessions/1000.mp4",
-            "sessions/3000.mp4",
-            "sessions/3000.ndjson",
-            "imported/2000.mp4",
-        ] {
-            let _ = std::fs::remove_file(self.0.join(file));
+        // Windows refuses to delete read-only files; the root holds only synthetic fixtures.
+        for path in self.read_only.borrow().iter() {
+            if let Ok(meta) = std::fs::metadata(path) {
+                let mut permissions = meta.permissions();
+                #[allow(clippy::permissions_set_readonly_false)]
+                permissions.set_readonly(false);
+                let _ = std::fs::set_permissions(path, permissions);
+            }
         }
-        let _ = std::fs::remove_dir(self.0.join("sessions"));
-        let _ = std::fs::remove_dir(self.0.join("imported"));
-        let _ = std::fs::remove_dir(&self.0);
+        let _ = std::fs::remove_dir_all(&self.root);
     }
+}
+
+fn intact(path: &Path) -> bool {
+    std::fs::read(path).is_ok_and(|bytes| bytes == SYNTHETIC)
 }
 
 #[test]
@@ -418,37 +483,214 @@ fn contributor_automatic_prune_preserves_imported_videos_and_prunes_only_its_own
 }
 
 #[test]
-fn official_automatic_prune_keeps_existing_custom_directory_behavior() {
+fn official_automatic_prune_removes_only_reported_recordings_from_the_custom_directory() {
     check_automatic_prune_scope(false);
 }
 
 fn check_automatic_prune_scope(contributor: bool) {
     let workspace = PruneWorkspace::new();
-    let sessions = workspace.0.join("sessions");
-    let imported = workspace.0.join("imported");
-    let own_orphan = sessions.join("1000.mp4");
-    let own_kept = sessions.join("3000.mp4");
-    let foreign_video = imported.join("2000.mp4");
-    for file in [&own_orphan, &own_kept, &foreign_video] {
-        std::fs::write(file, b"synthetic-video").unwrap();
-    }
-    std::fs::write(sessions.join("3000.ndjson"), b"{\"kind\":\"meta\"}\n").unwrap();
+    let (sessions, imported) = (workspace.sessions(), workspace.imported());
+    let own_orphan = workspace.file(&sessions, &format!("{UNKNOWN}.mp4"));
+    let own_kept = workspace.file(&sessions, &format!("{KEPT}.mp4"));
+    workspace.journal(KEPT);
+    workspace.journal(OLDER);
+    // Same name pattern, but no report on this installation: a reinstall or imported settings.
+    let foreign_video = workspace.file(&imported, &format!("{UNKNOWN}.p2.mp4"));
+    let reported_video = workspace.file(&imported, &format!("{OLDER}.mp4"));
 
-    assert_eq!(
-        super::prune_videos_in(
-            &super::store::DiskStore,
-            &sessions,
-            Some(&imported),
-            1,
-            contributor,
-        ),
+    let leftover = super::prune_videos_in(
+        &super::store::DiskStore,
+        &sessions,
+        Some(&imported),
         0,
+        contributor,
     );
     assert!(!own_orphan.exists());
-    assert!(own_kept.exists());
-    assert_eq!(foreign_video.exists(), contributor);
-    if contributor {
-        assert_eq!(std::fs::read(foreign_video).unwrap(), b"synthetic-video");
+    assert!(
+        !own_kept.exists(),
+        "a zero budget prunes reported recordings"
+    );
+    assert!(
+        intact(&foreign_video),
+        "a recording without a report is not ours to delete"
+    );
+    assert_eq!(intact(&reported_video), contributor);
+    assert_eq!(leftover, 0);
+}
+
+#[test]
+fn prune_never_deletes_foreign_or_lookalike_files() {
+    let workspace = PruneWorkspace::new();
+    let (sessions, imported) = (workspace.sessions(), workspace.imported());
+    workspace.journal(KEPT);
+    let lookalikes = [
+        "ferias.mp4".to_string(),
+        "OBS 2024-07-30 21-15-03.mp4".into(),
+        "1.mp4".into(),
+        "2024.mp4".into(),
+        "20240115143022.mp4".into(),
+        "0721400000000.mp4".into(),
+        format!("{KEPT}.p01.mp4"),
+        format!("{KEPT}.p+2.mp4"),
+        format!("{KEPT}.p1.mp4"),
+        format!("{KEPT}.p0.mp4"),
+        format!("{KEPT}.mp4.part"),
+        format!("{KEPT}.MP4"),
+        format!("{KEPT}.mkv"),
+        format!("{KEPT}.chat.ndjson.bak"),
+        "notes.txt".into(),
+    ];
+    let mut untouchable = Vec::new();
+    for dir in [&sessions, &imported] {
+        for name in &lookalikes {
+            untouchable.push(workspace.file(dir, name));
+        }
+    }
+    untouchable.push(workspace.file(&imported, &format!("{UNKNOWN}.mp4")));
+    untouchable.push(workspace.read_only_file(&sessions, &format!("{OLDER}.mp4")));
+    untouchable.push(workspace.read_only_file(&imported, &format!("{KEPT}.p3.mp4")));
+    let folder = sessions.join(format!("{UNKNOWN}.p2.mp4"));
+    std::fs::create_dir(&folder).unwrap();
+    std::fs::write(folder.join("inside.mp4"), SYNTHETIC).unwrap();
+    let orphan = workspace.file(&sessions, &format!("{UNKNOWN}.mp4"));
+
+    super::prune_videos_in(
+        &super::store::DiskStore,
+        &sessions,
+        Some(&imported),
+        0,
+        false,
+    );
+    let pruned = super::prune_sessions_with(&super::store::DiskStore, &sessions, 0, |_| false);
+    super::remove_recordings_of(&super::store::DiskStore, &imported, &pruned);
+
+    assert!(
+        !orphan.exists(),
+        "a canonical orphan in the session folder is Corneta's"
+    );
+    for path in &untouchable {
+        assert!(intact(path), "{} must stay", path.display());
+    }
+    assert!(intact(&folder.join("inside.mp4")));
+}
+
+fn link_file(target: &Path, link: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link).is_ok()
+    }
+    // Needs Developer Mode or elevation on Windows; the junction below needs neither.
+    #[cfg(windows)]
+    {
+        std::os::windows::fs::symlink_file(target, link).is_ok()
+    }
+}
+
+fn link_dir(target: &Path, link: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link).is_ok()
+    }
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .is_ok_and(|output| output.status.success())
+    }
+}
+
+#[test]
+fn prune_does_not_follow_links_out_of_its_folders() {
+    let workspace = PruneWorkspace::new();
+    let (sessions, imported, elsewhere) = (
+        workspace.sessions(),
+        workspace.imported(),
+        workspace.elsewhere(),
+    );
+    workspace.journal(KEPT);
+    workspace.journal(OLDER);
+    let victim = workspace.file(&elsewhere, "family.mp4");
+    let nested = workspace.file(&elsewhere, &format!("{KEPT}.mp4"));
+    let mut links = Vec::new();
+    for (link, target, is_dir) in [
+        (sessions.join(format!("{UNKNOWN}.mp4")), &victim, false),
+        (imported.join(format!("{KEPT}.mp4")), &victim, false),
+        (sessions.join(format!("{UNKNOWN}.p2.mp4")), &elsewhere, true),
+        (imported.join(format!("{OLDER}.mp4")), &elsewhere, true),
+    ] {
+        let created = if is_dir {
+            link_dir(target, &link)
+        } else {
+            link_file(target, &link)
+        };
+        if created {
+            links.push(link);
+        }
+    }
+    assert!(!links.is_empty(), "the platform could not create any link");
+
+    super::prune_videos_in(
+        &super::store::DiskStore,
+        &sessions,
+        Some(&imported),
+        0,
+        false,
+    );
+    let pruned = super::prune_sessions_with(&super::store::DiskStore, &sessions, 0, |_| false);
+    super::remove_recordings_of(&super::store::DiskStore, &imported, &pruned);
+
+    assert!(intact(&victim));
+    assert!(intact(&nested));
+    for link in &links {
+        assert!(
+            std::fs::symlink_metadata(link).is_ok(),
+            "{} is not Corneta's and must stay",
+            link.display()
+        );
+    }
+}
+
+#[test]
+fn session_prune_removes_its_recordings_from_the_configured_folder_and_nothing_else() {
+    const PREPARING: &str = "1721350000000";
+    let meta = "{\"kind\":\"meta\"}\n";
+    let files = [
+        (format!("/s/{OLDER}.ndjson"), meta),
+        (format!("/s/{OLDER}.chat.ndjson"), "{\"t\":1}\n"),
+        (format!("/s/{PREPARING}.ndjson"), meta),
+        (format!("/s/{KEPT}.ndjson"), meta),
+        (format!("/v/{OLDER}.mp4"), "video"),
+        (format!("/v/{OLDER}.p2.mp4"), "video"),
+        (format!("/v/{PREPARING}.mp4"), "video"),
+        (format!("/v/{UNKNOWN}.mp4"), "video"),
+        (format!("/v/{KEPT}.mp4"), "video"),
+        ("/v/ferias.mp4".to_string(), "video"),
+    ];
+    let entries: Vec<(&str, &str)> = files.iter().map(|(p, b)| (p.as_str(), *b)).collect();
+    let store = MemStore::with(&entries);
+    let protected = PathBuf::from(format!("/s/{PREPARING}.ndjson"));
+    let pruned = super::prune_sessions_with(&store, Path::new("/s"), 1, |path| path == protected);
+    assert_eq!(pruned, [OLDER]);
+    super::remove_recordings_of(&store, Path::new("/v"), &pruned);
+    for gone in [
+        format!("/s/{OLDER}.ndjson"),
+        format!("/s/{OLDER}.chat.ndjson"),
+        format!("/v/{OLDER}.mp4"),
+        format!("/v/{OLDER}.p2.mp4"),
+    ] {
+        assert!(!store.exists(&gone), "{gone} belongs to the pruned report");
+    }
+    for kept in [
+        format!("/s/{PREPARING}.ndjson"),
+        format!("/v/{PREPARING}.mp4"),
+        format!("/v/{UNKNOWN}.mp4"),
+        format!("/v/{KEPT}.mp4"),
+        "/v/ferias.mp4".to_string(),
+    ] {
+        assert!(store.exists(&kept), "{kept} must stay");
     }
 }
 
