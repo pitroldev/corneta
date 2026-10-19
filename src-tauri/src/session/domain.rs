@@ -43,14 +43,25 @@ pub fn is_session_file(path: &Path) -> bool {
 }
 
 /// Pruning may delete only recognized Corneta filenames, never arbitrary MP4s in a user-selected folder.
+/// Accept exactly what `recorder::video_path` writes: a 13-digit epoch-millisecond ID, then `.pN`
+/// for N >= 2. Names like `2024.mp4` or `<id>.p01.mp4` only resemble a recording.
 pub fn parse_video_name(name: &str) -> Option<(String, u32)> {
     let stem = name.strip_suffix(".mp4")?;
-    match stem.split_once(".p") {
-        Some((id, seg)) if valid_session_id(id) => Some((id.into(), seg.parse().ok()?)),
-        Some(_) => None,
-        None if valid_session_id(stem) => Some((stem.into(), 1)),
-        None => None,
-    }
+    let (id, seg) = match stem.split_once(".p") {
+        Some((id, seg)) => {
+            if seg.starts_with('0') || !seg.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            let seg: u32 = seg.parse().ok()?;
+            if seg < 2 {
+                return None;
+            }
+            (id, seg)
+        }
+        None => (stem, 1),
+    };
+    let recording_id = id.len() == 13 && !id.starts_with('0') && valid_session_id(id);
+    recording_id.then(|| (id.to_string(), seg))
 }
 
 pub fn video_id_of(path: &Path) -> Option<String> {

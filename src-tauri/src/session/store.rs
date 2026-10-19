@@ -136,6 +136,11 @@ impl SessionStore for DiskStore {
         entries.flatten().map(|e| e.path()).collect()
     }
 
+    fn prunable_len(&self, file: &Path) -> Option<u64> {
+        let meta = fs::symlink_metadata(file).ok()?;
+        (meta.file_type().is_file() && !meta.permissions().readonly()).then_some(meta.len())
+    }
+
     fn remove(&self, file: &Path) -> bool {
         let entry = file_entry(file);
         let mut writer = entry.lock().unwrap();
@@ -427,6 +432,10 @@ impl SessionStore for MemStore {
             .filter(|p| p.parent() == Some(dir))
             .cloned()
             .collect()
+    }
+
+    fn prunable_len(&self, file: &Path) -> Option<u64> {
+        self.files.lock().unwrap().get(file).map(|b| b.len() as u64)
     }
 
     fn remove(&self, file: &Path) -> bool {

@@ -41,6 +41,9 @@ pub trait SessionStore {
     fn modified_ms(&self, file: &Path) -> Option<u64>;
     /// Return unfiltered directory entries; callers enforce filename policy.
     fn list(&self, dir: &Path) -> Vec<PathBuf>;
+    /// Size of a regular, writable file, without following links. Pruning never touches links,
+    /// junctions, directories or files someone marked read-only.
+    fn prunable_len(&self, file: &Path) -> Option<u64>;
     /// Return whether the file was actually removed.
     fn remove(&self, file: &Path) -> bool;
 }
@@ -112,7 +115,16 @@ fn reset_clock_anchor() {
 
 pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
     let dir = sessions_dir(app)?;
-    prune_sessions(&DiskStore, &dir, domain::KEEP);
+    let pruned = prune_sessions(&DiskStore, &dir, domain::KEEP);
+    // Contributor builds never prune the configured folder (see prune_videos_in). The folder may
+    // be slow or remote, so its recordings go off the go-live path.
+    let configured = PathBuf::from(config.settings.record_video_dir.trim());
+    if !pruned.is_empty() && !cfg!(corneta_contributor) && !configured.as_os_str().is_empty() {
+        std::thread::spawn(move || {
+            let _mutation = crate::replay_commands::mutation_guard();
+            remove_recordings_of(&DiskStore, &configured, &pruned);
+        });
+    }
     let id = now_ms();
     let path = dir.join(domain::session_file_name(&id.to_string()));
     let platforms: Vec<Value> = config
@@ -438,6 +450,18 @@ fn video_files(store: &dyn SessionStore, dir: &Path) -> Vec<domain::VideoFile> {
         .collect()
 }
 
+fn prunable_video_files(store: &dyn SessionStore, dir: &Path) -> Vec<domain::VideoFile> {
+    store
+        .list(dir)
+        .into_iter()
+        .filter_map(|path| {
+            let id = domain::video_id_of(&path)?;
+            let len = store.prunable_len(&path)?;
+            Some(domain::VideoFile { path, len, id })
+        })
+        .collect()
+}
+
 fn known_ids(store: &dyn SessionStore, dir: &Path) -> Vec<String> {
     store
         .list(dir)
@@ -447,13 +471,14 @@ fn known_ids(store: &dyn SessionStore, dir: &Path) -> Vec<String> {
         .collect()
 }
 
-fn prune_sessions(store: &dyn SessionStore, dir: &Path, keep: usize) {
+/// Return the IDs whose reports were removed.
+fn prune_sessions(store: &dyn SessionStore, dir: &Path, keep: usize) -> Vec<String> {
     let _mutation = crate::replay_commands::mutation_guard();
     prune_sessions_with(store, dir, keep, |path| {
         path.file_stem()
             .and_then(|name| name.to_str())
             .is_some_and(crate::recorder::preparing_session)
-    });
+    })
 }
 
 fn prune_sessions_with(
@@ -461,15 +486,30 @@ fn prune_sessions_with(
     dir: &Path,
     keep: usize,
     protected: impl Fn(&Path) -> bool,
-) {
+) -> Vec<String> {
+    let mut pruned = Vec::new();
     for path in domain::plan_session_prune(&store.list(dir), keep) {
         if protected(&path) {
             continue;
         }
         store.remove(&chat_path(&path));
-        store.remove(&path);
+        if store.remove(&path) {
+            pruned.extend(path.file_stem().and_then(|s| s.to_str()).map(str::to_owned));
+        }
     }
-    // The next video prune collects recordings orphaned by this session prune.
+    // The next video prune collects recordings orphaned in the session directory.
+    pruned
+}
+
+/// Orphans are collected only in the session directory. Elsewhere, a report's ID is the only
+/// proof of ownership, so its recordings must go while that ID is still known.
+fn remove_recordings_of(store: &dyn SessionStore, dir: &Path, ids: &[String]) {
+    for recording in prunable_video_files(store, dir) {
+        if ids.contains(&recording.id) {
+            crate::replay_media::revoke_path(&recording.path);
+            store.remove(&recording.path);
+        }
+    }
 }
 
 /// Return bytes still over budget; never broaden deletion beyond recognized recordings.
@@ -495,13 +535,19 @@ fn prune_videos_in(
 ) -> u64 {
     let _mutation = crate::replay_commands::mutation_guard();
     let ids = known_ids(store, sessions);
-    let mut all = video_files(store, sessions);
+    let mut all = prunable_video_files(store, sessions);
     // Contributor builds may prune only their own session directory, not imported recording folders.
     // This isolation is a build-time decision, not a frontend-controlled flag.
     if !contributor {
         if let Some(dir) = configured.filter(|dir| !dir.as_os_str().is_empty() && *dir != sessions)
         {
-            all.extend(video_files(store, dir));
+            // A chosen folder may hold another installation's recordings (reinstall, imported
+            // settings). Without a report here, a matching name does not prove they are ours.
+            all.extend(
+                prunable_video_files(store, dir)
+                    .into_iter()
+                    .filter(|file| ids.contains(&file.id)),
+            );
         }
     }
     apply_video_prune(store, domain::plan_video_prune(all, &ids, keep_gb))
