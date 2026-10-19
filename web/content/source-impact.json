@@ -88,14 +88,14 @@
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "a4816bfc048d7541bbe288020e8b7cb720567844",
-      "reason": "A fila de gravação da config, quando outra janela grava antes, reaplica as edições desta janela sobre a versão nova em vez de descartá-las; nenhum passo, rótulo ou sequência do primeiro live citado mudou."
+      "sourceBlob": "ba14525f4cfb8ebe4c6f56d480c07ef78e327299",
+      "reason": "Só acrescenta a busca da chave da Kick pela conta logada, que grava no cofre e só preenche o servidor de um destino sem servidor; colar a chave e os passos citados continuam valendo."
     },
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
       "source": "src/screens/PlatformsScreen.tsx",
-      "sourceBlob": "0788cbf8d939fc8effd6a916cbddd9cde3a0920a",
-      "reason": "O convite para ligar o chat deixa de criar um canal vazio quando a conta já está conectada; os passos de gerenciar destinos citados não mudaram."
+      "sourceBlob": "c832594d2a22611e1e82bad6498c768e11b7d923",
+      "reason": "Os destinos da Kick ganham o mesmo botão Pegar da conta da Twitch, que grava a chave no cofre; Colar e salvar e os demais passos citados continuam valendo."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -142,8 +142,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "8ec8cf6d47dc5bff29d411a0d826eab9e85f3eb3",
-      "reason": "Só acrescenta os textos do ajuste de vídeo do OBS; os rótulos do assistente citados não mudaram."
+      "sourceBlob": "fd1132b564a32d54bf3ee97bad3fd96aaa98c123",
+      "reason": "Só acrescenta os textos de buscar a chave da Kick pela conta; os rótulos do assistente do OBS e do passo de vídeo citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
