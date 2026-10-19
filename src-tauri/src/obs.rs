@@ -364,6 +364,218 @@ fn req_ok(resp: &Value) -> bool {
         .unwrap_or(false)
 }
 
+/// OBS's output video, plus the stream bitrate when the simple output mode exposes it.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObsVideo {
+    pub output_width: u32,
+    pub output_height: u32,
+    pub fps_numerator: u32,
+    pub fps_denominator: u32,
+    /// The advanced output mode keeps the bitrate where obs-websocket cannot reach it.
+    pub simple_kbps: Option<u32>,
+}
+
+impl ObsVideo {
+    pub fn signal(&self) -> crate::engine::SourceSignal {
+        crate::engine::SourceSignal {
+            width: self.output_width,
+            height: self.output_height,
+            fps: f64::from(self.fps_numerator) / f64::from(self.fps_denominator.max(1)),
+            video_kbps: self.simple_kbps,
+        }
+    }
+}
+
+/// obs-websocket's OutputRunning status: video settings are locked while streaming or recording.
+const OUTPUT_RUNNING: i64 = 500;
+
+fn checked(resp: Value, req_type: &str) -> Result<Value, ConnErr> {
+    if req_ok(&resp) {
+        return Ok(resp
+            .pointer("/d/responseData")
+            .cloned()
+            .unwrap_or(Value::Null));
+    }
+    let status = resp
+        .pointer("/d/requestStatus")
+        .cloned()
+        .unwrap_or(Value::Null);
+    Err(ConnErr {
+        failure: ConnFailure::RequestRefused,
+        msg: if status.get("code").and_then(Value::as_i64) == Some(OUTPUT_RUNNING) {
+            Msg::ObsVideoOutputActive.now()
+        } else {
+            Msg::ObsRefusedRequest {
+                req_type,
+                response: &status.to_string(),
+            }
+            .now()
+        },
+    })
+}
+
+fn profile_parameter(socket: &mut Socket, category: &str, name: &str) -> Result<Value, ConnErr> {
+    let resp = request_with(
+        socket,
+        "GetProfileParameter",
+        "corneta-profile",
+        json!({ "parameterCategory": category, "parameterName": name }),
+    )?;
+    checked(resp, "GetProfileParameter")
+}
+
+/// An unset profile parameter falls back to OBS's default value.
+fn profile_value(v: &Value) -> Option<&str> {
+    v.get("parameterValue")
+        .and_then(Value::as_str)
+        .or_else(|| v.get("defaultParameterValue").and_then(Value::as_str))
+        .map(str::trim)
+}
+
+fn parse_obs_video(video: &Value, mode: &Value, bitrate: &Value) -> Option<ObsVideo> {
+    let number = |key: &str| {
+        video
+            .get(key)?
+            .as_u64()
+            .and_then(|n| u32::try_from(n).ok())
+            .filter(|n| *n > 0)
+    };
+    let simple = profile_value(mode) == Some("Simple");
+    Some(ObsVideo {
+        output_width: number("outputWidth")?,
+        output_height: number("outputHeight")?,
+        fps_numerator: number("fpsNumerator")?,
+        fps_denominator: number("fpsDenominator")?,
+        simple_kbps: if simple {
+            profile_value(bitrate).and_then(|kbps| kbps.parse().ok())
+        } else {
+            None
+        },
+    })
+}
+
+pub fn read_video(host: &str, port: u16, password: &str) -> Result<ObsVideo, ConnErr> {
+    let mut socket = connect_identify(host, port, password)?;
+    let result = (|| {
+        let video = checked(
+            request_with(&mut socket, "GetVideoSettings", "corneta-video", json!({}))?,
+            "GetVideoSettings",
+        )?;
+        let mode = profile_parameter(&mut socket, "Output", "Mode")?;
+        let bitrate = profile_parameter(&mut socket, "SimpleOutput", "VBitrate")?;
+        parse_obs_video(&video, &mode, &bitrate)
+            .ok_or_else(|| ConnErr::from(Msg::ObsVideoUnreadable.now()))
+    })();
+    let _ = socket.close(None);
+    result
+}
+
+/// Writes only the output (scaled) resolution, the frame rate and, in simple mode, the bitrate.
+fn write_video(host: &str, port: u16, password: &str, video: &ObsVideo) -> Result<(), ConnErr> {
+    let mut socket = connect_identify(host, port, password)?;
+    let result = (|| {
+        checked(
+            request_with(
+                &mut socket,
+                "SetVideoSettings",
+                "corneta-set-video",
+                json!({
+                    "outputWidth": video.output_width,
+                    "outputHeight": video.output_height,
+                    "fpsNumerator": video.fps_numerator,
+                    "fpsDenominator": video.fps_denominator,
+                }),
+            )?,
+            "SetVideoSettings",
+        )?;
+        if let Some(kbps) = video.simple_kbps {
+            checked(
+                request_with(
+                    &mut socket,
+                    "SetProfileParameter",
+                    "corneta-set-bitrate",
+                    json!({
+                        "parameterCategory": "SimpleOutput",
+                        "parameterName": "VBitrate",
+                        "parameterValue": kbps.to_string(),
+                    }),
+                )?,
+                "SetProfileParameter",
+            )?;
+        }
+        Ok(())
+    })();
+    let _ = socket.close(None);
+    result
+}
+
+fn even(n: u32) -> u32 {
+    (n / 2 * 2).max(2)
+}
+
+/// The OBS change that fits its signal within `limits`. It only lowers values and keeps the aspect ratio.
+pub fn fit_video(current: &ObsVideo, limits: &crate::engine::CopyLimits) -> Option<ObsVideo> {
+    let mut next = *current;
+    let short = current.output_width.min(current.output_height);
+    if short > limits.max_height {
+        let scale = f64::from(limits.max_height) / f64::from(short);
+        next.output_width = even((f64::from(current.output_width) * scale).round() as u32);
+        next.output_height = even((f64::from(current.output_height) * scale).round() as u32);
+    }
+    if current.signal().fps > f64::from(limits.max_fps) + 0.5 {
+        next.fps_numerator = limits.max_fps;
+        next.fps_denominator = 1;
+    }
+    if current
+        .simple_kbps
+        .is_some_and(|kbps| kbps > limits.max_kbps)
+    {
+        next.simple_kbps = Some(limits.max_kbps);
+    }
+    (next != *current).then_some(next)
+}
+
+/// Applies the fit and returns the new video. The first backup is kept, since it holds the
+/// settings from before any Corneta adjustment.
+pub fn apply_fit(
+    host: &str,
+    port: u16,
+    password: &str,
+    limits: &crate::engine::CopyLimits,
+    backup: &std::path::Path,
+) -> Result<ObsVideo, ConnErr> {
+    let current = read_video(host, port, password)?;
+    let Some(next) = fit_video(&current, limits) else {
+        return Ok(current);
+    };
+    if !backup.is_file() {
+        let saved = serde_json::to_vec(&current)
+            .ok()
+            .and_then(|bytes| std::fs::write(backup, bytes).ok());
+        if saved.is_none() {
+            return Err(ConnErr::from(Msg::ObsVideoBackupFailed.now()));
+        }
+    }
+    write_video(host, port, password, &next)?;
+    Ok(next)
+}
+
+pub fn undo_fit(
+    host: &str,
+    port: u16,
+    password: &str,
+    backup: &std::path::Path,
+) -> Result<(), ConnErr> {
+    let saved = std::fs::read(backup)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<ObsVideo>(&bytes).ok())
+        .ok_or_else(|| ConnErr::from(Msg::ObsVideoNoBackup.now()))?;
+    write_video(host, port, password, &saved)?;
+    let _ = std::fs::remove_file(backup);
+    Ok(())
+}
+
 /// Updating an existing source preserves its user-adjusted position.
 pub fn add_or_update_browser_source(
     host: &str,
@@ -678,5 +890,82 @@ mod tests {
             obs_auth_response("senha", "c2FsdA==", "Y2hhbGxlbmdl"),
             "+8Ytw+UBaCto3PZWaabX3QK0lhU/2NwTnVBbh4BAt80="
         );
+    }
+
+    fn video(width: u32, height: u32, fps: (u32, u32), simple_kbps: Option<u32>) -> ObsVideo {
+        ObsVideo {
+            output_width: width,
+            output_height: height,
+            fps_numerator: fps.0,
+            fps_denominator: fps.1,
+            simple_kbps,
+        }
+    }
+
+    #[test]
+    fn obs_video_settings_and_the_simple_bitrate_are_read() {
+        let settings = json!({
+            "baseWidth": 2560, "baseHeight": 1440,
+            "outputWidth": 1920, "outputHeight": 1080,
+            "fpsNumerator": 60000, "fpsDenominator": 1001
+        });
+        let simple = json!({ "parameterValue": "Simple", "defaultParameterValue": "Simple" });
+        let advanced = json!({ "parameterValue": "Advanced", "defaultParameterValue": "Simple" });
+        let unset_bitrate = json!({ "parameterValue": null, "defaultParameterValue": "2500" });
+        assert_eq!(
+            parse_obs_video(&settings, &simple, &unset_bitrate),
+            Some(video(1920, 1080, (60000, 1001), Some(2500)))
+        );
+        assert_eq!(
+            parse_obs_video(&settings, &advanced, &json!({ "parameterValue": "9000" })),
+            Some(video(1920, 1080, (60000, 1001), None)),
+            "the simple-mode bitrate does not apply to advanced output"
+        );
+        assert_eq!(
+            parse_obs_video(&json!({ "outputWidth": 0 }), &simple, &unset_bitrate),
+            None
+        );
+    }
+
+    #[test]
+    fn fitting_obs_only_lowers_and_keeps_the_aspect_ratio() {
+        let twitch = crate::engine::copy_limits("twitch").unwrap();
+        assert_eq!(
+            fit_video(&video(2560, 1440, (60, 1), Some(9000)), &twitch),
+            Some(video(1920, 1080, (60, 1), Some(6000)))
+        );
+        assert_eq!(
+            fit_video(&video(3440, 1440, (120, 1), None), &twitch),
+            Some(video(2580, 1080, (60, 1), None))
+        );
+        assert_eq!(
+            fit_video(&video(1280, 720, (30, 1), Some(3000)), &twitch),
+            None,
+            "a signal under the limits is never raised"
+        );
+        assert_eq!(
+            fit_video(&video(1920, 1080, (60000, 1001), Some(6000)), &twitch),
+            None
+        );
+    }
+
+    #[test]
+    fn undo_needs_a_saved_backup() {
+        let dir = std::env::temp_dir().join(format!("corneta-obs-fit-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let backup = dir.join("obs-video-backup.json");
+        let _ = std::fs::remove_file(&backup);
+        assert!(
+            undo_fit("127.0.0.1", 9, "", &backup).is_err(),
+            "nothing to undo"
+        );
+        std::fs::write(
+            &backup,
+            serde_json::to_vec(&video(2560, 1440, (60, 1), None)).unwrap(),
+        )
+        .unwrap();
+        let saved: ObsVideo = serde_json::from_slice(&std::fs::read(&backup).unwrap()).unwrap();
+        assert_eq!(saved, video(2560, 1440, (60, 1), None));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

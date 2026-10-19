@@ -640,6 +640,18 @@ messages! {
     ObsRefusedConfig { response: &'a str } = "rust.obs.refusedConfig" =>
         pt: "o OBS recusou a configuração: {response}",
         en: "OBS turned down the setup: {response}";
+    ObsVideoOutputActive = "rust.obs.video.outputActive" =>
+        pt: "o OBS só deixa mudar o vídeo com a transmissão e a gravação paradas",
+        en: "OBS only lets the video change while streaming and recording are stopped";
+    ObsVideoUnreadable = "rust.obs.video.unreadable" =>
+        pt: "não consegui ler as configurações de vídeo do OBS",
+        en: "I couldn't read OBS's video settings";
+    ObsVideoBackupFailed = "rust.obs.video.backupFailed" =>
+        pt: "não consegui guardar uma cópia das configurações do OBS, então não mudei nada",
+        en: "I couldn't save a copy of OBS's settings, so I didn't change anything";
+    ObsVideoNoBackup = "rust.obs.video.noBackup" =>
+        pt: "não tem ajuste da Corneta pra desfazer no OBS",
+        en: "there's no Corneta adjustment to undo in OBS";
     ObsRefusedRequest { req_type: &'a str, response: &'a str } = "rust.obs.refusedRequest" =>
         pt: "o OBS recusou {req_type}: {response}",
         en: "OBS turned down {req_type}: {response}";

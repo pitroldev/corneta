@@ -1210,6 +1210,20 @@ export const en: Dict = {
     "Couldn't measure your upload — no internet?",
   "golive.viewers.label": "watching",
 
+  "obs.video.adjusted": "OBS is at {current}, adjusted by Corneta.",
+  "obs.video.advancedBitrate":
+    "In advanced output mode, Corneta leaves the bitrate alone: check in OBS under Settings → Output that it's at most {kbps} kbps.",
+  "obs.video.applied": "Set OBS to {proposal}. You can undo it any time.",
+  "obs.video.apply": "Adjust OBS",
+  "obs.video.format": "{w}×{h} at {fps} fps",
+  "obs.video.formatKbps": "{w}×{h} at {fps} fps and {kbps} kbps",
+  "obs.video.ok":
+    "OBS sends {current}, which every active destination takes as-is.",
+  "obs.video.over":
+    "OBS sends {current}. For every active destination to take it without re-encoding, aim for {proposal}.",
+  "obs.video.title": "OBS video",
+  "obs.video.undo": "Undo",
+
   "platforms.about.blog.sub": "My blog and my projects.",
   "platforms.about.footer.made":
     "Corneta is free and open source. Made with {heart} and code.",

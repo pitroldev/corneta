@@ -19,6 +19,7 @@ import type { ObsErrorCode } from "../lib/types";
 import { obsFailure, obsHelpKind, type ObsFailure } from "../lib/obsErrors";
 import { cn } from "../lib/utils";
 import { Modal } from "./Modal";
+import { ObsVideoFit } from "./ObsVideoFit";
 import { Button, CopyField, Input } from "./ui";
 
 type Status = "idle" | "connecting" | "ok" | "error";
@@ -177,6 +178,7 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
               : bold(t, "encoding.wizard.ok.manual")}
           </div>
         )}
+        {status === "ok" && <ObsVideoFit />}
         {status === "error" && configError && (
           <p
             role="alert"

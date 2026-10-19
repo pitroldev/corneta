@@ -17,6 +17,8 @@ import type {
   EngineSnapshot,
   Leak,
   ObsCheck,
+  ObsVideo,
+  ObsVideoCheck,
   RecordDirCheck,
   SessionMeta,
   Viewers,
@@ -231,6 +233,10 @@ export interface CornetaApi {
   ): () => void;
   obsCheck(): Promise<ObsCheck>;
   obsAutoconfigure(): Promise<void>;
+  obsVideoCheck(): Promise<ObsVideoCheck>;
+  obsVideoApply(): Promise<ObsVideo>;
+  /** Restores the OBS video saved before Corneta's first adjustment. */
+  obsVideoUndo(): Promise<void>;
   systemMemoryBytes(): Promise<number>;
   markMoment(label?: string): Promise<void>;
   exportConfig(): Promise<boolean>;

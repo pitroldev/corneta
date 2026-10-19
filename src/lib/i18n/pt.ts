@@ -1195,6 +1195,21 @@ export const pt = {
     "Não consegui medir o upload — sem internet?",
   "golive.viewers.label": "assistindo",
 
+  "obs.video.adjusted": "O OBS está em {current}, com um ajuste da Corneta.",
+  "obs.video.advancedBitrate":
+    "No modo avançado de saída, a Corneta não mexe no bitrate: confira no OBS, em Configurações → Saída, se ele está em até {kbps} kbps.",
+  "obs.video.applied":
+    "Ajustei o OBS para {proposal}. Dá pra desfazer quando quiser.",
+  "obs.video.apply": "Ajustar o OBS",
+  "obs.video.format": "{w}×{h} a {fps} fps",
+  "obs.video.formatKbps": "{w}×{h} a {fps} fps e {kbps} kbps",
+  "obs.video.ok":
+    "O OBS manda {current}, que já cabe em todos os destinos ativos.",
+  "obs.video.over":
+    "O OBS manda {current}. Pra todos os destinos ativos receberem sem recodificar, o ideal é {proposal}.",
+  "obs.video.title": "Vídeo do OBS",
+  "obs.video.undo": "Desfazer",
+
   "platforms.about.blog.sub": "Meu blog e meus projetos.",
   "platforms.about.footer.made":
     "Corneta é grátis e de código aberto. Feita com {heart} e código.",

@@ -635,6 +635,107 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     }
 }
 
+const OBS_VIDEO_BACKUP: &str = "obs-video-backup.json";
+
+fn obs_video_backup(app: &AppHandle) -> Result<std::path::PathBuf, crate::obs::ObsFailure> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| crate::obs::ObsFailure::exchange(e.to_string()))?;
+    std::fs::create_dir_all(&dir).map_err(|e| crate::obs::ObsFailure::exchange(e.to_string()))?;
+    Ok(dir.join(OBS_VIDEO_BACKUP))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObsVideoCheck {
+    current: crate::obs::ObsVideo,
+    proposal: Option<crate::obs::ObsVideo>,
+    /// The strictest destination bitrate, for advanced output where Corneta cannot set it.
+    limit_kbps: Option<u32>,
+    can_undo: bool,
+}
+
+#[tauri::command]
+pub async fn obs_video_check(app: AppHandle) -> Result<ObsVideoCheck, crate::obs::ObsFailure> {
+    let config = get_config(app.clone());
+    let limits = engine::strictest_copy_limits(&config);
+    let backup = obs_video_backup(&app)?;
+    let password = config.settings.obs_password;
+    let current = tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::read_video(OBS_WS_HOST, OBS_WS_PORT, &password)
+    })
+    .await
+    .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
+    .map_err(crate::obs::ObsFailure::from)?;
+    Ok(ObsVideoCheck {
+        proposal: limits.and_then(|limits| crate::obs::fit_video(&current, &limits)),
+        current,
+        limit_kbps: limits.map(|limits| limits.max_kbps),
+        can_undo: backup.is_file(),
+    })
+}
+
+#[tauri::command]
+pub async fn obs_video_apply(
+    app: AppHandle,
+) -> Result<crate::obs::ObsVideo, crate::obs::ObsFailure> {
+    let config = get_config(app.clone());
+    let backup = obs_video_backup(&app)?;
+    let password = config.settings.obs_password.clone();
+    let Some(limits) = engine::strictest_copy_limits(&config) else {
+        return tauri::async_runtime::spawn_blocking(move || {
+            crate::obs::read_video(OBS_WS_HOST, OBS_WS_PORT, &password)
+        })
+        .await
+        .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
+        .map_err(crate::obs::ObsFailure::from);
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::apply_fit(OBS_WS_HOST, OBS_WS_PORT, &password, &limits, &backup)
+    })
+    .await
+    .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
+    .map_err(crate::obs::ObsFailure::from)
+}
+
+#[tauri::command]
+pub async fn obs_video_undo(app: AppHandle) -> Result<(), crate::obs::ObsFailure> {
+    let backup = obs_video_backup(&app)?;
+    let password = get_config(app).settings.obs_password;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::undo_fit(OBS_WS_HOST, OBS_WS_PORT, &password, &backup)
+    })
+    .await
+    .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
+    .map_err(crate::obs::ObsFailure::from)
+}
+
+/// Esperto reads what OBS sends before planning outputs; an unreachable OBS keeps the plain choice.
+async fn pin_smart_choices(config: &mut AppConfig) {
+    if config.mode != "hybrid" {
+        return;
+    }
+    let password = config.settings.obs_password.clone();
+    let read = tauri::async_runtime::spawn_blocking(move || {
+        crate::obs::read_video(OBS_WS_HOST, OBS_WS_PORT, &password)
+    });
+    // A hung OBS must not hold the live back.
+    let Ok(Ok(Ok(video))) = tokio::time::timeout(std::time::Duration::from_secs(2), read).await
+    else {
+        return;
+    };
+    let pinned = engine::apply_source_signal(config, &video.signal());
+    if !pinned.is_empty() {
+        log::info!(
+            "smart mode: transcoding {} for the OBS signal {}x{}",
+            pinned.join(", "),
+            video.output_width,
+            video.output_height
+        );
+    }
+}
+
 #[tauri::command]
 pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), crate::obs::ObsFailure> {
     let cfg = get_config(app);
@@ -1340,7 +1441,8 @@ async fn start_engine_inner(
         armed: true,
     };
 
-    let config = get_config(app.clone());
+    let mut config = get_config(app.clone());
+    pin_smart_choices(&mut config).await;
     // The frontend blocks going live with a destination that has no URL yet; never start one.
     let enabled: Vec<_> = config
         .targets

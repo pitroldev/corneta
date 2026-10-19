@@ -54,6 +54,96 @@ fn smart_hybrid_action(platform_id: &str) -> &'static str {
     }
 }
 
+/// What OBS is set to send, read over obs-websocket.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SourceSignal {
+    pub width: u32,
+    pub height: u32,
+    pub fps: f64,
+    /// Known only in OBS's simple output mode.
+    pub video_kbps: Option<u32>,
+}
+
+/// The most a destination takes as-is; beyond it, a copy is refused or degrades viewers.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CopyLimits {
+    /// Limits the shorter side, so a 2560×1440 canvas counts as 1440p.
+    pub max_height: u32,
+    pub max_fps: u32,
+    pub max_kbps: u32,
+}
+
+pub fn copy_limits(platform_id: &str) -> Option<CopyLimits> {
+    let limits = |max_height, max_fps, max_kbps| {
+        Some(CopyLimits {
+            max_height,
+            max_fps,
+            max_kbps,
+        })
+    };
+    match platform_id {
+        "twitch" => limits(1080, 60, 6000),
+        "kick" => limits(1080, 60, 8000),
+        "facebook" => limits(1080, 60, 9000),
+        "youtube" => limits(2160, 60, 51_000),
+        _ => None,
+    }
+}
+
+fn exceeds(signal: &SourceSignal, limits: &CopyLimits) -> bool {
+    signal.width.min(signal.height) > limits.max_height
+        || signal.fps > f64::from(limits.max_fps) + 0.5
+        || signal.video_kbps.is_some_and(|kbps| kbps > limits.max_kbps)
+}
+
+/// Esperto copies what a destination accepts and transcodes only where the OBS signal exceeds it.
+pub fn signal_hybrid_action(platform_id: &str, signal: Option<&SourceSignal>) -> &'static str {
+    let action = smart_hybrid_action(platform_id);
+    match (action, signal, copy_limits(platform_id)) {
+        ("copy", Some(signal), Some(limits)) if exceeds(signal, &limits) => "transcode",
+        _ => action,
+    }
+}
+
+/// Pins Esperto's choice for this live; a per-destination choice made by the user is kept.
+pub fn apply_source_signal(config: &mut AppConfig, signal: &SourceSignal) -> Vec<String> {
+    if config.mode != "hybrid" {
+        return Vec::new();
+    }
+    let mut transcoded = Vec::new();
+    for target in config.targets.iter_mut().filter(|t| t.enabled) {
+        if target
+            .encoding
+            .hybrid_override
+            .as_deref()
+            .is_some_and(|choice| !choice.is_empty())
+        {
+            continue;
+        }
+        if signal_hybrid_action(&target.platform_id, Some(signal)) == "transcode"
+            && smart_hybrid_action(&target.platform_id) == "copy"
+        {
+            target.encoding.hybrid_override = Some("transcode".into());
+            transcoded.push(target.platform_id.clone());
+        }
+    }
+    transcoded
+}
+
+/// The tightest limits among the enabled destinations that receive OBS's signal as-is.
+pub fn strictest_copy_limits(config: &AppConfig) -> Option<CopyLimits> {
+    config
+        .targets
+        .iter()
+        .filter(|t| t.enabled && effective_action(&config.mode, t) == "copy")
+        .filter_map(|t| copy_limits(&t.platform_id))
+        .reduce(|a, b| CopyLimits {
+            max_height: a.max_height.min(b.max_height),
+            max_fps: a.max_fps.min(b.max_fps),
+            max_kbps: a.max_kbps.min(b.max_kbps),
+        })
+}
+
 pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
     match mode {
         "passthrough" => "copy",
@@ -1392,5 +1482,107 @@ mod tests {
         feed_down(&mut a, 0.85, 8);
         a.on_reconnect();
         assert_eq!(a.current(), 4800);
+    }
+
+    fn signal(width: u32, height: u32, fps: f64, video_kbps: Option<u32>) -> SourceSignal {
+        SourceSignal {
+            width,
+            height,
+            fps,
+            video_kbps,
+        }
+    }
+
+    #[test]
+    fn smart_mode_transcodes_only_what_the_obs_signal_exceeds() {
+        let full_hd = signal(1920, 1080, 60.0, Some(6000));
+        assert_eq!(signal_hybrid_action("twitch", Some(&full_hd)), "copy");
+        assert_eq!(signal_hybrid_action("youtube", Some(&full_hd)), "copy");
+        assert_eq!(
+            signal_hybrid_action("twitch", Some(&signal(2560, 1440, 60.0, None))),
+            "transcode"
+        );
+        assert_eq!(
+            signal_hybrid_action("youtube", Some(&signal(2560, 1440, 60.0, None))),
+            "copy"
+        );
+        assert_eq!(
+            signal_hybrid_action("twitch", Some(&signal(1920, 1080, 59.94, None))),
+            "copy",
+            "NTSC rates count as 60"
+        );
+        assert_eq!(
+            signal_hybrid_action("twitch", Some(&signal(1920, 1080, 120.0, None))),
+            "transcode"
+        );
+        assert_eq!(
+            signal_hybrid_action("twitch", Some(&signal(1920, 1080, 60.0, Some(9000)))),
+            "transcode"
+        );
+        assert_eq!(
+            signal_hybrid_action("kick", Some(&signal(1920, 1080, 60.0, Some(8000)))),
+            "copy"
+        );
+        assert_eq!(signal_hybrid_action("twitch", None), "copy");
+        assert_eq!(
+            signal_hybrid_action("tiktok", Some(&full_hd)),
+            "transcode",
+            "vertical destinations always transcode"
+        );
+        assert_eq!(
+            signal_hybrid_action("x", Some(&signal(3840, 2160, 60.0, None))),
+            "copy",
+            "unknown limits keep the copy"
+        );
+    }
+
+    #[test]
+    fn the_obs_signal_pins_smart_choices_for_one_live() {
+        let mut config = crate::config::AppConfig {
+            mode: "hybrid".into(),
+            targets: vec![tgt("twitch", None), tgt("youtube", None), tgt("kick", None)],
+            ..Default::default()
+        };
+        config.targets[2].encoding.hybrid_override = Some("copy".into());
+        let pinned = apply_source_signal(&mut config, &signal(2560, 1440, 60.0, None));
+        assert_eq!(pinned, ["twitch"]);
+        assert_eq!(
+            config.targets[0].encoding.hybrid_override.as_deref(),
+            Some("transcode")
+        );
+        assert_eq!(config.targets[1].encoding.hybrid_override, None);
+        assert_eq!(
+            config.targets[2].encoding.hybrid_override.as_deref(),
+            Some("copy"),
+            "the user's own choice wins"
+        );
+
+        config.mode = "passthrough".into();
+        config.targets[0].encoding.hybrid_override = None;
+        assert!(apply_source_signal(&mut config, &signal(2560, 1440, 60.0, None)).is_empty());
+    }
+
+    #[test]
+    fn obs_fits_the_strictest_destination_that_copies() {
+        let mut config = crate::config::AppConfig {
+            mode: "hybrid".into(),
+            targets: vec![tgt("youtube", None), tgt("kick", None), tgt("tiktok", None)],
+            ..Default::default()
+        };
+        assert_eq!(
+            strictest_copy_limits(&config),
+            Some(CopyLimits {
+                max_height: 1080,
+                max_fps: 60,
+                max_kbps: 8000
+            })
+        );
+        config.targets.push(tgt("twitch", None));
+        assert_eq!(
+            strictest_copy_limits(&config).map(|l| l.max_kbps),
+            Some(6000)
+        );
+        config.mode = "per-platform".into();
+        assert_eq!(strictest_copy_limits(&config), None, "nothing is copied");
     }
 }
