@@ -10,8 +10,8 @@
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
-      "reason": "O feed e os alertas assinam o store em componentes próprios e os sliders do overlay gravam ao soltar; telas, URLs, Testar e Adicionar no OBS citados não mudaram."
+      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
+      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; o overlay, os blocos no OBS e o aviso de que a moderação não apaga o que já foi ao ar continuam corretos."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -28,8 +28,8 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
-      "reason": "O envio passa a excluir fontes desligadas ou sem canal de Todas, o que continua coerente com 'canais disponíveis para envio'; popout, overlay e moderação não mudaram."
+      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
+      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; o seletor de envio, Todas e o aviso de que a moderação vale só na plataforma de origem continuam corretos."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -46,8 +46,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "05a7aa71468e4b1f32b33b4e6e3c75793fa5a81d",
-      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "0d0324def361d383b305d23f7fe9b1fd258f9963",
+      "reason": "Só muda a assinatura do comando de envio do chat para aceitar uma resposta; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -58,20 +58,20 @@
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
-      "reason": "Os sliders do overlay gravam ao soltar e o feed assina o store à parte; passos, opções do overlay, endereço local e tabela de problemas citados não mudaram."
+      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
+      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; a aba Overlays, Adicionar no OBS e os ajustes citados não mudaram."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "9ea35e5e4876f7e5677768f340a6bb318052e7da",
-      "reason": "A audiência do YouTube passou a vir também pelo login, sem chave de API própria; adicionar canal, conectar e conferir a audiência na tela Chat continuam como o artigo descreve."
+      "sourceBlob": "37c9126aa0ba2e27ad78146545d61c4b79cb8780",
+      "reason": "Os conectores passaram a guardar o ID de quem mandou no YouTube e na Kick e a enviar respostas; adicionar canal, conectar e o que funciona sem login continuam corretos."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "bc56d71c3389fa4d459abe72c7ee546b7b501813",
-      "reason": "Os campos da fonte gravam ao sair do campo, com Enter ou ao fechar a configuração, então 'feche a configuração e clique em Conectar' continua valendo."
+      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
+      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; adicionar canal, conectar e a frase de que as ações mudam entre plataformas continuam corretos."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -100,14 +100,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "05a7aa71468e4b1f32b33b4e6e3c75793fa5a81d",
-      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "0d0324def361d383b305d23f7fe9b1fd258f9963",
+      "reason": "Só muda a assinatura do comando de envio do chat para aceitar uma resposta; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "05a7aa71468e4b1f32b33b4e6e3c75793fa5a81d",
-      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o que o diagnóstico exporta e omite não mudou."
+      "sourceBlob": "0d0324def361d383b305d23f7fe9b1fd258f9963",
+      "reason": "Só muda a assinatura do comando de envio do chat para aceitar uma resposta; o que o diagnóstico exporta e omite não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "f459d9f8e44c6738790880e6e900bac0c09d685f",
-      "reason": "Só muda a dica da chave de API do YouTube no chat; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "0b0e6be44d2c453c9187765a2b9cfa9c082ad625",
+      "reason": "Só acrescenta os textos de responder e de reconectar a Kick para banir; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
