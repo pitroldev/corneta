@@ -976,6 +976,10 @@ export function mockApi(): CornetaApi {
         decidedAt: new Date().toISOString(),
       });
     },
+    subscribeTelemetryChanged() {
+      return () => {};
+    },
+    async notifyTelemetryChanged() {},
     async registerShortcut() {},
     subscribeRecorder() {
       return () => {};

@@ -510,6 +510,24 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return invoke<TelemetryStatus>("telemetry_regenerate_id");
     },
+    subscribeTelemetryChanged(cb) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen("telemetry://changed", () => cb()).then((u) =>
+          cancelled ? u() : (unlisten = u),
+        ),
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
+    },
+    async notifyTelemetryChanged() {
+      const { emit } = await event();
+      await emit("telemetry://changed");
+    },
     async registerShortcut(shortcut, action = "toggleLive") {
       const { invoke } = await core();
       await invoke("register_shortcut", { shortcut, action });

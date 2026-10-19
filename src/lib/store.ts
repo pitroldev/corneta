@@ -73,28 +73,66 @@ export const useStore = create<State>((set, get) => {
   // Queue writes immediately and in order; asynchronous beforeunload is not reliable in WebView.
   // Edits made while a save is in flight collapse into one follow-up save of the latest config.
   let saveChain: Promise<void> = Promise.resolve();
+  // A window advances saveRevision only together with that revision's content, so every save it
+  // sends already contains every change up to the revision it claims.
   let saveRevision = 0;
+  let savedConfig: AppConfig | null = null;
+  // Newest config another window saved while this window still had unsaved edits.
+  let pendingRemote: AppConfig | null = null;
   let queuedConfig: AppConfig | null = null;
   let saving = false;
   let saveFailed = false;
   let liveOperation: { id: string } | null = null;
   const flushSave = () => saveChain;
-  const saveQueued = async () => {
+  const confirmSaved = (config: AppConfig) => {
+    savedConfig = config;
+    saveRevision = config.revision;
+    if (pendingRemote && pendingRemote.revision <= config.revision)
+      pendingRemote = null;
+  };
+  // save_config rejects a revision older than the file. When another window saved first, rebase the
+  // unsaved edits onto the file instead of dropping them; any other failure leaves them unsaved.
+  const rebaseOnNewerFile = async (sentRevision: number) => {
+    let file: AppConfig;
+    try {
+      file = await api.getConfig();
+    } catch {
+      return false;
+    }
+    if (!(file.revision > sentRevision)) return false;
+    const base = savedConfig ?? file;
+    confirmSaved(file);
+    persist(cfgOps.rebaseConfig(base, get().config ?? file, file));
+    return true;
+  };
+  const saveQueued = async (): Promise<void> => {
     const next = queuedConfig;
     if (!next) return;
     queuedConfig = null;
     saving = true;
+    const revision = saveRevision;
+    let rebased = false;
     try {
-      const saved = await api.saveConfig({ ...next, revision: saveRevision });
+      const saved = await api.saveConfig({ ...next, revision });
       saveFailed = false;
-      saveRevision = saved.revision;
-      if (!queuedConfig) set({ config: saved });
+      confirmSaved(saved);
+      if (!queuedConfig) {
+        // A config another window saved on top of this one supersedes it.
+        const latest = pendingRemote ?? saved;
+        confirmSaved(latest);
+        set({ config: latest });
+      }
     } catch (error) {
-      saveFailed = true;
-      console.error("Failed to save configuration", error);
+      rebased = await rebaseOnNewerFile(revision);
+      if (!rebased) {
+        saveFailed = true;
+        console.error("Failed to save configuration", error);
+      }
     } finally {
       saving = false;
     }
+    // Retry within this queue step so callers awaiting flushSave also wait for the rebased save.
+    if (rebased) await saveQueued();
   };
   const persist = (config: AppConfig) => {
     const profiles = config.profiles.map((p) =>
@@ -152,7 +190,7 @@ export const useStore = create<State>((set, get) => {
         set({ bootError: String(error) });
         return;
       }
-      saveRevision = config.revision;
+      confirmSaved(config);
       saveFailed = false;
       set({ config, loaded: true });
       try {
@@ -211,11 +249,17 @@ export const useStore = create<State>((set, get) => {
     bindConfigSync() {
       // Apply other-window saves without persisting again to avoid write loops.
       return api.subscribeConfigChanged((config) => {
-        saveRevision = Math.max(saveRevision, config.revision);
-        if (!queuedConfig && !saving) {
-          saveFailed = false;
-          set({ config });
+        // Echoes of this window's saves and late broadcasts must not roll back newer state.
+        if (config.revision <= saveRevision) return;
+        if (queuedConfig || saving) {
+          // Keep unsaved edits; saveQueued reconciles them with this config once their save settles.
+          if (!pendingRemote || config.revision > pendingRemote.revision)
+            pendingRemote = config;
+          return;
         }
+        saveFailed = false;
+        confirmSaved(config);
+        set({ config });
       });
     },
     addTarget(platformId) {
