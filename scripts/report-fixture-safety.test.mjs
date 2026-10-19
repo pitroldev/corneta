@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  symlinkSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   assertNoFixtureLinks,
@@ -8,8 +14,22 @@ import {
   validateFixtureManifest,
 } from "./report-fixture-safety.mjs";
 
+const directories = [];
+afterEach(() => {
+  for (const root of directories.splice(0)) {
+    if (dirname(root) !== tmpdir()) throw new Error("Invalid test cleanup");
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function temporaryDirectory(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  directories.push(root);
+  return root;
+}
+
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "corneta-fixture-safety-"));
+  const root = temporaryDirectory("corneta-fixture-safety-");
   const sessionsDir = join(root, "sessions");
   mkdirSync(sessionsDir);
   const file = join(sessionsDir, "1000.ndjson");
@@ -63,9 +83,7 @@ describe("fixture data ownership", () => {
   });
   it("rejects directory junctions before following a fixture path", () => {
     const { root } = fixture();
-    const destination = mkdtempSync(
-      join(tmpdir(), "corneta-fixture-external-"),
-    );
+    const destination = temporaryDirectory("corneta-fixture-external-");
     const link = join(root, "redirect");
     symlinkSync(
       destination,
