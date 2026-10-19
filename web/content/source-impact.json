@@ -64,8 +64,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "75c7fb5083f946220cc5f5fa101cd1458f3a091f",
-      "reason": "Os parsers do YouTube viram funções puras e eventos de sistema deixam de virar mensagem, o que o artigo não descreve; passos, ponto verde e tabela citados não mudaram."
+      "sourceBlob": "694b2a700acf16807f18b9d8cdb272f73de8f3b6",
+      "reason": "O conector só ganhou o alerta nativo de seguidor da Twitch para quem já entrou na conta; os passos de adicionar canal, conectar e o que funciona sem login continuam corretos."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "b9a25794f951b1499809265353b9ccd8821b3bb6",
-      "reason": "Só acrescenta os textos de buscar a chave da Twitch pela conta; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "f6ac7c73cd32e35e0da62f894569e6aa09a34e1a",
+      "reason": "As frases novas são do aviso de reconectar a Twitch na aba Conta; nenhum texto da configuração automática do OBS mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
