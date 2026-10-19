@@ -1,4 +1,5 @@
 mod cinefy;
+mod twitch_follows;
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -409,6 +410,27 @@ pub fn start_chat(app: &AppHandle) {
         let (app_v, run_v, key_v) = (app.clone(), running.clone(), api_key.clone());
         tauri::async_runtime::spawn_blocking(move || {
             run_viewers(vsources, key_v, run_v, app_v, gen)
+        });
+    }
+
+    // One EventSub socket covers every Twitch channel; follows need the app's own login.
+    let follow_channels: Vec<twitch_follows::FollowChannel> = s
+        .chat_sources
+        .iter()
+        .filter(|x| x.enabled && x.platform == "twitch" && !x.value.trim().is_empty())
+        .map(|x| twitch_follows::FollowChannel {
+            login: x.value.trim().to_lowercase(),
+            label: if x.name.trim().is_empty() {
+                x.value.clone()
+            } else {
+                x.name.clone()
+            },
+        })
+        .collect();
+    if !follow_channels.is_empty() && crate::keys::has_key("twitch_oauth") {
+        let (app_f, run_f) = (app.clone(), running.clone());
+        tauri::async_runtime::spawn_blocking(move || {
+            twitch_follows::run(follow_channels, run_f, app_f, gen)
         });
     }
 }
