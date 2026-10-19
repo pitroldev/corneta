@@ -510,7 +510,7 @@ export const en: Dict = {
   "chat.youtube.apikey.optional": "· optional (nice to have)",
   "chat.youtube.apikey.placeholder": "paste your API key (Data API v3)",
   "chat.youtube.apikey.tooltip":
-    "Corneta reads the chat without it. With it, you also get YouTube's “watching” count.",
+    "Corneta reads the chat without it and, with YouTube connected in the Account tab, updates the “watching” count every 2 minutes. With it, the count updates every 30 seconds and doesn't depend on the login.",
   "chat.youtube.creds.guide.hide": "hide the guide",
   "chat.youtube.creds.guide.show": "how do I get these?",
   "chat.youtube.creds.saved.toast":

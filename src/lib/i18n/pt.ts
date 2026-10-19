@@ -500,7 +500,7 @@ export const pt = {
   "chat.youtube.apikey.optional": "· opcional (bom ter)",
   "chat.youtube.apikey.placeholder": "cole sua API key (Data API v3)",
   "chat.youtube.apikey.tooltip":
-    "Sem ela a Corneta já lê o chat. Com ela você ganha a contagem de “assistindo” do YouTube.",
+    "Sem ela a Corneta já lê o chat e, com o YouTube conectado na aba Conta, atualiza o “assistindo” a cada 2 minutos. Com ela, a contagem atualiza a cada 30 segundos e não depende do login.",
   "chat.youtube.creds.guide.hide": "ocultar guia",
   "chat.youtube.creds.guide.show": "como conseguir?",
   "chat.youtube.creds.saved.toast": "Credenciais do YouTube no cofre 🔒",
