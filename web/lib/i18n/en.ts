@@ -203,10 +203,10 @@ export const en: Dict = {
   "content.scopes.kick.never":
     "This is the only login that goes through our server, because Kick requires a server-side secret in the exchange — and even then the token is not stored anywhere.",
   "content.scopes.kick.permission":
-    "Read the channel, send chat and delete messages; timeouts and bans are only requested the first time you try one",
+    "Read the channel, send chat and delete messages; timeouts and bans, and reading your stream key, are only requested the first time you use each",
   "content.scopes.kick.title": "Kick account",
   "content.scopes.kick.why":
-    "The same things as the unified chat: read, reply and moderate without leaving the app.",
+    "The same things as the unified chat: read, reply and moderate without leaving the app, and fill in your stream key when you ask.",
   "content.scopes.twitch.never":
     "Nothing is posted to your channel unless you ask for it, Corneta does not follow, subscribe or change anything in your account, and your stream key only goes into your PC's vault.",
   "content.scopes.twitch.permission":

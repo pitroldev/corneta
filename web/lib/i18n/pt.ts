@@ -199,10 +199,10 @@ export const pt = {
   "content.scopes.kick.never":
     "É o único login que passa pelo nosso servidor, porque a Kick exige um segredo de servidor na troca — e mesmo assim o token não é armazenado em lugar nenhum.",
   "content.scopes.kick.permission":
-    "Ler o canal, enviar no chat e apagar mensagens; dar timeout e banir só é pedido na primeira vez que você tenta",
+    "Ler o canal, enviar no chat e apagar mensagens; dar timeout e banir, e ler sua chave de transmissão, só são pedidos na primeira vez que você usa cada um",
   "content.scopes.kick.title": "Conta da Kick",
   "content.scopes.kick.why":
-    "As mesmas coisas do chat unificado: ler, responder e moderar sem sair do app.",
+    "As mesmas coisas do chat unificado: ler, responder e moderar sem sair do app, e preencher sua chave de transmissão quando você pedir.",
   "content.scopes.twitch.never":
     "Nada é postado no seu canal sem você pedir, a Corneta não segue, não inscreve nem altera nada da sua conta, e a chave de transmissão vai só para o cofre do seu PC.",
   "content.scopes.twitch.permission":
