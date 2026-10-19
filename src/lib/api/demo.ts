@@ -1001,6 +1001,30 @@ export function mockApi(): CornetaApi {
       };
     },
     async obsAutoconfigure() {},
+    async obsVideoCheck() {
+      return {
+        current: {
+          outputWidth: 1920,
+          outputHeight: 1080,
+          fpsNumerator: 60,
+          fpsDenominator: 1,
+          simpleKbps: 6000,
+        },
+        proposal: null,
+        limitKbps: 6000,
+        canUndo: false,
+      };
+    },
+    async obsVideoApply() {
+      return {
+        outputWidth: 1920,
+        outputHeight: 1080,
+        fpsNumerator: 60,
+        fpsDenominator: 1,
+        simpleKbps: 6000,
+      };
+    },
+    async obsVideoUndo() {},
     async systemMemoryBytes() {
       return 16 * 1024 ** 3;
     },

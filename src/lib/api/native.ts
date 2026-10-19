@@ -9,6 +9,8 @@ import type {
   EngineSnapshot,
   Leak,
   ObsCheck,
+  ObsVideo,
+  ObsVideoCheck,
   RecordDirCheck,
   SessionMeta,
   Viewers,
@@ -578,6 +580,18 @@ export function tauriApi(): CornetaApi {
     async obsAutoconfigure() {
       const { invoke } = await core();
       await invoke("obs_autoconfigure");
+    },
+    async obsVideoCheck() {
+      const { invoke } = await core();
+      return invoke<ObsVideoCheck>("obs_video_check");
+    },
+    async obsVideoApply() {
+      const { invoke } = await core();
+      return invoke<ObsVideo>("obs_video_apply");
+    },
+    async obsVideoUndo() {
+      const { invoke } = await core();
+      await invoke("obs_video_undo");
     },
     async systemMemoryBytes() {
       const { invoke } = await core();

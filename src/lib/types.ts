@@ -167,6 +167,23 @@ export type ObsErrorCode =
   | "identificationFailed"
   | "requestRefused";
 
+/** OBS output video; the bitrate is only reachable in OBS's simple output mode. */
+export interface ObsVideo {
+  outputWidth: number;
+  outputHeight: number;
+  fpsNumerator: number;
+  fpsDenominator: number;
+  simpleKbps: number | null;
+}
+
+export interface ObsVideoCheck {
+  current: ObsVideo;
+  /** What fits every destination that copies OBS's signal; null when it already fits. */
+  proposal: ObsVideo | null;
+  limitKbps: number | null;
+  canUndo: boolean;
+}
+
 export interface ObsCheck {
   reachable: boolean;
   /** Structured authentication failure flag; do not infer it from localized error text. */
