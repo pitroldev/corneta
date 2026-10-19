@@ -1439,6 +1439,33 @@ fn scrape_live(url: &str) -> LiveResolve {
     }
 }
 
+/// A handle maps to the same channel for the whole session; a miss is retried after a while.
+const CHANNEL_MISS_TTL: Duration = Duration::from_secs(6 * 3600);
+/// search.list costs 100 units, so each channel is searched at most this often.
+const LIVE_SEARCH_EVERY: Duration = Duration::from_secs(10 * 60);
+const LOOKUP_CACHE_CAP: usize = 64;
+
+type LookupCache<T> = Mutex<HashMap<String, (Instant, Option<T>)>>;
+static YT_CHANNEL_IDS: OnceLock<LookupCache<String>> = OnceLock::new();
+static YT_LIVE_SEARCHES: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
+
+/// A cached answer still valid at `now`: hits last the session, misses expire after `miss_ttl`.
+fn cached_answer<T: Clone>(
+    entry: Option<&(Instant, Option<T>)>,
+    miss_ttl: Duration,
+    now: Instant,
+) -> Option<Option<T>> {
+    match entry {
+        Some((_, Some(hit))) => Some(Some(hit.clone())),
+        Some((at, None)) if now.saturating_duration_since(*at) < miss_ttl => Some(None),
+        _ => None,
+    }
+}
+
+fn due(last: Option<&Instant>, every: Duration, now: Instant) -> bool {
+    last.is_none_or(|at| now.saturating_duration_since(*at) >= every)
+}
+
 fn channel_id_of(input: &str, api_key: &str) -> Option<String> {
     let s = input.trim();
     if let Some(i) = s.find("/channel/") {
@@ -1462,9 +1489,19 @@ fn channel_id_of(input: &str, api_key: &str) -> Option<String> {
     if handle.is_empty() || api_key.trim().is_empty() {
         return None;
     }
+    let cache_key = handle.to_lowercase();
+    let cache = YT_CHANNEL_IDS.get_or_init(Default::default);
+    if let Some(answer) = cached_answer(
+        cache.lock().unwrap().get(&cache_key),
+        CHANNEL_MISS_TTL,
+        Instant::now(),
+    ) {
+        return answer;
+    }
     let url = format!(
         "https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=@{handle}&key={api_key}"
     );
+    // Failed requests are not cached; only an answer from YouTube is.
     let body = ureq::get(&url)
         .timeout(Duration::from_secs(6))
         .call()
@@ -1472,15 +1509,36 @@ fn channel_id_of(input: &str, api_key: &str) -> Option<String> {
         .into_string()
         .ok()?;
     let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/items/0/id")
+    let id = v
+        .pointer("/items/0/id")
         .and_then(|x| x.as_str())
-        .map(String::from)
+        .map(String::from);
+    let mut ids = cache.lock().unwrap();
+    if ids.len() >= LOOKUP_CACHE_CAP {
+        ids.clear();
+    }
+    ids.insert(cache_key, (Instant::now(), id.clone()));
+    id
 }
 
 // Reserve quota-consuming search.list for page-resolution failures, not offline channels.
 fn search_live_video_id(channel_id: &str, api_key: &str) -> Option<String> {
     if api_key.trim().is_empty() {
         return None;
+    }
+    {
+        let now = Instant::now();
+        let mut searches = YT_LIVE_SEARCHES
+            .get_or_init(Default::default)
+            .lock()
+            .unwrap();
+        if !due(searches.get(channel_id), LIVE_SEARCH_EVERY, now) {
+            return None;
+        }
+        if searches.len() >= LOOKUP_CACHE_CAP {
+            searches.clear();
+        }
+        searches.insert(channel_id.to_string(), now);
     }
     let url = format!(
         "https://www.googleapis.com/youtube/v3/search?part=id&channelId={channel_id}&eventType=live&type=video&key={api_key}"
@@ -2559,46 +2617,108 @@ fn twitch_counts(channel: &str) -> ChannelCounts {
     }
 }
 
-fn yt_concurrent(api_key: &str, vid: &str) -> Option<u64> {
-    let url = format!(
-        "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}&key={api_key}"
-    );
-    let body = ureq::get(&url)
+/// The official project's quota is shared by every user, so login-based readings are spaced out.
+const SHARED_QUOTA_VIEWERS_EVERY: Duration = Duration::from_secs(120);
+
+#[derive(Debug, PartialEq)]
+struct YtLiveDetails {
+    live: bool,
+    /// Channel owners can hide the count while the video stays live.
+    viewers: Option<u64>,
+}
+
+fn parse_live_details(v: &Value) -> YtLiveDetails {
+    let details = v.pointer("/items/0/liveStreamingDetails");
+    let live = details
+        .is_some_and(|d| d.get("actualStartTime").is_some() && d.get("actualEndTime").is_none());
+    let viewers = details
+        .and_then(|d| d.get("concurrentViewers"))
+        .and_then(|n| {
+            n.as_str()
+                .and_then(|s| s.parse().ok())
+                .or_else(|| n.as_u64())
+        })
+        .filter(|_| live);
+    YtLiveDetails { live, viewers }
+}
+
+enum YtAuth {
+    /// The user's own Data API key and quota.
+    Key(String),
+    /// The login token, billed to the Corneta project's shared quota.
+    Bearer(String),
+}
+
+fn yt_live_details(auth: &YtAuth, vid: &str) -> Option<YtLiveDetails> {
+    let url =
+        format!("https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}");
+    let request = match auth {
+        YtAuth::Key(key) => ureq::get(format!("{url}&key={key}")),
+        YtAuth::Bearer(token) => ureq::get(&url).set("Authorization", &format!("Bearer {token}")),
+    };
+    let body = request
         .timeout(Duration::from_secs(6))
         .call()
         .ok()?
         .into_string()
         .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/items/0/liveStreamingDetails/concurrentViewers")
-        .and_then(|x| x.as_str())
-        .and_then(|s| s.parse::<u64>().ok())
+    serde_json::from_str::<Value>(&body)
+        .ok()
+        .map(|v| parse_live_details(&v))
 }
 
-// Reuse the resolved video ID across polls to avoid repeatedly scraping the channel page.
+#[derive(Default)]
+struct YtViewerCache {
+    /// Resolved live video per channel, so polls do not scrape the channel page again.
+    videos: HashMap<String, String>,
+    readings: HashMap<String, (Instant, Option<u64>)>,
+}
+
 fn youtube_viewers(
+    app: &AppHandle,
     api_key: &str,
     channel: &str,
-    cache: &mut std::collections::HashMap<String, String>,
+    cache: &mut YtViewerCache,
 ) -> Option<u64> {
-    if api_key.trim().is_empty() {
-        return None;
-    }
-    if let Some(vid) = cache.get(channel) {
-        if let Some(n) = yt_concurrent(api_key, vid) {
-            return Some(n);
-        }
-        cache.remove(channel);
-    }
-    let vid = match resolve_youtube_video(channel, api_key) {
-        LiveResolve::Video(v) => v,
-        _ => return None,
+    let auth = if api_key.trim().is_empty() {
+        YtAuth::Bearer(crate::auth::youtube_token(app)?)
+    } else {
+        YtAuth::Key(api_key.trim().to_string())
     };
-    let n = yt_concurrent(api_key, &vid);
-    if n.is_some() {
-        cache.insert(channel.to_string(), vid);
+    let every = match auth {
+        YtAuth::Key(_) => Duration::ZERO,
+        YtAuth::Bearer(_) => SHARED_QUOTA_VIEWERS_EVERY,
+    };
+    let now = Instant::now();
+    if let Some((at, viewers)) = cache.readings.get(channel) {
+        if now.saturating_duration_since(*at) < every {
+            return *viewers;
+        }
     }
-    n
+    let vid = match cache.videos.get(channel) {
+        Some(vid) => vid.clone(),
+        None => match resolve_youtube_video(channel, api_key) {
+            LiveResolve::Video(vid) => vid,
+            _ => {
+                cache.readings.remove(channel);
+                return None;
+            }
+        },
+    };
+    let viewers = match yt_live_details(&auth, &vid) {
+        // A hidden count keeps the video: it is still live and must not be resolved again.
+        Some(details) if details.live => {
+            cache.videos.insert(channel.to_string(), vid);
+            details.viewers
+        }
+        Some(_) => {
+            cache.videos.remove(channel);
+            None
+        }
+        None => None,
+    };
+    cache.readings.insert(channel.to_string(), (now, viewers));
+    viewers
 }
 
 // followers_count is undocumented; leave it unavailable rather than assuming zero if it disappears.
@@ -2642,7 +2762,7 @@ fn run_viewers(
     app: AppHandle,
     gen: u64,
 ) {
-    let mut yt_cache: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut yt_cache = YtViewerCache::default();
     let mut cinefy = cinefy::AudiencePoller::new(
         sources
             .iter()
@@ -2657,7 +2777,7 @@ fn run_viewers(
                 "twitch" => twitch_counts(&src.value),
                 // Rounded YouTube subscriber counts cannot reliably measure per-stream gains.
                 "youtube" => ChannelCounts {
-                    viewers: youtube_viewers(&api_key, &src.value, &mut yt_cache),
+                    viewers: youtube_viewers(&app, &api_key, &src.value, &mut yt_cache),
                     ..Default::default()
                 },
                 "kick" => kick_counts(&src.value),
@@ -3350,5 +3470,73 @@ mod tests {
             json!({ "snippet": { "type": "textMessageEvent", "displayMessage": "" } })
         )
         .is_none());
+    }
+
+    #[test]
+    fn hidden_youtube_counts_keep_the_live_video() {
+        let details =
+            |d: Value| parse_live_details(&json!({ "items": [{ "liveStreamingDetails": d }] }));
+        assert_eq!(
+            details(
+                json!({ "actualStartTime": "2026-10-19T10:00:00Z", "concurrentViewers": "1234" })
+            ),
+            YtLiveDetails {
+                live: true,
+                viewers: Some(1234)
+            }
+        );
+        assert_eq!(
+            details(json!({ "actualStartTime": "2026-10-19T10:00:00Z" })),
+            YtLiveDetails {
+                live: true,
+                viewers: None
+            },
+            "a hidden count is not an ended live"
+        );
+        assert_eq!(
+            details(json!({
+                "actualStartTime": "2026-10-19T10:00:00Z",
+                "actualEndTime": "2026-10-19T12:00:00Z",
+                "concurrentViewers": "50"
+            })),
+            YtLiveDetails {
+                live: false,
+                viewers: None
+            }
+        );
+        assert_eq!(
+            details(json!({ "scheduledStartTime": "2026-10-19T10:00:00Z" })),
+            YtLiveDetails {
+                live: false,
+                viewers: None
+            }
+        );
+        assert_eq!(
+            parse_live_details(&json!({ "items": [] })),
+            YtLiveDetails {
+                live: false,
+                viewers: None
+            }
+        );
+    }
+
+    #[test]
+    fn quota_spending_lookups_are_remembered() {
+        let start = Instant::now();
+        let later = |secs: u64| start + Duration::from_secs(secs);
+        let ttl = Duration::from_secs(60);
+        let hit = (start, Some("UCaaaaaaaaaaaaaaaaaaaaaa".to_string()));
+        let miss: (Instant, Option<String>) = (start, None);
+        assert_eq!(
+            cached_answer(Some(&hit), ttl, later(10_000)),
+            Some(Some("UCaaaaaaaaaaaaaaaaaaaaaa".to_string()))
+        );
+        assert_eq!(cached_answer(Some(&miss), ttl, later(30)), Some(None));
+        assert_eq!(cached_answer(Some(&miss), ttl, later(60)), None);
+        assert_eq!(cached_answer::<String>(None, ttl, start), None);
+
+        assert!(due(None, LIVE_SEARCH_EVERY, start));
+        assert!(!due(Some(&start), LIVE_SEARCH_EVERY, later(599)));
+        assert!(due(Some(&start), LIVE_SEARCH_EVERY, later(600)));
     }
 }
