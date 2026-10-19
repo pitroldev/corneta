@@ -10,8 +10,8 @@
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
-      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; o overlay, os blocos no OBS e o aviso de que a moderação não apaga o que já foi ao ar continuam corretos."
+      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
+      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; o overlay, os blocos no OBS e os avisos citados não mudaram."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -28,8 +28,8 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
-      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; o seletor de envio, Todas e o aviso de que a moderação vale só na plataforma de origem continuam corretos."
+      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
+      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; o seletor de envio e as regras de moderação citadas não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -58,8 +58,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
-      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; a aba Overlays, Adicionar no OBS e os ajustes citados não mudaram."
+      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
+      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; a aba Overlays e os ajustes citados não mudaram."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -70,8 +70,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "af9999aa4c5ff34b2670db8cd99ba07d46e8b3fc",
-      "reason": "A tela Chat ganhou o botão Responder e timeout e ban no YouTube e na Kick; adicionar canal, conectar e a frase de que as ações mudam entre plataformas continuam corretos."
+      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
+      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; o caminho Adicionar canal, preencher o identificador e Conectar continua valendo do jeito que o artigo descreve."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -82,8 +82,8 @@
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
       "source": "src/screens/PlatformsScreen.tsx",
-      "sourceBlob": "f8c783ab4eabe79efd2337bf51b1fa006439919a",
-      "reason": "Acrescenta, nos destinos da Twitch, o botão Pegar da conta, que grava a chave no mesmo cofre; Colar e salvar e os demais passos citados continuam valendo."
+      "sourceBlob": "0788cbf8d939fc8effd6a916cbddd9cde3a0920a",
+      "reason": "O convite para ligar o chat deixa de criar um canal vazio quando a conta já está conectada; os passos de gerenciar destinos citados não mudaram."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "0b0e6be44d2c453c9187765a2b9cfa9c082ad625",
-      "reason": "Só acrescenta os textos de responder e de reconectar a Kick para banir; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "be8c9b1b28dde9a90071fb4300f5afe09a90a1ea",
+      "reason": "Só acrescenta os textos das sugestões de chat das contas conectadas; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
