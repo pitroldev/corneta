@@ -322,7 +322,15 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("kick_login_start", {
         moderation: options?.moderation ?? null,
+        streamKey: options?.streamKey ?? null,
       });
+    },
+    async kickFetchStreamKey(targetId) {
+      const { invoke } = await core();
+      return invoke<{ login: string; url: string | null }>(
+        "kick_fetch_stream_key",
+        { targetId },
+      );
     },
     async kickLogout() {
       const { invoke } = await core();

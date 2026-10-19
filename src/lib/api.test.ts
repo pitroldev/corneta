@@ -73,7 +73,7 @@ describe("Tauri telemetry IPC", () => {
     });
   });
 
-  it("passes chat replies and the Kick ban opt-in as named arguments", async () => {
+  it("passes chat replies and the Kick opt-in scopes as named arguments", async () => {
     const { api } = await import("./api");
     await api.chatSend("valeu", ["source-1"], {
       nativeId: "message-1",
@@ -82,6 +82,8 @@ describe("Tauri telemetry IPC", () => {
     await api.chatSend("oi");
     await api.kickLoginStart();
     await api.kickLoginStart({ moderation: true });
+    await api.kickLoginStart({ streamKey: true });
+    await api.kickFetchStreamKey("target-1");
     expect(invoke).toHaveBeenCalledWith("chat_send", {
       text: "valeu",
       sources: ["source-1"],
@@ -94,9 +96,18 @@ describe("Tauri telemetry IPC", () => {
     });
     expect(invoke).toHaveBeenCalledWith("kick_login_start", {
       moderation: null,
+      streamKey: null,
     });
     expect(invoke).toHaveBeenCalledWith("kick_login_start", {
       moderation: true,
+      streamKey: null,
+    });
+    expect(invoke).toHaveBeenCalledWith("kick_login_start", {
+      moderation: null,
+      streamKey: true,
+    });
+    expect(invoke).toHaveBeenCalledWith("kick_fetch_stream_key", {
+      targetId: "target-1",
     });
   });
 

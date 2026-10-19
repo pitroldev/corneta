@@ -369,6 +369,17 @@ export const useStore = create<State>((set, get) => {
       get().updateTarget(id, { hasKey: true });
       return login;
     },
+    async fetchKickKey(id) {
+      await flushSave();
+      const { login, url } = await api.kickFetchStreamKey(id);
+      const target = get().config?.targets.find((t) => t.id === id);
+      // The account's server only fills a destination that has none; a URL the user set stays.
+      get().updateTarget(id, {
+        hasKey: true,
+        ...(url && !target?.ingestUrl.trim() ? { ingestUrl: url } : {}),
+      });
+      return login;
+    },
     async clearKey(id) {
       await flushSave();
       await api.clearKey(id);

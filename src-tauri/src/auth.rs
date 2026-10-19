@@ -32,6 +32,9 @@ const KICK_SCOPES: &str =
 const KICK_BAN_SCOPE: &str = "moderation:ban";
 /// Vault marker for a Kick grant that includes the ban scope; it lives and dies with the session.
 const KICK_BAN_GRANT: &str = "kick_moderation";
+/// Requested only from the key button, for the same reason as the ban scope.
+const KICK_KEY_SCOPE: &str = "streamkey:read";
+const KICK_KEY_GRANT: &str = "kick_stream_key";
 /// Twitch's own timeout ceiling; YouTube and Kick are clamped further by their APIs.
 const MAX_TIMEOUT_SECONDS: u64 = 1_209_600;
 const KICK_PORT: u16 = 7395;
@@ -554,6 +557,7 @@ fn forget_kick_session() -> Result<(), String> {
                 "kick_oauth",
                 "kick_oauth_mode",
                 KICK_BAN_GRANT,
+                KICK_KEY_GRANT,
             ])
         },
         || {
@@ -661,11 +665,12 @@ pub async fn auth_status(app: AppHandle) -> Value {
             "kickOwnCreds": kick_own,
             "kickUsingOwnCreds": !cfg.kick_client_secret.is_empty(),
             "kickCanBan": kick && keys::has_key(KICK_BAN_GRANT),
+            "kickCanReadKey": kick && keys::has_key(KICK_KEY_GRANT),
             "brokerError": broker.err(),
         })
     })
     .await
-    .unwrap_or_else(|_| json!({ "twitchLogin": null, "twitchMissingScopes": [], "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "kickCanBan": false, "brokerError": null }))
+    .unwrap_or_else(|_| json!({ "twitchLogin": null, "twitchMissingScopes": [], "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "kickCanBan": false, "kickCanReadKey": false, "brokerError": null }))
 }
 
 /// A logged-in account's own channel, offered as a chat source.
@@ -1842,14 +1847,11 @@ fn pct_decode(s: &str) -> String {
 }
 
 #[tauri::command]
-pub fn kick_login_start(app: AppHandle, moderation: Option<bool>) {
-    // Keep the ban scope across re-logins once it was granted.
+pub fn kick_login_start(app: AppHandle, moderation: Option<bool>, stream_key: Option<bool>) {
+    // Keep on-demand scopes across re-logins once they were granted.
     let with_ban = moderation.unwrap_or(false) || keys::has_key(KICK_BAN_GRANT);
-    let scopes = if with_ban {
-        format!("{KICK_SCOPES} {KICK_BAN_SCOPE}")
-    } else {
-        KICK_SCOPES.to_string()
-    };
+    let with_key = stream_key.unwrap_or(false) || keys::has_key(KICK_KEY_GRANT);
+    let scopes = kick_scopes(with_ban, with_key);
     tauri::async_runtime::spawn_blocking(move || {
         let broker = refresh_broker_config(&app);
         let cfg = oauth(&app);
@@ -1905,11 +1907,15 @@ pub fn kick_login_start(app: AppHandle, moderation: Option<bool>) {
         match oauth_wait(&listeners, &state, "Kick") {
             Ok(code) => match kick_exchange(&app, &cfg, &code, &verifier, &redirect) {
                 Ok(()) => {
-                    let _ = if with_ban {
-                        keys::set_key(KICK_BAN_GRANT, "1")
-                    } else {
-                        keys::clear_key(KICK_BAN_GRANT)
-                    };
+                    for (granted, marker) in
+                        [(with_ban, KICK_BAN_GRANT), (with_key, KICK_KEY_GRANT)]
+                    {
+                        let _ = if granted {
+                            keys::set_key(marker, "1")
+                        } else {
+                            keys::clear_key(marker)
+                        };
+                    }
                     let login = kick_whoami(&app).unwrap_or_default();
                     auth_event(&app, "kick", "connected", "", "", &login);
                 }
@@ -2274,6 +2280,82 @@ pub fn kick_send(
         Some(&body),
     )
     .map(|_| ())
+}
+
+fn kick_scopes(with_ban: bool, with_key: bool) -> String {
+    let mut scopes = KICK_SCOPES.to_string();
+    for (wanted, scope) in [(with_ban, KICK_BAN_SCOPE), (with_key, KICK_KEY_SCOPE)] {
+        if wanted {
+            scopes.push(' ');
+            scopes.push_str(scope);
+        }
+    }
+    scopes
+}
+
+#[derive(Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KickStreamKey {
+    login: String,
+    /// The account's server URL; the app uses it only for a destination that has none.
+    url: Option<String>,
+}
+
+/// Only the key and the server URL are read from the channel, and both must look like one.
+fn kick_stream_key_from(body: &Value) -> Option<(String, Option<String>)> {
+    let stream = body.get("data")?.as_array()?.first()?.get("stream")?;
+    let key = stream.get("key")?.as_str()?.trim();
+    if key.is_empty() || key.len() > 8 * 1024 || key.chars().any(char::is_whitespace) {
+        return None;
+    }
+    let url = stream
+        .get("url")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|url| {
+            (url.starts_with("rtmps://") || url.starts_with("rtmp://"))
+                && url.len() <= 2048
+                && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+        })
+        .map(String::from);
+    Some((key.to_string(), url))
+}
+
+#[tauri::command]
+pub async fn kick_fetch_stream_key(
+    app: AppHandle,
+    target_id: String,
+) -> Result<KickStreamKey, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::config::validate_secret_namespace(&target_id)?;
+        let config = crate::config::load(&app);
+        if !config
+            .targets
+            .iter()
+            .any(|target| target.id == target_id && target.platform_id == "kick")
+        {
+            return Err(Msg::KickStreamKeyWrongTarget.now());
+        }
+        if !keys::has_key("kick_refresh") {
+            return Err(Msg::KickStreamKeyNeedsLogin.now());
+        }
+        if !keys::has_key(KICK_KEY_GRANT) {
+            return Err(Msg::KickStreamKeyReconnect.now());
+        }
+        // Without a slug or ID, Kick answers with the authorized user's own channel.
+        let (key, url) = kick_api(&app, "GET", "https://api.kick.com/public/v1/channels", None)
+            .ok()
+            .and_then(|body| serde_json::from_str::<Value>(&body).ok())
+            .and_then(|body| kick_stream_key_from(&body))
+            .ok_or_else(|| Msg::KickStreamKeyFailed.now())?;
+        keys::set_key(&target_id, &key)?;
+        Ok(KickStreamKey {
+            login: kick_whoami(&app).unwrap_or_default(),
+            url,
+        })
+    })
+    .await
+    .map_err(|_| Msg::KickStreamKeyFailed.now())?
 }
 
 fn kick_whoami(app: &AppHandle) -> Option<String> {
@@ -3353,5 +3435,49 @@ mod tests {
             None
         );
         assert_eq!(parse_kick_account_channel(&json!({ "data": [] })), None);
+    }
+
+    #[test]
+    fn kick_asks_for_extra_scopes_only_when_wanted() {
+        assert_eq!(kick_scopes(false, false), KICK_SCOPES);
+        assert_eq!(
+            kick_scopes(true, true),
+            format!("{KICK_SCOPES} moderation:ban streamkey:read")
+        );
+        assert_eq!(
+            kick_scopes(false, true),
+            format!("{KICK_SCOPES} streamkey:read")
+        );
+    }
+
+    #[test]
+    fn kick_channel_yields_only_a_plausible_key_and_server() {
+        let channel = |stream: Value| {
+            kick_stream_key_from(&json!({ "data": [{ "slug": "ana", "stream": stream }] }))
+        };
+        assert_eq!(
+            channel(
+                json!({ "key": "placeholder-stream-value", "url": "rtmps://ingest.example/app" })
+            ),
+            Some((
+                "placeholder-stream-value".to_string(),
+                Some("rtmps://ingest.example/app".to_string())
+            ))
+        );
+        assert_eq!(
+            channel(json!({ "key": "placeholder-stream-value", "url": "https://kick.example/x" })),
+            Some(("placeholder-stream-value".to_string(), None)),
+            "only RTMP servers are offered"
+        );
+        assert_eq!(
+            channel(json!({ "key": "", "url": "rtmps://ingest.example/app" })),
+            None
+        );
+        assert_eq!(channel(json!({ "key": "two words" })), None);
+        assert_eq!(
+            channel(json!({ "url": "rtmps://ingest.example/app" })),
+            None
+        );
+        assert_eq!(kick_stream_key_from(&json!({ "data": [] })), None);
     }
 }

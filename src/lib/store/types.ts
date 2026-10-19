@@ -72,6 +72,8 @@ export interface State {
   setKey: (id: string, key: string) => Promise<void>;
   /** Fetches the key through the Twitch login; resolves with the account's login. */
   fetchTwitchKey: (id: string) => Promise<string>;
+  /** Fetches the key through the Kick login; resolves with the account's login, which may be empty. */
+  fetchKickKey: (id: string) => Promise<string>;
   clearKey: (id: string) => Promise<void>;
 
   refreshEncoders: () => Promise<void>;
@@ -133,7 +135,10 @@ export interface State {
   youtubeLogin: () => Promise<void>;
   youtubeLogout: () => Promise<void>;
   /** `moderation` also asks Kick for the ban scope, which plain logins leave out. */
-  kickLogin: (options?: { moderation?: boolean }) => Promise<void>;
+  kickLogin: (options?: {
+    moderation?: boolean;
+    streamKey?: boolean;
+  }) => Promise<void>;
   kickLogout: () => Promise<void>;
   moderate: (
     sourceId: string,

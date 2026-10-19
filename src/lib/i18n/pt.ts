@@ -1235,7 +1235,11 @@ export const pt = {
   "platforms.key.fetch": "Pegar da conta",
   "platforms.key.fetchTitle":
     "Busca a chave da conta @{login} na Twitch e guarda no cofre",
+  "platforms.key.fetchTitleKick":
+    "Busca a chave da sua conta na Kick e guarda no cofre",
   "platforms.key.fetchedToast": "Chave de @{login} guardada no cofre 🔒",
+  "platforms.key.fetchedToastAccount":
+    "Chave da sua conta guardada no cofre 🔒",
   "platforms.key.hide": "Ocultar a chave",
   "platforms.key.pasteSave": "Colar e salvar",
   "platforms.key.pasteSaveTitle":
@@ -1247,6 +1251,9 @@ export const pt = {
   "platforms.key.remove": "Remover",
   "platforms.key.removeConfirm": "Remover mesmo?",
   "platforms.key.removeFailed": "Não consegui remover a chave: {err}",
+  "platforms.key.reconnectKick": "Reconectar a Kick",
+  "platforms.key.reconnectKickTitle":
+    "A Corneta precisa de mais uma permissão da Kick para ler a chave da sua conta",
   "platforms.key.reconnectTwitch": "Reconectar a Twitch",
   "platforms.key.reconnectTwitchTitle":
     "A Corneta precisa de uma permissão nova para ler a chave da sua conta",

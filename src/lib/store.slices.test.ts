@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   setOauthConfig: vi.fn(),
   authStatus: vi.fn(),
   kickLoginStart: vi.fn(),
+  kickFetchStreamKey: vi.fn(),
   subscribeAuthFlow: vi.fn(),
 }));
 vi.mock("./api", () => ({
@@ -150,8 +151,8 @@ describe("store slices preserve shared contracts", () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
-  it("asks Kick for the ban scope only on demand", async () => {
-    const status = (kickCanBan: boolean) => ({
+  it("asks Kick for the ban and stream key scopes only on demand", async () => {
+    const status = (kickCanBan: boolean, kickCanReadKey = kickCanBan) => ({
       twitchLogin: null,
       twitchMissingScopes: [],
       youtube: false,
@@ -165,14 +166,20 @@ describe("store slices preserve shared contracts", () => {
       kickOwnCreds: false,
       kickUsingOwnCreds: false,
       kickCanBan,
+      kickCanReadKey,
       brokerError: null,
     });
     mocks.authStatus.mockResolvedValue(status(false));
     await useStore.getState().setupOauth();
     expect(useStore.getState().chatLogin.kick).toEqual({
       state: "connected",
-      missingScopes: ["moderation:ban"],
+      missingScopes: ["moderation:ban", "streamkey:read"],
     });
+    mocks.authStatus.mockResolvedValue(status(true, false));
+    await useStore.getState().setupOauth();
+    expect(useStore.getState().chatLogin.kick.missingScopes).toEqual([
+      "streamkey:read",
+    ]);
     mocks.authStatus.mockResolvedValue(status(true));
     await useStore.getState().setupOauth();
     expect(useStore.getState().chatLogin.kick.missingScopes).toEqual([]);
@@ -180,10 +187,17 @@ describe("store slices preserve shared contracts", () => {
     await useStore.getState().kickLogin();
     expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
       moderation: false,
+      streamKey: false,
     });
     await useStore.getState().kickLogin({ moderation: true });
     expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
       moderation: true,
+      streamKey: false,
+    });
+    await useStore.getState().kickLogin({ streamKey: true });
+    expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
+      moderation: false,
+      streamKey: true,
     });
 
     // A login event does not carry scopes, so every window reloads them.
@@ -201,7 +215,41 @@ describe("store slices preserve shared contracts", () => {
     await vi.waitFor(() =>
       expect(useStore.getState().chatLogin.kick.missingScopes).toEqual([
         "moderation:ban",
+        "streamkey:read",
       ]),
     );
+  });
+
+  it("fills the Kick server only for a destination without one", async () => {
+    const config = defaultConfig();
+    const empty = {
+      ...config.targets[0],
+      id: "kick-1",
+      platformId: "kick" as const,
+      ingestUrl: "",
+      hasKey: false,
+    };
+    const custom = {
+      ...empty,
+      id: "kick-2",
+      ingestUrl: "rtmps://custom.example/app",
+    };
+    config.targets = [empty, custom];
+    useStore.setState({ config });
+    mocks.saveConfig.mockImplementation(async (saved: AppConfig) => saved);
+    mocks.kickFetchStreamKey.mockResolvedValue({
+      login: "ana",
+      url: "rtmps://account.example/app",
+    });
+    expect(await useStore.getState().fetchKickKey("kick-1")).toBe("ana");
+    expect(await useStore.getState().fetchKickKey("kick-2")).toBe("ana");
+    expect(
+      useStore
+        .getState()
+        .config!.targets.map((target) => [target.ingestUrl, target.hasKey]),
+    ).toEqual([
+      ["rtmps://account.example/app", true],
+      ["rtmps://custom.example/app", true],
+    ]);
   });
 });

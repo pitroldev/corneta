@@ -294,6 +294,7 @@ pub fn run() {
             auth::account_chat_channels,
             auth::twitch_login_start,
             auth::twitch_fetch_stream_key,
+            auth::kick_fetch_stream_key,
             auth::twitch_logout,
             auth::youtube_login_start,
             auth::youtube_logout,

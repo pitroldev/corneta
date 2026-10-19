@@ -143,6 +143,8 @@ export interface CornetaApi {
     kickUsingOwnCreds: boolean;
     /** The Kick grant includes the ban scope, which is requested only on demand. */
     kickCanBan: boolean;
+    /** The Kick grant includes reading the stream key, also requested only on demand. */
+    kickCanReadKey: boolean;
     brokerError: string | null;
   }>;
   twitchLoginStart(): Promise<void>;
@@ -154,7 +156,14 @@ export interface CornetaApi {
   youtubeBroadcastRecoveryStatus(): Promise<"none" | "pending" | "unknown">;
   youtubeRetryBroadcastCleanup(): Promise<void>;
   youtubeAcknowledgeUnknownBroadcast(confirmed: boolean): Promise<void>;
-  kickLoginStart(options?: { moderation?: boolean }): Promise<void>;
+  kickLoginStart(options?: {
+    moderation?: boolean;
+    streamKey?: boolean;
+  }): Promise<void>;
+  /** Stores the logged-in account's Kick stream key in the vault; `url` is the account's server. */
+  kickFetchStreamKey(
+    targetId: string,
+  ): Promise<{ login: string; url: string | null }>;
   kickLogout(): Promise<void>;
   setStreamInfo(
     title: string,
