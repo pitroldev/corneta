@@ -1,7 +1,7 @@
 ---
 contentId: help_unified_chat_setup
 title: "Como configurar o chat unificado de Twitch, YouTube e Kick"
-description: "Adicione canais, conecte o feed e confira plataforma, emotes, selos e audiência na tela Chat."
+description: "Adicione canais, conecte o feed, responda e modere pela tela Chat e confira plataforma, emotes, selos e audiência."
 summary: "Abra Chat → Configurar → Canais, adicione Twitch, YouTube e Kick e clique em Conectar. Ler chat não exige que a Corneta publique as mensagens no vídeo."
 locale: pt-BR
 collection: help
@@ -13,9 +13,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-09-07
-reviewedAt: 2026-09-07
-productVersion: 0.7.0
+updatedAt: 2026-10-19
+reviewedAt: 2026-10-19
+productVersion: 0.8.5
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,15 @@ sources:
   - title: Corneta chat connectors
     kind: internal
     repoPath: src-tauri/src/chat.rs
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-19
   - title: Corneta chat interface
     kind: internal
     repoPath: src/screens/ChatScreen.tsx
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-10-19
+  - title: Corneta chat message actions
+    kind: internal
+    repoPath: src/components/ChatFeed.tsx
+    reviewedAt: 2026-10-19
 images:
   - baseName: corneta-unified-chat
     alt: "Tela Chat conectada a Twitch, YouTube e Kick com mensagens no mesmo feed."
@@ -51,13 +55,24 @@ images:
 5. Preencha o identificador pedido e deixe o canal ativado.
 6. Feche a configuração e clique em **Conectar**.
 
-O estado esperado é um ponto verde junto de cada canal. Com **Conectar sozinho** ativo, a Corneta liga o chat quando você entra no ar.
+O estado esperado é um ponto verde junto de cada canal. Com **Conectar o chat sozinho quando eu entrar no ar** ligado, a Corneta liga o chat quando você entra no ar.
+
+Depois da 0.8.5, se você já entrou na Twitch, no YouTube ou na Kick pela aba **Conta**, a aba **Canais** mostra **Das suas contas conectadas** com o canal dessa conta já preenchido. Clique em **Adicionar o chat** no lugar dos passos 4 e 5.
 
 <ContentImage baseName="corneta-unified-chat" />
 
 ## O que funciona sem login
 
 Leitura, emotes, selos e horário dependem do conector e do que a plataforma entrega publicamente. Para enviar mensagem e moderar, entre na conta pela aba **Conta**; as ações disponíveis mudam entre Twitch, YouTube e Kick.
+
+## Responda e modere pelo feed
+
+Passe o mouse sobre uma mensagem para ver as ações. Elas usam a sua conta e só aparecem na plataforma em que você entrou; se a conta não for dona nem moderadora daquele canal, a plataforma recusa a ação.
+
+- **Responder** leva a resposta para o campo de envio e manda só para o canal de onde a mensagem veio. Na Twitch e na Kick, a resposta fica ligada à mensagem original. O chat ao vivo do YouTube não tem resposta encadeada, então ela vai com uma menção `@nome`. **Esc** cancela.
+- **Apagar** remove a mensagem na plataforma.
+- **Timeout 10 min** e **Banir** valem na hora, sem confirmação. Depois da 0.8.5, eles também aparecem no YouTube e na Kick quando a mensagem traz o ID de quem mandou; sem esse ID, sobra só **Apagar**.
+- Na Kick, a primeira tentativa de timeout ou ban pede uma permissão a mais. Clique em **Reconectar** no aviso e autorize na página da Kick.
 
 ## Se um canal não conecta
 

@@ -13,8 +13,8 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-18
-reviewedAt: 2026-10-18
+updatedAt: 2026-10-19
+reviewedAt: 2026-10-19
 productVersion: 0.8.5
 testedWith:
   - name: Corneta
@@ -33,11 +33,19 @@ sources:
   - title: Corneta OBS wizard and live screen
     kind: internal
     repoPath: src/components/ObsWizard.tsx
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-10-19
   - title: Corneta OBS interface labels
     kind: internal
     repoPath: src/lib/i18n/pt.ts
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-10-19
+  - title: Corneta OBS video step
+    kind: internal
+    repoPath: src/components/ObsVideoFit.tsx
+    reviewedAt: 2026-10-19
+  - title: Corneta OBS video fit and undo
+    kind: internal
+    repoPath: src-tauri/src/obs.rs
+    reviewedAt: 2026-10-19
 images:
   - baseName: corneta-obs-connection-details
     alt: "Painel Liga no OBS com servidor local, chave local e o estado da conexão."
@@ -73,6 +81,21 @@ WebSocket, não a stream key de uma plataforma.
 
 Quando o estado virar **configurado**, a Corneta já trocou o serviço do OBS para
 **Personalizado...** e colocou o servidor e a chave locais nos campos certos.
+
+## Se a Corneta sugerir ajustar o vídeo
+
+Depois da 0.8.5, o assistente mostra **Vídeo do OBS** logo abaixo do
+**configurado**. Ele compara a resolução, o FPS e, no modo de saída simples do
+OBS, o bitrate com o que os destinos que recebem a cópia aceitam sem recodificar.
+
+- Se o OBS manda mais do que algum desses destinos aceita, clique em **Ajustar o
+  OBS**. A Corneta só diminui valores, mantém a proporção da tela e guarda as
+  configurações anteriores antes de mudar.
+- **Desfazer** volta o OBS para como estava antes do primeiro ajuste da Corneta.
+- No modo de saída avançado, a Corneta não alcança o bitrate. O aviso diz o
+  máximo para você conferir em **Configurações → Saída** no OBS.
+- O OBS só deixa mudar o vídeo com a transmissão e a gravação paradas. Pare as
+  duas no OBS e tente de novo.
 
 ## Se não conectar
 
