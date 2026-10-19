@@ -11,6 +11,7 @@ import type {
   AppConfig,
   ChatDelete,
   ChatMessage,
+  ChatPlatform,
   ChatStatus,
   EncoderInfo,
   EngineSnapshot,
@@ -20,6 +21,15 @@ import type {
   SessionMeta,
   Viewers,
 } from "../types";
+
+/** A logged-in account's own channel, offered as a chat source. */
+export interface AccountChatChannel {
+  platform: ChatPlatform;
+  value: string;
+  /** Other spellings of the same channel, to recognize sources added by hand. */
+  aliases: string[];
+  name: string;
+}
 
 /** The message a send answers; Twitch and Kick thread it, YouTube gets a mention. */
 export interface ChatReply {
@@ -180,6 +190,7 @@ export interface CornetaApi {
     ) => void,
   ): () => void;
   openChatWindow(): Promise<void>;
+  accountChatChannels(): Promise<AccountChatChannel[]>;
   subscribeChat(
     onMsg: (m: ChatMessage) => void,
     onStatus: (s: ChatStatus) => void,

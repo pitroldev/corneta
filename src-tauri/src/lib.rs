@@ -288,6 +288,7 @@ pub fn run() {
             auth::kick_use_official,
             auth::kick_use_own_creds,
             auth::auth_status,
+            auth::account_chat_channels,
             auth::twitch_login_start,
             auth::twitch_fetch_stream_key,
             auth::twitch_logout,

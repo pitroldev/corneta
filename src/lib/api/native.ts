@@ -14,6 +14,7 @@ import type {
   Viewers,
 } from "../types";
 import {
+  type AccountChatChannel,
   CornetaApi,
   MesaServerInfo,
   OverlayInfo,
@@ -406,6 +407,10 @@ export function tauriApi(): CornetaApi {
     async openChatWindow() {
       const { invoke } = await core();
       await invoke("open_chat_window");
+    },
+    async accountChatChannels() {
+      const { invoke } = await core();
+      return invoke<AccountChatChannel[]>("account_chat_channels");
     },
     subscribeChat(onMsg, onStatus, onDelete) {
       // Async listeners may resolve after effect cleanup; unregister late subscriptions to avoid duplicates.

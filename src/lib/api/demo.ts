@@ -842,6 +842,9 @@ export function mockApi(): CornetaApi {
       return () => {};
     },
     async openChatWindow() {},
+    async accountChatChannels() {
+      return [];
+    },
     async chatSend(text) {
       // Keep the self-echo label aligned with the moderation guard in ChatScreen.
       chatMsgListeners.forEach((l) =>

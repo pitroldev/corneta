@@ -679,8 +679,13 @@ function offerChatBridge(platformId: PlatformId, t: I18n["t"], locale: Locale) {
     () => {
       const st = useStore.getState();
       const cur = st.config?.settings.chatSources ?? [];
+      // A connected account is offered in the Channels tab with its channel filled in.
+      const loggedIn =
+        platformId in st.chatLogin &&
+        st.chatLogin[platformId as keyof typeof st.chatLogin].state ===
+          "connected";
       // The source may have been created while the toast was visible.
-      if (!cur.some((s) => s.platform === platformId)) {
+      if (!loggedIn && !cur.some((s) => s.platform === platformId)) {
         st.setSettings({
           chatSources: [
             ...cur,

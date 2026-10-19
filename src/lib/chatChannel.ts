@@ -1,6 +1,18 @@
 import type { ChatPlatform } from "./types";
 
 /** Idempotently normalize pasted channel identifiers for each backend. Reject inputs with no recoverable channel. Preserve YouTube video IDs separately from channel handles and IDs. */
+/** Whether two spellings (handle, URL, ID) name the same channel on a platform. */
+export function sameChatChannel(
+  platform: ChatPlatform,
+  a: string,
+  b: string,
+): boolean {
+  const left = normalizeChatChannel(platform, a).toLowerCase();
+  return (
+    left !== "" && left === normalizeChatChannel(platform, b).toLowerCase()
+  );
+}
+
 export function normalizeChatChannel(
   platform: ChatPlatform,
   raw: string,
