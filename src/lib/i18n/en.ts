@@ -251,6 +251,8 @@ export const en: Dict = {
   "chat.channels.add": "Add channel",
   "chat.channels.empty":
     "No channels yet. Add one from **Twitch**, **Kick**, **YouTube** or **Cinefy (experimental)** — you can add more than one from the same platform (two Twitch channels, say).",
+  "chat.channels.fromAccounts": "From your connected accounts",
+  "chat.channels.fromAccounts.add": "Add its chat",
   "chat.channels.section": "Channels",
   "chat.channels.which": "Which one?",
   "chat.clear": "Clear",

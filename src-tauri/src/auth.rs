@@ -390,6 +390,9 @@ fn youtube_refresh_form<'a>(
 }
 
 fn auth_event(app: &AppHandle, who: &str, state: &str, user_code: &str, verify: &str, login: &str) {
+    if state == "connected" || state == "loggedout" {
+        forget_account_channel(who);
+    }
     let _ = app.emit(
         &format!("auth://{who}"),
         json!({ "state": state, "userCode": user_code, "verifyUri": verify, "login": login }),
@@ -455,6 +458,7 @@ fn forget_youtube_session() -> Result<(), String> {
         || {
             *YT_TOKEN.lock().unwrap() = None;
             *YT_CHAT.lock().unwrap() = None;
+            forget_account_channel("youtube");
         },
         || {},
     )
@@ -552,7 +556,10 @@ fn forget_kick_session() -> Result<(), String> {
                 KICK_BAN_GRANT,
             ])
         },
-        || KICK_IDS.lock().unwrap().clear(),
+        || {
+            KICK_IDS.lock().unwrap().clear();
+            forget_account_channel("kick");
+        },
         || {},
     )
 }
@@ -659,6 +666,124 @@ pub async fn auth_status(app: AppHandle) -> Value {
     })
     .await
     .unwrap_or_else(|_| json!({ "twitchLogin": null, "twitchMissingScopes": [], "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "kickCanBan": false, "brokerError": null }))
+}
+
+/// A logged-in account's own channel, offered as a chat source.
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct AccountChannel {
+    platform: &'static str,
+    /// What a chat source stores for this channel.
+    value: String,
+    /// Other spellings of the same channel, so sources added by hand are recognized.
+    aliases: Vec<String>,
+    name: String,
+}
+
+static YT_ACCOUNT_CHANNEL: Mutex<Option<AccountChannel>> = Mutex::new(None);
+static KICK_ACCOUNT_CHANNEL: Mutex<Option<AccountChannel>> = Mutex::new(None);
+
+fn forget_account_channel(who: &str) {
+    match who {
+        "youtube" => *YT_ACCOUNT_CHANNEL.lock().unwrap() = None,
+        "kick" => *KICK_ACCOUNT_CHANNEL.lock().unwrap() = None,
+        _ => {}
+    }
+}
+
+fn parse_youtube_account_channel(v: &Value) -> Option<AccountChannel> {
+    let item = v.pointer("/items/0")?;
+    let id = item
+        .get("id")?
+        .as_str()
+        .filter(|id| id.len() == 24 && id.starts_with("UC"))?;
+    let handle = item
+        .pointer("/snippet/customUrl")
+        .and_then(Value::as_str)
+        .filter(|handle| handle.len() > 1 && handle.starts_with('@'));
+    Some(match handle {
+        Some(handle) => AccountChannel {
+            platform: "youtube",
+            value: handle.to_string(),
+            aliases: vec![id.to_string()],
+            name: String::new(),
+        },
+        None => AccountChannel {
+            platform: "youtube",
+            value: id.to_string(),
+            aliases: Vec::new(),
+            name: item
+                .pointer("/snippet/title")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        },
+    })
+}
+
+fn parse_kick_account_channel(v: &Value) -> Option<AccountChannel> {
+    let slug = v.pointer("/data/0/slug")?.as_str()?.trim();
+    (!slug.is_empty()).then(|| AccountChannel {
+        platform: "kick",
+        value: slug.to_lowercase(),
+        aliases: Vec::new(),
+        name: String::new(),
+    })
+}
+
+/// Costs one YouTube unit per login; the answer is kept until logout or the next login.
+fn youtube_account_channel(app: &AppHandle) -> Option<AccountChannel> {
+    if let Some(channel) = YT_ACCOUNT_CHANNEL.lock().unwrap().clone() {
+        return Some(channel);
+    }
+    let token = youtube_token(app)?;
+    let body = google_json(
+        "GET",
+        "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+        &token,
+        None,
+    )
+    .ok()?;
+    let channel = parse_youtube_account_channel(&serde_json::from_str(&body).ok()?)?;
+    *YT_ACCOUNT_CHANNEL.lock().unwrap() = Some(channel.clone());
+    Some(channel)
+}
+
+fn kick_account_channel(app: &AppHandle) -> Option<AccountChannel> {
+    if let Some(channel) = KICK_ACCOUNT_CHANNEL.lock().unwrap().clone() {
+        return Some(channel);
+    }
+    if !keys::has_key("kick_refresh") {
+        return None;
+    }
+    // Without a slug or ID, Kick answers with the authorized user's own channel.
+    let body = kick_api(app, "GET", "https://api.kick.com/public/v1/channels", None).ok()?;
+    let channel = parse_kick_account_channel(&serde_json::from_str(&body).ok()?)?;
+    *KICK_ACCOUNT_CHANNEL.lock().unwrap() = Some(channel.clone());
+    Some(channel)
+}
+
+#[tauri::command]
+pub async fn account_chat_channels(app: AppHandle) -> Vec<AccountChannel> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let twitch = twitch_token(&app)
+            .and_then(|token| twitch_validate(&token))
+            .map(|info| AccountChannel {
+                platform: "twitch",
+                value: info.login.to_lowercase(),
+                aliases: Vec::new(),
+                name: String::new(),
+            });
+        [
+            twitch,
+            youtube_account_channel(&app),
+            kick_account_channel(&app),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 pub struct TwitchInfo {
@@ -3181,5 +3306,52 @@ mod tests {
             kick_ban_body(7, 42, None),
             json!({ "broadcaster_user_id": 7, "user_id": 42 })
         );
+    }
+
+    #[test]
+    fn account_channels_prefer_the_handle_a_source_would_use() {
+        let youtube = |item: Value| parse_youtube_account_channel(&json!({ "items": [item] }));
+        assert_eq!(
+            youtube(json!({
+                "id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+                "snippet": { "title": "Canal da Ana", "customUrl": "@ana" }
+            })),
+            Some(AccountChannel {
+                platform: "youtube",
+                value: "@ana".into(),
+                aliases: vec!["UCaaaaaaaaaaaaaaaaaaaaaa".into()],
+                name: String::new(),
+            })
+        );
+        assert_eq!(
+            youtube(
+                json!({ "id": "UCaaaaaaaaaaaaaaaaaaaaaa", "snippet": { "title": "Canal da Ana" } })
+            ),
+            Some(AccountChannel {
+                platform: "youtube",
+                value: "UCaaaaaaaaaaaaaaaaaaaaaa".into(),
+                aliases: Vec::new(),
+                name: "Canal da Ana".into(),
+            })
+        );
+        assert_eq!(youtube(json!({ "id": "not-a-channel" })), None);
+        assert_eq!(parse_youtube_account_channel(&json!({ "items": [] })), None);
+
+        assert_eq!(
+            parse_kick_account_channel(
+                &json!({ "data": [{ "slug": "Ana-Live", "broadcaster_user_id": 7 }] })
+            ),
+            Some(AccountChannel {
+                platform: "kick",
+                value: "ana-live".into(),
+                aliases: Vec::new(),
+                name: String::new(),
+            })
+        );
+        assert_eq!(
+            parse_kick_account_channel(&json!({ "data": [{ "slug": " " }] })),
+            None
+        );
+        assert_eq!(parse_kick_account_channel(&json!({ "data": [] })), None);
     }
 }

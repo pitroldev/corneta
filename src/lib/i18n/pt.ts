@@ -246,6 +246,8 @@ export const pt = {
   "chat.channels.add": "Adicionar canal",
   "chat.channels.empty":
     "Nenhum canal ainda. Adicione um da **Twitch**, **Kick**, **YouTube** ou **Cinefy (experimental)** — pode repetir a mesma (ex.: 2 Twitches).",
+  "chat.channels.fromAccounts": "Das suas contas conectadas",
+  "chat.channels.fromAccounts.add": "Adicionar o chat",
   "chat.channels.section": "Canais",
   "chat.channels.which": "De qual?",
   "chat.clear": "Limpar",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeChatChannel } from "./chatChannel";
+import { normalizeChatChannel, sameChatChannel } from "./chatChannel";
 
 const cases: [Parameters<typeof normalizeChatChannel>[0], string, string][] = [
   ["twitch", "Pitrol", "pitrol"],
@@ -60,5 +60,26 @@ describe("normalizeChatChannel", () => {
     const got = normalizeChatChannel(p, input);
     expect(got).toBe(want);
     expect(normalizeChatChannel(p, got)).toBe(got);
+  });
+});
+
+describe("sameChatChannel", () => {
+  it("recognizes an account channel however the source was typed", () => {
+    expect(
+      sameChatChannel("twitch", "https://twitch.tv/Pitrol", "pitrol"),
+    ).toBe(true);
+    expect(
+      sameChatChannel("youtube", "https://www.youtube.com/@Ana", "@ana"),
+    ).toBe(true);
+    expect(
+      sameChatChannel(
+        "youtube",
+        "https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv",
+        "UCabcdefghijklmnopqrstuv",
+      ),
+    ).toBe(true);
+    expect(sameChatChannel("kick", "kick.com/ana-live", "ana-live")).toBe(true);
+    expect(sameChatChannel("twitch", "outro", "pitrol")).toBe(false);
+    expect(sameChatChannel("twitch", "", "")).toBe(false);
   });
 });

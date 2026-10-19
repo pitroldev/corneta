@@ -37,7 +37,8 @@ import {
   PlatformGlyph,
   SectionTitle,
 } from "../components/ui";
-import { api, IS_TAURI } from "../lib/api";
+import { api, IS_TAURI, type AccountChatChannel } from "../lib/api";
+import { sameChatChannel } from "../lib/chatChannel";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { resolveSendTargets, sendStatusLine, srcLabel } from "../lib/chatSend";
 import { bold, useI18n } from "../lib/i18n";
@@ -171,6 +172,28 @@ export function ChatScreen() {
   const [fontPreview, setFontPreview] = useState<number | null>(null);
   const [alertFontPreview, setAlertFontPreview] = useState<number | null>(null);
 
+  const [accountChannels, setAccountChannels] = useState<AccountChatChannel[]>(
+    [],
+  );
+  const channelsTabOpen = showConfig && configTab === "canais";
+  useEffect(() => {
+    if (!channelsTabOpen) return;
+    let cancelled = false;
+    api.accountChatChannels().then(
+      (channels) => {
+        if (!cancelled) setAccountChannels(channels);
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    channelsTabOpen,
+    chatLogin.twitch.state,
+    chatLogin.youtube.state,
+    chatLogin.kick.state,
+  ]);
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
@@ -208,6 +231,30 @@ export function ChatScreen() {
     !showFilters || feedPlatforms.every((platform) => filter[platform])
       ? null
       : filter;
+
+  const accountSuggestions = accountChannels.filter(
+    (channel) =>
+      !sources.some(
+        (source) =>
+          source.platform === channel.platform &&
+          [channel.value, ...channel.aliases].some((spelling) =>
+            sameChatChannel(channel.platform, source.value, spelling),
+          ),
+      ),
+  );
+  const addAccountSource = (channel: AccountChatChannel) =>
+    setSettings({
+      chatSources: [
+        ...sources,
+        {
+          id: uid("src"),
+          platform: channel.platform,
+          value: channel.value,
+          name: channel.name,
+          enabled: true,
+        },
+      ],
+    });
 
   const addSource = (platform: ChatPlatform) =>
     setSettings({
@@ -647,6 +694,33 @@ export function ChatScreen() {
                         </button>
                       ),
                     )}
+                  </div>
+                )}
+
+                {accountSuggestions.length > 0 && (
+                  <div className="mb-2 flex flex-col gap-1.5 rounded-md bg-surface-2 p-2">
+                    <span className="px-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+                      {t("chat.channels.fromAccounts")}
+                    </span>
+                    {accountSuggestions.map((channel) => (
+                      <div
+                        key={`${channel.platform}:${channel.value}`}
+                        className="flex items-center gap-2 px-1"
+                      >
+                        <PlatformGlyph id={channel.platform} size={18} />
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                          {channel.name || channel.value}
+                        </span>
+                        <Button
+                          variant="subtle"
+                          size="sm"
+                          onClick={() => addAccountSource(channel)}
+                        >
+                          <Plus className="size-3.5" />{" "}
+                          {t("chat.channels.fromAccounts.add")}
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
 
