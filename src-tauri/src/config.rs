@@ -541,76 +541,8 @@ impl AppConfig {
             return Err(Msg::ConfigInvalidEncodingMode.text(l));
         }
 
-        let allowed_platforms = [
-            "twitch",
-            "youtube",
-            "facebook",
-            "kick",
-            "tiktok",
-            "x",
-            "instagram",
-            "custom",
-        ];
         for target in &mut self.targets {
-            if !valid_id(&target.id) || !allowed_platforms.contains(&target.platform_id.as_str()) {
-                return Err(Msg::ConfigInvalidTarget.text(l));
-            }
-            limited(l, Msg::ConfigLabelTargetName, &target.name, 120)?;
-            if !matches!(target.protocol.as_str(), "rtmp" | "rtmps") {
-                return Err(Msg::ConfigUnsupportedProtocol.text(l));
-            }
-            // A destination is saved as soon as it is added, before its URL is filled in. The
-            // frontend blocks going live with it, and the engine skips it.
-            if !target.ingest_url.is_empty() {
-                let protocol = if target
-                    .ingest_url
-                    .get(..8)
-                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmps://"))
-                {
-                    "rtmps"
-                } else if target
-                    .ingest_url
-                    .get(..7)
-                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmp://"))
-                {
-                    "rtmp"
-                } else {
-                    return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
-                };
-                target.protocol = protocol.into();
-                let scheme_len = protocol.len() + 3;
-                if target.ingest_url.len() > 2_048
-                    || target.ingest_url[scheme_len..].trim_matches('/').is_empty()
-                    || target.ingest_url.chars().any(char::is_whitespace)
-                {
-                    return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
-                }
-            }
-            if !matches!(target.encoding.action.as_str(), "copy" | "transcode")
-                || !matches!(
-                    target.encoding.encoder.as_str(),
-                    "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software"
-                )
-                || target
-                    .encoding
-                    .hybrid_override
-                    .as_deref()
-                    .is_some_and(|v| !matches!(v, "copy" | "transcode"))
-            {
-                return Err(Msg::ConfigInvalidEncodingIn { name: &target.name }.text(l));
-            }
-            if let Some(p) = &mut target.encoding.preset {
-                if !(160..=7_680).contains(&p.width)
-                    || !(160..=4_320).contains(&p.height)
-                    || !(1..=120).contains(&p.fps)
-                    || !(100..=100_000).contains(&p.video_bitrate_kbps)
-                    || !(32..=1_536).contains(&p.audio_bitrate_kbps)
-                    || !(1..=10).contains(&p.keyframe_sec)
-                {
-                    return Err(Msg::ConfigPresetOutOfRange { name: &target.name }.text(l));
-                }
-            }
-            target.has_key = false;
+            normalize_target(target, l)?;
         }
         for profile in &mut self.profiles {
             if !valid_id(&profile.id) || profile.targets.len() > MAX_TARGETS {
@@ -645,6 +577,9 @@ impl AppConfig {
         s.alert_sources.truncate(16);
         for source in &mut s.chat_sources {
             source.has_send_token = false;
+            // The Twitch channel is written into an IRC line; CR/LF would start a new command.
+            source.value.retain(|c| !c.is_control());
+            source.name.retain(|c| !c.is_control());
         }
         for source in &mut s.alert_sources {
             source.has_token = false;
@@ -657,6 +592,11 @@ impl AppConfig {
         s.overlay_chat_max = s.overlay_chat_max.clamp(1, 100);
         s.chat_font_size = s.chat_font_size.clamp(8, 44);
         s.alert_font_size = s.alert_font_size.clamp(8, 44);
+        s.chat_both_split = s.chat_both_split.clamp(15, 75);
+        // FFmpeg's loudnorm rejects targets outside -70..-5 LUFS, which would fail every transcode.
+        if !(-70.0..=-5.0).contains(&s.loudness_target_lufs) {
+            s.loudness_target_lufs = default_loudness_target();
+        }
         if !matches!(s.theme.as_str(), "dark" | "light") {
             s.theme = default_theme();
         }
@@ -664,6 +604,168 @@ impl AppConfig {
         s.record_video_dir = s.record_video_dir.trim().chars().take(400).collect();
         Ok(self)
     }
+}
+
+const ALLOWED_PLATFORMS: [&str; 8] = [
+    "twitch",
+    "youtube",
+    "facebook",
+    "kick",
+    "tiktok",
+    "x",
+    "instagram",
+    "custom",
+];
+
+fn normalize_target(target: &mut Target, l: Locale) -> Result<(), String> {
+    if !valid_id(&target.id) || !ALLOWED_PLATFORMS.contains(&target.platform_id.as_str()) {
+        return Err(Msg::ConfigInvalidTarget.text(l));
+    }
+    limited(l, Msg::ConfigLabelTargetName, &target.name, 120)?;
+    if !matches!(target.protocol.as_str(), "rtmp" | "rtmps") {
+        return Err(Msg::ConfigUnsupportedProtocol.text(l));
+    }
+    // A NUL cannot be passed in a process argument, so FFmpeg would fail to spawn at all.
+    target
+        .ingest_url
+        .retain(|c| c.is_whitespace() || !c.is_control());
+    // A destination is saved as soon as it is added, before its URL is filled in. The
+    // frontend blocks going live with it, and the engine skips it.
+    if !target.ingest_url.is_empty() {
+        let protocol = if target
+            .ingest_url
+            .get(..8)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmps://"))
+        {
+            "rtmps"
+        } else if target
+            .ingest_url
+            .get(..7)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("rtmp://"))
+        {
+            "rtmp"
+        } else {
+            return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+        };
+        target.protocol = protocol.into();
+        let scheme_len = protocol.len() + 3;
+        if target.ingest_url.len() > 2_048
+            || target.ingest_url[scheme_len..].trim_matches('/').is_empty()
+            || target.ingest_url.chars().any(char::is_whitespace)
+        {
+            return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+        }
+    }
+    if !matches!(target.encoding.action.as_str(), "copy" | "transcode")
+        || !matches!(
+            target.encoding.encoder.as_str(),
+            "auto" | "nvenc" | "qsv" | "amf" | "videotoolbox" | "software"
+        )
+        || target
+            .encoding
+            .hybrid_override
+            .as_deref()
+            .is_some_and(|v| !matches!(v, "copy" | "transcode"))
+    {
+        return Err(Msg::ConfigInvalidEncodingIn { name: &target.name }.text(l));
+    }
+    if let Some(p) = &target.encoding.preset {
+        if !(160..=7_680).contains(&p.width)
+            || !(160..=4_320).contains(&p.height)
+            || !(1..=120).contains(&p.fps)
+            || !(100..=100_000).contains(&p.video_bitrate_kbps)
+            || !(32..=1_536).contains(&p.audio_bitrate_kbps)
+            || !(1..=10).contains(&p.keyframe_sec)
+        {
+            return Err(Msg::ConfigPresetOutOfRange { name: &target.name }.text(l));
+        }
+    }
+    target.has_key = false;
+    Ok(())
+}
+
+fn has_duplicates<'a>(ids: impl IntoIterator<Item = &'a str>) -> bool {
+    let mut seen = std::collections::HashSet::new();
+    ids.into_iter().any(|id| !seen.insert(id))
+}
+
+fn url_has_userinfo(url: &str) -> bool {
+    url.split_once("://").is_some_and(|(_, rest)| {
+        rest.split(['/', '?', '#'])
+            .next()
+            .is_some_and(|authority| authority.contains('@'))
+    })
+}
+
+/// Only a plain absolute path on a local drive; an empty value selects the session directory.
+fn is_local_absolute_dir(value: &str) -> bool {
+    use std::path::{Component, Path};
+    if value.is_empty() {
+        return true;
+    }
+    if value.chars().any(char::is_control) {
+        return false;
+    }
+    let path = Path::new(value);
+    let mut components = path.components();
+    let rooted = match components.next() {
+        #[cfg(windows)]
+        Some(Component::Prefix(prefix)) => {
+            matches!(prefix.kind(), std::path::Prefix::Disk(_))
+                && components.next() == Some(Component::RootDir)
+        }
+        #[cfg(not(windows))]
+        Some(Component::RootDir) => true,
+        _ => false,
+    };
+    rooted
+        && path
+            .components()
+            .all(|c| !matches!(c, Component::ParentDir | Component::CurDir))
+}
+
+/// A settings file is untrusted input. Credentials and machine-local paths stay as they are on
+/// this machine: exports blank the credentials, and Corneta stats and prunes the recording folder.
+pub(crate) fn config_from_import(
+    raw: &str,
+    current: &AppConfig,
+    l: Locale,
+) -> Result<AppConfig, String> {
+    let imported: AppConfig = serde_json::from_str(raw)
+        .map_err(|e| Msg::ConfigImportInvalidJson { e: &e.to_string() }.text(l))?;
+    let mut cfg = imported.validate_and_normalize_for_locale(l)?;
+    for profile in &mut cfg.profiles {
+        for target in &mut profile.targets {
+            normalize_target(target, l)?;
+        }
+    }
+    // Target IDs key the vault entry and the running FFmpeg; a duplicate would share both.
+    let target_lists = std::iter::once(&cfg.targets).chain(cfg.profiles.iter().map(|p| &p.targets));
+    for targets in target_lists {
+        if has_duplicates(targets.iter().map(|t| t.id.as_str())) {
+            return Err(Msg::ConfigInvalidTarget.text(l));
+        }
+        if let Some(target) = targets.iter().find(|t| url_has_userinfo(&t.ingest_url)) {
+            return Err(Msg::ConfigInvalidIngestUrl { name: &target.name }.text(l));
+        }
+    }
+    if has_duplicates(cfg.profiles.iter().map(|p| p.id.as_str())) {
+        return Err(Msg::ConfigInvalidProfile.text(l));
+    }
+    let s = &mut cfg.settings;
+    let mut chat_ids = std::collections::HashSet::new();
+    s.chat_sources
+        .retain(|source| valid_id(&source.id) && chat_ids.insert(source.id.clone()));
+    let mut alert_ids = std::collections::HashSet::new();
+    s.alert_sources
+        .retain(|source| valid_id(&source.id) && alert_ids.insert(source.id.clone()));
+    s.obs_password = current.settings.obs_password.clone();
+    s.youtube_api_key = current.settings.youtube_api_key.clone();
+    if !is_local_absolute_dir(&s.record_video_dir) {
+        s.record_video_dir = current.settings.record_video_dir.clone();
+    }
+    cfg.revision = current.revision.saturating_add(1);
+    Ok(cfg)
 }
 
 fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1066,5 +1168,414 @@ mod tests {
         assert!(validate_secret_namespace("alert_source_1").is_ok());
         assert!(validate_secret_namespace("../oauth_token").is_err());
         assert!(validate_secret_namespace("oauth_refresh").is_err());
+    }
+
+    use serde_json::{json, Value};
+
+    const KEY: &str = "live_sk_abc123";
+    #[cfg(windows)]
+    const LOCAL_DIR: &str = r"C:\Corneta\Lives";
+    #[cfg(not(windows))]
+    const LOCAL_DIR: &str = "/srv/corneta/lives";
+
+    /// The configuration already on this machine, holding its own credentials.
+    fn local_config() -> AppConfig {
+        AppConfig {
+            revision: 7,
+            settings: Settings {
+                obs_password: "local-obs-password".into(),
+                youtube_api_key: "local-api-key".into(),
+                record_video_dir: LOCAL_DIR.into(),
+                ..Settings::default()
+            },
+            ..AppConfig::default()
+        }
+    }
+
+    /// What export_config writes: the same shape, with blank credentials.
+    fn exported_file() -> Value {
+        let mut cfg = AppConfig::default();
+        cfg.targets.push(target_fixture("tgt_a1"));
+        cfg.profiles.push(Profile {
+            id: "prof_a1".into(),
+            name: "Sexta".into(),
+            mode: "hybrid".into(),
+            targets: vec![target_fixture("tgt_a1")],
+        });
+        cfg.active_profile_id = "prof_a1".into();
+        cfg.settings.chat_sources.push(ChatSource {
+            id: "src_a1".into(),
+            platform: "twitch".into(),
+            value: "fulano".into(),
+            name: String::new(),
+            enabled: true,
+            has_send_token: false,
+        });
+        cfg.settings.alert_sources.push(AlertSource {
+            id: "alert_a1".into(),
+            kind: "streamlabs".into(),
+            name: String::new(),
+            enabled: true,
+            has_token: false,
+        });
+        serde_json::to_value(cfg).unwrap()
+    }
+
+    fn import(file: &Value) -> Result<AppConfig, String> {
+        config_from_import(&file.to_string(), &local_config(), Locale::En)
+    }
+
+    fn edited(edit: impl FnOnce(&mut Value)) -> Value {
+        let mut file = exported_file();
+        edit(&mut file);
+        file
+    }
+
+    #[test]
+    fn importing_an_export_keeps_local_credentials_and_bumps_the_revision() {
+        let cfg = import(&exported_file()).expect("an exported file must import");
+        assert_eq!(cfg.settings.obs_password, "local-obs-password");
+        assert_eq!(cfg.settings.youtube_api_key, "local-api-key");
+        assert_eq!(cfg.revision, 8);
+        assert_eq!(cfg.targets[0].id, "tgt_a1");
+    }
+
+    #[test]
+    fn import_never_takes_credentials_from_the_file() {
+        let file = edited(|file| {
+            file["settings"]["obsPassword"] = json!("file-obs-password");
+            file["settings"]["youtubeApiKey"] = json!("file-api-key");
+            file["targets"][0]["hasKey"] = json!(true);
+            file["targets"][0]["streamKey"] = json!(KEY);
+            file["targets"][0]["key"] = json!(KEY);
+            file["profiles"][0]["targets"][0]["hasKey"] = json!(true);
+            file["profiles"][0]["targets"][0]["streamKey"] = json!(KEY);
+            file["settings"]["chatSources"][0]["hasSendToken"] = json!(true);
+            file["settings"]["chatSources"][0]["sendToken"] = json!(KEY);
+            file["settings"]["alertSources"][0]["hasToken"] = json!(true);
+            file["settings"]["alertSources"][0]["token"] = json!(KEY);
+            file["vault"] = json!({ "tgt_a1": KEY, "oauth_twitch": KEY });
+        });
+        let cfg = import(&file).expect("unknown fields are ignored, not fatal");
+        assert_eq!(cfg.settings.obs_password, "local-obs-password");
+        assert_eq!(cfg.settings.youtube_api_key, "local-api-key");
+        assert!(!cfg.targets[0].has_key);
+        assert!(!cfg.profiles[0].targets[0].has_key);
+        assert!(!cfg.settings.chat_sources[0].has_send_token);
+        assert!(!cfg.settings.alert_sources[0].has_token);
+        let saved = serde_json::to_string(&cfg).unwrap();
+        for secret in [KEY, "file-obs-password", "file-api-key", "vault"] {
+            assert!(!saved.contains(secret), "{secret} reached the saved config");
+        }
+    }
+
+    type Edit = Box<dyn Fn(&mut Value)>;
+
+    #[test]
+    fn import_rejects_hostile_structure_and_values() {
+        let url = |value: &'static str| {
+            move |file: &mut Value| file["targets"][0]["ingestUrl"] = json!(value)
+        };
+        let cases: Vec<(&str, Edit)> = vec![
+            (
+                "targets is not a list",
+                Box::new(|f| f["targets"] = json!("tgt_a1")),
+            ),
+            (
+                "port is a string",
+                Box::new(|f| f["ingest"]["port"] = json!("1935")),
+            ),
+            (
+                "negative port",
+                Box::new(|f| f["ingest"]["port"] = json!(-1)),
+            ),
+            ("huge port", Box::new(|f| f["ingest"]["port"] = json!(1e20))),
+            (
+                "port out of range",
+                Box::new(|f| f["ingest"]["port"] = json!(70_000)),
+            ),
+            (
+                "negative retention",
+                Box::new(|f| f["settings"]["recordVideoKeepGb"] = json!(-5)),
+            ),
+            (
+                "enabled is a string",
+                Box::new(|f| f["targets"][0]["enabled"] = json!("yes")),
+            ),
+            (
+                "schema from the future",
+                Box::new(|f| f["schemaVersion"] = json!(999)),
+            ),
+            (
+                "ingest open to the network",
+                Box::new(|f| f["ingest"]["host"] = json!("0.0.0.0")),
+            ),
+            (
+                "overlay port zero",
+                Box::new(|f| f["settings"]["overlayPort"] = json!(0)),
+            ),
+            ("javascript URL", Box::new(url("javascript:alert(1)"))),
+            ("file URL", Box::new(url("file:///C:/Windows/win.ini"))),
+            (
+                "credentials in the URL",
+                Box::new(url("rtmp://user:live_sk_abc123@live.example/app")),
+            ),
+            (
+                "line break in the URL",
+                Box::new(url("rtmp://live.example/app\r\nX-Injected: 1")),
+            ),
+            (
+                "traversal in a target id",
+                Box::new(|f| f["targets"][0]["id"] = json!("../tgt_a1")),
+            ),
+            (
+                "unknown platform",
+                Box::new(|f| f["targets"][0]["platformId"] = json!("evil")),
+            ),
+            (
+                "zero-width preset",
+                Box::new(|f| {
+                    f["targets"][0]["encoding"]["preset"] = json!({
+                        "width": 0, "height": 720, "fps": 30,
+                        "videoBitrateKbps": 6000, "audioBitrateKbps": 160, "keyframeSec": 2
+                    });
+                }),
+            ),
+            (
+                "huge bitrate",
+                Box::new(|f| {
+                    f["targets"][0]["encoding"]["preset"] = json!({
+                        "width": 1280, "height": 720, "fps": 30,
+                        "videoBitrateKbps": 4_294_967_295u32, "audioBitrateKbps": 160, "keyframeSec": 2
+                    });
+                }),
+            ),
+            (
+                "javascript URL in a profile",
+                Box::new(|f| {
+                    f["profiles"][0]["targets"][0]["ingestUrl"] = json!("javascript:alert(1)");
+                }),
+            ),
+            (
+                "credentials in a profile URL",
+                Box::new(|f| {
+                    f["profiles"][0]["targets"][0]["ingestUrl"] =
+                        json!("rtmps://user:live_sk_abc123@live.example/app");
+                }),
+            ),
+            (
+                "traversal in a profile target id",
+                Box::new(|f| {
+                    f["profiles"][0]["targets"][0]["id"] = json!("../../vault");
+                }),
+            ),
+            (
+                "duplicated target id",
+                Box::new(|f| {
+                    let target = f["targets"][0].clone();
+                    f["targets"].as_array_mut().unwrap().push(target);
+                }),
+            ),
+            (
+                "duplicated target id in a profile",
+                Box::new(|f| {
+                    let target = f["profiles"][0]["targets"][0].clone();
+                    f["profiles"][0]["targets"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(target);
+                }),
+            ),
+            (
+                "duplicated profile id",
+                Box::new(|f| {
+                    let profile = f["profiles"][0].clone();
+                    f["profiles"].as_array_mut().unwrap().push(profile);
+                }),
+            ),
+            (
+                "too many targets",
+                Box::new(|f| {
+                    let targets: Vec<Value> = (0..=MAX_TARGETS)
+                        .map(|i| serde_json::to_value(target_fixture(&format!("tgt_{i}"))).unwrap())
+                        .collect();
+                    f["targets"] = json!(targets);
+                }),
+            ),
+            (
+                "traversal in the active profile",
+                Box::new(|f| f["activeProfileId"] = json!("../x")),
+            ),
+        ];
+        for (name, edit) in cases {
+            let error = import(&edited(|file| edit(file)))
+                .expect_err(&format!("{name}: a hostile file must be rejected"));
+            assert!(
+                !error.contains(KEY),
+                "{name}: the error echoes the key: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn import_sanitizes_out_of_range_numbers() {
+        for (field, value, check) in [
+            (
+                "recordVideoKeepGb",
+                json!(u64::MAX),
+                (|c: &Settings| c.record_video_keep_gb == 2048) as fn(&Settings) -> bool,
+            ),
+            ("recordVideoKeepGb", json!(0), |c| {
+                c.record_video_keep_gb == 1
+            }),
+            ("loudnessTargetLufs", json!(1e300), |c| {
+                c.loudness_target_lufs == -14.0
+            }),
+            ("loudnessTargetLufs", json!(-1e300), |c| {
+                c.loudness_target_lufs == -14.0
+            }),
+            ("loudnessTargetLufs", json!(0), |c| {
+                c.loudness_target_lufs == -14.0
+            }),
+            ("loudnessTargetLufs", json!(-16), |c| {
+                c.loudness_target_lufs == -16.0
+            }),
+            ("chatBothSplit", json!(u32::MAX), |c| {
+                c.chat_both_split == 75
+            }),
+            ("chatBothSplit", json!(0), |c| c.chat_both_split == 15),
+            ("overlayDurationSecs", json!(u32::MAX), |c| {
+                c.overlay_duration_secs == 60
+            }),
+            ("overlayChatMax", json!(0), |c| c.overlay_chat_max == 1),
+            ("chatFontSize", json!(u32::MAX), |c| c.chat_font_size == 44),
+        ] {
+            let cfg = import(&edited(|file| file["settings"][field] = value.clone()))
+                .unwrap_or_else(|error| panic!("{field}={value}: {error}"));
+            assert!(
+                check(&cfg.settings),
+                "{field}={value} was not brought into range"
+            );
+        }
+    }
+
+    #[test]
+    fn import_keeps_the_local_recording_folder_unless_the_file_names_a_plain_local_path() {
+        for hostile in [
+            r"..\..\Windows\System32",
+            "../../etc",
+            "recordings",
+            r"\\attacker.example\share\lives",
+            "//attacker.example/share/lives",
+            r"\\?\C:\Lives",
+            r"\\.\pipe\corneta",
+            r"C:\Users\..\Windows",
+            "C:relative",
+            "/srv/../etc",
+            "C:\\Lives\u{0}",
+            "/srv/lives\u{0}",
+        ] {
+            let cfg = import(&edited(|file| {
+                file["settings"]["recordVideoDir"] = json!(hostile)
+            }))
+            .unwrap_or_else(|error| panic!("{hostile:?}: {error}"));
+            assert_eq!(cfg.settings.record_video_dir, LOCAL_DIR, "{hostile:?}");
+        }
+        #[cfg(windows)]
+        let plain = r"D:\Lives";
+        #[cfg(not(windows))]
+        let plain = "/media/lives";
+        for accepted in [plain, ""] {
+            let cfg = import(&edited(|file| {
+                file["settings"]["recordVideoDir"] = json!(accepted)
+            }))
+            .unwrap();
+            assert_eq!(cfg.settings.record_video_dir, accepted);
+        }
+    }
+
+    #[test]
+    fn import_drops_chat_and_alert_sources_whose_ids_cannot_name_a_vault_entry() {
+        let file = edited(|file| {
+            let chat = file["settings"]["chatSources"][0].clone();
+            let alert = file["settings"]["alertSources"][0].clone();
+            for (list, first) in [("chatSources", chat), ("alertSources", alert)] {
+                let mut entries = vec![first.clone(), first.clone()];
+                for id in ["../oauth_twitch", "", "a b"] {
+                    let mut entry = first.clone();
+                    entry["id"] = json!(id);
+                    entries.push(entry);
+                }
+                file["settings"][list] = json!(entries);
+            }
+        });
+        let cfg = import(&file).unwrap();
+        let chat: Vec<_> = cfg
+            .settings
+            .chat_sources
+            .iter()
+            .map(|s| s.id.as_str())
+            .collect();
+        let alerts: Vec<_> = cfg
+            .settings
+            .alert_sources
+            .iter()
+            .map(|s| s.id.as_str())
+            .collect();
+        assert_eq!(chat, ["src_a1"]);
+        assert_eq!(alerts, ["alert_a1"]);
+    }
+
+    #[test]
+    fn control_characters_cannot_reach_irc_or_process_arguments() {
+        let mut cfg = AppConfig::default();
+        let mut target = target_fixture("tgt_a1");
+        target.ingest_url = "rtmp://live.example/app\u{0}\u{7f}".into();
+        cfg.targets.push(target);
+        cfg.settings.chat_sources.push(ChatSource {
+            id: "src_a1".into(),
+            platform: "twitch".into(),
+            value: "fulano\r\nPRIVMSG #outro :spam".into(),
+            name: "x\u{0}".into(),
+            enabled: true,
+            has_send_token: false,
+        });
+        let cfg = cfg.validate_and_normalize().unwrap();
+        assert_eq!(cfg.targets[0].ingest_url, "rtmp://live.example/app");
+        let source = &cfg.settings.chat_sources[0];
+        assert!(
+            !source.value.chars().any(char::is_control),
+            "{:?}",
+            source.value
+        );
+        assert!(!source.name.chars().any(char::is_control));
+    }
+
+    /// Nesting stays within the 2 MiB read limit and must not exhaust the stack.
+    #[test]
+    fn import_survives_deeply_nested_json() {
+        let depth = 400_000;
+        let nested = format!("{}{}", "[".repeat(depth), "]".repeat(depth));
+        assert!((nested.len() as u64) < MAX_CONFIG_BYTES);
+        let file = exported_file().to_string();
+        let in_known_field = format!("{{\"targets\":{nested},{}", &file[1..]);
+        assert!(config_from_import(&in_known_field, &local_config(), Locale::En).is_err());
+        // serde_json skips unknown values iteratively, so this nesting is dropped, not parsed.
+        let in_unknown_field = format!("{{\"extra\":{nested},{}", &file[1..]);
+        let cfg = config_from_import(&in_unknown_field, &local_config(), Locale::En).unwrap();
+        assert!(!serde_json::to_string(&cfg).unwrap().contains("extra"));
+        assert_eq!(cfg.targets[0].id, "tgt_a1");
+    }
+
+    #[test]
+    fn import_rejects_an_oversized_file_before_parsing_it() {
+        let path = std::env::temp_dir().join(format!(
+            "corneta-import-oversized-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, vec![b' '; MAX_CONFIG_BYTES as usize + 1]).unwrap();
+        let result = read_config_file(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(matches!(result, Err(ConfigReadError::TooLarge)));
     }
 }

@@ -3507,17 +3507,14 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
     };
     let pb = p.into_path().map_err(|e| e.to_string())?;
     let content = config::read_config_file(&pb).map_err(|e| e.to_string())?;
-    let cfg: AppConfig = serde_json::from_str(&content)
-        .map_err(|e| Msg::ConfigImportInvalidJson { e: &e.to_string() }.now())?;
-    let mut cfg = cfg.validate_and_normalize()?;
+    let current = config::load(&app);
+    let mut cfg = config::config_from_import(&content, &current, crate::i18n::locale())?;
     // Preserve the current configuration before replacing profiles and settings.
     if let Ok(dir) = app.path().app_config_dir() {
-        let current = config::load(&app);
         if let Ok(json) = serde_json::to_string_pretty(&current) {
             let _ = std::fs::write(dir.join("corneta-backup-antes-do-import.json"), json);
         }
     }
-    cfg.revision = config::load(&app).revision.saturating_add(1);
     config::save(&app, &cfg)?;
     crate::apply_native_language(&app, &cfg.settings.language);
     refresh_secret_presence(&app, &mut cfg);
