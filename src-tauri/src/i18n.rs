@@ -714,6 +714,18 @@ messages! {
     TwitchStreamKeyRefused { reason: &'a str } = "rust.twitch.streamKey.refused" =>
         pt: "A Twitch não liberou a chave: {reason}",
         en: "Twitch didn't release the key: {reason}";
+    KickStreamKeyWrongTarget = "rust.kick.streamKey.wrongTarget" =>
+        pt: "Esse destino não é da Kick.",
+        en: "That destination isn't a Kick one.";
+    KickStreamKeyNeedsLogin = "rust.kick.streamKey.needsLogin" =>
+        pt: "Entre com a Kick na Corneta para pegar a chave pela conta.",
+        en: "Sign in with Kick in Corneta to fetch the key from your account.";
+    KickStreamKeyReconnect = "rust.kick.streamKey.reconnect" =>
+        pt: "Reconecte a Kick para a Corneta poder ler sua chave de transmissão.",
+        en: "Reconnect Kick so Corneta can read your stream key.";
+    KickStreamKeyFailed = "rust.kick.streamKey.failed" =>
+        pt: "Não consegui pegar a chave na Kick. Tente de novo ou cole a chave à mão.",
+        en: "I couldn't fetch the key from Kick. Try again or paste it by hand.";
     TwitchStreamKeyFailed = "rust.twitch.streamKey.failed" =>
         pt: "Não consegui pegar a chave na Twitch. Tente de novo ou cole a chave à mão.",
         en: "I couldn't fetch the key from Twitch. Try again or paste it by hand.";

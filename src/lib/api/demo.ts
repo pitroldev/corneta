@@ -880,6 +880,7 @@ export function mockApi(): CornetaApi {
         kickOwnCreds: false,
         kickUsingOwnCreds: false,
         kickCanBan: false,
+        kickCanReadKey: false,
         brokerError: null,
       };
     },
@@ -896,6 +897,9 @@ export function mockApi(): CornetaApi {
     async youtubeRetryBroadcastCleanup() {},
     async youtubeAcknowledgeUnknownBroadcast() {},
     async kickLoginStart() {},
+    async kickFetchStreamKey() {
+      return { login: "demo", url: null };
+    },
     async kickLogout() {},
     async setStreamInfo() {
       return {};

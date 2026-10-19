@@ -54,7 +54,10 @@ export function createOauthSlice({
           kick: a.kick
             ? {
                 state: "connected",
-                missingScopes: a.kickCanBan ? [] : ["moderation:ban"],
+                missingScopes: [
+                  ...(a.kickCanBan ? [] : ["moderation:ban"]),
+                  ...(a.kickCanReadKey ? [] : ["streamkey:read"]),
+                ],
               }
             : { state: "out" },
         },
@@ -216,7 +219,10 @@ export function createOauthSlice({
     async kickLogin(options) {
       pendingLogins.set("kick", "started");
       set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
-      await api.kickLoginStart({ moderation: options?.moderation === true });
+      await api.kickLoginStart({
+        moderation: options?.moderation === true,
+        streamKey: options?.streamKey === true,
+      });
     },
     async kickLogout() {
       await api.kickLogout();

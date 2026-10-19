@@ -1249,7 +1249,10 @@ export const en: Dict = {
   "platforms.key.fetch": "Fetch from account",
   "platforms.key.fetchTitle":
     "Fetches @{login}'s key from Twitch and stores it in the vault",
+  "platforms.key.fetchTitleKick":
+    "Fetches your account's key from Kick and stores it in the vault",
   "platforms.key.fetchedToast": "@{login}'s key stored in the vault 🔒",
+  "platforms.key.fetchedToastAccount": "Your account's key is in the vault 🔒",
   "platforms.key.hide": "Hide the stream key",
   "platforms.key.pasteSave": "Paste and save",
   "platforms.key.pasteSaveTitle":
@@ -1260,6 +1263,9 @@ export const en: Dict = {
   "platforms.key.remove": "Remove",
   "platforms.key.removeConfirm": "Remove it for real?",
   "platforms.key.removeFailed": "Couldn't remove the stream key — {err}",
+  "platforms.key.reconnectKick": "Reconnect Kick",
+  "platforms.key.reconnectKickTitle":
+    "Corneta needs one more Kick permission to read your account's key",
   "platforms.key.reconnectTwitch": "Reconnect Twitch",
   "platforms.key.reconnectTwitchTitle":
     "Corneta needs a new permission to read your account's key",

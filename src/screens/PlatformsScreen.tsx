@@ -716,23 +716,39 @@ function KeyField({
   const setKey = useStore((s) => s.setKey);
   const clearKey = useStore((s) => s.clearKey);
   const fetchTwitchKey = useStore((s) => s.fetchTwitchKey);
+  const fetchKickKey = useStore((s) => s.fetchKickKey);
   const twitchAccount = useStore((s) => s.chatLogin.twitch);
+  const kickAccount = useStore((s) => s.chatLogin.kick);
   const twitchLogin = useStore((s) => s.twitchLogin);
   const twitchLogout = useStore((s) => s.twitchLogout);
+  const kickLogin = useStore((s) => s.kickLogin);
+  const kickLogout = useStore((s) => s.kickLogout);
   const [reconnecting, setReconnecting] = useState(false);
   const [fetching, setFetching] = useState(false);
   const isTwitch = target.platformId === "twitch";
-  const twitchReady = isTwitch && twitchAccount.state === "connected";
+  const isKick = target.platformId === "kick";
+  const account = isTwitch ? twitchAccount : isKick ? kickAccount : null;
+  const accountReady = account?.state === "connected";
   const needsReconnect =
-    twitchReady &&
-    (twitchAccount.missingScopes ?? []).includes("channel:read:stream_key");
+    accountReady &&
+    (account.missingScopes ?? []).includes(
+      isTwitch ? "channel:read:stream_key" : "streamkey:read",
+    );
+  const loginForKey = () =>
+    isTwitch ? twitchLogin() : kickLogin({ streamKey: true });
   const fetchFromAccount = async () => {
     setFetching(true);
     try {
-      const login = await fetchTwitchKey(target.id);
+      const login = isTwitch
+        ? await fetchTwitchKey(target.id)
+        : await fetchKickKey(target.id);
       setValue("");
       setEditing(false);
-      toast.success(t("platforms.key.fetchedToast", { login }));
+      toast.success(
+        login
+          ? t("platforms.key.fetchedToast", { login })
+          : t("platforms.key.fetchedToastAccount"),
+      );
       offerChatBridge(target.platformId, t, locale);
     } catch (e) {
       toast.error(errMsg(e));
@@ -847,19 +863,27 @@ function KeyField({
             )}
           </button>
         </div>
-        {twitchReady &&
+        {accountReady &&
           (needsReconnect ? (
             <Button
               variant="subtle"
               size="sm"
               onClick={() => {
                 setReconnecting(true);
-                void twitchLogin();
+                void loginForKey();
               }}
-              title={t("platforms.key.reconnectTwitchTitle")}
+              title={t(
+                isTwitch
+                  ? "platforms.key.reconnectTwitchTitle"
+                  : "platforms.key.reconnectKickTitle",
+              )}
             >
               <RefreshCw className="size-4" />{" "}
-              {t("platforms.key.reconnectTwitch")}
+              {t(
+                isTwitch
+                  ? "platforms.key.reconnectTwitch"
+                  : "platforms.key.reconnectKick",
+              )}
             </Button>
           ) : (
             <Button
@@ -867,9 +891,13 @@ function KeyField({
               size="sm"
               disabled={fetching}
               onClick={() => void fetchFromAccount()}
-              title={t("platforms.key.fetchTitle", {
-                login: twitchAccount.login ?? "",
-              })}
+              title={
+                isTwitch
+                  ? t("platforms.key.fetchTitle", {
+                      login: twitchAccount.login ?? "",
+                    })
+                  : t("platforms.key.fetchTitleKick")
+              }
             >
               <Download className="size-4" /> {t("platforms.key.fetch")}
             </Button>
@@ -902,14 +930,14 @@ function KeyField({
           </Button>
         )}
       </div>
-      {isTwitch && reconnecting && twitchAccount.state !== "connected" && (
+      {account && reconnecting && account.state !== "connected" && (
         <LoginRow
-          platform="twitch"
-          label="Twitch"
-          state={twitchAccount}
+          platform={isTwitch ? "twitch" : "kick"}
+          label={isTwitch ? "Twitch" : "Kick"}
+          state={account}
           enabled
-          onLogin={twitchLogin}
-          onLogout={twitchLogout}
+          onLogin={loginForKey}
+          onLogout={isTwitch ? twitchLogout : kickLogout}
         />
       )}
     </div>
