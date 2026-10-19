@@ -3,6 +3,12 @@
   "declarations": [
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
+      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; a reconexão de um destino e o que acontece com os outros não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
       "sourceBlob": "c95a330b25bef231cf5ce54fa325148d85b3a74f",
       "reason": "Só acrescenta, sob o YouTube automático, a escolha de quem vê a live e de conteúdo para crianças; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
@@ -38,6 +44,12 @@
       "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; modos, cópia e transcodificação citados não mudaram."
     },
     {
+      "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
+      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; isso confirma o que o guia diz, que o Esperto recodifica só o necessário, e as três perguntas continuam valendo."
+    },
+    {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
       "sourceBlob": "cba0f28d618579cb834ec2e76e587421bcd9c620",
@@ -46,8 +58,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "0d0324def361d383b305d23f7fe9b1fd258f9963",
-      "reason": "Só muda a assinatura do comando de envio do chat para aceitar uma resposta; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "eb74a5274892b6d5eab3f103fabd9d093c6d56ea",
+      "reason": "Os comandos ganharam a leitura e o ajuste do vídeo do OBS, e o início da live consulta o sinal do OBS no modo Esperto; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -92,34 +104,46 @@
       "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o auto-bitrate e os limites citados não mudaram."
     },
     {
+      "article": "pt-BR/help/quality/auto-bitrate.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
+      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; o auto-bitrate e os limites citados não mudaram."
+    },
+    {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
       "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
       "reason": "Os cards de modo e a barra de carga passam a usar m, com a animação carregada sob demanda; modos, ajuste fino, cards e métricas ao vivo citados não mudaram."
     },
     {
+      "article": "pt-BR/help/quality/stream-metrics.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
+      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; as métricas e os estados citados não mudaram."
+    },
+    {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "0d0324def361d383b305d23f7fe9b1fd258f9963",
-      "reason": "Só muda a assinatura do comando de envio do chat para aceitar uma resposta; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "eb74a5274892b6d5eab3f103fabd9d093c6d56ea",
+      "reason": "Os comandos ganharam a leitura e o ajuste do vídeo do OBS, e o início da live consulta o sinal do OBS no modo Esperto; o teste de upload, os resultados e a tabela citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "0d0324def361d383b305d23f7fe9b1fd258f9963",
-      "reason": "Só muda a assinatura do comando de envio do chat para aceitar uma resposta; o que o diagnóstico exporta e omite não mudou."
+      "sourceBlob": "eb74a5274892b6d5eab3f103fabd9d093c6d56ea",
+      "reason": "Os comandos ganharam a leitura e o ajuste do vídeo do OBS, e o início da live consulta o sinal do OBS no modo Esperto; o que o diagnóstico exporta e omite não mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/components/ObsWizard.tsx",
-      "sourceBlob": "165aeab169d4edd6410c1491d28dcb55c08f8854",
-      "reason": "O campo de senha do assistente grava ao sair do campo ou com Enter; clicar em Conectar e configurar sai do campo e grava, como o artigo descreve."
+      "sourceBlob": "e16359a0f9136cd3da1027c6e93796df998dabf5",
+      "reason": "Depois de configurado, o assistente pode propor ajustar o vídeo do OBS, com Desfazer; ativar o WebSocket, Configura pra mim e o estado configurado continuam como o artigo descreve."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "be8c9b1b28dde9a90071fb4300f5afe09a90a1ea",
-      "reason": "Só acrescenta os textos das sugestões de chat das contas conectadas; os rótulos do assistente do OBS citados não mudaram."
+      "sourceBlob": "8ec8cf6d47dc5bff29d411a0d826eab9e85f3eb3",
+      "reason": "Só acrescenta os textos do ajuste de vídeo do OBS; os rótulos do assistente citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -132,6 +156,18 @@
       "source": "src/screens/SettingsScreen.tsx",
       "sourceBlob": "0cd619629f79b4b7f53e9f5b7c73b20ea678ca35",
       "reason": "Só acrescenta, no cartão de atalhos, um atalho opcional para o JÁ VOLTO; os passos em Segurança ao vivo, o selo ARMADO e a tabela citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
+      "source": "src-tauri/src/obs.rs",
+      "sourceBlob": "146476ac8fa9a611f9f936f72b17a711431d2ebc",
+      "reason": "Acrescenta a leitura e o ajuste do vídeo pelo obs-websocket; a conexão, a senha e os erros de OBS não encontrado citados não mudaram."
+    },
+    {
+      "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
+      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; os estados de reconexão e as correções citadas não mudaram."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
