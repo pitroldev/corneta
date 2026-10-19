@@ -38,6 +38,44 @@ export function createOauthSlice({
   // Auth events reach every window; only the one that started a login opens the page, copies the
   // code and restarts chat, once per attempt.
   const pendingLogins = new Map<string, "started" | "opened">();
+  const loadAuthStatus = async () => {
+    try {
+      const a = await api.authStatus();
+      set({
+        chatLogin: {
+          twitch: a.twitchLogin
+            ? {
+                state: "connected",
+                login: a.twitchLogin,
+                missingScopes: a.twitchMissingScopes,
+              }
+            : { state: "out" },
+          youtube: a.youtube ? { state: "connected" } : { state: "out" },
+          kick: a.kick
+            ? {
+                state: "connected",
+                missingScopes: a.kickCanBan ? [] : ["moderation:ban"],
+              }
+            : { state: "out" },
+        },
+        youtubeOauthReady: a.youtubeConfigured,
+        kickOauthReady: a.kickConfigured,
+        youtubeOauthModes: {
+          officialReady: a.youtubeOfficialReady,
+          ownCreds: a.youtubeOwnCreds,
+          usingOwnCreds: a.youtubeUsingOwnCreds,
+        },
+        kickOauthModes: {
+          officialReady: a.kickOfficialReady,
+          ownCreds: a.kickOwnCreds,
+          usingOwnCreds: a.kickUsingOwnCreds,
+        },
+        oauthBrokerError: a.brokerError,
+      });
+    } catch {
+      /* Keep login unavailable if session status cannot be read. */
+    }
+  };
   return {
     chatLogin: {
       twitch: { state: "out" },
@@ -56,42 +94,7 @@ export function createOauthSlice({
         kickClientId: OAUTH.kickClientId,
         setupApiUrl: OAUTH.setupApiUrl,
       });
-      try {
-        const a = await api.authStatus();
-        set({
-          chatLogin: {
-            twitch: a.twitchLogin
-              ? {
-                  state: "connected",
-                  login: a.twitchLogin,
-                  missingScopes: a.twitchMissingScopes,
-                }
-              : { state: "out" },
-            youtube: a.youtube ? { state: "connected" } : { state: "out" },
-            kick: a.kick
-              ? {
-                  state: "connected",
-                  missingScopes: a.kickCanBan ? [] : ["moderation:ban"],
-                }
-              : { state: "out" },
-          },
-          youtubeOauthReady: a.youtubeConfigured,
-          kickOauthReady: a.kickConfigured,
-          youtubeOauthModes: {
-            officialReady: a.youtubeOfficialReady,
-            ownCreds: a.youtubeOwnCreds,
-            usingOwnCreds: a.youtubeUsingOwnCreds,
-          },
-          kickOauthModes: {
-            officialReady: a.kickOfficialReady,
-            ownCreds: a.kickOwnCreds,
-            usingOwnCreds: a.kickUsingOwnCreds,
-          },
-          oauthBrokerError: a.brokerError,
-        });
-      } catch {
-        /* Keep login unavailable if session status cannot be read. */
-      }
+      await loadAuthStatus();
     },
     async setYoutubeOauth(clientId, clientSecret) {
       await api.setYoutubeOauth(clientId, clientSecret);
@@ -173,7 +176,7 @@ export function createOauthSlice({
           return;
         }
         // The event does not carry the granted scopes; every window reloads them for the features that ask.
-        if (a.state === "connected") void get().setupOauth();
+        if (a.state === "connected") void loadAuthStatus();
         if (!login || (a.state !== "connected" && a.state !== "error")) return;
         pendingLogins.delete(who);
         // Reconnect active Twitch chat after login so IRC authenticates, preserving history.
