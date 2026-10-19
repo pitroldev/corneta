@@ -955,12 +955,12 @@ messages! {
     ModerateYoutubeSignInFirst = "rust.moderate.youtube.signInFirst" =>
         pt: "entre no YouTube pra moderar",
         en: "sign in to YouTube to moderate";
-    ModerateYoutubeDeleteOnly = "rust.moderate.youtube.deleteOnly" =>
-        pt: "no YouTube, por enquanto só dá pra apagar a mensagem",
-        en: "on YouTube, deleting the message is all I can do for now";
-    ModerateKickDeleteOnly = "rust.moderate.kick.deleteOnly" =>
-        pt: "na Kick, por enquanto só dá pra apagar a mensagem",
-        en: "on Kick, deleting the message is all I can do for now";
+    ModerateNoAuthorId = "rust.moderate.noAuthorId" =>
+        pt: "essa mensagem chegou sem o ID de quem mandou; dá pra apagar, mas timeout e ban só pelo site",
+        en: "this message arrived without the sender's ID; you can delete it, but timeouts and bans need the website";
+    ModerateKickReconnect = "rust.moderate.kick.reconnect" =>
+        pt: "reconecte a Kick pra liberar timeout e ban",
+        en: "reconnect Kick to allow timeouts and bans";
 
     StreamInfoEmptyTitle = "rust.streamInfo.emptyTitle" =>
         pt: "digite um título",

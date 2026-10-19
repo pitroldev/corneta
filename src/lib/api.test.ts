@@ -73,6 +73,33 @@ describe("Tauri telemetry IPC", () => {
     });
   });
 
+  it("passes chat replies and the Kick ban opt-in as named arguments", async () => {
+    const { api } = await import("./api");
+    await api.chatSend("valeu", ["source-1"], {
+      nativeId: "message-1",
+      author: "ana",
+    });
+    await api.chatSend("oi");
+    await api.kickLoginStart();
+    await api.kickLoginStart({ moderation: true });
+    expect(invoke).toHaveBeenCalledWith("chat_send", {
+      text: "valeu",
+      sources: ["source-1"],
+      reply: { nativeId: "message-1", author: "ana" },
+    });
+    expect(invoke).toHaveBeenCalledWith("chat_send", {
+      text: "oi",
+      sources: null,
+      reply: null,
+    });
+    expect(invoke).toHaveBeenCalledWith("kick_login_start", {
+      moderation: null,
+    });
+    expect(invoke).toHaveBeenCalledWith("kick_login_start", {
+      moderation: true,
+    });
+  });
+
   it("uses native bounded playback capabilities instead of constructing asset URLs", async () => {
     const { api } = await import("./api");
     await api.recordVideoUrl("recording.mp4");

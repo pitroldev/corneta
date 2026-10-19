@@ -4,6 +4,7 @@ import { IS_TAURI } from "./api/runtime";
 import { CornetaApi } from "./api/types";
 export { IS_TAURI, START_CANCELLED } from "./api/runtime";
 export type {
+  ChatReply,
   CornetaApi,
   MesaServerInfo,
   OverlayInfo,

@@ -367,7 +367,10 @@ export function LoginRow({
           )}
         </div>
       </div>
-      {state.state === "connected" && enabled && state.missingScopes?.length ? (
+      {platform === "twitch" &&
+      state.state === "connected" &&
+      enabled &&
+      state.missingScopes?.length ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-warn">
           <span>{t("chat.loginrow.missingScopes")}</span>
           <Button

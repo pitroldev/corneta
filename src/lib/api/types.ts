@@ -21,6 +21,12 @@ import type {
   Viewers,
 } from "../types";
 
+/** The message a send answers; Twitch and Kick thread it, YouTube gets a mention. */
+export interface ChatReply {
+  nativeId?: string;
+  author: string;
+}
+
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
   saveConfig(config: AppConfig): Promise<AppConfig>;
@@ -96,7 +102,7 @@ export interface CornetaApi {
   chatRunning(): Promise<boolean>;
   /** Chat connection state is shared across webviews. */
   subscribeChatRunning(cb: (running: boolean) => void): () => void;
-  chatSend(text: string, sources?: string[]): Promise<void>;
+  chatSend(text: string, sources?: string[], reply?: ChatReply): Promise<void>;
   subscribeChatAuth(
     onAuth: (a: { source: string; login: string; ok: boolean }) => void,
   ): () => void;
@@ -123,6 +129,8 @@ export interface CornetaApi {
     kickOfficialReady: boolean;
     kickOwnCreds: boolean;
     kickUsingOwnCreds: boolean;
+    /** The Kick grant includes the ban scope, which is requested only on demand. */
+    kickCanBan: boolean;
     brokerError: string | null;
   }>;
   twitchLoginStart(): Promise<void>;
@@ -134,7 +142,7 @@ export interface CornetaApi {
   youtubeBroadcastRecoveryStatus(): Promise<"none" | "pending" | "unknown">;
   youtubeRetryBroadcastCleanup(): Promise<void>;
   youtubeAcknowledgeUnknownBroadcast(confirmed: boolean): Promise<void>;
-  kickLoginStart(): Promise<void>;
+  kickLoginStart(options?: { moderation?: boolean }): Promise<void>;
   kickLogout(): Promise<void>;
   setStreamInfo(
     title: string,

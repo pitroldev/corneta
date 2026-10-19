@@ -171,8 +171,8 @@ export function createChatSlice({
         })),
       );
     },
-    async sendChat(text, sources) {
-      await api.chatSend(text, sources);
+    async sendChat(text, sources, reply) {
+      await api.chatSend(text, sources, reply);
     },
     async setChatSendToken(id, token) {
       await flushSave();

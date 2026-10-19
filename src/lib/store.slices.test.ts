@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   kickLogout: vi.fn(),
   subscribeChat: vi.fn(),
   subscribeConfigChanged: vi.fn(),
+  setOauthConfig: vi.fn(),
+  authStatus: vi.fn(),
+  kickLoginStart: vi.fn(),
 }));
 vi.mock("./api", () => ({
   api: mocks,
@@ -144,5 +147,42 @@ describe("store slices preserve shared contracts", () => {
     ).toEqual(["2"]);
     stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it("asks Kick for the ban scope only on demand", async () => {
+    const status = (kickCanBan: boolean) => ({
+      twitchLogin: null,
+      twitchMissingScopes: [],
+      youtube: false,
+      youtubeConfigured: false,
+      youtubeOfficialReady: false,
+      youtubeOwnCreds: false,
+      youtubeUsingOwnCreds: false,
+      kick: true,
+      kickConfigured: true,
+      kickOfficialReady: true,
+      kickOwnCreds: false,
+      kickUsingOwnCreds: false,
+      kickCanBan,
+      brokerError: null,
+    });
+    mocks.authStatus.mockResolvedValue(status(false));
+    await useStore.getState().setupOauth();
+    expect(useStore.getState().chatLogin.kick).toEqual({
+      state: "connected",
+      missingScopes: ["moderation:ban"],
+    });
+    mocks.authStatus.mockResolvedValue(status(true));
+    await useStore.getState().setupOauth();
+    expect(useStore.getState().chatLogin.kick.missingScopes).toEqual([]);
+
+    await useStore.getState().kickLogin();
+    expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
+      moderation: false,
+    });
+    await useStore.getState().kickLogin({ moderation: true });
+    expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
+      moderation: true,
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { StoreApi } from "zustand";
+import type { ChatReply } from "../api";
 import type { I18n } from "../i18n";
 import type {
   Alert,
@@ -101,7 +102,11 @@ export interface State {
 
   chatAuth: Record<string, { login: string; ok: boolean }>;
   bindChatAuth: () => () => void;
-  sendChat: (text: string, sources?: string[]) => Promise<void>;
+  sendChat: (
+    text: string,
+    sources?: string[],
+    reply?: ChatReply,
+  ) => Promise<void>;
   setChatSendToken: (id: string, token: string) => Promise<void>;
   clearChatSendToken: (id: string) => Promise<void>;
 
@@ -127,7 +132,8 @@ export interface State {
   twitchLogout: () => Promise<void>;
   youtubeLogin: () => Promise<void>;
   youtubeLogout: () => Promise<void>;
-  kickLogin: () => Promise<void>;
+  /** `moderation` also asks Kick for the ban scope, which plain logins leave out. */
+  kickLogin: (options?: { moderation?: boolean }) => Promise<void>;
   kickLogout: () => Promise<void>;
   moderate: (
     sourceId: string,

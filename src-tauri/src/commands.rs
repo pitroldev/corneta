@@ -2921,8 +2921,9 @@ pub async fn chat_send(
     app: AppHandle,
     text: String,
     sources: Option<Vec<String>>,
+    reply: Option<chat::ReplyTo>,
 ) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || chat::send_message(&app, &text, sources))
+    tauri::async_runtime::spawn_blocking(move || chat::send_message(&app, &text, sources, reply))
         .await
         .map_err(|e| e.to_string())?
 }

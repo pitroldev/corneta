@@ -28,6 +28,12 @@ const GOOGLE_SCOPE: &str = "https://www.googleapis.com/auth/youtube";
 const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 const KICK_SCOPES: &str =
     "user:read channel:read channel:write chat:write moderation:chat_message:manage";
+/// Requested only after someone asks to ban on Kick, so a Kick app without it keeps working for login.
+const KICK_BAN_SCOPE: &str = "moderation:ban";
+/// Vault marker for a Kick grant that includes the ban scope; it lives and dies with the session.
+const KICK_BAN_GRANT: &str = "kick_moderation";
+/// Twitch's own timeout ceiling; YouTube and Kick are clamped further by their APIs.
+const MAX_TIMEOUT_SECONDS: u64 = 1_209_600;
 const KICK_PORT: u16 = 7395;
 
 /// Official IDs survive BYOK switches; active IDs select either the official client or vault credentials.
@@ -538,7 +544,14 @@ fn forget_kick_session() -> Result<(), String> {
         .lock()
         .map_err(|_| Msg::VaultDeleteFailed.now())?;
     finish_local_logout(
-        || keys::clear_keys(&["kick_refresh", "kick_oauth", "kick_oauth_mode"]),
+        || {
+            keys::clear_keys(&[
+                "kick_refresh",
+                "kick_oauth",
+                "kick_oauth_mode",
+                KICK_BAN_GRANT,
+            ])
+        },
         || KICK_IDS.lock().unwrap().clear(),
         || {},
     )
@@ -640,11 +653,12 @@ pub async fn auth_status(app: AppHandle) -> Value {
             "kickOfficialReady": cfg.kick_broker_ready && !cfg.kick_official_id.is_empty(),
             "kickOwnCreds": kick_own,
             "kickUsingOwnCreds": !cfg.kick_client_secret.is_empty(),
+            "kickCanBan": kick && keys::has_key(KICK_BAN_GRANT),
             "brokerError": broker.err(),
         })
     })
     .await
-    .unwrap_or_else(|_| json!({ "twitchLogin": null, "twitchMissingScopes": [], "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "brokerError": null }))
+    .unwrap_or_else(|_| json!({ "twitchLogin": null, "twitchMissingScopes": [], "youtube": false, "youtubeConfigured": false, "youtubeOfficialReady": false, "youtubeOwnCreds": false, "youtubeUsingOwnCreds": false, "kick": false, "kickConfigured": false, "kickOfficialReady": false, "kickOwnCreds": false, "kickUsingOwnCreds": false, "kickCanBan": false, "brokerError": null }))
 }
 
 pub struct TwitchInfo {
@@ -1447,8 +1461,8 @@ pub async fn chat_moderate(
             "twitch" => twitch_moderate(
                 &app, &src.value, &action, native_id, author, author_id, seconds,
             ),
-            "youtube" => youtube_moderate(&app, &action, native_id),
-            "kick" => kick_moderate(&app, &action, native_id),
+            "youtube" => youtube_moderate(&app, &src.value, &action, native_id, author_id, seconds),
+            "kick" => kick_moderate(&app, &src.value, &action, native_id, author_id, seconds),
             _ => Err(Msg::ModeratePlatformUnsupported.now()),
         }
     })
@@ -1522,7 +1536,7 @@ fn twitch_moderate(
                 }
             };
             let data = if action == "timeout" {
-                json!({ "data": { "user_id": target, "duration": seconds.unwrap_or(600) } })
+                json!({ "data": { "user_id": target, "duration": timeout_seconds(seconds) } })
             } else {
                 json!({ "data": { "user_id": target } })
             };
@@ -1538,10 +1552,81 @@ fn twitch_moderate(
     }
 }
 
+fn timeout_seconds(seconds: Option<u64>) -> u64 {
+    seconds.unwrap_or(600).clamp(1, MAX_TIMEOUT_SECONDS)
+}
+
+/// Kick takes whole minutes, from one minute to a week.
+fn kick_timeout_minutes(seconds: Option<u64>) -> u64 {
+    timeout_seconds(seconds).div_ceil(60).clamp(1, 10_080)
+}
+
+fn youtube_channel_id(id: &str) -> Option<&str> {
+    let id = id.trim();
+    (id.len() == 24
+        && id.starts_with("UC")
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+    .then_some(id)
+}
+
+fn youtube_ban_body(chat_id: &str, channel_id: &str, timeout: Option<u64>) -> Value {
+    match timeout {
+        Some(seconds) => json!({
+            "snippet": {
+                "liveChatId": chat_id,
+                "type": "temporary",
+                "banDurationSeconds": seconds,
+                "bannedUserDetails": { "channelId": channel_id }
+            }
+        }),
+        None => json!({
+            "snippet": {
+                "liveChatId": chat_id,
+                "type": "permanent",
+                "bannedUserDetails": { "channelId": channel_id }
+            }
+        }),
+    }
+}
+
+/// The chat of the live the source is reading, which is not always the signed-in channel's own.
+fn youtube_source_chat_id(token: &str, channel: &str) -> Result<String, String> {
+    let video = crate::chat::youtube_live_video(channel)
+        .filter(|id| {
+            id.len() == 11
+                && id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        })
+        .ok_or_else(|| Msg::ChatYoutubeNoActiveLive.now())?;
+    let body = google_json(
+        "GET",
+        &format!(
+            "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video}"
+        ),
+        token,
+        None,
+    )?;
+    serde_json::from_str::<Value>(&body)
+        .ok()
+        .and_then(|v| {
+            v.pointer("/items/0/liveStreamingDetails/activeLiveChatId")?
+                .as_str()
+                .map(String::from)
+        })
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| Msg::ChatYoutubeNoActiveLive.now())
+}
+
 fn youtube_moderate(
     app: &AppHandle,
+    channel: &str,
     action: &str,
     native_id: Option<String>,
+    author_id: Option<String>,
+    seconds: Option<u64>,
 ) -> Result<(), String> {
     let token = youtube_token(app).ok_or_else(|| Msg::ModerateYoutubeSignInFirst.now())?;
     match action {
@@ -1549,14 +1634,30 @@ fn youtube_moderate(
             let id = native_id.ok_or_else(|| Msg::ModerateNoMessageId.now())?;
             google_json(
                 "DELETE",
-                &format!("https://www.googleapis.com/youtube/v3/liveChat/messages?id={id}"),
+                &format!(
+                    "https://www.googleapis.com/youtube/v3/liveChat/messages?id={}",
+                    pct(&id)
+                ),
                 &token,
                 None,
             )
             .map(|_| ())
         }
-        // Bans/timeouts require an author channel ID that this feed does not provide.
-        _ => Err(Msg::ModerateYoutubeDeleteOnly.now()),
+        "timeout" | "ban" => {
+            let author = author_id.unwrap_or_default();
+            let channel_id =
+                youtube_channel_id(&author).ok_or_else(|| Msg::ModerateNoAuthorId.now())?;
+            let chat_id = youtube_source_chat_id(&token, channel)?;
+            let timeout = (action == "timeout").then(|| timeout_seconds(seconds));
+            google_json(
+                "POST",
+                "https://www.googleapis.com/youtube/v3/liveChat/bans?part=snippet",
+                &token,
+                Some(&youtube_ban_body(&chat_id, channel_id, timeout)),
+            )
+            .map(|_| ())
+        }
+        _ => Err(Msg::ModerateInvalidAction.now()),
     }
 }
 
@@ -1616,7 +1717,14 @@ fn pct_decode(s: &str) -> String {
 }
 
 #[tauri::command]
-pub fn kick_login_start(app: AppHandle) {
+pub fn kick_login_start(app: AppHandle, moderation: Option<bool>) {
+    // Keep the ban scope across re-logins once it was granted.
+    let with_ban = moderation.unwrap_or(false) || keys::has_key(KICK_BAN_GRANT);
+    let scopes = if with_ban {
+        format!("{KICK_SCOPES} {KICK_BAN_SCOPE}")
+    } else {
+        KICK_SCOPES.to_string()
+    };
     tauri::async_runtime::spawn_blocking(move || {
         let broker = refresh_broker_config(&app);
         let cfg = oauth(&app);
@@ -1664,7 +1772,7 @@ pub fn kick_login_start(app: AppHandle) {
             "https://id.kick.com/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&state={}",
             pct(&cfg.kick_client_id),
             pct(&redirect),
-            pct(KICK_SCOPES),
+            pct(&scopes),
             pct(&challenge),
             pct(&state),
         );
@@ -1672,6 +1780,11 @@ pub fn kick_login_start(app: AppHandle) {
         match oauth_wait(&listeners, &state, "Kick") {
             Ok(code) => match kick_exchange(&app, &cfg, &code, &verifier, &redirect) {
                 Ok(()) => {
+                    let _ = if with_ban {
+                        keys::set_key(KICK_BAN_GRANT, "1")
+                    } else {
+                        keys::clear_key(KICK_BAN_GRANT)
+                    };
                     let login = kick_whoami(&app).unwrap_or_default();
                     auth_event(&app, "kick", "connected", "", "", &login);
                 }
@@ -2017,10 +2130,18 @@ fn kick_broadcaster_id(app: &AppHandle, slug: &str) -> Result<i64, String> {
     Ok(id)
 }
 
-pub fn kick_send(app: &AppHandle, text: &str, slug: &str) -> Result<(), String> {
+pub fn kick_send(
+    app: &AppHandle,
+    text: &str,
+    slug: &str,
+    reply_to: Option<&str>,
+) -> Result<(), String> {
     let bid = kick_broadcaster_id(app, slug)?;
     let content: String = text.chars().take(500).collect();
-    let body = json!({ "type": "user", "content": content, "broadcaster_user_id": bid });
+    let mut body = json!({ "type": "user", "content": content, "broadcaster_user_id": bid });
+    if let Some(id) = reply_to.and_then(crate::chat::reply_id) {
+        body["reply_to_message_id"] = json!(id);
+    }
     kick_api(
         app,
         "POST",
@@ -2041,20 +2162,51 @@ fn kick_whoami(app: &AppHandle) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-fn kick_moderate(app: &AppHandle, action: &str, native_id: Option<String>) -> Result<(), String> {
+fn kick_ban_body(broadcaster_id: i64, user_id: u64, timeout_minutes: Option<u64>) -> Value {
+    let mut body = json!({ "broadcaster_user_id": broadcaster_id, "user_id": user_id });
+    if let Some(minutes) = timeout_minutes {
+        body["duration"] = json!(minutes);
+    }
+    body
+}
+
+fn kick_moderate(
+    app: &AppHandle,
+    slug: &str,
+    action: &str,
+    native_id: Option<String>,
+    author_id: Option<String>,
+    seconds: Option<u64>,
+) -> Result<(), String> {
     match action {
         "delete" => {
             let id = native_id.ok_or_else(|| Msg::ModerateNoMessageId.now())?;
             kick_api(
                 app,
                 "DELETE",
-                &format!("https://api.kick.com/public/v1/chat/{id}"),
+                &format!("https://api.kick.com/public/v1/chat/{}", pct(&id)),
                 None,
             )
             .map(|_| ())
         }
-        // Bans/timeouts require an author user ID; the Pusher feed only supplies a username.
-        _ => Err(Msg::ModerateKickDeleteOnly.now()),
+        "timeout" | "ban" => {
+            if !keys::has_key(KICK_BAN_GRANT) {
+                return Err(Msg::ModerateKickReconnect.now());
+            }
+            let user_id = author_id
+                .and_then(|id| id.trim().parse::<u64>().ok())
+                .ok_or_else(|| Msg::ModerateNoAuthorId.now())?;
+            let broadcaster_id = kick_broadcaster_id(app, slug)?;
+            let timeout = (action == "timeout").then(|| kick_timeout_minutes(seconds));
+            kick_api(
+                app,
+                "POST",
+                "https://api.kick.com/public/v1/moderation/bans",
+                Some(&kick_ban_body(broadcaster_id, user_id, timeout)),
+            )
+            .map(|_| ())
+        }
+        _ => Err(Msg::ModerateInvalidAction.now()),
     }
 }
 
@@ -2980,6 +3132,54 @@ mod tests {
             })),
             None,
             "Arbitrary fields are not part of the broker contract"
+        );
+    }
+
+    #[test]
+    fn timeouts_fit_each_platform_range() {
+        assert_eq!(timeout_seconds(None), 600);
+        assert_eq!(timeout_seconds(Some(0)), 1);
+        assert_eq!(timeout_seconds(Some(u64::MAX)), MAX_TIMEOUT_SECONDS);
+        assert_eq!(kick_timeout_minutes(None), 10);
+        assert_eq!(kick_timeout_minutes(Some(61)), 2);
+        assert_eq!(kick_timeout_minutes(Some(1)), 1);
+        assert_eq!(kick_timeout_minutes(Some(MAX_TIMEOUT_SECONDS)), 10_080);
+    }
+
+    #[test]
+    fn ban_requests_name_the_chat_and_the_person() {
+        assert_eq!(
+            youtube_channel_id(" UCaaaaaaaaaaaaaaaaaaaaaa "),
+            Some("UCaaaaaaaaaaaaaaaaaaaaaa")
+        );
+        for invalid in [
+            "",
+            "UCshort",
+            "XXaaaaaaaaaaaaaaaaaaaaaa",
+            "UCaaaaaaaaaaaaaaaaaaaa&a",
+        ] {
+            assert_eq!(youtube_channel_id(invalid), None, "{invalid:?}");
+        }
+
+        let timeout = youtube_ban_body("chat-1", "UCaaaaaaaaaaaaaaaaaaaaaa", Some(600));
+        assert_eq!(timeout["snippet"]["liveChatId"], "chat-1");
+        assert_eq!(timeout["snippet"]["type"], "temporary");
+        assert_eq!(timeout["snippet"]["banDurationSeconds"], 600);
+        assert_eq!(
+            timeout["snippet"]["bannedUserDetails"]["channelId"],
+            "UCaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        let ban = youtube_ban_body("chat-1", "UCaaaaaaaaaaaaaaaaaaaaaa", None);
+        assert_eq!(ban["snippet"]["type"], "permanent");
+        assert!(ban["snippet"].get("banDurationSeconds").is_none());
+
+        assert_eq!(
+            kick_ban_body(7, 42, Some(10)),
+            json!({ "broadcaster_user_id": 7, "user_id": 42, "duration": 10 })
+        );
+        assert_eq!(
+            kick_ban_body(7, 42, None),
+            json!({ "broadcaster_user_id": 7, "user_id": 42 })
         );
     }
 }
