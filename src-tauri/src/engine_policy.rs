@@ -77,31 +77,83 @@ pub(crate) fn parse_kv(line: &str, key: &str) -> Option<f64> {
     num.parse().ok()
 }
 
+/// FFmpeg prefixes lines with heap addresses (`[tls @ 0x55d4c403a0c0]`) and echoes destination
+/// URLs, which embed the stream key. Neither is a reason: a "403" inside them would park a
+/// transient failure as a refused key.
+fn error_reason_words(low: &str) -> String {
+    let mut words: Vec<&str> = Vec::new();
+    let mut tokens = low.split_whitespace().peekable();
+    while let Some(token) = tokens.next() {
+        if token == "@" {
+            let address = tokens.peek().map(|next| {
+                let hex = next.trim_end_matches(']');
+                let hex = hex.strip_prefix("0x").unwrap_or(hex);
+                !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit())
+            });
+            if address == Some(true) {
+                tokens.next();
+                continue;
+            }
+        }
+        words.push(if token.contains("://") {
+            "<url>"
+        } else {
+            token
+        });
+    }
+    words.join(" ")
+}
+
 pub(crate) fn friendly_error(low: &str, locale: Locale) -> (&'static str, String) {
-    if low.contains("403")
-        || low.contains("forbidden")
-        || low.contains("unauthorized")
-        || low.contains("not authorized")
-        || low.contains("rejected")
-        || low.contains("auth")
-        || low.contains("badname")
-        || low.contains("publish denied")
-        || low.contains("invalid stream")
-        || low.contains("invalid key")
-        || low.contains("stream key")
+    let text = error_reason_words(low);
+    let has = |needle: &str| text.contains(needle);
+    let status = |code: &str| {
+        text.split_whitespace()
+            .any(|word| word.trim_matches(|c: char| !c.is_ascii_alphanumeric()) == code)
+    };
+    if status("401")
+        || status("403")
+        || status("404")
+        || has("forbidden")
+        || has("unauthorized")
+        || has("not authorized")
+        || has("rejected")
+        || has("auth")
+        || has("badname")
+        || has("publish denied")
+        || has("publish.denied")
+        || has("invalid stream")
+        || has("invalid key")
+        || has("stream key")
     {
         ("error", Msg::TargetErrorDestinationRefused.text(locale))
-    } else if low.contains("connection refused")
-        || low.contains("cannot open")
-        || low.contains("failed to connect")
-        || low.contains("no route")
-        || low.contains("name or service not known")
+    } else if has("connection refused")
+        || has("cannot open")
+        || has("failed to connect")
+        || has("connection to <url> failed")
+        // FFmpeg 7 reports a failed output open this way; "Error opening output files: Encoder
+        // not found" is a local encoder problem, not a connection one.
+        || (has("error opening output") && has("i/o error"))
+        || has("failed to resolve hostname")
+        || has("no such host")
+        || has("no route")
+        || has("network is unreachable")
+        || has("name or service not known")
     {
         ("reconnecting", Msg::TargetErrorNoConnection.text(locale))
-    } else if low.contains("broken pipe")
-        || low.contains("connection reset")
-        || low.contains("end of file")
-        || low.contains("timed out")
+    } else if has("broken pipe")
+        || has("connection reset")
+        || has("end of file")
+        || has("unexpected eof")
+        || has("timed out")
+        || has("i/o error")
+        || has("input/output error")
+        || has("error in the pull function")
+        || has("error in the push function")
+        || has("error writing trailer")
+        // Windows builds print unmapped Winsock codes: WSAECONNABORTED and WSAECONNRESET.
+        || has("error number -10053")
+        || has("error number -10054")
     {
         (
             "reconnecting",
@@ -560,6 +612,211 @@ mod tests {
         assert!(!safe.contains("host"));
         assert!(!safe.contains("secret-key"));
         assert!(safe_ffmpeg_diagnostic("frame=12 fps=30", "secret").is_none());
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    enum Category {
+        Refused,
+        NoConnection,
+        Dropped,
+        Shaky,
+    }
+
+    impl Category {
+        fn expected(self, locale: Locale) -> (&'static str, String) {
+            match self {
+                Self::Refused => ("error", Msg::TargetErrorDestinationRefused.text(locale)),
+                Self::NoConnection => ("reconnecting", Msg::TargetErrorNoConnection.text(locale)),
+                Self::Dropped => (
+                    "reconnecting",
+                    Msg::TargetErrorConnectionDropped.text(locale),
+                ),
+                Self::Shaky => ("reconnecting", Msg::TargetErrorShaky.text(locale)),
+            }
+        }
+    }
+
+    struct Placeholders {
+        addr: &'static str,
+        url: &'static str,
+        tcp: &'static str,
+        host: &'static str,
+        stream_name: &'static str,
+    }
+
+    const PLAIN: Placeholders = Placeholders {
+        addr: "000001d2c4a0b1c0",
+        url: "rtmp://live.example/app/live_sk_abc123",
+        tcp: "tcp://live.example:1935",
+        host: "live.example",
+        stream_name: "live_sk_abc123",
+    };
+
+    // Heap addresses, hosts and keys may contain "403", "auth" or "rejected" by chance.
+    const MISLEADING: Placeholders = Placeholders {
+        addr: "0x55d4c403a0c0",
+        url: "rtmps://auth.live.example/app/live_403_rejected_sk",
+        tcp: "tcp://auth.live.example:1935",
+        host: "fa7403c1b171.global-contribute.live-video.net",
+        stream_name: "live_403_rejected_sk",
+    };
+
+    fn render(line: &str, p: &Placeholders) -> String {
+        line.replace("{addr}", p.addr)
+            .replace("{url}", p.url)
+            .replace("{tcp}", p.tcp)
+            .replace("{host}", p.host)
+    }
+
+    /// Lines as FFmpeg prints them, with placeholder addresses and destinations.
+    const FFMPEG_LINES: &[(&str, Category)] = &[
+        ("[rtmp @ {addr}] Server error: Authentication Failed", Category::Refused),
+        ("[rtmp @ {addr}] Server error: authentication failed.", Category::Refused),
+        ("[rtmp @ {addr}] Server error: NetStream.Publish.BadName", Category::Refused),
+        ("[rtmp @ {addr}] Server error: NetStream.Publish.Denied", Category::Refused),
+        ("[https @ {addr}] HTTP error 403 Forbidden", Category::Refused),
+        (
+            "[out#0/flv @ {addr}] Error opening output https://upload.live.example/ingest: Server returned 401 Unauthorized (authorization failed)",
+            Category::Refused,
+        ),
+        ("Server returned 403 Forbidden (access denied)", Category::Refused),
+        ("Server returned 404 Not Found", Category::Refused),
+        (
+            "[tcp @ {addr}] Connection to {tcp} failed: Connection refused",
+            Category::NoConnection,
+        ),
+        (
+            "[tcp @ {addr}] Connection to {tcp} failed: Error number -138 occurred",
+            Category::NoConnection,
+        ),
+        (
+            "[tcp @ {addr}] Connection to {tcp} failed: Network is unreachable",
+            Category::NoConnection,
+        ),
+        (
+            "[tcp @ {addr}] Failed to resolve hostname {host}: No such host is known. ",
+            Category::NoConnection,
+        ),
+        (
+            "[out#0/flv @ {addr}] Error opening output {url}: I/O error",
+            Category::NoConnection,
+        ),
+        ("Error opening output files: I/O error", Category::NoConnection),
+        ("[tls @ {addr}] Error in the pull function.", Category::Dropped),
+        ("[tls @ {addr}] Error in the push function.", Category::Dropped),
+        (
+            "[tls @ {addr}] error:0A000126:SSL routines::unexpected eof while reading",
+            Category::Dropped,
+        ),
+        ("{url}: I/O error", Category::Dropped),
+        ("Input/output error", Category::Dropped),
+        ("Broken pipe", Category::Dropped),
+        ("av_interleaved_write_frame(): Broken pipe", Category::Dropped),
+        ("av_interleaved_write_frame(): Connection reset by peer", Category::Dropped),
+        ("av_interleaved_write_frame(): Error number -10054 occurred", Category::Dropped),
+        ("[flv @ {addr}] Error writing trailer of {url}: Broken pipe", Category::Dropped),
+        (
+            "[out#0/flv @ {addr}] Error writing trailer: Error number -10053 occurred",
+            Category::Dropped,
+        ),
+        ("[rtmp @ {addr}] Server error: Already publishing", Category::Shaky),
+        ("[vost#0:0 @ {addr}] Unknown encoder 'h264_nvenc'", Category::Shaky),
+        ("[vost#0:0 @ {addr}] Error selecting an encoder", Category::Shaky),
+        ("Error opening output file {url}.", Category::Shaky),
+        ("Error opening output files: Encoder not found", Category::Shaky),
+        ("[h264_nvenc @ {addr}] Cannot load nvcuda.dll", Category::Shaky),
+        (
+            "[h264_nvenc @ {addr}] OpenEncodeSessionEx failed: unsupported device (2): (no details)",
+            Category::Shaky,
+        ),
+        ("[h264_amf @ {addr}] AMF failed", Category::Shaky),
+        (
+            "[vost#0:0/h264_nvenc @ {addr}] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height",
+            Category::Shaky,
+        ),
+        (
+            "Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate, rate, width or height",
+            Category::Shaky,
+        ),
+        ("Conversion failed!", Category::Shaky),
+        ("[udp @ {addr}] bind failed: Address already in use", Category::Shaky),
+        ("Address already in use", Category::Shaky),
+    ];
+
+    #[test]
+    fn real_ffmpeg_lines_map_to_their_friendly_category() {
+        for (line, category) in FFMPEG_LINES {
+            for placeholders in [&PLAIN, &MISLEADING] {
+                let line = render(line, placeholders);
+                for locale in Locale::ALL {
+                    assert_eq!(
+                        friendly_error(&line.to_lowercase(), locale),
+                        category.expected(locale),
+                        "{line:?} must map to {category:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Only a refused destination parks a target; local encoder failures must keep retrying so
+    /// the supervisor can fall back from the GPU pipeline.
+    #[test]
+    fn only_destination_refusals_park_and_encoder_failures_keep_retrying() {
+        for (line, category) in FFMPEG_LINES {
+            for placeholders in [&PLAIN, &MISLEADING] {
+                let line = render(line, placeholders);
+                let TargetLine::Error(low) = classify_target_line(&line) else {
+                    continue;
+                };
+                let parked = matches!(
+                    target_error_update(&low, true, "live", Locale::En),
+                    TargetErrorUpdate::Failed { park: true, .. }
+                );
+                assert_eq!(parked, *category == Category::Refused, "{line:?}");
+            }
+        }
+        for line in [
+            "[vost#0:0 @ 000001d2c4030a40] Unknown encoder 'h264_nvenc'",
+            "[h264_nvenc @ 0x55d4c403a0c0] Cannot load nvcuda.dll",
+            "Server returned 404 Not Found",
+            "Address already in use",
+        ] {
+            assert_eq!(classify_target_line(line), TargetLine::Ignore, "{line:?}");
+        }
+    }
+
+    #[test]
+    fn ffmpeg_lines_never_echo_the_stream_key_or_its_destination() {
+        for (line, _) in FFMPEG_LINES {
+            for placeholders in [&PLAIN, &MISLEADING] {
+                let line = render(line, placeholders);
+                for locale in Locale::ALL {
+                    let (_, message) = friendly_error(&line.to_lowercase(), locale);
+                    assert!(!message.contains(placeholders.stream_name), "{line:?}");
+                    assert!(!message.contains("://"), "{line:?}");
+                }
+                let Some(diagnostic) = safe_ffmpeg_diagnostic(&line, placeholders.stream_name)
+                else {
+                    continue;
+                };
+                assert!(
+                    !diagnostic.contains(placeholders.stream_name),
+                    "{diagnostic:?}"
+                );
+                assert!(!diagnostic.contains("/app/"), "{diagnostic:?}");
+                assert!(!diagnostic.to_ascii_lowercase().contains("rtmp://"));
+                assert!(!diagnostic.to_ascii_lowercase().contains("rtmps://"));
+            }
+        }
+        // A key pasted into the URL leaves the vault key empty; the URL redaction still applies.
+        let diagnostic = safe_ffmpeg_diagnostic(
+            "[out#0/flv @ 000001d2c4a0b1c0] Error opening output RTMP://LIVE.EXAMPLE/app/live_sk_abc123: I/O error",
+            "",
+        )
+        .unwrap();
+        assert!(!diagnostic.contains("live_sk_abc123"), "{diagnostic:?}");
+        assert!(diagnostic.contains("I/O error"), "{diagnostic:?}");
     }
 
     #[test]
