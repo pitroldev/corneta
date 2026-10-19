@@ -198,7 +198,8 @@ export const pt = {
     "A Corneta é um aplicativo gratuito e de código aberto para Windows que recebe um único sinal de vídeo do OBS (ou de qualquer programa que transmita por RTMP) e o retransmite ao mesmo tempo para Twitch, YouTube, Kick, Facebook e outros destinos, com cada plataforma em conexão independente. Além do envio, ela cuida da live inteira: reúne chat e alertas de todas as plataformas, mantém a transmissão de pé quando o sinal do programa cai e gera um relatório pós-live que cruza máquina, OBS e plataformas para apontar a causa provável de cada instabilidade — tudo processado no computador do streamer.",
   "content.scopes.kick.never":
     "É o único login que passa pelo nosso servidor, porque a Kick exige um segredo de servidor na troca — e mesmo assim o token não é armazenado em lugar nenhum.",
-  "content.scopes.kick.permission": "Ler o canal, enviar no chat e moderar",
+  "content.scopes.kick.permission":
+    "Ler o canal, enviar no chat e apagar mensagens; dar timeout e banir só é pedido na primeira vez que você tenta",
   "content.scopes.kick.title": "Conta da Kick",
   "content.scopes.kick.why":
     "As mesmas coisas do chat unificado: ler, responder e moderar sem sair do app.",
@@ -214,7 +215,7 @@ export const pt = {
   "content.scopes.youtube.permission": "Gerenciar sua conta do YouTube",
   "content.scopes.youtube.title": "Conta do YouTube (Google)",
   "content.scopes.youtube.why":
-    "Criar a transmissão ao vivo e pegar a chave sozinha, dar a ela o título que você escreveu no app, encerrar no fim, ler e enviar mensagens no chat ao vivo e mostrar quantas pessoas estão assistindo.",
+    "Criar a transmissão ao vivo e pegar a chave sozinha, dar a ela o título que você escreveu no app, encerrar no fim, ler e enviar mensagens no chat ao vivo, apagar mensagem, dar timeout ou banir quando você mandar e mostrar quantas pessoas estão assistindo.",
   "content.steps.1.text":
     "A Corneta abre a página certa de cada plataforma pra você copiar a chave, e guarda ela no cofre do Windows — nunca num arquivo de configuração.",
   "content.steps.1.title": "Escolha onde quer aparecer",
