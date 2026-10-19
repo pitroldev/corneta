@@ -120,10 +120,7 @@ pub fn start_session(app: &AppHandle, config: &AppConfig) -> Option<PathBuf> {
     // be slow or remote, so its recordings go off the go-live path.
     let configured = PathBuf::from(config.settings.record_video_dir.trim());
     if !pruned.is_empty() && !cfg!(corneta_contributor) && !configured.as_os_str().is_empty() {
-        std::thread::spawn(move || {
-            let _mutation = crate::replay_commands::mutation_guard();
-            remove_recordings_of(&DiskStore, &configured, &pruned);
-        });
+        std::thread::spawn(move || remove_recordings_of(&DiskStore, &configured, &pruned));
     }
     let id = now_ms();
     let path = dir.join(domain::session_file_name(&id.to_string()));
@@ -504,11 +501,18 @@ fn prune_sessions_with(
 /// Orphans are collected only in the session directory. Elsewhere, a report's ID is the only
 /// proof of ownership, so its recordings must go while that ID is still known.
 fn remove_recordings_of(store: &dyn SessionStore, dir: &Path, ids: &[String]) {
-    for recording in prunable_video_files(store, dir) {
-        if ids.contains(&recording.id) {
-            crate::replay_media::revoke_path(&recording.path);
-            store.remove(&recording.path);
-        }
+    let owned: Vec<_> = prunable_video_files(store, dir)
+        .into_iter()
+        .filter(|recording| ids.contains(&recording.id))
+        .collect();
+    if owned.is_empty() {
+        return;
+    }
+    // List without the lock: the folder may be slow, and recording start prunes under it.
+    let _mutation = crate::replay_commands::mutation_guard();
+    for recording in owned {
+        crate::replay_media::revoke_path(&recording.path);
+        store.remove(&recording.path);
     }
 }
 
