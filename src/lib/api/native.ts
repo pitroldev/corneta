@@ -252,9 +252,13 @@ export function tauriApi(): CornetaApi {
         unlisten = null;
       };
     },
-    async chatSend(text, sources) {
+    async chatSend(text, sources, reply) {
       const { invoke } = await core();
-      await invoke("chat_send", { text, sources: sources ?? null });
+      await invoke("chat_send", {
+        text,
+        sources: sources ?? null,
+        reply: reply ?? null,
+      });
     },
     subscribeChatAuth(onAuth) {
       let cancelled = false;
@@ -311,9 +315,11 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("youtube_acknowledge_unknown_broadcast", { confirmed });
     },
-    async kickLoginStart() {
+    async kickLoginStart(options) {
       const { invoke } = await core();
-      await invoke("kick_login_start");
+      await invoke("kick_login_start", {
+        moderation: options?.moderation ?? null,
+      });
     },
     async kickLogout() {
       const { invoke } = await core();

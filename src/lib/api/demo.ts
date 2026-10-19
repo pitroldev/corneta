@@ -876,6 +876,7 @@ export function mockApi(): CornetaApi {
         kickOfficialReady: false,
         kickOwnCreds: false,
         kickUsingOwnCreds: false,
+        kickCanBan: false,
         brokerError: null,
       };
     },

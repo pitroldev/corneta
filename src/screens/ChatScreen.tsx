@@ -8,6 +8,7 @@ import {
   Eye,
   LogIn,
   PictureInPicture2,
+  Reply,
   Plus,
   RefreshCw,
   Send,
@@ -125,6 +126,8 @@ export function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendTo, setSendTo] = useState("all");
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
   const [connecting, setConnecting] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const clearChatStep = useConfirm();
@@ -277,15 +280,26 @@ export function ChatScreen() {
     hasYoutubeChannel ||
     hasKickChannel;
 
+  const sourceForMessage = (m: ChatMessage) =>
+    sources.find((x) => x.platform === m.platform && srcLabel(x) === m.source);
+  const replySource = replyTo ? sourceForMessage(replyTo) : undefined;
   const doSend = async () => {
     const text = draft.trim();
     if (!text || sending || !canSend) return;
     setSending(true);
     try {
-      await sendChat(
-        text,
-        sendTargets.map((x) => x.id),
-      );
+      if (replyTo && replySource) {
+        await sendChat(text, [replySource.id], {
+          nativeId: replyTo.nativeId,
+          author: replyTo.author,
+        });
+        setReplyTo(null);
+      } else {
+        await sendChat(
+          text,
+          sendTargets.map((x) => x.id),
+        );
+      }
       setDraft("");
     } catch (e) {
       toast.error(errMsg(e));
@@ -345,22 +359,48 @@ export function ChatScreen() {
     }
   };
 
-  const sourceForMessage = (m: ChatMessage) =>
-    sources.find((x) => x.platform === m.platform && srcLabel(x) === m.source);
+  const isOwnMessage = (m: ChatMessage) => {
+    const myLogin = chatLogin.twitch.login?.toLowerCase();
+    return (
+      m.author === "você" || (!!myLogin && m.author.toLowerCase() === myLogin)
+    );
+  };
   const modLevel = (m: ChatMessage): "full" | "delete" | "none" => {
     const src = sourceForMessage(m);
-    if (!src) return "none";
-    const myLogin = chatLogin.twitch.login?.toLowerCase();
-    if (m.author === "você" || (myLogin && m.author.toLowerCase() === myLogin))
-      return "none";
+    if (!src || isOwnMessage(m)) return "none";
     if (src.platform === "twitch" && twitchReady) return "full";
-    if (src.platform === "youtube" && youtubeReady) return "delete";
-    if (src.platform === "kick" && kickReady) return "delete";
+    // Timeouts and bans need the sender's ID, which older feed modes may not carry.
+    if (src.platform === "youtube" && youtubeReady)
+      return m.authorId ? "full" : "delete";
+    if (src.platform === "kick" && kickReady)
+      return m.authorId ? "full" : "delete";
     return "none";
+  };
+  const canReply = (m: ChatMessage) => {
+    const src = sourceForMessage(m);
+    if (!src || m.deleted || isOwnMessage(m)) return false;
+    if (!sendableSources.some((x) => x.id === src.id)) return false;
+    return src.platform === "youtube" || !!m.nativeId;
+  };
+  const startReply = (m: ChatMessage) => {
+    setReplyTo(m);
+    requestAnimationFrame(() => composerRef.current?.focus());
   };
   const onModerate = (m: ChatMessage, action: string) => {
     const src = sourceForMessage(m);
     if (!src) return;
+    if (
+      src.platform === "kick" &&
+      action !== "delete" &&
+      chatLogin.kick.missingScopes?.includes("moderation:ban")
+    ) {
+      toast.action(
+        t("chat.mod.kickReconnect"),
+        t("chat.loginrow.reconnect"),
+        () => void kickLogin({ moderation: true }),
+      );
+      return;
+    }
     void moderate(src.id, action, {
       nativeId: m.nativeId,
       author: m.author,
@@ -1019,6 +1059,8 @@ export function ChatScreen() {
             onFontSize={(n) => setSettings({ chatFontSize: n })}
             modLevel={modLevel}
             onModerate={onModerate}
+            canReply={canReply}
+            onReply={startReply}
             disconnectedHint={
               configured ? t("chat.feed.hint.ready") : t("chat.feed.hint.setup")
             }
@@ -1114,12 +1156,33 @@ export function ChatScreen() {
 
       {IS_TAURI && sendableSources.length > 0 && (
         <div className="mt-3">
+          {replyTo && replySource && (
+            <div className="mb-1.5 flex min-w-0 items-center gap-1.5 px-0.5 text-xs text-ink-muted">
+              <Reply className="size-3.5 shrink-0 text-brass" />
+              <span className="truncate">
+                {t("chat.reply.to", {
+                  author: replyTo.author,
+                  source: srcLabel(replySource),
+                })}
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                title={t("chat.reply.cancel")}
+                aria-label={t("chat.reply.cancel")}
+                className="grid size-5 shrink-0 place-items-center rounded text-ink-faint hover:text-ink"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             {sendableSources.length > 1 && (
               <Select
                 className="w-40 shrink-0"
                 aria-label={t("chat.send.target.aria")}
-                value={effectiveSendTo}
+                disabled={!!replySource}
+                value={replySource?.id ?? effectiveSendTo}
                 options={[
                   { value: "all", label: t("chat.send.target.all") },
                   ...sendableSources.map((x) => ({
@@ -1131,12 +1194,16 @@ export function ChatScreen() {
               />
             )}
             <Input
+              ref={composerRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   void doSend();
+                } else if (e.key === "Escape" && replyTo) {
+                  e.preventDefault();
+                  setReplyTo(null);
                 }
               }}
               placeholder={t("chat.send.placeholder")}

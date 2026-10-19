@@ -355,6 +355,8 @@ export const en: Dict = {
   "chat.mod.action.timeout": "Time out 10 min",
   "chat.mod.banned": "Banned them",
   "chat.mod.deleted": "Deleted that message",
+  "chat.mod.kickReconnect":
+    "To time out and ban on Kick, Corneta needs one more permission.",
   "chat.mod.timeout": "Timed them out",
   "chat.overlay.addToObs": "Add to OBS",
   "chat.overlay.added.toast": "Added the {block} overlay to OBS",
@@ -426,6 +428,9 @@ export const en: Dict = {
   "chat.popout.win.minimize": "Minimize",
   "chat.popout.win.restore": "Restore",
   "chat.popout.windowTitle": "Corneta chat",
+  "chat.reply.action": "Reply",
+  "chat.reply.cancel": "Cancel reply",
+  "chat.reply.to": "Replying to {author} on {source}",
   "chat.send.button": "Send",
   "chat.send.placeholder": "Say something",
   "chat.send.status.connect": "{label}: connect chat to sign in",

@@ -365,7 +365,7 @@ export function Input({
   className,
   invalid,
   ...rest
-}: React.InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
+}: React.ComponentProps<"input"> & { invalid?: boolean }) {
   return (
     <input
       aria-invalid={invalid || undefined}

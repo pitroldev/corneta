@@ -57,7 +57,65 @@ pub struct ChatMessage {
 pub struct ChatRuntime {
     pub running: Arc<AtomicBool>,
     /// Source ID -> authenticated Twitch send queue; reset on chat restart.
-    pub senders: Arc<Mutex<HashMap<String, mpsc::Sender<String>>>>,
+    pub senders: Arc<Mutex<HashMap<String, mpsc::Sender<Outgoing>>>>,
+}
+
+pub struct Outgoing {
+    text: String,
+    reply_to: Option<String>,
+}
+
+/// The message a send answers: its native ID threads the reply where the platform supports it.
+#[derive(Debug, Default, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplyTo {
+    pub native_id: Option<String>,
+    pub author: String,
+}
+
+/// Reply IDs end up in an IRC tag or a JSON field, so only plain message IDs pass.
+pub(crate) fn reply_id(id: &str) -> Option<&str> {
+    let id = id.trim();
+    (!id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))
+        .then_some(id)
+}
+
+fn twitch_privmsg(channel: &str, text: &str, reply_to: Option<&str>) -> String {
+    match reply_to.and_then(reply_id) {
+        Some(id) => format!("@reply-parent-msg-id={id} PRIVMSG #{channel} :{text}"),
+        None => format!("PRIVMSG #{channel} :{text}"),
+    }
+}
+
+/// YouTube has no threaded replies; viewers answer each other with a mention.
+fn youtube_reply_text(author: &str, text: &str) -> String {
+    let author = author.trim();
+    if author.is_empty() {
+        return text.to_string();
+    }
+    let handle = author.strip_prefix('@').unwrap_or(author);
+    format!("@{handle} {text}")
+}
+
+/// Live video each YouTube chat source is reading, keyed by the configured channel value.
+static YT_LIVE_VIDEOS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn remember_youtube_video(channel: &str, video_id: &str) {
+    let mut videos = YT_LIVE_VIDEOS.get_or_init(Default::default).lock().unwrap();
+    if videos.len() >= 32 && !videos.contains_key(channel.trim()) {
+        videos.clear();
+    }
+    videos.insert(channel.trim().to_string(), video_id.to_string());
+}
+
+/// The live video last resolved for a YouTube chat source, if any.
+pub(crate) fn youtube_live_video(channel: &str) -> Option<String> {
+    YT_LIVE_VIDEOS
+        .get()?
+        .lock()
+        .unwrap()
+        .get(channel.trim())
+        .cloned()
 }
 
 static MSG_ID: AtomicU64 = AtomicU64::new(1);
@@ -597,10 +655,10 @@ fn run_twitch(
     log::info!("twitch chat: connected");
     chat_status_gen(&app, gen, "twitch", source, "connected");
 
-    let mut out_rx: Option<mpsc::Receiver<String>> = None;
+    let mut out_rx: Option<mpsc::Receiver<Outgoing>> = None;
     let mut send_login: Option<String> = None;
     if let Some((login, _)) = &creds {
-        let (tx, rx) = mpsc::channel::<String>();
+        let (tx, rx) = mpsc::channel::<Outgoing>();
         let senders = app.state::<AppState>().chat.lock().unwrap().senders.clone();
         // A late old connection must not overwrite the current sender with a dead receiver.
 
@@ -635,18 +693,16 @@ fn run_twitch(
                 if sends.len() >= 18 {
                     break;
                 }
-                let text = match rx.try_recv() {
+                let outgoing = match rx.try_recv() {
                     Ok(t) => t,
                     Err(_) => break,
                 };
-                let clean = sanitize_outgoing(&text);
+                let clean = sanitize_outgoing(&outgoing.text);
                 if clean.is_empty() {
                     continue;
                 }
-                if socket
-                    .send(Message::Text(format!("PRIVMSG #{ch} :{clean}").into()))
-                    .is_ok()
-                {
+                let line = twitch_privmsg(&ch, &clean, outgoing.reply_to.as_deref());
+                if socket.send(Message::Text(line.into())).is_ok() {
                     sends.push(Instant::now());
                     // Twitch does not echo the sender's own PRIVMSG.
                     emit_chat_gen(
@@ -804,6 +860,7 @@ pub fn send_message(
     app: &AppHandle,
     text: &str,
     sources: Option<Vec<String>>,
+    reply: Option<ReplyTo>,
 ) -> Result<(), String> {
     let text = sanitize_outgoing(text);
     if text.is_empty() {
@@ -815,7 +872,14 @@ pub fn send_message(
         let guard = st.chat.lock().map_err(|_| Msg::ChatStateLocked.now())?;
         guard.senders.clone()
     };
+    let reply_to = reply
+        .as_ref()
+        .and_then(|r| r.native_id.as_deref())
+        .and_then(reply_id)
+        .map(String::from);
     let targets: Vec<String> = match sources {
+        // A reply belongs to the chat its message came from.
+        Some(ids) if reply.is_some() => ids.into_iter().take(1).collect(),
         Some(ids) if !ids.is_empty() => ids,
 
         _ => {
@@ -850,7 +914,11 @@ pub fn send_message(
         match src.map(|s| s.platform.as_str()) {
             Some("twitch") => {
                 if let Some(tx) = senders.lock().unwrap().get(&id) {
-                    if tx.send(text.clone()).is_ok() {
+                    let outgoing = Outgoing {
+                        text: text.clone(),
+                        reply_to: reply_to.clone(),
+                    };
+                    if tx.send(outgoing).is_ok() {
                         sent += 1;
                     }
                 }
@@ -858,6 +926,10 @@ pub fn send_message(
 
             Some("youtube") if !youtube_done => {
                 youtube_done = true;
+                let text = match &reply {
+                    Some(reply) => sanitize_outgoing(&youtube_reply_text(&reply.author, &text)),
+                    None => text.clone(),
+                };
                 match crate::auth::youtube_send(app, &text) {
                     Ok(()) => {
                         sent += 1;
@@ -885,7 +957,7 @@ pub fn send_message(
             // Pusher echoes Kick messages, so local echo would duplicate them.
             Some("kick") => {
                 let slug = src.map(|s| s.value.clone()).unwrap_or_default();
-                match crate::auth::kick_send(app, &text, &slug) {
+                match crate::auth::kick_send(app, &text, &slug, reply_to.as_deref()) {
                     Ok(()) => sent += 1,
                     Err(e) => last_err = Some(e),
                 }
@@ -1905,7 +1977,10 @@ fn parse_innertube_action(
             platform: "youtube".into(),
             source: source.to_string(),
             author: author_of(r),
-            author_id: None,
+            author_id: r
+                .get("authorExternalChannelId")
+                .and_then(|v| v.as_str())
+                .map(String::from),
             native_id: r.get("id").and_then(|v| v.as_str()).map(String::from),
             color: None,
             fragments,
@@ -2037,6 +2112,7 @@ fn run_youtube(
             return false;
         }
     };
+    remember_youtube_video(channel, &vid);
 
     if youtube_innertube(&vid, source, &running, &app, gen) {
         return true;
@@ -2141,7 +2217,8 @@ fn parse_dataapi_item(
                 platform: "youtube".into(),
                 source: source.to_string(),
                 author: yt_author(item, locale),
-                author_id: None,
+                author_id: text_at("/authorDetails/channelId")
+                    .or_else(|| text_at("/snippet/authorChannelId")),
                 native_id: item.get("id").and_then(|v| v.as_str()).map(String::from),
                 color: None,
                 fragments: vec![text_frag(&text)],
@@ -2350,12 +2427,20 @@ fn parse_kick(raw: &str, source: &str) -> Option<ChatMessage> {
         .filter(|c| !c.is_empty())
         .map(String::from);
     let fragments = kick_fragments(&content);
+    // Pusher has sent the sender ID both as a number and as a string.
+    let author_id = d.pointer("/sender/id").and_then(|id| match id {
+        Value::Number(n) => n.as_u64().map(|n| n.to_string()),
+        Value::String(s) if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) => {
+            Some(s.clone())
+        }
+        _ => None,
+    });
     Some(ChatMessage {
         id: next_id(),
         platform: "kick".into(),
         source: source.to_string(),
         author,
-        author_id: None,
+        author_id,
         native_id: d.get("id").and_then(|x| x.as_str()).map(String::from),
         color,
         text: frags_to_text(&fragments),
@@ -3538,5 +3623,81 @@ mod tests {
         assert!(due(None, LIVE_SEARCH_EVERY, start));
         assert!(!due(Some(&start), LIVE_SEARCH_EVERY, later(599)));
         assert!(due(Some(&start), LIVE_SEARCH_EVERY, later(600)));
+    }
+
+    #[test]
+    fn moderation_ids_come_from_each_feed() {
+        let innertube_message = chat(innertube(json!({ "addChatItemAction": { "item": {
+            "liveChatTextMessageRenderer": {
+                "id": "native-3",
+                "authorName": { "simpleText": "@ana" },
+                "authorExternalChannelId": "UCaaaaaaaaaaaaaaaaaaaaaa",
+                "message": { "runs": [{ "text": "oi" }] }
+            }
+        } } })));
+        assert_eq!(
+            innertube_message.author_id.as_deref(),
+            Some("UCaaaaaaaaaaaaaaaaaaaaaa")
+        );
+
+        let data_api_message = chat(data_api(json!({
+            "id": "native-4",
+            "snippet": { "type": "textMessageEvent", "displayMessage": "oi" },
+            "authorDetails": { "displayName": "Ana", "channelId": "UCbbbbbbbbbbbbbbbbbbbbbb" }
+        })));
+        assert_eq!(
+            data_api_message.author_id.as_deref(),
+            Some("UCbbbbbbbbbbbbbbbbbbbbbb")
+        );
+
+        let kick = |sender: Value| {
+            let data = json!({ "id": "kick-1", "content": "oi", "sender": sender }).to_string();
+            parse_kick(
+                &json!({ "event": "App\\Events\\ChatMessageEvent", "data": data }).to_string(),
+                "fonte",
+            )
+            .expect("kick message")
+            .author_id
+        };
+        assert_eq!(
+            kick(json!({ "id": 123456, "username": "ana" })).as_deref(),
+            Some("123456")
+        );
+        assert_eq!(
+            kick(json!({ "id": "654321", "username": "ana" })).as_deref(),
+            Some("654321")
+        );
+        assert_eq!(kick(json!({ "id": "12a", "username": "ana" })), None);
+        assert_eq!(kick(json!({ "username": "ana" })), None);
+    }
+
+    #[test]
+    fn replies_thread_only_with_plain_message_ids() {
+        let id = "885196de-cb67-427a-baa8-82f9b0fcd05f";
+        assert_eq!(
+            twitch_privmsg("canal", "valeu", Some(id)),
+            format!("@reply-parent-msg-id={id} PRIVMSG #canal :valeu")
+        );
+        assert_eq!(
+            twitch_privmsg("canal", "valeu", None),
+            "PRIVMSG #canal :valeu"
+        );
+        for unsafe_id in [
+            "a b",
+            "a;mod=1",
+            "a\r\nPRIVMSG #x :y",
+            "",
+            "a".repeat(65).as_str(),
+        ] {
+            assert_eq!(reply_id(unsafe_id), None, "{unsafe_id:?}");
+            assert_eq!(
+                twitch_privmsg("canal", "valeu", Some(unsafe_id)),
+                "PRIVMSG #canal :valeu"
+            );
+        }
+
+        assert_eq!(youtube_reply_text("@ana", "valeu"), "@ana valeu");
+        assert_eq!(youtube_reply_text("Ana Maria", "valeu"), "@Ana Maria valeu");
+        assert_eq!(youtube_reply_text(" ", "valeu"), "valeu");
     }
 }

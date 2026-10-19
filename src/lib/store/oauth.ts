@@ -68,7 +68,12 @@ export function createOauthSlice({
                 }
               : { state: "out" },
             youtube: a.youtube ? { state: "connected" } : { state: "out" },
-            kick: a.kick ? { state: "connected" } : { state: "out" },
+            kick: a.kick
+              ? {
+                  state: "connected",
+                  missingScopes: a.kickCanBan ? [] : ["moderation:ban"],
+                }
+              : { state: "out" },
           },
           youtubeOauthReady: a.youtubeConfigured,
           kickOauthReady: a.kickConfigured,
@@ -167,6 +172,8 @@ export function createOauthSlice({
           if (url) void openExternal(url);
           return;
         }
+        // The event does not carry the granted scopes; every window reloads them for the features that ask.
+        if (a.state === "connected") void get().setupOauth();
         if (!login || (a.state !== "connected" && a.state !== "error")) return;
         pendingLogins.delete(who);
         // Reconnect active Twitch chat after login so IRC authenticates, preserving history.
@@ -203,10 +210,10 @@ export function createOauthSlice({
         chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
       }));
     },
-    async kickLogin() {
+    async kickLogin(options) {
       pendingLogins.set("kick", "started");
       set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
-      await api.kickLoginStart();
+      await api.kickLoginStart({ moderation: options?.moderation === true });
     },
     async kickLogout() {
       await api.kickLogout();

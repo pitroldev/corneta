@@ -7,7 +7,14 @@ import {
   type ReactNode,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, Ban, Clock, MessageSquare, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  Ban,
+  Clock,
+  MessageSquare,
+  Reply,
+  Trash2,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 import type { ChatMessage } from "../lib/types";
 import { useT } from "../lib/i18n";
@@ -45,6 +52,8 @@ export function ChatFeed({
   onFontSize,
   modLevel,
   onModerate,
+  canReply,
+  onReply,
   disconnectedHint,
   emptyAction,
 }: {
@@ -63,6 +72,8 @@ export function ChatFeed({
   onFontSize?: (next: number) => void;
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
   onModerate?: (m: ChatMessage, action: string) => void;
+  canReply?: (m: ChatMessage) => boolean;
+  onReply?: (m: ChatMessage) => void;
 }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -71,15 +82,25 @@ export function ChatFeed({
   const onFontSizeRef = useRef(onFontSize);
   const modLevelRef = useRef(modLevel);
   const onModerateRef = useRef(onModerate);
+  const canReplyRef = useRef(canReply);
+  const onReplyRef = useRef(onReply);
   onFontSizeRef.current = onFontSize;
   modLevelRef.current = modLevel;
   onModerateRef.current = onModerate;
+  canReplyRef.current = canReply;
+  onReplyRef.current = onReply;
   // Stable indirections preserve memoized rows without capturing stale callbacks.
   const stableModLevel = useRef(
     (m: ChatMessage) => modLevelRef.current?.(m) ?? "none",
   ).current;
   const stableModerate = useRef((m: ChatMessage, action: string) =>
     onModerateRef.current?.(m, action),
+  ).current;
+  const stableCanReply = useRef(
+    (m: ChatMessage) => canReplyRef.current?.(m) ?? false,
+  ).current;
+  const stableReply = useRef((m: ChatMessage) =>
+    onReplyRef.current?.(m),
   ).current;
   const fontResizeEnabled = onFontSize !== undefined;
 
@@ -222,6 +243,8 @@ export function ChatFeed({
                   view={view}
                   modLevel={stableModLevel}
                   onModerate={stableModerate}
+                  canReply={onReply ? stableCanReply : undefined}
+                  onReply={stableReply}
                 />
               </div>
             ))}
@@ -247,6 +270,8 @@ interface MsgRowProps {
   view: ChatView;
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
   onModerate?: (m: ChatMessage, action: string) => void;
+  canReply?: (m: ChatMessage) => boolean;
+  onReply?: (m: ChatMessage) => void;
 }
 
 const MsgRow = memo(function MsgRow({
@@ -254,6 +279,8 @@ const MsgRow = memo(function MsgRow({
   view,
   modLevel,
   onModerate,
+  canReply,
+  onReply,
 }: MsgRowProps) {
   const t = useT();
   if (m.deleted) {
@@ -325,7 +352,13 @@ const MsgRow = memo(function MsgRow({
           ),
         )}
       </span>
-      <ModButtons m={m} modLevel={modLevel} onModerate={onModerate} />
+      <ModButtons
+        m={m}
+        modLevel={modLevel}
+        onModerate={onModerate}
+        canReply={canReply}
+        onReply={onReply}
+      />
     </div>
   );
 }, areRowPropsEqual);
@@ -339,7 +372,9 @@ function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
     prev.view.source === next.view.source &&
     prev.view.timestamps === next.view.timestamps &&
     prev.modLevel === next.modLevel &&
-    prev.onModerate === next.onModerate
+    prev.onModerate === next.onModerate &&
+    prev.canReply === next.canReply &&
+    prev.onReply === next.onReply
   );
 }
 
@@ -348,33 +383,50 @@ function ModButtons({
   m,
   modLevel,
   onModerate,
+  canReply,
+  onReply,
 }: {
   m: ChatMessage;
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
   onModerate?: (m: ChatMessage, action: string) => void;
+  canReply?: (m: ChatMessage) => boolean;
+  onReply?: (m: ChatMessage) => void;
 }) {
   const t = useT();
-  if (!onModerate || !modLevel) return null;
-  const lvl = modLevel(m);
-  if (lvl === "none") return null;
+  const lvl = onModerate && modLevel ? modLevel(m) : "none";
+  const reply = !!onReply && !!canReply?.(m);
+  if (lvl === "none" && !reply) return null;
   const btn =
     "grid size-6 place-items-center rounded text-ink-faint transition-colors";
   return (
     <div className="absolute right-1.5 top-0.5 flex items-center gap-0.5 rounded-md bg-surface opacity-0 ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">
-      <button
-        type="button"
-        onClick={() => onModerate(m, "delete")}
-        title={t("chat.mod.action.delete")}
-        aria-label={t("chat.mod.action.delete")}
-        className={cn(btn, "hover:text-bad")}
-      >
-        <Trash2 className="size-3.5" />
-      </button>
+      {reply && (
+        <button
+          type="button"
+          onClick={() => onReply?.(m)}
+          title={t("chat.reply.action")}
+          aria-label={t("chat.reply.action")}
+          className={cn(btn, "hover:text-brass")}
+        >
+          <Reply className="size-3.5" />
+        </button>
+      )}
+      {lvl !== "none" && (
+        <button
+          type="button"
+          onClick={() => onModerate?.(m, "delete")}
+          title={t("chat.mod.action.delete")}
+          aria-label={t("chat.mod.action.delete")}
+          className={cn(btn, "hover:text-bad")}
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      )}
       {lvl === "full" && (
         <>
           <button
             type="button"
-            onClick={() => onModerate(m, "timeout")}
+            onClick={() => onModerate?.(m, "timeout")}
             title={t("chat.mod.action.timeout")}
             aria-label={t("chat.mod.action.timeout")}
             className={cn(btn, "hover:text-warn")}
@@ -383,7 +435,7 @@ function ModButtons({
           </button>
           <button
             type="button"
-            onClick={() => onModerate(m, "ban")}
+            onClick={() => onModerate?.(m, "ban")}
             title={t("chat.mod.action.ban")}
             aria-label={t("chat.mod.action.ban")}
             className={cn(btn, "hover:text-bad")}

@@ -348,6 +348,8 @@ export const pt = {
   "chat.mod.action.timeout": "Timeout 10 min",
   "chat.mod.banned": "Bani do chat",
   "chat.mod.deleted": "Apaguei a mensagem",
+  "chat.mod.kickReconnect":
+    "Pra dar timeout e banir na Kick, a Corneta precisa de mais uma permissão.",
   "chat.mod.timeout": "Dei 10 min de timeout",
   "chat.overlay.addToObs": "Adicionar no OBS",
   "chat.overlay.added.toast": "Pus o overlay de {block} no OBS",
@@ -419,6 +421,9 @@ export const pt = {
   "chat.popout.win.minimize": "Minimizar",
   "chat.popout.win.restore": "Restaurar",
   "chat.popout.windowTitle": "Chat da Corneta",
+  "chat.reply.action": "Responder",
+  "chat.reply.cancel": "Cancelar resposta",
+  "chat.reply.to": "Respondendo a {author} em {source}",
   "chat.send.button": "Mandar",
   "chat.send.placeholder": "Manda no chat",
   "chat.send.status.connect": "{label}: conecte o chat pra logar",
