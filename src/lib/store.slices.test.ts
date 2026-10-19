@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   setOauthConfig: vi.fn(),
   authStatus: vi.fn(),
   kickLoginStart: vi.fn(),
+  subscribeAuthFlow: vi.fn(),
 }));
 vi.mock("./api", () => ({
   api: mocks,
@@ -184,5 +185,23 @@ describe("store slices preserve shared contracts", () => {
     expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
       moderation: true,
     });
+
+    // A login event does not carry scopes, so every window reloads them.
+    let emit: (
+      who: string,
+      event: { state: string; login?: string },
+    ) => void = () => undefined;
+    mocks.subscribeAuthFlow.mockImplementation((callback) => {
+      emit = callback;
+      return () => undefined;
+    });
+    mocks.authStatus.mockResolvedValue(status(false));
+    useStore.getState().bindAuthFlow(((key: string) => key) as never);
+    emit("kick", { state: "connected", login: "ana" });
+    await vi.waitFor(() =>
+      expect(useStore.getState().chatLogin.kick.missingScopes).toEqual([
+        "moderation:ban",
+      ]),
+    );
   });
 });
