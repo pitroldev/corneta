@@ -201,6 +201,9 @@ export interface CornetaApi {
   }): Promise<TelemetryStatus>;
   /** Rotate the installation UUID only when both telemetry purposes are disabled. */
   telemetryRegenerateId(): Promise<TelemetryStatus>;
+  /** Each webview gates its own telemetry; a preference change is announced to all of them. */
+  subscribeTelemetryChanged(cb: () => void): () => void;
+  notifyTelemetryChanged(): Promise<void>;
   registerShortcut(shortcut: string, action?: ShortcutAction): Promise<void>;
   subscribeShortcut(cb: (action: ShortcutAction) => void): () => void;
   /** Recorder notice kinds are stable protocol values; translate only their display text. */

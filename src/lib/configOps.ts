@@ -194,3 +194,54 @@ export function renameProfile(
     profiles: config.profiles.map((p) => (p.id === id ? { ...p, name } : p)),
   };
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Key order and null versus an absent field are not edits; configs arrive from both Rust and spreads. */
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b || (a == null && b == null)) return true;
+  if (Array.isArray(a) || Array.isArray(b))
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((item, index) => sameJson(item, b[index]))
+    );
+  if (!isRecord(a) || !isRecord(b)) return false;
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].every((key) =>
+    sameJson(a[key], b[key]),
+  );
+}
+
+function mergeEdits(base: unknown, local: unknown, remote: unknown): unknown {
+  if (sameJson(local, base)) return remote;
+  if (sameJson(remote, base) || sameJson(remote, local)) return local;
+  if (!isRecord(base) || !isRecord(local) || !isRecord(remote)) return local;
+  const merged: Record<string, unknown> = {};
+  for (const key of new Set([
+    ...Object.keys(base),
+    ...Object.keys(local),
+    ...Object.keys(remote),
+  ])) {
+    const value = mergeEdits(base[key], local[key], remote[key]);
+    if (value !== undefined) merged[key] = value;
+  }
+  return merged;
+}
+
+/**
+ * Rebase this window's unsaved edits (`base` to `local`) onto `remote`, saved later by another window.
+ * Fields left untouched locally take the remote value; a field changed on both sides keeps the local
+ * edit. Arrays such as targets and profiles are replaced whole.
+ */
+export function rebaseConfig(
+  base: AppConfig,
+  local: AppConfig,
+  remote: AppConfig,
+): AppConfig {
+  return {
+    ...(mergeEdits(base, local, remote) as AppConfig),
+    revision: remote.revision,
+  };
+}

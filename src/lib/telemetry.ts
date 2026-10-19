@@ -43,6 +43,9 @@ export interface TelemetryBackend {
     noticeVersion: string;
   }): Promise<TelemetryStatus>;
   telemetryRegenerateId(): Promise<TelemetryStatus>;
+  /** Every window gates its own capture, so a change made in one must reach the others. */
+  subscribeTelemetryChanged?(onChange: () => void): () => void;
+  notifyTelemetryChanged?(): Promise<void>;
 }
 
 interface TelemetrySnapshot {
@@ -135,6 +138,8 @@ let sdkRetryAt = 0;
 
 let backend: TelemetryBackend | null = null;
 let initialization: Promise<void> | null = null;
+let stopStatusSync: (() => void) | null = null;
+let statusGeneration = 0;
 let sdk: PostHogSdk | null = null;
 let sdkPromise: Promise<PostHogSdk | null> | null = null;
 let sdkInstallationId: string | null = null;
@@ -277,6 +282,19 @@ function anyEnabledChoice(status = snapshot.status): boolean {
 
 function anyCurrentConsent(status = snapshot.status): boolean {
   return anyEnabledChoice(status);
+}
+
+function revokesPurpose(
+  previous: TelemetryStatus,
+  usage: TelemetryChoice,
+  crashReports: TelemetryChoice,
+): boolean {
+  return (
+    (telemetryPurposeActive(previous.usage, "usage") &&
+      !telemetryPurposeActive(usage, "usage")) ||
+    (telemetryPurposeActive(previous.crashReports, "crashReports") &&
+      !telemetryPurposeActive(crashReports, "crashReports"))
+  );
 }
 
 function onlyProperty(
@@ -627,6 +645,10 @@ export async function initializeTelemetry(
 ): Promise<void> {
   backend = telemetryBackend;
   if (initialization) return initialization;
+  stopStatusSync =
+    telemetryBackend.subscribeTelemetryChanged?.(
+      () => void reloadTelemetryStatus(),
+    ) ?? null;
   initialization = telemetryBackend
     .telemetryStatus()
     .then((status) => {
@@ -649,6 +671,42 @@ export async function initializeTelemetry(
   return initialization;
 }
 
+/** Another window changed the preference; the backend status is the authority. */
+async function reloadTelemetryStatus(): Promise<void> {
+  const generation = ++statusGeneration;
+  await initialization;
+  const source = backend;
+  if (!source || !snapshot.available) return;
+  let status: TelemetryStatus;
+  try {
+    status = normalizeTelemetryStatus(await source.telemetryStatus());
+  } catch {
+    return;
+  }
+  // A local change or a newer reload owns the snapshot now.
+  if (generation !== statusGeneration || snapshot.saving) return;
+  const previous = snapshot.status;
+  if (
+    previous.usage === status.usage &&
+    previous.crashReports === status.crashReports &&
+    previous.installationId === status.installationId &&
+    previous.noticeVersion === status.noticeVersion &&
+    previous.decidedAt === status.decidedAt
+  )
+    return;
+  if (
+    revokesPurpose(previous, status.usage, status.crashReports) ||
+    previous.installationId !== status.installationId
+  )
+    invalidateSdk();
+  updateSnapshot({ status });
+}
+
+function announceTelemetryChange(): void {
+  // The backend keeps a revocation in memory even when writing it fails, so failures are announced too.
+  void backend?.notifyTelemetryChanged?.()?.catch(() => undefined);
+}
+
 export function setTelemetryLocale(value: string): void {
   locale = value === "en" ? "en" : "pt-BR";
 }
@@ -667,11 +725,9 @@ export async function setTelemetryConsent(input: {
     input.crashReports,
     "crashReports",
   );
-  const revoked =
-    (telemetryPurposeActive(previous.usage, "usage") && !usageActive) ||
-    (telemetryPurposeActive(previous.crashReports, "crashReports") &&
-      !crashesActive);
-  if (revoked) invalidateSdk();
+  if (revokesPurpose(previous, input.usage, input.crashReports))
+    invalidateSdk();
+  statusGeneration += 1;
   const refusingBoth = !usageActive && !crashesActive;
   const optimistic: TelemetryStatus = {
     ...previous,
@@ -709,6 +765,8 @@ export async function setTelemetryConsent(input: {
     updateSnapshot({ status, saving: false });
     if (anyCurrentConsent(status)) requestDelivery();
     throw error;
+  } finally {
+    announceTelemetryChange();
   }
 }
 
@@ -719,6 +777,7 @@ export async function regenerateTelemetryId(): Promise<TelemetryStatus> {
   if (anyEnabledChoice())
     throw new Error("telemetry_disable_before_regenerate");
   invalidateSdk();
+  statusGeneration += 1;
   updateSnapshot({ saving: true });
   try {
     const status = normalizeTelemetryStatus(
@@ -729,6 +788,8 @@ export async function regenerateTelemetryId(): Promise<TelemetryStatus> {
   } catch (error) {
     updateSnapshot({ saving: false });
     throw error;
+  } finally {
+    announceTelemetryChange();
   }
 }
 
@@ -961,6 +1022,9 @@ export function __configureTelemetryForTests(input: {
   loader?: SdkLoader;
 }): void {
   invalidateSdk();
+  stopStatusSync?.();
+  stopStatusSync = null;
+  statusGeneration += 1;
   runtimeConfig = { ...runtimeConfig, ...input.config };
   sdkLoader = input.loader ?? defaultSdkLoader;
   snapshot = {

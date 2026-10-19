@@ -175,4 +175,75 @@ describe("configOps", () => {
     c = ops.addProfile(c, "p3", (n) => `Perfil ${n}`);
     expect(c.profiles.find((p) => p.id === "p3")!.name).toBe("Perfil 4");
   });
+
+  it("rebaseConfig keeps local edits and adopts remote edits to untouched fields", () => {
+    const saved = { ...base(), revision: 4 };
+    const local = {
+      ...saved,
+      settings: { ...saved.settings, streamTitle: "Local title" },
+    };
+    const remote = ops.toggleTarget(
+      {
+        ...saved,
+        revision: 5,
+        settings: { ...saved.settings, chatPopoutTab: "alerts" as const },
+      },
+      saved.targets[0].id,
+    );
+    const rebased = ops.rebaseConfig(saved, local, remote);
+    expect(rebased.revision).toBe(5);
+    expect(rebased.settings).toMatchObject({
+      streamTitle: "Local title",
+      chatPopoutTab: "alerts",
+    });
+    expect(rebased.targets).toEqual(remote.targets);
+  });
+
+  it("rebaseConfig lets the local edit win a same-field conflict and replaces arrays whole", () => {
+    const saved = { ...base(), revision: 1 };
+    const local = ops.toggleTarget(
+      { ...saved, settings: { ...saved.settings, chatFontSize: 16 } },
+      saved.targets[0].id,
+    );
+    const remote = {
+      ...ops.toggleTarget(saved, saved.targets[1].id),
+      revision: 2,
+      settings: { ...saved.settings, chatFontSize: 20 },
+    };
+    const rebased = ops.rebaseConfig(saved, local, remote);
+    expect(rebased.settings.chatFontSize).toBe(16);
+    expect(rebased.targets).toEqual(local.targets);
+  });
+
+  it("rebaseConfig does not mistake key order or null for an absent field as a local edit", () => {
+    const c = base();
+    const saved = {
+      ...c,
+      revision: 1,
+      settings: {
+        ...c.settings,
+        brbSlateFileName: null as unknown as string,
+      },
+    };
+    const { brbSlateFileName: _absent, ...settings } = saved.settings;
+    const local = {
+      ...saved,
+      targets: saved.targets.map(
+        (target) =>
+          Object.fromEntries(Object.entries(target).reverse()) as typeof target,
+      ),
+      settings: { ...settings, recordChat: true },
+    };
+    const remote = {
+      ...ops.toggleTarget(saved, saved.targets[0].id),
+      revision: 2,
+      settings: { ...saved.settings, brbSlateFileName: "slate.png" },
+    };
+    const rebased = ops.rebaseConfig(saved, local, remote);
+    expect(rebased.targets).toEqual(remote.targets);
+    expect(rebased.settings).toMatchObject({
+      recordChat: true,
+      brbSlateFileName: "slate.png",
+    });
+  });
 });

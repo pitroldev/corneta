@@ -35,6 +35,9 @@ export function createOauthSlice({
   | "kickLogin"
   | "kickLogout"
 > {
+  // Auth events reach every window; only the one that started a login opens the page, copies the
+  // code and restarts chat, once per attempt.
+  const pendingLogins = new Map<string, "started" | "opened">();
   return {
     chatLogin: {
       twitch: { state: "out" },
@@ -148,7 +151,10 @@ export function createOauthSlice({
           else if (a.state === "loggedout") next = { state: "out" };
           return { chatLogin: { ...s.chatLogin, [k]: next } };
         });
+        const login = pendingLogins.get(who);
         if (a.state === "code") {
+          if (login !== "started") return;
+          pendingLogins.set(who, "opened");
           // Copy device-flow codes before opening authorization; URL-prefilled flows do not need this.
           if (a.userCode) {
             try {
@@ -159,7 +165,10 @@ export function createOauthSlice({
           }
           const url = a.verifyUriComplete || a.verifyUri;
           if (url) void openExternal(url);
+          return;
         }
+        if (!login || (a.state !== "connected" && a.state !== "error")) return;
+        pendingLogins.delete(who);
         // Reconnect active Twitch chat after login so IRC authenticates, preserving history.
         if (
           who === "twitch" &&
@@ -171,6 +180,7 @@ export function createOauthSlice({
       });
     },
     async twitchLogin() {
+      pendingLogins.set("twitch", "started");
       set((s) => ({
         chatLogin: { ...s.chatLogin, twitch: { state: "code" } },
       }));
@@ -181,6 +191,7 @@ export function createOauthSlice({
       set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "out" } } }));
     },
     async youtubeLogin() {
+      pendingLogins.set("youtube", "started");
       set((s) => ({
         chatLogin: { ...s.chatLogin, youtube: { state: "code" } },
       }));
@@ -193,6 +204,7 @@ export function createOauthSlice({
       }));
     },
     async kickLogin() {
+      pendingLogins.set("kick", "started");
       set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
       await api.kickLoginStart();
     },
