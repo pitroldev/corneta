@@ -202,7 +202,8 @@ export const en: Dict = {
     "Corneta is a free, open source Windows app that takes a single video signal from OBS (or from any program that streams over RTMP) and sends it at the same time to Twitch, YouTube, Kick, Facebook and other destinations, each platform on its own connection. Beyond just sending the video, it handles the whole stream: it gathers chat and alerts from every platform, keeps the stream up when the program's signal drops, and builds a post-stream report that cross-checks the machine, OBS and the platforms to point at the likely cause of each instability — all of it processed on the streamer's own computer.",
   "content.scopes.kick.never":
     "This is the only login that goes through our server, because Kick requires a server-side secret in the exchange — and even then the token is not stored anywhere.",
-  "content.scopes.kick.permission": "Read the channel, send chat, and moderate",
+  "content.scopes.kick.permission":
+    "Read the channel, send chat and delete messages; timeouts and bans are only requested the first time you try one",
   "content.scopes.kick.title": "Kick account",
   "content.scopes.kick.why":
     "The same things as the unified chat: read, reply and moderate without leaving the app.",
@@ -218,7 +219,7 @@ export const en: Dict = {
   "content.scopes.youtube.permission": "Manage your YouTube account",
   "content.scopes.youtube.title": "YouTube account (Google)",
   "content.scopes.youtube.why":
-    "Create the live broadcast and get its stream key automatically, give it the title you wrote in the app, end it when the stream is over, read and send messages in the live chat, and show how many people are watching.",
+    "Create the live broadcast and get its stream key automatically, give it the title you wrote in the app, end it when the stream is over, read and send messages in the live chat, delete a message, time someone out or ban them when you say so, and show how many people are watching.",
   "content.steps.1.text":
     "Corneta opens the right page on each platform for you to copy the key, and keeps it in Windows Credential Manager — never in a config file.",
   "content.steps.1.title": "Pick where you want to show up",
