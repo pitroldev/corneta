@@ -118,8 +118,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "f6ac7c73cd32e35e0da62f894569e6aa09a34e1a",
-      "reason": "As frases novas são do aviso de reconectar a Twitch na aba Conta; nenhum texto da configuração automática do OBS mudou."
+      "sourceBlob": "8ac8720e29caa408de55dff587b8d223dadce731",
+      "reason": "Só acrescenta o aviso de Mesa cheia; os rótulos do assistente do OBS citados não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
