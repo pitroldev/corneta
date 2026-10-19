@@ -336,6 +336,9 @@ export const pt = {
   "chat.loginrow.device.waitingParens": "(aguardando…)",
   "chat.loginrow.signedIn": "logado",
   "chat.loginrow.signedInAs": "logado como @{login}",
+  "chat.loginrow.missingScopes":
+    "Este login é de antes das permissões novas. Reconecte para liberar os alertas de seguidor e a chave pela conta.",
+  "chat.loginrow.reconnect": "Reconectar",
   "chat.loginrow.signin": "Entrar",
   "chat.loginrow.signout": "Sair",
   "chat.loginrow.unavailable": "indisponível nesta versão",

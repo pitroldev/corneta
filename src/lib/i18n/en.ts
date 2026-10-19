@@ -343,6 +343,9 @@ export const en: Dict = {
   "chat.loginrow.device.waitingParens": "(waiting…)",
   "chat.loginrow.signedIn": "signed in",
   "chat.loginrow.signedInAs": "signed in as @{login}",
+  "chat.loginrow.missingScopes":
+    "This login predates the new permissions. Reconnect to turn on follower alerts and fetching the key from your account.",
+  "chat.loginrow.reconnect": "Reconnect",
   "chat.loginrow.signin": "Sign in",
   "chat.loginrow.signout": "Sign out",
   "chat.loginrow.unavailable": "not available in this build",

@@ -300,6 +300,7 @@ export function LoginRow({
     verifyUri?: string;
     verifyUriComplete?: string;
     message?: string;
+    missingScopes?: string[];
   };
   enabled: boolean;
   onLogin: () => Promise<void>;
@@ -366,6 +367,20 @@ export function LoginRow({
           )}
         </div>
       </div>
+      {state.state === "connected" && enabled && state.missingScopes?.length ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-warn">
+          <span>{t("chat.loginrow.missingScopes")}</span>
+          <Button
+            variant="subtle"
+            size="sm"
+            loading={busy}
+            disabled={busy}
+            onClick={() => void act(onLogin)}
+          >
+            <LogIn className="size-3.5" /> {t("chat.loginrow.reconnect")}
+          </Button>
+        </div>
+      ) : null}
       {platform === "youtube" ? <YoutubeBroadcastRecovery /> : null}
       {state.state === "code" &&
         (state.userCode && !state.verifyUriComplete ? (

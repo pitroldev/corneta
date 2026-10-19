@@ -1363,6 +1363,52 @@ fn helix(token: &str, client_id: &str, url: &str) -> Option<Value> {
     serde_json::from_str(&body).ok()
 }
 
+pub(crate) fn twitch_client_id(app: &AppHandle) -> String {
+    oauth(app).twitch_client_id
+}
+
+/// Resolves channel logins to user IDs in one Helix call; logins Twitch could not issue are skipped.
+pub(crate) fn twitch_user_ids(
+    token: &str,
+    client_id: &str,
+    logins: &[String],
+) -> std::collections::HashMap<String, String> {
+    let query = logins
+        .iter()
+        .filter(|login| {
+            (1..=25).contains(&login.len())
+                && login
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+        .take(100)
+        .map(|login| format!("login={login}"))
+        .collect::<Vec<_>>()
+        .join("&");
+    if query.is_empty() {
+        return Default::default();
+    }
+    helix(
+        token,
+        client_id,
+        &format!("https://api.twitch.tv/helix/users?{query}"),
+    )
+    .and_then(|body| {
+        body.get("data")?.as_array().map(|users| {
+            users
+                .iter()
+                .filter_map(|user| {
+                    Some((
+                        user.get("login")?.as_str()?.to_lowercase(),
+                        user.get("id")?.as_str()?.to_string(),
+                    ))
+                })
+                .collect()
+        })
+    })
+    .unwrap_or_default()
+}
+
 fn helix_user_id(token: &str, client_id: &str, login: &str) -> Option<String> {
     let v = helix(
         token,
