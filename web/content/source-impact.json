@@ -40,8 +40,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "d2d496dfebe5577dc8fb674f0f8c9f27e2a270a2",
-      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; modos, cópia e transcodificação citados não mudaram."
+      "sourceBlob": "0f42ddbc00dd06a9392cc2499524048639d6af65",
+      "reason": "A importação de configurações passa a manter senha do OBS, chave da API e pasta de gravação locais e a recusar arquivos hostis, e um alvo de loudness fora da faixa do FFmpeg volta ao padrão; modos, cópia, transcodificação e normalizador citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -58,8 +58,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "eb74a5274892b6d5eab3f103fabd9d093c6d56ea",
-      "reason": "Os comandos ganharam a leitura e o ajuste do vídeo do OBS, e o início da live consulta o sinal do OBS no modo Esperto; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "dc5be30928a9692b0d5a504e24b8addd8bf3e055",
+      "reason": "Só muda a importação de configurações, que agora mantém credenciais e pasta de gravação locais; encoders, detecção, modos e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -100,8 +100,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "d2d496dfebe5577dc8fb674f0f8c9f27e2a270a2",
-      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; o auto-bitrate e os limites citados não mudaram."
+      "sourceBlob": "0f42ddbc00dd06a9392cc2499524048639d6af65",
+      "reason": "A importação de configurações passa a manter credenciais e pasta de gravação locais e a recusar arquivos hostis; o ajuste de auto-bitrate e o que ele cobre não mudaram."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -124,14 +124,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "eb74a5274892b6d5eab3f103fabd9d093c6d56ea",
-      "reason": "Os comandos ganharam a leitura e o ajuste do vídeo do OBS, e o início da live consulta o sinal do OBS no modo Esperto; o teste de upload, os resultados e a tabela citados não mudaram."
+      "sourceBlob": "dc5be30928a9692b0d5a504e24b8addd8bf3e055",
+      "reason": "Só muda a importação de configurações, que agora mantém credenciais e pasta de gravação locais; o teste de upload e o passo a passo citados não mudaram."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "eb74a5274892b6d5eab3f103fabd9d093c6d56ea",
-      "reason": "Os comandos ganharam a leitura e o ajuste do vídeo do OBS, e o início da live consulta o sinal do OBS no modo Esperto; o que o diagnóstico exporta e omite não mudou."
+      "sourceBlob": "dc5be30928a9692b0d5a504e24b8addd8bf3e055",
+      "reason": "Só muda a importação de configurações, que agora mantém credenciais e pasta de gravação locais; o que o diagnóstico leva e o que fica de fora não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -172,8 +172,8 @@
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "8f3bd079f9a0f509bca851b1b71de6790a976d6d",
-      "reason": "A regra de linha do FFmpeg foi movida para engine_policy com o mesmo comportamento; nomes de estado, mensagens e Tentar de novo citados não mudaram."
+      "sourceBlob": "3bea1bb9de290da1b9afe13966a0047d8a5432ae",
+      "reason": "A classificação das falhas do FFmpeg passa a ignorar endereços de memória e URLs e reconhece mais motivos de queda; os estados, o que significam e o que fazer em cada um não mudaram."
     }
   ]
 }
