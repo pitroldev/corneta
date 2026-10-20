@@ -8,6 +8,8 @@ export function createNavigationSlice({
   | "markReportSeen"
   | "tourNonce"
   | "replayTour"
+  | "setupOpen"
+  | "setSetupOpen"
   | "settingsTab"
   | "setSettingsTab"
   | "navRequest"
@@ -28,6 +30,10 @@ export function createNavigationSlice({
     tourNonce: 0,
     replayTour() {
       set((s) => ({ tourNonce: s.tourNonce + 1 }));
+    },
+    setupOpen: false,
+    setSetupOpen(open) {
+      set({ setupOpen: open });
     },
     settingsTab: null,
     setSettingsTab(v) {

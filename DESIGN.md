@@ -316,7 +316,19 @@ Bordas são firmes, normalmente de 2px em campos, opções e estados vazios; div
 
 ### Navigation
 
-A sidebar é uma jornada numerada. O item ativo é um bloco de latão com ícone, Baloo 2 bold, dica curta em Inter e sombra seca; os inativos usam tinta apagada e ganham superfície somente em hover. A sidebar permanece com 16rem no shell desktop.
+A sidebar separa o que se usa durante a live (**Na live**: Ao vivo, Chat, Relatórios) do que se prepara antes (**Preparar**: Plataformas, Qualidade), sem números de ordem — as telas não formam uma sequência obrigatória. O estado da live (fora do ar, conectando, no ar com o tempo, erro) fica no topo da sidebar, visível em qualquer tela. O item ativo é um bloco de latão com ícone, Baloo 2 bold, dica curta em Inter e sombra seca; os inativos usam tinta apagada e ganham superfície somente em hover. Um ponto de atenção marca Plataformas quando alguma ligada ainda não está pronta. A sidebar permanece com 16rem no shell desktop.
+
+### Live Screen
+
+A tela Ao vivo tem uma protagonista por estado. Fora do ar, quatro indicadores (Plataformas, OBS, Internet, Proteções) dizem o que está pronto; cada um abre o detalhe numa gaveta lateral, sem sair da tela. O BORA AO VIVO vive numa barra fixa embaixo com uma única linha de status — a mesma pendência nunca aparece em vários blocos. No ar, a tela vira cockpit: números por plataforma, carga da máquina e o chat unificado ao lado a partir de 1280px.
+
+### Drawer
+
+Detalhe sob demanda entra numa gaveta lateral de 26rem, com cabeçalho de ícone em latão, conteúdo rolável e, quando houver, um rodapé com o caminho para a tela completa. A gaveta usa borda de 2px e sombra seca deslocada para a esquerda; o fundo escurece com tinta, sem blur.
+
+### First-run Setup
+
+A configuração inicial ocupa a janela abaixo da barra de título: trilha de passos em latão à esquerda e um passo por vez à direita. Cada passo termina algo real (plataforma conectada, OBS apontado, upload medido) em vez de só explicar, e qualquer passo pode ficar para depois — o painel mostra o que faltou.
 
 ### Report Story
 

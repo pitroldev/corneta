@@ -16,21 +16,12 @@ import {
   flushTelemetry,
   setTelemetryLocale,
 } from "./lib/telemetry";
-import { Sidebar, type Screen } from "./components/Sidebar";
+import { NAV_ORDER, Sidebar, type Screen } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Button } from "./components/ui";
 
-// Navigation order defines Alt+N shortcuts and must match Sidebar.
-const SCREENS: Screen[] = [
-  "platforms",
-  "encoding",
-  "golive",
-  "chat",
-  ...(MESA_ENABLED ? (["mesa"] as Screen[]) : []),
-  "reports",
-  "settings",
-  "about",
-];
+// The sidebar's visual order defines the Alt+N shortcuts.
+const SCREENS: Screen[] = NAV_ORDER;
 import { TitleBar } from "./components/TitleBar";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { LiveBar } from "./components/LiveBar";
@@ -157,9 +148,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(() => {
     try {
       const stored = localStorage.getItem("corneta.screen") as Screen | null;
-      return stored && SCREENS.includes(stored) ? stored : "platforms";
+      return stored && SCREENS.includes(stored) ? stored : "golive";
     } catch {
-      return "platforms";
+      return "golive";
     }
   });
   const navigate = (s: Screen) => {
@@ -379,6 +370,8 @@ export default function App() {
     });
   }, [t]);
 
+  const setupOpen = useStore((s) => s.setupOpen);
+  const requestChatConfig = useStore((s) => s.requestChatConfig);
   const navRequest = useStore((s) => s.navRequest);
   const requestNavigate = useStore((s) => s.requestNavigate);
   useEffect(() => {
@@ -442,7 +435,8 @@ export default function App() {
 
         <UpdateBanner />
 
-        <LiveBar onOpen={() => navigate("golive")} />
+        {/* The Live screen shows the same status in its own bar. */}
+        {screen !== "golive" && <LiveBar onOpen={() => navigate("golive")} />}
 
         {!loaded ? (
           <div className="grid flex-1 place-items-center" role="status">
@@ -495,7 +489,7 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1" inert={setupOpen}>
             <Sidebar
               screen={screen}
               onNavigate={navigate}
@@ -539,7 +533,12 @@ export default function App() {
         )}
 
         <Toaster />
-        <Onboarding onStart={() => navigate("platforms")} />
+        <Onboarding
+          onDone={(next) => {
+            if (next === "chat") requestChatConfig("canais");
+            navigate(next);
+          }}
+        />
         <TelemetryConsentNotice />
       </div>
     </MotionConfig>

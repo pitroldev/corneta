@@ -1,67 +1,60 @@
-import {
-  memo,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { useShallow } from "zustand/react/shallow";
-import { useConfirm } from "../lib/useConfirm";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, m } from "framer-motion";
-import * as Collapsible from "@radix-ui/react-collapsible";
 import {
-  Check,
-  Radio,
-  Square,
-  Gauge,
-  Wifi,
-  Zap,
   AlertTriangle,
-  Loader2,
-  Pause,
-  Play,
-  ClipboardCheck,
-  MapPin,
-  ExternalLink,
+  Check,
+  ChevronRight,
   Eye,
-  Shield,
-  RefreshCw,
   FileText,
-  ChevronDown,
-  Megaphone,
+  Loader2,
+  MapPin,
+  Plus,
+  Radio,
+  RefreshCw,
+  Square,
+  Zap,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { api, START_CANCELLED } from "../lib/api";
-import { obsIngestUrl } from "../lib/factory";
-import { bandFit, effectiveAction, estimate } from "../lib/estimates";
-import { PLATFORMS } from "../lib/platforms";
+import { bandFit, estimate } from "../lib/estimates";
+import { platformName } from "../lib/platforms";
+import {
+  joinNames,
+  obsConfigured,
+  youtubeAutoTargetId,
+} from "../lib/readiness";
+import { shortcutLabel } from "../lib/shortcuts";
 import { toast } from "../lib/toast";
 import { updateBusy, useUpdate } from "../lib/updater";
-import { cn, errMsg, fmtUptime, openExternal } from "../lib/utils";
-import type { EngineState, ObsCheck, Target, TargetState } from "../lib/types";
+import { useConfirm } from "../lib/useConfirm";
+import { useNow } from "../lib/useNow";
+import { useReadiness, useReadinessContext } from "../lib/useReadiness";
+import { cn, errMsg, fmtUptime } from "../lib/utils";
+import type { EngineState } from "../lib/types";
 import { isUuid } from "../lib/telemetry-schema";
 import type { Screen } from "../components/Sidebar";
-import { blockingIssues } from "../lib/validation";
 import { rich, useI18n, useT } from "../lib/i18n";
 import {
-  Badge,
   Button,
   Card,
   CopyField,
-  ExperimentalBadge,
   PlatformGlyph,
   SectionTitle,
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
-import { Select } from "../components/Select";
 import { ObsQualityGuide } from "../components/ObsQualityGuide";
-import { FirstLiveChecklist } from "../components/FirstLiveChecklist";
+import { modeTitleKey } from "../components/QualityModes";
+import {
+  ReadinessDrawer,
+  ReadinessTiles,
+  type ReadinessPanel,
+} from "./golive/Readiness";
+import { LiveCockpit } from "./golive/LiveCockpit";
+import { StreamInfoCard } from "./golive/StreamInfoCard";
+import { BrbNowButton } from "./golive/parts";
 
 let prewarmedUpload = false;
-// Module state keeps the OBS setup prompt from reopening on every route visit.
-let autoOpenedObsOnce = false;
 // The preflight bypass lasts only for this process; persisting it would hide future OBS warnings.
 let skippedPreflightOnce = false;
 
@@ -70,15 +63,12 @@ export function GoLiveScreen({
 }: {
   onNavigate?: (s: Screen) => void;
 }) {
-  const { t, fmt } = useI18n();
-  const config = useStore((s) => s.config)!;
+  const t = useT();
   // Narrow subscriptions: per-target metrics arrive up to four times a second while live.
   const state = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const engineMessage = useStore((s) => s.snapshot.message);
   const errorId = useStore((s) => s.snapshot.errorId);
-  const startedAt = useStore((s) => s.snapshot.startedAt);
-  const viewers = useStore((s) => s.viewers);
   const start = useStore((s) => s.start);
   const stop = useStore((s) => s.stop);
   const toggleTarget = useStore((s) => s.toggleTarget);
@@ -86,43 +76,20 @@ export function GoLiveScreen({
   const runUploadTest = useStore((s) => s.runUploadTest);
   const encoders = useStore((s) => s.encoders);
   const refreshEncoders = useStore((s) => s.refreshEncoders);
-  const setSettingsTab = useStore((s) => s.setSettingsTab);
   const lastOperationId = useStore((s) => s.lastOperationId);
-  const openSecurity = () => {
-    setSettingsTab("seguranca");
-    onNavigate?.("settings");
-  };
+  const obs = useStore((s) => s.obs);
+  const runObsCheck = useStore((s) => s.runObsCheck);
 
   const updating = useUpdate(updateBusy);
   const live = state === "live";
   const starting = state === "starting";
-  const enabled = useMemo(
-    () => config.targets.filter((target) => target.enabled),
-    [config.targets],
-  );
+  const onAir = live || starting;
+  const r = useReadiness();
   const signalLost = useStore((s) =>
-    enabled.some(
+    r.enabled.some(
       (target) => s.snapshot.targets[target.id]?.state === "signal-lost",
     ),
   );
-  const problems = useMemo(
-    () =>
-      enabled
-        .map((target) => ({ target, issues: blockingIssues(target, t) }))
-        .filter((p) => p.issues.length > 0),
-    [enabled, t],
-  );
-  const canStart = !updating && enabled.length > 0 && problems.length === 0;
-  const blockReason = updating
-    ? t("golive.block.updating")
-    : enabled.length === 0
-      ? t("golive.block.noPlatform")
-      : problems.length > 0
-        ? t("golive.block.fixTarget", {
-            nome: problems[0].target.name || t("golive.target.noName"),
-            problemas: problems[0].issues.join(", "),
-          })
-        : "";
 
   // Initialize from the current state so remounting during a stream does not announce a new transition.
   const prevState = useRef<EngineState>(state);
@@ -133,22 +100,14 @@ export function GoLiveScreen({
     prevState.current = state;
   }, [state, t]);
 
-  const est = useMemo(() => estimate(config), [config]);
-  const neededMbps = est.uploadKbps / 1000;
-
-  const fit = bandFit(est.uploadKbps, uploadMbps);
-  const bandTone = fit === "unknown" ? "default" : fit;
-
+  const [panel, setPanel] = useState<ReadinessPanel | null>(null);
   const [testing, setTesting] = useState(false);
   const [showObs, setShowObs] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const [obsOpen, setObsOpen] = useState(false);
 
   useEffect(() => {
     if (encoders.length === 0) void refreshEncoders();
   }, [encoders.length, refreshEncoders]);
-  const obs = useStore((s) => s.obs);
-  const runObsCheck = useStore((s) => s.runObsCheck);
   const runObs = () => runObsCheck(true);
   const onTest = async () => {
     setTesting(true);
@@ -162,7 +121,7 @@ export function GoLiveScreen({
   };
 
   useEffect(() => {
-    if (prewarmedUpload || live || starting || uploadMbps != null) return;
+    if (prewarmedUpload || onAir || uploadMbps != null) return;
     prewarmedUpload = true;
     setTesting(true);
     runUploadTest()
@@ -172,7 +131,7 @@ export function GoLiveScreen({
   }, []);
 
   useEffect(() => {
-    if (live || starting) return;
+    if (onAir) return;
     void runObsCheck();
     const id = setInterval(() => void runObsCheck(), 6000);
     const onFocus = () => void runObsCheck();
@@ -182,19 +141,7 @@ export function GoLiveScreen({
       window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, starting]);
-
-  useEffect(() => {
-    if (autoOpenedObsOnce) return;
-    if (
-      obs !== null &&
-      obs !== "loading" &&
-      !(obs.reachable && obs.pointingAtCorneta)
-    ) {
-      autoOpenedObsOnce = true;
-      setObsOpen(true);
-    }
-  }, [obs]);
+  }, [onAir]);
 
   // Block duplicate clicks locally while config persistence delays the native starting snapshot.
   const [startBusy, setStartBusy] = useState(false);
@@ -227,7 +174,7 @@ export function GoLiveScreen({
       !skippedPreflightOnce &&
       obs !== null &&
       obs !== "loading" &&
-      !(obs.reachable && obs.pointingAtCorneta)
+      !obsConfigured(obs)
     ) {
       setPreflightWarn(true);
       return;
@@ -238,6 +185,16 @@ export function GoLiveScreen({
     skippedPreflightOnce = true;
     void doStart();
   };
+  // Pending platforms are switched off (and say so) instead of blocking the ready ones.
+  const startWithoutPending = () => {
+    const names = r.pending.map(
+      (p) => p.target.name || platformName(p.target.platformId, t),
+    );
+    r.pending.forEach((p) => toggleTarget(p.target.id));
+    toast.info(t("golive.partial.turnedOff", { names: joinNames(names, t) }));
+    onStart();
+  };
+
   const [rescue, setRescue] = useState(false);
   useEffect(() => {
     if (!starting || ingestLive) {
@@ -252,7 +209,6 @@ export function GoLiveScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingestLive, starting]);
 
-  const stopStep = useConfirm(3000, { minDelayMs: 400 });
   const onStop = async () => {
     await stop();
     toast.action(
@@ -261,34 +217,11 @@ export function GoLiveScreen({
       () => onNavigate?.("reports"),
     );
   };
-  const onStopClick = () => {
-    // minDelayMs requires a pause between clicks, so an accidental double-click cannot stop the stream.
-    if (stopStep.confirm()) void onStop();
-  };
   const onCancel = async () => {
     await stop();
     toast.info(t("golive.toast.canceled"));
   };
-  const onMark = async () => {
-    try {
-      await api.markMoment();
-      toast.success(t("golive.toast.markerSaved"));
-    } catch {
-      /* Marker failures must not interrupt the active stream. */
-    }
-  };
 
-  const obsConfigured =
-    obs !== null && obs !== "loading" && obs.reachable && obs.pointingAtCorneta;
-  const obsStatus =
-    obs === null || obs === "loading"
-      ? { tone: "neutral" as const, label: t("golive.obs.status.checking") }
-      : obsConfigured
-        ? { tone: "ok" as const, label: t("golive.obs.status.ok") }
-        : obs.reachable
-          ? { tone: "warn" as const, label: t("golive.obs.status.notPointing") }
-          : { tone: "bad" as const, label: t("golive.obs.status.missing") };
-  // Authentication failure takes precedence over the generic OBS-unavailable diagnosis.
   const rescueHint =
     obs === null || obs === "loading"
       ? null
@@ -299,26 +232,24 @@ export function GoLiveScreen({
           : !obs.pointingAtCorneta
             ? t("golive.rescue.notPointing")
             : null;
-  const bandColor =
-    bandTone === "ok"
-      ? "text-ok"
-      : bandTone === "warn"
-        ? "text-warn"
-        : bandTone === "bad"
-          ? "text-bad"
-          : "text-ink";
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <SectionTitle
-        kicker={t("golive.header.kicker")}
-        title={t("golive.header.title")}
-        subtitle={t("golive.header.subtitle")}
-      />
-
-      {!live && !starting && (
-        <FirstLiveChecklist onSetupObs={() => setShowObs(true)} />
+    <div
+      className={cn(
+        "mx-auto transition-[max-width] duration-300",
+        onAir ? "max-w-6xl" : "max-w-3xl",
       )}
+    >
+      <SectionTitle
+        title={t("golive.header.title")}
+        subtitle={t(
+          live
+            ? "golive.header.subtitle.live"
+            : starting
+              ? "golive.header.subtitle.starting"
+              : "golive.header.subtitle",
+        )}
+      />
 
       {state === "error" && (
         <Card role="alert" className="mb-4 border-2 border-bad/40 bg-bad/10">
@@ -374,407 +305,109 @@ export function GoLiveScreen({
         </Card>
       )}
 
-      <StreamInfoCard />
-
-      {!live && (
-        <Card className="mb-4">
-          <Collapsible.Root open={obsOpen} onOpenChange={setObsOpen}>
-            <Collapsible.Trigger className="group flex w-full items-center gap-2.5 text-left">
-              <h3 className="text-lg">{t("golive.obs.section.title")}</h3>
-              <Badge tone={obsStatus.tone}>{obsStatus.label}</Badge>
-              <ChevronDown className="ml-auto size-4 shrink-0 text-ink-faint transition-transform group-data-[state=open]:rotate-180" />
-            </Collapsible.Trigger>
-            <Collapsible.Content className="mt-3">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <p className="text-xs text-ink-faint">
-                  {rich(t, "golive.obs.hint", {
-                    caminho: (
-                      <strong className="text-ink-muted">
-                        {t("golive.obs.hint.path")}
-                      </strong>
-                    ),
-                  })}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => setShowObs(true)}
-                >
-                  <Zap className="size-4 text-brass" strokeWidth={2.6} />{" "}
-                  {t("golive.obs.fixForMe")}
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                <CopyField
-                  label={t("golive.obs.field.server")}
-                  value={obsIngestUrl(config.ingest)}
-                />
-                <CopyField
-                  label={t("golive.obs.field.key")}
-                  value={config.ingest.key}
-                  mono
-                />
-              </div>
-              <p className="mt-3 text-xs text-ink-faint">
-                {t("golive.obs.key.note")}
-              </p>
-              <button
-                onClick={() => setShowGuide(true)}
-                className="mt-2 flex items-center gap-1.5 text-xs font-bold text-brass hover:underline"
-              >
-                <Gauge className="size-3.5" /> {t("golive.obs.qualityGuide")}
-              </button>
-            </Collapsible.Content>
-          </Collapsible.Root>
-        </Card>
-      )}
-
-      {!live && (
-        <Card className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 bg-surface-2 py-3">
-          <span className="flex items-center gap-2">
-            <Gauge className="size-4 text-brass" />
-            <span className="text-sm font-semibold text-ink-muted">
-              {t("golive.band.title")}
-            </span>
-          </span>
-          <span className="text-sm">
-            <span
-              className={cn(
-                "font-display text-lg font-extrabold tabular-nums",
-                bandColor,
-              )}
-            >
-              {uploadMbps == null ? "—" : fmt.num(uploadMbps)}
-            </span>
-            <span className="text-ink-faint">
-              {" "}
-              / {fmt.dec(neededMbps, 1)} Mbps
-            </span>
-          </span>
-          {uploadMbps != null && bandTone === "bad" ? (
-            <button
-              onClick={() => onNavigate?.("encoding")}
-              className="text-xs font-bold text-bad hover:underline"
-            >
-              {t("golive.band.tooTight")}
-            </button>
-          ) : uploadMbps != null && bandTone === "warn" ? (
-            <button
-              onClick={() => onNavigate?.("encoding")}
-              className="text-xs font-bold text-warn hover:underline"
-            >
-              {t("golive.band.atEdge")}
-            </button>
-          ) : null}
-          <Button
-            variant="subtle"
-            size="sm"
-            className="ml-auto"
-            onClick={onTest}
-            loading={testing}
-            disabled={testing || starting}
-            title={starting ? t("golive.band.test.disabledTitle") : undefined}
-          >
-            {!testing && <Wifi className="size-4" />}
-            {testing ? t("golive.band.testing") : t("golive.band.test")}
-          </Button>
-        </Card>
-      )}
-
-      {!live && !starting && problems.length > 0 && (
-        <Card className="mb-4 bg-warn/10">
-          <div className="flex items-center gap-2 text-sm font-bold text-warn">
-            <AlertTriangle className="size-4" /> {t("golive.problems.title")}
-          </div>
-          <ul className="mt-1.5 space-y-1.5 text-sm text-ink-muted">
-            {problems.map((p) => (
-              <li
-                key={p.target.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1"
-              >
-                <span>
-                  <strong className="text-ink">
-                    {p.target.name || t("golive.target.noName")}
-                  </strong>
-                  : {p.issues.join(", ")}
-                </span>
-                <button
-                  onClick={() => onNavigate?.("platforms")}
-                  className="text-xs font-bold text-brass hover:underline"
-                >
-                  {t("golive.problems.pasteKey")}
-                </button>
-                <button
-                  onClick={() => {
-                    toggleTarget(p.target.id);
-                    toast.info(
-                      t("golive.problems.turnedOff.toast", {
-                        nome: p.target.name,
-                      }),
-                    );
-                  }}
-                  className="text-xs font-bold text-ink-faint hover:text-ink hover:underline"
-                >
-                  {t("golive.problems.turnOff")}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {!live && !starting && enabled.length === 0 && (
-        <Card className="mb-4 bg-surface-2 text-sm text-ink-muted">
-          {rich(t, "golive.empty.noPlatforms", {
-            plataformas: (
-              <strong className="text-ink">{t("platforms.title")}</strong>
-            ),
-          })}
-        </Card>
-      )}
-
-      {!live && !starting && (
-        <Checkup
-          obs={obs}
-          onRecheck={runObs}
-          onGuide={() => setShowGuide(true)}
-          onSetupObs={() => setShowObs(true)}
-        />
-      )}
-
-      {!live && !starting && <SecurityPanel onAdjust={openSecurity} />}
-
-      {(live || starting) && (
-        <>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-4">
-              <LiveTimer
-                startedAt={startedAt}
-                live={live}
-                ingestLive={ingestLive}
-              />
-              {showAudience(viewers) && (
-                <span
-                  className="flex items-center gap-1.5"
-                  title={audienceTooltip(viewers.items, { t, fmt })}
-                >
-                  <Eye className="size-4 text-ink-faint" />
-                  <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
-                    {audienceTotal(viewers, fmt)}
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                    {t("golive.viewers.label")}
-                  </span>
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <BrbNowButton live={live} />
-              <Button
-                variant="subtle"
-                size="sm"
-                onClick={onMark}
-                disabled={!live}
-                title={
-                  live ? t("golive.marker.title") : t("golive.onlyWhenLive")
-                }
-              >
-                <MapPin className="size-4" /> {t("golive.marker.button")}
-              </Button>
-            </div>
-          </div>
-
+      {!onAir ? (
+        <div className="flex flex-col gap-4">
+          <ReadinessTiles onOpen={setPanel} testing={testing} />
+          <StreamInfoCard />
+          <Destinations
+            onFix={() => setPanel("platforms")}
+            onAdd={() => onNavigate?.("platforms")}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
           {live && signalLost && (
-            <Card
-              role="alert"
-              className="mb-2 border-2 border-bad/40 bg-bad/10"
+            <AlertCard
+              tone="bad"
+              title={t("golive.signalLost.title")}
+              body={t("golive.signalLost.body")}
             >
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-display font-bold text-bad">
-                    {t("golive.signalLost.title")}
-                  </div>
-                  <div className="text-sm text-ink-muted">
-                    {t("golive.signalLost.body")}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setShowObs(true)}
-                >
-                  <Zap className="size-4" /> {t("golive.obs.fixForMe")}
-                </Button>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={runObs}
-                  loading={obs === "loading"}
-                  disabled={obs === "loading"}
-                >
-                  {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
-                  {t("golive.obs.check")}
-                </Button>
-                <Badge tone={obsStatus.tone}>
-                  {t("golive.obs.badge", { status: obsStatus.label })}
-                </Badge>
-              </div>
-            </Card>
-          )}
-
-          {starting && !ingestLive && rescue && (
-            <Card className="mb-2 border-2 border-warn/40 bg-warn/10">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warn" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-display font-bold text-warn">
-                    {t("golive.rescue.title")}
-                  </div>
-                  <div className="text-sm text-ink-muted">
-                    {rich(t, "golive.rescue.body", {
-                      botao: (
-                        <strong className="text-ink">
-                          {t("golive.obs.startStreamingButton")}
-                        </strong>
-                      ),
-                    })}{" "}
-                    {rescueHint}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setShowObs(true)}
-                >
-                  <Zap className="size-4" /> {t("golive.obs.fixForMe")}
-                </Button>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={runObs}
-                  loading={obs === "loading"}
-                >
-                  {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
-                  {t("golive.obs.check")}
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          <MachineUsage />
-
-          <SecurityPanel onAdjust={openSecurity} />
-
-          <LiveTargetList targets={enabled} onNavigate={onNavigate} />
-        </>
-      )}
-
-      <div className="sticky -bottom-8 z-10 mt-4 border-t-2 border-border bg-bg pb-3 pt-3">
-        {preflightWarn && !live && !starting && (
-          <div className="mb-2 rounded-md border-2 border-warn/40 bg-warn/10 p-3">
-            <div className="flex items-center gap-2 text-sm font-bold text-warn">
-              <AlertTriangle className="size-4 shrink-0" />{" "}
-              {t("golive.preflight.title")}
-            </div>
-            <p className="mt-0.5 text-xs text-ink-muted">
-              {t("golive.preflight.body")}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => {
-                  setPreflightWarn(false);
-                  setShowObs(true);
-                }}
+                onClick={() => setShowObs(true)}
               >
                 <Zap className="size-4" /> {t("golive.obs.fixForMe")}
               </Button>
-              <Button variant="subtle" size="sm" onClick={skipPreflightThisRun}>
-                {t("golive.preflight.goAnyway")}
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={runObs}
+                loading={obs === "loading"}
+                disabled={obs === "loading"}
+              >
+                {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
+                {t("golive.obs.check")}
+              </Button>
+            </AlertCard>
+          )}
+          {starting && !ingestLive && rescue && (
+            <AlertCard
+              tone="warn"
+              title={t("golive.rescue.title")}
+              body={
+                <>
+                  {rich(t, "golive.rescue.body", {
+                    botao: (
+                      <strong className="text-ink">
+                        {t("golive.obs.startStreamingButton")}
+                      </strong>
+                    ),
+                  })}{" "}
+                  {rescueHint}
+                </>
+              }
+            >
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowObs(true)}
+              >
+                <Zap className="size-4" /> {t("golive.obs.fixForMe")}
               </Button>
               <Button
-                variant="ghost"
+                variant="subtle"
                 size="sm"
-                onClick={() => setPreflightWarn(false)}
+                onClick={runObs}
+                loading={obs === "loading"}
               >
-                {t("golive.cancel")}
+                {obs !== "loading" && <RefreshCw className="size-4" />}{" "}
+                {t("golive.obs.check")}
               </Button>
-            </div>
-          </div>
-        )}
-        {starting ? (
-          <div className="flex items-stretch gap-2">
-            <div className="flex h-14 flex-1 items-center justify-center gap-2.5 rounded-md bg-surface-2 font-display text-lg font-bold text-ink-muted">
-              <Loader2 className="size-5 animate-spin" />{" "}
-              {t(
-                ingestLive
-                  ? "golive.starting.connectingTargets"
-                  : "golive.starting.waiting",
-              )}
-            </div>
-            <Button variant="outline" size="lg" onClick={onCancel}>
-              {t("golive.cancel")}
-            </Button>
-          </div>
-        ) : live ? (
-          <Button
-            variant="danger"
-            size="lg"
-            className="w-full"
-            onClick={onStopClick}
-          >
-            <Square className="size-5" />{" "}
-            {stopStep.armed ? t("golive.stop.confirm") : t("golive.stop")}
-          </Button>
-        ) : (
-          <Button
-            variant="tomato"
-            size="lg"
-            className="w-full"
-            disabled={!canStart || startBusy}
-            loading={startBusy}
-            onClick={onStart}
-            aria-label={
-              canStart
-                ? t("golive.cta.aria")
-                : t("golive.cta.aria.blocked", { motivo: blockReason })
-            }
-          >
-            {!startBusy && <Radio className="size-6" strokeWidth={2.5} />}{" "}
-            {t("golive.cta")}
-          </Button>
-        )}
-        {starting && !ingestLive && (
-          <p className="mt-2 text-center text-xs text-ink-faint">
-            {rich(
-              t,
-              config.settings.autoStartObs
-                ? "golive.starting.autoObs"
-                : "golive.starting.manualObs",
-              {
-                botao: (
-                  <strong className="text-ink-muted">
-                    {t("golive.obs.startStreamingButton")}
-                  </strong>
-                ),
-              },
-            )}
-          </p>
-        )}
-        {!live && !starting && !canStart && blockReason && (
-          <p className="mt-2 text-center text-xs text-ink-faint">
-            {blockReason}
-          </p>
-        )}
-      </div>
+            </AlertCard>
+          )}
+          <LiveCockpit targets={r.enabled} onNavigate={onNavigate} />
+          <StreamInfoCard />
+        </div>
+      )}
 
+      <ActionBar
+        updating={updating}
+        startBusy={startBusy}
+        preflightWarn={preflightWarn}
+        onStart={onStart}
+        onStartWithoutPending={startWithoutPending}
+        onFix={(p) => setPanel(p)}
+        onSetupObs={() => {
+          setPreflightWarn(false);
+          setShowObs(true);
+        }}
+        onSkipPreflight={skipPreflightThisRun}
+        onDismissPreflight={() => setPreflightWarn(false)}
+        onStop={onStop}
+        onCancel={onCancel}
+      />
+
+      <ReadinessDrawer
+        panel={panel}
+        onClose={() => setPanel(null)}
+        onNavigate={onNavigate}
+        onSetupObs={() => setShowObs(true)}
+        onRecheckObs={runObs}
+        onGuide={() => setShowGuide(true)}
+        onTest={() => void onTest()}
+        testing={testing}
+      />
       {showObs && (
         <ObsWizard
           onClose={() => {
@@ -788,928 +421,538 @@ export function GoLiveScreen({
   );
 }
 
-function BrbNowButton({ live }: { live: boolean }) {
-  const t = useT();
-  const settings = useStore((s) => s.config!.settings);
-  const forced = useStore((s) => s.snapshot.forcedBrb ?? false);
-  const [busy, setBusy] = useState(false);
-  const armed = settings.brbEnabled || settings.guardianEnabled;
-
-  // Keep the resume action available even if BRB is disabled while a manual pause is active.
-  if (!armed && !forced) {
-    return live ? (
-      <span className="max-w-52 text-right text-[11px] leading-tight text-ink-faint">
-        {rich(t, "golive.brb.armHint", {
-          jaVolto: (
-            <strong className="text-ink-muted">
-              {t("golive.bar.protection.brb")}
-            </strong>
-          ),
-        })}
-      </span>
-    ) : null;
-  }
-
-  const toggle = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await api.setForceBrb(!forced);
-      toast.success(
-        forced ? t("golive.brb.toast.back") : t("golive.brb.toast.on"),
-      );
-    } catch (e) {
-      toast.error(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
+function AlertCard({
+  tone,
+  title,
+  body,
+  children,
+}: {
+  tone: "bad" | "warn";
+  title: string;
+  body: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <Button
-      variant={forced ? "tomato" : "subtle"}
-      size="sm"
-      onClick={toggle}
-      disabled={!live || busy}
-      title={
-        live
-          ? forced
-            ? t("golive.brb.title.back")
-            : t("golive.brb.title.on")
-          : t("golive.onlyWhenLive")
-      }
+    <m.div
+      role="alert"
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        "rounded-lg border-2 p-5",
+        tone === "bad"
+          ? "border-bad/40 bg-bad/10"
+          : "border-warn/40 bg-warn/10",
+      )}
     >
-      {forced ? <Play className="size-4" /> : <Pause className="size-4" />}
-      {forced ? t("golive.brb.back") : t("golive.brb.now")}
-    </Button>
+      <div className="flex items-start gap-3">
+        <AlertTriangle
+          className={cn(
+            "mt-0.5 size-5 shrink-0",
+            tone === "bad" ? "text-bad" : "text-warn",
+          )}
+        />
+        <div className="min-w-0 flex-1">
+          <div
+            className={cn(
+              "font-display font-bold",
+              tone === "bad" ? "text-bad" : "text-warn",
+            )}
+          >
+            {title}
+          </div>
+          <div className="text-sm text-ink-muted">{body}</div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>
+    </m.div>
   );
 }
 
-const PLAT_LABEL: Record<string, string> = {
-  twitch: "Twitch",
-  youtube: "YouTube",
-  kick: "Kick",
-};
-
-function StreamInfoCard() {
+/** Where the stream goes: one sticker per platform, with what each still needs. */
+function Destinations({
+  onFix,
+  onAdd,
+}: {
+  onFix: () => void;
+  onAdd: () => void;
+}) {
   const t = useT();
-  const chatLogin = useStore((s) => s.chatLogin);
-  const settings = useStore((s) => s.config!.settings);
-  const setSettings = useStore((s) => s.setSettings);
-  const requestNavigate = useStore((s) => s.requestNavigate);
-  const requestChatConfig = useStore((s) => s.requestChatConfig);
-  const ready = {
-    twitch: chatLogin.twitch.state === "connected",
-    youtube: chatLogin.youtube.state === "connected",
-    kick: chatLogin.kick.state === "connected",
-  };
-  const targets = (["twitch", "youtube", "kick"] as const).filter(
-    (p) => ready[p],
-  );
-  const [title, setTitleLocal] = useState(settings.streamTitle ?? "");
-  const [game, setGame] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState<Record<
-    string,
-    { ok: boolean; error?: string; warn?: string }
-  > | null>(null);
-
-  if (targets.length === 0) {
-    return (
-      <Card className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h3 className="flex items-center gap-2 text-lg">
-          <Megaphone className="size-5 text-brass" />{" "}
-          {t("golive.streamInfo.title")}
-        </h3>
-        <p className="min-w-48 flex-1 text-xs text-ink-faint">
-          {t("golive.streamInfo.teaser")}
-        </p>
-        <Button
-          variant="subtle"
-          size="sm"
-          onClick={() => {
-            requestChatConfig("conta");
-            requestNavigate("chat");
-          }}
-        >
-          {t("golive.streamInfo.signIn")}
-        </Button>
-      </Card>
-    );
-  }
-
-  // The persisted title also feeds automatic YouTube broadcast creation.
-  const persistTitle = () => {
-    const trimmed = title.trim();
-    if (trimmed !== settings.streamTitle) setSettings({ streamTitle: trimmed });
-  };
-  const onTitle = (v: string) => {
-    setTitleLocal(v);
-    setResults(null);
-  };
-  const onGame = (v: string) => {
-    setGame(v);
-    setResults(null);
-  };
-
-  const apply = async () => {
-    if (busy) return;
-    if (!title.trim()) {
-      toast.error(t("golive.streamInfo.needTitle"));
-      return;
-    }
-    persistTitle();
-    setBusy(true);
-    setResults(null);
-    try {
-      const r = await api.setStreamInfo(title.trim(), game.trim() || undefined);
-      setResults(r);
-      const okN = Object.values(r).filter((x) => x.ok).length;
-      const total = Object.keys(r).length;
-      if (okN === total)
-        toast.success(t("golive.streamInfo.applied", { n: okN }));
-      else toast.error(t("golive.streamInfo.partial", { ok: okN, total }));
-    } catch (e) {
-      toast.error(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const targets = useStore((s) => s.config!.targets);
+  const r = useReadiness();
+  const ctx = useReadinessContext();
+  const autoYoutube = youtubeAutoTargetId(targets, ctx);
   return (
-    <Card className="mb-4">
-      <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <h3 className="flex items-center gap-2 text-lg">
-          <Megaphone className="size-5 text-brass" />{" "}
-          {t("golive.streamInfo.title")}
-        </h3>
-        <div className="ml-auto flex items-center gap-1.5">
-          {targets.map((p) => (
-            <span
-              key={p}
-              className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-muted"
+    <Card className="py-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-lg">{t("golive.destinations.title")}</h3>
+        <button
+          type="button"
+          onClick={onFix}
+          className="flex items-center gap-0.5 text-xs font-bold text-brass hover:underline"
+        >
+          {t("golive.destinations.manage")}{" "}
+          <ChevronRight className="size-3.5" />
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {targets.map((target, i) => {
+          const pending = r.pending.some((p) => p.target.id === target.id);
+          const status = !target.enabled
+            ? t("golive.destinations.off")
+            : pending
+              ? t("golive.destinations.pending")
+              : target.id === autoYoutube && !target.hasKey
+                ? t("golive.destinations.auto")
+                : t("golive.destinations.ready");
+          return (
+            <m.button
+              key={target.id}
+              type="button"
+              onClick={onFix}
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.05 + i * 0.03, duration: 0.18 }}
+              className={cn(
+                "flex items-center gap-2.5 rounded-md border-2 bg-surface-2 py-1.5 pl-1.5 pr-3 text-left transition hover:-translate-y-0.5 hover:bg-surface-3",
+                pending ? "border-warn/50" : "border-transparent",
+                !target.enabled && "opacity-55",
+              )}
             >
-              <PlatformGlyph id={p} size={13} /> {PLAT_LABEL[p]}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        <input
-          value={title}
-          onChange={(e) => onTitle(e.target.value)}
-          onBlur={persistTitle}
-          onKeyDown={(e) =>
-            e.key === "Enter" && !busy && title.trim() && void apply()
-          }
-          placeholder={t("golive.streamInfo.title.placeholder")}
-          aria-label={t("golive.streamInfo.title.placeholder")}
-          maxLength={140}
-          className="h-10 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
-        />
-        <div className="flex gap-2">
-          <input
-            value={game}
-            onChange={(e) => onGame(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && !busy && title.trim() && void apply()
-            }
-            placeholder={t("golive.streamInfo.game.placeholder")}
-            aria-label={t("golive.streamInfo.game.placeholder")}
-            className="h-10 flex-1 rounded-md border-2 border-border bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brass"
-          />
-          <Button
-            variant="primary"
-            onClick={apply}
-            loading={busy}
-            disabled={busy || !title.trim()}
-          >
-            {!busy && <Megaphone className="size-4" />}{" "}
-            {t("golive.streamInfo.apply")}
-          </Button>
-        </div>
-      </div>
-      {results && (
-        <div className="mt-2.5 flex flex-col gap-1">
-          {Object.entries(results).map(([p, r]) => (
-            <div key={p} className="flex min-w-0 items-center gap-1.5 text-xs">
-              {!r.ok ? (
-                <AlertTriangle className="size-3.5 shrink-0 text-bad" />
-              ) : r.warn ? (
-                <AlertTriangle className="size-3.5 shrink-0 text-warn" />
-              ) : (
-                <Check
-                  className="size-3.5 shrink-0 text-ok"
-                  strokeWidth={2.6}
-                />
-              )}
-              <span className="shrink-0 font-semibold">
-                {PLAT_LABEL[p] ?? p}
-              </span>
-              {!r.ok && <span className="truncate text-bad">· {r.error}</span>}
-              {r.ok && r.warn && (
-                <span className="truncate text-warn">· {r.warn}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {ready.youtube && (
-        <>
-          <OptionCheck
-            checked={settings.youtubeAutoLive}
-            onToggle={() =>
-              setSettings({ youtubeAutoLive: !settings.youtubeAutoLive })
-            }
-            title={t("golive.streamInfo.youtubeAuto.title")}
-            desc={t("golive.streamInfo.youtubeAuto.desc")}
-          />
-          {settings.youtubeAutoLive && (
-            <div className="mt-1.5 space-y-1.5 pl-7">
-              <label className="flex items-center justify-between gap-3 text-xs">
-                <span className="text-ink-muted">
-                  {t("golive.streamInfo.youtubePrivacy.label")}
+              <PlatformGlyph id={target.platformId} size={28} />
+              <span className="flex flex-col leading-tight">
+                <span className="font-display text-sm font-bold">
+                  {target.name || platformName(target.platformId, t)}
                 </span>
-                <Select
-                  className="w-56 shrink-0"
-                  value={settings.youtubePrivacy}
-                  options={[
-                    {
-                      value: "public",
-                      label: t("golive.streamInfo.youtubePrivacy.public"),
-                    },
-                    {
-                      value: "unlisted",
-                      label: t("golive.streamInfo.youtubePrivacy.unlisted"),
-                    },
-                    {
-                      value: "private",
-                      label: t("golive.streamInfo.youtubePrivacy.private"),
-                    },
-                  ]}
-                  onChange={(youtubePrivacy) => setSettings({ youtubePrivacy })}
-                />
-              </label>
-              <OptionCheck
-                className="mt-0"
-                checked={settings.youtubeMadeForKids}
-                onToggle={() =>
-                  setSettings({
-                    youtubeMadeForKids: !settings.youtubeMadeForKids,
-                  })
-                }
-                title={t("golive.streamInfo.youtubeKids.title")}
-                desc={t("golive.streamInfo.youtubeKids.desc")}
-              />
-            </div>
-          )}
-          <p className="mt-1.5 text-[11px] text-ink-faint">
-            {rich(t, "golive.streamInfo.youtubeNote", {
-              titulo: (
-                <strong className="text-ink-muted">
-                  {t("golive.streamInfo.title")}
-                </strong>
-              ),
-            })}
-          </p>
-        </>
-      )}
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-xs",
+                    pending
+                      ? "font-semibold text-warn"
+                      : target.enabled
+                        ? "text-ok"
+                        : "text-ink-faint",
+                  )}
+                >
+                  {target.enabled && !pending && (
+                    <Check className="size-3" strokeWidth={3} />
+                  )}
+                  {status}
+                </span>
+              </span>
+            </m.button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex items-center gap-2 rounded-md border-2 border-dashed border-border px-3 py-2 text-sm font-semibold text-ink-muted transition-colors hover:border-brass hover:text-ink"
+        >
+          <Plus className="size-4" /> {t("golive.destinations.add")}
+        </button>
+      </div>
     </Card>
   );
 }
 
-function OptionCheck({
-  checked,
-  onToggle,
-  title,
-  desc,
-  className,
+function ActionBar({
+  updating,
+  startBusy,
+  preflightWarn,
+  onStart,
+  onStartWithoutPending,
+  onFix,
+  onSetupObs,
+  onSkipPreflight,
+  onDismissPreflight,
+  onStop,
+  onCancel,
 }: {
-  checked: boolean;
-  onToggle: () => void;
-  title: string;
-  desc: string;
-  className?: string;
+  updating: boolean;
+  startBusy: boolean;
+  preflightWarn: boolean;
+  onStart: () => void;
+  onStartWithoutPending: () => void;
+  onFix: (panel: ReadinessPanel) => void;
+  onSetupObs: () => void;
+  onSkipPreflight: () => void;
+  onDismissPreflight: () => void;
+  onStop: () => Promise<void>;
+  onCancel: () => Promise<void>;
 }) {
+  const t = useT();
+  const state = useStore((s) => s.snapshot.state);
+  const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
+  const autoStartObs = useStore((s) => s.config!.settings.autoStartObs);
+  const live = state === "live";
+  const starting = state === "starting";
+
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      onClick={onToggle}
-      className={cn(
-        "mt-2.5 flex w-full items-center gap-2 rounded-md bg-surface-2 px-2.5 py-2 text-left",
-        className,
-      )}
-    >
-      <span
-        aria-hidden
+    <div className="sticky -bottom-8 z-10 mt-6 bg-bg pb-6 pt-3">
+      <AnimatePresence>
+        {preflightWarn && !live && !starting && (
+          <m.div
+            initial={{ opacity: 0, y: 8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: 8, height: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <div className="mb-2 rounded-lg border-2 border-warn/40 bg-warn/10 p-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-warn">
+                <AlertTriangle className="size-4 shrink-0" />{" "}
+                {t("golive.preflight.title")}
+              </div>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                {t("golive.preflight.body")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button variant="primary" size="sm" onClick={onSetupObs}>
+                  <Zap className="size-4" /> {t("golive.obs.fixForMe")}
+                </Button>
+                <Button variant="subtle" size="sm" onClick={onSkipPreflight}>
+                  {t("golive.preflight.goAnyway")}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onDismissPreflight}>
+                  {t("golive.cancel")}
+                </Button>
+              </div>
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
+      <div
         className={cn(
-          "grid size-5 shrink-0 place-items-center rounded border-2 transition-colors",
-          checked
-            ? "border-brass bg-brass text-brass-ink"
-            : "border-border text-transparent",
+          "flex min-h-[4.5rem] items-center gap-4 rounded-lg border-2 p-3 pl-4 pop transition-colors duration-300",
+          live ? "border-live/50 bg-surface" : "border-border bg-surface",
         )}
       >
-        <Check className="size-3.5" strokeWidth={3} />
-      </span>
-      <span className="text-xs leading-snug">
-        <strong className="text-ink">{title}</strong>
-        <span className="text-ink-faint">{desc}</span>
-      </span>
-    </button>
-  );
-}
-
-function SecurityPanel({ onAdjust }: { onAdjust: () => void }) {
-  const t = useT();
-  const settings = useStore((s) => s.config!.settings);
-  const guardianStatus = useStore((s) => s.snapshot.guardianStatus);
-  const watchCount = settings.guardianWatchlist.filter(
-    (term) => term.trim().length >= 3,
-  ).length;
-  const items = [
-    {
-      on:
-        settings.guardianEnabled &&
-        watchCount > 0 &&
-        (!guardianStatus || guardianStatus === "ready"),
-      status:
-        guardianStatus && guardianStatus !== "ready"
-          ? t(`guardian.status.${guardianStatus}.short`)
-          : undefined,
-      label: t("golive.security.guardian.label"),
-      desc:
-        guardianStatus && guardianStatus !== "ready"
-          ? t(`guardian.status.${guardianStatus}.body`)
-          : settings.guardianEnabled
-            ? watchCount > 0
-              ? t("golive.security.guardian.watching", { n: watchCount })
-              : t("golive.security.guardian.noTerms")
-            : t("golive.security.guardian.desc.off"),
-      experimental: true,
-      show: true,
-    },
-    {
-      on: settings.brbEnabled,
-      label: t("golive.security.brb.label"),
-      desc: settings.brbEnabled
-        ? t("golive.security.brb.desc")
-        : t("golive.security.brb.desc.off"),
-      experimental: false,
-      show: true,
-    },
-    {
-      on: settings.autoBitrate,
-      label: t("golive.security.bitrate.label"),
-      desc: settings.autoBitrate
-        ? t("golive.security.bitrate.desc")
-        : t("golive.security.bitrate.desc.off"),
-      experimental: false,
-      show: true,
-    },
-    {
-      on: settings.loudnessNormalize,
-      label: t("golive.security.loudness.label"),
-      desc: t("golive.security.loudness.desc"),
-      experimental: false,
-      show: settings.loudnessNormalize,
-    },
-  ].filter((it) => it.show);
-  return (
-    <Card accent className="mb-2 bg-surface-2">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-lg">
-          <Shield className="size-5 text-brass" /> {t("golive.security.title")}
-        </h3>
-        <Button variant="ghost" size="sm" onClick={onAdjust}>
-          {t("golive.security.adjust")}
-        </Button>
-      </div>
-      <div className="flex flex-col gap-2">
-        {items.map((it) => (
-          <div
-            key={it.label}
-            className="flex flex-wrap items-center gap-2 text-sm"
+        <AnimatePresence mode="wait" initial={false}>
+          <m.div
+            key={live ? "live" : starting ? "starting" : "idle"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2"
           >
-            <Badge tone={it.on ? "brass" : "neutral"}>
-              {it.status ??
-                (it.on ? t("golive.security.armed") : t("golive.security.off"))}
-            </Badge>
-            <span className="font-semibold">{it.label}</span>
-            {it.experimental && <ExperimentalBadge size="icon" />}
-            <span className="text-xs text-ink-faint">· {it.desc}</span>
-          </div>
-        ))}
+            {live ? (
+              <LiveControls onStop={onStop} />
+            ) : starting ? (
+              <>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Loader2 className="size-5 shrink-0 animate-spin text-brass" />
+                  <div className="min-w-0">
+                    <div className="font-display text-base font-extrabold">
+                      {t(
+                        ingestLive
+                          ? "golive.starting.connectingTargets"
+                          : "golive.starting.waiting",
+                      )}
+                    </div>
+                    {!ingestLive && (
+                      <p className="text-xs text-ink-muted">
+                        {rich(
+                          t,
+                          autoStartObs
+                            ? "golive.starting.autoObs"
+                            : "golive.starting.manualObs",
+                          {
+                            botao: (
+                              <strong className="text-ink">
+                                {t("golive.obs.startStreamingButton")}
+                              </strong>
+                            ),
+                          },
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button variant="outline" onClick={() => void onCancel()}>
+                  {t("golive.cancel")}
+                </Button>
+              </>
+            ) : (
+              <IdleControls
+                updating={updating}
+                startBusy={startBusy}
+                onStart={onStart}
+                onStartWithoutPending={onStartWithoutPending}
+                onFix={onFix}
+                onSetupObs={onSetupObs}
+              />
+            )}
+          </m.div>
+        </AnimatePresence>
       </div>
-    </Card>
-  );
-}
-
-function LiveTimer({
-  startedAt,
-  live,
-  ingestLive,
-}: {
-  startedAt: number | null;
-  live: boolean;
-  ingestLive: boolean;
-}) {
-  const t = useT();
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  if (!live) {
-    return (
-      <div className="flex items-center gap-2 text-info">
-        <span className="size-2.5 rounded-full bg-info animate-pulse" />
-        <span className="font-display text-sm font-bold uppercase tracking-wide">
-          {t(
-            ingestLive
-              ? "golive.timer.connectingTargets"
-              : "golive.timer.waiting",
-          )}
-        </span>
-      </div>
-    );
-  }
-  const secs = startedAt ? (now - startedAt) / 1000 : 0;
-  return (
-    <div className="flex items-center gap-2">
-      <span className="size-2.5 rounded-full bg-live" />
-      <span className="font-display text-2xl font-extrabold leading-none tabular-nums">
-        {fmtUptime(secs)}
-      </span>
-      <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-        {t("golive.timer.onAir")}
-      </span>
     </div>
   );
 }
 
-function Checkup({
-  obs,
-  onRecheck,
-  onGuide,
-  onSetupObs,
-}: {
-  obs: ObsCheck | "loading" | null;
-  onRecheck: () => void;
-  onGuide?: () => void;
-  onSetupObs?: () => void;
-}) {
-  const { t, fmt } = useI18n();
-  const config = useStore((s) => s.config)!;
-  const encoders = useStore((s) => s.encoders);
-  const uploadMbps = useStore((s) => s.uploadMbps);
-  const enabled = config.targets.filter((target) => target.enabled);
-  const neededKbps = estimate(config).uploadKbps;
-  const needed = neededKbps / 1000;
-  const upFit = bandFit(neededKbps, uploadMbps);
-
-  return (
-    <Card className="mb-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-lg">
-          <ClipboardCheck className="size-5 text-brass" />{" "}
-          {t("golive.checkup.title")}
-        </h3>
-        <Button
-          variant="subtle"
-          size="sm"
-          onClick={onRecheck}
-          loading={obs === "loading"}
-          disabled={obs === "loading"}
-        >
-          {obs !== "loading" && <Zap className="size-4 text-brass" />}
-          {t("golive.obs.check")}
-        </Button>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <CheckRow
-          label={t("golive.checkup.encoder")}
-          ok={encoders.some((e) => e.available)}
-          warn={encoders.length === 0}
-          detail={
-            encoders.length === 0 ? t("golive.checkup.checking") : undefined
-          }
-        />
-        <CheckRow
-          label={t("golive.checkup.keys")}
-          ok={
-            enabled.length > 0 &&
-            enabled.every((target) => blockingIssues(target, t).length === 0)
-          }
-          detail={
-            enabled.length === 0 ? t("golive.checkup.keys.none") : undefined
-          }
-        />
-        <CheckRow
-          label={t("golive.checkup.upload")}
-          ok={upFit === "ok"}
-          warn={upFit === "unknown" || upFit === "warn"}
-          detail={
-            upFit === "unknown"
-              ? t("golive.checkup.upload.untested")
-              : t(
-                  upFit === "warn"
-                    ? "golive.checkup.upload.detail.tight"
-                    : "golive.checkup.upload.detail",
-                  {
-                    atual: fmt.num(uploadMbps ?? 0),
-                    necessario: fmt.dec(needed, 1),
-                  },
-                )
-          }
-        />
-        {obs && obs !== "loading" && (
-          <>
-            <CheckRow
-              label={t("golive.checkup.obsConnected")}
-              ok={obs.reachable}
-              warn={!obs.reachable}
-              detail={
-                obs.reachable
-                  ? undefined
-                  : obs.authFailed
-                    ? t("golive.rescue.authFailed")
-                    : t("golive.checkup.obsConnected.fix")
-              }
-            />
-            {obs.reachable && (
-              <CheckRow
-                label={t("golive.checkup.obsPointing")}
-                ok={obs.pointingAtCorneta}
-                warn={!obs.pointingAtCorneta}
-                detail={
-                  obs.pointingAtCorneta
-                    ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)}fps`
-                    : t("golive.checkup.obsPointing.fix")
-                }
-                action={
-                  !obs.pointingAtCorneta && onSetupObs ? (
-                    <Button variant="subtle" size="sm" onClick={onSetupObs}>
-                      <Zap className="size-4 text-brass" />{" "}
-                      {t("golive.obs.fixForMe")}
-                    </Button>
-                  ) : undefined
-                }
-              />
-            )}
-          </>
-        )}
-      </div>
-      {enabled.some(
-        (target) => effectiveAction(config.mode, target) === "copy",
-      ) && (
-        <p className="mt-2 text-xs text-ink-faint">
-          {rich(t, "golive.checkup.tip", {
-            caminho: (
-              <strong className="text-ink-muted">
-                {t("golive.checkup.tip.path")}
-              </strong>
-            ),
-            taxa: (
-              <strong className="text-ink-muted">
-                {t("golive.checkup.tip.rateControl")}
-              </strong>
-            ),
-            keyframe: (
-              <strong className="text-ink-muted">
-                {t("golive.checkup.tip.keyframe")}
-              </strong>
-            ),
-          })}{" "}
-          {onGuide && (
-            <button
-              onClick={onGuide}
-              className="font-bold text-brass hover:underline"
-            >
-              {t("golive.checkup.tip.guide")}
-            </button>
-          )}
-        </p>
-      )}
-    </Card>
-  );
-}
-
-function CheckRow({
-  label,
-  ok,
-  warn,
+function StatusLine({
+  tone,
+  title,
   detail,
   action,
 }: {
-  label: string;
-  ok?: boolean;
-  warn?: boolean;
-  detail?: string;
+  tone: "ok" | "warn" | "bad";
+  title: string;
+  detail?: ReactNode;
   action?: ReactNode;
 }) {
-  const t = useT();
-  const Icon = ok ? Check : warn ? AlertTriangle : Square;
-  const cls = ok ? "text-ok" : warn ? "text-warn" : "text-bad";
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-      <Icon className={cn("size-4 shrink-0", cls)} strokeWidth={2.4} />
-      <span className="sr-only">
-        {t(
-          ok
-            ? "golive.checkup.state.ok"
-            : warn
-              ? "golive.checkup.state.warn"
-              : "golive.checkup.state.bad",
-        )}
-      </span>
-      <span className="font-semibold">{label}</span>
-      {detail && <span className="text-xs text-ink-faint">· {detail}</span>}
-      {action}
-    </div>
-  );
-}
-
-function MachineUsage() {
-  const t = useT();
-  const cpu = useStore((s) => s.snapshot.cpu);
-  const gpu = useStore((s) => s.snapshot.gpu);
-  return (
-    <Card className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
-      <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-        {t("golive.machine.label")}
-      </span>
-      <Usage label="CPU" value={cpu} />
-      <Usage label="GPU" value={gpu} />
-    </Card>
-  );
-}
-
-// Rows read their own metrics, so a stats update re-renders one row and never re-measures the list.
-const LiveTargetList = memo(function LiveTargetList({
-  targets,
-  onNavigate,
-}: {
-  targets: Target[];
-  onNavigate?: (s: Screen) => void;
-}) {
-  return (
-    <div className="mb-4 flex flex-col gap-2">
-      <AnimatePresence>
-        {targets.map((target, i) => (
-          <m.div
-            key={target.id}
-            layout
-            layoutDependency={i}
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{
-              delay: i * 0.05,
-              type: "spring",
-              stiffness: 320,
-              damping: 28,
-            }}
-          >
-            <LiveTargetRow target={target} onNavigate={onNavigate} />
-          </m.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-});
-
-const LiveTargetRow = memo(function LiveTargetRow({
-  target,
-  onNavigate,
-}: {
-  target: Target;
-  onNavigate?: (s: Screen) => void;
-}) {
-  const { t, fmt } = useI18n();
-  const st = useStore(
-    useShallow((s) => {
-      const metrics = s.snapshot.targets[target.id];
-      return {
-        state: metrics?.state,
-        message: metrics?.message,
-        bitrateKbps: metrics?.bitrateKbps,
-        fps: metrics?.fps,
-        droppedFrames: metrics?.droppedFrames,
-        uptimeSec: metrics?.uptimeSec,
-      };
-    }),
-  );
-  const paused = st.state === "paused";
-  // Show only observed metrics, never preset values for a destination that is not transmitting.
-  const flowing = st.state === "live" || st.state === "brb";
-  return (
-    <Card className="flex items-center gap-4 bg-surface-2 py-3">
-      <PlatformGlyph id={target.platformId} size={36} />
-      <div className="min-w-32 flex-1">
-        <div className="font-display font-bold">{target.name}</div>
-        <StatePill state={st.state ?? "idle"} />
-        {st.message && (
-          <div className="mt-0.5 text-[11px] text-bad">{st.message}</div>
-        )}
-        {st.state === "error" && (
-          <div className="mt-0.5 flex flex-wrap gap-x-3">
-            <button
-              onClick={() =>
-                void api
-                  .retryTarget(target.id)
-                  .catch((e) => toast.error(errMsg(e)))
-              }
-              className="text-[11px] font-bold text-brass hover:underline"
-            >
-              {t("golive.target.retry")}
-            </button>
-            <button
-              onClick={() => onNavigate?.("platforms")}
-              className="text-[11px] font-bold text-brass hover:underline"
-            >
-              {t("golive.target.swapKey")}
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="hidden gap-6 sm:flex">
-        <MiniStat
-          label={t("golive.stat.bitrate")}
-          value={flowing ? fmt.bitrate(st.bitrateKbps ?? 0) : "—"}
-        />
-        <MiniStat
-          label={t("golive.stat.fps")}
-          value={flowing ? String(st.fps ?? 0) : "—"}
-        />
-        <MiniStat
-          label={t("golive.stat.drops")}
-          value={flowing ? String(st.droppedFrames ?? 0) : "—"}
-          tone={flowing && (st.droppedFrames ?? 0) > 0 ? "warn" : "default"}
-        />
-        <MiniStat
-          label={t("golive.stat.uptime")}
-          value={flowing ? fmtUptime(st.uptimeSec ?? 0) : "—"}
-        />
-      </div>
-      <div className="flex gap-4 sm:hidden">
-        <MiniStat
-          label={t("golive.stat.bitrate")}
-          value={flowing ? fmt.bitrate(st.bitrateKbps ?? 0) : "—"}
-        />
-        <MiniStat
-          label={t("golive.stat.drops")}
-          value={flowing ? String(st.droppedFrames ?? 0) : "—"}
-          tone={flowing && (st.droppedFrames ?? 0) > 0 ? "warn" : "default"}
-        />
-      </div>
-      {PLATFORMS[target.platformId].liveUrl && (
-        <button
-          onClick={() =>
-            void openExternal(PLATFORMS[target.platformId].liveUrl!)
-          }
-          className="grid size-9 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-          title={t("golive.target.openChannel.title")}
-          aria-label={t("golive.target.openChannel.aria", {
-            nome: target.name,
-          })}
-        >
-          <ExternalLink className="size-4" />
-        </button>
-      )}
-      <button
-        onClick={() => void api.setTargetPaused(target.id, !paused)}
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <span
         className={cn(
-          "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold uppercase tracking-wide transition-colors",
-          paused
-            ? "bg-brass/15 text-brass hover:bg-brass/25"
-            : "bg-surface-3 text-ink-muted hover:text-ink",
+          "grid size-8 shrink-0 place-items-center rounded-md",
+          tone === "ok"
+            ? "bg-ok/15 text-ok"
+            : tone === "warn"
+              ? "bg-warn/15 text-warn"
+              : "bg-bad/15 text-bad",
         )}
-        title={
-          paused
-            ? t("golive.target.resume.title")
-            : t("golive.target.pause.title")
+      >
+        {tone === "ok" ? (
+          <Check className="size-4" strokeWidth={2.8} />
+        ) : (
+          <AlertTriangle className="size-4" />
+        )}
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 font-display text-base font-extrabold leading-tight">
+          {title}
+          {action}
+        </div>
+        {detail && <p className="truncate text-xs text-ink-muted">{detail}</p>}
+      </div>
+    </div>
+  );
+}
+
+function IdleControls({
+  updating,
+  startBusy,
+  onStart,
+  onStartWithoutPending,
+  onFix,
+  onSetupObs,
+}: {
+  updating: boolean;
+  startBusy: boolean;
+  onStart: () => void;
+  onStartWithoutPending: () => void;
+  onFix: (panel: ReadinessPanel) => void;
+  onSetupObs: () => void;
+}) {
+  const { t, tp, fmt } = useI18n();
+  const config = useStore((s) => s.config!);
+  const obs = useStore((s) => s.obs);
+  const uploadMbps = useStore((s) => s.uploadMbps);
+  const r = useReadiness();
+  const shortcut = config.settings.liveShortcut
+    ? shortcutLabel(config.settings.liveShortcut)
+    : null;
+  const pendingNames = joinNames(
+    r.pending.map((p) => p.target.name || platformName(p.target.platformId, t)),
+    t,
+  );
+  const fixLink = (
+    <button
+      type="button"
+      onClick={() => onFix("platforms")}
+      className="text-sm font-bold text-brass hover:underline"
+    >
+      {t("golive.bar.fix")}
+    </button>
+  );
+
+  let status: ReactNode;
+  let canGo = false;
+  let partial = false;
+  if (updating) {
+    status = <StatusLine tone="warn" title={t("golive.block.updating")} />;
+  } else if (r.enabled.length === 0) {
+    status = (
+      <StatusLine
+        tone="bad"
+        title={t("golive.bar.noPlatform")}
+        detail={t("golive.bar.noPlatform.detail")}
+        action={fixLink}
+      />
+    );
+  } else if (r.ready.length === 0) {
+    status = (
+      <StatusLine
+        tone="warn"
+        title={t("golive.bar.pending", { names: pendingNames })}
+        detail={t("golive.bar.pending.detail")}
+        action={fixLink}
+      />
+    );
+  } else if (r.pending.length > 0) {
+    canGo = true;
+    partial = true;
+    status = (
+      <StatusLine
+        tone="warn"
+        title={t("golive.bar.pending", { names: pendingNames })}
+        detail={t("golive.bar.partial.detail", { names: pendingNames })}
+        action={fixLink}
+      />
+    );
+  } else {
+    canGo = true;
+    const est = estimate(config);
+    const fit = bandFit(est.uploadKbps, uploadMbps);
+    const obsChecked = obs !== null && obs !== "loading";
+    status =
+      obsChecked && !obsConfigured(obs) ? (
+        <StatusLine
+          tone="warn"
+          title={t("golive.bar.obs")}
+          detail={t("golive.bar.obs.detail")}
+          action={
+            <button
+              type="button"
+              onClick={onSetupObs}
+              className="text-sm font-bold text-brass hover:underline"
+            >
+              {t("golive.obs.fixForMe")}
+            </button>
+          }
+        />
+      ) : (
+        <StatusLine
+          tone={fit === "bad" ? "warn" : "ok"}
+          title={t(
+            fit === "bad" ? "golive.bar.readyTight" : "golive.bar.ready",
+          )}
+          detail={[
+            tp("golive.bar.readyCount", r.ready.length),
+            t(modeTitleKey(config.mode)),
+            uploadMbps != null &&
+              t("golive.bar.readyUpload", {
+                need: fmt.dec(est.uploadKbps / 1000, 1),
+                have: fmt.num(uploadMbps),
+              }),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        />
+      );
+  }
+
+  return (
+    <>
+      {status}
+      <Button
+        variant="tomato"
+        size="lg"
+        className="shrink-0"
+        disabled={!canGo || startBusy}
+        loading={startBusy}
+        onClick={partial ? onStartWithoutPending : onStart}
+        aria-label={
+          partial
+            ? t("golive.cta.aria.partial", { names: pendingNames })
+            : t("golive.cta.aria")
         }
       >
-        {paused ? (
-          <Play className="size-3.5" />
-        ) : (
-          <Pause className="size-3.5" />
-        )}
-        {paused ? t("golive.target.resume") : t("golive.target.pause")}
-      </button>
-    </Card>
-  );
-});
-
-function StatePill({ state }: { state: TargetState }) {
-  const t = useT();
-  const map: Record<TargetState, { label: string; cls: string; dot: string }> =
-    {
-      idle: {
-        label: t("golive.state.idle"),
-        cls: "text-ink-faint",
-        dot: "bg-ink-faint",
-      },
-      connecting: {
-        label: t("golive.state.connecting"),
-        cls: "text-warn",
-        dot: "bg-warn",
-      },
-      live: {
-        label: t("golive.state.live"),
-        cls: "text-ok",
-        dot: "bg-live",
-      },
-      reconnecting: {
-        label: t("golive.state.reconnecting"),
-        cls: "text-warn",
-        dot: "bg-warn",
-      },
-      error: { label: t("golive.state.error"), cls: "text-bad", dot: "bg-bad" },
-      paused: {
-        label: t("golive.state.paused"),
-        cls: "text-ink-muted",
-        dot: "bg-ink-faint",
-      },
-      waiting: {
-        label: t("golive.state.waiting"),
-        cls: "text-info",
-        dot: "bg-info animate-pulse",
-      },
-      "signal-lost": {
-        label: t("golive.state.signalLost"),
-        cls: "text-bad",
-        dot: "bg-bad animate-pulse",
-      },
-      brb: {
-        label: t("golive.state.brb"),
-        cls: "text-brass",
-        dot: "bg-brass animate-pulse",
-      },
-      censor: {
-        label: t("golive.state.censor"),
-        cls: "text-bad",
-        dot: "bg-bad animate-pulse",
-      },
-    };
-  const m = map[state] ?? map.idle;
-  return (
-    <span
-      className={cn(
-        "mt-0.5 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide",
-        m.cls,
-      )}
-    >
-      <span className={cn("size-2 rounded-full", m.dot)} /> {m.label}
-    </span>
+        {!startBusy && <Radio className="size-6" strokeWidth={2.5} />}
+        <span className="flex flex-col items-start leading-none">
+          <span>{t("golive.cta")}</span>
+          {partial ? (
+            <span className="mt-1 font-sans text-[11px] font-bold opacity-80">
+              {t("golive.cta.without", { names: pendingNames })}
+            </span>
+          ) : (
+            shortcut && (
+              <span className="mt-1 font-sans text-[11px] font-bold opacity-70">
+                {shortcut}
+              </span>
+            )
+          )}
+        </span>
+      </Button>
+    </>
   );
 }
 
-function MiniStat({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "warn";
-}) {
+function LiveControls({ onStop }: { onStop: () => Promise<void> }) {
+  const { t, fmt } = useI18n();
+  const startedAt = useStore((s) => s.snapshot.startedAt);
+  const viewers = useStore((s) => s.viewers);
+  const onAirCount = useStore(
+    (s) =>
+      Object.values(s.snapshot.targets).filter(
+        (x) => x.state === "live" || x.state === "brb",
+      ).length,
+  );
+  const total = useStore(
+    (s) => s.config?.targets.filter((x) => x.enabled).length ?? 0,
+  );
+  const now = useNow(true);
+  const stopStep = useConfirm(3000, { minDelayMs: 400 });
+  const onMark = async () => {
+    try {
+      await api.markMoment();
+      toast.success(t("golive.toast.markerSaved"));
+    } catch {
+      /* Marker failures must not interrupt the active stream. */
+    }
+  };
+  const onStopClick = () => {
+    // minDelayMs requires a pause between clicks, so an accidental double-click cannot stop the stream.
+    if (stopStep.confirm()) void onStop();
+  };
   return (
-    <div className="text-right">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">
-        {label}
-      </div>
-      <div
-        className={cn(
-          "font-display text-base font-extrabold tabular-nums",
-          tone === "warn" ? "text-warn" : "text-ink",
+    <>
+      <div className="flex shrink-0 items-center gap-4">
+        <span className="flex items-center gap-2 text-sm font-semibold text-ink-muted xl:hidden">
+          <span className="live-dot size-2 rounded-full bg-live" />
+          {t("golive.bar.liveCount", { live: onAirCount, total })}
+        </span>
+        <span className="hidden h-11 shrink-0 -rotate-1 items-center gap-2.5 rounded-md bg-live px-3.5 text-white pop-sm xl:flex">
+          <span className="live-dot size-2.5 rounded-full bg-white" />
+          <span className="font-display text-base font-extrabold uppercase tracking-wide">
+            {t("golive.timer.onAir")}
+          </span>
+          <span className="font-display text-lg font-extrabold tabular-nums">
+            {fmtUptime(startedAt ? (now - startedAt) / 1000 : 0)}
+          </span>
+        </span>
+        {showAudience(viewers) && (
+          <span
+            className="hidden items-center gap-1.5 sm:flex"
+            title={audienceTooltip(viewers.items, { t, fmt })}
+          >
+            <Eye className="size-4 text-ink-faint" />
+            <span className="font-display text-xl font-extrabold leading-none tabular-nums">
+              {audienceTotal(viewers, fmt)}
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              {t("golive.viewers.label")}
+            </span>
+          </span>
         )}
+      </div>
+      <span className="flex-1" />
+      <Button
+        variant="subtle"
+        onClick={() => void onMark()}
+        title={t("golive.marker.title")}
       >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Usage({ label, value }: { label: string; value?: number }) {
-  const pct = value ?? 0;
-  const tone = pct > 85 ? "bg-bad" : pct > 60 ? "bg-warn" : "bg-ok";
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-        {label}
-      </span>
-      <div className="h-2 w-24 overflow-hidden rounded-sm bg-surface">
-        <div
-          className={cn("h-full rounded-sm", tone)}
-          style={{ width: `${Math.min(100, pct)}%` }}
-        />
-      </div>
-      <span className="w-12 font-display text-sm font-bold tabular-nums">
-        {value == null ? "—" : `${value}%`}
-      </span>
-    </div>
+        <MapPin className="size-4" /> {t("golive.marker.button")}
+      </Button>
+      <BrbNowButton live size="md" />
+      <Button
+        variant="danger"
+        onClick={onStopClick}
+        className={cn(stopStep.armed && "bg-bad text-night hover:bg-bad")}
+      >
+        <Square className="size-4" />{" "}
+        {stopStep.armed ? t("golive.stop.confirm") : t("golive.stop")}
+      </Button>
+    </>
   );
 }

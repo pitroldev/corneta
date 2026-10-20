@@ -473,7 +473,6 @@ export function ChatScreen() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col">
       <SectionTitle
-        kicker={t("chat.header.kicker")}
         title={t("chat.header.title")}
         subtitle={t("chat.header.subtitle")}
         right={

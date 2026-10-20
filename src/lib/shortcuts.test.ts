@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureShortcut, shortcutErrorKey } from "./shortcuts";
+import { captureShortcut, shortcutErrorKey, shortcutLabel } from "./shortcuts";
 
 const event = {
   code: "KeyK",
@@ -81,5 +81,17 @@ describe("global shortcut capture", () => {
     expect(shortcutErrorKey({ code: "toString" })).toBe(
       "settings.hotkey.toast.registerFailed",
     );
+  });
+});
+
+describe("shortcut labels", () => {
+  it.each([
+    ["CommandOrControl+Alt+L", "Ctrl+Alt+L"],
+    ["Control+Alt+KeyL", "Ctrl+Alt+L"],
+    ["Control+Shift+Digit1", "Ctrl+Shift+1"],
+    ["Super+F9", "Win+F9"],
+    ["Control+NumpadAdd", "Ctrl+NumpadAdd"],
+  ])("shows %s as %s", (value, label) => {
+    expect(shortcutLabel(value)).toBe(label);
   });
 });

@@ -342,7 +342,6 @@ export function MesaScreen() {
   return (
     <div className="mx-auto max-w-5xl">
       <SectionTitle
-        kicker={t("platforms.mesa.kicker")}
         title={t("platforms.mesa.title")}
         subtitle={t("platforms.mesa.subtitle")}
         right={

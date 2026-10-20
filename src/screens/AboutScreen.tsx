@@ -65,10 +65,7 @@ export function AboutScreen() {
   const made = t("platforms.about.footer.made").split("{heart}");
   return (
     <div className="mx-auto max-w-3xl">
-      <SectionTitle
-        kicker={t("platforms.about.kicker")}
-        title={t("platforms.about.title")}
-      />
+      <SectionTitle title={t("platforms.about.title")} />
 
       <div className="relative mb-4 overflow-hidden rounded-xl bg-brass p-6 text-brass-ink pop-brass">
         <SoundWaves className="pointer-events-none absolute -right-10 -top-8 size-52 text-brass-ink/10" />

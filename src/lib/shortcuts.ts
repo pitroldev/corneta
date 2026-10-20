@@ -104,3 +104,28 @@ export function captureShortcut(
     return { kind: "unsupported" };
   return { kind: "shortcut", value: [...modifiers, code].join("+") };
 }
+
+const MODIFIER_LABELS: Record<string, string> = {
+  CommandOrControl: "Ctrl",
+  CmdOrCtrl: "Ctrl",
+  Control: "Ctrl",
+  Ctrl: "Ctrl",
+  Super: "Win",
+  Meta: "Win",
+  Alt: "Alt",
+  Option: "Alt",
+  Shift: "Shift",
+};
+
+/** Human label for a stored accelerator: "CommandOrControl+Alt+KeyL" → "Ctrl+Alt+L". */
+export function shortcutLabel(value: string): string {
+  return value
+    .split("+")
+    .filter(Boolean)
+    .map(
+      (part) =>
+        MODIFIER_LABELS[part] ??
+        part.replace(/^Key([A-Z])$/, "$1").replace(/^Digit(\d)$/, "$1"),
+    )
+    .join("+");
+}

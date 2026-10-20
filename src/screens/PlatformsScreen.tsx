@@ -1,27 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "../lib/useConfirm";
-import { Reorder, useDragControls } from "framer-motion";
+import { AnimatePresence, Reorder, m, useDragControls } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { Modal } from "../components/Modal";
 import {
-  KeyRound,
   Plus,
   Trash2,
   Check,
   X,
-  AlertTriangle,
   ChevronDown,
   Layers,
   Pencil,
   GripVertical,
-  Eye,
-  EyeOff,
-  ClipboardPaste,
   Wifi,
   ExternalLink,
   Crop,
-  Download,
-  RefreshCw,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -33,18 +26,18 @@ import {
   platformTagline,
 } from "../lib/platforms";
 import { toast } from "../lib/toast";
-import { cn, errMsg, openExternal, uid } from "../lib/utils";
-import { LoginRow } from "./chat/AccountSettings";
-import { useI18n, useT, type I18n, type Locale } from "../lib/i18n";
-import type { AppConfig, ChatPlatform, PlatformId, Target } from "../lib/types";
+import { cn, openExternal } from "../lib/utils";
+import { useI18n, useT } from "../lib/i18n";
+import type { AppConfig, PlatformId, Target } from "../lib/types";
 import { draftInputProps, useDraft } from "../lib/useDraft";
+import { youtubeAutoTargetId } from "../lib/readiness";
+import { useReadiness, useReadinessContext } from "../lib/useReadiness";
 import {
   INGEST_URL_RE,
   sanitizeIngestUrl,
-  blockingIssues,
   hasValidUrl,
   isUrlInvalid,
-  sanitizeStreamKey,
+  targetIssueCodes,
 } from "../lib/validation";
 import {
   Badge,
@@ -58,26 +51,38 @@ import {
   Toggle,
 } from "../components/ui";
 import { ReframeEditor } from "../components/ReframeEditor";
-import { FirstLiveChecklist } from "../components/FirstLiveChecklist";
+import { KeyField, QuickConnect } from "../components/platforms/TargetConnect";
 import { Mascot } from "../components/decor";
 
 export function PlatformsScreen() {
-  const t = useT();
+  const { t, tp } = useI18n();
   const config = useStore((s) => s.config);
   const addTarget = useStore((s) => s.addTarget);
   const reorderTargets = useStore((s) => s.reorderTargets);
+  const r = useReadiness();
   const [picking, setPicking] = useState(false);
   const [reframeTarget, setReframeTarget] = useState<Target | null>(null);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   if (!config) return null;
 
+  const subtitle =
+    config.targets.length === 0
+      ? t("platforms.subtitle")
+      : r.enabled.length === 0
+        ? t("platforms.summary.noneOn")
+        : r.pending.length === 0
+          ? tp("platforms.summary.allReady", r.ready.length)
+          : t("platforms.summary.partial", {
+              ready: r.ready.length,
+              total: r.enabled.length,
+            });
+
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker={t("platforms.title.kicker")}
         title={t("platforms.title")}
-        subtitle={t("platforms.subtitle")}
+        subtitle={subtitle}
         right={
           <Button variant="primary" onClick={() => setPicking(true)}>
             <Plus className="size-4" strokeWidth={2.6} /> {t("platforms.add")}
@@ -85,32 +90,33 @@ export function PlatformsScreen() {
         }
       />
 
-      <FirstLiveChecklist />
-
       <ProfileBar />
 
       {config.targets.length === 0 ? (
         <EmptyState onAdd={() => setPicking(true)} />
       ) : (
-        <>
-          <ReadinessSummary targets={config.targets} />
-          <Reorder.Group
-            axis="y"
-            values={config.targets}
-            onReorder={reorderTargets}
-            className="flex list-none flex-col gap-3"
-          >
-            {config.targets.map((tg) => (
-              <TargetRow
-                key={tg.id}
-                target={tg}
-                onReframe={() => setReframeTarget(tg)}
-                justAdded={tg.id === justAddedId}
-                onSpotlightDone={() => setJustAddedId(null)}
-              />
-            ))}
-          </Reorder.Group>
-        </>
+        <Reorder.Group
+          axis="y"
+          values={config.targets}
+          onReorder={reorderTargets}
+          className="flex list-none flex-col gap-2.5"
+        >
+          {config.targets.map((tg) => (
+            <TargetRow
+              key={tg.id}
+              target={tg}
+              onReframe={() => setReframeTarget(tg)}
+              justAdded={tg.id === justAddedId}
+              onSpotlightDone={() => setJustAddedId(null)}
+            />
+          ))}
+        </Reorder.Group>
+      )}
+
+      {config.targets.length > 1 && (
+        <p className="mt-3 text-xs text-ink-faint">
+          {t("platforms.footer.hint")}
+        </p>
       )}
 
       {reframeTarget && (
@@ -153,109 +159,99 @@ function ProfileBar() {
   const many = config.profiles.length > 1;
 
   return (
-    <div className="mb-6 rounded-lg bg-surface-2 p-3">
-      <div className="mb-2.5 flex items-center gap-1.5 px-0.5">
-        <Layers className="size-3.5 text-ink-faint" />
-        <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-          {t("platforms.profile.label")}
-        </span>
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2">
+      <span className="flex items-center gap-1.5 pr-1 text-xs font-bold uppercase tracking-wide text-ink-faint">
+        <Layers className="size-3.5" />
+        {t("platforms.profile.label")}
         <Hint text={t("platforms.profile.hint")} />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {config.profiles.map((p) => {
-          const on = p.id === active.id;
-          if (on && editing) {
-            return (
-              <ProfileNameInput
-                key={p.id}
-                profile={active}
-                onDone={() => setEditing(false)}
-              />
-            );
-          }
+      </span>
+      {config.profiles.map((p) => {
+        const on = p.id === active.id;
+        if (on && editing) {
           return (
-            <button
+            <ProfileNameInput
               key={p.id}
-              onClick={() => {
-                if (!on) loadProfile(p.id);
-              }}
-              aria-pressed={on}
-              title={
-                on
-                  ? t("platforms.profile.active")
-                  : t("platforms.profile.switchTo", {
-                      name: p.name || t("platforms.profile.untitled"),
-                    })
-              }
-              className={cn(
-                "flex h-9 items-center gap-2 rounded-md px-3 font-display text-sm font-bold transition",
-                on
-                  ? "bg-brass text-brass-ink pop-brass"
-                  : "bg-surface text-ink-muted ring-1 ring-border hover:-translate-y-px hover:text-ink",
-              )}
-            >
-              <span className="max-w-[14rem] truncate">
-                {p.name || t("platforms.profile.untitled")}
-              </span>
-              <span
-                className={cn(
-                  "rounded px-1.5 text-[10px] font-extrabold tabular-nums",
-                  on
-                    ? "bg-brass-ink/15 text-brass-ink"
-                    : "bg-surface-2 text-ink-faint",
-                )}
-                title={t("platforms.profile.count", { n: p.targets.length })}
-              >
-                {p.targets.length}
-              </span>
-            </button>
+              profile={active}
+              onDone={() => setEditing(false)}
+            />
           );
-        })}
-
-        <Button
-          variant="subtle"
-          size="sm"
-          className="h-9"
-          onClick={() =>
-            addProfile((n) => t("platforms.profile.defaultNew", { n }))
-          }
-        >
-          <Plus className="size-4" strokeWidth={2.6} />{" "}
-          {t("platforms.profile.new")}
-        </Button>
-
-        <div className="ml-auto flex items-center gap-1">
-          {!editing && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9"
-              onClick={() => setEditing(true)}
-              title={t("platforms.profile.renameTitle")}
+        }
+        return (
+          <button
+            key={p.id}
+            onClick={() => {
+              if (!on) loadProfile(p.id);
+            }}
+            aria-pressed={on}
+            title={
+              on
+                ? t("platforms.profile.active")
+                : t("platforms.profile.switchTo", {
+                    name: p.name || t("platforms.profile.untitled"),
+                  })
+            }
+            className={cn(
+              "flex h-8 items-center gap-2 rounded-md px-2.5 font-display text-sm font-bold transition",
+              on
+                ? "bg-brass text-brass-ink"
+                : "bg-surface text-ink-muted hover:-translate-y-px hover:text-ink",
+            )}
+          >
+            <span className="max-w-[12rem] truncate">
+              {p.name || t("platforms.profile.untitled")}
+            </span>
+            <span
+              className={cn(
+                "rounded-sm px-1 text-[11px] font-extrabold tabular-nums",
+                on
+                  ? "bg-brass-ink/15 text-brass-ink"
+                  : "bg-surface-2 text-ink-faint",
+              )}
+              title={t("platforms.profile.count", { n: p.targets.length })}
             >
-              <Pencil className="size-3.5" /> {t("platforms.profile.rename")}
-            </Button>
-          )}
-          {many && (
-            <Button
-              variant={deleteProfileStep.armed ? "danger" : "ghost"}
-              size="sm"
-              className="h-9"
-              onClick={() => {
-                if (deleteProfileStep.confirm()) removeProfile(active.id);
-              }}
-              title={t("platforms.profile.deleteTitle", {
-                name: active.name || t("platforms.profile.untitled"),
-              })}
-            >
-              <Trash2 className="size-3.5" />{" "}
-              {deleteProfileStep.armed
-                ? t("platforms.profile.deleteConfirm")
-                : t("platforms.profile.delete")}
-            </Button>
-          )}
-        </div>
+              {p.targets.length}
+            </span>
+          </button>
+        );
+      })}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() =>
+          addProfile((n) => t("platforms.profile.defaultNew", { n }))
+        }
+      >
+        <Plus className="size-4" strokeWidth={2.6} />{" "}
+        {t("platforms.profile.new")}
+      </Button>
+      <div className="ml-auto flex items-center gap-1">
+        {!editing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setEditing(true)}
+            title={t("platforms.profile.renameTitle")}
+          >
+            <Pencil className="size-3.5" /> {t("platforms.profile.rename")}
+          </Button>
+        )}
+        {many && (
+          <Button
+            variant={deleteProfileStep.armed ? "danger" : "ghost"}
+            size="sm"
+            onClick={() => {
+              if (deleteProfileStep.confirm()) removeProfile(active.id);
+            }}
+            title={t("platforms.profile.deleteTitle", {
+              name: active.name || t("platforms.profile.untitled"),
+            })}
+          >
+            <Trash2 className="size-3.5" />{" "}
+            {deleteProfileStep.armed
+              ? t("platforms.profile.deleteConfirm")
+              : t("platforms.profile.delete")}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -285,7 +281,7 @@ function ProfileNameInput({
         if (e.key === "Enter" || e.key === "Escape") onDone();
       }}
       aria-label={t("platforms.profile.nameAria")}
-      className="h-9 min-w-0 max-w-[14rem] rounded-md border-2 border-brass bg-surface px-2.5 font-display text-sm font-bold text-ink outline-none [field-sizing:content]"
+      className="h-8 min-w-0 max-w-[12rem] rounded-md border-2 border-brass bg-surface px-2.5 font-display text-sm font-bold text-ink outline-none [field-sizing:content]"
     />
   );
 }
@@ -308,49 +304,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function ReadinessSummary({ targets }: { targets: Target[] }) {
-  const t = useT();
-  const enabled = targets.filter((x) => x.enabled);
-  const ready = enabled.filter((x) => blockingIssues(x, t).length === 0).length;
-  const missingKey = enabled.filter((x) => !x.hasKey).length;
-  const missingUrl = enabled.filter((x) => !hasValidUrl(x)).length;
-  const off = targets.length - enabled.length;
-  const allReady = enabled.length > 0 && ready === enabled.length;
-  return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-      {allReady ? (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-ok/15 px-2.5 py-1 font-bold text-ok">
-          <Check className="size-3.5" strokeWidth={2.8} />{" "}
-          {t("platforms.readiness.allReady")}
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1 font-bold text-ink-muted">
-          <Check className="size-3.5 text-ok" strokeWidth={2.8} />
-          <span className="text-ink">
-            {t("platforms.readiness.ready", { n: ready })}
-          </span>
-        </span>
-      )}
-      {missingKey > 0 && (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-warn/15 px-2.5 py-1 font-bold text-warn">
-          <KeyRound className="size-3.5" />{" "}
-          {t("platforms.readiness.noKey", { n: missingKey })}
-        </span>
-      )}
-      {missingUrl > 0 && (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-bad/15 px-2.5 py-1 font-bold text-bad">
-          <AlertTriangle className="size-3.5" />{" "}
-          {t("platforms.readiness.noUrl", { n: missingUrl })}
-        </span>
-      )}
-      {off > 0 && (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1 font-semibold text-ink-faint">
-          {t("platforms.readiness.off", { n: off })}
-        </span>
-      )}
-    </div>
-  );
-}
+type RowTone = "ok" | "warn" | "bad" | "neutral";
 
 function TargetRow({
   target,
@@ -364,11 +318,14 @@ function TargetRow({
   onSpotlightDone?: () => void;
 }) {
   const t = useT();
+  const targets = useStore((s) => s.config!.targets);
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const toggleTarget = useStore((s) => s.toggleTarget);
   const moveTarget = useStore((s) => s.moveTarget);
   const undoRemoveTarget = useStore((s) => s.undoRemoveTarget);
+  const r = useReadiness();
+  const ctx = useReadinessContext();
   const controls = useDragControls();
   const preset = PLATFORMS[target.platformId];
   const isCustom = target.platformId === "custom";
@@ -394,24 +351,49 @@ function TargetRow({
   };
   const urlInvalid = isUrlInvalid(edited);
   const urlOk = hasValidUrl(edited);
-  const readiness = !urlOk
+  const pending = r.pending.find((p) => p.target.id === target.id);
+  const auto =
+    target.id === youtubeAutoTargetId(targets, ctx) && !target.hasKey;
+  const keyOnly = !!pending && pending.issues.every((i) => i === "noKey");
+  const noName = targetIssueCodes(edited).includes("noName");
+
+  const status: { tone: RowTone; label: string; sub: string } = !target.enabled
     ? {
-        tone: "bad" as const,
-        label: urlInvalid
-          ? t("platforms.target.badge.urlInvalid")
-          : t("platforms.target.badge.noUrl"),
+        tone: "neutral",
+        label: t("platforms.target.badge.off"),
+        sub: t("platforms.target.sub.off"),
       }
-    : !target.hasKey
-      ? { tone: "warn" as const, label: t("platforms.target.badge.pasteKey") }
-      : !edited.name.trim()
-        ? { tone: "warn" as const, label: t("platforms.target.badge.noName") }
-        : { tone: "ok" as const, label: t("platforms.target.badge.ready") };
+    : !urlOk
+      ? {
+          tone: "bad",
+          label: urlInvalid
+            ? t("platforms.target.badge.urlInvalid")
+            : t("platforms.target.badge.noUrl"),
+          sub: t("platforms.target.sub.noUrl"),
+        }
+      : pending
+        ? {
+            tone: "warn",
+            label: t("platforms.target.badge.pasteKey"),
+            sub: t("platforms.target.sub.noKey"),
+          }
+        : noName
+          ? {
+              tone: "warn",
+              label: t("platforms.target.badge.noName"),
+              sub: t("platforms.target.sub.ready"),
+            }
+          : {
+              tone: "ok",
+              label: t("platforms.target.badge.ready"),
+              sub: auto
+                ? t("platforms.target.sub.youtubeAuto")
+                : t("platforms.target.sub.ready"),
+            };
 
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
-  const blocking = blockingIssues(edited, t);
-  const keyOnlyPending = blocking.length > 0 && urlOk;
-  const [open, setOpen] = useState(() => blocking.length > 0);
+  const [open, setOpen] = useState(() => !urlOk);
 
   const itemRef = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -450,12 +432,13 @@ function TargetRow({
     >
       <Card
         className={cn(
-          "transition-colors",
+          "group/row border-2 p-4 transition-colors duration-300",
           !target.enabled && "bg-surface-2",
-          blocking.length > 0 &&
-            (keyOnlyPending
-              ? "border-l-4 border-warn"
-              : "border-l-4 border-bad"),
+          target.enabled && status.tone === "warn"
+            ? "border-warn/45"
+            : target.enabled && status.tone === "bad"
+              ? "border-bad/45"
+              : "border-transparent",
         )}
       >
         <Collapsible.Root open={open} onOpenChange={setOpen}>
@@ -473,7 +456,7 @@ function TargetRow({
               }}
               aria-label={t("platforms.target.reorderAria")}
               title={t("platforms.target.reorderTitle")}
-              className="shrink-0 cursor-grab touch-none text-ink-faint active:cursor-grabbing"
+              className="-ml-1 shrink-0 cursor-grab touch-none text-ink-faint opacity-40 transition-opacity focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100"
             >
               <GripVertical className="size-5" />
             </button>
@@ -484,7 +467,7 @@ function TargetRow({
                 !target.enabled && "opacity-50",
               )}
             >
-              <PlatformGlyph id={target.platformId} />
+              <PlatformGlyph id={target.platformId} size={40} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -503,14 +486,16 @@ function TargetRow({
                 )}
                 {preset.experimental && <ExperimentalBadge />}
               </div>
-              <div className="mt-0.5 truncate text-xs text-ink-faint">
-                {urlOk ? target.ingestUrl : t("platforms.target.urlUnset")}
+              <div className="mt-0.5 truncate px-1 text-xs text-ink-muted">
+                {status.sub}
               </div>
             </div>
-            {!target.enabled && (
-              <Badge tone="neutral">{t("platforms.target.badge.off")}</Badge>
-            )}
-            <Badge tone={readiness.tone}>{readiness.label}</Badge>
+            <Badge tone={status.tone}>
+              {status.tone === "ok" && (
+                <Check className="size-3" strokeWidth={3} />
+              )}
+              {status.label}
+            </Badge>
             <Toggle
               checked={target.enabled}
               onChange={() => toggleTarget(target.id)}
@@ -529,7 +514,7 @@ function TargetRow({
               >
                 <ChevronDown
                   className={cn(
-                    "size-5 transition-transform",
+                    "size-5 transition-transform duration-200",
                     open && "rotate-180",
                   )}
                 />
@@ -537,12 +522,28 @@ function TargetRow({
             </Collapsible.Trigger>
           </div>
 
-          <Collapsible.Content className="mt-4 flex flex-col gap-4">
+          <AnimatePresence initial={false}>
+            {target.enabled && keyOnly && !open && (
+              <m.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="overflow-hidden"
+              >
+                <div className="pl-[4.75rem] pt-3">
+                  <QuickConnect target={target} />
+                </div>
+              </m.div>
+            )}
+          </AnimatePresence>
+
+          <Collapsible.Content className="mt-4 flex flex-col gap-4 border-t border-border-soft pt-4">
             <p className="text-xs text-ink-faint">
               {platformNote(target.platformId, t)}
             </p>
 
-            {showUrlField && (
+            {showUrlField ? (
               <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
                 <span>
                   {t("platforms.target.url.label")}
@@ -563,11 +564,23 @@ function TargetRow({
                   invalid={urlInvalid}
                 />
                 {urlInvalid && (
-                  <span className="text-[11px] font-medium text-bad">
+                  <span className="text-xs font-medium text-bad">
                     {t("platforms.target.url.invalid")}
                   </span>
                 )}
               </label>
+            ) : (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="shrink-0 font-semibold text-ink-faint">
+                  {t("platforms.target.url.label")}
+                </span>
+                <span
+                  data-selectable
+                  className="truncate font-mono text-ink-muted"
+                >
+                  {target.ingestUrl}
+                </span>
+              </div>
             )}
 
             <KeyField target={target} autoFocusKey={justAdded} />
@@ -643,307 +656,6 @@ function TargetRow({
   );
 }
 
-// Portuguese platform names require gendered prepositions; English uses the catalog name.
-type StreamChatPlatform = Extract<PlatformId, ChatPlatform>;
-
-const CHAT_BRIDGE_LABEL_PT: Record<StreamChatPlatform, string> = {
-  twitch: "da Twitch",
-  youtube: "do YouTube",
-  kick: "da Kick",
-};
-
-function isChatPlatform(id: PlatformId): id is StreamChatPlatform {
-  return id === "twitch" || id === "youtube" || id === "kick";
-}
-
-// Pass the caller's locale to avoid shared-state races between webviews.
-function offerChatBridge(platformId: PlatformId, t: I18n["t"], locale: Locale) {
-  if (!isChatPlatform(platformId)) return;
-  const sources = useStore.getState().config?.settings.chatSources ?? [];
-  if (sources.some((s) => s.platform === platformId)) return;
-  // Record the offer immediately, regardless of whether it is accepted or dismissed.
-  const offeredKey = `corneta.chatBridgeOffered.${platformId}`;
-  try {
-    if (localStorage.getItem(offeredKey)) return;
-    localStorage.setItem(offeredKey, "1");
-  } catch {
-    /* Unavailable storage may repeat the offer; it must not prevent offering chat setup. */
-  }
-  const platformLabel =
-    locale === "pt-BR"
-      ? CHAT_BRIDGE_LABEL_PT[platformId]
-      : platformName(platformId, t);
-  toast.action(
-    t("platforms.chatBridge.ask", { platform: platformLabel }),
-    t("platforms.chatBridge.cta"),
-    () => {
-      const st = useStore.getState();
-      const cur = st.config?.settings.chatSources ?? [];
-      // A connected account is offered in the Channels tab with its channel filled in.
-      const loggedIn =
-        platformId in st.chatLogin &&
-        st.chatLogin[platformId as keyof typeof st.chatLogin].state ===
-          "connected";
-      // The source may have been created while the toast was visible.
-      if (!loggedIn && !cur.some((s) => s.platform === platformId)) {
-        st.setSettings({
-          chatSources: [
-            ...cur,
-            {
-              id: uid("src"),
-              platform: platformId,
-              value: "",
-              name: "",
-              enabled: true,
-            },
-          ],
-        });
-      }
-      st.requestChatConfig("canais");
-      st.requestNavigate("chat");
-    },
-  );
-}
-
-function KeyField({
-  target,
-  autoFocusKey,
-}: {
-  target: Target;
-  autoFocusKey?: boolean;
-}) {
-  const { t, locale } = useI18n();
-  const setKey = useStore((s) => s.setKey);
-  const clearKey = useStore((s) => s.clearKey);
-  const fetchTwitchKey = useStore((s) => s.fetchTwitchKey);
-  const fetchKickKey = useStore((s) => s.fetchKickKey);
-  const twitchAccount = useStore((s) => s.chatLogin.twitch);
-  const kickAccount = useStore((s) => s.chatLogin.kick);
-  const twitchLogin = useStore((s) => s.twitchLogin);
-  const twitchLogout = useStore((s) => s.twitchLogout);
-  const kickLogin = useStore((s) => s.kickLogin);
-  const kickLogout = useStore((s) => s.kickLogout);
-  const [reconnecting, setReconnecting] = useState(false);
-  const [fetching, setFetching] = useState(false);
-  const isTwitch = target.platformId === "twitch";
-  const isKick = target.platformId === "kick";
-  const account = isTwitch ? twitchAccount : isKick ? kickAccount : null;
-  const accountReady = account?.state === "connected";
-  const needsReconnect =
-    accountReady &&
-    (account.missingScopes ?? []).includes(
-      isTwitch ? "channel:read:stream_key" : "streamkey:read",
-    );
-  const loginForKey = () =>
-    isTwitch ? twitchLogin() : kickLogin({ streamKey: true });
-  const fetchFromAccount = async () => {
-    setFetching(true);
-    try {
-      const login = isTwitch
-        ? await fetchTwitchKey(target.id)
-        : await fetchKickKey(target.id);
-      setValue("");
-      setEditing(false);
-      toast.success(
-        login
-          ? t("platforms.key.fetchedToast", { login })
-          : t("platforms.key.fetchedToastAccount"),
-      );
-      offerChatBridge(target.platformId, t, locale);
-    } catch (e) {
-      toast.error(errMsg(e));
-    } finally {
-      setFetching(false);
-    }
-  };
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState("");
-  const [reveal, setReveal] = useState(false);
-  const clearKeyStep = useConfirm();
-
-  const save = async (raw: string = value) => {
-    try {
-      const { key, strippedUrl } = sanitizeStreamKey(raw, target.ingestUrl);
-      if (!key) {
-        if (strippedUrl) toast.error(t("platforms.key.pastedUrlOnly"));
-        return;
-      }
-      await setKey(target.id, key);
-      setValue("");
-      setEditing(false);
-      if (strippedUrl) toast.info(t("platforms.key.strippedUrl"));
-      toast.success(t("platforms.key.savedToast"));
-      offerChatBridge(target.platformId, t, locale);
-    } catch (e) {
-      toast.error(t("platforms.key.saveFailed", { err: String(e) }));
-    }
-  };
-  const paste = async () => {
-    try {
-      const clip = await navigator.clipboard.readText();
-      if (!clip.trim()) return;
-      await save(clip);
-    } catch {
-      /* Clipboard access may be denied; manual entry remains available. */
-    }
-  };
-
-  if (target.hasKey && !editing) {
-    return (
-      <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2">
-        <Check className="size-4 text-ok" strokeWidth={2.6} />
-        <span className="text-sm font-semibold">
-          {t("platforms.key.saved")}
-        </span>
-        <span className="font-mono text-sm text-ink-faint">•••••••••••</span>
-        <div className="ml-auto flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setValue("");
-              setEditing(true);
-            }}
-          >
-            <Pencil className="size-3.5" /> {t("platforms.key.change")}
-          </Button>
-          <Button
-            variant={clearKeyStep.armed ? "danger" : "ghost"}
-            size="sm"
-            onClick={async () => {
-              if (!clearKeyStep.confirm()) return;
-              try {
-                await clearKey(target.id);
-                toast.info(t("platforms.key.removed"));
-              } catch (e) {
-                toast.error(
-                  t("platforms.key.removeFailed", { err: String(e) }),
-                );
-              }
-            }}
-          >
-            {clearKeyStep.armed
-              ? t("platforms.key.removeConfirm")
-              : t("platforms.key.remove")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
-          <Input
-            type={reveal ? "text" : "password"}
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- Only focus after editing or adding a destination, never on initial load.
-            autoFocus={editing || autoFocusKey}
-            aria-label={t("platforms.key.placeholder")}
-            className="pl-9 pr-9"
-            placeholder={t("platforms.key.placeholder")}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && value.trim() && void save()}
-          />
-          <button
-            type="button"
-            onClick={() => setReveal((v) => !v)}
-            className="absolute right-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-ink-faint hover:text-ink"
-            aria-label={
-              reveal ? t("platforms.key.hide") : t("platforms.key.show")
-            }
-            title={reveal ? t("platforms.key.hide") : t("platforms.key.show")}
-          >
-            {reveal ? (
-              <EyeOff className="size-4" />
-            ) : (
-              <Eye className="size-4" />
-            )}
-          </button>
-        </div>
-        {accountReady &&
-          (needsReconnect ? (
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={() => {
-                setReconnecting(true);
-                void loginForKey();
-              }}
-              title={t(
-                isTwitch
-                  ? "platforms.key.reconnectTwitchTitle"
-                  : "platforms.key.reconnectKickTitle",
-              )}
-            >
-              <RefreshCw className="size-4" />{" "}
-              {t(
-                isTwitch
-                  ? "platforms.key.reconnectTwitch"
-                  : "platforms.key.reconnectKick",
-              )}
-            </Button>
-          ) : (
-            <Button
-              variant="subtle"
-              size="sm"
-              disabled={fetching}
-              onClick={() => void fetchFromAccount()}
-              title={
-                isTwitch
-                  ? t("platforms.key.fetchTitle", {
-                      login: twitchAccount.login ?? "",
-                    })
-                  : t("platforms.key.fetchTitleKick")
-              }
-            >
-              <Download className="size-4" /> {t("platforms.key.fetch")}
-            </Button>
-          ))}
-        <Button
-          variant="subtle"
-          size="sm"
-          onClick={paste}
-          title={t("platforms.key.pasteSaveTitle")}
-        >
-          <ClipboardPaste className="size-4" /> {t("platforms.key.pasteSave")}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!value.trim()}
-          onClick={() => void save()}
-        >
-          {t("platforms.key.save")}
-        </Button>
-        {editing && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setEditing(false)}
-            aria-label={t("platforms.key.cancelEdit")}
-            title={t("platforms.key.cancelEdit")}
-          >
-            <X className="size-4" />
-          </Button>
-        )}
-      </div>
-      {account && reconnecting && account.state !== "connected" && (
-        <LoginRow
-          platform={isTwitch ? "twitch" : "kick"}
-          label={isTwitch ? "Twitch" : "Kick"}
-          state={account}
-          enabled
-          onLogin={loginForKey}
-          onLogout={isTwitch ? twitchLogout : kickLogout}
-        />
-      )}
-    </div>
-  );
-}
-
 function PlatformPicker({
   onPick,
   onClose,
@@ -955,6 +667,37 @@ function PlatformPicker({
   const targets = useStore((s) => s.config?.targets ?? []);
   const countOf = (id: PlatformId) =>
     targets.filter((tg) => tg.platformId === id).length;
+  const main = PLATFORM_LIST.filter((p) => !p.experimental);
+  const experimental = PLATFORM_LIST.filter((p) => p.experimental);
+
+  const option = (p: (typeof PLATFORM_LIST)[number], i: number) => (
+    <m.button
+      key={p.id}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: i * 0.025 }}
+      onClick={() => onPick(p.id)}
+      title={platformNote(p.id, t)}
+      className="flex items-center gap-3 rounded-md bg-surface-2 p-3 text-left transition hover:-translate-y-0.5 hover:bg-surface-3"
+    >
+      <PlatformGlyph id={p.id} size={38} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-display font-bold">
+          {platformName(p.id, t)}
+        </span>
+        <span className="mt-0.5 block text-xs font-medium text-ink-faint">
+          {platformTagline(p.id, t)}
+        </span>
+      </span>
+      {countOf(p.id) > 0 && (
+        <Badge tone="neutral" className="shrink-0 self-start">
+          {countOf(p.id) > 1
+            ? t("platforms.picker.alreadyCount", { n: countOf(p.id) })
+            : t("platforms.picker.already")}
+        </Badge>
+      )}
+    </m.button>
+  );
 
   return (
     <Modal
@@ -975,38 +718,20 @@ function PlatformPicker({
           <X className="size-4" />
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {PLATFORM_LIST.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => onPick(p.id)}
-            title={platformNote(p.id, t)}
-            className="flex items-center gap-3 rounded-md bg-surface-2 p-3 text-left transition hover:translate-x-0.5 hover:-translate-y-0.5 hover:bg-surface-3"
-          >
-            <PlatformGlyph id={p.id} size={38} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate font-display font-bold">
-                  {platformName(p.id, t)}
-                </span>
-                {p.experimental && (
-                  <ExperimentalBadge className="shrink-0 scale-90" />
-                )}
-              </div>
-              <div className="mt-0.5 text-[11px] font-medium text-ink-faint">
-                {platformTagline(p.id, t)}
-              </div>
-            </div>
-            {countOf(p.id) > 0 && (
-              <Badge tone="neutral" className="shrink-0 self-start">
-                {countOf(p.id) > 1
-                  ? t("platforms.picker.alreadyCount", { n: countOf(p.id) })
-                  : t("platforms.picker.already")}
-              </Badge>
-            )}
-          </button>
-        ))}
-      </div>
+      <div className="grid grid-cols-2 gap-2">{main.map(option)}</div>
+      {experimental.length > 0 && (
+        <>
+          <div className="mb-2 mt-5 flex items-center gap-2">
+            <ExperimentalBadge />
+            <span className="text-xs text-ink-faint">
+              {t("platforms.picker.experimental")}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {experimental.map((p, i) => option(p, main.length + i))}
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
