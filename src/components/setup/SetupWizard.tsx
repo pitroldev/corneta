@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, m } from "framer-motion";
+import { AnimatePresence, m, type Variants } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -35,6 +35,22 @@ const STEPS: { id: SetupStep; labelKey: MessageKey; icon: typeof Tv2 }[] = [
   { id: "quality", labelKey: "components.setup.rail.quality", icon: Gauge },
   { id: "done", labelKey: "components.setup.rail.done", icon: Check },
 ];
+
+// Variants read the direction through AnimatePresence's custom prop, so the step leaving after
+// "Back" slides out the way it came instead of the direction it was entered with.
+const STEP_MOTION: Variants = {
+  enter: (direction: number) => ({ opacity: 0, x: 24 * direction }),
+  center: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: -24 * direction,
+    transition: { duration: 0.12, ease: "easeIn" },
+  }),
+};
 
 /**
  * Full-window first-run setup: every step finishes something real (connected platform, OBS pointed
@@ -217,10 +233,10 @@ export function SetupWizard({
             <m.div
               key={step}
               custom={direction}
-              initial={{ opacity: 0, x: 28 * direction }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -28 * direction }}
-              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+              variants={STEP_MOTION}
+              initial="enter"
+              animate="center"
+              exit="exit"
               className="mx-auto max-w-3xl px-10 py-10"
             >
               {step === "welcome" && (
