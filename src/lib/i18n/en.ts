@@ -465,8 +465,7 @@ export const en: Dict = {
   "components.connect.fetching": "Getting the key…",
   "components.connect.login": "Sign in with {platform}",
   "components.connect.pasteInstead": "or paste the key",
-  "components.connect.pastePlaceholder":
-    "Paste the stream key here ({platform})",
+  "components.connect.pastePlaceholder": "Paste the key",
   "components.connect.turningOnAuto": "Turning on automatic YouTube…",
   "components.connect.waitBrowser":
     "I opened the sign-in in your browser — authorize it and come back here.",

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { m } from "framer-motion";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, m, useIsPresent } from "framer-motion";
 import { ArrowRight, ScrollText } from "lucide-react";
 import { acceptedCurrent, recordAcceptance } from "../lib/legal";
 import { useStore } from "../lib/store";
@@ -141,9 +141,6 @@ export function Onboarding({
     });
   };
 
-  if (flow === null) return null;
-  // Setup edits platforms and settings, so it waits for the configuration to load.
-  if (flow === "setup" && !config) return null;
   if (flow === "reaccept")
     return (
       <LegalUpdate
@@ -155,34 +152,59 @@ export function Onboarding({
       />
     );
   return (
+    <AnimatePresence>
+      {/* Setup edits platforms and settings, so it waits for the configuration to load. */}
+      {flow === "setup" && config && (
+        <SetupOverlay key="setup" label={t("components.setup.aria")}>
+          <SetupWizard
+            consent={askConsent ? consent : null}
+            onConsent={setConsent}
+            onStepCompleted={onStepCompleted}
+            onFinish={(next) => {
+              captureOnboarding({
+                event: "onboarding_completed",
+                properties: {
+                  duration_bucket: durationBucket(
+                    Date.now() - startedAt.current,
+                  ),
+                },
+              });
+              close(next);
+            }}
+            onSkip={() => {
+              if (run.current === 0)
+                toast.info(t("components.onboarding.dismissed.toast"));
+              close("golive");
+            }}
+          />
+        </SetupOverlay>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/** Fades out over the panel it hands off to; inert while leaving so a second click cannot finish twice. */
+function SetupOverlay({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  const present = useIsPresent();
+  return (
     <m.div
       role="dialog"
       aria-modal="true"
-      aria-label={t("components.setup.aria")}
+      aria-label={label}
+      inert={!present}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.2 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       className="fixed inset-x-0 bottom-0 top-9 z-[70] bg-bg"
     >
-      <SetupWizard
-        consent={askConsent ? consent : null}
-        onConsent={setConsent}
-        onStepCompleted={onStepCompleted}
-        onFinish={(next) => {
-          captureOnboarding({
-            event: "onboarding_completed",
-            properties: {
-              duration_bucket: durationBucket(Date.now() - startedAt.current),
-            },
-          });
-          close(next);
-        }}
-        onSkip={() => {
-          if (run.current === 0)
-            toast.info(t("components.onboarding.dismissed.toast"));
-          close("golive");
-        }}
-      />
+      {children}
     </m.div>
   );
 }

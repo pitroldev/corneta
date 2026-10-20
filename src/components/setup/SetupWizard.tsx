@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { AnimatePresence, m, type Variants } from "framer-motion";
 import {
   ArrowLeft,
@@ -90,13 +90,16 @@ export function SetupWizard({
     done: false,
   };
 
-  // Move focus to the new step's heading so keyboard and screen-reader users follow along.
-  useEffect(() => {
-    const id = requestAnimationFrame(() =>
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // With mode="wait" the next step mounts only after the previous one has left, so an effect on the
+  // index would focus the leaving heading. Focus follows the step that actually mounted instead.
+  const onStepMounted = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    scrollRef.current?.scrollTo({ top: 0 });
+    requestAnimationFrame(() =>
       titleRef.current?.focus({ preventScroll: true }),
     );
-    return () => cancelAnimationFrame(id);
-  }, [index]);
+  }, []);
 
   const go = (next: number) => {
     if (next < 0 || next >= STEPS.length || next === index) return;
@@ -228,10 +231,14 @@ export function SetupWizard({
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
+        <div
+          ref={scrollRef}
+          className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]"
+        >
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <m.div
               key={step}
+              ref={onStepMounted}
               custom={direction}
               variants={STEP_MOTION}
               initial="enter"
