@@ -1231,7 +1231,8 @@ export const en: Dict = {
   "golive.checkup.encoder": "Encoder available",
   "golive.checkup.obsConnected": "OBS connected",
   "golive.checkup.obsConnected.fix":
-    "turn it on under Tools → WebSocket Server Settings (and the password goes in Corneta's Settings, if you set one)",
+    "is it open? If so, turn it on under Tools → WebSocket Server Settings (and the password goes in Corneta's Settings, if you set one)",
+  "golive.checkup.obsNotConnected": "OBS hasn't connected yet",
   "golive.checkup.obsPointing": "OBS pointing at Corneta",
   "golive.checkup.state.bad": "problem",
   "golive.checkup.state.ok": "done",

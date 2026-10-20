@@ -493,7 +493,11 @@ function ObsPanel({
           ) : (
             <>
               <CheckRow
-                label={t("golive.checkup.obsConnected")}
+                label={t(
+                  obs.reachable
+                    ? "golive.checkup.obsConnected"
+                    : "golive.checkup.obsNotConnected",
+                )}
                 ok={obs.reachable}
                 warn={!obs.reachable}
                 detail={

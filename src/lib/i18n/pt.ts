@@ -1219,7 +1219,8 @@ export const pt = {
   "golive.checkup.encoder": "Encoder disponível",
   "golive.checkup.obsConnected": "OBS conectado",
   "golive.checkup.obsConnected.fix":
-    "ative em Ferramentas → Configurações do servidor WebSocket (e a senha em Configurações, se houver)",
+    "ele tá aberto? Se tá, ative em Ferramentas → Configurações do servidor WebSocket (e a senha em Configurações, se houver)",
+  "golive.checkup.obsNotConnected": "O OBS ainda não conectou",
   "golive.checkup.obsPointing": "OBS apontando pra Corneta",
   "golive.checkup.state.bad": "com problema",
   "golive.checkup.state.ok": "feito",
