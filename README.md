@@ -20,9 +20,9 @@
 
 > **Windows x64 · Código aberto.** [Experimente a demo](#testar-sem-rust-obs-ou-contas) ou veja [como usar na sua live](#quero-usar-na-minha-live).
 
-[![Preparação da live na Corneta: conexão com o OBS, teste de upload e checklist antes de entrar no ar.](docs/images/readme/live.webp)](docs/images/readme/live.webp)
+[![Painel Ao vivo da Corneta antes da live: plataformas, OBS, upload e proteções conferidos, com o BORA AO VIVO liberado.](docs/images/readme/live.webp)](docs/images/readme/live.webp)
 
-_Interface real da versão 0.7.0 em modo de demonstração, com dados fictícios. Clique nos prints para ampliar._
+_Interface real em modo de demonstração, com dados fictícios. Clique nos prints para ampliar._
 
 ## Conheça a Corneta
 
