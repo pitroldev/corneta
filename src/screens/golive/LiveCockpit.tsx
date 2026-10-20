@@ -161,12 +161,10 @@ const LiveTargetRow = memo(function LiveTargetRow({
           value={flowing ? String(st.droppedFrames ?? 0) : "—"}
           tone={flowing && (st.droppedFrames ?? 0) > 0 ? "warn" : "default"}
         />
-        <div className="hidden xl:block">
-          <MiniStat
-            label={t("golive.stat.fps")}
-            value={flowing ? String(st.fps ?? 0) : "—"}
-          />
-        </div>
+        <MiniStat
+          label={t("golive.stat.fps")}
+          value={flowing ? String(st.fps ?? 0) : "—"}
+        />
         <div className="hidden 2xl:block">
           <MiniStat
             label={t("golive.stat.uptime")}

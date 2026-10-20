@@ -619,7 +619,8 @@ export const pt = {
   "golive.drawer.internet.title": "Banda de upload",
   "golive.drawer.internet.unknown": "Ainda não medi o seu upload.",
   "golive.drawer.obs.manual": "Prefiro configurar na mão",
-  "golive.drawer.obs.notPointing": "use “Configura pra mim” aqui embaixo",
+  "golive.drawer.obs.notPointing":
+    "falta apontar pra cá — use “Configura pra mim” aqui embaixo",
   "golive.drawer.obs.subtitle":
     "A Corneta recebe a imagem do OBS e manda pra cada plataforma.",
   "golive.drawer.obs.title": "Liga no OBS",
