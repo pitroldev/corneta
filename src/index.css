@@ -326,8 +326,10 @@
 :root[data-theme="light"] :is(.bg-night, .bg-brass-ink) :focus-visible {
   outline-color: var(--color-brass);
 }
-/* Headings take focus from script only so screen readers announce them; they are not controls. */
-:is(h1, h2, h3)[tabindex="-1"]:focus-visible {
+/* Headings and the routed screen take focus from script only so screen readers follow along;
+   they are not controls, and the next Tab shows the ring on the first control. */
+:is(h1, h2, h3)[tabindex="-1"]:focus-visible,
+#screen-scroll > [tabindex="-1"]:focus-visible {
   outline: none;
 }
 
