@@ -626,7 +626,8 @@ export const en: Dict = {
   "golive.drawer.internet.title": "Upload bandwidth",
   "golive.drawer.internet.unknown": "I haven't measured your upload yet.",
   "golive.drawer.obs.manual": "I'd rather set it up by hand",
-  "golive.drawer.obs.notPointing": "use “Set it up for me” below",
+  "golive.drawer.obs.notPointing":
+    "not pointing here yet — use “Set it up for me” below",
   "golive.drawer.obs.subtitle":
     "Corneta takes the OBS picture and sends it to each platform.",
   "golive.drawer.obs.title": "Hook up OBS",
