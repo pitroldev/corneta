@@ -334,9 +334,7 @@ export function QuickConnect({
                   type="password"
                   className="pl-9"
                   aria-label={t("platforms.key.placeholder")}
-                  placeholder={t("components.connect.pastePlaceholder", {
-                    platform: platformName(target.platformId, t),
-                  })}
+                  placeholder={t("components.connect.pastePlaceholder")}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && void save()}

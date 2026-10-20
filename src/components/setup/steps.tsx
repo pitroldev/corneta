@@ -23,6 +23,7 @@ import {
 } from "../../lib/readiness";
 import { shortcutLabel } from "../../lib/shortcuts";
 import { useReadiness, useReadinessContext } from "../../lib/useReadiness";
+import { useFocusRescue } from "../../lib/useFocusRescue";
 import { cn } from "../../lib/utils";
 import { INGEST_URL_RE } from "../../lib/validation";
 import { useI18n, useT } from "../../lib/i18n";
@@ -49,25 +50,31 @@ export function StepHeader({
   title,
   lead,
   titleRef,
+  badge,
 }: {
   kicker: string;
   title: string;
   lead: string;
   titleRef: React.RefObject<HTMLHeadingElement | null>;
+  /** Sits beside the title rather than above it, so the step still fits the default window. */
+  badge?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6">
-      <div className="mb-1.5 text-xs font-bold uppercase tracking-[0.18em] text-brass">
-        {kicker}
+    <div className="mb-6 flex items-start gap-5">
+      {badge}
+      <div className="min-w-0 flex-1">
+        <div className="mb-1.5 text-xs font-bold uppercase tracking-[0.18em] text-brass">
+          {kicker}
+        </div>
+        <h2
+          ref={titleRef}
+          tabIndex={-1}
+          className="text-4xl leading-none outline-none"
+        >
+          {title}
+        </h2>
+        <p className="mt-2.5 max-w-xl text-base text-ink-muted">{lead}</p>
       </div>
-      <h2
-        ref={titleRef}
-        tabIndex={-1}
-        className="text-4xl leading-none outline-none"
-      >
-        {title}
-      </h2>
-      <p className="mt-2.5 max-w-xl text-base text-ink-muted">{lead}</p>
     </div>
   );
 }
@@ -97,19 +104,21 @@ export function WelcomeStep({
   ];
   return (
     <div>
-      <m.div
-        initial={{ scale: 0.6, rotate: -14, opacity: 0 }}
-        animate={{ scale: 1, rotate: -6, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 260, damping: 16 }}
-        className="brand-tile mb-5 grid size-16 place-items-center rounded-lg bg-brass text-brass-ink"
-      >
-        <Mascot className="size-9 animate-shout" />
-      </m.div>
       <StepHeader
         kicker={t("components.setup.welcome.kicker")}
         title={t("components.setup.welcome.title")}
         lead={t("components.setup.welcome.lead")}
         titleRef={titleRef}
+        badge={
+          <m.div
+            initial={{ scale: 0.6, rotate: -14, opacity: 0 }}
+            animate={{ scale: 1, rotate: -6, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 16 }}
+            className="brand-tile mt-1 grid size-16 shrink-0 place-items-center rounded-lg bg-brass text-brass-ink"
+          >
+            <Mascot className="size-9 animate-shout" />
+          </m.div>
+        }
       />
       <FlowDiagram />
       <ol className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
@@ -248,6 +257,12 @@ function Line({ delay }: { delay: number }) {
 
 /* ---------- Platforms ---------- */
 
+const cardEntrance = (i: number) => ({
+  delay: 0.04 + i * 0.05,
+  duration: 0.2,
+  ease: "easeOut" as const,
+});
+
 export function PlatformsStep({
   titleRef,
 }: {
@@ -268,17 +283,22 @@ export function PlatformsStep({
             key={id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 + i * 0.06 }}
+            transition={cardEntrance(i)}
           >
             <PlatformSetupCard platformId={id} />
           </m.div>
         ))}
       </div>
-      <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+      <m.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={cardEntrance(SETUP_PLATFORMS.length)}
+        className="mt-4 flex flex-wrap items-center gap-2 text-sm text-ink-muted"
+      >
         <Plus className="size-4" />
         {t("components.setup.platforms.more")}
         <ExperimentalBadge />
-      </p>
+      </m.p>
     </div>
   );
 }
@@ -303,9 +323,11 @@ function PlatformSetupCard({ platformId }: { platformId: PlatformId }) {
     if (ready && !wasReady.current) setJustReady(true);
     wasReady.current = ready;
   }, [ready]);
+  const cardRef = useFocusRescue<HTMLDivElement>();
 
   return (
     <div
+      ref={cardRef}
       className={cn(
         "flex h-full flex-col gap-3 rounded-lg border-2 bg-surface p-4 transition-colors duration-300",
         ready ? "border-ok/60" : "border-transparent",
@@ -333,7 +355,12 @@ function PlatformSetupCard({ platformId }: { platformId: PlatformId }) {
         )}
       </div>
       {ready && target ? (
-        <div className="mt-auto flex items-center gap-2 rounded-md bg-ok/10 px-3 py-2 text-sm">
+        // Saving with Enter lands here rather than on "Not now", so a repeated Enter cannot undo it.
+        <div
+          data-focus-first=""
+          tabIndex={-1}
+          className="mt-auto flex items-center gap-2 rounded-md bg-ok/10 px-3 py-2 text-sm"
+        >
           <span className="min-w-0 flex-1 text-ink">
             {auto
               ? t("components.setup.platforms.readyAuto")
@@ -416,7 +443,7 @@ export function ObsStep({
           })}
         </m.p>
       )}
-      <ObsSetupPanel autoFocusAction={!already} onStatus={setStatus} />
+      <ObsSetupPanel onStatus={setStatus} />
     </div>
   );
 }
@@ -686,21 +713,6 @@ export function DoneStep({
   const hasChat = (s.chatSources ?? []).length > 0;
   return (
     <div>
-      <m.div
-        initial={{ scale: 0.4, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 320, damping: 14 }}
-        className={cn(
-          "mb-5 grid size-16 -rotate-6 place-items-center rounded-lg pop",
-          ok ? "bg-ok text-night" : "bg-brass text-brass-ink",
-        )}
-      >
-        {ok ? (
-          <Check className="size-9" strokeWidth={3.2} />
-        ) : (
-          <Clock className="size-8" />
-        )}
-      </m.div>
       <StepHeader
         kicker={t("components.setup.done.kicker")}
         title={t(
@@ -712,6 +724,23 @@ export function DoneStep({
           ok ? "components.setup.done.lead" : "components.setup.done.leadLater",
         )}
         titleRef={titleRef}
+        badge={
+          <m.div
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 320, damping: 14 }}
+            className={cn(
+              "mt-1 grid size-16 shrink-0 -rotate-6 place-items-center rounded-lg pop",
+              ok ? "bg-ok text-night" : "bg-brass text-brass-ink",
+            )}
+          >
+            {ok ? (
+              <Check className="size-9" strokeWidth={3.2} />
+            ) : (
+              <Clock className="size-8" />
+            )}
+          </m.div>
+        }
       />
       <ul className="overflow-hidden rounded-lg bg-surface">
         {rows.map((row, i) => (

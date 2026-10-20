@@ -456,8 +456,7 @@ export const pt = {
   "components.connect.fetching": "Pegando a chave…",
   "components.connect.login": "Entrar {platform}",
   "components.connect.pasteInstead": "ou colar a chave",
-  "components.connect.pastePlaceholder":
-    "Cole aqui a chave de transmissão ({platform})",
+  "components.connect.pastePlaceholder": "Cole a chave",
   "components.connect.turningOnAuto": "Ligando o YouTube automático…",
   "components.connect.waitBrowser":
     "Abri o login no navegador — é só autorizar e voltar pra cá.",

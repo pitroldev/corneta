@@ -326,6 +326,10 @@
 :root[data-theme="light"] :is(.bg-night, .bg-brass-ink) :focus-visible {
   outline-color: var(--color-brass);
 }
+/* Headings take focus from script only so screen readers announce them; they are not controls. */
+:is(h1, h2, h3)[tabindex="-1"]:focus-visible {
+  outline: none;
+}
 
 /* Disable CSS motion here; MotionConfig handles Framer Motion's reduced-motion behavior. */
 @media (prefers-reduced-motion: reduce) {

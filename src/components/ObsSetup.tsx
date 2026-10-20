@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { draftInputProps, useDraft } from "../lib/useDraft";
+import { useFocusRescue } from "../lib/useFocusRescue";
 import {
   ObsConfigChangedError,
   ObsConfigSaveError,
@@ -70,10 +71,8 @@ function obsErrorHelp(
  */
 export function ObsSetupPanel({
   onStatus,
-  autoFocusAction,
 }: {
   onStatus?: (status: ObsSetupStatus) => void;
-  autoFocusAction?: boolean;
 }) {
   const t = useT();
   const settings = useStore((s) => s.config!.settings);
@@ -134,13 +133,14 @@ export function ObsSetupPanel({
     }
   };
 
+  const rescueRef = useFocusRescue<HTMLDivElement>();
   const video =
     obs !== null && obs !== "loading" && obs.reachable && obs.width
       ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)} fps`
       : null;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={rescueRef} className="flex flex-col gap-3">
       <AnimatePresence mode="wait" initial={false}>
         {status === "ok" ? (
           <m.div
@@ -149,6 +149,8 @@ export function ObsSetupPanel({
             animate={{ opacity: 1, y: 0 }}
             className="rounded-lg bg-surface-2 p-5"
             role="status"
+            data-focus-first=""
+            tabIndex={-1}
           >
             <ul className="flex flex-col gap-2.5">
               {[
@@ -239,8 +241,6 @@ export function ObsSetupPanel({
             <Button
               variant="primary"
               size="lg"
-              // eslint-disable-next-line jsx-a11y/no-autofocus -- First-run setup moves straight to this step's only action.
-              autoFocus={autoFocusAction}
               onClick={() => void connect()}
               loading={status === "connecting"}
               disabled={status === "connecting"}
