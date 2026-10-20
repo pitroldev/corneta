@@ -9,15 +9,15 @@
           "src": "/images/editorial/getting-started/corneta-first-live-checklist.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 45758
+          "bytes": 54896
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-platform-destinations",
@@ -27,15 +27,15 @@
           "src": "/images/editorial/multistream/corneta-platform-destinations.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 41176
+          "bytes": 39036
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-platform-key-setup",
@@ -45,15 +45,15 @@
           "src": "/images/editorial/getting-started/corneta-platform-key-setup.webp",
           "width": 1080,
           "height": 900,
-          "bytes": 50654
+          "bytes": 48836
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-obs-connection-details",
@@ -63,15 +63,15 @@
           "src": "/images/editorial/getting-started/corneta-obs-connection-details.webp",
           "width": 1080,
           "height": 900,
-          "bytes": 54540
+          "bytes": 52450
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-quality-modes",
@@ -81,15 +81,15 @@
           "src": "/images/editorial/quality/corneta-quality-modes.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 54716
+          "bytes": 55688
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-live-safety-settings",
@@ -99,15 +99,15 @@
           "src": "/images/editorial/operations/corneta-live-safety-settings.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 66954
+          "bytes": 68694
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-upload-test-result",
@@ -117,15 +117,15 @@
           "src": "/images/editorial/quality/corneta-upload-test-result.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 58024
+          "bytes": 58682
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-unified-chat",
@@ -135,15 +135,15 @@
           "src": "/images/editorial/chat-and-alerts/corneta-unified-chat.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 37708
+          "bytes": 49308
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-post-live-report",
@@ -153,15 +153,15 @@
           "src": "/images/editorial/reports-and-data/corneta-post-live-report.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 51440
+          "bytes": 49546
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-vertical-target-settings",
@@ -171,15 +171,15 @@
           "src": "/images/editorial/multistream/corneta-vertical-target-settings.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 59552
+          "bytes": 60070
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     },
     {
       "baseName": "corneta-vertical-reframe-editor",
@@ -189,15 +189,15 @@
           "src": "/images/editorial/multistream/corneta-vertical-reframe-editor.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 26378
+          "bytes": 27442
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-08-01",
-      "productVersion": "0.6.0"
+      "capturedAt": "2026-10-20",
+      "productVersion": "0.10.0"
     }
   ]
 }
