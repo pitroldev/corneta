@@ -198,7 +198,6 @@ export function SettingsScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker={t("settings.header.kicker")}
         title={t("settings.header.title")}
         subtitle={t("settings.header.subtitle")}
       />

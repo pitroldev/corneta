@@ -26,12 +26,13 @@ export function Toaster() {
   const pause = useToasts((s) => s.pause);
   const resume = useToasts((s) => s.resume);
 
+  // bottom-28 clears the Live screen and first-run action bars, so toasts never cover their main button.
   return (
     <div
       role="region"
       aria-label={t("components.toaster.region.aria")}
       aria-live="polite"
-      className="pointer-events-none fixed bottom-5 right-5 z-[100] flex w-80 flex-col gap-2"
+      className="pointer-events-none fixed bottom-28 right-5 z-[100] flex w-80 flex-col gap-2"
     >
       <AnimatePresence>
         {toasts.map((item) => {

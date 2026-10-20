@@ -338,7 +338,15 @@ export type TelemetryEventMap = {
   screen_viewed: { screen_id: ScreenId };
   onboarding_started: { entry_point: "first_run" | "replay" };
   onboarding_step_completed: {
-    step_id: "welcome" | "platforms" | "obs" | "golive" | "chat_reports";
+    // golive and chat_reports belong to the previous tour; kept so older events stay valid.
+    step_id:
+      | "welcome"
+      | "platforms"
+      | "obs"
+      | "quality"
+      | "done"
+      | "golive"
+      | "chat_reports";
   };
   onboarding_completed: { duration_bucket: DurationBucket };
   obs_check_completed: {
@@ -552,7 +560,15 @@ const ENUMS: Record<string, ReadonlySet<string>> = {
     "chat_popout",
   ]),
   entry_point: new Set(["first_run", "replay"]),
-  step_id: new Set(["welcome", "platforms", "obs", "golive", "chat_reports"]),
+  step_id: new Set([
+    "welcome",
+    "platforms",
+    "obs",
+    "quality",
+    "done",
+    "golive",
+    "chat_reports",
+  ]),
   outcome: new Set([
     "ok",
     "not_reachable",

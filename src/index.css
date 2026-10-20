@@ -294,6 +294,20 @@
   }
 }
 
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.drawer-sheet {
+  box-shadow: -4px 0 0 0 var(--color-night);
+}
+
 /* Unlayered focus-visible rules override outline-none utilities without adding rings to mouse clicks. */
 :focus-visible {
   outline: 3px solid var(--color-brass);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
-import { captureShortcut } from "../../lib/shortcuts";
+import { captureShortcut, shortcutLabel } from "../../lib/shortcuts";
 
 export function ShortcutCapture({
   value,
@@ -91,7 +91,7 @@ export function ShortcutCapture({
                 : "settings.hotkey.capture.needsModifier",
             )
           : t("settings.hotkey.capture.prompt")
-        : value || t("settings.hotkey.capture.idle")}
+        : (value && shortcutLabel(value)) || t("settings.hotkey.capture.idle")}
     </button>
   );
 }

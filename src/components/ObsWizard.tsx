@@ -1,122 +1,24 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  Plug,
-  Wrench,
-  X,
-} from "lucide-react";
-import { useStore } from "../lib/store";
-import { draftInputProps, useDraft } from "../lib/useDraft";
-import {
-  ObsConfigChangedError,
-  ObsConfigSaveError,
-} from "../lib/obsCoordinator";
-import { obsIngestUrl } from "../lib/factory";
-import { bold, useT, type I18n } from "../lib/i18n";
-import type { ObsErrorCode } from "../lib/types";
-import { obsFailure, obsHelpKind, type ObsFailure } from "../lib/obsErrors";
-import { cn } from "../lib/utils";
+import { useRef, useState } from "react";
+import { Check, Plug, X } from "lucide-react";
+import { useT } from "../lib/i18n";
 import { Modal } from "./Modal";
-import { ObsVideoFit } from "./ObsVideoFit";
-import { Button, CopyField, Input } from "./ui";
-
-type Status = "idle" | "connecting" | "ok" | "error";
-
-function obsErrorHelp(
-  t: I18n["t"],
-  code: ObsErrorCode | undefined,
-): { title: string; tips: string[] } {
-  const kind = obsHelpKind(code);
-  if (kind === "auth") {
-    return {
-      title: t("encoding.wizard.error.auth.title"),
-      tips: [
-        t("encoding.wizard.error.auth.tip1"),
-        t("encoding.wizard.error.auth.tip2"),
-        t("encoding.wizard.error.auth.tip3"),
-      ],
-    };
-  }
-  if (kind === "notFound") {
-    return {
-      title: t("encoding.wizard.error.notfound.title"),
-      tips: [
-        t("encoding.wizard.error.notfound.tip1"),
-        t("encoding.wizard.error.notfound.tip2"),
-        t("encoding.wizard.error.notfound.tip3"),
-        t("encoding.wizard.error.notfound.tip4"),
-      ],
-    };
-  }
-  return {
-    title: t("encoding.wizard.error.generic.title"),
-    tips: [
-      t("encoding.wizard.error.generic.tip1"),
-      t("encoding.wizard.error.generic.tip2"),
-    ],
-  };
-}
+import { ObsSetupPanel, type ObsSetupStatus } from "./ObsSetup";
+import { Button } from "./ui";
 
 export function ObsWizard({ onClose }: { onClose: () => void }) {
-  const settings = useStore((s) => s.config!.settings);
-  const ingest = useStore((s) => s.config!.ingest);
-  const setSettings = useStore((s) => s.setSettings);
-  const configureObs = useStore((s) => s.configureObs);
   const t = useT();
-  const passwordDraft = useDraft(settings.obsPassword, (obsPassword) =>
-    setSettings({ obsPassword }),
-  );
-  const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState<ObsFailure | null>(null);
-  const [manualOpen, setManualOpen] = useState(false);
-  const [configError, setConfigError] = useState<"save" | "changed" | null>(
-    null,
-  );
-  const active = useRef(true);
-  const connecting = useRef(false);
-  useEffect(() => {
-    active.current = true;
-    return () => {
-      active.current = false;
-    };
-  }, []);
+  const [status, setStatus] = useState<ObsSetupStatus>("idle");
   // Focus the heading rather than the close button, which is first in DOM order.
   const titleRef = useRef<HTMLHeadingElement>(null);
-
-  const help = error ? obsErrorHelp(t, error.code) : null;
-
-  const connect = async () => {
-    if (connecting.current) return;
-    connecting.current = true;
-    setStatus("connecting");
-    setError(null);
-    setConfigError(null);
-    try {
-      await configureObs();
-      if (!active.current) return;
-      setStatus("ok");
-    } catch (e) {
-      if (!active.current) return;
-      if (e instanceof ObsConfigSaveError) setConfigError("save");
-      else if (e instanceof ObsConfigChangedError) setConfigError("changed");
-      else setError(obsFailure(e));
-      setStatus("error");
-      setManualOpen(true);
-    } finally {
-      connecting.current = false;
-    }
-  };
 
   return (
     <Modal
       title={t("encoding.wizard.title")}
       onClose={onClose}
-      className="max-w-lg rounded-xl bg-surface pop"
+      className="max-w-xl rounded-xl bg-surface pop"
       initialFocusRef={titleRef}
     >
-      <div className="sticky top-0 flex items-center justify-between bg-brass px-5 py-4 text-brass-ink">
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-brass px-5 py-4 text-brass-ink">
         <div className="flex items-center gap-3">
           <div className="grid size-10 place-items-center rounded-lg bg-brass-ink text-brass">
             <Plug className="size-5" strokeWidth={2.3} />
@@ -145,169 +47,23 @@ export function ObsWizard({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex flex-col gap-4 p-5">
-        <Step n={1} title={t("encoding.wizard.step1.title")}>
-          {bold(t, "encoding.wizard.step1.body")}
-        </Step>
-
-        <Step n={2} title={t("encoding.wizard.step2.title")}>
-          {bold(t, "encoding.wizard.step2.body")}
-          <Input
-            type="password"
-            aria-label={t("encoding.wizard.step2.title")}
-            placeholder={t("encoding.wizard.step2.placeholder")}
-            className="mt-2"
-            {...draftInputProps(passwordDraft)}
-            disabled={status === "connecting"}
-          />
-        </Step>
-
-        <Step n={3} title={t("encoding.wizard.step3.title")}>
-          {settings.autoStartObs
-            ? bold(t, "encoding.wizard.step3.body.autostart")
-            : bold(t, "encoding.wizard.step3.body.manual")}
-        </Step>
-
-        {status === "ok" && (
-          <div
-            role="status"
-            className="flex items-center gap-2 rounded-md bg-ok/15 px-3 py-2 text-sm font-semibold text-ok"
-          >
-            <Check className="size-4 shrink-0" strokeWidth={2.6} />{" "}
-            {settings.autoStartObs
-              ? bold(t, "encoding.wizard.ok.autostart")
-              : bold(t, "encoding.wizard.ok.manual")}
-          </div>
-        )}
-        {status === "ok" && <ObsVideoFit />}
-        {status === "error" && configError && (
-          <p
-            role="alert"
-            className="rounded-md bg-bad/10 p-3 text-sm font-semibold text-bad"
-          >
-            {t(
-              configError === "save"
-                ? "settings.obs.test.saveFailed"
-                : "settings.obs.test.settingsChanged",
-            )}
-          </p>
-        )}
-        {status === "error" && help && (
-          <div
-            role="alert"
-            className="rounded-md border-2 border-bad/40 bg-bad/10 p-3"
-          >
-            <div className="flex items-center gap-2 font-display font-bold text-bad">
-              <AlertTriangle className="size-4 shrink-0" /> {help.title}
-            </div>
-            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-ink-muted">
-              {help.tips.map((tip, i) => (
-                <li key={i}>{tip}</li>
-              ))}
-            </ul>
-            <details className="mt-2 text-xs text-ink-faint">
-              <summary className="cursor-pointer select-none font-semibold">
-                {t("encoding.wizard.error.details")}
-              </summary>
-              <p
-                data-selectable
-                className="mt-1 font-mono break-all text-ink-muted"
-              >
-                {error?.message}
-              </p>
-            </details>
-          </div>
-        )}
-
-        <div className="rounded-md border-2 border-border-soft bg-surface-2">
-          <button
-            onClick={() => setManualOpen((o) => !o)}
-            aria-expanded={manualOpen}
-            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-ink-muted hover:text-ink"
-          >
-            <Wrench className="size-4 text-brass" />
-            {t("encoding.wizard.manual.toggle")}
-            <ChevronDown
-              className={cn(
-                "ml-auto size-4 transition-transform",
-                manualOpen && "rotate-180",
-              )}
-            />
-          </button>
-          {manualOpen && (
-            <div className="flex flex-col gap-2 border-t border-border-soft p-3">
-              <p className="text-xs text-ink-faint">
-                {bold(t, "encoding.wizard.manual.lede")}
-              </p>
-              <CopyField
-                label={t("encoding.wizard.manual.server")}
-                value={obsIngestUrl(ingest)}
-              />
-              <CopyField
-                label={t("encoding.wizard.manual.key")}
-                value={ingest.key}
-                mono
-              />
-              <p className="text-xs text-ink-faint">
-                {settings.autoStartObs
-                  ? bold(t, "encoding.wizard.manual.note.autostart")
-                  : bold(t, "encoding.wizard.manual.note.manual")}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <button
-            onClick={onClose}
-            className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
-          >
-            {t("encoding.close")}
-          </button>
+        <ObsSetupPanel onStatus={setStatus} />
+        <div className="flex items-center justify-end gap-3 pt-1">
           {status === "ok" ? (
             <Button variant="primary" onClick={onClose}>
               {t("encoding.wizard.cta.done")}{" "}
               <Check className="size-4" strokeWidth={2.6} />
             </Button>
           ) : (
-            <Button
-              variant="primary"
-              onClick={connect}
-              loading={status === "connecting"}
-              disabled={status === "connecting"}
+            <button
+              onClick={onClose}
+              className="text-sm font-semibold text-ink-faint hover:text-ink-muted"
             >
-              {status === "connecting"
-                ? t("encoding.wizard.cta.connecting")
-                : status === "error"
-                  ? t("encoding.wizard.cta.retry")
-                  : t("encoding.wizard.cta.connect")}
-            </Button>
+              {t("encoding.close")}
+            </button>
           )}
         </div>
       </div>
     </Modal>
-  );
-}
-
-function Step({
-  n,
-  title,
-  children,
-}: {
-  n: number;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex gap-3">
-      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-surface-2 font-display text-sm font-extrabold text-brass">
-        {n}
-      </span>
-      <div>
-        <div className="font-display font-bold">{title}</div>
-        <div className="mt-0.5 text-sm leading-relaxed text-ink-muted">
-          {children}
-        </div>
-      </div>
-    </div>
   );
 }

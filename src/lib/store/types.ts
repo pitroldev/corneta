@@ -168,6 +168,9 @@ export interface State {
 
   tourNonce: number;
   replayTour: () => void;
+  /** First-run setup covers the app; the shell goes inert while it is open. */
+  setupOpen: boolean;
+  setSetupOpen: (open: boolean) => void;
 
   settingsTab: string | null;
   setSettingsTab: (v: string | null) => void;

@@ -319,7 +319,6 @@ export const en: Dict = {
   "chat.feed.hint.ready": "Until you connect, Corneta isn't reading your chat.",
   "chat.feed.hint.setup":
     "Add a channel (Twitch, Kick, YouTube or experimental Cinefy) and click Connect.",
-  "chat.header.kicker": "Everyone in one feed",
   "chat.header.subtitle":
     "Twitch, Kick, YouTube and experimental Cinefy in the same feed — up to two Twitch channels.",
   "chat.header.title": "Unified chat",
@@ -462,6 +461,248 @@ export const en: Dict = {
   "audience.embedded.unknown":
     "Stream from another platform; audience excluded from the total.",
   "audience.startedAt": "Reported start: {date}, {time}",
+  "components.connect.cancel": "Cancel",
+  "components.connect.fetching": "Getting the key…",
+  "components.connect.login": "Sign in with {platform}",
+  "components.connect.pasteInstead": "or paste the key",
+  "components.connect.pastePlaceholder":
+    "Paste the stream key here ({platform})",
+  "components.connect.turningOnAuto": "Turning on automatic YouTube…",
+  "components.connect.waitBrowser":
+    "I opened the sign-in in your browser — authorize it and come back here.",
+  "components.connect.waitCode":
+    "Paste this code on the page I opened and authorize:",
+  "components.connect.waiting": "Waiting for sign-in…",
+  "components.connect.whereKey": "Where do I find the key?",
+  "components.connect.youtubeReady":
+    "Automatic YouTube is on: I create the broadcast when you hit GO LIVE.",
+  "components.drawer.close": "Close",
+  "components.obsSetup.connecting.body":
+    "Connecting through OBS's WebSocket and pointing its stream here.",
+  "components.obsSetup.connecting.title": "Looking for OBS…",
+  "components.obsSetup.cta": "Set up OBS for me",
+  "components.obsSetup.error.body":
+    "Check the tips below and try again — or set it up by hand.",
+  "components.obsSetup.idle.body":
+    "Keep OBS open. I connect, point its stream here and check the video — no technical menus.",
+  "components.obsSetup.idle.title": "OBS open? Let's go.",
+  "components.obsSetup.ok.connected": "Connected to OBS",
+  "components.obsSetup.ok.pointed": "Pointed the OBS stream at Corneta",
+  "components.obsSetup.ok.video": "OBS video: {video}",
+  "components.obsSetup.ok.videoChecking": "Checking the OBS video…",
+  "components.obsSetup.websocket.toggle":
+    "OBS not found? Turn on its WebSocket",
+  "components.setup.aria": "Corneta first-time setup",
+  "components.setup.cta.back": "Back",
+  "components.setup.cta.finish": "Go to the panel",
+  "components.setup.cta.later": "Do it later",
+  "components.setup.cta.next": "Continue",
+  "components.setup.cta.start": "Get started",
+  "components.setup.done.chat": "Bring your platforms' chat together",
+  "components.setup.done.chatHint": "optional",
+  "components.setup.done.kicker": "Done",
+  "components.setup.done.later": "Left for later",
+  "components.setup.done.lead":
+    "Now give it a title and hit GO LIVE on the panel.",
+  "components.setup.done.leadLater":
+    "Whatever you left for later shows up on the panel with a button to fix it.",
+  "components.setup.done.obs": "OBS",
+  "components.setup.done.platforms": "Platforms",
+  "components.setup.done.quality": "Quality",
+  "components.setup.done.safety": "Safety nets",
+  "components.setup.done.shortcut":
+    "starts and stops the stream from anywhere, even with a game in full screen.",
+  "components.setup.done.title": "All set for your first stream!",
+  "components.setup.done.titleLater": "Almost there!",
+  "components.setup.obs.already":
+    "OBS is already pointed here ({video}). Check again if you like.",
+  "components.setup.obs.lead":
+    "Corneta takes the OBS picture and sends it to each platform. You keep building scenes in OBS as usual.",
+  "components.setup.obs.title": "Now OBS",
+  "components.setup.platforms.count.one": "{count} ready",
+  "components.setup.platforms.count.other": "{count} ready",
+  "components.setup.platforms.lead":
+    "Sign in and Corneta fetches the stream key for you. No account handy? You can paste the key.",
+  "components.setup.platforms.more":
+    "TikTok, X or your own RTMP are in Platforms → Add.",
+  "components.setup.platforms.needOne": "Connect at least one",
+  "components.setup.platforms.notNow": "Not now",
+  "components.setup.platforms.ready": "Ready to stream.",
+  "components.setup.platforms.readyAuto":
+    "Automatic YouTube: I create the broadcast when you GO LIVE.",
+  "components.setup.platforms.title": "Where do you stream?",
+  "components.setup.platforms.use": "Use {platform}",
+  "components.setup.privacy.note": "You can change this anytime in Settings.",
+  "components.setup.privacy.title": "Your privacy",
+  "components.setup.quality.failed":
+    "I couldn't measure it right now — you can try again.",
+  "components.setup.quality.fit.bad":
+    "In {mode} mode the stream uses about {mbps} Mbps — more than your upload can take. Pick a lighter mode.",
+  "components.setup.quality.fit.ok":
+    "In {mode} mode the stream uses about {mbps} Mbps — it fits with room to spare.",
+  "components.setup.quality.fit.warn":
+    "In {mode} mode the stream uses about {mbps} Mbps — it fits, with no room to spare.",
+  "components.setup.quality.guardian":
+    "Covers the picture if a term from your list shows up. It keeps the stream 12s behind, only looks for listed terms and doesn't cover audio. Set it up later in Settings → Safety nets.",
+  "components.setup.quality.lead":
+    "Every platform uses your internet's upload. I'll measure it to pick a quality that fits.",
+  "components.setup.quality.modes": "Quality",
+  "components.setup.quality.recommended": "Recommended",
+  "components.setup.quality.retest": "Measure again",
+  "components.setup.quality.safety": "Safety nets",
+  "components.setup.quality.testing": "Measuring your upload…",
+  "components.setup.quality.title": "Can your internet take it?",
+  "components.setup.quality.untested": "I haven't measured your upload yet.",
+  "components.setup.rail.done": "Done",
+  "components.setup.rail.obs": "OBS",
+  "components.setup.rail.platforms": "Platforms",
+  "components.setup.rail.quality": "Internet and quality",
+  "components.setup.rail.skip": "Skip setup",
+  "components.setup.rail.subtitle": "first-time setup",
+  "components.setup.rail.time": "You can skip any step and finish later.",
+  "components.setup.rail.welcome": "Welcome",
+  "components.setup.step": "Step {n} of {total}",
+  "components.setup.welcome.kicker": "Welcome",
+  "components.setup.welcome.lead":
+    "You send one stream from OBS and Corneta spreads it to Twitch, YouTube, Kick and Facebook at the same time. Let's get everything ready now.",
+  "components.setup.welcome.title": "Hey! Ready to go live everywhere?",
+  "components.setup.welcome.todo.internet": "Measure your internet",
+  "components.setup.welcome.todo.obs": "Hook up OBS for you",
+  "components.setup.welcome.todo.platforms": "Connect your platforms",
+  "golive.bar.fix": "Fix it",
+  "golive.bar.liveCount": "{live} of {total} on air",
+  "golive.bar.noPlatform": "No platform turned on.",
+  "golive.bar.noPlatform.detail":
+    "Turn on at least one so the stream has somewhere to go.",
+  "golive.bar.obs": "OBS isn't pointed here yet.",
+  "golive.bar.obs.detail":
+    "Set it up now, or go live and connect OBS after — I'll wait for the signal.",
+  "golive.bar.partial.detail":
+    "You can go live on the others now and leave {names} for later.",
+  "golive.bar.pending": "Not ready yet: {names}.",
+  "golive.bar.pending.detail": "Sign in or paste the key to go live.",
+  "golive.bar.ready": "All set to go live.",
+  "golive.bar.readyCount.one": "{count} platform",
+  "golive.bar.readyCount.other": "{count} platforms",
+  "golive.bar.readyTight": "Ready, but your upload may not keep up.",
+  "golive.bar.readyUpload": "uses {need} of {have} Mbps",
+  "golive.brb.armHint.title":
+    "To pause with one click, turn on BE RIGHT BACK in Safety nets before your next stream.",
+  "golive.chat.cantSend": "Sign in to send messages",
+  "golive.chat.connect": "Connect chat",
+  "golive.chat.connected": "connected",
+  "golive.chat.none.body":
+    "Pick your channels once and every platform's chat shows up here together.",
+  "golive.chat.none.title": "Unified chat",
+  "golive.chat.off.body": "Your channels are already set up — just connect.",
+  "golive.chat.off.title": "Chat disconnected",
+  "golive.chat.open": "Open",
+  "golive.chat.placeholder": "Send to every chat",
+  "golive.chat.send": "Send message",
+  "golive.chat.setup": "Set up chat",
+  "golive.chat.title": "Chat",
+  "golive.cta.aria.partial": "Go live without {names}",
+  "golive.cta.without": "without {names}",
+  "golive.destinations.add": "Add",
+  "golive.destinations.auto": "automatic",
+  "golive.destinations.manage": "Details",
+  "golive.destinations.off": "not in this stream",
+  "golive.destinations.pending": "needs setup",
+  "golive.destinations.ready": "all set",
+  "golive.destinations.title": "Where the stream goes",
+  "golive.drawer.internet.fit.bad":
+    "In {mode} mode your stream uses about {mbps} Mbps — more than your upload can take. Pick a lighter mode or turn off a platform.",
+  "golive.drawer.internet.fit.ok":
+    "In {mode} mode your stream uses about {mbps} Mbps — it fits with room to spare.",
+  "golive.drawer.internet.fit.unknown":
+    "In {mode} mode your stream uses about {mbps} Mbps. Measure your upload to see if it fits.",
+  "golive.drawer.internet.fit.warn":
+    "In {mode} mode your stream uses about {mbps} Mbps — it fits, with no room to spare. If your connection wobbles, the stream may stutter.",
+  "golive.drawer.internet.measured": "upload on the last test",
+  "golive.drawer.internet.modes": "Quality",
+  "golive.drawer.internet.more": "Fine-tune quality",
+  "golive.drawer.internet.subtitle":
+    "Every platform uses your internet's upload.",
+  "golive.drawer.internet.title": "Upload bandwidth",
+  "golive.drawer.internet.unknown": "I haven't measured your upload yet.",
+  "golive.drawer.obs.manual": "I'd rather set it up by hand",
+  "golive.drawer.obs.notPointing": "use “Set it up for me” below",
+  "golive.drawer.obs.subtitle":
+    "Corneta takes the OBS picture and sends it to each platform.",
+  "golive.drawer.obs.title": "Hook up OBS",
+  "golive.drawer.platforms.add": "Add a platform",
+  "golive.drawer.platforms.empty": "You don't have any platforms yet.",
+  "golive.drawer.platforms.fixUrl": "Fix the address in Platforms",
+  "golive.drawer.platforms.issue.noKey": "missing the key",
+  "golive.drawer.platforms.issue.url": "missing the server address",
+  "golive.drawer.platforms.manage": "Manage platforms",
+  "golive.drawer.platforms.off": "not in this stream",
+  "golive.drawer.platforms.ready": "all set",
+  "golive.drawer.platforms.subtitle":
+    "Turn them on or off and connect accounts without leaving.",
+  "golive.drawer.platforms.title": "Platforms",
+  "golive.drawer.platforms.youtubeAuto":
+    "automatic — I create the broadcast when you GO LIVE",
+  "golive.drawer.safety.more": "More safety settings",
+  "golive.drawer.safety.note":
+    "Protection helps, but it isn't a guarantee. Guardian is experimental: it keeps the stream 12s behind, only looks for the terms on your list, and doesn't cover audio.",
+  "golive.drawer.safety.subtitle":
+    "What I do on my own if something goes wrong mid-stream.",
+  "golive.drawer.safety.title": "Safety nets",
+  "golive.header.subtitle.live":
+    "You're on air. Follow each platform and the chat from here.",
+  "golive.header.subtitle.starting":
+    "Going live — each platform shows up here as soon as it connects.",
+  "golive.list.join": "{head} and {last}",
+  "golive.partial.turnedOff":
+    "I left {names} out of this stream. Turn it back on in Platforms once it's fixed.",
+  "golive.streamInfo.subtitle":
+    "Changes the title on every platform you're signed in to, without opening each dashboard.",
+  "golive.streamInfo.youtubeOptions": "YouTube options · {privacy}",
+  "golive.tile.aria": "{label}: {value}. {sub}. See details",
+  "golive.tile.internet.label": "Internet",
+  "golive.tile.internet.testing": "Measuring…",
+  "golive.tile.internet.testingSub": "testing your upload",
+  "golive.tile.internet.unknown": "Not measured",
+  "golive.tile.internet.unknownSub": "Measure now",
+  "golive.tile.internet.uses": "the stream uses ~{mbps} Mbps",
+  "golive.tile.obs.auth": "Password refused",
+  "golive.tile.obs.checking": "Checking…",
+  "golive.tile.obs.checkingSub": "checking OBS",
+  "golive.tile.obs.fixSub": "Set it up for me",
+  "golive.tile.obs.label": "OBS",
+  "golive.tile.obs.missing": "Not set up",
+  "golive.tile.obs.notPointing": "Not pointing here yet",
+  "golive.tile.obs.ok": "Set up",
+  "golive.tile.obs.okSub": "pointed at Corneta",
+  "golive.tile.platforms.label": "Platforms",
+  "golive.tile.platforms.missing.one": "still missing: {names}",
+  "golive.tile.platforms.missing.other": "still missing: {names}",
+  "golive.tile.platforms.none": "None turned on",
+  "golive.tile.platforms.noneSub": "Pick platforms",
+  "golive.tile.platforms.partial": "{ready} of {total} ready",
+  "golive.tile.platforms.ready.one": "{count} ready",
+  "golive.tile.platforms.ready.other": "{count} ready",
+  "golive.tile.safety.count": "{on} of {total} on",
+  "golive.tile.safety.label": "Safety nets",
+  "golive.tile.safety.noneSub": "none on",
+  "platforms.footer.hint":
+    "Drag the handle to reorder. Keys stay in the Windows vault, never in a file.",
+  "platforms.picker.experimental": "They work, but may still change or fail.",
+  "platforms.summary.allReady.one": "{count} platform ready to stream.",
+  "platforms.summary.allReady.other":
+    "All {count} platforms turned on are ready.",
+  "platforms.summary.noneOn":
+    "No platform turned on — turn on the ones that should get the stream.",
+  "platforms.summary.partial":
+    "{ready} of {total} turned on are ready. Fix what's missing right in the list.",
+  "platforms.target.sub.noKey": "Missing the stream key",
+  "platforms.target.sub.noUrl":
+    "Missing the server address — open it to fill in",
+  "platforms.target.sub.off": "Left out of upcoming streams",
+  "platforms.target.sub.ready": "Key saved in the Windows vault",
+  "platforms.target.sub.youtubeAuto":
+    "Automatic YouTube — I create the broadcast when you GO LIVE",
   "reports.channel.audienceLatest": "Last reading: {status}",
   "reports.channel.audienceUnavailable":
     "audience unavailable for this reading",
@@ -522,6 +763,10 @@ export const en: Dict = {
   "chat.youtube.creds.guide.show": "how do I get these?",
   "chat.youtube.creds.saved.toast":
     "Saved your YouTube credentials in Windows Credential Manager 🔒",
+  "sidebar.aria": "Main navigation",
+  "sidebar.group.live": "Streaming",
+  "sidebar.group.prepare": "Set up",
+  "sidebar.pending.title": "A platform still needs setup",
   "youtube.recovery.open": "Recover YouTube",
   "youtube.recovery.loading": "Checking recovery for this installation…",
   "youtube.recovery.loadFailed":
@@ -587,52 +832,16 @@ export const en: Dict = {
   "components.app.loading.error":
     "Couldn't read your settings. Try again — if it keeps happening, open the logs and send them my way.",
   "components.app.loading.screen": "Tuning this screen…",
-  "components.firstLive.dismiss.aria": "Dismiss the guide",
-  "components.firstLive.dismiss.title": "Dismiss the first-stream guide",
-  "components.firstLive.step.golive": "GO LIVE",
-  "components.firstLive.step.key": "Paste one platform's stream key",
-  "components.firstLive.step.obs": "Connect OBS",
-  "components.firstLive.title": "Your first stream in 3 steps",
   "components.legal.accept":
     "By continuing, you accept the {terms} and the {privacy}.",
   "components.legal.link.privacy": "Privacy policy",
   "components.legal.link.terms": "Terms of use",
-  "components.onboarding.art.key.label": "your key",
-  "components.onboarding.art.onair.label": "On air",
-  "components.onboarding.back": "Back",
   "components.onboarding.dismissed.toast":
-    "No rush — the tour lives in About → Replay the tour.",
-  "components.onboarding.dot.aria": "Step {n}",
+    "No rush — first-time setup lives in About → Redo first-time setup.",
   "components.onboarding.legalUpdate.body":
     "We updated the Terms of use and the Privacy policy. Take a look at what changed — if you keep using Corneta, you're accepting the new version.",
   "components.onboarding.legalUpdate.cta": "Accept and continue",
   "components.onboarding.legalUpdate.title": "The terms changed",
-  "components.onboarding.next": "Next",
-  "components.onboarding.picker.note":
-    "You can change this later. TikTok, X and your own RTMP server are on the Platforms screen.",
-  "components.onboarding.picker.text":
-    "Check the ones you stream on and Corneta gets the platforms ready — then you just paste each stream key.",
-  "components.onboarding.picker.title": "Where do you stream?",
-  "components.onboarding.skip": "Skip",
-  "components.onboarding.skip.aria": "Skip the tour",
-  "components.onboarding.start": "Let's get started",
-  "components.onboarding.step1.text":
-    "You send 1 stream out of OBS and Corneta pushes it out to Twitch, YouTube, Kick and more — all at once.",
-  "components.onboarding.step1.title": "One stream, everywhere",
-  "components.onboarding.step2.text":
-    "Each platform becomes a destination with its own stream key — you just paste one for each.",
-  "components.onboarding.step2.title": "Pick your platforms",
-  "components.onboarding.step3.text":
-    "On the Live screen, “Set it up for me” sets OBS up for you — no technical menus to dig through.",
-  "components.onboarding.step3.title": "Hook up OBS",
-  "components.onboarding.step4.text":
-    "One click and you're live on all of them. Keep an eye on each platform's numbers.",
-  "components.onboarding.step4.title": "Let the horn rip",
-  "components.onboarding.step5.text":
-    "Every chat in one place and, when you wrap up, a report on what choked.",
-  "components.onboarding.step5.title": "Chat and reports",
-  "components.onboarding.subtitle": "{n} steps, from OBS to the report.",
-  "components.onboarding.title": "Hey! Ready to sound the horn?",
   "components.telemetry.crashes.body":
     "On when you have not made a choice. Sends the failure stage and code, with names, paths and your text removed before leaving.",
   "components.telemetry.crashes.title": "Send crash reports",
@@ -858,7 +1067,6 @@ export const en: Dict = {
   "encoding.guide.why.onepass.strong": "One pass only.",
   "encoding.guide.why.onepass.text":
     "Converting the video for no reason just throws quality away.",
-  "encoding.header.kicker": "How good it looks on each platform",
   "encoding.header.subtitle":
     "How good the picture goes out — and how much your PC sweats for it.",
   "encoding.header.title": "Quality",
@@ -942,7 +1150,6 @@ export const en: Dict = {
   "encoding.vertical.warn.join": " and ",
   "encoding.vertical.warn.passthrough":
     "On Straight up, landscape video goes to **{platforms}**, and vertical is the only thing that works there — your stream goes out sideways or doesn't go out at all.",
-  "encoding.wizard.cta.connect": "Connect and set it up",
   "encoding.wizard.cta.connecting": "Connecting…",
   "encoding.wizard.cta.done": "Close the guide",
   "encoding.wizard.cta.retry": "Try again",
@@ -986,21 +1193,13 @@ export const en: Dict = {
     "If **Enable Authentication** is checked, click **Show Connect Info**, copy it and paste it here. No password? Leave it empty.",
   "encoding.wizard.step2.placeholder": "WebSocket password",
   "encoding.wizard.step2.title": "Password (if there is one)",
-  "encoding.wizard.step3.body.autostart":
-    "I connect and set OBS to point over here. When you hit **GO LIVE**, I hit play in OBS myself.",
-  "encoding.wizard.step3.body.manual":
-    "I connect and set OBS to point over here. Then, when it's stream time, just hit **Start Streaming** in OBS.",
-  "encoding.wizard.step3.title": "Connect",
   "encoding.wizard.subtitle": "Corneta sets OBS up for you.",
   "encoding.wizard.title": "Connect to OBS",
 
-  "golive.band.atEdge": "cutting it close — give it some room",
   "golive.band.test": "Measure now",
   "golive.band.test.disabledTitle":
     "Your stream is coming up — measuring now would steal bandwidth from it",
   "golive.band.testing": "Testing…",
-  "golive.band.title": "Upload bandwidth",
-  "golive.band.tooTight": "won't keep up — adjust the quality",
   "golive.bar.dismiss.aria": "Dismiss this warning",
   "golive.bar.down": "{n} platform(s) down",
   "golive.bar.error.aria": "Open the live panel — the stream went down",
@@ -1016,13 +1215,8 @@ export const en: Dict = {
     "OBS connected · connecting to the platforms…",
   "golive.bar.waitingObs": "Waiting for OBS…",
   "golive.bar.watching": "watching",
-  "golive.block.fixTarget":
-    "Fix {nome}: {problemas} — paste the stream key or turn that platform off.",
-  "golive.block.noPlatform": "Turn on at least one platform under Platforms.",
   "golive.block.updating":
     "Corneta is updating. Wait for it to reopen before starting your stream.",
-  "golive.brb.armHint":
-    "Want a one-click break? Arm {jaVolto} in Settings for your next stream.",
   "golive.brb.back": "I'm back!",
   "golive.brb.now": "BE RIGHT BACK now",
   "golive.brb.title.back":
@@ -1035,48 +1229,32 @@ export const en: Dict = {
   "golive.cancel": "Cancel",
   "golive.checkup.checking": "checking…",
   "golive.checkup.encoder": "Encoder available",
-  "golive.checkup.keys": "Keys and URLs",
-  "golive.checkup.keys.none": "no platforms turned on",
   "golive.checkup.obsConnected": "OBS connected",
   "golive.checkup.obsConnected.fix":
     "turn it on under Tools → WebSocket Server Settings (and the password goes in Corneta's Settings, if you set one)",
   "golive.checkup.obsPointing": "OBS pointing at Corneta",
-  "golive.checkup.obsPointing.fix":
-    "point OBS here with the button next to this",
   "golive.checkup.state.bad": "problem",
   "golive.checkup.state.ok": "done",
   "golive.checkup.state.warn": "missing",
   "golive.checkup.tip":
     "In OBS, under {caminho}: Simple mode is already right — relax. In Advanced mode, check {taxa} and {keyframe} — that's what the platforms ask for so it doesn't stutter.",
-  "golive.checkup.tip.guide": "See the full guide →",
   "golive.checkup.tip.keyframe": "Keyframe Interval: 2 s",
   "golive.checkup.tip.path": "Settings → Output",
   "golive.checkup.tip.rateControl": "Rate Control: CBR",
-  "golive.checkup.title": "Pre-stream checkup",
-  "golive.checkup.upload": "Upload",
-  "golive.checkup.upload.detail": "{atual} / {necessario} Mbps",
-  "golive.checkup.upload.detail.tight":
-    "{atual} / {necessario} Mbps · cutting it close",
-  "golive.checkup.upload.untested": "run the test in Upload bandwidth above",
   "golive.cta": "GO LIVE",
   "golive.cta.aria": "Go live",
-  "golive.cta.aria.blocked": "Go live (blocked: {motivo})",
-  "golive.empty.noPlatforms":
-    "No platforms turned on. Head to {plataformas}, switch at least one on and paste its key.",
   "golive.error.body": "The stream stopped. Check the logs or try again.",
   "golive.error.errorId": "Error ID",
   "golive.error.logs": "See the logs",
   "golive.error.operationId": "Operation ID",
   "golive.error.retry": "Try again",
   "golive.error.title": "Couldn't get your stream on air",
-  "golive.header.kicker": "Sound the horn",
   "golive.header.subtitle":
-    "Hook OBS up once, see if your internet can take it, and go live everywhere in one shot.",
+    "Check everything's ready, give it a title, and go live everywhere at once.",
   "golive.header.title": "Live",
   "golive.machine.label": "Your machine",
   "golive.marker.button": "Mark this moment",
   "golive.marker.title": "Drop a marker into the report",
-  "golive.obs.badge": "OBS: {status}",
   "golive.obs.check": "Check OBS",
   "golive.obs.field.key": "Stream key",
   "golive.obs.field.server": "Server",
@@ -1086,22 +1264,12 @@ export const en: Dict = {
   "golive.obs.key.note":
     "This key is just between OBS and Corneta — it's not from any platform.",
   "golive.obs.qualityGuide": "What's the best quality for OBS? Quick guide →",
-  "golive.obs.section.title": "Hook up OBS",
   "golive.obs.startStreamingButton": "Start Streaming",
-  "golive.obs.status.checking": "checking…",
-  "golive.obs.status.missing": "not set up",
-  "golive.obs.status.notPointing": "not pointing here yet",
-  "golive.obs.status.ok": "set up",
   "golive.onlyWhenLive": "Available once you're live",
   "golive.preflight.body":
     "You can go live anyway — the stream only starts when OBS sends the video.",
   "golive.preflight.goAnyway": "Go anyway",
   "golive.preflight.title": "OBS isn't pointing here yet",
-  "golive.problems.pasteKey": "Paste the key →",
-  "golive.problems.title": "Fix this before you start:",
-  "golive.problems.turnOff": "Turn this platform off",
-  "golive.problems.turnedOff.toast":
-    "Turned {nome} off — switch it back on under Platforms.",
   "golive.rescue.authFailed":
     "Found OBS, but the WebSocket password didn't match — check it under Settings → OBS.",
   "golive.rescue.body": "Is it open? Did you hit {botao}?",
@@ -1109,8 +1277,6 @@ export const en: Dict = {
   "golive.rescue.notReachable":
     "Couldn't find OBS around here — looks like it's closed, or the WebSocket is off.",
   "golive.rescue.title": "OBS hasn't connected yet",
-  "golive.security.adjust": "Adjust",
-  "golive.security.armed": "Armed",
   "golive.security.bitrate.desc":
     "if your internet chokes, I drop the quality before the stream freezes",
   "golive.security.bitrate.desc.off":
@@ -1130,8 +1296,6 @@ export const en: Dict = {
     "watching {n} word(s) — if one shows up, I cut to BE RIGHT BACK",
   "golive.security.loudness.desc": "I level your volume on my own",
   "golive.security.loudness.label": "Audio normalizer",
-  "golive.security.off": "Off",
-  "golive.security.title": "Your safety nets",
   "golive.signalLost.body":
     "Your viewers are staring at a frozen screen. Check OBS (did it close? did it stop streaming?) — when the signal comes back, I'll pick it up on my own.",
   "golive.signalLost.title":
@@ -1182,7 +1346,6 @@ export const en: Dict = {
   "golive.streamInfo.youtubePrivacy.public": "Public",
   "golive.streamInfo.youtubePrivacy.unlisted":
     "Unlisted (anyone with the link)",
-  "golive.target.noName": "(no name)",
   "golive.target.openChannel.aria": "Open your {nome} channel",
   "golive.target.openChannel.title": "Open your channel on the platform",
   "golive.target.pause": "Pause",
@@ -1192,8 +1355,6 @@ export const en: Dict = {
   "golive.target.retry": "Try again",
   "golive.target.swapKey": "Swap the key →",
   "golive.timer.onAir": "on air",
-  "golive.timer.connectingTargets": "OBS connected · opening the platforms…",
-  "golive.timer.waiting": "No video from OBS yet…",
   "golive.toast.canceled": "Canceled — you never went on air.",
   "golive.toast.live": "You're live! The horn's blowing 📣",
   "golive.toast.markerSaved":
@@ -1230,10 +1391,9 @@ export const en: Dict = {
   "platforms.about.hero.body":
     "I built Corneta to kill a headache of my own: one stream out of OBS goes live on Twitch, YouTube, Kick and the rest all at once — free.",
   "platforms.about.hero.title": "Hi, I'm Petro",
-  "platforms.about.kicker": "Who's behind the horn",
   "platforms.about.legal.privacy": "Privacy policy",
   "platforms.about.legal.terms": "Terms of use",
-  "platforms.about.replayTour": "Replay the welcome tour",
+  "platforms.about.replayTour": "Redo first-time setup",
   "platforms.about.site.sub": "Official site, FAQ and download.",
   "platforms.about.title": "About",
   "platforms.about.version": "Corneta v{version} · multistream",
@@ -1263,12 +1423,6 @@ export const en: Dict = {
   "platforms.key.remove": "Remove",
   "platforms.key.removeConfirm": "Remove it for real?",
   "platforms.key.removeFailed": "Couldn't remove the stream key — {err}",
-  "platforms.key.reconnectKick": "Reconnect Kick",
-  "platforms.key.reconnectKickTitle":
-    "Corneta needs one more Kick permission to read your account's key",
-  "platforms.key.reconnectTwitch": "Reconnect Twitch",
-  "platforms.key.reconnectTwitchTitle":
-    "Corneta needs a new permission to read your account's key",
   "platforms.key.removed": "Removed your stream key",
   "platforms.key.save": "Save",
   "platforms.key.saveFailed": "Couldn't save the stream key — {err}",
@@ -1317,7 +1471,6 @@ export const en: Dict = {
   "platforms.mesa.join.note":
     "For now it works on the same network (or with the host reachable over the internet) — a relay is on the way.",
   "platforms.mesa.join.title": "Join a Table",
-  "platforms.mesa.kicker": "Table · co-stream",
   "platforms.mesa.leave": "Leave the Table",
   "platforms.mesa.mic.off": "Muted",
   "platforms.mesa.mic.on": "Mic",
@@ -1364,11 +1517,6 @@ export const en: Dict = {
   "platforms.profile.renameTitle": "Rename the active profile",
   "platforms.profile.switchTo": 'Switch to "{name}"',
   "platforms.profile.untitled": "Untitled",
-  "platforms.readiness.allReady": "All set to go live",
-  "platforms.readiness.noKey": "{n} with no stream key",
-  "platforms.readiness.noUrl": "{n} with no URL",
-  "platforms.readiness.off": "{n} turned off",
-  "platforms.readiness.ready": "{n} ready",
   "platforms.subtitle":
     "Pick your platforms, paste each one's stream key, and I'll push your OBS video to all of them at once.",
   "platforms.target.badge.noName": "No name",
@@ -1420,9 +1568,7 @@ export const en: Dict = {
   "platforms.target.url.placeholder":
     "rtmp://server/app  (rtmp:// or rtmps://)",
   "platforms.target.badge.off": "off",
-  "platforms.target.urlUnset": "No URL set",
   "platforms.title": "Platforms",
-  "platforms.title.kicker": "Where your horn gets heard",
   "platforms.toast.added": "{platform} is in 📣",
   "platforms.toast.removed": "{name} is out",
   "platforms.toast.undo": "Undo",
@@ -1999,12 +2145,11 @@ export const en: Dict = {
   "sidebar.settings": "Settings",
   "sidebar.start.title": "Go to Live and get started",
   "sidebar.state.error": "Error",
-  "sidebar.state.live": "On air · blowing the horn",
+  "sidebar.state.live": "On air",
   "sidebar.state.connectingTargets": "Connecting to the platforms",
   "sidebar.state.starting": "Waiting on OBS",
   "sidebar.state.stopped": "Off air",
   "sidebar.viewers": "watching",
-  "settings.header.kicker": "Under the hood",
   "settings.header.subtitle":
     "How Corneta talks to OBS and how it behaves on air.",
   "settings.header.title": "Settings",

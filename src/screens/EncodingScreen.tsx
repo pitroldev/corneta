@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, m } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
   ChevronDown,
@@ -7,12 +7,10 @@ import {
   Crosshair,
   Gauge,
   Info,
-  Layers,
-  Sparkles,
   Wand2,
 } from "lucide-react";
 import { useStore } from "../lib/store";
-import type { EncoderKind, EncodingAction, EncodingMode } from "../lib/types";
+import type { EncoderKind, EncodingAction } from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
 import {
   bandFit,
@@ -22,14 +20,7 @@ import {
   smartHybridAction,
 } from "../lib/estimates";
 import { toast } from "../lib/toast";
-import {
-  bold,
-  rich,
-  useI18n,
-  useT,
-  type I18n,
-  type MessageKey,
-} from "../lib/i18n";
+import { bold, rich, useI18n, type I18n, type MessageKey } from "../lib/i18n";
 import { cn, fmtResolution } from "../lib/utils";
 import {
   Badge,
@@ -43,44 +34,10 @@ import {
 import { Select, type SelectOption } from "../components/Select";
 import { ReframeEditor } from "../components/ReframeEditor";
 import { ObsQualityGuide } from "../components/ObsQualityGuide";
+import { QualityModeCards, useModeEstimates } from "../components/QualityModes";
 
 const MIN_BR = 1000;
 const MAX_BR = 51000;
-
-// IDs are persisted Rust enum values; only translation keys are display copy.
-const MODES: {
-  id: EncodingMode;
-  titleKey: MessageKey;
-  tagKey: MessageKey;
-  tone: "brass" | "neutral";
-  icon: typeof Cpu;
-  descKey: MessageKey;
-}[] = [
-  {
-    id: "passthrough",
-    titleKey: "encoding.mode.passthrough.title",
-    tagKey: "encoding.mode.passthrough.tag",
-    tone: "neutral",
-    icon: Layers,
-    descKey: "encoding.mode.passthrough.desc",
-  },
-  {
-    id: "hybrid",
-    titleKey: "encoding.mode.hybrid.title",
-    tagKey: "encoding.mode.hybrid.tag",
-    tone: "brass",
-    icon: Wand2,
-    descKey: "encoding.mode.hybrid.desc",
-  },
-  {
-    id: "per-platform",
-    titleKey: "encoding.mode.perPlatform.title",
-    tagKey: "encoding.mode.perPlatform.tag",
-    tone: "neutral",
-    icon: Sparkles,
-    descKey: "encoding.mode.perPlatform.desc",
-  },
-];
 
 export function EncodingScreen() {
   const config = useStore((s) => s.config);
@@ -113,19 +70,7 @@ export function EncodingScreen() {
   }, [encoders.length, refreshEncoders]);
 
   const anyHw = encoders.some((e) => e.available && e.kind !== "software");
-  // estimate() is pure: compute each mode once per config change, not several times per render.
-  const estimates = useMemo(
-    () =>
-      config
-        ? new Map(
-            MODES.map((mode) => [
-              mode.id,
-              estimate({ ...config, mode: mode.id }, { anyHwAvailable: anyHw }),
-            ]),
-          )
-        : null,
-    [config, anyHw],
-  );
+  const estimates = useModeEstimates();
 
   if (!config || !estimates) return null;
 
@@ -176,7 +121,6 @@ export function EncodingScreen() {
   return (
     <div className="mx-auto max-w-3xl">
       <SectionTitle
-        kicker={t("encoding.header.kicker")}
         title={t("encoding.header.title")}
         subtitle={t("encoding.header.subtitle")}
       />
@@ -198,81 +142,7 @@ export function EncodingScreen() {
         </EmptyState>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {MODES.map((mode) => {
-          const est = estimates.get(mode.id)!;
-          const fit = bandFit(est.uploadKbps, uploadMbps);
-          const active = config.mode === mode.id;
-          const Icon = mode.icon;
-          return (
-            <m.button
-              key={mode.id}
-              onClick={() => setMode(mode.id)}
-              whileTap={{ scale: 0.97 }}
-              aria-pressed={active}
-              className={cn(
-                "relative flex flex-col rounded-lg p-4 text-left transition",
-                active
-                  ? "border-2 border-brass bg-surface pop-brass"
-                  : "border-2 border-transparent bg-surface-2 hover:bg-surface-3",
-              )}
-            >
-              <Badge tone={mode.tone} className="mb-2 self-start">
-                {t(mode.tagKey)}
-              </Badge>
-              <div className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "grid size-7 shrink-0 place-items-center rounded-md",
-                    active
-                      ? "bg-brass text-brass-ink"
-                      : "bg-surface text-ink-muted",
-                  )}
-                >
-                  <Icon className="size-4" strokeWidth={2.4} />
-                </span>
-                <span className="font-display text-lg font-bold">
-                  {t(mode.titleKey)}
-                </span>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                {t(mode.descKey)}
-              </p>
-              <div className="mt-auto space-y-2 pt-3">
-                <LoadBar load={est.load} />
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-ink-faint">
-                    {t("encoding.card.upload.label")}
-                  </span>
-                  <span className="font-display font-extrabold tabular-nums">
-                    {fmt.bitrate(est.uploadKbps)}
-                  </span>
-                </div>
-                <div
-                  className={cn(
-                    "min-h-4 text-[11px] font-bold",
-                    fit === "ok"
-                      ? "text-ok"
-                      : fit === "warn"
-                        ? "text-warn"
-                        : fit === "bad"
-                          ? "text-bad"
-                          : "text-ink-faint/60",
-                  )}
-                >
-                  {fit === "ok"
-                    ? t("encoding.fit.ok")
-                    : fit === "warn"
-                      ? t("encoding.fit.warn")
-                      : fit === "bad"
-                        ? t("encoding.fit.bad")
-                        : " "}
-                </div>
-              </div>
-            </m.button>
-          );
-        })}
-      </div>
+      <QualityModeCards />
 
       <p className="mt-3 min-h-4 truncate text-xs text-ink-faint">
         {uploadMbps == null
@@ -537,38 +407,6 @@ export function EncodingScreen() {
               {t("encoding.tuning.noPlatforms")}
             </Card>
           ))}
-      </div>
-    </div>
-  );
-}
-
-function LoadBar({ load }: { load: number }) {
-  const t = useT();
-  const pct = Math.round(load * 100);
-  const tone = load > 0.66 ? "bg-bad" : load > 0.33 ? "bg-warn" : "bg-ok";
-  const word = t(
-    load >= 0.95
-      ? "encoding.load.word.max"
-      : load > 0.66
-        ? "encoding.load.word.heavy"
-        : load > 0.33
-          ? "encoding.load.word.warm"
-          : "encoding.load.word.easy",
-  );
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="font-semibold text-ink-faint">
-          {t("encoding.load.label")}
-        </span>
-        <span className="font-display font-bold text-ink-muted">{word}</span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-sm bg-surface">
-        <m.div
-          className={cn("h-full rounded-sm", tone)}
-          animate={{ width: `${Math.max(4, pct)}%` }}
-          transition={{ type: "spring", stiffness: 200, damping: 26 }}
-        />
       </div>
     </div>
   );

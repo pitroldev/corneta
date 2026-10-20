@@ -383,11 +383,14 @@ export function CopyField({
   label,
   value,
   mono,
+  stacked,
   className,
 }: {
   label?: string;
   value: string;
   mono?: boolean;
+  /** Label above the value, for narrow panels where a side label would truncate it. */
+  stacked?: boolean;
   className?: string;
 }) {
   const t = useT();
@@ -402,9 +405,20 @@ export function CopyField({
     }
   };
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        stacked && "flex-wrap gap-y-1",
+        className,
+      )}
+    >
       {label && (
-        <div className="w-40 shrink-0 text-xs font-bold uppercase tracking-wide text-ink-faint">
+        <div
+          className={cn(
+            "shrink-0 text-xs font-bold uppercase tracking-wide text-ink-faint",
+            stacked ? "w-full" : "w-40",
+          )}
+        >
           {label}
         </div>
       )}

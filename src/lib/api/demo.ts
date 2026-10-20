@@ -39,6 +39,36 @@ export function mockApi(): CornetaApi {
   const saveVault = (v: Record<string, string>) =>
     localStorage.setItem(VAULT_KEY, JSON.stringify(v));
 
+  // Sign-in is simulated for YouTube and Kick (Twitch needs a build-time client ID) so the connect
+  // flow can be exercised without accounts: a pending "code" state, then "connected".
+  const ACCOUNTS_KEY = "corneta.demo.accounts";
+  type DemoAccount = "youtube" | "kick";
+  const loadAccounts = (): Partial<Record<DemoAccount, boolean>> => {
+    try {
+      return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  };
+  const setAccount = (who: DemoAccount, on: boolean) =>
+    localStorage.setItem(
+      ACCOUNTS_KEY,
+      JSON.stringify({ ...loadAccounts(), [who]: on }),
+    );
+  type AuthListener = Parameters<CornetaApi["subscribeAuthFlow"]>[0];
+  const authListeners = new Set<AuthListener>();
+  const emitAuth = (who: DemoAccount, state: string, login = "") =>
+    authListeners.forEach((listener) =>
+      listener(who, { state, userCode: "", verifyUri: "", login }),
+    );
+  const demoLogin = (who: DemoAccount) => {
+    setTimeout(() => emitAuth(who, "code"), 50);
+    setTimeout(() => {
+      setAccount(who, true);
+      emitAuth(who, "connected", who === "kick" ? "demo" : "");
+    }, 1800);
+  };
+
   const loadTelemetry = (): TelemetryStatus => {
     try {
       const stored = localStorage.getItem(TELEMETRY_KEY);
@@ -866,21 +896,22 @@ export function mockApi(): CornetaApi {
     },
     async setOauthConfig() {},
     async authStatus() {
+      const accounts = loadAccounts();
       return {
         twitchLogin: null,
         twitchMissingScopes: [],
-        youtube: false,
-        youtubeConfigured: false,
-        youtubeOfficialReady: false,
+        youtube: !!accounts.youtube,
+        youtubeConfigured: true,
+        youtubeOfficialReady: true,
         youtubeOwnCreds: false,
         youtubeUsingOwnCreds: false,
-        kick: false,
-        kickConfigured: false,
-        kickOfficialReady: false,
+        kick: !!accounts.kick,
+        kickConfigured: true,
+        kickOfficialReady: true,
         kickOwnCreds: false,
         kickUsingOwnCreds: false,
         kickCanBan: false,
-        kickCanReadKey: false,
+        kickCanReadKey: !!accounts.kick,
         brokerError: null,
       };
     },
@@ -889,18 +920,27 @@ export function mockApi(): CornetaApi {
       return "demo";
     },
     async twitchLogout() {},
-    async youtubeLoginStart() {},
-    async youtubeLogout() {},
+    async youtubeLoginStart() {
+      demoLogin("youtube");
+    },
+    async youtubeLogout() {
+      setAccount("youtube", false);
+    },
     async youtubeBroadcastRecoveryStatus() {
       return "none";
     },
     async youtubeRetryBroadcastCleanup() {},
     async youtubeAcknowledgeUnknownBroadcast() {},
-    async kickLoginStart() {},
-    async kickFetchStreamKey() {
+    async kickLoginStart() {
+      demoLogin("kick");
+    },
+    async kickFetchStreamKey(targetId) {
+      saveVault({ ...loadVault(), [targetId]: "demo-account-key" });
       return { login: "demo", url: null };
     },
-    async kickLogout() {},
+    async kickLogout() {
+      setAccount("kick", false);
+    },
     async setStreamInfo() {
       return {};
     },
@@ -913,8 +953,11 @@ export function mockApi(): CornetaApi {
     async kickUseOfficial() {},
     async kickUseOwnCreds() {},
     async chatModerate() {},
-    subscribeAuthFlow() {
-      return () => {};
+    subscribeAuthFlow(onAuth) {
+      authListeners.add(onAuth);
+      return () => {
+        authListeners.delete(onAuth);
+      };
     },
     subscribeChat(onMsg, onStatus, onDelete) {
       chatMsgListeners.add(onMsg);
