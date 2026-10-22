@@ -2,6 +2,18 @@
   "version": 1,
   "declarations": [
     {
+      "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "pt-BR/guides/comparisons/restream-alternative.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+    },
+    {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
@@ -14,6 +26,18 @@
       "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
     },
     {
+      "article": "pt-BR/guides/multistream/local-vs-cloud.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "pt-BR/guides/multistream/obs-multistream.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+    },
+    {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
@@ -24,6 +48,18 @@
       "source": "src/screens/GoLiveScreen.tsx",
       "sourceBlob": "c95a330b25bef231cf5ce54fa325148d85b3a74f",
       "reason": "Só acrescenta, sob o YouTube automático, a escolha de quem vê a live e de conteúdo para crianças; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
+    },
+    {
+      "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "pt-BR/guides/multistream/twitch-youtube-simultaneously.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/guides/operations/analyze-stream-drop.mdx",
@@ -122,6 +158,12 @@
       "reason": "Os cards de modo e a barra de carga passam a usar m, com a animação carregada sob demanda, e uma variável foi renomeada; modos, padrões de bitrate e cards citados não mudaram."
     },
     {
+      "article": "pt-BR/guides/quality/why-stream-lags.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+    },
+    {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src-tauri/src/overlay.rs",
       "sourceBlob": "09a6b7e4b0b1142fe8595a14892f91b4563061d0",
@@ -156,6 +198,12 @@
       "source": "src/lib/store.ts",
       "sourceBlob": "0baa491691070ea7d29cf2c102481778277c7806",
       "reason": "As ações de conta e de chave viraram genéricas por provedor; o primeiro uso descrito no artigo não mudou."
+    },
+    {
+      "article": "pt-BR/help/getting-started/first-stream.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
+      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
