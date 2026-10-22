@@ -1032,6 +1032,7 @@ dependencies = [
  "ort",
  "posthog-rs",
  "regex",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.11.1",

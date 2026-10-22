@@ -38,6 +38,8 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 ureq3 = { package = "ureq", version = "3.3.0" }
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 tungstenite = { version = "0.30.0", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+# The graph enables both ring and aws-lc-rs, so rustls cannot pick a process default on its own.
+rustls = { version = "0.23.46", default-features = false, features = ["ring"] }
 sha2 = "0.11.0"
 base64 = "0.23.0"
 # Share immutable decoded frames across delay, freeze and encoding without large copies.
