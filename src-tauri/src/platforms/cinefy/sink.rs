@@ -48,6 +48,7 @@ impl super::OutputPort for CinefySink {
                             .map(|badge| ChatBadge {
                                 label: badge.label,
                                 kind: badge.kind,
+                                ..Default::default()
                             })
                             .collect(),
                         text,
@@ -56,6 +57,7 @@ impl super::OutputPort for CinefySink {
                         } else {
                             message.published_at_ms
                         },
+                        ..Default::default()
                     },
                 );
             }

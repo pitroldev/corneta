@@ -5,6 +5,8 @@ import type {
   AppConfig,
   ChatDelete,
   ChatMessage,
+  ChatModes,
+  ChatPoll,
   ChatStatus,
   EncoderInfo,
   EngineSnapshot,
@@ -403,6 +405,36 @@ export function tauriApi(): CornetaApi {
         void listen<ChatDelete>("chat://delete", (e) =>
           onDelete(e.payload),
         ).then(add);
+      });
+      return () => {
+        cancelled = true;
+        uns.forEach((u) => u());
+        uns.length = 0;
+      };
+    },
+    subscribeChatSide(onEvent) {
+      let cancelled = false;
+      const uns: Array<() => void> = [];
+      const add = (u: () => void) => (cancelled ? u() : uns.push(u));
+      void event().then(({ listen }) => {
+        void listen<{ platform: string; source: string; modes: ChatModes }>(
+          "chat://modes",
+          (e) => onEvent({ kind: "modes", ...e.payload }),
+        ).then(add);
+        void listen<{
+          platform: string;
+          source: string;
+          message: ChatMessage | null;
+        }>("chat://pin", (e) => onEvent({ kind: "pin", ...e.payload })).then(
+          add,
+        );
+        void listen<{
+          platform: string;
+          source: string;
+          poll: ChatPoll | null;
+        }>("chat://poll", (e) => onEvent({ kind: "poll", ...e.payload })).then(
+          add,
+        );
       });
       return () => {
         cancelled = true;

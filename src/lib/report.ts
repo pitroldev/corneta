@@ -3,6 +3,9 @@ import { CHAT_PLATFORMS } from "../platforms";
 import { pluralSuffix } from "./i18n/locale";
 import type {
   AlertKind,
+  ChatBadge,
+  ChatFragment,
+  ChatHighlight,
   ChatPlatform,
   PlatformId,
   ReplayChatGap,
@@ -25,6 +28,67 @@ import type {
 export type Translate = I18n["t"];
 
 type RawLine = { kind?: string; [k: string]: unknown };
+
+const REPLAY_FRAGMENT_KINDS = new Set<ChatFragment["kind"]>([
+  "text",
+  "emote",
+  "gif",
+  "sticker",
+  "link",
+  "mention",
+  "cheer",
+]);
+const REPLAY_HIGHLIGHTS = new Set<ChatHighlight>([
+  "first",
+  "returning",
+  "highlighted",
+  "redeemed",
+  "announcement",
+  "effect",
+  "pinned",
+  "paid",
+  "celebration",
+  "error",
+]);
+const webUrl = (value: unknown): string | undefined =>
+  typeof value === "string" &&
+  /^https?:\/\/[^\s"<>]+$/.test(value) &&
+  value.length <= 2048
+    ? value
+    : undefined;
+
+/** Session files are editable; only known fragment kinds and web URLs come back. */
+function replayFragments(value: unknown): ChatFragment[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: ChatFragment[] = [];
+  for (const raw of value.slice(0, 200)) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    const kind = item.k as ChatFragment["kind"];
+    if (!REPLAY_FRAGMENT_KINDS.has(kind)) continue;
+    out.push({
+      kind,
+      text: typeof item.t === "string" ? item.t.slice(0, 500) : undefined,
+      url: webUrl(item.u),
+    });
+  }
+  return out.length ? out : undefined;
+}
+
+function replayBadges(value: unknown): ChatBadge[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: ChatBadge[] = [];
+  for (const raw of value.slice(0, 12)) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    out.push({
+      label: String(item.l ?? "").slice(0, 24),
+      kind: String(item.k ?? "").slice(0, 24),
+      url: webUrl(item.u),
+    });
+  }
+  return out.length ? out : undefined;
+}
 
 const finiteMetric = (value: unknown, max = 100): number | undefined => {
   const number = Number(value);
@@ -385,6 +449,26 @@ export function parseChatSession(ndjson: string): {
         c: o.c == null ? undefined : String(o.c),
         m: String(o.m),
         i: o.i == null ? undefined : String(o.i),
+        f: replayFragments(o.f),
+        b: replayBadges(o.b),
+        h: REPLAY_HIGHLIGHTS.has(o.h as ChatHighlight)
+          ? (o.h as ChatHighlight)
+          : undefined,
+        r:
+          o.r && typeof o.r === "object"
+            ? {
+                author: String((o.r as Record<string, unknown>).a ?? "").slice(
+                  0,
+                  100,
+                ),
+                text: String((o.r as Record<string, unknown>).m ?? "").slice(
+                  0,
+                  500,
+                ),
+              }
+            : undefined,
+        me: o.me === true || undefined,
+        sys: o.sys === true || undefined,
       });
     }
   }
@@ -1658,7 +1742,7 @@ function newAcc(platform: ChatPlatform, source: string): ChannelAcc {
   };
 }
 
-const SUB_KINDS: AlertKind[] = ["sub", "resub", "subgift", "member"];
+const SUB_KINDS: AlertKind[] = ["sub", "resub", "subgift", "member", "upgrade"];
 
 function channelBreakdown(d: SessionData): ChannelBreakdown {
   const acc = new Map<string, ChannelAcc>();
@@ -1874,11 +1958,7 @@ function alertStats(d: SessionData): AlertStats {
         topRaid = { user: e.user, amount: e.amount ?? 0 };
     }
   }
-  const subs =
-    (byKind.sub ?? 0) +
-    (byKind.resub ?? 0) +
-    (byKind.subgift ?? 0) +
-    (byKind.member ?? 0);
+  const subs = SUB_KINDS.reduce((sum, kind) => sum + (byKind[kind] ?? 0), 0);
   return {
     total: a.length,
     byKind,

@@ -59,6 +59,7 @@ export const twitchChat: ChatProviderSpec = {
   send: "session",
   echoesOwnMessages: true,
   repliesNeedNativeId: true,
+  maxLength: 480,
   copy: {
     channel: "chat.source.value.twitch",
     placeholder: "chat.source.placeholder.twitch",

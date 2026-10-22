@@ -2,6 +2,7 @@
 //! `src/platforms/<id>/destination.json`, and the chat and account providers registered below.
 
 pub mod cinefy;
+pub mod emotes;
 pub mod kick;
 pub mod provider;
 pub mod twitch;

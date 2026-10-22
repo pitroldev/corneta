@@ -68,6 +68,7 @@ export const youtubeChat: ChatProviderSpec = {
   send: "account",
   bansNeedAuthorId: true,
   repliesNeedNativeId: false,
+  maxLength: 200,
   copy: {
     channel: "chat.source.value.youtube",
     placeholder: "chat.source.placeholder.youtube",

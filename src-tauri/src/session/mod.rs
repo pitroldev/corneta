@@ -284,12 +284,15 @@ pub fn record_chat_msg(
     color: Option<&str>,
     text: &str,
     native_id: Option<&str>,
+    details: Option<serde_json::Value>,
 ) {
-    DiskStore.append(
-        &chat_path(session),
-        &domain::chat_msg_line(t, platform, source, author, color, text, native_id),
-        MAX_CHAT_BYTES,
-    );
+    let mut line = domain::chat_msg_line(t, platform, source, author, color, text, native_id);
+    if let (Some(serde_json::Value::Object(details)), serde_json::Value::Object(line)) =
+        (details, &mut line)
+    {
+        line.extend(details);
+    }
+    DiskStore.append(&chat_path(session), &line, MAX_CHAT_BYTES);
 }
 
 pub fn record_chat_gap(session: &Path, from: u64) {

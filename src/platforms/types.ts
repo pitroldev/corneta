@@ -26,6 +26,8 @@ export interface ChatProviderSpec {
   bansNeedAuthorId?: boolean;
   /** Replies thread on the message's native ID; without that the platform mentions the author instead. */
   repliesNeedNativeId: boolean;
+  /** Longest message the platform accepts, in characters. */
+  maxLength: number;
   copy: {
     channel: MessageKey;
     placeholder: MessageKey;

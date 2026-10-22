@@ -59,6 +59,8 @@ impl ChatProvider for Youtube {
             Some(reply) => sanitize_outgoing(&chat::youtube_reply_text(&reply.author, out.text)),
             None => out.text.to_string(),
         };
+        // YouTube rejects messages longer than 200 characters.
+        let text: String = text.chars().take(200).collect();
         Some(account::youtube_send(out.app, &text).map(|()| {
             emit_chat(
                 out.app,
@@ -74,6 +76,7 @@ impl ChatProvider for Youtube {
                     fragments: vec![text_frag(&text)],
                     badges: vec![],
                     ts: now_ms(),
+                    ..Default::default()
                 },
             );
         }))

@@ -7,6 +7,8 @@ import type {
   AppConfig,
   AppSettings,
   ChatMessage,
+  ChatModes,
+  ChatPoll,
   EncoderInfo,
   EncodingMode,
   EngineSnapshot,
@@ -18,6 +20,18 @@ import type {
   Viewers,
 } from "../types";
 export type T = I18n["t"];
+
+/** What a chat source keeps on screen besides its messages. */
+export interface ChatSide {
+  platform: string;
+  source: string;
+  modes: ChatModes;
+  pin: ChatMessage | null;
+  poll: ChatPoll | null;
+}
+
+export const chatSideKey = (platform: string, source: string) =>
+  `${platform}:${source}`;
 export interface LoginState {
   state: string;
   login?: string;
@@ -91,6 +105,8 @@ export interface State {
   chatMessages: ChatMessage[];
   chatConnected: boolean;
   chatStatuses: Record<string, { platform: string; status: string }>;
+  /** Modes, pinned message and running poll per source, keyed by `chatSideKey`. */
+  chatSide: Record<string, ChatSide>;
   bindChat: () => () => void;
   bindChatRunning: () => () => void;
   connectChat: (t: T) => Promise<void>;

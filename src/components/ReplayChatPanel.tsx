@@ -24,10 +24,14 @@ function asLiveChatMessage(message: ReplayChatMessage): ChatMessage {
     author: message.a,
     color: message.c,
     text: message.m,
-    fragments: [{ kind: "text", text: message.m }],
-    badges: [],
+    fragments: message.f ?? [{ kind: "text", text: message.m }],
+    badges: message.b ?? [],
     ts: message.t,
     deleted: message.deleted,
+    highlight: message.h,
+    reply: message.r,
+    action: message.me,
+    system: message.sys,
   };
   replayMessageCache.set(message, converted);
   return converted;

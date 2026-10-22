@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   clearKey: vi.fn(),
   accountLogout: vi.fn(),
   subscribeChat: vi.fn(),
+  subscribeChatSide: vi.fn(),
   subscribeConfigChanged: vi.fn(),
   setOauthConfig: vi.fn(),
   authStatus: vi.fn(),
@@ -25,6 +26,7 @@ import { useStore } from "./store";
 describe("store slices preserve shared contracts", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.subscribeChatSide.mockReturnValue(() => {});
     useStore.setState(
       { ...useStore.getInitialState(), config: defaultConfig(), loaded: true },
       true,

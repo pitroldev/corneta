@@ -1,10 +1,11 @@
 //! Twitch: IRC chat with third-party emotes, EventSub follows, viewers, and the account.
 
 pub mod account;
+mod assets;
 mod audience;
 mod chat;
-mod emotes;
-mod follows;
+mod eventsub;
+mod irc;
 
 use serde_json::{json, Map, Value};
 use tauri::AppHandle;
@@ -41,10 +42,10 @@ impl ChatProvider for Twitch {
 
     fn start_shared(&self, session: &ChatSession) {
         // One EventSub socket covers every Twitch channel; follows need the app's own login.
-        let channels: Vec<follows::FollowChannel> = session
+        let channels: Vec<eventsub::FollowChannel> = session
             .sources
             .iter()
-            .map(|source| follows::FollowChannel {
+            .map(|source| eventsub::FollowChannel {
                 login: source.value.trim().to_lowercase(),
                 label: source_label(source),
             })
@@ -53,7 +54,7 @@ impl ChatProvider for Twitch {
             return;
         }
         let (app, running, gen) = (session.app.clone(), session.running.clone(), session.gen);
-        tauri::async_runtime::spawn_blocking(move || follows::run(channels, running, app, gen));
+        tauri::async_runtime::spawn_blocking(move || eventsub::run(channels, running, app, gen));
     }
 
     fn send(&self, out: &Outbox) -> Option<Result<(), String>> {

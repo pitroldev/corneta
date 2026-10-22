@@ -240,16 +240,45 @@ export interface AlertSource {
   hasToken?: boolean;
 }
 
+export type ChatFragmentKind =
+  "text" | "emote" | "gif" | "sticker" | "link" | "mention" | "cheer";
+
+/** One piece of a message; `text` is always the plain-text fallback. */
 export interface ChatFragment {
-  kind: "text" | "emote";
+  kind: ChatFragmentKind;
   text?: string;
+  /** Image for emotes, GIFs, stickers and cheers; the target for links. */
   url?: string;
+  /** Bits in a cheer. */
+  amount?: number;
+  /** Cheer tier color. */
+  color?: string;
+  /** Zero-width emote drawn over the previous one. */
+  overlay?: boolean;
+  /** Power-up: the emote is shown much larger. */
+  giant?: boolean;
 }
 
 export interface ChatBadge {
   label: string;
   kind: string;
+  /** Badge image; without one the label is shown. */
+  url?: string;
+  /** Tooltip, such as "Subscriber · 14 months". */
+  title?: string;
 }
+
+export type ChatHighlight =
+  | "first"
+  | "returning"
+  | "highlighted"
+  | "redeemed"
+  | "announcement"
+  | "effect"
+  | "pinned"
+  | "paid"
+  | "celebration"
+  | "error";
 
 export interface ChatMessage {
   id: string;
@@ -266,6 +295,20 @@ export interface ChatMessage {
   ts: number;
   /** Moderated messages remain as tombstones in the live feed. */
   deleted?: boolean;
+  /** `/me`: the whole line takes the author's color. */
+  action?: boolean;
+  /** Why the platform singles the message out. */
+  highlight?: ChatHighlight;
+  /** Accent for announcements and paid highlights. */
+  accent?: string;
+  /** What the highlight is about, such as a message effect or who pinned it. */
+  note?: string;
+  /** The message this one replies to, as the platform quotes it. */
+  reply?: { author: string; text: string };
+  /** Shared chat: sent in another channel of the session. */
+  shared?: boolean;
+  /** A platform notice with no author line, such as a watch streak or a mode change. */
+  system?: boolean;
 }
 
 export interface ChatDelete {
@@ -274,7 +317,43 @@ export interface ChatDelete {
   source?: string;
   nativeId?: string;
   author?: string;
+  /** Matches the author even when the display name differs from the login. */
+  authorId?: string;
+  /** A timeout's length; absent for bans and hides. */
+  seconds?: number;
 }
+
+/** Restrictions a chat reports; each update carries only what changed. */
+export interface ChatModes {
+  emoteOnly?: boolean;
+  subsOnly?: boolean;
+  membersOnly?: boolean;
+  uniqueChat?: boolean;
+  /** Seconds between messages; 0 is off. */
+  slow?: number;
+  /** Minutes a viewer must follow first; -1 is off. */
+  followersOnly?: number;
+}
+
+export interface ChatPoll {
+  id: string;
+  kind: "poll" | "prediction";
+  question: string;
+  options: { label: string; votes?: number; percent?: number }[];
+  total?: number;
+  ended: boolean;
+}
+
+/** What a source keeps on screen besides messages. */
+export type ChatSideEvent =
+  | { kind: "modes"; platform: string; source: string; modes: ChatModes }
+  | {
+      kind: "pin";
+      platform: string;
+      source: string;
+      message: ChatMessage | null;
+    }
+  | { kind: "poll"; platform: string; source: string; poll: ChatPoll | null };
 
 export interface ChatStatus {
   platform: string;
@@ -317,7 +396,15 @@ export type AlertKind =
   | "tip"
   | "raid"
   | "member"
-  | "superchat";
+  | "superchat"
+  | "upgrade"
+  | "payforward"
+  | "streak"
+  | "charity"
+  | "gift"
+  | "kicks"
+  | "reward"
+  | "milestone";
 
 export interface Alert {
   id: string;
@@ -332,6 +419,10 @@ export interface Alert {
   /** Emote fragments; empty or absent falls back to plain message text. */
   fragments?: ChatFragment[];
   ts: number;
+  /** Sticker or gift artwork. */
+  image?: string;
+  /** What was given or redeemed: a reward, a gift, a charity or a membership level. */
+  title?: string;
 }
 
 export interface Leak {
@@ -524,6 +615,13 @@ export interface ReplayChatMessage {
   i?: string;
   /** Moderated after delivery; replay hides the message by default. */
   deleted?: boolean;
+  /** Emotes, GIFs and links, when the message had more than text. */
+  f?: ChatFragment[];
+  b?: ChatBadge[];
+  h?: ChatHighlight;
+  r?: { author: string; text: string };
+  me?: boolean;
+  sys?: boolean;
 }
 
 export interface ReplayChatGap {

@@ -16,6 +16,7 @@ import type {
   ChatDelete,
   ChatFragment,
   ChatMessage,
+  ChatSideEvent,
   ChatStatus,
   EngineSnapshot,
   SessionMeta,
@@ -352,6 +353,7 @@ export function mockApi(): CornetaApi {
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
   const chatStatusListeners = new Set<(s: ChatStatus) => void>();
   const chatDeleteListeners = new Set<(d: ChatDelete) => void>();
+  const chatSideListeners = new Set<(e: ChatSideEvent) => void>();
   const alertListeners = new Set<(a: Alert) => void>();
   let alertSeq = 0;
   const viewerListeners = new Set<(v: Viewers) => void>();
@@ -383,6 +385,10 @@ export function mockApi(): CornetaApi {
       "raid",
       "member",
       "superchat",
+      "streak",
+      "reward",
+      "kicks",
+      "upgrade",
     ];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
@@ -422,6 +428,34 @@ export function mockApi(): CornetaApi {
           amount: pick([5, 10, 50]),
           currency: "BRL",
           message: t("core.mock.alert.superchat.message"),
+        };
+      case "streak":
+        return {
+          ...base,
+          platform: "twitch",
+          source: "Twitch Demo",
+          amount: 7,
+        };
+      case "reward":
+        return {
+          ...base,
+          title: t("core.mock.alert.reward.title"),
+          message: t("core.mock.alert.reward.message"),
+        };
+      case "kicks":
+        return {
+          ...base,
+          platform: "kick",
+          source: "Kick Demo",
+          amount: pick([10, 100, 500]),
+          title: "Full Send",
+        };
+      case "upgrade":
+        return {
+          ...base,
+          platform: "twitch",
+          source: "Twitch Demo",
+          tier: "T1",
         };
       default:
         return base;
@@ -756,6 +790,45 @@ export function mockApi(): CornetaApi {
           l({ platform: src.platform, source: src.name, status: "connected" }),
         ),
       );
+      const side = (e: ChatSideEvent) => chatSideListeners.forEach((l) => l(e));
+      side({
+        kind: "modes",
+        platform: "twitch",
+        source: "Twitch Demo A",
+        modes: { slow: 10, followersOnly: 10 },
+      });
+      side({
+        kind: "pin",
+        platform: "kick",
+        source: "Kick Demo",
+        message: {
+          id: "demo-pin",
+          platform: "kick",
+          source: "Kick Demo",
+          author: "viewer_kick_01",
+          text: t("core.mock.chat.pinned"),
+          fragments: [{ kind: "text", text: t("core.mock.chat.pinned") }],
+          badges: [{ label: "MOD", kind: "moderator" }],
+          ts: Date.now(),
+          highlight: "pinned",
+        },
+      });
+      side({
+        kind: "poll",
+        platform: "youtube",
+        source: "YouTube Demo",
+        poll: {
+          id: "demo-poll",
+          kind: "poll",
+          question: t("core.mock.chat.poll.question"),
+          options: [
+            { label: t("core.mock.chat.poll.a"), percent: 58 },
+            { label: t("core.mock.chat.poll.b"), percent: 30 },
+            { label: t("core.mock.chat.poll.c"), percent: 12 },
+          ],
+          ended: false,
+        },
+      });
       const VBASE: Record<string, number> = {
         "Twitch Demo A": 820,
         "Twitch Demo B": 4200,
@@ -837,23 +910,84 @@ export function mockApi(): CornetaApi {
         recentIds.push({ nativeId, platform });
         if (recentIds.length > 40) recentIds.shift();
         const pool = AUTHORS[platform];
-        chatMsgListeners.forEach((l) =>
-          l({
-            id: `${chatSeq}-${Date.now()}`,
-            platform,
-            source: src.name,
-            author: pool[Math.floor(Math.random() * pool.length)],
-            nativeId,
-            color:
-              platform === "youtube"
-                ? undefined
-                : COLORS[Math.floor(Math.random() * COLORS.length)],
-            text,
-            fragments,
-            badges,
-            ts: Date.now(),
-          }),
-        );
+        const base: ChatMessage = {
+          id: `${chatSeq}-${Date.now()}`,
+          platform,
+          source: src.name,
+          author: pool[Math.floor(Math.random() * pool.length)],
+          nativeId,
+          color:
+            platform === "youtube"
+              ? undefined
+              : COLORS[Math.floor(Math.random() * COLORS.length)],
+          text,
+          fragments,
+          badges,
+          ts: Date.now(),
+        };
+        // Now and then, one of the richer message kinds the platforms send.
+        const roll = Math.random();
+        const message: ChatMessage =
+          roll < 0.04 && platform === "twitch"
+            ? {
+                ...base,
+                text: "[Y A Y Yes GIF by Djemilah Birnie]",
+                fragments: [
+                  {
+                    kind: "gif",
+                    text: "[Y A Y Yes GIF by Djemilah Birnie]",
+                    url: "https://media4.giphy.com/media/joSNxeswxuc74Juo8X/giphy.gif",
+                  },
+                ],
+                badges: [{ label: "SUB", kind: "subscriber", title: "T2" }],
+              }
+            : roll < 0.08
+              ? {
+                  ...base,
+                  text: t("core.mock.chat.reply"),
+                  fragments: [
+                    { kind: "text", text: t("core.mock.chat.reply") },
+                  ],
+                  reply: { author: pool[0], text },
+                }
+              : roll < 0.11
+                ? {
+                    ...base,
+                    text: t("core.mock.chat.first"),
+                    fragments: [
+                      { kind: "text", text: t("core.mock.chat.first") },
+                    ],
+                    highlight: "first",
+                  }
+                : roll < 0.13 && platform === "twitch"
+                  ? {
+                      ...base,
+                      text: t("core.mock.chat.announcement"),
+                      fragments: [
+                        {
+                          kind: "text",
+                          text: t("core.mock.chat.announcement"),
+                        },
+                      ],
+                      highlight: "announcement",
+                      accent: "#9146ff",
+                    }
+                  : roll < 0.15
+                    ? {
+                        ...base,
+                        text: t("core.mock.chat.streak", { user: base.author }),
+                        fragments: [
+                          {
+                            kind: "text",
+                            text: t("core.mock.chat.streak", {
+                              user: base.author,
+                            }),
+                          },
+                        ],
+                        system: true,
+                      }
+                    : base;
+        chatMsgListeners.forEach((l) => l(message));
       }, 1100);
     },
     async chatStop() {
@@ -954,6 +1088,12 @@ export function mockApi(): CornetaApi {
         chatMsgListeners.delete(onMsg);
         chatStatusListeners.delete(onStatus);
         chatDeleteListeners.delete(onDelete);
+      };
+    },
+    subscribeChatSide(onEvent) {
+      chatSideListeners.add(onEvent);
+      return () => {
+        chatSideListeners.delete(onEvent);
       };
     },
     subscribeAlerts(onAlert) {

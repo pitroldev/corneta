@@ -37,6 +37,7 @@ export const kickChat: ChatProviderSpec = {
   send: "account",
   bansNeedAuthorId: true,
   repliesNeedNativeId: true,
+  maxLength: 480,
   copy: {
     channel: "chat.source.value.kick",
     placeholder: "chat.source.placeholder.kick",

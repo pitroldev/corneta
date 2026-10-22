@@ -125,6 +125,13 @@
         vertical-align: -0.35em;
         margin: 0 1px;
       }
+      .alert .art {
+        display: block;
+        max-height: 5em;
+        width: auto;
+        margin-top: 0.3em;
+        border-radius: 8px;
+      }
       .alert .plat {
         margin-top: 0.375em;
         font-size: 0.6875em;
@@ -240,7 +247,58 @@
               return {
                 emoji: "💬",
                 head: `${U} — super chat ${money(amt)}`,
+                note: a.image && a.title ? esc(a.title) : "",
                 accent: "blue",
+              };
+            case "upgrade":
+              return {
+                emoji: "⏫",
+                head: `${U} continuou a assinatura de presente!`,
+                accent: "brass",
+              };
+            case "payforward":
+              return {
+                emoji: "🤝",
+                head: `${U} passou o presente adiante!`,
+                accent: "tomato",
+              };
+            case "streak":
+              return {
+                emoji: "🔥",
+                head: `${U} tá há ${fmtAmount(amt) || "várias"} lives seguidas aqui!`,
+                accent: "tomato",
+              };
+            case "charity":
+              return {
+                emoji: "💚",
+                head: `${U} doou ${money(amt)} pra caridade!`,
+                note: a.title ? esc(a.title) : "",
+                accent: "green",
+              };
+            case "gift":
+              return {
+                emoji: "🎀",
+                head: `${U} mandou ${a.title ? esc(a.title) : "um presente"}!`,
+                accent: "brass",
+              };
+            case "kicks":
+              return {
+                emoji: "🟩",
+                head: `${U} mandou ${fmtAmount(amt)} KICKs!`,
+                note: a.title ? esc(a.title) : "",
+                accent: "green",
+              };
+            case "reward":
+              return {
+                emoji: "🎟️",
+                head: `${U} resgatou ${a.title ? esc(a.title) : "uma recompensa"}!`,
+                accent: "cyan",
+              };
+            case "milestone":
+              return {
+                emoji: "🏆",
+                head: `${U} chegou a um marco!`,
+                accent: "brass",
               };
             default:
               return {
@@ -262,7 +320,7 @@
           if (Array.isArray(a.fragments) && a.fragments.length) {
             return a.fragments
               .map((f) =>
-                f.kind === "emote" && f.url
+                (f.kind === "emote" || f.kind === "cheer") && f.url
                   ? `<img class="emote" src="${esc(f.url)}" alt="${esc(f.text || "")}" />`
                   : esc(f.text || ""),
               )
@@ -300,6 +358,9 @@
             `<div class="body">` +
             `<div class="head">${p.head}</div>` +
             (msg ? `<div class="msg">${msg}</div>` : "") +
+            (a.image && /^https:\/\//.test(a.image)
+              ? `<img class="art" src="${esc(a.image)}" alt="${esc(a.title || "")}" />`
+              : "") +
             (platLabel ? `<div class="plat">${esc(platLabel)}</div>` : "") +
             `</div>`;
           stage.appendChild(el);

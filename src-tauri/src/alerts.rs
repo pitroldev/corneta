@@ -231,6 +231,7 @@ fn parse_streamlabs(source: &str, data: &Value) -> Option<Alert> {
         message,
         fragments: Vec::new(),
         ts: now_ms(),
+        ..Default::default()
     })
 }
 
@@ -286,6 +287,7 @@ fn parse_streamelements(source: &str, ev: &Value) -> Option<Alert> {
         message,
         fragments: Vec::new(),
         ts: now_ms(),
+        ..Default::default()
     })
 }
 

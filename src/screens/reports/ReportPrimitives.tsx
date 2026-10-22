@@ -1,9 +1,14 @@
 import { type ComponentType } from "react";
 import { useConfirm } from "../../lib/useConfirm";
 import {
+  Coins,
   Copy,
+  Flame,
   Gift,
+  HandHeart,
   Heart,
+  Ticket,
+  CircleArrowUp,
   Medal,
   MessageSquare,
   Play,
@@ -443,4 +448,10 @@ export const ALERT_LABELS: [string, string, Icon][] = [
   ["superchat", "reports.alerts.kind.superchat", MessageSquare],
   ["raid", "reports.alerts.kind.raid", Rocket],
   ["follow", "reports.alerts.kind.follow", Heart],
+  ["upgrade", "reports.alerts.kind.upgrade", CircleArrowUp],
+  ["gift", "reports.alerts.kind.gift", Gift],
+  ["kicks", "reports.alerts.kind.kicks", Coins],
+  ["reward", "reports.alerts.kind.reward", Ticket],
+  ["streak", "reports.alerts.kind.streak", Flame],
+  ["charity", "reports.alerts.kind.charity", HandHeart],
 ];
