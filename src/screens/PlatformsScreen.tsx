@@ -328,11 +328,11 @@ function TargetRow({
   const ctx = useReadinessContext();
   const controls = useDragControls();
   const preset = PLATFORMS[target.platformId];
-  const isCustom = target.platformId === "custom";
-  // Incomplete presets require a user-provided ingest URL; Kick URLs can vary by account or region.
+  const userServer = !!preset.userServer;
+  // Incomplete presets require a user-provided ingest URL; regional ingests stay editable.
   const presetUrlIncomplete = !INGEST_URL_RE.test(preset.ingestUrl.trim());
   const showUrlField =
-    isCustom || presetUrlIncomplete || target.platformId === "kick";
+    userServer || presetUrlIncomplete || !!preset.regionalIngest;
   const nameDraft = useDraft(target.name, (name) =>
     updateTarget(target.id, { name }),
   );
@@ -476,7 +476,7 @@ function TargetRow({
                   aria-label={t("platforms.target.nameAria")}
                   className="min-w-0 max-w-full rounded-md border border-transparent bg-transparent px-1 font-display text-lg font-bold leading-tight text-ink outline-none [field-sizing:content] hover:border-border focus:border-brass focus:bg-surface-2"
                 />
-                {isCustom && (
+                {userServer && (
                   <Badge color={preset.color}>
                     {target.ingestUrl
                       .trim()
@@ -547,11 +547,11 @@ function TargetRow({
               <label className="flex flex-col gap-1 text-xs font-semibold text-ink-muted">
                 <span>
                   {t("platforms.target.url.label")}
-                  {!isCustom && (
+                  {!userServer && (
                     <span className="font-normal text-ink-faint">
                       {" "}
-                      {target.platformId === "kick"
-                        ? t("platforms.target.url.helpKick")
+                      {preset.regionalIngest
+                        ? t("platforms.target.url.helpPrefilled")
                         : t("platforms.target.url.help", {
                             platform: platformName(target.platformId, t),
                           })}

@@ -15,7 +15,11 @@ import {
 } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { bandFit, estimate } from "../../lib/estimates";
-import { PLATFORMS, platformName, platformTagline } from "../../lib/platforms";
+import {
+  SETUP_PLATFORMS,
+  platformName,
+  platformTagline,
+} from "../../lib/platforms";
 import {
   joinNames,
   obsConfigured,
@@ -25,7 +29,6 @@ import { shortcutLabel } from "../../lib/shortcuts";
 import { useReadiness, useReadinessContext } from "../../lib/useReadiness";
 import { useFocusRescue } from "../../lib/useFocusRescue";
 import { cn } from "../../lib/utils";
-import { INGEST_URL_RE } from "../../lib/validation";
 import { useI18n, useT } from "../../lib/i18n";
 import type { PlatformId } from "../../lib/types";
 import { ObsSetupPanel, type ObsSetupStatus } from "../ObsSetup";
@@ -33,17 +36,6 @@ import { QualityModeCards, modeTitleKey } from "../QualityModes";
 import { QuickConnect } from "../platforms/TargetConnect";
 import { Mascot } from "../decor";
 import { Badge, Button, ExperimentalBadge, PlatformGlyph, Toggle } from "../ui";
-
-const SETUP_ORDER: PlatformId[] = ["twitch", "youtube", "kick", "facebook"];
-
-/** Platforms first-run setup offers: complete presets with a key page, never experimental ones. */
-export const SETUP_PLATFORMS: PlatformId[] = Object.values(PLATFORMS)
-  .filter((p) => !p.experimental && p.keyUrl && INGEST_URL_RE.test(p.ingestUrl))
-  .map((p) => p.id)
-  .sort(
-    (a, b) =>
-      (SETUP_ORDER.indexOf(a) + 1 || 99) - (SETUP_ORDER.indexOf(b) + 1 || 99),
-  );
 
 export function StepHeader({
   kicker,
@@ -200,7 +192,7 @@ function ConsentRow({
 
 /** OBS → Corneta → every platform, drawn left to right. */
 function FlowDiagram() {
-  const ids: PlatformId[] = ["twitch", "youtube", "kick", "facebook"];
+  const ids = SETUP_PLATFORMS;
   return (
     <div className="flex items-center gap-3 rounded-lg bg-surface px-5 py-4">
       <m.span

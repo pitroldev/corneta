@@ -1,4 +1,4 @@
-import { PLATFORMS } from "../../lib/platforms";
+import { presetOf } from "../../lib/platforms";
 import type { ChannelStats, ReportAnalysis } from "../../lib/report";
 import type { SessionData, SessionSummary } from "../../lib/types";
 import type { Fmt, I18n, MessageKey } from "../../lib/i18n";
@@ -10,7 +10,7 @@ export const MODE_KEY: Record<string, MessageKey> = {
 };
 
 export const platformColor = (platformId: string): string =>
-  PLATFORMS[platformId as keyof typeof PLATFORMS]?.color ?? "#ffb323";
+  presetOf(platformId).color;
 
 function lighten(hex: string, amount: number): string {
   const match = /^#([0-9a-f]{6})$/i.exec(hex);

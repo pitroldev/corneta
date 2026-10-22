@@ -1,0 +1,27 @@
+{
+  "id": "kick",
+  "order": 40,
+  "name": "Kick",
+  "color": "#53FC18",
+  "icon": "M1.333 0h8v5.333H12V2.667h2.667V0h8v8H20v2.667h-2.667v2.666H20V16h2.667v8h-8v-2.667H12v-2.666H9.333V24h-8Z",
+  "protocol": "rtmps",
+  "ingestUrl": "rtmps://fa723fc1b171.global-contribute.live-video.net/app",
+  "recommended": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "videoBitrateKbps": 6000,
+    "audioBitrateKbps": 160,
+    "keyframeSec": 2
+  },
+  "copyLimits": {
+    "maxHeight": 1080,
+    "maxFps": 60,
+    "maxKbps": 8000
+  },
+  "keyUrl": "https://kick.com/dashboard/settings/stream",
+  "liveUrl": "https://kick.com/dashboard/stream",
+  "account": "kick",
+  "setupRank": 3,
+  "regionalIngest": true
+}

@@ -1,4 +1,5 @@
 import type { StoreApi } from "zustand";
+import type { AccountPlatform } from "../../platforms";
 import type { ChatReply } from "../api";
 import type { I18n } from "../i18n";
 import type {
@@ -70,10 +71,8 @@ export interface State {
   renameProfile: (id: string, name: string) => void;
 
   setKey: (id: string, key: string) => Promise<void>;
-  /** Fetches the key through the Twitch login; resolves with the account's login. */
-  fetchTwitchKey: (id: string) => Promise<string>;
-  /** Fetches the key through the Kick login; resolves with the account's login, which may be empty. */
-  fetchKickKey: (id: string) => Promise<string>;
+  /** Fetches a destination's key through its account; resolves with the account's login, which may be empty. */
+  fetchStreamKey: (platform: AccountPlatform, id: string) => Promise<string>;
   clearKey: (id: string) => Promise<void>;
 
   refreshEncoders: () => Promise<void>;
@@ -112,34 +111,30 @@ export interface State {
   setChatSendToken: (id: string, token: string) => Promise<void>;
   clearChatSendToken: (id: string) => Promise<void>;
 
-  chatLogin: { twitch: LoginState; youtube: LoginState; kick: LoginState };
-  youtubeOauthReady: boolean;
+  chatLogin: Record<AccountPlatform, LoginState>;
+  /** Whether each account can sign in, for accounts whose readiness the backend reports. */
+  oauthReady: Partial<Record<AccountPlatform, boolean>>;
   /** Available mode switches must leave at least one usable login path. */
-  youtubeOauthModes: OauthModes;
-  kickOauthModes: OauthModes;
+  oauthModes: Partial<Record<AccountPlatform, OauthModes>>;
   /** null means the setup API responded successfully. */
   oauthBrokerError: string | null;
-  setYoutubeOauth: (clientId: string, clientSecret: string) => Promise<void>;
-  clearYoutubeOauth: () => Promise<void>;
-  youtubeUseOfficial: () => Promise<void>;
-  youtubeUseOwnCreds: () => Promise<void>;
-  kickOauthReady: boolean;
-  setKickOauth: (clientId: string, clientSecret: string) => Promise<void>;
-  clearKickOauth: () => Promise<void>;
-  kickUseOfficial: () => Promise<void>;
-  kickUseOwnCreds: () => Promise<void>;
+  saveOwnOauth: (
+    platform: AccountPlatform,
+    clientId: string,
+    clientSecret: string,
+  ) => Promise<void>;
+  /** Forgets the saved credentials; switching modes keeps them. */
+  clearOwnOauth: (platform: AccountPlatform) => Promise<void>;
+  switchToOfficialOauth: (platform: AccountPlatform) => Promise<void>;
+  switchToOwnOauth: (platform: AccountPlatform) => Promise<void>;
   setupOauth: () => Promise<void>;
   bindAuthFlow: (t: T) => () => void;
-  twitchLogin: () => Promise<void>;
-  twitchLogout: () => Promise<void>;
-  youtubeLogin: () => Promise<void>;
-  youtubeLogout: () => Promise<void>;
-  /** `moderation` also asks Kick for the ban scope, which plain logins leave out. */
-  kickLogin: (options?: {
-    moderation?: boolean;
-    streamKey?: boolean;
-  }) => Promise<void>;
-  kickLogout: () => Promise<void>;
+  /** Starts a login on any account platform; `moderation` and `streamKey` ask for scopes granted on demand. */
+  accountLogin: (
+    platform: AccountPlatform,
+    options?: { moderation?: boolean; streamKey?: boolean },
+  ) => Promise<void>;
+  accountLogout: (platform: AccountPlatform) => Promise<void>;
   moderate: (
     sourceId: string,
     action: string,

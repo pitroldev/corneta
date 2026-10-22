@@ -166,8 +166,7 @@ export function seriesCsv(
           (x) => `${x.platform}:${x.source}` === c.key,
         );
         if (it?.viewers != null) lastKnown[k] = it.viewers;
-        else if (c.platform === "cinefy" && c.audience !== undefined)
-          lastKnown[k] = null;
+        else if (c.audience !== undefined) lastKnown[k] = null;
       }
       vi++;
     }

@@ -1,7 +1,7 @@
 //! Native Twitch follower alerts over an EventSub WebSocket, run locally by the app. Only Pong may
 //! be sent on this socket: any other outbound frame makes Twitch close it with 4001.
 
-use super::{emit_alert, reconnect_for, Alert, CHAT_GEN};
+use crate::chat::{emit_alert, reconnect_for, Alert, CHAT_GEN};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -273,22 +273,22 @@ fn session(
     app: &AppHandle,
     seen: &mut Seen,
 ) -> Outcome {
-    let Some(token) = crate::auth::twitch_token(app) else {
+    let Some(token) = super::account::twitch_token(app) else {
         return Outcome::Stop;
     };
-    let Some(info) = crate::auth::twitch_validate(&token) else {
+    let Some(info) = super::account::twitch_validate(&token) else {
         return Outcome::Retry { connected: false };
     };
     if !info.scopes.iter().any(|scope| scope == FOLLOWERS_SCOPE) {
         log::info!("twitch follows: the login lacks {FOLLOWERS_SCOPE}; reconnect Twitch to enable");
         return Outcome::Stop;
     }
-    let client_id = crate::auth::twitch_client_id(app);
+    let client_id = super::account::twitch_client_id(app);
     let logins: Vec<String> = channels
         .iter()
         .map(|channel| channel.login.clone())
         .collect();
-    let ids = crate::auth::twitch_user_ids(&token, &client_id, &logins);
+    let ids = super::account::twitch_user_ids(&token, &client_id, &logins);
     if ids.is_empty() {
         return Outcome::Retry { connected: false };
     }
@@ -333,7 +333,7 @@ fn session(
             return Outcome::Retry { connected: true };
         }
         if validated_at.elapsed() > REVALIDATE_EVERY {
-            if crate::auth::twitch_validate(&token).is_none() {
+            if super::account::twitch_validate(&token).is_none() {
                 return Outcome::Retry { connected: true };
             }
             validated_at = Instant::now();
@@ -365,7 +365,7 @@ fn session(
                                 tier: None,
                                 message: None,
                                 fragments: Vec::new(),
-                                ts: super::now_ms(),
+                                ts: crate::chat::now_ms(),
                             },
                         );
                     }

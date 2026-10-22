@@ -1,12 +1,5 @@
-export type PlatformId =
-  | "twitch"
-  | "youtube"
-  | "facebook"
-  | "kick"
-  | "tiktok"
-  | "x"
-  | "instagram"
-  | "custom";
+/** A destination id: the folder name of a src/platforms/<id>/destination.json. */
+export type PlatformId = string;
 
 export type Protocol = "rtmp" | "rtmps";
 
@@ -26,18 +19,45 @@ export interface VideoPreset {
   keyframeSec: number;
 }
 
+export interface CopyLimits {
+  maxHeight: number;
+  maxFps: number;
+  maxKbps: number;
+}
+
 export interface PlatformPreset {
   id: PlatformId;
+  /** Picker position; lower comes first. */
+  order: number;
   name: string;
   color: string;
+  /** SVG path in a 24×24 box; destinations without one show a globe. */
+  icon?: string;
   protocol: Protocol;
-  /** Ingest URL without the stream key. */
+  /** Ingest URL without the stream key; "rtmp://" alone means the user pastes it. */
   ingestUrl: string;
   recommended: VideoPreset;
-  note?: string;
+  /** The most the platform takes as a copy of the OBS signal. */
+  copyLimits?: CopyLimits;
   keyUrl?: string;
   liveUrl?: string;
   experimental?: boolean;
+  /** Account provider that can sign in and fill this destination. */
+  account?: AccountPlatform;
+  /** Position in first-run setup; absent destinations are not offered there. */
+  setupRank?: number;
+  /** Part of a brand-new configuration. */
+  starter?: boolean;
+  /** The ingest URL varies by account or region, so the field stays editable. */
+  regionalIngest?: boolean;
+  /** Custom ingests may need OBS-style publisher metadata and a separate playpath. */
+  publisherCompat?: boolean;
+  /** The catalog name is a persisted default; the interface shows core.platform.<id>.name instead. */
+  localizedName?: boolean;
+  /** Stands in for destination ids the catalog no longer knows, such as in old sessions. */
+  fallback?: boolean;
+  /** The user brings any server, so the card shows its protocol instead of platform help. */
+  userServer?: boolean;
 }
 
 /** Portrait crop: x/y pan within 0–1; zoom within 0.25–1. */
@@ -196,8 +216,8 @@ export interface ObsCheck {
   error?: string;
 }
 
-/** Cinefy is a chat source, not a streaming destination. */
-export type ChatPlatform = "twitch" | "youtube" | "kick" | "cinefy";
+export type { ChatPlatform } from "../platforms/types";
+import type { AccountPlatform, ChatPlatform } from "../platforms/types";
 
 export interface ChatSource {
   id: string;
@@ -264,7 +284,8 @@ export interface ChatStatus {
 
 export type ViewerAudienceStatus =
   "live" | "offline" | "unavailable" | "embedded";
-export type ViewerAudienceOrigin = "twitch" | "youtube" | "kick" | "external";
+/** Where an embedded audience is watching: a chat platform, or a site the app does not read. */
+export type ViewerAudienceOrigin = ChatPlatform | "external";
 
 export interface ViewerAudienceMetadata {
   audienceStatus?: ViewerAudienceStatus;

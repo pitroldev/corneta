@@ -16,7 +16,7 @@ Referência da linha 0.7.0. Este guia descreve capacidades implementadas, não a
 | TikTok, X e Instagram | Presets experimentais; acesso à ingestão e URL/chave dependem da conta/provedor | Não implementada                                                                            | Não                                                     | Não                          | Não                                                         |
 | Personalizado         | URL/chave RTMP/RTMPS configurada pelo usuário                                   | Não implica OAuth                                                                           | Não implica chat                                        | Não                          | Não                                                         |
 
-Implementação: [`platforms.ts`](../src/lib/platforms.ts), [`chat.rs`](../src-tauri/src/chat.rs), [`auth.rs`](../src-tauri/src/auth.rs), [adaptador Cinefy](../src-tauri/src/chat/cinefy/adapter.rs). Os presets são referências: o usuário deve usar o destino que o provedor atribuiu à sua conta. Não atribuímos a RTMP a confidencialidade de RTMPS; URL/chave e mídia em RTMP não têm TLS.
+Implementação: presets em `src/platforms/<id>/destination.json` (por exemplo [Twitch](../src/platforms/twitch/destination.json)), código de cada plataforma em [`src-tauri/src/platforms`](../src-tauri/src/platforms/mod.rs), núcleo em [`chat.rs`](../src-tauri/src/chat.rs) e [`auth.rs`](../src-tauri/src/auth.rs), [adaptador Cinefy](../src-tauri/src/platforms/cinefy/adapter.rs). Os presets são referências: o usuário deve usar o destino que o provedor atribuiu à sua conta. Não atribuímos a RTMP a confidencialidade de RTMPS; URL/chave e mídia em RTMP não têm TLS.
 
 ### Audiência da Cinefy
 
@@ -24,7 +24,7 @@ Ao conectar uma fonte de chat Cinefy, a Corneta consulta também os espectadores
 
 Players incorporados de Twitch, YouTube, Kick ou outra plataforma são identificados; quando disponível, seu contador aparece como audiência externa informada pelo player. Ele não é atribuído à Cinefy nem somado ao total ou às métricas de audiência nativa. Views acumuladas, seguidores, espectadores únicos e retenção não são inferidos a partir de simultâneos ou mensagens.
 
-As consultas usam o ciclo de aproximadamente 30 segundos, com cache por canal e recuo progressivo após falhas. Dados indisponíveis ficam sem leitura, em vez de virarem zero; uma resposta válida com zero espectadores continua sendo zero. Durante uma falha da Cinefy, o contador ao vivo sinaliza o total parcial e o gráfico total mantém uma lacuna, sem inventar uma queda ou um destaque na recuperação. Esses endpoints não têm contrato público estável, portanto o parser rejeita respostas ambíguas. Detalhes e limites estão no [coletor de audiência Cinefy](../src-tauri/src/chat/cinefy/audience.rs).
+As consultas usam o ciclo de aproximadamente 30 segundos, com cache por canal e recuo progressivo após falhas. Dados indisponíveis ficam sem leitura, em vez de virarem zero; uma resposta válida com zero espectadores continua sendo zero. Durante uma falha da Cinefy, o contador ao vivo sinaliza o total parcial e o gráfico total mantém uma lacuna, sem inventar uma queda ou um destaque na recuperação. Esses endpoints não têm contrato público estável, portanto o parser rejeita respostas ambíguas. Detalhes e limites estão no [coletor de audiência Cinefy](../src-tauri/src/platforms/cinefy/audience.rs).
 
 ## Serviços que escutam no computador
 
@@ -93,7 +93,7 @@ Relatórios/chat/gravações são arquivos locais que podem conter nomes, mensag
 
 ## Recuperação de transmissões automáticas do YouTube
 
-O fluxo em [`auth/youtube_broadcast.rs`](../src-tauri/src/auth/youtube_broadcast.rs) preserva a pendência no cofre até confirmar o estado remoto e a limpeza local. Ao parar, tenta concluir transmissões em `live`/`testing`; não usa exclusão automática, inclusive depois de erros de rede, quota ou autenticação. Estados `created`/`ready` ou ainda em transição ficam pendentes: confira a transmissão correspondente no YouTube Studio e cancele o agendamento se não for utilizá-lo. Uma observação antiga do estado não autoriza apagar um vídeo.
+O fluxo em [`platforms/youtube/broadcast.rs`](../src-tauri/src/platforms/youtube/broadcast.rs) preserva a pendência no cofre até confirmar o estado remoto e a limpeza local. Ao parar, tenta concluir transmissões em `live`/`testing`; não usa exclusão automática, inclusive depois de erros de rede, quota ou autenticação. Estados `created`/`ready` ou ainda em transição ficam pendentes: confira a transmissão correspondente no YouTube Studio e cancele o agendamento se não for utilizá-lo. Uma observação antiga do estado não autoriza apagar um vídeo.
 
 Se a resposta de criação se perder antes de devolver o ID, o app bloqueia outra criação automática até a revisão no Studio e a confirmação explícita pelo fluxo **Recuperar YouTube**. Quando o ID é conhecido, essa confirmação não o descarta: o app precisa consultar novamente ou concluir a transmissão. Parar o envio local não prova que a transmissão remota foi encerrada. As credenciais manuais continuam sendo um caminho separado; confira o canal antes de assumir que está no ar.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveYoutubeRecovery } from "./youtubeRecovery";
+import { resolveYoutubeRecovery } from "./recovery";
 
 function mockRecovery() {
   return {

@@ -1,4 +1,6 @@
 import type { I18n } from "./i18n";
+import { PLATFORMS } from "./platforms";
+import { accountProvider } from "../platforms";
 import type { ObsCheck, Target } from "./types";
 import { blockingIssueCodes, type TargetIssue } from "./validation";
 
@@ -25,7 +27,12 @@ export function youtubeAutoTargetId(
 ): string | null {
   if (!ctx.youtubeAuto) return null;
   return (
-    targets.find((t) => t.enabled && t.platformId === "youtube")?.id ?? null
+    targets.find(
+      (t) =>
+        t.enabled &&
+        accountProvider(PLATFORMS[t.platformId]?.account ?? "")?.connect ===
+          "auto-broadcast",
+    )?.id ?? null
   );
 }
 

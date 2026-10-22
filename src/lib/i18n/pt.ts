@@ -440,7 +440,7 @@ export const pt = {
     "O nome que aparece no link: kick.com/SEUNOME. Às vezes a Kick bloqueia a leitura e não conecta.",
   "chat.source.hint.cinefy":
     "O nome no link da Cinefy. Chat e audiência de lives próprias, somente leitura. Players de outras plataformas não entram no total. A integração depende de endpoints não documentados e pode mudar sem aviso.",
-  "audience.cinefy": "Audiência da Cinefy",
+  "audience.details": "Audiência por canal",
   "audience.partial": "Total parcial: inclui apenas as audiências disponíveis.",
   "audience.external": "outra plataforma",
   "audience.embeddedCount":
@@ -1553,8 +1553,8 @@ export const pt = {
     "Vê se o servidor da plataforma tá respondendo — não confere a chave",
   "platforms.target.url.help":
     "— o endereço pra onde seu vídeo vai; cole a URL que o painel da plataforma te deu",
-  "platforms.target.url.helpKick":
-    "— o endereço pra onde seu vídeo vai; essa já vem pronta, só troque se o painel da Kick mostrar outra",
+  "platforms.target.url.helpPrefilled":
+    "— o endereço pra onde seu vídeo vai; essa já vem pronta, só troque se o painel da plataforma mostrar outra",
   "platforms.target.url.invalid": "URL inválida — use rtmp:// ou rtmps://",
   "platforms.target.url.label": "URL do servidor",
   "platforms.target.url.placeholder":

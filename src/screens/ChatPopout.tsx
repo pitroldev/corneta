@@ -40,7 +40,7 @@ import { Button, Input, Toggle } from "../components/ui";
 import { Select } from "../components/Select";
 import { Slider } from "../components/Slider";
 import { type ChatView } from "../components/ChatFeed";
-import { CinefyAudience } from "../components/CinefyAudience";
+import { AudienceDetails } from "../components/AudienceDetails";
 import {
   AlertCountLabel,
   LiveAlertsFeed,
@@ -587,7 +587,7 @@ export function ChatPopout() {
       </div>
 
       {(st?.chatShowViewers ?? true) && (
-        <CinefyAudience items={viewers.items} />
+        <AudienceDetails items={viewers.items} />
       )}
 
       {showConfig && (

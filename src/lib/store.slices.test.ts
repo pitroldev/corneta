@@ -5,15 +5,13 @@ import type { AppConfig, ChatMessage } from "./types";
 const mocks = vi.hoisted(() => ({
   saveConfig: vi.fn(),
   clearKey: vi.fn(),
-  twitchLogout: vi.fn(),
-  youtubeLogout: vi.fn(),
-  kickLogout: vi.fn(),
+  accountLogout: vi.fn(),
   subscribeChat: vi.fn(),
   subscribeConfigChanged: vi.fn(),
   setOauthConfig: vi.fn(),
   authStatus: vi.fn(),
-  kickLoginStart: vi.fn(),
-  kickFetchStreamKey: vi.fn(),
+  accountLoginStart: vi.fn(),
+  fetchStreamKey: vi.fn(),
   subscribeAuthFlow: vi.fn(),
 }));
 vi.mock("./api", () => ({
@@ -37,20 +35,20 @@ describe("store slices preserve shared contracts", () => {
   it.each(["twitch", "youtube", "kick"] as const)(
     "keeps %s connected when local credential deletion fails",
     async (platform) => {
-      const action = `${platform}Logout` as const;
-      mocks[action].mockRejectedValue(new Error("vault unavailable"));
+      mocks.accountLogout.mockRejectedValue(new Error("vault unavailable"));
       useStore.setState({
         chatLogin: {
           ...useStore.getState().chatLogin,
           [platform]: { state: "connected" },
         },
       });
-      await expect(useStore.getState()[action]()).rejects.toThrow(
+      await expect(useStore.getState().accountLogout(platform)).rejects.toThrow(
         "vault unavailable",
       );
       expect(useStore.getState().chatLogin[platform].state).toBe("connected");
-      mocks[action].mockResolvedValue(undefined);
-      await useStore.getState()[action]();
+      mocks.accountLogout.mockResolvedValue(undefined);
+      await useStore.getState().accountLogout(platform);
+      expect(mocks.accountLogout).toHaveBeenLastCalledWith(platform);
       expect(useStore.getState().chatLogin[platform].state).toBe("out");
     },
   );
@@ -184,18 +182,18 @@ describe("store slices preserve shared contracts", () => {
     await useStore.getState().setupOauth();
     expect(useStore.getState().chatLogin.kick.missingScopes).toEqual([]);
 
-    await useStore.getState().kickLogin();
-    expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
+    await useStore.getState().accountLogin("kick");
+    expect(mocks.accountLoginStart).toHaveBeenLastCalledWith("kick", {
       moderation: false,
       streamKey: false,
     });
-    await useStore.getState().kickLogin({ moderation: true });
-    expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
+    await useStore.getState().accountLogin("kick", { moderation: true });
+    expect(mocks.accountLoginStart).toHaveBeenLastCalledWith("kick", {
       moderation: true,
       streamKey: false,
     });
-    await useStore.getState().kickLogin({ streamKey: true });
-    expect(mocks.kickLoginStart).toHaveBeenLastCalledWith({
+    await useStore.getState().accountLogin("kick", { streamKey: true });
+    expect(mocks.accountLoginStart).toHaveBeenLastCalledWith("kick", {
       moderation: false,
       streamKey: true,
     });
@@ -237,12 +235,17 @@ describe("store slices preserve shared contracts", () => {
     config.targets = [empty, custom];
     useStore.setState({ config });
     mocks.saveConfig.mockImplementation(async (saved: AppConfig) => saved);
-    mocks.kickFetchStreamKey.mockResolvedValue({
+    mocks.fetchStreamKey.mockResolvedValue({
       login: "ana",
       url: "rtmps://account.example/app",
     });
-    expect(await useStore.getState().fetchKickKey("kick-1")).toBe("ana");
-    expect(await useStore.getState().fetchKickKey("kick-2")).toBe("ana");
+    expect(await useStore.getState().fetchStreamKey("kick", "kick-1")).toBe(
+      "ana",
+    );
+    expect(await useStore.getState().fetchStreamKey("kick", "kick-2")).toBe(
+      "ana",
+    );
+    expect(mocks.fetchStreamKey).toHaveBeenLastCalledWith("kick", "kick-2");
     expect(
       useStore
         .getState()

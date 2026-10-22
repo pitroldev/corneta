@@ -1,15 +1,16 @@
+import { chatProvider } from "../platforms";
 import type { I18n } from "./i18n";
 import type { ViewerItem, Viewers } from "./types";
 
 type AudienceMetadata = Pick<ViewerItem, "audienceStatus" | "audienceOrigin">;
 type AudienceI18n = Pick<I18n, "t" | "fmt">;
 
-const ORIGIN_NAMES = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" };
+const originName = (origin: string) => chatProvider(origin)?.name ?? origin;
 
-const hasUnknownCinefy = (items: readonly ViewerItem[]) =>
+/** Only sources that report an audience status can leave the total partial. */
+const hasUnknownCount = (items: readonly ViewerItem[]) =>
   items.some(
     (item) =>
-      item.platform === "cinefy" &&
       !item.audienceOrigin &&
       (item.audienceStatus === "unavailable" ||
         (item.audienceStatus === "live" && item.viewers === null)),
@@ -22,7 +23,7 @@ export function audienceStatusText(
   if (item.audienceStatus === "embedded") {
     const origin = item.audienceOrigin;
     return origin && origin !== "external"
-      ? t("audience.embedded", { platform: ORIGIN_NAMES[origin] })
+      ? t("audience.embedded", { platform: originName(origin) })
       : t("audience.embedded.unknown");
   }
   if (item.audienceStatus === "offline") return t("audience.offline");
@@ -45,7 +46,7 @@ export function embeddedAudienceText(
   return t("audience.embeddedCount", {
     platform:
       origin && origin !== "external"
-        ? ORIGIN_NAMES[origin]
+        ? originName(origin)
         : t("audience.external"),
     n: fmt.num(item.embeddedViewers),
   });
@@ -55,9 +56,7 @@ export function showAudience(viewers: Viewers): boolean {
   return (
     viewers.total > 0 ||
     viewers.anyLive ||
-    viewers.items.some(
-      (item) => item.platform === "cinefy" && item.audienceStatus !== undefined,
-    )
+    viewers.items.some((item) => item.audienceStatus !== undefined)
   );
 }
 
@@ -72,7 +71,7 @@ export function audienceTotal(viewers: Viewers, fmt: I18n["fmt"]): string {
   );
   if (!known && viewers.total <= 0) return "—";
   const total = fmt.num(viewers.total);
-  return hasUnknownCinefy(viewers.items) ? `≥ ${total}` : total;
+  return hasUnknownCount(viewers.items) ? `≥ ${total}` : total;
 }
 
 export function audienceTooltip(
@@ -96,7 +95,7 @@ export function audienceTooltip(
       });
     })
     .join("\n");
-  return hasUnknownCinefy(items) ? `${t("audience.partial")}\n${rows}` : rows;
+  return hasUnknownCount(items) ? `${t("audience.partial")}\n${rows}` : rows;
 }
 
 export function audienceStartedAt(

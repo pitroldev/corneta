@@ -3,7 +3,7 @@
 //! Google lifecycle: https://developers.google.com/youtube/v3/live/docs/liveBroadcasts
 //! Never delete automatically: a created/ready observation can become stale before the next request.
 
-use super::youtube_error::GoogleError;
+use super::error::GoogleError;
 use crate::i18n::Msg;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -264,7 +264,7 @@ pub(super) fn valid_id(id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::youtube_error::GoogleReason;
+    use super::super::error::GoogleReason;
     use super::*;
     use std::cell::Cell;
 

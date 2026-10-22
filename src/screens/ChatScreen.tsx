@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type ChatView } from "../components/ChatFeed";
-import { CinefyAudience } from "../components/CinefyAudience";
+import { AudienceDetails } from "../components/AudienceDetails";
 import { LegalLink } from "../components/legal";
 import { Modal } from "../components/Modal";
 import { Select } from "../components/Select";
@@ -43,7 +43,6 @@ import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { resolveSendTargets, sendStatusLine, srcLabel } from "../lib/chatSend";
 import { bold, useI18n } from "../lib/i18n";
 import { legalUrl } from "../lib/legal";
-import { HAS_TWITCH_OAUTH } from "../lib/oauth";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
 import type {
@@ -54,16 +53,10 @@ import type {
   ChatSource,
 } from "../lib/types";
 import { cn, errMsg, uid } from "../lib/utils";
-import {
-  KickCredsForm,
-  LoginRow,
-  YoutubeCredsForm,
-} from "./chat/AccountSettings";
 import { AlertSourceCard } from "./chat/AlertSourceCard";
 import {
   ALERT_META,
   alertSourceLabel,
-  CHAT_PLATFORM_LABEL,
   CONFIG_TABS,
   ConfigTab,
   statusDot,
@@ -72,7 +65,17 @@ import {
 } from "./chat/constants";
 import { OverlayCard } from "./chat/OverlaySettings";
 import { FilterChip, splitAt, ToggleRow } from "./chat/primitives";
-import { SourceCard, YoutubeApiKeyField } from "./chat/SourceCard";
+import { SourceCard } from "./chat/SourceCard";
+import {
+  ACCOUNT_PLATFORMS,
+  ACCOUNT_PROVIDERS,
+  type AccountPlatform,
+  CHAT_PLATFORMS,
+  CHAT_PROVIDERS,
+  accountProvider,
+  chatProvider,
+} from "../platforms";
+import { ACCOUNT_UI, CHAT_UI } from "../platforms/ui";
 import {
   AlertCountLabel,
   LiveAlertsFeed,
@@ -95,24 +98,7 @@ export function ChatScreen() {
   const chatAuth = useStore((s) => s.chatAuth);
   const sendChat = useStore((s) => s.sendChat);
   const chatLogin = useStore((s) => s.chatLogin);
-  const twitchLogin = useStore((s) => s.twitchLogin);
-  const twitchLogout = useStore((s) => s.twitchLogout);
-  const youtubeLogin = useStore((s) => s.youtubeLogin);
-  const youtubeLogout = useStore((s) => s.youtubeLogout);
-  const kickLogin = useStore((s) => s.kickLogin);
-  const kickLogout = useStore((s) => s.kickLogout);
-  const youtubeOauthReady = useStore((s) => s.youtubeOauthReady);
-  const youtubeOauthModes = useStore((s) => s.youtubeOauthModes);
-  const setYoutubeOauth = useStore((s) => s.setYoutubeOauth);
-  const clearYoutubeOauth = useStore((s) => s.clearYoutubeOauth);
-  const youtubeUseOfficial = useStore((s) => s.youtubeUseOfficial);
-  const youtubeUseOwnCreds = useStore((s) => s.youtubeUseOwnCreds);
-  const kickOauthReady = useStore((s) => s.kickOauthReady);
-  const kickOauthModes = useStore((s) => s.kickOauthModes);
-  const setKickOauth = useStore((s) => s.setKickOauth);
-  const clearKickOauth = useStore((s) => s.clearKickOauth);
-  const kickUseOfficial = useStore((s) => s.kickUseOfficial);
-  const kickUseOwnCreds = useStore((s) => s.kickUseOwnCreds);
+  const accountLogin = useStore((s) => s.accountLogin);
   const oauthBrokerError = useStore((s) => s.oauthBrokerError);
   const moderate = useStore((s) => s.moderate);
   const chatConfigRequest = useStore((s) => s.chatConfigRequest);
@@ -122,8 +108,6 @@ export function ChatScreen() {
   const [configTab, setConfigTab] = useState<ConfigTab>("canais");
   const [adding, setAdding] = useState(false);
   const [addingAlert, setAddingAlert] = useState(false);
-  const [showYoutubeByok, setShowYoutubeByok] = useState(false);
-  const [showKickByok, setShowKickByok] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendTo, setSendTo] = useState("all");
@@ -134,12 +118,13 @@ export function ChatScreen() {
   const clearChatStep = useConfirm();
   const clearAlertsStep = useConfirm();
   const [alertPulse, setAlertPulse] = useState(false);
-  const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>({
-    twitch: true,
-    youtube: true,
-    kick: true,
-    cinefy: true,
-  });
+  const [filter, setFilter] = useState<Record<ChatPlatform, boolean>>(
+    () =>
+      Object.fromEntries(CHAT_PLATFORMS.map((p) => [p, true])) as Record<
+        ChatPlatform,
+        boolean
+      >,
+  );
 
   useEffect(() => {
     if (chatConfigRequest) {
@@ -176,6 +161,8 @@ export function ChatScreen() {
     [],
   );
   const channelsTabOpen = showConfig && configTab === "canais";
+  // A login or logout changes which account channels can be suggested.
+  const loginStates = ACCOUNT_PLATFORMS.map((p) => chatLogin[p].state).join();
   useEffect(() => {
     if (!channelsTabOpen) return;
     let cancelled = false;
@@ -188,12 +175,7 @@ export function ChatScreen() {
     return () => {
       cancelled = true;
     };
-  }, [
-    channelsTabOpen,
-    chatLogin.twitch.state,
-    chatLogin.youtube.state,
-    chatLogin.kick.state,
-  ]);
+  }, [channelsTabOpen, loginStates]);
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
@@ -304,28 +286,22 @@ export function ChatScreen() {
     }
   };
 
-  const twitchReady = chatLogin.twitch.state === "connected";
-  const youtubeReady = chatLogin.youtube.state === "connected";
-  const kickReady = chatLogin.kick.state === "connected";
-  const sendReady = {
-    twitch: twitchReady,
-    youtube: youtubeReady,
-    kick: kickReady,
-  };
+  const sendReady = Object.fromEntries(
+    ACCOUNT_PLATFORMS.map((p) => [p, chatLogin[p].state === "connected"]),
+  ) as Record<AccountPlatform, boolean>;
   const {
     sendable: sendableSources,
     effectiveSendTo,
     targets: sendTargets,
     canSend,
   } = resolveSendTargets(sources, sendTo, sendReady, chatAuth);
-  const hasTwitchChannel = sources.some((x) => x.platform === "twitch");
-  const hasYoutubeChannel = sources.some((x) => x.platform === "youtube");
-  const hasKickChannel = sources.some((x) => x.platform === "kick");
-  // Bootstrap or user-supplied credentials may enable YouTube and Kick without build-time fallbacks.
-  const canLoginSomewhere =
-    (hasTwitchChannel && HAS_TWITCH_OAUTH) ||
-    hasYoutubeChannel ||
-    hasKickChannel;
+  // Accounts whose login matters here: the user has a chat channel on that platform.
+  const accountsWithChannel = ACCOUNT_PROVIDERS.filter((account) =>
+    sources.some((x) => chatProvider(x.platform)?.account === account.id),
+  );
+  const canLoginSomewhere = accountsWithChannel.some(
+    (account) => ACCOUNT_UI[account.id].setupAvailable,
+  );
 
   const sourceForMessage = (m: ChatMessage) =>
     sources.find((x) => x.platform === m.platform && srcLabel(x) === m.source);
@@ -356,28 +332,6 @@ export function ChatScreen() {
   };
   const sendStatus = sendStatusLine(sendTargets, chatAuth, sendReady, t);
 
-  const modeAction =
-    (close: (open: boolean) => void) =>
-    async (action: Promise<void>, ok?: string) => {
-      try {
-        await action;
-        if (ok) toast.success(ok);
-        close(false);
-      } catch (e) {
-        toast.error(errMsg(e));
-      }
-    };
-  const youtubeMode = modeAction(setShowYoutubeByok);
-  const kickMode = modeAction(setShowKickByok);
-  const saveYoutubeOauth = async (id: string, secret: string) => {
-    await setYoutubeOauth(id, secret);
-    setShowYoutubeByok(false);
-  };
-  const saveKickOauth = async (id: string, secret: string) => {
-    await setKickOauth(id, secret);
-    setShowKickByok(false);
-  };
-
   const doConnect = async () => {
     if (IS_TAURI && !configured) {
       setConfigTab("canais");
@@ -407,27 +361,30 @@ export function ChatScreen() {
   };
 
   const isOwnMessage = (m: ChatMessage) => {
-    const myLogin = chatLogin.twitch.login?.toLowerCase();
+    const author = m.author.toLowerCase();
     return (
-      m.author === "você" || (!!myLogin && m.author.toLowerCase() === myLogin)
+      m.author === "você" ||
+      CHAT_PROVIDERS.some(
+        (p) =>
+          p.echoesOwnMessages &&
+          p.account &&
+          chatLogin[p.account].login?.toLowerCase() === author,
+      )
     );
   };
   const modLevel = (m: ChatMessage): "full" | "delete" | "none" => {
     const src = sourceForMessage(m);
     if (!src || isOwnMessage(m)) return "none";
-    if (src.platform === "twitch" && twitchReady) return "full";
+    const provider = chatProvider(src.platform);
+    if (!provider?.account || !sendReady[provider.account]) return "none";
     // Timeouts and bans need the sender's ID, which older feed modes may not carry.
-    if (src.platform === "youtube" && youtubeReady)
-      return m.authorId ? "full" : "delete";
-    if (src.platform === "kick" && kickReady)
-      return m.authorId ? "full" : "delete";
-    return "none";
+    return provider.bansNeedAuthorId && !m.authorId ? "delete" : "full";
   };
   const canReply = (m: ChatMessage) => {
     const src = sourceForMessage(m);
     if (!src || m.deleted || isOwnMessage(m)) return false;
     if (!sendableSources.some((x) => x.id === src.id)) return false;
-    return src.platform === "youtube" || !!m.nativeId;
+    return !chatProvider(src.platform)?.repliesNeedNativeId || !!m.nativeId;
   };
   const startReply = (m: ChatMessage) => {
     setReplyTo(m);
@@ -436,15 +393,19 @@ export function ChatScreen() {
   const onModerate = (m: ChatMessage, action: string) => {
     const src = sourceForMessage(m);
     if (!src) return;
+    const account = chatProvider(src.platform)?.account;
+    const spec = account && accountProvider(account);
     if (
-      src.platform === "kick" &&
+      account &&
+      spec?.banScope &&
+      spec.banScopeNotice &&
       action !== "delete" &&
-      chatLogin.kick.missingScopes?.includes("moderation:ban")
+      chatLogin[account].missingScopes?.includes(spec.banScope)
     ) {
       toast.action(
-        t("chat.mod.kickReconnect"),
+        t(spec.banScopeNotice),
         t("chat.loginrow.reconnect"),
-        () => void kickLogin({ moderation: true }),
+        () => void accountLogin(account, { moderation: true }),
       );
       return;
     }
@@ -603,7 +564,7 @@ export function ChatScreen() {
           </div>
         </div>
         {(s.chatShowViewers ?? true) && (
-          <CinefyAudience items={viewers.items} />
+          <AudienceDetails items={viewers.items} />
         )}
       </Card>
 
@@ -675,24 +636,22 @@ export function ChatScreen() {
                     <span className="px-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
                       {t("chat.channels.which")}
                     </span>
-                    {(["twitch", "kick", "youtube", "cinefy"] as const).map(
-                      (p) => (
-                        <button
-                          key={p}
-                          onClick={() => {
-                            addSource(p);
-                            setAdding(false);
-                          }}
-                          className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-xs font-bold ring-1 ring-border transition hover:-translate-y-px hover:text-ink"
-                        >
-                          <PlatformGlyph id={p} size={18} />
-                          {CHAT_PLATFORM_LABEL[p]}
-                          {p === "cinefy" && (
-                            <ExperimentalBadge className="ml-0.5 scale-90" />
-                          )}
-                        </button>
-                      ),
-                    )}
+                    {CHAT_PROVIDERS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          addSource(p.id);
+                          setAdding(false);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-xs font-bold ring-1 ring-border transition hover:-translate-y-px hover:text-ink"
+                      >
+                        <PlatformGlyph id={p.id} size={18} />
+                        {p.name}
+                        {p.experimental && (
+                          <ExperimentalBadge className="ml-0.5 scale-90" />
+                        )}
+                      </button>
+                    ))}
                   </div>
                 )}
 
@@ -753,12 +712,13 @@ export function ChatScreen() {
                   </div>
                 )}
 
-                {sources.some((x) => x.platform === "youtube") && (
-                  <YoutubeApiKeyField
-                    value={s.youtubeApiKey ?? ""}
-                    onChange={(v) => setSettings({ youtubeApiKey: v })}
-                  />
-                )}
+                {CHAT_PROVIDERS.map((p) => {
+                  const Settings = CHAT_UI[p.id]?.ChannelSettings;
+                  return Settings &&
+                    sources.some((x) => x.platform === p.id) ? (
+                    <Settings key={p.id} />
+                  ) : null;
+                })}
               </div>
             </RTabs.Content>
 
@@ -840,7 +800,7 @@ export function ChatScreen() {
                 <p className="text-xs text-ink-muted">
                   {t("chat.account.desktopOnly")}
                 </p>
-              ) : !hasTwitchChannel && !hasYoutubeChannel && !hasKickChannel ? (
+              ) : accountsWithChannel.length === 0 ? (
                 <p className="text-xs text-ink-muted">
                   {bold(t, "chat.account.needChannel")}
                 </p>
@@ -862,130 +822,10 @@ export function ChatScreen() {
                     {privacyAfter}
                   </p>
                   <div className="flex flex-col gap-2">
-                    {hasTwitchChannel && (
-                      <LoginRow
-                        platform="twitch"
-                        label="Twitch"
-                        state={chatLogin.twitch}
-                        enabled={HAS_TWITCH_OAUTH}
-                        onLogin={twitchLogin}
-                        onLogout={twitchLogout}
-                      />
-                    )}
-                    {hasYoutubeChannel &&
-                      (youtubeOauthReady ? (
-                        <div className="flex flex-col gap-1">
-                          <LoginRow
-                            platform="youtube"
-                            label="YouTube"
-                            state={chatLogin.youtube}
-                            enabled
-                            onLogin={youtubeLogin}
-                            onLogout={youtubeLogout}
-                          />
-                          <button
-                            onClick={() =>
-                              setShowYoutubeByok((value) => !value)
-                            }
-                            className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
-                          >
-                            {showYoutubeByok
-                              ? t("chat.account.byok.hide")
-                              : t("chat.account.byok.show")}
-                          </button>
-                          {showYoutubeByok && (
-                            <YoutubeCredsForm
-                              onSave={saveYoutubeOauth}
-                              modes={youtubeOauthModes}
-                              onUseOfficial={() =>
-                                void youtubeMode(
-                                  youtubeUseOfficial(),
-                                  t("chat.account.youtube.official.toast"),
-                                )
-                              }
-                              onUseSaved={() =>
-                                void youtubeMode(
-                                  youtubeUseOwnCreds(),
-                                  t("chat.account.youtube.ownCreds.toast"),
-                                )
-                              }
-                              onForget={() =>
-                                void youtubeMode(
-                                  clearYoutubeOauth(),
-                                  t("chat.account.youtube.forgot.toast"),
-                                )
-                              }
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <YoutubeCredsForm
-                          onSave={saveYoutubeOauth}
-                          modes={youtubeOauthModes}
-                          onUseSaved={() =>
-                            void youtubeMode(
-                              youtubeUseOwnCreds(),
-                              t("chat.account.youtube.ownCreds.toast"),
-                            )
-                          }
-                        />
-                      ))}
-                    {hasKickChannel &&
-                      (kickOauthReady ? (
-                        <div className="flex flex-col gap-1">
-                          <LoginRow
-                            platform="kick"
-                            label="Kick"
-                            state={chatLogin.kick}
-                            enabled={kickOauthReady}
-                            onLogin={kickLogin}
-                            onLogout={kickLogout}
-                          />
-                          <button
-                            onClick={() => setShowKickByok((value) => !value)}
-                            className="self-end text-[11px] font-semibold text-ink-faint hover:text-ink"
-                          >
-                            {showKickByok
-                              ? t("chat.account.byok.hide")
-                              : t("chat.account.byok.show")}
-                          </button>
-                          {showKickByok && (
-                            <KickCredsForm
-                              onSave={saveKickOauth}
-                              modes={kickOauthModes}
-                              onUseOfficial={() =>
-                                void kickMode(
-                                  kickUseOfficial(),
-                                  t("chat.account.kick.official.toast"),
-                                )
-                              }
-                              onUseSaved={() =>
-                                void kickMode(
-                                  kickUseOwnCreds(),
-                                  t("chat.account.kick.ownCreds.toast"),
-                                )
-                              }
-                              onForget={() =>
-                                void kickMode(
-                                  clearKickOauth(),
-                                  t("chat.account.kick.forgot.toast"),
-                                )
-                              }
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <KickCredsForm
-                          onSave={saveKickOauth}
-                          modes={kickOauthModes}
-                          onUseSaved={() =>
-                            void kickMode(
-                              kickUseOwnCreds(),
-                              t("chat.account.kick.ownCreds.toast"),
-                            )
-                          }
-                        />
-                      ))}
+                    {accountsWithChannel.map((account) => {
+                      const Panel = ACCOUNT_UI[account.id].AccountPanel;
+                      return <Panel key={account.id} />;
+                    })}
                   </div>
                   <p className="mt-3 text-[11px] text-ink-faint">
                     {bold(t, "chat.account.footer")}
@@ -1085,7 +925,7 @@ export function ChatScreen() {
             <FilterChip
               key={p}
               id={p}
-              label={CHAT_PLATFORM_LABEL[p]}
+              label={chatProvider(p)?.name ?? p}
               on={filter[p]}
               onClick={() => setFilter((f) => ({ ...f, [p]: !f[p] }))}
             />

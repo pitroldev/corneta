@@ -1,18 +1,15 @@
-mod cinefy;
-mod twitch_follows;
-
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
-use tungstenite::Message;
 
-use crate::http_client as ureq;
-use crate::i18n::{Locale, Msg};
+use crate::config::{ChatSource, Settings};
+use crate::i18n::Msg;
+use crate::platforms::provider::{AudienceReader, AudienceSetup, ChatSession, Connection, Outbox};
 use crate::AppState;
 
 #[derive(Serialize, Clone, Debug)]
@@ -36,7 +33,7 @@ pub struct ChatBadge {
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub id: String,
-    pub platform: String, // "twitch" | "youtube" | "kick" | "cinefy"
+    pub platform: String, // A registered chat provider id.
     pub source: String,   // Source label distinguishes channels on the same platform.
     pub author: String,
     /// Native author ID avoids name lookups during moderation.
@@ -61,8 +58,8 @@ pub struct ChatRuntime {
 }
 
 pub struct Outgoing {
-    text: String,
-    reply_to: Option<String>,
+    pub text: String,
+    pub reply_to: Option<String>,
 }
 
 /// The message a send answers: its native ID threads the reply where the platform supports it.
@@ -80,46 +77,8 @@ pub(crate) fn reply_id(id: &str) -> Option<&str> {
         .then_some(id)
 }
 
-fn twitch_privmsg(channel: &str, text: &str, reply_to: Option<&str>) -> String {
-    match reply_to.and_then(reply_id) {
-        Some(id) => format!("@reply-parent-msg-id={id} PRIVMSG #{channel} :{text}"),
-        None => format!("PRIVMSG #{channel} :{text}"),
-    }
-}
-
-/// YouTube has no threaded replies; viewers answer each other with a mention.
-fn youtube_reply_text(author: &str, text: &str) -> String {
-    let author = author.trim();
-    if author.is_empty() {
-        return text.to_string();
-    }
-    let handle = author.strip_prefix('@').unwrap_or(author);
-    format!("@{handle} {text}")
-}
-
-/// Live video each YouTube chat source is reading, keyed by the configured channel value.
-static YT_LIVE_VIDEOS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
-
-fn remember_youtube_video(channel: &str, video_id: &str) {
-    let mut videos = YT_LIVE_VIDEOS.get_or_init(Default::default).lock().unwrap();
-    if videos.len() >= 32 && !videos.contains_key(channel.trim()) {
-        videos.clear();
-    }
-    videos.insert(channel.trim().to_string(), video_id.to_string());
-}
-
-/// The live video last resolved for a YouTube chat source, if any.
-pub(crate) fn youtube_live_video(channel: &str) -> Option<String> {
-    YT_LIVE_VIDEOS
-        .get()?
-        .lock()
-        .unwrap()
-        .get(channel.trim())
-        .cloned()
-}
-
 static MSG_ID: AtomicU64 = AtomicU64::new(1);
-fn next_id() -> String {
+pub(crate) fn next_id() -> String {
     MSG_ID.fetch_add(1, Ordering::Relaxed).to_string()
 }
 
@@ -196,7 +155,7 @@ pub fn drain_msg_counts() -> HashMap<String, u64> {
 }
 // Superseded connections must not replace current senders or publish stale status.
 
-static CHAT_GEN: AtomicU64 = AtomicU64::new(0);
+pub(crate) static CHAT_GEN: AtomicU64 = AtomicU64::new(0);
 
 fn session_path(app: &AppHandle) -> Option<std::path::PathBuf> {
     app.state::<AppState>()
@@ -206,20 +165,20 @@ fn session_path(app: &AppHandle) -> Option<std::path::PathBuf> {
         .session_path
         .clone()
 }
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
-fn text_frag(t: &str) -> ChatFragment {
+pub(crate) fn text_frag(t: &str) -> ChatFragment {
     ChatFragment {
         kind: "text".into(),
         text: Some(t.to_string()),
         url: None,
     }
 }
-fn frags_to_text(frags: &[ChatFragment]) -> String {
+pub(crate) fn frags_to_text(frags: &[ChatFragment]) -> String {
     frags
         .iter()
         .filter_map(|f| f.text.clone())
@@ -227,7 +186,7 @@ fn frags_to_text(frags: &[ChatFragment]) -> String {
         .join("")
 }
 
-fn emit_chat(app: &AppHandle, msg: ChatMessage) {
+pub(crate) fn emit_chat(app: &AppHandle, msg: ChatMessage) {
     if !first_native_delivery(&msg) {
         return;
     }
@@ -256,12 +215,12 @@ fn emit_chat(app: &AppHandle, msg: ChatMessage) {
     let _ = app.emit("chat://message", msg);
 }
 
-fn emit_chat_gen(app: &AppHandle, gen: u64, msg: ChatMessage) {
+pub(crate) fn emit_chat_gen(app: &AppHandle, gen: u64, msg: ChatMessage) {
     if CHAT_GEN.load(Ordering::SeqCst) == gen {
         emit_chat(app, msg);
     }
 }
-fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
+pub(crate) fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
     // Record disconnection gaps so replay distinguishes missing capture from actual silence.
 
     if status == "disconnected" && crate::session::chat_recording() {
@@ -275,20 +234,26 @@ fn chat_status(app: &AppHandle, platform: &str, source: &str, status: &str) {
     );
 }
 
-fn chat_status_gen(app: &AppHandle, gen: u64, platform: &str, source: &str, status: &str) {
+pub(crate) fn chat_status_gen(
+    app: &AppHandle,
+    gen: u64,
+    platform: &str,
+    source: &str,
+    status: &str,
+) {
     if CHAT_GEN.load(Ordering::SeqCst) == gen {
         chat_status(app, platform, source, status);
     }
 }
 // Auth status describes sending permission, not the anonymous read connection.
 
-fn chat_auth(app: &AppHandle, source_id: &str, login: &str, ok: bool) {
+pub(crate) fn chat_auth(app: &AppHandle, source_id: &str, login: &str, ok: bool) {
     let _ = app.emit(
         "chat://auth",
         json!({ "source": source_id, "login": login, "ok": ok }),
     );
 }
-fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
+pub(crate) fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
     // Persist moderation so replay does not resurface deleted messages by default.
 
     if crate::session::chat_recording() {
@@ -301,13 +266,13 @@ fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
         json!({ "scope": "message", "platform": platform, "nativeId": native_id }),
     );
 }
-fn delete_user(app: &AppHandle, platform: &str, source: &str, author: &str) {
+pub(crate) fn delete_user(app: &AppHandle, platform: &str, source: &str, author: &str) {
     let _ = app.emit(
         "chat://delete",
         json!({ "scope": "user", "platform": platform, "source": source, "author": author }),
     );
 }
-fn clear_source(app: &AppHandle, platform: &str, source: &str) {
+pub(crate) fn clear_source(app: &AppHandle, platform: &str, source: &str) {
     let _ = app.emit(
         "chat://delete",
         json!({ "scope": "all", "platform": platform, "source": source }),
@@ -359,7 +324,7 @@ pub fn start_chat(app: &AppHandle) {
     // Invalidate old connections before clearing queues so late setup cannot overwrite new senders.
 
     let gen = CHAT_GEN.fetch_add(1, Ordering::SeqCst) + 1;
-    let s = crate::config::load(app).settings;
+    let settings = Arc::new(crate::config::load(app).settings);
     let running = {
         let st = app.state::<AppState>();
         let mut chat = st.chat.lock().unwrap();
@@ -369,127 +334,81 @@ pub fn start_chat(app: &AppHandle) {
         chat.running = running.clone();
         running
     };
-    let api_key = s.youtube_api_key.clone();
-
-    for src in s
-        .chat_sources
-        .iter()
-        .filter(|x| x.enabled && !x.value.trim().is_empty())
-    {
-        let label = if src.name.trim().is_empty() {
-            src.value.clone()
-        } else {
-            src.name.clone()
-        };
-        let (app2, run2, value) = (app.clone(), running.clone(), src.value.clone());
-        let sid = src.id.clone();
-        let plat = src.platform.clone();
-        match src.platform.as_str() {
-            "twitch" => {
-                // Resolve credentials on every connection so expired OAuth tokens can refresh.
-
-                let send_key = format!("chat_send_{}", src.id);
-                tauri::async_runtime::spawn_blocking(move || {
-                    let mut backoff: u32 = 15; // 200 ms ticks.
-                    while run2.load(Ordering::Relaxed) {
-                        let tok = crate::keys::get_key(&send_key)
-                            .or_else(|| crate::auth::twitch_token(&app2));
-                        if contain_connection_panic(&plat, &label, || {
-                            run_twitch(&value, &label, &sid, tok, run2.clone(), app2.clone(), gen)
-                        }) {
-                            backoff = 15;
-                        }
-                        reconnect_for(&run2, backoff);
-                        backoff = (backoff * 2).min(300);
-                    }
-                });
-            }
-            "kick" => {
-                tauri::async_runtime::spawn_blocking(move || {
-                    let mut backoff: u32 = 15;
-                    while run2.load(Ordering::Relaxed) {
-                        if contain_connection_panic(&plat, &label, || {
-                            run_kick(&value, &label, run2.clone(), app2.clone(), gen)
-                        }) {
-                            backoff = 15;
-                        }
-                        reconnect_for(&run2, backoff);
-                        backoff = (backoff * 2).min(300);
-                    }
-                });
-            }
-            "youtube" => {
-                // InnerTube can read without a Data API key.
-                let key = api_key.clone();
-                tauri::async_runtime::spawn_blocking(move || {
-                    // Offline channels poll less often; backoff uses 200 ms ticks.
-                    let mut backoff: u32 = 100;
-                    while run2.load(Ordering::Relaxed) {
-                        if contain_connection_panic(&plat, &label, || {
-                            run_youtube(&key, &value, &label, run2.clone(), app2.clone(), gen)
-                        }) {
-                            backoff = 100;
-                        }
-                        reconnect_for(&run2, backoff);
-                        backoff = (backoff * 2).min(300);
-                    }
-                });
-            }
-            "cinefy" => {
-                tauri::async_runtime::spawn_blocking(move || {
-                    let mut backoff: u32 = 15;
-                    while run2.load(Ordering::Relaxed) {
-                        let sink = CinefySink {
-                            app: app2.clone(),
-                            source: label.clone(),
-                            gen,
-                        };
-                        if contain_connection_panic(&plat, &label, || {
-                            cinefy::run(&value, run2.clone(), &sink)
-                        }) {
-                            backoff = 15;
-                        }
-                        reconnect_for(&run2, backoff);
-                        backoff = (backoff * 2).min(300);
-                    }
-                });
-            }
-            _ => {}
-        }
-    }
-
-    let vsources: Vec<crate::config::ChatSource> = s
+    let active: Vec<ChatSource> = settings
         .chat_sources
         .iter()
         .filter(|x| x.enabled && !x.value.trim().is_empty())
         .cloned()
         .collect();
-    if !vsources.is_empty() {
-        let (app_v, run_v, key_v) = (app.clone(), running.clone(), api_key.clone());
+
+    for source in &active {
+        let Some(provider) = crate::platforms::chat_provider(&source.platform) else {
+            continue;
+        };
+        let (app2, run2, settings2, source) = (
+            app.clone(),
+            running.clone(),
+            settings.clone(),
+            source.clone(),
+        );
+        let label = source_label(&source);
         tauri::async_runtime::spawn_blocking(move || {
-            run_viewers(vsources, key_v, run_v, app_v, gen)
+            let first = provider.first_backoff();
+            let mut backoff = first; // 200 ms ticks.
+            while run2.load(Ordering::Relaxed) {
+                let connection = Connection {
+                    app: &app2,
+                    gen,
+                    running: &run2,
+                    source: &source,
+                    label: &label,
+                    settings: &settings2,
+                };
+                if contain_connection_panic(provider.id(), &label, || provider.connect(&connection))
+                {
+                    backoff = first;
+                }
+                reconnect_for(&run2, backoff);
+                backoff = (backoff * 2).min(300);
+            }
         });
     }
 
-    // One EventSub socket covers every Twitch channel; follows need the app's own login.
-    let follow_channels: Vec<twitch_follows::FollowChannel> = s
-        .chat_sources
-        .iter()
-        .filter(|x| x.enabled && x.platform == "twitch" && !x.value.trim().is_empty())
-        .map(|x| twitch_follows::FollowChannel {
-            login: x.value.trim().to_lowercase(),
-            label: if x.name.trim().is_empty() {
-                x.value.clone()
-            } else {
-                x.name.clone()
-            },
-        })
-        .collect();
-    if !follow_channels.is_empty() && crate::keys::has_key("twitch_oauth") {
-        let (app_f, run_f) = (app.clone(), running.clone());
+    if !active.is_empty() {
+        let (app_v, run_v, settings_v, sources_v) = (
+            app.clone(),
+            running.clone(),
+            settings.clone(),
+            active.clone(),
+        );
         tauri::async_runtime::spawn_blocking(move || {
-            twitch_follows::run(follow_channels, run_f, app_f, gen)
+            run_viewers(sources_v, settings_v, run_v, app_v, gen)
         });
+    }
+
+    for provider in crate::platforms::chat_providers() {
+        let sources: Vec<ChatSource> = active
+            .iter()
+            .filter(|source| source.platform == provider.id())
+            .cloned()
+            .collect();
+        if !sources.is_empty() {
+            provider.start_shared(&ChatSession {
+                app,
+                gen,
+                running: &running,
+                sources: &sources,
+            });
+        }
+    }
+}
+
+/// What the UI shows for a source: its name, or its channel when it has none.
+pub(crate) fn source_label(source: &ChatSource) -> String {
+    if source.name.trim().is_empty() {
+        source.value.clone()
+    } else {
+        source.name.clone()
     }
 }
 
@@ -516,7 +435,7 @@ pub fn stop_chat(app: &AppHandle) {
 }
 
 // Poll cancellation every 200 ms while backing off.
-fn reconnect_for(running: &AtomicBool, ticks: u32) {
+pub(crate) fn reconnect_for(running: &AtomicBool, ticks: u32) {
     for _ in 0..ticks {
         if !running.load(Ordering::Relaxed) {
             return;
@@ -525,329 +444,10 @@ fn reconnect_for(running: &AtomicBool, ticks: u32) {
     }
 }
 
-struct CinefySink {
-    app: AppHandle,
-    source: String,
-    gen: u64,
-}
-
-impl cinefy::OutputPort for CinefySink {
-    fn status(&self, status: cinefy::ConnectionStatus) {
-        let status = match status {
-            cinefy::ConnectionStatus::Connected => "connected",
-            cinefy::ConnectionStatus::Disconnected => "disconnected",
-            cinefy::ConnectionStatus::Error => "error",
-        };
-        chat_status_gen(&self.app, self.gen, "cinefy", &self.source, status);
-    }
-
-    fn publish(&self, event: cinefy::Event) {
-        if CHAT_GEN.load(Ordering::SeqCst) != self.gen {
-            return;
-        }
-        match event {
-            cinefy::Event::Message(message) => {
-                let text = message.text;
-                emit_chat_gen(
-                    &self.app,
-                    self.gen,
-                    ChatMessage {
-                        id: next_id(),
-                        platform: "cinefy".into(),
-                        source: self.source.clone(),
-                        author: message.author,
-                        author_id: message.author_id,
-                        native_id: Some(message.native_id),
-                        color: message.color,
-                        fragments: vec![text_frag(&text)],
-                        badges: message
-                            .badges
-                            .into_iter()
-                            .map(|badge| ChatBadge {
-                                label: badge.label,
-                                kind: badge.kind,
-                            })
-                            .collect(),
-                        text,
-                        ts: if message.published_at_ms == 0 {
-                            now_ms()
-                        } else {
-                            message.published_at_ms
-                        },
-                    },
-                );
-            }
-            cinefy::Event::DeleteMessage { native_id } => {
-                delete_message(&self.app, "cinefy", &native_id);
-            }
-        }
-    }
-}
-
-/// True means the connection succeeded at least once, allowing the supervisor to reset backoff.
-fn run_twitch(
-    channel: &str,
-    source: &str,
-    source_id: &str,
-    send_token: Option<String>,
-    running: Arc<AtomicBool>,
-    app: AppHandle,
-    gen: u64,
-) -> bool {
-    let ch = channel.trim().trim_start_matches('#').to_lowercase();
-    if ch.is_empty() {
-        return false;
-    }
-
-    // Invalid tokens or missing chat:edit scope fall back to anonymous reading.
-
-    let creds: Option<(String, String)> = match send_token.as_ref() {
-        Some(t) => {
-            let raw = t.trim().trim_start_matches("oauth:").trim().to_string();
-            match twitch_validate(&raw) {
-                TokenCheck::Valid(login, true) => Some((login, raw)),
-                TokenCheck::Valid(login, false) => {
-                    chat_auth(&app, source_id, &login, false);
-                    None
-                }
-                TokenCheck::Invalid => {
-                    chat_auth(&app, source_id, "", false);
-                    None
-                }
-                // Retry network failures without invalidating a potentially valid token or downgrading to anonymous.
-                TokenCheck::Network => return false,
-            }
-        }
-        None => None,
-    };
-
-    let mut socket = match tungstenite::connect("wss://irc-ws.chat.twitch.tv:443") {
-        Ok((s, _)) => s,
-        Err(_) => {
-            log::warn!("twitch chat: connection failed");
-            chat_status_gen(&app, gen, "twitch", source, "error");
-            return false;
-        }
-    };
-    match socket.get_mut() {
-        tungstenite::stream::MaybeTlsStream::Rustls(s) => {
-            let _ = s.sock.set_read_timeout(Some(Duration::from_millis(400)));
-        }
-        tungstenite::stream::MaybeTlsStream::Plain(tcp) => {
-            let _ = tcp.set_read_timeout(Some(Duration::from_millis(400)));
-        }
-        _ => {}
-    }
-    let _ = socket.send(Message::Text(
-        "CAP REQ :twitch.tv/tags twitch.tv/commands".into(),
-    ));
-
-    if let Some((login, raw)) = &creds {
-        let _ = socket.send(Message::Text(format!("PASS oauth:{raw}").into()));
-        let _ = socket.send(Message::Text(format!("NICK {login}").into()));
-    } else {
-        let _ = socket.send(Message::Text("PASS SCHMOOPIIE".into()));
-        let _ = socket.send(Message::Text(
-            format!("NICK justinfan{}", now_ms() % 100000).into(),
-        ));
-    }
-    let _ = socket.send(Message::Text(format!("JOIN #{ch}").into()));
-    log::info!("twitch chat: connected");
-    chat_status_gen(&app, gen, "twitch", source, "connected");
-
-    let mut out_rx: Option<mpsc::Receiver<Outgoing>> = None;
-    let mut send_login: Option<String> = None;
-    if let Some((login, _)) = &creds {
-        let (tx, rx) = mpsc::channel::<Outgoing>();
-        let senders = app.state::<AppState>().chat.lock().unwrap().senders.clone();
-        // A late old connection must not overwrite the current sender with a dead receiver.
-
-        let registered = {
-            let mut map = senders.lock().unwrap();
-            if CHAT_GEN.load(Ordering::SeqCst) == gen && running.load(Ordering::Relaxed) {
-                map.insert(source_id.to_string(), tx);
-                true
-            } else {
-                false
-            }
-        };
-        if registered {
-            chat_auth(&app, source_id, login, true);
-            out_rx = Some(rx);
-            send_login = Some(login.clone());
-        }
-    }
-    let mut sends: Vec<Instant> = Vec::new();
-
-    // Load before parsing messages; late emote lookup would leave them permanently rendered as text.
-
-    let mut emotes = fetch_global_thirdparty();
-    let mut channel_emotes_done = false;
-
-    while running.load(Ordering::Relaxed) {
-        // Drain on read timeouts too, so quiet channels do not stall outgoing messages.
-
-        if let (Some(rx), Some(login)) = (&out_rx, &send_login) {
-            loop {
-                sends.retain(|t| t.elapsed() < Duration::from_secs(30));
-                if sends.len() >= 18 {
-                    break;
-                }
-                let outgoing = match rx.try_recv() {
-                    Ok(t) => t,
-                    Err(_) => break,
-                };
-                let clean = sanitize_outgoing(&outgoing.text);
-                if clean.is_empty() {
-                    continue;
-                }
-                let line = twitch_privmsg(&ch, &clean, outgoing.reply_to.as_deref());
-                if socket.send(Message::Text(line.into())).is_ok() {
-                    sends.push(Instant::now());
-                    // Twitch does not echo the sender's own PRIVMSG.
-                    emit_chat_gen(
-                        &app,
-                        gen,
-                        ChatMessage {
-                            id: next_id(),
-                            platform: "twitch".into(),
-                            source: source.to_string(),
-                            author: login.clone(),
-                            author_id: None,
-                            native_id: None,
-                            color: Some("#ffb323".into()),
-                            text: clean.clone(),
-                            fragments: vec![text_frag(&clean)],
-                            badges: vec![],
-                            ts: now_ms(),
-                        },
-                    );
-                }
-            }
-        }
-
-        match socket.read() {
-            Ok(Message::Text(t)) => {
-                for line in t.split("\r\n").filter(|l| !l.is_empty()) {
-                    if !channel_emotes_done {
-                        if let Some(room_id) = tag_val(twitch_tags(line), "room-id") {
-                            fetch_channel_thirdparty(&room_id, &mut emotes);
-                            channel_emotes_done = true;
-                        }
-                    }
-                    // Compare the IRC command, not substrings that may occur in user text.
-
-                    let cmd = irc_command(line);
-                    if cmd == "PING" {
-                        let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
-                    } else if cmd == "PRIVMSG" {
-                        if let Some(b) =
-                            tag_val(twitch_tags(line), "bits").and_then(|v| v.parse::<f64>().ok())
-                        {
-                            if b > 0.0 {
-                                emit_alert(
-                                    &app,
-                                    Alert {
-                                        id: next_id(),
-                                        platform: "twitch".into(),
-                                        source: source.to_string(),
-                                        kind: "bits".into(),
-                                        user: tag_val(twitch_tags(line), "display-name")
-                                            .unwrap_or_else(|| Msg::ChatUnknownUser.now()),
-                                        amount: Some(b),
-                                        currency: None,
-                                        tier: None,
-                                        message: None,
-                                        fragments: Vec::new(),
-                                        ts: now_ms(),
-                                    },
-                                );
-                            }
-                        }
-                        if let Some(msg) = parse_privmsg(line, source, &emotes) {
-                            emit_chat_gen(&app, gen, msg);
-                        }
-                    } else if cmd == "USERNOTICE" {
-                        if let Some(alert) = parse_usernotice(line, source, &emotes) {
-                            emit_alert(&app, alert);
-                        }
-                    } else if cmd == "CLEARMSG" {
-                        if let Some(id) = tag_val(twitch_tags(line), "target-msg-id") {
-                            delete_message(&app, "twitch", &id);
-                        }
-                    } else if cmd == "CLEARCHAT" {
-                        match clearchat_user(line) {
-                            Some(u) => delete_user(&app, "twitch", source, &u),
-                            None => clear_source(&app, "twitch", source),
-                        }
-                    }
-                }
-            }
-            Ok(Message::Close(_)) => break,
-            Ok(_) => {}
-            Err(tungstenite::Error::Io(e))
-                if matches!(
-                    e.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) =>
-            {
-                continue;
-            }
-            Err(_) => break,
-        }
-    }
-    let _ = socket.close(None);
-    // Old connection cleanup must not remove a new generation's queue or report it disconnected.
-
-    if CHAT_GEN.load(Ordering::SeqCst) == gen {
-        if send_login.is_some() {
-            let senders = app.state::<AppState>().chat.lock().unwrap().senders.clone();
-            senders.lock().unwrap().remove(source_id);
-        }
-        chat_status(&app, "twitch", source, "disconnected");
-    }
-    true
-}
-
-enum TokenCheck {
-    Valid(String, bool), // Lowercase login and chat:edit permission.
-    Invalid,
-    Network,
-}
-
 // Only 401 invalidates a token; transient errors must not disable authenticated chat.
 
-fn twitch_validate(token: &str) -> TokenCheck {
-    let body = match ureq::get("https://id.twitch.tv/oauth2/validate")
-        .set("Authorization", &format!("OAuth {token}"))
-        .timeout(Duration::from_secs(5))
-        .call()
-    {
-        Ok(r) => match r.into_string() {
-            Ok(b) => b,
-            Err(_) => return TokenCheck::Network,
-        },
-        Err(ureq::Error::Status(401, _)) => return TokenCheck::Invalid,
-        Err(_) => return TokenCheck::Network,
-    };
-    let parsed = (|| -> Option<(String, bool)> {
-        let v: Value = serde_json::from_str(&body).ok()?;
-        let login = v.get("login")?.as_str()?.to_lowercase();
-        let can_send = v
-            .get("scopes")
-            .and_then(|s| s.as_array())
-            .map(|arr| arr.iter().any(|x| x.as_str() == Some("chat:edit")))
-            .unwrap_or(false);
-        Some((login, can_send))
-    })();
-    match parsed {
-        Some((login, can_send)) => TokenCheck::Valid(login, can_send),
-        None => TokenCheck::Network,
-    }
-}
-
 // Replace line breaks to prevent injecting additional IRC commands.
-fn sanitize_outgoing(s: &str) -> String {
+pub(crate) fn sanitize_outgoing(s: &str) -> String {
     let one_line: String = s
         .chars()
         .map(|c| if c == '\r' || c == '\n' { ' ' } else { c })
@@ -885,84 +485,42 @@ pub fn send_message(
         _ => {
             let mut t: Vec<String> = senders.lock().unwrap().keys().cloned().collect();
             for s in &cfg.settings.chat_sources {
-                if s.enabled && (s.platform == "youtube" || s.platform == "kick") {
+                if s.enabled
+                    && crate::platforms::chat_provider(&s.platform)
+                        .is_some_and(|provider| provider.sends_by_default())
+                {
                     t.push(s.id.clone());
                 }
             }
             t
         }
     };
-    let label_of = |id: &str| -> String {
-        cfg.settings
-            .chat_sources
-            .iter()
-            .find(|s| s.id == id)
-            .map(|s| {
-                if s.name.trim().is_empty() {
-                    s.value.clone()
-                } else {
-                    s.name.clone()
-                }
-            })
-            .unwrap_or_default()
-    };
     let mut sent = 0u32;
     let mut last_err: Option<String> = None;
-    let mut youtube_done = false; // YouTube inserts into the signed-in user's live chat; send only once.
+    let mut sent_once: HashSet<&'static str> = HashSet::new();
     for id in targets {
-        let src = cfg.settings.chat_sources.iter().find(|s| s.id == id);
-        match src.map(|s| s.platform.as_str()) {
-            Some("twitch") => {
-                if let Some(tx) = senders.lock().unwrap().get(&id) {
-                    let outgoing = Outgoing {
-                        text: text.clone(),
-                        reply_to: reply_to.clone(),
-                    };
-                    if tx.send(outgoing).is_ok() {
-                        sent += 1;
-                    }
-                }
-            }
-
-            Some("youtube") if !youtube_done => {
-                youtube_done = true;
-                let text = match &reply {
-                    Some(reply) => sanitize_outgoing(&youtube_reply_text(&reply.author, &text)),
-                    None => text.clone(),
-                };
-                match crate::auth::youtube_send(app, &text) {
-                    Ok(()) => {
-                        sent += 1;
-                        emit_chat(
-                            app,
-                            ChatMessage {
-                                id: next_id(),
-                                platform: "youtube".into(),
-                                source: label_of(&id),
-                                author: Msg::ChatSelfAuthor.now(),
-                                author_id: None,
-                                native_id: None,
-                                color: Some("#ffb323".into()),
-                                text: text.clone(),
-                                fragments: vec![text_frag(&text)],
-                                badges: vec![],
-                                ts: now_ms(),
-                            },
-                        );
-                    }
-                    Err(e) => last_err = Some(e),
-                }
-            }
-
-            // Pusher echoes Kick messages, so local echo would duplicate them.
-            Some("kick") => {
-                let slug = src.map(|s| s.value.clone()).unwrap_or_default();
-                match crate::auth::kick_send(app, &text, &slug, reply_to.as_deref()) {
-                    Ok(()) => sent += 1,
-                    Err(e) => last_err = Some(e),
-                }
-            }
-            _ => {}
+        let Some(source) = cfg.settings.chat_sources.iter().find(|s| s.id == id) else {
+            continue;
+        };
+        let Some(provider) = crate::platforms::chat_provider(&source.platform) else {
+            continue;
+        };
+        if provider.sends_once() && !sent_once.insert(provider.id()) {
+            continue;
+        }
+        let label = source_label(source);
+        match provider.send(&Outbox {
+            app,
+            senders: &senders,
+            source,
+            label: &label,
+            text: &text,
+            reply: reply.as_ref(),
+            reply_to: reply_to.as_deref(),
+        }) {
+            Some(Ok(())) => sent += 1,
+            Some(Err(e)) => last_err = Some(e),
+            None => {}
         }
     }
     if sent == 0 {
@@ -971,946 +529,8 @@ pub fn send_message(
     Ok(())
 }
 
-// Skip IRC tags and prefix before examining the command; message text is not a command.
-
-fn irc_command(line: &str) -> &str {
-    let mut rest = line;
-    if rest.starts_with('@') {
-        rest = match rest.find(' ') {
-            Some(i) => &rest[i + 1..],
-            None => return "",
-        };
-    }
-    if rest.starts_with(':') {
-        rest = match rest.find(' ') {
-            Some(i) => &rest[i + 1..],
-            None => return "",
-        };
-    }
-    rest.split(' ').next().unwrap_or("")
-}
-
-fn twitch_tags(line: &str) -> &str {
-    line.strip_prefix('@')
-        .and_then(|s| s.split(' ').next())
-        .unwrap_or("")
-}
-fn tag_val(tags: &str, key: &str) -> Option<String> {
-    for kv in tags.split(';') {
-        let mut it = kv.splitn(2, '=');
-        if it.next() == Some(key) {
-            let v = it.next().unwrap_or("");
-            return (!v.is_empty()).then(|| v.to_string());
-        }
-    }
-    None
-}
-fn clearchat_user(line: &str) -> Option<String> {
-    let after = line.split("CLEARCHAT").nth(1)?;
-    let idx = after.find(':')?;
-    let u = after[idx + 1..].trim();
-    (!u.is_empty()).then(|| u.to_string())
-}
-
-fn parse_usernotice(line: &str, source: &str, emotes: &HashMap<String, String>) -> Option<Alert> {
-    let tags = twitch_tags(line);
-    let msg_id = tag_val(tags, "msg-id")?;
-    let user = tag_val(tags, "display-name")
-        .or_else(|| tag_val(tags, "login"))
-        .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-    let tier = tag_val(tags, "msg-param-sub-plan").map(|p| match p.as_str() {
-        "Prime" => "Prime".into(),
-        "1000" => "T1".into(),
-        "2000" => "T2".into(),
-        "3000" => "T3".into(),
-        other => other.to_string(),
-    });
-    let (kind, amount) = match msg_id.as_str() {
-        "sub" => ("sub", Some(1.0)),
-        "resub" => (
-            "resub",
-            tag_val(tags, "msg-param-cumulative-months").and_then(|v| v.parse().ok()),
-        ),
-        "subgift" => ("subgift", Some(1.0)),
-        "submysterygift" | "anonsubmysterygift" => (
-            "subgift",
-            tag_val(tags, "msg-param-mass-gift-count").and_then(|v| v.parse().ok()),
-        ),
-        "raid" => (
-            "raid",
-            tag_val(tags, "msg-param-viewerCount").and_then(|v| v.parse().ok()),
-        ),
-        _ => return None,
-    };
-    let emotes_tag = tag_val(tags, "emotes").unwrap_or_default();
-    let (message, fragments) = if kind == "subgift" {
-        (
-            tag_val(tags, "msg-param-recipient-display-name")
-                .map(|r| Msg::ChatGiftRecipient { recipient: &r }.now()),
-            Vec::new(),
-        )
-    } else {
-        match usernotice_text(line) {
-            Some(t) => {
-                let frags = apply_thirdparty(twitch_fragments(&t, &emotes_tag), emotes);
-                (Some(t), frags)
-            }
-            None => (None, Vec::new()),
-        }
-    };
-    Some(Alert {
-        id: next_id(),
-        platform: "twitch".into(),
-        source: source.to_string(),
-        kind: kind.into(),
-        user,
-        amount,
-        currency: None,
-        tier,
-        message,
-        fragments,
-        ts: now_ms(),
-    })
-}
-
-fn usernotice_text(line: &str) -> Option<String> {
-    let idx = line.find("USERNOTICE")?;
-    let after = &line[idx..];
-    let mi = after.find(':')?;
-    let t = after[mi + 1..].trim_end();
-    (!t.is_empty()).then(|| t.to_string())
-}
-
-fn parse_privmsg(
-    line: &str,
-    source: &str,
-    emotes: &HashMap<String, String>,
-) -> Option<ChatMessage> {
-    let (tags, rest) = if let Some(stripped) = line.strip_prefix('@') {
-        let sp = stripped.find(' ')?;
-        (&stripped[..sp], &stripped[sp + 1..])
-    } else {
-        ("", line)
-    };
-    let privmsg_idx = rest.find("PRIVMSG")?;
-    let after = &rest[privmsg_idx..];
-    let msg_idx = after.find(':')?;
-    let mut text = after[msg_idx + 1..].trim_end().to_string();
-    // Strip the CTCP /me envelope while preserving its action text.
-    if let Some(inner) = text
-        .strip_prefix("\u{1}ACTION ")
-        .and_then(|s| s.strip_suffix('\u{1}'))
-    {
-        text = inner.to_string();
-    }
-    if text.is_empty() {
-        return None;
-    }
-
-    let nick = rest
-        .strip_prefix(':')
-        .and_then(|r| r.split('!').next())
-        .unwrap_or("anon")
-        .to_string();
-
-    let mut color = None;
-    let mut display = nick;
-    let mut emotes_tag = "";
-    let mut badges_tag = "";
-    let mut native_id = None;
-    for kv in tags.split(';') {
-        let mut it = kv.splitn(2, '=');
-        let k = it.next().unwrap_or("");
-        let v = it.next().unwrap_or("");
-        match k {
-            "color" if !v.is_empty() => color = Some(v.to_string()),
-            "display-name" if !v.is_empty() => display = v.to_string(),
-            "emotes" => emotes_tag = v,
-            "badges" => badges_tag = v,
-            "id" if !v.is_empty() => native_id = Some(v.to_string()),
-            _ => {}
-        }
-    }
-
-    Some(ChatMessage {
-        id: next_id(),
-        platform: "twitch".into(),
-        source: source.to_string(),
-        author: display,
-        author_id: tag_val(twitch_tags(line), "user-id"),
-        native_id,
-        color,
-        fragments: apply_thirdparty(twitch_fragments(&text, emotes_tag), emotes),
-        badges: twitch_badges(badges_tag),
-        text,
-        ts: now_ms(),
-    })
-}
-
-fn fetch_json(url: &str) -> Option<Value> {
-    let body = ureq::get(url)
-        .set("User-Agent", "Corneta/1.0")
-        .timeout(Duration::from_secs(5))
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    serde_json::from_str(&body).ok()
-}
-
-fn add_bttv(v: &Value, map: &mut HashMap<String, String>) {
-    if let Some(arr) = v.as_array() {
-        for e in arr {
-            if let (Some(code), Some(id)) = (
-                e.get("code").and_then(|x| x.as_str()),
-                e.get("id").and_then(|x| x.as_str()),
-            ) {
-                map.insert(
-                    code.to_string(),
-                    format!("https://cdn.betterttv.net/emote/{id}/2x"),
-                );
-            }
-        }
-    }
-}
-
-fn add_ffz(v: &Value, map: &mut HashMap<String, String>) {
-    let Some(sets) = v.get("sets").and_then(|x| x.as_object()) else {
-        return;
-    };
-    for set in sets.values() {
-        let Some(emos) = set.get("emoticons").and_then(|x| x.as_array()) else {
-            continue;
-        };
-        for e in emos {
-            let name = e.get("name").and_then(|x| x.as_str());
-            let urls = e.get("urls");
-            let pick = urls
-                .and_then(|u| u.get("2").or_else(|| u.get("4")).or_else(|| u.get("1")))
-                .and_then(|x| x.as_str());
-            if let (Some(name), Some(u)) = (name, pick) {
-                let full = if let Some(rest) = u.strip_prefix("//") {
-                    format!("https://{rest}")
-                } else {
-                    u.to_string()
-                };
-                map.insert(name.to_string(), full);
-            }
-        }
-    }
-}
-
-fn add_7tv(emotes: &Value, map: &mut HashMap<String, String>) {
-    if let Some(arr) = emotes.as_array() {
-        for e in arr {
-            if let (Some(name), Some(id)) = (
-                e.get("name").and_then(|x| x.as_str()),
-                e.get("id").and_then(|x| x.as_str()),
-            ) {
-                map.insert(
-                    name.to_string(),
-                    format!("https://cdn.7tv.app/emote/{id}/2x.webp"),
-                );
-            }
-        }
-    }
-}
-
-// Share global emote fetches across reconnects; failed empty responses must not populate this cache.
-type ThirdPartyCache = Mutex<Option<(Instant, HashMap<String, String>)>>;
-static GLOBAL_3P: OnceLock<ThirdPartyCache> = OnceLock::new();
-
-fn fetch_global_thirdparty() -> HashMap<String, String> {
-    let cache = GLOBAL_3P.get_or_init(|| Mutex::new(None));
-    if let Ok(guard) = cache.lock() {
-        if let Some((at, map)) = guard.as_ref() {
-            if at.elapsed() < Duration::from_secs(3600) {
-                return map.clone();
-            }
-        }
-    }
-    let mut map = HashMap::new();
-    if let Some(v) = fetch_json("https://api.betterttv.net/3/cached/emotes/global") {
-        add_bttv(&v, &mut map);
-    }
-    if let Some(v) = fetch_json("https://api.frankerfacez.com/v1/set/global") {
-        add_ffz(&v, &mut map);
-    }
-    if let Some(v) = fetch_json("https://7tv.io/v3/emote-sets/global") {
-        add_7tv(v.get("emotes").unwrap_or(&Value::Null), &mut map);
-    }
-    // A temporary network failure must not suppress emotes for the entire TTL.
-    if !map.is_empty() {
-        if let Ok(mut guard) = cache.lock() {
-            *guard = Some((Instant::now(), map.clone()));
-        }
-    }
-    map
-}
-
-fn fetch_channel_thirdparty(room_id: &str, map: &mut HashMap<String, String>) {
-    if let Some(v) = fetch_json(&format!(
-        "https://api.betterttv.net/3/cached/users/twitch/{room_id}"
-    )) {
-        add_bttv(v.get("channelEmotes").unwrap_or(&Value::Null), map);
-        add_bttv(v.get("sharedEmotes").unwrap_or(&Value::Null), map);
-    }
-    if let Some(v) = fetch_json(&format!(
-        "https://api.frankerfacez.com/v1/room/id/{room_id}"
-    )) {
-        add_ffz(&v, map);
-    }
-    if let Some(v) = fetch_json(&format!("https://7tv.io/v3/users/twitch/{room_id}")) {
-        add_7tv(v.pointer("/emote_set/emotes").unwrap_or(&Value::Null), map);
-    }
-}
-
-fn apply_thirdparty(
-    frags: Vec<ChatFragment>,
-    emotes: &HashMap<String, String>,
-) -> Vec<ChatFragment> {
-    if emotes.is_empty() {
-        return frags;
-    }
-    let mut out = vec![];
-    for f in frags {
-        if f.kind != "text" {
-            out.push(f);
-            continue;
-        }
-        let text = f.text.unwrap_or_default();
-        let mut buf = String::new();
-        for word in text.split_inclusive(' ') {
-            let bare = word.trim_end_matches(' ');
-            if let Some(url) = emotes.get(bare) {
-                if !buf.is_empty() {
-                    out.push(text_frag(&buf));
-                    buf.clear();
-                }
-                out.push(ChatFragment {
-                    kind: "emote".into(),
-                    text: Some(bare.to_string()),
-                    url: Some(url.clone()),
-                });
-                if word.ends_with(' ') {
-                    buf.push(' ');
-                }
-            } else {
-                buf.push_str(word);
-            }
-        }
-        if !buf.is_empty() {
-            out.push(text_frag(&buf));
-        }
-    }
-    out
-}
-
-fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
-    if emotes_tag.is_empty() {
-        return vec![text_frag(text)];
-    }
-    let mut ranges: Vec<(usize, usize, String)> = vec![];
-    for part in emotes_tag.split('/') {
-        let mut it = part.splitn(2, ':');
-        let id = it.next().unwrap_or("");
-        let positions = it.next().unwrap_or("");
-        if id.is_empty() {
-            continue;
-        }
-        for pos in positions.split(',') {
-            let mut p = pos.splitn(2, '-');
-            if let (Some(a), Some(b)) = (
-                p.next().and_then(|x| x.parse::<usize>().ok()),
-                p.next().and_then(|x| x.parse::<usize>().ok()),
-            ) {
-                ranges.push((a, b, id.to_string()));
-            }
-        }
-    }
-    if ranges.is_empty() {
-        return vec![text_frag(text)];
-    }
-    ranges.sort_by_key(|r| r.0);
-
-    let chars: Vec<char> = text.chars().collect();
-    let n = chars.len();
-    let mut frags = vec![];
-    let mut cursor = 0usize;
-    for (a, b, id) in ranges {
-        if a >= n || a < cursor || b < a {
-            continue;
-        }
-        if a > cursor {
-            frags.push(text_frag(&chars[cursor..a].iter().collect::<String>()));
-        }
-        let end = (b + 1).min(n);
-        frags.push(ChatFragment {
-            kind: "emote".into(),
-            text: Some(chars[a..end].iter().collect()),
-            url: Some(format!(
-                "https://static-cdn.jtvnw.net/emoticons/v2/{id}/default/dark/1.0"
-            )),
-        });
-        cursor = end;
-    }
-    if cursor < n {
-        frags.push(text_frag(&chars[cursor..].iter().collect::<String>()));
-    }
-    frags
-}
-
-fn twitch_badges(tag: &str) -> Vec<ChatBadge> {
-    if tag.is_empty() {
-        return vec![];
-    }
-    tag.split(',')
-        .filter_map(|b| {
-            let set = b.split('/').next().unwrap_or("");
-            let (label, kind) = match set {
-                "broadcaster" => ("HOST", "broadcaster"),
-                "moderator" => ("MOD", "moderator"),
-                "vip" => ("VIP", "vip"),
-                "subscriber" => ("SUB", "subscriber"),
-                "founder" => ("FND", "subscriber"),
-                "premium" => ("PRIME", "premium"),
-                "turbo" => ("TURBO", "premium"),
-                "partner" => ("✓", "partner"),
-                "staff" | "admin" | "global_mod" => ("STAFF", "staff"),
-                "artist-badge" => ("ART", "artist"),
-                _ => return None,
-            };
-            Some(ChatBadge {
-                label: label.into(),
-                kind: kind.into(),
-            })
-        })
-        .collect()
-}
-
-fn extract_video_id(input: &str) -> String {
-    let s = input.trim();
-    if let Some(i) = s.find("v=") {
-        return s[i + 2..]
-            .split(['&', '#'])
-            .next()
-            .unwrap_or("")
-            .to_string();
-    }
-    for marker in ["youtu.be/", "/live/", "/shorts/", "/embed/"] {
-        if let Some(i) = s.find(marker) {
-            return s[i + marker.len()..]
-                .split(['?', '&', '#', '/'])
-                .next()
-                .unwrap_or("")
-                .to_string();
-        }
-    }
-    s.to_string()
-}
-
-const BROWSER_UA: &str =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-
-enum LiveResolve {
-    Video(String),
-    NotLive,
-    ScrapeFailed,
-}
-
-fn direct_video_id(s: &str) -> Option<String> {
-    let s = s.trim();
-    if s.contains("watch?v=")
-        || s.contains("youtu.be/")
-        || s.contains("/shorts/")
-        || s.contains("/embed/")
-        || (s.contains("/live/") && !s.trim_end_matches('/').ends_with("/live"))
-    {
-        let v = extract_video_id(s);
-        return (!v.is_empty()).then_some(v);
-    }
-
-    if !s.contains('/')
-        && !s.starts_with('@')
-        && s.len() == 11
-        && s.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-    {
-        return Some(s.to_string());
-    }
-    None
-}
-
-fn youtube_live_url(input: &str) -> Option<String> {
-    let s = input.trim().trim_end_matches('/');
-    const BASE: &str = "https://www.youtube.com";
-    for marker in ["/channel/", "/@", "/c/", "/user/"] {
-        if let Some(i) = s.find(marker) {
-            let seg = s[i + marker.len()..].split('/').next().unwrap_or("");
-            if seg.is_empty() {
-                return None;
-            }
-            return Some(format!("{BASE}/{}{seg}/live", &marker[1..]));
-        }
-    }
-    if let Some(h) = s.strip_prefix('@') {
-        return (!h.is_empty()).then(|| format!("{BASE}/@{h}/live"));
-    }
-    if s.starts_with("UC") && s.len() == 24 {
-        return Some(format!("{BASE}/channel/{s}/live"));
-    }
-    if !s.is_empty() && !s.contains('/') && !s.contains('.') {
-        return Some(format!("{BASE}/@{s}/live"));
-    }
-    None
-}
-
-fn live_video_from_html(html: &str) -> Option<String> {
-    if !(html.contains("\"isLive\":true") || html.contains("\"isLiveNow\":true")) {
-        return None;
-    }
-    let grab = |start: usize| -> Option<String> {
-        let id: String = html[start..]
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
-            .collect();
-        (id.len() == 11).then_some(id)
-    };
-
-    if let Some(i) = html.find("rel=\"canonical\"") {
-        if let Some(j) = html[i..].find("watch?v=") {
-            if j < 220 {
-                if let Some(id) = grab(i + j + 8) {
-                    return Some(id);
-                }
-            }
-        }
-    }
-
-    html.find("\"videoId\":\"").and_then(|i| grab(i + 11))
-}
-
-fn scrape_live(url: &str) -> LiveResolve {
-    let body = match ureq::get(url)
-        .set("User-Agent", BROWSER_UA)
-        .set("Accept-Language", "en-US,en;q=0.9")
-        .timeout(Duration::from_secs(8))
-        .call()
-    {
-        Ok(r) => r.into_string().unwrap_or_default(),
-        Err(_) => return LiveResolve::ScrapeFailed,
-    };
-    if let Some(vid) = live_video_from_html(&body) {
-        return LiveResolve::Video(vid);
-    }
-
-    if body.contains("ytInitialData") || body.contains("\"videoId\"") {
-        LiveResolve::NotLive
-    } else {
-        LiveResolve::ScrapeFailed
-    }
-}
-
-/// A handle maps to the same channel for the whole session; a miss is retried after a while.
-const CHANNEL_MISS_TTL: Duration = Duration::from_secs(6 * 3600);
-/// search.list costs 100 units, so each channel is searched at most this often.
-const LIVE_SEARCH_EVERY: Duration = Duration::from_secs(10 * 60);
-const LOOKUP_CACHE_CAP: usize = 64;
-
-type LookupCache<T> = Mutex<HashMap<String, (Instant, Option<T>)>>;
-static YT_CHANNEL_IDS: OnceLock<LookupCache<String>> = OnceLock::new();
-static YT_LIVE_SEARCHES: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
-
-/// A cached answer still valid at `now`: hits last the session, misses expire after `miss_ttl`.
-fn cached_answer<T: Clone>(
-    entry: Option<&(Instant, Option<T>)>,
-    miss_ttl: Duration,
-    now: Instant,
-) -> Option<Option<T>> {
-    match entry {
-        Some((_, Some(hit))) => Some(Some(hit.clone())),
-        Some((at, None)) if now.saturating_duration_since(*at) < miss_ttl => Some(None),
-        _ => None,
-    }
-}
-
-fn due(last: Option<&Instant>, every: Duration, now: Instant) -> bool {
-    last.is_none_or(|at| now.saturating_duration_since(*at) >= every)
-}
-
-fn channel_id_of(input: &str, api_key: &str) -> Option<String> {
-    let s = input.trim();
-    if let Some(i) = s.find("/channel/") {
-        let id = s[i + 9..].split('/').next().unwrap_or("");
-        if id.starts_with("UC") {
-            return Some(id.to_string());
-        }
-    }
-    if s.starts_with("UC") && s.len() == 24 {
-        return Some(s.to_string());
-    }
-    let handle = if let Some(h) = s.strip_prefix('@') {
-        h.to_string()
-    } else if let Some(i) = s.find("/@") {
-        s[i + 2..].split('/').next().unwrap_or("").to_string()
-    } else if !s.contains('/') && !s.contains('.') {
-        s.to_string()
-    } else {
-        return None;
-    };
-    if handle.is_empty() || api_key.trim().is_empty() {
-        return None;
-    }
-    let cache_key = handle.to_lowercase();
-    let cache = YT_CHANNEL_IDS.get_or_init(Default::default);
-    if let Some(answer) = cached_answer(
-        cache.lock().unwrap().get(&cache_key),
-        CHANNEL_MISS_TTL,
-        Instant::now(),
-    ) {
-        return answer;
-    }
-    let url = format!(
-        "https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=@{handle}&key={api_key}"
-    );
-    // Failed requests are not cached; only an answer from YouTube is.
-    let body = ureq::get(&url)
-        .timeout(Duration::from_secs(6))
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    let id = v
-        .pointer("/items/0/id")
-        .and_then(|x| x.as_str())
-        .map(String::from);
-    let mut ids = cache.lock().unwrap();
-    if ids.len() >= LOOKUP_CACHE_CAP {
-        ids.clear();
-    }
-    ids.insert(cache_key, (Instant::now(), id.clone()));
-    id
-}
-
-// Reserve quota-consuming search.list for page-resolution failures, not offline channels.
-fn search_live_video_id(channel_id: &str, api_key: &str) -> Option<String> {
-    if api_key.trim().is_empty() {
-        return None;
-    }
-    {
-        let now = Instant::now();
-        let mut searches = YT_LIVE_SEARCHES
-            .get_or_init(Default::default)
-            .lock()
-            .unwrap();
-        if !due(searches.get(channel_id), LIVE_SEARCH_EVERY, now) {
-            return None;
-        }
-        if searches.len() >= LOOKUP_CACHE_CAP {
-            searches.clear();
-        }
-        searches.insert(channel_id.to_string(), now);
-    }
-    let url = format!(
-        "https://www.googleapis.com/youtube/v3/search?part=id&channelId={channel_id}&eventType=live&type=video&key={api_key}"
-    );
-    let body = ureq::get(&url)
-        .timeout(Duration::from_secs(8))
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    v.pointer("/items/0/id/videoId")
-        .and_then(|x| x.as_str())
-        .map(String::from)
-}
-
-pub fn check_youtube_key(key: &str) -> Result<String, String> {
-    let key = key.trim();
-    if key.is_empty() {
-        return Err(Msg::YoutubeKeyPasteFirst.now());
-    }
-    // Keep the existing provider response locale; changing it also changes raw API error copy.
-
-    let url =
-        format!("https://www.googleapis.com/youtube/v3/i18nLanguages?part=snippet&hl=pt&key={key}");
-    match ureq::get(&url).timeout(Duration::from_secs(10)).call() {
-        Ok(_) => Ok(Msg::YoutubeKeyValid.now()),
-        Err(ureq::Error::Status(code, r)) => {
-            let body = r.into_string().unwrap_or_default();
-            let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
-            let reason = v
-                .pointer("/error/errors/0/reason")
-                .and_then(|x| x.as_str())
-                .unwrap_or("");
-            let status = v
-                .pointer("/error/status")
-                .and_then(|x| x.as_str())
-                .unwrap_or("");
-            let msg = v
-                .pointer("/error/message")
-                .and_then(|x| x.as_str())
-                .unwrap_or("");
-            Err(match reason {
-                "keyInvalid" | "badRequest" => Msg::YoutubeKeyInvalid.now(),
-                "accessNotConfigured" => Msg::YoutubeKeyApiNotEnabled.now(),
-                "ipRefererBlocked" | "forbidden" => Msg::YoutubeKeyRestricted.now(),
-                // Exhausted quota still proves the key is valid.
-                "quotaExceeded" | "dailyLimitExceeded" | "rateLimitExceeded" => {
-                    return Ok(Msg::YoutubeKeyValidQuotaMaxed.now())
-                }
-                _ if status == "PERMISSION_DENIED" => Msg::YoutubeKeyApiNotEnabled.now(),
-                _ if !msg.is_empty() => Msg::YoutubeKeyApiError { code, msg }.now(),
-                _ => Msg::YoutubeKeyApiStatus { code }.now(),
-            })
-        }
-        Err(_) => Err(Msg::YoutubeKeyNoConnection.now()),
-    }
-}
-
-fn resolve_youtube_video(input: &str, api_key: &str) -> LiveResolve {
-    if let Some(vid) = direct_video_id(input) {
-        return LiveResolve::Video(vid);
-    }
-    let Some(url) = youtube_live_url(input) else {
-        return LiveResolve::NotLive;
-    };
-    match scrape_live(&url) {
-        LiveResolve::Video(v) => LiveResolve::Video(v),
-        LiveResolve::NotLive => LiveResolve::NotLive,
-        LiveResolve::ScrapeFailed => {
-            if let Some(cid) = channel_id_of(input, api_key) {
-                if let Some(v) = search_live_video_id(&cid, api_key) {
-                    return LiveResolve::Video(v);
-                }
-            }
-            LiveResolve::NotLive
-        }
-    }
-}
-
-fn get_live_chat_id(api_key: &str, video_id: &str) -> Option<String> {
-    let url = format!(
-        "https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={api_key}"
-    );
-    let body = ureq::get(&url)
-        .timeout(Duration::from_secs(8))
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let json: Value = serde_json::from_str(&body).ok()?;
-    json.pointer("/items/0/liveStreamingDetails/activeLiveChatId")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-}
-
-fn yt_author(item: &Value, locale: Locale) -> String {
-    item.pointer("/authorDetails/displayName")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| Msg::ChatUnknownUser.text(locale))
-}
-
-/// Identity and clock for one parsed YouTube item; tests inject fixed values.
-struct YtStamp {
-    id: String,
-    ts: u64,
-}
-
-impl YtStamp {
-    fn now() -> Self {
-        Self {
-            id: next_id(),
-            ts: now_ms(),
-        }
-    }
-}
-
-/// What one YouTube item means, decided without side effects.
-#[derive(Debug)]
-enum YtEvent {
-    Chat(ChatMessage),
-    Alert(Alert),
-    DeleteMessage(String),
-    DeleteUser(String),
-}
-
-fn yt_alert(stamp: YtStamp, source: &str, kind: &str, user: String) -> Alert {
-    Alert {
-        id: stamp.id,
-        platform: "youtube".into(),
-        source: source.to_string(),
-        kind: kind.into(),
-        user,
-        amount: None,
-        currency: None,
-        tier: None,
-        message: None,
-        fragments: Vec::new(),
-        ts: stamp.ts,
-    }
-}
-
-fn dispatch_yt(app: &AppHandle, gen: u64, source: &str, event: YtEvent) {
-    match event {
-        YtEvent::Chat(message) => emit_chat_gen(app, gen, message),
-        YtEvent::Alert(alert) => emit_alert(app, alert),
-        YtEvent::DeleteMessage(id) => delete_message(app, "youtube", &id),
-        YtEvent::DeleteUser(author) => delete_user(app, "youtube", source, &author),
-    }
-}
-
-// InnerTube is an undocumented browser endpoint and may change independently of the Data API.
-
-// Parse only the JSON value after marker, ignoring trailing JavaScript.
-fn json_after(html: &str, marker: &str) -> Option<Value> {
-    let i = html.find(marker)? + marker.len();
-    serde_json::Deserializer::from_str(&html[i..])
-        .into_iter::<Value>()
-        .next()?
-        .ok()
-}
-fn find_between(s: &str, start: &str, end: &str) -> Option<String> {
-    let i = s.find(start)? + start.len();
-    let j = s[i..].find(end)?;
-    Some(s[i..i + j].to_string())
-}
-
-fn continuation_token(c: &Value) -> Option<String> {
-    for path in [
-        "/invalidationContinuationData/continuation",
-        "/timedContinuationData/continuation",
-        "/reloadContinuationData/continuation",
-    ] {
-        if let Some(s) = c.pointer(path).and_then(|v| v.as_str()) {
-            return Some(s.to_string());
-        }
-    }
-    None
-}
-
-/// Returns the public browser API key, client version, and initial continuation.
-fn innertube_bootstrap(video_id: &str) -> Option<(String, String, String)> {
-    let url = format!("https://www.youtube.com/live_chat?is_popout=1&v={video_id}");
-    let html = ureq::get(&url)
-        .set("User-Agent", BROWSER_UA)
-        .set("Accept-Language", "en-US,en;q=0.9")
-        .timeout(Duration::from_secs(8))
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let key = find_between(&html, "\"INNERTUBE_API_KEY\":\"", "\"")?;
-    let version = find_between(&html, "\"INNERTUBE_CONTEXT_CLIENT_VERSION\":\"", "\"")
-        .or_else(|| find_between(&html, "\"clientVersion\":\"", "\""))?;
-    let yt = json_after(&html, "ytInitialData = ")
-        .or_else(|| json_after(&html, "window[\"ytInitialData\"] = "))?;
-    let cont = yt
-        .pointer("/contents/liveChatRenderer/continuations")?
-        .as_array()?
-        .iter()
-        .find_map(continuation_token)?;
-    Some((key, version, cont))
-}
-
-fn innertube_poll(key: &str, version: &str, cont: &str) -> Option<Value> {
-    let url = format!(
-        "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={key}&prettyPrint=false"
-    );
-    let body = json!({
-        "context": { "client": { "clientName": "WEB", "clientVersion": version } },
-        "continuation": cont,
-    });
-    let txt = ureq::post(&url)
-        .set("User-Agent", BROWSER_UA)
-        .set("Content-Type", "application/json")
-        .timeout(Duration::from_secs(10))
-        .send_string(&body.to_string())
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&txt).ok()?;
-    v.pointer("/continuationContents/liveChatContinuation")
-        .cloned()
-}
-
-fn yt_message_fragments(message: &Value) -> (String, Vec<ChatFragment>) {
-    let mut text = String::new();
-    let mut frags = vec![];
-    if let Some(runs) = message.get("runs").and_then(|r| r.as_array()) {
-        for run in runs {
-            if let Some(t) = run.get("text").and_then(|x| x.as_str()) {
-                text.push_str(t);
-                frags.push(text_frag(t));
-            } else if let Some(emoji) = run.get("emoji") {
-                // Channel emojis often have no shortcut; fall back to their search term or label.
-                let label = [
-                    "/shortcuts/0",
-                    "/searchTerms/0",
-                    "/image/accessibility/accessibilityData/label",
-                    "/emojiId",
-                ]
-                .iter()
-                .find_map(|path| emoji.pointer(path).and_then(|x| x.as_str()))
-                .unwrap_or("");
-                text.push_str(label);
-                match emoji
-                    .pointer("/image/thumbnails/0/url")
-                    .and_then(|x| x.as_str())
-                {
-                    Some(u) => frags.push(ChatFragment {
-                        kind: "emote".into(),
-                        text: Some(label.to_string()),
-                        url: Some(u.to_string()),
-                    }),
-                    None => frags.push(text_frag(label)),
-                }
-            }
-        }
-    } else if let Some(s) = message.get("simpleText").and_then(|x| x.as_str()) {
-        text.push_str(s);
-        frags.push(text_frag(s));
-    }
-    (text, frags)
-}
-
-fn yt_innertube_badges(renderer: &Value, locale: Locale) -> Vec<ChatBadge> {
-    let mut out = vec![];
-    if let Some(badges) = renderer.get("authorBadges").and_then(|b| b.as_array()) {
-        for b in badges {
-            let r = b.get("liveChatAuthorBadgeRenderer");
-            match r
-                .and_then(|x| x.pointer("/icon/iconType"))
-                .and_then(|x| x.as_str())
-            {
-                Some("OWNER") => out.push(ChatBadge {
-                    label: "HOST".into(),
-                    kind: "broadcaster".into(),
-                }),
-                Some("MODERATOR") => out.push(ChatBadge {
-                    label: "MOD".into(),
-                    kind: "moderator".into(),
-                }),
-                Some("VERIFIED") => out.push(ChatBadge {
-                    label: "✓".into(),
-                    kind: "verified".into(),
-                }),
-                _ if r.and_then(|x| x.get("customThumbnail")).is_some() => out.push(ChatBadge {
-                    label: Msg::ChatBadgeMember.text(locale),
-                    kind: "subscriber".into(),
-                }),
-                _ => {}
-            }
-        }
-    }
-    out
-}
-
 // Best-effort parsing of localized currency text; it is not a financial amount parser.
-fn parse_amount(s: &str) -> Option<f64> {
+pub(crate) fn parse_amount(s: &str) -> Option<f64> {
     let kept: String = s
         .chars()
         .filter(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
@@ -1939,653 +559,18 @@ fn parse_amount(s: &str) -> Option<f64> {
     norm.parse::<f64>().ok()
 }
 
-fn handle_innertube_action(app: &AppHandle, source: &str, action: &Value, gen: u64) {
-    if let Some(event) =
-        parse_innertube_action(source, action, YtStamp::now(), crate::i18n::locale())
-    {
-        dispatch_yt(app, gen, source, event);
-    }
-}
-
-fn parse_innertube_action(
-    source: &str,
-    action: &Value,
-    stamp: YtStamp,
-    locale: Locale,
-) -> Option<YtEvent> {
-    if let Some(id) = action
-        .pointer("/markChatItemAsDeletedAction/targetItemId")
-        .and_then(|v| v.as_str())
-    {
-        return Some(YtEvent::DeleteMessage(id.to_string()));
-    }
-    let item = action.pointer("/addChatItemAction/item")?;
-    let author_of = |r: &Value| {
-        r.pointer("/authorName/simpleText")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.text(locale))
-    };
-
-    if let Some(r) = item.get("liveChatTextMessageRenderer") {
-        let (text, fragments) = yt_message_fragments(r.get("message").unwrap_or(&Value::Null));
-        if fragments.is_empty() {
-            return None;
-        }
-        return Some(YtEvent::Chat(ChatMessage {
-            id: stamp.id,
-            platform: "youtube".into(),
-            source: source.to_string(),
-            author: author_of(r),
-            author_id: r
-                .get("authorExternalChannelId")
-                .and_then(|v| v.as_str())
-                .map(String::from),
-            native_id: r.get("id").and_then(|v| v.as_str()).map(String::from),
-            color: None,
-            fragments,
-            badges: yt_innertube_badges(r, locale),
-            text,
-            ts: stamp.ts,
-        }));
-    }
-
-    // Super Chats and Super Stickers share the paid-message amount text.
-    for (renderer, sticker) in [
-        ("liveChatPaidMessageRenderer", false),
-        ("liveChatPaidStickerRenderer", true),
-    ] {
-        let Some(r) = item.get(renderer) else {
-            continue;
-        };
-        let amount_text = r
-            .pointer("/purchaseAmountText/simpleText")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let (msg, _) = if sticker {
-            (String::new(), Vec::new())
-        } else {
-            yt_message_fragments(r.get("message").unwrap_or(&Value::Null))
-        };
-        let display = if msg.is_empty() {
-            amount_text.to_string()
-        } else {
-            format!("{amount_text} — {msg}")
-        };
-        return Some(YtEvent::Alert(Alert {
-            amount: parse_amount(amount_text),
-            message: Some(display),
-            ..yt_alert(stamp, source, "superchat", author_of(r))
-        }));
-    }
-
-    if let Some(r) = item.get("liveChatMembershipItemRenderer") {
-        return Some(YtEvent::Alert(yt_alert(
-            stamp,
-            source,
-            "member",
-            author_of(r),
-        )));
-    }
-
-    if let Some(r) = item.get("liveChatSponsorshipsGiftPurchaseAnnouncementRenderer") {
-        let author = r
-            .pointer("/header/liveChatSponsorshipsHeaderRenderer")
-            .map(&author_of)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.text(locale));
-        return Some(YtEvent::Alert(yt_alert(stamp, source, "subgift", author)));
-    }
-    None
-}
-
-/// False permits a Data API fallback only when InnerTube could not initialize.
-fn youtube_innertube(
-    video_id: &str,
-    source: &str,
-    running: &Arc<AtomicBool>,
-    app: &AppHandle,
-    gen: u64,
-) -> bool {
-    let Some((key, version, mut cont)) = innertube_bootstrap(video_id) else {
-        return false;
-    };
-    log::info!("youtube chat: InnerTube connected");
-    chat_status_gen(app, gen, "youtube", source, "connected");
-    let mut first = true;
-    let mut errors = 0u32;
-    while running.load(Ordering::Relaxed) {
-        let lcc = match innertube_poll(&key, &version, &cont) {
-            Some(v) => {
-                errors = 0;
-                v
-            }
-            None => {
-                errors += 1;
-                if errors >= 3 {
-                    break;
-                }
-                thread::sleep(Duration::from_secs(4));
-                continue;
-            }
-        };
-        if !first {
-            if let Some(actions) = lcc.get("actions").and_then(|a| a.as_array()) {
-                for action in actions {
-                    handle_innertube_action(app, source, action, gen);
-                }
-            }
-        }
-        first = false;
-        let Some(next) = lcc.pointer("/continuations/0").and_then(continuation_token) else {
-            break;
-        };
-        cont = next;
-        let timeout = lcc
-            .pointer("/continuations/0/invalidationContinuationData/timeoutMs")
-            .or_else(|| lcc.pointer("/continuations/0/timedContinuationData/timeoutMs"))
-            .and_then(|v| v.as_u64())
-            .unwrap_or(2000)
-            .clamp(1000, 5000);
-        let mut slept = 0u64;
-        while running.load(Ordering::Relaxed) && slept < timeout {
-            thread::sleep(Duration::from_millis(200));
-            slept += 200;
-        }
-    }
-    chat_status_gen(app, gen, "youtube", source, "disconnected");
-    true
-}
-
-/// True means the connection succeeded at least once, allowing the supervisor to reset backoff.
-fn run_youtube(
-    api_key: &str,
-    channel: &str,
-    source: &str,
-    running: Arc<AtomicBool>,
-    app: AppHandle,
-    gen: u64,
-) -> bool {
-    let vid = match resolve_youtube_video(channel, api_key) {
-        LiveResolve::Video(v) => v,
-        _ => {
-            chat_status_gen(&app, gen, "youtube", source, "waiting");
-            return false;
-        }
-    };
-    remember_youtube_video(channel, &vid);
-
-    if youtube_innertube(&vid, source, &running, &app, gen) {
-        return true;
-    }
-
-    if api_key.trim().is_empty() {
-        chat_status_gen(&app, gen, "youtube", source, "waiting");
-        return false;
-    }
-    youtube_dataapi(api_key, &vid, source, running, app, gen)
-}
-
-/// True means the connection succeeded at least once, allowing the supervisor to reset backoff.
-fn parse_dataapi_item(
-    source: &str,
-    item: &Value,
-    stamp: YtStamp,
-    locale: Locale,
-) -> Option<YtEvent> {
-    let text_at = |path: &str| {
-        item.pointer(path)
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.is_empty())
-            .map(String::from)
-    };
-    let micros_at = |path: &str| {
-        item.pointer(path)
-            .and_then(|v| v.as_str())
-            .and_then(|s| s.parse::<f64>().ok())
-            .map(|m| m / 1_000_000.0)
-    };
-    let count_at = |path: &str| {
-        item.pointer(path)
-            .and_then(|v| v.as_u64())
-            .map(|n| n as f64)
-    };
-    let kind = item
-        .pointer("/snippet/type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("textMessageEvent");
-    match kind {
-        "messageDeletedEvent" => {
-            text_at("/snippet/messageDeletedDetails/deletedMessageId").map(YtEvent::DeleteMessage)
-        }
-        "userBannedEvent" => text_at("/snippet/userBannedDetails/bannedUserDetails/displayName")
-            .map(YtEvent::DeleteUser),
-        "superChatEvent" => Some(YtEvent::Alert(Alert {
-            amount: micros_at("/snippet/superChatDetails/amountMicros"),
-            currency: text_at("/snippet/superChatDetails/currency"),
-            message: text_at("/snippet/superChatDetails/userComment"),
-            ..yt_alert(stamp, source, "superchat", yt_author(item, locale))
-        })),
-        "superStickerEvent" => Some(YtEvent::Alert(Alert {
-            amount: micros_at("/snippet/superStickerDetails/amountMicros"),
-            currency: text_at("/snippet/superStickerDetails/currency"),
-            ..yt_alert(stamp, source, "superchat", yt_author(item, locale))
-        })),
-        "newSponsorEvent" => Some(YtEvent::Alert(Alert {
-            tier: text_at("/snippet/newSponsorDetails/memberLevelName"),
-            ..yt_alert(stamp, source, "member", yt_author(item, locale))
-        })),
-        "memberMilestoneChatEvent" => Some(YtEvent::Alert(Alert {
-            amount: count_at("/snippet/memberMilestoneChatDetails/memberMonth"),
-            tier: text_at("/snippet/memberMilestoneChatDetails/memberLevelName"),
-            message: text_at("/snippet/memberMilestoneChatDetails/userComment"),
-            ..yt_alert(stamp, source, "member", yt_author(item, locale))
-        })),
-        "membershipGiftingEvent" => Some(YtEvent::Alert(Alert {
-            amount: count_at("/snippet/membershipGiftingDetails/giftMembershipsCount"),
-            tier: text_at("/snippet/membershipGiftingDetails/giftMembershipsLevelName"),
-            ..yt_alert(stamp, source, "subgift", yt_author(item, locale))
-        })),
-        // Other event types (chat ended, gift received, mode changes) are not chat lines.
-        "textMessageEvent" => {
-            let text = text_at("/snippet/displayMessage")?;
-            let flag = |k: &str| {
-                item.pointer(&format!("/authorDetails/{k}"))
-                    .and_then(|v| v.as_bool())
-                    == Some(true)
-            };
-            let mut badges = vec![];
-            if flag("isChatOwner") {
-                badges.push(ChatBadge {
-                    label: "HOST".into(),
-                    kind: "broadcaster".into(),
-                });
-            }
-            if flag("isChatModerator") {
-                badges.push(ChatBadge {
-                    label: "MOD".into(),
-                    kind: "moderator".into(),
-                });
-            }
-            if flag("isChatSponsor") {
-                badges.push(ChatBadge {
-                    label: Msg::ChatBadgeMember.text(locale),
-                    kind: "subscriber".into(),
-                });
-            }
-            Some(YtEvent::Chat(ChatMessage {
-                id: stamp.id,
-                platform: "youtube".into(),
-                source: source.to_string(),
-                author: yt_author(item, locale),
-                author_id: text_at("/authorDetails/channelId")
-                    .or_else(|| text_at("/snippet/authorChannelId")),
-                native_id: item.get("id").and_then(|v| v.as_str()).map(String::from),
-                color: None,
-                fragments: vec![text_frag(&text)],
-                badges,
-                text,
-                ts: stamp.ts,
-            }))
-        }
-        _ => None,
-    }
-}
-
-fn youtube_dataapi(
-    api_key: &str,
-    vid: &str,
-    source: &str,
-    running: Arc<AtomicBool>,
-    app: AppHandle,
-    gen: u64,
-) -> bool {
-    let live_chat_id = match get_live_chat_id(api_key, vid) {
-        Some(id) => id,
-        None => {
-            chat_status_gen(&app, gen, "youtube", source, "waiting");
-            return false;
-        }
-    };
-    log::info!("youtube chat: Data API connected");
-    chat_status_gen(&app, gen, "youtube", source, "connected");
-
-    let mut page_token: Option<String> = None;
-    let mut first = true;
-    let mut errors = 0u32;
-    while running.load(Ordering::Relaxed) {
-        let mut url = format!(
-            "https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={live_chat_id}&part=snippet,authorDetails&key={api_key}"
-        );
-        if let Some(tok) = &page_token {
-            url.push_str(&format!("&pageToken={tok}"));
-        }
-        let json = match ureq::get(&url).timeout(Duration::from_secs(8)).call() {
-            Ok(r) => {
-                errors = 0;
-                serde_json::from_str::<Value>(&r.into_string().unwrap_or_default())
-                    .unwrap_or(Value::Null)
-            }
-            Err(_) => {
-                errors += 1;
-
-                if errors >= 3 {
-                    break;
-                }
-                thread::sleep(Duration::from_secs(5));
-                continue;
-            }
-        };
-        page_token = json
-            .get("nextPageToken")
-            .and_then(|v| v.as_str())
-            .map(String::from);
-        let interval = json
-            .get("pollingIntervalMillis")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(5000)
-            .max(2000);
-
-        if !first {
-            if let Some(items) = json.get("items").and_then(|v| v.as_array()) {
-                let locale = crate::i18n::locale();
-                for item in items {
-                    if let Some(event) = parse_dataapi_item(source, item, YtStamp::now(), locale) {
-                        dispatch_yt(&app, gen, source, event);
-                    }
-                }
-            }
-        }
-        first = false;
-
-        let mut slept = 0u64;
-        while running.load(Ordering::Relaxed) && slept < interval {
-            thread::sleep(Duration::from_millis(200));
-            slept += 200;
-        }
-    }
-    chat_status_gen(&app, gen, "youtube", source, "disconnected");
-    true
-}
-
-/// Chatroom ID carries chat; channel ID carries engagement events.
-fn get_kick_ids(slug: &str) -> Option<(u64, u64)> {
-    let url = format!("https://kick.com/api/v2/channels/{slug}");
-    let body = ureq::get(&url)
-        .timeout(Duration::from_secs(6))
-        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
-        .set("Accept", "application/json")
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    let chatroom = v.pointer("/chatroom/id").and_then(|x| x.as_u64())?;
-    let channel = v.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
-    Some((chatroom, channel))
-}
-
-/// True means the connection succeeded at least once, allowing the supervisor to reset backoff.
-fn run_kick(slug: &str, source: &str, running: Arc<AtomicBool>, app: AppHandle, gen: u64) -> bool {
-    let slug = slug.trim().trim_start_matches('@').to_lowercase();
-    if slug.is_empty() {
-        return false;
-    }
-    let (chatroom_id, channel_id) = match get_kick_ids(&slug) {
-        Some(ids) => ids,
-        None => {
-            log::warn!("kick chat: chatroom resolution failed");
-            chat_status_gen(&app, gen, "kick", source, "error");
-            return false;
-        }
-    };
-    let url = "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=corneta&version=1.0&flash=false";
-    let mut socket = match tungstenite::connect(url) {
-        Ok((s, _)) => s,
-        Err(_) => {
-            log::warn!("kick chat: Pusher connection failed");
-            chat_status_gen(&app, gen, "kick", source, "error");
-            return false;
-        }
-    };
-    if let tungstenite::stream::MaybeTlsStream::Rustls(s) = socket.get_mut() {
-        let _ = s.sock.set_read_timeout(Some(Duration::from_millis(400)));
-    }
-    let _ = socket.send(Message::Text(format!(
-        "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroom_id}.v2\"}}}}"
-    )
-    .into()));
-
-    if channel_id != 0 {
-        let _ = socket.send(Message::Text(format!(
-            "{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"channel.{channel_id}\"}}}}"
-        )
-        .into()));
-    }
-    log::info!(
-        "kick chat: connected; event channel={}",
-        if channel_id == 0 { "missing" } else { "active" }
-    );
-    chat_status_gen(&app, gen, "kick", source, "connected");
-
-    while running.load(Ordering::Relaxed) {
-        match socket.read() {
-            Ok(Message::Text(t)) => {
-                // Inspect the event field so user text containing pusher:ping is not swallowed.
-
-                let is_ping = serde_json::from_str::<Value>(&t)
-                    .ok()
-                    .and_then(|v| Some(v.get("event")?.as_str()? == "pusher:ping"))
-                    .unwrap_or(false);
-                if is_ping {
-                    let _ = socket.send(Message::Text(
-                        "{\"event\":\"pusher:pong\",\"data\":{}}".into(),
-                    ));
-                } else if let Some(msg) = parse_kick(&t, source) {
-                    emit_chat_gen(&app, gen, msg);
-                } else if let Some(alert) = parse_kick_alert(&t, source) {
-                    emit_alert(&app, alert);
-                } else {
-                    let _ = handle_kick_moderation(&t, source, &app);
-                }
-            }
-            Ok(Message::Close(_)) => break,
-            Ok(_) => {}
-            Err(tungstenite::Error::Io(e))
-                if matches!(
-                    e.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) =>
-            {
-                continue;
-            }
-            Err(_) => break,
-        }
-    }
-    let _ = socket.close(None);
-    chat_status_gen(&app, gen, "kick", source, "disconnected");
-    true
-}
-
-fn parse_kick(raw: &str, source: &str) -> Option<ChatMessage> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    if !v.get("event")?.as_str()?.ends_with("ChatMessageEvent") {
-        return None;
-    }
-    let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
-    let content = d.get("content")?.as_str()?.to_string();
-    if content.is_empty() {
-        return None;
-    }
-    let author = d
-        .pointer("/sender/username")
-        .and_then(|x| x.as_str())
-        .unwrap_or("anon")
-        .to_string();
-    let color = d
-        .pointer("/sender/identity/color")
-        .and_then(|x| x.as_str())
-        .filter(|c| !c.is_empty())
-        .map(String::from);
-    let fragments = kick_fragments(&content);
-    // Pusher has sent the sender ID both as a number and as a string.
-    let author_id = d.pointer("/sender/id").and_then(|id| match id {
-        Value::Number(n) => n.as_u64().map(|n| n.to_string()),
-        Value::String(s) if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) => {
-            Some(s.clone())
-        }
-        _ => None,
-    });
-    Some(ChatMessage {
-        id: next_id(),
-        platform: "kick".into(),
-        source: source.to_string(),
-        author,
-        author_id,
-        native_id: d.get("id").and_then(|x| x.as_str()).map(String::from),
-        color,
-        text: frags_to_text(&fragments),
-        badges: kick_badges(d.pointer("/sender/identity/badges")),
-        fragments,
-        ts: now_ms(),
-    })
-}
-
-fn handle_kick_moderation(raw: &str, source: &str, app: &AppHandle) -> Option<()> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    let event = v.get("event")?.as_str()?;
-    let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
-    if event.ends_with("MessageDeletedEvent") {
-        let id = d.pointer("/message/id").and_then(|x| x.as_str())?;
-        delete_message(app, "kick", id);
-    } else if event.ends_with("UserBannedEvent") {
-        let u = d.pointer("/user/username").and_then(|x| x.as_str())?;
-        delete_user(app, "kick", source, u);
-    }
-    Some(())
-}
-
-fn parse_kick_alert(raw: &str, source: &str) -> Option<Alert> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    let event = v.get("event")?.as_str()?;
-    let d: Value = serde_json::from_str(v.get("data")?.as_str()?).ok()?;
-    let mk = |kind: &str, user: String, amount: Option<f64>| Alert {
-        id: next_id(),
-        platform: "kick".into(),
-        source: source.to_string(),
-        kind: kind.into(),
-        user,
-        amount,
-        currency: None,
-        tier: None,
-        message: None,
-        fragments: Vec::new(),
-        ts: now_ms(),
-    };
-    if event.ends_with("SubscriptionEvent") {
-        let user = d
-            .get("username")
-            .and_then(|x| x.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-        Some(mk(
-            "sub",
-            user,
-            d.get("months").and_then(|x| x.as_u64()).map(|m| m as f64),
-        ))
-    } else if event.ends_with("GiftedSubscriptionsEvent") {
-        let user = d
-            .get("gifter_username")
-            .and_then(|x| x.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-        let count = d
-            .get("gifted_usernames")
-            .and_then(|x| x.as_array())
-            .map(|a| a.len() as f64);
-        Some(mk("subgift", user, count))
-    } else if event.ends_with("StreamHostEvent") {
-        let user = d
-            .get("host_username")
-            .and_then(|x| x.as_str())
-            .map(String::from)
-            .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-        Some(mk(
-            "raid",
-            user,
-            d.get("number_viewers")
-                .and_then(|x| x.as_u64())
-                .map(|m| m as f64),
-        ))
-    } else {
-        None
-    }
-}
-
-fn kick_fragments(content: &str) -> Vec<ChatFragment> {
-    let mut frags = vec![];
-    let mut rest = content;
-    while let Some(start) = rest.find("[emote:") {
-        if start > 0 {
-            frags.push(text_frag(&rest[..start]));
-        }
-        let after = &rest[start..];
-        if let Some(end) = after.find(']') {
-            let inner = &after[7..end];
-            let mut it = inner.splitn(2, ':');
-            let id = it.next().unwrap_or("");
-            let name = it.next().unwrap_or("");
-            if !id.is_empty() {
-                frags.push(ChatFragment {
-                    kind: "emote".into(),
-                    text: Some(if name.is_empty() {
-                        id.to_string()
-                    } else {
-                        name.to_string()
-                    }),
-                    url: Some(format!("https://files.kick.com/emotes/{id}/fullsize")),
-                });
-            }
-            rest = &after[end + 1..];
-        } else {
-            frags.push(text_frag(after));
-            rest = "";
-            break;
-        }
-    }
-    if !rest.is_empty() {
-        frags.push(text_frag(rest));
-    }
-    if frags.is_empty() {
-        frags.push(text_frag(content));
-    }
-    frags
-}
-
 // Fetch audience and followers together when the provider returns both in one response.
 
 #[derive(Default)]
-struct ChannelCounts {
+pub struct ChannelCounts {
     /// None means offline or unavailable, not zero viewers.
-    viewers: Option<u64>,
+    pub viewers: Option<u64>,
     /// None means unsupported or unavailable, not zero followers.
-    followers: Option<u64>,
-    audience: Option<cinefy::AudienceSnapshot>,
-}
-
-impl ChannelCounts {
-    fn cinefy(audience: cinefy::AudienceSnapshot) -> Self {
-        // Embedded counts belong to the upstream platform and must not be counted twice.
-        let viewers = match audience.audience_status {
-            cinefy::AudienceStatus::Live if audience.live => audience.viewers,
-            cinefy::AudienceStatus::Offline => Some(0),
-            _ => None,
-        };
-        Self {
-            viewers,
-            followers: None,
-            audience: Some(audience),
-        }
-    }
+    pub followers: Option<u64>,
+    /// Liveness the platform reports apart from the viewer count.
+    pub live: Option<bool>,
+    /// Extra fields the audience UI reads, such as why an audience is not counted.
+    pub details: Map<String, Value>,
 }
 
 #[derive(Default)]
@@ -2597,22 +582,18 @@ struct ViewerSample {
 }
 
 fn collect_viewer_sample(
-    sources: &[crate::config::ChatSource],
+    sources: &[ChatSource],
     is_current: impl Fn() -> bool,
-    mut fetch: impl FnMut(&crate::config::ChatSource) -> ChannelCounts,
+    mut fetch: impl FnMut(&ChatSource) -> Option<ChannelCounts>,
 ) -> Option<ViewerSample> {
     let mut sample = ViewerSample::default();
-    let mut cinefy_channels = HashSet::new();
     for src in sources {
         if !is_current() {
             return None;
         }
-        if src.platform == "cinefy"
-            && cinefy::normalize_slug(&src.value).is_some_and(|slug| !cinefy_channels.insert(slug))
-        {
+        let Some(counts) = fetch(src) else {
             continue;
-        }
-        let counts = fetch(src);
+        };
         if !is_current() {
             return None;
         }
@@ -2621,10 +602,7 @@ fn collect_viewer_sample(
         } else {
             &src.name
         };
-        let live = counts
-            .audience
-            .as_ref()
-            .map_or(counts.viewers.is_some(), |audience| audience.live);
+        let live = counts.live.unwrap_or(counts.viewers.is_some());
         sample.total = sample.total.saturating_add(counts.viewers.unwrap_or(0));
         sample.any_live |= live;
         if let Some(total) = counts.followers {
@@ -2640,234 +618,52 @@ fn collect_viewer_sample(
             "viewers": counts.viewers,
             "live": live,
         });
-        if let Some(audience) = counts.audience {
-            item["audienceStatus"] = json!(audience.audience_status);
-            if let Some(origin) = audience
-                .audience_origin
-                .filter(|_| matches!(audience.audience_status, cinefy::AudienceStatus::Embedded))
-            {
-                item["audienceOrigin"] = json!(origin);
-            }
-            if let Some(viewers) = audience
-                .embedded_viewers
-                .filter(|_| matches!(audience.audience_status, cinefy::AudienceStatus::Embedded))
-            {
-                item["embeddedViewers"] = json!(viewers);
-            }
-            if let Some(title) = audience.title {
-                item["title"] = json!(title);
-            }
-            if let Some(started_at) = audience.started_at {
-                item["startedAt"] = json!(started_at);
-            }
+        if let Some(fields) = item.as_object_mut() {
+            fields.extend(counts.details);
         }
         sample.items.push(item);
     }
     is_current().then_some(sample)
 }
 
-fn twitch_counts(channel: &str) -> ChannelCounts {
-    let ch = channel.trim().trim_start_matches('#').to_lowercase();
-    if ch.is_empty() {
-        return ChannelCounts::default();
-    }
-    let body = json!({
-        "query": format!(
-            "query {{ user(login: \"{ch}\") {{ followers {{ totalCount }} stream {{ viewersCount }} }} }}"
-        )
-    })
-    .to_string();
-    let Some(resp) = ureq::post("https://gql.twitch.tv/gql")
-        .set("Client-Id", "kimne78kx3ncx6brgo4mv6wki5h1ko")
-        .set("Content-Type", "application/json")
-        .timeout(Duration::from_secs(6))
-        .send_string(&body)
-        .ok()
-        .and_then(|r| r.into_string().ok())
-    else {
-        return ChannelCounts::default();
-    };
-    let Ok(v) = serde_json::from_str::<Value>(&resp) else {
-        return ChannelCounts::default();
-    };
-    ChannelCounts {
-        // Offline stream is null, but followers may still be available.
-        viewers: v
-            .pointer("/data/user/stream/viewersCount")
-            .and_then(|x| x.as_u64()),
-        followers: v
-            .pointer("/data/user/followers/totalCount")
-            .and_then(|x| x.as_u64()),
-        ..Default::default()
-    }
-}
-
-/// The official project's quota is shared by every user, so login-based readings are spaced out.
-const SHARED_QUOTA_VIEWERS_EVERY: Duration = Duration::from_secs(120);
-
-#[derive(Debug, PartialEq)]
-struct YtLiveDetails {
-    live: bool,
-    /// Channel owners can hide the count while the video stays live.
-    viewers: Option<u64>,
-}
-
-fn parse_live_details(v: &Value) -> YtLiveDetails {
-    let details = v.pointer("/items/0/liveStreamingDetails");
-    let live = details
-        .is_some_and(|d| d.get("actualStartTime").is_some() && d.get("actualEndTime").is_none());
-    let viewers = details
-        .and_then(|d| d.get("concurrentViewers"))
-        .and_then(|n| {
-            n.as_str()
-                .and_then(|s| s.parse().ok())
-                .or_else(|| n.as_u64())
-        })
-        .filter(|_| live);
-    YtLiveDetails { live, viewers }
-}
-
-enum YtAuth {
-    /// The user's own Data API key and quota.
-    Key(String),
-    /// The login token, billed to the Corneta project's shared quota.
-    Bearer(String),
-}
-
-fn yt_live_details(auth: &YtAuth, vid: &str) -> Option<YtLiveDetails> {
-    let url =
-        format!("https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={vid}");
-    let request = match auth {
-        YtAuth::Key(key) => ureq::get(format!("{url}&key={key}")),
-        YtAuth::Bearer(token) => ureq::get(&url).set("Authorization", &format!("Bearer {token}")),
-    };
-    let body = request
-        .timeout(Duration::from_secs(6))
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    serde_json::from_str::<Value>(&body)
-        .ok()
-        .map(|v| parse_live_details(&v))
-}
-
-#[derive(Default)]
-struct YtViewerCache {
-    /// Resolved live video per channel, so polls do not scrape the channel page again.
-    videos: HashMap<String, String>,
-    readings: HashMap<String, (Instant, Option<u64>)>,
-}
-
-fn youtube_viewers(
-    app: &AppHandle,
-    api_key: &str,
-    channel: &str,
-    cache: &mut YtViewerCache,
-) -> Option<u64> {
-    let auth = if api_key.trim().is_empty() {
-        YtAuth::Bearer(crate::auth::youtube_token(app)?)
-    } else {
-        YtAuth::Key(api_key.trim().to_string())
-    };
-    let every = match auth {
-        YtAuth::Key(_) => Duration::ZERO,
-        YtAuth::Bearer(_) => SHARED_QUOTA_VIEWERS_EVERY,
-    };
-    let now = Instant::now();
-    if let Some((at, viewers)) = cache.readings.get(channel) {
-        if now.saturating_duration_since(*at) < every {
-            return *viewers;
-        }
-    }
-    let vid = match cache.videos.get(channel) {
-        Some(vid) => vid.clone(),
-        None => match resolve_youtube_video(channel, api_key) {
-            LiveResolve::Video(vid) => vid,
-            _ => {
-                cache.readings.remove(channel);
-                return None;
-            }
-        },
-    };
-    let viewers = match yt_live_details(&auth, &vid) {
-        // A hidden count keeps the video: it is still live and must not be resolved again.
-        Some(details) if details.live => {
-            cache.videos.insert(channel.to_string(), vid);
-            details.viewers
-        }
-        Some(_) => {
-            cache.videos.remove(channel);
-            None
-        }
-        None => None,
-    };
-    cache.readings.insert(channel.to_string(), (now, viewers));
-    viewers
-}
-
 // followers_count is undocumented; leave it unavailable rather than assuming zero if it disappears.
 
-fn kick_counts(slug: &str) -> ChannelCounts {
-    let slug = slug.trim().trim_start_matches('@').to_lowercase();
-    if slug.is_empty() {
-        return ChannelCounts::default();
-    }
-    let url = format!("https://kick.com/api/v2/channels/{slug}");
-    let Some(body) = ureq::get(&url)
-        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
-        .set("Accept", "application/json")
-        .timeout(Duration::from_secs(6))
-        .call()
-        .ok()
-        .and_then(|r| r.into_string().ok())
-    else {
-        return ChannelCounts::default();
-    };
-    let Ok(v) = serde_json::from_str::<Value>(&body) else {
-        return ChannelCounts::default();
-    };
-    let followers = v.get("followers_count").and_then(|x| x.as_u64());
-    if followers.is_none() {
-        log::debug!("kick: missing followers_count in channel response");
-    }
-    ChannelCounts {
-        viewers: v
-            .pointer("/livestream/viewer_count")
-            .and_then(|x| x.as_u64()),
-        followers,
-        ..Default::default()
-    }
-}
-
 fn run_viewers(
-    sources: Vec<crate::config::ChatSource>,
-    api_key: String,
+    sources: Vec<ChatSource>,
+    settings: Arc<Settings>,
     running: Arc<AtomicBool>,
     app: AppHandle,
     gen: u64,
 ) {
-    let mut yt_cache = YtViewerCache::default();
-    let mut cinefy = cinefy::AudiencePoller::new(
-        sources
+    let mut readers: Vec<(&'static str, Box<dyn AudienceReader>)> = Vec::new();
+    for provider in crate::platforms::chat_providers() {
+        let mine: Vec<ChatSource> = sources
             .iter()
-            .filter(|src| src.platform == "cinefy")
-            .map(|src| src.value.as_str()),
-    );
+            .filter(|src| src.platform == provider.id())
+            .cloned()
+            .collect();
+        if mine.is_empty() {
+            continue;
+        }
+        let setup = AudienceSetup {
+            app: &app,
+            running: &running,
+            settings: &settings,
+            sources: &mine,
+        };
+        if let Some(reader) = provider.audience(&setup) {
+            readers.push((provider.id(), reader));
+        }
+    }
     let is_current = || running.load(Ordering::Relaxed) && CHAT_GEN.load(Ordering::SeqCst) == gen;
     while is_current() {
-        cinefy.begin_cycle();
+        for (_, reader) in &mut readers {
+            reader.begin_cycle();
+        }
         let Some(sample) = collect_viewer_sample(&sources, is_current, |src| {
-            match src.platform.as_str() {
-                "twitch" => twitch_counts(&src.value),
-                // Rounded YouTube subscriber counts cannot reliably measure per-stream gains.
-                "youtube" => ChannelCounts {
-                    viewers: youtube_viewers(&app, &api_key, &src.value, &mut yt_cache),
-                    ..Default::default()
-                },
-                "kick" => kick_counts(&src.value),
-                "cinefy" => ChannelCounts::cinefy(cinefy.poll(&src.value, running.as_ref())),
-                _ => ChannelCounts::default(),
+            match readers.iter_mut().find(|(id, _)| *id == src.platform) {
+                Some((_, reader)) => reader.read(src),
+                None => Some(ChannelCounts::default()),
             }
         }) else {
             return;
@@ -2897,37 +693,66 @@ fn run_viewers(
     }
 }
 
-fn kick_badges(badges: Option<&Value>) -> Vec<ChatBadge> {
-    let Some(arr) = badges.and_then(|v| v.as_array()) else {
-        return vec![];
-    };
-    arr.iter()
-        .filter_map(|b| {
-            let kind = b.get("type").and_then(|x| x.as_str()).unwrap_or("");
-            let text = b.get("text").and_then(|x| x.as_str()).unwrap_or("");
-            let label = match kind {
-                "broadcaster" => "HOST".to_string(),
-                "moderator" => "MOD".to_string(),
-                "vip" => "VIP".to_string(),
-                "subscriber" => "SUB".to_string(),
-                "founder" => "FND".to_string(),
-                "og" => "OG".to_string(),
-                "verified" => "✓".to_string(),
-                _ if !text.is_empty() => text.to_uppercase(),
-                _ => return None,
-            };
-            let kind = if kind.is_empty() { "subscriber" } else { kind };
-            Some(ChatBadge {
-                label,
-                kind: kind.to_string(),
-            })
-        })
-        .collect()
+/// Malformed network input every chat parser must survive.
+#[cfg(test)]
+pub(crate) fn hostile_chat_corpus() -> Vec<String> {
+    let mut cases: Vec<String> = vec![
+        String::new(),
+        " ".into(),
+        ":".into(),
+        "@".into(),
+        "@;".into(),
+        "@=".into(),
+        "\u{1}".into(),
+        "\u{1}ACTION".into(),
+        "\u{1}ACTION \u{1}".into(),
+        "\0\0\0".into(),
+        "\r\n".into(),
+        "😀".into(),
+        "[emote:😀]".into(),
+        "[emote:".into(),
+        "[emote:]".into(),
+        "[emote::]".into(),
+        "[emote:1:😀]".into(),
+        "😀[emote:1:x]😀".into(),
+        "[emote:1:x".into(),
+        "]]][emote:".into(),
+        "@badge-info=;badges=;color= :a!a@a.tmi.twitch.tv PRIVMSG #c :oi".into(),
+        "@ :a!a@a PRIVMSG #c :".into(),
+        ":a!a@a PRIVMSG".into(),
+        "PRIVMSG #c :sem tags".into(),
+        "@k=v :n!n@n PRIVMSG #c :\u{1}ACTION dança\u{1}".into(),
+        ":tmi.twitch.tv CLEARCHAT #c".into(),
+        ":tmi.twitch.tv CLEARCHAT #c :".into(),
+        "CLEARCHAT:".into(),
+        "{}".into(),
+        "[]".into(),
+        "null".into(),
+        "não é json".into(),
+        r#"{"event":"x"}"#.into(),
+        r#"{"event":"x","data":"{}"}"#.into(),
+        r#"{"event":"x","data":"não é json aninhado"}"#.into(),
+        r#"{"event":"App\\Events\\ChatMessageEvent","data":"{}"}"#.into(),
+    ];
+
+    cases.push("á".repeat(20_000));
+    cases.push(format!(
+        "@{} PRIVMSG #c :{}",
+        "t=v;".repeat(2_000),
+        "😀".repeat(2_000)
+    ));
+    cases.push(format!(
+        "[emote:{}:{}]",
+        "9".repeat(5_000),
+        "ç".repeat(5_000)
+    ));
+    cases
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::platforms::cinefy;
 
     fn viewer_source(platform: &str, value: &str, name: &str) -> crate::config::ChatSource {
         crate::config::ChatSource {
@@ -2973,19 +798,19 @@ mod tests {
                     audience.title = Some("Synthetic live".into());
                     audience.started_at = Some("2026-09-09T10:00:00Z".into());
                     audience.audience_origin = Some(cinefy::AudienceOrigin::Kick);
-                    ChannelCounts::cinefy(audience)
+                    Some(cinefy::counts(audience))
                 }
                 "embedded" => {
                     let mut audience =
                         cinefy_audience(cinefy::AudienceStatus::Embedded, true, Some(900));
                     audience.audience_origin = Some(cinefy::AudienceOrigin::Twitch);
                     audience.embedded_viewers = Some(900);
-                    ChannelCounts::cinefy(audience)
+                    Some(cinefy::counts(audience))
                 }
-                _ => ChannelCounts {
+                _ => Some(ChannelCounts {
                     viewers: Some(30),
                     ..Default::default()
-                },
+                }),
             },
         )
         .expect("current viewer sample");
@@ -3022,7 +847,7 @@ mod tests {
             let sample = collect_viewer_sample(
                 &[viewer_source("cinefy", "channel", "")],
                 || true,
-                |_| ChannelCounts::cinefy(cinefy_audience(status, live, count)),
+                |_| Some(cinefy::counts(cinefy_audience(status, live, count))),
             )
             .expect("current viewer sample");
             assert_eq!(sample.total, 0);
@@ -3045,19 +870,19 @@ mod tests {
             &sources,
             || true,
             |source| match source.platform.as_str() {
-                "twitch" => ChannelCounts {
+                "twitch" => Some(ChannelCounts {
                     viewers: None,
                     followers: Some(100),
                     ..Default::default()
-                },
-                "kick" => ChannelCounts {
+                }),
+                "kick" => Some(ChannelCounts {
                     viewers: Some(0),
                     ..Default::default()
-                },
-                _ => ChannelCounts {
+                }),
+                _ => Some(ChannelCounts {
                     viewers: Some(5),
                     ..Default::default()
-                },
+                }),
             },
         )
         .expect("current viewer sample");
@@ -3091,22 +916,27 @@ mod tests {
             viewer_source("twitch", "example", "Twitch second"),
         ];
         let mut calls = 0;
+        let mut cinefy_rooms = std::collections::HashSet::new();
         let sample = collect_viewer_sample(
             &sources,
             || true,
             |source| {
-                calls += 1;
                 if source.platform == "cinefy" {
-                    ChannelCounts::cinefy(cinefy_audience(
+                    if cinefy::already_read_this_cycle(&mut cinefy_rooms, &source.value) {
+                        return None;
+                    }
+                    calls += 1;
+                    Some(cinefy::counts(cinefy_audience(
                         cinefy::AudienceStatus::Live,
                         true,
                         Some(10),
-                    ))
+                    )))
                 } else {
-                    ChannelCounts {
+                    calls += 1;
+                    Some(ChannelCounts {
                         viewers: Some(20),
                         ..Default::default()
-                    }
+                    })
                 }
             },
         )
@@ -3133,10 +963,10 @@ mod tests {
                 if calls == 2 {
                     running.store(false, Ordering::Relaxed);
                 }
-                ChannelCounts {
+                Some(ChannelCounts {
                     viewers: Some(5),
                     ..Default::default()
-                }
+                })
             },
         );
         assert_eq!(calls, 2);
@@ -3160,7 +990,11 @@ mod tests {
             || generation.load(Ordering::SeqCst) == 1,
             |_| {
                 generation.store(2, Ordering::SeqCst);
-                ChannelCounts::cinefy(cinefy_audience(cinefy::AudienceStatus::Live, true, Some(5)))
+                Some(cinefy::counts(cinefy_audience(
+                    cinefy::AudienceStatus::Live,
+                    true,
+                    Some(5),
+                )))
             },
         );
         assert!(sample.is_none());
@@ -3175,13 +1009,22 @@ mod tests {
         let sample = collect_viewer_sample(
             &sources,
             || true,
-            |_| ChannelCounts {
-                viewers: Some(u64::MAX),
-                ..Default::default()
+            |_| {
+                Some(ChannelCounts {
+                    viewers: Some(u64::MAX),
+                    ..Default::default()
+                })
             },
         )
         .expect("current viewer sample");
         assert_eq!(sample.total, u64::MAX);
+    }
+
+    #[test]
+    fn amount_parser_tolerates_hostile_network_fixtures() {
+        for case in hostile_chat_corpus() {
+            let _ = parse_amount(&case);
+        }
     }
 
     fn native_message(source: &str, native_id: Option<&str>) -> ChatMessage {
@@ -3221,142 +1064,6 @@ mod tests {
         assert!(bounded.accept(&native_message("canal", Some("id-0"))));
     }
 
-    fn hostile_corpus() -> Vec<String> {
-        let mut cases: Vec<String> = vec![
-            String::new(),
-            " ".into(),
-            ":".into(),
-            "@".into(),
-            "@;".into(),
-            "@=".into(),
-            "\u{1}".into(),
-            "\u{1}ACTION".into(),
-            "\u{1}ACTION \u{1}".into(),
-            "\0\0\0".into(),
-            "\r\n".into(),
-            "😀".into(),
-            "[emote:😀]".into(),
-            "[emote:".into(),
-            "[emote:]".into(),
-            "[emote::]".into(),
-            "[emote:1:😀]".into(),
-            "😀[emote:1:x]😀".into(),
-            "[emote:1:x".into(),
-            "]]][emote:".into(),
-            "@badge-info=;badges=;color= :a!a@a.tmi.twitch.tv PRIVMSG #c :oi".into(),
-            "@ :a!a@a PRIVMSG #c :".into(),
-            ":a!a@a PRIVMSG".into(),
-            "PRIVMSG #c :sem tags".into(),
-            "@k=v :n!n@n PRIVMSG #c :\u{1}ACTION dança\u{1}".into(),
-            ":tmi.twitch.tv CLEARCHAT #c".into(),
-            ":tmi.twitch.tv CLEARCHAT #c :".into(),
-            "CLEARCHAT:".into(),
-            "{}".into(),
-            "[]".into(),
-            "null".into(),
-            "não é json".into(),
-            r#"{"event":"x"}"#.into(),
-            r#"{"event":"x","data":"{}"}"#.into(),
-            r#"{"event":"x","data":"não é json aninhado"}"#.into(),
-            r#"{"event":"App\\Events\\ChatMessageEvent","data":"{}"}"#.into(),
-        ];
-
-        cases.push("á".repeat(20_000));
-        cases.push(format!(
-            "@{} PRIVMSG #c :{}",
-            "t=v;".repeat(2_000),
-            "😀".repeat(2_000)
-        ));
-        cases.push(format!(
-            "[emote:{}:{}]",
-            "9".repeat(5_000),
-            "ç".repeat(5_000)
-        ));
-        cases
-    }
-
-    #[test]
-    fn chat_parsers_tolerate_hostile_network_fixtures() {
-        let emotes: HashMap<String, String> = HashMap::new();
-        for case in hostile_corpus() {
-            let _ = parse_privmsg(&case, "fonte", &emotes);
-            let _ = parse_usernotice(&case, "fonte", &emotes);
-            let _ = clearchat_user(&case);
-            let _ = parse_kick(&case, "fonte");
-            let _ = parse_kick_alert(&case, "fonte");
-            let _ = parse_amount(&case);
-            let _ = tag_val(twitch_tags(&case), "id");
-            let frags = kick_fragments(&case);
-            // An empty fragment list would hide a message instead of showing its plain-text fallback.
-
-            assert!(
-                !frags.is_empty(),
-                "kick_fragments returned an empty list for {case:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn kick_fragments_preserve_text_and_extract_emotes() {
-        let frags = kick_fragments("oi [emote:37226:Kappa] tudo bem");
-        let text: String = frags
-            .iter()
-            .filter(|f| f.kind == "text")
-            .filter_map(|f| f.text.clone())
-            .collect();
-        assert_eq!(text, "oi  tudo bem");
-        let emote = frags
-            .iter()
-            .find(|f| f.kind == "emote")
-            .expect("has an emote");
-        assert_eq!(emote.text.as_deref(), Some("Kappa"));
-        assert_eq!(
-            emote.url.as_deref(),
-            Some("https://files.kick.com/emotes/37226/fullsize")
-        );
-    }
-
-    #[test]
-    fn kick_fragments_handle_emotes_adjacent_to_multibyte_text() {
-        for case in [
-            "😀[emote:1:a]",
-            "[emote:1:a]😀",
-            "ção[emote:1:ção]ção",
-            "[emote:1:😀][emote:2:😀]",
-        ] {
-            let frags = kick_fragments(case);
-            assert!(!frags.is_empty(), "empty for {case:?}");
-        }
-    }
-
-    #[test]
-    fn privmsg_extracts_text_and_ignores_lines_without_messages() {
-        let emotes: HashMap<String, String> = HashMap::new();
-        let msg = parse_privmsg(
-            "@id=1 :fulano!fulano@fulano.tmi.twitch.tv PRIVMSG #canal :bora cornetar 😀",
-            "meu-canal",
-            &emotes,
-        )
-        .expect("valid message");
-        assert_eq!(msg.author, "fulano");
-        assert_eq!(msg.text, "bora cornetar 😀");
-        assert_eq!(msg.source, "meu-canal");
-        assert_eq!(msg.platform, "twitch");
-
-        assert!(parse_privmsg("@id=1 :a!a@a PRIVMSG #c :", "s", &emotes).is_none());
-        assert!(parse_privmsg("PING :tmi.twitch.tv", "s", &emotes).is_none());
-    }
-
-    #[test]
-    fn tag_value_matches_the_exact_key_not_its_prefix() {
-        let tags = twitch_tags("@id=abc;bits=100;idade=9 :resto");
-        assert_eq!(tag_val(tags, "id").as_deref(), Some("abc"));
-        assert_eq!(tag_val(tags, "bits").as_deref(), Some("100"));
-
-        assert_eq!(tag_val("id=;bits=", "bits"), None);
-        assert_eq!(tag_val(tags, "nao-existe"), None);
-    }
-
     use super::parse_amount;
 
     #[test]
@@ -3374,330 +1081,5 @@ mod tests {
     #[test]
     fn parse_amount_mixed_separators() {
         assert_eq!(parse_amount("1,234.56"), Some(1234.56));
-    }
-
-    fn stamp() -> YtStamp {
-        YtStamp {
-            id: "fixed-id".into(),
-            ts: 1_700_000_000_000,
-        }
-    }
-
-    fn innertube(action: Value) -> Option<YtEvent> {
-        parse_innertube_action("Canal", &action, stamp(), Locale::PtBr)
-    }
-
-    fn data_api(item: Value) -> Option<YtEvent> {
-        parse_dataapi_item("Canal", &item, stamp(), Locale::PtBr)
-    }
-
-    fn chat(event: Option<YtEvent>) -> ChatMessage {
-        match event {
-            Some(YtEvent::Chat(message)) => message,
-            other => panic!("expected a chat message, got {other:?}"),
-        }
-    }
-
-    fn alert(event: Option<YtEvent>) -> Alert {
-        match event {
-            Some(YtEvent::Alert(alert)) => alert,
-            other => panic!("expected an alert, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn innertube_text_messages_use_the_injected_identity_and_clock() {
-        let message = chat(innertube(json!({ "addChatItemAction": { "item": {
-            "liveChatTextMessageRenderer": {
-                "id": "native-1",
-                "authorName": { "simpleText": "Ana" },
-                "message": { "runs": [{ "text": "oi " }, { "text": "galera" }] },
-                "authorBadges": [{ "liveChatAuthorBadgeRenderer": { "icon": { "iconType": "MODERATOR" } } }]
-            }
-        } } })));
-        assert_eq!(message.id, "fixed-id");
-        assert_eq!(message.ts, 1_700_000_000_000);
-        assert_eq!(message.source, "Canal");
-        assert_eq!(message.author, "Ana");
-        assert_eq!(message.native_id.as_deref(), Some("native-1"));
-        assert_eq!(message.text, "oi galera");
-        assert_eq!(message.badges[0].kind, "moderator");
-    }
-
-    #[test]
-    fn innertube_keeps_emoji_only_messages_from_channel_emojis() {
-        let message = chat(innertube(json!({ "addChatItemAction": { "item": {
-            "liveChatTextMessageRenderer": {
-                "message": { "runs": [{ "emoji": {
-                    "emojiId": "UC/custom",
-                    "searchTerms": ["corneta"],
-                    "image": { "thumbnails": [{ "url": "https://yt3.example.invalid/e.png" }] }
-                } }] }
-            }
-        } } })));
-        assert_eq!(message.text, "corneta");
-        assert_eq!(message.fragments[0].kind, "emote");
-        // Without an author name the localized fallback is used, not a hard-coded "anon".
-        assert_eq!(message.author, "alguém");
-    }
-
-    #[test]
-    fn innertube_deletions_paid_items_and_memberships() {
-        assert!(matches!(
-            innertube(json!({ "markChatItemAsDeletedAction": { "targetItemId": "native-9" } })),
-            Some(YtEvent::DeleteMessage(id)) if id == "native-9"
-        ));
-        let chat_alert = alert(innertube(json!({ "addChatItemAction": { "item": {
-            "liveChatPaidMessageRenderer": {
-                "authorName": { "simpleText": "Bia" },
-                "purchaseAmountText": { "simpleText": "R$ 10,00" },
-                "message": { "runs": [{ "text": "valeu" }] }
-            }
-        } } })));
-        assert_eq!(chat_alert.kind, "superchat");
-        assert_eq!(chat_alert.amount, Some(10.0));
-        assert_eq!(chat_alert.message.as_deref(), Some("R$ 10,00 — valeu"));
-        let sticker = alert(innertube(json!({ "addChatItemAction": { "item": {
-            "liveChatPaidStickerRenderer": {
-                "authorName": { "simpleText": "Caio" },
-                "purchaseAmountText": { "simpleText": "R$ 5,00" }
-            }
-        } } })));
-        assert_eq!(sticker.kind, "superchat");
-        assert_eq!(sticker.message.as_deref(), Some("R$ 5,00"));
-        let gift = alert(innertube(json!({ "addChatItemAction": { "item": {
-            "liveChatSponsorshipsGiftPurchaseAnnouncementRenderer": {
-                "header": { "liveChatSponsorshipsHeaderRenderer": { "authorName": { "simpleText": "Duda" } } }
-            }
-        } } })));
-        assert_eq!(
-            (gift.kind.as_str(), gift.user.as_str()),
-            ("subgift", "Duda")
-        );
-        assert!(innertube(json!({ "addChatItemAction": { "item": { "liveChatViewerEngagementMessageRenderer": {} } } })).is_none());
-    }
-
-    #[test]
-    fn data_api_text_messages_carry_role_badges() {
-        let message = chat(data_api(json!({
-            "id": "native-2",
-            "snippet": { "type": "textMessageEvent", "displayMessage": "boa noite" },
-            "authorDetails": { "displayName": "Eva", "isChatOwner": true, "isChatSponsor": true }
-        })));
-        assert_eq!(
-            (message.author.as_str(), message.text.as_str()),
-            ("Eva", "boa noite")
-        );
-        assert_eq!(message.native_id.as_deref(), Some("native-2"));
-        let kinds: Vec<_> = message.badges.iter().map(|b| b.kind.as_str()).collect();
-        assert_eq!(kinds, ["broadcaster", "subscriber"]);
-        assert_eq!(message.badges[1].label, "MEMBRO");
-    }
-
-    #[test]
-    fn data_api_paid_events_become_alerts() {
-        let super_chat = alert(data_api(json!({
-            "snippet": { "type": "superChatEvent", "superChatDetails": {
-                "amountMicros": "25000000", "currency": "BRL", "userComment": "manda salve"
-            } },
-            "authorDetails": { "displayName": "Fê" }
-        })));
-        assert_eq!(super_chat.amount, Some(25.0));
-        assert_eq!(super_chat.currency.as_deref(), Some("BRL"));
-        assert_eq!(super_chat.message.as_deref(), Some("manda salve"));
-        let sticker = alert(data_api(json!({
-            "snippet": { "type": "superStickerEvent", "superStickerDetails": {
-                "amountMicros": "5000000", "currency": "BRL"
-            } },
-            "authorDetails": { "displayName": "Gui" }
-        })));
-        assert_eq!(
-            (sticker.kind.as_str(), sticker.amount),
-            ("superchat", Some(5.0))
-        );
-        let gifts = alert(data_api(json!({
-            "snippet": { "type": "membershipGiftingEvent", "membershipGiftingDetails": {
-                "giftMembershipsCount": 5, "giftMembershipsLevelName": "Fã"
-            } },
-            "authorDetails": { "displayName": "Hugo" }
-        })));
-        assert_eq!((gifts.kind.as_str(), gifts.amount), ("subgift", Some(5.0)));
-        assert_eq!(gifts.tier.as_deref(), Some("Fã"));
-    }
-
-    #[test]
-    fn data_api_moderation_and_non_chat_events() {
-        assert!(matches!(
-            data_api(json!({ "snippet": { "type": "messageDeletedEvent",
-                "messageDeletedDetails": { "deletedMessageId": "native-3" } } })),
-            Some(YtEvent::DeleteMessage(id)) if id == "native-3"
-        ));
-        assert!(matches!(
-            data_api(json!({ "snippet": { "type": "userBannedEvent",
-                "userBannedDetails": { "bannedUserDetails": { "displayName": "Ivo" } } } })),
-            Some(YtEvent::DeleteUser(name)) if name == "Ivo"
-        ));
-        // These used to reach the feed as chat lines.
-        for kind in [
-            "chatEndedEvent",
-            "giftMembershipReceivedEvent",
-            "sponsorOnlyModeStartedEvent",
-        ] {
-            assert!(
-                data_api(
-                    json!({ "snippet": { "type": kind, "displayMessage": "texto do sistema" } })
-                )
-                .is_none(),
-                "{kind}"
-            );
-        }
-        assert!(data_api(
-            json!({ "snippet": { "type": "textMessageEvent", "displayMessage": "" } })
-        )
-        .is_none());
-    }
-
-    #[test]
-    fn hidden_youtube_counts_keep_the_live_video() {
-        let details =
-            |d: Value| parse_live_details(&json!({ "items": [{ "liveStreamingDetails": d }] }));
-        assert_eq!(
-            details(
-                json!({ "actualStartTime": "2026-10-19T10:00:00Z", "concurrentViewers": "1234" })
-            ),
-            YtLiveDetails {
-                live: true,
-                viewers: Some(1234)
-            }
-        );
-        assert_eq!(
-            details(json!({ "actualStartTime": "2026-10-19T10:00:00Z" })),
-            YtLiveDetails {
-                live: true,
-                viewers: None
-            },
-            "a hidden count is not an ended live"
-        );
-        assert_eq!(
-            details(json!({
-                "actualStartTime": "2026-10-19T10:00:00Z",
-                "actualEndTime": "2026-10-19T12:00:00Z",
-                "concurrentViewers": "50"
-            })),
-            YtLiveDetails {
-                live: false,
-                viewers: None
-            }
-        );
-        assert_eq!(
-            details(json!({ "scheduledStartTime": "2026-10-19T10:00:00Z" })),
-            YtLiveDetails {
-                live: false,
-                viewers: None
-            }
-        );
-        assert_eq!(
-            parse_live_details(&json!({ "items": [] })),
-            YtLiveDetails {
-                live: false,
-                viewers: None
-            }
-        );
-    }
-
-    #[test]
-    fn quota_spending_lookups_are_remembered() {
-        let start = Instant::now();
-        let later = |secs: u64| start + Duration::from_secs(secs);
-        let ttl = Duration::from_secs(60);
-        let hit = (start, Some("UCaaaaaaaaaaaaaaaaaaaaaa".to_string()));
-        let miss: (Instant, Option<String>) = (start, None);
-        assert_eq!(
-            cached_answer(Some(&hit), ttl, later(10_000)),
-            Some(Some("UCaaaaaaaaaaaaaaaaaaaaaa".to_string()))
-        );
-        assert_eq!(cached_answer(Some(&miss), ttl, later(30)), Some(None));
-        assert_eq!(cached_answer(Some(&miss), ttl, later(60)), None);
-        assert_eq!(cached_answer::<String>(None, ttl, start), None);
-
-        assert!(due(None, LIVE_SEARCH_EVERY, start));
-        assert!(!due(Some(&start), LIVE_SEARCH_EVERY, later(599)));
-        assert!(due(Some(&start), LIVE_SEARCH_EVERY, later(600)));
-    }
-
-    #[test]
-    fn moderation_ids_come_from_each_feed() {
-        let innertube_message = chat(innertube(json!({ "addChatItemAction": { "item": {
-            "liveChatTextMessageRenderer": {
-                "id": "native-3",
-                "authorName": { "simpleText": "@ana" },
-                "authorExternalChannelId": "UCaaaaaaaaaaaaaaaaaaaaaa",
-                "message": { "runs": [{ "text": "oi" }] }
-            }
-        } } })));
-        assert_eq!(
-            innertube_message.author_id.as_deref(),
-            Some("UCaaaaaaaaaaaaaaaaaaaaaa")
-        );
-
-        let data_api_message = chat(data_api(json!({
-            "id": "native-4",
-            "snippet": { "type": "textMessageEvent", "displayMessage": "oi" },
-            "authorDetails": { "displayName": "Ana", "channelId": "UCbbbbbbbbbbbbbbbbbbbbbb" }
-        })));
-        assert_eq!(
-            data_api_message.author_id.as_deref(),
-            Some("UCbbbbbbbbbbbbbbbbbbbbbb")
-        );
-
-        let kick = |sender: Value| {
-            let data = json!({ "id": "kick-1", "content": "oi", "sender": sender }).to_string();
-            parse_kick(
-                &json!({ "event": "App\\Events\\ChatMessageEvent", "data": data }).to_string(),
-                "fonte",
-            )
-            .expect("kick message")
-            .author_id
-        };
-        assert_eq!(
-            kick(json!({ "id": 123456, "username": "ana" })).as_deref(),
-            Some("123456")
-        );
-        assert_eq!(
-            kick(json!({ "id": "654321", "username": "ana" })).as_deref(),
-            Some("654321")
-        );
-        assert_eq!(kick(json!({ "id": "12a", "username": "ana" })), None);
-        assert_eq!(kick(json!({ "username": "ana" })), None);
-    }
-
-    #[test]
-    fn replies_thread_only_with_plain_message_ids() {
-        let id = "885196de-cb67-427a-baa8-82f9b0fcd05f";
-        assert_eq!(
-            twitch_privmsg("canal", "valeu", Some(id)),
-            format!("@reply-parent-msg-id={id} PRIVMSG #canal :valeu")
-        );
-        assert_eq!(
-            twitch_privmsg("canal", "valeu", None),
-            "PRIVMSG #canal :valeu"
-        );
-        for unsafe_id in [
-            "a b",
-            "a;mod=1",
-            "a\r\nPRIVMSG #x :y",
-            "",
-            "a".repeat(65).as_str(),
-        ] {
-            assert_eq!(reply_id(unsafe_id), None, "{unsafe_id:?}");
-            assert_eq!(
-                twitch_privmsg("canal", "valeu", Some(unsafe_id)),
-                "PRIVMSG #canal :valeu"
-            );
-        }
-
-        assert_eq!(youtube_reply_text("@ana", "valeu"), "@ana valeu");
-        assert_eq!(youtube_reply_text("Ana Maria", "valeu"), "@Ana Maria valeu");
-        assert_eq!(youtube_reply_text(" ", "valeu"), "valeu");
     }
 }

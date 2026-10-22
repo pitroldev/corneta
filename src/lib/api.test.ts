@@ -80,10 +80,10 @@ describe("Tauri telemetry IPC", () => {
       author: "ana",
     });
     await api.chatSend("oi");
-    await api.kickLoginStart();
-    await api.kickLoginStart({ moderation: true });
-    await api.kickLoginStart({ streamKey: true });
-    await api.kickFetchStreamKey("target-1");
+    await api.accountLoginStart("kick");
+    await api.accountLoginStart("kick", { moderation: true });
+    await api.accountLoginStart("kick", { streamKey: true });
+    await api.fetchStreamKey("kick", "target-1");
     expect(invoke).toHaveBeenCalledWith("chat_send", {
       text: "valeu",
       sources: ["source-1"],
@@ -94,19 +94,23 @@ describe("Tauri telemetry IPC", () => {
       sources: null,
       reply: null,
     });
-    expect(invoke).toHaveBeenCalledWith("kick_login_start", {
+    expect(invoke).toHaveBeenCalledWith("account_login_start", {
+      platform: "kick",
       moderation: null,
       streamKey: null,
     });
-    expect(invoke).toHaveBeenCalledWith("kick_login_start", {
+    expect(invoke).toHaveBeenCalledWith("account_login_start", {
+      platform: "kick",
       moderation: true,
       streamKey: null,
     });
-    expect(invoke).toHaveBeenCalledWith("kick_login_start", {
+    expect(invoke).toHaveBeenCalledWith("account_login_start", {
+      platform: "kick",
       moderation: null,
       streamKey: true,
     });
-    expect(invoke).toHaveBeenCalledWith("kick_fetch_stream_key", {
+    expect(invoke).toHaveBeenCalledWith("account_fetch_stream_key", {
+      platform: "kick",
       targetId: "target-1",
     });
   });

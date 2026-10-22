@@ -1,0 +1,27 @@
+{
+  "id": "twitch",
+  "order": 10,
+  "name": "Twitch",
+  "color": "#9146FF",
+  "icon": "M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z",
+  "protocol": "rtmp",
+  "ingestUrl": "rtmp://live.twitch.tv/app",
+  "recommended": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "videoBitrateKbps": 6000,
+    "audioBitrateKbps": 160,
+    "keyframeSec": 2
+  },
+  "copyLimits": {
+    "maxHeight": 1080,
+    "maxFps": 60,
+    "maxKbps": 6000
+  },
+  "keyUrl": "https://dashboard.twitch.tv/settings/stream",
+  "liveUrl": "https://dashboard.twitch.tv/stream-manager",
+  "account": "twitch",
+  "setupRank": 1,
+  "starter": true
+}

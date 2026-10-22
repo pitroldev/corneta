@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CHAT_PLATFORMS } from "../platforms";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
@@ -452,10 +453,9 @@ function ChatFunnel() {
   return (
     <div className="flex items-center gap-1" aria-hidden>
       <div className="flex flex-col gap-1.5">
-        <PlatformGlyph id="twitch" size={20} />
-        <PlatformGlyph id="kick" size={20} />
-        <PlatformGlyph id="youtube" size={20} />
-        <PlatformGlyph id="cinefy" size={20} />
+        {CHAT_PLATFORMS.map((p) => (
+          <PlatformGlyph key={p} id={p} size={20} />
+        ))}
       </div>
       <svg
         viewBox="0 0 44 84"

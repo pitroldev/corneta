@@ -1,4 +1,5 @@
 import type { I18n, MessageKey } from "./i18n";
+import { CHAT_PLATFORMS } from "../platforms";
 import { pluralSuffix } from "./i18n/locale";
 import type {
   AlertKind,
@@ -76,7 +77,10 @@ const AUDIENCE_STATUSES = [
   "unavailable",
   "embedded",
 ] as const;
-const AUDIENCE_ORIGINS = ["twitch", "youtube", "kick", "external"] as const;
+const AUDIENCE_ORIGINS: readonly ViewerAudienceOrigin[] = [
+  ...CHAT_PLATFORMS,
+  "external",
+];
 
 function parseAudienceStartedAt(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length > 40) return undefined;
@@ -145,7 +149,7 @@ function parseViewerItems(value: unknown): SessionViewerSample["items"] {
       viewers:
         audienceStatus === "embedded" ||
         audienceStatus === "unavailable" ||
-        (item.platform === "cinefy" && audienceOrigin !== undefined)
+        audienceOrigin !== undefined
           ? null
           : audienceCount(item.viewers),
       ...(typeof item.live === "boolean" ? { live: item.live } : {}),
@@ -159,24 +163,23 @@ function parseViewerItems(value: unknown): SessionViewerSample["items"] {
   return items;
 }
 
-const hasCinefyAudience = (item: SessionViewerSample["items"][number]) =>
-  item.platform === "cinefy" &&
-  (item.audienceStatus !== undefined || item.audienceOrigin !== undefined);
+/** Sources that report an audience status, which the legacy per-platform counters never did. */
+const reportsAudience = (item: SessionViewerSample["items"][number]) =>
+  item.audienceStatus !== undefined || item.audienceOrigin !== undefined;
 
 function viewerTotal(
   rawTotal: unknown,
   items: SessionViewerSample["items"],
 ): number | null {
-  if (!items.some(hasCinefyAudience)) return audienceCount(rawTotal);
+  if (!items.some(reportsAudience)) return audienceCount(rawTotal);
   // A partial total would invent a drop and a recovery spike during a native counter outage.
   if (
     items.some(
       (item) =>
-        item.platform === "cinefy" &&
-        (item.audienceStatus === "unavailable" ||
-          (item.audienceStatus === "live" &&
-            item.audienceOrigin === undefined &&
-            item.viewers === null)),
+        item.audienceStatus === "unavailable" ||
+        (item.audienceStatus === "live" &&
+          item.audienceOrigin === undefined &&
+          item.viewers === null),
     )
   )
     return null;
@@ -1386,9 +1389,10 @@ function aggregates(data: SessionData) {
   const memories = samples
     .map((s) => s.memoryPct)
     .filter((x): x is number => x != null);
+  // Stays free of the destination catalog so scripts can run it outside Vite; presentation
+  // reads an empty id as the fallback destination.
   const platOf = (id: string): PlatformId =>
-    (meta.platforms.find((p) => p.id === id)?.platformId ??
-      "custom") as PlatformId;
+    meta.platforms.find((p) => p.id === id)?.platformId ?? "";
 
   const byId: Record<
     string,
@@ -1606,7 +1610,6 @@ function viewerStats(d: SessionData): ViewerStats {
 export const channelKey = (platform: string, source: string) =>
   `${platform}:${source}`;
 
-const CHAT_PLATFORMS = ["twitch", "youtube", "kick", "cinefy"] as const;
 const isChatPlatform = (p: string): p is ChatPlatform =>
   (CHAT_PLATFORMS as readonly string[]).includes(p);
 
@@ -1618,7 +1621,8 @@ interface ChannelAcc {
   viewerLast: number;
   viewerSeen: boolean;
   viewerCount: number;
-  measuredCinefy: boolean;
+  /** The source reports its audience status, so a gap is not a measured zero. */
+  reportsAudience: boolean;
   audience?: ChannelStats["audience"];
   audienceAt: number;
   chat: number;
@@ -1644,7 +1648,7 @@ function newAcc(platform: ChatPlatform, source: string): ChannelAcc {
     viewerLast: 0,
     viewerSeen: false,
     viewerCount: 0,
-    measuredCinefy: false,
+    reportsAudience: false,
     audienceAt: -Infinity,
     chat: 0,
     followFirst: null,
@@ -1668,7 +1672,7 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
   for (const v of d.viewerSamples)
     for (const it of v.items) {
       const c = get(it.platform, it.source);
-      if (hasCinefyAudience(it)) c.measuredCinefy = true;
+      if (reportsAudience(it)) c.reportsAudience = true;
       if (
         (it.audienceStatus !== undefined ||
           it.audienceOrigin !== undefined ||
@@ -1762,8 +1766,8 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
     ...(c.audience ? { audience: c.audience } : {}),
     viewers: {
       peak: c.viewerPeak,
-      // Preserve legacy denominators; explicit Cinefy gaps are not measured zeroes.
-      avg: c.measuredCinefy
+      // Preserve legacy denominators; gaps in a reported audience are not measured zeroes.
+      avg: c.reportsAudience
         ? c.viewerCount
           ? Math.round(c.viewerSum / c.viewerCount)
           : 0
@@ -1774,7 +1778,7 @@ function channelBreakdown(d: SessionData): ChannelBreakdown {
       hasData: c.viewerSeen,
     },
     sharePct:
-      totalViewerSum && (!c.measuredCinefy || c.viewerSeen)
+      totalViewerSum && (!c.reportsAudience || c.viewerSeen)
         ? Math.round((c.viewerSum / totalViewerSum) * 1000) / 10
         : null,
     chat: {

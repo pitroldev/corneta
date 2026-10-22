@@ -1,3 +1,4 @@
+import { chatProvider, type AccountPlatform } from "../platforms";
 import type { ChatSource } from "./types";
 import type { I18n } from "./i18n";
 
@@ -8,13 +9,10 @@ export type Translate = I18n["t"];
 export const srcLabel = (x: ChatSource) =>
   x.name.trim() === "" ? x.value : x.name;
 
-export interface SendReady {
-  twitch: boolean;
-  youtube: boolean;
-  kick: boolean;
-}
+/** Which account logins are connected. */
+export type SendReady = Record<AccountPlatform, boolean>;
 
-/** Twitch requires authenticated IRC; YouTube and Kick send over HTTP after login. */
+/** A session sender (Twitch IRC) needs its own authentication; account senders send over HTTP after login. */
 export function sendStatusLine(
   sendTargets: ChatSource[],
   chatAuth: Record<string, { login: string; ok: boolean } | undefined>,
@@ -24,17 +22,15 @@ export function sendStatusLine(
   return sendTargets
     .map((x) => {
       const label = srcLabel(x);
-      if (x.platform === "youtube")
-        return ready.youtube
-          ? t("chat.send.status.signedIn", { platform: "YouTube" })
-          : t("chat.send.status.signIn", { label, platform: "YouTube" });
-      if (x.platform === "kick")
-        return ready.kick
-          ? t("chat.send.status.signedIn", { platform: "Kick" })
-          : t("chat.send.status.signIn", { label, platform: "Kick" });
+      const provider = chatProvider(x.platform);
+      if (provider?.send === "account" && provider.account)
+        return ready[provider.account]
+          ? t("chat.send.status.signedIn", { platform: provider.name })
+          : t("chat.send.status.signIn", { label, platform: provider.name });
       const a = chatAuth[x.id];
       if (a?.ok) return t("chat.loginrow.signedInAs", { login: a.login });
-      if (ready.twitch) return t("chat.send.status.reconnect", { label });
+      if (provider?.account && ready[provider.account])
+        return t("chat.send.status.reconnect", { label });
       if (a && !a.ok) return t("chat.send.status.invalidToken", { label });
       return t("chat.send.status.connect", { label });
     })
@@ -55,6 +51,13 @@ export interface SendTargets {
   canSend: boolean;
 }
 
+function canAddress(x: ChatSource, ready: SendReady): boolean {
+  const provider = chatProvider(x.platform);
+  if (!provider?.send || !provider.account) return false;
+  const signedIn = ready[provider.account];
+  return provider.send === "session" ? !!x.hasSendToken || signedIn : signedIn;
+}
+
 /** Resolve where a typed message goes; disabled sources and sources without a channel never receive it. */
 export function resolveSendTargets(
   sources: readonly ChatSource[],
@@ -63,12 +66,7 @@ export function resolveSendTargets(
   chatAuth: ChatAuth,
 ): SendTargets {
   const sendable = sources.filter(
-    (x) =>
-      x.enabled &&
-      x.value.trim() !== "" &&
-      ((x.platform === "twitch" && (x.hasSendToken || ready.twitch)) ||
-        (x.platform === "youtube" && ready.youtube) ||
-        (x.platform === "kick" && ready.kick)),
+    (x) => x.enabled && x.value.trim() !== "" && canAddress(x, ready),
   );
   const effectiveSendTo =
     sendTo !== "all" && sendable.some((x) => x.id === sendTo) ? sendTo : "all";
@@ -76,13 +74,12 @@ export function resolveSendTargets(
     effectiveSendTo === "all"
       ? sendable
       : sendable.filter((x) => x.id === effectiveSendTo);
-  // Twitch requires IRC authentication before sending; YouTube and Kick send over HTTP.
-  const canSend = targets.some((x) =>
-    x.platform === "youtube"
-      ? ready.youtube
-      : x.platform === "kick"
-        ? ready.kick
-        : !!chatAuth[x.id]?.ok,
-  );
+  // A session sender must have authenticated its chat connection; account senders only need the login.
+  const canSend = targets.some((x) => {
+    const provider = chatProvider(x.platform);
+    return provider?.send === "account" && provider.account
+      ? ready[provider.account]
+      : !!chatAuth[x.id]?.ok;
+  });
   return { sendable, effectiveSendTo, targets, canSend };
 }

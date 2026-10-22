@@ -915,43 +915,30 @@ export function mockApi(): CornetaApi {
         brokerError: null,
       };
     },
-    async twitchLoginStart() {},
-    async twitchFetchStreamKey() {
-      return "demo";
+    // The demo signs in to the accounts with a login flow; Twitch only exists through the built-in client.
+    async accountLoginStart(platform) {
+      if (platform !== "twitch") demoLogin(platform);
     },
-    async twitchLogout() {},
-    async youtubeLoginStart() {
-      demoLogin("youtube");
+    async accountLogout(platform) {
+      if (platform !== "twitch") setAccount(platform, false);
     },
-    async youtubeLogout() {
-      setAccount("youtube", false);
+    async fetchStreamKey(platform, targetId) {
+      if (platform !== "twitch")
+        saveVault({ ...loadVault(), [targetId]: "demo-account-key" });
+      return { login: "demo", url: null };
     },
     async youtubeBroadcastRecoveryStatus() {
       return "none";
     },
     async youtubeRetryBroadcastCleanup() {},
     async youtubeAcknowledgeUnknownBroadcast() {},
-    async kickLoginStart() {
-      demoLogin("kick");
-    },
-    async kickFetchStreamKey(targetId) {
-      saveVault({ ...loadVault(), [targetId]: "demo-account-key" });
-      return { login: "demo", url: null };
-    },
-    async kickLogout() {
-      setAccount("kick", false);
-    },
     async setStreamInfo() {
       return {};
     },
-    async setYoutubeOauth() {},
-    async clearYoutubeOauth() {},
-    async youtubeUseOfficial() {},
-    async youtubeUseOwnCreds() {},
-    async setKickOauth() {},
-    async clearKickOauth() {},
-    async kickUseOfficial() {},
-    async kickUseOwnCreds() {},
+    async accountSaveOwnCredentials() {},
+    async accountClearOwnCredentials() {},
+    async accountUseOfficial() {},
+    async accountUseOwnCredentials() {},
     async chatModerate() {},
     subscribeAuthFlow(onAuth) {
       authListeners.add(onAuth);

@@ -69,8 +69,7 @@ const native = vi.hoisted(() => {
     chatRunning: vi.fn(async () => false),
     listSessions: vi.fn(async () => []),
     chatStart: vi.fn(async () => undefined),
-    twitchLoginStart: vi.fn(async () => undefined),
-    kickLoginStart: vi.fn(async () => undefined),
+    accountLoginStart: vi.fn(async () => undefined),
     subscribeAuthFlow: vi.fn(
       (listener: (who: string, event: AuthEvent) => void) => {
         authListeners.add(listener);
@@ -264,7 +263,7 @@ describe("auth flow shared by the main and chat windows", () => {
     }
     expect(native.authListeners.size).toBe(2);
 
-    await main.getState().twitchLogin();
+    await main.getState().accountLogin("twitch");
     native.emitAuth("twitch", {
       state: "code",
       userCode: "WDJB-MJHT",
@@ -289,7 +288,11 @@ describe("auth flow shared by the main and chat windows", () => {
       login: "streamer",
     });
     expect(native.api.chatStart).toHaveBeenCalledOnce();
-    expect(native.api.twitchLoginStart).toHaveBeenCalledOnce();
+    expect(native.api.accountLoginStart).toHaveBeenCalledOnce();
+    expect(native.api.accountLoginStart).toHaveBeenCalledWith("twitch", {
+      moderation: false,
+      streamKey: false,
+    });
     for (const webview of [main, chat])
       expect(webview.getState().chatLogin.twitch).toEqual({
         state: "connected",
@@ -312,7 +315,7 @@ describe("auth flow shared by the main and chat windows", () => {
       verifyUriComplete: url,
       login: "",
     };
-    await main.getState().kickLogin();
+    await main.getState().accountLogin("kick");
     native.emitAuth("kick", code);
     native.emitAuth("kick", {
       state: "error",
@@ -325,9 +328,9 @@ describe("auth flow shared by the main and chat windows", () => {
       message: "synthetic denial",
     });
 
-    await main.getState().kickLogin();
+    await main.getState().accountLogin("kick");
     native.emitAuth("kick", code);
-    expect(native.api.kickLoginStart).toHaveBeenCalledTimes(2);
+    expect(native.api.accountLoginStart).toHaveBeenCalledTimes(2);
     expect(native.openExternal).toHaveBeenCalledTimes(2);
     expect(native.writeText).not.toHaveBeenCalled();
     expect(native.api.chatStart).not.toHaveBeenCalled();

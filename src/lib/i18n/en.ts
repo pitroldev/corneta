@@ -447,7 +447,7 @@ export const en: Dict = {
     "The name in the link: kick.com/YOURNAME. Kick sometimes blocks reading the chat and it won't connect.",
   "chat.source.hint.cinefy":
     "The name in the Cinefy link. Read-only chat and audience for streams hosted on Cinefy. Embedded players from other platforms are excluded from the total. The integration relies on undocumented endpoints that may change without notice.",
-  "audience.cinefy": "Cinefy audience",
+  "audience.details": "Audience by channel",
   "audience.partial": "Partial total: includes only available audience counts.",
   "audience.external": "another platform",
   "audience.embeddedCount":
@@ -1561,8 +1561,8 @@ export const en: Dict = {
     "Checks whether the platform's server answers — it doesn't check your stream key",
   "platforms.target.url.help":
     "— where your video goes; paste the URL the platform's dashboard gave you",
-  "platforms.target.url.helpKick":
-    "— where your video goes; I filled this one in, only change it if Kick's dashboard shows a different one",
+  "platforms.target.url.helpPrefilled":
+    "— where your video goes; I filled this one in, only change it if the platform's dashboard shows a different one",
   "platforms.target.url.invalid":
     "That URL won't work — use rtmp:// or rtmps://",
   "platforms.target.url.label": "Server URL",

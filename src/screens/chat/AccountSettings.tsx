@@ -1,23 +1,36 @@
 import { Check, Copy, ExternalLink, LogIn } from "lucide-react";
 import { useState } from "react";
-import { Button, Input, PlatformGlyph } from "../../components/ui";
-import { bold, useT } from "../../lib/i18n";
-import { toast } from "../../lib/toast";
+import type { ReactNode } from "react";
+import { Button, PlatformGlyph } from "../../components/ui";
+import { useT } from "../../lib/i18n";
 import type { ChatPlatform } from "../../lib/types";
-import { openExternal } from "../../lib/utils";
-import { sanitizeToken } from "../../lib/validation";
-import { splitAt, StepNum } from "./primitives";
+import { toast } from "../../lib/toast";
+import { errMsg, openExternal } from "../../lib/utils";
+import { accountProvider } from "../../platforms";
+import { StepNum } from "./primitives";
 import { useAccountAction } from "./useAccountAction";
-import { YoutubeBroadcastRecovery } from "./YoutubeBroadcastRecovery";
 
-type ByokModes = {
+/** Switches a login mode, confirms it, and closes the user's own app form. */
+export const runModeAction =
+  (close: (open: boolean) => void) =>
+  async (action: Promise<void>, ok?: string) => {
+    try {
+      await action;
+      if (ok) toast.success(ok);
+      close(false);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+
+export type ByokModes = {
   officialReady: boolean;
   ownCreds: boolean;
   usingOwnCreds: boolean;
 };
 
 /** Switching modes preserves client credentials; forgetting them is a separate action. */
-function ByokModeActions({
+export function ByokModeActions({
   modes,
   onUseOfficial,
   onUseSaved,
@@ -66,223 +79,6 @@ function ByokModeActions({
   );
 }
 
-export function YoutubeCredsForm({
-  onSave,
-  modes,
-  onUseOfficial,
-  onUseSaved,
-  onForget,
-}: {
-  onSave: (clientId: string, clientSecret: string) => Promise<void>;
-  modes?: ByokModes;
-  onUseOfficial?: () => void;
-  onUseSaved?: () => void;
-  onForget?: () => void;
-}) {
-  const t = useT();
-  const [id, setId] = useState("");
-  const [secret, setSecret] = useState("");
-  const [guide, setGuide] = useState(false);
-  const { busy, run } = useAccountAction();
-  const can = id.trim() !== "" && secret.trim() !== "";
-  const save = () => {
-    if (!can) return;
-    void run(
-      () => onSave(sanitizeToken(id), sanitizeToken(secret)),
-      () => {
-        setId("");
-        setSecret("");
-        toast.success(t("chat.youtube.creds.saved.toast"));
-      },
-    );
-  };
-  const [step1Before, step1After] = splitAt(
-    t("chat.youtube.guide.step1"),
-    "Google Cloud Console",
-  );
-  return (
-    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
-      <div className="mb-2 flex items-center gap-2">
-        <PlatformGlyph id="youtube" size={20} />
-        <span className="font-display text-sm font-bold">YouTube</span>
-        <button
-          onClick={() => setGuide((v) => !v)}
-          className="ml-auto text-xs font-bold text-brass hover:underline"
-        >
-          {guide
-            ? t("chat.youtube.creds.guide.hide")
-            : t("chat.youtube.creds.guide.show")}
-        </button>
-      </div>
-
-      <ByokModeActions
-        modes={modes}
-        onUseOfficial={onUseOfficial}
-        onUseSaved={onUseSaved}
-        onForget={onForget}
-      />
-
-      {guide && (
-        <>
-          <ol className="mb-2.5 list-decimal space-y-2 rounded-md bg-surface px-5 py-3 text-[11px] leading-relaxed text-ink-muted marker:font-bold marker:text-brass">
-            <li>
-              {step1Before}
-              <button
-                onClick={() =>
-                  void openExternal(
-                    "https://console.cloud.google.com/projectcreate",
-                  )
-                }
-                className="font-bold text-brass hover:underline"
-              >
-                Google Cloud Console
-              </button>
-              {step1After}
-            </li>
-            <li>{bold(t, "chat.youtube.guide.step2")}</li>
-            <li>{bold(t, "chat.youtube.guide.step3")}</li>
-            <li>{bold(t, "chat.youtube.guide.step4")}</li>
-            <li>{bold(t, "chat.youtube.guide.step5")}</li>
-            <li>{bold(t, "chat.youtube.guide.step6")}</li>
-            <li>{bold(t, "chat.youtube.guide.step7")}</li>
-          </ol>
-          <p className="mb-2.5 rounded-md border-2 border-warn/40 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
-            <strong className="text-ink">
-              {t("chat.youtube.guide.warn.label")}
-            </strong>{" "}
-            {bold(t, "chat.youtube.guide.warn.text")}
-          </p>
-        </>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <Input
-          name="youtube-client-id"
-          disabled={busy}
-          autoComplete="off"
-          placeholder="Client ID"
-          aria-label="YouTube — Client ID"
-          value={id}
-          onChange={(e) => setId(e.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            name="youtube-client-secret"
-            disabled={busy}
-            autoComplete="off"
-            placeholder="Client Secret"
-            aria-label="YouTube — Client Secret"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && can && save()}
-            className="flex-1"
-          />
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!can || busy}
-            loading={busy}
-            onClick={save}
-          >
-            {t("chat.common.save")}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function KickCredsForm({
-  onSave,
-  modes,
-  onUseOfficial,
-  onUseSaved,
-  onForget,
-}: {
-  onSave: (clientId: string, clientSecret: string) => Promise<void>;
-  modes?: ByokModes;
-  onUseOfficial?: () => void;
-  onUseSaved?: () => void;
-  onForget?: () => void;
-}) {
-  const t = useT();
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const { busy, run } = useAccountAction();
-  const canSave = clientId.trim() !== "" && clientSecret.trim() !== "";
-  const save = () => {
-    if (!canSave) return;
-    void run(
-      () => onSave(sanitizeToken(clientId), sanitizeToken(clientSecret)),
-      () => {
-        setClientId("");
-        setClientSecret("");
-        toast.success(t("chat.kick.creds.saved.toast"));
-      },
-    );
-  };
-  return (
-    <div className="rounded-md border-2 border-border-soft bg-surface-2 p-2.5">
-      <div className="mb-2 flex items-center gap-2">
-        <PlatformGlyph id="kick" size={20} />
-        <span className="font-display text-sm font-bold">Kick</span>
-        <button
-          className="ml-auto text-xs font-bold text-brass hover:underline"
-          onClick={() =>
-            void openExternal("https://kick.com/settings/developer")
-          }
-        >
-          {t("chat.kick.creds.openDeveloper")}
-        </button>
-      </div>
-      <p className="mb-2 text-[11px] text-ink-muted">
-        {bold(t, "chat.kick.creds.redirect")}
-      </p>
-      <ByokModeActions
-        modes={modes}
-        onUseOfficial={onUseOfficial}
-        onUseSaved={onUseSaved}
-        onForget={onForget}
-      />
-      <div className="flex flex-col gap-2">
-        <Input
-          name="kick-client-id"
-          disabled={busy}
-          autoComplete="off"
-          placeholder="Client ID"
-          aria-label="Kick — Client ID"
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <Input
-            name="kick-client-secret"
-            disabled={busy}
-            autoComplete="off"
-            type="password"
-            placeholder="Client Secret"
-            aria-label="Kick — Client Secret"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && canSave && save()}
-            className="flex-1"
-          />
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canSave || busy}
-            loading={busy}
-            onClick={save}
-          >
-            {t("chat.common.save")}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function LoginRow({
   platform,
   label,
@@ -290,6 +86,7 @@ export function LoginRow({
   enabled,
   onLogin,
   onLogout,
+  extra,
 }: {
   platform: ChatPlatform;
   label: string;
@@ -305,6 +102,8 @@ export function LoginRow({
   enabled: boolean;
   onLogin: () => Promise<void>;
   onLogout: () => Promise<void>;
+  /** Platform-specific status below the row, such as a broadcast left to clean up. */
+  extra?: ReactNode;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -367,7 +166,8 @@ export function LoginRow({
           )}
         </div>
       </div>
-      {platform === "twitch" &&
+      {/* Platforms that ask for scopes on demand are expected to lack some until a feature needs them. */}
+      {!accountProvider(platform)?.scopesOnDemand &&
       state.state === "connected" &&
       enabled &&
       state.missingScopes?.length ? (
@@ -384,7 +184,7 @@ export function LoginRow({
           </Button>
         </div>
       ) : null}
-      {platform === "youtube" ? <YoutubeBroadcastRecovery /> : null}
+      {extra}
       {state.state === "code" &&
         (state.userCode && !state.verifyUriComplete ? (
           <div className="mt-2 rounded-md bg-brass/5 px-3 py-2.5 ring-1 ring-brass/25">

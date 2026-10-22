@@ -1470,17 +1470,7 @@ fn valid_bucket(value: &str) -> bool {
 }
 
 fn normalize_platform(value: &str) -> Option<&'static str> {
-    match value {
-        "twitch" => Some("twitch"),
-        "youtube" => Some("youtube"),
-        "facebook" => Some("facebook"),
-        "kick" => Some("kick"),
-        "tiktok" => Some("tiktok"),
-        "x" => Some("x"),
-        "instagram" => Some("instagram"),
-        "custom" => Some("custom"),
-        _ => None,
-    }
+    crate::platforms::destination(value).map(|d| d.id.as_str())
 }
 
 fn normalize_target_state(value: &str) -> Option<&'static str> {
@@ -1879,7 +1869,7 @@ pub fn diagnostic_config_summary(config: &AppConfig) -> Value {
     let mut platform_counts: HashMap<&'static str, u64> = HashMap::new();
     let mut encoder_kinds = HashSet::new();
     for target in config.targets.iter().filter(|target| target.enabled) {
-        let platform = normalize_platform(&target.platform_id).unwrap_or("custom");
+        let platform = crate::platforms::known_destination_id(&target.platform_id);
         *platform_counts.entry(platform).or_default() += 1;
         let encoder = match target.encoding.encoder.as_str() {
             "auto" => "auto",
