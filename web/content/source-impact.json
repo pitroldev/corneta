@@ -2,10 +2,22 @@
   "version": 1,
   "declarations": [
     {
+      "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
+      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+    },
+    {
+      "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
+      "source": "src/lib/platforms.ts",
+      "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
+      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
+    },
+    {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
-      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; a reconexão de um destino e o que acontece com os outros não mudaram."
+      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
+      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -14,10 +26,16 @@
       "reason": "Só acrescenta, sob o YouTube automático, a escolha de quem vê a live e de conteúdo para crianças; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
     },
     {
+      "article": "pt-BR/guides/operations/analyze-stream-drop.mdx",
+      "source": "src/lib/report.ts",
+      "sourceBlob": "d8edb6e364d37293745dcde2d14d32a195bc5683",
+      "reason": "O replay passou a guardar emotes, selos e marcas do chat e os novos tipos de alerta ganharam rótulo; o que o artigo descreve continua correto."
+    },
+    {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
-      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; o overlay, os blocos no OBS e os avisos citados não mudaram."
+      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
+      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -34,32 +52,68 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
-      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; o seletor de envio e as regras de moderação citadas não mudaram."
+      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
+      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "0f42ddbc00dd06a9392cc2499524048639d6af65",
-      "reason": "A importação de configurações passa a manter senha do OBS, chave da API e pasta de gravação locais e a recusar arquivos hostis, e um alvo de loudness fora da faixa do FFmpeg volta ao padrão; modos, cópia, transcodificação e normalizador citados não mudaram."
+      "sourceBlob": "f8245cdb543f45c346f4943da03ef55443c8f5d5",
+      "reason": "A validação passou a aceitar os destinos do catálogo por pasta; os mesmos destinos e regras continuam valendo."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
-      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; isso confirma o que o guia diz, que o Esperto recodifica só o necessário, e as três perguntas continuam valendo."
+      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
+      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "cba0f28d618579cb834ec2e76e587421bcd9c620",
-      "reason": "Só acrescenta atalhos globais para marcar momento e para o JÁ VOLTO, vazios até a pessoa escolher; padrões de bitrate, encoder e qualidade citados não mudaram."
+      "sourceBlob": "6831b3b94c5f9639090451526ebb8f4c4ffbc70c",
+      "reason": "A criação de destinos lê o catálogo por pasta, com os mesmos valores; o artigo continua correto."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "dc5be30928a9692b0d5a504e24b8addd8bf3e055",
-      "reason": "Só muda a importação de configurações, que agora mantém credenciais e pasta de gravação locais; encoders, detecção, modos e o passo a passo citados não mudaram."
+      "sourceBlob": "16d19a857bb3ed735751e2cdae31355b37e39792",
+      "reason": "Os comandos de conta viraram genéricos e o YouTube automático virou gancho do provedor; nada do que o artigo descreve mudou."
+    },
+    {
+      "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
+      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+    },
+    {
+      "article": "pt-BR/guides/quality/multistream-upload-speed.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
+      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+    },
+    {
+      "article": "pt-BR/guides/quality/resolution-and-fps.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
+      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+    },
+    {
+      "article": "pt-BR/guides/quality/streaming-glossary.mdx",
+      "source": "src/lib/platforms.ts",
+      "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
+      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
+    },
+    {
+      "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
+      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+    },
+    {
+      "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
+      "source": "src/lib/platforms.ts",
+      "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
+      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -69,45 +123,69 @@
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
+      "source": "src-tauri/src/overlay.rs",
+      "sourceBlob": "09a6b7e4b0b1142fe8595a14892f91b4563061d0",
+      "reason": "O overlay de chat passou a receber as exclusões e os fixados; a configuração descrita no artigo não mudou."
+    },
+    {
+      "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
-      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; a aba Overlays e os ajustes citados não mudaram."
+      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
+      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "37c9126aa0ba2e27ad78146545d61c4b79cb8780",
-      "reason": "Os conectores passaram a guardar o ID de quem mandou no YouTube e na Kick e a enviar respostas; adicionar canal, conectar e o que funciona sem login continuam corretos."
+      "sourceBlob": "9d09054e728e5f794b4306d975088be66939ee35",
+      "reason": "O chat ganhou GIFs, respostas, destaques, fixados, enquetes e modos; o que o artigo descreve continua correto, mas vale revisar para incluir os recursos novos."
+    },
+    {
+      "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
+      "source": "src/components/ChatFeed.tsx",
+      "sourceBlob": "8b1c2f8a0b6f29bc4f8c733d1890a2db4ca65378",
+      "reason": "O feed passou a mostrar GIFs, respostas, destaques e linhas de aviso das plataformas; o que o artigo descreve continua correto, mas vale revisar para incluir os recursos novos."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "eb112ed7301733c67c2028e2a683bf15510dfec5",
-      "reason": "A aba Canais passou a sugerir o chat das contas conectadas, com um botão para adicionar; o caminho Adicionar canal, preencher o identificador e Conectar continua valendo do jeito que o artigo descreve."
+      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
+      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "ba14525f4cfb8ebe4c6f56d480c07ef78e327299",
-      "reason": "Só acrescenta a busca da chave da Kick pela conta logada, que grava no cofre e só preenche o servidor de um destino sem servidor; colar a chave e os passos citados continuam valendo."
+      "sourceBlob": "0baa491691070ea7d29cf2c102481778277c7806",
+      "reason": "As ações de conta e de chave viraram genéricas por provedor; o primeiro uso descrito no artigo não mudou."
     },
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
       "source": "src/screens/PlatformsScreen.tsx",
-      "sourceBlob": "c832594d2a22611e1e82bad6498c768e11b7d923",
-      "reason": "Os destinos da Kick ganham o mesmo botão Pegar da conta da Twitch, que grava a chave no cofre; Colar e salvar e os demais passos citados continuam valendo."
+      "sourceBlob": "b82e3122fe5e243eeb1f4340053de761bd7c4950",
+      "reason": "O destino Personalizado passou a ser reconhecido por capacidade do catálogo; a tela e os passos do artigo não mudaram."
+    },
+    {
+      "article": "pt-BR/help/platforms/streaming-keys-and-urls.mdx",
+      "source": "src/lib/platforms.ts",
+      "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
+      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "0f42ddbc00dd06a9392cc2499524048639d6af65",
-      "reason": "A importação de configurações passa a manter credenciais e pasta de gravação locais e a recusar arquivos hostis; o ajuste de auto-bitrate e o que ele cobre não mudaram."
+      "sourceBlob": "f8245cdb543f45c346f4943da03ef55443c8f5d5",
+      "reason": "A validação passou a aceitar os destinos do catálogo por pasta; os mesmos destinos e regras continuam valendo."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
-      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; o auto-bitrate e os limites citados não mudaram."
+      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
+      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
+    },
+    {
+      "article": "pt-BR/help/quality/quality-modes.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
+      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -118,20 +196,26 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
-      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; as métricas e os estados citados não mudaram."
+      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
+      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "dc5be30928a9692b0d5a504e24b8addd8bf3e055",
-      "reason": "Só muda a importação de configurações, que agora mantém credenciais e pasta de gravação locais; o teste de upload e o passo a passo citados não mudaram."
+      "sourceBlob": "16d19a857bb3ed735751e2cdae31355b37e39792",
+      "reason": "Os comandos de conta viraram genéricos e o YouTube automático virou gancho do provedor; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "dc5be30928a9692b0d5a504e24b8addd8bf3e055",
-      "reason": "Só muda a importação de configurações, que agora mantém credenciais e pasta de gravação locais; o que o diagnóstico leva e o que fica de fora não mudaram."
+      "sourceBlob": "16d19a857bb3ed735751e2cdae31355b37e39792",
+      "reason": "Os comandos de conta viraram genéricos e o YouTube automático virou gancho do provedor; nada do que o artigo descreve mudou."
+    },
+    {
+      "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
+      "source": "src/lib/report.ts",
+      "sourceBlob": "d8edb6e364d37293745dcde2d14d32a195bc5683",
+      "reason": "O replay passou a guardar emotes, selos e marcas do chat e os novos tipos de alerta ganharam rótulo; o que o artigo descreve continua correto."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -142,8 +226,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "fd1132b564a32d54bf3ee97bad3fd96aaa98c123",
-      "reason": "Só acrescenta os textos de buscar a chave da Kick pela conta; os rótulos do assistente do OBS e do passo de vídeo citados não mudaram."
+      "sourceBlob": "5090a841042b6979734bbe3cf6bcbba05980c047",
+      "reason": "Só entraram textos novos do chat; nenhum texto da configuração automática do OBS mudou."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -166,8 +250,8 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4843138d5195c56f722499e87a44f883097213a0",
-      "reason": "O motor só ganhou os limites de cópia por plataforma, usados pelo Esperto para recodificar o destino que o sinal do OBS estoura; os estados de reconexão e as correções citadas não mudaram."
+      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
+      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
