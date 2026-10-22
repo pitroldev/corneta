@@ -1,11 +1,13 @@
 import { localePath, type Locale, type T } from "@/lib/i18n";
+import Image from "next/image";
 import Link from "next/link";
 import { faqsFor } from "@/lib/content";
 import { DOWNLOAD_PATH } from "@/lib/download";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, legalHref } from "@/lib/legal";
 import { BrandMark } from "../_components/brand-mark";
 import { Mascot, SoundWaves } from "../_components/decor";
-import { WindowsIcon } from "../_components/icons";
+import { ArrowIcon, PlayIcon, WindowsIcon } from "../_components/icons";
+import { lpMedia } from "@/lib/lp-media";
 import {
   cn,
   downloadButton,
@@ -15,43 +17,6 @@ import {
   TwoCol,
 } from "../_components/ui";
 import { DownloadButton } from "./hero";
-
-const TINY =
-  "flex items-start gap-[13px] bg-charcoal px-5 py-4.5 " +
-  "[&>i>svg]:h-[21px] [&>i>svg]:w-[21px] [&>i>svg]:fill-none [&>i>svg]:stroke-current [&>i>svg]:[stroke-linecap:round] [&>i>svg]:[stroke-linejoin:round] [&>i>svg]:[stroke-width:2.2] " +
-  "[&_strong]:block [&_strong]:font-display [&_strong]:text-base [&_strong]:leading-[1.15] [&_strong]:font-bold " +
-  "[&_p]:mt-[3px] [&_p]:text-[0.8rem] [&_p]:leading-[1.45] [&_p]:font-medium [&_p]:text-muted";
-
-export function TinyThings({
-  t,
-  items,
-}: {
-  t: T;
-  items: { icon: React.ReactNode; title: string; text: string }[];
-}) {
-  return (
-    <Section>
-      <Shell>
-        <SectionHeading
-          kicker={t("closing.tiny.kicker")}
-          title={t("closing.tiny.title")}
-        />
-
-        <div className="mt-[clamp(38px,4vw,56px)] grid grid-cols-3 gap-px bg-border-soft max-[980px]:grid-cols-1">
-          {items.map((item) => (
-            <div className={TINY} key={item.title}>
-              <i>{item.icon}</i>
-              <div>
-                <strong>{item.title}</strong>
-                <p>{item.text}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Shell>
-    </Section>
-  );
-}
 
 const FAQ_LIST =
   "border-t-[3px] border-ink max-[980px]:max-w-[720px] " +
@@ -63,42 +28,89 @@ const FAQ_LIST =
   "[&_summary>i]:before:absolute [&_summary>i]:before:top-[11.5px] [&_summary>i]:before:left-1.5 [&_summary>i]:before:h-[3px] [&_summary>i]:before:w-3.5 [&_summary>i]:before:bg-brass-ink [&_summary>i]:before:content-['']" +
   " [&_summary>i]:after:absolute [&_summary>i]:after:top-[11.5px] [&_summary>i]:after:left-1.5 [&_summary>i]:after:h-[3px] [&_summary>i]:after:w-3.5 [&_summary>i]:after:rotate-90 [&_summary>i]:after:bg-brass-ink [&_summary>i]:after:transition-transform [&_summary>i]:after:content-[''] " +
   "[&_details[open]_summary>i]:after:rotate-0 " +
-  "[&_details>p]:mt-[-2px] [&_details>p]:mb-6 [&_details>p]:max-w-[68ch] [&_details>p]:pr-11 max-[760px]:[&_details>p]:pr-0 [&_details>p]:leading-[1.68] [&_details>p]:font-medium [&_details>p]:text-ink-muted";
+  "[&_summary>span]:flex-1 [&_summary>span]:pl-10 [&_summary>span]:-indent-10 [&_summary:hover>span]:text-tomato-ink " +
+  "[&_summary_b]:inline-block [&_summary_b]:w-10 [&_summary_b]:indent-0 [&_summary_b]:font-sans [&_summary_b]:text-[0.78rem] [&_summary_b]:font-bold [&_summary_b]:text-ink-faint [&_summary_b]:tabular-nums " +
+  "[&_details>p]:mt-[-2px] [&_details>p]:mb-6 [&_details>p]:ml-10 [&_details>p]:max-w-[62ch] [&_details>p]:pr-11 max-[760px]:[&_details>p]:ml-0 max-[760px]:[&_details>p]:pr-0 [&_details>p]:leading-[1.68] [&_details>p]:font-medium [&_details>p]:text-ink-muted";
 
-export function Faq({ t }: { t: T }) {
+const MORE_LINK =
+  "group flex min-h-14 items-center justify-between gap-3 rounded-lg border-2 border-ink bg-paper px-4 py-3 font-display text-[1.05rem] font-extrabold text-ink shadow-[4px_4px_0_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-tomato [&>svg]:size-5 [&>svg]:transition-transform group-hover:[&>svg]:translate-x-1";
+
+export function Faq({ t, locale }: { t: T; locale: Locale }) {
   return (
-    <Section id="duvidas" tone="paper-raised">
+    <Section
+      id="duvidas"
+      tone="paper-raised"
+      className="border-t-[3px] border-ink"
+    >
       <Shell>
         <TwoCol
           align="start"
           cols="minmax(0,0.78fr) minmax(440px,1.22fr)"
           className="gap-[clamp(44px,7vw,100px)]"
         >
-          <SectionHeading
-            tight
-            tone="paper"
-            kicker={t("closing.faq.kicker")}
-            title={t("closing.faq.title")}
-          >
-            <p>{t("closing.faq.subtitle")}</p>
-            <a
-              className={cn(
-                downloadButton,
-                "mt-7 min-h-11 gap-[9px] rounded-sm px-[15px] text-[0.92rem] shadow-[4px_4px_0_0_var(--ink)] [&>svg]:h-[18px] [&>svg]:w-[18px]",
-              )}
-              href={DOWNLOAD_PATH}
-              data-telemetry-cta="faq_download"
+          {/* Below 980px the wrapper dissolves so the help links can follow the questions. */}
+          <div className="sticky top-28 max-[980px]:contents">
+            <SectionHeading
+              tight
+              tone="paper"
+              kicker={t("closing.faq.kicker")}
+              title={t("closing.faq.title")}
+              className="max-[980px]:order-1"
             >
-              <WindowsIcon />
-              <span>{t("closing.faq.cta")}</span>
-            </a>
-          </SectionHeading>
+              <p>{t("closing.faq.subtitle")}</p>
+              <a
+                className={cn(
+                  downloadButton,
+                  "mt-7 min-h-11 gap-[9px] rounded-sm px-[15px] text-[0.92rem] shadow-[4px_4px_0_0_var(--ink)] [&>svg]:h-[18px] [&>svg]:w-[18px]",
+                )}
+                href={DOWNLOAD_PATH}
+                data-telemetry-cta="faq_download"
+              >
+                <WindowsIcon />
+                <span>{t("closing.faq.cta")}</span>
+              </a>
+            </SectionHeading>
+            <nav
+              aria-label={t("closing.faq.more")}
+              className="mt-10 border-t-2 border-paper-line pt-6 max-[980px]:order-3 max-[980px]:mt-0"
+            >
+              <p className="text-[0.9rem] font-bold text-ink">
+                {t("closing.faq.more")}
+              </p>
+              <ul
+                className="mt-3 flex max-w-[360px] flex-col gap-3"
+                role="list"
+              >
+                <li>
+                  <Link
+                    className={MORE_LINK}
+                    href={localePath(locale, "/guides")}
+                    data-telemetry-cta="home_guides"
+                  >
+                    {t("knowledge.guides.action")} <ArrowIcon />
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    className={MORE_LINK}
+                    href={localePath(locale, "/help")}
+                    data-telemetry-cta="home_help"
+                  >
+                    {t("knowledge.help.action")} <ArrowIcon />
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          </div>
 
-          <div className={FAQ_LIST}>
-            {faqsFor(t).map((faq, index) => (
-              <details key={faq.question} open={index === 0}>
+          <div className={cn(FAQ_LIST, "max-[980px]:order-2")}>
+            {faqsFor(t).map((faq, i) => (
+              <details key={faq.question}>
                 <summary>
-                  <span>{faq.question}</span>
+                  <span>
+                    <b aria-hidden="true">{String(i + 1).padStart(2, "0")}</b>
+                    {faq.question}
+                  </span>
                   <i aria-hidden="true" />
                 </summary>
                 <p>{faq.answer}</p>
@@ -111,75 +123,52 @@ export function Faq({ t }: { t: T }) {
   );
 }
 
-const TICKER_ROW =
-  "inline-flex items-center gap-5.5 pr-5.5 whitespace-nowrap [&_svg]:h-[17px] [&_svg]:w-[17px] [&_svg]:fill-current";
-
-const TICKER_KEYS = [
-  "closing.ticker.item1",
-  "closing.ticker.item2",
-  "closing.ticker.item3",
-  "closing.ticker.item4",
-] as const;
-
-const TICKER_PASSES = 4;
-
-// Each ticker copy must cover the viewport throughout the -50% translation cycle.
-function TickerRow({ t }: { t: T }) {
-  return (
-    <span className="flex min-w-[100vw] justify-around">
-      {Array.from({ length: TICKER_PASSES }, (_, pass) =>
-        TICKER_KEYS.map((key) => (
-          <span className={TICKER_ROW} key={`${pass}-${key}`}>
-            <Mascot />
-            {t(key)}
-          </span>
-        )),
-      )}
-    </span>
-  );
-}
-
-export function Ticker({ t }: { t: T }) {
-  return (
-    <div
-      className="overflow-hidden border-y-[3px] border-night bg-tomato text-brass-ink select-none"
-      aria-hidden="true"
-    >
-      <div className="flex w-max animate-[marquee_52s_linear_infinite] items-center py-[11px] font-display text-[0.95rem] font-extrabold tracking-[0.06em] uppercase">
-        <TickerRow t={t} />
-        <TickerRow t={t} />
-      </div>
-    </div>
-  );
-}
-
-export function FinalCta({ t }: { t: T }) {
+export function FinalCta({ t, locale }: { t: T; locale: Locale }) {
+  const poster = lpMedia(locale).poster;
   return (
     <section
       id="download"
-      className="relative isolate overflow-hidden py-[clamp(70px,8vw,110px)]"
+      className="relative isolate overflow-hidden bg-charcoal bg-[image:var(--halftone-dark)] bg-[length:20px_20px] py-[clamp(70px,8vw,110px)]"
     >
       <SoundWaves className="pointer-events-none absolute -right-[190px] -bottom-[220px] -z-10 w-[640px] text-brass opacity-14" />
       <Shell>
         <TwoCol
-          cols="minmax(0,1.12fr) minmax(320px,0.88fr)"
+          cols="minmax(0,1.05fr) minmax(320px,0.95fr)"
           className="gap-[clamp(38px,5vw,66px)]"
         >
-          <div>
+          <div className="flex flex-col items-start">
             <span
               className="mb-5.5 grid size-[62px] animate-[shout_2.4s_ease-in-out_infinite] -rotate-3 place-items-center rounded-lg bg-brass text-brass-ink shadow-pop [&>svg]:h-9 [&>svg]:w-9"
               aria-hidden="true"
             >
               <Mascot />
             </span>
-            <h2 className="max-w-[24ch] text-[clamp(2.35rem,4.2vw,3.9rem)] leading-[0.98] tracking-[-0.03em] max-md:text-[clamp(2.1rem,10.5vw,3rem)]">
+            <h2 className="max-w-[18ch] text-[clamp(2.6rem,5vw,4.4rem)] leading-[0.95] tracking-[-0.03em] max-md:text-[clamp(2.3rem,11vw,3.2rem)]">
               {t("closing.cta.title")}
             </h2>
+            <div className="mt-8 flex w-[min(420px,100%)] flex-col gap-3.5 [&>a]:w-full [&>p]:text-[0.8rem] [&>p]:font-[650] [&>p]:text-faint">
+              <DownloadButton t={t} ctaId="final_download" />
+              <p>{t("closing.cta.note")}</p>
+            </div>
           </div>
-          <div className="flex flex-col items-start gap-4 [&>a]:w-[min(400px,100%)] [&>p]:text-[0.78rem] [&>p]:font-[650] [&>p]:text-faint">
-            <DownloadButton t={t} ctaId="final_download" />
-            <p>{t("closing.cta.note")}</p>
-          </div>
+          <a
+            href="#video"
+            data-video-seek="0"
+            className="group relative block overflow-hidden rounded-xl border-[3px] border-cream shadow-[8px_8px_0_0_var(--brass)] focus-visible:outline-[4px] focus-visible:outline-offset-4 focus-visible:outline-brass"
+          >
+            <Image
+              src={poster.src}
+              width={poster.width}
+              height={poster.height}
+              alt=""
+              sizes="(max-width: 980px) 92vw, 520px"
+              className="h-auto w-full transition-transform duration-500 group-hover:scale-[1.02] motion-reduce:transition-none"
+            />
+            <span className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-night/85 px-4 py-3 font-display text-[1rem] font-extrabold text-cream [&>svg]:size-5 [&>svg]:fill-brass [&>svg]:stroke-brass">
+              <PlayIcon />
+              {t("closing.cta.replay")}
+            </span>
+          </a>
         </TwoCol>
       </Shell>
     </section>

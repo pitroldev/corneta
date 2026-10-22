@@ -4,48 +4,12 @@ import type { Dict } from "./pt";
 export const en: Dict = {
   "seo.howto.name": "How to stream to several platforms at once with Corneta",
   "seo.howto.description":
-    "Three steps to take a single stream from your streaming app to Twitch, YouTube, Kick and other destinations at the same time.",
+    "Four steps to take a single stream from your streaming app to Twitch, YouTube, Kick and other destinations at the same time.",
   "seo.howto.tool.software":
     "OBS Studio, Streamlabs, XSplit or any other RTMP app",
   "seo.howto.tool.pc": "A PC running Windows 10 or 11",
   "seo.app.subcategory": "Live streaming software (multistream)",
   "seo.app.requirements": "OBS Studio or any streaming app that speaks RTMP",
-
-  "replica.live.label": "live panel · 01:42:08",
-  "replica.live.tag": "numbers are illustrative",
-  "replica.report.label": "stream report · 3h12",
-  "replica.report.tag": "sample session",
-  "replica.crop.caption":
-    "Pick a side of the frame: that is how you decide what goes vertical.",
-
-  "benefits.chat.body":
-    "Twitch, YouTube and Kick scroll together, in the order things happened, and you reply right from there. The sub alert drops into the same column, right above whatever got typed next.",
-  "benefits.chat.demo.input.placeholder": "Reply to all three at once…",
-  "benefits.chat.demo.input.send": "send",
-  "benefits.chat.demo.label": "chat in one place",
-  "benefits.chat.demo.line1.author": "gabzilla · Twitch",
-  "benefits.chat.demo.line1.message": "yooo just got here",
-  "benefits.chat.demo.line2.author": "Marcus L. · YouTube",
-  "benefits.chat.demo.line2.message": "audio's clean today 👏",
-  "benefits.chat.demo.line3.author": "dannyxx · Kick",
-  "benefits.chat.demo.line3.message": "let's goooo!!",
-  "benefits.chat.demo.tag": "example",
-  "benefits.chat.note":
-    "You can pop it out into its own window on your second monitor",
-  "benefits.chat.title": "All three chats in one column, emotes and all",
-  "benefits.heading.kicker": "After you hit GO LIVE",
-  "benefits.heading.subtitle":
-    "No alt-tab to find out who's still live and who's talking to you.",
-  "benefits.heading.title": "One screen — even when it all goes sideways.",
-  "benefits.routes.body":
-    "Every platform gets its own connection. When one is reconnecting, the rest keep going — and you see it on the panel, which platform and what time, instead of finding out from chat.",
-  "benefits.routes.demo.hint":
-    "click a destination to drop it — and watch what happens to the others",
-  "benefits.routes.demo.label": "your platforms",
-  "benefits.routes.demo.tag": "example",
-  "benefits.routes.note":
-    "You can pause one platform and leave the rest running",
-  "benefits.routes.title": "If Kick drops, Twitch never finds out",
 
   "chrome.html.lang": "en-US",
   "chrome.llms.contact.label": "contact:",
@@ -105,8 +69,7 @@ export const en: Dict = {
   "chrome.twitter.title": "Corneta — one stream, three platforms, one chat",
 
   "closing.cta.note": "Windows 10/11 · no sign-up · no subscription",
-  "closing.cta.title":
-    "Your next stream could already be in three places at once.",
+  "closing.cta.title": "Go live everywhere.",
   "closing.faq.cta": "Download for free",
   "closing.faq.kicker": "Before you download",
   "closing.faq.subtitle": "Including the ones that don't make us look good.",
@@ -123,39 +86,26 @@ export const en: Dict = {
   "closing.footer.nav.ariaLabel": "Footer links",
   "closing.footer.tagline":
     "Multistream that runs on your PC — not in somebody else's cloud.",
-  "closing.ticker.item1": "Sound the horn",
-  "closing.ticker.item2": "One stream · three platforms · one chat",
-  "closing.ticker.item3": "Multistream that runs on your PC",
-  "closing.ticker.item4": "Free and open source",
-  "closing.tiny.kicker": "The small stuff",
-  "closing.tiny.title":
-    "The kind of thing you only notice on your third stream.",
 
   "content.faq.free.answer":
-    "It's free, no sign-up and no trial period. Everything that runs on your PC — multistream, chat, alerts, reports and protections — is open source under the MIT license and stays that way. If something paid ever shows up, it'll be an optional cloud service, and you'll know about it before you install anything.",
+    "It's free, with no sign-up and no trial. Everything that runs on your PC is open source and stays that way. If something paid ever shows up, it'll be an optional cloud service, and you'll know before.",
   "content.faq.free.question":
     "Is it really free? Will it turn into a subscription later?",
   "content.faq.macos_linux.answer":
     "Today the download is Windows only. It's built so other systems can come later, but there's no date to announce. If you're on macOS or Linux, the answer is: not yet.",
   "content.faq.macos_linux.question": "Does it work on macOS or Linux?",
   "content.faq.multistream_ban.answer":
-    "Each platform decides that, not Corneta — and those rules have changed a lot in the last few years: several of them allow it now, with conditions that depend on your account type or on a contract you signed. Corneta doesn't change any of that, it just sends your signal where you tell it to. Before you go live in two places at once, read the terms of whoever you already signed with. Five minutes now saves you a headache later.",
+    "Each platform decides that, not Corneta, and the rules depend on your account type and any contract you signed. Corneta just sends your signal where you tell it to: before your first simulcast, check the terms of whoever you've signed with.",
   "content.faq.multistream_ban.question":
     "Can I stream to Twitch and YouTube at the same time? Won't I get banned?",
   "content.faq.obs_plugin.answer":
-    "If all you want is to send the same video to more than one place, the plugin does the job — and we'd rather tell you that now than after the download. Corneta earns its place when the stream is more than just pushing video out: it holds the stream up when your program crashes (the plugin goes down with it, because it lives inside OBS), puts chat and alerts from every platform in one place, warns you if something private of yours shows up on screen and, at the end, builds a report that cross-checks your machine, your OBS and each platform to say why it stuttered.",
+    "If all you want is to send the same video to more than one place, the plugin does the job. Corneta earns its place when the stream is more than that: it holds the stream up if OBS crashes (the plugin goes down with it, since it lives inside OBS), puts every platform's chat and alerts in one place and, at the end, builds a report for each one.",
   "content.faq.obs_plugin.question":
     "I already use a multistream plugin in OBS. Why switch?",
-  "content.faq.overlay.answer":
-    "There is. Corneta runs a small server on your own PC that serves the alerts and the chat (emotes included) at a URL you add as a Browser Source — just once. Position, size, duration, sound and message limit are all adjustable, and there's a test alert button so you can check it right there.",
-  "content.faq.overlay.question": "Is there an overlay I can use in OBS?",
   "content.faq.performance.answer":
-    "Depends on the mode. Copying the signal from your program costs almost nothing — a modest PC handles it. Reworking the image for each platform puts the job on the graphics card (recent NVIDIA, Intel and AMD ones handle it fine) or, if you don't have one, on the processor, which hits a lot harder. Before you go live, Corneta estimates that load and how many conversions your card can take.",
+    "Depends on the mode. Just copying the signal costs almost nothing. Re-encoding for each platform puts the work on the graphics card (recent NVIDIA, Intel or AMD) or, without one, on the processor, which hits harder. Corneta shows that load before you go live.",
   "content.faq.performance.question":
     "Will it lag my game? Do I need a good graphics card?",
-  "content.faq.platforms.answer":
-    "Twitch, YouTube, Kick, Facebook and any RTMP server you want to add. TikTok, Instagram and X show up as experimental because they depend on approval and on each platform's own way in.",
-  "content.faq.platforms.question": "Which platforms show up in the app?",
   "content.faq.replaces_obs.answer":
     "No. You keep building scenes, camera and audio in the program you already use. Corneta picks up from there: it takes that signal, pushes it to the platforms, watches how each one is holding up, and keeps the stream's safety nets running.",
   "content.faq.replaces_obs.question": "Does Corneta replace OBS?",
@@ -166,10 +116,6 @@ export const en: Dict = {
   "content.faq.upload.answer":
     "Each platform eats a slice of your upload. Before the stream, Corneta measures your connection, adds it all up and helps you pick a setup that fits with room to spare.",
   "content.faq.upload.question": "Am I going to need a lot of internet?",
-  "content.faq.vertical_tiktok.answer":
-    "Corneta crops a 9:16 out of your landscape video and you pick the framing, with a preview before it goes out. TikTok and Instagram are still experimental because getting in depends on the platform approving you; the same crop works for any vertical RTMP destination.",
-  "content.faq.vertical_tiktok.question":
-    "Can I send vertical video to TikTok?",
   "content.features.alerts":
     "Alerts from the platforms and from Streamlabs/StreamElements in the same panel",
   "content.features.auto_bitrate":
@@ -200,34 +146,14 @@ export const en: Dict = {
     "Vertical 9:16 crop with manual framing for TikTok and Instagram",
   "content.one_liner":
     "Corneta is a free, open source Windows app that takes a single video signal from OBS (or from any program that streams over RTMP) and sends it at the same time to Twitch, YouTube, Kick, Facebook and other destinations, each platform on its own connection. Beyond just sending the video, it handles the whole stream: it gathers chat and alerts from every platform, keeps the stream up when the program's signal drops, and builds a post-stream report that cross-checks the machine, OBS and the platforms to point at the likely cause of each instability — all of it processed on the streamer's own computer.",
-  "content.scopes.kick.never":
-    "This is the only login that goes through our server, because Kick requires a server-side secret in the exchange — and even then the token is not stored anywhere.",
-  "content.scopes.kick.permission":
-    "Read the channel, send chat and delete messages; timeouts and bans, and reading your stream key, are only requested the first time you use each",
-  "content.scopes.kick.title": "Kick account",
-  "content.scopes.kick.why":
-    "The same things as the unified chat: read, reply and moderate without leaving the app, and fill in your stream key when you ask.",
-  "content.scopes.twitch.never":
-    "Nothing is posted to your channel unless you ask for it, Corneta does not follow, subscribe or change anything in your account, and your stream key only goes into your PC's vault.",
-  "content.scopes.twitch.permission":
-    "Read and send chat, moderate, manage the stream, see new followers and read your stream key",
-  "content.scopes.twitch.title": "Twitch account",
-  "content.scopes.twitch.why":
-    "Show the chat in the app, reply from there, delete a message or time someone out when you say so, follow the state of your stream, announce new followers and fill in your stream key when you ask.",
-  "content.scopes.youtube.never":
-    "Corneta does not upload recorded video to your channel, does not touch the videos already there, does not read your history, and does not use this data for advertising or model training.",
-  "content.scopes.youtube.permission": "Manage your YouTube account",
-  "content.scopes.youtube.title": "YouTube account (Google)",
-  "content.scopes.youtube.why":
-    "Create the live broadcast and get its stream key automatically, give it the title you wrote in the app, end it when the stream is over, read and send messages in the live chat, delete a message, time someone out or ban them when you say so, and show how many people are watching.",
   "content.steps.1.text":
-    "Corneta opens the right page on each platform for you to copy the key, and keeps it in Windows Credential Manager — never in a config file.",
-  "content.steps.1.title": "Pick where you want to show up",
+    "One click and OBS sends the stream to Corneta. Another app? Paste an address and a key once.",
+  "content.steps.1.title": "It sets up OBS for you",
   "content.steps.2.text":
-    "With OBS, Corneta sets it up by itself. With anything else (Streamlabs, XSplit), you paste one address and one key — once, and never again.",
-  "content.steps.2.title": "Hook up your streaming program",
+    "Twitch, YouTube, Kick and more. Sign in and the key fills itself in.",
+  "content.steps.2.title": "Pick your platforms",
   "content.steps.3.text":
-    "The panel shows each platform coming on air, one by one, and you go back to the game. If you want, Corneta tells OBS to start along with it.",
+    "Each platform goes live on its own, and you watch them all on one panel.",
   "content.steps.3.title": "Hit GO LIVE",
 
   "hero.cta.footnote":
@@ -237,463 +163,114 @@ export const en: Dict = {
   "hero.download.full": "Download free for Windows",
   "hero.header.brand.aria": "Corneta — home",
   "hero.header.download": "Download free",
-  "hero.mechanism.aria": "How Corneta works",
-  "hero.mechanism.step1.detail": "from OBS, Streamlabs, XSplit…",
-  "hero.mechanism.step1.title": "1 signal",
-  "hero.mechanism.step2.detail": "if one drops, the rest stay live",
-  "hero.mechanism.step2.title": "Each platform on its own",
-  "hero.mechanism.step3.detail":
-    "your keys, your settings and the report from every stream",
-  "hero.mechanism.step3.title": "All on your PC",
   "hero.nav.aria": "Main navigation",
   "hero.nav.guides": "Guides",
   "hero.nav.help": "Help",
   "hero.nav.platforms": "Platforms",
-  "hero.nav.why": "Why Corneta",
   "hero.nav.lang": "View in Portuguese",
 
-  "knowledge.kicker": "Learn at your pace",
-  "knowledge.title": "From first setup to stream troubleshooting.",
-  "knowledge.description":
-    "Practical guides for building your broadcast and direct answers when something does not go as planned.",
-  "knowledge.guides.eyebrow": "Step-by-step guides",
-  "knowledge.guides.title": "Get your next stream live.",
-  "knowledge.guides.description":
-    "Setup, platforms, quality, and best practices explained from start to finish.",
-  "knowledge.guides.action": "Explore guides",
-  "knowledge.help.eyebrow": "Help center",
-  "knowledge.help.title": "Find out what went wrong.",
-  "knowledge.help.description":
-    "Short solutions, objective checks, and safe paths back to broadcasting.",
-  "knowledge.help.action": "Open help",
+  "knowledge.guides.action": "Step-by-step guides",
+  "knowledge.help.action": "Help center",
   "hero.pitch":
-    "You don't touch OBS — Corneta sets itself up in there. It takes your stream to each platform and stays open beside it, showing all three. When it ends, the stream is saved — with the best moment already marked.",
+    "From your OBS to Twitch, YouTube and Kick at the same time, with one chat. Free, and it runs on your PC.",
   "hero.skiplink.label": "Skip to content",
-  "hero.sticker": "Corneta · multistream on your PC",
+  "hero.sticker": "Multistreaming that runs on your PC",
   "hero.title.line1": "One stream.",
-  "hero.title.line2": "Three platforms.",
-  "hero.title.line3": "One chat.",
-  "hero.trust.aria": "Key facts",
-  "hero.trust.free": "Free forever",
+  "hero.title.line2": "Every platform.",
   "hero.trust.opensource": "Open source",
 
-  "journey.live.back": "coming back",
-  "journey.live.cpu": "CPU",
-  "journey.live.gpu": "GPU",
-  "journey.live.hint": "click a destination to start or pause it",
-  "journey.live.metrics": "{kbps} kbps · 60 fps · {drops} drops · 1h42",
-  "journey.live.onAir": "on air",
-  "journey.live.paused": "paused by you",
-  "journey.live.pausedState": "paused",
-  "journey.live.reconnecting": "reconnecting · try 2 · {s}s down",
-  "journey.report.average": "avg 870",
-  "journey.report.chartAria":
-    "Audience curve from an example stream, with a spike at the raid and a stretch where the signal dropped.",
-  "journey.report.drop": "1 rough stretch",
-  "journey.report.hint": "drag across the curve to read any minute",
-  "journey.report.messages": "3,412 messages",
-  "journey.report.peak": "peak 1,284",
-  "journey.report.raid": "raid at 22:30",
-  "journey.report.scrub": "stream timeline",
-  "journey.watching": "{n} watching",
   "page-data.destinations.custom.name": "Custom RTMP",
-  "page-data.destinations.custom.note": "Any RTMP or RTMPS server",
   "page-data.destinations.facebook.name": "Facebook",
-  "page-data.destinations.facebook.note": "Go live on a Page or a profile",
   "page-data.destinations.instagram.name": "Instagram",
-  "page-data.destinations.instagram.note":
-    "Vertical video — no official way in, so it can drop",
   "page-data.destinations.kick.name": "Kick",
-  "page-data.destinations.kick.note": "Same deal as Twitch",
   "page-data.destinations.tiktok.name": "TikTok",
-  "page-data.destinations.tiktok.note":
-    "Vertical video — your account has to be approved",
   "page-data.destinations.twitch.name": "Twitch",
-  "page-data.destinations.twitch.note": "Your usual stream",
   "page-data.destinations.x.name": "X (Twitter)",
-  "page-data.destinations.x.note": "You grab the key in Media Studio",
   "page-data.destinations.youtube.name": "YouTube",
-  "page-data.destinations.youtube.note": "Handles high quality just fine",
-  "page-data.tiny.backup.text":
-    "Exports your setup to a file. The keys stay in Windows Credential Manager and don't go with it.",
   "page-data.tiny.backup.title": "Settings backup",
-  "page-data.tiny.chatwindow.text":
-    "Chat, alerts, or both in a window that sits on top of everything, at whatever size you want.",
   "page-data.tiny.chatwindow.title": "Little chat window",
-  "page-data.tiny.hotkey.text":
-    "Start and cut the stream without leaving the game — the key works even when Corneta's in the background.",
   "page-data.tiny.hotkey.title": "Global hotkey",
-  "page-data.tiny.profiles.text":
-    "Platform and quality presets, ready to go: your usual stream, the one with a guest, the test one.",
   "page-data.tiny.profiles.title": "Saved profiles",
-  "page-data.tiny.startup.text":
-    "Boots up with the PC, ready to stream — if you want it to.",
   "page-data.tiny.startup.title": "Starts with Windows",
-  "page-data.tiny.theme.text":
-    "Corneta in dark or light — and flipping it blows the horn.",
   "page-data.tiny.theme.title": "Light and dark theme",
-  "page-data.tiny.tray.text":
-    "Closing the window hides Corneta next to the clock — the stream stays up.",
   "page-data.tiny.tray.title": "Lives in the tray",
-  "page-data.tiny.youtube.text":
-    "With your account connected, Corneta creates the broadcast and drops the key into GO LIVE. You never open YouTube Studio.",
   "page-data.tiny.youtube.title": "YouTube on autopilot",
 
-  "after.kicker": "After the stream",
-  "after.badge": "new",
-  "after.title": "The clip you would have hunted for, already marked.",
-  "after.body":
-    "Corneta records what went out and stamps everything with the same clock: audience, chat, alerts and what each platform received. Click a moment in the report and the video jumps there.",
-  "after.proof":
-    "The report works even without recording video: from your first stream you already get audience, chat and alerts split by channel — plus the comparison with your last stream.",
-  "after.cost":
-    "Recording takes disk: roughly 2.7 GB per hour at the default bitrate. That's why it ships off — you turn it on, pick the folder, and Corneta deletes the oldest recordings once you pass the cap you set.",
-  "after.more.channels": "audience, chat and alerts split per channel",
-  "after.more.export": "exports to HTML, CSV and JSON",
-  "after.more.compare": "compares against your previous stream",
-  "after.more.clip": "cuts a clip straight from the recording",
-
-  "after.scope.axis": "the whole stream · 3h12",
-  "after.scope.series.platforms": "what the platforms got",
-  "after.scope.series.obs": "what OBS sent",
-  "after.scope.chat": "chat at that moment",
-  "after.scope.hint":
-    "drag the timeline — the video, the chat and the chart all follow",
-  "after.scope.pause": "pause the replay",
-  "after.scope.play": "play the replay",
-  "after.scope.scrub": "recording timeline",
-  "after.scope.chart.aria":
-    "Example chart of a stream, in two lanes: on top, what the platforms received; below, what OBS sent. Three moments are marked: the chat spike at 42 minutes, the Twitch drop at 1h58, and the moment OBS closed at 2h35 — when the bottom lane hits zero and the top one doesn't.",
-
-  "after.frame.live": "on air",
-  "after.frame.reconnect": "reconnecting",
-  "after.frame.note": "the frame that went out that second",
-
-  "after.moment.chat.tab": "chat spike",
-  "after.moment.chat.title": "Moment: chat blew up at 42 minutes",
-  "after.moment.chat.finding": "Chat 5× above average at 42min.",
-  "after.moment.chat.reading":
-    "The report flags it as a highlight on its own — it's the clip you'd have gone hunting for by hand.",
-  "after.moment.chat.chat.1": "LETS GOOO",
-  "after.moment.chat.chat.2": "clip that please",
-  "after.moment.chat.chat.3": "best play of the month",
-  "after.moment.chat.chat.4": "came back just to see it again",
-  "after.moment.chat.chat.5": "BRO",
-  "after.moment.chat.chat.6": "pause and read the chat lol",
-  "after.moment.chat.chat.7": "that was way too clean",
-
-  "after.moment.queda.tab": "Twitch dropped 8s",
-  "after.moment.queda.title": "Moment: Twitch dropped for 8 seconds",
-  "after.moment.queda.finding":
-    "CPU was at 98% the same minute Twitch dropped.",
-  "after.moment.queda.reading":
-    "Likely an encoding bottleneck, not your internet — and YouTube and Kick never noticed.",
-  "after.moment.queda.chat.1": "did it freeze?",
-  "after.moment.queda.chat.2": "back now",
-  "after.moment.queda.chat.3": "smooth over here",
-  "after.moment.queda.chat.4": "froze for like 5s on twitch",
-  "after.moment.queda.chat.5": "youtube didn't even blink",
-
-  "after.moment.brb.tab": "OBS closed",
-  "after.moment.brb.title": "Moment: OBS closed and BE RIGHT BACK took over",
-  "after.moment.brb.finding": "All three platforms kept receiving video.",
-  "after.moment.brb.reading":
-    "OBS closed at 2h35 and BE RIGHT BACK took its place. Anyone watching saw the holding screen and stayed put.",
-  "after.moment.brb.chat.1": "where'd he go",
-  "after.moment.brb.chat.2": "he's back!!",
-  "after.moment.brb.chat.3": "never even left the tab",
-  "after.moment.brb.chat.4": "thought he crashed",
-  "after.moment.brb.chat.5": "kept playing over here",
-
-  "preview.badge": "ILLUSTRATIVE PREVIEW",
-  "preview.chat.compose": "Reply to everyone at once…",
-  "preview.chat.compose.send": "send",
-  "preview.chat.msg.1.from": "gabizera",
-  "preview.chat.msg.1.text": "yo yo, just got here!",
-  "preview.chat.msg.2.from": "Marcos L.",
-  "preview.chat.msg.2.text": "audio's clean today 👏",
-  "preview.chat.msg.3.from": "duduxx",
-  "preview.chat.msg.3.text": "let's gooo!!",
-  "preview.chat.msg.4.from": "PedroHD",
-  "preview.chat.msg.4.text": "this setup is smooth",
-  "preview.chat.msg.5.from": "nanda",
-  "preview.chat.msg.5.text": "just got here, did i miss much?",
-  "preview.chat.platforms": "3 platforms",
-  "preview.chat.title": "Unified chat",
-  "preview.cta": "GO LIVE",
-  "preview.figure.alt":
-    "Illustrative preview of the Corneta app on the “Live” screen: the OBS signal goes out to Twitch, YouTube and Kick, each destination with its own quality and its own switch, with chat from all three platforms gathered beside it.",
-  // Match the desktop sidebar's localized labels.
-  "preview.nav.chat.hint": "every chat in one place",
-  "preview.nav.chat.label": "Chat",
-  "preview.nav.encoding.hint": "how good it looks",
-  "preview.nav.encoding.label": "Quality",
-  "preview.nav.golive.hint": "puts it all on air",
-  "preview.nav.golive.label": "Live",
-  "preview.nav.platforms.hint": "where your stream lands",
-  "preview.nav.platforms.label": "Platforms",
-  "preview.nav.reports.badge": "new",
-  "preview.nav.reports.hint": "how the stream went",
-  "preview.nav.reports.label": "Reports",
-  "preview.panel.title": "stream panel",
-  "preview.settings": "Settings",
-  "preview.stat.headroom": "headroom",
-  "preview.stat.headroom.value": "easy",
-  "preview.stat.needed.value": "18.5 Mb/s",
-  "preview.stat.needed": "the stream needs",
-  "preview.stat.upload.value": "25 Mb/s",
-  "preview.stat.upload": "your upload",
-  "preview.state.onAir": "On air · 3 platforms",
-  "preview.state.offAir": "Off air",
-  "preview.target.copy": "Copy",
-  "preview.target.metrics": "{kbps} kbps · 60 fps · {drops} drops",
-  "preview.state.live": "on air",
-  "preview.stat.uptime": "On air",
-  "preview.stat.sending": "Going out",
-  "preview.stat.drops": "Drops",
-  "preview.stop": "Stop streaming",
-  "preview.chat.msg.6.from": "duduxx",
-  "preview.chat.msg.6.text": "look at that combo",
-  "preview.chat.msg.7.from": "gabizera",
-  "preview.chat.msg.7.text": "first time here, already subbed",
-  "preview.chat.msg.8.from": "Marcos L.",
-  "preview.chat.msg.8.text": "run it back please",
-  "preview.titlebar.tag": "multi-stream",
-  "preview.verdict":
-    "Three platforms and zero re-encoding: the video leaves OBS and arrives the same on all three.",
-
-  "protection.alerts.chip.bits": "bits",
-  "protection.alerts.chip.member": "member",
-  "protection.alerts.chip.subgift": "subgift",
-  "protection.alerts.chip.tip": "tip",
-  "protection.alerts.demo.example": "example",
-  "protection.alerts.demo.label": "live alerts",
-  "protection.alerts.item.bits.amount": "500",
-  "protection.alerts.item.bits.meta": "Twitch · bits",
-  "protection.alerts.item.bits.title": "ronaldo cheered",
-  "protection.alerts.item.follow.meta": "Twitch · just now",
-  "protection.alerts.item.follow.title": "lucasrmk followed you",
-  "protection.alerts.item.member.amount": "3 months",
-  "protection.alerts.item.member.meta": "YouTube · member",
-  "protection.alerts.item.member.title": "ju.costa became a member",
-  "protection.alerts.item.raid.meta":
-    "Twitch · brought new people into the chat",
-  "protection.alerts.item.raid.title": "zeke_tv raided you",
-  "protection.alerts.item.sub.amount": "3 months",
-  "protection.alerts.item.sub.meta":
-    "Twitch · tier 1 · “been here since day one!”",
-  "protection.alerts.item.sub.title": "ana.play subscribed",
-  "protection.alerts.item.superchat.amount": "$5",
-  "protection.alerts.item.superchat.meta":
-    "YouTube · “walk us through your setup!”",
-  "protection.alerts.item.superchat.title": "Superchat from Marcos L.",
-  "protection.alerts.note":
-    "Follows, subs, resubs, subgifts, bits, raids, members and superchats come straight from the platforms. Donations and goals come in through Streamlabs or StreamElements, with the token kept in Windows Credential Manager. The panel sits next to the chat — or in its own little window, on top of the game.",
-  "protection.alerts.test": "fire a test alert",
-  "protection.body":
-    "Four nets you turn on (or don't) in Settings. Each one costs you something — and Corneta tells you what it costs before you go live, not in the middle of it.",
-  "protection.brb.art.aria": "The BE RIGHT BACK screen Corneta puts on air",
-  "protection.brb.art.brand": "CORNETA · MULTI-STREAM",
-  // Match the desktop brb.slate.subtitle; this illustration reproduces the transmitted card.
-  "protection.brb.art.line": "back in a sec — hold the horn 📣",
-  // Match the desktop brb.slate.title.
-  "protection.brb.art.title": "BE RIGHT BACK",
-  "protection.brb.body":
-    "If OBS drops mid-stream, this screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns. It also works for a manual break: one click and you're out of the chair with the mic muted.",
-  "protection.brb.note":
-    "Use Corneta's BE RIGHT BACK screen or your own image or video",
-  "protection.brb.title":
-    "“BE RIGHT BACK”: the signal drops, the stream keeps going",
-  "protection.chat.body":
-    "Read, reply and moderate without switching windows. Alerts from the platforms and from Streamlabs in the same panel. And an overlay you paste into OBS once and forget.",
-  "protection.chat.action.delete": "delete",
-  "protection.chat.action.reply": "reply",
-  "protection.chat.action.timeout": "timeout",
-  "protection.chat.demo.example": "example",
-  "protection.chat.demo.label": "chat in one feed · 3 platforms",
-  "protection.chat.hint":
-    "get close to a message: delete, timeout and reply show up right there",
-  "protection.chat.input.placeholder": "Say something…",
-  "protection.chat.input.sendAll": "send to all platforms",
-  "protection.chat.kicker": "Everyone in one feed",
-  "protection.chat.me": "you",
-  "protection.chat.mine.badge": "3 platforms",
-  "protection.chat.msg.1.badge": "mod",
-  "protection.chat.msg.1.name": "gabizera",
-  "protection.chat.msg.1.text": "yo yo, just got here!",
-  "protection.chat.msg.2.badge": "member",
-  "protection.chat.msg.2.name": "Marcos L.",
-  "protection.chat.msg.2.text": "audio's clean today 👏",
-  "protection.chat.msg.3.name": "duduxx",
-  "protection.chat.msg.3.text": "let's gooo!!",
-  "protection.chat.msg.4.name": "bot_spam_xyz",
-  "protection.chat.msg.4.text": "free followers on the site in my bio 🔥🔥",
-  "protection.chat.msg.5.name": "nanda",
-  "protection.chat.msg.5.text": "just got here, did I miss much?",
-  "protection.chat.msg.6.name": "PedroHD",
-  "protection.chat.msg.6.text": "this setup is way too clean",
-  "protection.chat.msg.7.name": "carol_hd",
-  "protection.chat.msg.7.text":
-    "was that doorbell yours or was it in the stream lol",
-  "protection.chat.msg.8.name": "vitinho",
-  "protection.chat.msg.8.text": "first time here, already followed",
-  "protection.chat.removed": "deleted by you",
-  "protection.chat.timedOut": "10 min timeout",
-  "protection.chat.note":
-    "Twitch, Kick and YouTube in the same feed — up to two Twitch channels at once. BTTV, FFZ and 7TV emotes, badges, timestamps and one field to send from. Delete and time out right in the feed: the message turns into a tombstone instead of vanishing with no explanation and leaving you in the dark.",
-  "protection.chat.tabs.alerts.hint": "who showed up and chipped in",
-  "protection.chat.tabs.alerts.title": "Alerts",
-  "protection.chat.tabs.chat.hint": "read, reply, moderate",
-  "protection.chat.tabs.chat.title": "Unified chat",
-  "protection.chat.tabs.label": "Chat, alerts and overlay",
-  "protection.chat.tabs.overlay.hint": "one URL, once",
-  "protection.chat.tabs.overlay.title": "Overlay for OBS",
-  "protection.chat.title":
-    "Nobody's left talking to themselves in a tab you never opened.",
-  "protection.guard.audio.body":
-    "Corneta evens out your audio before it goes out — no “can't hear you” from chat, no blown-out ears when you switch scenes, in the same encode that was already running.",
-  "protection.guard.audio.cost":
-    "If you already normalize in OBS, leave this off so the two don't fight.",
-  "protection.guard.audio.switch": "optional",
-  "protection.guard.audio.title": "Audio normalizer",
-  "protection.guard.bitrate.body":
-    "If your internet chokes, Corneta drops the video quality for a while instead of letting the stream stutter or die — and brings it back up on its own.",
-  "protection.guard.bitrate.cost":
-    "Only works on the platforms being re-encoded; the ones getting a straight copy go out exactly the way OBS sent them.",
-  "protection.guard.bitrate.switch": "on by default",
-  "protection.guard.bitrate.title": "Auto-bitrate",
   "protection.guard.privacy.body":
-    "You list the words that can't leak — email, real name, address. When Corneta detects one, it covers the video with BE RIGHT BACK. Unverified images also stay covered while reading starts up, fails or falls behind. Video returns automatically once reading recovers and finds no listed term.",
+    "hides the picture when a term from your list shows up.",
   "protection.guard.privacy.cost":
-    "Adds 12s of stream delay. It's experimental: it can miss terms and does not censor audio, which keeps being transmitted.",
+    "Adds a 12s delay, can miss terms and does not censor audio.",
   "protection.guard.privacy.switch": "experimental",
   "protection.guard.privacy.title": "Privacy guard",
-  "protection.kicker": "Safety nets",
-  "protection.overlay.alert": "ana.play subscribed · tier 1",
-  "protection.overlay.camera": "camera",
-  "protection.overlay.chat.1": "gabizera: yo yo!",
-  "protection.overlay.chat.2": "Marcos L.: audio's clean",
-  // Keep this example aligned with protection.chat.msg.3.text.
-  "protection.overlay.chat.3": "duduxx: let's gooo!!",
-  "protection.overlay.demo.example": "example",
-  "protection.overlay.demo.label": "your OBS scene",
-  "protection.overlay.note":
-    "A local server puts the alerts and the chat (emotes and all) on a URL you add as a Browser Source — once, and Corneta can even create the source in OBS for you. Position, size, duration, sound, how many messages stay on screen and hiding commands (“!”) are all adjustable. There's a test alert button so you can check it without waiting for anyone.",
-  "protection.overlay.scene": "scene · your usual stream",
-  "protection.overlay.url.copied": "copied!",
-  "protection.overlay.url.copy": "copy",
-  "protection.title": "Your stream shouldn't end because OBS froze.",
 
-  "quality.desk.demolabel.estimate": "app's estimate",
-  "quality.desk.demolabel.platforms": "4 platforms hooked up",
-  "quality.desk.summary.encodes": "conversions",
-  "quality.desk.summary.load": "estimated load",
-  "quality.desk.summary.upload": "total upload",
-  "quality.desk.tablist.label": "Quality modes",
-  "quality.desk.tag.convert": "Convert",
-  "quality.desk.tag.copy": "Copy",
-  "quality.desk.tag.unusable": "Won't work",
-  "quality.heading.body":
-    "Your stream can go out looking great on every platform without frying your PC — but that's a choice, and it costs you upload and GPU. You see that bill before you go live, not halfway through it. Here's what changes in each mode:",
-  "quality.heading.kicker": "How good it looks on each platform",
-  "quality.heading.title":
-    "The same picture for every platform, or one sized for each.",
-  "quality.journey.after.body":
-    "Audience, chat and alerts for every channel, side by side with what your machine and your OBS were doing at the same time. Compare it with your last stream, export it to a spreadsheet — and, when one of them stuttered, see what to change.",
-  "quality.journey.after.sticker": "After the stream",
-  "quality.journey.after.title": "See how each platform did.",
-  "quality.journey.before.body":
-    "Hook up the platforms, measure your upload and get everything ready in a few clicks. Corneta sets OBS up for you — and hits play on it when you press GO LIVE.",
-  "quality.journey.before.check.checklist": "First-stream checklist",
-  "quality.journey.before.check.obs": "Guided OBS setup",
-  "quality.journey.before.check.upload": "A real upload test",
-  "quality.journey.before.stat.caption":
-    "enough for three platforms, with room to spare",
-  "quality.journey.before.stat.label": "your upload · example",
-  "quality.journey.before.stat.value": "25 Mb/s",
-  "quality.journey.before.sticker": "Before the stream",
-  "quality.journey.before.title":
-    "Get to GO LIVE without that pit in your stomach.",
-  "quality.journey.during.body":
-    "Bitrate, fps, dropped frames and time on air for each platform, plus real CPU and GPU load. You can pause one without ending the others — and whichever one drops comes back on its own.",
-  "quality.journey.during.sticker": "During the stream",
-  "quality.journey.during.title":
-    "One glance out of the corner of your eye and back to the game.",
-  "quality.journey.kicker": "From setup to the report",
-  "quality.journey.title": "Before, during and after — all in the same window.",
-  "quality.mode.caprichado.encodes": "4 (on the GPU)",
-  "quality.mode.caprichado.lead":
-    "Best picture each platform can take, but it's the heaviest.",
-  "quality.mode.caprichado.tag": "Max quality",
-  "quality.mode.caprichado.title": "All out",
-  "quality.mode.caprichado.upload": "24.6 Mb/s",
-  "quality.mode.caprichado.verdict":
-    "YouTube gets all 9000 kbps it can take and every platform gets the best picture it can show — but your upload and your GPU pay for it. You see that total before you hit GO LIVE.",
-  "quality.mode.esperto.encodes": "1 (on the GPU)",
-  "quality.mode.esperto.lead":
-    "Only touches the platforms that need it. Figures it out on its own.",
-  "quality.mode.esperto.tag": "Recommended",
-  "quality.mode.esperto.title": "Smart",
-  "quality.mode.esperto.upload": "21.6 Mb/s",
-  "quality.mode.esperto.verdict":
-    "One conversion, just for the vertical feed. The rest goes out as a copy: your machine barely feels it and nobody loses quality along the way.",
-  "quality.mode.lata.encodes": "none",
-  "quality.mode.lata.lead":
-    "The same picture goes to every platform, at the same settings.",
-  "quality.mode.lata.load": "almost none",
-  "quality.mode.lata.row.tiktok.detail": "gets landscape video",
-  "quality.mode.lata.tag": "Lightest",
-  "quality.mode.lata.title": "Straight up",
-  "quality.mode.lata.upload": "12.6 Mb/s",
-  "quality.mode.lata.verdict":
-    "TikTok is the weakest one on the list, so everybody drops to its bitrate — and it still gets landscape video. Corneta shows you that damage before you go live, with the fix one click away.",
-  "quality.vertical.body":
-    "TikTok and Instagram only take vertical video. Instead of building a second scene and streaming twice, Corneta crops a 9:16 out of what's already on air — and you pick the framing by dragging the box, watching it as you go.",
-  "quality.vertical.check.crop": "9:16 crop with pan and zoom",
-  "quality.vertical.check.rtmp": "Works with any vertical RTMP destination",
-  "quality.vertical.note":
-    "TikTok and Instagram are still experimental: getting in depends on the platform clearing you first.",
-  "quality.vertical.title": "Your landscape stream going out vertical",
-
-  "steps.accounts.kicker": "Signing in with your account",
-  "steps.accounts.label.never": "What doesn't happen:",
-  "steps.accounts.label.why": "What it's for:",
   "steps.accounts.lede":
-    "You can just paste your stream key and be done. But connect your account and the app does the boring part for you: creates the stream, grabs the key and pulls the chat in. Here's exactly what each permission is for.",
+    "Connecting your account is optional. With it, Corneta creates the YouTube broadcast, gets the key and brings in the chat; what it does with each permission is in the",
   "steps.accounts.privacy.link": "privacy policy",
-  "steps.accounts.privacy.text":
-    "Access tokens are stored in Windows Credential Manager, on your machine. Before removing the app, disconnect your accounts in Corneta and revoke access on the platforms. Uninstalling does not guarantee that vault entries are deleted. Learn how to check local credentials and how each sign-in flow works in the",
-  "steps.accounts.title": "What Corneta asks for — and what it does with it.",
-  "steps.badge.golive": "GO LIVE",
-  "steps.golive.connecting": "connecting",
-  "steps.golive.onAir": "on air · {n} platforms",
-  "steps.golive.pick": "click a destination to add or drop it",
-  "steps.kicker": "From your streaming app to everyone watching",
-  "steps.lede": "No terminal, no Docker, no server address to memorize.",
   "steps.local.body":
-    "The heavy lifting happens on the machine that's already streaming. Settings, keys and reports stay with you — and even the OBS overlay is a server that only answers inside your own computer.",
+    "The stream goes from your computer straight to each platform, and your keys, settings and reports stay with you.",
   "steps.local.check.free": "Free, no sign-up",
   "steps.local.check.keys": "Keys in Windows Credential Manager",
   "steps.local.check.license": "Open source",
   "steps.local.honest.body":
-    "And bumping the quality for each one hits your graphics card or your CPU. Corneta measures your connection, adds it all up and shows you the math before you go live — not halfway through it.",
+    "And re-encoding loads your GPU or CPU. Corneta measures your connection and shows, mode by mode, how much upload and PC the stream will take, before you go live.",
   "steps.local.honest.label": "The honest math",
   "steps.local.honest.title": "Every platform eats a chunk of your upload.",
-  "steps.local.kicker": "Actually runs on your PC",
+  "steps.local.kicker": "Runs on your PC",
   "steps.local.proof.link": "See the code",
-  "steps.local.proof.text":
-    "Open source: you can open the repo and see exactly what the app does with your key.",
-  "steps.local.title":
-    "No monthly fee, because there's no Corneta server in the middle.",
-  "steps.platforms.kicker": "From your channel to everywhere",
-  "steps.platforms.lede":
-    "The big four come ready, with each one's address already filled in. Add as many as you want — including any RTMP server that isn't on this list.",
+  "steps.local.title": "No server in the middle. No monthly fee.",
+  "steps.platforms.kicker": "Platforms",
+  "steps.platforms.lede": "And you can add any RTMP server.",
   "steps.platforms.note.experimental.strong":
     "TikTok, Instagram and X are experimental.",
-  "steps.platforms.note.experimental.text":
-    "Whether you get in depends on each platform's approval and its own sign-up flow, so they might just not work for your account.",
   "steps.platforms.note.validation":
-    "Test each destination with your account and setup before an important stream. Having a platform in the app doesn't guarantee it will accept the stream.",
-  "steps.platforms.title": "The big four ready to go — the rest is on you.",
-  "steps.title": "You go live in three steps.",
+    "Test each destination with your account and setup before an important stream: being in the app doesn't guarantee the platform will accept it.",
+  "steps.platforms.title": "The big four come ready.",
+  "closing.cta.replay": "Watch the video again",
+  "feat.tiny.title": "Plus",
+  "feat.report.alt":
+    "Stream audience chart by platform, with Twitch, YouTube and Kick and the highlight markers",
+  "feat.report.text":
+    "Each platform's audience and the stream's best moments, with the exact minute to clip.",
+  "feat.report.title": "The report after the stream",
+  "feat.chat.alt":
+    "Corneta unified chat with messages from Twitch, YouTube and Kick",
+  "feat.chat.text":
+    "Twitch, YouTube and Kick in one feed, plus alerts and an OBS overlay.",
+  "feat.chat.title": "Chat, alerts and overlay",
+  "feat.protection.alt":
+    "Corneta safety nets: BE RIGHT BACK, auto-bitrate and privacy guard",
+  "feat.protection.text":
+    "If OBS drops, BE RIGHT BACK goes on air without ending the stream. If your internet chokes, auto-bitrate eases the re-encoded destinations.",
+  "feat.protection.title": "Safety nets",
+  "feat.independent.alt":
+    "Corneta live panel: Twitch and YouTube live, Kick reconnecting",
+  "feat.independent.text":
+    "Each platform has its own connection: if one drops, only that one reconnects.",
+  "feat.independent.title": "If one drops, the rest keep going",
+  "feat.title": "Built to keep the stream up.",
+  "feat.kicker": "What comes with it",
+  "content.steps.4.text":
+    "Twitch, YouTube and Kick in one feed: reply and moderate from there.",
+  "content.steps.4.title": "One chat for all",
+  "how.watch": "Watch it ({time})",
+  "how.title": "From OBS to live in four steps.",
+  "hero.video.real": "Real app screens",
+  "hero.video.label": "Video: one stream, every platform — how Corneta works",
+  "hero.video.play": "Watch Corneta in action",
+  "hero.nav.features": "Features",
+  "hero.nav.how": "How it works",
+  "feat.sample": "App screens with sample data.",
+  "feat.more.quality": "3 quality modes",
+  "feat.more.vertical": "9:16 vertical crop",
+  "steps.platforms.tag.experimental": "experimental",
+  "closing.faq.more": "Didn't find yours?",
+  "feat.report.moments.alt":
+    "Highlights worth clipping: audience spikes and the minute the chat blew up",
+  "feat.report.export.label": "Exports as",
+  "feat.report.export.chapters": "YouTube chapters",
+  "feat.report.export.csv": "spreadsheet (CSV)",
+  "feat.report.export.edl": "EDL for your editor",
+  "hero.video.captions": "English",
+  "steps.local.honest.alt":
+    "Corneta Quality screen: the Straight up, Smart and All out modes with each one's PC load and upload, and the connection measured at 24 Mbps",
 };

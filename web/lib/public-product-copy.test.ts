@@ -19,17 +19,14 @@ describe("public product claims", () => {
     const enPrivacy = source(
       "../app/(legal)/[locale]/legal/_content/privacy.en.tsx",
     );
-    const ptCopy = pt["steps.accounts.privacy.text"];
-    const enCopy = en["steps.accounts.privacy.text"];
-
-    for (const text of [ptCopy, ptPrivacy]) {
+    for (const text of [ptPrivacy]) {
       expect(text).toMatch(/desconecte suas contas na Corneta/i);
       expect(text).toMatch(/revogue o acesso nas plataformas/i);
       expect(text).toMatch(/desinstalar (?:o aplicativo )?não garante/i);
       expect(text).not.toMatch(/desinstalar o app apaga|some ao desinstalar/i);
       expect(text).not.toContain("A revogação vale imediatamente");
     }
-    for (const text of [enCopy, enPrivacy]) {
+    for (const text of [enPrivacy]) {
       expect(text).toMatch(/disconnect your accounts in Corneta/i);
       expect(text).toMatch(/revoke access on the platforms/i);
       expect(text).toMatch(/uninstalling (?:the app )?does not guarantee/i);
@@ -130,12 +127,13 @@ describe("public product claims", () => {
     const enTerms = source(
       "../app/(legal)/[locale]/legal/_content/terms.en.tsx",
     );
-    for (const text of [pt["protection.guard.privacy.body"], ptTerms]) {
+    // The landing page only states what the guard does and costs; the terms carry the fail-closed detail.
+    for (const text of [ptTerms]) {
       expect(text).toContain("imagens não verificadas também ficam cobertas");
       expect(text).toContain("falhar ou ficar atrasada");
       expect(text).toContain("automaticamente");
     }
-    for (const text of [en["protection.guard.privacy.body"], enTerms]) {
+    for (const text of [enTerms]) {
       expect(text).toContain("Unverified images also stay covered");
       expect(text).toContain("fails or falls behind");
       expect(text).toContain("automatically");

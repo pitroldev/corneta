@@ -3,18 +3,12 @@ import { DOWNLOAD_PATH } from "@/lib/download";
 import type { SiteCtaId } from "@/lib/telemetry-schema";
 import { LocaleSwitch } from "../_components/locale-switch";
 import { SiteNav } from "../_components/site-nav";
-import { CheckIcon, DownloadIcon, WindowsIcon } from "../_components/icons";
-import { Mascot, SoundWaves } from "../_components/decor";
+import { DownloadIcon, WindowsIcon } from "../_components/icons";
+import { Mascot } from "../_components/decor";
 import { BrandMark } from "../_components/brand-mark";
-import { ProductPreview } from "../_components/product-preview";
-import {
-  cn,
-  downloadButton,
-  heroWaves,
-  Shell,
-  Slab,
-  Sticker,
-} from "../_components/ui";
+import { HeroVideo } from "../_components/hero-video";
+import { clock, lpMedia } from "@/lib/lp-media";
+import { cn, downloadButton, Shell, Sticker } from "../_components/ui";
 
 export function DownloadButton({
   t,
@@ -77,14 +71,9 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
           copy={{
             aria: t("hero.nav.aria"),
             items: [
-              {
-                href: "#por-que",
-                label: t("hero.nav.why"),
-              },
-              {
-                href: "#plataformas",
-                label: t("hero.nav.platforms"),
-              },
+              { href: "#como-funciona", label: t("hero.nav.how") },
+              { href: "#recursos", label: t("hero.nav.features") },
+              { href: "#plataformas", label: t("hero.nav.platforms") },
               {
                 href: localePath(locale, "/guides"),
                 label: t("hero.nav.guides"),
@@ -113,99 +102,97 @@ export function SiteHeader({ t, locale }: { t: T; locale: Locale }) {
   );
 }
 
-const TRUST =
-  "inline-flex items-center gap-[7px] rounded-sm bg-surface-2 px-[11px] py-[7px] text-[0.78rem] font-bold shadow-pop-sm " +
-  "max-[760px]:text-[0.74rem] [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:stroke-ok [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:3]";
-
-export function Hero({ t, locale }: { t: T; locale: Locale }) {
+function Tape({ className }: { className: string }) {
   return (
-    <section
-      id="topo"
-      className="relative isolate overflow-hidden pt-[clamp(46px,5.5vw,78px)] max-[760px]:pt-[34px]"
-    >
-      <SoundWaves className={heroWaves} />
-
-      <Shell>
-        <div className="mb-[clamp(38px,4vw,54px)] grid items-end gap-[clamp(28px,3.5vw,56px)] [grid-template-columns:minmax(0,1.26fr)_minmax(270px,0.74fr)] max-[980px]:grid-cols-1 [&>*]:min-w-0">
-          <div>
-            <Sticker className="animate-[copy-in_500ms_cubic-bezier(0.16,1,0.3,1)_both] mb-6.5">
-              <Mascot />
-              {t("hero.sticker")}
-            </Sticker>
-
-            <h1 className="animate-[copy-in_620ms_70ms_cubic-bezier(0.16,1,0.3,1)_both] text-[clamp(2.95rem,4.9vw,4.45rem)] leading-[0.95] tracking-[-0.035em] max-[760px]:text-[clamp(2.55rem,11.4vw,3.4rem)] max-[420px]:text-[clamp(2.35rem,11vw,3rem)] [&>span]:block">
-              <span>{t("hero.title.line1")}</span>
-              <span>
-                <Slab>{t("hero.title.line2")}</Slab>
-              </span>
-              <span>{t("hero.title.line3")}</span>
-            </h1>
-          </div>
-
-          <div className="animate-[copy-in_620ms_150ms_cubic-bezier(0.16,1,0.3,1)_both] pb-1.5">
-            <p className="max-w-[46ch] text-[clamp(1.04rem,1.5vw,1.2rem)] leading-[1.62] font-medium text-muted">
-              {t("hero.pitch")}
-            </p>
-            <div
-              className="mt-6.5 flex flex-wrap gap-2.5"
-              aria-label={t("hero.trust.aria")}
-            >
-              <span className={TRUST}>
-                <CheckIcon /> {t("hero.trust.free")}
-              </span>
-              <a
-                className={cn(
-                  TRUST,
-                  "min-h-11 underline underline-offset-4 transition-colors hover:text-brass focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-brass",
-                )}
-                href="https://github.com/pitroldev/corneta"
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                <CheckIcon /> {t("hero.trust.opensource")}
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative z-2 animate-[stage-in_720ms_210ms_cubic-bezier(0.16,1,0.3,1)_both]">
-          <ProductPreview t={t} locale={locale} />
-        </div>
-
-        <div className="mt-[clamp(48px,5vw,76px)] flex flex-col items-center gap-3.5 pb-[clamp(46px,5vw,70px)] text-center max-[760px]:mt-[44px] [&_a]:min-h-[70px] [&_a]:w-[min(440px,100%)] [&_a]:text-[1.24rem] max-[760px]:[&_a]:min-h-[62px] max-[760px]:[&_a]:w-full max-[760px]:[&_a]:text-[1.06rem] [&>p]:text-[0.84rem] [&>p]:font-semibold [&>p]:text-faint">
-          <DownloadButton t={t} ctaId="hero_download" />
-          <p>{t("hero.cta.footnote")}</p>
-        </div>
-      </Shell>
-    </section>
+    <span
+      aria-hidden="true"
+      className={cn(
+        "absolute z-10 h-[30px] w-[118px] border border-paper-line/60 bg-paper-raised/80 max-[760px]:hidden",
+        className,
+      )}
+    />
   );
 }
 
-const ARROW =
-  "relative h-[3px] w-[30px] bg-brass-ink " +
-  "after:absolute after:-top-1 after:right-0 after:h-[9px] after:w-[9px] after:rotate-45 after:border-t-[3px] after:border-r-[3px] after:border-brass-ink after:content-['']";
+export function Hero({ t, locale }: { t: T; locale: Locale }) {
+  const media = lpMedia(locale);
 
-export function MechanismStrip({ t }: { t: T }) {
   return (
     <section
-      className="border-y-[3px] border-brass-ink bg-brass text-brass-ink"
-      aria-label={t("hero.mechanism.aria")}
+      id="topo"
+      className="relative isolate overflow-hidden bg-paper bg-[image:var(--halftone-light)] bg-[length:22px_22px] pt-[clamp(40px,5vw,72px)] pb-[clamp(56px,6vw,88px)] text-ink"
     >
-      <Shell className="grid min-h-28 items-center gap-5.5 [grid-template-columns:1fr_30px_1.5fr_30px_1.15fr] max-[980px]:grid-cols-1 max-[980px]:gap-0 max-[980px]:py-4 max-[980px]:[&>div]:py-[11px] [&>div]:flex [&>div]:flex-col [&>div]:gap-[3px] [&_strong]:font-display [&_strong]:text-[1.3rem] [&_strong]:leading-none [&_strong]:font-extrabold [&_span]:text-[0.83rem] [&_span]:font-semibold max-[980px]:[&>i]:hidden">
-        <div>
-          <strong>{t("hero.mechanism.step1.title")}</strong>
-          <span>{t("hero.mechanism.step1.detail")}</span>
+      <Shell className="text-center">
+        <Sticker className="animate-[copy-in_500ms_cubic-bezier(0.16,1,0.3,1)_both]">
+          <Mascot />
+          {t("hero.sticker")}
+        </Sticker>
+
+        <h1 className="mt-6 animate-[copy-in_620ms_70ms_cubic-bezier(0.16,1,0.3,1)_both] text-[clamp(3rem,6.4vw,5.7rem)] leading-[0.92] tracking-[-0.035em] max-[760px]:text-[clamp(2.6rem,12vw,3.6rem)]">
+          <span className="block">{t("hero.title.line1")}</span>
+          <span className="relative inline-block">
+            {t("hero.title.line2")}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 600 34"
+              preserveAspectRatio="none"
+              className="hero-marker absolute -bottom-[0.16em] left-[-2%] -z-10 h-[0.42em] w-[104%] text-brass"
+            >
+              <path
+                d="M6 22C120 12 260 26 380 18S540 10 594 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="22"
+                strokeLinecap="round"
+                pathLength={1}
+              />
+            </svg>
+          </span>
+        </h1>
+
+        <p className="mx-auto mt-7 max-w-[60ch] animate-[copy-in_620ms_150ms_cubic-bezier(0.16,1,0.3,1)_both] text-[clamp(1.05rem,1.5vw,1.24rem)] leading-[1.6] font-medium text-ink-muted">
+          {t("hero.pitch")}
+        </p>
+      </Shell>
+
+      <div className="relative mx-auto mt-[clamp(34px,4.4vw,58px)] w-[min(calc(100%-2rem),1140px)] animate-[copy-in_720ms_210ms_cubic-bezier(0.16,1,0.3,1)_both]">
+        <Tape className="-top-3.5 left-[6%] -rotate-[5deg]" />
+        <Tape className="-top-3.5 right-[24%] rotate-[4deg]" />
+        <Sticker className="absolute -top-4 -right-3 z-10 max-[760px]:hidden">
+          {t("hero.video.real")}
+        </Sticker>
+        <HeroVideo
+          webm={media.video.webm}
+          mp4={media.video.mp4}
+          poster={media.poster.src}
+          captions={{
+            src: media.video.captions,
+            lang: locale,
+            label: t("hero.video.captions"),
+          }}
+          copy={{
+            play: t("hero.video.play"),
+            duration: clock(media.video.seconds),
+            videoLabel: t("hero.video.label"),
+          }}
+        />
+      </div>
+
+      <Shell className="mt-[clamp(40px,4.4vw,60px)] flex flex-col items-center gap-3.5 text-center">
+        <div className="w-[min(440px,100%)] [&>a]:min-h-[70px] [&>a]:w-full [&>a]:text-[1.24rem] max-[760px]:[&>a]:min-h-[62px] max-[760px]:[&>a]:text-[1.06rem]">
+          <DownloadButton t={t} ctaId="hero_download" />
         </div>
-        <i className={ARROW} aria-hidden="true" />
-        <div>
-          <strong>{t("hero.mechanism.step2.title")}</strong>
-          <span>{t("hero.mechanism.step2.detail")}</span>
-        </div>
-        <i className={ARROW} aria-hidden="true" />
-        <div>
-          <strong>{t("hero.mechanism.step3.title")}</strong>
-          <span>{t("hero.mechanism.step3.detail")}</span>
-        </div>
+        <p className="text-[0.84rem] font-semibold text-ink-faint">
+          {t("hero.cta.footnote")} ·{" "}
+          <a
+            className="underline decoration-2 underline-offset-4 transition-colors hover:text-tomato-ink focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-tomato"
+            href="https://github.com/pitroldev/corneta"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            {t("hero.trust.opensource")}
+          </a>
+        </p>
       </Shell>
     </section>
   );

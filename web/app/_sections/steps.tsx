@@ -1,243 +1,158 @@
 import type { Locale, T } from "@/lib/i18n";
+import Image from "next/image";
 import Link from "next/link";
-import { accountScopesFor, stepsFor } from "@/lib/content";
 import { legalHref } from "@/lib/legal";
 import { Mascot, PlatformGlyph } from "../_components/decor";
-import { CheckIcon, LockIcon } from "../_components/icons";
-import { GoLive } from "../_components/go-live";
-import {
-  Checklist,
-  HonestNote,
-  Proof,
-  Section,
-  SectionHeading,
-  Shell,
-  TwoCol,
-} from "../_components/ui";
+import { CheckIcon, InfoIcon, LockIcon } from "../_components/icons";
+import { lpMedia } from "@/lib/lp-media";
+import { cn, Section, SectionHeading, Shell, TwoCol } from "../_components/ui";
 
-const STEPS_LIST =
-  "m-0 list-none border-t-[3px] border-ink p-0 " +
-  "[&>li]:grid [&>li]:grid-cols-[52px_1fr] [&>li]:items-start [&>li]:gap-5 [&>li]:border-b-[3px] [&>li]:border-ink [&>li]:py-6.5 " +
-  "[&>li>b]:grid [&>li>b]:size-[46px] [&>li>b]:rotate-[-2.4deg] [&>li>b]:place-items-center [&>li>b]:rounded-md [&>li>b]:bg-brass [&>li>b]:font-display [&>li>b]:text-[1.35rem] [&>li>b]:font-extrabold [&>li>b]:text-brass-ink [&>li>b]:shadow-pop-ink " +
-  "[&_h3]:text-[clamp(1.42rem,2.2vw,1.9rem)] [&_h3]:leading-[1.1] " +
-  "[&_p]:mt-1.5 [&_p]:max-w-[54ch] [&_p]:leading-[1.6] [&_p]:font-medium [&_p]:text-ink-muted " +
-  "[&_em]:mt-3 [&_em]:inline-flex [&_em]:rotate-[-1.5deg] [&_em]:items-center [&_em]:gap-[7px] [&_em]:rounded-sm [&_em]:bg-tomato [&_em]:px-[9px] [&_em]:py-[5px] [&_em]:font-display [&_em]:text-[0.86rem] [&_em]:font-extrabold [&_em]:text-brass-ink [&_em]:not-italic [&_em]:shadow-[3px_3px_0_0_var(--ink)] " +
-  "[&_em>svg]:h-[15px] [&_em>svg]:w-[15px] [&_em>svg]:fill-none [&_em>svg]:stroke-current";
+const LINK =
+  "font-[750] text-tomato-ink underline decoration-2 underline-offset-[3px] transition-colors hover:text-ink";
 
-export function Steps({ t }: { t: T }) {
-  const steps = stepsFor(t);
+export function Local({ t, locale }: { t: T; locale: Locale }) {
+  const { honest } = lpMedia(locale);
   return (
-    <Section id="como-funciona" tone="paper-raised">
+    <Section id="seu-pc" tone="paper">
       <Shell>
         <TwoCol
-          align="start"
-          cols="minmax(0,0.86fr) minmax(400px,1.14fr)"
-          className="gap-[clamp(44px,7vw,100px)]"
+          cols="minmax(0,1.25fr) minmax(280px,0.75fr)"
+          className="items-end gap-[clamp(28px,5vw,64px)]"
         >
           <SectionHeading
-            tight
             tone="paper"
-            kicker={t("steps.kicker")}
-            title={t("steps.title")}
+            kicker={t("steps.local.kicker")}
+            title={t("steps.local.title")}
           >
-            <p>{t("steps.lede")}</p>
+            <p>{t("steps.local.body")}</p>
           </SectionHeading>
-
-          <ol className={STEPS_LIST}>
-            {steps.map((step, i) => (
-              <li key={step.title}>
-                <b>{i + 1}</b>
-                <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
-                  {i === steps.length - 1 && (
-                    <GoLive
-                      copy={{
-                        golive: t("steps.badge.golive"),
-                        stop: t("preview.stop"),
-                        live: t("preview.state.live"),
-                        off: t("preview.state.offAir"),
-                        connecting: t("steps.golive.connecting"),
-                        onAir: t("steps.golive.onAir"),
-                        pick: t("steps.golive.pick"),
-                      }}
-                    />
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
+          <ul
+            className="flex flex-col gap-2.5 [&>li]:flex [&>li]:min-h-12 [&>li]:items-center [&>li]:gap-3 [&>li]:rounded-lg [&>li]:border-2 [&>li]:border-ink [&>li]:bg-paper-raised [&>li]:px-4 [&>li]:py-2.5 [&>li]:font-display [&>li]:text-[1.02rem] [&>li]:font-extrabold [&>li]:shadow-[4px_4px_0_0_var(--ink)] [&_svg]:size-[18px] [&_svg]:shrink-0 [&_svg]:fill-none [&_svg]:stroke-ok-ink [&_svg]:[stroke-width:3]"
+            role="list"
+          >
+            <li>
+              <CheckIcon /> {t("steps.local.check.free")}
+            </li>
+            <li>
+              <CheckIcon /> {t("steps.local.check.keys")}
+            </li>
+            <li>
+              <CheckIcon /> {t("steps.local.check.license")}
+              <a
+                className={cn(LINK, "ml-auto font-sans text-[0.86rem]")}
+                href="https://github.com/pitroldev/corneta"
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                {t("steps.local.proof.link")}
+              </a>
+            </li>
+          </ul>
         </TwoCol>
-      </Shell>
-    </Section>
-  );
-}
 
-export function Local({ t }: { t: T }) {
-  return (
-    <Section>
-      <Shell>
-        <TwoCol
-          align="stretch"
-          cols="minmax(0,1.18fr) minmax(310px,0.82fr)"
-          className="gap-[clamp(38px,5vw,58px)]"
-        >
+        <div className="mt-[clamp(40px,5vw,64px)] grid grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] items-center gap-[clamp(24px,3.4vw,48px)] rounded-xl bg-brass p-[clamp(22px,3.2vw,44px)] text-brass-ink shadow-[8px_8px_0_0_var(--night)] max-[980px]:grid-cols-1 max-[760px]:shadow-[5px_5px_0_0_var(--night)]">
           <div>
-            <SectionHeading
-              kicker={t("steps.local.kicker")}
-              title={t("steps.local.title")}
-            >
-              <p className="max-w-[60ch]!">{t("steps.local.body")}</p>
-            </SectionHeading>
-
-            <Checklist row className="mt-6.5">
-              <li>
-                <CheckIcon /> {t("steps.local.check.free")}
-              </li>
-              <li>
-                <CheckIcon /> {t("steps.local.check.license")}
-              </li>
-              <li>
-                <CheckIcon /> {t("steps.local.check.keys")}
-              </li>
-            </Checklist>
-
-            <Proof>
-              <LockIcon />
-              <span>
-                {t("steps.local.proof.text")}{" "}
-                <a
-                  href="https://github.com/pitroldev"
-                  rel="noreferrer noopener"
-                  target="_blank"
-                >
-                  {t("steps.local.proof.link")}
-                </a>
-              </span>
-            </Proof>
-          </div>
-
-          <HonestNote>
-            <span>
+            <span className="inline-flex items-center gap-2 text-[0.72rem] font-extrabold tracking-[0.1em] uppercase [&>svg]:size-4 [&>svg]:fill-current">
               <Mascot /> {t("steps.local.honest.label")}
             </span>
-            <h3>{t("steps.local.honest.title")}</h3>
-            <p>{t("steps.local.honest.body")}</p>
-          </HonestNote>
-        </TwoCol>
+            <h3 className="mt-3 text-[clamp(1.75rem,2.8vw,2.5rem)] leading-none">
+              {t("steps.local.honest.title")}
+            </h3>
+            <p className="mt-4 leading-[1.6] font-[550]">
+              {t("steps.local.honest.body")}
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-lg border-2 border-ink bg-night shadow-[6px_6px_0_0_var(--night)] max-[560px]:hidden">
+            <Image
+              src={honest.wide.src}
+              width={honest.wide.width}
+              height={honest.wide.height}
+              alt={t("steps.local.honest.alt")}
+              sizes="(max-width: 980px) 92vw, 720px"
+              className="h-auto w-full"
+            />
+          </div>
+          <div className="mx-auto hidden w-full max-w-[300px] overflow-hidden rounded-lg border-2 border-ink bg-night shadow-[5px_5px_0_0_var(--night)] max-[560px]:block">
+            <Image
+              src={honest.narrow.src}
+              width={honest.narrow.width}
+              height={honest.narrow.height}
+              alt={t("steps.local.honest.alt")}
+              sizes="300px"
+              className="h-auto w-full"
+            />
+          </div>
+        </div>
+
+        <p className="mt-[clamp(28px,3.4vw,40px)] flex max-w-[80ch] items-start gap-3 text-[0.88rem] leading-[1.6] font-medium text-ink-muted [&>svg]:mt-0.5 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomato-ink [&>svg]:[stroke-width:2.2]">
+          <LockIcon />
+          <span>
+            {t("steps.accounts.lede")}{" "}
+            <Link className={LINK} href={legalHref(locale, "privacy")}>
+              {t("steps.accounts.privacy.link")}
+            </Link>
+            .
+          </span>
+        </p>
       </Shell>
     </Section>
   );
 }
 
-const DEST =
-  "grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 rounded-md bg-surface-2 px-[13px] py-3 " +
-  "[&_.glyph]:h-[38px] [&_.glyph]:w-[38px] " +
-  "[&_strong]:block [&_strong]:font-display [&_strong]:text-[0.98rem] [&_strong]:leading-[1.1] [&_strong]:font-bold " +
-  "[&_p]:mt-[3px] [&_p]:text-[0.74rem] [&_p]:leading-[1.35] [&_p]:font-[550] [&_p]:text-faint-raised";
-const DEST_NOTE =
-  "mt-[18px] border-t-2 border-border-soft pt-4 text-[0.8rem] leading-[1.55] font-[550] text-muted " +
-  "[&_strong]:font-[750] [&_strong]:text-cream " +
-  "[&+&]:mt-2.5 [&+&]:border-t-0 [&+&]:pt-0";
-
-const ACCOUNT =
-  "flex flex-col rounded-lg bg-surface bg-[image:var(--halftone-dark)] bg-[length:18px_18px] p-[clamp(20px,2.4vw,26px)] text-cream shadow-pop-ink-lg " +
-  "[&_p]:text-[0.86rem] [&_p]:leading-[1.55] [&_p]:font-medium [&_p]:text-muted " +
-  "[&_p+p]:mt-3 [&_b]:font-[750] [&_b]:text-cream";
+const EXPERIMENTAL = new Set(["tiktok", "instagram", "x"]);
 
 export function Platforms({
   t,
-  locale,
   destinations,
 }: {
   t: T;
-  locale: Locale;
-  destinations: readonly { id: string; name: string; note: string }[];
+  destinations: readonly { id: string; name: string }[];
 }) {
   return (
-    <Section id="plataformas" tone="paper">
+    <Section id="plataformas">
       <Shell>
         <TwoCol
-          cols="minmax(0,1fr) minmax(430px,1.02fr)"
-          className="gap-[clamp(40px,5vw,72px)]"
+          cols="minmax(0,0.8fr) minmax(0,1.2fr)"
+          className="gap-[clamp(36px,5vw,72px)]"
         >
           <SectionHeading
             tight
-            tone="paper"
             kicker={t("steps.platforms.kicker")}
             title={t("steps.platforms.title")}
           >
             <p>{t("steps.platforms.lede")}</p>
           </SectionHeading>
-
-          <div className="rounded-xl bg-surface bg-[image:var(--halftone-dark)] bg-[length:20px_20px] p-5.5 text-cream shadow-pop-ink-lg max-[980px]:max-w-[720px]">
-            <div className="grid grid-cols-2 gap-[9px] max-[760px]:grid-cols-1">
-              {destinations.map((destination) => (
-                <article className={DEST} key={destination.name}>
-                  <PlatformGlyph id={destination.id as never} />
-                  <div>
-                    <strong>{destination.name}</strong>
-                    <p>{destination.note}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <p className={DEST_NOTE}>
-              <strong>{t("steps.platforms.note.experimental.strong")}</strong>{" "}
-              {t("steps.platforms.note.experimental.text")}
-            </p>
-            <p className={DEST_NOTE}>{t("steps.platforms.note.validation")}</p>
-          </div>
-        </TwoCol>
-
-        <Shell className="w-full!" as="div">
-          <div id="contas">
-            <SectionHeading
-              tone="paper"
-              kicker={t("steps.accounts.kicker")}
-              title={t("steps.accounts.title")}
-              className="mt-[clamp(56px,7vw,96px)] max-w-[720px]! border-t-2 border-paper-line pt-[clamp(40px,5vw,64px)]"
+          <div>
+            <ul
+              className="grid grid-cols-4 gap-2.5 max-[560px]:grid-cols-2"
+              role="list"
             >
-              <p>{t("steps.accounts.lede")}</p>
-            </SectionHeading>
-
-            <div className="mt-[clamp(32px,4vw,48px)] grid grid-cols-3 gap-[clamp(14px,2vw,20px)] max-[980px]:grid-cols-1">
-              {accountScopesFor(t).map((account) => (
-                <article className={ACCOUNT} key={account.platform}>
-                  <div className="mb-4 grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 [&_.glyph]:h-10 [&_.glyph]:w-10">
-                    <PlatformGlyph id={account.platform} />
-                    <div>
-                      <strong className="block font-display text-[1.06rem] leading-[1.15] font-bold">
-                        {account.title}
-                      </strong>
-                      <small className="mt-[3px] block text-[0.72rem] font-bold text-brass">
-                        {account.permission}
-                      </small>
-                    </div>
-                  </div>
-                  <p>
-                    <b>{t("steps.accounts.label.why")}</b> {account.why}
-                  </p>
-                  <p className="mt-auto! border-t-2 border-border-soft pt-3.5 text-[0.8rem]! text-faint-raised!">
-                    <b>{t("steps.accounts.label.never")}</b> {account.never}
-                  </p>
-                </article>
+              {destinations.map((destination) => (
+                <li
+                  key={destination.id}
+                  className="relative flex flex-col items-center gap-2.5 rounded-lg border border-border-dry bg-surface px-2 pt-5 pb-4 text-center [&_.glyph]:h-11 [&_.glyph]:w-11"
+                >
+                  <PlatformGlyph id={destination.id as never} />
+                  <strong className="font-display text-[0.98rem] leading-[1.1] font-bold text-cream">
+                    {destination.name}
+                  </strong>
+                  {EXPERIMENTAL.has(destination.id) && (
+                    <span className="absolute -top-2 right-1.5 rotate-2 rounded-sm bg-tomato px-1.5 py-0.5 text-[0.6rem] font-extrabold tracking-[0.08em] text-brass-ink uppercase">
+                      {t("steps.platforms.tag.experimental")}
+                    </span>
+                  )}
+                </li>
               ))}
-            </div>
-
-            <p className="mt-[clamp(22px,2.5vw,30px)] flex max-w-[90ch] items-start gap-3 text-[0.9rem] leading-[1.6] font-medium text-ink-muted [&>svg]:mt-px [&>svg]:h-[19px] [&>svg]:w-[19px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:text-tomato-ink [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:2.2] [&_a]:font-[750] [&_a]:text-tomato-ink [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-[3px]">
-              <LockIcon />
+            </ul>
+            <p className="mt-5 flex items-start gap-2.5 text-[0.86rem] leading-[1.55] font-medium text-muted [&_strong]:font-bold [&_strong]:text-cream [&>svg]:mt-0.5 [&>svg]:size-[18px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-brass [&>svg]:[stroke-width:2.2]">
+              <InfoIcon />
               <span>
-                {t("steps.accounts.privacy.text")}{" "}
-                <Link href={legalHref(locale, "privacy")}>
-                  {t("steps.accounts.privacy.link")}
-                </Link>
-                .
+                <strong>{t("steps.platforms.note.experimental.strong")}</strong>{" "}
+                {t("steps.platforms.note.validation")}
               </span>
             </p>
           </div>
-        </Shell>
+        </TwoCol>
       </Shell>
     </Section>
   );

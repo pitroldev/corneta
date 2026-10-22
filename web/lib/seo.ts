@@ -1,4 +1,5 @@
 import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "./content";
+import { lpMedia } from "./lp-media";
 import { DEFAULT_LOCALE, localePath, translator, type Locale } from "./i18n";
 import { LEGAL_CNPJ, LEGAL_CONTACT, LEGAL_OPERATOR, legalHref } from "./legal";
 import { siteUrl } from "./site";
@@ -113,6 +114,23 @@ const howToFor = (locale: Locale) => {
   };
 };
 
+const videoFor = (locale: Locale) => {
+  const t = translator(locale);
+  const media = lpMedia(locale);
+  return {
+    "@type": "VideoObject",
+    "@id": abs(`${localePath(locale)}#video`),
+    name: t("hero.video.label"),
+    description: t("hero.pitch"),
+    thumbnailUrl: abs(media.poster.src),
+    uploadDate: "2026-10-20",
+    duration: `PT${Math.floor(media.video.seconds / 60)}M${media.video.seconds % 60}S`,
+    contentUrl: abs(media.video.mp4),
+    inLanguage: locale,
+    publisher: { "@id": abs("/#empresa") },
+  };
+};
+
 export function homeJsonLd(locale: Locale = DEFAULT_LOCALE) {
   return {
     "@context": "https://schema.org",
@@ -122,6 +140,7 @@ export function homeJsonLd(locale: Locale = DEFAULT_LOCALE) {
       softwareApplication(locale),
       faqPageFor(locale),
       howToFor(locale),
+      videoFor(locale),
     ],
   };
 }

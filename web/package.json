@@ -31,7 +31,6 @@
     "check": "pnpm content:check && pnpm lint && pnpm typecheck && pnpm build && node scripts/check-build-routes.mjs"
   },
   "dependencies": {
-    "framer-motion": "^14.3.0",
     "github-slugger": "2.0.0",
     "gray-matter": "4.0.3",
     "lucide-react": "^1.57.0",
