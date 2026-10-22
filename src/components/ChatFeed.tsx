@@ -12,14 +12,17 @@ import {
   ArrowDown,
   Ban,
   Clock,
+  CornerDownRight,
   MessageSquare,
   Reply,
+  Repeat2,
   Trash2,
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import type { ChatMessage } from "../lib/types";
-import { useT } from "../lib/i18n";
+import type { ChatBadge, ChatHighlight, ChatMessage } from "../lib/types";
+import { useT, type MessageKey } from "../lib/i18n";
 import { PlatformGlyph } from "./ui";
+import { ChatFragments } from "./ChatFragments";
 import { pruneChatMeasurements } from "../lib/chatMeasurements";
 
 export interface ChatView {
@@ -302,57 +305,95 @@ const MsgRow = memo(function MsgRow({
       </div>
     );
   }
-  return (
-    <div className="group relative flex flex-wrap items-start gap-1.5 px-3 py-1 pr-16 leading-snug hover:bg-surface-2">
-      {view.timestamps && (
-        <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-ink-faint">
-          {fmtTime(m.ts)}
-        </span>
-      )}
-      {view.platform && (
-        <span className="mt-0.5 shrink-0">
-          <PlatformGlyph id={m.platform} size={15} />
-        </span>
-      )}
-      {view.source && m.source && (
-        <span className="mt-0.5 shrink-0 rounded bg-surface-3 px-1 text-[9px] font-bold uppercase leading-4 text-ink-faint">
-          {m.source}
-        </span>
-      )}
-      {view.badges &&
-        m.badges.map((b, i) => (
-          <span
-            key={i}
-            className={cn(
-              "mt-0.5 shrink-0 rounded px-1 text-[9px] font-extrabold uppercase leading-4",
-              badgeColor(b.kind),
-            )}
-          >
-            {b.label}
-          </span>
-        ))}
-      <span
-        className="shrink-0 font-bold"
-        style={m.color ? { color: m.color } : undefined}
-      >
-        {m.author}
-      </span>
-      <span className="min-w-0 break-words text-ink-muted">
-        {m.fragments.map((f, i) =>
-          f.kind === "emote" && view.emotes && f.url ? (
-            <img
-              key={i}
-              src={f.url}
-              alt={f.text}
-              title={f.text}
-              className="mx-0.5 inline-block h-5 w-auto align-middle"
-              loading="lazy"
-            />
-          ) : (
-            <span key={i}>{f.text}</span>
-          ),
+  if (m.system) {
+    return (
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-1.5 px-3 py-1 leading-snug",
+          m.highlight === "error" ? "text-warn" : "text-ink-faint",
         )}
-      </span>
+      >
+        {view.platform && <PlatformGlyph id={m.platform} size={13} />}
+        <span className="min-w-0 break-words text-[0.92em]">
+          <ChatFragments fragments={m.fragments} images={view.emotes} />
+        </span>
+      </div>
+    );
+  }
+  const accent =
+    m.accent ?? (m.highlight ? HIGHLIGHT_ACCENT[m.highlight] : undefined);
+  return (
+    <div
+      className={cn(
+        "group relative px-3 py-1 pr-16 leading-snug hover:bg-surface-2",
+        m.highlight && "border-l-[3px] bg-surface-2/60",
+      )}
+      style={accent ? { borderLeftColor: accent } : undefined}
+    >
+      {(m.highlight || m.reply) && (
+        <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-[0.78em] text-ink-faint">
+          {m.highlight && (
+            <span
+              className="shrink-0 font-bold uppercase tracking-wide"
+              style={accent ? { color: accent } : undefined}
+            >
+              {t(`chat.feed.highlight.${m.highlight}` as MessageKey)}
+              {m.note ? ` · ${m.note}` : ""}
+            </span>
+          )}
+          {m.reply && (
+            <span className="flex min-w-0 items-center gap-1">
+              <CornerDownRight className="size-3 shrink-0" />
+              <span className="shrink-0">
+                {t("chat.feed.reply", { author: m.reply.author })}:
+              </span>
+              <span className="truncate italic">{m.reply.text}</span>
+            </span>
+          )}
+        </div>
+      )}
+      <div className="flex flex-wrap items-start gap-1.5">
+        {view.timestamps && (
+          <span className="mt-0.5 shrink-0 text-[10px] tabular-nums text-ink-faint">
+            {fmtTime(m.ts)}
+          </span>
+        )}
+        {view.platform && (
+          <span className="mt-0.5 shrink-0">
+            <PlatformGlyph id={m.platform} size={15} />
+          </span>
+        )}
+        {view.source && m.source && (
+          <span className="mt-0.5 shrink-0 rounded bg-surface-3 px-1 text-[9px] font-bold uppercase leading-4 text-ink-faint">
+            {m.source}
+          </span>
+        )}
+        {view.badges && m.badges.map((b, i) => <Badge key={i} b={b} />)}
+        {m.shared && (
+          <span
+            className="mt-0.5 shrink-0 text-ink-faint"
+            title={t("chat.feed.shared")}
+            aria-label={t("chat.feed.shared")}
+          >
+            <Repeat2 className="size-3.5" />
+          </span>
+        )}
+        <span
+          className="shrink-0 font-bold"
+          style={m.color ? { color: m.color } : undefined}
+        >
+          {m.author}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 break-words",
+            m.action ? "italic" : "text-ink-muted",
+          )}
+          style={m.action && m.color ? { color: m.color } : undefined}
+        >
+          <ChatFragments fragments={m.fragments} images={view.emotes} />
+        </span>
+      </div>
       <ModButtons
         m={m}
         modLevel={modLevel}
@@ -363,6 +404,44 @@ const MsgRow = memo(function MsgRow({
     </div>
   );
 }, areRowPropsEqual);
+
+/** Default accents per highlight; announcements bring their own color. */
+const HIGHLIGHT_ACCENT: Partial<Record<ChatHighlight, string>> = {
+  first: "#3ccf8e",
+  returning: "#5aa7ff",
+  highlighted: "#bd73ff",
+  redeemed: "#ffb323",
+  announcement: "#9146ff",
+  effect: "#ff7ad9",
+  pinned: "#ffb323",
+  paid: "#ffb323",
+  celebration: "#53fc18",
+};
+
+function Badge({ b }: { b: ChatBadge }) {
+  if (b.url)
+    return (
+      <img
+        src={b.url}
+        alt={b.title ?? b.label}
+        title={b.title ?? b.label}
+        loading="lazy"
+        className="mt-0.5 inline-block size-4 shrink-0 rounded-[3px] object-contain"
+      />
+    );
+  if (!b.label) return null;
+  return (
+    <span
+      title={b.title}
+      className={cn(
+        "mt-0.5 shrink-0 rounded px-1 text-[9px] font-extrabold uppercase leading-4",
+        badgeColor(b.kind),
+      )}
+    >
+      {b.label}
+    </span>
+  );
+}
 
 function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
   return (

@@ -3353,6 +3353,7 @@ pub fn overlay_test(state: State<'_, AppState>) {
         message: Some(Msg::OverlayDemoAlertMessage.now()),
         fragments: Vec::new(),
         ts: 0,
+        ..Default::default()
     };
     crate::overlay::push(&state.overlay, &demo);
 }
@@ -3373,18 +3374,22 @@ pub fn overlay_chat_test(state: State<'_, AppState>) {
                 kind: "text".into(),
                 text: Some(Msg::OverlayDemoChatTextFragment.now()),
                 url: None,
+                ..Default::default()
             },
             chat::ChatFragment {
                 kind: "emote".into(),
                 text: Some("Kappa".into()),
                 url: Some("https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0".into()),
+                ..Default::default()
             },
         ],
         badges: vec![chat::ChatBadge {
             label: "sub".into(),
             kind: "subscriber".into(),
+            ..Default::default()
         }],
         ts: 0,
+        ..Default::default()
     };
     crate::overlay::push_chat(&state.overlay, &demo);
 }

@@ -4,6 +4,7 @@ import {
   chatRateSeriesFor,
   hasChat,
   hasObs,
+  parseChatSession,
   parseSession,
   timeAxis,
   viewerSeriesFor,
@@ -781,5 +782,49 @@ describe("byChannel", () => {
     ).byChannel;
     expect(unattributedAlerts).toBe(1);
     expect(channels.map((c) => c.key)).toEqual([A]);
+  });
+});
+
+describe("parseChatSession rich replay", () => {
+  it("keeps emotes, badges and marks while dropping unsafe values", () => {
+    const { messages } = parseChatSession(
+      nd([
+        {
+          t: 1,
+          p: "twitch",
+          s: "Canal",
+          a: "Ana",
+          m: "oi Kappa",
+          f: [
+            { k: "text", t: "oi " },
+            { k: "emote", t: "Kappa", u: "https://static-cdn.jtvnw.net/e/25" },
+            { k: "link", t: "x", u: "javascript:alert(1)" },
+            { k: "script", t: "nope" },
+          ],
+          b: [{ l: "MOD", k: "moderator", u: "data:image/png;base64,AA" }],
+          h: "first",
+          r: { a: "Bia", m: "salve" },
+          me: true,
+        },
+        {
+          t: 2,
+          p: "twitch",
+          s: "Canal",
+          a: "",
+          m: "aviso",
+          sys: true,
+          h: "bogus",
+        },
+      ]),
+    );
+    const [rich, notice] = messages;
+    expect(rich.f?.map((f) => f.kind)).toEqual(["text", "emote", "link"]);
+    expect(rich.f?.[2].url).toBeUndefined();
+    expect(rich.b?.[0].url).toBeUndefined();
+    expect(rich.h).toBe("first");
+    expect(rich.r).toEqual({ author: "Bia", text: "salve" });
+    expect(rich.me).toBe(true);
+    expect(notice.sys).toBe(true);
+    expect(notice.h).toBeUndefined();
   });
 });

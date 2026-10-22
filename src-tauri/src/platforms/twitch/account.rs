@@ -16,6 +16,9 @@ use crate::platforms::provider::StreamKeyGrant;
 
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast channel:read:stream_key moderator:read:followers";
+/// Asked at sign-in but never reported as missing: they only add owner events to the chat.
+const TWITCH_OPTIONAL_SCOPES: &str =
+    "channel:read:redemptions channel:read:polls channel:read:predictions channel:read:hype_train";
 
 pub struct TwitchInfo {
     pub user_id: String,
@@ -154,7 +157,10 @@ pub(crate) fn twitch_login_start(app: AppHandle) {
             "https://id.twitch.tv/oauth2/device",
             &[
                 ("client_id", &cfg.twitch_client_id),
-                ("scopes", TWITCH_SCOPES),
+                (
+                    "scopes",
+                    &format!("{TWITCH_SCOPES} {TWITCH_OPTIONAL_SCOPES}"),
+                ),
             ],
         ) {
             Ok(v) => v,

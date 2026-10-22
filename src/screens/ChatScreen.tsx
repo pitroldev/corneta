@@ -40,7 +40,12 @@ import {
 import { api, IS_TAURI, type AccountChatChannel } from "../lib/api";
 import { sameChatChannel } from "../lib/chatChannel";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
-import { resolveSendTargets, sendStatusLine, srcLabel } from "../lib/chatSend";
+import {
+  resolveSendTargets,
+  sendMaxLength,
+  sendStatusLine,
+  srcLabel,
+} from "../lib/chatSend";
 import { bold, useI18n } from "../lib/i18n";
 import { legalUrl } from "../lib/legal";
 import { useStore } from "../lib/store";
@@ -66,6 +71,8 @@ import {
 import { OverlayCard } from "./chat/OverlaySettings";
 import { FilterChip, splitAt, ToggleRow } from "./chat/primitives";
 import { SourceCard } from "./chat/SourceCard";
+import { ModeChips } from "./chat/ChatSide";
+import { chatSideKey } from "../lib/store/types";
 import {
   ACCOUNT_PLATFORMS,
   ACCOUNT_PROVIDERS,
@@ -88,6 +95,7 @@ export function ChatScreen() {
   const setSettings = useStore((s) => s.setSettings);
   const connected = useStore((s) => s.chatConnected);
   const statuses = useStore((s) => s.chatStatuses);
+  const chatSide = useStore((s) => s.chatSide);
   const connectChat = useStore((s) => s.connectChat);
   const disconnectChat = useStore((s) => s.disconnectChat);
   const clearChat = useStore((s) => s.clearChat);
@@ -512,6 +520,9 @@ export function ChatScreen() {
                       aria-hidden
                     />
                     <span className="text-ink-muted">{source}</span>
+                    <ModeChips
+                      modes={chatSide[chatSideKey(st.platform, source)]?.modes}
+                    />
                     {st.status !== "connected" ? (
                       <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
                         {statusLabel(t, st.status)}
@@ -1121,6 +1132,7 @@ export function ChatScreen() {
               }}
               placeholder={t("chat.send.placeholder")}
               aria-label={t("chat.send.placeholder")}
+              maxLength={sendMaxLength(sendTargets)}
               className="flex-1"
             />
             <Button

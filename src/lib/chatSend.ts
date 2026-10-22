@@ -42,6 +42,16 @@ export type ChatAuth = Record<
   { login: string; ok: boolean } | undefined
 >;
 
+/** The shortest limit among the targets, since one draft goes to all of them. */
+export function sendMaxLength(
+  targets: readonly ChatSource[],
+): number | undefined {
+  const limits = targets
+    .map((x) => chatProvider(x.platform)?.maxLength)
+    .filter((n): n is number => n !== undefined);
+  return limits.length ? Math.min(...limits) : undefined;
+}
+
 export interface SendTargets {
   /** Sources the composer can address, in configuration order. */
   sendable: ChatSource[];

@@ -671,6 +671,27 @@ messages! {
         pt: "o OBS recusou remover a fonte da Mesa: {resp}",
         en: "OBS wouldn't remove the Table source: {resp}";
 
+    ChatBadgeMonths { badge: &'a str, months: &'a str } = "rust.chat.badgeMonths" =>
+        pt: "{badge} · {months} meses",
+        en: "{badge} · {months} months";
+    ChatCelebrationMonths { months: &'a str } = "rust.chat.celebrationMonths" =>
+        pt: "{months} meses de inscrição",
+        en: "{months} months subscribed";
+    ChatHypeTrainStarted { level: &'a str } = "rust.chat.hypeTrainStarted" =>
+        pt: "🚂 Hype Train começou! Nível {level}",
+        en: "🚂 Hype Train started! Level {level}";
+    ChatHypeTrainEnded { level: &'a str } = "rust.chat.hypeTrainEnded" =>
+        pt: "🚂 Hype Train terminou no nível {level}",
+        en: "🚂 Hype Train ended at level {level}";
+    ChatSharedChatStarted { channels: &'a str } = "rust.chat.sharedChatStarted" =>
+        pt: "Chat compartilhado começou: {channels}",
+        en: "Shared chat started: {channels}";
+    ChatSharedChatEnded = "rust.chat.sharedChatEnded" =>
+        pt: "O chat compartilhado terminou",
+        en: "Shared chat ended";
+    ChatGiftReceived { user: &'a str } = "rust.chat.giftReceived" =>
+        pt: "{user} recebeu uma assinatura de presente",
+        en: "{user} received a gift membership";
     ChatGiftRecipient { recipient: &'a str } = "rust.chat.giftRecipient" =>
         pt: "🎁 para {recipient}",
         en: "🎁 for {recipient}";

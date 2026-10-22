@@ -12,24 +12,57 @@ use crate::i18n::Msg;
 use crate::platforms::provider::{AudienceReader, AudienceSetup, ChatSession, Connection, Outbox};
 use crate::AppState;
 
-#[derive(Serialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatFragment {
-    pub kind: String, // "text" | "emote"
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
-#[derive(Serialize, Clone, Debug)]
+/// One piece of a message. `text` is always the plain-text fallback.
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatFragment {
+    /// "text" | "emote" | "gif" | "sticker" | "link" | "mention" | "cheer"
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// Image for emotes, GIFs, stickers and cheermotes; the target for links.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Bits in a cheer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<u64>,
+    /// Cheer tier color.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Zero-width emote drawn over the previous one.
+    #[serde(skip_serializing_if = "is_false")]
+    pub overlay: bool,
+    /// Power-up: the emote is shown much larger.
+    #[serde(skip_serializing_if = "is_false")]
+    pub giant: bool,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatBadge {
     pub label: String,
     pub kind: String,
+    /// Badge image; without one the label is shown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Tooltip, such as "Subscriber (14 months)".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+/// The message a reply answers, as the platform quotes it.
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplyContext {
+    pub author: String,
+    pub text: String,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub id: String,
@@ -48,6 +81,30 @@ pub struct ChatMessage {
     pub fragments: Vec<ChatFragment>,
     pub badges: Vec<ChatBadge>,
     pub ts: u64,
+    /// `/me`: the whole line takes the author's color.
+    #[serde(skip_serializing_if = "is_false")]
+    pub action: bool,
+    /// Why the platform singles the message out: "first" | "returning" | "highlighted" |
+    /// "redeemed" | "announcement" | "effect" | "pinned" | "paid" | "error".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<String>,
+    /// Accent for announcements and paid highlights, as a CSS color.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+    /// What the highlight is about, such as a channel points reward or a Super Chat amount.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply: Option<ReplyContext>,
+    /// Shared chat: the message was sent in another channel of the session.
+    #[serde(skip_serializing_if = "is_false")]
+    pub shared: bool,
+    /// A platform notice with no author line, such as a watch streak or a mode change.
+    #[serde(skip_serializing_if = "is_false")]
+    pub system: bool,
+    /// The same message reaching more than one source (Twitch shared chat) is shown once.
+    #[serde(skip)]
+    pub dedup_key: Option<String>,
 }
 
 #[derive(Default)]
@@ -101,13 +158,18 @@ struct NativeMessageDedup {
 
 impl NativeMessageDedup {
     fn accept(&mut self, msg: &ChatMessage) -> bool {
-        let Some(native_id) = msg.native_id.as_deref() else {
-            return true;
-        };
-        let key = NativeMessageKey {
-            platform: msg.platform.clone(),
-            source: msg.source.clone(),
-            native_id: native_id.to_string(),
+        let key = match (&msg.dedup_key, &msg.native_id) {
+            (Some(shared), _) => NativeMessageKey {
+                platform: msg.platform.clone(),
+                source: String::new(),
+                native_id: shared.clone(),
+            },
+            (None, Some(native_id)) => NativeMessageKey {
+                platform: msg.platform.clone(),
+                source: msg.source.clone(),
+                native_id: native_id.clone(),
+            },
+            (None, None) => return true,
         };
         if !self.seen.insert(key.clone()) {
             return false;
@@ -175,15 +237,90 @@ pub(crate) fn text_frag(t: &str) -> ChatFragment {
     ChatFragment {
         kind: "text".into(),
         text: Some(t.to_string()),
-        url: None,
+        ..Default::default()
     }
 }
-pub(crate) fn frags_to_text(frags: &[ChatFragment]) -> String {
+
+/// Splits plain text into text, link and mention fragments; platforms without link or
+/// mention metadata use this on their text runs.
+pub(crate) fn rich_text_frags(t: &str) -> Vec<ChatFragment> {
+    let mut out: Vec<ChatFragment> = Vec::new();
+    let mut plain = String::new();
+    let flush = |plain: &mut String, out: &mut Vec<ChatFragment>| {
+        if !plain.is_empty() {
+            out.push(text_frag(plain));
+            plain.clear();
+        }
+    };
+    let mut rest = t;
+    while !rest.is_empty() {
+        let word_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let (word, after) = rest.split_at(word_end);
+        let space_end = after
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(after.len());
+        let (space, next) = after.split_at(space_end);
+        if let Some(url) = link_target(word) {
+            flush(&mut plain, &mut out);
+            out.push(ChatFragment {
+                kind: "link".into(),
+                text: Some(word.to_string()),
+                url: Some(url),
+                ..Default::default()
+            });
+        } else if is_mention(word) {
+            flush(&mut plain, &mut out);
+            out.push(ChatFragment {
+                kind: "mention".into(),
+                text: Some(word.to_string()),
+                ..Default::default()
+            });
+        } else {
+            plain.push_str(word);
+        }
+        plain.push_str(space);
+        rest = next;
+    }
+    flush(&mut plain, &mut out);
+    out
+}
+
+/// Only http(s) links open; anything else stays text.
+fn link_target(word: &str) -> Option<String> {
+    let word = word.trim_end_matches(['.', ',', '!', '?', ')', ';', ':']);
+    let lower = word.to_ascii_lowercase();
+    let url = if lower.starts_with("https://") || lower.starts_with("http://") {
+        word.to_string()
+    } else if lower.starts_with("www.") && word.len() > 4 {
+        format!("https://{word}")
+    } else {
+        return None;
+    };
+    (url.len() <= 2048 && !url.chars().any(|c| c.is_control() || c == '"' || c == '<'))
+        .then_some(url)
+}
+
+fn is_mention(word: &str) -> bool {
+    let Some(name) = word.strip_prefix('@') else {
+        return false;
+    };
+    let name = name.trim_end_matches(['.', ',', '!', '?', ':', ';']);
+    !name.is_empty()
+        && name.chars().count() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '.' | '-'))
+}
+
+/// Splits text fragments further into links and mentions, keeping every other fragment.
+pub(crate) fn enrich_frags(frags: Vec<ChatFragment>) -> Vec<ChatFragment> {
     frags
-        .iter()
-        .filter_map(|f| f.text.clone())
-        .collect::<Vec<_>>()
-        .join("")
+        .into_iter()
+        .flat_map(|f| match (f.kind.as_str(), f.text.as_deref()) {
+            ("text", Some(t)) => rich_text_frags(t),
+            _ => vec![f],
+        })
+        .collect()
 }
 
 pub(crate) fn emit_chat(app: &AppHandle, msg: ChatMessage) {
@@ -208,11 +345,64 @@ pub(crate) fn emit_chat(app: &AppHandle, msg: ChatMessage) {
                 msg.color.as_deref(),
                 &msg.text,
                 msg.native_id.as_deref(),
+                replay_details(&msg),
             );
         }
     }
     crate::overlay::push_chat(&app.state::<AppState>().overlay, &msg);
     let _ = app.emit("chat://message", msg);
+}
+
+/// What replay needs beyond the plain text: images, badges and how the line is marked.
+fn replay_details(msg: &ChatMessage) -> Option<Value> {
+    let mut extra = Map::new();
+    if msg.fragments.iter().any(|f| f.kind != "text") {
+        extra.insert(
+            "f".into(),
+            Value::Array(
+                msg.fragments
+                    .iter()
+                    .map(|f| {
+                        let mut frag = json!({ "k": f.kind, "t": f.text });
+                        if let Some(url) = &f.url {
+                            frag["u"] = json!(url);
+                        }
+                        frag
+                    })
+                    .collect(),
+            ),
+        );
+    }
+    if !msg.badges.is_empty() {
+        extra.insert(
+            "b".into(),
+            Value::Array(
+                msg.badges
+                    .iter()
+                    .map(|b| {
+                        let mut badge = json!({ "l": b.label, "k": b.kind });
+                        if let Some(url) = &b.url {
+                            badge["u"] = json!(url);
+                        }
+                        badge
+                    })
+                    .collect(),
+            ),
+        );
+    }
+    if let Some(highlight) = &msg.highlight {
+        extra.insert("h".into(), json!(highlight));
+    }
+    if let Some(reply) = &msg.reply {
+        extra.insert("r".into(), json!({ "a": reply.author, "m": reply.text }));
+    }
+    if msg.action {
+        extra.insert("me".into(), json!(true));
+    }
+    if msg.system {
+        extra.insert("sys".into(), json!(true));
+    }
+    (!extra.is_empty()).then_some(Value::Object(extra))
 }
 
 pub(crate) fn emit_chat_gen(app: &AppHandle, gen: u64, msg: ChatMessage) {
@@ -266,26 +456,111 @@ pub(crate) fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
         json!({ "scope": "message", "platform": platform, "nativeId": native_id }),
     );
 }
-pub(crate) fn delete_user(app: &AppHandle, platform: &str, source: &str, author: &str) {
-    let _ = app.emit(
-        "chat://delete",
-        json!({ "scope": "user", "platform": platform, "source": source, "author": author }),
-    );
+/// Removes one author's messages: a ban, a timeout (`seconds`) or a hide.
+pub(crate) fn delete_user(
+    app: &AppHandle,
+    platform: &str,
+    source: &str,
+    author: &str,
+    author_id: Option<&str>,
+    seconds: Option<u64>,
+) {
+    let mut event =
+        json!({ "scope": "user", "platform": platform, "source": source, "author": author });
+    if let Some(id) = author_id {
+        event["authorId"] = json!(id);
+    }
+    if let Some(seconds) = seconds {
+        event["seconds"] = json!(seconds);
+    }
+    publish_delete(app, event);
 }
 pub(crate) fn clear_source(app: &AppHandle, platform: &str, source: &str) {
-    let _ = app.emit(
-        "chat://delete",
+    publish_delete(
+        app,
         json!({ "scope": "all", "platform": platform, "source": source }),
     );
 }
 
-#[derive(Serialize, Clone, Debug)]
+fn publish_delete(app: &AppHandle, event: Value) {
+    crate::overlay::push_chat_event(&app.state::<AppState>().overlay, "delete", &event);
+    let _ = app.emit("chat://delete", event);
+}
+
+/// Chat restrictions a source reports; each update carries only what changed.
+pub(crate) fn emit_modes(app: &AppHandle, gen: u64, platform: &str, source: &str, modes: Value) {
+    if CHAT_GEN.load(Ordering::SeqCst) == gen {
+        let _ = app.emit(
+            "chat://modes",
+            json!({ "platform": platform, "source": source, "modes": modes }),
+        );
+    }
+}
+
+/// The message pinned on a source, or None when the pin is removed.
+pub(crate) fn emit_pin(
+    app: &AppHandle,
+    gen: u64,
+    platform: &str,
+    source: &str,
+    message: Option<ChatMessage>,
+) {
+    if CHAT_GEN.load(Ordering::SeqCst) == gen {
+        let event = json!({ "platform": platform, "source": source, "message": message });
+        crate::overlay::push_chat_event(&app.state::<AppState>().overlay, "pin", &event);
+        let _ = app.emit("chat://pin", event);
+    }
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PollOption {
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub votes: Option<u64>,
+    /// Share of the votes, 0–100, when the platform reports only percentages.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub percent: Option<f64>,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Poll {
+    pub id: String,
+    /// "poll" | "prediction"
+    pub kind: String,
+    pub question: String,
+    pub options: Vec<PollOption>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<u64>,
+    pub ended: bool,
+}
+
+/// A running poll or prediction on a source, or None when it closes.
+pub(crate) fn emit_poll(
+    app: &AppHandle,
+    gen: u64,
+    platform: &str,
+    source: &str,
+    poll: Option<Poll>,
+) {
+    if CHAT_GEN.load(Ordering::SeqCst) == gen {
+        let _ = app.emit(
+            "chat://poll",
+            json!({ "platform": platform, "source": source, "poll": poll }),
+        );
+    }
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Alert {
     pub id: String,
-    pub platform: String, // twitch | youtube | kick
+    pub platform: String, // A chat provider id, or an alert service such as streamlabs.
     pub source: String,
-    pub kind: String, // sub|resub|subgift|bits|raid|member|superchat|tip|follow
+    /// sub | resub | subgift | bits | raid | member | superchat | tip | follow | upgrade |
+    /// payforward | streak | charity | gift | kicks | reward | milestone
+    pub kind: String,
     pub user: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<f64>, // Unit depends on kind: bits, months, gifts, viewers, or currency amount.
@@ -300,6 +575,12 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fragments: Vec<ChatFragment>,
     pub ts: u64,
+    /// Sticker or gift artwork.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    /// What was given or redeemed: a reward, a gift, a charity or a membership level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 pub fn emit_alert(app: &AppHandle, alert: Alert) {
@@ -1040,6 +1321,7 @@ mod tests {
             fragments: vec![text_frag("oi")],
             badges: vec![],
             ts: 1,
+            ..Default::default()
         }
     }
 

@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import { cn } from "../lib/utils";
 import { useI18n, type I18n, type MessageKey } from "../lib/i18n";
 import { PlatformGlyph } from "./ui";
+import { ChatFragments } from "./ChatFragments";
 import type { Alert, AlertKind, PlatformId } from "../lib/types";
 
 const ORIGIN: Record<string, string> = {
@@ -31,7 +32,30 @@ const KIND_META: Record<
     verbKey: "chat.alerts.verb.superchat",
     accent: "brass",
   },
+  upgrade: {
+    emoji: "⏫",
+    verbKey: "chat.alerts.verb.upgrade",
+    accent: "brass",
+  },
+  payforward: {
+    emoji: "🤝",
+    verbKey: "chat.alerts.verb.payforward",
+    accent: "tomato",
+  },
+  streak: { emoji: "🔥", verbKey: "chat.alerts.verb.streak", accent: "info" },
+  charity: { emoji: "💚", verbKey: "chat.alerts.verb.charity", accent: "ok" },
+  gift: { emoji: "🎀", verbKey: "chat.alerts.verb.gift", accent: "tomato" },
+  kicks: { emoji: "🟩", verbKey: "chat.alerts.verb.kicks", accent: "ok" },
+  reward: { emoji: "🎟️", verbKey: "chat.alerts.verb.reward", accent: "info" },
+  milestone: {
+    emoji: "🏆",
+    verbKey: "chat.alerts.verb.milestone",
+    accent: "brass",
+  },
 };
+
+const money = (a: Alert) =>
+  a.amount ? `${a.currency ? a.currency + " " : ""}${a.amount}` : "";
 
 const ACCENT: Record<string, { bar: string }> = {
   brass: { bar: "border-brass" },
@@ -64,7 +88,21 @@ function detail(a: Alert, i18n: Pick<I18n, "t" | "tp">): string {
         .join(" · ");
     case "superchat":
     case "tip":
-      return a.amount ? `${a.currency ? a.currency + " " : ""}${a.amount}` : "";
+    case "charity":
+      // The platform's own amount text (localized) when it has one.
+      return a.title && a.kind === "superchat" && !a.image ? a.title : money(a);
+    case "gift":
+      return a.currency === "JEWELS" && a.amount
+        ? i18n.t("chat.alerts.detail.jewels", { n: a.amount })
+        : "";
+    case "kicks":
+      return a.amount
+        ? i18n.t("chat.alerts.detail.kicks", { n: a.amount })
+        : "";
+    case "streak":
+      return a.amount ? i18n.tp("chat.alerts.detail.streak", a.amount) : "";
+    case "milestone":
+      return a.amount ? String(a.amount) : "";
     default:
       return "";
   }
@@ -106,7 +144,23 @@ const AlertRow = memo(function AlertRow({
         <div className="text-ink-muted" style={{ fontSize: "0.85em" }}>
           {t(meta.verbKey)}
           {d && <span className="font-bold text-ink"> · {d}</span>}
+          {/* Rewards, gifts, charities and upgrades name what was given. */}
+          {a.title && a.kind !== "superchat" && (
+            <span className="text-ink"> · {a.title}</span>
+          )}
+          {a.title && a.kind === "superchat" && a.image && (
+            <span className="text-ink"> · {a.title}</span>
+          )}
         </div>
+        {a.image && (
+          <img
+            src={a.image}
+            alt={a.title ?? ""}
+            title={a.title}
+            loading="lazy"
+            className="mt-1 max-h-20 w-auto rounded-md"
+          />
+        )}
         {(a.fragments?.length || a.message) && (
           <div
             className="mt-0.5 truncate italic text-ink-faint"
@@ -114,22 +168,11 @@ const AlertRow = memo(function AlertRow({
             title={a.message}
           >
             “
-            {a.fragments?.length
-              ? a.fragments.map((f, i) =>
-                  f.kind === "emote" && f.url ? (
-                    <img
-                      key={i}
-                      src={f.url}
-                      alt={f.text}
-                      title={f.text}
-                      className="mx-0.5 inline-block h-[1.4em] w-auto not-italic align-middle"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span key={i}>{f.text}</span>
-                  ),
-                )
-              : a.message}
+            {a.fragments?.length ? (
+              <ChatFragments fragments={a.fragments} />
+            ) : (
+              a.message
+            )}
             ”
           </div>
         )}

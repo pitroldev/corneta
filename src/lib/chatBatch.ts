@@ -18,11 +18,16 @@ function deletedBy(message: ChatMessage, deletion: ChatDelete): boolean {
     return false;
   if (deletion.scope === "message")
     return message.nativeId != null && message.nativeId === deletion.nativeId;
-  if (deletion.scope === "user")
+  if (deletion.scope === "user") {
+    if (message.source !== deletion.source) return false;
+    // Display names may differ from the login the platform reports, so IDs win when known.
+    if (deletion.authorId && message.authorId)
+      return message.authorId === deletion.authorId;
     return (
-      message.source === deletion.source &&
-      message.author.toLowerCase() === (deletion.author ?? "").toLowerCase()
+      !!deletion.author &&
+      message.author.toLowerCase() === deletion.author.toLowerCase()
     );
+  }
   return deletion.scope === "all" && message.source === deletion.source;
 }
 

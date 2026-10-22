@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveSendTargets,
+  sendMaxLength,
   sendStatusLine,
   srcLabel,
   type SendReady,
@@ -167,5 +168,15 @@ describe("sendStatusLine", () => {
       "chat.send.status.reconnect(label=channel-t)",
     ]);
     expect(sendStatusLine([], {}, all, echo)).toBe("");
+  });
+});
+
+describe("sendMaxLength", () => {
+  it("uses the shortest limit among the targets", () => {
+    expect(sendMaxLength([source("t", "twitch")])).toBe(480);
+    expect(sendMaxLength([source("t", "twitch"), source("y", "youtube")])).toBe(
+      200,
+    );
+    expect(sendMaxLength([])).toBeUndefined();
   });
 });

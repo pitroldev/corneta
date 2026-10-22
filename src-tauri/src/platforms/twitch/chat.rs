@@ -1,21 +1,20 @@
 //! Twitch chat over the IRC WebSocket: messages, notices (subs, raids, bits) and moderation.
 
 use serde_json::Value;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 use tungstenite::Message;
 
-use super::emotes::{apply_thirdparty, fetch_channel_thirdparty, fetch_global_thirdparty};
+use super::assets::{ChannelAssets, Helix};
+use super::irc::{is_ping, line_events, room_id, TwitchEvent};
 use crate::chat::{
     chat_auth, chat_status, chat_status_gen, clear_source, delete_message, delete_user, emit_alert,
-    emit_chat_gen, next_id, now_ms, reply_id, sanitize_outgoing, text_frag, Alert, ChatBadge,
-    ChatFragment, ChatMessage, Outgoing, CHAT_GEN,
+    emit_chat_gen, emit_modes, next_id, now_ms, reply_id, sanitize_outgoing, text_frag,
+    ChatMessage, Outgoing, CHAT_GEN,
 };
 use crate::http_client as ureq;
-use crate::i18n::Msg;
 use crate::AppState;
 
 fn twitch_privmsg(channel: &str, text: &str, reply_to: Option<&str>) -> String {
@@ -122,8 +121,14 @@ pub(crate) fn run_twitch(
 
     // Load before parsing messages; late emote lookup would leave them permanently rendered as text.
 
-    let mut emotes = fetch_global_thirdparty();
-    let mut channel_emotes_done = false;
+    let helix = super::account::twitch_token(&app)
+        .map(|token| Helix {
+            token,
+            client_id: crate::auth::oauth(&app).twitch_client_id,
+        })
+        .filter(|h| !h.client_id.is_empty());
+    let mut assets = ChannelAssets::global(helix.as_ref());
+    let mut channel_assets_done = false;
 
     while running.load(Ordering::Relaxed) {
         // Drain on read timeouts too, so quiet channels do not stall outgoing messages.
@@ -161,6 +166,7 @@ pub(crate) fn run_twitch(
                             fragments: vec![text_frag(&clean)],
                             badges: vec![],
                             ts: now_ms(),
+                            ..Default::default()
                         },
                     );
                 }
@@ -170,56 +176,37 @@ pub(crate) fn run_twitch(
         match socket.read() {
             Ok(Message::Text(t)) => {
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
-                    if !channel_emotes_done {
-                        if let Some(room_id) = tag_val(twitch_tags(line), "room-id") {
-                            fetch_channel_thirdparty(&room_id, &mut emotes);
-                            channel_emotes_done = true;
+                    if is_ping(line) {
+                        let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
+                        continue;
+                    }
+                    if !channel_assets_done {
+                        if let Some(room) = room_id(line) {
+                            assets.load_channel(&room, helix.as_ref());
+                            channel_assets_done = true;
                         }
                     }
-                    // Compare the IRC command, not substrings that may occur in user text.
-
-                    let cmd = irc_command(line);
-                    if cmd == "PING" {
-                        let _ = socket.send(Message::Text("PONG :tmi.twitch.tv".into()));
-                    } else if cmd == "PRIVMSG" {
-                        if let Some(b) =
-                            tag_val(twitch_tags(line), "bits").and_then(|v| v.parse::<f64>().ok())
-                        {
-                            if b > 0.0 {
-                                emit_alert(
-                                    &app,
-                                    Alert {
-                                        id: next_id(),
-                                        platform: "twitch".into(),
-                                        source: source.to_string(),
-                                        kind: "bits".into(),
-                                        user: tag_val(twitch_tags(line), "display-name")
-                                            .unwrap_or_else(|| Msg::ChatUnknownUser.now()),
-                                        amount: Some(b),
-                                        currency: None,
-                                        tier: None,
-                                        message: None,
-                                        fragments: Vec::new(),
-                                        ts: now_ms(),
-                                    },
-                                );
+                    for event in line_events(line, source, &assets) {
+                        match event {
+                            TwitchEvent::Message(msg) => emit_chat_gen(&app, gen, msg),
+                            TwitchEvent::Alert(alert) => emit_alert(&app, alert),
+                            TwitchEvent::Delete(id) => delete_message(&app, "twitch", &id),
+                            TwitchEvent::DeleteUser {
+                                login,
+                                user_id,
+                                seconds,
+                            } => delete_user(
+                                &app,
+                                "twitch",
+                                source,
+                                &login,
+                                user_id.as_deref(),
+                                seconds,
+                            ),
+                            TwitchEvent::Clear => clear_source(&app, "twitch", source),
+                            TwitchEvent::Modes(modes) => {
+                                emit_modes(&app, gen, "twitch", source, modes)
                             }
-                        }
-                        if let Some(msg) = parse_privmsg(line, source, &emotes) {
-                            emit_chat_gen(&app, gen, msg);
-                        }
-                    } else if cmd == "USERNOTICE" {
-                        if let Some(alert) = parse_usernotice(line, source, &emotes) {
-                            emit_alert(&app, alert);
-                        }
-                    } else if cmd == "CLEARMSG" {
-                        if let Some(id) = tag_val(twitch_tags(line), "target-msg-id") {
-                            delete_message(&app, "twitch", &id);
-                        }
-                    } else if cmd == "CLEARCHAT" {
-                        match clearchat_user(line) {
-                            Some(u) => delete_user(&app, "twitch", source, &u),
-                            None => clear_source(&app, "twitch", source),
                         }
                     }
                 }
@@ -285,308 +272,9 @@ fn twitch_validate(token: &str) -> TokenCheck {
     }
 }
 
-// Skip IRC tags and prefix before examining the command; message text is not a command.
-
-fn irc_command(line: &str) -> &str {
-    let mut rest = line;
-    if rest.starts_with('@') {
-        rest = match rest.find(' ') {
-            Some(i) => &rest[i + 1..],
-            None => return "",
-        };
-    }
-    if rest.starts_with(':') {
-        rest = match rest.find(' ') {
-            Some(i) => &rest[i + 1..],
-            None => return "",
-        };
-    }
-    rest.split(' ').next().unwrap_or("")
-}
-
-fn twitch_tags(line: &str) -> &str {
-    line.strip_prefix('@')
-        .and_then(|s| s.split(' ').next())
-        .unwrap_or("")
-}
-
-fn tag_val(tags: &str, key: &str) -> Option<String> {
-    for kv in tags.split(';') {
-        let mut it = kv.splitn(2, '=');
-        if it.next() == Some(key) {
-            let v = it.next().unwrap_or("");
-            return (!v.is_empty()).then(|| v.to_string());
-        }
-    }
-    None
-}
-
-fn clearchat_user(line: &str) -> Option<String> {
-    let after = line.split("CLEARCHAT").nth(1)?;
-    let idx = after.find(':')?;
-    let u = after[idx + 1..].trim();
-    (!u.is_empty()).then(|| u.to_string())
-}
-
-fn parse_usernotice(line: &str, source: &str, emotes: &HashMap<String, String>) -> Option<Alert> {
-    let tags = twitch_tags(line);
-    let msg_id = tag_val(tags, "msg-id")?;
-    let user = tag_val(tags, "display-name")
-        .or_else(|| tag_val(tags, "login"))
-        .unwrap_or_else(|| Msg::ChatUnknownUser.now());
-    let tier = tag_val(tags, "msg-param-sub-plan").map(|p| match p.as_str() {
-        "Prime" => "Prime".into(),
-        "1000" => "T1".into(),
-        "2000" => "T2".into(),
-        "3000" => "T3".into(),
-        other => other.to_string(),
-    });
-    let (kind, amount) = match msg_id.as_str() {
-        "sub" => ("sub", Some(1.0)),
-        "resub" => (
-            "resub",
-            tag_val(tags, "msg-param-cumulative-months").and_then(|v| v.parse().ok()),
-        ),
-        "subgift" => ("subgift", Some(1.0)),
-        "submysterygift" | "anonsubmysterygift" => (
-            "subgift",
-            tag_val(tags, "msg-param-mass-gift-count").and_then(|v| v.parse().ok()),
-        ),
-        "raid" => (
-            "raid",
-            tag_val(tags, "msg-param-viewerCount").and_then(|v| v.parse().ok()),
-        ),
-        _ => return None,
-    };
-    let emotes_tag = tag_val(tags, "emotes").unwrap_or_default();
-    let (message, fragments) = if kind == "subgift" {
-        (
-            tag_val(tags, "msg-param-recipient-display-name")
-                .map(|r| Msg::ChatGiftRecipient { recipient: &r }.now()),
-            Vec::new(),
-        )
-    } else {
-        match usernotice_text(line) {
-            Some(t) => {
-                let frags = apply_thirdparty(twitch_fragments(&t, &emotes_tag), emotes);
-                (Some(t), frags)
-            }
-            None => (None, Vec::new()),
-        }
-    };
-    Some(Alert {
-        id: next_id(),
-        platform: "twitch".into(),
-        source: source.to_string(),
-        kind: kind.into(),
-        user,
-        amount,
-        currency: None,
-        tier,
-        message,
-        fragments,
-        ts: now_ms(),
-    })
-}
-
-fn usernotice_text(line: &str) -> Option<String> {
-    let idx = line.find("USERNOTICE")?;
-    let after = &line[idx..];
-    let mi = after.find(':')?;
-    let t = after[mi + 1..].trim_end();
-    (!t.is_empty()).then(|| t.to_string())
-}
-
-fn parse_privmsg(
-    line: &str,
-    source: &str,
-    emotes: &HashMap<String, String>,
-) -> Option<ChatMessage> {
-    let (tags, rest) = if let Some(stripped) = line.strip_prefix('@') {
-        let sp = stripped.find(' ')?;
-        (&stripped[..sp], &stripped[sp + 1..])
-    } else {
-        ("", line)
-    };
-    let privmsg_idx = rest.find("PRIVMSG")?;
-    let after = &rest[privmsg_idx..];
-    let msg_idx = after.find(':')?;
-    let mut text = after[msg_idx + 1..].trim_end().to_string();
-    // Strip the CTCP /me envelope while preserving its action text.
-    if let Some(inner) = text
-        .strip_prefix("\u{1}ACTION ")
-        .and_then(|s| s.strip_suffix('\u{1}'))
-    {
-        text = inner.to_string();
-    }
-    if text.is_empty() {
-        return None;
-    }
-
-    let nick = rest
-        .strip_prefix(':')
-        .and_then(|r| r.split('!').next())
-        .unwrap_or("anon")
-        .to_string();
-
-    let mut color = None;
-    let mut display = nick;
-    let mut emotes_tag = "";
-    let mut badges_tag = "";
-    let mut native_id = None;
-    for kv in tags.split(';') {
-        let mut it = kv.splitn(2, '=');
-        let k = it.next().unwrap_or("");
-        let v = it.next().unwrap_or("");
-        match k {
-            "color" if !v.is_empty() => color = Some(v.to_string()),
-            "display-name" if !v.is_empty() => display = v.to_string(),
-            "emotes" => emotes_tag = v,
-            "badges" => badges_tag = v,
-            "id" if !v.is_empty() => native_id = Some(v.to_string()),
-            _ => {}
-        }
-    }
-
-    Some(ChatMessage {
-        id: next_id(),
-        platform: "twitch".into(),
-        source: source.to_string(),
-        author: display,
-        author_id: tag_val(twitch_tags(line), "user-id"),
-        native_id,
-        color,
-        fragments: apply_thirdparty(twitch_fragments(&text, emotes_tag), emotes),
-        badges: twitch_badges(badges_tag),
-        text,
-        ts: now_ms(),
-    })
-}
-
-fn twitch_fragments(text: &str, emotes_tag: &str) -> Vec<ChatFragment> {
-    if emotes_tag.is_empty() {
-        return vec![text_frag(text)];
-    }
-    let mut ranges: Vec<(usize, usize, String)> = vec![];
-    for part in emotes_tag.split('/') {
-        let mut it = part.splitn(2, ':');
-        let id = it.next().unwrap_or("");
-        let positions = it.next().unwrap_or("");
-        if id.is_empty() {
-            continue;
-        }
-        for pos in positions.split(',') {
-            let mut p = pos.splitn(2, '-');
-            if let (Some(a), Some(b)) = (
-                p.next().and_then(|x| x.parse::<usize>().ok()),
-                p.next().and_then(|x| x.parse::<usize>().ok()),
-            ) {
-                ranges.push((a, b, id.to_string()));
-            }
-        }
-    }
-    if ranges.is_empty() {
-        return vec![text_frag(text)];
-    }
-    ranges.sort_by_key(|r| r.0);
-
-    let chars: Vec<char> = text.chars().collect();
-    let n = chars.len();
-    let mut frags = vec![];
-    let mut cursor = 0usize;
-    for (a, b, id) in ranges {
-        if a >= n || a < cursor || b < a {
-            continue;
-        }
-        if a > cursor {
-            frags.push(text_frag(&chars[cursor..a].iter().collect::<String>()));
-        }
-        let end = (b + 1).min(n);
-        frags.push(ChatFragment {
-            kind: "emote".into(),
-            text: Some(chars[a..end].iter().collect()),
-            url: Some(format!(
-                "https://static-cdn.jtvnw.net/emoticons/v2/{id}/default/dark/1.0"
-            )),
-        });
-        cursor = end;
-    }
-    if cursor < n {
-        frags.push(text_frag(&chars[cursor..].iter().collect::<String>()));
-    }
-    frags
-}
-
-fn twitch_badges(tag: &str) -> Vec<ChatBadge> {
-    if tag.is_empty() {
-        return vec![];
-    }
-    tag.split(',')
-        .filter_map(|b| {
-            let set = b.split('/').next().unwrap_or("");
-            let (label, kind) = match set {
-                "broadcaster" => ("HOST", "broadcaster"),
-                "moderator" => ("MOD", "moderator"),
-                "vip" => ("VIP", "vip"),
-                "subscriber" => ("SUB", "subscriber"),
-                "founder" => ("FND", "subscriber"),
-                "premium" => ("PRIME", "premium"),
-                "turbo" => ("TURBO", "premium"),
-                "partner" => ("✓", "partner"),
-                "staff" | "admin" | "global_mod" => ("STAFF", "staff"),
-                "artist-badge" => ("ART", "artist"),
-                _ => return None,
-            };
-            Some(ChatBadge {
-                label: label.into(),
-                kind: kind.into(),
-            })
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn privmsg_extracts_text_and_ignores_lines_without_messages() {
-        let emotes: HashMap<String, String> = HashMap::new();
-        let msg = parse_privmsg(
-            "@id=1 :fulano!fulano@fulano.tmi.twitch.tv PRIVMSG #canal :bora cornetar 😀",
-            "meu-canal",
-            &emotes,
-        )
-        .expect("valid message");
-        assert_eq!(msg.author, "fulano");
-        assert_eq!(msg.text, "bora cornetar 😀");
-        assert_eq!(msg.source, "meu-canal");
-        assert_eq!(msg.platform, "twitch");
-
-        assert!(parse_privmsg("@id=1 :a!a@a PRIVMSG #c :", "s", &emotes).is_none());
-        assert!(parse_privmsg("PING :tmi.twitch.tv", "s", &emotes).is_none());
-    }
-
-    #[test]
-    fn tag_value_matches_the_exact_key_not_its_prefix() {
-        let tags = twitch_tags("@id=abc;bits=100;idade=9 :resto");
-        assert_eq!(tag_val(tags, "id").as_deref(), Some("abc"));
-        assert_eq!(tag_val(tags, "bits").as_deref(), Some("100"));
-
-        assert_eq!(tag_val("id=;bits=", "bits"), None);
-        assert_eq!(tag_val(tags, "nao-existe"), None);
-    }
-
-    #[test]
-    fn twitch_parsers_tolerate_hostile_network_fixtures() {
-        let emotes: HashMap<String, String> = HashMap::new();
-        for case in crate::chat::hostile_chat_corpus() {
-            let _ = parse_privmsg(&case, "fonte", &emotes);
-            let _ = parse_usernotice(&case, "fonte", &emotes);
-            let _ = clearchat_user(&case);
-            let _ = tag_val(twitch_tags(&case), "id");
-        }
-    }
 
     #[test]
     fn replies_thread_only_with_plain_message_ids() {

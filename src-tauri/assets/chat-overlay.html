@@ -105,6 +105,56 @@
         vertical-align: -0.4em;
         margin: 0 1px;
       }
+      .msg .emote.giant {
+        height: 4em;
+      }
+      .msg .stack {
+        display: inline-grid;
+        vertical-align: -0.4em;
+      }
+      .msg .stack > img {
+        grid-area: 1 / 1;
+        margin: auto;
+        vertical-align: 0;
+      }
+      .msg .gif {
+        max-height: 6em;
+        max-width: 100%;
+        border-radius: 8px;
+        vertical-align: middle;
+      }
+      .msg .cheer {
+        font-weight: 800;
+      }
+      .msg .mention {
+        font-weight: 800;
+      }
+      .msg img.badge {
+        height: 1em;
+        width: auto;
+        padding: 0;
+        vertical-align: -0.12em;
+      }
+      .msg.hl {
+        border-left: 4px solid var(--hl, #ffb323);
+      }
+      .msg .reply {
+        display: block;
+        font-size: 0.72em;
+        opacity: 0.75;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .msg.action .body {
+        font-style: italic;
+      }
+      .msg.system .body {
+        margin-left: 0;
+        font-style: italic;
+        color: rgba(255, 255, 255, 0.8);
+      }
     </style>
   </head>
   <body>
@@ -160,45 +210,118 @@
               ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
           );
         }
+        function fragHtml(f) {
+          const alt = esc(f.text || "");
+          if (f.kind === "emote" && f.url)
+            return `<img class="emote${f.giant ? " giant" : ""}" src="${esc(f.url)}" alt="${alt}" />`;
+          if ((f.kind === "gif" || f.kind === "sticker") && f.url)
+            return `<img class="gif" src="${esc(f.url)}" alt="${alt}" />`;
+          if (f.kind === "cheer")
+            return f.url
+              ? `<span class="cheer"${f.color ? ` style="color:${esc(f.color)}"` : ""}><img class="emote" src="${esc(f.url)}" alt="${alt}" />${esc(f.amount ?? "")}</span>`
+              : `<span class="cheer">${alt}</span>`;
+          if (f.kind === "mention")
+            return `<span class="mention">${alt}</span>`;
+          return alt;
+        }
+        // Zero-width emotes stack over the emote before them.
         function fragsHtml(m) {
           const frags =
             Array.isArray(m.fragments) && m.fragments.length
               ? m.fragments
               : [{ kind: "text", text: m.text || "" }];
-          return frags
-            .map((f) =>
-              f.kind === "emote" && f.url
-                ? `<img class="emote" src="${esc(f.url)}" alt="${esc(f.text || "")}" />`
-                : esc(f.text || ""),
+          let html = "";
+          for (let i = 0; i < frags.length; i++) {
+            const stack = [frags[i]];
+            while (
+              frags[i].kind === "emote" &&
+              frags[i + 1] &&
+              frags[i + 1].overlay
             )
-            .join("");
+              stack.push(frags[++i]);
+            html +=
+              stack.length > 1
+                ? `<span class="stack">${stack.map(fragHtml).join("")}</span>`
+                : fragHtml(stack[0]);
+          }
+          return html;
+        }
+        const HL_COLOR = {
+          first: "#3ccf8e",
+          returning: "#5aa7ff",
+          highlighted: "#bd73ff",
+          redeemed: "#ffb323",
+          announcement: "#9146ff",
+          effect: "#ff7ad9",
+          pinned: "#ffb323",
+          celebration: "#53fc18",
+        };
+        // Moderation removes lines already on screen; data-* carry what a deletion matches.
+        function removeMatching(d) {
+          if (!d) return;
+          for (const el of Array.from(feed.children)) {
+            const x = el.dataset;
+            if (x.platform !== d.platform) continue;
+            if (d.source != null && x.source !== d.source) continue;
+            const hit =
+              d.scope === "message"
+                ? !!d.nativeId && x.nativeId === d.nativeId
+                : d.scope === "user"
+                  ? d.authorId && x.authorId
+                    ? x.authorId === d.authorId
+                    : !!d.author &&
+                      (x.author || "").toLowerCase() === d.author.toLowerCase()
+                  : d.scope === "all";
+            if (hit) el.remove();
+          }
         }
 
         function render(m) {
           if (!m || m.deleted) return;
           if (NOCMD && (m.text || "").trim().startsWith("!")) return;
           const el = document.createElement("div");
-          el.className = "msg";
+          el.className =
+            "msg" +
+            (m.highlight && !m.system ? " hl" : "") +
+            (m.action ? " action" : "") +
+            (m.system ? " system" : "");
+          const hl = m.accent || HL_COLOR[m.highlight];
+          if (hl) el.style.setProperty("--hl", hl);
+          el.dataset.platform = m.platform || "";
+          el.dataset.source = m.source || "";
+          el.dataset.author = m.author || "";
+          if (m.nativeId) el.dataset.nativeId = m.nativeId;
+          if (m.authorId) el.dataset.authorId = m.authorId;
           const dot = SHOW_PLATFORM
             ? `<span class="dot" style="background:${PLAT_COLOR[m.platform] || "#999"}"></span>`
             : "";
           const badges =
             SHOW_BADGES && Array.isArray(m.badges)
               ? m.badges
-                  .map(
-                    (b) =>
-                      `<span class="badge" style="${badgeStyle(b.kind)}">${esc(b.label)}</span>`,
+                  .map((b) =>
+                    b.url
+                      ? `<img class="badge" src="${esc(b.url)}" alt="${esc(b.title || b.label || "")}" />`
+                      : b.label
+                        ? `<span class="badge" style="${badgeStyle(b.kind)}">${esc(b.label)}</span>`
+                        : "",
                   )
                   .join("")
               : "";
           const authorColor = m.color
             ? `color:${esc(m.color)}`
             : "color:var(--brass)";
-          el.innerHTML =
-            dot +
-            badges +
-            `<span class="author" style="${authorColor}">${esc(m.author || "")}</span>` +
-            `<span class="body">${fragsHtml(m)}</span>`;
+          const reply = m.reply
+            ? `<span class="reply">↳ ${esc(m.reply.author || "")}: ${esc(m.reply.text || "")}</span>`
+            : "";
+          const bodyColor =
+            m.action && m.color ? ` style="color:${esc(m.color)}"` : "";
+          el.innerHTML = m.system
+            ? dot + `<span class="body">${fragsHtml(m)}</span>`
+            : reply +
+              dot +
+              badges +
+              `<span class="author" style="${authorColor}">${esc(m.author || "")}</span>` +
+              `<span class="body"${bodyColor}>${fragsHtml(m)}</span>`;
           feed.appendChild(el);
           while (feed.childElementCount > MAX)
             feed.removeChild(feed.firstElementChild);
@@ -230,6 +353,8 @@
             } catch (_) {
               return;
             }
+            if (m && m.event === "delete") return removeMatching(m.data);
+            if (m && m.event) return;
             render(m);
           };
           ws.onclose = () => {

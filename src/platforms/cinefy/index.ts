@@ -34,6 +34,7 @@ export const cinefyChat: ChatProviderSpec = {
   icon: "M8 5.14v13.72L19 12 8 5.14z",
   experimental: true,
   repliesNeedNativeId: true,
+  maxLength: 480,
   copy: {
     channel: "chat.source.value.cinefy",
     placeholder: "chat.source.placeholder.cinefy",

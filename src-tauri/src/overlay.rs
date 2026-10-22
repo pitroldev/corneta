@@ -110,6 +110,15 @@ pub fn push_chat(server: &Mutex<OverlayServer>, msg: &ChatMessage) {
     push_json(server, |s| s.chat.clone(), || serde_json::to_string(msg));
 }
 
+/// Deletions and pins for the chat overlay, tagged so the page tells them from messages.
+pub fn push_chat_event(server: &Mutex<OverlayServer>, event: &str, body: &serde_json::Value) {
+    push_json(
+        server,
+        |s| s.chat.clone(),
+        || serde_json::to_string(&serde_json::json!({ "event": event, "data": body })),
+    );
+}
+
 /// Serialize outside the server lock so active producers do not block each other.
 fn push_json(
     server: &Mutex<OverlayServer>,

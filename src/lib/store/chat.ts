@@ -1,6 +1,33 @@
 import { api } from "../api";
 import { applyChatBatch, type ChatEvent } from "../chatBatch";
-import type { SliceContext, State } from "./types";
+import type { ChatSideEvent } from "../types";
+import {
+  chatSideKey,
+  type ChatSide,
+  type SliceContext,
+  type State,
+} from "./types";
+
+function applySide(
+  side: Record<string, ChatSide>,
+  event: ChatSideEvent,
+): Record<string, ChatSide> {
+  const key = chatSideKey(event.platform, event.source);
+  const current: ChatSide = side[key] ?? {
+    platform: event.platform,
+    source: event.source,
+    modes: {},
+    pin: null,
+    poll: null,
+  };
+  const next: ChatSide =
+    event.kind === "modes"
+      ? { ...current, modes: { ...current.modes, ...event.modes } }
+      : event.kind === "pin"
+        ? { ...current, pin: event.message }
+        : { ...current, poll: event.poll };
+  return { ...side, [key]: next };
+}
 const CHAT_CAP = 400;
 const ALERT_CAP = 100;
 export function createChatSlice({
@@ -13,6 +40,7 @@ export function createChatSlice({
   | "chatMessages"
   | "chatConnected"
   | "chatStatuses"
+  | "chatSide"
   | "alertStatuses"
   | "chatAuth"
   | "bindChat"
@@ -42,6 +70,7 @@ export function createChatSlice({
     chatMessages: [],
     chatConnected: false,
     chatStatuses: {},
+    chatSide: {},
     alertStatuses: {},
     chatAuth: {},
     bindChat() {
@@ -83,20 +112,36 @@ export function createChatSlice({
         (message) => enqueue({ kind: "message", message }),
         (status) => {
           flush();
-          set((state) => ({
-            chatStatuses: {
-              ...state.chatStatuses,
-              [status.source || status.platform]: {
-                platform: status.platform,
-                status: status.status,
+          set((state) => {
+            // A dropped source no longer shows what it had pinned or running.
+            const key = chatSideKey(status.platform, status.source);
+            const side =
+              status.status === "connected" || !state.chatSide[key]
+                ? state.chatSide
+                : {
+                    ...state.chatSide,
+                    [key]: { ...state.chatSide[key], pin: null, poll: null },
+                  };
+            return {
+              chatStatuses: {
+                ...state.chatStatuses,
+                [status.source || status.platform]: {
+                  platform: status.platform,
+                  status: status.status,
+                },
               },
-            },
-          }));
+              chatSide: side,
+            };
+          });
         },
         (deletion) => enqueue({ kind: "delete", deletion }),
       );
+      const unsubscribeSide = api.subscribeChatSide((event) =>
+        set((state) => ({ chatSide: applySide(state.chatSide, event) })),
+      );
       return () => {
         unsubscribe();
+        unsubscribeSide();
         flush();
         if (discardPendingChat === discard) discardPendingChat = () => {};
       };
@@ -109,7 +154,7 @@ export function createChatSlice({
     },
     async connectChat(t) {
       // Reconnection preserves history; only explicit clearChat removes it.
-      set({ chatStatuses: {}, alertStatuses: {}, chatAuth: {} });
+      set({ chatStatuses: {}, chatSide: {}, alertStatuses: {}, chatAuth: {} });
       await api.chatStart(t);
       await api.alertsStart();
       set({ chatConnected: true });
@@ -120,6 +165,7 @@ export function createChatSlice({
       set({
         chatConnected: false,
         chatStatuses: {},
+        chatSide: {},
         alertStatuses: {},
         chatAuth: {},
       });

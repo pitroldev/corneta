@@ -12,6 +12,7 @@ import type {
   AppConfig,
   ChatDelete,
   ChatMessage,
+  ChatSideEvent,
   ChatPlatform,
   ChatStatus,
   EncoderInfo,
@@ -187,6 +188,8 @@ export interface CornetaApi {
     onStatus: (s: ChatStatus) => void,
     onDelete: (d: ChatDelete) => void,
   ): () => void;
+  /** Modes, the pinned message and the running poll of each source. */
+  subscribeChatSide(onEvent: (e: ChatSideEvent) => void): () => void;
   subscribeAlerts(onAlert: (a: Alert) => void): () => void;
   alertsStart(): Promise<void>;
   alertsStop(): Promise<void>;

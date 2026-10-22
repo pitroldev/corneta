@@ -107,3 +107,55 @@ describe("chat batch duplicate index", () => {
     expect(result).toHaveLength(2);
   });
 });
+
+describe("chat batch moderation by author", () => {
+  it("matches a ban by author ID even when the display name differs from the login", () => {
+    const shown = {
+      ...message("1"),
+      author: "Ástrid",
+      authorId: "42",
+    } as ChatMessage;
+    const other = {
+      ...message("2"),
+      author: "Bia",
+      authorId: "7",
+    } as ChatMessage;
+    const result = applyChatBatch(
+      [shown, other],
+      [
+        {
+          kind: "delete",
+          deletion: {
+            platform: "twitch",
+            source: "channel",
+            scope: "user",
+            author: "astrid",
+            authorId: "42",
+            seconds: 600,
+          },
+        },
+      ],
+      400,
+    );
+    expect(result.map((m) => m.deleted)).toEqual([true, undefined]);
+  });
+
+  it("falls back to the name when the platform sends no ID", () => {
+    const result = applyChatBatch(
+      [message("1")],
+      [
+        {
+          kind: "delete",
+          deletion: {
+            platform: "twitch",
+            source: "channel",
+            scope: "user",
+            author: "alice",
+          },
+        },
+      ],
+      400,
+    );
+    expect(result[0].deleted).toBe(true);
+  });
+});
