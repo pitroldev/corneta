@@ -1915,10 +1915,14 @@ mod tests {
         assert_eq!(percent_decode("%C3%A9"), "é");
     }
 
-    /// Run by hand: `cargo test --lib live_youtube -- --ignored --nocapture`.
+    /// Run by hand with `CORNETA_LIVE_CHAT=1 cargo test --lib live_youtube -- --ignored --nocapture`;
+    /// CI runs ignored tests too, and these depend on a third-party service.
     #[test]
     #[ignore = "talks to youtube.com"]
     fn live_youtube_actions_parse_into_events() {
+        if std::env::var_os("CORNETA_LIVE_CHAT").is_none() {
+            return;
+        }
         crate::install_tls_provider();
         let channel = std::env::var("CORNETA_LIVE_YOUTUBE").unwrap_or_else(|_| "@LofiGirl".into());
         let LiveResolve::Video(video) = resolve_youtube_video(&channel, "") else {

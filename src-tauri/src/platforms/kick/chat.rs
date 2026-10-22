@@ -805,10 +805,14 @@ mod tests {
         assert_eq!(author(json!({ "username": "ana" })), None);
     }
 
-    /// Run by hand: `cargo test --lib live_kick -- --ignored --nocapture`.
+    /// Run by hand with `CORNETA_LIVE_CHAT=1 cargo test --lib live_kick -- --ignored --nocapture`;
+    /// CI runs ignored tests too, and these depend on a third-party service.
     #[test]
     #[ignore = "talks to kick.com"]
     fn live_kick_channel_resolves_and_streams_chat() {
+        if std::env::var_os("CORNETA_LIVE_CHAT").is_none() {
+            return;
+        }
         crate::install_tls_provider();
         let channel = get_channel(&kick_slug("xqc")).expect("kick.com answered the channel lookup");
         let (key, cluster) = pusher_endpoint();
