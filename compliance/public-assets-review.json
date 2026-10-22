@@ -246,6 +246,102 @@
     {
       "file": "web/public/images/editorial/reports-and-data/corneta-post-live-report.webp",
       "sha256": "4f163ea057e65fa04d35e774026200aca30e1ed672eabb5694acc0a6904c4302"
+    },
+    {
+      "file": "web/public/images/lp/en/feat-chat.webp",
+      "sha256": "a1ca25c7339ae50cf6cc4c46a05a98359b014f163efdc9193478d6c23293afcf",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/feat-independent.webp",
+      "sha256": "6675a8384ddec79601e5f736059ef8503b2d245c6354800b14d85f7bc45ee909",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/feat-protection.webp",
+      "sha256": "18f170f3412dd1764c512bd321958a9a25d5870f5d648d2f5bc73ae49818fa9f",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/feat-report-moments.webp",
+      "sha256": "622888821ca2d5f10e548dcd5e10c43ac4450507446f477d0842d1061df18782",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/feat-report.webp",
+      "sha256": "606a4f779a8c40499d0370945f56053de21a61579ddaa2c7a5931047361d5330",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/honest-mode.webp",
+      "sha256": "76118fdb09d1791f73500eac9f6559f77aba72fee4b0f3363062bf3d9bab92b8",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/honest-modes.webp",
+      "sha256": "4db625dc93b7fdb24002d3f2133e90ec6f20d95d243ad104d75e3cd6897f9681",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/poster.webp",
+      "sha256": "f13c26ad9beb53d03ab726e97d376c15d83ef693d8759230e231310cb20e12f3",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/feat-chat.webp",
+      "sha256": "dc2effc99881616b50d102578ec2ba24ee7f69305bc4db8245ccbf9dc5d4026d",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/feat-independent.webp",
+      "sha256": "31cad3e4fc5692590539e3ec8d97b646c6368d73827cacca69bfbd8995c7273b",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/feat-protection.webp",
+      "sha256": "bffb00518c95cbf8763279d1a5d8eae7e61699fdf00fe9d6a6171acaa15c09dc",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/feat-report-moments.webp",
+      "sha256": "d2dd494cae9507b4880ded1477d5cc2ac4673b1f1889bf4f09fb86dbce6267f6",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/feat-report.webp",
+      "sha256": "2d4b1abd603ad31263233146c6bd6f77f463172d9159a994c5ad73fa89bb700b",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/honest-mode.webp",
+      "sha256": "b4af823e1b5a82c55dce9e39c3c1ca97839ca293f67350bd17cb64b4834d8ee8",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/honest-modes.webp",
+      "sha256": "c43cfdf09b27f0381dbc5ce4b08be4a0ed35358793b585936778273ba5d947d0",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/poster.webp",
+      "sha256": "5f684e2a4fdd327e18bcdf0031cd551a92776b3417ba639df9080611f1d83b3c",
+      "reviewedAt": "2026-10-22",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
     }
   ],
   "hashing": "SHA-256 of raw binary bytes; CRLF normalized to LF for UTF-8 SVG and Markdown."
