@@ -61,7 +61,7 @@ O streamer prepara cenas, câmera e áudio no OBS ou em outro programa compatív
 
 - Interface funcional do app em `../src/`.
 - Vídeo de apresentação da LP (`public/video/`) e recortes das telas reais do app (`public/images/lp/`), feitos a partir do modo demo de contribuidor; pessoas, nomes e números neles são ilustrativos.
-- A conta de banda e carga da LP é o recorte da tela Qualidade do app, que calcula com `../src/lib/estimates.ts` e os presets de `../src/lib/platforms.ts`; se um dia virar HTML, tem que espelhar esses arquivos.
+- A conta de banda e carga da LP é o recorte da tela Qualidade do app, que calcula com `../src/lib/estimates.ts` e os presets de cada destino em `../src/platforms/<id>/destination.json`; se um dia virar HTML, tem que espelhar esses arquivos.
 - Copy dos recursos e das ressalvas espelha os rótulos do app (`../src/screens/SettingsScreen.tsx`, `EncodingScreen.tsx`, `ChatScreen.tsx`).
 - [Checklist de publicação](../docs/PUBLICACAO.md) e [critérios de validação real](../docs/GATES-DE-RELEASE.md). São requisitos, não evidência de que um ensaio ocorreu. Ao documentar um ensaio, registrar plataforma, versão/commit, data, cenário, ambiente e resultado verificável antes de anunciar validação.
 - Arquitetura e funcionalidades documentadas em `../README.md` e `../docs/`.
