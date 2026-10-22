@@ -17,6 +17,7 @@ fn main() {
     } else {
         bake_public_env();
     }
+    assemble_destinations();
     tauri_build::build();
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
@@ -25,6 +26,30 @@ fn main() {
         let out_dir = std::env::var("OUT_DIR").expect("Cargo must define OUT_DIR");
         println!("cargo:rustc-link-search=native={out_dir}");
     }
+}
+
+// Each destination is src/platforms/<id>/destination.json, the same files the frontend globs.
+fn assemble_destinations() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../src/platforms");
+    // A directory is scanned recursively, so a new destination folder also reruns this.
+    println!("cargo:rerun-if-changed={}", root.display());
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&root)
+        .expect("src/platforms must exist")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path().join("destination.json"))
+        .filter(|path| path.is_file())
+        .collect();
+    files.sort();
+    let entries: Vec<String> = files
+        .iter()
+        .map(|path| std::fs::read_to_string(path).expect("destination.json must be readable"))
+        .collect();
+    let out_dir = std::env::var("OUT_DIR").expect("Cargo must define OUT_DIR");
+    std::fs::write(
+        PathBuf::from(out_dir).join("destinations.json"),
+        format!("{{\"destinations\":[{}]}}", entries.join(",")),
+    )
+    .expect("OUT_DIR must be writable");
 }
 
 // Cargo does not load dotenv files. Explicit environment values must take precedence.

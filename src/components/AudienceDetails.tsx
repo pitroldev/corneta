@@ -8,15 +8,14 @@ import { useI18n } from "../lib/i18n";
 import type { ViewerItem } from "../lib/types";
 import { PlatformGlyph } from "./ui";
 
-export const CinefyAudience = memo(function CinefyAudience({
+/** Channels whose platform reports an audience status, with why a count is or is not part of the total. */
+export const AudienceDetails = memo(function AudienceDetails({
   items,
 }: {
   items: readonly ViewerItem[];
 }) {
   const { t, fmt } = useI18n();
-  const channels = items.filter(
-    (item) => item.platform === "cinefy" && item.audienceStatus,
-  );
+  const channels = items.filter((item) => item.audienceStatus);
   if (!channels.length) return null;
   return (
     <div
@@ -24,13 +23,16 @@ export const CinefyAudience = memo(function CinefyAudience({
       role="region"
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The bounded scroll region must be keyboard reachable.
       tabIndex={0}
-      aria-label={t("audience.cinefy")}
+      aria-label={t("audience.details")}
     >
       {channels.map((item) => {
         const startedAt = audienceStartedAt(item.startedAt, { t, fmt });
         return (
-          <div key={item.source} className="flex min-w-0 items-start gap-2">
-            <PlatformGlyph id="cinefy" size={18} />
+          <div
+            key={`${item.platform}:${item.source}`}
+            className="flex min-w-0 items-start gap-2"
+          >
+            <PlatformGlyph id={item.platform} size={18} />
             <div className="min-w-0 flex-1">
               <p className="break-words leading-relaxed">
                 <strong className="text-ink">{item.source}</strong>

@@ -1,29 +1,25 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { useConfirm } from "../../lib/useConfirm";
-import { ChevronDown, Trash2, Wifi } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronDown, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Select } from "../../components/Select";
-import { Tooltip } from "../../components/Tooltip";
 import {
   Button,
   ExperimentalBadge,
   PlatformGlyph,
   Toggle,
 } from "../../components/ui";
-import { api } from "../../lib/api";
 import { normalizeChatChannel } from "../../lib/chatChannel";
 import { useT } from "../../lib/i18n";
 import type { ChatPlatform, ChatSource } from "../../lib/types";
-import { cn, errMsg } from "../../lib/utils";
-import { sanitizeApiKey } from "../../lib/validation";
+import { cn } from "../../lib/utils";
 import { draftInputProps, useDraft } from "../../lib/useDraft";
-import {
-  CHAT_PLATFORM_LABEL,
-  HINT,
-  PLACEHOLDER,
-  PLATFORM_OPTS,
-  VALUE_LABEL,
-} from "./constants";
+import { CHAT_PROVIDERS, chatProvider } from "../../platforms";
+
+const PLATFORM_OPTS = CHAT_PROVIDERS.map((p) => ({
+  value: p.id,
+  label: p.experimental ? `${p.name} · experimental` : p.name,
+}));
 
 export function SourceCard({
   src,
@@ -45,7 +41,8 @@ export function SourceCard({
   const nameDraft = useDraft(src.name, (name) => onChange({ name }));
   const inputCls =
     "h-9 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass";
-  const platLabel = CHAT_PLATFORM_LABEL[src.platform];
+  const provider = chatProvider(src.platform);
+  const platLabel = provider?.name ?? src.platform;
   return (
     <div
       className={cn(
@@ -61,7 +58,7 @@ export function SourceCard({
             <span className="shrink-0 font-display text-sm font-bold">
               {platLabel}
             </span>
-            {src.platform === "cinefy" && (
+            {provider?.experimental && (
               <ExperimentalBadge className="ml-1 scale-90" />
             )}
             {valueDraft.value.trim() ? (
@@ -120,10 +117,10 @@ export function SourceCard({
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_11rem]">
             <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-faint">
-              {t(VALUE_LABEL[src.platform])}
+              {provider && t(provider.copy.channel)}
               <input
                 {...draftInputProps(valueDraft)}
-                placeholder={t(PLACEHOLDER[src.platform])}
+                placeholder={provider && t(provider.copy.placeholder)}
                 className={inputCls}
               />
             </label>
@@ -141,7 +138,11 @@ export function SourceCard({
               />
             </label>
           </div>
-          <p className="text-[11px] text-ink-faint">{t(HINT[src.platform])}</p>
+          {provider && (
+            <p className="text-[11px] text-ink-faint">
+              {t(provider.copy.hint)}
+            </p>
+          )}
           <div className="flex justify-end border-t-2 border-border-soft pt-2.5">
             <Button
               variant={removeStep.armed ? "danger" : "ghost"}
@@ -158,82 +159,6 @@ export function SourceCard({
           </div>
         </Collapsible.Content>
       </Collapsible.Root>
-    </div>
-  );
-}
-
-export function YoutubeApiKeyField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const t = useT();
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(
-    null,
-  );
-  const draft = useDraft(value, onChange, sanitizeApiKey);
-  useEffect(() => setResult(null), [draft.value]);
-  const verify = async () => {
-    const key = sanitizeApiKey(draft.value).trim();
-    if (!key) return;
-    setTesting(true);
-    setResult(null);
-    try {
-      setResult({ ok: true, msg: await api.youtubeKeyCheck(key, t) });
-    } catch (e) {
-      setResult({ ok: false, msg: errMsg(e) });
-    } finally {
-      setTesting(false);
-    }
-  };
-  // A label wrapper would name the tooltip button first; name the input directly.
-  return (
-    <div className="mt-2 flex flex-col gap-1.5 rounded-md border-2 border-border-soft bg-surface-2 p-2.5 text-[11px] font-semibold text-ink-faint">
-      <span className="flex flex-wrap items-center gap-1.5">
-        <PlatformGlyph id="youtube" size={14} />{" "}
-        {t("chat.youtube.apikey.label")}
-        <Tooltip content={t("chat.youtube.apikey.tooltip")}>
-          <button
-            type="button"
-            className="cursor-help font-medium normal-case text-ink-faint/80 underline decoration-dotted underline-offset-2"
-          >
-            {t("chat.youtube.apikey.optional")}
-          </button>
-        </Tooltip>
-      </span>
-      <div className="flex items-center gap-2">
-        <input
-          {...draftInputProps(draft)}
-          aria-label={t("chat.youtube.apikey.label")}
-          placeholder={t("chat.youtube.apikey.placeholder")}
-          className="h-9 flex-1 rounded-md border-2 border-border bg-surface px-2 text-sm font-medium text-ink outline-none focus:border-brass"
-        />
-        <Button
-          variant="subtle"
-          size="sm"
-          className="h-9 shrink-0"
-          disabled={!draft.value.trim() || testing}
-          onClick={verify}
-        >
-          <Wifi className="size-3.5" />{" "}
-          {testing
-            ? t("chat.youtube.apikey.checking")
-            : t("chat.youtube.apikey.check")}
-        </Button>
-      </div>
-      {result && (
-        <span
-          className={cn(
-            "font-bold normal-case",
-            result.ok ? "text-ok" : "text-bad",
-          )}
-        >
-          {result.ok ? "✓" : "✕"} {result.msg}
-        </span>
-      )}
     </div>
   );
 }

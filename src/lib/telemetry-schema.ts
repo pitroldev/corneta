@@ -1,5 +1,8 @@
 /** Keep this contract aligned with Rust. Allowlist every event before the SDK and again at before_send. */
 
+import { PLATFORM_LIST } from "./platforms";
+import type { PlatformId } from "./types";
+
 export const TELEMETRY_SCHEMA_VERSION = 1;
 // Must match NOTICE_VERSION in src-tauri/src/telemetry.rs.
 export const TELEMETRY_NOTICE_VERSION = "2026-09-09";
@@ -197,15 +200,8 @@ export type ScreenId =
   | "about"
   | "chat_popout";
 
-export type SafePlatform =
-  | "twitch"
-  | "youtube"
-  | "facebook"
-  | "kick"
-  | "tiktok"
-  | "x"
-  | "instagram"
-  | "custom";
+/** A destination catalog id; never free text. */
+export type SafePlatform = PlatformId;
 
 export type SafeTargetState =
   | "idle"
@@ -607,16 +603,7 @@ const ENUMS: Record<string, ReadonlySet<string>> = {
     "mixed",
     "unknown",
   ]),
-  platform: new Set([
-    "twitch",
-    "youtube",
-    "facebook",
-    "kick",
-    "tiktok",
-    "x",
-    "instagram",
-    "custom",
-  ]),
+  platform: new Set(PLATFORM_LIST.map((p) => p.id)),
   from: new Set([
     "idle",
     "connecting",

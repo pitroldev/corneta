@@ -1,0 +1,20 @@
+{
+  "id": "custom",
+  "order": 80,
+  "name": "Personalizado",
+  "color": "#8b93a7",
+  "protocol": "rtmp",
+  "ingestUrl": "rtmp://",
+  "recommended": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "videoBitrateKbps": 4500,
+    "audioBitrateKbps": 160,
+    "keyframeSec": 2
+  },
+  "publisherCompat": true,
+  "localizedName": true,
+  "fallback": true,
+  "userServer": true
+}

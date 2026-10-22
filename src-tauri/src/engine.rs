@@ -1,28 +1,7 @@
 use crate::config::{AppConfig, Reframe, Target, VideoPreset};
+pub use crate::platforms::{copy_limits, recommended_preset, CopyLimits};
 use serde::Serialize;
 use std::collections::HashMap;
-
-// Keep default presets aligned with src/lib/platforms.ts.
-pub fn recommended_preset(platform_id: &str) -> VideoPreset {
-    let v = |width, height, fps, vb, ab| VideoPreset {
-        width,
-        height,
-        fps,
-        video_bitrate_kbps: vb,
-        audio_bitrate_kbps: ab,
-        keyframe_sec: 2,
-    };
-    match platform_id {
-        "twitch" => v(1920, 1080, 60, 6000, 160),
-        "youtube" => v(1920, 1080, 60, 9000, 192),
-        "facebook" => v(1280, 720, 30, 4000, 128),
-        "kick" => v(1920, 1080, 60, 6000, 160),
-        "tiktok" => v(720, 1280, 30, 3000, 128),
-        "x" => v(1280, 720, 30, 3000, 128),
-        "instagram" => v(720, 1280, 30, 2500, 128),
-        _ => v(1920, 1080, 30, 4500, 160),
-    }
-}
 
 // Imported presets are untrusted; bound derived bitrate/GOP arithmetic and FFmpeg arguments.
 fn sanitize_preset(mut p: VideoPreset) -> VideoPreset {
@@ -46,8 +25,7 @@ pub(crate) fn effective_preset(t: &Target) -> VideoPreset {
 }
 
 fn smart_hybrid_action(platform_id: &str) -> &'static str {
-    let r = recommended_preset(platform_id);
-    if r.height > r.width {
+    if crate::platforms::is_vertical(platform_id) {
         "transcode"
     } else {
         "copy"
@@ -62,32 +40,6 @@ pub struct SourceSignal {
     pub fps: f64,
     /// Known only in OBS's simple output mode.
     pub video_kbps: Option<u32>,
-}
-
-/// The most a destination takes as-is; beyond it, a copy is refused or degrades viewers.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CopyLimits {
-    /// Limits the shorter side, so a 2560×1440 canvas counts as 1440p.
-    pub max_height: u32,
-    pub max_fps: u32,
-    pub max_kbps: u32,
-}
-
-pub fn copy_limits(platform_id: &str) -> Option<CopyLimits> {
-    let limits = |max_height, max_fps, max_kbps| {
-        Some(CopyLimits {
-            max_height,
-            max_fps,
-            max_kbps,
-        })
-    };
-    match platform_id {
-        "twitch" => limits(1080, 60, 6000),
-        "kick" => limits(1080, 60, 8000),
-        "facebook" => limits(1080, 60, 9000),
-        "youtube" => limits(2160, 60, 51_000),
-        _ => None,
-    }
 }
 
 fn exceeds(signal: &SourceSignal, limits: &CopyLimits) -> bool {
@@ -334,8 +286,7 @@ pub fn ffmpeg_args_for_target(
         ));
     }
 
-    if t.platform_id == "custom" {
-        // Some custom ingests require OBS-compatible publisher metadata and a separate playpath.
+    if crate::platforms::needs_publisher_compat(&t.platform_id) {
         args.extend(
             [
                 "-rtmp_flashver",

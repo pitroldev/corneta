@@ -606,19 +606,8 @@ impl AppConfig {
     }
 }
 
-const ALLOWED_PLATFORMS: [&str; 8] = [
-    "twitch",
-    "youtube",
-    "facebook",
-    "kick",
-    "tiktok",
-    "x",
-    "instagram",
-    "custom",
-];
-
 fn normalize_target(target: &mut Target, l: Locale) -> Result<(), String> {
-    if !valid_id(&target.id) || !ALLOWED_PLATFORMS.contains(&target.platform_id.as_str()) {
+    if !valid_id(&target.id) || !crate::platforms::is_destination(&target.platform_id) {
         return Err(Msg::ConfigInvalidTarget.text(l));
     }
     limited(l, Msg::ConfigLabelTargetName, &target.name, 120)?;

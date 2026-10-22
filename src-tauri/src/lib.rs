@@ -16,6 +16,7 @@ mod keys;
 mod obs;
 mod overlay;
 mod permissions;
+mod platforms;
 mod queue_probe;
 mod recorder;
 mod renditions;
@@ -117,9 +118,7 @@ fn shutdown_engine(app: &tauri::AppHandle) {
     studio::stop(&app.state::<AppState>().studio);
     overlay::stop(&app.state::<AppState>().overlay);
     commands::kill_engine_for_shutdown(app);
-    if auth::youtube_complete_active(app, generation).is_err() {
-        log::warn!("YouTube auto-broadcast: cleanup_pending_at_shutdown");
-    }
+    commands::close_auto_broadcasts(app, generation, false);
 }
 
 /// Explain the first tray hide, and always confirm that an active stream continues.
@@ -289,27 +288,18 @@ pub fn run() {
             commands::chat_running,
             commands::chat_send,
             auth::set_oauth_config,
-            auth::set_youtube_oauth,
-            auth::clear_youtube_oauth,
-            auth::youtube_use_official,
-            auth::youtube_use_own_creds,
-            auth::set_kick_oauth,
-            auth::clear_kick_oauth,
-            auth::kick_use_official,
-            auth::kick_use_own_creds,
+            auth::account_save_own_credentials,
+            auth::account_clear_own_credentials,
+            auth::account_use_official,
+            auth::account_use_own_credentials,
             auth::auth_status,
             auth::account_chat_channels,
-            auth::twitch_login_start,
-            auth::twitch_fetch_stream_key,
-            auth::kick_fetch_stream_key,
-            auth::twitch_logout,
-            auth::youtube_login_start,
-            auth::youtube_logout,
-            auth::youtube_broadcast_recovery_status,
-            auth::youtube_retry_broadcast_cleanup,
-            auth::youtube_acknowledge_unknown_broadcast,
-            auth::kick_login_start,
-            auth::kick_logout,
+            auth::account_login_start,
+            auth::account_logout,
+            auth::account_fetch_stream_key,
+            platforms::youtube::account::youtube_broadcast_recovery_status,
+            platforms::youtube::account::youtube_retry_broadcast_cleanup,
+            platforms::youtube::account::youtube_acknowledge_unknown_broadcast,
             auth::set_stream_info,
             auth::chat_moderate,
             commands::alerts_start,
@@ -317,7 +307,7 @@ pub fn run() {
             commands::open_chat_window,
             commands::obs_set_stream,
             commands::test_target,
-            commands::youtube_key_check,
+            platforms::youtube::chat::youtube_key_check,
             commands::alert_test,
             commands::open_logs_dir,
             commands::export_diagnostics,

@@ -1,4 +1,5 @@
 import type { I18n } from "../i18n";
+import type { AccountPlatform } from "../../platforms";
 
 /** Matches the native `shortcut::Action`. */
 export type ShortcutAction = "toggleLive" | "markMoment" | "brb";
@@ -38,6 +39,12 @@ export interface ChatReply {
   nativeId?: string;
   author: string;
 }
+
+/** Each account provider's own fields, read by its spec in src/platforms/<id>, plus the setup API state. */
+export type AuthStatus = {
+  /** null means the setup API responded successfully. */
+  brokerError: string | null;
+} & Readonly<Record<string, unknown>>;
 
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
@@ -119,65 +126,38 @@ export interface CornetaApi {
     onAuth: (a: { source: string; login: string; ok: boolean }) => void,
   ): () => void;
   setOauthConfig(c: {
-    twitchClientId: string;
-    googleClientId: string;
-    kickClientId: string;
+    officialClientIds: Partial<Record<AccountPlatform, string>>;
     setupApiUrl: string;
   }): Promise<void>;
-  authStatus(): Promise<{
-    twitchLogin: string | null;
-    /** Required scopes the current Twitch grant lacks; empty when logged out. */
-    twitchMissingScopes: string[];
-    youtube: boolean;
-    /** At least one official or user-supplied login path exists. */
-    youtubeConfigured: boolean;
-    /** The official path is ready, so switching modes will not strand login. */
-    youtubeOfficialReady: boolean;
-    /** User-supplied credentials remain available in the vault. */
-    youtubeOwnCreds: boolean;
-    youtubeUsingOwnCreds: boolean;
-    kick: boolean;
-    kickConfigured: boolean;
-    kickOfficialReady: boolean;
-    kickOwnCreds: boolean;
-    kickUsingOwnCreds: boolean;
-    /** The Kick grant includes the ban scope, which is requested only on demand. */
-    kickCanBan: boolean;
-    /** The Kick grant includes reading the stream key, also requested only on demand. */
-    kickCanReadKey: boolean;
-    brokerError: string | null;
-  }>;
-  twitchLoginStart(): Promise<void>;
-  /** Stores the logged-in account's stream key in the vault; resolves with that account's login. */
-  twitchFetchStreamKey(targetId: string): Promise<string>;
-  twitchLogout(): Promise<void>;
-  youtubeLoginStart(): Promise<void>;
-  youtubeLogout(): Promise<void>;
+  authStatus(): Promise<AuthStatus>;
+  /** Starts signing in; progress arrives as auth events. The options ask for scopes granted on demand. */
+  accountLoginStart(
+    platform: AccountPlatform,
+    options?: { moderation?: boolean; streamKey?: boolean },
+  ): Promise<void>;
+  accountLogout(platform: AccountPlatform): Promise<void>;
+  /** Stores the logged-in account's stream key in the vault; `url` is the account's server, if it has one. */
+  fetchStreamKey(
+    platform: AccountPlatform,
+    targetId: string,
+  ): Promise<{ login: string; url: string | null }>;
   youtubeBroadcastRecoveryStatus(): Promise<"none" | "pending" | "unknown">;
   youtubeRetryBroadcastCleanup(): Promise<void>;
   youtubeAcknowledgeUnknownBroadcast(confirmed: boolean): Promise<void>;
-  kickLoginStart(options?: {
-    moderation?: boolean;
-    streamKey?: boolean;
-  }): Promise<void>;
-  /** Stores the logged-in account's Kick stream key in the vault; `url` is the account's server. */
-  kickFetchStreamKey(
-    targetId: string,
-  ): Promise<{ login: string; url: string | null }>;
-  kickLogout(): Promise<void>;
   setStreamInfo(
     title: string,
     category?: string,
   ): Promise<Record<string, { ok: boolean; error?: string; warn?: string }>>;
-  setYoutubeOauth(clientId: string, clientSecret: string): Promise<void>;
-  clearYoutubeOauth(): Promise<void>;
+  /** Saves the user's own OAuth app for an account and switches to it. */
+  accountSaveOwnCredentials(
+    platform: AccountPlatform,
+    clientId: string,
+    clientSecret: string,
+  ): Promise<void>;
+  accountClearOwnCredentials(platform: AccountPlatform): Promise<void>;
   /** Switch modes without deleting credentials; reject unavailable modes. */
-  youtubeUseOfficial(): Promise<void>;
-  youtubeUseOwnCreds(): Promise<void>;
-  setKickOauth(clientId: string, clientSecret: string): Promise<void>;
-  clearKickOauth(): Promise<void>;
-  kickUseOfficial(): Promise<void>;
-  kickUseOwnCreds(): Promise<void>;
+  accountUseOfficial(platform: AccountPlatform): Promise<void>;
+  accountUseOwnCredentials(platform: AccountPlatform): Promise<void>;
   chatModerate(
     sourceId: string,
     action: string,

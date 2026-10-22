@@ -12,8 +12,9 @@ function deps(patch: Partial<ConnectDeps> = {}): ConnectDeps {
   return {
     youtubeAutoLive: false,
     setSettings: vi.fn(),
-    fetchTwitchKey: vi.fn(async () => "lu_gamer"),
-    fetchKickKey: vi.fn(async () => ""),
+    fetchStreamKey: vi.fn(async (platform) =>
+      platform === "twitch" ? "lu_gamer" : "",
+    ),
     ...patch,
   };
 }
@@ -71,8 +72,8 @@ describe("finishConnect", () => {
       kind: "key",
       login: "lu_gamer",
     });
-    expect(d.fetchTwitchKey).toHaveBeenCalledWith("tgt_1");
-    expect(d.fetchKickKey).not.toHaveBeenCalled();
+    expect(d.fetchStreamKey).toHaveBeenCalledWith("twitch", "tgt_1");
+    expect(d.fetchStreamKey).toHaveBeenCalledTimes(1);
   });
 
   it("reads the Kick key, which may come without an account name", async () => {
@@ -81,16 +82,16 @@ describe("finishConnect", () => {
       kind: "key",
       login: "",
     });
-    expect(d.fetchKickKey).toHaveBeenCalledWith("tgt_2");
+    expect(d.fetchStreamKey).toHaveBeenCalledWith("kick", "tgt_2");
   });
 
   it("turns on automatic YouTube instead of fetching a key", async () => {
     const d = deps();
     await expect(finishConnect("youtube", "tgt_3", d)).resolves.toEqual({
-      kind: "youtubeAuto",
+      kind: "autoBroadcast",
     });
     expect(d.setSettings).toHaveBeenCalledWith({ youtubeAutoLive: true });
-    expect(d.fetchTwitchKey).not.toHaveBeenCalled();
+    expect(d.fetchStreamKey).not.toHaveBeenCalled();
   });
 
   it("leaves settings alone when automatic YouTube is already on", async () => {
@@ -101,7 +102,7 @@ describe("finishConnect", () => {
 
   it("passes a failed key fetch to the caller", async () => {
     const d = deps({
-      fetchTwitchKey: vi.fn(async () => {
+      fetchStreamKey: vi.fn(async () => {
         throw new Error("denied");
       }),
     });
@@ -111,16 +112,14 @@ describe("finishConnect", () => {
 
 describe("startLogin", () => {
   it("asks Kick for the stream key scope and uses each platform's login", async () => {
-    const d = {
-      twitchLogin: vi.fn(async () => {}),
-      youtubeLogin: vi.fn(async () => {}),
-      kickLogin: vi.fn(async () => {}),
-    };
+    const d = { accountLogin: vi.fn(async () => {}) };
     await startLogin("kick", d);
     await startLogin("twitch", d);
     await startLogin("youtube", d);
-    expect(d.kickLogin).toHaveBeenCalledWith({ streamKey: true });
-    expect(d.twitchLogin).toHaveBeenCalledTimes(1);
-    expect(d.youtubeLogin).toHaveBeenCalledTimes(1);
+    expect(d.accountLogin).toHaveBeenNthCalledWith(1, "kick", {
+      streamKey: true,
+    });
+    expect(d.accountLogin).toHaveBeenNthCalledWith(2, "twitch", undefined);
+    expect(d.accountLogin).toHaveBeenNthCalledWith(3, "youtube", undefined);
   });
 });

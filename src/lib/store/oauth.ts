@@ -1,39 +1,34 @@
 import { api } from "../api";
+import {
+  ACCOUNT_PROVIDERS,
+  CHAT_PROVIDERS,
+  type AccountPlatform,
+} from "../../platforms";
 import { OAUTH } from "../oauth";
 import { openExternal } from "../utils";
 import type { LoginState, OauthModes, SliceContext, State } from "./types";
-const NO_OAUTH_MODES: OauthModes = {
-  officialReady: false,
-  ownCreds: false,
-  usingOwnCreds: false,
-};
+
+const perAccount = <V>(value: (platform: AccountPlatform) => V) =>
+  Object.fromEntries(
+    ACCOUNT_PROVIDERS.map((p) => [p.id, value(p.id)]),
+  ) as Record<AccountPlatform, V>;
 export function createOauthSlice({
   set,
   get,
 }: SliceContext): Pick<
   State,
   | "chatLogin"
-  | "youtubeOauthReady"
-  | "kickOauthReady"
-  | "youtubeOauthModes"
-  | "kickOauthModes"
+  | "oauthReady"
+  | "oauthModes"
   | "oauthBrokerError"
   | "setupOauth"
-  | "setYoutubeOauth"
-  | "clearYoutubeOauth"
-  | "youtubeUseOfficial"
-  | "youtubeUseOwnCreds"
-  | "setKickOauth"
-  | "clearKickOauth"
-  | "kickUseOfficial"
-  | "kickUseOwnCreds"
+  | "saveOwnOauth"
+  | "clearOwnOauth"
+  | "switchToOfficialOauth"
+  | "switchToOwnOauth"
   | "bindAuthFlow"
-  | "twitchLogin"
-  | "twitchLogout"
-  | "youtubeLogin"
-  | "youtubeLogout"
-  | "kickLogin"
-  | "kickLogout"
+  | "accountLogin"
+  | "accountLogout"
 > {
   // Auth events reach every window; only the one that started a login opens the page, copies the
   // code and restarts chat, once per attempt.
@@ -41,38 +36,21 @@ export function createOauthSlice({
   const loadAuthStatus = async () => {
     try {
       const a = await api.authStatus();
+      const read = ACCOUNT_PROVIDERS.map(
+        (p) => [p.id, p.readStatus(a)] as const,
+      );
+      const oauthReady: Partial<Record<AccountPlatform, boolean>> = {};
+      const oauthModes: Partial<Record<AccountPlatform, OauthModes>> = {};
+      for (const [id, status] of read) {
+        if (status.oauthReady !== undefined) oauthReady[id] = status.oauthReady;
+        if (status.modes) oauthModes[id] = status.modes;
+      }
       set({
-        chatLogin: {
-          twitch: a.twitchLogin
-            ? {
-                state: "connected",
-                login: a.twitchLogin,
-                missingScopes: a.twitchMissingScopes,
-              }
-            : { state: "out" },
-          youtube: a.youtube ? { state: "connected" } : { state: "out" },
-          kick: a.kick
-            ? {
-                state: "connected",
-                missingScopes: [
-                  ...(a.kickCanBan ? [] : ["moderation:ban"]),
-                  ...(a.kickCanReadKey ? [] : ["streamkey:read"]),
-                ],
-              }
-            : { state: "out" },
-        },
-        youtubeOauthReady: a.youtubeConfigured,
-        kickOauthReady: a.kickConfigured,
-        youtubeOauthModes: {
-          officialReady: a.youtubeOfficialReady,
-          ownCreds: a.youtubeOwnCreds,
-          usingOwnCreds: a.youtubeUsingOwnCreds,
-        },
-        kickOauthModes: {
-          officialReady: a.kickOfficialReady,
-          ownCreds: a.kickOwnCreds,
-          usingOwnCreds: a.kickUsingOwnCreds,
-        },
+        chatLogin: Object.fromEntries(
+          read.map(([id, status]) => [id, status.login]),
+        ) as Record<AccountPlatform, LoginState>,
+        oauthReady,
+        oauthModes,
         oauthBrokerError: a.brokerError,
       });
     } catch {
@@ -80,70 +58,38 @@ export function createOauthSlice({
     }
   };
   return {
-    chatLogin: {
-      twitch: { state: "out" },
-      youtube: { state: "out" },
-      kick: { state: "out" },
-    },
-    youtubeOauthReady: false,
-    kickOauthReady: false,
-    youtubeOauthModes: NO_OAUTH_MODES,
-    kickOauthModes: NO_OAUTH_MODES,
+    chatLogin: perAccount((): LoginState => ({ state: "out" })),
+    oauthReady: {},
+    oauthModes: {},
     oauthBrokerError: null,
     async setupOauth() {
-      await api.setOauthConfig({
-        twitchClientId: OAUTH.twitchClientId,
-        googleClientId: OAUTH.googleClientId,
-        kickClientId: OAUTH.kickClientId,
-        setupApiUrl: OAUTH.setupApiUrl,
-      });
+      await api.setOauthConfig(OAUTH);
       await loadAuthStatus();
     },
-    async setYoutubeOauth(clientId, clientSecret) {
-      await api.setYoutubeOauth(clientId, clientSecret);
+    async saveOwnOauth(platform, clientId, clientSecret) {
+      await api.accountSaveOwnCredentials(platform, clientId, clientSecret);
       set((s) => ({
-        youtubeOauthReady: true,
-        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
+        oauthReady: { ...s.oauthReady, [platform]: true },
+        chatLogin: { ...s.chatLogin, [platform]: { state: "out" } },
       }));
       await get().setupOauth();
     },
-    // Delete credentials only on explicit forgetting; mode switches retain them.
-    async clearYoutubeOauth() {
-      await api.clearYoutubeOauth();
+    async clearOwnOauth(platform) {
+      await api.accountClearOwnCredentials(platform);
       await get().setupOauth();
     },
-    async youtubeUseOfficial() {
-      await api.youtubeUseOfficial();
+    async switchToOfficialOauth(platform) {
+      await api.accountUseOfficial(platform);
       await get().setupOauth();
     },
-    async youtubeUseOwnCreds() {
-      await api.youtubeUseOwnCreds();
-      await get().setupOauth();
-    },
-    async setKickOauth(clientId, clientSecret) {
-      await api.setKickOauth(clientId, clientSecret);
-      set((s) => ({
-        kickOauthReady: true,
-        chatLogin: { ...s.chatLogin, kick: { state: "out" } },
-      }));
-      await get().setupOauth();
-    },
-    async clearKickOauth() {
-      await api.clearKickOauth();
-      await get().setupOauth();
-    },
-    async kickUseOfficial() {
-      await api.kickUseOfficial();
-      await get().setupOauth();
-    },
-    async kickUseOwnCreds() {
-      await api.kickUseOwnCreds();
+    async switchToOwnOauth(platform) {
+      await api.accountUseOwnCredentials(platform);
       await get().setupOauth();
     },
     bindAuthFlow(t) {
       return api.subscribeAuthFlow((who, a) => {
         set((s) => {
-          const k = who as "twitch" | "youtube" | "kick";
+          const k = who as AccountPlatform;
           let next: LoginState = s.chatLogin[k];
           if (a.state === "code")
             next = {
@@ -182,9 +128,11 @@ export function createOauthSlice({
         if (a.state === "connected") void loadAuthStatus();
         if (!login || (a.state !== "connected" && a.state !== "error")) return;
         pendingLogins.delete(who);
-        // Reconnect active Twitch chat after login so IRC authenticates, preserving history.
+        // Chat that writes over its own session (Twitch IRC) must reconnect to authenticate; history stays.
         if (
-          who === "twitch" &&
+          CHAT_PROVIDERS.some(
+            (p) => p.account === who && p.send === "session",
+          ) &&
           a.state === "connected" &&
           get().chatConnected
         ) {
@@ -192,41 +140,21 @@ export function createOauthSlice({
         }
       });
     },
-    async twitchLogin() {
-      pendingLogins.set("twitch", "started");
+    async accountLogin(platform, options) {
+      pendingLogins.set(platform, "started");
       set((s) => ({
-        chatLogin: { ...s.chatLogin, twitch: { state: "code" } },
+        chatLogin: { ...s.chatLogin, [platform]: { state: "code" } },
       }));
-      await api.twitchLoginStart();
-    },
-    async twitchLogout() {
-      await api.twitchLogout();
-      set((s) => ({ chatLogin: { ...s.chatLogin, twitch: { state: "out" } } }));
-    },
-    async youtubeLogin() {
-      pendingLogins.set("youtube", "started");
-      set((s) => ({
-        chatLogin: { ...s.chatLogin, youtube: { state: "code" } },
-      }));
-      await api.youtubeLoginStart();
-    },
-    async youtubeLogout() {
-      await api.youtubeLogout();
-      set((s) => ({
-        chatLogin: { ...s.chatLogin, youtube: { state: "out" } },
-      }));
-    },
-    async kickLogin(options) {
-      pendingLogins.set("kick", "started");
-      set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "code" } } }));
-      await api.kickLoginStart({
+      await api.accountLoginStart(platform, {
         moderation: options?.moderation === true,
         streamKey: options?.streamKey === true,
       });
     },
-    async kickLogout() {
-      await api.kickLogout();
-      set((s) => ({ chatLogin: { ...s.chatLogin, kick: { state: "out" } } }));
+    async accountLogout(platform) {
+      await api.accountLogout(platform);
+      set((s) => ({
+        chatLogin: { ...s.chatLogin, [platform]: { state: "out" } },
+      }));
     },
   };
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ACCOUNT_PLATFORMS, accountProvider } from "../../platforms";
 import { AnimatePresence, m } from "framer-motion";
 import {
   AlertTriangle,
@@ -30,13 +31,11 @@ export function StreamInfoCard() {
   const setSettings = useStore((s) => s.setSettings);
   const requestNavigate = useStore((s) => s.requestNavigate);
   const requestChatConfig = useStore((s) => s.requestChatConfig);
-  const ready = {
-    twitch: chatLogin.twitch.state === "connected",
-    youtube: chatLogin.youtube.state === "connected",
-    kick: chatLogin.kick.state === "connected",
-  };
-  const targets = (["twitch", "youtube", "kick"] as const).filter(
-    (p) => ready[p],
+  const targets = ACCOUNT_PLATFORMS.filter(
+    (p) => chatLogin[p].state === "connected",
+  );
+  const autoBroadcast = targets.some(
+    (p) => accountProvider(p)?.connect === "auto-broadcast",
   );
   const [title, setTitleLocal] = useState(settings.streamTitle ?? "");
   const [game, setGame] = useState("");
@@ -203,7 +202,7 @@ export function StreamInfoCard() {
           </m.div>
         )}
       </AnimatePresence>
-      {ready.youtube && (
+      {autoBroadcast && (
         <>
           <OptionCheck
             checked={settings.youtubeAutoLive}

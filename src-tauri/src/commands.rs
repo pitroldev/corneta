@@ -9,6 +9,7 @@ use crate::engine_policy::{
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
+use crate::platforms::provider::{AutoBroadcastFailure, ProvisionedIngest};
 use crate::recorder;
 use crate::session;
 use crate::telemetry::{self, AppError};
@@ -130,19 +131,6 @@ fn capture_engine_error(
     engine.telemetry_last_error_id = Some(error_id.clone());
     engine.telemetry_last_error_operation_id = operation_id;
     error_id
-}
-
-fn telemetry_platform(value: &str) -> &'static str {
-    match value {
-        "twitch" => "twitch",
-        "youtube" => "youtube",
-        "facebook" => "facebook",
-        "kick" => "kick",
-        "tiktok" => "tiktok",
-        "x" => "x",
-        "instagram" => "instagram",
-        _ => "custom",
-    }
 }
 
 fn telemetry_encoder_kind(config: &AppConfig) -> String {
@@ -1289,7 +1277,13 @@ async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
 }
 
 // Manual fallback may still lack a YouTube broadcast; notify instead of implying success.
-fn yt_auto_fallback(app: &AppHandle, target_id: &str, generation: u64, err: &str) {
+fn auto_broadcast_fallback(
+    app: &AppHandle,
+    failure: AutoBroadcastFailure,
+    target_id: &str,
+    generation: u64,
+    err: &str,
+) {
     let state = app.state::<AppState>();
     {
         let engine = state.engine.lock().unwrap();
@@ -1297,13 +1291,9 @@ fn yt_auto_fallback(app: &AppHandle, target_id: &str, generation: u64, err: &str
             return;
         }
     }
-    let error_id = capture_native_error(app, "youtube_auto_provision_failed", "oauth", true, None);
-    log::warn!("YouTube auto-broadcast: error_id={error_id}");
-    notify(
-        app,
-        &Msg::NotifyYoutubeAutoFailedTitle.now(),
-        &Msg::NotifyYoutubeAutoFailedBody.now(),
-    );
+    let error_id = capture_native_error(app, failure.error_code, "oauth", true, None);
+    log::warn!("automatic broadcast: error_id={error_id}");
+    notify(app, &failure.title, &failure.body);
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     if !eng.live || eng.start_gen != generation {
@@ -1311,11 +1301,27 @@ fn yt_auto_fallback(app: &AppHandle, target_id: &str, generation: u64, err: &str
     }
     if let Some(snap) = eng.snapshot.as_mut() {
         if let Some(st) = snap.targets.get_mut(target_id) {
-            st.message = Some(format!("{} {err}", Msg::TargetYoutubeAutoFallback.now()));
+            st.message = Some(format!("{} {err}", failure.target_note));
         }
         let out = snap.clone();
         drop(eng);
         emit(app, &out);
+    }
+}
+
+/// Ends the broadcasts accounts opened for that live; failures stay recoverable on the next start.
+pub(crate) fn close_auto_broadcasts(app: &AppHandle, generation: u64, notify_user: bool) {
+    for provider in crate::platforms::account_providers() {
+        let Some(auto) = provider.auto_broadcast() else {
+            continue;
+        };
+        if auto.close(app, generation).is_err() {
+            log::warn!("{}: automatic broadcast cleanup_pending", provider.id());
+            if notify_user {
+                let (title, body) = auto.close_failure();
+                notify(app, &title, &body);
+            }
+        }
     }
 }
 
@@ -1456,7 +1462,7 @@ async fn start_engine_inner(
             .map(|target| {
                 (
                     target.id.clone(),
-                    telemetry_platform(&target.platform_id).to_string(),
+                    crate::platforms::known_destination_id(&target.platform_id).to_string(),
                 )
             })
             .collect();
@@ -1478,8 +1484,9 @@ async fn start_engine_inner(
     }
     emit(&app, &snap);
 
-    // Refresh without delaying startup to reduce mid-stream Kick token expiry.
-    crate::auth::warm_kick_session(&app);
+    for provider in crate::platforms::account_providers() {
+        provider.before_go_live(&app);
+    }
 
     let mut keymap: HashMap<String, String> = HashMap::new();
     for t in &enabled {
@@ -1578,38 +1585,36 @@ async fn start_engine_inner(
     emit(&app, &snap);
 
     // Provision only after local startup succeeds to avoid broadcasts orphaned by setup failure.
-    let mut yt_override: Option<(String, String, String)> = None;
-    if config.settings.youtube_auto_live && keys::has_key("youtube_refresh") {
-        if let Some(yt) = enabled.iter().find(|t| t.platform_id == "youtube") {
-            let yid = yt.id.clone();
-            let title = {
-                let t = config.settings.stream_title.trim();
-                if t.is_empty() {
-                    Msg::YoutubeDefaultBroadcastTitle.now()
-                } else {
-                    t.to_string()
-                }
-            };
-            let privacy = config.settings.youtube_privacy.clone();
-            let made_for_kids = config.settings.youtube_made_for_kids;
-            let app2 = app.clone();
-            match tauri::async_runtime::spawn_blocking(move || {
-                crate::auth::youtube_provision_broadcast(
-                    &app2,
-                    &title,
-                    &privacy,
-                    made_for_kids,
-                    my_gen,
-                )
-            })
+    let mut provisioned: HashMap<String, ProvisionedIngest> = HashMap::new();
+    for provider in crate::platforms::account_providers() {
+        let Some(auto) = provider.auto_broadcast() else {
+            continue;
+        };
+        if !auto.enabled(&config.settings) {
+            continue;
+        }
+        let Some(target) = enabled
+            .iter()
+            .find(|t| crate::platforms::destination_account(&t.platform_id) == Some(provider.id()))
+        else {
+            continue;
+        };
+        let target_id = target.id.clone();
+        let (app2, settings) = (app.clone(), config.settings.clone());
+        match tauri::async_runtime::spawn_blocking(move || auto.open(&app2, &settings, my_gen))
             .await
-            {
-                Ok(Ok((addr, key))) => {
-                    log::info!("YouTube: broadcast provisioned automatically");
-                    yt_override = Some((yid, addr, key));
-                }
-                Ok(Err(e)) => yt_auto_fallback(&app, &yid, my_gen, &e),
-                Err(_) => yt_auto_fallback(&app, &yid, my_gen, &Msg::AuthYoutubeBadResponse.now()),
+        {
+            Ok(Ok(ingest)) => {
+                log::info!("{}: broadcast provisioned automatically", provider.id());
+                provisioned.insert(target_id, ingest);
+            }
+            Ok(Err(e)) => {
+                auto_broadcast_fallback(&app, auto.open_failure(), &target_id, my_gen, &e)
+            }
+            Err(_) => {
+                let failure = auto.open_failure();
+                let reason = failure.unknown_reason.clone();
+                auto_broadcast_fallback(&app, failure, &target_id, my_gen, &reason)
             }
         }
     }
@@ -1856,11 +1861,9 @@ async fn start_engine_inner(
     for &t in &enabled {
         let mut target = t.clone();
         let mut key = keymap.get(&t.id).cloned().unwrap_or_default();
-        if let Some((yid, yurl, ykey)) = &yt_override {
-            if target.id == *yid {
-                target.ingest_url = yurl.clone();
-                key = ykey.clone();
-            }
+        if let Some(ingest) = provisioned.get(&t.id) {
+            target.ingest_url = ingest.url.clone();
+            key = ingest.key.clone();
         }
         let cfg = config.clone();
         let is_transcode = engine::effective_action(&config.mode, t) == "transcode";
@@ -1872,8 +1875,8 @@ async fn start_engine_inner(
         let run_flag = running.clone();
         let pause_flag = pause_flags.get(&t.id).cloned().unwrap_or_default();
         let auth_flag = auth_flags.get(&t.id).cloned().unwrap_or_default();
-        // Provisioned YouTube credentials override the vault and must survive retries.
-        let has_yt_override = yt_override.as_ref().is_some_and(|(yid, _, _)| *yid == t.id);
+        // Provisioned broadcast credentials override the vault and must survive retries.
+        let has_provisioned = provisioned.contains_key(&t.id);
         // Outputs follow program readiness so OBS loss alone does not restart their connections.
         let signal = if compositor_on {
             prog_ready.clone()
@@ -1906,7 +1909,7 @@ async fn start_engine_inner(
                         break;
                     }
                     // A retry may follow a credential edit made while the stream stayed live.
-                    if !auth_flag.load(Ordering::Relaxed) && !has_yt_override {
+                    if !auth_flag.load(Ordering::Relaxed) && !has_provisioned {
                         let tid = target_id.clone();
                         if let Ok(Some(k)) =
                             tauri::async_runtime::spawn_blocking(move || keys::get_key(&tid)).await
@@ -2161,7 +2164,7 @@ async fn start_engine_inner(
 // Blocking process cleanup stays off the event loop; kill_engine publishes stopped first.
 #[tauri::command]
 pub async fn stop_engine(app: AppHandle, operation_id: Option<String>) -> Result<(), String> {
-    let (youtube_generation, youtube_activity) = {
+    let (generation, activity) = {
         let state = app.state::<AppState>();
         let engine = state.engine.lock().unwrap();
         (engine.start_gen, engine.begin_pending_activity())
@@ -2184,18 +2187,11 @@ pub async fn stop_engine(app: AppHandle, operation_id: Option<String>) -> Result
     tauri::async_runtime::spawn_blocking(move || kill_engine(&app2))
         .await
         .map_err(|e| e.to_string())?;
-    // YouTube autostop is disabled for reconnects; failed cleanup stays recoverable.
+    // Platform autostop is disabled for reconnects; failed cleanup stays recoverable.
     let app3 = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let _activity = youtube_activity;
-        if crate::auth::youtube_complete_active(&app3, youtube_generation).is_err() {
-            log::warn!("YouTube auto-broadcast: cleanup_pending");
-            notify(
-                &app3,
-                &Msg::NotifyYoutubeCleanupFailedTitle.now(),
-                &Msg::NotifyYoutubeCleanupFailedBody.now(),
-            );
-        }
+        let _activity = activity;
+        close_auto_broadcasts(&app3, generation, true);
     });
     Ok(())
 }
@@ -3123,13 +3119,6 @@ pub async fn test_target(app: AppHandle, target_id: String) -> Result<String, St
         .ok_or_else(|| Msg::TargetNotFound.now())?;
     let url = t.ingest_url;
     tauri::async_runtime::spawn_blocking(move || tcp_reach(&url))
-        .await
-        .map_err(|e| format!("join: {e}"))?
-}
-
-#[tauri::command]
-pub async fn youtube_key_check(key: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || crate::chat::check_youtube_key(&key))
         .await
         .map_err(|e| format!("join: {e}"))?
 }

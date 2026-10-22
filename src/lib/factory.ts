@@ -1,5 +1,5 @@
 import type { AppConfig, PlatformId, Target } from "./types";
-import { PLATFORMS } from "./platforms";
+import { PLATFORMS, STARTER_PLATFORMS } from "./platforms";
 import { INGEST_URL_RE } from "./validation";
 import { uid } from "./utils";
 
@@ -22,7 +22,7 @@ export function makeTarget(platformId: PlatformId): Target {
 }
 
 export function defaultConfig(): AppConfig {
-  const targets = [makeTarget("twitch"), makeTarget("youtube")];
+  const targets = STARTER_PLATFORMS.map(makeTarget);
   const profId = uid("prof");
   return {
     schemaVersion: 1,

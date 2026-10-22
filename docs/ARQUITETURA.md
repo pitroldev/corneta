@@ -19,7 +19,8 @@ Site/API Next.js: setup/OAuth/manifestos, não transporte da live
 | Responsabilidade                                 | Entrada e testes próximos                                                                                                                                                       |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Registro de IPC, janelas, bandeja e encerramento | [lib.rs](../src-tauri/src/lib.rs), [commands.rs](../src-tauri/src/commands.rs).                                                                                                 |
-| Presets, argumentos de mídia, estado do motor    | [engine.rs](../src-tauri/src/engine.rs), [engine_policy.rs](../src-tauri/src/engine_policy.rs); testes nos módulos.                                                             |
+| Argumentos de mídia, estado do motor             | [engine.rs](../src-tauri/src/engine.rs), [engine_policy.rs](../src-tauri/src/engine_policy.rs); testes nos módulos.                                                             |
+| Plataformas: destinos, chat e contas             | [src/platforms](../src/platforms/index.ts) (um `destination.json` por pasta), [src-tauri/src/platforms](../src-tauri/src/platforms/mod.rs); ver abaixo.                         |
 | Reuso de codificação e programa                  | [renditions.rs](../src-tauri/src/renditions.rs), [compositor.rs](../src-tauri/src/compositor.rs), [splicer.rs](../src-tauri/src/splicer.rs).                                    |
 | Gravação isolada                                 | [recorder](../src-tauri/src/recorder/): domínio puro, disco, FFmpeg e testes separados.                                                                                         |
 | Relatórios e retenção                            | [session](../src-tauri/src/session/): domínio, armazenamento, operações e testes.                                                                                               |
@@ -44,6 +45,15 @@ Ao revisar código assíncrono, confira duração de locks, cancelamento após c
 A sessão atual usa schema 4, relatórios limitados a 32 MiB e chat a 16 MiB, com retenção oficial de 50 sessões. A listagem lê caudas limitadas; vídeo é um arquivo separado. O perfil Contributor não poda diretórios de gravação externos. Constantes e testes em `session/domain.rs` são a referência executável, não aumente os limites só para esconder um caso de carga.
 
 O frontend carrega telas/módulos sob demanda. O worker retira parsing/análise pesada do fluxo de interação; replay separa relógio, segmentos e paginação de chat. Um marcador não deve invalidar a página inteira nem recriar o player. Preserve buffers transferíveis, listas limitadas e assinaturas estreitas de estado.
+
+### Plataformas
+
+Cada plataforma vive na própria pasta, e o núcleo só conhece o registro.
+
+- **Destinos** são dados: cada um é um `src/platforms/<id>/destination.json` (por exemplo [`facebook`](../src/platforms/facebook/destination.json) e o RTMP [`custom`](../src/platforms/custom/destination.json)) com a ordem, a cor, o ícone, o preset recomendado, os limites de cópia, se é experimental, a conta que preenche a chave, a ordem no setup e capacidades como `userServer` e `fallback`. O frontend junta as pastas com `import.meta.glob` ([`destinations.ts`](../src/platforms/destinations.ts)) e o [`build.rs`](../src-tauri/build.rs) junta os mesmos arquivos para o motor. Um destino novo é uma pasta com esse arquivo, mais a nota e o slogan dele nos dicionários, sem tocar no Rust nem nas telas; a telemetria aceita os ids do catálogo.
+- **Chat e conta** são código. No Rust, cada pasta em [`src-tauri/src/platforms`](../src-tauri/src/platforms/mod.rs) implementa `ChatProvider` (conexão, envio, audiência, moderação) e, se houver login, `AccountProvider` (status, entrar e sair, ler a chave, título da live, canais da conta, credenciais próprias e transmissão automática ao entrar no ar); `chat.rs`, `auth.rs` e `commands.rs` ficam com a infraestrutura comum e despacham pelo registro. No frontend, [`src/platforms`](../src/platforms/index.ts) descreve as capacidades de cada plataforma (normalização do canal, como envia, o que a moderação exige, como ler o próprio status) e `platforms/ui.ts` liga os painéis de conta e os ajustes de canal de cada uma.
+- [`registry.test.ts`](../src/platforms/registry.test.ts) falha se o código fora das pastas de plataforma voltar a citar o id de uma plataforma.
+- Os loops de rede de cada plataforma continuam dentro dela; o supervisor de reconexão, a deduplicação, a gravação da sessão e o overlay são do núcleo.
 
 ### Fronteiras do frontend
 

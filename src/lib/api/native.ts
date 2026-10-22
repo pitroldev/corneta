@@ -1,4 +1,5 @@
 import { type TelemetryStatus } from "../telemetry-schema";
+import { ACCOUNT_PLATFORMS } from "../../platforms";
 import type {
   Alert,
   AppConfig,
@@ -286,25 +287,24 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return await invoke("auth_status");
     },
-    async twitchLoginStart() {
+    async accountLoginStart(platform, options) {
       const { invoke } = await core();
-      await invoke("twitch_login_start");
+      await invoke("account_login_start", {
+        platform,
+        moderation: options?.moderation ?? null,
+        streamKey: options?.streamKey ?? null,
+      });
     },
-    async twitchFetchStreamKey(targetId) {
+    async accountLogout(platform) {
       const { invoke } = await core();
-      return invoke<string>("twitch_fetch_stream_key", { targetId });
+      await invoke("account_logout", { platform });
     },
-    async twitchLogout() {
+    async fetchStreamKey(platform, targetId) {
       const { invoke } = await core();
-      await invoke("twitch_logout");
-    },
-    async youtubeLoginStart() {
-      const { invoke } = await core();
-      await invoke("youtube_login_start");
-    },
-    async youtubeLogout() {
-      const { invoke } = await core();
-      await invoke("youtube_logout");
+      return invoke<{ login: string; url: string | null }>(
+        "account_fetch_stream_key",
+        { platform, targetId },
+      );
     },
     async youtubeBroadcastRecoveryStatus() {
       const { invoke } = await core();
@@ -318,24 +318,6 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("youtube_acknowledge_unknown_broadcast", { confirmed });
     },
-    async kickLoginStart(options) {
-      const { invoke } = await core();
-      await invoke("kick_login_start", {
-        moderation: options?.moderation ?? null,
-        streamKey: options?.streamKey ?? null,
-      });
-    },
-    async kickFetchStreamKey(targetId) {
-      const { invoke } = await core();
-      return invoke<{ login: string; url: string | null }>(
-        "kick_fetch_stream_key",
-        { targetId },
-      );
-    },
-    async kickLogout() {
-      const { invoke } = await core();
-      await invoke("kick_logout");
-    },
     async setStreamInfo(title, category) {
       const { invoke } = await core();
       return await invoke("set_stream_info", {
@@ -343,37 +325,25 @@ export function tauriApi(): CornetaApi {
         category: category ?? null,
       });
     },
-    async setYoutubeOauth(clientId, clientSecret) {
+    async accountSaveOwnCredentials(platform, clientId, clientSecret) {
       const { invoke } = await core();
-      await invoke("set_youtube_oauth", { clientId, clientSecret });
+      await invoke("account_save_own_credentials", {
+        platform,
+        clientId,
+        clientSecret,
+      });
     },
-    async clearYoutubeOauth() {
+    async accountClearOwnCredentials(platform) {
       const { invoke } = await core();
-      await invoke("clear_youtube_oauth");
+      await invoke("account_clear_own_credentials", { platform });
     },
-    async youtubeUseOfficial() {
+    async accountUseOfficial(platform) {
       const { invoke } = await core();
-      await invoke("youtube_use_official");
+      await invoke("account_use_official", { platform });
     },
-    async youtubeUseOwnCreds() {
+    async accountUseOwnCredentials(platform) {
       const { invoke } = await core();
-      await invoke("youtube_use_own_creds");
-    },
-    async setKickOauth(clientId, clientSecret) {
-      const { invoke } = await core();
-      await invoke("set_kick_oauth", { clientId, clientSecret });
-    },
-    async clearKickOauth() {
-      const { invoke } = await core();
-      await invoke("clear_kick_oauth");
-    },
-    async kickUseOfficial() {
-      const { invoke } = await core();
-      await invoke("kick_use_official");
-    },
-    async kickUseOwnCreds() {
-      const { invoke } = await core();
-      await invoke("kick_use_own_creds");
+      await invoke("account_use_own_credentials", { platform });
     },
     async chatModerate(sourceId, action, opts) {
       const { invoke } = await core();
@@ -398,15 +368,11 @@ export function tauriApi(): CornetaApi {
         login: string;
       };
       void event().then(({ listen }) => {
-        void listen<AuthPayload>("auth://twitch", (e) =>
-          onAuth("twitch", e.payload),
-        ).then(add);
-        void listen<AuthPayload>("auth://youtube", (e) =>
-          onAuth("youtube", e.payload),
-        ).then(add);
-        void listen<AuthPayload>("auth://kick", (e) =>
-          onAuth("kick", e.payload),
-        ).then(add);
+        for (const platform of ACCOUNT_PLATFORMS) {
+          void listen<AuthPayload>(`auth://${platform}`, (e) =>
+            onAuth(platform, e.payload),
+          ).then(add);
+        }
       });
       return () => {
         cancelled = true;

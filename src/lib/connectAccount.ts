@@ -1,24 +1,23 @@
+import { accountProvider, type AccountPlatform } from "../platforms";
+import { PLATFORMS } from "./platforms";
 import type { LoginState } from "./store/types";
 import type { PlatformId } from "./types";
 
-export type AccountPlatform = "twitch" | "youtube" | "kick";
+export type { AccountPlatform } from "../platforms";
 
-export function isAccountPlatform(id: PlatformId): id is AccountPlatform {
-  return id === "twitch" || id === "youtube" || id === "kick";
+/** The account that can sign in and fill a destination, if the destination has one. */
+export function destinationAccount(
+  platformId: PlatformId,
+): AccountPlatform | undefined {
+  return PLATFORMS[platformId]?.account;
 }
-
-/** OAuth scope each platform needs before its stream key can be read through the login. */
-const KEY_SCOPE: Partial<Record<AccountPlatform, string>> = {
-  twitch: "channel:read:stream_key",
-  kick: "streamkey:read",
-};
 
 /** A login from before the key scope existed can chat but cannot read the key; it must sign in again. */
 export function missingKeyScope(
   platform: AccountPlatform,
   account: LoginState | null,
 ): boolean {
-  const scope = KEY_SCOPE[platform];
+  const scope = accountProvider(platform)?.keyScope;
   return (
     !!scope &&
     account?.state === "connected" &&
@@ -48,42 +47,43 @@ export function loginOutcome(
 export interface ConnectDeps {
   youtubeAutoLive: boolean;
   setSettings: (patch: { youtubeAutoLive: boolean }) => void;
-  fetchTwitchKey: (targetId: string) => Promise<string>;
-  fetchKickKey: (targetId: string) => Promise<string>;
+  fetchStreamKey: (
+    platform: AccountPlatform,
+    targetId: string,
+  ) => Promise<string>;
 }
 
 export type ConnectResult =
-  { kind: "youtubeAuto" } | { kind: "key"; login: string };
+  { kind: "autoBroadcast" } | { kind: "key"; login: string };
 
-/** Twitch and Kick read the stream key through the login; YouTube turns on the automatic broadcast. */
+/** Fetch-key accounts read the stream key through the login; the others turn on the automatic broadcast. */
 export async function finishConnect(
   platform: AccountPlatform,
   targetId: string,
   deps: ConnectDeps,
 ): Promise<ConnectResult> {
-  if (platform === "youtube") {
+  if (accountProvider(platform)?.connect === "auto-broadcast") {
     if (!deps.youtubeAutoLive) deps.setSettings({ youtubeAutoLive: true });
-    return { kind: "youtubeAuto" };
+    return { kind: "autoBroadcast" };
   }
-  const login =
-    platform === "twitch"
-      ? await deps.fetchTwitchKey(targetId)
-      : await deps.fetchKickKey(targetId);
+  const login = await deps.fetchStreamKey(platform, targetId);
   return { kind: "key", login };
 }
 
 export interface LoginDeps {
-  twitchLogin: () => Promise<void>;
-  youtubeLogin: () => Promise<void>;
-  kickLogin: (options?: { streamKey?: boolean }) => Promise<void>;
+  accountLogin: (
+    platform: AccountPlatform,
+    options?: { streamKey?: boolean },
+  ) => Promise<void>;
 }
 
-/** Kick only grants the key scope when asked, so its login always requests it here. */
+/** Platforms that grant scopes on demand only give the key scope when asked, so this login asks for it. */
 export function startLogin(
   platform: AccountPlatform,
   deps: LoginDeps,
 ): Promise<void> {
-  if (platform === "twitch") return deps.twitchLogin();
-  if (platform === "youtube") return deps.youtubeLogin();
-  return deps.kickLogin({ streamKey: true });
+  return deps.accountLogin(
+    platform,
+    accountProvider(platform)?.scopesOnDemand ? { streamKey: true } : undefined,
+  );
 }

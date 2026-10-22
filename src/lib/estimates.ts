@@ -7,7 +7,7 @@ import type {
   Target,
   VideoPreset,
 } from "./types";
-import { PLATFORMS } from "./platforms";
+import { PLATFORMS, isVertical } from "./platforms";
 
 // Reference workload: one 1080p60 encode.
 const REF_PIXELS_PER_SEC = 1920 * 1080 * 60;
@@ -21,8 +21,7 @@ function transcodeCost(p: VideoPreset, encoder: EncoderKind): number {
 }
 
 export function smartHybridAction(platformId: PlatformId): EncodingAction {
-  const r = PLATFORMS[platformId].recommended;
-  return r.height > r.width ? "transcode" : "copy";
+  return isVertical(platformId) ? "transcode" : "copy";
 }
 
 export function effectiveAction(mode: EncodingMode, t: Target): EncodingAction {

@@ -5,11 +5,8 @@ import { api } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
 import { openExternal } from "../../lib/utils";
-import { useAccountAction } from "./useAccountAction";
-import {
-  resolveYoutubeRecovery,
-  type YoutubeRecoveryStatus,
-} from "./youtubeRecovery";
+import { useAccountAction } from "../../screens/chat/useAccountAction";
+import { resolveYoutubeRecovery, type YoutubeRecoveryStatus } from "./recovery";
 
 export function YoutubeBroadcastRecovery() {
   const t = useT();

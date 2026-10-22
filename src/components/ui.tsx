@@ -1,31 +1,13 @@
 import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
 import * as Switch from "@radix-ui/react-switch";
 import { Check, Copy, FlaskConical, Globe, Info, Loader2 } from "lucide-react";
-import {
-  siTwitch,
-  siYoutube,
-  siFacebook,
-  siKick,
-  siTiktok,
-  siX,
-  siInstagram,
-} from "simple-icons";
 import { cn, readableOn } from "../lib/utils";
 import { useT } from "../lib/i18n";
-import { PLATFORMS } from "../lib/platforms";
+import { PLATFORMS, presetOf } from "../lib/platforms";
 import type { ChatPlatform, PlatformId } from "../lib/types";
+import { chatProvider } from "../platforms";
 import { Mascot } from "./decor";
 import { Tooltip } from "./Tooltip";
-
-const PLATFORM_ICON: Partial<Record<PlatformId, string>> = {
-  twitch: siTwitch.path,
-  youtube: siYoutube.path,
-  facebook: siFacebook.path,
-  kick: siKick.path,
-  tiktok: siTiktok.path,
-  x: siX.path,
-  instagram: siInstagram.path,
-};
 
 // pop is a compatibility alias for tomato, distinct from the CSS shadow utility.
 type Variant =
@@ -235,15 +217,11 @@ export function PlatformGlyph({
   id: PlatformId | ChatPlatform;
   size?: number;
 }) {
-  // Cinefy is a chat source, not a streaming destination.
-  const isCinefy = id === "cinefy";
-  const preset = isCinefy ? undefined : PLATFORMS[id as PlatformId];
-  // Old or manually edited configurations may contain unknown platform IDs.
-  const color = isCinefy ? "#FFD200" : (preset?.color ?? "#64748B");
+  // Chat-only providers have no destination preset; old or edited configurations may hold unknown IDs.
+  const color =
+    PLATFORMS[id]?.color ?? chatProvider(id)?.color ?? presetOf(id).color;
   const fg = readableOn(color);
-  const path = isCinefy
-    ? "M8 5.14v13.72L19 12 8 5.14z"
-    : PLATFORM_ICON[id as PlatformId];
+  const path = PLATFORMS[id]?.icon ?? chatProvider(id)?.icon;
   const glyph = size * 0.52;
   return (
     <div

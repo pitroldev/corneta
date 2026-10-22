@@ -726,6 +726,9 @@ messages! {
     KickStreamKeyFailed = "rust.kick.streamKey.failed" =>
         pt: "Não consegui pegar a chave na Kick. Tente de novo ou cole a chave à mão.",
         en: "I couldn't fetch the key from Kick. Try again or paste it by hand.";
+    StreamKeyFailed = "rust.streamKey.failed" =>
+        pt: "Não consegui pegar a chave pela conta. Tente de novo ou cole a chave à mão.",
+        en: "I couldn't fetch the key from your account. Try again or paste it by hand.";
     TwitchStreamKeyFailed = "rust.twitch.streamKey.failed" =>
         pt: "Não consegui pegar a chave na Twitch. Tente de novo ou cole a chave à mão.",
         en: "I couldn't fetch the key from Twitch. Try again or paste it by hand.";

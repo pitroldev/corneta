@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { useStore } from "../../lib/store";
 import type { LoginState } from "../../lib/store/types";
-import { HAS_TWITCH_OAUTH } from "../../lib/oauth";
 import { PLATFORMS, platformName } from "../../lib/platforms";
 import { toast } from "../../lib/toast";
 import { useConfirm } from "../../lib/useConfirm";
@@ -27,33 +26,20 @@ import type { PlatformId, Target } from "../../lib/types";
 import {
   connectAction,
   finishConnect,
-  isAccountPlatform,
+  destinationAccount,
   loginOutcome,
   startLogin,
   type AccountPlatform,
 } from "../../lib/connectAccount";
 import { Button, Input } from "../ui";
-
-// Portuguese platform names require gendered prepositions; English uses the catalog name.
-const PT_OF: Record<AccountPlatform, string> = {
-  twitch: "da Twitch",
-  youtube: "do YouTube",
-  kick: "da Kick",
-};
-const PT_WITH: Record<AccountPlatform, string> = {
-  twitch: "com a Twitch",
-  youtube: "com o YouTube",
-  kick: "com a Kick",
-};
+import { CHAT_PROVIDERS, accountProvider } from "../../platforms";
+import { useLoginReady } from "../../platforms/ui";
 
 /** Whether this build can sign in to the platform; without it, pasting the key is the only path. */
 export function useCanLogin(platformId: PlatformId): boolean {
-  const youtube = useStore((s) => s.youtubeOauthReady);
-  const kick = useStore((s) => s.kickOauthReady);
-  if (platformId === "twitch") return HAS_TWITCH_OAUTH;
-  if (platformId === "youtube") return youtube;
-  if (platformId === "kick") return kick;
-  return false;
+  const ready = useLoginReady();
+  const account = destinationAccount(platformId);
+  return !!account && ready[account];
 }
 
 /** "Entrar com a Twitch": the label keeps the Portuguese article next to the platform name. */
@@ -62,10 +48,13 @@ export function loginLabel(
   t: I18n["t"],
   locale: Locale,
 ): string {
+  // Portuguese platform names take gendered prepositions; English uses the catalog name.
   const name = platformName(platformId, t);
-  if (locale === "pt-BR" && isAccountPlatform(platformId))
-    return t("components.connect.login", { platform: PT_WITH[platformId] });
-  return t("components.connect.login", { platform: name });
+  const account = destinationAccount(platformId);
+  const pt = account && accountProvider(account)?.pt.with;
+  return t("components.connect.login", {
+    platform: locale === "pt-BR" && pt ? pt : name,
+  });
 }
 
 type ConnectPhase = "idle" | "login" | "fetching";
@@ -76,11 +65,9 @@ type ConnectPhase = "idle" | "login" | "fetching";
  */
 export function useConnectAccount(target: Target, onDone?: () => void) {
   const { t } = useI18n();
-  const platform = target.platformId;
-  const account = useStore((s) =>
-    isAccountPlatform(platform) ? s.chatLogin[platform] : null,
-  );
-  const canLogin = useCanLogin(platform);
+  const platform = destinationAccount(target.platformId);
+  const account = useStore((s) => (platform ? s.chatLogin[platform] : null));
+  const canLogin = useCanLogin(target.platformId);
   const [phase, setPhase] = useState<ConnectPhase>("idle");
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -94,11 +81,10 @@ export function useConnectAccount(target: Target, onDone?: () => void) {
       const result = await finishConnect(platform, target.id, {
         youtubeAutoLive: !!st.config?.settings.youtubeAutoLive,
         setSettings: st.setSettings,
-        fetchTwitchKey: st.fetchTwitchKey,
-        fetchKickKey: st.fetchKickKey,
+        fetchStreamKey: st.fetchStreamKey,
       });
       toast.success(
-        result.kind === "youtubeAuto"
+        result.kind === "autoBroadcast"
           ? t("components.connect.youtubeReady")
           : result.login
             ? t("platforms.key.fetchedToast", { login: result.login })
@@ -123,14 +109,14 @@ export function useConnectAccount(target: Target, onDone?: () => void) {
   };
 
   const connect = () => {
-    if (!isAccountPlatform(platform) || phase !== "idle") return;
+    if (!platform || phase !== "idle") return;
     if (connectAction(platform, account) === "finish") void finish(platform);
     else void login(platform);
   };
 
   const accountState = account?.state;
   useEffect(() => {
-    if (phaseRef.current !== "login" || !isAccountPlatform(platform)) return;
+    if (phaseRef.current !== "login" || !platform) return;
     const outcome = loginOutcome(accountState);
     if (outcome === "finish") void finish(platform);
     else if (outcome === "cancel") setPhase("idle");
@@ -138,7 +124,10 @@ export function useConnectAccount(target: Target, onDone?: () => void) {
   }, [accountState]);
 
   return {
-    canLogin: canLogin && isAccountPlatform(platform),
+    canLogin: canLogin && !!platform,
+    /** Signing in turns on the automatic broadcast instead of reading a key. */
+    autoBroadcast:
+      !!platform && accountProvider(platform)?.connect === "auto-broadcast",
     account,
     phase,
     busy: phase !== "idle",
@@ -283,7 +272,7 @@ export function QuickConnect({
             {!connect.busy && <LogIn className="size-4" />}
             {connect.phase === "fetching"
               ? t(
-                  target.platformId === "youtube"
+                  connect.autoBroadcast
                     ? "components.connect.turningOnAuto"
                     : "components.connect.fetching",
                 )
@@ -383,9 +372,11 @@ export function offerChatBridge(
   t: I18n["t"],
   locale: Locale,
 ) {
-  if (!isAccountPlatform(platformId)) return;
+  const account = destinationAccount(platformId);
+  const chat = account && CHAT_PROVIDERS.find((p) => p.account === account);
+  if (!account || !chat) return;
   const sources = useStore.getState().config?.settings.chatSources ?? [];
-  if (sources.some((s) => s.platform === platformId)) return;
+  if (sources.some((s) => s.platform === chat.id)) return;
   // Record the offer immediately, regardless of whether it is accepted or dismissed.
   const offeredKey = `corneta.chatBridgeOffered.${platformId}`;
   try {
@@ -394,8 +385,9 @@ export function offerChatBridge(
   } catch {
     /* Unavailable storage may repeat the offer; it must not prevent offering chat setup. */
   }
+  const pt = accountProvider(account)?.pt.of;
   const platformLabel =
-    locale === "pt-BR" ? PT_OF[platformId] : platformName(platformId, t);
+    locale === "pt-BR" && pt ? pt : platformName(platformId, t);
   toast.action(
     t("platforms.chatBridge.ask", { platform: platformLabel }),
     t("platforms.chatBridge.cta"),
@@ -403,15 +395,15 @@ export function offerChatBridge(
       const st = useStore.getState();
       const cur = st.config?.settings.chatSources ?? [];
       // A connected account is offered in the Channels tab with its channel filled in.
-      const loggedIn = st.chatLogin[platformId].state === "connected";
+      const loggedIn = st.chatLogin[account].state === "connected";
       // The source may have been created while the toast was visible.
-      if (!loggedIn && !cur.some((s) => s.platform === platformId)) {
+      if (!loggedIn && !cur.some((s) => s.platform === chat.id)) {
         st.setSettings({
           chatSources: [
             ...cur,
             {
               id: uid("src"),
-              platform: platformId,
+              platform: chat.id,
               value: "",
               name: "",
               enabled: true,
@@ -439,8 +431,8 @@ export function KeyField({
   const connect = useConnectAccount(target, () =>
     offerChatBridge(target.platformId, t, locale),
   );
-  const isKeyPlatform =
-    target.platformId === "twitch" || target.platformId === "kick";
+  const keySpec = accountProvider(destinationAccount(target.platformId) ?? "");
+  const isKeyPlatform = keySpec?.connect === "fetch-key";
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [reveal, setReveal] = useState(false);
@@ -547,11 +539,10 @@ export function KeyField({
             loading={connect.busy}
             onClick={connect.connect}
             title={
-              target.platformId === "twitch"
-                ? t("platforms.key.fetchTitle", {
-                    login: connect.account?.login ?? "",
-                  })
-                : t("platforms.key.fetchTitleKick")
+              keySpec?.fetchKeyTitle &&
+              t(keySpec.fetchKeyTitle, {
+                login: connect.account?.login ?? "",
+              })
             }
           >
             {!connect.busy &&
