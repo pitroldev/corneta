@@ -172,9 +172,16 @@ fn clamp_window_to_screen(w: &tauri::WebviewWindow) {
     }
 }
 
+/// WebSocket TLS (Twitch, Kick, Cinefy, alerts) builds its rustls config from the process default.
+/// The updater installs one only when it checks, which can come after chat connects.
+fn install_tls_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let startup_started = std::time::Instant::now();
+    install_tls_provider();
     let builder = tauri::Builder::default()
         // Register first to prevent competing ingest listeners or duplicate engines.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -465,4 +472,13 @@ pub fn run() {
                 telemetry.shutdown();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn websocket_tls_has_a_crypto_provider() {
+        super::install_tls_provider();
+        let _ = rustls::ClientConfig::builder();
+    }
 }
