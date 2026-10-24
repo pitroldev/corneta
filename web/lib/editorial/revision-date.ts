@@ -6,3 +6,12 @@ export const REVISION_DATE_PATTERN =
 export function revisionDay(value: string): string {
   return value.slice(0, 10);
 }
+
+// Editorial dates are Brasília time, which has had no daylight saving since 2019.
+const EDITORIAL_UTC_OFFSET = "-03:00";
+
+/** Structured data and Open Graph need the time and the time zone, not a bare day. */
+export function revisionDateTime(value: string): string {
+  const [day, time = "00:00"] = value.split("T");
+  return `${day}T${time}:00${EDITORIAL_UTC_OFFSET}`;
+}

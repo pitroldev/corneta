@@ -60,7 +60,7 @@ describe("editorial structured data", () => {
         description: "Fluxo testado para escolher um bitrate estável.",
         locale: "pt-BR",
         publishedAt: "2026-08-01",
-        updatedAt: "2026-08-01",
+        updatedAt: "2026-08-03T18:05",
         sources: [],
       },
     } as unknown as PublishedEditorialDocument;
@@ -95,8 +95,8 @@ describe("editorial structured data", () => {
     expect(article).toMatchObject({
       "@type": "TechArticle",
       headline: "Como escolher o bitrate",
-      datePublished: "2026-08-01",
-      dateModified: "2026-08-01",
+      datePublished: "2026-08-01T00:00:00-03:00",
+      dateModified: "2026-08-03T18:05:00-03:00",
       author: {
         "@type": "Person",
         name: "Petro Cardoso",
