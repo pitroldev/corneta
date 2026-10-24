@@ -1,0 +1,75 @@
+---
+contentId: guide_one_platform_disconnected_en
+title: "One platform dropped? What to check without ending the rest"
+description: "Isolate the key, ingest server, rule and route of the platform that dropped from your multistream without interrupting the destinations still live."
+summary: "If only one platform is reconnecting, don't stop the whole stream. Pause that destination, check the key and server, check the platform's status and resume once the cause is isolated."
+locale: en
+collection: guides
+kind: guide
+category: multistream
+slug: one-platform-disconnected
+translationKey: one-platform-disconnected
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: one platform dropped while multistreaming
+related:
+  - help_platform_reconnecting_en
+  - guide_dropped_frames_en
+  - help_export_safe_diagnostic_en
+sources:
+  - title: Corneta independent target engine
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-09-07
+  - title: Corneta target controls
+    kind: internal
+    repoPath: src/screens/GoLiveScreen.tsx
+    reviewedAt: 2026-10-20
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Platforms screen with Twitch, YouTube and Kick destinations set up separately."
+    caption: "Each card has its own key, server and status; a fix doesn't need to touch the other outputs."
+---
+
+## First: confirm it's isolated
+
+On the **Live** screen, see whether Twitch, YouTube or Kick are still **LIVE** while one shows as **RECONNECTING** or **ERROR**. If they all dropped together, skip to your local network or the input signal.
+
+## Don't end the others
+
+1. Pause only the bad destination.
+2. Open **Platforms** and use **Test the server** on that card.
+3. Check whether the key was changed in the platform's dashboard.
+4. Compare the ingest URL with the current official documentation.
+5. Check the platform's status page.
+6. Resume the destination and watch its bitrate for a few minutes.
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+## How to read the result
+
+| Result                        | Likely cause                   | Next step                         |
+| ----------------------------- | ------------------------------ | --------------------------------- |
+| Server doesn't respond        | route, DNS, firewall or outage | try the alternate official ingest |
+| Connects and then drops       | key, codec or platform limit   | review credentials and preset     |
+| Bitrate fluctuates only there | route to that ingest           | switch that destination's server  |
+| All start dropping together   | saturated local upload         | lower the combined bitrate        |
+
+<Callout label="Don't paste a key into a support ticket" tone="important">
+  If the platform told you to reset your stream key, update it in Corneta's
+  vault. Don't send the key in a screenshot, chat or diagnostic.
+</Callout>
+
+The operational step-by-step is in [one platform keeps reconnecting](/en/help/troubleshooting/platform-reconnecting).

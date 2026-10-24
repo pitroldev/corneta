@@ -1,0 +1,74 @@
+---
+contentId: help_obs_not_found_en
+title: "Corneta can't find OBS: WebSocket, password, port, firewall"
+description: "Fix a refused connection, a wrong password or a different port when Corneta's automatic setup can't find OBS Studio through the WebSocket server."
+summary: "In OBS, open Tools → WebSocket Server Settings, keep the server enabled and copy the same password into Corneta. Corneta always looks for OBS on port 4455; if you changed the port in OBS, set it back to 4455."
+locale: en
+collection: help
+kind: troubleshooting
+category: troubleshooting
+slug: obs-not-found
+translationKey: obs-not-found
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: Corneta can't find OBS WebSocket
+related:
+  - help_automatic_obs_setup_en
+  - help_stream_statuses_en
+  - guide_obs_closed_during_stream_en
+sources:
+  - title: OBS Remote Control Guide
+    kind: official
+    url: https://obsproject.com/kb/remote-control-guide
+    reviewedAt: 2026-10-18
+  - title: Corneta OBS WebSocket client
+    kind: internal
+    repoPath: src-tauri/src/obs.rs
+    reviewedAt: 2026-10-18T18:05
+images:
+  - baseName: corneta-obs-connection-details-en
+    alt: "Corneta screen with the OBS connection set up and the local input details."
+    caption: "The WebSocket controls OBS; the local RTMP address receives the video. They are two different paths."
+---
+
+## First test
+
+In OBS 28 or later, open **Tools → WebSocket Server Settings**. WebSocket comes built in; don't install a separate plugin unless you need to.
+
+1. Turn on the WebSocket server.
+2. Check that **Server Port** is set to `4455`. Corneta doesn't let you change this port.
+3. Keep **Enable Authentication** on.
+4. Click **Show Connect Info**, copy the password and paste it into **Settings → OBS** in Corneta.
+5. Click **Test connection** or go back to **Hook up OBS**.
+
+<ContentImage baseName="corneta-obs-connection-details-en" />
+
+## By symptom
+
+| Message in Corneta                           | Likely cause                                                                                                     | Fix                                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Couldn't find OBS                            | OBS is closed, the WebSocket is off or the port isn't 4455. Up to 0.8.5, a wrong password also shows up this way | open OBS, turn on the server, set the port back to 4455 and copy the password again |
+| Password refused                             | OBS asks for a password and Corneta has none or, after 0.8.5, a different one                                    | paste the password into **Settings → OBS**                                          |
+| Connected, but OBS isn't pointing at Corneta | OBS is streaming to another server                                                                               | click **Set it up for me** on the **Live** screen                                   |
+| Connected, but **Waiting for signal**        | the WebSocket is fine; the video hasn't arrived                                                                  | start streaming in OBS                                                              |
+
+If OBS froze, close it and open it again. Antivirus software with its own firewall can also block the connection: allow OBS and Corneta in it.
+
+Don't turn off the password just to “see if it works” on a shared network. The OBS documentation recommends protecting the WebSocket.
+
+If it keeps happening, write down the message and the versions. Never send the WebSocket password.

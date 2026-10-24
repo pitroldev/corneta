@@ -1,0 +1,120 @@
+---
+contentId: guide_twitch_youtube_simultaneously_en
+title: "How to stream to Twitch and YouTube at the same time"
+description: "Set up Twitch and YouTube as independent outputs from OBS, work out the upload you need and check the current simulcasting rules."
+summary: "You can send the same stream to Twitch and YouTube at the same time. Get both accounts ready, add up the bitrates and use a separate destination for each stream key."
+locale: en
+collection: guides
+kind: guide
+category: multistream
+slug: twitch-youtube-simultaneously
+translationKey: twitch-youtube-simultaneously
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: how to stream on Twitch and YouTube at the same time
+related:
+  - guide_obs_multistream_en
+  - guide_multistream_upload_speed_en
+  - help_manage_platform_en
+sources:
+  - title: Twitch Simulcasting Guidelines FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/simulcasting-guidelines
+    reviewedAt: 2026-08-01
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Twitch and YouTube set up as independent destinations on the Platforms screen."
+    caption: "Both platforms get the same content, but each output keeps its own key, status and reconnection."
+  - baseName: corneta-quality-modes-en
+    alt: "Corneta's quality modes with an upload estimate for the configured destinations."
+    caption: "The screen shows how much the two outputs need and when there will be re-encoding."
+---
+
+## Is it allowed?
+
+Yes. Twitch allows simulcasting for anyone without an individual exclusivity
+agreement, and YouTube has its own guidance for streaming across platforms.
+Twitch requires that its experience not be worse than on the other platforms and
+forbids using your Twitch stream to send the audience to watch the competing
+stream.
+
+If you signed an individual agreement, it overrides any public guide. Read the
+document or contact the platform's support before you go live.
+
+## Get both accounts ready
+
+On YouTube, the channel needs to be verified and have live streaming enabled.
+YouTube itself says the first activation can take at least 24 hours, so don't
+leave this until it's time to hit **GO LIVE**.
+
+On Twitch, grab the current stream key from your dashboard. Don't put either key
+in OBS: OBS will send a local signal to Corneta.
+
+## Set up Twitch and YouTube
+
+1. In Corneta, open **Platforms → Add platform**.
+2. Add Twitch, paste the stream key and use **Test the server**.
+3. Add YouTube. If the account is connected, Corneta can create the broadcast
+   when you hit **GO LIVE**; otherwise, enter the event details.
+4. Confirm that both destinations show as **Ready**.
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+## Check upload and quality
+
+With local distribution, the upload you need is the sum of both outputs. One
+destination at 6 Mbps and another at 4 Mbps need 10 Mbps of bitrate alone; you
+still need headroom for the connection to fluctuate. YouTube recommends testing
+with 1.5 to 2 times the sum as a stability reference.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+If the same signal works for both, **Straight up** avoids a second re-encode. If
+only one destination needs to change, **Smart** adapts just that one.
+
+## Do a rehearsal that counts
+
+Test with the game open, plus camera, audio, alerts and a scene with movement.
+Open both viewing pages on another device and confirm video and sound. A speed
+test alone doesn't reproduce the work of a live stream.
+
+## During the stream
+
+- keep equivalent quality on Twitch;
+- don't add a QR code, banner or chat command sending the Twitch audience to the
+  competing stream;
+- monitor bitrate and reconnections per destination;
+- if one platform drops, try reconnecting just that one before ending
+  everything.
+
+<Callout label="When the cloud makes more sense" tone="limit">
+  If your upload can't handle both local outputs, a cloud relay receives a
+  single signal and replicates it from there. The trade-off is putting an
+  external service in the middle.
+</Callout>
+
+Use the [upload calculator](/en/guides/quality/multistream-upload-speed) before
+choosing your bitrates.

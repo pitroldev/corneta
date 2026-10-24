@@ -1,0 +1,144 @@
+---
+contentId: help_first_stream_en
+title: "Your first stream: from zero to GO LIVE"
+description: "Connect OBS Studio, get a platform ready and check you have the upload you need to start your first live stream with Corneta."
+summary: "Connect OBS, get at least one destination ready and check your upload. Then all that's left is to send the signal to Corneta and hit GO LIVE."
+locale: en
+collection: help
+kind: help
+category: getting-started
+slug: first-stream
+translationKey: first-stream
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: how to do your first stream with Corneta
+related:
+  - guide_obs_multistream_en
+  - help_automatic_obs_setup_en
+  - help_manage_platform_en
+  - help_quality_modes_en
+sources:
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+  - title: Corneta live start sequencing
+    kind: internal
+    repoPath: src/lib/store.ts
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-obs-connection-details-en
+    alt: "Corneta's Live screen with the Hook up OBS panel open, showing the local server, the local key and copy buttons."
+    caption: "The server and key on this screen connect OBS to Corneta; they aren't credentials for any platform."
+  - baseName: corneta-platform-key-setup-en
+    alt: "Twitch destination open on Corneta's Platforms screen, with the key protected in the vault and the Test the server button."
+    caption: "Open the destination to change the key or test the server before the stream."
+  - baseName: corneta-platform-destinations-en
+    alt: "Corneta's Platforms screen with the Twitch and YouTube destinations marked as ready for the stream."
+    caption: "Before moving on, check that every enabled destination shows as ready."
+  - baseName: corneta-quality-modes-en
+    alt: "Corneta's Quality screen comparing the Straight up, Smart and All out modes, with load and upload estimates."
+    caption: "Compare the cost on your machine and the upload before choosing how each destination receives the signal."
+  - baseName: corneta-first-live-checklist-en
+    alt: "Corneta's Live screen with platforms, OBS, upload and safety nets approved and GO LIVE unlocked."
+    caption: "The Live screen brings together what needs to be in order before GO LIVE."
+---
+
+## The path to GO LIVE
+
+OBS sends a single signal to Corneta. Corneta takes care of the rest and tracks
+each platform separately. If one destination stumbles, the others stay on air.
+
+Do it in this order: connect OBS, get at least one destination ready, check your
+upload and only then send the signal. That way you fix any problem before the
+stream really starts.
+
+## Before you start
+
+- Corneta and OBS Studio installed on Windows;
+- a stream key for at least one platform;
+- enough upload for the destinations you chose;
+- no other app competing for the stream or the encoder.
+
+Your stream key is a password. Don't put it in chat, a screenshot or a support
+request.
+
+## Connect Corneta to OBS
+
+Open OBS and then Corneta. Use the automatic setup when it's available. If OBS
+asks for confirmation or the WebSocket password doesn't match, sort that out
+before moving on.
+
+Once OBS shows as connected, control is ready. The video hasn't arrived yet —
+that's the next step.
+
+<ContentImage baseName="corneta-obs-connection-details-en" />
+
+## Add and test a platform
+
+Choose the platform, enter the details it asks for and run the test before the
+stream. If Corneta warns you that the key is invalid, fix it now. Being live is
+no time to find out a password is wrong.
+
+<ContentImage baseName="corneta-platform-key-setup-en" />
+
+Destination ready and no authentication error? You can move on.
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+## Check your upload and quality mode
+
+Since the distribution happens on your PC, each destination uses part of your
+upload. The math starts with the sum of the bitrates, and you still need headroom
+for when your internet fluctuates.
+
+Copying the signal is lighter on the machine. Changing the resolution or bitrate
+for each platform requires re-encoding and can use CPU or GPU.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+If the estimate goes over the stable capacity of your connection, lower the
+quality or consider a cloud relay. The [OBS Studio multistream guide](/en/guides/multistream/obs-multistream)
+explains that choice.
+
+<ContentImage baseName="corneta-first-live-checklist-en" />
+
+## Send the signal from OBS
+
+In OBS, choose the custom service and use the local address Corneta shows. The
+key for this local destination isn't your Twitch, YouTube or Kick stream key.
+
+Check your scene, camera and audio. In Corneta, click **GO LIVE** to prepare the
+local input and the destinations. If automatic start is enabled, Corneta will
+try to start the stream in OBS. If the start is manual or that attempt fails,
+click **Start Streaming** in OBS after GO LIVE.
+
+When the signal arrives, Corneta stops waiting and connects the enabled
+destinations.
+
+## Check before you call everyone in
+
+See whether there's motion, audio and bitrate on each destination. Open the
+platforms in another window or on your phone and confirm the right channel is
+live. One screen working doesn't prove they all are.
+
+## Something went wrong?
+
+Write down the exact message, the step where it stopped and whether the problem
+hit every destination or just one. Those three things are worth more than “it
+didn't work”.
+
+If you ask for help, never send a stream key, token, password or a URL with
+credentials.

@@ -1,0 +1,81 @@
+---
+contentId: guide_protect_stream_key_en
+title: "Is a stream key a password? RTMP, RTMPS and account security"
+description: "Learn why a stream key authorizes a live stream on your channel, when to use RTMPS and what to do after a key has been exposed."
+summary: "Treat your stream key like a password: anyone who has the key can stream to your channel. Prefer RTMPS, keep credentials in the system vault and reset the key as soon as you suspect it was exposed."
+locale: en
+collection: guides
+kind: guide
+category: security
+slug: protect-stream-key
+translationKey: protect-stream-key
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: is a stream key a password
+related:
+  - help_streaming_keys_and_urls_en
+  - help_export_safe_diagnostic_en
+  - guide_simulcasting_rules_en
+sources:
+  - title: Twitch Stream Key FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/twitch-stream-key-faq?language=en_US
+    reviewedAt: 2026-08-01
+  - title: YouTube Manage live stream settings
+    kind: official
+    url: https://support.google.com/youtube/answer/9854503?hl=en
+    reviewedAt: 2026-08-01
+  - title: YouTube Encrypt your stream using RTMPS
+    kind: official
+    url: https://support.google.com/youtube/answer/10349430?hl=en
+    reviewedAt: 2026-08-01
+  - title: Corneta native key vault
+    kind: internal
+    repoPath: src-tauri/src/keys.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-platform-key-setup-en
+    alt: "Corneta platform card with the URL and key fields filled in with fictional data."
+    caption: "The URL locates the server; the key authorizes the channel. Corneta keeps the key in the Windows vault."
+---
+
+## The key authorizes the stream
+
+A stream key isn't your login password, but it deserves the same care. Twitch defines the key as the authorization that identifies your channel at the ingest. On YouTube, it links the encoder to the stream you chose.
+
+<ContentImage baseName="corneta-platform-key-setup-en" />
+
+Anyone who gets that key can try to send video to your channel without knowing your password. That's why it never goes into a screenshot, a pasted log, a settings backup or a support ticket.
+
+## RTMP and RTMPS
+
+RTMP carries the signal to the ingest. RTMPS adds TLS along that path. YouTube recommends RTMPS because the upload stays encrypted all the way to the platform's infrastructure. When the dashboard offers both, prefer `rtmps://`.
+
+RTMPS doesn't fix a key that has already leaked. It protects the transport; it doesn't stop someone who copied the credential from using it.
+
+## If the key showed up on screen
+
+1. End the suspicious stream.
+2. Reset the key in the platform's dashboard.
+3. Update the key in Corneta.
+4. Review the VOD, clip, screenshot and local recording where it appeared.
+5. Change your account password if there's any sign of a break-in, and turn on 2FA.
+
+<Callout label="Blur is not revocation" tone="important">
+  If a real key showed up in a file, treat it as exposed even if you blur it
+  afterward. Reset first; edit the image later.
+</Callout>
+
+To know which field to copy without mixing up the addresses, see [stream key, ingest URL and the OBS key](/en/help/platforms/streaming-keys-and-urls).

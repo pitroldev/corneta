@@ -1,0 +1,117 @@
+---
+contentId: guide_multistream_upload_speed_en
+title: "How much upload speed do you need to multistream?"
+description: "Add up the video and audio bitrate of every output, leave a stability margin and test your upload under the real load of your stream."
+summary: "For local multistream, add up the video and audio bitrate of every output. As a starting point, look for a stable connection of 1.5 to 2 times that total."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: multistream-upload-speed
+translationKey: multistream-upload-speed
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: how much upload speed do i need to multistream
+related:
+  - help_quality_modes_en
+  - guide_local_vs_cloud_en
+  - guide_twitch_youtube_simultaneously_en
+sources:
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-10-18
+  - title: OBS Stream Connection Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-10-18
+  - title: Corneta upload estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen showing the upload estimate for the current profile in Corneta."
+    caption: "The estimate uses the bitrates of the destinations turned on in the current profile."
+---
+
+## The math that matters
+
+Add up the **video and audio** bitrate of each local output. Then leave a margin
+for Wi-Fi, other people on the network and swings from your provider. YouTube
+recommends aiming for 1.5 to 2 times the combined bitrate when simulstreaming.
+
+Corneta's **Quality** screen already says **fits your upload with room to
+spare** at 20% headroom. On Wi-Fi or a shared network, aim for the 1.5× to 2×
+range.
+
+If Twitch uses 6 Mb/s and YouTube uses 4 Mb/s, the total is 10 Mb/s. The stable
+upload to aim for sits between 15 and 20 Mb/s. That is not a promise from your
+provider: it helps you decide whether this setup is worth testing.
+
+<UploadCalculator />
+
+## What goes into the total
+
+Every destination that leaves your PC directly counts. If three platforms get
+6 Mb/s each, you are not using 6 Mb/s: you are trying to sustain close to
+18 Mb/s, plus audio, protocol overhead and fluctuations.
+
+A cloud relay changes the local math. Your PC sends one output to the relay, and
+the relay copies it out on its side. You use less upload at home, but you now
+depend on that service and the limits of its plan.
+
+## Your plan's Mbps is not stable Mbps
+
+The number on your plan is a ceiling, not a guarantee of stability every
+second. Run the test on the same network, at the same time of day and with the
+cable or Wi-Fi you use when you stream.
+
+OBS explains that dropped frames show up when the connection to the server
+can't keep up with the bitrate you set. A quick test can show a high number and
+still hide packet loss, jitter or short drops.
+
+## Test with your real stream
+
+1. Close backups, sync and downloads on other devices.
+2. Open your game, camera, microphone, alerts and your heaviest scene.
+3. On the **Live** screen, use **Upload bandwidth → Measure now** while you are
+   not streaming.
+4. Do an unlisted or test stream with every destination.
+5. Watch bitrate and dropped frames for a few minutes, especially in scenes
+   with motion.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## If the math doesn't add up
+
+Lower the bitrate of the least demanding destination first. Then look at FPS
+and resolution. Switching from **All out** to **Smart** takes load off your PC:
+Twitch, YouTube and Kick get a copy of the OBS signal, and only destinations
+that need vertical video are transcoded. Your upload changes too, because each
+copy goes up at the OBS bitrate. Check the number on the mode's card before you
+decide.
+
+If your connection can only hold one good output, use a cloud relay. Fighting
+an upload that is already at its limit usually ends in dropped frames at the
+worst moment.
+
+<Callout label="Don't use download in the math" tone="warning">
+  Your stream leaves from your PC. The number that matters is stable upload, not
+  download or the highest peak you saw in the test.
+</Callout>
+
+See the full comparison in [local or cloud
+multistream](/en/guides/multistream/local-vs-cloud).

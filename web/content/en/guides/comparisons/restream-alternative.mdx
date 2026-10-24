@@ -1,0 +1,109 @@
+---
+contentId: guide_restream_alternative_en
+title: "Restream alternative: when to go local and when not to"
+description: "Compare Corneta and Restream on upload, cost, control, privacy and PC load before you decide between local multistreaming and a cloud relay."
+summary: "Corneta makes more sense when your upload can handle every output and you want local control with no monthly fee. Restream has the edge when your connection can only sustain one output or when you'd rather have distribution happen in the cloud."
+locale: en
+collection: guides
+kind: comparison
+category: comparisons
+slug: restream-alternative
+translationKey: restream-alternative
+status: published
+publishedAt: 2026-10-24
+intent: commercial
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11 with OBS Studio 32.2.1
+  - name: Restream
+    version: web service as of 2026-08-01
+    environment: public flow up to sign-in; no output run without an account
+reviewIntervalDays: 60
+experimental: false
+primaryQuery: Restream alternative
+related:
+  - guide_local_vs_cloud_en
+  - guide_multistream_tools_en
+  - guide_multistream_upload_speed_en
+sources:
+  - title: Restream free plan
+    kind: official
+    url: https://support.restream.io/en/articles/9127747-can-i-use-restream-for-free-yes
+    reviewedAt: 2026-08-01
+  - title: Restream with streaming software
+    kind: official
+    url: https://support.restream.io/en/articles/9241076-why-use-streaming-software-with-restream
+    reviewedAt: 2026-08-01
+  - title: Restream pricing
+    kind: official
+    url: https://restream.io/pricing
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Corneta screen with Twitch, YouTube and Kick set up as independent local destinations."
+    caption: "In Corneta, the connections leave from your PC and each destination stays under separate control."
+---
+
+## The difference that decides almost everything
+
+Restream receives **one** stream and replicates it in the cloud. Corneta receives the OBS signal locally and opens **one connection per destination**. That changes upload, dependencies and control.
+
+| If you need to…                                                | Best starting point |
+| -------------------------------------------------------------- | ------------------- |
+| save upload at home                                            | Restream            |
+| avoid a subscription to distribute locally                     | Corneta             |
+| pause or reconnect one destination without touching the others | Corneta             |
+| stream without installing another local app                    | Restream            |
+| keep stream keys on your computer                              | Corneta             |
+| use a browser-based studio and remote guests                   | Restream            |
+
+Don't choose by the list of platforms. Choose by the real bottleneck in your setup.
+
+## The test and its limits
+
+On August 1, 2026, we repeated the local flow on Windows 11 with Corneta 0.6.0 and OBS 32.2.1: setting up destinations, estimating bandwidth, starting the relay and controlling each output. For Restream, we checked the public onboarding, the free plan and the current documentation; we didn't create an account or stream through it.
+
+That's why this article compares architecture, requirements and documented features. It doesn't measure Restream's latency or stability, and it doesn't pretend it did.
+
+## When Corneta fits better
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+- your connection sustains the sum of the bitrates with headroom;
+- you already use Windows and OBS;
+- you want to test, pause and reconnect each destination separately;
+- you'd rather keep your keys in the system's local vault;
+- you want chat, alerts, metrics and the report in the same app;
+- you don't need a guest studio in the browser.
+
+The downside is physical: three 6 Mbps outputs use close to 18 Mbps of video, plus audio and headroom. Corneta doesn't make up bandwidth.
+
+## When Restream is the simpler choice
+
+- your upload only holds one good output;
+- your PC is already working at its limit with the game and OBS;
+- you want to run things from the browser;
+- remote studio features matter more to you than local control;
+- the plan you pick covers every destination and integration you need.
+
+The free plan described by Restream allows two platforms and includes the service's branding. More destinations and some features depend on the current plan; check the price on the day you sign up.
+
+<Callout label="The cloud also sits in the path" tone="limit">
+  The relay reduces the upload leaving your home, but adds an account, a service
+  and an external route. If the connection to the cloud drops, every replica
+  loses the signal.
+</Callout>
+
+## The decision in 30 seconds
+
+Run the [upload test](/en/help/quality/test-upload) with your real scene. If the sum of the outputs fits with room to spare, try Corneta. If it doesn't fit, a cloud relay is the technically correct decision, even though the local alternative is free.

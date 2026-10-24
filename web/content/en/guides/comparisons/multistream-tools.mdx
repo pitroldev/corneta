@@ -1,0 +1,139 @@
+---
+contentId: guide_multistream_tools_en
+title: "Aitum, Multiple RTMP, Restream or Corneta: which to choose?"
+description: "Compare four ways to multistream from OBS by architecture, upload, installation, control, vertical output, chat and post-stream diagnostics."
+summary: "Aitum and Multiple RTMP live inside OBS, Restream replicates in the cloud and Corneta runs as a separate local app. Choose by your bottleneck: OBS integration, saving upload, or per-destination control and diagnostics."
+locale: en
+collection: guides
+kind: comparison
+category: comparisons
+slug: multistream-tools
+translationKey: multistream-tools
+status: published
+publishedAt: 2026-10-24
+intent: commercial
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11 with OBS Studio 32.2.1
+  - name: Aitum Multistream
+    version: 1.0.8
+    environment: portable OBS Studio 32.2.1 on Windows 11
+  - name: Multiple RTMP Outputs
+    version: 0.7.4.0
+    environment: portable OBS Studio 32.2.1 on Windows 11
+  - name: Restream
+    version: web service as of 2026-08-01
+    environment: public flow up to sign-in; no output run without an account
+reviewIntervalDays: 60
+experimental: false
+primaryQuery: Aitum vs Multiple RTMP vs Restream vs Corneta
+related:
+  - guide_restream_alternative_en
+  - guide_obs_multistream_en
+  - guide_horizontal_vertical_live_en
+sources:
+  - title: Aitum Multistream 1.0.8
+    kind: primary
+    url: https://github.com/Aitum/obs-aitum-multistream/releases/tag/1.0.8
+    reviewedAt: 2026-08-01
+  - title: Multiple RTMP Outputs releases
+    kind: primary
+    url: https://github.com/sorayuki/obs-multi-rtmp/releases/latest
+    reviewedAt: 2026-08-01
+  - title: Restream free plan
+    kind: official
+    url: https://support.restream.io/en/articles/9127747-can-i-use-restream-for-free-yes
+    reviewedAt: 2026-08-01
+  - title: OBS Studio 32.2.1
+    kind: primary
+    url: https://github.com/obsproject/obs-studio/releases/tag/32.2.1
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Twitch, YouTube and Kick destinations set up separately in the Corneta app."
+    caption: "Corneta keeps each destination visible and controllable outside the OBS window."
+  - baseName: corneta-quality-modes-en
+    alt: "Corneta's quality modes with upload estimates and encoder sessions."
+    caption: "What sets Corneta apart isn't just opening RTMP connections: it shows the cost up front and diagnoses each output afterward."
+---
+
+## Short answer
+
+- **Aitum Multistream:** best if you want extra outputs tightly integrated into OBS and you use the Aitum ecosystem.
+- **Multiple RTMP Outputs:** best if you want a direct, flexible plugin and already know the encoder details.
+- **Restream:** best for reducing local upload and running everything through a cloud service.
+- **Corneta:** best if you want local distribution with per-destination control, chat, alerts, metrics and a report in a separate app.
+
+No option wins at everything.
+
+## How we tested
+
+On August 1, 2026, we used a portable OBS 32.2.1 on Windows 11. Aitum Multistream 1.0.8 and Multiple RTMP Outputs 0.7.4.0 loaded together and exposed their controls in OBS. In Corneta 0.6.0, we repeated setup, load estimation and destination control.
+
+Restream requires an account to run an output. We reviewed the public flow, the free plan and the official documentation, but we didn't stream through it. So we didn't compare latency or stability across the four.
+
+## Practical matrix
+
+| Factor                   | Aitum                               | Multiple RTMP                   | Restream                     | Corneta                           |
+| ------------------------ | ----------------------------------- | ------------------------------- | ---------------------------- | --------------------------------- |
+| Architecture             | local plugin                        | local plugin                    | cloud relay                  | local app                         |
+| Where you control it     | inside OBS                          | inside OBS                      | browser                      | separate app                      |
+| Local upload             | sum of the outputs                  | sum of the outputs              | one output to the cloud      | sum of the outputs                |
+| Installation             | OBS-compatible plugin               | OBS-compatible plugin           | account and web setup        | Windows app + RTMP source         |
+| Per-destination settings | yes                                 | yes                             | depends on the plan and flow | copy or re-encode per destination |
+| Vertical                 | integrates with the Aitum ecosystem | depends on your OBS composition | features vary by plan        | manual 9:16 crop per destination  |
+| Chat and alerts          | outside the plugin's core           | outside the plugin's core       | its own features             | unified in the app                |
+| Post-stream diagnostics  | OBS logs                            | OBS logs                        | the service's analytics      | local report per destination      |
+| Core cost                | free                                | free                            | free with limits; paid plans | free                              |
+
+Restream's prices and limits change. Check the current plan before you decide.
+
+## Where each option is strong
+
+### Aitum Multistream
+
+It stays where you already work. It's especially appealing if you also use Aitum's vertical canvas and want to control outputs without switching apps.
+
+### Multiple RTMP Outputs
+
+It's direct and lets you share the encoder with OBS's main output. It makes sense if you prefer to build your own flow and don't need an operations or reporting layer.
+
+### Restream
+
+It solves the structural upload bottleneck: one stream leaves your home and the service replicates it. It also spares you from installing a plugin, but it puts an account, a plan and the cloud in the path.
+
+### Corneta
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+It separates distribution from the OBS interface and shows each destination as an independent connection. Beyond video, it brings together chat, alerts, statuses and the report. The price of that visibility is opening another app and using upload for each output.
+
+OBS is recommended because of the automatic setup, start/stop control and built-in stats. Corneta also receives the signal from other RTMP-compatible programs, set up manually; that doesn't offer the same integration with those programs.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## Go with your first “yes”
+
+1. **Your upload can't handle the sum?** Start with Restream or another cloud relay.
+2. **Want everything inside OBS?** Try Aitum and Multiple RTMP.
+3. **Is an independent vertical output the core of your setup?** Look at the Aitum ecosystem.
+4. **Want operation and diagnostics outside OBS?** Try Corneta.
+5. **Only need to duplicate an identical signal?** A simple plugin may be enough.
+
+<Callout label="Corneta doesn't replace the whole ecosystem" tone="limit">
+  It doesn't offer a cloud guest studio or an independent vertical canvas with
+  its own scenes. The current vertical framing is a manual crop of the signal it
+  receives.
+</Callout>
+
+If you're still torn between local and cloud, use the [Corneta or Restream](/en/guides/comparisons/restream-alternative) comparison with your upload speed at hand.

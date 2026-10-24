@@ -1,0 +1,72 @@
+---
+contentId: help_platform_reconnecting_en
+title: "One platform keeps reconnecting while the others are fine"
+description: "Test the key, server, preset and route of the affected destination without taking down the platforms that are still live in your multistream."
+summary: "Pause only the platform that's reconnecting, test the server on its card and check the key, ingest and limits. If the others stay LIVE, don't restart the whole stream."
+locale: en
+collection: help
+kind: troubleshooting
+category: troubleshooting
+slug: platform-reconnecting
+translationKey: platform-reconnecting
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: platform keeps reconnecting Corneta multistream
+related:
+  - guide_one_platform_disconnected_en
+  - help_stream_statuses_en
+  - help_export_safe_diagnostic_en
+sources:
+  - title: Corneta independent target reconnect
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-09-07
+  - title: KICK OBS or Streamlabs not connecting
+    kind: official
+    url: https://help.kick.com/en/articles/14994318-obs-or-streamlabs-not-connecting-to-kick
+    reviewedAt: 2026-08-01
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Platforms screen with independent cards for Twitch, YouTube and Kick."
+    caption: "Run the test and the fix on the affected card; the other keys and outputs don't need to change."
+---
+
+## Isolate the destination
+
+1. On the **Live** screen, confirm that the other platforms are **LIVE**.
+2. Click **Pause** on the destination that keeps reconnecting.
+3. Open **Platforms**.
+4. On the affected card, click **Test the server**.
+5. Check the key and the URL in the platform's official dashboard.
+6. Review bitrate, codec, resolution and FPS in **Quality**.
+7. Go back to **Live** and click **Resume**.
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+## Pick the branch
+
+| Confirmation                         | Likely cause                   | Fix                                   |
+| ------------------------------------ | ------------------------------ | ------------------------------------- |
+| server test fails                    | route, DNS, firewall or ingest | use an alternative official address   |
+| authenticates, then drops            | key or platform rule           | reset the key and review the preset   |
+| bitrate is over the limit            | incompatible settings          | lower only that destination           |
+| official dashboard shows an incident | platform unavailable           | keep it paused and wait               |
+| all of them start dropping           | local upload                   | lower the total and test your network |
+
+The connector tries to come back on its own, but repeated attempts don't fix an invalid credential. If you reset the key, change it in Corneta too.
+
+## If that didn't fix it
+
+Write down the platform, the time, the previous status, the message and whether the server test passed. Export the safe diagnostics file. Never send a stream key, token or URL that carries a credential.

@@ -1,0 +1,71 @@
+---
+contentId: guide_obs_closed_during_stream_en
+title: "What happens to your stream when OBS closes?"
+description: "See when the BE RIGHT BACK screen keeps your destinations connected after OBS closes, and which failures still end your stream."
+summary: "With the protection armed, Corneta replaces the lost signal with the BE RIGHT BACK screen and keeps the destinations connected until OBS comes back. If your PC, your internet or Corneta itself stops, this protection doesn't work."
+locale: en
+collection: guides
+kind: guide
+category: operations
+slug: obs-closed-during-stream
+translationKey: obs-closed-during-stream
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: what happens if obs closes during a stream
+related:
+  - help_brb_screen_en
+  - help_stream_statuses_en
+  - help_obs_not_found_en
+sources:
+  - title: Corneta continuity compositor
+    kind: internal
+    repoPath: src-tauri/src/compositor.rs
+    reviewedAt: 2026-09-07
+  - title: Corneta copy-mode continuity
+    kind: internal
+    repoPath: src-tauri/src/splicer.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-live-safety-settings-en
+    alt: "Safety nets settings with BE RIGHT BACK and auto-bitrate armed."
+    caption: "The protection has to be armed before the stream; turning it on midway doesn't rebuild an output that has already dropped."
+---
+
+## With BE RIGHT BACK armed
+
+Once the first real signal has arrived, Corneta can replace the missing video with the **BE RIGHT BACK** screen. The destinations stay connected and go back to your content when the signal returns.
+
+<ContentImage baseName="corneta-live-safety-settings-en" />
+
+This covers OBS closing, OBS restarting and an interruption of the local RTMP. There's also the **BE RIGHT BACK now** button, which puts the screen up manually and cuts the audio while you take a break.
+
+## Without the protection
+
+If the signal disappears in the middle of the stream and BE RIGHT BACK wasn't armed, Corneta warns you that it lost the input. The platforms may end the stream when they stop receiving media.
+
+## What the protection doesn't cover
+
+- a total internet outage;
+- a PC that is shut down or frozen;
+- Corneta being closed;
+- a power outage;
+- a block or shutdown by the platform.
+
+It's a safety net inside the same PC, not a cloud relay. Covering a total failure of the machine would take another encoder somewhere else.
+
+Test it first with an unlisted stream: go live, close OBS, confirm **BE RIGHT BACK on air** and open OBS again. The full procedure is in [how to use and customize the BE RIGHT BACK screen](/en/help/streaming-software/brb-screen).

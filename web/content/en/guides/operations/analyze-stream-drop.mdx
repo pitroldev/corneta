@@ -1,0 +1,64 @@
+---
+contentId: guide_analyze_stream_drop_en
+title: "How to find the minute your stream stuttered"
+description: "Use the post-stream report timeline to cross-check bitrate, dropped frames, CPU, GPU and the status of each platform at the same minute."
+summary: "Open the post-stream report, find the window flagged as a problem and compare the charts at the same minute. Then confirm whether the failure hit the whole input or just one platform."
+locale: en
+collection: guides
+kind: guide
+category: operations
+slug: analyze-stream-drop
+translationKey: analyze-stream-drop
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: find the minute my stream lagged
+related:
+  - help_post_live_report_en
+  - help_stream_metrics_en
+  - guide_dropped_frames_en
+sources:
+  - title: Corneta report analysis
+    kind: internal
+    repoPath: src/lib/report.ts
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-post-live-report-en
+    alt: "Corneta report with the stream summary: peak viewers, average viewers, messages, followers and subs."
+    caption: "The report points to the likely window; the charts show what changed in that same stretch."
+---
+
+## Start with the reported time
+
+If someone said “it froze around the 1:58 mark”, note that point before you open the report. Without a reference, look for the stretches where the diagnosis flagged network, rendering or encoding.
+
+<ContentImage baseName="corneta-post-live-report-en" />
+
+## Cross-check the charts at the same minute
+
+| What changed at the same time             | Likely reading                           |
+| ----------------------------------------- | ---------------------------------------- |
+| bitrate dropped on every destination      | input or local upload                    |
+| only one platform reconnected             | key, ingest or route for that output     |
+| CPU/GPU went up and encoding fell behind  | machine with no headroom                 |
+| render skipped went up in OBS             | the scene or the game took over the GPU  |
+| audience dropped with no technical metric | content, player delay or incomplete data |
+
+Correlation doesn't prove cause. A CPU spike in the same minute is a clue; the report calls it a likely cause because it can't see the router, the platform's server or each viewer's player.
+
+## Mark it during your next stream
+
+Use **Mark this moment** when you notice stuttering, a heavy scene switch or a platform dropping. The marker shows up on the timeline and narrows the search later.
+
+If you need to send the case, export the report or a [safe diagnostic](/en/help/reports-and-data/export-safe-diagnostic). Never send a stream key or the whole logs folder.

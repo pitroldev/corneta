@@ -1,0 +1,91 @@
+---
+contentId: guide_chat_alerts_obs_en
+title: "How to add multi-platform chat and alerts to OBS"
+description: "Put chat and alerts from Twitch, YouTube and Kick into local OBS Browser Sources, with testing, placement and clear limits."
+summary: "Corneta gives you two local URLs: one for alerts and one for the unified chat. Add each URL as a Browser Source in OBS, test them separately and keep the source platform visible."
+locale: en
+collection: guides
+kind: guide
+category: operations
+slug: chat-alerts-obs
+translationKey: chat-alerts-obs
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11, installed app
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11 with Browser Source
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: add chat and alerts from multiple platforms to obs
+related:
+  - help_obs_overlay_en
+  - help_unified_chat_setup_en
+  - guide_unified_chat_rules_en
+sources:
+  - title: OBS Browser Source
+    kind: official
+    url: https://obsproject.com/kb/browser-source
+    reviewedAt: 2026-08-01
+  - title: Twitch Simulcasting Guidelines FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/simulcasting-guidelines?language=en_US
+    reviewedAt: 2026-08-01
+  - title: Corneta overlay controls
+    kind: internal
+    repoPath: src/screens/ChatScreen.tsx
+    reviewedAt: 2026-10-20
+images:
+  - baseName: corneta-unified-chat-en
+    alt: "Corneta unified chat with messages and their sources from Twitch, YouTube and Kick."
+    caption: "The panel keeps the source of each message visible before you decide what goes into the video."
+---
+
+## Separate what you read from what the audience sees
+
+The unified panel is private. The overlay is public because it goes into the video. Don't turn everything on out of habit: decide whether the scene needs chat, alerts or both.
+
+<ContentImage baseName="corneta-unified-chat-en" />
+
+In the installed Corneta app, open **Chat → Set up → Overlays** and turn on the local server. It generates one URL for alerts and another for chat. The demo mode in the browser doesn't start this server.
+
+## Add them in OBS
+
+1. Copy the URL of the block you want.
+2. In OBS, add a **Browser Source** to the scene.
+3. Paste the URL and set the width and height for the area you use.
+4. Turn on sound only on the alerts source, if you want to hear it on stream.
+5. Go back to Corneta and use **Test**.
+6. Repeat for the second block, without reusing the same source.
+
+The **Add to OBS** action automates this step when the WebSocket is connected. If you change the position, duration or size later, remove the source and add it again so you don't keep an old URL.
+
+## A layout that doesn't turn into a mess
+
+- keep the chat away from the HUD, captions and webcam;
+- limit the number of messages;
+- use automatic fade-out when the feed covers content;
+- keep the platform icons visible;
+- hide commands that start with `!`;
+- test long names, emotes and two-line messages.
+
+## Rules and moderation still apply
+
+A message shown in the overlay crosses the visual boundary between platforms. It doesn't get unified moderation: deleting it at the source doesn't guarantee the text disappears from a frame that has already been streamed.
+
+<Callout label="The URL is local" tone="note">
+  The `127.0.0.1` address works because OBS and Corneta are on the same machine.
+  If Corneta closes or the overlay server stops, the Browser Source is left with
+  no content.
+</Callout>
+
+To fix a transparent screen, a busy port or caching problems, follow [the OBS overlay troubleshooting](/en/help/chat-and-alerts/obs-browser-source-overlay).

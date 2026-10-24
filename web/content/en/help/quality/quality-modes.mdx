@@ -1,0 +1,114 @@
+---
+contentId: help_quality_modes_en
+title: "Straight up, Smart or All out: which mode to choose?"
+description: "Compare Corneta's three quality modes, Straight up, Smart and All out, by upload cost, re-encoding load on your PC and platform compatibility."
+summary: "Use Straight up when the OBS signal already works for every platform. Smart copies OBS and re-encodes only the vertical platforms. All out re-encodes every destination and asks more of your machine."
+locale: en
+collection: help
+kind: help
+category: quality
+slug: quality-modes
+translationKey: quality-modes
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: Straight up Smart or All out Corneta
+related:
+  - guide_multistream_upload_speed_en
+  - help_first_stream_en
+  - guide_why_stream_lags_en
+sources:
+  - title: Corneta encoding screen
+    kind: internal
+    repoPath: src/screens/EncodingScreen.tsx
+    reviewedAt: 2026-10-20
+  - title: Corneta platform estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen comparing Straight up, Smart and All out with upload and load estimates."
+    caption: "The estimate changes with the destinations, bitrates and settings of the current profile."
+---
+
+## The short answer
+
+- **Straight up:** when OBS already delivers a resolution, FPS and bitrate that
+  every platform accepts.
+- **Smart:** when the landscape platforms accept the OBS signal and only the
+  vertical ones, like TikTok and Instagram, need a different format.
+- **All out:** when each platform needs to get its own preset and your GPU or
+  CPU can handle one re-encode per destination.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## Straight up
+
+Corneta copies the compressed video from OBS to every destination. It doesn't
+open a new video re-encode per platform, so it's the lightest mode.
+
+The limit shows up early: every platform gets the same video. If the setup that
+works well for YouTube goes over what another destination accepts, set OBS to
+the lowest limit or switch modes. A vertical platform, like TikTok or Instagram,
+comes out sideways on a copy.
+
+## Smart
+
+Corneta copies OBS to the landscape platforms, like Twitch, YouTube and Kick,
+and re-encodes only the vertical ones on its own. It doesn't compare the OBS
+signal with each platform's limit: on the copies, the OBS bitrate is what goes
+out. The **Quality** screen shows the maximum the copied platforms accept.
+
+Only Smart lets you choose, in **Fine-tuning per platform**, between **Auto**,
+**Copy** and **Convert** for each destination.
+
+Check the mode cards: they show the total **Upload** and the estimated **Load on
+your PC**. If the re-encodes go beyond what the graphics card can handle, the
+screen warns you.
+
+## All out
+
+Each destination gets its own re-encode, using the platform's preset. In
+**Fine-tuning per platform**, you choose the picture quality (**Light**,
+**Standard** or **Sharp**), the bitrate and **What converts it**: graphics card
+or processor. Resolution and FPS follow each platform's preset. It's the mode
+that puts the most load on the CPU or GPU. On cards with a limit on simultaneous
+sessions, the math may not add up.
+
+## How to decide on your PC
+
+1. Start on **Straight up** if every platform accepts the OBS output.
+2. Switch to **Smart** when you have a vertical platform or when only one
+   destination needs to change. In that case, choose **Convert** on that one
+   only.
+3. Use **All out** when per-platform tuning is worth the extra load.
+4. Do a test stream with your real game, camera, alerts and motion.
+5. On the **Live** screen, watch CPU and GPU in the **Your machine** panel and
+   each platform's **FPS** and **Drops** during the heaviest stretch.
+
+| Symptom                       | Quick test                            | Next change                              |
+| ----------------------------- | ------------------------------------- | ---------------------------------------- |
+| Encoder overloaded            | Switch from All out to Smart          | Reduce the number of re-encodes          |
+| GPU maxed out with the game   | Cap the game's FPS                    | Leave GPU time for OBS and the encoder   |
+| Upload at the limit           | Check the **Upload** on the mode card | Lower the bitrate or use a cloud relay   |
+| A platform rejects the signal | Compare its preset                    | Re-encode only that destination in Smart |
+
+<Callout label="The estimate doesn't replace a test stream" tone="limit">
+  An available encoder doesn't mean a stable game. Test the heaviest scene and
+  keep the **Live** screen open before you bring your audience in.
+</Callout>
+
+Do the math in the [multistream upload
+guide](/en/guides/quality/multistream-upload-speed).

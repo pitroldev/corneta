@@ -1,0 +1,70 @@
+---
+contentId: guide_unified_chat_rules_en
+title: "Unified multistream chat: private panel or public overlay?"
+description: "Learn when to gather chat from every platform just for you and when to show messages from several platforms inside the stream itself."
+summary: "Bringing Twitch, YouTube and Kick together in a private panel makes running the stream simpler. Putting that feed in the video changes the context: the message is then also shown to people on other platforms."
+locale: en
+collection: guides
+kind: guide
+category: operations
+slug: unified-chat-rules
+translationKey: unified-chat-rules
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: unified multistream chat overlay
+related:
+  - help_unified_chat_setup_en
+  - help_obs_overlay_en
+  - guide_simulcasting_rules_en
+sources:
+  - title: Twitch Simulcasting Guidelines FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/simulcasting-guidelines?language=en_US
+    reviewedAt: 2026-08-01
+  - title: Corneta chat behavior
+    kind: internal
+    repoPath: src/screens/ChatScreen.tsx
+    reviewedAt: 2026-10-20
+images:
+  - baseName: corneta-unified-chat-en
+    alt: "Corneta chat connected to Twitch, YouTube and Kick, with the platform and author on each message."
+    caption: "In the private panel, each message keeps its source platform and only you see the full feed."
+---
+
+## The private panel is the safe default
+
+Use the unified chat to read, reply and moderate without switching windows. Check the selector before you send: you can pick a channel or **All**, which sends to the channels available for sending. To reply on just one source, select that channel.
+
+<ContentImage baseName="corneta-unified-chat-en" />
+
+On Twitch, the simulcasting documentation allows tools that combine activity for personal use. That fits the panel and the floating window that stay only on your monitor.
+
+## The overlay is a different decision
+
+When the feed becomes a **Browser Source**, a message written on one platform shows up inside the video streamed to the others. Before you turn it on:
+
+- keep the platform icon visible;
+- hide commands that start with `!`;
+- set a message limit and a fade-out time;
+- test moderation and long names;
+- let your community know when that context matters.
+
+Don't use the overlay as a way to send the audience of one stream to another. On Twitch, actively promoting the simultaneous stream somewhere else falls under the simulcasting restrictions.
+
+## Moderation doesn't carry over on its own
+
+Deleting a message on Twitch doesn't guarantee it's removed from YouTube or Kick. The action applies on the channel and platform that accept that operation. The panel cuts down on alt-tabbing; it doesn't turn three moderation systems into one.
+
+To put the feed in OBS with these options visible, follow [how to add the Corneta overlay](/en/help/chat-and-alerts/obs-browser-source-overlay).

@@ -1,0 +1,109 @@
+---
+contentId: guide_horizontal_vertical_live_en
+title: "How to stream horizontal and vertical at the same time"
+description: "Set up one 16:9 output and one 9:16 output, choose the vertical framing and work out the extra re-encoding cost before you go live."
+summary: "To stream in both formats, keep the main signal in 16:9 and re-encode the vertical destination with a 9:16 crop. Copying the horizontal picture to a vertical platform usually produces bars, a wrong crop or a rejected stream."
+locale: en
+collection: guides
+kind: guide
+category: multistream
+slug: horizontal-and-vertical-live
+translationKey: horizontal-and-vertical-live
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: stream horizontal and vertical at the same time
+related:
+  - guide_resolution_and_fps_en
+  - guide_copy_vs_transcode_en
+  - help_quality_modes_en
+sources:
+  - title: Twitch Dual Format Streaming
+    kind: official
+    url: https://help.twitch.tv/s/article/dual-format-vertical-video
+    reviewedAt: 2026-10-18
+  - title: YouTube Get started with live streaming
+    kind: official
+    url: https://support.google.com/youtube/answer/2474026
+    reviewedAt: 2026-10-18
+  - title: Corneta reframe editor
+    kind: internal
+    repoPath: src/components/ReframeEditor.tsx
+    reviewedAt: 2026-10-18
+  - title: Corneta platform presets
+    kind: internal
+    repoPath: src/lib/platforms.ts
+    reviewedAt: 2026-10-18
+  - title: Corneta quality modes
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-vertical-target-settings-en
+    alt: "Vertical TikTok destination on Corneta's Platforms screen, with the ingest URL and the Frame the 9:16 action."
+    caption: "A vertical destination needs re-encoding and its own framing; it shouldn't get a blind copy of the 16:9."
+  - baseName: corneta-vertical-reframe-editor-en
+    alt: "Corneta's vertical framing editor with a 9:16 area, a zoom control and a preview of the result."
+    caption: "With a frame grabbed from OBS, the editor shows which strip of the horizontal frame goes into the 720×1280."
+---
+
+## Build two outputs, not two improvised streams
+
+Use OBS in 16:9 as the main source. In Corneta, leave Quality on **Smart**: it copies Twitch, Kick and YouTube when the signal already fits and re-encodes the upright 9:16 destination on its own. Just don't force **Copy** on that destination or use **Straight up**: then the video goes out sideways and either comes out wrong or doesn't get in at all.
+
+<ContentImage baseName="corneta-vertical-target-settings-en" />
+
+The vertical destination uses an encoder session and more upload. The format doesn't come from rotating the picture: it comes from choosing what stays inside the narrow frame.
+
+On YouTube, the platform itself creates a 9:16 version of your horizontal stream by default, with a center crop or other layouts, when you stream through Live Control Room. Decide before going live: YouTube doesn't let you add the vertical version after the stream has started.
+
+## Choose the framing
+
+1. Add TikTok or Instagram in **Platforms**. They're Corneta's upright destinations, still marked as experimental.
+2. Enter the URL and key provided by the platform's dashboard.
+3. Open **Frame the 9:16** and click **Grab a frame from OBS** to see your real scene. Grabbing a frame works while OBS is live; if you don't move anything, the center crop is used.
+4. Position the 9:16 strip over your face, camera, scoreboard or the main action.
+5. Adjust the zoom without cutting off essential text.
+6. Save and check the result with real movement.
+
+<ContentImage baseName="corneta-vertical-reframe-editor-en" />
+
+The editor is manual. Corneta doesn't promise auto-reframing and doesn't follow a person on its own. If the focus moves around a lot during the stream, set up a layout that stays readable in the center or use a tool with an independent vertical canvas.
+
+## What fits in the center
+
+A 9:16 crop of a 16:9 frame throws away a good part of the sides. Before you stream:
+
+- move your webcam and important captions to the center zone;
+- avoid scoreboards pinned to the corners;
+- don't use small text designed only for horizontal 1080p;
+- test the game's menus, map and HUD;
+- check the overlay on a phone, not just on your monitor.
+
+## What it costs your machine
+
+A vertical output has to scale and re-encode. If OBS already uses the GPU encoder, confirm how many simultaneous sessions your driver supports. Corneta sends the vertical output at 720×1280 and 30 FPS. What you can raise is the bitrate, from **Standard** to **Sharp** in the fine-tuning on the **Quality** screen, and only after a stable test stream.
+
+<Callout label="Twitch Dual Format is a different flow" tone="note">
+  Twitch has rolled out Dual Format to all streamers. On OBS 32 or newer, it
+  uses Enhanced Broadcasting with a vertical canvas, such as the one from the
+  Aitum Vertical plugin. It's a separate flow between OBS and Twitch. Don't
+  confuse this feature with sending an independent vertical RTMP output to
+  another platform.
+</Callout>
+
+If the preview stutters, follow the order in the guide to [multistreaming on a low-end PC](/en/guides/quality/multistream-low-end-pc).
