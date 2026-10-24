@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-20",
+  "reviewedAt": "2026-10-24",
   "reviewScope": "Visible privacy review of editorial masters/derivatives and project artwork; not a legal certification or future approval.",
   "roots": [
     "docs/images/readme",
@@ -342,6 +342,94 @@
       "sha256": "5f684e2a4fdd327e18bcdf0031cd551a92776b3417ba639df9080611f1d83b3c",
       "reviewedAt": "2026-10-22",
       "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/content/assets/originals/chat-and-alerts/corneta-unified-chat-en.png",
+      "sha256": "09961da75a414a2429ceaad5e6cd63755336380a26ef5077148e242e10b805bb"
+    },
+    {
+      "file": "web/content/assets/originals/getting-started/corneta-first-live-checklist-en.png",
+      "sha256": "43aa7c4d2b96386a1c25d4768cdbbeddb8a1ba45d07d3f03470e21eb39db74a7"
+    },
+    {
+      "file": "web/content/assets/originals/getting-started/corneta-obs-connection-details-en.png",
+      "sha256": "4e4080ae650095c5c40e92f817d35296c4b34ba532d76bd8549af7f1d7dcda9f"
+    },
+    {
+      "file": "web/content/assets/originals/getting-started/corneta-platform-key-setup-en.png",
+      "sha256": "fec73fcd2b3b50f4bff5f2d5fb41a7f9b4cc58178d7697d4bd8559a555e5c52c"
+    },
+    {
+      "file": "web/content/assets/originals/multistream/corneta-platform-destinations-en.png",
+      "sha256": "7a281d29843c06f8221a4d4ca9c363d8d1aaafaea891ace907479520113d10e2"
+    },
+    {
+      "file": "web/content/assets/originals/multistream/corneta-vertical-reframe-editor-en.png",
+      "sha256": "3b25224ef4807a2383a4374d82f6f38b683a25c0423979b66f1b26e798606d68"
+    },
+    {
+      "file": "web/content/assets/originals/multistream/corneta-vertical-target-settings-en.png",
+      "sha256": "c381f60bb9f89fd38c85a5e8ed3708f2651a99f2cadbcb7c5d12e917e79fb87d"
+    },
+    {
+      "file": "web/content/assets/originals/operations/corneta-live-safety-settings-en.png",
+      "sha256": "c0ff51a6e6592ad8e7f995c8a9d0ba21166f2a0ab2fee31131155703e06efbd7"
+    },
+    {
+      "file": "web/content/assets/originals/quality/corneta-quality-modes-en.png",
+      "sha256": "53f8a10c0ad3fe837bbcf3f1e2aee4bdf4481ad66940b57f4c8d1a54f937ac9c"
+    },
+    {
+      "file": "web/content/assets/originals/quality/corneta-upload-test-result-en.png",
+      "sha256": "b9e88bc7f9f9e4870d70c07d10798df9c87c8733c74614ba8225099477e33cca"
+    },
+    {
+      "file": "web/content/assets/originals/reports-and-data/corneta-post-live-report-en.png",
+      "sha256": "19b3f2add50c7da730924594ddf08b0428946ca241eebba3cd26bc35c4116783"
+    },
+    {
+      "file": "web/public/images/editorial/chat-and-alerts/corneta-unified-chat-en.webp",
+      "sha256": "3736f9950e253a16cfd269659414167be0b6dd14191b9af6f764bf6ce0884171"
+    },
+    {
+      "file": "web/public/images/editorial/getting-started/corneta-first-live-checklist-en.webp",
+      "sha256": "fdfb97bb70b068efdd1e728754609b779bf3f8774df58455ac349cf8ace6b063"
+    },
+    {
+      "file": "web/public/images/editorial/getting-started/corneta-obs-connection-details-en.webp",
+      "sha256": "f62724ee73d1f9bc6f16253d8ecee794c0969ffb5e988635d8ead219c9648d1e"
+    },
+    {
+      "file": "web/public/images/editorial/getting-started/corneta-platform-key-setup-en.webp",
+      "sha256": "acb70543352f95258f13aaf409a42f07130166ff7e2b65576616f7a6c728f6a3"
+    },
+    {
+      "file": "web/public/images/editorial/multistream/corneta-platform-destinations-en.webp",
+      "sha256": "cc50695b6413b316552c91b2f676601359b3a3bc908eb1426ad95a4ca998d71a"
+    },
+    {
+      "file": "web/public/images/editorial/multistream/corneta-vertical-reframe-editor-en.webp",
+      "sha256": "3159ad701220fc8f167e278afaa1545c12163915f662382373423f59d34878c9"
+    },
+    {
+      "file": "web/public/images/editorial/multistream/corneta-vertical-target-settings-en.webp",
+      "sha256": "6db67d5173c378ef3b0a7522b94ef5cbc00950e8e11257d57d17fa77827644cb"
+    },
+    {
+      "file": "web/public/images/editorial/operations/corneta-live-safety-settings-en.webp",
+      "sha256": "f3b716dd487857bf2e3d6b71a5f2c070cc94b4ee92fe24ac6cb920a4a4a16987"
+    },
+    {
+      "file": "web/public/images/editorial/quality/corneta-quality-modes-en.webp",
+      "sha256": "fb745efecd2b526faaecb52488270574309133939f416bb16e706556ef218646"
+    },
+    {
+      "file": "web/public/images/editorial/quality/corneta-upload-test-result-en.webp",
+      "sha256": "500bcf3a67366b6cefe8f07a82a2dee063c4793d3c9b18820e9291f49548f656"
+    },
+    {
+      "file": "web/public/images/editorial/reports-and-data/corneta-post-live-report-en.webp",
+      "sha256": "a2c1d19cd4ddbbe2eb54be64994709d01effbafb2aedfe2a9a31aab65258bc7b"
     }
   ],
   "hashing": "SHA-256 of raw binary bytes; CRLF normalized to LF for UTF-8 SVG and Markdown."
