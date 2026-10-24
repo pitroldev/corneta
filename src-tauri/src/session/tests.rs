@@ -120,6 +120,7 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
         memory_pct: Some(61.5),
         obs: None,
         forced_brb: false,
+        black_screen: false,
         guardian_status: None,
     }
 }

@@ -63,6 +63,7 @@ function scenarios(): { name: string; config: AppConfig }[] {
       youtubeMadeForKids: true,
       youtubeAutoLive: false,
       streamTitle: "Live de teste",
+      blackScreenAlert: true,
     },
   };
   return [

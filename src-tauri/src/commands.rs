@@ -9,7 +9,7 @@ use crate::engine_policy::{
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
-use crate::platforms::provider::{AutoBroadcastFailure, ProvisionedIngest};
+use crate::platforms::provider::{AutoBroadcastFailure, MarkOutcome, ProvisionedIngest};
 use crate::recorder;
 use crate::session;
 use crate::telemetry::{self, AppError};
@@ -855,6 +855,35 @@ fn set_ingest_live(app: &AppHandle, live: bool) {
     emit(app, &out);
 }
 
+fn slate_forced(app: &AppHandle) -> bool {
+    let state = app.state::<AppState>();
+    let eng = state.engine.lock().unwrap();
+    eng.snapshot.as_ref().is_some_and(|snap| snap.forced_brb)
+}
+
+fn set_black_screen(app: &AppHandle, on: bool) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
+    if snap.state == "stopped" || snap.black_screen == on {
+        return;
+    }
+    snap.black_screen = on;
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+    if on {
+        log::warn!("engine: the OBS picture has stayed black");
+        notify(
+            app,
+            &Msg::NotifyBlackScreenTitle.now(),
+            &Msg::NotifyBlackScreenBody.now(),
+        );
+    }
+}
+
 fn mediamtx_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -1688,6 +1717,27 @@ async fn start_engine_inner(
             std::thread::sleep(std::time::Duration::from_millis(700));
         }
     });
+
+    let black_screen_ffmpeg = config
+        .settings
+        .black_screen_alert
+        .then(crate::compositor::ffmpeg_path)
+        .flatten();
+    if let Some(ffmpeg) = black_screen_ffmpeg {
+        let (app_b, run_b, sig_b) = (app.clone(), running.clone(), has_signal.clone());
+        let url = engine::ingest_url(&config);
+        tauri::async_runtime::spawn_blocking(move || {
+            let app_p = app_b.clone();
+            crate::black_screen::run(
+                &ffmpeg,
+                run_b,
+                sig_b,
+                url,
+                move || slate_forced(&app_p),
+                move |on| set_black_screen(&app_b, on),
+            );
+        });
+    }
 
     let brb_enabled = config.settings.brb_enabled;
     let auto_bitrate = config.settings.auto_bitrate;
@@ -3424,18 +3474,77 @@ pub fn open_privacy_settings(app: AppHandle, which: String) -> Result<(), String
     app.shell().open(uri, None).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn mark_moment(app: AppHandle, label: Option<String>) -> Result<(), String> {
-    let st = app.state::<AppState>();
-    let path = st.engine.lock().unwrap().session_path.clone();
-    match path {
-        Some(p) => {
-            let fallback = Msg::SessionDefaultMarkerLabel.now();
-            session::record_marker(&p, label.as_deref().unwrap_or(&fallback));
-            Ok(())
-        }
-        None => Err(Msg::SessionNotRecording.now()),
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformMark {
+    platform: &'static str,
+    outcome: MarkOutcome,
+}
+
+/// Platforms that refused markers during this live; asking again would only repeat the warning.
+static MARK_REFUSED: std::sync::Mutex<(u64, Vec<&'static str>)> =
+    std::sync::Mutex::new((0, Vec::new()));
+
+fn mark_refused(generation: u64, platform: &'static str) -> bool {
+    let refused = MARK_REFUSED.lock().unwrap();
+    refused.0 == generation && refused.1.contains(&platform)
+}
+
+fn remember_mark_refusal(generation: u64, platform: &'static str) {
+    let mut refused = MARK_REFUSED.lock().unwrap();
+    if refused.0 != generation {
+        *refused = (generation, Vec::new());
     }
+    refused.1.push(platform);
+}
+
+/// The report marker is written before any platform call, so it keeps the instant the streamer asked for.
+#[tauri::command]
+pub async fn mark_moment(
+    app: AppHandle,
+    label: Option<String>,
+) -> Result<Vec<PlatformMark>, String> {
+    let label = label.unwrap_or_else(|| Msg::SessionDefaultMarkerLabel.now());
+    let (path, generation, on_air) = {
+        let st = app.state::<AppState>();
+        let eng = st.engine.lock().unwrap();
+        let on_air: Vec<&'static str> = eng
+            .snapshot
+            .iter()
+            .flat_map(|snap| snap.targets.values())
+            .filter(|target| target.state == "live" || target.state == "brb")
+            .filter_map(|target| eng.target_platforms.get(&target.target_id))
+            .filter_map(|platform| crate::platforms::destination_account(platform))
+            .collect();
+        (eng.session_path.clone(), eng.start_gen, on_air)
+    };
+    let path = path.ok_or_else(|| Msg::SessionNotRecording.now())?;
+    session::record_marker(&path, &label);
+    let mut marks = Vec::new();
+    for &provider in crate::platforms::account_providers() {
+        let platform = provider.id();
+        if !on_air.contains(&platform) || mark_refused(generation, platform) {
+            continue;
+        }
+        let (app, label) = (app.clone(), label.clone());
+        let outcome = tauri::async_runtime::spawn_blocking(move || {
+            provider
+                .signed_in()
+                .then(|| provider.mark_moment(&app, &label))
+                .flatten()
+        })
+        .await
+        .ok()
+        .flatten();
+        let Some(outcome) = outcome else {
+            continue;
+        };
+        if outcome == MarkOutcome::Unavailable {
+            remember_mark_refusal(generation, platform);
+        }
+        marks.push(PlatformMark { platform, outcome });
+    }
+    Ok(marks)
 }
 
 /// Write frontend-rendered UTF-8 unchanged, including any BOM; false means cancellation.

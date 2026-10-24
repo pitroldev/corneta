@@ -352,6 +352,12 @@ messages! {
     NotifySignalLostBody = "rust.notify.signalLost.body" =>
         pt: "Sua live está sem imagem — confira o OBS.",
         en: "Your stream has no picture — check OBS.";
+    NotifyBlackScreenTitle = "rust.notify.blackScreen.title" =>
+        pt: "Sua live tá com a tela preta",
+        en: "Your stream is showing a black screen";
+    NotifyBlackScreenBody = "rust.notify.blackScreen.body" =>
+        pt: "A imagem do OBS tá toda preta há mais de 10 s — confira a cena e a captura.",
+        en: "The OBS picture has been fully black for over 10 s — check your scene and capture.";
     NotifyYoutubeAutoFailedTitle = "rust.notify.youtubeAutoFailed.title" =>
         pt: "YouTube automático falhou",
         en: "YouTube autopilot failed";

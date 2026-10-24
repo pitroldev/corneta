@@ -94,7 +94,7 @@ enum GenExit {
 }
 
 /// Tauri places externalBin beside the executable without its target-triple suffix.
-fn ffmpeg_path() -> Option<std::path::PathBuf> {
+pub(crate) fn ffmpeg_path() -> Option<std::path::PathBuf> {
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     let name = if cfg!(windows) {
         "ffmpeg.exe"

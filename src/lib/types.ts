@@ -137,6 +137,8 @@ export interface AppSettings {
   loudnessNormalize: boolean;
   /** Integrated loudness target in LUFS. */
   loudnessTargetLufs: number;
+  /** Opt-in: a dark game scene can look like a failed capture. */
+  blackScreenAlert: boolean;
   brbEnabled: boolean;
   brbSlateKind: "auto" | "image" | "video";
   /** Original filename for display only; the backend stores brb-slate.*. */
@@ -500,7 +502,15 @@ export interface EngineSnapshot {
   memoryPct?: number;
   obs?: ObsStats;
   forcedBrb?: boolean;
+  /** The OBS picture has stayed fully black long enough to warn. */
+  blackScreen?: boolean;
   guardianStatus?: "starting" | "ready" | "unavailable";
+}
+
+/** What a platform did with a moment marked during the live. */
+export interface PlatformMark {
+  platform: string;
+  outcome: "marked" | "unavailable" | "reconnect" | "failed";
 }
 
 export interface EncoderInfo {

@@ -1293,6 +1293,8 @@ export const pt = {
   "golive.machine.label": "Máquina",
   "golive.marker.button": "Marcar momento",
   "golive.marker.title": "Cravar um marcador no relatório",
+  "golive.marker.titleShortcut":
+    "Cravar um marcador no relatório (atalho: {shortcut})",
   "golive.obs.check": "Verificar OBS",
   "golive.obs.field.key": "Chave de transmissão",
   "golive.obs.field.server": "Servidor",
@@ -1322,6 +1324,11 @@ export const pt = {
   "golive.security.bitrate.desc.off":
     "se a internet apertar, a live trava em vez de só baixar a qualidade",
   "golive.security.bitrate.label": "Auto-bitrate",
+  "golive.security.blackScreen.desc":
+    "te aviso se a imagem do OBS ficar toda preta por mais de 10 s",
+  "golive.security.blackScreen.desc.off":
+    "se a captura apagar, ninguém te avisa que a live tá preta",
+  "golive.security.blackScreen.label": "Alerta de tela preta",
   "golive.security.brb.desc":
     "se o OBS cair, corto pro JÁ VOLTO e a live nem pisca",
   "golive.security.brb.desc.off":
@@ -1336,6 +1343,9 @@ export const pt = {
     "de olho em {n} termo(s) — se um aparecer, corto pro JÁ VOLTO",
   "golive.security.loudness.desc": "acerto o seu volume sozinha",
   "golive.security.loudness.label": "Normalizador de áudio",
+  "golive.blackScreen.body":
+    "Faz mais de 10 s que a imagem do OBS tá toda preta. Confira a cena e a captura do jogo ou da tela — quando a imagem voltar, este aviso some sozinho.",
+  "golive.blackScreen.title": "Sua live tá com a tela preta",
   "golive.signalLost.body":
     "Pros espectadores a tela congelou. Confira o OBS (fechou? parou de transmitir?) — quando o sinal voltar, eu retomo sozinha.",
   "golive.signalLost.title": "O sinal do OBS sumiu — sua live tá sem imagem",
@@ -1397,7 +1407,15 @@ export const pt = {
   "golive.timer.onAir": "no ar",
   "golive.toast.canceled": "Cancelei — você não chegou a entrar no ar.",
   "golive.toast.live": "No ar! A corneta tá tocando 📣",
+  "golive.toast.marker.failed":
+    "Não deu pra marcar no VOD {platform} agora. No relatório ficou.",
+  "golive.toast.marker.reconnect":
+    "Não deu pra marcar no VOD {platform}: reconecte a conta em Plataformas. No relatório ficou.",
+  "golive.toast.marker.unavailable":
+    "Não deu pra marcar no VOD {platform}: só dá quando a live fica salva no canal (VOD ligado). No relatório ficou.",
   "golive.toast.markerSaved": "Marquei o momento 📍 — aparece no relatório",
+  "golive.toast.markerSavedOn":
+    "Marquei o momento 📍 — tá no relatório e no VOD {platforms}",
   "golive.toast.obsPlay": "Mandei o OBS transmitir — entrando no ar…",
   "golive.toast.obsPlayFailed":
     "Não consegui dar play no OBS — dê play manualmente.",
@@ -2289,6 +2307,9 @@ export const pt = {
     "Internet engasgou? A Corneta desce a qualidade do vídeo por um tempo em vez de deixar a live travar ou cair, e sobe de novo quando o upload firma.",
   "settings.safety.bitrate.title":
     "Segurar a live quando a internet aperta (auto-bitrate)",
+  "settings.safety.blackScreen.desc":
+    "Se a imagem que sai do OBS ficar toda preta por mais de 10 s — uma captura de jogo que apagou, uma cena vazia —, a Corneta te avisa aqui e numa notificação do Windows. Jogo muito escuro pode dar alarme falso, por isso vem desligado.",
+  "settings.safety.blackScreen.title": "Alerta de tela preta",
   "settings.safety.brb.desc":
     "Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna.",
   "settings.safety.brb.title": "Proteção contra quedas (JÁ VOLTO)",

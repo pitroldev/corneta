@@ -71,6 +71,11 @@ function useSafetyItems() {
       on: guardianOn,
       label: t("golive.security.guardian.label"),
     },
+    {
+      key: "blackScreen",
+      on: settings.blackScreenAlert,
+      label: t("golive.security.blackScreen.label"),
+    },
   ];
 }
 
@@ -173,7 +178,10 @@ export function ReadinessTiles({
   const armed = safety.filter((x) => x.on);
   const safetyTile: TileProps = {
     tone: armed.length > 0 ? "ok" : "neutral",
-    value: t("golive.tile.safety.count", { on: armed.length, total: 3 }),
+    value: t("golive.tile.safety.count", {
+      on: armed.length,
+      total: safety.length,
+    }),
     sub:
       armed.length > 0
         ? joinNames(
@@ -748,6 +756,15 @@ function SafetyPanel() {
         guardianStatus && guardianStatus !== "ready"
           ? t(`guardian.status.${guardianStatus}.short`)
           : undefined,
+    },
+    {
+      key: "blackScreen",
+      label: t("golive.security.blackScreen.label"),
+      desc: settings.blackScreenAlert
+        ? t("golive.security.blackScreen.desc")
+        : t("golive.security.blackScreen.desc.off"),
+      on: settings.blackScreenAlert,
+      set: (blackScreenAlert) => setSettings({ blackScreenAlert }),
     },
   ];
   if (settings.loudnessNormalize)

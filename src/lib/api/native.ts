@@ -14,6 +14,7 @@ import type {
   ObsCheck,
   ObsVideo,
   ObsVideoCheck,
+  PlatformMark,
   RecordDirCheck,
   SessionMeta,
   Viewers,
@@ -605,7 +606,7 @@ export function tauriApi(): CornetaApi {
     },
     async markMoment(label) {
       const { invoke } = await core();
-      await invoke("mark_moment", { label: label ?? null });
+      return invoke<PlatformMark[]>("mark_moment", { label: label ?? null });
     },
     async exportConfig() {
       const { invoke } = await core();

@@ -214,6 +214,9 @@ pub struct Settings {
     /// Integrated loudness target in LUFS.
     #[serde(default = "default_loudness_target")]
     pub loudness_target_lufs: f64,
+    /// Opt-in: a dark game scene can look like a failed capture.
+    #[serde(default)]
+    pub black_screen_alert: bool,
     #[serde(default = "default_true")]
     pub youtube_auto_live: bool,
     /// Privacy of the broadcast the auto-live creates; one of `YOUTUBE_PRIVACY`.
@@ -409,6 +412,7 @@ impl Default for Settings {
             guardian_watchlist: Vec::new(),
             loudness_normalize: false,
             loudness_target_lufs: -14.0,
+            black_screen_alert: false,
             youtube_auto_live: true,
             youtube_privacy: default_youtube_privacy(),
             youtube_made_for_kids: false,

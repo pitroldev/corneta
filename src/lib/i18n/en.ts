@@ -1305,6 +1305,8 @@ export const en: Dict = {
   "golive.machine.label": "Your machine",
   "golive.marker.button": "Mark this moment",
   "golive.marker.title": "Drop a marker into the report",
+  "golive.marker.titleShortcut":
+    "Drop a marker into the report (shortcut: {shortcut})",
   "golive.obs.check": "Check OBS",
   "golive.obs.field.key": "Stream key",
   "golive.obs.field.server": "Server",
@@ -1332,6 +1334,11 @@ export const en: Dict = {
   "golive.security.bitrate.desc.off":
     "if your internet chokes, the stream freezes instead of just losing some quality",
   "golive.security.bitrate.label": "Auto-bitrate",
+  "golive.security.blackScreen.desc":
+    "I'll warn you if the OBS picture stays fully black for over 10 s",
+  "golive.security.blackScreen.desc.off":
+    "if your capture goes dark, nobody tells you the stream is black",
+  "golive.security.blackScreen.label": "Black screen alert",
   "golive.security.brb.desc":
     "if OBS drops, I cut to BE RIGHT BACK and the stream doesn't even blink",
   "golive.security.brb.desc.off":
@@ -1346,6 +1353,9 @@ export const en: Dict = {
     "watching {n} word(s) — if one shows up, I cut to BE RIGHT BACK",
   "golive.security.loudness.desc": "I level your volume on my own",
   "golive.security.loudness.label": "Audio normalizer",
+  "golive.blackScreen.body":
+    "The OBS picture has been fully black for over 10 seconds. Check your scene and your game or screen capture — this goes away on its own when the picture comes back.",
+  "golive.blackScreen.title": "Your stream is showing a black screen",
   "golive.signalLost.body":
     "Your viewers are staring at a frozen screen. Check OBS (did it close? did it stop streaming?) — when the signal comes back, I'll pick it up on my own.",
   "golive.signalLost.title":
@@ -1407,8 +1417,16 @@ export const en: Dict = {
   "golive.timer.onAir": "on air",
   "golive.toast.canceled": "Canceled — you never went on air.",
   "golive.toast.live": "You're live! The horn's blowing 📣",
+  "golive.toast.marker.failed":
+    "Couldn't mark the VOD on {platform} right now. It's in the report.",
+  "golive.toast.marker.reconnect":
+    "Couldn't mark the VOD on {platform}: reconnect the account in Platforms. It's in the report.",
+  "golive.toast.marker.unavailable":
+    "Couldn't mark the VOD on {platform}: that only works when the stream is saved to your channel (VODs on). It's in the report.",
   "golive.toast.markerSaved":
     "Dropped a marker 📍 — it'll show up in the report",
+  "golive.toast.markerSavedOn":
+    "Dropped a marker 📍 — it's in the report and in the VOD on {platforms}",
   "golive.toast.obsPlay": "Told OBS to start streaming — going live…",
   "golive.toast.obsPlayFailed":
     "Couldn't hit play in OBS — go hit Start Streaming over there.",
@@ -2292,6 +2310,9 @@ export const en: Dict = {
     "Internet choking? Corneta drops the video quality for a while instead of letting the stream stutter or die, and brings it back up when your upload steadies.",
   "settings.safety.bitrate.title":
     "Hold the stream up when your internet chokes (auto-bitrate)",
+  "settings.safety.blackScreen.desc":
+    "If the picture coming out of OBS stays fully black for over 10 s — a game capture that went dark, an empty scene — Corneta warns you here and with a Windows notification. A very dark game can set off a false alarm, so it starts off.",
+  "settings.safety.blackScreen.title": "Black screen alert",
   "settings.safety.brb.desc":
     "If OBS drops mid-stream, the “BE RIGHT BACK” screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns.",
   "settings.safety.brb.title": "Drop protection (BE RIGHT BACK)",
