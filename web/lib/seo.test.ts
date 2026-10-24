@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PublishedEditorialDocument } from "./editorial/types";
 import { DOWNLOAD_PATH } from "./download";
-import { editorialArticleJsonLd } from "./seo";
+import { editorialArticleJsonLd, homeJsonLd } from "./seo";
 import { siteUrl } from "./site";
 
 describe("download structured data", () => {
@@ -32,6 +32,22 @@ describe("download structured data", () => {
       }
     },
   );
+});
+
+describe("video structured data", () => {
+  it("dates the upload with a time and a time zone in both locales", () => {
+    for (const locale of ["pt-BR", "en"] as const) {
+      const video = homeJsonLd(locale)["@graph"].find(
+        (node) => node["@type"] === "VideoObject",
+      );
+      expect(video).toHaveProperty(
+        "uploadDate",
+        expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/,
+        ),
+      );
+    }
+  });
 });
 
 describe("editorial structured data", () => {

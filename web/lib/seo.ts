@@ -123,7 +123,8 @@ const videoFor = (locale: Locale) => {
     name: t("hero.video.label"),
     description: t("hero.pitch"),
     thumbnailUrl: abs(media.poster.src),
-    uploadDate: "2026-10-20",
+    // Google rejects a bare date here: it needs the time and the time zone.
+    uploadDate: "2026-10-21T23:47:31-03:00",
     duration: `PT${Math.floor(media.video.seconds / 60)}M${media.video.seconds % 60}S`,
     contentUrl: abs(media.video.mp4),
     inLanguage: locale,
