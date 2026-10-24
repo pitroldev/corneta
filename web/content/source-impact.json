@@ -2,6 +2,108 @@
   "version": 1,
   "declarations": [
     {
+      "article": "en/guides/multistream/one-platform-disconnected.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+    },
+    {
+      "article": "en/guides/multistream/one-platform-disconnected.mdx",
+      "source": "src/screens/GoLiveScreen.tsx",
+      "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
+      "reason": "A tela Ao vivo só ganhou o aviso de tela preta e a dica do atalho no Marcar momento; o que o artigo mostra sobre plataforma desconectada não mudou."
+    },
+    {
+      "article": "en/guides/operations/obs-closed-during-stream.mdx",
+      "source": "src-tauri/src/compositor.rs",
+      "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
+      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
+    },
+    {
+      "article": "en/guides/quality/copy-vs-transcode.mdx",
+      "source": "src-tauri/src/config.rs",
+      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
+      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "en/guides/quality/copy-vs-transcode.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+    },
+    {
+      "article": "en/guides/quality/dropped-frames.mdx",
+      "source": "src/lib/factory.ts",
+      "sourceBlob": "cd42d4dced00aa822d21fba008a8b7d3d734b293",
+      "reason": "O factory.ts só ganhou o padrão do alerta de tela preta, desligado; os outros padrões não mudaram."
+    },
+    {
+      "article": "en/guides/quality/live-stream-encoders.mdx",
+      "source": "src-tauri/src/commands.rs",
+      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
+      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "en/help/quality/auto-bitrate.mdx",
+      "source": "src-tauri/src/config.rs",
+      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
+      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "en/help/quality/auto-bitrate.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+    },
+    {
+      "article": "en/help/quality/stream-metrics.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+    },
+    {
+      "article": "en/help/quality/test-upload.mdx",
+      "source": "src-tauri/src/commands.rs",
+      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
+      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
+      "source": "src-tauri/src/commands.rs",
+      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
+      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+    },
+    {
+      "article": "en/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src/lib/i18n/pt.ts",
+      "sourceBlob": "d67536326e5f7a8517a6a8439b0b1c0589c2b78f",
+      "reason": "O pt.ts só ganhou os textos do marcador na Twitch e do alerta de tela preta; os rótulos que o artigo cita não mudaram."
+    },
+    {
+      "article": "en/help/streaming-software/brb-screen.mdx",
+      "source": "src-tauri/src/compositor.rs",
+      "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
+      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
+    },
+    {
+      "article": "en/help/streaming-software/brb-screen.mdx",
+      "source": "src/screens/SettingsScreen.tsx",
+      "sourceBlob": "624e880c7105b9ad4965952eab3f65ac9baf0900",
+      "reason": "A aba Segurança ao vivo só ganhou o Alerta de tela preta, abaixo da Proteção contra quedas; o caminho e o ajuste do JÁ VOLTO não mudaram."
+    },
+    {
+      "article": "en/help/troubleshooting/platform-reconnecting.mdx",
+      "source": "src-tauri/src/engine.rs",
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+    },
+    {
+      "article": "en/help/troubleshooting/stream-statuses.mdx",
+      "source": "src-tauri/src/engine_policy.rs",
+      "sourceBlob": "1cfd703a3de6bb8423346f0bbb976ab0ff11c597",
+      "reason": "O engine_policy.rs só mudou num teste, por causa do campo novo do alerta de tela preta; os status da live são os mesmos."
+    },
+    {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
       "source": "web/PRODUCT.md",
       "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
@@ -40,14 +142,14 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
-      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "c95a330b25bef231cf5ce54fa325148d85b3a74f",
-      "reason": "Só acrescenta, sob o YouTube automático, a escolha de quem vê a live e de conteúdo para crianças; status, Pausar/Retomar, Testar o servidor e o passo a passo citados não mudaram."
+      "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
+      "reason": "A tela Ao vivo só ganhou o aviso de tela preta e a dica do atalho no Marcar momento; o que o artigo mostra sobre plataforma desconectada não mudou."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
@@ -76,8 +178,8 @@
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/compositor.rs",
-      "sourceBlob": "4a661ba66e118f84da3fccb54c427f63eaf6151c",
-      "reason": "Os processos do compositor entram num job object e o vigia mata o encoder travado pelo handle, sem taskkill; o JÁ VOLTO, o que a proteção cobre e o teste citados não mudaram."
+      "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
+      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -94,26 +196,26 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "f8245cdb543f45c346f4943da03ef55443c8f5d5",
-      "reason": "A validação passou a aceitar os destinos do catálogo por pasta; os mesmos destinos e regras continuam valendo."
+      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
+      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
-      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "6831b3b94c5f9639090451526ebb8f4c4ffbc70c",
-      "reason": "A criação de destinos lê o catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "sourceBlob": "cd42d4dced00aa822d21fba008a8b7d3d734b293",
+      "reason": "O factory.ts só ganhou o padrão do alerta de tela preta, desligado; os outros padrões não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "16d19a857bb3ed735751e2cdae31355b37e39792",
-      "reason": "Os comandos de conta viraram genéricos e o YouTube automático virou gancho do provedor; nada do que o artigo descreve mudou."
+      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
+      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -220,14 +322,14 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "f8245cdb543f45c346f4943da03ef55443c8f5d5",
-      "reason": "A validação passou a aceitar os destinos do catálogo por pasta; os mesmos destinos e regras continuam valendo."
+      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
+      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
-      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -244,20 +346,20 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
-      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "16d19a857bb3ed735751e2cdae31355b37e39792",
-      "reason": "Os comandos de conta viraram genéricos e o YouTube automático virou gancho do provedor; nada do que o artigo descreve mudou."
+      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
+      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "16d19a857bb3ed735751e2cdae31355b37e39792",
-      "reason": "Os comandos de conta viraram genéricos e o YouTube automático virou gancho do provedor; nada do que o artigo descreve mudou."
+      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
+      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -274,20 +376,20 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "5090a841042b6979734bbe3cf6bcbba05980c047",
-      "reason": "Só entraram textos novos do chat; nenhum texto da configuração automática do OBS mudou."
+      "sourceBlob": "d67536326e5f7a8517a6a8439b0b1c0589c2b78f",
+      "reason": "O pt.ts só ganhou os textos do marcador na Twitch e do alerta de tela preta; os rótulos que o artigo cita não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src-tauri/src/compositor.rs",
-      "sourceBlob": "4a661ba66e118f84da3fccb54c427f63eaf6151c",
-      "reason": "Os processos do compositor entram num job object e o vigia mata o encoder travado pelo handle; os passos, o selo ARMADO, o teste e a tabela citados não mudaram."
+      "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
+      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "0cd619629f79b4b7f53e9f5b7c73b20ea678ca35",
-      "reason": "Só acrescenta, no cartão de atalhos, um atalho opcional para o JÁ VOLTO; os passos em Segurança ao vivo, o selo ARMADO e a tabela citados não mudaram."
+      "sourceBlob": "624e880c7105b9ad4965952eab3f65ac9baf0900",
+      "reason": "A aba Segurança ao vivo só ganhou o Alerta de tela preta, abaixo da Proteção contra quedas; o caminho e o ajuste do JÁ VOLTO não mudaram."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
@@ -298,14 +400,14 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "0a0316cdb9e8e82d5f35d65b36366dfac4f8f189",
-      "reason": "O motor passou a ler presets e limites do catálogo e a transmissão automática virou gancho do provedor; o comportamento descrito no artigo não mudou."
+      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
+      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "3bea1bb9de290da1b9afe13966a0047d8a5432ae",
-      "reason": "A classificação das falhas do FFmpeg passa a ignorar endereços de memória e URLs e reconhece mais motivos de queda; os estados, o que significam e o que fazer em cada um não mudaram."
+      "sourceBlob": "1cfd703a3de6bb8423346f0bbb976ab0ff11c597",
+      "reason": "O engine_policy.rs só mudou num teste, por causa do campo novo do alerta de tela preta; os status da live são os mesmos."
     }
   ]
 }
