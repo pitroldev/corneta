@@ -30,6 +30,8 @@ function substantiveFrontmatter(
   frontmatter: EditorialRevisionFrontmatter,
 ): Record<string, unknown> {
   const copy = structuredClone(frontmatter) as Record<string, unknown>;
+  // Pairing an article with its translation changes the language links, not what the article says.
+  delete copy.translationKey;
   delete copy.updatedAt;
   delete copy.reviewedAt;
   delete copy.productVersion;
