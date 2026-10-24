@@ -23,3 +23,18 @@ export function socialImage(locale: Locale) {
     ...SOCIAL_IMAGE_SIZE,
   };
 }
+
+/** The article's own card, served under the article's public path. */
+export function articleSocialImage({
+  href,
+  frontmatter,
+}: {
+  href: string;
+  frontmatter: { title: string };
+}) {
+  return {
+    url: new URL(`/opengraph-image${href}`, siteUrl).toString(),
+    alt: `${frontmatter.title} — Corneta`,
+    ...SOCIAL_IMAGE_SIZE,
+  };
+}

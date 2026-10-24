@@ -103,7 +103,14 @@ describe("editorial structured data", () => {
         url: "https://github.com/pitroldev",
       },
     });
-    expect(article).not.toHaveProperty("image");
+    expect(article).toHaveProperty("image", {
+      "@type": "ImageObject",
+      url: expect.stringMatching(
+        /\/opengraph-image\/guides\/quality\/choose-bitrate$/,
+      ),
+      width: 1200,
+      height: 630,
+    });
     expect(article).not.toHaveProperty("reviewedBy");
     expect(webPage).toMatchObject({
       reviewedBy: {

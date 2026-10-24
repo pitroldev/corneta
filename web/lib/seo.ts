@@ -9,6 +9,7 @@ import type {
   PublishedEditorialDocument,
 } from "./editorial/types";
 import { revisionDateTime } from "./editorial/revision-date";
+import { articleSocialImage } from "./social-image";
 
 // Structured data must describe published content and available releases only.
 
@@ -264,6 +265,7 @@ export function editorialArticleJsonLd({
   reviewer: EditorialPerson;
 }) {
   const { frontmatter, href } = document;
+  const socialCard = articleSocialImage(document);
   const externalCitations = frontmatter.sources.flatMap((source) =>
     source.url ? [source.url] : [],
   );
@@ -280,6 +282,12 @@ export function editorialArticleJsonLd({
         mainEntityOfPage: { "@id": abs(`${href}#pagina`) },
         headline: frontmatter.title,
         description: frontmatter.description,
+        image: {
+          "@type": "ImageObject",
+          url: socialCard.url,
+          width: socialCard.width,
+          height: socialCard.height,
+        },
         articleSection: categoryName,
         inLanguage: frontmatter.locale,
         datePublished: revisionDateTime(frontmatter.publishedAt),

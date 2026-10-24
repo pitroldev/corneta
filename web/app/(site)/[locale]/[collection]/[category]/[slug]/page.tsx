@@ -42,6 +42,7 @@ import { isLocale, localePath } from "@/lib/i18n";
 import { articleStaticParams } from "@/lib/editorial/static-params";
 import { revisionDateTime } from "@/lib/editorial/revision-date";
 import { editorialArticleJsonLd, jsonLdScript } from "@/lib/seo";
+import { articleSocialImage } from "@/lib/social-image";
 import {
   buildEditorialMetadata,
   editorialChromeLinks,
@@ -148,6 +149,7 @@ export async function generateMetadata({
     description: frontmatter.description,
     indexable: true,
     alternates,
+    image: articleSocialImage(document),
     article: {
       publishedTime: revisionDateTime(frontmatter.publishedAt),
       modifiedTime: revisionDateTime(frontmatter.updatedAt),

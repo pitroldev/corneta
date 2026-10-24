@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
 import type { Locale } from "@/lib/i18n";
 import { SOCIAL_IMAGE_SIZE } from "@/lib/social-image";
+import { cardFonts, DISPLAY_FONT, LABEL_FONT } from "./fonts";
+import { Badge, BrandMark, CARD_COLORS, DESTINATIONS } from "./parts";
 
 const COPY: Record<
   Locale,
@@ -29,13 +31,14 @@ const COPY: Record<
   },
 };
 
-const destinations = [
-  { name: "Twitch", color: "#9146FF", ink: "#ffffff" },
-  { name: "YouTube", color: "#FF0000", ink: "#ffffff" },
-  { name: "Kick", color: "#53FC18", ink: "#100b07" },
-];
+const headline = {
+  fontFamily: DISPLAY_FONT,
+  fontSize: 66,
+  lineHeight: 1.05,
+  letterSpacing: -1.5,
+} as const;
 
-export function socialCard(locale: Locale) {
+export async function socialCard(locale: Locale) {
   const copy = COPY[locale];
   return new ImageResponse(
     <div
@@ -45,8 +48,9 @@ export function socialCard(locale: Locale) {
         display: "flex",
         flexDirection: "column",
         padding: "48px 60px",
-        color: "#fcf3e3",
-        background: "#100b07",
+        color: CARD_COLORS.cream,
+        background: CARD_COLORS.night,
+        fontFamily: LABEL_FONT,
       }}
     >
       <div
@@ -56,59 +60,8 @@ export function socialCard(locale: Locale) {
           justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div
-            style={{
-              width: 54,
-              height: 54,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 12,
-              border: "2px solid #2a1c00",
-              background: "#ffb323",
-              boxShadow: "5px 5px 0 0 #2a1c00",
-              transform: "rotate(-6deg)",
-            }}
-          >
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
-              <path d="M3.4 9.1 L13 5.9 V18.1 L3.4 14.9 Z" fill="#2a1c00" />
-              <rect
-                x="4.7"
-                y="13.9"
-                width="2.5"
-                height="4.6"
-                rx="1.1"
-                fill="#2a1c00"
-              />
-              <path
-                d="M15.6 8.4a5 5 0 0 1 0 7.2M17.8 6.4a8 8 0 0 1 0 11.2"
-                stroke="#2a1c00"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <span style={{ fontSize: 34, fontWeight: 900, letterSpacing: -1 }}>
-            Corneta
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            padding: "9px 14px",
-            color: "#2a1c00",
-            borderRadius: 5,
-            background: "#ffb323",
-            boxShadow: "4px 4px 0 0 #2a1c00",
-            fontSize: 18,
-            fontWeight: 900,
-            transform: "rotate(2deg)",
-          }}
-        >
-          {copy.badge}
-        </div>
+        <BrandMark />
+        <Badge>{copy.badge}</Badge>
       </div>
 
       <div
@@ -116,33 +69,28 @@ export function socialCard(locale: Locale) {
           display: "flex",
           flex: 1,
           alignItems: "center",
-          gap: 48,
+          gap: 36,
         }}
       >
-        <div style={{ width: 610, display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: 78, fontWeight: 900, letterSpacing: -3 }}>
-            {copy.line1}
-          </span>
-          <div style={{ display: "flex", marginBlock: 8 }}>
+        <div style={{ width: 648, display: "flex", flexDirection: "column" }}>
+          <span style={headline}>{copy.line1}</span>
+          <div style={{ display: "flex", marginBlock: 10 }}>
             <span
               style={{
+                ...headline,
                 display: "flex",
-                padding: "4px 16px 12px",
-                color: "#2a1c00",
-                background: "#ffb323",
-                boxShadow: "9px 9px 0 0 #ff5a36",
-                fontSize: 74,
-                fontWeight: 900,
-                letterSpacing: -3,
+                padding: "10px 16px 2px",
+                color: CARD_COLORS.brassInk,
+                background: CARD_COLORS.brass,
+                boxShadow: `9px 9px 0 0 ${CARD_COLORS.coral}`,
+                fontSize: 60,
                 transform: "rotate(-1.4deg)",
               }}
             >
               {copy.line2}
             </span>
           </div>
-          <span style={{ fontSize: 78, fontWeight: 900, letterSpacing: -3 }}>
-            {copy.line3}
-          </span>
+          <span style={headline}>{copy.line3}</span>
         </div>
 
         <div
@@ -153,22 +101,21 @@ export function socialCard(locale: Locale) {
             gap: 12,
             padding: 22,
             borderRadius: 14,
-            background: "#1a130c",
+            background: CARD_COLORS.panel,
             boxShadow: "8px 8px 0 0 #0b0805",
           }}
         >
           <span
             style={{
-              color: "#8c7a60",
+              color: CARD_COLORS.muted,
               fontSize: 15,
-              fontWeight: 800,
               letterSpacing: 2,
             }}
           >
             {copy.panel}
           </span>
 
-          {destinations.map((destination) => (
+          {DESTINATIONS.map((destination) => (
             <div
               key={destination.name}
               style={{
@@ -177,9 +124,8 @@ export function socialCard(locale: Locale) {
                 gap: 12,
                 padding: "12px 14px",
                 borderRadius: 7,
-                background: "#221a10",
+                background: CARD_COLORS.row,
                 fontSize: 20,
-                fontWeight: 800,
               }}
             >
               <span
@@ -195,9 +141,9 @@ export function socialCard(locale: Locale) {
               <span
                 style={{
                   marginLeft: "auto",
-                  color: "#56e39b",
+                  color: CARD_COLORS.live,
                   fontSize: 14,
-                  fontWeight: 900,
+                  letterSpacing: 1,
                 }}
               >
                 {copy.live}
@@ -211,13 +157,14 @@ export function socialCard(locale: Locale) {
               alignItems: "center",
               justifyContent: "center",
               marginTop: 4,
-              padding: "15px 18px",
-              color: "#2a1c00",
+              padding: "14px 18px 10px",
+              color: CARD_COLORS.brassInk,
               borderRadius: 7,
-              background: "#ff5a36",
-              boxShadow: "5px 5px 0 0 #fcf3e3",
-              fontSize: 21,
-              fontWeight: 900,
+              background: CARD_COLORS.coral,
+              boxShadow: `5px 5px 0 0 ${CARD_COLORS.cream}`,
+              fontFamily: DISPLAY_FONT,
+              fontSize: 24,
+              lineHeight: 1,
             }}
           >
             {copy.cta}
@@ -225,6 +172,6 @@ export function socialCard(locale: Locale) {
         </div>
       </div>
     </div>,
-    SOCIAL_IMAGE_SIZE,
+    { ...SOCIAL_IMAGE_SIZE, fonts: await cardFonts() },
   );
 }
