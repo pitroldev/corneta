@@ -47,7 +47,7 @@ describe("editorial metadata boundary", () => {
         en: "/en/guides/quality/choose-bitrate",
       },
       image: {
-        src: "/images/editorial/guides/choose-bitrate.webp",
+        url: "/images/editorial/guides/choose-bitrate.webp",
         width: 1600,
         height: 900,
         alt: "Corneta quality controls showing the bitrate field",
@@ -84,5 +84,39 @@ describe("editorial metadata boundary", () => {
         ],
       },
     });
+  });
+
+  it("shares the card in the page's language and drops the brand from long titles", () => {
+    const longTitle =
+      "Dropped frames no OBS: rede, renderização ou codificação?";
+    const portuguese = buildEditorialMetadata({
+      locale: "pt-BR",
+      canonical: "/guides/quality/dropped-frames",
+      title: longTitle,
+      description: "Leia os três contadores do OBS.",
+      indexable: true,
+    });
+    const english = buildEditorialMetadata({
+      locale: "en",
+      canonical: "/en/help",
+      title: "Help center",
+      description: "Direct answers for using Corneta.",
+      indexable: false,
+    });
+
+    expect(portuguese.title).toEqual({ absolute: longTitle });
+    expect(portuguese.openGraph?.images).toEqual([
+      expect.objectContaining({
+        url: expect.stringMatching(/\/opengraph-image$/),
+        alt: expect.stringContaining("uma live"),
+      }),
+    ]);
+    expect(english.title).toBe("Help center");
+    expect(english.openGraph?.images).toEqual([
+      expect.objectContaining({
+        url: expect.stringMatching(/\/opengraph-image\/en$/),
+        alt: expect.stringContaining("one stream"),
+      }),
+    ]);
   });
 });

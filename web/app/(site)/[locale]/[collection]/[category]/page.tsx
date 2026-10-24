@@ -80,13 +80,13 @@ export async function generateMetadata({
         }),
       }
     : undefined;
-  const title = `${categoryCopy.title} — ${collectionCopy.label}`;
+  const title = `${categoryCopy.title} — ${collectionCopy.metaLabel}`;
 
   return buildEditorialMetadata({
     locale,
     canonical,
     title,
-    description: categoryCopy.description,
+    description: `${categoryCopy.description} ${collectionCopy.categoryMetaSuffix}`,
     indexable: documents.length > 0,
     alternates,
   });

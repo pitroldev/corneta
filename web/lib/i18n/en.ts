@@ -40,7 +40,7 @@ export const en: Dict = {
     "Local multistream for streamers — one output per platform, all running on your PC.",
   "chrome.manifest.lang": "en-US",
   "chrome.meta.description":
-    "Multistream from your PC to Twitch, YouTube, Kick and more — chat in one place, your stream still up when the signal drops, and a report with the numbers for each one. Free.",
+    "Multistream from your PC to Twitch, YouTube, Kick and more — one chat, a stream that stays up when the signal drops, and a report for each platform. Free.",
   "chrome.meta.keywords.1": "multistream",
   "chrome.meta.keywords.10": "Kick",
   "chrome.meta.keywords.11": "open source",
@@ -158,7 +158,6 @@ export const en: Dict = {
 
   "hero.cta.footnote":
     "Corneta for Windows 10/11 · no sign-up · no subscription",
-  "hero.download.aria": "Download Corneta free for Windows",
   "hero.download.compact": "Download",
   "hero.download.full": "Download free for Windows",
   "hero.header.brand.aria": "Corneta — home",

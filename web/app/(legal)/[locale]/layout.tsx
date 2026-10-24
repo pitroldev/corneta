@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, LOCALES } from "@/lib/i18n";
 import { legalUi } from "@/lib/legal-ui";
+import { TITLE_TEMPLATE } from "@/lib/page-title";
 import { siteUrl } from "@/lib/site";
 import { fontVars } from "../../fonts";
 import { LegalHeader } from "./legal/_components/legal-chrome";
@@ -15,6 +16,7 @@ export function generateStaticParams() {
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
+  title: { default: "Corneta", template: TITLE_TEMPLATE },
 };
 
 export const viewport: Viewport = {

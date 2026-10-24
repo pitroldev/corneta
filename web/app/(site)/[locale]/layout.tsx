@@ -2,11 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { LEGAL_AUTHOR, LEGAL_OPERATOR } from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
-import {
-  SOCIAL_IMAGE_ALT,
-  SOCIAL_IMAGE_PATH,
-  SOCIAL_IMAGE_SIZE,
-} from "@/lib/social-image";
+import { TITLE_TEMPLATE } from "@/lib/page-title";
+import { socialImage } from "@/lib/social-image";
 import {
   isLocale,
   LOCALES,
@@ -38,8 +35,6 @@ const KEYWORD_KEYS = [
   "chrome.meta.keywords.11",
 ] as const;
 
-const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, siteUrl).toString();
-
 function searchVerification(): Metadata["verification"] | undefined {
   const google = process.env.GOOGLE_SITE_VERIFICATION?.trim();
   const bing = process.env.BING_SITE_VERIFICATION?.trim();
@@ -70,12 +65,13 @@ export async function generateMetadata({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const t = translator(locale);
+  const image = socialImage(locale);
 
   return {
     metadataBase: siteUrl,
     title: {
       default: t("chrome.meta.title.default"),
-      template: "%s | Corneta",
+      template: TITLE_TEMPLATE,
     },
     description: t("chrome.meta.description"),
     applicationName: "Corneta",
@@ -107,19 +103,13 @@ export async function generateMetadata({
       siteName: "Corneta",
       title: t("chrome.og.title"),
       description: t("chrome.og.description"),
-      images: [
-        {
-          url: socialImageUrl,
-          ...SOCIAL_IMAGE_SIZE,
-          alt: SOCIAL_IMAGE_ALT,
-        },
-      ],
+      images: [image],
     },
     twitter: {
       card: "summary_large_image",
       title: t("chrome.og.title"),
       description: t("chrome.twitter.description"),
-      images: [socialImageUrl],
+      images: [image],
     },
   };
 }

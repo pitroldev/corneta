@@ -4,6 +4,11 @@ export type EditorialCollectionName = "help" | "guides";
 
 type CollectionCopy = {
   label: string;
+  /** Search titles: the layout appends the brand, so these never repeat it. */
+  metaTitle: string;
+  metaLabel: string;
+  /** Sets a category's search snippet apart from the same category in the other collection. */
+  categoryMetaSuffix: string;
   title: string;
   description: string;
   emptyTitle: string;
@@ -93,6 +98,10 @@ const COPY: Record<Locale, EditorialCopy> = {
     collections: {
       help: {
         label: "Central de ajuda",
+        metaTitle: "Central de ajuda: multistream, OBS e plataformas",
+        metaLabel: "Central de ajuda",
+        categoryMetaSuffix:
+          "Respostas da Central de ajuda da Corneta para resolver e voltar pra live.",
         title: "Resolva o problema e volte para a live.",
         description:
           "Respostas diretas, verificações seguras e caminhos de diagnóstico para usar a Corneta.",
@@ -102,6 +111,10 @@ const COPY: Record<Locale, EditorialCopy> = {
       },
       guides: {
         label: "Guias Corneta",
+        metaTitle: "Guias de multistream, OBS e qualidade de live",
+        metaLabel: "Guias",
+        categoryMetaSuffix:
+          "Guias da Corneta para entender a live antes de apertar o botão.",
         title: "Entenda a live antes de apertar o botão.",
         description:
           "Guias completos sobre multistream, OBS Studio, qualidade, operação e segurança.",
@@ -224,6 +237,10 @@ const COPY: Record<Locale, EditorialCopy> = {
     collections: {
       help: {
         label: "Help center",
+        metaTitle: "Help center: multistream, OBS and platforms",
+        metaLabel: "Help center",
+        categoryMetaSuffix:
+          "Answers from the Corneta help center to fix it and get back to your stream.",
         title: "Fix the problem and get back to your stream.",
         description:
           "Direct answers, safe checks, and troubleshooting paths for using Corneta.",
@@ -233,6 +250,10 @@ const COPY: Record<Locale, EditorialCopy> = {
       },
       guides: {
         label: "Corneta guides",
+        metaTitle: "Multistream, OBS and stream quality guides",
+        metaLabel: "Guides",
+        categoryMetaSuffix:
+          "Corneta guides to understand your stream before you press the button.",
         title: "Understand your stream before you press the button.",
         description:
           "Complete guides to multistreaming, OBS Studio, quality, operations, and security.",

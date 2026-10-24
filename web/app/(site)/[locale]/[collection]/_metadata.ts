@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
+import { pageTitle } from "../../../../lib/page-title";
 import { siteUrl } from "../../../../lib/site";
-import {
-  SOCIAL_IMAGE_ALT,
-  SOCIAL_IMAGE_PATH,
-  SOCIAL_IMAGE_SIZE,
-} from "../../../../lib/social-image";
+import { socialImage } from "../../../../lib/social-image";
 
 type MetadataLocale = "pt-BR" | "en";
 type MetadataAlternates = Partial<Record<MetadataLocale, string>>;
@@ -12,12 +9,6 @@ type MetadataAlternates = Partial<Record<MetadataLocale, string>>;
 const OPEN_GRAPH_LOCALE: Record<MetadataLocale, string> = {
   "pt-BR": "pt_BR",
   en: "en_US",
-};
-
-const DEFAULT_SOCIAL_IMAGE = {
-  src: new URL(SOCIAL_IMAGE_PATH, siteUrl).toString(),
-  ...SOCIAL_IMAGE_SIZE,
-  alt: SOCIAL_IMAGE_ALT,
 };
 
 function otherLocale(locale: MetadataLocale): MetadataLocale {
@@ -72,7 +63,7 @@ interface EditorialMetadataOptions {
   indexable: boolean;
   alternates?: MetadataAlternates;
   image?: {
-    src: string;
+    url: string;
     width: number;
     height: number;
     alt: string;
@@ -93,7 +84,7 @@ export function buildEditorialMetadata({
   description,
   indexable,
   alternates,
-  image = DEFAULT_SOCIAL_IMAGE,
+  image = socialImage(locale),
   article,
 }: EditorialMetadataOptions): Metadata {
   const hasCompletePair = Boolean(alternates?.["pt-BR"] && alternates.en);
@@ -104,19 +95,12 @@ export function buildEditorialMetadata({
     title: socialTitle,
     description,
     ...openGraphLocales(locale, hasCompletePair),
-    images: [
-      {
-        url: image.src,
-        width: image.width,
-        height: image.height,
-        alt: image.alt,
-      },
-    ],
+    images: [image],
   };
 
   return {
     metadataBase: siteUrl,
-    title,
+    title: pageTitle(title),
     description,
     alternates: completeLanguageAlternates(canonical, alternates),
     robots: metadataRobots(indexable),
@@ -144,7 +128,7 @@ export function buildEditorialMetadata({
       card: "summary_large_image",
       title: socialTitle,
       description,
-      images: [image.src],
+      images: [image],
     },
   };
 }

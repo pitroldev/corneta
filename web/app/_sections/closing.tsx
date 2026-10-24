@@ -184,7 +184,7 @@ const FOOTER_GROUP_TITLE =
 
 export function SiteFooter({ t, locale }: { t: T; locale: Locale }) {
   return (
-    <footer className="border-t-2 border-border-soft bg-panel">
+    <footer className="border-t-2 border-border-soft bg-panel text-cream">
       <Shell>
         <div className="grid grid-cols-[minmax(240px,0.9fr)_minmax(420px,1.1fr)] gap-x-[clamp(48px,8vw,112px)] gap-y-10 py-10 max-[760px]:grid-cols-1 max-[560px]:py-8">
           <div className="flex flex-col items-start gap-4">

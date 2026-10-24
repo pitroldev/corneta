@@ -64,7 +64,7 @@ export async function generateMetadata({
   return buildEditorialMetadata({
     locale,
     canonical,
-    title: collectionCopy.label,
+    title: collectionCopy.metaTitle,
     description: collectionCopy.description,
     indexable: documents.length > 0,
     alternates,

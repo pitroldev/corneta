@@ -30,7 +30,6 @@ export function DownloadButton({
       )}
       href={DOWNLOAD_PATH}
       data-telemetry-cta={ctaId}
-      aria-label={t("hero.download.aria")}
     >
       <WindowsIcon />
       <span>
@@ -164,7 +163,7 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
         <HeroVideo
           webm={media.video.webm}
           mp4={media.video.mp4}
-          poster={media.poster.src}
+          poster={media.poster}
           captions={{
             src: media.video.captions,
             lang: locale,

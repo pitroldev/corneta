@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import Image from "next/image";
 import { PlayIcon } from "./icons";
 
 const noSubscription = () => () => {};
@@ -28,7 +29,7 @@ export function HeroVideo({
 }: {
   webm: string;
   mp4: string;
-  poster: string;
+  poster: { src: string; width: number; height: number };
   captions: { src: string; lang: string; label: string };
   copy: HeroVideoCopy;
 }) {
@@ -78,13 +79,24 @@ export function HeroVideo({
       id="video"
       className="relative aspect-video scroll-mt-28 overflow-hidden rounded-[14px] border-[3px] border-ink bg-night shadow-[10px_10px_0_0_var(--ink)] max-[760px]:shadow-[6px_6px_0_0_var(--ink)]"
     >
+      {/* The poster is the page's largest paint: a responsive, preloaded image shows through
+          the video, which stays transparent until it has frames, even without JavaScript. */}
+      <Image
+        src={poster.src}
+        width={poster.width}
+        height={poster.height}
+        alt=""
+        preload
+        fetchPriority="high"
+        sizes="(max-width: 1172px) calc(100vw - 2rem), 1140px"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
       <video
         ref={video}
-        className="h-full w-full bg-night"
+        className="relative h-full w-full"
         controls={!hydrated || !covered}
         playsInline
         preload="none"
-        poster={poster}
         aria-label={copy.videoLabel}
         onPlay={() => setCovered(false)}
       >
@@ -103,7 +115,6 @@ export function HeroVideo({
           type="button"
           className="hero-video-cover group @container absolute inset-0 block cursor-pointer overflow-hidden focus-visible:outline-none"
           onClick={() => play()}
-          aria-label={`${copy.play} (${copy.duration})`}
         >
           <span
             aria-hidden

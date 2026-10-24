@@ -158,7 +158,6 @@ export const pt = {
 
   "hero.cta.footnote":
     "Corneta para Windows 10/11 · sem cadastro · sem assinatura",
-  "hero.download.aria": "Baixar a Corneta grátis para Windows",
   "hero.download.compact": "Baixar",
   "hero.download.full": "Baixar grátis para Windows",
   "hero.header.brand.aria": "Corneta — início",
