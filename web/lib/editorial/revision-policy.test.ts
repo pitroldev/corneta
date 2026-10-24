@@ -66,6 +66,14 @@ describe("editorial revision policy", () => {
     expect(validateEditorialRevision(previous, reviewOnly)).toEqual([]);
   });
 
+  it("pairs an article with its translation without a new updatedAt", () => {
+    const previous = snapshot();
+    const paired = snapshot({ translationKey: "example" });
+
+    expect(hasSubstantiveEditorialChange(previous, paired)).toBe(false);
+    expect(validateEditorialRevision(previous, paired)).toEqual([]);
+  });
+
   it("ignores serialized YAML key order", () => {
     const previous = snapshot();
     const current = snapshot();
