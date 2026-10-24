@@ -298,7 +298,7 @@ describe("checks and boot cancellation", () => {
     vi.stubEnv("VITE_CONTRIBUTOR", "1");
     expect(await updater.checkForUpdate()).toBeNull();
     updater.subscribeUpdateStatus()();
-    updater.scheduleBootCheck(vi.fn())();
+    updater.scheduleUpdateChecks(vi.fn())();
     await vi.dynamicImportSettled();
     expect(mocks.check).not.toHaveBeenCalled();
     expect(mocks.listen).not.toHaveBeenCalled();
@@ -325,7 +325,7 @@ describe("checks and boot cancellation", () => {
   it("cancels a queued boot check before any request", async () => {
     vi.useFakeTimers();
     const found = vi.fn();
-    const cleanup = updater.scheduleBootCheck(found);
+    const cleanup = updater.scheduleUpdateChecks(found);
     cleanup();
     await vi.advanceTimersByTimeAsync(20_000);
     expect(mocks.check).not.toHaveBeenCalled();
@@ -337,12 +337,108 @@ describe("checks and boot cancellation", () => {
     const result = deferred<Update>();
     const found = vi.fn();
     mocks.check.mockReturnValue(result.promise);
-    const cleanup = updater.scheduleBootCheck(found);
+    const cleanup = updater.scheduleUpdateChecks(found);
     await vi.advanceTimersByTimeAsync(20_000);
     expect(mocks.check).toHaveBeenCalledTimes(1);
     cleanup();
     result.resolve(info.handle);
     await vi.advanceTimersByTimeAsync(0);
     expect(found).not.toHaveBeenCalled();
+  });
+});
+
+describe("proactive update offers", () => {
+  const handle = (version: string) =>
+    ({
+      rid: 7,
+      version,
+      close: vi.fn().mockResolvedValue(undefined),
+    }) as unknown as Update;
+  const offer = (version: string): UpdateInfo => ({
+    version,
+    notes: "",
+    handle: handle(version),
+  });
+
+  function stubStorage() {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+    });
+  }
+
+  function stubAttention(attended: boolean) {
+    vi.stubGlobal("document", {
+      visibilityState: attended ? "visible" : "hidden",
+      hasFocus: () => attended,
+    });
+  }
+
+  it("checks again every six hours until cleanup", async () => {
+    vi.useFakeTimers();
+    mocks.check.mockResolvedValue(null);
+    const cleanup = updater.scheduleUpdateChecks(vi.fn());
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(mocks.check).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+    expect(mocks.check).toHaveBeenCalledTimes(2);
+    cleanup();
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+    expect(mocks.check).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a dismissal for the same version and shows a newer one", () => {
+    const first = offer("0.12.0");
+    updater.offerUpdate(first);
+    updater.useUpdate.getState().dismiss();
+    const again = offer("0.12.0");
+    updater.offerUpdate(again);
+    expect(updater.useUpdate.getState()).toMatchObject({
+      info: first,
+      dismissed: true,
+    });
+    expect(again.handle.close).toHaveBeenCalled();
+    const newer = offer("0.13.0");
+    updater.offerUpdate(newer);
+    expect(updater.useUpdate.getState()).toMatchObject({
+      info: newer,
+      dismissed: false,
+    });
+    expect(first.handle.close).toHaveBeenCalled();
+  });
+
+  it("leaves the offer being installed in place", () => {
+    const current = offer("0.12.0");
+    updater.offerUpdate(current);
+    updater.useUpdate.setState({ nativeInstalling: true });
+    const newer = offer("0.13.0");
+    updater.offerUpdate(newer);
+    expect(updater.useUpdate.getState().info).toBe(current);
+    expect(current.handle.close).not.toHaveBeenCalled();
+  });
+
+  it("notifies once per version, and only after the live ends", async () => {
+    stubStorage();
+    stubAttention(false);
+    await updater.announceUpdate("0.12.0", true);
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    await updater.announceUpdate("0.12.0", false);
+    await updater.announceUpdate("0.12.0", false);
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke).toHaveBeenCalledWith("notify_update_available", {
+      version: "0.12.0",
+    });
+    await updater.announceUpdate("0.13.0", false);
+    expect(mocks.invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves an attended window to the banner", async () => {
+    stubStorage();
+    stubAttention(true);
+    await updater.announceUpdate("0.12.0", false);
+    stubAttention(false);
+    await updater.announceUpdate("0.12.0", false);
+    expect(mocks.invoke).not.toHaveBeenCalled();
   });
 });

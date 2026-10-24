@@ -6,6 +6,9 @@ import { normalizeErrorCode } from "./telemetry-schema";
 
 /** Defer update checks to avoid competing with initial app setup. */
 const BOOT_DELAY_MS = 20_000;
+/** An app left in the tray for days still hears about new releases. */
+const RECHECK_MS = 6 * 60 * 60 * 1000;
+const NOTIFIED_KEY = "corneta.update.notified";
 
 export interface UpdateInfo {
   version: string;
@@ -155,18 +158,63 @@ export function subscribeUpdateStatus(): () => void {
 }
 
 /** Return a cancellation function for effect cleanup. */
-export function scheduleBootCheck(
+export function scheduleUpdateChecks(
   onFound: (info: UpdateInfo) => void,
 ): () => void {
   if (!inTauri()) return () => {};
   let alive = true;
-  const t = setTimeout(() => {
+  const run = () => {
     void checkForUpdate().then((info) => {
       if (alive && info) onFound(info);
     });
-  }, BOOT_DELAY_MS);
+  };
+  const boot = setTimeout(run, BOOT_DELAY_MS);
+  const every = setInterval(run, RECHECK_MS);
   return () => {
     alive = false;
-    clearTimeout(t);
+    clearTimeout(boot);
+    clearInterval(every);
   };
+}
+
+const release = (info: UpdateInfo) =>
+  info.handle.close().catch(() => undefined);
+
+/** A repeated automatic check keeps the user's dismissal of the same version. */
+export function offerUpdate(next: UpdateInfo): void {
+  const { info, installing, nativeInstalling } = useUpdate.getState();
+  if (installing || nativeInstalling || info?.version === next.version) {
+    void release(next);
+    return;
+  }
+  if (info) void release(info);
+  useUpdate.setState({ info: next, dismissed: false });
+}
+
+function readNotified(): string | null {
+  try {
+    return localStorage.getItem(NOTIFIED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** One Windows notification per version, held until the live ends; an attended window has the banner. */
+export async function announceUpdate(
+  version: string,
+  live: boolean,
+): Promise<void> {
+  if (live || !inTauri() || readNotified() === version) return;
+  try {
+    localStorage.setItem(NOTIFIED_KEY, version);
+  } catch {
+    // Without storage the notification may repeat on the next launch.
+  }
+  if (document.visibilityState === "visible" && document.hasFocus()) return;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("notify_update_available", { version });
+  } catch {
+    // The banner still offers the update when the window opens.
+  }
 }

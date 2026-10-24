@@ -6,9 +6,11 @@ import { useT } from "../lib/i18n";
 import { cn, errMsg } from "../lib/utils";
 import { Button } from "./ui";
 import {
+  announceUpdate,
   checkForUpdate,
   installUpdate,
-  scheduleBootCheck,
+  offerUpdate,
+  scheduleUpdateChecks,
   subscribeUpdateStatus,
   updateBusy,
   useUpdate,
@@ -20,7 +22,6 @@ export function UpdateBanner() {
   const t = useT();
   const info = useUpdate((s) => s.info);
   const dismissed = useUpdate((s) => s.dismissed);
-  const setInfo = useUpdate((s) => s.setInfo);
   const dismiss = useUpdate((s) => s.dismiss);
   const progress = useUpdate((s) => s.progress);
   // After reload only the native lock is known, not the download's current phase.
@@ -29,8 +30,11 @@ export function UpdateBanner() {
   // Starting and error states can still own active media processes.
   const live = useStore((s) => s.snapshot.state !== "stopped");
 
-  useEffect(() => scheduleBootCheck(setInfo), [setInfo]);
+  useEffect(() => scheduleUpdateChecks(offerUpdate), []);
   useEffect(subscribeUpdateStatus, []);
+  useEffect(() => {
+    if (info) void announceUpdate(info.version, live);
+  }, [info, live]);
 
   if ((!info || dismissed) && !installing) return null;
 

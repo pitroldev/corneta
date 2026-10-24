@@ -352,6 +352,12 @@ messages! {
     NotifySignalLostBody = "rust.notify.signalLost.body" =>
         pt: "Sua live está sem imagem — confira o OBS.",
         en: "Your stream has no picture — check OBS.";
+    NotifyUpdateTitle { version: &'a str } = "rust.notify.update.title" =>
+        pt: "Saiu a Corneta {version}",
+        en: "Corneta {version} is out";
+    NotifyUpdateBody = "rust.notify.update.body" =>
+        pt: "Abra a Corneta e clique em “Atualizar agora”.",
+        en: "Open Corneta and click “Update now”.";
     NotifyBlackScreenTitle = "rust.notify.blackScreen.title" =>
         pt: "Sua live tá com a tela preta",
         en: "Your stream is showing a black screen";

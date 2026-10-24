@@ -93,6 +93,33 @@ pub fn update_installing(app: AppHandle, webview: Webview) -> Result<bool, Strin
     Ok(installing)
 }
 
+/// The release check runs in the main window, but only native code can raise a Windows notification.
+#[tauri::command]
+pub fn notify_update_available(
+    app: AppHandle,
+    webview: Webview,
+    version: String,
+) -> Result<(), String> {
+    if webview.label() != "main" {
+        return Err(Msg::UpdateUnavailable.now());
+    }
+    let version = display_version(&version);
+    crate::commands::notify(
+        &app,
+        &Msg::NotifyUpdateTitle { version: &version }.now(),
+        &Msg::NotifyUpdateBody.now(),
+    );
+    Ok(())
+}
+
+/// The version comes from the signed manifest, but it reaches here through the webview.
+fn display_version(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+        .take(32)
+        .collect()
+}
+
 #[tauri::command]
 pub async fn install_update(
     app: AppHandle,
@@ -137,6 +164,14 @@ pub async fn install_update(
 mod tests {
     use super::*;
     use crate::engine::EngineSnapshot;
+
+    #[test]
+    fn a_notified_version_keeps_only_version_characters() {
+        assert_eq!(display_version("0.12.0"), "0.12.0");
+        assert_eq!(display_version("1.0.0-rc.1+build"), "1.0.0-rc.1+build");
+        assert_eq!(display_version("0.12.0\n<b>x</b>"), "0.12.0bxb");
+        assert_eq!(display_version(&"9".repeat(80)).len(), 32);
+    }
     use std::sync::{Arc, Barrier};
 
     #[test]

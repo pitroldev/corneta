@@ -259,6 +259,7 @@ pub fn run() {
             commands::start_engine,
             commands::stop_engine,
             updater::install_update,
+            updater::notify_update_available,
             updater::update_installing,
             commands::set_target_paused,
             commands::retry_target,
