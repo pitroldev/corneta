@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 import sitemap from "./sitemap";
 
 describe("editorial sitemap", () => {
-  it("publishes the complete editorial catalog without inventing translations", async () => {
+  it("publishes the complete editorial catalog in both languages", async () => {
     const entries = await sitemap();
     const paths = entries.map((entry) => new URL(entry.url).pathname);
 
@@ -66,10 +66,15 @@ describe("editorial sitemap", () => {
     expect(
       paths.filter((path) => publishedPhasePaths.includes(path)),
     ).toHaveLength(publishedPhasePaths.length);
+    expect(paths).toEqual(
+      expect.arrayContaining(publishedPhasePaths.map((path) => `/en${path}`)),
+    );
     expect(paths).toContain("/guides");
     expect(paths).toContain("/help");
-    expect(paths).not.toContain("/en/guides/multistream/obs-multistream");
+    expect(paths).toContain("/en/guides");
+    expect(paths).toContain("/en/help");
     expect(paths).not.toContain("/help/obs/automatic-obs-setup");
+    expect(paths).not.toContain("/en/help/obs/automatic-obs-setup");
     expect(paths).not.toContain("/guides/obs/why-stream-lags");
     expect(paths).toContain("/");
     expect(paths).toContain("/en");
