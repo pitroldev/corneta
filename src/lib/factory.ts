@@ -67,6 +67,7 @@ export function defaultConfig(): AppConfig {
       guardianWatchlist: [],
       loudnessNormalize: false,
       loudnessTargetLufs: -14,
+      blackScreenAlert: false,
       youtubeAutoLive: true,
       youtubePrivacy: "public",
       youtubeMadeForKids: false,

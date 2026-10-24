@@ -1,4 +1,4 @@
-import { AudioLines } from "lucide-react";
+import { AudioLines, BellRing } from "lucide-react";
 import { useId } from "react";
 import { useT } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
@@ -46,6 +46,18 @@ export function LoudnessPreview() {
         <div className="absolute inset-y-0 left-[58%] w-1 rounded-sm bg-ok" />
       </div>
       <AudioLines
+        className="absolute right-1.5 top-1.5 size-3.5 text-brass"
+        strokeWidth={2.4}
+      />
+    </div>
+  );
+}
+
+export function BlackScreenPreview() {
+  return (
+    <div className="absolute inset-0 bg-surface-2 p-2">
+      <div className="h-full w-full rounded-sm bg-black ring-1 ring-border" />
+      <BellRing
         className="absolute right-1.5 top-1.5 size-3.5 text-brass"
         strokeWidth={2.4}
       />

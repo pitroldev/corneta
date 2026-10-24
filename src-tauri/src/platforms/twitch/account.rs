@@ -12,7 +12,7 @@ use crate::auth::{
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
-use crate::platforms::provider::StreamKeyGrant;
+use crate::platforms::provider::{MarkOutcome, StreamKeyGrant};
 
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast channel:read:stream_key moderator:read:followers";
@@ -505,6 +505,48 @@ pub(crate) fn twitch_set_info(
     }
 }
 
+pub(crate) fn twitch_mark_moment(app: &AppHandle, label: &str) -> MarkOutcome {
+    let Some(token) = twitch_token(app) else {
+        return MarkOutcome::Reconnect;
+    };
+    let Some(info) = twitch_validate(&token) else {
+        return MarkOutcome::Reconnect;
+    };
+    if missing_twitch_scopes(&info.scopes).contains(&"channel:manage:broadcast") {
+        return MarkOutcome::Reconnect;
+    }
+    let body = json!({
+        "user_id": info.user_id,
+        "description": label.chars().take(140).collect::<String>(),
+    });
+    match ureq::post("https://api.twitch.tv/helix/streams/markers")
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Client-Id", &oauth(app).twitch_client_id)
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(8))
+        .send_string(&body.to_string())
+    {
+        Ok(_) => MarkOutcome::Marked,
+        Err(ureq::Error::Status(code, _)) => {
+            log::warn!("twitch: marker refused with HTTP {code}");
+            marker_outcome(code)
+        }
+        Err(e) => {
+            log::warn!("twitch: marker request failed: {e}");
+            MarkOutcome::Failed
+        }
+    }
+}
+
+/// Twitch answers 404 when the live is not saved as a past broadcast, so it cannot hold markers.
+fn marker_outcome(status: u16) -> MarkOutcome {
+    match status {
+        404 => MarkOutcome::Unavailable,
+        401 => MarkOutcome::Reconnect,
+        _ => MarkOutcome::Failed,
+    }
+}
+
 fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
     let v = helix(
         token,
@@ -527,6 +569,14 @@ fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_refused_marker_tells_a_live_without_vods_from_a_stale_login() {
+        assert_eq!(marker_outcome(404), MarkOutcome::Unavailable);
+        assert_eq!(marker_outcome(401), MarkOutcome::Reconnect);
+        assert_eq!(marker_outcome(403), MarkOutcome::Failed);
+        assert_eq!(marker_outcome(500), MarkOutcome::Failed);
+    }
 
     #[test]
     fn older_twitch_grants_report_the_scopes_they_lack() {

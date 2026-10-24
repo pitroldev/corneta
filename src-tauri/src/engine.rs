@@ -680,6 +680,8 @@ pub struct EngineSnapshot {
     pub obs: Option<ObsStats>,
     /// Manual slate activation, independent of input loss.
     pub forced_brb: bool,
+    /// The OBS picture has stayed fully black long enough to warn; set only with the opt-in watch.
+    pub black_screen: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guardian_status: Option<crate::guardian::GuardianStatus>,
 }
@@ -710,6 +712,7 @@ impl EngineSnapshot {
             memory_pct: None,
             obs: None,
             forced_brb: false,
+            black_screen: false,
             guardian_status: None,
         }
     }
@@ -751,6 +754,7 @@ impl EngineSnapshot {
             memory_pct: None,
             obs: None,
             forced_brb: false,
+            black_screen: false,
             guardian_status: (config.settings.guardian_enabled
                 && config
                     .settings

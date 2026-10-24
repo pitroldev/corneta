@@ -25,6 +25,7 @@ import {
   youtubeAutoTargetId,
 } from "../lib/readiness";
 import { shortcutLabel } from "../lib/shortcuts";
+import { announceMark } from "../lib/markMoment";
 import { toast } from "../lib/toast";
 import { updateBusy, useUpdate } from "../lib/updater";
 import { useConfirm } from "../lib/useConfirm";
@@ -90,6 +91,7 @@ export function GoLiveScreen({
       (target) => s.snapshot.targets[target.id]?.state === "signal-lost",
     ),
   );
+  const blackScreen = useStore((s) => s.snapshot.blackScreen ?? false);
 
   // Initialize from the current state so remounting during a stream does not announce a new transition.
   const prevState = useRef<EngineState>(state);
@@ -341,6 +343,13 @@ export function GoLiveScreen({
               </Button>
             </AlertCard>
           )}
+          {live && blackScreen && !signalLost && (
+            <AlertCard
+              tone="bad"
+              title={t("golive.blackScreen.title")}
+              body={t("golive.blackScreen.body")}
+            />
+          )}
           {starting && !ingestLive && rescue && (
             <AlertCard
               tone="warn"
@@ -430,7 +439,7 @@ function AlertCard({
   tone: "bad" | "warn";
   title: string;
   body: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <m.div
@@ -463,7 +472,9 @@ function AlertCard({
           <div className="text-sm text-ink-muted">{body}</div>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>
+      {children && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>
+      )}
     </m.div>
   );
 }
@@ -879,8 +890,9 @@ function IdleControls({
 }
 
 function LiveControls({ onStop }: { onStop: () => Promise<void> }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, locale } = useI18n();
   const startedAt = useStore((s) => s.snapshot.startedAt);
+  const markShortcut = useStore((s) => s.config?.settings.markMomentShortcut);
   const viewers = useStore((s) => s.viewers);
   const onAirCount = useStore(
     (s) =>
@@ -895,8 +907,7 @@ function LiveControls({ onStop }: { onStop: () => Promise<void> }) {
   const stopStep = useConfirm(3000, { minDelayMs: 400 });
   const onMark = async () => {
     try {
-      await api.markMoment();
-      toast.success(t("golive.toast.markerSaved"));
+      announceMark(await api.markMoment(), { t, locale });
     } catch {
       /* Marker failures must not interrupt the active stream. */
     }
@@ -940,7 +951,13 @@ function LiveControls({ onStop }: { onStop: () => Promise<void> }) {
       <Button
         variant="subtle"
         onClick={() => void onMark()}
-        title={t("golive.marker.title")}
+        title={
+          markShortcut
+            ? t("golive.marker.titleShortcut", {
+                shortcut: shortcutLabel(markShortcut),
+              })
+            : t("golive.marker.title")
+        }
       >
         <MapPin className="size-4" /> {t("golive.marker.button")}
       </Button>

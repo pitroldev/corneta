@@ -51,6 +51,7 @@ import { GuardianEditor, GuardianPreview } from "./settings/GuardianSettings";
 import { ObsTestButton } from "./settings/ObsTestButton";
 import {
   BitratePreview,
+  BlackScreenPreview,
   LoudnessPreview,
   LoudnessTarget,
 } from "./settings/QualityPreviews";
@@ -394,6 +395,21 @@ export function SettingsScreen() {
                     <BrbSlateChooser />
                   </SubSettings>
                 )}
+              </div>
+
+              <div>
+                <SecurityFeature
+                  preview={<BlackScreenPreview />}
+                  on={settings.blackScreenAlert}
+                  title={t("settings.safety.blackScreen.title")}
+                  desc={t("settings.safety.blackScreen.desc")}
+                >
+                  <Toggle
+                    checked={settings.blackScreenAlert}
+                    onChange={(v) => setSettings({ blackScreenAlert: v })}
+                    label={t("settings.safety.blackScreen.title")}
+                  />
+                </SecurityFeature>
               </div>
 
               <div>

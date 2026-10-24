@@ -12,7 +12,7 @@ use tauri::AppHandle;
 
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, ChatProvider, ChatSession,
-    Connection, LoginOptions, Moderation, Outbox, StreamKeyGrant,
+    Connection, LoginOptions, MarkOutcome, Moderation, Outbox, StreamKeyGrant,
 };
 use crate::auth::{bootstrap_client_id, keep_client_id, AccountChannel, OauthConfig};
 use crate::chat::{source_label, Outgoing};
@@ -157,5 +157,9 @@ impl AccountProvider for Twitch {
         category: &str,
     ) -> Result<Option<String>, String> {
         account::twitch_set_info(app, title, category)
+    }
+
+    fn mark_moment(&self, app: &AppHandle, label: &str) -> Option<MarkOutcome> {
+        Some(account::twitch_mark_moment(app, label))
     }
 }

@@ -1202,7 +1202,9 @@ export function mockApi(): CornetaApi {
     async systemMemoryBytes() {
       return 16 * 1024 ** 3;
     },
-    async markMoment() {},
+    async markMoment() {
+      return [];
+    },
     async exportConfig() {
       return false;
     },

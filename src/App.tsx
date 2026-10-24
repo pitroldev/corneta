@@ -7,6 +7,7 @@ import { errMsg } from "./lib/utils";
 import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
 import { brbSlateGeneration, renderBrbSlatePng } from "./lib/brbSlate";
+import { announceMark } from "./lib/markMoment";
 import { runWhenIdle } from "./lib/idle";
 import { applyTheme } from "./lib/theme";
 import { useI18n, useT } from "./lib/i18n";
@@ -204,7 +205,7 @@ export default function App() {
       if (st !== "live") return;
       if (action === "markMoment") {
         api.markMoment().then(
-          () => toast.success(t("golive.toast.markerSaved")),
+          (marks) => announceMark(marks, { t, locale }),
           () => undefined,
         );
         return;
@@ -233,6 +234,7 @@ export default function App() {
     };
   }, [
     t,
+    locale,
     load,
     setupOauth,
     bindEngine,

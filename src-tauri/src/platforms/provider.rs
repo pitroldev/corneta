@@ -169,6 +169,17 @@ pub trait AutoBroadcast: Sync {
     fn close_failure(&self) -> (String, String);
 }
 
+/// What a platform did with a moment marked during the live.
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum MarkOutcome {
+    Marked,
+    /// The platform refused this live, such as a channel that does not save its broadcasts.
+    Unavailable,
+    Reconnect,
+    Failed,
+}
+
 pub trait AccountProvider: Sync {
     fn id(&self) -> &'static str;
     fn signed_in(&self) -> bool;
@@ -206,6 +217,10 @@ pub trait AccountProvider: Sync {
     }
     /// Runs as a live starts; it must not block the start.
     fn before_go_live(&self, _app: &AppHandle) {}
+    /// Marks the running live on the platform's own recording. Blocking; None when the platform cannot.
+    fn mark_moment(&self, _app: &AppHandle, _label: &str) -> Option<MarkOutcome> {
+        None
+    }
     /// Ok(Some) carries a warning; the title went through but something else did not.
     fn set_stream_info(
         &self,

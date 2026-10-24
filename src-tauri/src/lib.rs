@@ -1,5 +1,6 @@
 mod alerts;
 mod auth;
+mod black_screen;
 mod chat;
 mod commands;
 mod compositor;

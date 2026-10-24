@@ -21,6 +21,7 @@ import type {
   ObsCheck,
   ObsVideo,
   ObsVideoCheck,
+  PlatformMark,
   RecordDirCheck,
   SessionMeta,
   Viewers,
@@ -230,7 +231,8 @@ export interface CornetaApi {
   /** Restores the OBS video saved before Corneta's first adjustment. */
   obsVideoUndo(): Promise<void>;
   systemMemoryBytes(): Promise<number>;
-  markMoment(label?: string): Promise<void>;
+  /** The report marker is always written; the result lists the platforms that were asked too. */
+  markMoment(label?: string): Promise<PlatformMark[]>;
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
   saveBrbSlate(b64: string, generation?: string): Promise<void>;
