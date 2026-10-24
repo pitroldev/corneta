@@ -42,7 +42,7 @@ export function Section({
     <section
       id={id}
       className={cn(
-        "bg-[length:20px_20px] py-[clamp(78px,8vw,122px)]",
+        "below-fold bg-[length:20px_20px] py-[clamp(78px,8vw,122px)]",
         tone === "dark"
           ? "bg-charcoal bg-[image:var(--halftone-dark)]"
           : cn(

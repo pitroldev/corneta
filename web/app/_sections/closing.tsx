@@ -128,7 +128,7 @@ export function FinalCta({ t, locale }: { t: T; locale: Locale }) {
   return (
     <section
       id="download"
-      className="relative isolate overflow-hidden bg-charcoal bg-[image:var(--halftone-dark)] bg-[length:20px_20px] py-[clamp(70px,8vw,110px)]"
+      className="below-fold relative isolate overflow-hidden bg-charcoal bg-[image:var(--halftone-dark)] bg-[length:20px_20px] py-[clamp(70px,8vw,110px)]"
     >
       <SoundWaves className="pointer-events-none absolute -right-[190px] -bottom-[220px] -z-10 w-[640px] text-brass opacity-14" />
       <Shell>
@@ -184,7 +184,7 @@ const FOOTER_GROUP_TITLE =
 
 export function SiteFooter({ t, locale }: { t: T; locale: Locale }) {
   return (
-    <footer className="border-t-2 border-border-soft bg-panel text-cream">
+    <footer className="below-fold border-t-2 border-border-soft bg-panel text-cream">
       <Shell>
         <div className="grid grid-cols-[minmax(240px,0.9fr)_minmax(420px,1.1fr)] gap-x-[clamp(48px,8vw,112px)] gap-y-10 py-10 max-[760px]:grid-cols-1 max-[560px]:py-8">
           <div className="flex flex-col items-start gap-4">

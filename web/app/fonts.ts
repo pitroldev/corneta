@@ -8,10 +8,13 @@ const display = Baloo_2({
   display: "swap",
 });
 
+// The body text paints first in the metric-matched fallback, so its font does not need to compete
+// with the stylesheet for bandwidth before the first paint.
 const body = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
+  preload: false,
 });
 
 export const fontVars = `${display.variable} ${body.variable}`;

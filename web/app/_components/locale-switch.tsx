@@ -8,7 +8,6 @@ import {
   type Locale,
 } from "@/lib/i18n";
 import { GlobeIcon } from "./icons";
-import { cn } from "./ui";
 
 // Save the preference before navigation so the proxy cannot redirect it back.
 
@@ -37,13 +36,14 @@ export function LocaleSwitch({
       onClick={() => remember(other)}
       aria-label={label}
       title={label}
-      className={cn(
+      // A plain join keeps tailwind-merge out of the browser bundle; these classes never conflict.
+      className={[
         "inline-flex shrink-0 items-center gap-2 rounded-md font-[650] whitespace-nowrap text-muted",
         "outline-offset-2 transition-colors duration-150 hover:bg-surface-2 hover:text-cream focus-visible:outline-[3px] focus-visible:outline-brass",
         "[&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-linejoin:round] [&>svg]:[stroke-width:1.9]",
         full ? "min-h-11 px-3 text-[0.95rem]" : "min-h-9 px-2 text-[0.84rem]",
         "[@media(pointer:coarse)]:min-h-11",
-      )}
+      ].join(" ")}
     >
       <GlobeIcon />
       {LOCALE_LABEL[other]}

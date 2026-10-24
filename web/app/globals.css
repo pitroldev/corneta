@@ -133,6 +133,14 @@
     --brand-tile-border: 1px;
     --brand-tile-shadow: 2px;
   }
+
+  /* A slow phone lays out only the header and the hero before the first paint; the sections
+     below wait until they near the viewport. In-page links jump instead of scrolling smoothly,
+     because sections laid out mid-animation would push the target off its mark. */
+  .below-fold {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 900px;
+  }
 }
 
 /* Base-layer rules must not override Tailwind utilities. */
@@ -142,7 +150,6 @@
   }
 
   html {
-    scroll-behavior: smooth;
     background: var(--charcoal);
   }
 
@@ -240,10 +247,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
   *,
   *::before,
   *::after {

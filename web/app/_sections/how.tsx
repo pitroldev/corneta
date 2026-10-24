@@ -13,7 +13,7 @@ export function How({ t, locale }: { t: T; locale: Locale }) {
     <section
       id="como-funciona"
       aria-labelledby="como-funciona-titulo"
-      className="border-y-[3px] border-ink bg-charcoal bg-[image:var(--halftone-dark)] bg-[length:20px_20px] py-[clamp(56px,6vw,88px)] text-cream"
+      className="below-fold border-y-[3px] border-ink bg-charcoal bg-[image:var(--halftone-dark)] bg-[length:20px_20px] py-[clamp(56px,6vw,88px)] text-cream"
     >
       <Shell>
         <h2
