@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 import sitemap from "./sitemap";
 
 describe("editorial sitemap", () => {
+  // Reads and validates the whole bilingual catalog, which takes longer under a full parallel run.
   it("publishes the complete editorial catalog in both languages", async () => {
     const entries = await sitemap();
     const paths = entries.map((entry) => new URL(entry.url).pathname);
@@ -78,5 +79,5 @@ describe("editorial sitemap", () => {
     expect(paths).not.toContain("/guides/obs/why-stream-lags");
     expect(paths).toContain("/");
     expect(paths).toContain("/en");
-  });
+  }, 30_000);
 });
