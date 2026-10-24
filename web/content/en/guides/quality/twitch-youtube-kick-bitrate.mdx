@@ -1,0 +1,96 @@
+---
+contentId: guide_twitch_youtube_kick_bitrate_en
+title: "What bitrate should you use on Twitch, YouTube and Kick?"
+description: "Compare bitrate, resolution, FPS and the official limits of Twitch, YouTube and Kick before you build your multistream profile."
+summary: "There is no perfect bitrate for all three platforms. In H.264, 1080p60 calls for 6 Mbps on Twitch, 17 Mbps recommended on YouTube (6 minimum) and up to 8 Mbps on Kick; use the lowest common profile or transcode only the destinations that need it."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: twitch-youtube-kick-bitrate
+translationKey: twitch-youtube-kick-bitrate
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: what bitrate to use on Twitch YouTube and Kick
+related:
+  - guide_multistream_upload_speed_en
+  - guide_live_stream_encoders_en
+  - help_quality_modes_en
+sources:
+  - title: Twitch Broadcasting Guidelines
+    kind: official
+    url: https://help.twitch.tv/s/article/broadcasting-guidelines?language=en_US
+    reviewedAt: 2026-10-18
+  - title: YouTube live encoder settings, bitrates and resolutions
+    kind: official
+    url: https://support.google.com/youtube/answer/2853702?hl=en
+    reviewedAt: 2026-10-18
+  - title: How to stream on KICK.com
+    kind: official
+    url: https://help.kick.com/en/articles/7066931-how-to-stream-on-kick-com
+    reviewedAt: 2026-10-18
+  - title: Settings and stream quality on the KICK - Go Live app
+    kind: official
+    url: https://help.kick.com/en/articles/15159752-settings-and-stream-quality-on-the-kick-go-live-app
+    reviewedAt: 2026-10-18
+  - title: Corneta quality modes
+    kind: internal
+    repoPath: src/screens/EncodingScreen.tsx
+    reviewedAt: 2026-10-20
+  - title: Corneta upload estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-10-18
+  - title: Corneta platform presets
+    kind: internal
+    repoPath: src/lib/platforms.ts
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-upload-test-result-en
+    alt: "Quality screen after the test, showing 27 Mbps available and the bandwidth each mode needs."
+    caption: "The math only works when your available bandwidth stays above the total shown for the mode you picked."
+---
+
+## The matrix that matters
+
+Values reviewed on October 18, 2026 for H.264 video. They are a starting point, not an order to fill all the bandwidth you have.
+
+| Output  |     Twitch |                         YouTube |             Kick |
+| ------- | ---------: | ------------------------------: | ---------------: |
+| 720p30  | 3,000 kbps |  8,000 recommended (min. 3,000) | 2,500–4,500 kbps |
+| 720p60  | 4,500 kbps |  8,000 recommended (min. 3,000) | 3,500–5,000 kbps |
+| 1080p30 | 4,500 kbps | 14,000 recommended (min. 5,000) | 4,500–6,000 kbps |
+| 1080p60 | 6,000 kbps | 17,000 recommended (min. 6,000) | 6,000–8,000 kbps |
+
+All three accept CBR and a keyframe every 2s. Kick caps H.264 at 8,000 kbps, 1080p and 60 FPS. Kick's per-resolution ranges come from the guide for the KICK - Go Live app; in its OBS guide, it only sets 1,000 to 8,000 kbps. YouTube accepts more bitrate and creates smaller versions for viewers; in AV1 or HEVC, its recommended values are lower. On Twitch, 6,000 kbps is still the official reference for 1080p60.
+
+## One signal, or one per platform?
+
+If OBS sends 1080p60 at 6,000 kbps, **Straight up** is the lightest path: all three get the same signal. YouTube sits well below its recommended 17 Mbps, but still within the minimum it asks for 1080p60 in H.264.
+
+If you want more quality on YouTube without going over the limits of Twitch and Kick, use **All out** and send a stronger signal from OBS: Corneta transcodes each platform to its own preset. YouTube goes out at 9,000 kbps by default, and you can raise it in fine-tuning. **Smart** doesn't do this on its own: it copies OBS to Twitch, YouTube and Kick and only transcodes destinations that need vertical video, like TikTok and Instagram. Each mode shows the total upload and the load on your PC; if the transcodes go beyond what your graphics card can handle, the screen warns you.
+
+<ContentImage baseName="corneta-upload-test-result-en" />
+
+## Do the math before you hit GO LIVE
+
+Add up video and audio for every platform that is turned on: copied or transcoded, each output goes up separately. Then compare the total with a test run while the scene has motion. As a practical margin, YouTube itself recommends an upload between 1.5× and 2× the combined bitrate when simulcasting.
+
+<Callout label="More bitrate won't fix a heavy scene" tone="limit">
+  If OBS is losing frames to rendering or encoding, raising the bitrate only
+  adds pressure on the network. First find out which counter got worse.
+</Callout>
+
+To pick a mode without memorizing this table, see [Straight up, Smart or All out](/en/help/quality/quality-modes).

@@ -1,0 +1,77 @@
+---
+contentId: help_post_live_report_en
+title: "How to read and export the post-stream report"
+description: "Understand the summary, diagnosis, audience, chat and timeline of each stream, and download the stream's data in formats that are safe to share."
+summary: "Open Reports and pick a stream. Start with the diagnosis, confirm the minute in the charts and download the right format; the cause shown is a hypothesis based on the available metrics."
+locale: en
+collection: help
+kind: help
+category: reports-and-data
+slug: post-live-report
+translationKey: post-live-report
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: post stream report Corneta
+related:
+  - guide_analyze_stream_drop_en
+  - help_stream_metrics_en
+  - help_export_safe_diagnostic_en
+sources:
+  - title: Corneta report renderer and exports
+    kind: internal
+    repoPath: src/screens/ReportsScreen.tsx
+    reviewedAt: 2026-09-07
+  - title: Corneta report analysis
+    kind: internal
+    repoPath: src/lib/report.ts
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-post-live-report-en
+    alt: "Post-stream report with peak viewers, average, messages, followers and subs."
+    caption: "The summary shows the size of the stream; the diagnosis and the timeline explain where to look."
+---
+
+## Open the right stream
+
+1. Go to **Reports**.
+2. Pick the date and time.
+3. Check the platforms, duration and quality mode.
+4. Read the diagnosis notice before the charts.
+
+<ContentImage baseName="corneta-post-live-report-en" />
+
+Peak and average audience, messages and alerts only show up when that source delivered data. Missing data doesn't turn into a made-up zero.
+
+## Read the diagnosis as a hypothesis
+
+Corneta cross-checks CPU, GPU, OBS stats and the state of each destination. It can say “a quick stutter while preparing video” because the counters changed together; it can't see your router, your viewers' computers or every platform failure.
+
+## Download the right format
+
+- **HTML**: a readable report to open or attach.
+- **CSV**: a table for comparing streams.
+- **JSON**: structured data for technical analysis.
+- **Recap**: an image ready to share, after you review it.
+
+## If the numbers look wrong
+
+| Symptom                             | Check                    | Likely explanation                          |
+| ----------------------------------- | ------------------------ | ------------------------------------------- |
+| missing audience                    | account connections      | the source didn't provide samples           |
+| followers differ from the dashboard | period and attribution   | external events may lack a reliable channel |
+| chart ends early                    | end time                 | the session or the app was interrupted      |
+| cause doesn't match what you saw    | minute and other metrics | incomplete correlation                      |
+
+Before sharing, check channel names, messages and any personal data. For technical support, use the [safe diagnostics file](/en/help/reports-and-data/export-safe-diagnostic) instead.

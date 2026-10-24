@@ -1,0 +1,64 @@
+---
+contentId: help_stream_statuses_en
+title: "What Waiting, Reconnecting, Paused and Error mean in Corneta"
+description: "Learn what each status on Corneta's Live screen means, from Waiting to Error, and what to do when a destination never reaches LIVE."
+summary: "Each status tells you where the signal stopped. Waiting looks at the input; Connecting and Reconnecting look at the platform; Paused and BE RIGHT BACK are states you control."
+locale: en
+collection: help
+kind: troubleshooting
+category: troubleshooting
+slug: stream-statuses
+translationKey: stream-statuses
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: Corneta stream status waiting reconnecting
+related:
+  - help_platform_reconnecting_en
+  - help_brb_screen_en
+  - help_obs_not_found_en
+sources:
+  - title: Corneta engine state policy
+    kind: internal
+    repoPath: src-tauri/src/engine_policy.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-first-live-checklist-en
+    alt: "Live screen with the platforms, OBS, internet and safety nets indicators."
+    caption: "The indicators show what's still missing before the destinations move to Connecting."
+---
+
+## The status map
+
+| Status            | What's happening                                  | What to do                                                       |
+| ----------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| **Waiting**       | Corneta hasn't received a signal yet              | check the address and start streaming in your streaming software |
+| **Connecting**    | the output is opening a session with the platform | wait; if it doesn't change, test the key and server              |
+| **LIVE**          | the platform is receiving media                   | keep an eye on bitrate and dropped frames                        |
+| **Reconnecting**  | the output dropped and is trying to come back     | investigate only the affected destination                        |
+| **Paused**        | you stopped that destination                      | use **Resume** when you want it back                             |
+| **BE RIGHT BACK** | the protection screen replaced the signal         | check whether it was a manual pause or OBS dropping out          |
+| **Error**         | the attempt stopped with a known cause            | open the message and use **Try again** after the fix             |
+
+<ContentImage baseName="corneta-first-live-checklist-en" />
+
+## Waiting doesn't mean OBS is disconnected from the WebSocket
+
+The WebSocket lets Corneta set up and control OBS. The video signal arrives over local RTMP. The OBS button can show **Set up** while Corneta keeps waiting, because OBS hasn't started streaming yet.
+
+## When to ask for help
+
+Write down the exact status, the affected platform and the message shown. If there's an error ID or operation ID, copy it as text.
+
+Never share your stream key, WebSocket password, token, local path or a screenshot with a credential. Use [export safe diagnostics](/en/help/reports-and-data/export-safe-diagnostic).

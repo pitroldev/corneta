@@ -1,0 +1,77 @@
+---
+contentId: guide_copy_vs_transcode_en
+title: "Copy or transcode your stream? How to choose per platform"
+description: "Decide when to reuse the incoming signal and when to create a different resolution, bitrate or framing for a destination."
+summary: "Copy when the same H.264, resolution, FPS and bitrate work for every platform. Transcode only the destination that requires a different limit or format."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: copy-vs-transcode
+translationKey: copy-vs-transcode
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: copy or transcode live multistream
+related:
+  - help_quality_modes_en
+  - guide_live_stream_encoders_en
+  - guide_twitch_youtube_kick_bitrate_en
+sources:
+  - title: Corneta encoding modes
+    kind: internal
+    repoPath: src-tauri/src/config.rs
+    reviewedAt: 2026-09-07
+  - title: Corneta engine pipeline
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen comparing the Straight up, Smart and All out modes."
+    caption: "Straight up copies everything; Smart transcodes only what's needed; All out prepares each destination."
+---
+
+## Copying keeps what came in
+
+When copying, Corneta forwards the video it receives without recreating its frames. That cuts CPU and GPU work, but it doesn't change resolution, FPS, video bitrate or framing.
+
+Audio can be converted to the output format, or processed by the normalizer when it is turned on. The video mode alone doesn't decide whether the audio gets transcoded.
+
+## Transcoding creates a new output
+
+Transcoding decodes the video and produces a separate live output. It's the way to go when:
+
+- a platform accepts less bitrate;
+- a destination needs a different resolution or FPS;
+- a vertical stream requires a 9:16 crop;
+- the incoming codec doesn't work on the platform.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## The decision in three questions
+
+1. Do all of them accept exactly the signal that came in? Use **Straight up**.
+2. Do only one or two need adjusting? Use **Smart**.
+3. Do you want an independent preset per platform, and can your machine handle it? Use **All out**.
+
+Don't pick All out just because the name sounds better. If three outputs already accept the same 1080p60, transcoding three times can burn GPU without any visible difference.
+
+<Callout label="Copying won't fix a bad signal" tone="limit">
+  If your streaming software already sends a blurry picture, clipping audio or a
+  wrong keyframe setting, Straight up replicates the problem. Fix the source, or
+  transcode with a clear goal.
+</Callout>
+
+See the names and the estimate in Help: [which quality mode to choose](/en/help/quality/quality-modes).

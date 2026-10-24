@@ -1,0 +1,113 @@
+---
+contentId: help_manage_platform_en
+title: "How to add, test, pause and remove a platform"
+description: "Manage each Corneta destination without taking the other platforms down: add it, test the server, pause, resume or remove it, one at a time."
+summary: "Add the platform, store the stream key in Windows Credential Manager and use Test the server before the stream. While live, Pause and Resume only affect that destination."
+locale: en
+collection: help
+kind: help
+category: platforms
+slug: manage-platform
+translationKey: manage-platform
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: how to add a platform to Corneta
+related:
+  - help_streaming_keys_and_urls_en
+  - help_quality_modes_en
+  - help_first_stream_en
+sources:
+  - title: Corneta platforms screen
+    kind: internal
+    repoPath: src/screens/PlatformsScreen.tsx
+    reviewedAt: 2026-10-20
+images:
+  - baseName: corneta-platform-key-setup-en
+    alt: "Twitch destination open on the Platforms screen, with the key in Windows Credential Manager and the Test the server button."
+    caption: "The test checks whether the server answers. The key only proves itself when the stream goes live."
+  - baseName: corneta-platform-destinations-en
+    alt: "Platforms screen with Twitch and YouTube set up independently and ready for the stream."
+    caption: "Each destination has its own state. Pausing one doesn't take the others down."
+---
+
+## Add a platform
+
+1. Open **Platforms**.
+2. Click **Add**.
+3. Choose the platform: Twitch, YouTube, Kick, Facebook, TikTok, X, Instagram
+   or **Custom RTMP**. TikTok, X and Instagram are still experimental.
+4. Paste the stream key and click **Paste and save**.
+5. If the **Server URL** field shows up, paste the `rtmp://` or `rtmps://`
+   address shown in the platform's dashboard.
+
+Corneta stores the stream key in Windows Credential Manager. The configuration
+file doesn't carry that key.
+
+## Test the server before the stream
+
+Open the destination and click **Test the server**. The test checks whether the
+platform's server answers at the address you entered. It doesn't check the key:
+a wrong or expired key only shows up when the stream goes live.
+
+<ContentImage baseName="corneta-platform-key-setup-en" />
+
+If the result says **Couldn't find** or **No answer**, check the server URL in
+the platform's dashboard and your network.
+
+The **Ready** badge doesn't depend on the test. It appears when the destination
+has a name, a valid URL and a key in Windows Credential Manager.
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+## Pause or resume during the stream
+
+On the **Live** screen, use **Pause** on the destination that needs to drop out.
+Twitch can stay on air while Kick is paused, for example. Use **Resume** to open
+that output again.
+
+If the platform refuses the key, that destination shows **The platform turned
+down your stream key** and the others stay on air. Paste the new key in
+**Platforms** and click **Try again** on the **Live** screen.
+
+Pausing doesn't delete the key or the settings. Removing does something else: it
+takes the destination out of the active profile.
+
+## Remove a platform
+
+On the **Platforms** screen, open the destination and click **Remove**. It goes
+away right away; if that was a mistake, click **Undo** in the notice that
+appears. Do this outside the stream. If you just won't use the platform today,
+turn the destination off instead of removing it.
+
+To delete only the stream key, use the **Remove** next to **Stream key in
+Windows Credential Manager** and confirm with **Remove it for real?**.
+
+## If the card isn't ready
+
+| Signal        | What it usually is                          | Next step                                     |
+| ------------- | ------------------------------------------- | --------------------------------------------- |
+| Paste the key | There's no stream key stored                | Get a new key from the platform's dashboard   |
+| No URL        | The destination has no ingest server        | Paste a valid `rtmp://` or `rtmps://` URL     |
+| Bad URL       | A web page was pasted into the ingest field | Copy the RTMP/RTMPS server, not the dashboard |
+| No name       | The destination was left without a name     | Give the destination a name right on the card |
+
+<Callout label="Each platform sets its own rules" tone="limit">
+  The test confirms that the server answers. It doesn't check the key or clear
+  your account to go live. YouTube, for example, may require you to enable your
+  first stream in advance.
+</Callout>
+
+If the field names are still mixed up in your head, see [stream key, ingest URL
+and OBS key](/en/help/platforms/streaming-keys-and-urls).

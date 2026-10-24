@@ -1,0 +1,102 @@
+---
+contentId: guide_resolution_and_fps_en
+title: "720p30, 720p60 or 1080p60: how to choose"
+description: "Choose resolution and FPS based on content type, available bitrate, encoder capacity and the lowest common denominator of your multistream."
+summary: "Use 720p30 for stability and low-motion content, 720p60 for motion with limited bandwidth and 1080p60 when text, detail, upload and encoder can keep up. The best setting is the one that stays stable in your heaviest scene."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: resolution-and-fps
+translationKey: resolution-and-fps
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: 720p30 720p60 or 1080p60
+related:
+  - guide_twitch_youtube_kick_bitrate_en
+  - guide_multistream_low_end_pc_en
+  - guide_horizontal_vertical_live_en
+sources:
+  - title: Twitch Broadcasting Guidelines
+    kind: official
+    url: https://help.twitch.tv/s/article/broadcasting-guidelines?language=en_US
+    reviewedAt: 2026-10-18
+  - title: YouTube live encoder settings
+    kind: official
+    url: https://support.google.com/youtube/answer/2853702?hl=en
+    reviewedAt: 2026-10-18
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-10-18
+  - title: Corneta quality modes
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Corneta Quality screen with upload, transcode and encoder estimates for each mode."
+    caption: "Resolution and FPS only make sense alongside the bitrate and the number of encodes your machine will open."
+---
+
+## Choose by what moves
+
+| Profile | Makes sense for                                 | Main trade-off                             |
+| ------- | ----------------------------------------------- | ------------------------------------------ |
+| 720p30  | talk, podcasts, drawing and limited setups      | more stability, less detail and smoothness |
+| 720p60  | fast games with tight bitrate or encoder        | smooth motion, less crisp text             |
+| 1080p30 | camera, tutorials and text with little motion   | more detail, less smooth motion            |
+| 1080p60 | fast games, fine text and a setup with headroom | highest load and need for bitrate          |
+
+Don't pick 1080p60 because your monitor is Full HD. The output has to survive the worst minute of your stream.
+
+## Bitrate changes the result
+
+On Twitch, the official reference uses 3,000 kbps for 720p30, 4,500 for 720p60 and 6,000 for 1080p60. On YouTube, the current table recommends, in H.264, 8 Mbps for 720p30 and 720p60 and 17 Mbps for 1080p60, with minimums of 3, 3 and 6 Mbps. In AV1 or HEVC, the recommended values drop to 6, 6 and 12 Mbps.
+
+With tight bitrate, more pixels can make the picture worse: the encoder splits the same amount of data across more detail and more frames. Blocky motion is a sign to lower resolution, FPS or scene complexity.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## In multistream, there are three paths
+
+1. **Lowest common denominator:** set OBS to a profile every platform accepts and copy the signal.
+2. **One exception:** copy to the compatible destinations and transcode only the one that is different.
+3. **All separate:** transcode each platform when per-destination quality is worth the load.
+
+In Corneta, these paths are the modes on the **Quality** screen: **Straight up** (1), **Smart** (2, which copies the landscape platforms and transcodes only the vertical ones) and **All out** (3). **Set it up for me** only points OBS at Corneta, with server and key; you set resolution, FPS and bitrate in OBS itself.
+
+Start with the first one. Only open a new encoder session when the benefit is visible.
+
+## Test without fooling yourself
+
+- use your heaviest scene;
+- move the camera and the game like in a real stream;
+- let the test run for ten minutes;
+- check rendering, encoding and network separately;
+- watch on a phone and on a regular connection;
+- test every platform at the same time.
+
+A smooth local recording doesn't prove that three network outputs will stay stable. A high speed test doesn't prove that your GPU can handle transcoding either.
+
+<Callout label="Vertical changes the geometry" tone="limit">
+  720×1280 is not a horizontal 720p turned on its side. The 9:16 destination
+  needs its own crop, composition and readability.
+</Callout>
+
+If the profile you picked goes over your bandwidth, work out the total in the [bitrate and upload guide](/en/guides/quality/multistream-upload-speed).

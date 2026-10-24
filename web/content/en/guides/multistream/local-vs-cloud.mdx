@@ -1,0 +1,105 @@
+---
+contentId: guide_local_vs_cloud_en
+title: "Local vs cloud multistreaming: which makes sense for you?"
+description: "Compare upload, PC load, cost, per-destination control and privacy before choosing between local multistreaming and a cloud relay."
+summary: "Local multistreaming gives you direct control and keeps the keys on your PC, but it adds up the upload of every output. A cloud relay uses one local output and replicates it elsewhere, with another dependency in the path."
+locale: en
+collection: guides
+kind: comparison
+category: multistream
+slug: local-vs-cloud
+translationKey: local-vs-cloud
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: local vs cloud multistreaming
+related:
+  - guide_multistream_upload_speed_en
+  - guide_obs_multistream_en
+  - help_quality_modes_en
+sources:
+  - title: YouTube Stream across platforms
+    kind: official
+    url: https://support.google.com/youtube/answer/16404722
+    reviewedAt: 2026-08-01
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Corneta destinations set up separately for local distribution."
+    caption: "On the local path, each platform can pause or reconnect without pulling the others down."
+---
+
+## The short answer
+
+Choose **local** when your upload can handle the sum, you want to control each
+platform separately and you'd rather keep keys and reports on your PC. Choose a
+**cloud relay** when your connection can only sustain one good output or when
+taking the distribution load off your machine is worth the external dependency.
+
+There's no winner without looking at your connection. The same streamer might go
+local at home and use a relay at an event with tight upload.
+
+## What changes in the path
+
+In local mode, OBS delivers one signal to the app, and the app opens one
+connection per platform. The upload math grows with every output.
+
+With a relay, OBS or an app sends one signal to the cloud. The relay opens the
+other outputs, so your PC's upload stays close to a single stream.
+
+## Side-by-side comparison
+
+| Factor                   | Local                                              | Cloud relay                                                            |
+| ------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| Upload at home           | Sum of the local bitrates                          | One main output                                                        |
+| Re-encoding load         | May use your PC's CPU or GPU                       | May happen on the service, depending on the plan                       |
+| Keys                     | Stay on your computer                              | Must be handed to the service                                          |
+| Per-destination control  | Depends on the local app; in Corneta it's separate | Depends on the dashboard and plan                                      |
+| What can fail in between | Your PC and local connection                       | The service, the account and the route to the relay also join the path |
+| Recurring cost           | Corneta's core is free                             | Varies by service and plan                                             |
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+## When local fits better
+
+- your stable upload sits above the sum, with headroom;
+- your PC can handle copying or re-encoding the outputs you chose;
+- you want to pause, test and reconnect one destination at a time;
+- you don't want to hand your stream keys to a relay;
+- Windows and OBS are already part of your setup.
+
+## When the cloud saves you a headache
+
+- your upload only sustains one good-quality output;
+- your machine is already at its limit with the game and OBS;
+- you need to stream from a temporary or unpredictable network;
+- the relay's plan delivers the destinations and settings you need;
+- you're fine with storing your keys on that service.
+
+## The middle ground
+
+Not every adaptation means re-encoding everything. In Corneta, **Smart** copies
+the compatible destinations and re-encodes only the ones that need to change.
+That reduces the load on your machine, but each output still uses upload.
+
+<Callout label="A relay doesn't fix the internet on the way to it" tone="limit">
+  You still need to keep a stable output from your PC to the cloud. If that
+  first leg drops, every relay destination loses the signal.
+</Callout>
+
+Do the math with your own bitrates in the
+[multistream upload guide](/en/guides/quality/multistream-upload-speed).

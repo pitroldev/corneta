@@ -1,0 +1,100 @@
+---
+contentId: guide_multistream_low_end_pc_en
+title: "Multistreaming on a low-end PC: what to cut first"
+description: "Cut GPU, encoder, scene, resolution and FPS load in the right order, without guessing at minimum requirements for multistreaming."
+summary: "First cap the game's FPS and copy the compatible signal instead of transcoding it. If there is still lag, simplify scenes, cut transcoded outputs and go from 60 to 30 FPS before you touch the OBS base resolution."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: multistream-low-end-pc
+translationKey: multistream-low-end-pc
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.2.1
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: multistream on a low-end PC
+related:
+  - guide_why_stream_lags_en
+  - guide_live_stream_encoders_en
+  - guide_resolution_and_fps_en
+sources:
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: OBS Hardware Encoding
+    kind: official
+    url: https://obsproject.com/kb/hardware-encoding
+    reviewedAt: 2026-08-01
+  - title: Corneta workload estimates
+    kind: internal
+    repoPath: src/lib/estimates.ts
+    reviewedAt: 2026-08-01
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Corneta Quality screen comparing the Straight up, Smart and All out modes and the available encoders."
+    caption: "The number of transcodes matters more than the mode's name: check the estimate before going live."
+  - baseName: corneta-upload-test-result-en
+    alt: "Corneta upload test result compared with the estimated usage of each mode."
+    caption: "PC and internet are different bottlenecks; check both before you sacrifice picture quality."
+---
+
+## Cut in this order
+
+1. cap the game's FPS;
+2. use a hardware encoder you have;
+3. copy the destinations that accept the OBS signal;
+4. cut back on Browser Sources, filters and heavy scenes;
+5. drop unnecessary transcodes;
+6. move the heavy outputs from 60 to 30 FPS;
+7. lower the output resolution;
+8. touch the OBS base resolution only as the last step.
+
+This order protects what your audience notices and goes after duplicated work first.
+
+## Start with the invisible load
+
+A game with no FPS cap tries to take up the whole GPU. OBS still needs room to compose the scene and encode. Cap the game at your monitor's refresh rate or at a stable value, and check whether **rendering lag** goes down.
+
+Then temporarily turn off filters, browser sources and animations. If the counter improves, turn them back on one at a time. A pretty overlay isn't worth a stream that skips frames.
+
+## Copying costs much less than transcoding
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+If Twitch, YouTube and Kick can all take the same 1080p60 at 6 Mbps, **Straight up** avoids new encodes. If only one destination needs 720p30 or 9:16, **Smart** transcodes just that one. **All out** is the last mode to try on a limited PC.
+
+There is no universal minimum requirement. An old GTX with a simple scene can do better than a new card kept busy by an uncapped game, a browser, filters and recording.
+
+## FPS before resolution
+
+Going from 60 to 30 FPS cuts in half the number of frames that have to be rendered and encoded. For talk, podcasts, art or slow games, that usually hurts less than turning fine 1080p text into 720p.
+
+In fast games, do the opposite only if motion is the priority and text stays readable at the lower resolution.
+
+## Don't confuse a weak PC with low upload
+
+<ContentImage baseName="corneta-upload-test-result-en" />
+
+- rendering lag points to the GPU/scene;
+- encoding lag points to the encoder/CPU/GPU;
+- frames dropped by the network point to the connection;
+- one bad platform while the others stay stable points to that destination or its route.
+
+Lowering the resolution won't fix an unstable route. And paying for more internet won't free up a maxed-out GPU.
+
+Do a ten-minute recording or private stream with your heaviest scene. The right profile is the last one that keeps OBS, the game and every output stable — not the biggest number available.

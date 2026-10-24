@@ -1,0 +1,80 @@
+---
+contentId: help_stream_metrics_en
+title: "How to read bitrate, FPS, dropped frames, CPU and GPU"
+description: "Read bitrate, FPS, dropped frames, CPU and GPU on Corneta's Live screen without mixing up the symptom, the cause and your machine's capacity."
+summary: "Bitrate and FPS show what went out; dropped frames show where something couldn't keep up; CPU and GPU help confirm pressure on the machine. Read the metrics over the same time window."
+locale: en
+collection: help
+kind: help
+category: quality
+slug: stream-metrics
+translationKey: stream-metrics
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: read bitrate FPS dropped frames CPU GPU stream
+related:
+  - guide_dropped_frames_en
+  - guide_analyze_stream_drop_en
+  - help_post_live_report_en
+sources:
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: Corneta runtime metrics
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen showing estimated upload and detected encoders."
+    caption: "Before GO LIVE, the estimate shows the planned load; during the stream, the metrics show what happened."
+---
+
+## Read them together
+
+| Metric         | What it answers                   | What it doesn't prove on its own                          |
+| -------------- | --------------------------------- | --------------------------------------------------------- |
+| bitrate        | how much data goes out per second | perceived quality or future stability                     |
+| FPS            | how many frames reach the output  | whether the game is running at the same FPS               |
+| dropped frames | part of the flow couldn't keep up | the cause, without separating network, render and encoder |
+| CPU            | overall processing pressure       | which process is to blame                                 |
+| GPU            | overall graphics card pressure    | whether rendering or an encoder session ran short         |
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## A quick diagnosis
+
+1. Note the minute of the symptom.
+2. See whether the drop hit every destination.
+3. Open **View → Stats** in OBS.
+4. Compare network, rendering and encoding over the same window.
+5. Change one thing and repeat the same scene.
+
+High CPU with a smooth stream isn't an error. GPU below 100% doesn't guarantee headroom to render a scene on time either. What matters is the change that comes with the symptom.
+
+## If it's still confusing
+
+| Symptom                         | Confirm                      | Next step                           |
+| ------------------------------- | ---------------------------- | ----------------------------------- |
+| bitrate drops on all of them    | network dropped frames       | test upload and cable               |
+| FPS drops with render skipped   | game or scene uses the GPU   | cap FPS and simplify sources        |
+| output skipped goes up          | encoder fell behind          | lower FPS, resolution or transcodes |
+| only one destination reconnects | state of the other platforms | review that ingest                  |
+
+Export the report or the diagnostic, never credentials or raw logs.

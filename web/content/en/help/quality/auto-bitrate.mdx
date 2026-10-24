@@ -1,0 +1,67 @@
+---
+contentId: help_auto_bitrate_en
+title: "What auto-bitrate does — and when it doesn't step in"
+description: "See which destinations can lower their bitrate automatically, when quality comes back up, and why outputs that Corneta only copies don't change."
+summary: "Auto-bitrate temporarily lowers the bitrate of destinations Corneta is re-encoding when bandwidth gets tight. Copied outputs stay the same because their bitrate comes from the streaming software."
+locale: en
+collection: help
+kind: help
+category: quality
+slug: auto-bitrate
+translationKey: auto-bitrate
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: auto bitrate Corneta how it works
+related:
+  - help_quality_modes_en
+  - guide_copy_vs_transcode_en
+  - help_test_upload_en
+sources:
+  - title: Corneta auto-bitrate controller
+    kind: internal
+    repoPath: src-tauri/src/engine.rs
+    reviewedAt: 2026-09-07
+  - title: Corneta auto-bitrate setting
+    kind: internal
+    repoPath: src-tauri/src/config.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-live-safety-settings-en
+    alt: "Safety nets settings with auto-bitrate armed."
+    caption: "Auto-bitrate starts out on and shows as ARMED; it can only change destinations that are being re-encoded."
+---
+
+## Turn it on and check the scope
+
+1. Open **Settings → Safety nets**.
+2. Turn on **Hold the stream up when your internet chokes (auto-bitrate)**.
+3. Confirm **ARMED**.
+4. In **Quality**, see which platforms will be re-encoded.
+
+<ContentImage baseName="corneta-live-safety-settings-en" />
+
+When sending gets tight, Corneta lowers the bitrate of a re-encoded output and tries to raise it again once the connection steadies. It would rather degrade the picture for a while than let that destination drop.
+
+## When it doesn't step in
+
+The adjustment doesn't act on destinations in **Straight up** mode or on copies inside **Smart**. On those, the video arrives already encoded. To lower that output, lower the bitrate in your streaming software or switch the destination to re-encoding.
+
+## What the adjustment doesn't fix on its own
+
+The controller watches whether the output keeps up with the stream's pace; a slow output doesn't prove the cause is the internet. Lowering the bitrate doesn't fix an invalid key or URL, doesn't bring back a platform that's down, and doesn't restore a lost connection. It also isn't guaranteed to fix encoder overload or rendering problems in OBS: in those cases, check your machine's load and settings.
+
+## How to confirm
+
+If a destination reconnects even with auto-bitrate on, check whether it was being re-encoded and whether other outputs also lost their connection. Export the time and state through the diagnostic; never send a key or a URL with credentials.

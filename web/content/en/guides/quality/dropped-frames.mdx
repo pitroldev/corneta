@@ -1,0 +1,86 @@
+---
+contentId: guide_dropped_frames_en
+title: "Dropped frames in OBS: network, rendering or encoding?"
+description: "Read the three OBS counters and find out whether your stream lost frames on the internet, on the GPU or inside the encoder."
+summary: "“Dropped frames” usually points to the network, but OBS also measures rendering lag and encoding lag. Open Stats and fix the counter that actually went up."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: dropped-frames
+translationKey: dropped-frames
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: dropped frames OBS
+related:
+  - guide_why_stream_lags_en
+  - guide_one_platform_disconnected_en
+  - help_stream_metrics_en
+sources:
+  - title: OBS Stream Connection Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-10-18
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-10-18
+  - title: OBS Streaming with x264
+    kind: official
+    url: https://obsproject.com/blog/streaming-with-x264
+    reviewedAt: 2026-10-18
+  - title: Corneta local OBS ingest
+    kind: internal
+    repoPath: src/lib/factory.ts
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen with the upload estimate and the available encoders."
+    caption: "Once you find the cause, cut only the cost that is tight: upload, rendering or transcoding."
+---
+
+## Open the right counter
+
+In OBS, open **View → Stats** during the same scene that usually lags. Don't draw conclusions from the CPU or the game's FPS alone.
+
+| What went up                                   | Likely bottleneck                                        | First test                                     |
+| ---------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------- |
+| Dropped Frames (Network)                       | with Corneta, a local bottleneck between OBS and Corneta | close heavy programs and cut transcodes        |
+| Frames missed due to rendering lag             | GPU without time to build the scene                      | cap the game's FPS                             |
+| Skipped frames due to encoding lag             | encoder not delivering in time                           | lower resolution and FPS; then a faster preset |
+| Drops or reconnects on one platform in Corneta | upload, Wi-Fi, route or ingest                           | cable, no VPN and a lower bitrate              |
+
+## Network
+
+When OBS sends straight to the platform, **Dropped Frames (Network)** measures your internet. With Corneta, OBS hands off the video inside your own PC (`127.0.0.1`), so that counter points to a local bottleneck, not to your internet.
+
+Internet problems show up in Corneta, platform by platform, as reconnects and drops. That's when it pays to close backup and sync, test over a cable, turn off your VPN and lower the bitrate. If only one platform reconnects, look into that platform before you touch OBS as a whole. Don't change the OBS server: it has to keep pointing at Corneta.
+
+## Rendering
+
+OBS uses the GPU to build the scene even when the video is encoded on the CPU. A game with uncapped FPS, heavy Browser Sources and filters can take up the time that ran short. Cap the game, run OBS as administrator and turn off one source at a time.
+
+## Encoding
+
+Here the frame was built, but the encoder fell behind. Lower resolution and FPS; if that isn't enough, use a faster preset. Your graphics card's hardware encoder usually takes load off the CPU, and going from 60 to 30 FPS cuts the number of frames to encode in half. In multistream, cutting transcodes counts too.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+Repeat the test in the same scene for a few minutes. If the counter settled, the change hit the cause. If another counter went up, you only moved the bottleneck.
+
+For the full decision tree, go back to [why your stream lags](/en/guides/quality/why-stream-lags).

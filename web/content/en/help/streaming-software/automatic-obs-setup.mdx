@@ -1,0 +1,125 @@
+---
+contentId: help_automatic_obs_setup_en
+title: "How to connect and set up OBS automatically"
+description: "Turn on the OBS WebSocket, use Set it up for me and confirm that OBS is pointing at Corneta before you start your live stream."
+summary: "Turn on the WebSocket server in OBS and click Set it up for me on the Live screen. Corneta connects, switches the OBS service to the local address and confirms when both are ready."
+locale: en
+collection: help
+kind: help
+category: streaming-software
+slug: automatic-obs-setup
+translationKey: automatic-obs-setup
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: WebSocket v5
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: how to set up OBS automatically with Corneta
+related:
+  - help_first_stream_en
+  - help_streaming_keys_and_urls_en
+sources:
+  - title: Corneta OBS wizard and live screen
+    kind: internal
+    repoPath: src/components/ObsWizard.tsx
+    reviewedAt: 2026-10-20
+  - title: Corneta OBS interface labels
+    kind: internal
+    repoPath: src/lib/i18n/pt.ts
+    reviewedAt: 2026-10-20
+  - title: Corneta OBS video step
+    kind: internal
+    repoPath: src/components/ObsVideoFit.tsx
+    reviewedAt: 2026-10-19
+  - title: Corneta OBS video fit and undo
+    kind: internal
+    repoPath: src-tauri/src/obs.rs
+    reviewedAt: 2026-10-19
+images:
+  - baseName: corneta-obs-connection-details-en
+    alt: "Hook up OBS panel with the local server, the local key and the connection status."
+    caption: "Once it shows as set up, OBS is already pointing at Corneta."
+---
+
+## The expected result
+
+At the end of this step, the **Live** screen shows OBS as set up and pointing
+at Corneta. That doesn't put any video on air yet: it only prepares the way for
+Corneta to tell OBS to stream when you hit **GO LIVE**.
+
+## Before you click
+
+- open OBS Studio before Corneta;
+- use OBS Studio 28 or newer, which already ships with the WebSocket;
+- close any other app that might be changing your streaming settings;
+- if the WebSocket asks for a password, have that password at hand.
+
+## Set it up in three steps
+
+1. In OBS, open **Tools → WebSocket Server Settings**.
+2. Check **Enable WebSocket server** and keep port `4455`. Corneta's automatic
+   integration uses that port on the same computer. If it's taken, resolve the
+   conflict or use the manual setup below.
+3. In Corneta, open **Live → Hook up OBS** and click **Set it up for me**.
+
+If **Enable Authentication** is on in OBS, click **Show Connect Info** and
+paste the password Corneta asks for. This is the WebSocket password, not a
+platform's stream key.
+
+<ContentImage baseName="corneta-obs-connection-details-en" />
+
+When the status changes to **Set up**, Corneta has already switched the OBS
+service to **Custom...** and put the local server and key in the right fields.
+
+## If Corneta suggests adjusting the video
+
+Starting with 0.9.0, the wizard shows **OBS video** right below **Set up**. It
+compares the resolution, the FPS and, in OBS's simple output mode, the bitrate
+with what the destinations receiving the copy accept without re-encoding.
+
+- If OBS sends more than any of those destinations accepts, click **Adjust
+  OBS**. Corneta only lowers values, keeps the screen's aspect ratio and saves
+  the previous settings before changing anything.
+- **Undo** puts OBS back the way it was before Corneta's first adjustment.
+- In advanced output mode, Corneta can't reach the bitrate setting. The warning
+  tells you the maximum so you can check it under **Settings → Output** in OBS.
+- OBS only lets you change the video while streaming and recording are both
+  stopped. Stop both in OBS and try again.
+
+## If it doesn't connect
+
+| What showed up                               | Likely cause                                                                                  | How to confirm                                           | What to do                                                                                               |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Couldn't find OBS to connect to              | OBS closed, WebSocket off, a port other than 4455 or a firewall blocking it                   | Open the OBS window and go back to the Tools menu        | Turn on the WebSocket server and try again                                                               |
+| That WebSocket password didn't match         | A password different from the one OBS shows, or Corneta has no password when OBS asks for one | Click **Show Connect Info** in OBS                       | Copy the current password and paste it into Corneta                                                      |
+| Couldn't set OBS up on my own                | The connection dropped midway or OBS refused the settings change                              | Look at the technical detail in the same window          | Try again or use plan B below                                                                            |
+| **Not pointing here yet** in **Hook up OBS** | Control works, but the streaming service wasn't switched                                      | Open **Settings → Stream** in OBS                        | Click **Set it up for me** again                                                                         |
+| The ingest server crashed                    | Another program is using the local port that receives the video from OBS                      | Close other streaming apps or RTMP servers and try again | Close that program or change the port under **Settings → OBS → Advanced** and click **Set it up for me** |
+
+## Plan B: set it up by hand
+
+Open **Hook up OBS**, choose **I'd rather set it up by hand** and copy the
+**Server** and **Stream key** fields. In OBS, go to **Settings → Stream**,
+choose **Service: Custom...** and paste both.
+
+Without the WebSocket, Corneta can't hit play in OBS on its own. After **GO
+LIVE**, click **Start Streaming** in OBS.
+
+<Callout label="Don't send the WebSocket password" tone="warning">
+  If it still doesn't work, share the exact message and the port you used. Don't
+  send a password, stream key, token or a screenshot with credentials.
+</Callout>
+
+All set here? Continue with [your first stream](/en/help/getting-started/first-stream).

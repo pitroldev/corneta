@@ -1,0 +1,122 @@
+---
+contentId: guide_obs_multistream_en
+title: "How to multistream in OBS Studio: a complete guide"
+description: "Learn the ways to send one OBS Studio stream to several platforms and choose between local distribution, an OBS plugin or a cloud relay."
+summary: "OBS sends one signal. From there, you choose who distributes it: a local app, a plugin or a cloud relay. Upload and control decide the best path."
+locale: en
+collection: guides
+kind: guide
+category: multistream
+slug: obs-multistream
+translationKey: obs-multistream
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: how to multistream in OBS Studio
+related:
+  - help_first_stream_en
+  - guide_twitch_youtube_simultaneously_en
+  - guide_multistream_upload_speed_en
+  - guide_local_vs_cloud_en
+sources:
+  - title: Corneta product reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+  - title: OBS Studio stream connection troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-08-01
+images:
+  - baseName: corneta-platform-destinations-en
+    alt: "Corneta's Platforms screen with Twitch and YouTube set up as independent, ready destinations."
+    caption: "In Corneta, each destination has its own status without hiding the signal path."
+  - baseName: corneta-quality-modes-en
+    alt: "Corneta's Quality screen comparing copying, automatic adjustment and per-platform re-encoding."
+    caption: "The modes make the trade-off between machine load, quality and upload visible."
+  - baseName: corneta-obs-connection-details-en
+    alt: "Corneta's Live screen showing the server and the local key used to receive the signal from OBS."
+    caption: "OBS publishes to a local address; Corneta takes over distribution from there."
+  - baseName: corneta-first-live-checklist-en
+    alt: "Corneta's Live screen with platforms, OBS, internet and safety nets all checked before GO LIVE."
+    caption: "The indicators at the top confirm the full path before the destinations open."
+---
+
+## What is multistreaming in OBS Studio?
+
+OBS builds scenes, combines audio and video and delivers one signal.
+Multistreaming means sending that signal to two or more destinations, such as
+Twitch, YouTube and Kick.
+
+The difference is who does the distribution. In local mode, each destination
+uses part of your upload. With a cloud relay, your PC sends one output and the
+service replicates the signal out there.
+
+## Three ways to distribute the stream
+
+### Local app
+
+OBS sends the signal to an app on the same computer. The app copies or adapts
+the stream for each platform. That's how Corneta works: one destination can
+drop, pause or reconnect without pulling the others down with it.
+
+<ContentImage baseName="corneta-platform-destinations-en" />
+
+### OBS plugin
+
+A plugin adds new outputs inside OBS. It's the shortest path if you only want to
+distribute the signal, but per-destination control and diagnostics depend on the
+plugin you choose.
+
+### Cloud relay
+
+OBS sends a single output to an external service, which replicates the stream.
+It makes sense when your upload can't handle the sum of the destinations or when
+you'd rather take that load off your PC.
+
+## How do you choose without guessing?
+
+Run four checks:
+
+1. add up the bitrate of every local output;
+2. leave headroom for swings in your connection;
+3. confirm whether the signal will be copied or re-encoded per destination;
+4. decide whether you need to pause, reconnect and diagnose each platform
+   independently.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+If the math doesn't work out, don't fight the router. Lower the quality or use a
+cloud relay. If your PC can't handle re-encoding, copy a compatible signal or
+lower the resolution and FPS.
+
+## Where Corneta fits in
+
+Corneta sits between OBS and the platforms. OBS keeps handling production;
+Corneta distributes, monitors and reconnects each destination.
+
+<ContentImage baseName="corneta-obs-connection-details-en" />
+
+Want to put this on air? Follow the
+[first stream](/en/help/getting-started/first-stream) walkthrough.
+
+<ContentImage baseName="corneta-first-live-checklist-en" />
+
+## The ground rules before GO LIVE
+
+- each local destination eats part of your upload;
+- re-encoding uses CPU or GPU;
+- each platform sets its own rules and limits;
+- Corneta runs on Windows first, and OBS keeps producing the stream;
+- with little upload, a cloud relay may be the right choice.

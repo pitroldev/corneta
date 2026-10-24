@@ -1,0 +1,77 @@
+---
+contentId: help_obs_overlay_en
+title: "How to add the Corneta overlay as an OBS Browser Source"
+description: "Turn on Corneta's local overlay server, add alerts or chat to OBS as a Browser Source, and test position, size, sound and messages."
+summary: "Open Chat → Set up → Overlays, turn the feature on and use Add to OBS. Corneta creates a local Browser Source for chat or alerts, without sending the feed to an external server."
+locale: en
+collection: help
+kind: help
+category: chat-and-alerts
+slug: obs-browser-source-overlay
+translationKey: obs-browser-source-overlay
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: add Corneta overlay Browser Source OBS
+related:
+  - help_unified_chat_setup_en
+  - guide_unified_chat_rules_en
+  - help_obs_not_found_en
+sources:
+  - title: Corneta local overlay server
+    kind: internal
+    repoPath: src-tauri/src/overlay.rs
+    reviewedAt: 2026-08-01
+  - title: Corneta overlay controls
+    kind: internal
+    repoPath: src/screens/ChatScreen.tsx
+    reviewedAt: 2026-10-20
+images:
+  - baseName: corneta-unified-chat-en
+    alt: "Chat screen connected to Twitch, YouTube and Kick before setting up the overlay."
+    caption: "The overlay uses the same connected feed; first confirm where the messages come from in the private panel."
+---
+
+## Turn on the overlay
+
+Applies to the installed app; the browser demo mode doesn't open the local server.
+
+1. Open **Chat → Set up → Overlays**.
+2. Turn on **Overlays for OBS**.
+3. Under **Alerts** or **Chat**, click **Add to OBS**.
+4. In OBS, confirm the new **Browser Source** in the current scene.
+5. Position and resize the source.
+6. Go back to Corneta and use the test button.
+
+<ContentImage baseName="corneta-unified-chat-en" />
+
+## Adjust before the stream
+
+For alerts, set position, scale, duration, sound and followers. For chat, adjust font size, maximum messages, badges, platform icon, commands and the time before messages fade out.
+
+The URL uses loopback and the configured local port. Don't swap it for a public IP or open the port on your router.
+
+## If it doesn't show up
+
+| Symptom                     | How to confirm               | Fix                                             |
+| --------------------------- | ---------------------------- | ----------------------------------------------- |
+| source doesn't exist in OBS | look in the current scene    | click **Add to OBS** again                      |
+| empty frame                 | send a test from Corneta     | refresh the Browser Source cache                |
+| URL doesn't open            | check that the overlay is on | turn it off and on again, and check the port    |
+| no sound                    | test audio monitoring in OBS | turn on sound and the source's audio properties |
+
+If it still fails, write down the port and the message. Don't share your alert sources' tokens.

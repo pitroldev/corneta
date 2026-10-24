@@ -1,0 +1,67 @@
+---
+contentId: help_test_upload_en
+title: "How to test your upload speed before going live"
+description: "Measure your available upload bandwidth in Corneta and compare it with the upload your quality mode and chosen platforms need before you go live."
+summary: "Open Quality and click measure now. Corneta compares the result with the estimated total of the outputs; test with the scene and the network in the state you will use them."
+locale: en
+collection: help
+kind: help
+category: quality
+slug: test-upload
+translationKey: test-upload
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: test upload Corneta before going live
+related:
+  - guide_multistream_upload_speed_en
+  - guide_twitch_youtube_kick_bitrate_en
+  - help_quality_modes_en
+sources:
+  - title: Corneta upload test
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-upload-test-result-en
+    alt: "Quality screen showing 27 Mbps measured and the bandwidth each mode needs."
+    caption: "The result appears next to the required total; the headroom changes when you switch mode or platform."
+---
+
+## Before you measure
+
+Applies to Corneta 0.6.0 on Windows 11. Connect your PC the way it will be during the stream, close backup uploads and let other people on the network use it as usual. A test on an empty network can promise headroom that disappears at night.
+
+## Run the test
+
+1. Open **Quality**.
+2. Choose **Straight up**, **Smart** or **All out**.
+3. Click **measure now**.
+4. Wait for the value to show up in **Your internet uploads at**.
+5. Compare it with the upload shown for each mode.
+
+<ContentImage baseName="corneta-upload-test-result-en" />
+
+The expected state is **fits your upload with room to spare**. If the margin is tight, lower the bitrate, use fewer re-encodes or test over a cable.
+
+## If the result doesn't match the stream
+
+| Symptom                            | Likely cause                 | How to confirm                    | Fix                                  |
+| ---------------------------------- | ---------------------------- | --------------------------------- | ------------------------------------ |
+| high test, stream loses connection | routing or brief fluctuation | check dropped frames in OBS       | cable, another ingest, lower bitrate |
+| result varies a lot                | Wi-Fi or a contested network | repeat at different times         | stabilize the connection             |
+| only one platform drops            | that destination's route     | compare states on the Live screen | test another ingest                  |
+| test doesn't finish                | firewall or no internet      | try another connection            | allow Corneta through and repeat     |
+
+If it keeps happening, note the time, the mode and the measured value. Don't share your key, IP, PC name or raw logs.

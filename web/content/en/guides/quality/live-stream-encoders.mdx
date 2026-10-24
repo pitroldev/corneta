@@ -1,0 +1,76 @@
+---
+contentId: guide_live_stream_encoders_en
+title: "NVENC, QSV, AMF or x264: which encoder for live streaming?"
+description: "Choose your encoder based on the graphics card you have, the load from your game and how many destinations need transcoding."
+summary: "Start with the hardware encoder you have: NVENC on NVIDIA, QSV on Intel or AMF on AMD. Use x264 when there is no compatible hardware or when the CPU has proven headroom."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: live-stream-encoders
+translationKey: live-stream-encoders
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 180
+experimental: false
+primaryQuery: NVENC QSV AMF or x264
+related:
+  - guide_copy_vs_transcode_en
+  - guide_dropped_frames_en
+  - help_quality_modes_en
+sources:
+  - title: OBS Hardware Encoding
+    kind: official
+    url: https://obsproject.com/kb/hardware-encoding
+    reviewedAt: 2026-08-01
+  - title: Corneta encoder detection
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen listing NVIDIA NVENC and Software x264 as available and QSV and AMF as unavailable."
+    caption: "Corneta detects which encoders exist on this machine before estimating the transcodes."
+---
+
+## Choose by the hardware you have
+
+| Encoder | Where it runs                  | When to start with it                                  |
+| ------- | ------------------------------ | ------------------------------------------------------ |
+| NVENC   | dedicated block on NVIDIA GPUs | machine with a compatible NVIDIA card                  |
+| QSV     | Intel integrated video         | Intel with Quick Sync exposed to the system            |
+| AMF     | encoder on AMD GPUs            | machine with a compatible AMD card                     |
+| x264    | CPU                            | no hardware available, or a CPU with measured headroom |
+
+OBS recommends a hardware encoder on modern machines because it takes work off the CPU and uses a block built for video. Older generations can deliver a worse picture at the same bitrate; test your actual card, not just the name of its family.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## Multistream changes the math
+
+**Straight up** copies the signal from your streaming software and doesn't open a new encoder session per platform. **Smart** only transcodes what doesn't fit the destination. **All out** can open a session for every output.
+
+Cards and drivers set different limits on simultaneous sessions. Corneta shows the detected estimate, but it doesn't promise that your game, OBS and several transcodes will all fit together. The confirmation is a test stream with your heaviest scene.
+
+## Test order
+
+1. Pick the hardware you have.
+2. Run your real scene with the game's FPS capped.
+3. Watch rendering and encoding lag in OBS.
+4. Add transcodes one at a time.
+5. If you start dropping frames, go back to the last stable profile.
+
+If the picture already fits all three platforms, [copying instead of transcoding](/en/guides/quality/copy-vs-transcode) saves more resources than switching encoders.

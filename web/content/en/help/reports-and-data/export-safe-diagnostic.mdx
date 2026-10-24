@@ -1,0 +1,105 @@
+---
+contentId: help_export_safe_diagnostic_en
+title: "How to export a safe diagnostics file for support"
+description: "Create Corneta's diagnostics file, check what it includes and share it with support without sending stream keys, chat messages or raw logs."
+summary: "Open Settings → General, find Data & diagnostics and use Export diagnostics. The file carries versions, a configuration summary and technical events; keys, chat, paths and raw logs stay out."
+locale: en
+collection: help
+kind: help
+category: reports-and-data
+slug: export-safe-diagnostic
+translationKey: export-safe-diagnostic
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: export safe diagnostics Corneta
+related:
+  - guide_why_stream_lags_en
+  - help_first_stream_en
+sources:
+  - title: Corneta diagnostic export command
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-10-19
+  - title: Corneta telemetry and diagnostics runbook
+    kind: internal
+    repoPath: docs/RUNBOOK-POSTHOG.md
+    reviewedAt: 2026-10-18
+images: []
+---
+
+## Export the file
+
+1. Open **Settings**.
+2. In the **General** tab, find the **Data & diagnostics** section.
+3. Click **Export diagnostics**.
+4. Choose where to save `corneta-diagnostico.txt`.
+5. Open the file and check what's in it before attaching it to the ticket.
+
+Canceling the save window doesn't create or send a diagnostics file.
+Corneta also doesn't attach the diagnostics automatically. Technical events
+about the operation follow your telemetry preferences, without including the file.
+
+## What goes in
+
+The file is built from a fixed set of fields:
+
+- Corneta version, operating system and architecture;
+- a configuration summary without names or credentials;
+- the state of your telemetry preferences;
+- schema version and build SHA;
+- structured technical events, with the failure code and stage.
+
+## What stays out
+
+- the telemetry ID: the file marks the field as omitted;
+- stream keys, tokens and the WebSocket password;
+- channel names, stream title and chat messages;
+- images, audio, video and text read from the screen;
+- local paths, computer name and IP as a property;
+- the privacy guard watchlist;
+- raw logs.
+
+The telemetry ID helps match a technical event in PostHog, but it isn't
+needed for every request. If support asks for it, copy the **Telemetry ID** from
+the same **Data & diagnostics** section and send it in the ticket.
+
+Logs stay local and have a separate command to open their folder. Don't send
+the whole folder unless someone from support explains which file they need and
+why.
+
+## What to write with it
+
+The diagnostics file can't guess what you saw. Add three lines to the ticket:
+
+1. what you were trying to do;
+2. the exact message that appeared;
+3. whether the failure hit every destination or just one.
+
+If there's an **Error ID** or **Operation ID** on the Live screen, copy it as text.
+You don't need to send a screenshot of the whole panel.
+
+## If you opened the file and saw something odd
+
+Don't share it. Keep a local copy, send the ticket without the attachment and say
+that the diagnostics file seems to contain unexpected data. Give the field name,
+not the value.
+
+<Callout label="Blur doesn't protect secrets" tone="important">
+  If you send a screenshot on your own, cut the field out of the frame before
+  you capture it. Don't rely on blur over a stream key, token or password.
+</Callout>
+
+To narrow down the cause before opening a ticket, use the guide [why your
+stream lags](/en/guides/quality/why-stream-lags).

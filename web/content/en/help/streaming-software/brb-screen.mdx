@@ -1,0 +1,71 @@
+---
+contentId: help_brb_screen_en
+title: "How to use and customize the BE RIGHT BACK screen"
+description: "Arm Corneta's protection against signal drops, choose the default screen or a file of your own, and test it before you go live."
+summary: "Turn on Drop protection in Settings → Safety nets. The BE RIGHT BACK screen kicks in when the signal disappears after the stream has started, and you can also trigger it manually."
+locale: en
+collection: help
+kind: help
+category: streaming-software
+slug: brb-screen
+translationKey: brb-screen
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: set up be right back screen Corneta
+related:
+  - guide_obs_closed_during_stream_en
+  - help_stream_statuses_en
+  - help_auto_bitrate_en
+sources:
+  - title: Corneta BE RIGHT BACK settings
+    kind: internal
+    repoPath: src/screens/SettingsScreen.tsx
+    reviewedAt: 2026-10-20
+  - title: Corneta continuity compositor
+    kind: internal
+    repoPath: src-tauri/src/compositor.rs
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-live-safety-settings-en
+    alt: "Safety nets settings with Drop protection and the BE RIGHT BACK screen picker."
+    caption: "The ARMED badge confirms the protection will be available when the next stream starts."
+---
+
+## Arm it before the stream
+
+1. Open **Settings**.
+2. Go to **Safety nets**.
+3. Turn on **Drop protection (BE RIGHT BACK)**.
+4. Confirm the **ARMED** badge.
+5. Choose **Use Corneta's default** or **Pick a file of mine** (image or video).
+
+<ContentImage baseName="corneta-live-safety-settings-en" />
+
+With your own file, Corneta copies the chosen media into its local settings. Video plays in a loop and can have sound. Check the preview before GO LIVE.
+
+## Test the return
+
+Do an unlisted stream, wait for the signal to come in and close your streaming software. The destination should switch to **BE RIGHT BACK on air** without disconnecting. Open the software again and confirm your content comes back.
+
+## Common symptoms
+
+| Symptom                               | Likely cause                                                                              | Fix                                                   |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| destination on **Waiting for signal** | the software hasn't streamed yet; BE RIGHT BACK only kicks in after the first real signal | start streaming in the software                       |
+| screen doesn't come up after a drop   | the protection wasn't armed                                                               | end the stream, arm it and run a new test             |
+| your own file doesn't open            | the format, or the file can't be accessed                                                 | go back to the default screen and choose another file |
+| content comes back without audio      | the audio hasn't arrived yet or a manual pause is on                                      | check the software and click **I'm back!**            |
+
+BE RIGHT BACK doesn't cover your internet, your power or the whole PC. Don't share a file with personal data, and don't use a secret as part of the artwork.

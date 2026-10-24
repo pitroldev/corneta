@@ -1,0 +1,103 @@
+---
+contentId: help_streaming_keys_and_urls_en
+title: "Stream key, ingest URL and OBS key: which is which?"
+description: "Learn where to use the stream key, the platform's RTMP or RTMPS ingest URL, and the local key that connects OBS to Corneta on your own PC."
+summary: "The ingest URL is the address of the platform's server. The stream key is your channel's password. The key shown in Hook up OBS only connects OBS to Corneta on your PC."
+locale: en
+collection: help
+kind: help
+category: platforms
+slug: streaming-keys-and-urls
+translationKey: streaming-keys-and-urls
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: difference between stream key ingest URL and OBS key
+related:
+  - help_manage_platform_en
+  - help_automatic_obs_setup_en
+sources:
+  - title: Corneta target validation
+    kind: internal
+    repoPath: src/lib/validation.ts
+    reviewedAt: 2026-10-18
+  - title: Corneta platform presets
+    kind: internal
+    repoPath: src/lib/platforms.ts
+    reviewedAt: 2026-10-18
+  - title: Twitch Stream Key FAQ
+    kind: official
+    url: https://help.twitch.tv/s/article/twitch-stream-key-faq
+    reviewedAt: 2026-10-18
+images:
+  - baseName: corneta-platform-key-setup-en
+    alt: "Ingest URL and stream key fields inside a Corneta destination."
+    caption: "The platform's URL and key live in the destination; the key is stored in Windows Credential Manager."
+  - baseName: corneta-obs-connection-details-en
+    alt: "Hook up OBS panel with the server and key used only for the local connection."
+    caption: "These two fields go into the Custom service in OBS; neither of them is your Twitch stream key."
+---
+
+## The difference in one table
+
+| Field              | What it is                                      | Where you get it                                  | Where you paste it                     |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------- | -------------------------------------- |
+| Ingest URL         | Address of the server that receives the stream  | The platform's dashboard or documentation         | In the Corneta destination             |
+| Stream key         | Password that points the stream to your channel | Twitch, YouTube, Kick or other platform dashboard | In the Corneta destination             |
+| Local OBS key      | Identifier of the link between OBS and Corneta  | Live screen → Hook up OBS                         | OBS → Settings → Stream                |
+| WebSocket password | Password that lets Corneta control OBS          | OBS → Tools → WebSocket Server Settings           | Corneta's first-time setup or Settings |
+
+## Ingest URL
+
+It starts with `rtmp://` or `rtmps://`. It's a streaming address, not a page
+that opens in your browser. Twitch, YouTube, Facebook and Kick already come with
+the default server in Corneta. For TikTok, X, Instagram and **Custom RTMP**, you
+paste the full address the platform shows you.
+
+## Stream key
+
+It works as your channel's password. Anyone who has this key can try to stream
+to your account. If it showed up in a screenshot or in chat, revoke it in the
+platform's dashboard and generate a new one — deleting the message doesn't undo
+the leak.
+
+<ContentImage baseName="corneta-platform-key-setup-en" />
+
+If you paste a full URL into the key field, Corneta tries to split off the
+address and store only the key. Even so, check both fields. The **Test the
+server** button only checks whether the address answers; it doesn't check the
+key. The key only proves it's right when the stream goes live.
+
+## The local key shown in Hook up OBS
+
+This key only works on your computer. It makes OBS publish to Corneta's local
+server, usually at the address `127.0.0.1`. Then Corneta opens a separate output
+for each platform.
+
+<ContentImage baseName="corneta-obs-connection-details-en" />
+
+## The WebSocket password
+
+The WebSocket doesn't carry the video. It lets Corneta check, configure, start
+and stop OBS. If you set everything up by hand, the stream works without this
+password, but Corneta won't control OBS for you.
+
+<Callout label="What never to send to support" tone="important">
+  Don't send a stream key, WebSocket password, token, URL with credentials or a
+  screenshot where one of those fields is visible. The error message and the
+  name of the step are enough to start the diagnosis.
+</Callout>
+
+Now that the fields are sorted out, [add and test the
+platform](/en/help/platforms/manage-platform).

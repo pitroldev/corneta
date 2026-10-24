@@ -1,0 +1,87 @@
+---
+contentId: help_unified_chat_setup_en
+title: "How to set up unified chat for Twitch, YouTube and Kick"
+description: "Add channels, connect the feed, reply and moderate from the Chat screen, and check the platform, emotes, badges and audience behind each message."
+summary: "Open Chat → Set up → Channels, add Twitch, YouTube and Kick, and click Connect. Reading chat doesn't require Corneta to publish the messages on your video."
+locale: en
+collection: help
+kind: help
+category: chat-and-alerts
+slug: unified-chat-setup
+translationKey: unified-chat-setup
+status: published
+publishedAt: 2026-10-24
+intent: support
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: set up unified chat Twitch YouTube Kick
+related:
+  - guide_unified_chat_rules_en
+  - help_obs_overlay_en
+  - help_platform_reconnecting_en
+sources:
+  - title: Corneta chat connectors
+    kind: internal
+    repoPath: src-tauri/src/chat.rs
+    reviewedAt: 2026-10-19
+  - title: Corneta chat interface
+    kind: internal
+    repoPath: src/screens/ChatScreen.tsx
+    reviewedAt: 2026-10-20
+  - title: Corneta chat message actions
+    kind: internal
+    repoPath: src/components/ChatFeed.tsx
+    reviewedAt: 2026-10-19
+images:
+  - baseName: corneta-unified-chat-en
+    alt: "Chat screen connected to Twitch, YouTube and Kick with messages in the same feed."
+    caption: "Color, icon and name keep the source visible even with all three platforms in the same panel."
+---
+
+## Add the channels
+
+1. Open **Chat**.
+2. Click **Set up**.
+3. Go to the **Channels** tab.
+4. Click **Add channel** and choose the platform.
+5. Fill in the identifier it asks for and leave the channel turned on.
+6. Close the setup and click **Connect**.
+
+The expected state is a green dot next to each channel. With **Connect the chat for me when I go live** turned on, Corneta connects the chat when you go live.
+
+Since 0.9.0, if you already signed in to Twitch, YouTube or Kick in the **Account** tab, the **Channels** tab shows **From your connected accounts** with that account's channel already filled in. Click **Add its chat** instead of following steps 4 and 5.
+
+<ContentImage baseName="corneta-unified-chat-en" />
+
+## What works without signing in
+
+Reading, emotes, badges and timestamps depend on the connector and on what the platform makes public. To send messages and moderate, sign in to your account in the **Account** tab; the available actions differ between Twitch, YouTube and Kick.
+
+## Reply and moderate from the feed
+
+Hover over a message to see the actions. They use your account and only show up on the platform you signed in to; if the account isn't the owner or a moderator of that channel, the platform rejects the action.
+
+- **Reply** puts the reply in the send field and sends it only to the channel the message came from. On Twitch and Kick, the reply is linked to the original message. YouTube live chat has no threaded replies, so it goes out with an `@name` mention. **Esc** cancels.
+- **Delete** removes the message on the platform.
+- **Time out 10 min** and **Ban** take effect right away, with no confirmation. Since 0.9.0, they also show up on YouTube and Kick when the message carries the sender's ID; without that ID, only **Delete** is left.
+- On Kick, the first timeout or ban attempt asks for one more permission. Click **Reconnect** in the notice and authorize it on the Kick page.
+
+## If a channel doesn't connect
+
+| Symptom                        | How to confirm                | Fix                                   |
+| ------------------------------ | ----------------------------- | ------------------------------------- |
+| Twitch shows no messages       | check the channel name        | remove the `@` and use the exact name |
+| YouTube waiting for the stream | see if the stream has started | wait, or enter the correct video      |
+| Kick reconnecting              | open the channel in a browser | check the name and try again          |
+| empty feed with green dots     | send a test message           | check the filters in **Display**      |
+
+Don't paste a token or OAuth credential into a support ticket. The panel is private by default; [a public overlay is a separate decision](/en/guides/operations/unified-chat-rules).

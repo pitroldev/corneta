@@ -1,0 +1,123 @@
+---
+contentId: guide_why_stream_lags_en
+title: "Why does my stream lag? Internet, GPU or encoder"
+description: "Use the metrics in OBS and in Corneta to tell frames dropped by the network apart from rendering lag and encoding overload."
+summary: "A lagging stream can come from the network, rendering or the encoder. Check which counter went up before you lower quality or restart everything — each cause needs a different fix."
+locale: en
+collection: guides
+kind: guide
+category: quality
+slug: why-stream-lags
+translationKey: why-stream-lags
+status: published
+publishedAt: 2026-10-24
+intent: informational
+author: Petro Cardoso
+reviewedBy: Petro Cardoso
+updatedAt: 2026-10-24
+reviewedAt: 2026-10-24
+productVersion: 0.11.0
+testedWith:
+  - name: Corneta
+    version: 0.6.0
+    environment: Windows 11
+  - name: OBS Studio
+    version: 32.x
+    environment: Windows 11
+reviewIntervalDays: 90
+experimental: false
+primaryQuery: why does my stream lag OBS
+related:
+  - guide_multistream_upload_speed_en
+  - help_quality_modes_en
+  - help_export_safe_diagnostic_en
+sources:
+  - title: OBS Stream Connection Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/stream-connection-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: OBS Encoding Performance Troubleshooting
+    kind: official
+    url: https://obsproject.com/kb/encoding-performance-troubleshooting
+    reviewedAt: 2026-08-01
+  - title: Corneta metrics reference
+    kind: internal
+    repoPath: web/PRODUCT.md
+    reviewedAt: 2026-09-07
+images:
+  - baseName: corneta-first-live-checklist-en
+    alt: "Live screen showing platforms, OBS, upload and safety nets before the stream starts."
+    caption: "The indicators show missing bandwidth or OBS not set up right before the failure shows up on stream."
+  - baseName: corneta-quality-modes-en
+    alt: "Quality screen showing the estimated transcoding load and upload."
+    caption: "Before going live, check whether the profile asks for more sessions or upload than your machine can handle."
+---
+
+## First: which counter went up?
+
+Open **View → Stats** in OBS and the metrics on Corneta's **Live** screen. Don't
+change bitrate, encoder, server and scene at the same time. Write down the
+symptom and change one thing per test.
+
+| Metric that got worse              | Where the problem usually is               |
+| ---------------------------------- | ------------------------------------------ |
+| Dropped frames (network)           | Path between your PC and the ingest server |
+| Frames missed due to rendering lag | GPU without time to build the scene        |
+| Frames skipped due to encoding lag | Encoder, CPU or GPU not delivering in time |
+| Only one platform reconnecting     | That destination's key, server or route    |
+
+## If it's the network
+
+OBS treats dropped frames and intermittent disconnects as a problem on the path
+to the ingest server. Try a cable instead of Wi-Fi, close your VPN and upload
+apps, pick another official server and lower the bitrate in controlled steps.
+
+If every platform drops at once, look at your local connection first. If only
+one drops, don't take the others down: check that platform's key, ingest and
+status.
+
+## If it's rendering
+
+OBS needs GPU time to build each scene, even when the encoder is a different
+chip. A game with uncapped FPS can take up the whole GPU and leave OBS no room.
+
+Cap the game's FPS, lower its graphics quality and temporarily turn off Browser
+Sources or heavy filters. If the rendering losses stop, you found the right side
+of the problem.
+
+## If it's encoding
+
+An "Encoding overloaded" message or frames skipped due to encoding points to
+CPU, GPU or encoder sessions. Lower FPS or resolution, use a hardware encoder
+you have and cut the number of transcoded destinations.
+
+Switching from **All out** to **Smart** can fix it when only one platform needs
+adjusting. **Straight up** is even lighter if every platform accepts the OBS
+signal.
+
+<ContentImage baseName="corneta-quality-modes-en" />
+
+## Before your next stream
+
+Run the upload test and check the encoder in the **Hook up OBS** panel. Then
+replay the scene that lagged — an idle menu almost never reproduces a failure
+that happens in the middle of a match.
+
+<ContentImage baseName="corneta-first-live-checklist-en" />
+
+## What to write down if it keeps happening
+
+- approximate time and the minute of the stream;
+- whether it hit every platform or just one;
+- which counter went up in OBS;
+- quality mode and number of transcodes;
+- the exact message and error ID, if there is one.
+
+<Callout label="A normal speed test doesn't clear the network" tone="limit">
+  A good peak doesn't show short losses, a bad route to the ingest or upload
+  that other traffic is competing for. Compare the test with the dropped frames
+  during a real scene.
+</Callout>
+
+If you need to share the case, [export a safe
+diagnostic](/en/help/reports-and-data/export-safe-diagnostic).
