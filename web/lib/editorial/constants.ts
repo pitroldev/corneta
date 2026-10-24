@@ -121,7 +121,7 @@ export const EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS: {
   readonly version: number;
   readonly paths: readonly string[];
 } = {
-  version: 11,
+  version: 12,
   paths: [
     "/images/editorial/getting-started/corneta-obs-connection-details.webp",
     "/images/editorial/getting-started/corneta-platform-key-setup.webp",
@@ -134,6 +134,17 @@ export const EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS: {
     "/images/editorial/reports-and-data/corneta-post-live-report.webp",
     "/images/editorial/multistream/corneta-vertical-target-settings.webp",
     "/images/editorial/multistream/corneta-vertical-reframe-editor.webp",
+    "/images/editorial/getting-started/corneta-first-live-checklist-en.webp",
+    "/images/editorial/multistream/corneta-platform-destinations-en.webp",
+    "/images/editorial/getting-started/corneta-platform-key-setup-en.webp",
+    "/images/editorial/getting-started/corneta-obs-connection-details-en.webp",
+    "/images/editorial/quality/corneta-quality-modes-en.webp",
+    "/images/editorial/operations/corneta-live-safety-settings-en.webp",
+    "/images/editorial/quality/corneta-upload-test-result-en.webp",
+    "/images/editorial/chat-and-alerts/corneta-unified-chat-en.webp",
+    "/images/editorial/reports-and-data/corneta-post-live-report-en.webp",
+    "/images/editorial/multistream/corneta-vertical-target-settings-en.webp",
+    "/images/editorial/multistream/corneta-vertical-reframe-editor-en.webp",
   ],
 };
 
