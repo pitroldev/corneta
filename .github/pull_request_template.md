@@ -7,6 +7,7 @@
 <!-- Commands actually run and their results; also mention tests you did not run. -->
 
 - [ ] I added a regression test where relevant.
+- [ ] Changes people will notice have a line under `Unreleased` in CHANGELOG.md.
 - [ ] I considered CPU/GPU, memory and interface responsiveness during a stream.
 - [ ] I reviewed privacy, cancellation and data/IPC compatibility.
 - [ ] Public text was reviewed in PT/EN and the components use the design system, where applicable.

@@ -112,6 +112,15 @@ jobs:
           "NEXT_PUBLIC_BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "BUILD_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Require the changelog entry
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.Substring(1)
+          $heading = "^## \[$([regex]::Escape($version))\] - \d{4}-\d{2}-\d{2}$"
+          if (-not (Select-String -LiteralPath CHANGELOG.md -Pattern $heading -CaseSensitive -Quiet)) {
+            throw "CHANGELOG.md needs a '## [$version] - YYYY-MM-DD' section before this release."
+          }
+
       - run: pnpm install --frozen-lockfile
 
       - name: Review help affected by the release
@@ -328,7 +337,7 @@ jobs:
               --verify-tag `
               --draft `
               --title "Corneta $env:RELEASE_TAG" `
-              --notes "Download the .exe and check SHA256SUMS.txt. This release may show a SmartScreen warning: confirm where it came from before running it. corneta-third-party.zip holds the notices, corresponding sources and license inventory. If you already use Corneta, the app tells you about the update.`n`nBaixe o .exe e confira SHA256SUMS.txt. Este lançamento pode exibir um aviso do SmartScreen: confirme a origem antes de executar. corneta-third-party.zip contém avisos, fontes correspondentes e inventário de licenças. Quem já usa a Corneta recebe o aviso de atualização no app." `
+              --notes "Download the .exe and check SHA256SUMS.txt, or verify where it was built with: gh attestation verify FILE --repo pitroldev/corneta. This release may show a SmartScreen warning: confirm where it came from before running it. corneta-third-party.zip holds the notices, corresponding sources and license inventory. If you already use Corneta, the app tells you about the update. Code signing policy: https://github.com/pitroldev/corneta/blob/main/docs/SIGNING.md#code-signing-policy`n`nBaixe o .exe e confira SHA256SUMS.txt, ou confira onde ele foi gerado com: gh attestation verify ARQUIVO --repo pitroldev/corneta. Este lançamento pode exibir um aviso do SmartScreen: confirme a origem antes de executar. corneta-third-party.zip contém avisos, fontes correspondentes e inventário de licenças. Quem já usa a Corneta recebe o aviso de atualização no app." `
               --generate-notes `
               @notesRange
             if ($LASTEXITCODE -ne 0) {
@@ -379,6 +388,8 @@ jobs:
     permissions:
       contents: write
       actions: read
+      id-token: write
+      attestations: write
     environment:
       name: production-release
       url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag }}
@@ -396,12 +407,36 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.18.1
+      # Scans the lockfiles before the release bytes land in the workspace; the five
+      # approved assets stay the only release files, so the SBOM ships as an attestation.
+      - name: Generate the source SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: ${{ runner.temp }}/corneta-source.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
       - name: Download the exact artifact from this build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.release.outputs.artifact_id }}
           path: .artifacts/release-publication
           digest-mismatch: error
+      - name: Attest the build provenance of the release files
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            .artifacts/release-publication/${{ needs.release.outputs.installer }}
+            .artifacts/release-publication/${{ needs.release.outputs.signature }}
+            .artifacts/release-publication/latest.json
+            .artifacts/release-publication/SHA256SUMS.txt
+            .artifacts/release-publication/corneta-third-party.zip
+      - name: Attest the source SBOM to the installer
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: .artifacts/release-publication/${{ needs.release.outputs.installer }}
+          sbom-path: ${{ runner.temp }}/corneta-source.spdx.json
       - name: Verify uploaded assets and publish the approved release
         env:
           GH_TOKEN: ${{ github.token }}

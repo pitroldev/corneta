@@ -61,19 +61,28 @@ Review the controls on the repository and branch that will be published. Their
 state depends on permissions, plan and visibility; a missing field or an error
 response does not prove that a control is active.
 
-- Protect the main branch against force pushes and deletion, including for administrators.
-- Require an up-to-date branch and the `resolve`, `secrets`, `frontend` and `rust`
-  checks from [CI](../.github/workflows/ci.yml), bound to the application
-  that actually publishes them. The `frontend` job requires `browser-smoke` to
-  succeed; a skipped job must not be treated as approval.
+- The `Proteger main` ruleset blocks deletion and force pushes on the default
+  branch, including for administrators.
+- The same ruleset requires a pull request with one approval, an up-to-date branch
+  and the `resolve`, `secrets`, `frontend` and `rust` checks from
+  [CI](../.github/workflows/ci.yml), bound to GitHub Actions. The `frontend` job
+  requires `browser-smoke` to succeed; a skipped job must not be treated as
+  approval. Repository administrators may bypass the pull request and checks to
+  push directly, and stay responsible for running the checks before they do.
+- In the Vercel project, Deployment Checks hold each production deployment until
+  the same four checks pass, so a red commit on `main` never reaches the site.
 - Check the actual names in a run before changing the protection. Renaming
-  jobs requires updating the required checks at the same time; do not impose
-  reviewers the project does not have.
+  jobs requires updating the required checks and the Vercel Deployment Checks at
+  the same time; do not impose reviewers the project does not have.
 - Keep the default Actions token read-only and without permission to approve PRs.
   Review the approval of runs from forks and avoid giving secrets to untrusted
   code.
 - Check the availability and activation of secret scanning and push protection.
   The local/CI scanner is not equivalent to these GitHub controls.
+- [CodeQL](../.github/workflows/codeql.yml) analyzes the workflows, JavaScript/TypeScript
+  and Rust on every pull request, every push to `main` and weekly;
+  [OpenSSF Scorecard](../.github/workflows/scorecard.yml) publishes the repository's
+  supply-chain score. Triage their findings in the Security tab; neither replaces review.
 - Confirm that the private channel in [SECURITY.md](../SECURITY.md) receives
   reports, without using secrets as a test. Do not advertise native private
   reporting as usable without verifying that it is enabled and reachable.
@@ -82,7 +91,7 @@ response does not prove that a control is active.
 
 ```sh
 gh api repos/pitroldev/corneta --jq '{visibility,default_branch,security_and_analysis}'
-gh api repos/pitroldev/corneta/branches/main/protection --jq '{required_status_checks,enforce_admins,allow_force_pushes,allow_deletions}'
+gh api repos/pitroldev/corneta/rules/branches/main --jq '[.[] | {type, parameters}]'
 gh api repos/pitroldev/corneta/actions/permissions/workflow
 gh api repos/pitroldev/corneta/private-vulnerability-reporting
 gh api repos/pitroldev/corneta/actions/permissions/fork-pr-contributor-approval

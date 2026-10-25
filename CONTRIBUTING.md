@@ -68,7 +68,9 @@ These commands may read the workspace's public build configuration; run them in 
 
 ## What the PR should include
 
-Explain the problem, the chosen solution and what was left out of scope. List the commands you actually ran and their results, including checks you did not run. Add a regression test for bugs and sanitized visual evidence if you change the interface. For performance changes, describe the scenario, data volume, hardware and measurement.
+Explain the problem, the chosen solution and what was left out of scope. List the commands you actually ran and their results, including checks you did not run. Add a regression test for bugs and sanitized visual evidence if you change the interface. For performance changes, describe the scenario, data volume, hardware and measurement. If people using Corneta will notice the change, add a line under `Unreleased` in [CHANGELOG.md](CHANGELOG.md).
+
+Pull requests to `main` need the CI checks to pass and a review from the maintainer before they are merged.
 
 You must have the right to contribute the code and materials you submit, preserving authorship and third-party notices. The project's own code is under the [MIT](LICENSE) license; do not introduce content under an incompatible license or private data. Assistive tools do not exempt you from review, testing and provenance checks.
 

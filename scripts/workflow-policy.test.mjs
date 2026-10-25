@@ -58,7 +58,12 @@ describe("workflow safety contracts", () => {
     const publish = release.jobs.publish;
     expect(publish.needs).toEqual(["quality", "release"]);
     expect(publish.environment.name).toBe("production-release");
-    expect(publish.permissions).toEqual({ contents: "write", actions: "read" });
+    expect(publish.permissions).toEqual({
+      contents: "write",
+      actions: "read",
+      "id-token": "write",
+      attestations: "write",
+    });
     expect(publish.concurrency).toEqual({
       group: "release-publication",
       "cancel-in-progress": false,
@@ -87,6 +92,53 @@ describe("workflow safety contracts", () => {
     );
     expect(JSON.stringify(publish)).not.toContain("secrets.");
     expect(JSON.stringify(publish)).not.toContain("POSTHOG");
+  });
+
+  it("attests the five approved files and the source SBOM before publishing", () => {
+    const steps = parse(workflow("release")).jobs.publish.steps;
+    const index = (prefix) =>
+      steps.findIndex((step) => step.uses?.startsWith(prefix));
+    const sbom = index("anchore/sbom-action@");
+    const download = index("actions/download-artifact@");
+    const provenance = index("actions/attest-build-provenance@");
+    const sbomAttestation = index("actions/attest-sbom@");
+    const promotion = steps.findIndex(
+      (step) => step.run === "node scripts/promote-release.mjs",
+    );
+    expect(sbom).toBeGreaterThan(-1);
+    expect(sbom).toBeLessThan(download);
+    expect(steps[sbom].with["upload-artifact"]).toBe(false);
+    expect(steps[sbom].with["upload-release-assets"]).toBe(false);
+    expect(provenance).toBeGreaterThan(download);
+    expect(sbomAttestation).toBeGreaterThan(download);
+    expect(promotion).toBeGreaterThan(provenance);
+    expect(promotion).toBeGreaterThan(sbomAttestation);
+    const subjects = steps[provenance].with["subject-path"].trim().split("\n");
+    const promoted = Object.entries(steps[promotion].env)
+      .filter(([key]) => key.endsWith("_PATH"))
+      .map(([, value]) => value);
+    expect(subjects.sort()).toEqual(promoted.sort());
+    expect(steps[sbomAttestation].with["subject-path"]).toBe(
+      steps[promotion].env.INSTALLER_PATH,
+    );
+    expect(steps[sbomAttestation].with["sbom-path"]).toBe(
+      steps[sbom].with["output-file"],
+    );
+  });
+
+  it("keeps Scorecard results publishable", () => {
+    const scorecard = parse(workflow("scorecard"));
+    expect(scorecard.permissions).toEqual({});
+    expect(scorecard.env).toBeUndefined();
+    expect(scorecard.defaults).toBeUndefined();
+    const jobs = Object.values(scorecard.jobs);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]["runs-on"]).toMatch(/^ubuntu-/);
+    expect(jobs[0].env).toBeUndefined();
+    for (const step of jobs[0].steps)
+      expect(step.uses).toMatch(
+        /^(?:actions\/checkout|actions\/upload-artifact|github\/codeql-action\/upload-sarif|ossf\/scorecard-action)@/,
+      );
   });
 
   it("hands off only scanned assets and waits for the exact production deployment", () => {
@@ -130,7 +182,7 @@ describe("workflow safety contracts", () => {
     );
   });
 
-  it.each(["ci", "release"])(
+  it.each(["ci", "release", "codeql", "scorecard"])(
     "pins every external action implementation in %s",
     (name) => {
       const actions = workflowSteps(workflow(name)).filter((step) => step.uses);

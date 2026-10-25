@@ -54,6 +54,12 @@ Approval criteria for an official distribution, for maintainers. A release may o
   their hashes and their match with the remote assets. Only then does it promote the draft; it
   does not rebuild or overwrite public assets. Promotions are serialized and older versions do
   not replace Latest. A missing reviewer, an enabled bypass or inaccessible metadata blocks it.
+- The release job requires a `## [X.Y.Z] - YYYY-MM-DD` section for the tagged version in
+  [CHANGELOG.md](../CHANGELOG.md). Move the `Unreleased` entries there before tagging; the
+  release notes repeat them in English first, then in Portuguese.
+- Before promoting, the `publish` job attests the build provenance of the five files and attaches
+  an SPDX SBOM of the source dependencies to the installer, both through GitHub attestations; the
+  release keeps exactly five assets. See [how to verify a release](SIGNING.md#verify-where-a-release-was-built).
 - The `telemetry:release:check` gate confirms the US region and the same public project token in
   the desktop app, site and Setup API, smoke-tests the published metadata without exposing the
   Personal API Key and requires an identical SHA across React/Rust/Next.js and the published

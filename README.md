@@ -12,6 +12,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/pitroldev/corneta/actions/workflows/ci.yml"><img src="https://github.com/pitroldev/corneta/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/pitroldev/corneta/actions/workflows/codeql.yml"><img src="https://github.com/pitroldev/corneta/actions/workflows/codeql.yml/badge.svg?branch=main" alt="CodeQL status"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/pitroldev/corneta"><img src="https://api.scorecard.dev/projects/github.com/pitroldev/corneta/badge" alt="OpenSSF Scorecard"></a>
+</p>
+
+<p align="center">
   <a href="#meet-corneta">Meet it</a> ·
   <a href="#try-it-without-rust-obs-or-accounts">Try it</a> ·
   <a href="#develop-and-contribute">Contribute</a> ·
@@ -87,7 +93,7 @@ The contributor profile does not load your personal `.env` and turns telemetry o
 
 ## Use it on your stream
 
-See the [project releases](https://github.com/pitroldev/corneta/releases) for installers and release notes. **Windows x64 is the current platform**; macOS, Linux and Windows ARM do not have a validated distribution yet. Contributor builds are meant for development and do not replace the release installers.
+See the [project releases](https://github.com/pitroldev/corneta/releases) for installers and release notes, and the [changelog](CHANGELOG.md) for every version in one place. Before running an installer, check it as described in the [code signing policy](docs/SIGNING.md#code-signing-policy) and [how to verify a release](docs/SIGNING.md#verify-where-a-release-was-built). **Windows x64 is the current platform**; macOS, Linux and Windows ARM do not have a validated distribution yet. Contributor builds are meant for development and do not replace the release installers.
 
 To test the native app from source, follow the [desktop development](#native-desktop--windows-x64) path below. Run your tests outside a real stream.
 
@@ -160,13 +166,13 @@ The media flow is **local MediaMTX → Rust/FFmpeg processing → destinations**
 
 ## Documentation
 
-| I want to…                               | Where to start                                                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Understand what works and what changed   | [Compatibility](docs/COMPATIBILITY.md) · [Release notes](https://github.com/pitroldev/corneta/releases)                  |
-| Set up the environment and find tasks    | [Development](docs/DEVELOPMENT.md) · [Contributing](CONTRIBUTING.md)                                                     |
-| Understand the code and test scenarios   | [Architecture](docs/ARCHITECTURE.md) · [Performance](docs/PERFORMANCE.md) · [Report fixtures](docs/SYNTHETIC-REPORTS.md) |
-| Configure integrations or a distribution | [Configuration](docs/CONFIGURATION.md) · [Release gates](docs/RELEASE-GATES.md)                                          |
-| Get help or report a vulnerability       | [Support](SUPPORT.md) · [Security channel](SECURITY.md)                                                                  |
+| I want to…                               | Where to start                                                                                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Understand what works and what changed   | [Compatibility](docs/COMPATIBILITY.md) · [Changelog](CHANGELOG.md) · [Release notes](https://github.com/pitroldev/corneta/releases) |
+| Set up the environment and find tasks    | [Development](docs/DEVELOPMENT.md) · [Contributing](CONTRIBUTING.md)                                                                |
+| Understand the code and test scenarios   | [Architecture](docs/ARCHITECTURE.md) · [Performance](docs/PERFORMANCE.md) · [Report fixtures](docs/SYNTHETIC-REPORTS.md)            |
+| Configure integrations or a distribution | [Configuration](docs/CONFIGURATION.md) · [Release gates](docs/RELEASE-GATES.md)                                                     |
+| Get help or report a vulnerability       | [Support](SUPPORT.md) · [Security channel](SECURITY.md)                                                                             |
 
 The [full index](docs/README.md) lists the other guides, including design, content, privacy and operations.
 
