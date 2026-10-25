@@ -4,26 +4,26 @@
     {
       "article": "en/guides/comparisons/multistream-tools.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "en/guides/comparisons/restream-alternative.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "en/guides/multistream/local-vs-cloud.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "en/guides/multistream/obs-multistream.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
@@ -40,20 +40,32 @@
     {
       "article": "en/guides/multistream/twitch-youtube-kick.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "en/guides/multistream/twitch-youtube-simultaneously.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
+    },
+    {
+      "article": "en/guides/operations/chat-alerts-obs.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/compositor.rs",
       "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
       "reason": "compositor.rs only started sharing the FFmpeg path with the black screen alert; the BE RIGHT BACK screen and signal recovery work the same."
+    },
+    {
+      "article": "en/guides/operations/unified-chat-rules.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
@@ -76,20 +88,38 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
+      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
+      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
+    },
+    {
+      "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
+      "source": "src-tauri/src/overlay.rs",
+      "sourceBlob": "9515c4467c51f15c143000aab77f11eba43519a8",
+      "reason": "The overlay pages now follow the app language; the Browser Source setup, options and URLs in the article did not change."
+    },
+    {
+      "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
-      "reason": "It only started forwarding messages and alerts to the phone paired in deck mode; the chat setup described in the article did not change."
+      "sourceBlob": "dc7ee62acb2f58e725b5cdab876e542db87dc1e4",
+      "reason": "Chat messages gained an internal own-message flag; the chat setup described in the article did not change."
+    },
+    {
+      "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
+      "source": "src/screens/ChatScreen.tsx",
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
@@ -100,8 +130,8 @@
     {
       "article": "en/help/getting-started/first-stream.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
@@ -124,14 +154,14 @@
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
+      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
+      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "It only gained the deck mode commands and saving settings from the phone; nothing the article describes changed."
+      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
+      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -142,8 +172,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "f156a0be6db196b22e1ecaa4d4edf431cad97f5e",
-      "reason": "Only the privacy guard strings were removed; the strings the article cites did not change."
+      "sourceBlob": "1cafb644c07d6be6cfb98115f525f6b2e6be78f8",
+      "reason": "Only a label for an invalid alerts token was added; the strings the article cites did not change."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -154,8 +184,8 @@
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "34e49f5f20332d5a7721fe87dba4fcf028c1f7dd",
-      "reason": "It only gained the deck mode card under General; the BE RIGHT BACK setup described in the article did not change."
+      "sourceBlob": "daafd159c9c41534582ddb5d02307cf475def51a",
+      "reason": "Only the internal tab ids became English; the Settings screen and the BE RIGHT BACK setup the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
@@ -178,14 +208,14 @@
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/guides/comparisons/restream-alternative.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
@@ -202,14 +232,14 @@
     {
       "article": "pt-BR/guides/multistream/local-vs-cloud.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/guides/multistream/obs-multistream.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -226,14 +256,14 @@
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-simultaneously.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/guides/operations/analyze-stream-drop.mdx",
@@ -244,8 +274,8 @@
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -262,8 +292,8 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -286,8 +316,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
+      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
+      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -334,26 +364,26 @@
     {
       "article": "pt-BR/guides/quality/why-stream-lags.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src-tauri/src/overlay.rs",
-      "sourceBlob": "09a6b7e4b0b1142fe8595a14892f91b4563061d0",
-      "reason": "The chat overlay started receiving deletions and pinned messages; the setup described in the article did not change."
+      "sourceBlob": "9515c4467c51f15c143000aab77f11eba43519a8",
+      "reason": "The overlay pages now follow the app language; the Browser Source setup, options and URLs in the article did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
-      "reason": "It only started forwarding messages and alerts to the phone paired in deck mode; the chat setup described in the article did not change."
+      "sourceBlob": "dc7ee62acb2f58e725b5cdab876e542db87dc1e4",
+      "reason": "Chat messages gained an internal own-message flag; the chat setup described in the article did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -364,8 +394,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
+      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
+      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -376,8 +406,8 @@
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "86226059b8330e083a54a60c89986dc4aaa12bf4",
-      "reason": "O PRODUCT.md só perdeu o link para o guia de publicação, que saiu do repositório; nada do que o artigo afirma mudou."
+      "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
+      "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
@@ -424,14 +454,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
+      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
+      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "It only gained the deck mode commands and saving settings from the phone; nothing the article describes changed."
+      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
+      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -454,8 +484,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "f156a0be6db196b22e1ecaa4d4edf431cad97f5e",
-      "reason": "Only the privacy guard strings were removed; the strings the article cites did not change."
+      "sourceBlob": "1cafb644c07d6be6cfb98115f525f6b2e6be78f8",
+      "reason": "Only a label for an invalid alerts token was added; the strings the article cites did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -466,8 +496,8 @@
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "34e49f5f20332d5a7721fe87dba4fcf028c1f7dd",
-      "reason": "It only gained the deck mode card under General; the BE RIGHT BACK setup described in the article did not change."
+      "sourceBlob": "daafd159c9c41534582ddb5d02307cf475def51a",
+      "reason": "Only the internal tab ids became English; the Settings screen and the BE RIGHT BACK setup the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
