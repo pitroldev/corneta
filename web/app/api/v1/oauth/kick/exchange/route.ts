@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       throw new ApiError(
         503,
         "OAUTH_NOT_CONFIGURED",
-        "Kick OAuth ainda não está configurado no servidor.",
+        "Kick OAuth is not configured on the server.",
       );
     }
     const body = await readJson<{
@@ -38,13 +38,13 @@ export async function POST(request: Request) {
     const codeVerifier = requiredString(body.codeVerifier, "codeVerifier", 128);
     const redirectUri = requiredString(body.redirectUri, "redirectUri", 512);
     if (!PKCE_VERIFIER.test(codeVerifier)) {
-      throw new ApiError(400, "INVALID_PKCE", "PKCE verifier inválido.");
+      throw new ApiError(400, "INVALID_PKCE", "Invalid PKCE verifier.");
     }
     if (!config.kick.redirectUris.has(redirectUri)) {
       throw new ApiError(
         400,
         "INVALID_REDIRECT_URI",
-        "Redirect URI não permitida.",
+        "Redirect URI is not allowed.",
       );
     }
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       throw new ApiError(
         response.status === 400 ? 400 : 502,
         "PROVIDER_REJECTED_REQUEST",
-        "A Kick recusou a conclusão do login.",
+        "Kick rejected the login exchange.",
       );
     }
     return apiJson(oauthTokens(provider), telemetry);

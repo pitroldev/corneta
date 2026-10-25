@@ -709,6 +709,16 @@ export function validateEditorialCatalog(
       const group = translationGroups.get(frontmatter.translationKey) ?? [];
       group.push(document);
       translationGroups.set(frontmatter.translationKey, group);
+    } else if (frontmatter.status === "published") {
+      // The site is bilingual: nothing goes live in only one language.
+      issues.push(
+        issue(
+          document,
+          "missing-translation",
+          "published content needs a translationKey shared with its published version in the other locale",
+          "translationKey",
+        ),
+      );
     }
 
     const sourceWithoutCode = sourceWithoutMarkdownCode(document.source);

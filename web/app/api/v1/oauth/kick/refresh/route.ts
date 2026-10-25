@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       throw new ApiError(
         503,
         "OAUTH_NOT_CONFIGURED",
-        "Kick OAuth ainda não está configurado no servidor.",
+        "Kick OAuth is not configured on the server.",
       );
     }
     const body = await readJson<{ refreshToken?: unknown }>(request);
@@ -45,8 +45,8 @@ export async function POST(request: Request) {
         invalid ? 401 : 502,
         invalid ? "OAUTH_SESSION_EXPIRED" : "PROVIDER_REJECTED_REQUEST",
         invalid
-          ? "A sessão da Kick expirou. Entre novamente."
-          : "A Kick recusou a renovação.",
+          ? "The Kick session expired; sign in again."
+          : "Kick rejected the token refresh.",
         !invalid,
       );
     }

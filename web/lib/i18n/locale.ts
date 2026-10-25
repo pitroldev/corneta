@@ -3,6 +3,8 @@ export type Locale = (typeof LOCALES)[number];
 
 // Portuguese uses the established unprefixed canonical URL.
 export const DEFAULT_LOCALE: Locale = "pt-BR";
+/** Visitors whose languages are all outside the catalog get English; no preference keeps the default. */
+export const FALLBACK_LOCALE: Locale = "en";
 
 // An explicit cookie preference must override automatic language negotiation.
 export const LOCALE_COOKIE = "corneta.locale";
@@ -57,10 +59,11 @@ function matchLocale(tag: string): Locale | null {
 
 export function negotiateLocale(header: string | null | undefined): Locale {
   if (!header) return DEFAULT_LOCALE;
-  for (const { tag } of parseAcceptLanguage(header)) {
+  const tags = parseAcceptLanguage(header);
+  for (const { tag } of tags) {
     if (tag === "*") return DEFAULT_LOCALE;
     const hit = matchLocale(tag);
     if (hit) return hit;
   }
-  return DEFAULT_LOCALE;
+  return tags.length ? FALLBACK_LOCALE : DEFAULT_LOCALE;
 }

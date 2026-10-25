@@ -21,7 +21,7 @@ export const en: Dict = {
   "chrome.llms.heading.steps": "## How to use it in three steps",
   "chrome.llms.heading.who": "## Who you're talking to",
   "chrome.llms.intro":
-    "Local multistream, free and open source (MIT license), for Windows 10 and 11.\nBuilt for Brazilian streamers. It's not a cloud service, there's no subscription\nand no sign-up: the video goes straight from the streamer's computer to each\nplatform.",
+    "Local multistream, free and open source (MIT license), for Windows 10 and 11.\nMade in Brazil, in Portuguese and English. It's not a cloud service, there's no\nsubscription and no sign-up: the video goes straight from the streamer's\ncomputer to each platform.",
   "chrome.llms.link.home": "Site and download",
   "chrome.llms.link.privacy": "Privacy policy",
   "chrome.llms.link.source": "Source code",

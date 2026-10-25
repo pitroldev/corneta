@@ -63,7 +63,7 @@ describe("OAuth token contract", () => {
     { access_token: "test", expires_in: "Infinity" },
   ])("rejects a malformed session", (body) => {
     expect(() => oauthTokens(body)).toThrow(
-      "A Kick não retornou uma sessão válida",
+      "Kick did not return a valid session",
     );
   });
 });

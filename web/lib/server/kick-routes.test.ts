@@ -196,31 +196,31 @@ type ExpectedError = {
 const loginRejected = (status: number): ExpectedError => ({
   status,
   code: "PROVIDER_REJECTED_REQUEST",
-  message: "A Kick recusou a conclusão do login.",
+  message: "Kick rejected the login exchange.",
   retryable: false,
 });
 const sessionExpired: ExpectedError = {
   status: 401,
   code: "OAUTH_SESSION_EXPIRED",
-  message: "A sessão da Kick expirou. Entre novamente.",
+  message: "The Kick session expired; sign in again.",
   retryable: false,
 };
 const refreshRejected: ExpectedError = {
   status: 502,
   code: "PROVIDER_REJECTED_REQUEST",
-  message: "A Kick recusou a renovação.",
+  message: "Kick rejected the token refresh.",
   retryable: true,
 };
 const unreadableReply: ExpectedError = {
   status: 502,
   code: "INVALID_PROVIDER_RESPONSE",
-  message: "O provedor retornou uma resposta inválida.",
+  message: "The provider returned an invalid response.",
   retryable: true,
 };
 const notConfigured: ExpectedError = {
   status: 503,
   code: "OAUTH_NOT_CONFIGURED",
-  message: "Kick OAuth ainda não está configurado no servidor.",
+  message: "Kick OAuth is not configured on the server.",
   retryable: false,
 };
 
@@ -380,7 +380,7 @@ describe("Kick OAuth provider failures", () => {
     expect(JSON.parse(text)).toEqual({
       error: {
         code: "INTERNAL_ERROR",
-        message: "Não foi possível concluir a operação.",
+        message: "The operation could not be completed.",
         retryable: true,
         requestId: response.headers.get("x-request-id"),
       },

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { PostHogConfig } from "posthog-js/dist/module.no-external";
 import { createTelemetryTransport } from "./telemetry-transport";
+import { detectSystemLocale } from "./i18n/locale";
 import {
   EMPTY_TELEMETRY_STATUS,
   errorFromWindowEvent,
@@ -158,8 +159,7 @@ let snapshot: TelemetrySnapshot = {
 };
 
 function detectLocale(): TelemetryContext["locale"] {
-  if (typeof navigator === "undefined") return "pt-BR";
-  return navigator.language.toLowerCase().startsWith("en") ? "en" : "pt-BR";
+  return detectSystemLocale();
 }
 
 function environment(mode: string): TelemetryContext["environment"] {

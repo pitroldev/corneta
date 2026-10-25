@@ -211,6 +211,24 @@ Setext example
     ).toEqual([]);
   });
 
+  it("refuses to publish content that exists in only one language", () => {
+    const draft = parseEditorialSource(
+      draftSource("").replace("test-article", "obs-multistream"),
+      "pt-BR/guides/multistream/obs-multistream.mdx",
+    );
+    const published = {
+      ...draft,
+      frontmatter: { ...draft.frontmatter, status: "published" },
+    } as unknown as typeof draft;
+
+    expect(
+      validateEditorialCatalog([draft]).map((item) => item.code),
+    ).not.toContain("missing-translation");
+    expect(
+      validateEditorialCatalog([published]).map((item) => item.code),
+    ).toContain("missing-translation");
+  });
+
   it("requires versioned human approval for each English editorial path", () => {
     const approved = parseEditorialSource(
       draftSource("").replace("test-article", "obs-multistream"),

@@ -11,7 +11,7 @@ function unavailable() {
   return new ApiError(
     503,
     "RATE_LIMIT_UNAVAILABLE",
-    "O login está temporariamente indisponível. Tente novamente.",
+    "Sign-in is temporarily unavailable; try again.",
     true,
     5,
   );
@@ -21,7 +21,7 @@ function limited(ttlMs: number) {
   return new ApiError(
     429,
     "RATE_LIMITED",
-    "Muitas tentativas. Aguarde um pouco e tente novamente.",
+    "Too many attempts; wait and try again.",
     true,
     Math.max(1, Math.ceil(ttlMs / 1_000)),
   );

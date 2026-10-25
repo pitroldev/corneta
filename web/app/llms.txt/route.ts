@@ -1,11 +1,12 @@
 import { faqsFor, featuresFor, oneLinerFor, stepsFor } from "@/lib/content";
-import { translator } from "@/lib/i18n";
 import {
-  LEGAL_CONTACT,
-  LEGAL_OPERATOR,
-  LEGAL_ROUTES,
-  legalHref,
-} from "@/lib/legal";
+  LOCALE_LABEL,
+  localePath,
+  translator,
+  type Locale,
+  type MessageKey,
+} from "@/lib/i18n";
+import { LEGAL_CONTACT, LEGAL_OPERATOR, legalHref } from "@/lib/legal";
 import { siteUrl } from "@/lib/site";
 import { listPublishedEditorial } from "@/lib/editorial/server";
 import { editorialCollectionHref } from "@/lib/editorial/urls";
@@ -16,76 +17,81 @@ export const dynamic = "force-static";
 
 const abs = (path: string) => new URL(path, siteUrl).toString();
 
-async function body() {
-  const t = translator("pt-BR");
-  const ONE_LINER = oneLinerFor(t);
-  const FEATURES = featuresFor(t);
-  const FAQS = faqsFor(t);
-  const STEPS = stepsFor(t);
-  const editorial = await listPublishedEditorial({ locale: "pt-BR" });
+const OTHER: Record<Locale, Locale> = { "pt-BR": "en", en: "pt-BR" };
+
+async function section(locale: Locale) {
+  const t = translator(locale);
+  const editorial = await listPublishedEditorial({ locale });
   const publishedCollections = new Set(
     editorial.map((document) => document.frontmatter.collection),
   );
   const editorialPages = [
     ...(publishedCollections.has("help")
       ? [
-          `- [Central de ajuda](${abs(editorialCollectionHref("pt-BR", "help"))})`,
+          `- [${t("knowledge.help.action")}](${abs(editorialCollectionHref(locale, "help"))})`,
         ]
       : []),
     ...(publishedCollections.has("guides")
-      ? [`- [Guias](${abs(editorialCollectionHref("pt-BR", "guides"))})`]
+      ? [
+          `- [${t("hero.nav.guides")}](${abs(editorialCollectionHref(locale, "guides"))})`,
+        ]
       : []),
     ...editorial.map(
       (document) =>
         `- [${document.frontmatter.title}](${abs(document.href)}) — ${document.frontmatter.summary}`,
     ),
   ];
+  const other = OTHER[locale];
   return `# Corneta
 
-> ${ONE_LINER}
+> ${oneLinerFor(t)}
 
-Multistream local, gratuito e open source (licença MIT), para Windows 10 e 11.
-Feito para streamers brasileiros. Não é serviço de nuvem, não tem assinatura e
-não exige cadastro: o vídeo sai do computador do streamer direto para cada
-plataforma.
+${t("chrome.llms.intro")}
 
-## O que a Corneta faz
+${t("chrome.llms.heading.features")}
 
-${FEATURES.map((f) => `- ${f}`).join("\n")}
+${featuresFor(t)
+  .map((f) => `- ${f}`)
+  .join("\n")}
 
-## O que a Corneta NÃO é
+${t("chrome.llms.heading.notis")}
 
-- Não substitui o OBS: cenas, câmera e áudio continuam no programa de captura.
-- Não é relay em nuvem: nenhum servidor nosso recebe, armazena ou repassa vídeo.
-- Não exige conta na Corneta — não existe cadastro nem login no site.
-- Não tem versão para macOS ou Linux até agora, e não há data pública.
+${[1, 2, 3, 4].map((n) => t(`chrome.llms.notis.${n}` as MessageKey)).join("\n")}
 
-## Como usar em três passos
+${t("chrome.llms.heading.steps")}
 
-${STEPS.map((s, i) => `${i + 1}. **${s.title}** — ${s.text}`).join("\n")}
+${stepsFor(t)
+  .map((s, i) => `${i + 1}. **${s.title}** — ${s.text}`)
+  .join("\n")}
 
-## Plataformas
+${t("chrome.llms.heading.platforms")}
 
 ${t("chrome.llms.platforms.body")}
 
 ${t("steps.platforms.note.validation")}
 
-## Perguntas frequentes
+${t("chrome.llms.heading.faq")}
 
-${FAQS.map((f) => `### ${f.question}\n\n${f.answer}`).join("\n\n")}
+${faqsFor(t)
+  .map((f) => `### ${f.question}\n\n${f.answer}`)
+  .join("\n\n")}
 
-## Páginas
+${t("chrome.llms.heading.pages")}
 
-- [Site e download](${abs("/")})
-- [Site em inglês](${abs("/en")})
-- [Política de privacidade](${abs(LEGAL_ROUTES.privacy)}) · [English](${abs(legalHref("en", "privacy"))})
-- [Termos de uso](${abs(LEGAL_ROUTES.terms)}) · [English](${abs(legalHref("en", "terms"))})
-${editorialPages.length > 0 ? `${editorialPages.join("\n")}\n` : ""}- [Código-fonte](https://github.com/pitroldev)
+- [${t("chrome.llms.link.home")}](${abs(localePath(locale))}) · [${LOCALE_LABEL[other]}](${abs(localePath(other))})
+- [${t("chrome.llms.link.privacy")}](${abs(legalHref(locale, "privacy"))})
+- [${t("chrome.llms.link.terms")}](${abs(legalHref(locale, "terms"))})
+${editorialPages.length > 0 ? `${editorialPages.join("\n")}\n` : ""}- [${t("chrome.llms.link.source")}](https://github.com/pitroldev/corneta)
 
-## Quem responde
+${t("chrome.llms.heading.who")}
 
-${LEGAL_OPERATOR} — contato: ${LEGAL_CONTACT}
+${LEGAL_OPERATOR} — ${t("chrome.llms.contact.label")} ${LEGAL_CONTACT}
 `;
+}
+
+// The site is bilingual, so the file carries the Portuguese and the English version in full.
+async function body() {
+  return `${await section("pt-BR")}\n---\n\n${await section("en")}`;
 }
 
 export async function GET() {

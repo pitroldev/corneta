@@ -24,9 +24,9 @@ describe("negotiateLocale", () => {
     expect(negotiateLocale("pt-BR;q=0,en;q=0.5")).toBe("en");
   });
 
-  it("falls back to the default for unsupported languages", () => {
-    expect(negotiateLocale("es-AR,es;q=0.9")).toBe("pt-BR");
-    expect(negotiateLocale("ja")).toBe("pt-BR");
+  it("sends unsupported languages to English and keeps the default for any language", () => {
+    expect(negotiateLocale("es-AR,es;q=0.9")).toBe("en");
+    expect(negotiateLocale("ja")).toBe("en");
     expect(negotiateLocale("*")).toBe("pt-BR");
   });
 

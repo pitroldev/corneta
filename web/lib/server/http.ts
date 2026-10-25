@@ -105,7 +105,7 @@ export function errorResponse(error: unknown, context: ApiTelemetryContext) {
     {
       error: {
         code: "INTERNAL_ERROR",
-        message: "Não foi possível concluir a operação.",
+        message: "The operation could not be completed.",
         retryable: true,
         requestId: context.requestId,
       },
@@ -118,7 +118,7 @@ export function errorResponse(error: unknown, context: ApiTelemetryContext) {
 export async function readJson<T>(request: Request, maxBytes = 8_192) {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(declared) && declared > maxBytes) {
-    throw new ApiError(413, "BODY_TOO_LARGE", "Requisição muito grande.");
+    throw new ApiError(413, "BODY_TOO_LARGE", "Request body too large.");
   }
 
   try {
@@ -129,15 +129,15 @@ export async function readJson<T>(request: Request, maxBytes = 8_192) {
     return value as T;
   } catch (error) {
     if (error instanceof Error && error.message === "BODY_TOO_LARGE")
-      throw new ApiError(413, "BODY_TOO_LARGE", "Requisição muito grande.");
+      throw new ApiError(413, "BODY_TOO_LARGE", "Request body too large.");
     if (error instanceof Error && error.message === "BODY_TIMEOUT")
       throw new ApiError(
         408,
         "INVALID_REQUEST",
-        "A requisição demorou demais. Tente novamente.",
+        "The request timed out; try again.",
         true,
       );
-    throw new ApiError(400, "INVALID_JSON", "JSON inválido.");
+    throw new ApiError(400, "INVALID_JSON", "Invalid JSON.");
   }
 }
 
@@ -147,7 +147,7 @@ export function requiredString(
   maxLength = 4_096,
 ) {
   if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
-    throw new ApiError(400, "INVALID_REQUEST", `Campo inválido: ${field}.`);
+    throw new ApiError(400, "INVALID_REQUEST", `Invalid field: ${field}.`);
   }
   return value.trim();
 }
@@ -173,7 +173,7 @@ export async function providerForm(
     throw new ApiError(
       503,
       "PROVIDER_UNAVAILABLE",
-      "O provedor não respondeu. Tente novamente.",
+      "The provider did not respond; try again.",
       true,
     );
   }
@@ -189,7 +189,7 @@ export async function providerForm(
     throw new ApiError(
       502,
       "INVALID_PROVIDER_RESPONSE",
-      "O provedor retornou uma resposta inválida.",
+      "The provider returned an invalid response.",
       true,
     );
   }

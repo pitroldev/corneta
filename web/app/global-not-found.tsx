@@ -13,11 +13,11 @@ import {
 } from "./_components/ui";
 import "./globals.css";
 
-// Multiple root layouts require a standalone document for unmatched routes.
+// Multiple root layouts require a standalone document for unmatched routes; it has no locale, so it speaks both.
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
-  title: "Página não encontrada | Corneta",
+  title: "Página não encontrada · Page not found | Corneta",
   robots: { index: false, follow: true },
 };
 
@@ -41,9 +41,20 @@ export default function GlobalNotFound() {
             <p className="my-[26px] mb-8 max-w-[46ch] text-[1.02rem] leading-[1.62] font-medium text-muted">
               A transmissão principal continua firme. Volte para o início e
               tente outro caminho.
+              <span lang="en" className="mt-3 block">
+                This page went off the air, but the main stream is still on.
+                Head back to the start and try another path.
+              </span>
             </p>
             <Link className={downloadButton} href="/">
               Voltar ao início
+            </Link>
+            <Link
+              lang="en"
+              href="/en"
+              className="mt-5 font-bold text-cream underline decoration-brass decoration-[3px] underline-offset-4"
+            >
+              Back to home in English
             </Link>
           </Shell>
         </main>

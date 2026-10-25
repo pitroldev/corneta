@@ -16,8 +16,9 @@ describe("detectSystemLocale", () => {
     expect(detectSystemLocale(["es-AR", "en-US", "pt-BR"])).toBe("en");
   });
 
-  it("falls back for unsupported languages", () => {
-    expect(detectSystemLocale(["ja", "ko"])).toBe("pt-BR");
+  it("uses English for unsupported languages and the default without any", () => {
+    expect(detectSystemLocale(["ja", "ko"])).toBe("en");
+    expect(detectSystemLocale(["es-ES", "de"])).toBe("en");
     expect(detectSystemLocale([])).toBe("pt-BR");
   });
 });
@@ -33,9 +34,9 @@ describe("detectSystemLocale without arguments", () => {
     expect(detectSystemLocale()).toBe("en");
   });
 
-  it("falls back for an unsupported system language", () => {
+  it("uses English for an unsupported system language", () => {
     vi.stubGlobal("navigator", { languages: ["ja-JP", "ko"] });
-    expect(detectSystemLocale()).toBe("pt-BR");
+    expect(detectSystemLocale()).toBe("en");
   });
 
   it("falls back without navigator", () => {

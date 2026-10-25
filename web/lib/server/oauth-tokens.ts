@@ -27,7 +27,7 @@ export function oauthTokens(provider: Record<string, unknown>) {
     throw new ApiError(
       502,
       "INVALID_PROVIDER_RESPONSE",
-      "A Kick não retornou uma sessão válida. Tente novamente.",
+      "Kick did not return a valid session; try again.",
       true,
     );
   }

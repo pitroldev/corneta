@@ -36,7 +36,7 @@ describe("OAuth HTTP boundary", () => {
       "kick",
     );
     const response = errorResponse(
-      new ApiError(429, "RATE_LIMITED", "Tente novamente.", true, 25),
+      new ApiError(429, "RATE_LIMITED", "Try again.", true, 25),
       context,
     );
     expect(response.headers.get("retry-after")).toBe("25");

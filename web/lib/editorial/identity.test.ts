@@ -119,21 +119,30 @@ describe("editorial attribution", () => {
       contentRoot,
       "pt-BR/guides/multistream/obs-multistream.mdx",
     );
+    // Published content must exist in both languages, so the fixture is a translated pair.
+    const english = path.join(
+      contentRoot,
+      "en/guides/multistream/obs-multistream.mdx",
+    );
+    const pair = { ...published, translationKey: "obs-multistream" };
+    const englishOf = (frontmatter: Record<string, unknown>) => ({
+      ...frontmatter,
+      contentId: "guide_identity_fixture_en",
+      locale: "en",
+    });
     try {
       await mkdir(path.dirname(article), { recursive: true });
+      await mkdir(path.dirname(english), { recursive: true });
       await mkdir(path.join(contentRoot, "assets"), { recursive: true });
       await mkdir(publicRoot, { recursive: true });
       await writeFile(
         path.join(contentRoot, "assets/manifest.json"),
         JSON.stringify({ version: 1, assets: [] }),
       );
-      await writeFile(
-        article,
-        matter.stringify(
-          "## Synthetic fixture\n\nThis is not a published article.",
-          published,
-        ),
-      );
+      const fixtureBody =
+        "## Synthetic fixture\n\nThis is not a published article.";
+      await writeFile(article, matter.stringify(fixtureBody, pair));
+      await writeFile(english, matter.stringify(fixtureBody, englishOf(pair)));
       for (const [person, expectedCode] of [
         [reviewer, undefined],
         [{ ...reviewer, name: "Someone Else" }, "unregistered-person"],
@@ -151,6 +160,10 @@ describe("editorial attribution", () => {
         else expect(result.issues).toEqual([]);
       }
       await writeFile(article, matter.stringify("## Unassigned draft", draft));
+      await writeFile(
+        english,
+        matter.stringify("## Unassigned draft", englishOf(draft)),
+      );
       const result = await auditEditorialContent({ contentRoot, publicRoot });
       expect(result.issues).toEqual([]);
     } finally {

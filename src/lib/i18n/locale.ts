@@ -4,6 +4,8 @@ export type Locale = (typeof LOCALES)[number];
 export type LanguageSetting = "auto" | Locale;
 
 export const DEFAULT_LOCALE: Locale = "pt-BR";
+/** Languages outside the catalog get English; only missing language information uses the default. */
+export const FALLBACK_LOCALE: Locale = "en";
 
 export const isLocale = (v: string): v is Locale =>
   (LOCALES as readonly string[]).includes(v);
@@ -27,11 +29,12 @@ export function detectSystemLocale(
     ? undefined
     : navigator.languages,
 ): Locale {
-  for (const tag of tags ?? []) {
+  if (!tags?.length) return DEFAULT_LOCALE;
+  for (const tag of tags) {
     const hit = matchLocale(tag);
     if (hit) return hit;
   }
-  return DEFAULT_LOCALE;
+  return FALLBACK_LOCALE;
 }
 
 export function resolveLocale(

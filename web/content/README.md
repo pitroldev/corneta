@@ -120,9 +120,11 @@ src, alt, legenda, dimensões e proveniência pelo frontmatter. Cada item de
 
 ## Traduções
 
-`translationKey` só deve permanecer em conteúdo publicado quando existirem as
-versões completas `pt-BR` e `en`, ambas publicadas, com a mesma coleção,
-categoria e slug. O loader só expõe alternates quando esse par é recíproco.
+O site é bilíngue: todo conteúdo publicado precisa das versões completas
+`pt-BR` e `en`, ambas publicadas e ligadas pela mesma `translationKey`, com a
+mesma coleção, categoria e slug. O `content:check` reprova artigo publicado sem
+esse par. Rascunhos podem existir num idioma só enquanto a tradução não fica
+pronta. O loader só expõe alternates quando o par é recíproco.
 
 Tradução não significa copiar screenshots no idioma errado. Cada imagem declara
 `language: pt-BR`, `language: en` ou `language: none`. Use `none` apenas quando o

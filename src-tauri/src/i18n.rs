@@ -9,8 +9,10 @@ pub enum Locale {
     En,
 }
 
-/// Match the frontend DEFAULT_LOCALE when no supported OS language is found.
+/// Match the frontend DEFAULT_LOCALE when Windows reports no display language at all.
 pub const DEFAULT_LOCALE: Locale = Locale::PtBr;
+/// Match the frontend FALLBACK_LOCALE: display languages outside the catalog get English.
+pub const FALLBACK_LOCALE: Locale = Locale::En;
 
 impl Locale {
     #[cfg(test)]
@@ -141,8 +143,11 @@ pub fn system_locale() -> Locale {
                 return hit;
             }
         }
+        if count == 0 {
+            return DEFAULT_LOCALE;
+        }
     }
-    DEFAULT_LOCALE
+    FALLBACK_LOCALE
 }
 
 /// Non-Windows test builds use the shared default.
@@ -873,6 +878,18 @@ messages! {
     AuthBrokerDown = "rust.auth.brokerDown" =>
         pt: "Não consegui falar com o serviço de login — sem internet?",
         en: "Couldn't reach the login service — no internet?";
+    AuthBrokerNotConfigured = "rust.auth.brokerNotConfigured" =>
+        pt: "O serviço de login ainda não está configurado no servidor",
+        en: "The login service isn't set up on the server yet";
+    AuthBrokerSessionExpired = "rust.auth.brokerSessionExpired" =>
+        pt: "A sessão expirou — entre de novo",
+        en: "Your session expired — sign in again";
+    AuthBrokerRateLimited = "rust.auth.brokerRateLimited" =>
+        pt: "Muitas tentativas seguidas — espere um pouco e tente de novo",
+        en: "Too many attempts in a row — wait a bit and try again";
+    AuthBrokerUnavailable = "rust.auth.brokerUnavailable" =>
+        pt: "O login está fora do ar agora — tente de novo daqui a pouco",
+        en: "Sign-in is down right now — try again in a bit";
     AuthSetupApiMissing = "rust.auth.setupApiMissing" =>
         pt: "serviço de login não configurado (VITE_SETUP_API_URL vazio)",
         en: "login service isn't set up (VITE_SETUP_API_URL is empty)";

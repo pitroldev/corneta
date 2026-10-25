@@ -173,23 +173,31 @@ pub(crate) fn record_broker_failure(app: &AppHandle, body: &Value, code: &str) -
 }
 
 pub(crate) fn broker_error(app: &AppHandle, code: u16, body: &Value, fallback: &str) -> String {
-    let message = body
-        .get("error")
-        .and_then(|e| e.get("message"))
-        .and_then(|m| m.as_str())
-        .unwrap_or("");
-    let base = if !message.is_empty() {
-        message.to_string()
-    } else if code == 0 {
-        Msg::AuthBrokerDown.now()
-    } else {
-        fallback.into()
-    };
+    let base = broker_message(code, body).unwrap_or_else(|| fallback.into());
     if let Some(request_id) = record_broker_failure(app, body, "oauth_broker_failed") {
         format!("{base} (request_id: {request_id})")
     } else {
         base
     }
+}
+
+/// The Setup API message is not localized; only its stable error code may pick the user's text.
+fn broker_message(status: u16, body: &Value) -> Option<String> {
+    if status == 0 {
+        return Some(Msg::AuthBrokerDown.now());
+    }
+    let code = body
+        .get("error")
+        .and_then(|e| e.get("code"))
+        .and_then(|c| c.as_str())?;
+    let message = match code {
+        "OAUTH_NOT_CONFIGURED" => Msg::AuthBrokerNotConfigured,
+        "OAUTH_SESSION_EXPIRED" => Msg::AuthBrokerSessionExpired,
+        "RATE_LIMITED" => Msg::AuthBrokerRateLimited,
+        "RATE_LIMIT_UNAVAILABLE" | "PROVIDER_UNAVAILABLE" => Msg::AuthBrokerUnavailable,
+        _ => return None,
+    };
+    Some(message.now())
 }
 
 /// Legacy installations without a preference retain BYOK; selecting official preserves saved credentials.
@@ -706,6 +714,27 @@ pub async fn set_stream_info(
 mod tests {
     use super::*;
     use std::net::Ipv4Addr;
+
+    #[test]
+    fn broker_errors_never_show_the_servers_own_text() {
+        let body = |code: &str| serde_json::json!({ "error": { "code": code, "message": "Mensagem só em português" } });
+        for code in [
+            "OAUTH_NOT_CONFIGURED",
+            "OAUTH_SESSION_EXPIRED",
+            "RATE_LIMITED",
+            "RATE_LIMIT_UNAVAILABLE",
+            "PROVIDER_UNAVAILABLE",
+        ] {
+            let text = broker_message(400, &body(code)).expect(code);
+            assert!(!text.contains("português"), "{code}: {text}");
+        }
+        assert_eq!(broker_message(400, &body("INVALID_PKCE")), None);
+        assert_eq!(broker_message(400, &serde_json::json!({})), None);
+        assert_eq!(
+            broker_message(0, &serde_json::json!({})),
+            Some(Msg::AuthBrokerDown.now())
+        );
+    }
 
     #[test]
     fn youtube_callback_error_never_echoes_provider_text() {
