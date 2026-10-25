@@ -26,7 +26,7 @@ Execute o servidor e o build em momentos diferentes ou em cópias separadas. O p
 
 Para testar integrações próprias, o exemplo pertinente é [web/.env.example](.env.example), e o arquivo local é `web/.env.local` — ambos relativos à raiz do repositório. Não sobrescreva um arquivo existente. Os comandos `pnpm web:dev` e `pnpm web:check`, também na raiz, usam essa configuração e não têm o isolamento do perfil de contribuição.
 
-O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, limites locais, proxy, precedência e distinção entre segredos e valores públicos. O [guia de publicação](../docs/PUBLICACAO.md) reúne os procedimentos e as evidências adicionais exigidas para distribuir o produto, incluindo proteção WAF/edge no host.
+O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, limites locais, proxy, precedência e distinção entre segredos e valores públicos. Os [gates de release](../docs/GATES-DE-RELEASE.md) reúnem os critérios adicionais exigidos para distribuir o produto, incluindo proteção WAF/edge no host.
 
 O download usa o endereço estável `/download`, sem variável de ambiente ou segredo.
 A rota consulta o `latest.json` público da release oficial no GitHub e redireciona
@@ -63,11 +63,11 @@ origem em janelas fixas de 60 segundos. Reiniciar/escalar cria contadores novos;
 não é um limite global. Proteção compartilhada antes das instâncias depende de
 WAF/edge configurado e testado no host, com resposta `429` sem desafio interativo.
 O build não configura nem comprova essa proteção. Confira escopo, cobertura e
-ensaios no [guia de publicação](../docs/PUBLICACAO.md).
+ensaios antes de distribuir.
 
 ## Telemetria e diagnóstico
 
-Sem configuração válida ou com o kill switch pertinente, o envio fica desativado. No desktop, uso é opt-in (`unset` desativado) e falhas são opt-out (`unset` ativo); escolhas explícitas anteriores são preservadas e a ativação não recupera eventos de uso anteriores. O site mantém seu controle único de opt-out, DNT/GPC e kill switch; não compartilha as preferências do desktop. A API preserva a correlação conforme cada finalidade ativa no app. O contrato completo está na [política de telemetria](../docs/LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e no [runbook](../docs/RUNBOOK-POSTHOG.md); esta descrição não substitui revisão jurídica.
+Sem configuração válida ou com o kill switch pertinente, o envio fica desativado. No desktop, uso é opt-in (`unset` desativado) e falhas são opt-out (`unset` ativo); escolhas explícitas anteriores são preservadas e a ativação não recupera eventos de uso anteriores. O site mantém seu controle único de opt-out, DNT/GPC e kill switch; não compartilha as preferências do desktop. A API preserva a correlação conforme cada finalidade ativa no app. O que é coletado está na [política de privacidade](https://www.corneta.live/legal/privacy); esta descrição não substitui revisão jurídica.
 
 Quando o envio aplicável está habilitado:
 
@@ -96,7 +96,7 @@ metadata com o desktop antes de criar o draft; nenhuma Personal API Key ou token
 resposta.
 
 No projeto PostHog de produção, configure retenção de 90 dias, **Discard client IP data**,
-Cloud US (Virginia), DPA, MFA e acesso por função. O [runbook completo](../docs/RUNBOOK-POSTHOG.md) separa esses requisitos das verificações locais.
+Cloud US (Virginia), DPA, MFA e acesso por função.
 
 ### Páginas legais
 

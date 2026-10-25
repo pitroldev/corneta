@@ -97,4 +97,4 @@ humana, não inspeciona anexos do GitHub e não cobre arquivos fora dessas raíz
 Revise separadamente novos anexos, imagens e textos que serão publicados fora do
 inventário. Contatos e dados públicos de operação devem ser intencionais e
 mínimos; não classifique automaticamente toda informação pessoal como credencial.
-Os critérios gerais de distribuição estão em [PUBLICACAO](PUBLICACAO.md).
+Os critérios gerais de distribuição estão nos [gates de release](GATES-DE-RELEASE.md).

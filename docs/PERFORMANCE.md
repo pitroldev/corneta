@@ -12,13 +12,13 @@ Referência: linha 0.7.0. A promessa de resposta rápida deve ser sustentada por
 | Browser de produção | `pnpm smoke:reports`: Chromium descartável, worker real de `dist`, dados fictícios e chat volumoso com paginação limitada. Não exige contas.                    |
 | Build               | `pnpm benchmark:build`: registrar frio/quente e versões; não comparar máquinas/caches diferentes como ganho do código.                                          |
 
-O benchmark Node exclui a criação/serialização da fixture, disco, React, IPC e GPU. O teste unitário existente inclui a serialização no seu cronômetro: os números não são intercambiáveis. Preserve o teto do teste e investigue regressões antes de aumentá-lo. A [baseline sintética](../compliance/performance-baseline.json) identifica cenário, ferramenta e hardware; não certifica lives reais.
+O benchmark Node exclui a criação/serialização da fixture, disco, React, IPC e GPU. O teste unitário existente inclui a serialização no seu cronômetro: os números não são intercambiáveis. Preserve o teto do teste e investigue regressões antes de aumentá-lo. Uma medição local identifica cenário, ferramenta e hardware; não certifica lives reais.
 
 ## Medições em ambiente real
 
 A evidência sintética registra o SHA-256 da fixture e dos fontes medidos (`source.sourceTreeSha256`), além do HEAD disponível. O hash inclui as alterações locais: HEAD sozinho não identifica um benchmark executado em uma árvore modificada. A seleção de arquivos está em `scripts/benchmark-source.mjs`; normaliza CRLF para LF, ordena os caminhos e calcula SHA-256 do manifesto de hashes. Credenciais e artefatos ficam fora. Se os fontes mudarem durante a execução, o benchmark falha e não grava o resultado. Para atualizar a baseline, conclua as edições, rode novamente e copie o JSON medido; não reaproveite números de outra árvore.
 
-Use estes procedimentos para complementar os gates sintéticos. A matriz e as evidências exigidas para uma distribuição estão em [Publicação](PUBLICACAO.md); resultados de uma execução não aprovam automaticamente outra versão ou configuração.
+Use estes procedimentos para complementar os gates sintéticos. Os critérios exigidos para uma distribuição estão nos [gates de release](GATES-DE-RELEASE.md); resultados de uma execução não aprovam automaticamente outra versão ou configuração.
 
 | Medição                          | Procedimento reproduzível                                                                                                                                                                    | Limite da evidência                                                            |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

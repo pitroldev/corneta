@@ -113,9 +113,9 @@ describe("current public documentation", () => {
     ])
       expect(historicalDocument(`docs/${name}`), name).toBe(true);
     for (const file of [
-      "docs/PUBLICACAO.md",
+      "docs/GATES-DE-RELEASE.md",
       "docs/ARQUITETURA.md",
-      "docs/RUNBOOK-POSTHOG.md",
+      "docs/RUNBOOK-MANUTENCAO-EDITORIAL.md",
       "web/content/README.md",
     ])
       expect(historicalDocument(file), file).toBe(false);
@@ -124,11 +124,11 @@ describe("current public documentation", () => {
   it("ignores example and external links while resolving local index destinations", () => {
     expect(
       indexedDocuments(
-        "[Current](PUBLICACAO.md#checks) [Again](/docs/PUBLICACAO.md) " +
+        "[Current](GATES-DE-RELEASE.md#checks) [Again](/docs/GATES-DE-RELEASE.md) " +
           "[Root](../README.md) [External](https://example.com/guide.md) " +
           "`[Example](PLANO-example.md)`\n[Config][config]\n" +
           "[config]: CONFIGURACAO.md\n[Unused]: UNUSED.md",
       ),
-    ).toEqual(["docs/CONFIGURACAO.md", "docs/PUBLICACAO.md"]);
+    ).toEqual(["docs/CONFIGURACAO.md", "docs/GATES-DE-RELEASE.md"]);
   });
 });

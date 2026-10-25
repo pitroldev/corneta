@@ -124,7 +124,7 @@ ou uma live. Os testes geram mídia sintética em diretórios temporários.
 - **Arquivo `web/.env*` encontrado:** use clone limpo. O preflight não remove seus dados.
 - **Porta ocupada:** encerre o processo de teste correspondente; não mate OBS ou Corneta de produção indiscriminadamente. Demo usa 1420; Next dev usa 7390. Ingestão e callback dependem da configuração/fluxo mostrados no app.
 - **Compilador/linker ausente:** verifique C++/MSVC e Windows SDK, não apenas o editor Visual Studio.
-- **Erro de hash/download:** não desative a verificação. Consulte o [guia de publicação](PUBLICACAO.md) para o espelho verificado ou reporte a versão/URL pública do artefato, sem credenciais.
+- **Erro de hash/download:** não desative a verificação. Consulte a [conformidade do FFmpeg](CONFORMIDADE-FFMPEG.md) para o espelho verificado ou reporte a versão/URL pública do artefato, sem credenciais.
 - **Teste falha:** registre comando, versão/commit e saída sanitizada. Não apague cofre, relatórios ou lockfiles como tentativa de reparo.
 
 O código pode ser estudado e alterado sem serviço hospedado. Hospedar e distribuir um fork completo ainda exige configurar identidade, domínios, provedores e atualizações próprios; não é uma capacidade automaticamente garantida pela demo ou por um build local bem-sucedido.

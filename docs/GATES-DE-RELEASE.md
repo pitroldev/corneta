@@ -1,6 +1,6 @@
 # Gates de release
 
-Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Os procedimentos e o checklist estão no [guia de publicação](PUBLICACAO.md). Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
+Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma release só pode ser publicada quando cumprir todos os critérios abaixo. Guarde os resultados e as evidências junto da execução da release; este documento não certifica um artefato específico.
 
 ## Automatizados
 
@@ -67,13 +67,13 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma 
 - WAF/edge configurado e verificado para ambas as rotas POST de OAuth Kick, cobrindo hosts,
   aliases e caminhos normalizados, sem acesso direto à origem ou desafio interativo de
   navegador. Validar bloqueio `429` antes de múltiplas instâncias e registrar o escopo regional
-  real do provedor; o cache local não impõe limite global. Ver [publicação](PUBLICACAO.md).
+  real do provedor; o cache local não impõe limite global.
 - Authenticode segue a [política de assinatura](ASSINATURA.md). O gate aceita
   `NotSigned` com aviso ou `Valid`, nunca assinatura inválida. `REQUIRE_WINDOWS_CODE_SIGNING=1`
   exige assinatura quando adotada. Conferir o aviso em Windows limpo; assinatura não garante
   ausência de SmartScreen.
 - Testar N-1 → N em endpoint HTTPS de teste e recuperação com snapshot/backup compatível.
-  Draft privado não é endpoint público; não presumir downgrade automático. Ver [publicação](PUBLICACAO.md).
+  Draft privado não é endpoint público; não presumir downgrade automático.
 - Pacote de conformidade GPL do FFmpeg anexado à distribuição conforme
   `THIRD_PARTY_NOTICES.md`.
 - Matriz real aprovada: Windows 10 e 11; NVIDIA, Intel, AMD e software; OBS autenticado e sem
@@ -98,9 +98,7 @@ Critérios de aprovação de uma distribuição oficial, para mantenedores. Uma 
   deve permitir apenas eventos futuros, sem recuperar o onboarding anterior. Preservar escolhas
   explícitas `enabled` e `disabled` em upgrades de aviso; fechar o aviso ou aceitar termos não
   pode ativar uso. Depois ligar uma finalidade de cada vez,
-  inspecionar payloads e validar uma stack React simbolicada conforme o
-  [`RUNBOOK-POSTHOG.md`](./RUNBOOK-POSTHOG.md). Ver o teste de balanceamento em
-  [`LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md`](./LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md).
+  inspecionar payloads e validar uma stack React simbolicada.
 
 Registre data, versão, máquina, GPU/driver, cenário e resultado em cada execução. Falha em um
 item bloqueia publicação; não deve ser convertida em “risco aceito” sem uma decisão explícita.

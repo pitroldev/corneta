@@ -167,11 +167,7 @@ components:
 
 ## Política dos arquivos de design
 
-Este documento orienta o trabalho visual do site; os estilos/componentes em `app/` implementam a interface. [PRODUCT.md](PRODUCT.md) delimita o que o produto pode afirmar. O [snapshot `.impeccable/design.json`](.impeccable/design.json), schema 2 e data registrada em `generatedAt`, é preservado como material de intercâmbio/referência da ferramenta de design, não como configuração do Next.js nem fonte automática de CSS.
-
-O snapshot guarda a composição documentada na sua data, incluindo exemplos HTML/CSS. Ele não certifica que esses exemplos estejam idênticos à interface atual. Para implementar mudanças, confira primeiro este documento e o código; não copie o export antigo sobre os componentes. A ferramenta de design não é requisito para contribuir, testar ou compilar, e não existe comando no build que regenere esse arquivo.
-
-Ao atualizar o snapshot pela ferramenta ou manualmente, revise schema, exemplos e narrativa contra este documento, mantenha a data verdadeira da atualização e envie o diff no mesmo PR da decisão visual correspondente. Não atualize a data apenas por formatar JSON. Somente `web/.impeccable/design.json` é fonte compartilhada: os outros arquivos de estado da ferramenta são ignorados. O inventário de fontes preserva esse arquivo tanto em Git quanto em snapshots sem `.git`, sem seguir links simbólicos/junctions.
+Este documento orienta o trabalho visual do site; os estilos/componentes em `app/` implementam a interface. [PRODUCT.md](PRODUCT.md) delimita o que o produto pode afirmar. Para implementar mudanças, confira primeiro este documento e o código. A ferramenta de design não é requisito para contribuir, testar ou compilar, e o estado dela não é versionado.
 
 ## Overview
 

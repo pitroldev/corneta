@@ -23,15 +23,14 @@ Comece pelo [README do projeto](../README.md) para conhecer o app, os requisitos
 
 ## Operar e distribuir
 
-- [Publicação](PUBLICACAO.md): procedimentos, checklist e evidências necessárias para distribuir.
 - [Gates de release](GATES-DE-RELEASE.md): critérios de aprovação; executar um subconjunto não aprova a release.
 - [Assinaturas](ASSINATURA.md) e [atualização automática](ATUALIZACAO-AUTOMATICA.md): integridade do instalador, updater e recuperação.
 - [Conformidade do FFmpeg](CONFORMIDADE-FFMPEG.md) e [avisos de terceiros](../THIRD_PARTY_NOTICES.md): licenças e fontes correspondentes da distribuição.
 - [Materiais públicos](MATERIAIS-PUBLICOS.md): procedência, inventário e revisão de assets.
-- [Política de telemetria](LGPD-LEGITIMO-INTERESSE-TELEMETRIA.md) e [operação do PostHog](RUNBOOK-POSTHOG.md): finalidades, configuração e controles. A documentação técnica não substitui revisão jurídica.
+- [Política de privacidade](https://www.corneta.live/legal/privacy): o que a telemetria coleta e como desligar; variáveis e kill switches ficam na [configuração](CONFIGURACAO.md).
 
 ## Manter a documentação
 
-Atualize o guia responsável pelo contrato alterado. Mudanças entregues aparecem nas [notas de cada release](https://github.com/pitroldev/corneta/releases); preparação de distribuição pertence ao guia de publicação. Planos, prioridades futuras, registros de execução e relatórios de revisão não devem virar páginas permanentes de documentação.
+Atualize o guia responsável pelo contrato alterado. Mudanças entregues aparecem nas [notas de cada release](https://github.com/pitroldev/corneta/releases); preparação e operação da distribuição oficial ficam com os mantenedores, fora do repositório. Planos, prioridades futuras, registros de execução e relatórios de revisão não devem virar páginas permanentes de documentação.
 
 `pnpm docs:check` verifica destinos locais em arquivos Markdown rastreados e novos, incluindo imagens e referências, ignorando exemplos em código e comentários. O comando não consulta URLs externas nem valida âncoras; confira esses casos ao revisar links.

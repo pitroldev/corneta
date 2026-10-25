@@ -40,7 +40,7 @@ O endpoint oficial está em `plugins.updater.endpoints`. Ele aponta ao `latest.j
 
 O gerador versionado produz a entrada `platforms.windows-x86_64`, com URL HTTPS do instalador e o **conteúdo** da assinatura `.exe.sig`, não seu caminho. Versão, tag e binário precisam corresponder. Não mantenha um manifesto editado manualmente em paralelo com o gerador.
 
-Siga [PUBLICACAO.md](PUBLICACAO.md) para configurar Actions, criar a versão e ensaiar o draft. O push de uma tag `vX.Y.Z` dispara o workflow, que entrega instalador, assinatura, manifesto, checksums e pacote de terceiros. Depois dos [gates](GATES-DE-RELEASE.md) e da aprovação do Environment `production-release`, o job de promoção verifica os mesmos arquivos e publica automaticamente. Versões antigas não substituem Latest; não é necessário editar o endpoint a cada versão. Enquanto o repositório estiver privado ou a release for draft, o canal atual não atende instalações sem login.
+O push de uma tag `vX.Y.Z` dispara o workflow, que entrega instalador, assinatura, manifesto, checksums e pacote de terceiros. Depois dos [gates](GATES-DE-RELEASE.md) e da aprovação do Environment `production-release`, o job de promoção verifica os mesmos arquivos e publica automaticamente. Versões antigas não substituem Latest; não é necessário editar o endpoint a cada versão. Enquanto o repositório estiver privado ou a release for draft, o canal atual não atende instalações sem login.
 
 ## Diagnóstico e recuperação
 

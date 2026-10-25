@@ -2,7 +2,7 @@
 
 Procedimentos para revisar o código publicável e os controles do repositório.
 Este guia não comprova o estado atual do GitHub, não certifica o aplicativo e não
-aprova uma distribuição. Os critérios de publicação estão em [PUBLICACAO](PUBLICACAO.md).
+aprova uma distribuição. Os critérios de publicação estão nos [gates de release](GATES-DE-RELEASE.md).
 
 ## Varredura do histórico e dos arquivos publicáveis
 

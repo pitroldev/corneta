@@ -155,7 +155,6 @@ describe("executable editorial instructions", () => {
   it.each([
     ["ci", 1],
     ["release", 1],
-    ["editorial-maintenance", 1],
   ])(
     "passes real arguments from the %s workflow to its parser",
     (name, expected) => {

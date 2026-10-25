@@ -22,7 +22,7 @@ describe("benchmark source provenance", () => {
     for (const path of [
       ".env",
       "src/.env/private.json",
-      "compliance/performance-baseline.json",
+      "compliance/public-assets-review.json",
       ".artifacts/report.json",
       "web/.next/cache.json",
     ])

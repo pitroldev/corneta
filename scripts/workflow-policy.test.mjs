@@ -130,7 +130,7 @@ describe("workflow safety contracts", () => {
     );
   });
 
-  it.each(["ci", "release", "editorial-maintenance"])(
+  it.each(["ci", "release"])(
     "pins every external action implementation in %s",
     (name) => {
       const actions = workflowSteps(workflow(name)).filter((step) => step.uses);
@@ -220,25 +220,4 @@ describe("workflow safety contracts", () => {
       frontend.indexOf("uses: actions/checkout@"),
     );
   });
-  it("does not create recurring maintainer issues in forks without an opt-in", () => {
-    expect(workflow("editorial-maintenance")).toContain(
-      "vars.ENABLE_EDITORIAL_AUTOMATION == 'true'",
-    );
-  });
-  it.each(["open", "closed"])(
-    "stops editorial issue creation when the %s query fails or returns invalid JSON",
-    (state) => {
-      const editorial = workflow("editorial-maintenance");
-      const query = editorial.split(`$${state}IssuesJson = gh issue list`)[1];
-      expect(query).toBeTruthy();
-      expect(query).toContain(
-        `if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($${state}IssuesJson)) {`,
-      );
-      const parse = `$${state}Issues = @($${state}IssuesJson | ConvertFrom-Json -ErrorAction Stop)`;
-      expect(query.indexOf("throw '")).toBeLessThan(query.indexOf(parse));
-      expect(query.indexOf(parse)).toBeLessThan(
-        query.indexOf("gh issue create"),
-      );
-    },
-  );
 });

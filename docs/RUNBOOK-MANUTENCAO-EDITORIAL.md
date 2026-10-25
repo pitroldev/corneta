@@ -37,11 +37,7 @@ pnpm content:maintenance:check
 O último comando falha quando existe artigo vencido. O build automático de produção na Vercel só
 imprime essa fila: um artigo vencido não bloqueia o deploy, para não travar correções da API ou de
 segurança. Builds de release explícitos (`build:release` ou `CORNETA_RELEASE_CHECK=1`) continuam
-recusando artigo vencido. O controle do prazo fica com a issue editorial. O workflow
-`Editorial maintenance` está agendado para segunda-feira, publica o resumo na execução e
-mantém uma issue com a label `editorial-maintenance`. Um novo ciclo só começa
-28 dias depois do encerramento do anterior. Em forks, essa automação externa fica
-desligada até configurar `ENABLE_EDITORIAL_AUTOMATION=true`; os checks locais continuam disponíveis.
+recusando artigo vencido, então rode a fila com regularidade e antes de cada release.
 
 ## Como revisar um artigo
 
@@ -97,30 +93,3 @@ fixado no lockfile; apenas alinhar tabelas ou quebrar linhas não exige `updated
 Se uma mudança relevante não acionar o gate, adicione ao artigo o `repoPath`
 mais próximo do comportamento documentado. Não use um diretório amplo como
 atalho: a fonte deve permitir localizar a regra ou tela concreta.
-
-## Ciclo de Search Console e Bing
-
-A issue recorrente é o registro do ciclo. Use sempre os 28 dias completos mais
-recentes e, quando houver volume, compare com os 28 dias anteriores.
-
-1. No Google Search Console, registre cliques, impressões, CTR e posição por
-   consulta e página.
-2. Separe consultas com a marca Corneta das consultas sem marca.
-3. Procure páginas perdendo cliques, CTR baixo com boa posição, consultas entre
-   as posições 5 e 20 e duas páginas disputando a mesma intenção.
-4. No Bing Webmaster Tools, confira sitemap, cobertura e alertas de rastreamento.
-5. Escolha pelo menos duas publicações ou revisões substanciais para o ciclo e
-   registre a justificativa na issue.
-6. Depois das mudanças, anote o que foi publicado e feche a issue. O workflow
-   abrirá o próximo ciclo após 28 dias.
-
-Não use uma variação pequena sem demanda como motivo para criar uma página.
-Prefira melhorar o artigo que já resolve aquela intenção e manter uma resposta
-mais completa.
-
-## Preparação externa
-
-Depois do deploy, ainda é necessário validar a propriedade de
-`https://www.corneta.live` no Google Search Console e no Bing Webmaster Tools,
-enviar `/sitemap.xml` e confirmar que `/robots.txt` aponta para o sitemap. Essa
-etapa depende das contas e do DNS de produção e não é executada pelo CI.
