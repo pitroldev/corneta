@@ -6,7 +6,7 @@ Treat people with respect. Discuss code and decisions with verifiable arguments;
 
 ## Reporting and handling an incident
 
-The person currently responsible for the project's spaces is the maintainer [@pitroldev](https://github.com/pitroldev). The private contact provided by the project is **corneta@pitrol.dev**. Use the subject “Conduct — Corneta”, describe the facts, relevant links and the outcome you want; send only the data that is needed. Operational confirmation of this mailbox is still pending in the [security record](docs/REPOSITORY-SECURITY.md); we do not assume a delivery test or a response time.
+The person currently responsible for the project's spaces is the maintainer [@pitroldev](https://github.com/pitroldev). The private contact provided by the project is **[contact@corneta.live](mailto:contact@corneta.live)**. Use the subject “Conduct — Corneta”, describe the facts, relevant links and the outcome you want; send only the data that is needed. No response time is guaranteed.
 
 The maintainer should acknowledge receipt when possible, examine the context, hear the people involved when appropriate and communicate a decision. They may give guidance, ask for a correction, remove offensive content, issue a warning or restrict participation temporarily or permanently, depending on severity and repetition. Reports are handled with discretion, but absolute confidentiality is not promised when there is a risk or an applicable obligation.
 

@@ -4,9 +4,9 @@
 
 **Do not open a public issue with exploit details, tokens, stream keys, personal data or configuration files.**
 
-The contact the project already uses is **[corneta@pitrol.dev](mailto:corneta@pitrol.dev)**. Use the subject `Corneta — private security report`. Send a sanitized summary first and agree on a suitable channel before transferring sensitive material. Do not send your stream key, password, OAuth token or `.env`, not even by email.
+Use **Report a vulnerability** in the Security tab of the [official repository](https://github.com/pitroldev/corneta/security/advisories/new). It opens a private report that only the maintainer sees; do not confuse it with creating an issue.
 
-When the **Report a vulnerability** option is available in the Security tab of the [official repository](https://github.com/pitroldev/corneta/security), it also lets you start a private report. Do not confuse this option with creating an issue. Its availability depends on the GitHub configuration; if it does not appear, use the contact above.
+You can also write to **[contact@corneta.live](mailto:contact@corneta.live)** with the subject `Corneta — private security report`. Send a sanitized summary first and agree on a suitable channel before transferring sensitive material. Do not send your stream key, password, OAuth token or `.env`, not even by email.
 
 ## What to include
 

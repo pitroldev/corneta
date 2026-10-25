@@ -4,7 +4,7 @@ export const LEGAL_CNPJ = "44.638.580/0001-12";
 /** Copyright ownership is distinct from the legal operator. */
 export const LEGAL_AUTHOR = "Petro Cardoso";
 
-export const LEGAL_CONTACT = "corneta@pitrol.dev";
+export const LEGAL_CONTACT = "contact@corneta.live";
 
 export const LEGAL_VENUE = "Rio de Janeiro, RJ";
 
