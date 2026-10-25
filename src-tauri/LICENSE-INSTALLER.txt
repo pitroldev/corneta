@@ -1,4 +1,28 @@
-﻿CORNETA — LICENÇA E CONDIÇÕES DE USO
+﻿CORNETA — LICENSE AND TERMS OF USE
+
+Corneta is free software, released under the MIT license. You may use, copy,
+modify and redistribute it freely. The full license text is at the end of this
+document.
+
+That license covers the CODE. Using the app, the website and the official
+sign-in service is governed by two documents published online:
+
+    Terms of Use ............... https://www.corneta.live/en/legal/terms-of-use
+    Privacy Policy ............. https://www.corneta.live/en/legal/privacy
+
+Both are worth reading. Among other things, they explain that Corneta runs
+entirely on your computer, that your video never goes through a server of ours,
+and that you remain responsible for following the rules of each platform you
+stream to. The Portuguese versions are the binding ones.
+
+Both are always one click away inside the app, on the "About" screen.
+
+App and sign-in service provided by PCL DE SOUZA TECNOLOGIA,
+CNPJ 44.638.580/0001-12. Contact: corneta@pitrol.dev
+
+-------------------------------------------------------------------------------
+
+CORNETA — LICENÇA E CONDIÇÕES DE USO
 
 A Corneta é software livre, distribuído sob a licença MIT. Você pode usar,
 copiar, modificar e redistribuir à vontade. O texto completo da licença está no
@@ -20,30 +44,6 @@ Os dois estão sempre a um clique dentro do aplicativo, na tela "Sobre".
 
 Aplicativo e serviço de login oferecidos por PCL DE SOUZA TECNOLOGIA,
 CNPJ 44.638.580/0001-12. Contato: corneta@pitrol.dev
-
--------------------------------------------------------------------------------
-
-CORNETA — LICENSE AND TERMS OF USE
-
-Corneta is free software, released under the MIT license. You may use, copy,
-modify and redistribute it freely. The full license text is at the end of this
-document.
-
-That license covers the CODE. Using the app, the website and the official
-sign-in service is governed by two documents published online:
-
-    Terms of Use ............... https://www.corneta.live/en/legal/terms-of-use
-    Privacy Policy ............. https://www.corneta.live/en/legal/privacy
-
-Both are worth reading. Among other things, they explain that Corneta runs
-entirely on your computer, that your video never goes through a server of ours,
-and that you remain responsible for following the rules of each platform you
-stream to. The Portuguese versions are the binding ones.
-
-Both are always one click away inside the app, on the "About" screen.
-
-App and sign-in service provided by PCL DE SOUZA TECNOLOGIA,
-CNPJ 44.638.580/0001-12. Contact: corneta@pitrol.dev
 
 -------------------------------------------------------------------------------
 

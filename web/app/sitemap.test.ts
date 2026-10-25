@@ -77,7 +77,9 @@ describe("editorial sitemap", () => {
     expect(paths).not.toContain("/help/obs/automatic-obs-setup");
     expect(paths).not.toContain("/en/help/obs/automatic-obs-setup");
     expect(paths).not.toContain("/guides/obs/why-stream-lags");
-    expect(paths).toContain("/");
+    // The root only negotiates the language; each home has its own address.
+    expect(paths).not.toContain("/");
+    expect(paths).toContain("/pt-BR");
     expect(paths).toContain("/en");
   }, 30_000);
 });

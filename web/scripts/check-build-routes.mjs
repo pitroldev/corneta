@@ -4,9 +4,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Portuguese URLs are public without a prefix; the proxy rewrites them to the internal locale route.
+// Portuguese collection URLs are public without a prefix and rewritten to the internal locale route;
+// the Portuguese home and English pages are public under their own prefix.
 export function internalRoute(pathname) {
   if (pathname === "/") return "/pt-BR";
+  if (pathname === "/pt-BR" || pathname.startsWith("/pt-BR/")) return pathname;
   if (pathname === "/en" || pathname.startsWith("/en/")) return pathname;
   return `/pt-BR${pathname}`;
 }

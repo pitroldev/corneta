@@ -34,14 +34,16 @@ describe("site proxy", () => {
     expect(config.matcher).toEqual(["/"]);
   });
 
-  it("rewrites the root to Portuguese or redirects to the chosen locale, varying by preference", () => {
+  it("redirects the root to Portuguese only when the visitor signals it, varying by preference", () => {
     const pt = proxy(request("/", "pt-BR,pt;q=0.9"));
-    expect(pt.headers.get("x-middleware-rewrite")).toBe(
-      "https://www.corneta.live/pt-BR",
-    );
+    expect(pt.status).toBe(307);
+    expect(pt.headers.get("location")).toBe("https://www.corneta.live/pt-BR");
     expect(pt.headers.get("vary")).toBe("Accept-Language, Cookie");
-    const en = proxy(request("/", "en-US,en;q=0.9"));
-    expect(en.status).toBe(307);
-    expect(en.headers.get("vary")).toBe("Accept-Language, Cookie");
+    for (const header of ["en-US,en;q=0.9", "de-DE", "*", ""]) {
+      const en = proxy(request("/", header));
+      expect(en.status).toBe(307);
+      expect(en.headers.get("location")).toBe("https://www.corneta.live/en");
+      expect(en.headers.get("vary")).toBe("Accept-Language, Cookie");
+    }
   });
 });

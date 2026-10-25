@@ -41,7 +41,7 @@ export function completeLanguageAlternates(
     // Empty alternates clear inherited home links when no published translation pair exists.
     languages:
       portuguese && english
-        ? { "pt-BR": portuguese, en: english, "x-default": portuguese }
+        ? { "pt-BR": portuguese, en: english, "x-default": english }
         : {},
   };
 }

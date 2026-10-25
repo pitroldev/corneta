@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  DEFAULT_LOCALE,
   isLocale,
   LOCALE_COOKIE,
+  localePath,
   negotiateLocale,
 } from "./lib/i18n";
 
@@ -21,14 +21,9 @@ export function proxy(req: NextRequest) {
       ? saved
       : negotiateLocale(req.headers.get("accept-language"));
 
-  if (chosen === DEFAULT_LOCALE) {
-    const res = NextResponse.rewrite(new URL(`/${DEFAULT_LOCALE}`, req.url));
-    res.headers.set("Vary", "Accept-Language, Cookie");
-    return res;
-  }
-
+  // The root is the language-neutral x-default: English unless the visitor signals Portuguese.
   const url = req.nextUrl.clone();
-  url.pathname = `/${chosen}`;
+  url.pathname = localePath(chosen);
   const res = NextResponse.redirect(url, 307);
   res.headers.set("Vary", "Accept-Language, Cookie");
   return res;

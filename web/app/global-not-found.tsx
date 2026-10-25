@@ -17,13 +17,13 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
-  title: "Página não encontrada · Page not found | Corneta",
+  title: "Page not found · Página não encontrada | Corneta",
   robots: { index: false, follow: true },
 };
 
 export default function GlobalNotFound() {
   return (
-    <html lang="pt-BR" className={fontVars}>
+    <html lang="en" className={fontVars}>
       <body>
         <main className="relative grid min-h-screen place-items-center overflow-hidden py-[60px]">
           <SoundWaves className={heroWaves} />
@@ -33,28 +33,28 @@ export default function GlobalNotFound() {
               Erro 404
             </Sticker>
             <h1 className="text-[clamp(2.6rem,8vw,4.4rem)] leading-[0.95] tracking-[-0.035em] [&>span]:block">
-              <span>Essa página</span>
+              <span>This page</span>
               <span>
-                <Slab>saiu do ar.</Slab>
+                <Slab>went off the air.</Slab>
               </span>
             </h1>
             <p className="my-[26px] mb-8 max-w-[46ch] text-[1.02rem] leading-[1.62] font-medium text-muted">
-              A transmissão principal continua firme. Volte para o início e
-              tente outro caminho.
-              <span lang="en" className="mt-3 block">
-                This page went off the air, but the main stream is still on.
-                Head back to the start and try another path.
+              The main stream is still on. Head back to the start and try
+              another path.
+              <span lang="pt-BR" className="mt-3 block">
+                Essa página saiu do ar, mas a transmissão principal continua
+                firme. Volte para o início e tente outro caminho.
               </span>
             </p>
             <Link className={downloadButton} href="/">
-              Voltar ao início
+              Back to home
             </Link>
             <Link
-              lang="en"
-              href="/en"
+              lang="pt-BR"
+              href="/pt-BR"
               className="mt-5 font-bold text-cream underline decoration-brass decoration-[3px] underline-offset-4"
             >
-              Back to home in English
+              Voltar ao início em português
             </Link>
           </Shell>
         </main>

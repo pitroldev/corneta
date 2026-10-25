@@ -89,9 +89,9 @@ ${LEGAL_OPERATOR} — ${t("chrome.llms.contact.label")} ${LEGAL_CONTACT}
 `;
 }
 
-// The site is bilingual, so the file carries the Portuguese and the English version in full.
+// The site is bilingual, so the file carries both versions in full, English first.
 async function body() {
-  return `${await section("pt-BR")}\n---\n\n${await section("en")}`;
+  return `${await section("en")}\n---\n\n${await section("pt-BR")}`;
 }
 
 export async function GET() {

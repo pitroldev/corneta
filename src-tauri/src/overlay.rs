@@ -51,7 +51,7 @@ struct Ctx {
     shutdown: watch::Receiver<bool>,
 }
 
-const PAGE_LANG: &str = "<html lang=\"pt-BR\">";
+const PAGE_LANG: &str = "<html lang=\"en\">";
 
 /// OBS shows these pages to viewers, so they follow the app's language; a Browser Source reload picks up a change.
 fn with_lang(page: &str, locale: crate::i18n::Locale) -> String {
@@ -295,8 +295,8 @@ mod tests {
     fn overlay_pages_take_the_app_language() {
         for page in [OVERLAY_HTML, CHAT_OVERLAY_HTML] {
             assert_eq!(page.matches(PAGE_LANG).count(), 1);
-            assert!(with_lang(page, Locale::En).contains("<html lang=\"en\">"));
-            assert!(with_lang(page, Locale::PtBr).contains(PAGE_LANG));
+            assert!(with_lang(page, Locale::PtBr).contains("<html lang=\"pt-BR\">"));
+            assert!(with_lang(page, Locale::En).contains(PAGE_LANG));
         }
     }
 

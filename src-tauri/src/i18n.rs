@@ -9,10 +9,8 @@ pub enum Locale {
     En,
 }
 
-/// Match the frontend DEFAULT_LOCALE when Windows reports no display language at all.
-pub const DEFAULT_LOCALE: Locale = Locale::PtBr;
-/// Match the frontend FALLBACK_LOCALE: display languages outside the catalog get English.
-pub const FALLBACK_LOCALE: Locale = Locale::En;
+/// Match the frontend DEFAULT_LOCALE: English unless Windows names Portuguese.
+pub const DEFAULT_LOCALE: Locale = Locale::En;
 
 impl Locale {
     #[cfg(test)]
@@ -142,11 +140,8 @@ pub fn system_locale() -> Locale {
                 return hit;
             }
         }
-        if count == 0 {
-            return DEFAULT_LOCALE;
-        }
     }
-    FALLBACK_LOCALE
+    DEFAULT_LOCALE
 }
 
 /// Non-Windows test builds use the shared default.

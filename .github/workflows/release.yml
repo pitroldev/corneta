@@ -328,7 +328,7 @@ jobs:
               --verify-tag `
               --draft `
               --title "Corneta $env:RELEASE_TAG" `
-              --notes "Baixe o .exe e confira SHA256SUMS.txt. Este lançamento pode exibir um aviso do SmartScreen: confirme a origem antes de executar. corneta-third-party.zip contém avisos, fontes correspondentes e inventário de licenças. Quem já usa a Corneta recebe o aviso de atualização no app.`n`nDownload the .exe and check SHA256SUMS.txt. This release may show a SmartScreen warning: confirm where it came from before running it. corneta-third-party.zip holds the notices, corresponding sources and license inventory. If you already use Corneta, the app tells you about the update." `
+              --notes "Download the .exe and check SHA256SUMS.txt. This release may show a SmartScreen warning: confirm where it came from before running it. corneta-third-party.zip holds the notices, corresponding sources and license inventory. If you already use Corneta, the app tells you about the update.`n`nBaixe o .exe e confira SHA256SUMS.txt. Este lançamento pode exibir um aviso do SmartScreen: confirme a origem antes de executar. corneta-third-party.zip contém avisos, fontes correspondentes e inventário de licenças. Quem já usa a Corneta recebe o aviso de atualização no app." `
               --generate-notes `
               @notesRange
             if ($LASTEXITCODE -ne 0) {

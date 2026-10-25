@@ -1,5 +1,5 @@
 // Keep legal chrome independent of the landing-page dictionary bundle.
-import { DEFAULT_LOCALE, type Locale } from "./i18n";
+import type { Locale } from "./i18n";
 import { LEGAL_UPDATED_LABEL_EN, LEGAL_UPDATED_LABEL_PT } from "./legal";
 
 export interface LegalUi {
@@ -73,5 +73,5 @@ const EN: LegalUi = {
 };
 
 export function legalUi(locale: Locale): LegalUi {
-  return locale === DEFAULT_LOCALE ? PT : EN;
+  return locale === "pt-BR" ? PT : EN;
 }

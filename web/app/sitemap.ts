@@ -29,7 +29,7 @@ function editorialLanguages(paths: Partial<Record<EditorialLocale, string>>) {
     languages: {
       "pt-BR": abs(paths["pt-BR"]),
       en: abs(paths.en),
-      "x-default": abs(paths["pt-BR"]),
+      "x-default": abs(paths.en),
     },
   };
 }
@@ -58,7 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const languages = {
     "pt-BR": abs(localePath("pt-BR")),
     en: abs(localePath("en")),
-    "x-default": abs(localePath("pt-BR")),
+    "x-default": abs("/"),
   };
 
   const groupedCollections = new Map<
@@ -163,7 +163,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         languages: {
           "pt-BR": abs(legalHref("pt-BR", doc)),
           en: abs(legalHref("en", doc)),
-          "x-default": abs(legalHref("pt-BR", doc)),
+          "x-default": abs(legalHref("en", doc)),
         },
       };
       return LOCALES.map((locale) => ({

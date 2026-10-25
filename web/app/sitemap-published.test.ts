@@ -74,7 +74,7 @@ describe("published editorial sitemap", () => {
     ).toMatchObject({
       "pt-BR": expect.stringMatching(/\/guides\/quality\/choose-bitrate$/),
       en: expect.stringMatching(/\/en\/guides\/quality\/choose-bitrate$/),
-      "x-default": expect.stringMatching(/\/guides\/quality\/choose-bitrate$/),
+      "x-default": expect.stringMatching(/\/en\/guides\/quality\/choose-bitrate$/),
     });
 
     expect(byPath.get("/guides/quality/choose-bitrate")?.lastModified).toEqual(

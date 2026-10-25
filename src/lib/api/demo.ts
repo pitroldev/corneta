@@ -1030,7 +1030,9 @@ export function mockApi(): CornetaApi {
     async chatSend(text) {
       // The native app localizes its own author name and marks the message as its own.
       const you =
-        resolveLocale(loadConfig().settings.language) === "en" ? "you" : "você";
+        resolveLocale(loadConfig().settings.language) === "pt-BR"
+          ? "você"
+          : "you";
       chatMsgListeners.forEach((l) =>
         l({
           id: `me-${Date.now()}`,

@@ -16,10 +16,11 @@ describe("detectSystemLocale", () => {
     expect(detectSystemLocale(["es-AR", "en-US", "pt-BR"])).toBe("en");
   });
 
-  it("uses English for unsupported languages and the default without any", () => {
+  it("uses Portuguese only when the system names it, English otherwise", () => {
     expect(detectSystemLocale(["ja", "ko"])).toBe("en");
     expect(detectSystemLocale(["es-ES", "de"])).toBe("en");
-    expect(detectSystemLocale([])).toBe("pt-BR");
+    expect(detectSystemLocale(["es-ES", "pt-PT"])).toBe("pt-BR");
+    expect(detectSystemLocale([])).toBe("en");
   });
 });
 
@@ -39,9 +40,9 @@ describe("detectSystemLocale without arguments", () => {
     expect(detectSystemLocale()).toBe("en");
   });
 
-  it("falls back without navigator", () => {
+  it("uses English without navigator", () => {
     vi.stubGlobal("navigator", undefined);
-    expect(detectSystemLocale()).toBe("pt-BR");
+    expect(detectSystemLocale()).toBe("en");
   });
 });
 

@@ -37,7 +37,6 @@ describe("legacy editorial redirects", () => {
     const redirects = await nextConfig.redirects?.();
     expect(redirects).toEqual(
       expect.arrayContaining([
-        { source: "/pt-BR", destination: "/", permanent: true },
         {
           source: "/pt-BR/:collection(legal|help|guides|search)/:path*",
           destination: "/:collection/:path*",

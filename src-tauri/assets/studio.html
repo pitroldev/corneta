@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -139,7 +139,7 @@
         "use strict";
         // The local server sets <html lang> from the app's language when it serves this page.
         const TEXT =
-          document.documentElement.lang === "en"
+          document.documentElement.lang !== "pt-BR"
             ? {
                 kicker: "Corneta · Table",
                 brb: "BE RIGHT BACK",

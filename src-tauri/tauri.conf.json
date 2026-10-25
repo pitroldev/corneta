@@ -55,7 +55,7 @@
     },
     "windows": {
       "nsis": {
-        "languages": ["PortugueseBR", "English"],
+        "languages": ["English", "PortugueseBR"],
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp"
       }

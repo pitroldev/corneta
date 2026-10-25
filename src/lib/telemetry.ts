@@ -708,7 +708,7 @@ function announceTelemetryChange(): void {
 }
 
 export function setTelemetryLocale(value: string): void {
-  locale = value === "en" ? "en" : "pt-BR";
+  locale = value === "pt-BR" ? "pt-BR" : "en";
 }
 
 export async function setTelemetryConsent(input: {

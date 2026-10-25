@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import { captureSiteException } from "@/lib/client/telemetry";
 
-// This boundary replaces the root layout, so it reads the language from the URL.
+// This boundary replaces the root layout, so it reads the language from the URL:
+// Portuguese pages are the unprefixed collections and /pt-BR; everything else is English.
 const COPY = {
   "pt-BR": {
     title: "Não foi possível abrir esta página.",
@@ -29,9 +30,9 @@ export default function GlobalError({
   }, [error]);
   const locale =
     typeof window !== "undefined" &&
-    /^\/en(\/|$)/.test(window.location.pathname)
-      ? "en"
-      : "pt-BR";
+    /^\/(pt-BR|legal|help|guides|search)(\/|$)/.test(window.location.pathname)
+      ? "pt-BR"
+      : "en";
   const copy = COPY[locale];
 
   return (

@@ -6,9 +6,9 @@ action. For product limits, see [the public reference](../web/PRODUCT.md); for
 tokens and components, see [the app design](../DESIGN.md) and [the site
 design](../web/DESIGN.md).
 
-The guide applies to both dictionaries. The examples below are pt-BR, the
-default locale, because they show the Brazilian register; the English copy
-follows the same principles in natural English.
+The guide applies to both dictionaries. English is the default locale; the
+examples below are pt-BR because they show the Brazilian register, and the
+English copy follows the same principles in natural English.
 
 ## 1. Who we write for
 

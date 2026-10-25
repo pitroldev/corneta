@@ -1,10 +1,8 @@
 export const LOCALES = ["pt-BR", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 
-// Portuguese uses the established unprefixed canonical URL.
-export const DEFAULT_LOCALE: Locale = "pt-BR";
-/** Visitors whose languages are all outside the catalog get English; no preference keeps the default. */
-export const FALLBACK_LOCALE: Locale = "en";
+/** Visitors get English unless they signal Portuguese. */
+export const DEFAULT_LOCALE: Locale = "en";
 
 // An explicit cookie preference must override automatic language negotiation.
 export const LOCALE_COOKIE = "corneta.locale";
@@ -12,9 +10,12 @@ export const LOCALE_COOKIE = "corneta.locale";
 export const isLocale = (v: string): v is Locale =>
   (LOCALES as readonly string[]).includes(v);
 
+// Portuguese pages keep their established unprefixed URLs; the root negotiates the
+// language, so the Portuguese home has its own address.
 export function localePath(locale: Locale, path = "/"): string {
   const clean = path === "/" ? "" : path.replace(/\/+$/, "");
-  return locale === DEFAULT_LOCALE ? clean || "/" : `/${locale}${clean}`;
+  if (locale === "pt-BR") return clean || "/pt-BR";
+  return `/${locale}${clean}`;
 }
 
 export const LOCALE_LABEL: Record<Locale, string> = {
@@ -58,12 +59,10 @@ function matchLocale(tag: string): Locale | null {
 }
 
 export function negotiateLocale(header: string | null | undefined): Locale {
-  if (!header) return DEFAULT_LOCALE;
-  const tags = parseAcceptLanguage(header);
-  for (const { tag } of tags) {
+  for (const { tag } of parseAcceptLanguage(header ?? "")) {
     if (tag === "*") return DEFAULT_LOCALE;
     const hit = matchLocale(tag);
     if (hit) return hit;
   }
-  return tags.length ? FALLBACK_LOCALE : DEFAULT_LOCALE;
+  return DEFAULT_LOCALE;
 }

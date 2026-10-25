@@ -52,7 +52,7 @@ function alternatesFor(locale: Locale) {
     languages: {
       "pt-BR": localePath("pt-BR"),
       en: localePath("en"),
-      "x-default": localePath("pt-BR"),
+      "x-default": "/",
     },
   };
 }

@@ -52,7 +52,6 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       // The internal Portuguese prefix must redirect to the established public URL.
-      { source: "/pt-BR", destination: "/", permanent: true },
       {
         source: `/pt-BR/:collection(${PT_COLLECTIONS})/:path*`,
         destination: "/:collection/:path*",

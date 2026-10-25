@@ -66,7 +66,7 @@ describe("editorial metadata boundary", () => {
         languages: {
           "pt-BR": "/guides/quality/choose-bitrate",
           en: "/en/guides/quality/choose-bitrate",
-          "x-default": "/guides/quality/choose-bitrate",
+          "x-default": "/en/guides/quality/choose-bitrate",
         },
       },
       robots: { index: true },
