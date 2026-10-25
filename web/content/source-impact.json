@@ -22,8 +22,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
-      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
+      "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
+      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
@@ -34,20 +34,26 @@
     {
       "article": "en/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "cd42d4dced00aa822d21fba008a8b7d3d734b293",
-      "reason": "O factory.ts só ganhou o padrão do alerta de tela preta, desligado; os outros padrões não mudaram."
+      "sourceBlob": "9fe1333c4007cc52aec42474b42f76923ace5d1b",
+      "reason": "Só ganhou os padrões do modo deck, que vem desligado; nada do que o artigo descreve mudou."
     },
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
-      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
+      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+    },
+    {
+      "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
+      "source": "src-tauri/src/chat.rs",
+      "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
+      "reason": "Só passou a repassar mensagens e alertas para o celular pareado no modo deck; a configuração do chat descrita no artigo não mudou."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
-      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
+      "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
+      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
@@ -64,20 +70,26 @@
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
-      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
+      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
-      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
+      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+    },
+    {
+      "article": "en/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src-tauri/src/obs.rs",
+      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
+      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "d67536326e5f7a8517a6a8439b0b1c0589c2b78f",
-      "reason": "O pt.ts só ganhou os textos do marcador na Twitch e do alerta de tela preta; os rótulos que o artigo cita não mudaram."
+      "sourceBlob": "e4873b79063468f5605c5a60397b12a1d7a1efd6",
+      "reason": "Só ganhou os textos do modo deck e do passo opcional do celular na configuração inicial; os textos que o artigo cita não mudaram."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -88,8 +100,14 @@
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "624e880c7105b9ad4965952eab3f65ac9baf0900",
-      "reason": "A aba Segurança ao vivo só ganhou o Alerta de tela preta, abaixo da Proteção contra quedas; o caminho e o ajuste do JÁ VOLTO não mudaram."
+      "sourceBlob": "34e49f5f20332d5a7721fe87dba4fcf028c1f7dd",
+      "reason": "Só ganhou o cartão do modo deck em Geral; a configuração do JÁ VOLTO descrita no artigo não mudou."
+    },
+    {
+      "article": "en/help/troubleshooting/obs-not-found.mdx",
+      "source": "src-tauri/src/obs.rs",
+      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
+      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
@@ -196,8 +214,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
-      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
+      "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
+      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -208,14 +226,14 @@
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "cd42d4dced00aa822d21fba008a8b7d3d734b293",
-      "reason": "O factory.ts só ganhou o padrão do alerta de tela preta, desligado; os outros padrões não mudaram."
+      "sourceBlob": "9fe1333c4007cc52aec42474b42f76923ace5d1b",
+      "reason": "Só ganhou os padrões do modo deck, que vem desligado; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
-      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
+      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -280,8 +298,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "9d09054e728e5f794b4306d975088be66939ee35",
-      "reason": "O chat ganhou GIFs, respostas, destaques, fixados, enquetes e modos; o que o artigo descreve continua correto, mas vale revisar para incluir os recursos novos."
+      "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
+      "reason": "Só passou a repassar mensagens e alertas para o celular pareado no modo deck; a configuração do chat descrita no artigo não mudou."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -322,8 +340,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6edae8ef0f1a6be3fad85c76726119e8621f11a2",
-      "reason": "O config.rs só ganhou a opção do alerta de tela preta, desligada por padrão; nada do que o artigo afirma mudou."
+      "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
+      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -352,20 +370,26 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
-      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
+      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4b087c4fda78b61e347b329c28064e92c0147734",
-      "reason": "O commands.rs só ganhou o marcador no VOD da Twitch dentro do Marcar momento e o alerta opcional de tela preta; nada do que o artigo afirma mudou."
+      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
+      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
       "source": "src/lib/report.ts",
       "sourceBlob": "d8edb6e364d37293745dcde2d14d32a195bc5683",
       "reason": "O replay passou a guardar emotes, selos e marcas do chat e os novos tipos de alerta ganharam rótulo; o que o artigo descreve continua correto."
+    },
+    {
+      "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src-tauri/src/obs.rs",
+      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
+      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -376,8 +400,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "d67536326e5f7a8517a6a8439b0b1c0589c2b78f",
-      "reason": "O pt.ts só ganhou os textos do marcador na Twitch e do alerta de tela preta; os rótulos que o artigo cita não mudaram."
+      "sourceBlob": "e4873b79063468f5605c5a60397b12a1d7a1efd6",
+      "reason": "Só ganhou os textos do modo deck e do passo opcional do celular na configuração inicial; os textos que o artigo cita não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -388,14 +412,14 @@
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "624e880c7105b9ad4965952eab3f65ac9baf0900",
-      "reason": "A aba Segurança ao vivo só ganhou o Alerta de tela preta, abaixo da Proteção contra quedas; o caminho e o ajuste do JÁ VOLTO não mudaram."
+      "sourceBlob": "34e49f5f20332d5a7721fe87dba4fcf028c1f7dd",
+      "reason": "Só ganhou o cartão do modo deck em Geral; a configuração do JÁ VOLTO descrita no artigo não mudou."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "146476ac8fa9a611f9f936f72b17a711431d2ebc",
-      "reason": "Acrescenta a leitura e o ajuste do vídeo pelo obs-websocket; a conexão, a senha e os erros de OBS não encontrado citados não mudaram."
+      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
+      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
